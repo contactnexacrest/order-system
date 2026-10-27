@@ -2980,12 +2980,6 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
   <details class="step-card" id="step-ci-generate"<?= $subCardOpen('11', '11a') ?>>
     <summary><?= $stepStatusIcon($subStepStatus('11', '11a')) ?><h2>Step 11a &middot; Generate Commercial Invoice<?= $isFob ? ' (before shipment)' : ' (against BL)' ?></h2></summary>
-    <?php
-      // Batch 3 #11 — the Commercial Invoice is conventionally dated to match the recorded BL date;
-      // nothing enforces this, so flag it as an advisory (not a hard block — a same-day match is the
-      // norm but not the only valid business reason to differ) right where staff generate the CI.
-      $__ciBlDateMismatch = $shipping && !empty($shipping['bl_date']) && $shipping['bl_date'] !== date('Y-m-d');
-    ?>
     <?php if ($ciBalanceLocked): ?>
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     <?php else: ?>
@@ -2996,12 +2990,11 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php else: ?>
         <p class="muted small">Scanned BL copy is on file (<a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">download</a>) — generate the Commercial Invoice against it.</p>
       <?php endif; ?>
-      <?php if ($__ciBlDateMismatch): ?>
-        <p class="alert alert-warning">&#9888; Recorded BL date is <strong><?= htmlspecialchars($shipping['bl_date']) ?></strong>, not today. The Commercial Invoice is conventionally dated to match the BL — double-check before generating it if that's not intentional here.</p>
-      <?php endif; ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
         <input type="hidden" name="document_type" value="CI">
+        <?php // Owner request (2026-10-27): the CI can be dated today or earlier, e.g. to match the BL. ?>
+        <label class="ci-date-field">Invoice date (printed on the CI) *<input type="date" name="document_date" required value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" min="<?= htmlspecialchars(substr((string) $order['created_at'], 0, 10)) ?>"><small class="muted">Today by default. To match the BL, pick the BL date here — today or any earlier date.</small></label>
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         <?= $stepBadge('11a') ?><button type="submit" class="<?= $__docBtnClass('CI') ?>" data-loading-text="Generating…">Generate Commercial Invoice</button><?= $__docAlreadyNote('CI') ?>
@@ -3408,33 +3401,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php else: ?>
           <p class="muted">Not enough data recorded yet to compute profitability for this order.</p>
         <?php endif; ?>
-      <details class="fin-annexure">
-        <summary class="muted small">Internal-Only Financial Annexure (CAFIN) — staff/CA use, never shown to the client</summary>
-        <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
-        <?php if ($canManageCaInternalDoc): ?>
-          <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/toggle" style="margin-bottom:6px;">
-            <?= Csrf::field() ?>
-            <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
-              <input type="checkbox" name="enabled" value="1" <?= !empty($order['ca_internal_doc_enabled']) ? 'checked' : '' ?> onchange="this.form.submit()">
-              Enable internal financial annexure for this order
-            </label>
-          </form>
-          <?php if (!empty($order['ca_internal_doc_enabled'])): ?>
-            <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/generate" style="display:inline;">
-              <?= Csrf::field() ?>
-              <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
-            </form>
-          <?php endif; ?>
-        <?php else: ?>
-          <p class="muted small">Internal financial annexure is currently <strong><?= !empty($order['ca_internal_doc_enabled']) ? 'enabled' : 'disabled' ?></strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
-        <?php endif; ?>
-        <?php if ($caInternalDoc): ?>
-          <p class="small" style="margin-top:6px;">
-            Latest: <a href="/documents/<?= (int) $caInternalDoc['id'] ?>/download?format=pdf"><?= htmlspecialchars($caInternalDoc['document_reference']) ?></a>
-            (generated <?= htmlspecialchars((string) $caInternalDoc['generated_at']) ?>) — <span class="badge">INTERNAL ONLY — never shown to client</span>
-          </p>
-        <?php endif; ?>
-      </details>
+      <p class="muted small">The internal financial annexure (CAFIN) is generated from <a href="#order-cafin">the CAFIN box at the top of this page</a> — available at any stage.</p>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/financials/complete" class="fin-confirm">
         <?= Csrf::field() ?>
         <?php if (!empty($order['financials_completed_at'])): ?>
@@ -4042,6 +4009,27 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <div><span class="k">Special Requirements/Instructions</span><span class="v"><?= htmlspecialchars($order['special_requirements'] ?? '—') ?></span></div>
         </div>
       </div>
+
+      <?php if ($canManageOrderFinancials): ?>
+      <?php // Owner request (2026-10-27): CAFIN can be generated whenever it is wanted — at any stage, no "enable" step. ?>
+      <div class="sidebar-panel sidebar-cafin" id="order-cafin">
+        <h3>Internal Financial Annexure (CAFIN) <span class="badge badge-internal">INTERNAL ONLY — never shown to the client</span></h3>
+        <div class="sidebar-cafin-row">
+          <?php if ($canManageCaInternalDoc): ?>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/ca-internal-doc/generate" style="display:inline;">
+              <?= Csrf::field() ?>
+              <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate CAFIN now (PDF)</button>
+            </form>
+          <?php endif; ?>
+          <?php if ($caInternalDoc): ?>
+            <span class="small">Latest: <a href="/documents/<?= (int) $caInternalDoc['id'] ?>/download?format=pdf"><?= htmlspecialchars($caInternalDoc['document_reference']) ?></a> (generated <?= htmlspecialchars((string) $caInternalDoc['generated_at']) ?>)</span>
+          <?php else: ?>
+            <span class="muted small">None generated yet.</span>
+          <?php endif; ?>
+          <span class="muted small"><?= $canManageCaInternalDoc ? 'Available at any stage — it shows whatever is recorded so far.' : 'Only Admin/MD/ED (or someone specifically granted the permission) can generate it.' ?> Never sent, attached or shown to the client.</span>
+        </div>
+      </div>
+      <?php endif; ?>
 
       <div class="sidebar-panel">
         <details class="sidebar-docs-toggle">

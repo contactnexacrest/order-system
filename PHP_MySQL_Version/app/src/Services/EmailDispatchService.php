@@ -512,7 +512,7 @@ final class EmailDispatchService
             '{buyer_contact_person}' => $order['contact_person'] ?: 'Sir/Madam',
             '{buyer_company_name}'   => $order['company_legal_name'],
             '{document_reference}'   => $document['document_reference'] ?? '—',
-            '{generated_date}'       => $document ? (new \DateTimeImmutable((string) $document['generated_at']))->format('d F Y') : '—',
+            '{generated_date}'       => $document ? (new \DateTimeImmutable(DocumentRepository::printedDate($document)))->format('d F Y') : '—',
             '{order_reference}'      => $order['order_reference'],
             '{buyer_inquiry_ref}'    => $order['buyer_inquiry_ref'],
             '{quotation_ref}'        => $qtDoc['document_reference'] ?? '—',

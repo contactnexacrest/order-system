@@ -330,11 +330,6 @@ async function generateInternalDoc(req, res) {
     res.redirect('/orders');
     return;
   }
-  if (!order.ca_internal_doc_enabled) {
-    flash.set(req, 'error', 'The internal CA financial annexure is not enabled for this order yet — enable it first.');
-    res.redirect(`/orders/${orderId}`);
-    return;
-  }
 
   const documentGenerationService = require('../services/documentGenerationService');
   const result = await documentGenerationService.generateCaInternalAnnexure(orderId, user.id);
@@ -342,7 +337,7 @@ async function generateInternalDoc(req, res) {
   await auditLogRepository.log(user.id, 'CA_INTERNAL_DOC_GENERATED', 'orders', orderId, 'document_reference', null, result.document_reference);
 
   flash.set(req, 'success', `Internal CA financial annexure generated: ${result.document_reference}.`);
-  res.redirect(`/orders/${orderId}`);
+  res.redirect(`/orders/${orderId}#order-cafin`);
 }
 
 /**

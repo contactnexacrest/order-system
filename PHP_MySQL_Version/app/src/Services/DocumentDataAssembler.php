@@ -171,7 +171,7 @@ final class DocumentDataAssembler
                 'quotation_ref'        => $qtDoc['document_reference'] ?? null,
                 'pi_ref'               => $piDoc['document_reference'] ?? null,
                 'ci_ref'               => $ciDoc['document_reference'] ?? null,
-                'ci_date'              => $ciDoc ? self::formatDate($ciDoc['generated_at'] ?? null) : null,
+                'ci_date'              => $ciDoc ? self::formatDate(DocumentRepository::printedDate($ciDoc)) : null,
                 'fdn_ref'              => $fdnDoc['document_reference'] ?? null,
                 'fdn_date'             => $fdnDoc ? self::formatDate($fdnDoc['generated_at'] ?? null) : null,
                 'pl_ref'               => $plDoc['document_reference'] ?? null,

@@ -165,7 +165,7 @@ async function assemble(orderId, documentTypeCode = null) {
       quotation_ref: qtDoc ? qtDoc.document_reference : null,
       pi_ref: piDoc ? piDoc.document_reference : null,
       ci_ref: ciDoc ? ciDoc.document_reference : null,
-      ci_date: ciDoc ? formatDate(ciDoc.generated_at ?? null) : null,
+      ci_date: ciDoc ? formatDate(documentRepository.printedDate(ciDoc)) : null,
       fdn_ref: fdnDoc ? fdnDoc.document_reference : null,
       fdn_date: fdnDoc ? formatDate(fdnDoc.generated_at ?? null) : null,
       pl_ref: plDoc ? plDoc.document_reference : null,

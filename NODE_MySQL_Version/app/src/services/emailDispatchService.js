@@ -84,7 +84,7 @@ async function tokensFor(order, document, sender) {
     '{buyer_contact_person}': order.contact_person || 'Sir/Madam',
     '{buyer_company_name}': order.company_legal_name,
     '{document_reference}': (document && document.document_reference) || '—',
-    '{generated_date}': document ? documentDataAssembler.formatDate(document.generated_at) : '—',
+    '{generated_date}': document ? documentDataAssembler.formatDate(documentRepository.printedDate(document)) : '—',
     '{order_reference}': order.order_reference,
     '{buyer_inquiry_ref}': order.buyer_inquiry_ref,
     '{quotation_ref}': (qtDoc && qtDoc.document_reference) || '—',

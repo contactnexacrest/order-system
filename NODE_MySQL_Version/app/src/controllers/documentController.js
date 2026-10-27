@@ -2,15 +2,35 @@
 
 const fs = require('fs');
 const flash = require('../helpers/flash');
+const { todayIst } = require('../helpers/dbDateTime');
 const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
+const orderRepository = require('../repositories/orderRepository');
 const documentGenerationService = require('../services/documentGenerationService');
 
 // Port of App\Controllers\DocumentController.
 
 const ALLOWED_TYPES = ['QT', 'ANNEXA', 'PI', 'OC', 'BUYERPO', 'SUPPO', 'FDN', 'PL', 'BLI', 'CI', 'COOPREP'];
+
+/**
+ * The invoice date staff picked: null for today (left blank or today), the
+ * YYYY-MM-DD date for an earlier day, or false when it is not a real date,
+ * is in the future, or is before the order was created.
+ */
+async function pickedDocumentDate(date, orderId) {
+  const value = date.trim();
+  const today = todayIst();
+  if (value === '' || value === today) return null;
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const d = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.getUTCFullYear() !== Number(m[1]) || d.getUTCMonth() + 1 !== Number(m[2]) || d.getUTCDate() !== Number(m[3]) || value > today) return false;
+  const order = await orderRepository.find(orderId);
+  if (order && order.created_at && value < String(order.created_at).slice(0, 10)) return false;
+  return value;
+}
 
 async function generate(req, res) {
   const orderId = parseInt(req.params.id, 10);
@@ -29,6 +49,18 @@ async function generate(req, res) {
   // though the PDF checkbox is shown (checked, disabled) for clarity in the
   // form. DOCX is the real optional toggle.
   const generateDocx = !!req.body.generate_docx;
+
+  // Owner request (2026-10-27): the Commercial Invoice can be dated today or
+  // earlier (e.g. to match the BL) — today if left blank.
+  let documentDate = null;
+  if (type === 'CI') {
+    documentDate = await pickedDocumentDate(String(req.body.document_date || ''), orderId);
+    if (documentDate === false) {
+      flash.set(req, 'error', 'Choose an invoice date that is today or earlier (and not before the order was created).');
+      res.redirect(`/orders/${orderId}#step-ci-generate`);
+      return;
+    }
+  }
 
   // Narrow, audited escape hatch for generate()'s own locked-order /
   // out-of-sequence-stage guard (see that method's docblock) — never trust
@@ -55,7 +87,7 @@ async function generate(req, res) {
 
   let result;
   try {
-    result = await documentGenerationService.generate(orderId, type, user.id, null, generateDocx, allowOverride);
+    result = await documentGenerationService.generate(orderId, type, user.id, null, generateDocx, allowOverride, documentDate);
   } catch (e) {
     if (e instanceof documentGenerationService.StageGateBlockedError) {
       flash.set(req, 'error', e.message);

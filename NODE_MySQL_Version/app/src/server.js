@@ -732,7 +732,7 @@ app.get('/ca/tds-summary', requireAuth, requirePermission('ca_module_view'), asy
 app.post('/ca/expenses/:id/tds', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.setExpenseTds));
 app.post('/ca/expenses/:id/link-order', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.linkExpenseToOrder));
 app.post('/orders/:id/ca-internal-doc/toggle', requireAuth, requirePermission('ca_internal_doc_manage'), checkOrderLock, verifyCsrf, asyncHandler(caController.toggleInternalDoc));
-app.post('/orders/:id/ca-internal-doc/generate', requireAuth, requirePermission('ca_internal_doc_manage'), checkOrderLock, verifyCsrf, asyncHandler(caController.generateInternalDoc));
+app.post('/orders/:id/ca-internal-doc/generate', requireAuth, requirePermission('ca_internal_doc_manage'), verifyCsrf, asyncHandler(caController.generateInternalDoc));
 app.post('/orders/:id/export-benefits', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addExportBenefit));
 app.post('/orders/:id/export-benefits/:benefitId/received', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.markExportBenefitReceived));
 app.post('/orders/:id/financials/costs-confirmed', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.confirmCosts));

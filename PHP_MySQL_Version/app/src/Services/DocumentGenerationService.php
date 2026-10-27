@@ -30,7 +30,7 @@ use Twig\TwigFilter;
  */
 final class DocumentGenerationService
 {
-    public static function generate(int $orderId, string $documentTypeCode, int $generatedByUserId, ?int $signatoryOverrideUserId = null, bool $generateDocx = false, bool $allowOverride = false): array
+    public static function generate(int $orderId, string $documentTypeCode, int $generatedByUserId, ?int $signatoryOverrideUserId = null, bool $generateDocx = false, bool $allowOverride = false, ?string $documentDate = null): array
     {
         $pdo = Database::connection();
 
@@ -138,7 +138,8 @@ final class DocumentGenerationService
                 'revision_label'     => 'Rev.' . str_pad((string) $revisionNumber, 2, '0', STR_PAD_LEFT),
                 'client_revision_number' => $clientRevisionNumber,
                 'client_revision_label'  => self::clientRevisionLabel($clientRevisionNumber),
-                'generated_date'     => (new \DateTimeImmutable())->format('d F Y'),
+                // Owner request (2026-10-27): a date staff picked (the CI, to match the BL) prints instead of today.
+                'generated_date'     => (new \DateTimeImmutable($documentDate ?? 'now'))->format('d F Y'),
             ],
             'watermark' => $watermark,
             'doc_title' => self::titleFor($documentTypeCode),
@@ -219,6 +220,9 @@ final class DocumentGenerationService
             $data['company'],
             $clientRevisionNumber
         );
+        if ($documentDate !== null) {
+            DocumentRepository::setDocumentDate($documentId, $documentDate);
+        }
 
         // External QA report M-08: "Regenerating an earlier-stage document
         // after later stages passed: ... 'drift' notices on affected
@@ -609,7 +613,7 @@ final class DocumentGenerationService
                 'revision_label'     => 'Rev.' . str_pad((string) $document['revision_number'], 2, '0', STR_PAD_LEFT),
                 'client_revision_number' => (int) $document['client_revision_number'],
                 'client_revision_label'  => self::clientRevisionLabel((int) $document['client_revision_number']),
-                'generated_date'     => (new \DateTimeImmutable($document['generated_at']))->format('d F Y'),
+                'generated_date'     => (new \DateTimeImmutable(DocumentRepository::printedDate($document)))->format('d F Y'),
             ],
             'watermark' => self::withRevisionStamp(self::finalWatermark(), (int) $document['client_revision_number'], $document['document_type_category'] ?? null),
             'doc_title' => self::titleFor($documentTypeCode),
@@ -781,7 +785,7 @@ final class DocumentGenerationService
                 'revision_label'     => 'Rev.' . str_pad((string) $document['revision_number'], 2, '0', STR_PAD_LEFT),
                 'client_revision_number' => (int) $document['client_revision_number'],
                 'client_revision_label'  => self::clientRevisionLabel((int) $document['client_revision_number']),
-                'generated_date'     => (new \DateTimeImmutable($document['generated_at']))->format('d F Y'),
+                'generated_date'     => (new \DateTimeImmutable(DocumentRepository::printedDate($document)))->format('d F Y'),
             ],
             'watermark' => self::invalidWatermark(),
             'doc_title' => self::titleFor($documentTypeCode),
@@ -1048,9 +1052,9 @@ final class DocumentGenerationService
      *     requires ca_module_view specifically for this one document
      *     type before serving it.
      *
-     * Refused unless orders.ca_internal_doc_enabled is set (checked here
-     * too, not just in the controller, as defense in depth) — see
-     * OrderRepository::setCaInternalDocEnabled(). No stage-gate or
+     * Owner request (2026-10-27): available whenever it is wanted — no
+     * per-order "enable" step any more (the ca_internal_doc_manage
+     * permission on the route is what guards it). No stage-gate or
      * locked-order check: unlike buyer documents, this one is often only
      * generated well after an order has closed (RODTEP can take months
      * to actually be credited), so it must remain generatable regardless
@@ -1061,9 +1065,6 @@ final class DocumentGenerationService
         $order = OrderRepository::find($orderId);
         if (!$order) {
             throw new \RuntimeException("Order {$orderId} not found");
-        }
-        if (empty($order['ca_internal_doc_enabled'])) {
-            throw new \RuntimeException("Internal CA financial annexure is not enabled for order {$orderId}.");
         }
 
         $docTypeId = self::documentTypeIdFor('CAFIN');

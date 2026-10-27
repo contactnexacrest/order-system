@@ -27,6 +27,12 @@ async function setOrderStage(orderId, stageNumber) {
  * this alert system exists to catch.
  */
 describe('Expiry alerts (90-item backlog "expiry alerts")', () => {
+  // run() is the real sitewide job: it notifies every Admin/MD (one email each)
+  // for every expired order in the shared test database, so in the full run
+  // it can take longer than the default 20s depending on which suites ran
+  // first and how many orders/admins they left behind.
+  jest.setTimeout(90000);
+
   let adminId;
 
   beforeAll(async () => {

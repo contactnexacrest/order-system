@@ -118,6 +118,11 @@ final class OrderLockGuardMiddlewareTest extends DbTestCase
             // state. Already narrowly gated to assign_order_owner
             // (Admin/MD/ED), who hold edit_locked_data too in practice.
             '/orders/{id}/assignees', '/orders/{id}/assignees/{userId}/remove',
+            // Owner request (2026-10-27): CAFIN is internal and can be
+            // generated whenever it is wanted — often after the order has
+            // closed (benefits are credited months later) — so it must
+            // stay reachable on a locked order. It writes no order data.
+            '/orders/{id}/ca-internal-doc/generate',
         ];
         $lines = array_filter(
             explode("\n", $source),

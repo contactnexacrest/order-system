@@ -2511,9 +2511,6 @@
 
   <details class="step-card" id="step-ci-generate"{{ flow.subCardOpen('s11', '11a') }}>
     <summary>{{ stepStatusIcon(flow.subStepStatus('s11', '11a')) }}<h2>Step 11a &middot; Generate Commercial Invoice{{ ' (before shipment)' if isFob else ' (against BL)' }}</h2></summary>
-    {# Batch 3 #11 — the Commercial Invoice is conventionally dated to match the recorded BL date;
-       nothing enforces this, so flag it as an advisory (not a hard block) right where staff generate the CI. #}
-    {% set ciBlDateMismatch = shipping and shipping.bl_date and shipping.bl_date != today() %}
     {% if ciBalanceLocked %}
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     {% else %}
@@ -2524,12 +2521,11 @@
       {% else %}
         <p class="muted small">Scanned BL copy is on file (<a href="/file-store/{{ shipping.bl_copy_file_id }}/download">download</a>) — generate the Commercial Invoice against it.</p>
       {% endif %}
-      {% if ciBlDateMismatch %}
-        <p class="alert alert-warning">&#9888; Recorded BL date is <strong>{{ shipping.bl_date }}</strong>, not today. The Commercial Invoice is conventionally dated to match the BL — double-check before generating it if that's not intentional here.</p>
-      {% endif %}
       <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="hidden" name="document_type" value="CI">
+        {# Owner request (2026-10-27): the CI can be dated today or earlier, e.g. to match the BL. #}
+        <label class="ci-date-field">Invoice date (printed on the CI) *<input type="date" name="document_date" required value="{{ today() }}" max="{{ today() }}" min="{{ (order.created_at or '') | string | truncate(10, true, '') }}"><small class="muted">Today by default. To match the BL, pick the BL date here — today or any earlier date.</small></label>
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         {{ stepBadge('11a') | safe }}<button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'CI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Commercial Invoice</button>{{ docAlreadyNote(documents, 'CI') }}
@@ -2909,33 +2905,7 @@
         {% else %}
           <p class="muted">Not enough data recorded yet to compute profitability for this order.</p>
         {% endif %}
-      <details class="fin-annexure">
-        <summary class="muted small">Internal-Only Financial Annexure (CAFIN) — staff/CA use, never shown to the client</summary>
-        <p class="muted small">A single internal PDF combining everything above, for staff/CA use only. This is structurally excluded from the client portal and can never be attached to or sent alongside any client-facing document, enabled or not.</p>
-        {% if canManageCaInternalDoc %}
-          <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/toggle" style="margin-bottom:6px;">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label style="display:inline-flex; align-items:center; gap:6px; font-weight:normal;">
-              <input type="checkbox" name="enabled" value="1" {% if order.ca_internal_doc_enabled %}checked{% endif %} onchange="this.form.submit()">
-              Enable internal financial annexure for this order
-            </label>
-          </form>
-          {% if order.ca_internal_doc_enabled %}
-            <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/generate" style="display:inline;">
-              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <button type="submit" class="btn-sm">Generate Internal Financial Annexure (PDF)</button>
-            </form>
-          {% endif %}
-        {% else %}
-          <p class="muted small">Internal financial annexure is currently <strong>{% if order.ca_internal_doc_enabled %}enabled{% else %}disabled{% endif %}</strong> for this order — only Admin/MD/ED (or someone specifically granted the permission) can change this or generate it.</p>
-        {% endif %}
-        {% if caInternalDoc %}
-          <p class="small" style="margin-top:6px;">
-            Latest: <a href="/documents/{{ caInternalDoc.id }}/download?format=pdf">{{ caInternalDoc.document_reference }}</a>
-            (generated {{ caInternalDoc.generated_at }}) — <span class="badge">INTERNAL ONLY — never shown to client</span>
-          </p>
-        {% endif %}
-      </details>
+      <p class="muted small">The internal financial annexure (CAFIN) is generated from <a href="#order-cafin">the CAFIN box at the top of this page</a> — available at any stage.</p>
       <form method="post" action="/orders/{{ order.id }}/financials/complete" class="fin-confirm">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         {% if order.financials_completed_at %}
@@ -3547,6 +3517,27 @@
           <div><span class="k">Special Requirements/Instructions</span><span class="v">{{ order.special_requirements or '—' }}</span></div>
         </div>
       </div>
+
+      {% if canManageOrderFinancials %}
+      {# Owner request (2026-10-27): CAFIN can be generated whenever it is wanted — at any stage, no "enable" step. #}
+      <div class="sidebar-panel sidebar-cafin" id="order-cafin">
+        <h3>Internal Financial Annexure (CAFIN) <span class="badge badge-internal">INTERNAL ONLY — never shown to the client</span></h3>
+        <div class="sidebar-cafin-row">
+          {% if canManageCaInternalDoc %}
+            <form method="post" action="/orders/{{ order.id }}/ca-internal-doc/generate" style="display:inline;">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm" data-loading-text="Generating…">Generate CAFIN now (PDF)</button>
+            </form>
+          {% endif %}
+          {% if caInternalDoc %}
+            <span class="small">Latest: <a href="/documents/{{ caInternalDoc.id }}/download?format=pdf">{{ caInternalDoc.document_reference }}</a> (generated {{ caInternalDoc.generated_at }})</span>
+          {% else %}
+            <span class="muted small">None generated yet.</span>
+          {% endif %}
+          <span class="muted small">{{ 'Available at any stage — it shows whatever is recorded so far.' if canManageCaInternalDoc else 'Only Admin/MD/ED (or someone specifically granted the permission) can generate it.' }} Never sent, attached or shown to the client.</span>
+        </div>
+      </div>
+      {% endif %}
 
       <div class="sidebar-panel">
         <details class="sidebar-docs-toggle">

@@ -82,6 +82,16 @@ async function allForOrderAndType(orderId, documentTypeId) {
   );
 }
 
+/** Owner request (2026-10-27): the date staff picked to print on the document (e.g. a CI dated to match the BL). */
+async function setDocumentDate(documentId, date) {
+  await db.execute('UPDATE documents SET document_date = :date WHERE id = :id', { date, id: documentId });
+}
+
+/** The date a document carries: the one staff picked, else the day it was generated. */
+function printedDate(document) {
+  return document.document_date ? document.document_date : document.generated_at;
+}
+
 /** Looks up the latest generated document of a given type CODE for an order, for cross-referencing on a later-stage document. */
 async function findLatestForOrderAndTypeCode(orderId, documentTypeCode) {
   return db.queryOne(
@@ -208,5 +218,5 @@ async function deleteDraft(id) {
 module.exports = {
   customerFacingForOrder, forOrder, find, findLatestForOrderAndType, findLatestForOrderAndTypeCode,
   allForOrderAndType, countPriorSent, markApproved, markSuperseded, markInReview, markDraft, markSent, create, deleteDraft,
-  flagDrift,
+  flagDrift, setDocumentDate, printedDate,
 };

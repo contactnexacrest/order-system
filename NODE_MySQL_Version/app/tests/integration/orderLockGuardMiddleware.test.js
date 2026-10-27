@@ -99,6 +99,11 @@ describe('orderLockGuard middleware (External QA report L-28)', () => {
       // to assign_order_owner (Admin/MD/ED), who hold edit_locked_data
       // too in practice.
       '/orders/:id/assignees', '/orders/:id/assignees/:userId/remove',
+      // Owner request (2026-10-27): CAFIN is internal and can be generated
+      // whenever it is wanted — often after the order has closed (benefits
+      // are credited months later) — so it must stay reachable on a locked
+      // order. It writes no order data.
+      '/orders/:id/ca-internal-doc/generate',
     ]);
     const lines = source.split('\n').filter((line) => /^app\.post\('\/orders\/:id/.test(line.trim()));
     expect(lines.length).toBeGreaterThan(0);

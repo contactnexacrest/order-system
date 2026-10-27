@@ -115,6 +115,20 @@ final class DocumentRepository
      * OC shows the PI ref). Returns null if that document hasn't been
      * generated yet — callers render 'To Be Confirmed'/'—' rather than fail.
      */
+    /** Owner request (2026-10-27): the date staff picked to print on the document (e.g. a CI dated to match the BL). */
+    public static function setDocumentDate(int $documentId, string $date): void
+    {
+        Database::connection()
+            ->prepare('UPDATE documents SET document_date = :date WHERE id = :id')
+            ->execute(['date' => $date, 'id' => $documentId]);
+    }
+
+    /** The date a document carries: the one staff picked, else the day it was generated. */
+    public static function printedDate(array $document): string
+    {
+        return (string) (!empty($document['document_date']) ? $document['document_date'] : $document['generated_at']);
+    }
+
     public static function findLatestForOrderAndTypeCode(int $orderId, string $documentTypeCode): ?array
     {
         $stmt = Database::connection()->prepare(

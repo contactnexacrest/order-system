@@ -134,7 +134,7 @@ function fontsBlock() {
   return fontsBlockCache;
 }
 
-async function generate(orderId, documentTypeCode, generatedByUserId, signatoryOverrideUserId = null, generateDocx = false, allowOverride = false) {
+async function generate(orderId, documentTypeCode, generatedByUserId, signatoryOverrideUserId = null, generateDocx = false, allowOverride = false, documentDate = null) {
   const docType = await findDocumentType(documentTypeCode);
   if (!docType) {
     throw new Error(`Unknown document type: ${documentTypeCode}`);
@@ -240,7 +240,8 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
       revision_label: `Rev.${String(revisionNumber).padStart(2, '0')}`,
       client_revision_number: clientRevisionNumber,
       client_revision_label: clientRevisionLabel(clientRevisionNumber),
-      generated_date: formatNow(),
+      // Owner request (2026-10-27): a date staff picked (the CI, to match the BL) prints instead of today.
+      generated_date: documentDate ? documentDataAssembler.formatDate(documentDate) : formatNow(),
     },
     watermark,
     doc_title: titleFor(documentTypeCode),
@@ -320,6 +321,9 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
     data.company,
     clientRevisionNumber
   );
+  if (documentDate) {
+    await documentRepository.setDocumentDate(documentId, documentDate);
+  }
 
   // External QA report M-08: "Regenerating an earlier-stage document
   // after later stages passed: ... 'drift' notices on affected stages."
@@ -674,7 +678,7 @@ async function finalizeApproval(documentId) {
       revision_label: `Rev.${String(document.revision_number).padStart(2, '0')}`,
       client_revision_number: document.client_revision_number,
       client_revision_label: clientRevisionLabel(document.client_revision_number),
-      generated_date: documentDataAssembler.formatDate(document.generated_at),
+      generated_date: documentDataAssembler.formatDate(documentRepository.printedDate(document)),
     },
     watermark: withRevisionStamp(await finalWatermark(), document.client_revision_number, document.document_type_category),
     doc_title: titleFor(documentTypeCode),
@@ -838,7 +842,7 @@ async function markSuperseded(documentId) {
       revision_label: `Rev.${String(document.revision_number).padStart(2, '0')}`,
       client_revision_number: document.client_revision_number,
       client_revision_label: clientRevisionLabel(document.client_revision_number),
-      generated_date: documentDataAssembler.formatDate(document.generated_at),
+      generated_date: documentDataAssembler.formatDate(documentRepository.printedDate(document)),
     },
     watermark: invalidWatermark(),
     doc_title: titleFor(documentTypeCode),
@@ -1086,9 +1090,9 @@ async function generateAmendment(amendmentId, generatedByUserId) {
  *     documentController.download() separately requires ca_module_view
  *     specifically for this one document type before serving it.
  *
- * Refused unless orders.ca_internal_doc_enabled is set (checked here
- * too, not just in the controller, as defense in depth) — see
- * orderRepository.setCaInternalDocEnabled(). No stage-gate or locked-
+ * Owner request (2026-10-27): available whenever it is wanted — no
+ * per-order "enable" step any more (the ca_internal_doc_manage
+ * permission on the route is what guards it). No stage-gate or locked-
  * order check: unlike buyer documents, this one is often only generated
  * well after an order has closed (RODTEP can take months to actually be
  * credited), so it must remain generatable regardless of the order's own
@@ -1098,9 +1102,6 @@ async function generateCaInternalAnnexure(orderId, generatedByUserId) {
   const order = await orderRepository.find(orderId);
   if (!order) {
     throw new Error(`Order ${orderId} not found`);
-  }
-  if (!order.ca_internal_doc_enabled) {
-    throw new Error(`Internal CA financial annexure is not enabled for order ${orderId}.`);
   }
 
   const docTypeId = await documentTypeIdFor('CAFIN');

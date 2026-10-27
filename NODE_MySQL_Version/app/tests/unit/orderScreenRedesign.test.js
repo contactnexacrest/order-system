@@ -192,4 +192,14 @@ describe('Order screen redesign (Point 2/4)', () => {
     // "+ Add a cost" opens and closes like "+ Add an expense".
     expect(html).toContain('<details class="fin-add-cost">\n        <summary class="small"><strong>+ Add a cost</strong></summary>');
   });
+
+  it('CAFIN sits in its own box at the top of the order page, with no enable step', () => {
+    // Owner request (2026-10-27): CAFIN can be generated whenever it is wanted.
+    const html = showNjk();
+    const box = html.indexOf('id="order-cafin"');
+    expect(box).toBeGreaterThan(html.indexOf('id="order-detail-sidebar"'));
+    expect(html).toContain('{% if canManageOrderFinancials %}\n      {# Owner request (2026-10-27): CAFIN');
+    expect(html).toContain('Generate CAFIN now (PDF)');
+    expect(html).not.toContain('Enable internal financial annexure for this order');
+  });
 });

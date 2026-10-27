@@ -18,6 +18,29 @@ final class DocumentController
 {
     private const ALLOWED_TYPES = ['QT', 'ANNEXA', 'PI', 'OC', 'BUYERPO', 'SUPPO', 'FDN', 'PL', 'BLI', 'CI', 'COOPREP'];
 
+    /**
+     * The invoice date staff picked: null for today (left blank or today),
+     * the Y-m-d date for an earlier day, or false when it is not a real
+     * date, is in the future, or is before the order was created.
+     */
+    private static function pickedDocumentDate(string $date, int $orderId): string|false|null
+    {
+        $date = trim($date);
+        $today = date('Y-m-d');
+        if ($date === '' || $date === $today) {
+            return null;
+        }
+        $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+        if (!$parsed || $parsed->format('Y-m-d') !== $date || $date > $today) {
+            return false;
+        }
+        $order = \App\Repositories\OrderRepository::find($orderId);
+        if ($order && !empty($order['created_at']) && $date < substr((string) $order['created_at'], 0, 10)) {
+            return false;
+        }
+        return $date;
+    }
+
     public function generate(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -36,6 +59,18 @@ final class DocumentController
         // even though the PDF checkbox is shown (checked, disabled) for
         // clarity in the form. DOCX is the real optional toggle.
         $generateDocx = !empty($_POST['generate_docx']);
+
+        // Owner request (2026-10-27): the Commercial Invoice can be dated
+        // today or earlier (e.g. to match the BL) — today if left blank.
+        $documentDate = null;
+        if ($type === 'CI') {
+            $documentDate = self::pickedDocumentDate((string) ($_POST['document_date'] ?? ''), $orderId);
+            if ($documentDate === false) {
+                Flash::set('error', 'Choose an invoice date that is today or earlier (and not before the order was created).');
+                header("Location: /orders/{$orderId}#step-ci-generate");
+                return;
+            }
+        }
 
         // Narrow, audited escape hatch for generate()'s own locked-order /
         // out-of-sequence-stage guard (see that method's docblock) — never
@@ -61,7 +96,7 @@ final class DocumentController
         }
 
         try {
-            $result = DocumentGenerationService::generate($orderId, $type, (int) $user['id'], null, $generateDocx, $allowOverride);
+            $result = DocumentGenerationService::generate($orderId, $type, (int) $user['id'], null, $generateDocx, $allowOverride, $documentDate);
         } catch (StageGateBlockedException $e) {
             Flash::set('error', $e->getMessage());
             header("Location: /orders/{$orderId}");

@@ -102,11 +102,16 @@ describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
     expect(!!(await orderRepository.find(orderId)).ca_internal_doc_enabled).toBe(false);
   });
 
-  it('generateCaInternalAnnexure refuses when not enabled', async () => {
+  // Owner request (2026-10-27): CAFIN is available whenever it is wanted — no per-order "enable" step.
+  it('generateCaInternalAnnexure needs no enable step', async () => {
     const userId = await createTestUser('Admin');
     const orderId = await createTestOrder(await createTestClient());
+    expect(!!(await orderRepository.find(orderId)).ca_internal_doc_enabled).toBe(false);
 
-    await expect(documentGenerationService.generateCaInternalAnnexure(orderId, userId)).rejects.toThrow(/not enabled/);
+    const result = await documentGenerationService.generateCaInternalAnnexure(orderId, userId);
+
+    expect(result.document_reference).toContain('CAFIN');
+    fs.unlinkSync((await fileStoreRepository.find(result.pdf_file_id)).server_path);
   });
 
   it('generateCaInternalAnnexure produces a real PDF and an internal-only document row', async () => {
@@ -202,14 +207,16 @@ describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
     expect(parseInt(row.c, 10)).toBe(1);
   });
 
-  it('generateInternalDoc controller refuses when not enabled', async () => {
+  it('generateInternalDoc controller generates without an enable step', async () => {
     const userId = await createTestUser('Admin');
     const orderId = await createTestOrder(await createTestClient());
 
     const req = { params: { id: String(orderId) }, body: {}, user: { id: userId }, session: {} };
     await caController.generateInternalDoc(req, fakeRes());
 
-    expect(await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CAFIN')).toBeNull();
+    const document = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CAFIN');
+    expect(document).not.toBeNull();
+    fs.unlinkSync((await fileStoreRepository.find(document.pdf_file_id)).server_path);
   });
 
   it('generateInternalDoc controller generates and audit-logs when enabled', async () => {

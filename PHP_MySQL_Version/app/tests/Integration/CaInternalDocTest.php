@@ -49,14 +49,17 @@ final class CaInternalDocTest extends DbTestCase
         self::assertSame(0, (int) OrderRepository::find($orderId)['ca_internal_doc_enabled']);
     }
 
-    public function testGenerateCaInternalAnnexureRefusesWhenNotEnabled(): void
+    /** Owner request (2026-10-27): CAFIN is available whenever it is wanted — no per-order "enable" step. */
+    public function testGenerateCaInternalAnnexureNeedsNoEnableStep(): void
     {
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
+        self::assertSame(0, (int) OrderRepository::find($orderId)['ca_internal_doc_enabled']);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('not enabled');
-        DocumentGenerationService::generateCaInternalAnnexure($orderId, $userId);
+        $result = DocumentGenerationService::generateCaInternalAnnexure($orderId, $userId);
+
+        self::assertStringContainsString('CAFIN', $result['document_reference']);
+        @unlink(FileStoreRepository::find((int) $result['pdf_file_id'])['server_path']);
     }
 
     public function testGenerateCaInternalAnnexureProducesARealPdfAndAnInternalOnlyDocumentRow(): void
@@ -170,7 +173,7 @@ final class CaInternalDocTest extends DbTestCase
         self::assertSame(1, $count);
     }
 
-    public function testGenerateInternalDocControllerRefusesWhenNotEnabled(): void
+    public function testGenerateInternalDocControllerGeneratesWithoutAnEnableStep(): void
     {
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
@@ -181,7 +184,9 @@ final class CaInternalDocTest extends DbTestCase
         $controller->generateInternalDoc(['id' => (string) $orderId]);
         ob_get_clean();
 
-        self::assertNull(DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CAFIN'));
+        $document = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CAFIN');
+        self::assertNotNull($document);
+        @unlink(FileStoreRepository::find((int) $document['pdf_file_id'])['server_path']);
     }
 
     public function testGenerateInternalDocControllerGeneratesAndAuditLogsWhenEnabled(): void
@@ -273,8 +278,11 @@ final class CaInternalDocTest extends DbTestCase
         $controller->show(['id' => (string) $orderId]);
         $output = ob_get_clean();
 
-        self::assertStringContainsString('Internal-Only Financial Annexure', $output);
-        self::assertStringContainsString('Enable internal financial annexure for this order', $output);
+        // Owner request (2026-10-27): CAFIN sits in its own box at the top of
+        // the order page, with one Generate button and no "enable" tick.
+        self::assertStringContainsString('id="order-cafin"', $output);
+        self::assertStringContainsString('Generate CAFIN now (PDF)', $output);
+        self::assertStringNotContainsString('Enable internal financial annexure for this order', $output);
     }
 
     /**
@@ -295,8 +303,8 @@ final class CaInternalDocTest extends DbTestCase
         $controller->show(['id' => (string) $orderId]);
         $output = ob_get_clean();
 
-        self::assertStringNotContainsString('Internal-Only Financial Annexure', $output);
-        self::assertStringNotContainsString('Enable internal financial annexure for this order', $output);
+        self::assertStringNotContainsString('id="order-cafin"', $output);
+        self::assertStringNotContainsString('Internal Financial Annexure (CAFIN)', $output);
         self::assertStringNotContainsString('Order Financials', $output);
     }
 
@@ -323,8 +331,8 @@ final class CaInternalDocTest extends DbTestCase
         $controller->show(['id' => (string) $orderId]);
         $output = ob_get_clean();
 
-        self::assertStringContainsString('Internal-Only Financial Annexure', $output);
-        self::assertStringNotContainsString('Enable internal financial annexure for this order', $output);
-        self::assertStringContainsString('only Admin/MD/ED', $output);
+        self::assertStringContainsString('id="order-cafin"', $output);
+        self::assertStringNotContainsString('Generate CAFIN now (PDF)', $output);
+        self::assertStringContainsString('Only Admin/MD/ED', $output);
     }
 }

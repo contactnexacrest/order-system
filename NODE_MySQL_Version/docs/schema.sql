@@ -4144,3 +4144,12 @@ CREATE TABLE order_expenses (
   FOREIGN KEY (created_by) REFERENCES users(id),
   INDEX idx_order_expenses_order (order_id)
 ) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION CF — DOCUMENT DATE (owner request 2026-10-27)
+-- The date printed on a document when staff pick one (today or earlier) —
+-- used for the Commercial Invoice, so it can match the BL. NULL means the
+-- day it was generated (generated_at), as for every other document.
+-- ================================================================
+ALTER TABLE documents
+  ADD COLUMN document_date DATE NULL;

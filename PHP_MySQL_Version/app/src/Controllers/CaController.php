@@ -367,12 +367,6 @@ final class CaController
             header('Location: /orders');
             return;
         }
-        if (empty($order['ca_internal_doc_enabled'])) {
-            Flash::set('error', 'The internal CA financial annexure is not enabled for this order yet — enable it first.');
-            header("Location: /orders/{$orderId}");
-            return;
-        }
-
         $result = \App\Services\DocumentGenerationService::generateCaInternalAnnexure($orderId, (int) $user['id']);
 
         AuditLogRepository::log(
@@ -386,7 +380,7 @@ final class CaController
         );
 
         Flash::set('success', "Internal CA financial annexure generated: {$result['document_reference']}.");
-        header("Location: /orders/{$orderId}");
+        header("Location: /orders/{$orderId}#order-cafin");
     }
 
     /**

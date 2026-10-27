@@ -459,7 +459,7 @@ $router->get('/ca/tds-summary', [$ca, 'tdsSummary'], [SessionAuth::required(), P
 $router->post('/ca/expenses/{id}/tds', [$ca, 'setExpenseTds'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/expenses/{id}/link-order', [$ca, 'linkExpenseToOrder'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/ca-internal-doc/toggle', [$ca, 'toggleInternalDoc'], [SessionAuth::required(), PermissionCheck::requires('ca_internal_doc_manage'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/ca-internal-doc/generate', [$ca, 'generateInternalDoc'], [SessionAuth::required(), PermissionCheck::requires('ca_internal_doc_manage'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/ca-internal-doc/generate', [$ca, 'generateInternalDoc'], [SessionAuth::required(), PermissionCheck::requires('ca_internal_doc_manage'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/export-benefits', [$orderFinancials, 'addExportBenefit'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/export-benefits/{benefitId}/received', [$orderFinancials, 'markExportBenefitReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/financials/costs-confirmed', [$orderFinancials, 'confirmCosts'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
