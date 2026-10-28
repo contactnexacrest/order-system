@@ -165,7 +165,13 @@ Partner Bills card — see [Chapter 5](./05-stage5-supplier-po.md) and
 CHA / transport / other bills as **Logistics Bills — CHA / Transport**,
 and ocean-freight bills replace the Step 9 freight quote as **Ocean
 Freight — from the forwarder's bills**. GST on every bill is picked as a
-rate (%), with the amount worked out automatically.
+rate (%), with the amount worked out automatically. Owner decision
+(2026-10-28, Option B): only **tax invoices** count at their total; a
+**proforma** counts only for what was paid on it, and not at all once its
+tax invoice is added — so a proforma and the invoice for the same charges
+are never both counted. The ledger shows one line per payment, and the
+CAFIN annexure prints each bill as "Proforma …" or "Tax invoice …" with
+every payment against it.
 
 ### 3. Expenses Imported from Zoho Books
 

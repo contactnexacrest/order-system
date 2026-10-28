@@ -41,7 +41,7 @@ describe('CAFIN complete order snapshot', () => {
     }, 'signed');
     const po = await orderSupplierPoRepository.findLatestForOrder(orderId);
     const bill = await orderVendorBillRepository.create(orderId, 'supplier', { supplier_po_id: po.id, bill_for: 'balance', bill_no: 'SNAP-TI-1', bill_date: todayIst(), taxable_inr: 45000, gst_inr: 0 }, userId);
-    await orderVendorBillRepository.markPaid(bill, todayIst(), 45000, 'NEFT / RTGS', 'UTR-SNAP', userId);
+    await orderVendorBillRepository.addPayment(bill, 'balance', todayIst(), 45000, 'NEFT / RTGS', 'UTR-SNAP', userId);
     const partnerId = await logisticsPartnerRepository.create({ partner_name: 'Snapshot CHA', service_type: 'cha' }, userId);
     await orderVendorBillRepository.create(orderId, 'logistics', { logistics_partner_id: partnerId, bill_for: 'cha', bill_no: 'SNAP-CHA-1', bill_date: todayIst(), taxable_inr: 18500, gst_inr: 0 }, userId);
     await orderCostEntryRepository.create(orderId, 'ecgc_insurance', 'ECGC cover', 5000, todayIst(), userId);

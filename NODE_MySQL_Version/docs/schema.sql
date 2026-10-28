@@ -4168,3 +4168,37 @@ ALTER TABLE documents
 -- ================================================================
 ALTER TABLE order_vendor_bills
   ADD COLUMN payment_kind VARCHAR(10) NOT NULL DEFAULT 'final';
+
+-- ================================================================
+-- SECTION CH — PROFORMA / TAX INVOICE AND PAYMENTS (owner decision 2026-10-28, Option B)
+-- A vendor bill is a Proforma (an advance request — not a cost; asks for
+-- requested_amount_inr) or a Tax invoice (the real bill — the cost). A tax
+-- invoice can replace an earlier proforma from the same vendor
+-- (replaces_bill_id), so the advance paid on the proforma counts towards
+-- it. A bill can take several payments (order_vendor_bill_payments; leg =
+-- 'advance' / 'balance' for a supplier bill — the step it was paid from).
+-- order_vendor_bills.paid_at / paid_amount_inr / payment_mode /
+-- payment_ref / paid_by now summarise those payments: paid_at is the day
+-- the bill was settled (NULL while anything is still owed), paid_amount_inr
+-- the total paid on this bill itself.
+-- ================================================================
+ALTER TABLE order_vendor_bills
+  ADD COLUMN doc_kind VARCHAR(10) NOT NULL DEFAULT 'invoice',
+  ADD COLUMN requested_amount_inr DECIMAL(14,2) NULL,
+  ADD COLUMN replaces_bill_id BIGINT UNSIGNED NULL,
+  ADD CONSTRAINT fk_vendor_bill_replaces FOREIGN KEY (replaces_bill_id) REFERENCES order_vendor_bills(id) ON DELETE SET NULL;
+
+CREATE TABLE order_vendor_bill_payments (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  bill_id       BIGINT UNSIGNED NOT NULL,
+  leg           VARCHAR(10)   NULL,
+  paid_at       DATE          NOT NULL,
+  amount_inr    DECIMAL(14,2) NOT NULL,
+  payment_mode  VARCHAR(30)   NOT NULL,
+  payment_ref   VARCHAR(100)  NOT NULL,
+  paid_by       BIGINT UNSIGNED NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_vendor_bill_payment_bill FOREIGN KEY (bill_id) REFERENCES order_vendor_bills(id) ON DELETE CASCADE,
+  CONSTRAINT fk_vendor_bill_payment_user FOREIGN KEY (paid_by) REFERENCES users(id),
+  INDEX idx_vendor_bill_payments_bill (bill_id)
+) ENGINE=InnoDB;

@@ -33,6 +33,34 @@ const date = (v) => (v ? dates.short(String(v)) : '—');
 const ucwords = (s) => String(s).replace(/_/g, ' ').replace(/(^|\s)(\S)/g, (m, sp, c) => sp + c.toUpperCase());
 const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
 
+/**
+ * Owner decision (2026-10-28, Option B): a bill reads as a Proforma or a Tax
+ * invoice, with what it asks for now and which bill replaced which. b is an
+ * enriched bill (orderVendorBillRepository.forOrder).
+ */
+function billLabel(b) {
+  let label = `${orderVendorBillRepository.DOC_KINDS[b.doc_kind]} ${b.bill_no} · ${date(b.bill_date)}`;
+  if (b.doc_kind === 'proforma' && b.requested_amount_inr !== null) label += ` — asks ₹${money(b.requested_amount_inr)} now`;
+  if (b.replaces_bill_no !== null) label += ` — replaces proforma ${b.replaces_bill_no}`;
+  if (b.replaced_by !== null) label += ` — replaced by tax invoice ${b.replaced_by}, not a cost`;
+  return label;
+}
+
+/** Every payment on the bill (and, on a tax invoice, those made on the proforma it replaces), then what is still due. */
+function paidText(b) {
+  const parts = [
+    ...b.carried_payments.map((p) => `₹${money(p.amount_inr)} on ${date(p.paid_at)} (on proforma ${b.replaces_bill_no})`),
+    ...b.payments.map((p) => `₹${money(p.amount_inr)} on ${date(p.paid_at)}`),
+  ];
+  if (!parts.length) return b.replaced_by !== null ? '—' : 'Unpaid';
+  if (!b.settled) parts.push(`₹${money(b.remaining)} still due`);
+  return parts.join('; ');
+}
+
+function utrText(b) {
+  return b.payments.length ? b.payments.map((p) => `${p.payment_mode} · ${p.payment_ref}`).join('; ') : '—';
+}
+
 async function build(orderId) {
   const order = await orderRepository.find(orderId);
   const currency = String(order.currency_code || '');
@@ -94,16 +122,17 @@ async function build(orderId) {
     let paidTotal = 0;
     for (const b of await orderVendorBillRepository.forOrder(orderId, 'supplier')) {
       if (Number(b.supplier_po_id) !== Number(supplierPo.id)) continue;
-      paidTotal += Number(b.paid_amount_inr || 0);
+      paidTotal += b.own_paid;
       bills.push({
         leg: orderVendorBillRepository.SUPPLIER_LEGS[b.bill_for] || b.bill_for,
-        bill: `${b.bill_no} · ${date(b.bill_date)}`,
+        bill: billLabel(b),
         taxable: money(b.taxable_inr),
         gst: money(b.gst_inr),
         total: money(b.total_inr),
-        paid: b.paid_at ? `₹${money(b.paid_amount_inr)} on ${date(b.paid_at)}` : 'Unpaid',
-        unpaid: b.paid_at === null,
-        utr: b.paid_at ? `${b.payment_mode} · ${b.payment_ref}` : '—',
+        paid: paidText(b),
+        unpaid: !b.settled,
+        due: money(b.remaining),
+        utr: utrText(b),
       });
     }
     // Paid before supplier bills were kept — shown from the Supplier PO itself.
@@ -146,24 +175,23 @@ async function build(orderId) {
   const unpaidBills = [];
   for (const b of await orderVendorBillRepository.forOrder(orderId, 'logistics')) {
     const ocean = b.bill_for === 'ocean_freight';
-    if (b.paid_at !== null) {
-      logisticsPaid += Number(b.paid_amount_inr);
-    } else {
-      logisticsDue += Number(b.total_inr);
-      unpaidBills.push(`${b.partner_name || 'Logistics'} ${b.bill_no}, ₹${money(b.total_inr)}`);
+    logisticsPaid += b.own_paid;
+    if (!b.settled) {
+      logisticsDue += b.remaining;
+      unpaidBills.push(`${b.partner_name || 'Logistics'} ${b.bill_no}, ₹${money(b.remaining)} due`);
     }
     logistics.push({
       partner: String(b.partner_name || '—'),
       for: `${orderVendorBillRepository.LOGISTICS_SERVICES[b.bill_for] || b.bill_for}${ocean ? ' (counted in C1)' : ''}`,
-      bill: `${b.bill_no} · ${date(b.bill_date)}`,
+      bill: billLabel(b),
       total: money(b.total_inr),
-      paid: b.paid_at ? `₹${money(b.paid_amount_inr)} on ${date(b.paid_at)}` : 'Unpaid',
-      unpaid: b.paid_at === null,
-      utr: b.paid_at ? `${b.payment_mode} · ${b.payment_ref}` : '—',
+      paid: paidText(b),
+      unpaid: !b.settled,
+      utr: utrText(b),
     });
   }
   for (const row of (supplier && supplier.bills) || []) {
-    if (row.unpaid) unpaidBills.push(`Supplier ${row.bill}, ₹${row.total}`);
+    if (row.unpaid) unpaidBills.push(`Supplier ${row.bill}, ₹${row.due} due`);
   }
 
   // C3 — other order costs (Step 12a).

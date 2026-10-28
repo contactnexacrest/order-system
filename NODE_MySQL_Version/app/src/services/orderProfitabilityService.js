@@ -79,14 +79,17 @@ async function computeForOrder(orderId) {
   // Owner decisions (2026-10-27): the logistics partners' bills (CHA,
   // transport, forwarder) are costs of the order. The forwarder's real
   // ocean-freight bills replace the 9a confirmed rate, so freight is never
-  // counted twice.
+  // counted twice. Owner decision (2026-10-28, Option B): a tax invoice
+  // counts at its total; a proforma only for what was paid on it, and not at
+  // all once a tax invoice replaces it — so a proforma and its invoice for
+  // the same charges are never both counted.
   let logisticsCostInr = 0;
   let oceanFreightBillsInr = null;
   for (const bill of await orderVendorBillRepository.forOrder(orderId, 'logistics')) {
     if (bill.bill_for === 'ocean_freight') {
-      oceanFreightBillsInr = (oceanFreightBillsInr || 0) + Number(bill.total_inr);
+      oceanFreightBillsInr = (oceanFreightBillsInr || 0) + bill.cost_inr;
     } else {
-      logisticsCostInr += Number(bill.total_inr);
+      logisticsCostInr += bill.cost_inr;
     }
   }
   if (oceanFreightBillsInr !== null) {

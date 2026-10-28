@@ -109,11 +109,19 @@ CHA and transport can send one combined bill or separate bills):
   freight or Other;
 - **Payment** — **Advance** (paid before the service) or **Final**
   (against the completed service) (owner decision 2026-10-27);
+- **Bill type** (owner decision 2026-10-28, Option B) — **Proforma /
+  advance request** (asks for money now — not a cost; enter the full
+  charges and, in **Amount asked now**, the part asked for now) or **Tax
+  invoice / final bill** (the cost). A tax invoice can be linked to an
+  earlier proforma from the same partner, so what was paid on the
+  proforma counts towards it and the proforma stops counting;
 - bill number, bill date, taxable value, **GST rate (%)** — GST (₹) and
   the bill total fill in by themselves — the bill file and a note.
 
 Each bill then gets the green **₹ Mark Paid** button (amount, date, mode,
-UTR), exactly like the supplier bills in Steps 7e / 10a.
+UTR), exactly like the supplier bills in Steps 7e / 10a: prefilled with
+what is still due, never more, and a bill can be paid in parts (**₹ Record
+another payment**).
 
 **When a bill can be paid:**
 
@@ -124,8 +132,10 @@ UTR), exactly like the supplier bills in Steps 7e / 10a.
 
 Until 9d, a Final bill shows no Mark Paid and the card explains why;
 Advance bills stay payable. Bills recorded before this choice existed
-count as Final. The table tags each row **Advance** or **Final** and
-totals what is paid and still due. Every logistics bill flows into the
+count as Final, and as tax invoices. The table tags each row **Advance**
+or **Final** and **Proforma** or **Tax invoice**, and totals the cost
+(tax invoices, plus what is paid on a proforma until its tax invoice
+arrives), what is paid and what is still due. Every logistics bill flows into the
 order's financials (Step 12) as logistics cost.
 
 ## What the client does (or doesn't)

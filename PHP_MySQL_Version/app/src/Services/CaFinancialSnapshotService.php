@@ -40,6 +40,53 @@ final class CaFinancialSnapshotService
         return $value ? Dates::short((string) $value) : '—';
     }
 
+    /**
+     * Owner decision (2026-10-28, Option B): a bill reads as a Proforma or a
+     * Tax invoice, with what it asks for now and which bill replaced which.
+     *
+     * @param array<string,mixed> $b an enriched bill (OrderVendorBillRepository::forOrder)
+     */
+    private static function billLabel(array $b): string
+    {
+        $label = OrderVendorBillRepository::DOC_KINDS[$b['doc_kind']] . ' ' . $b['bill_no'] . ' · ' . self::date($b['bill_date']);
+        if ($b['doc_kind'] === 'proforma' && $b['requested_amount_inr'] !== null) {
+            $label .= ' — asks ₹' . self::money($b['requested_amount_inr']) . ' now';
+        }
+        if ($b['replaces_bill_no'] !== null) {
+            $label .= ' — replaces proforma ' . $b['replaces_bill_no'];
+        }
+        if ($b['replaced_by'] !== null) {
+            $label .= ' — replaced by tax invoice ' . $b['replaced_by'] . ', not a cost';
+        }
+        return $label;
+    }
+
+    /** @param array<string,mixed> $b every payment on the bill (and, on a tax invoice, those made on the proforma it replaces), then what is still due */
+    private static function paidText(array $b): string
+    {
+        $parts = [];
+        foreach ($b['carried_payments'] as $p) {
+            $parts[] = '₹' . self::money($p['amount_inr']) . ' on ' . self::date($p['paid_at']) . ' (on proforma ' . $b['replaces_bill_no'] . ')';
+        }
+        foreach ($b['payments'] as $p) {
+            $parts[] = '₹' . self::money($p['amount_inr']) . ' on ' . self::date($p['paid_at']);
+        }
+        if ($parts === []) {
+            return $b['replaced_by'] !== null ? '—' : 'Unpaid';
+        }
+        if (!$b['settled']) {
+            $parts[] = '₹' . self::money($b['remaining']) . ' still due';
+        }
+        return implode('; ', $parts);
+    }
+
+    /** @param array<string,mixed> $b */
+    private static function utrText(array $b): string
+    {
+        $refs = array_map(static fn (array $p): string => $p['payment_mode'] . ' · ' . $p['payment_ref'], $b['payments']);
+        return $refs !== [] ? implode('; ', $refs) : '—';
+    }
+
     /** @return array<string,mixed> */
     public static function build(int $orderId): array
     {
@@ -111,16 +158,17 @@ final class CaFinancialSnapshotService
                 if ((int) $b['supplier_po_id'] !== (int) $supplierPo['id']) {
                     continue;
                 }
-                $paidTotal += (float) ($b['paid_amount_inr'] ?? 0);
+                $paidTotal += $b['own_paid'];
                 $bills[] = [
                     'leg' => OrderVendorBillRepository::SUPPLIER_LEGS[$b['bill_for']] ?? $b['bill_for'],
-                    'bill' => $b['bill_no'] . ' · ' . self::date($b['bill_date']),
+                    'bill' => self::billLabel($b),
                     'taxable' => self::money($b['taxable_inr']),
                     'gst' => self::money($b['gst_inr']),
                     'total' => self::money($b['total_inr']),
-                    'paid' => $b['paid_at'] ? '₹' . self::money($b['paid_amount_inr']) . ' on ' . self::date($b['paid_at']) : 'Unpaid',
-                    'unpaid' => $b['paid_at'] === null,
-                    'utr' => $b['paid_at'] ? $b['payment_mode'] . ' · ' . $b['payment_ref'] : '—',
+                    'paid' => self::paidText($b),
+                    'unpaid' => !$b['settled'],
+                    'due' => self::money($b['remaining']),
+                    'utr' => self::utrText($b),
                 ];
             }
             // Paid before supplier bills were kept — shown from the Supplier PO itself.
@@ -162,25 +210,24 @@ final class CaFinancialSnapshotService
         $unpaidBills = [];
         foreach (OrderVendorBillRepository::forOrder($orderId, 'logistics') as $b) {
             $ocean = $b['bill_for'] === 'ocean_freight';
-            if ($b['paid_at'] !== null) {
-                $logisticsPaid += (float) $b['paid_amount_inr'];
-            } else {
-                $logisticsDue += (float) $b['total_inr'];
-                $unpaidBills[] = ($b['partner_name'] ?? 'Logistics') . ' ' . $b['bill_no'] . ', ₹' . self::money($b['total_inr']);
+            $logisticsPaid += $b['own_paid'];
+            if (!$b['settled']) {
+                $logisticsDue += $b['remaining'];
+                $unpaidBills[] = ($b['partner_name'] ?? 'Logistics') . ' ' . $b['bill_no'] . ', ₹' . self::money($b['remaining']) . ' due';
             }
             $logistics[] = [
                 'partner' => (string) ($b['partner_name'] ?? '—'),
                 'for' => (OrderVendorBillRepository::LOGISTICS_SERVICES[$b['bill_for']] ?? $b['bill_for']) . ($ocean ? ' (counted in C1)' : ''),
-                'bill' => $b['bill_no'] . ' · ' . self::date($b['bill_date']),
+                'bill' => self::billLabel($b),
                 'total' => self::money($b['total_inr']),
-                'paid' => $b['paid_at'] ? '₹' . self::money($b['paid_amount_inr']) . ' on ' . self::date($b['paid_at']) : 'Unpaid',
-                'unpaid' => $b['paid_at'] === null,
-                'utr' => $b['paid_at'] ? $b['payment_mode'] . ' · ' . $b['payment_ref'] : '—',
+                'paid' => self::paidText($b),
+                'unpaid' => !$b['settled'],
+                'utr' => self::utrText($b),
             ];
         }
         foreach ($supplier['bills'] ?? [] as $row) {
             if ($row['unpaid']) {
-                $unpaidBills[] = 'Supplier ' . $row['bill'] . ', ₹' . $row['total'];
+                $unpaidBills[] = 'Supplier ' . $row['bill'] . ', ₹' . $row['due'] . ' due';
             }
         }
 

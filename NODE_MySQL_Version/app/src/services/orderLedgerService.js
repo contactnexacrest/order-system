@@ -105,13 +105,15 @@ async function forOrder(orderId, orderCurrency, full) {
   // Owner decisions (2026-10-27): logistics partners' bills paid, and the
   // order's actual expenses. Real travel expenses replace the provisional
   // travel % line.
+  // Owner decision (2026-10-28, Option B): one line per payment — a bill can
+  // be paid in more than one part.
   for (const bill of await orderVendorBillRepository.forOrder(orderId, 'logistics')) {
-    if (bill.paid_at !== null) {
+    for (const payment of bill.payments) {
       rows.push(out(
-        bill.paid_at,
-        `Logistics paid — ${bill.partner_name || 'Partner'} (${orderVendorBillRepository.LOGISTICS_SERVICES[bill.bill_for] || bill.bill_for}, bill ${bill.bill_no})`,
-        bill.paid_amount_inr,
-        `Logistics bill · ${bill.payment_mode} ${bill.payment_ref}`
+        payment.paid_at,
+        `Logistics paid — ${bill.partner_name || 'Partner'} (${orderVendorBillRepository.LOGISTICS_SERVICES[bill.bill_for] || bill.bill_for}, ${orderVendorBillRepository.DOC_KINDS[bill.doc_kind].toLowerCase()} ${bill.bill_no})`,
+        payment.amount_inr,
+        `Logistics bill · ${payment.payment_mode} ${payment.payment_ref}`
       ));
     }
   }

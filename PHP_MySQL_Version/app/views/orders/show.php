@@ -521,7 +521,13 @@ $vendorBillPayTo = static function (?array $bank, string $editUrl, bool $canEdit
         . ($bank['bank_verified_at'] ? ' <span class="badge good">&#10003; Verified</span>' : ' <span class="badge warn">&#9888; Not verified — check before paying</span>' . $editLink)
         . '</div>';
 };
-$renderVendorBills = static function (array $bills, bool $showPartner, bool $canPay, ?string $payBlocked, callable $payToFor) use ($order): void {
+// Owner decision (2026-10-28, Option B): each bill is a Proforma (an
+// advance request — not a cost) or a Tax invoice (the cost); a tax invoice
+// can replace an earlier proforma so what was paid on it counts towards the
+// invoice; a bill takes as many payments as it needs. $leg is the supplier
+// step a payment recorded here counts towards (7e advance, 10a balance);
+// $carriedIds are 7e bills shown in 10a until fully paid.
+$renderVendorBills = static function (array $bills, bool $showPartner, bool $canPay, ?string $payBlocked, callable $payToFor, ?string $leg = null, array $carriedIds = []) use ($order): void {
     if ($bills === []) {
         echo '<p class="muted small">No bills added yet.</p>';
         if ($canPay && $payBlocked !== null) {
@@ -529,13 +535,15 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
         }
         return;
     }
-    $total = $paid = 0.0;
+    $cost = $paid = $due = 0.0;
+    $money = static fn ($v): string => number_format((float) $v, 2);
     ?>
     <table class="list vendor-bills">
-      <tr><?php if ($showPartner): ?><th>Partner</th><?php endif; ?><th>For</th><?php if ($showPartner): ?><th>Payment</th><?php endif; ?><th>Bill / invoice</th><th style="text-align:right">Taxable &#8377;</th><th style="text-align:right">GST &#8377;</th><th style="text-align:right">Bill total &#8377;</th><th>Paid</th></tr>
+      <tr><?php if ($showPartner): ?><th>Partner</th><?php endif; ?><th>For</th><?php if ($showPartner): ?><th>Payment</th><?php endif; ?><th>Type</th><th>Bill / invoice</th><th style="text-align:right">Taxable &#8377;</th><th style="text-align:right">GST &#8377;</th><th style="text-align:right">Bill total &#8377;</th><th>Paid</th></tr>
       <?php foreach ($bills as $b): ?>
-        <?php $total += (float) $b['total_inr']; $paid += (float) ($b['paid_amount_inr'] ?? 0); ?>
+        <?php $cost += $b['cost_inr']; $paid += $b['own_paid']; $due += $b['remaining']; ?>
         <?php $forLabel = $b['vendor_kind'] === 'supplier' ? (\App\Repositories\OrderVendorBillRepository::SUPPLIER_LEGS[$b['bill_for']] ?? $b['bill_for']) : (\App\Repositories\OrderVendorBillRepository::LOGISTICS_SERVICES[$b['bill_for']] ?? $b['bill_for']); ?>
+        <?php $__isProforma = $b['doc_kind'] === 'proforma'; ?>
       <tr id="vendor-bill-<?= (int) $b['id'] ?>">
         <?php if ($showPartner): ?><td><?= htmlspecialchars((string) ($b['partner_name'] ?? '—')) ?></td><?php endif; ?>
         <td><?= htmlspecialchars($forLabel) ?></td>
@@ -545,22 +553,35 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
         $__rowBlocked = $__isAdvanceBill ? null : $payBlocked;
         ?>
         <?php if ($showPartner): ?><td><span class="badge <?= $__isAdvanceBill ? 'badge-advance' : 'badge-final' ?>"><?= $__isAdvanceBill ? 'Advance' : 'Final' ?></span></td><?php endif; ?>
-        <td><?= htmlspecialchars((string) $b['bill_no']) ?> · <?= htmlspecialchars(\App\Helpers\Dates::short((string) $b['bill_date'])) ?><?php if (!empty($b['bill_file_id'])): ?> · <a href="/file-store/<?= (int) $b['bill_file_id'] ?>/download">bill</a><?php endif; ?><?php if (!empty($b['note'])): ?><br><small class="muted"><?= htmlspecialchars((string) $b['note']) ?></small><?php endif; ?></td>
-        <td style="text-align:right"><?= number_format((float) $b['taxable_inr'], 2) ?></td>
-        <td style="text-align:right"><?= number_format((float) $b['gst_inr'], 2) ?></td>
-        <td style="text-align:right"><?= number_format((float) $b['total_inr'], 2) ?></td>
-        <td>
-          <?php if ($b['paid_at'] !== null): ?>
-            <span class="vendor-bill-paid">&#10003; &#8377;<?= number_format((float) $b['paid_amount_inr'], 2) ?> on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $b['paid_at'])) ?></span><br><small class="muted"><?= htmlspecialchars((string) $b['payment_mode']) ?> · <?= htmlspecialchars((string) $b['payment_ref']) ?></small>
+        <td><span class="badge <?= $__isProforma ? 'badge-proforma' : 'badge-invoice' ?>"><?= $__isProforma ? 'Proforma' : 'Tax invoice' ?></span></td>
+        <td><?= htmlspecialchars((string) $b['bill_no']) ?> · <?= htmlspecialchars(\App\Helpers\Dates::short((string) $b['bill_date'])) ?><?php if (!empty($b['bill_file_id'])): ?> · <a href="/file-store/<?= (int) $b['bill_file_id'] ?>/download">bill</a><?php endif; ?>
+          <?php if ($__isProforma && $b['requested_amount_inr'] !== null): ?><br><small class="muted">Asks for &#8377;<?= $money($b['requested_amount_inr']) ?> now</small><?php endif; ?>
+          <?php if ($b['replaces_bill_no'] !== null): ?><br><small class="muted">Replaces proforma <?= htmlspecialchars($b['replaces_bill_no']) ?></small><?php endif; ?>
+          <?php if ($b['replaced_by'] !== null): ?><br><small class="muted">Replaced by tax invoice <?= htmlspecialchars($b['replaced_by']) ?></small><?php endif; ?>
+          <?php if (in_array((int) $b['id'], $carriedIds, true)): ?><br><small class="muted">Added in Step 7e — shown here until fully paid</small><?php endif; ?>
+          <?php if (!empty($b['note'])): ?><br><small class="muted"><?= htmlspecialchars((string) $b['note']) ?></small><?php endif; ?></td>
+        <td style="text-align:right"><?= $money($b['taxable_inr']) ?></td>
+        <td style="text-align:right"><?= $money($b['gst_inr']) ?></td>
+        <td style="text-align:right"><?= $money($b['total_inr']) ?><?php if ($__isProforma): ?><br><small class="muted">not a cost<?= $b['replaced_by'] === null && $b['own_paid'] > 0 ? ' — what is paid counts until its tax invoice arrives' : '' ?></small><?php endif; ?></td>
+        <td class="vendor-bill-payments">
+          <?php foreach ($b['carried_payments'] as $__p): ?>
+            <div><span class="vendor-bill-paid">&#10003; &#8377;<?= $money($__p['amount_inr']) ?> on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $__p['paid_at'])) ?></span><br><small class="muted">advance, on proforma <?= htmlspecialchars((string) $b['replaces_bill_no']) ?></small></div>
+          <?php endforeach; ?>
+          <?php foreach ($b['payments'] as $__p): ?>
+            <div><span class="vendor-bill-paid">&#10003; &#8377;<?= $money($__p['amount_inr']) ?> on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $__p['paid_at'])) ?></span><br><small class="muted"><?= htmlspecialchars((string) $__p['payment_mode']) ?> · <?= htmlspecialchars((string) $__p['payment_ref']) ?></small></div>
+          <?php endforeach; ?>
+          <?php if ($b['settled']): ?>
+            <?php if ($b['replaced_by'] !== null): ?><small class="muted">Nothing due — replaced</small><?php elseif ($b['payments'] === [] && $b['carried_payments'] === []): ?><small class="muted">Nothing due</small><?php endif; ?>
           <?php else: ?>
-            <span class="vendor-bill-due">Unpaid</span>
+            <span class="vendor-bill-due"><?= $b['payments'] === [] && $b['carried_payments'] === [] ? 'Unpaid' : 'Due &#8377;' . $money($b['remaining']) ?></span>
             <?php if ($canPay && $__rowBlocked === null): ?>
             <details class="vendor-bill-pay">
-              <summary class="btn-sm">Mark Paid</summary>
+              <summary class="btn-sm"><?= $b['payments'] === [] ? 'Mark Paid' : '&#8377; Record another payment' ?></summary>
               <?= $payToFor($b) ?>
               <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/<?= (int) $b['id'] ?>/pay" class="field-grid">
                 <?= \App\Helpers\Csrf::field() ?>
-                <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" name="paid_amount_inr" value="<?= htmlspecialchars((string) $b['total_inr']) ?>" required></label>
+                <?php if ($leg !== null): ?><input type="hidden" name="leg" value="<?= htmlspecialchars($leg) ?>"><?php endif; ?>
+                <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" max="<?= htmlspecialchars(number_format($b['remaining'], 2, '.', '')) ?>" name="paid_amount_inr" value="<?= htmlspecialchars(number_format($b['remaining'], 2, '.', '')) ?>" required></label>
                 <label>Paid on *<input type="date" name="paid_at" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required></label>
                 <label>Mode *
                   <select name="payment_mode" required>
@@ -571,28 +592,37 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
                 <div><button type="submit" class="btn-sm">Save Payment</button></div>
               </form>
             </details>
+            <?php if ($b['payments'] === []): ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/<?= (int) $b['id'] ?>/delete" data-confirm="Remove the unpaid bill <?= htmlspecialchars((string) $b['bill_no'], ENT_QUOTES) ?>?" style="display:inline">
               <?= \App\Helpers\Csrf::field() ?>
               <button type="submit" class="btn-link small">Remove</button>
             </form>
             <?php endif; ?>
+            <?php endif; ?>
           <?php endif; ?>
         </td>
       </tr>
       <?php endforeach; ?>
-      <tr><td colspan="<?= $showPartner ? 6 : 4 ?>"><strong>Total</strong></td><td style="text-align:right"><strong><?= number_format($total, 2) ?></strong></td><td><span class="vendor-bill-paid">Paid &#8377;<?= number_format($paid, 2) ?></span><?php if ($total - $paid > 0.004): ?><br><span class="vendor-bill-due">Due &#8377;<?= number_format($total - $paid, 2) ?></span><?php endif; ?></td></tr>
+      <tr><td colspan="<?= $showPartner ? 7 : 5 ?>"><strong>Total cost</strong> <small class="muted">(tax invoices; a proforma only for what is paid on it, until its tax invoice arrives)</small></td><td style="text-align:right"><strong><?= $money($cost) ?></strong></td><td><span class="vendor-bill-paid">Paid &#8377;<?= $money($paid) ?></span><br><?= $due > 0.004 ? '<span class="vendor-bill-due">Due &#8377;' . $money($due) . '</span>' : '<span class="vendor-bill-paid">Nothing due</span>' ?></td></tr>
     </table>
     <?php if ($canPay && $payBlocked !== null): ?>
       <p class="review-banner warn">&#9888; <?= htmlspecialchars($payBlocked) ?> Bills can still be added now.</p>
     <?php endif; ?>
     <?php
 };
-// The bill fields both kinds share (number, date, taxable, GST, the bill itself).
-$vendorBillFields = static function () use ($gstRates): void {
+// The bill fields both kinds share (type, number, date, taxable, GST, the
+// bill itself). Owner decision (2026-10-28, Option B): a Proforma may say
+// how much it asks for now; a Tax invoice may replace an earlier proforma.
+$vendorBillFields = static function (string $defaultKind = 'invoice', array $replaceable = [], ?string $askedHint = null) use ($gstRates): void {
     ?>
+    <fieldset class="full radio-row">
+      <legend>Bill type *</legend>
+      <label><input type="radio" name="doc_kind" value="proforma" required<?= $defaultKind === 'proforma' ? ' checked' : '' ?>> <span><b>Proforma / advance request</b><br><small class="muted">Asks for money now. Not counted as a cost.</small></span></label>
+      <label><input type="radio" name="doc_kind" value="invoice" required<?= $defaultKind === 'invoice' ? ' checked' : '' ?>> <span><b>Tax invoice / final bill</b><br><small class="muted">The real bill. Counted as the order's cost.</small></span></label>
+    </fieldset>
     <label>Bill / invoice no. *<input type="text" name="bill_no" required maxlength="100" placeholder="e.g. INV-120"></label>
     <label>Bill date *<input type="date" name="bill_date" required max="<?= date('Y-m-d') ?>"></label>
-    <label>Taxable value (&#8377;) *<input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base></label>
+    <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base></label>
     <label>GST rate (%) *
       <select name="gst_rate_pct" required data-gst-rate>
         <?php foreach ($gstRates as $o): ?>
@@ -602,6 +632,18 @@ $vendorBillFields = static function () use ($gstRates): void {
     </label>
     <label>GST (&#8377;) <small class="muted">(auto: Taxable &times; GST rate)</small><input type="text" readonly tabindex="-1" data-gst-amount value="0.00"></label>
     <label>Bill total (&#8377;) <small class="muted">(auto: Taxable + GST)</small><input type="text" readonly tabindex="-1" data-gst-total value="0.00"></label>
+    <label data-show-when="doc_kind=proforma">Amount asked now (&#8377;) <small class="muted">(leave blank when the proforma asks for the whole bill<?= $askedHint !== null ? ' — ' . htmlspecialchars($askedHint) : '' ?>)</small><input type="number" step="0.01" min="0.01" name="requested_amount_inr" data-not-more-than="[data-gst-total]" data-not-more-than-message="The amount asked now cannot be more than the bill total."></label>
+    <?php if ($replaceable !== []): ?>
+    <label class="full" data-show-when="doc_kind=invoice">Advance already paid on a proforma from this vendor
+      <select name="replaces_bill_id">
+        <option value="">None — this invoice replaces no proforma</option>
+        <?php foreach ($replaceable as $__pf): ?>
+          <option value="<?= (int) $__pf['id'] ?>"<?= count($replaceable) === 1 ? ' selected' : '' ?>><?= htmlspecialchars(($__pf['partner_name'] ?? null) !== null ? $__pf['partner_name'] . ' — ' : '') ?><?= htmlspecialchars((string) $__pf['bill_no']) ?> — &#8377;<?= number_format($__pf['own_paid'], 2) ?> paid</option>
+        <?php endforeach; ?>
+      </select>
+      <small class="muted">What was paid on the proforma counts towards this invoice; the proforma stops counting as a cost.</small>
+    </label>
+    <?php endif; ?>
     <label>Attach bill *<input type="file" name="bill_file" required accept=".pdf,.jpg,.jpeg,.png"></label>
     <label>Note<input type="text" name="note" maxlength="500" placeholder="optional"></label>
     <?php
@@ -617,7 +659,13 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
     $planned = $supplierPo[$leg . '_amount_inr'] ?? null;
     $paidAt = $supplierPo[$leg . '_paid_at'] ?? null;
     $label = $leg === 'advance' ? 'Advance' : 'Balance';
-    $legBills = array_values(array_filter($vendorBills, static fn (array $b): bool => $b['vendor_kind'] === 'supplier' && (int) $b['supplier_po_id'] === (int) $supplierPo['id'] && $b['bill_for'] === $leg));
+    $poBills = array_values(array_filter($vendorBills, static fn (array $b): bool => $b['vendor_kind'] === 'supplier' && (int) $b['supplier_po_id'] === (int) $supplierPo['id']));
+    $legBills = array_values(array_filter($poBills, static fn (array $b): bool => $b['bill_for'] === $leg));
+    // Owner decision (2026-10-28, Option B): a 7e tax invoice not yet fully
+    // paid is shown in 10a as well, so its balance is paid from there.
+    $carried = $leg === 'balance' ? array_values(array_filter($poBills, static fn (array $b): bool => $b['bill_for'] === 'advance' && $b['doc_kind'] === 'invoice' && !$b['settled'])) : [];
+    $legBills = array_merge($carried, $legBills);
+    $replaceable = array_values(array_filter($poBills, static fn (array $b): bool => $b['doc_kind'] === 'proforma' && $b['replaced_by'] === null));
     $inr = static fn ($v): string => is_numeric($v) ? '&#8377;' . number_format((float) $v, 2) : '—';
     echo '<div class="plan-bar"><div>Supplier PO<b>' . htmlspecialchars((string) $supplierPo['supplier_po_reference']) . '</b></div>'
         . '<div>PO total<b>' . $inr($supplierPo['total_payable_inr'] ?? null) . '</b></div>'
@@ -641,7 +689,7 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
     if ($noAdvance && $legBills === []) {
         echo '<p class="review-banner ok">&#10003; <span><strong>No advance on this order</strong> — the Supplier PO terms plan no advance, so there is nothing to pay here. The full amount is paid as the supplier balance in <a href="#step-10a-supplier-balance-paid">Step 10a</a>.</span></p>';
     } else {
-        $renderVendorBills($legBills, false, $canManageSupplierPayments, $payBlocked, static fn (array $b): string => $vendorBillPayTo($supplierBank, $editUrl, $canEditSupplier));
+        $renderVendorBills($legBills, false, $canManageSupplierPayments, $payBlocked, static fn (array $b): string => $vendorBillPayTo($supplierBank, $editUrl, $canEditSupplier), $leg, array_map(static fn (array $b): int => (int) $b['id'], $carried));
     }
     if (!$canManageSupplierPayments) {
         echo '<p class="muted small">Bills and payments are recorded by Accounts (needs the "Manage supplier payments" permission).</p>';
@@ -649,11 +697,11 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
     }
     ?>
     <details class="vendor-bill-add"<?= $legBills === [] && !$noAdvance ? ' open' : '' ?>>
-      <summary class="small"><strong>+ Add the supplier's <?= strtolower($label) ?> bill<?= $noAdvance ? ' anyway' : '' ?></strong> <span class="muted">(<?= $leg === 'advance' ? 'advance / proforma invoice' : 'tax invoice' ?>)</span></summary>
+      <summary class="small"><strong>+ Add the supplier's <?= strtolower($label) ?> bill<?= $noAdvance ? ' anyway' : '' ?></strong> <span class="muted">(<?= $leg === 'advance' ? 'proforma or tax invoice' : 'tax invoice' ?>)</span></summary>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/supplier" enctype="multipart/form-data" class="field-grid">
         <?= \App\Helpers\Csrf::field() ?>
         <input type="hidden" name="bill_for" value="<?= htmlspecialchars($leg) ?>">
-        <?php $vendorBillFields(); ?>
+        <?php $vendorBillFields($leg === 'advance' ? 'proforma' : 'invoice', $replaceable, $leg === 'advance' && (float) ($planned ?? 0) > 0 ? 'the planned advance is ₹' . number_format((float) $planned, 2) : null); ?>
         <div><button type="submit" class="btn-sm">Add Bill</button></div>
       </form>
     </details>
@@ -2672,7 +2720,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     // Steps 9-11 and never locks them; on CFR/CIF orders a bill can be paid
     // only once the buyer's Debit Note payment has cleared (9d).
     $__logisticsBills = array_values(array_filter($vendorBills, static fn (array $b): bool => $b['vendor_kind'] === 'logistics'));
-    $__logisticsUnpaid = count(array_filter($__logisticsBills, static fn (array $b): bool => $b['paid_at'] === null));
+    $__logisticsUnpaid = count(array_filter($__logisticsBills, static fn (array $b): bool => !$b['settled']));
     $__logisticsStatus = $__logisticsBills !== [] && $__logisticsUnpaid === 0 ? 'done' : (in_array($currentUserStep, ['9', '10', '11'], true) ? 'current' : 'locked');
   ?>
   <?php if ($canManageSupplierPayments || $canManageOrderFinancials): ?>
@@ -2710,7 +2758,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           </select>
           <small class="muted"><?= $isFob ? 'Advance and Final bills can both be paid any time on an FOB order.' : 'An Advance bill can be paid any time; a Final bill waits for Step 9d.' ?></small>
         </label>
-        <?php $vendorBillFields(); ?>
+        <?php $vendorBillFields('invoice', array_values(array_filter($__logisticsBills, static fn (array $b): bool => $b['doc_kind'] === 'proforma' && $b['replaced_by'] === null))); ?>
         <div><button type="submit" class="btn-sm">Add Bill</button></div>
       </form>
       <?php endif; ?>
@@ -3264,7 +3312,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         // its receipt (or a reason when no bill exists). The travel % of FOB
         // stays the provisional figure until real travel expenses are recorded.
         $__travelBudget = $orderTravelExpenses ? (float) $orderTravelExpenses['expense_amount'] : null;
-        $__logisticsTotal = array_sum(array_map(static fn (array $b): float => (float) $b['total_inr'], array_filter($vendorBills, static fn (array $b): bool => $b['vendor_kind'] === 'logistics')));
+        $__logisticsTotal = array_sum(array_map(static fn (array $b): float => $b['cost_inr'], array_filter($vendorBills, static fn (array $b): bool => $b['vendor_kind'] === 'logistics')));
       ?>
       <div class="order-expenses" id="order-expenses">
         <h3 style="font-size:0.95em; margin-top:10px;">Order Expenses — travel &amp; other</h3>
@@ -3886,10 +3934,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php
         // Owner decision (2026-10-27): unpaid supplier / logistics bills are a
         // warning here, not a block — accounts may settle vendor bills later.
-        $__unpaidBills = array_values(array_filter($vendorBills, static fn (array $b): bool => $b['paid_at'] === null));
+        $__unpaidBills = array_values(array_filter($vendorBills, static fn (array $b): bool => !$b['settled']));
       ?>
       <?php if ($__unpaidBills !== []): ?>
-        <p class="review-banner warn" id="unpaid-vendor-bills-warning">&#9888; <?= count($__unpaidBills) ?> vendor bill<?= count($__unpaidBills) === 1 ? '' : 's' ?> still unpaid: &#8377;<?= number_format(array_sum(array_map(static fn (array $b): float => (float) $b['total_inr'], $__unpaidBills)), 2) ?>
+        <p class="review-banner warn" id="unpaid-vendor-bills-warning">&#9888; <?= count($__unpaidBills) ?> vendor bill<?= count($__unpaidBills) === 1 ? '' : 's' ?> still unpaid: &#8377;<?= number_format(array_sum(array_map(static fn (array $b): float => $b['remaining'], $__unpaidBills)), 2) ?> due
           (<?= htmlspecialchars(implode(', ', array_map(static fn (array $b): string => ($b['vendor_kind'] === 'supplier' ? 'Supplier' : (string) ($b['partner_name'] ?? 'Logistics')) . ' ' . $b['bill_no'], $__unpaidBills))) ?>) — you can still mark the order fully settled.</p>
       <?php endif; ?>
       <?php if ($canEditLockedData): ?>

@@ -784,6 +784,13 @@ details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.
 /* Owner decision (2026-10-27): logistics bills are tagged Advance or Final. */
 .badge.badge-advance{background:#EAF1FD;color:#1F4E9E;}
 .badge.badge-final{background:#FDF3E2;color:#A67623;}
+/* Owner decision (2026-10-28, Option B): Proforma vs Tax invoice, and the bill-type choice. */
+.badge.badge-proforma{background:#EEF2FF;color:#3730A3;}
+.badge.badge-invoice{background:#ECFDF5;color:#065F46;}
+fieldset.radio-row{border:0;padding:0;margin:0;display:flex;gap:18px;flex-wrap:wrap;}
+fieldset.radio-row legend{font-weight:600;padding:0;margin-bottom:4px;}
+fieldset.radio-row label{display:flex;gap:6px;align-items:flex-start;font-weight:400;}
+.vendor-bill-payments > div{margin-bottom:4px;}
 /* Owner decision (2026-10-27): a green "all clear" banner (e.g. Step 7e with no supplier advance). */
 .review-banner.ok{background:var(--success-soft);color:var(--success);}
 

@@ -38,7 +38,7 @@ final class CaFinancialSnapshotTest extends DbTestCase
         ], 'signed');
         $po = OrderSupplierPoRepository::findLatestForOrder($orderId);
         $bill = OrderVendorBillRepository::create($orderId, 'supplier', ['supplier_po_id' => (int) $po['id'], 'bill_for' => 'balance', 'bill_no' => 'SNAP-TI-1', 'bill_date' => date('Y-m-d'), 'taxable_inr' => 45000, 'gst_inr' => 0], $userId);
-        OrderVendorBillRepository::markPaid($bill, date('Y-m-d'), 45000, 'NEFT / RTGS', 'UTR-SNAP', $userId);
+        OrderVendorBillRepository::addPayment($bill, 'balance', date('Y-m-d'), 45000, 'NEFT / RTGS', 'UTR-SNAP', $userId);
         $partnerId = LogisticsPartnerRepository::create(['partner_name' => 'Snapshot CHA', 'service_type' => 'cha'], $userId);
         OrderVendorBillRepository::create($orderId, 'logistics', ['logistics_partner_id' => $partnerId, 'bill_for' => 'cha', 'bill_no' => 'SNAP-CHA-1', 'bill_date' => date('Y-m-d'), 'taxable_inr' => 18500, 'gst_inr' => 0], $userId);
         OrderCostEntryRepository::create($orderId, 'ecgc_insurance', 'ECGC cover', 5000, date('Y-m-d'), $userId);

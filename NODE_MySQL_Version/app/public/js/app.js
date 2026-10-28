@@ -482,6 +482,15 @@
       var file = el.form.elements.namedItem(el.dataset.requiredUnless);
       if (file && file.files && file.files.length === 0) return el.dataset.requiredUnlessMessage || 'Attach the receipt / bill, or give the reason no bill exists.';
     }
+    // data-not-more-than="<selector>": a number that cannot exceed another
+    // field in the same form (e.g. a proforma's amount asked now, at most
+    // the bill total).
+    if (el.dataset.notMoreThan && el.form && value !== '') {
+      var cap = el.form.querySelector(el.dataset.notMoreThan);
+      if (cap && cap.value !== '' && parseFloat(value) > parseFloat(cap.value) + 0.004) {
+        return el.dataset.notMoreThanMessage || 'This cannot be more than ' + cap.value + '.';
+      }
+    }
     var bankMessage = bankError(el, value);
     if (bankMessage) return bankMessage;
     if (/^bank_account_number(_confirm)?$/.test(name) && value !== '' && !/^[0-9]{6,20}$/.test(value.replace(/\s+/g, ''))) {
@@ -573,6 +582,31 @@
       revealElement(el);
       showFieldError(el, el.validationMessage || 'Please check this field.');
     }, true);
+  }
+
+  // data-show-when="<name>=<value>": shown only while that field of the same
+  // form has that value (e.g. a proforma's "amount asked now" only for a
+  // Proforma). While hidden its inputs are disabled, so they are neither
+  // checked nor sent.
+  function initShowWhen() {
+    function update(form) {
+      Array.prototype.forEach.call(form.querySelectorAll('[data-show-when]'), function (el) {
+        var cond = el.dataset.showWhen.split('=');
+        var field = form.elements.namedItem(cond[0]);
+        var show = !!field && field.value === cond[1];
+        el.hidden = !show;
+        el.style.display = show ? '' : 'none';
+        Array.prototype.forEach.call(el.querySelectorAll('input, select, textarea'), function (input) {
+          input.disabled = !show;
+        });
+      });
+    }
+    document.addEventListener('change', function (e) {
+      if (e.target && e.target.form) update(e.target.form);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('form'), function (form) {
+      if (form.querySelector('[data-show-when]')) update(form);
+    });
   }
 
   // Owner request (2026-10-27): GST is always picked as a rate (%) and the
@@ -713,6 +747,7 @@
     initRemittanceStatements();
     initSchemeRows();
     initGstCalc();
+    initShowWhen();
     initAutoReasons();
     initFieldLabels();
     initStepStatusClasses();

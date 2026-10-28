@@ -83,13 +83,15 @@ final class OrderLedgerService
         // Owner decisions (2026-10-27): logistics partners' bills paid, and the
         // order's actual expenses. Real travel expenses replace the provisional
         // travel % line.
+        // Owner decision (2026-10-28, Option B): one line per payment — a
+        // bill can be paid in more than one part.
         foreach (OrderVendorBillRepository::forOrder($orderId, 'logistics') as $bill) {
-            if ($bill['paid_at'] !== null) {
+            foreach ($bill['payments'] as $payment) {
                 $rows[] = self::out(
-                    (string) $bill['paid_at'],
-                    'Logistics paid — ' . ($bill['partner_name'] ?? 'Partner') . ' (' . (OrderVendorBillRepository::LOGISTICS_SERVICES[$bill['bill_for']] ?? $bill['bill_for']) . ', bill ' . $bill['bill_no'] . ')',
-                    $bill['paid_amount_inr'],
-                    'Logistics bill · ' . $bill['payment_mode'] . ' ' . $bill['payment_ref']
+                    (string) $payment['paid_at'],
+                    'Logistics paid — ' . ($bill['partner_name'] ?? 'Partner') . ' (' . (OrderVendorBillRepository::LOGISTICS_SERVICES[$bill['bill_for']] ?? $bill['bill_for']) . ', ' . strtolower(OrderVendorBillRepository::DOC_KINDS[$bill['doc_kind']]) . ' ' . $bill['bill_no'] . ')',
+                    $payment['amount_inr'],
+                    'Logistics bill · ' . $payment['payment_mode'] . ' ' . $payment['payment_ref']
                 );
             }
         }

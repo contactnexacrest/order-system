@@ -152,19 +152,49 @@ default); everyone else sees the amounts but no buttons.
 
 Each leg is **bill first, then payment**:
 
-1. **+ Add the supplier's advance bill** (7e — the supplier's advance /
-   proforma invoice) or **balance bill** (10a — the tax invoice): bill
-   number, bill date, taxable value, **GST rate (%)** picked from the GST
-   Rate list (0, 5, 12, 18, 28 — 18% preselected), the bill file and an
-   optional note. **GST (₹)** and **Bill total (₹)** fill in by themselves
-   and can't be typed; the server works the GST out again on save and
-   refuses a rate that isn't on the list.
+1. **+ Add the supplier's advance bill** (7e) or **balance bill** (10a).
+   First pick the **Bill type** (owner decision 2026-10-28, Option B):
+   - **Proforma / advance request** — the supplier asks for money now. It
+     is *not* a cost. 7e starts on Proforma. Enter the full value exactly
+     as printed on the proforma, and in **Amount asked now (₹)** the part
+     it asks for now (e.g. the 40% advance — the planned advance is shown
+     as a hint). Leave it blank when the proforma asks for the whole bill;
+     it can't be more than the bill total.
+   - **Tax invoice / final bill** — the real bill; this is the cost. 10a
+     starts on Tax invoice. When an earlier proforma from this supplier is
+     on the order, **Advance already paid on a proforma from this vendor**
+     links it (picked automatically when there is only one): what was paid
+     on the proforma counts towards the invoice, and the proforma stops
+     counting as a cost — so the same goods are never paid or counted
+     twice.
+
+   Then the bill number, bill date, taxable value, **GST rate (%)** picked
+   from the GST Rate list (0, 5, 12, 18, 28 — 18% preselected), the bill
+   file and an optional note. **GST (₹)** and **Bill total (₹)** fill in by
+   themselves and can't be typed; the server works the GST out again on
+   save and refuses a rate that isn't on the list.
 2. **₹ Mark Paid** (the green button in the bill's row) opens the payment
-   form: amount paid (the bill total, prefilled), paid on, mode (NEFT /
-   RTGS, IMPS, UPI, Cheque) and UTR / reference. The supplier's bank
-   details show above it, or a warning with a link when none are on file.
-   **Save Payment** marks the bill paid; the leg is done once its bills are
-   paid.
+   form: amount paid (prefilled with what is still due — a proforma's
+   asked amount, or an invoice's total less anything already paid on it or
+   on its proforma), paid on, mode (NEFT / RTGS, IMPS, UPI, Cheque) and
+   UTR / reference. The supplier's bank details show above it, or a
+   warning with a link when none are on file. More than is still due is
+   refused. A bill can be paid in parts: after the first payment the
+   button reads **₹ Record another payment**, and the row lists every
+   payment with its UTR and **Due ₹…** until nothing is left. A payment
+   counts towards the step it is recorded from (7e advance, 10a balance).
+
+**Example** — supplier PO ₹5,31,000, 40% advance: in 7e add Proforma
+PI-045 for ₹5,31,000 asking ₹2,12,400 now, and pay ₹2,12,400. In 10a add
+Tax invoice TI-112 for ₹5,31,000 linked to PI-045 — it shows ₹2,12,400
+already paid and **Due ₹3,18,600**; pay that. The supplier is paid
+₹5,31,000 once, and only the tax invoice is counted as cost.
+
+- **A tax invoice added in 7e that is not fully paid** (the supplier sent
+  the final bill up front) is shown in 10a as well — "Added in Step 7e —
+  shown here until fully paid" — so its balance is paid from 10a.
+- A bill with a payment on it can't be removed; **Remove** shows only on a
+  bill with no payment yet.
 
 The top of each card shows the Supplier PO reference, the PO total, the
 amount planned for that leg and — once paid — how much and when.

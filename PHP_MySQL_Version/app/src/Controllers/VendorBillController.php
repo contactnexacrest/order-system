@@ -74,6 +74,46 @@ final class VendorBillController
         ];
     }
 
+    /**
+     * Owner decision (2026-10-28, Option B): the bill type, a proforma's
+     * asked amount, and the earlier proforma a tax invoice replaces.
+     * $sameVendor says whether a proforma comes from the same vendor.
+     *
+     * @param array<string,mixed> $fields the bill fields (for its total)
+     * @return array<string,mixed>|string the extra fields, or an error message
+     */
+    private function docKindFields(int $orderId, string $vendorKind, array $fields, callable $sameVendor): array|string
+    {
+        $docKind = (string) ($_POST['doc_kind'] ?? 'invoice');
+        if (!isset(OrderVendorBillRepository::DOC_KINDS[$docKind])) {
+            return 'Choose whether the bill is a Proforma or a Tax invoice.';
+        }
+        $total = round((float) $fields['taxable_inr'] + (float) $fields['gst_inr'], 2);
+        if ($docKind === 'proforma') {
+            $asked = trim((string) ($_POST['requested_amount_inr'] ?? ''));
+            if ($asked === '') {
+                return ['doc_kind' => 'proforma', 'requested_amount_inr' => null, 'replaces_bill_id' => null];
+            }
+            if (!is_numeric($asked) || (float) $asked <= 0) {
+                return 'Enter the amount the proforma asks for now (₹), or leave it blank when it asks for the whole bill.';
+            }
+            if (round((float) $asked, 2) > $total + 0.004) {
+                return 'The amount asked now cannot be more than the bill total (₹' . number_format($total, 2) . ').';
+            }
+            return ['doc_kind' => 'proforma', 'requested_amount_inr' => round((float) $asked, 2), 'replaces_bill_id' => null];
+        }
+        $replaces = (int) ($_POST['replaces_bill_id'] ?? 0);
+        if ($replaces === 0) {
+            return ['doc_kind' => 'invoice', 'requested_amount_inr' => null, 'replaces_bill_id' => null];
+        }
+        foreach (OrderVendorBillRepository::replaceableProformas($orderId, $vendorKind) as $proforma) {
+            if ((int) $proforma['id'] === $replaces && $sameVendor($proforma)) {
+                return ['doc_kind' => 'invoice', 'requested_amount_inr' => null, 'replaces_bill_id' => $replaces];
+            }
+        }
+        return 'That proforma cannot be linked — it is from another vendor, or already replaced by an invoice.';
+    }
+
     private static function validDate(string $date): bool
     {
         return (bool) preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) && checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
@@ -99,6 +139,12 @@ final class VendorBillController
             $this->back($orderId, $anchor, 'error', $fields);
             return;
         }
+        $kind = $this->docKindFields($orderId, 'supplier', $fields, static fn (array $b): bool => (int) $b['supplier_po_id'] === (int) $supplierPo['id']);
+        if (is_string($kind)) {
+            $this->back($orderId, $anchor, 'error', $kind);
+            return;
+        }
+        $fields += $kind;
         $user = AuthService::currentUser();
         try {
             $fileId = FileUploadService::handleUpload('bill_file', 'vendor_bill', OrderStorage::forReceived($order, 'supplier_po'), (int) $order['client_id'], $orderId, (int) $user['id'], null, (string) ($supplierPo['supplier_legal_name'] ?? 'Supplier'), 'Supplier bill / invoice');
@@ -107,8 +153,8 @@ final class VendorBillController
             return;
         }
         $billId = OrderVendorBillRepository::create($orderId, 'supplier', $fields + ['supplier_po_id' => (int) $supplierPo['id'], 'bill_for' => $leg, 'bill_file_id' => $fileId], (int) $user['id']);
-        AuditLogRepository::log((int) $user['id'], 'SUPPLIER_BILL_ADDED', 'order_vendor_bills', $billId, 'bill_no', null, $fields['bill_no'], OrderVendorBillRepository::SUPPLIER_LEGS[$leg] . ' bill ₹' . number_format($fields['taxable_inr'] + $fields['gst_inr'], 2));
-        $this->back($orderId, $anchor, 'success', 'Supplier bill ' . $fields['bill_no'] . ' added — mark it paid once the payment goes out.');
+        AuditLogRepository::log((int) $user['id'], 'SUPPLIER_BILL_ADDED', 'order_vendor_bills', $billId, 'bill_no', null, $fields['bill_no'], OrderVendorBillRepository::SUPPLIER_LEGS[$leg] . ' ' . OrderVendorBillRepository::DOC_KINDS[$fields['doc_kind']] . ' ₹' . number_format($fields['taxable_inr'] + $fields['gst_inr'], 2));
+        $this->back($orderId, $anchor, 'success', 'Supplier ' . strtolower(OrderVendorBillRepository::DOC_KINDS[$fields['doc_kind']]) . ' ' . $fields['bill_no'] . ' added — record the payment once it goes out.');
     }
 
     public function addLogisticsBill(array $params): void
@@ -141,6 +187,12 @@ final class VendorBillController
             $this->back($orderId, $anchor, 'error', $fields);
             return;
         }
+        $kind = $this->docKindFields($orderId, 'logistics', $fields, static fn (array $b): bool => (int) $b['logistics_partner_id'] === (int) $partner['id']);
+        if (is_string($kind)) {
+            $this->back($orderId, $anchor, 'error', $kind);
+            return;
+        }
+        $fields += $kind;
         $user = AuthService::currentUser();
         try {
             $fileId = FileUploadService::handleUpload('bill_file', 'vendor_bill', OrderStorage::forReceived($order, 'freight'), (int) $order['client_id'], $orderId, (int) $user['id'], null, (string) $partner['partner_name'], 'Logistics partner bill');
@@ -149,7 +201,7 @@ final class VendorBillController
             return;
         }
         $billId = OrderVendorBillRepository::create($orderId, 'logistics', $fields + ['logistics_partner_id' => (int) $partner['id'], 'bill_for' => $service, 'payment_kind' => $paymentKind, 'bill_file_id' => $fileId], (int) $user['id']);
-        AuditLogRepository::log((int) $user['id'], 'LOGISTICS_BILL_ADDED', 'order_vendor_bills', $billId, 'bill_no', null, $fields['bill_no'], $partner['partner_name'] . ' — ' . OrderVendorBillRepository::LOGISTICS_SERVICES[$service] . ' (' . OrderVendorBillRepository::LOGISTICS_PAYMENT_KINDS[$paymentKind] . ') ₹' . number_format($fields['taxable_inr'] + $fields['gst_inr'], 2));
+        AuditLogRepository::log((int) $user['id'], 'LOGISTICS_BILL_ADDED', 'order_vendor_bills', $billId, 'bill_no', null, $fields['bill_no'], $partner['partner_name'] . ' — ' . OrderVendorBillRepository::LOGISTICS_SERVICES[$service] . ' (' . OrderVendorBillRepository::LOGISTICS_PAYMENT_KINDS[$paymentKind] . ', ' . OrderVendorBillRepository::DOC_KINDS[$fields['doc_kind']] . ') ₹' . number_format($fields['taxable_inr'] + $fields['gst_inr'], 2));
         $this->back($orderId, $anchor, 'success', 'Bill ' . $fields['bill_no'] . ' from ' . $partner['partner_name'] . ' added.');
     }
 
@@ -180,9 +232,15 @@ final class VendorBillController
             echo 'Bill not found.';
             return;
         }
-        $anchor = $bill['vendor_kind'] === 'supplier' ? self::ANCHORS[$bill['bill_for']] ?? self::ANCHORS['advance'] : self::ANCHORS['logistics'];
-        if ($bill['paid_at'] !== null) {
-            $this->back($orderId, $anchor, 'error', 'Bill ' . $bill['bill_no'] . ' is already marked paid.');
+        // A supplier payment counts towards the step it is recorded from
+        // (7e advance, 10a balance) — one tax invoice can take both.
+        $leg = $bill['vendor_kind'] === 'supplier' ? (string) ($_POST['leg'] ?? $bill['bill_for']) : null;
+        if ($leg !== null && !isset(OrderVendorBillRepository::SUPPLIER_LEGS[$leg])) {
+            $leg = (string) $bill['bill_for'];
+        }
+        $anchor = $leg !== null ? self::ANCHORS[$leg] ?? self::ANCHORS['advance'] : self::ANCHORS['logistics'];
+        if ($bill['settled']) {
+            $this->back($orderId, $anchor, 'error', 'Nothing is due on bill ' . $bill['bill_no'] . ($bill['replaced_by'] !== null ? ' — it was replaced by tax invoice ' . $bill['replaced_by'] . '.' : ' — it is fully paid.'));
             return;
         }
         $supplierPo = null;
@@ -193,7 +251,7 @@ final class VendorBillController
                 return;
             }
             // Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one.
-            if ($bill['bill_for'] === 'balance' && (float) ($supplierPo['advance_amount_inr'] ?? 0) > 0 && empty($supplierPo['advance_paid_at'])) {
+            if ($leg === 'balance' && (float) ($supplierPo['advance_amount_inr'] ?? 0) > 0 && empty($supplierPo['advance_paid_at'])) {
                 $this->back($orderId, $anchor, 'error', 'Pay the supplier advance (Step 7e) first — the Supplier PO terms plan an advance of ₹' . number_format((float) $supplierPo['advance_amount_inr'], 2) . '.');
                 return;
             }
@@ -210,6 +268,10 @@ final class VendorBillController
         $amount = trim((string) ($_POST['paid_amount_inr'] ?? ''));
         if (!is_numeric($amount) || (float) $amount <= 0) {
             $this->back($orderId, $anchor, 'error', 'Enter the amount paid (₹).');
+            return;
+        }
+        if (round((float) $amount, 2) > $bill['remaining'] + 0.004) {
+            $this->back($orderId, $anchor, 'error', 'That is more than is still due on bill ' . $bill['bill_no'] . ' (₹' . number_format($bill['remaining'], 2) . ').');
             return;
         }
         $mode = (string) ($_POST['payment_mode'] ?? '');
@@ -229,17 +291,17 @@ final class VendorBillController
             return;
         }
 
-        OrderVendorBillRepository::markPaid((int) $bill['id'], $paidAt, round((float) $amount, 2), $mode, mb_substr($reference, 0, 100), (int) $user['id']);
+        OrderVendorBillRepository::addPayment((int) $bill['id'], $leg, $paidAt, round((float) $amount, 2), $mode, mb_substr($reference, 0, 100), (int) $user['id']);
         if ($supplierPo !== null) {
             // The Supplier PO's own advance / balance paid figures (Steps
             // 7e / 10a, reports, the ledger) follow the bills paid on that leg.
-            [$legPaid, $lastPaid] = OrderVendorBillRepository::supplierLegPaid((int) $supplierPo['id'], (string) $bill['bill_for']);
-            if ($bill['bill_for'] === 'advance') {
+            [$legPaid, $lastPaid] = OrderVendorBillRepository::supplierLegPaid((int) $supplierPo['id'], (string) $leg);
+            if ($leg === 'advance') {
                 OrderSupplierPoRepository::markAdvancePaid((int) $supplierPo['id'], (string) $lastPaid, (int) $user['id'], $legPaid);
             } else {
                 OrderSupplierPoRepository::markBalancePaid((int) $supplierPo['id'], (string) $lastPaid, (int) $user['id'], $legPaid);
             }
-            AuditLogRepository::log((int) $user['id'], $bill['bill_for'] === 'advance' ? 'SUPPLIER_ADVANCE_PAID' : 'SUPPLIER_BALANCE_PAID', 'order_supplier_po', (int) $supplierPo['id'], $bill['bill_for'] . '_paid_date', null, $paidAt, 'Against bill ' . $bill['bill_no'] . ' — ' . $mode . ' ' . $reference);
+            AuditLogRepository::log((int) $user['id'], $leg === 'advance' ? 'SUPPLIER_ADVANCE_PAID' : 'SUPPLIER_BALANCE_PAID', 'order_supplier_po', (int) $supplierPo['id'], $leg . '_paid_date', null, $paidAt, 'Against bill ' . $bill['bill_no'] . ' — ' . $mode . ' ' . $reference);
         }
         AuditLogRepository::log((int) $user['id'], 'VENDOR_BILL_PAID', 'order_vendor_bills', (int) $bill['id'], 'paid_at', null, $paidAt, '₹' . number_format((float) $amount, 2) . ' — ' . $mode . ' ' . $reference);
         $this->back($orderId, $anchor, 'success', 'Payment of ₹' . number_format((float) $amount, 2) . ' against bill ' . $bill['bill_no'] . ' recorded.');
@@ -256,10 +318,10 @@ final class VendorBillController
         }
         $anchor = $bill['vendor_kind'] === 'supplier' ? self::ANCHORS[$bill['bill_for']] ?? self::ANCHORS['advance'] : self::ANCHORS['logistics'];
         if (!OrderVendorBillRepository::deleteUnpaid((int) $bill['id'])) {
-            $this->back($orderId, $anchor, 'error', 'A paid bill stays on record and cannot be removed.');
+            $this->back($orderId, $anchor, 'error', 'A bill with a payment on it stays on record and cannot be removed.');
             return;
         }
-        AuditLogRepository::log((int) AuthService::currentUserId(), 'VENDOR_BILL_REMOVED', 'order_vendor_bills', (int) $bill['id'], 'bill_no', $bill['bill_no'], null, 'Unpaid bill removed.');
+        AuditLogRepository::log((int) AuthService::currentUserId(), 'VENDOR_BILL_REMOVED', 'order_vendor_bills', (int) $bill['id'], 'bill_no', $bill['bill_no'], null, 'Bill with no payment removed.');
         $this->back($orderId, $anchor, 'success', 'Bill ' . $bill['bill_no'] . ' removed.');
     }
 }
