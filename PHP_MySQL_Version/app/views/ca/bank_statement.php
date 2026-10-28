@@ -43,7 +43,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caBankUser['id'],
                   : ($l['matched_expense_id'] !== null ? \App\Repositories\CaFyLockRepository::lockMessageForDate($l['matched_expense_date'] ?? null) : null);
             ?>
             <?php if ($l['matched_order_id'] !== null): ?>
-              Revenue: <?= $canViewOrders ? '<a href="/orders/' . (int) $l['matched_order_id'] . '">' . htmlspecialchars($l['matched_order_ref']) . '</a>' : htmlspecialchars($l['matched_order_ref']) ?> — <?= htmlspecialchars(ucfirst($l['matched_leg'])) ?>
+              Revenue: <?= \App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $l['matched_order_id']) ? '<a href="/orders/' . (int) $l['matched_order_id'] . '">' . htmlspecialchars($l['matched_order_ref']) . '</a>' : htmlspecialchars($l['matched_order_ref']) ?> — <?= htmlspecialchars(ucfirst($l['matched_leg'])) ?>
               <?php if ($matchLockMessage !== null && !$canOverrideFyLock): ?>
                 <br><span class="muted small">&#128274; <?= htmlspecialchars($matchLockMessage) ?></span>
               <?php else: ?>

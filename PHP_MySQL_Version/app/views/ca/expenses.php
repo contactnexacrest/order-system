@@ -35,7 +35,7 @@ $canManageCa = \App\Services\PermissionService::can((int) $__caExpensesUser['id'
           <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
           <td>
             <?php if ($e['order_id'] !== null): ?>
-              <?= $canViewOrders ? '<a href="/orders/' . (int) $e['order_id'] . '">' . htmlspecialchars($e['order_reference']) . '</a>' : htmlspecialchars($e['order_reference']) ?>
+              <?= \App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $e['order_id']) ? '<a href="/orders/' . (int) $e['order_id'] . '">' . htmlspecialchars($e['order_reference']) . '</a>' : htmlspecialchars($e['order_reference']) ?>
               <?php if ($canEditTds): ?>
                 <form method="post" action="/ca/expenses/<?= (int) $e['id'] ?>/link-order" style="display:inline" onsubmit="return confirm('Unlink this expense from its order?');">
                   <?= \App\Helpers\Csrf::field() ?>

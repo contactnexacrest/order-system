@@ -21,7 +21,7 @@
           <td>{{ e.amount | money }} {{ e.currency_code }}</td>
           <td>
             {% if e.order_id != null %}
-              {% if permissions.manage_orders or permissions.view_orders %}<a href="/orders/{{ e.order_id }}">{{ e.order_reference }}</a>{% else %}{{ e.order_reference }}{% endif %}
+              {% if canOpenOrder(e.order_id) %}<a href="/orders/{{ e.order_id }}">{{ e.order_reference }}</a>{% else %}{{ e.order_reference }}{% endif %}
               {% if canEditTds %}
                 <form method="post" action="/ca/expenses/{{ e.id }}/link-order" style="display:inline" onsubmit="return confirm('Unlink this expense from its order?');">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">

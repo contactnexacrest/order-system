@@ -43,10 +43,9 @@ final class OpsNavGroupVisibilityTest extends DbTestCase
 
     public function testOpsGroupRendersWithAClientsLinkForAUserWhoseOnlyOpsPermissionIsViewClients(): void
     {
-        // CA / Chartered Accountant is seeded with neither manage_orders
-        // nor view_clients/view_orders (docs/seed.sql) — a clean base role
-        // to add exactly one override onto.
-        $userId = $this->createTestUser('CA / Chartered Accountant');
+        // A role with no permissions at all — a clean base to add exactly
+        // one override onto.
+        $userId = $this->createTestUser($this->noPermissionRole());
         $this->grantOnlyPermission($userId, 'view_clients');
 
         $output = $this->renderDashboardAs($userId);
@@ -57,7 +56,7 @@ final class OpsNavGroupVisibilityTest extends DbTestCase
 
     public function testOpsGroupRendersWithAnOrdersLinkForAUserWhoseOnlyOpsPermissionIsViewOrders(): void
     {
-        $userId = $this->createTestUser('CA / Chartered Accountant');
+        $userId = $this->createTestUser($this->noPermissionRole());
         $this->grantOnlyPermission($userId, 'view_orders');
 
         $output = $this->renderDashboardAs($userId);
@@ -78,17 +77,27 @@ final class OpsNavGroupVisibilityTest extends DbTestCase
 
     public function testOpsGroupStaysHiddenForAUserWithNoOpsPermissionsAtAll(): void
     {
-        // CA / Chartered Accountant is seeded with only ca_module_view +
-        // inr_actual_view (docs/seed.sql) — none of manage_orders,
+        // A role with no permissions at all — none of manage_orders,
         // view_archived_orders, manage_disputes, respond_to_disputes,
-        // view_clients or view_orders, so this is a clean negative case
+        // view_clients or view_orders — so this is a clean negative case
         // without mutating any shared role_permissions row.
-        $userId = $this->createTestUser('CA / Chartered Accountant');
+        $userId = $this->createTestUser($this->noPermissionRole());
 
         $output = $this->renderDashboardAs($userId);
 
         self::assertStringNotContainsString('href="/clients"', $output);
         self::assertStringNotContainsString('href="/orders"', $output);
         self::assertStringNotContainsString('>Operations</summary>', $output);
+    }
+
+    /**
+     * A role holding no permission at all — the CA role used to serve as
+     * this clean base, until it was given view_orders (owner decision
+     * 2026-10-28).
+     */
+    private function noPermissionRole(): string
+    {
+        \App\Config\Database::connection()->exec("INSERT IGNORE INTO roles (name, description, is_system_role) VALUES ('Test Role — No Permissions', 'Test only', 0)");
+        return 'Test Role — No Permissions';
     }
 }

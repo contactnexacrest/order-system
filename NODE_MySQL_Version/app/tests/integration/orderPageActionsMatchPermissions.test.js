@@ -92,8 +92,7 @@ describe('Order page offers only actions the user may use (QA Round 5, R5-20)', 
     return [...denied].sort();
   }
 
-  // (CA / Chartered Accountant can't open order pages at all — no view_orders.)
-  it.each(['Viewer / Auditor', 'Logistics Executive', 'Accounts Executive'])('%s is offered no action it may not use', async (roleName) => {
+  it.each(['Viewer / Auditor', 'Logistics Executive', 'Accounts Executive', 'CA / Chartered Accountant'])('%s is offered no action it may not use', async (roleName) => {
     expect(await deniedActionsShownTo(roleName)).toEqual([]);
   });
 });

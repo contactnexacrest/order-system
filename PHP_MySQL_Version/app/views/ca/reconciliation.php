@@ -41,7 +41,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caReconUser['id']
         <tr><th>Order Ref</th><th>Leg</th><th>Cleared On</th><th>INR Actual</th></tr>
         <?php foreach ($unmatchedRevenueLegs as $leg): ?>
         <tr>
-          <td><?= $canViewOrders ? '<a href="/orders/' . (int) $leg['order_id'] . '">' . htmlspecialchars($leg['buyer_inquiry_ref']) . '</a>' : htmlspecialchars($leg['buyer_inquiry_ref']) ?></td>
+          <td><?= \App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $leg['order_id']) ? '<a href="/orders/' . (int) $leg['order_id'] . '">' . htmlspecialchars($leg['buyer_inquiry_ref']) . '</a>' : htmlspecialchars($leg['buyer_inquiry_ref']) ?></td>
           <td><?= htmlspecialchars(ucfirst($leg['leg'])) ?></td>
           <td><?= htmlspecialchars((string) $leg['cleared_at']) ?></td>
           <td>&#8377;<?= number_format((float) $leg['inr_actual'], 2) ?></td>

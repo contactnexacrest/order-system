@@ -50,7 +50,7 @@
         <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Foreign Amount</th><th>Currency</th><th>Exchange Rate</th><th>Cleared On</th><th>INR Actual</th><th>Forex Gain/(Loss)</th><th>FIRC/eBRC</th><th>Zoho Books</th></tr>
         {% for s in settlements %}
         <tr>
-          <td>{% if permissions.manage_orders or permissions.view_orders %}<a href="/orders/{{ s.order_id }}">{{ s.buyer_inquiry_ref }}</a>{% else %}{{ s.buyer_inquiry_ref }}{% endif %}</td>
+          <td>{% if canOpenOrder(s.order_id) %}<a href="/orders/{{ s.order_id }}">{{ s.buyer_inquiry_ref }}</a>{% else %}{{ s.buyer_inquiry_ref }}{% endif %}</td>
           <td>{{ s.company_legal_name }}</td>
           <td>{{ s.leg | capitalize }}</td>
           <td>{{ (s.foreign_amount | money) if s.foreign_amount != null else '—' }}</td>

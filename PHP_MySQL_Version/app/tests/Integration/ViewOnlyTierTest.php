@@ -55,8 +55,8 @@ final class ViewOnlyTierTest extends DbTestCase
 
     public function testRequiresAnyBlocksAUserWithNeitherPermission(): void
     {
-        // 'CA / Chartered Accountant' holds ca_module_view/inr_actual_view only — neither manage_orders nor view_orders/view_clients.
-        $userId = $this->createTestUser('CA / Chartered Accountant');
+        // A role with no permissions at all — neither manage_orders nor view_orders/view_clients.
+        $userId = $this->createTestUser($this->noPermissionRole());
         $_SESSION['_auth_user_id'] = $userId;
 
         self::assertFalse($this->callRequiresAny(['manage_orders', 'view_orders']));
@@ -162,5 +162,16 @@ final class ViewOnlyTierTest extends DbTestCase
 
         self::assertTrue($this->callRequiresAny(['view_orders']));
         self::assertTrue($this->callRequiresAny(['view_clients']));
+    }
+
+    /**
+     * A role holding no permission at all — the CA role used to serve as
+     * this clean base, until it was given view_orders (owner decision
+     * 2026-10-28).
+     */
+    private function noPermissionRole(): string
+    {
+        \App\Config\Database::connection()->exec("INSERT IGNORE INTO roles (name, description, is_system_role) VALUES ('Test Role — No Permissions', 'Test only', 0)");
+        return 'Test Role — No Permissions';
     }
 }

@@ -30,7 +30,7 @@
         <tr>
           <td><?= htmlspecialchars((string) $row['created_at']) ?></td>
           <td><?= htmlspecialchars($row['triggered_by']) ?><?= $row['triggered_by_name'] ? ' (' . htmlspecialchars($row['triggered_by_name']) . ')' : '' ?></td>
-          <td><?= $row['entity_id'] ? '<a href="/orders/' . (int) $row['entity_id'] . '">Order #' . (int) $row['entity_id'] . '</a>' . ($row['leg'] ? ' — ' . htmlspecialchars(ucfirst($row['leg'])) : '') : '<span class="muted">—</span>' ?></td>
+          <td><?= $row['entity_id'] ? (\App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $row['entity_id']) ? '<a href="/orders/' . (int) $row['entity_id'] . '">Order #' . (int) $row['entity_id'] . '</a>' : 'Order #' . (int) $row['entity_id']) . ($row['leg'] ? ' — ' . htmlspecialchars(ucfirst($row['leg'])) : '') : '<span class="muted">—</span>' ?></td>
           <td>
             <?php if ($row['status'] === 'success'): ?>
               <span style="color:var(--success)">Success</span>

@@ -1,5 +1,6 @@
 'use strict';
 
+const orderAccessService = require('../services/orderAccessService');
 const caRepository = require('../repositories/caRepository');
 const caExpenseRepository = require('../repositories/caExpenseRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
@@ -89,6 +90,7 @@ async function usersById() {
 
 async function index(req, res) {
   res.renderView('ca/index', {
+    canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     settlements: await caRepository.settlementRegister(),
     usersById: await usersById(),
     // Point 3 (2026-10-01): zoho-sync and fy-locks are gated on the
@@ -130,6 +132,7 @@ async function reports(req, res) {
   }
 
   res.renderView('ca/reports', {
+    canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     mode,
     period,
     availableFy,
@@ -150,6 +153,7 @@ async function reports(req, res) {
  */
 async function zohoSync(req, res) {
   res.renderView('ca/zoho_sync', {
+    canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     isEnabled: await zohoBooksService.isEnabled(),
     pendingCount: (await caRepository.legsPendingZohoSync()).length,
     log: await zohoSyncLogRepository.recent(100),
@@ -194,6 +198,7 @@ async function expenses(req, res) {
   }
 
   res.renderView('ca/expenses', {
+    canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     expenses: allExpenses,
     usersById: await usersById(),
     canEditTds: !!req.permissions.inr_actual_edit,
@@ -362,6 +367,7 @@ async function exportBenefits(req, res) {
   }
 
   res.renderView('ca/export_benefits', {
+    canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     benefits,
     schemeOptions: await lookupRepository.dropdownOptions('export_benefit_scheme'),
     totalClaimed: await caExportBenefitRepository.totalClaimed(),
@@ -500,6 +506,7 @@ async function bankStatement(req, res) {
   }
 
   res.renderView('ca/bank_statement', {
+    canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     lines,
     unmatchedRevenueLegs,
     unmatchedExpenses,
@@ -626,6 +633,7 @@ async function reconciliation(req, res) {
   const allLines = await caBankStatementRepository.all();
 
   res.renderView('ca/reconciliation', {
+    canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     bankTotals,
     totalRevenue: await caRepository.totalInrActualAll(),
     totalExpenses: await caExpenseRepository.totalAll(),

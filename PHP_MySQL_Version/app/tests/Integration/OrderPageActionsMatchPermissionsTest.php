@@ -123,5 +123,9 @@ final class OrderPageActionsMatchPermissionsTest extends DbTestCase
         self::assertSame([], $this->deniedActionsShownTo('Accounts Executive'));
     }
 
-    // (CA / Chartered Accountant can't open order pages at all — no view_orders.)
+    /** Owner decision (2026-10-28): the CA has view_orders (read-only) and view_cafin. */
+    public function testACaIsOfferedNoActionItMayNotUse(): void
+    {
+        self::assertSame([], $this->deniedActionsShownTo('CA / Chartered Accountant'));
+    }
 }

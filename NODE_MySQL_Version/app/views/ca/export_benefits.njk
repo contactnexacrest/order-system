@@ -58,7 +58,7 @@
         <tr>
           <td>{{ b.claimed_at }}</td>
           <td>{{ b.scheme_name }}</td>
-          <td>{% if b.order_id %}<a href="/orders/{{ b.order_id }}">{{ b.order_reference }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if b.order_id and canOpenOrder(b.order_id) %}<a href="/orders/{{ b.order_id }}">{{ b.order_reference }}</a>{% elif b.order_id %}{{ b.order_reference }}{% else %}<span class="muted">—</span>{% endif %}</td>
           <td class="muted small">{{ b.reference_number or '—' }}</td>
           <td>{{ b.claimed_amount | money }} {{ b.currency_code }}</td>
           <td>

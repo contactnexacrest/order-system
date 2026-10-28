@@ -53,9 +53,13 @@ order-management access, or vice versa.
 | `ca_internal_doc_manage` | Turn on, and generate, the internal-only CA Financial Annexure for a specific order (see below) — deliberately **not** granted to the Accounts Executive or CA roles by default, unlike every other CA permission. |
 | `manage_order_financials` | View/add/edit an order's government export benefit claims, other order costs, and its Order Profitability Sheet, all from the order's own page (see [Order Financials](./ca-08-order-financials.md)) — deliberately **stricter** than `ca_module_view`/`inr_actual_edit`: not auto-granted to Accounts Executive or CA, Admin/MD/ED and Super Admin only by default. |
 
-A new role, **CA / Chartered Accountant**, is seeded with `ca_module_view`
-and `inr_actual_view` only — a view-only role for an external or in-house
-Chartered Accountant, with no order-management access at all. The
+A new role, **CA / Chartered Accountant**, is seeded with `ca_module_view`,
+`inr_actual_view`, `view_cafin` and `view_orders` — a view-only role for an
+external or in-house Chartered Accountant, with no order-management access
+at all. `view_orders` (owner decision 2026-10-28) lets the CA open the
+pages of the orders assigned to them, read-only, and so reach each order's
+CAFIN box; assign the CA to an order, or also grant "View all orders", to
+open every order. The
 **Accounts Executive** role is granted `ca_module_view`,
 `inr_actual_view`, and `inr_actual_edit` (not delete) — but, deliberately,
 **not** `ca_internal_doc_manage`. **Admin, Managing Director,** and

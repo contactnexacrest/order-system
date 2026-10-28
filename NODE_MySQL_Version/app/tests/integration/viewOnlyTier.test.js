@@ -45,6 +45,16 @@ describe('View-only tier for Orders/Clients (Batch 3 #13a part 2)', () => {
     return { userId: result.insertId, email, password };
   }
 
+  /**
+   * A role holding no permission at all — the CA role used to serve as
+   * this clean base, until it was given view_orders (owner decision
+   * 2026-10-28).
+   */
+  async function noPermissionRole() {
+    await db.execute("INSERT IGNORE INTO roles (name, description, is_system_role) VALUES ('Test Role — No Permissions', 'Test only', 0)");
+    return 'Test Role — No Permissions';
+  }
+
   async function effectivePermissionsFor(roleName) {
     const role = await db.queryOne('SELECT id FROM roles WHERE name = :name', { name: roleName });
     const { userId } = await createLoginableUser(roleName);
@@ -74,8 +84,8 @@ describe('View-only tier for Orders/Clients (Batch 3 #13a part 2)', () => {
   });
 
   test('requiresAny blocks a user with neither permission', async () => {
-    // 'CA / Chartered Accountant' holds ca_module_view/inr_actual_view only — neither manage_orders nor view_orders/view_clients.
-    const { userId, permissions } = await effectivePermissionsFor('CA / Chartered Accountant');
+    // A role with no permissions at all — neither manage_orders nor view_orders/view_clients.
+    const { userId, permissions } = await effectivePermissionsFor(await noPermissionRole());
     expect(await callRequiresAny(['manage_orders', 'view_orders'], userId, permissions)).toBe(false);
     expect(await callRequiresAny(['manage_orders', 'view_clients'], userId, permissions)).toBe(false);
   });

@@ -32,8 +32,19 @@ describe('Ops nav group visibility (External QA report U-18)', () => {
 
   const PASSWORD = 'Nav-Test-Password-1!';
 
-  async function createTestStaffUserWithRealPassword(roleName = 'CA / Chartered Accountant') {
-    const role = await db.queryOne('SELECT id FROM roles WHERE name = :name', { name: roleName });
+
+  /**
+   * A role holding no permission at all — the CA role used to serve as
+   * this clean base, until it was given view_orders (owner decision
+   * 2026-10-28).
+   */
+  async function noPermissionRole() {
+    await db.execute("INSERT IGNORE INTO roles (name, description, is_system_role) VALUES ('Test Role — No Permissions', 'Test only', 0)");
+    return 'Test Role — No Permissions';
+  }
+
+  async function createTestStaffUserWithRealPassword(roleName = null) {
+    const role = await db.queryOne('SELECT id FROM roles WHERE name = :name', { name: roleName || (await noPermissionRole()) });
     const hash = await passwordHash.hash(PASSWORD);
     const email = `jest-opsnavtest-${Math.random().toString(16).slice(2, 10)}@nexacrest.test`;
     const result = await db.execute(

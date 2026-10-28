@@ -58,7 +58,7 @@
         <tr>
           <td><?= htmlspecialchars((string) $b['claimed_at']) ?></td>
           <td><?= htmlspecialchars($b['scheme_name']) ?></td>
-          <td><?= $b['order_id'] !== null ? '<a href="/orders/' . (int) $b['order_id'] . '">' . htmlspecialchars($b['order_reference']) . '</a>' : '<span class="muted">—</span>' ?></td>
+          <td><?= $b['order_id'] === null ? '<span class="muted">—</span>' : (\App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $b['order_id']) ? '<a href="/orders/' . (int) $b['order_id'] . '">' . htmlspecialchars($b['order_reference']) . '</a>' : htmlspecialchars($b['order_reference'])) ?></td>
           <td class="muted small"><?= htmlspecialchars((string) ($b['reference_number'] ?? '—')) ?></td>
           <td><?= number_format((float) $b['claimed_amount'], 2) ?> <?= htmlspecialchars($b['currency_code']) ?></td>
           <td>

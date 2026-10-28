@@ -131,7 +131,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'CA / Chartered Accountant'
-  AND p.permission_key IN ('ca_module_view','inr_actual_view','view_cafin');
+  AND p.permission_key IN ('ca_module_view','inr_actual_view','view_cafin','view_orders'); -- view_orders: owner decision 2026-10-28 (read-only, so the CA can open an order and its CAFIN box)
 
 -- ================================================================
 -- USERS — one seeded account to get in the door.

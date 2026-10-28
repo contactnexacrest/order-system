@@ -72,7 +72,7 @@
         <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Cleared On</th><th>Foreign Amount</th><th>INR Actual</th><th>Forex Gain/(Loss)</th></tr>
         {% for r in report.rows %}
         <tr>
-          <td>{% if permissions.manage_orders or permissions.view_orders %}<a href="/orders/{{ r.order_id }}">{{ r.buyer_inquiry_ref }}</a>{% else %}{{ r.buyer_inquiry_ref }}{% endif %}</td>
+          <td>{% if canOpenOrder(r.order_id) %}<a href="/orders/{{ r.order_id }}">{{ r.buyer_inquiry_ref }}</a>{% else %}{{ r.buyer_inquiry_ref }}{% endif %}</td>
           <td>{{ r.company_legal_name }}</td>
           <td>{{ r.leg | capitalize }}</td>
           <td>{{ r.cleared_at }}</td>

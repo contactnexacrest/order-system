@@ -45,5 +45,6 @@ final class PermissionService
         self::$cachedForUserId = null;
         self::$superAdminCache = null;
         self::$superAdminCachedForUserId = null;
+        OrderAccessService::resetCache();
     }
 }

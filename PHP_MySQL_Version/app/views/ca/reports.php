@@ -79,7 +79,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caReportsUser['id
         <tr><th>Order Ref</th><th>Client</th><th>Leg</th><th>Cleared On</th><th>Foreign Amount</th><th>INR Actual</th><th>Forex Gain/(Loss)</th></tr>
         <?php foreach ($report['rows'] as $r): ?>
         <tr>
-          <td><?= $canViewOrders ? '<a href="/orders/' . (int) $r['order_id'] . '">' . htmlspecialchars($r['buyer_inquiry_ref']) . '</a>' : htmlspecialchars($r['buyer_inquiry_ref']) ?></td>
+          <td><?= \App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $r['order_id']) ? '<a href="/orders/' . (int) $r['order_id'] . '">' . htmlspecialchars($r['buyer_inquiry_ref']) . '</a>' : htmlspecialchars($r['buyer_inquiry_ref']) ?></td>
           <td><?= htmlspecialchars($r['company_legal_name']) ?></td>
           <td><?= htmlspecialchars(ucfirst($r['leg'])) ?></td>
           <td><?= htmlspecialchars((string) $r['cleared_at']) ?></td>

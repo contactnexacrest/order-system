@@ -1,5 +1,6 @@
 'use strict';
 
+const db = require('../config/db');
 const orderAssigneeRepository = require('../repositories/orderAssigneeRepository');
 const orderRepository = require('../repositories/orderRepository');
 const documentRepository = require('../repositories/documentRepository');
@@ -50,4 +51,26 @@ async function denialReasonForPath(path, userId, permissions) {
   return order ? denialReason(order, userId, permissions) : null;
 }
 
-module.exports = { denialReason, orderIdForPath, denialReasonForPath };
+/**
+ * For list pages (the CA hub, reports, ...) deciding whether an order
+ * reference is a link or plain text: returns canOpenOrder(id), the same
+ * answer as /orders/:id would give — manage_orders or view_orders, plus
+ * denialReason()'s archived and assignment rules. Two queries at most.
+ */
+async function orderLinkChecker(userId, permissions) {
+  const perms = permissions || {};
+  if (!perms.manage_orders && !perms.view_orders) return () => false;
+  const assigned = perms.view_all_orders
+    ? null
+    : new Set((await db.query('SELECT order_id FROM order_assignees WHERE user_id = :u', { u: userId })).map((r) => Number(r.order_id)));
+  const archived = perms.view_archived_orders
+    ? null
+    : new Set((await db.query('SELECT id FROM orders WHERE is_archived = 1')).map((r) => Number(r.id)));
+  return (orderId) => {
+    const id = Number(orderId);
+    if (archived && archived.has(id)) return false;
+    return assigned === null || assigned.has(id);
+  };
+}
+
+module.exports = { denialReason, orderIdForPath, denialReasonForPath, orderLinkChecker };

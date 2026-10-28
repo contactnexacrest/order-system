@@ -16,6 +16,9 @@ use App\Repositories\OrderRepository;
  */
 final class OrderAccessService
 {
+    /** @var array{user: int, ids: array<int, true>, archived: array<int, true>}|null per-request cache for currentUserMayOpenOrderId() */
+    private static ?array $openableCache = null;
+
     /** @return string|null why this user may not see the order, or null when they may */
     public static function denialReason(array $order, int $userId, ?int $roleId): ?string
     {
@@ -52,5 +55,44 @@ final class OrderAccessService
         $orderId = self::orderIdForPath($path);
         $order = $orderId !== null ? OrderRepository::find($orderId) : null;
         return $order ? self::denialReason($order, $userId, $roleId) : null;
+    }
+
+    /**
+     * Whether the signed-in user may open /orders/{id} — for list pages
+     * (the CA hub, reports, ...) deciding whether an order reference is a
+     * link or plain text. Same answer as the route: manage_orders or
+     * view_orders, plus denialReason()'s archived and assignment rules.
+     * Two queries per request at most, whatever the number of rows.
+     */
+    public static function currentUserMayOpenOrderId(int $orderId): bool
+    {
+        $user = AuthService::currentUser();
+        if (!$user) {
+            return false;
+        }
+        $userId = (int) $user['id'];
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!PermissionService::can($userId, $roleId, 'manage_orders') && !PermissionService::can($userId, $roleId, 'view_orders')) {
+            return false;
+        }
+        if (self::$openableCache === null || self::$openableCache['user'] !== $userId) {
+            $pdo = \App\Config\Database::connection();
+            $assigned = $pdo->prepare('SELECT order_id FROM order_assignees WHERE user_id = :u');
+            $assigned->execute(['u' => $userId]);
+            self::$openableCache = [
+                'user'     => $userId,
+                'ids'      => array_fill_keys(array_map('intval', $assigned->fetchAll(\PDO::FETCH_COLUMN)), true),
+                'archived' => array_fill_keys(array_map('intval', $pdo->query('SELECT id FROM orders WHERE is_archived = 1')->fetchAll(\PDO::FETCH_COLUMN)), true),
+            ];
+        }
+        if (isset(self::$openableCache['archived'][$orderId]) && !PermissionService::can($userId, $roleId, 'view_archived_orders')) {
+            return false;
+        }
+        return PermissionService::can($userId, $roleId, 'view_all_orders') || isset(self::$openableCache['ids'][$orderId]);
+    }
+
+    public static function resetCache(): void
+    {
+        self::$openableCache = null;
     }
 }

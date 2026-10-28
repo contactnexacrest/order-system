@@ -32,7 +32,7 @@
           <td>{{ row.triggered_by }}{% if row.triggered_by_name %} ({{ row.triggered_by_name }}){% endif %}</td>
           <td>
             {% if row.entity_id %}
-              <a href="/orders/{{ row.entity_id }}">Order #{{ row.entity_id }}</a>{% if row.leg %} — {{ row.leg | capitalize }}{% endif %}
+              {% if canOpenOrder(row.entity_id) %}<a href="/orders/{{ row.entity_id }}">Order #{{ row.entity_id }}</a>{% else %}Order #{{ row.entity_id }}{% endif %}{% if row.leg %} — {{ row.leg | capitalize }}{% endif %}
             {% else %}
               <span class="muted">—</span>
             {% endif %}
