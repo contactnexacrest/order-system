@@ -771,3 +771,17 @@ details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.
 .badge.badge-final{background:#FDF3E2;color:#A67623;}
 /* Owner decision (2026-10-27): a green "all clear" banner (e.g. Step 7e with no supplier advance). */
 .review-banner.ok{background:var(--success-soft);color:var(--success);}
+
+/* QA Round 5, R5-11 — phones. Tap targets at least 24px, no text below 11px,
+   and form fields at 16px so iOS doesn't zoom in when one is focused.
+   Vertical padding on an inline link enlarges its tap area without
+   changing the line height, so text layout is unaffected. */
+@media (max-width:640px){
+  .tag,.tag-hint,.step-group-num,.gs-pill{font-size:11px;}
+  a:not([class*="btn"]){padding-block:4px;}
+  input[type=checkbox],input[type=radio]{min-width:24px;min-height:24px;}
+  button,.btn,.btn-sm{min-height:24px;min-width:24px;}
+}
+@media (max-width:480px){
+  input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:16px !important;}
+}

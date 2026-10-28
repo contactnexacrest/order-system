@@ -2,6 +2,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { login, logout, ROLES } = require('./support/auth');
+const { getMailSending, setMailSending } = require('./support/db');
 
 /**
  * Two workflows with zero prior E2E coverage: the Email & Deferred Send
@@ -110,6 +111,15 @@ async function adminAssignSelfAndApprove(page, typeCode) {
 }
 
 test.describe.serial('Email Approvals — the Level-1/Level-2 deferred send queue', () => {
+  // QA Round 5, R5-13: the send queue only exists with email sending on
+  // (the seed ships it off) — switch it on here, restore it afterwards.
+  let previousMailSending;
+  test.beforeAll(() => {
+    previousMailSending = getMailSending();
+    setMailSending('1');
+  });
+  test.afterAll(() => setMailSending(previousMailSending));
+
   let orderId;
   let orderReference;
   let emailLogId;

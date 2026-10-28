@@ -147,10 +147,12 @@ final class ReferenceNumberService
         $pdo = Database::connection();
         // Same LAST_INSERT_ID() gap as nextSeq() above — wrap the SELECT's
         // computed seed so the first order for a brand-new client reports
-        // 1, not 0.
+        // 1, not 0. QA Round 5, R5-08: the MAX() sits in a scalar subquery
+        // so the outer SELECT has no aggregate — the same form as Node,
+        // where MariaDB with ONLY_FULL_GROUP_BY refused the old one.
         $stmt = $pdo->prepare(
             'INSERT INTO reference_sequences (scope_key, last_seq)
-             SELECT :key, LAST_INSERT_ID(COALESCE(MAX(o.sequence_no), 0) + 1) FROM orders o WHERE o.client_id = :client_id
+             SELECT :key, LAST_INSERT_ID(COALESCE((SELECT MAX(o.sequence_no) FROM orders o WHERE o.client_id = :client_id), 0) + 1) FROM DUAL
              ON DUPLICATE KEY UPDATE last_seq = LAST_INSERT_ID(last_seq + 1)'
         );
         $stmt->execute(['key' => 'order_seq:client:' . $clientId, 'client_id' => $clientId]);
@@ -177,11 +179,12 @@ final class ReferenceNumberService
     public static function nextDocumentRevisionNumber(int $orderId, int $documentTypeId): int
     {
         $pdo = Database::connection();
-        // Same LAST_INSERT_ID() gap as nextSeq() above.
+        // Same LAST_INSERT_ID() gap as nextSeq() above, and the same
+        // scalar-subquery form as nextOrderSequenceForClient() (R5-08).
         $stmt = $pdo->prepare(
             'INSERT INTO reference_sequences (scope_key, last_seq)
-             SELECT :key, LAST_INSERT_ID(COALESCE(MAX(d.revision_number), -1) + 1) FROM documents d
-             WHERE d.order_id = :order_id AND d.document_type_id = :document_type_id
+             SELECT :key, LAST_INSERT_ID(COALESCE((SELECT MAX(d.revision_number) FROM documents d
+               WHERE d.order_id = :order_id AND d.document_type_id = :document_type_id), -1) + 1) FROM DUAL
              ON DUPLICATE KEY UPDATE last_seq = LAST_INSERT_ID(last_seq + 1)'
         );
         $stmt->execute([

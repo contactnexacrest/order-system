@@ -272,7 +272,13 @@ final class UserController
         try {
             UserRepository::delete($userId);
         } catch (\PDOException $e) {
-            Flash::set('error', "{$target['name']} can't be deleted — they have order, document, or audit history on file. Archive them instead.");
+            // QA Round 5, R5-09: name where the user still appears.
+            $where = implode(', ', array_map(
+                static fn (string $table, int $n): string => str_replace('_', ' ', $table) . " ({$n})",
+                array_keys($blockers = UserRepository::referencingRows($userId)),
+                $blockers
+            ));
+            Flash::set('error', "{$target['name']} can't be deleted — they still appear in: " . ($where !== '' ? $where : 'other records') . '. History is never removed, so archive (deactivate) them instead.');
             header('Location: /users');
             return;
         }

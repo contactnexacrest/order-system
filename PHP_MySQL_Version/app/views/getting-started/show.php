@@ -94,7 +94,7 @@ body{font-size:15.5px; line-height:1.6;}
 .gs-compare{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:16px;}
 @media (max-width:620px){.gs-compare{grid-template-columns:1fr;}}
 .gs-compare h3{font-size:14.5px; margin:0 0 8px; display:flex; align-items:center; gap:7px;}
-.gs-pill{font-size:10.5px; font-family:ui-monospace,Menlo,Consolas,monospace; padding:2px 8px; border-radius:99px; background:var(--success-soft); color:var(--success); font-weight:600; text-transform:uppercase; letter-spacing:.03em;}
+.gs-pill{font-size:11px; font-family:ui-monospace,Menlo,Consolas,monospace; padding:2px 8px; border-radius:99px; background:var(--success-soft); color:var(--success); font-weight:600; text-transform:uppercase; letter-spacing:.03em;}
 .gs-pill.gold{background:var(--gold-soft); color:var(--gold-strong);}
 
 .gs-navmap{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-top:16px;}

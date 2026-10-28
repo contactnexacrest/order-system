@@ -112,6 +112,30 @@ async function unarchive(userId) {
 }
 
 /**
+ * QA Round 5, R5-09: where a user still appears, when deleteUser() is
+ * refused — read from the database's own foreign keys to users (the same
+ * always-current source deleteUser() relies on), so the message names the
+ * real blocker, e.g. "audit log (1)". Port of UserRepository::referencingRows().
+ *
+ * @returns {Promise<Object<string, number>>} table name → rows referencing this user
+ */
+async function referencingRows(userId) {
+  const columns = await db.query(
+    `SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name FROM information_schema.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME = 'users' AND REFERENCED_COLUMN_NAME = 'id'
+     ORDER BY TABLE_NAME, COLUMN_NAME`
+  );
+  const found = {};
+  for (const { table_name: table, column_name: column } of columns) {
+    if (!/^\w+$/.test(table) || !/^\w+$/.test(column) || (table === 'users' && column === 'id')) continue;
+    const row = await db.queryOne(`SELECT COUNT(*) AS c FROM \`${table}\` WHERE \`${column}\` = :id`, { id: userId });
+    const count = Number(row.c);
+    if (count > 0) found[table] = (found[table] || 0) + count;
+  }
+  return found;
+}
+
+/**
  * Real DELETE, deliberately with no manual "is this user referenced
  * anywhere" check first — users.id is a FK target from 57+ tables
  * (audit_log, documents.generated_by, every reviewer/approver column,
@@ -191,6 +215,7 @@ async function updateUiTemplatePreference(userId, templateId) {
 }
 
 module.exports = {
+  referencingRows,
   findByEmail, findById, incrementFailedLogins, resetFailedLogins, lockUntil,
   updateLastLogin, updatePassword, flagPasswordExpired, setTwoFactor,
   listActive, listAllForAdmin, statusCounts, create, update, setActive, adminForceResetPassword,

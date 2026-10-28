@@ -50,4 +50,15 @@ describe('Oversized file upload gets a clear error, not a generic 500 (QA-5 UP-0
     expect(res.status).toBe(413);
     expect(res.text).toContain('File too large');
   }, 20000);
+
+  // QA Round 5, R5-07: a file under a field name the route doesn't expect
+  // was a raw 500 (MulterError: Unexpected file field).
+  it('responds 400 with a clear message for a file under an unexpected field name', async () => {
+    const res = await agent
+      .post('/company-assets/replace')
+      .attach('not_the_right_field', Buffer.from('tiny'), 'logo.png');
+
+    expect(res.status).toBe(400);
+    expect(res.text).toContain('Upload not accepted');
+  });
 });

@@ -631,6 +631,41 @@
     });
   }
 
+  // QA Round 5, R5-06: every form field has an accessible name. Fields
+  // with no <label>, aria-label, aria-labelledby or title (table-row
+  // inputs, search boxes, textareas under a heading) get an aria-label
+  // from their placeholder, else their table column header, else their
+  // field name made readable — once, sitewide, for every page.
+  function hasAccessibleName(el) {
+    if (el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title')) return true;
+    if (el.closest('label')) return true;
+    return !!(el.id && document.querySelector('label[for="' + el.id.replace(/"/g, '\\"') + '"]'));
+  }
+
+  function columnHeaderFor(el) {
+    var cell = el.closest('td');
+    var table = cell && cell.closest('table');
+    if (!table) return '';
+    var headerRow = table.querySelector('thead tr') || table.querySelector('tr');
+    var header = headerRow && headerRow.children[cell.cellIndex];
+    return header && header !== cell ? header.textContent.trim() : '';
+  }
+
+  function readableName(name) {
+    var text = String(name || '').replace(/\[[^\]]*\]/g, ' ').replace(/[_-]+/g, ' ').trim();
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+  }
+
+  function initFieldLabels() {
+    document.querySelectorAll('input, select, textarea').forEach(function (el) {
+      var type = (el.getAttribute('type') || '').toLowerCase();
+      if (type === 'hidden' || type === 'submit' || type === 'button' || type === 'reset' || type === 'image') return;
+      if (hasAccessibleName(el)) return;
+      var name = el.getAttribute('placeholder') || columnHeaderFor(el) || readableName(el.getAttribute('name'));
+      if (name) el.setAttribute('aria-label', name);
+    });
+  }
+
   function init() {
     // Before initConfirmDialogs(): both listen in the capture phase, so
     // registering this first means an invalid form is stopped before any
@@ -667,6 +702,7 @@
     initSchemeRows();
     initGstCalc();
     initAutoReasons();
+    initFieldLabels();
   }
 
   if (document.readyState === 'loading') {

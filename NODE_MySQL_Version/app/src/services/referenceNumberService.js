@@ -61,13 +61,15 @@ async function nextSeq(scopeKey) {
  * non-unique-indexed range) under real concurrent load — this UPSERT is a
  * single point-lock on reference_sequences' unique scope_key index instead.
  */
-async function nextOrderSequenceForClient(clientId) {
+async function nextOrderSequenceForClient(clientId, executor = db) {
   // Same LAST_INSERT_ID() gap as nextSeq() above — wrap the SELECT's
   // computed seed so the first order for a brand-new client reports 1,
-  // not 0.
-  const result = await db.execute(
+  // not 0. QA Round 5, R5-08: the MAX() sits in a scalar subquery, so the
+  // outer SELECT (which carries a bound parameter) has no aggregate —
+  // MariaDB with ONLY_FULL_GROUP_BY refused the old form (error 1140).
+  const result = await executor.execute(
     `INSERT INTO reference_sequences (scope_key, last_seq)
-     SELECT :key, LAST_INSERT_ID(COALESCE(MAX(o.sequence_no), 0) + 1) FROM orders o WHERE o.client_id = :client_id
+     SELECT :key, LAST_INSERT_ID(COALESCE((SELECT MAX(o.sequence_no) FROM orders o WHERE o.client_id = :client_id), 0) + 1) FROM DUAL
      ON DUPLICATE KEY UPDATE last_seq = LAST_INSERT_ID(last_seq + 1)`,
     { key: `order_seq:client:${clientId}`, client_id: clientId }
   );
@@ -89,12 +91,13 @@ async function nextOrderSequenceForClient(clientId) {
  * `SELECT ... FOR UPDATE`. revision_number starts at 0 (not 1), hence
  * COALESCE(...,-1) + 1 rather than COALESCE(...,0) + 1.
  */
-async function nextDocumentRevisionNumber(orderId, documentTypeId) {
-  // Same LAST_INSERT_ID() gap as nextSeq() above.
-  const result = await db.execute(
+async function nextDocumentRevisionNumber(orderId, documentTypeId, executor = db) {
+  // Same LAST_INSERT_ID() gap as nextSeq() above, and the same
+  // scalar-subquery form as nextOrderSequenceForClient() (R5-08).
+  const result = await executor.execute(
     `INSERT INTO reference_sequences (scope_key, last_seq)
-     SELECT :key, LAST_INSERT_ID(COALESCE(MAX(d.revision_number), -1) + 1) FROM documents d
-     WHERE d.order_id = :order_id AND d.document_type_id = :document_type_id
+     SELECT :key, LAST_INSERT_ID(COALESCE((SELECT MAX(d.revision_number) FROM documents d
+       WHERE d.order_id = :order_id AND d.document_type_id = :document_type_id), -1) + 1) FROM DUAL
      ON DUPLICATE KEY UPDATE last_seq = LAST_INSERT_ID(last_seq + 1)`,
     { key: `document_revision:${orderId}:${documentTypeId}`, order_id: orderId, document_type_id: documentTypeId }
   );

@@ -4,16 +4,26 @@ const { spawnSync } = require('child_process');
 
 // Dev-only credentials, same ones used throughout this suite's setup
 // (see e2e/README.md) — not a secret worth protecting, just a local
-// disposable dev database.
-const DB_USER = 'nexacrest_app';
-const DB_PASSWORD = 'DevPass123!';
+// disposable dev database. QA Round 5, R5-13: override them (and the
+// database name) with E2E_DB_USER / E2E_DB_PASSWORD / E2E_DB_NAME.
+const DB_USER = process.env.E2E_DB_USER || 'nexacrest_app';
+const DB_PASSWORD = process.env.E2E_DB_PASSWORD || 'DevPass123!';
 
 function isNodeStack() {
   return (process.env.BASE_URL || '').includes(':3000');
 }
 
 function dbName() {
+  if (process.env.E2E_DB_NAME) return process.env.E2E_DB_NAME;
   return isNodeStack() ? 'nexacrest_node_dev' : 'nexacrest_php_dev';
+}
+
+function runSql(sql, what) {
+  const result = spawnSync('mysql', ['-N', '-u', DB_USER, `-p${DB_PASSWORD}`, dbName(), '-e', sql]);
+  if (result.status !== 0) {
+    throw new Error(`${what} failed: ${result.stderr.toString()}`);
+  }
+  return result.stdout.toString().trim();
 }
 
 /**
@@ -86,4 +96,27 @@ function provisionClientLogin(email, password) {
   }
 }
 
-module.exports = { resetClientPassword, provisionClientLogin };
+/**
+ * QA Round 5, R5-13: the seed ships with email sending OFF, but the email
+ * specs (05, 08) exercise sending — each switches it to what it needs in
+ * its own setup and puts the previous value back afterwards.
+ */
+function getMailSending() {
+  return runSql("SELECT setting_value FROM company_settings WHERE setting_key = 'mail_sending_enabled'", 'reading mail_sending_enabled') || '0';
+}
+
+function setMailSending(value) {
+  runSql(`UPDATE company_settings SET setting_value = '${value === '1' ? '1' : '0'}' WHERE setting_key = 'mail_sending_enabled'`, 'setting mail_sending_enabled');
+}
+
+/** Whether the newest email_log row to this recipient went out with a document attached. */
+function lastEmailSentWithDocument(recipient) {
+  const row = runSql(
+    `SELECT CONCAT(status, '|', IFNULL(document_id, '')) FROM email_log WHERE recipient_email = '${recipient.replace(/'/g, "''")}' ORDER BY id DESC LIMIT 1`,
+    'reading email_log'
+  );
+  const [status, documentId] = row.split('|');
+  return status === 'sent' && documentId !== '';
+}
+
+module.exports = { resetClientPassword, provisionClientLogin, getMailSending, setMailSending, lastEmailSentWithDocument };

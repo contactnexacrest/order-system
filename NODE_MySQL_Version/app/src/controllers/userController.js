@@ -244,7 +244,10 @@ async function deleteUser(req, res) {
     await userRepository.deleteUser(userId);
   } catch (err) {
     if (err && err.code === 'ER_ROW_IS_REFERENCED_2') {
-      flash.set(req, 'error', `${target.name} can't be deleted — they have order, document, or audit history on file. Archive them instead.`);
+      // QA Round 5, R5-09: name where the user still appears.
+      const where = Object.entries(await userRepository.referencingRows(userId))
+        .map(([table, n]) => `${table.replace(/_/g, ' ')} (${n})`).join(', ');
+      flash.set(req, 'error', `${target.name} can't be deleted — they still appear in: ${where || 'other records'}. History is never removed, so archive (deactivate) them instead.`);
       res.redirect('/users');
       return;
     }

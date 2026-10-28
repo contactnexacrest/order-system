@@ -70,7 +70,7 @@ describe('User delete clears transient rows first (External QA report L-33)', ()
 
     const [flashEntry] = req.session._flash || [];
     expect(flashEntry && flashEntry.type).toBe('error');
-    expect(flashEntry && flashEntry.message).toContain('order, document, or audit history');
+    expect(flashEntry && flashEntry.message).toContain('still appear in: audit log (1)'); // QA Round 5, R5-09: the real blocker, named
     expect(await userRepository.findById(targetId)).not.toBeNull();
   });
 });

@@ -118,6 +118,8 @@ final class SopController
     private function rewriteRelativeLinks(string $markdown): string
     {
         $markdown = str_replace('](./images/', '](/sop-assets/', $markdown);
+        // QA Round 5, R5-05: README.md is the chapter list the /sop index page shows.
+        $markdown = preg_replace('/\]\(\.\/README\.md(#[\w-]*)?\)/', '](/sop$1)', $markdown) ?? $markdown;
         return preg_replace('/\]\(\.\/([\w-]+)\.md(#[\w-]*)?\)/', '](/sop/$1$2)', $markdown) ?? $markdown;
     }
 

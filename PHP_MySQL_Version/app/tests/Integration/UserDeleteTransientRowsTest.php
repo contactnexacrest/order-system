@@ -72,7 +72,7 @@ final class UserDeleteTransientRowsTest extends DbTestCase
 
         $flash = Flash::pull();
         self::assertSame('error', $flash[0]['type'] ?? null);
-        self::assertStringContainsString('order, document, or audit history', $flash[0]['message'] ?? '');
+        self::assertStringContainsString('still appear in: audit log (1)', $flash[0]['message'] ?? ''); // QA Round 5, R5-09: the real blocker, named
 
         $stmt = Database::connection()->prepare('SELECT COUNT(*) AS c FROM users WHERE id = :id');
         $stmt->execute(['id' => $targetId]);

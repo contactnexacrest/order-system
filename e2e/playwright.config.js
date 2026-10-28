@@ -32,8 +32,9 @@ module.exports = defineConfig({
     baseURL: process.env.BASE_URL || 'http://127.0.0.1:8080',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    launchOptions: {
-      executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-    },
+    // QA Round 5, R5-13: the browser path used to be hard-coded to one
+    // machine's install — set PW_CHROMIUM_PATH to use a specific
+    // Chromium, otherwise Playwright's own installed browser is used.
+    ...(process.env.PW_CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } } : {}),
   },
 });

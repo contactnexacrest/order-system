@@ -16,6 +16,17 @@ const { toRfc2822Ist } = require('../helpers/dbDateTime');
  * the only gate that still makes sense is "is SMTP actually configured" —
  * same dev/production behavior, one fewer condition.
  */
+/**
+ * QA Round 5, R5-17: SMTP_ENCRYPTION means the same on both stacks — blank
+ * or 'tls' is STARTTLS and the send fails if the server doesn't offer it
+ * (PHP's PHPMailer SMTPSecure='tls'); 'ssl' is implicit TLS. Before, a
+ * blank value here sent in clear when the server offered no TLS.
+ */
+function smtpSecurityOptions() {
+  const encryption = String(env.get('SMTP_ENCRYPTION', 'tls')).toLowerCase();
+  return { secure: encryption === 'ssl', requireTLS: encryption === 'tls' };
+}
+
 let cachedTransport = null;
 function transport() {
   const host = env.get('SMTP_HOST');
@@ -24,7 +35,7 @@ function transport() {
   cachedTransport = nodemailer.createTransport({
     host,
     port: env.getInt('SMTP_PORT', 587),
-    secure: env.get('SMTP_ENCRYPTION', 'tls') === 'ssl',
+    ...smtpSecurityOptions(),
     auth: env.get('SMTP_USERNAME') ? { user: env.get('SMTP_USERNAME'), pass: env.get('SMTP_PASSWORD') } : undefined,
   });
   return cachedTransport;
@@ -195,5 +206,5 @@ async function sendTestEmail(toEmail, subject, body) {
 
 module.exports = {
   sendPlainText, sendWithAttachment, sendWithAttachments, deliverWithAttachments, sendTestEmail,
-  mailDomain, replyToAddress, freshMessageId,
+  mailDomain, replyToAddress, freshMessageId, smtpSecurityOptions,
 };

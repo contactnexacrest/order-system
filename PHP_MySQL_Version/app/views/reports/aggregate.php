@@ -109,8 +109,8 @@
       <td><?= htmlspecialchars($r['order_reference']) ?></td>
       <td><?= htmlspecialchars($r['company_legal_name']) ?></td>
       <td><?= htmlspecialchars($r['country_of_destination'] ?? '—') ?></td>
-      <td><?= htmlspecialchars($r['incoterm_code']) ?></td>
-      <td><?= htmlspecialchars($r['currency_code']) ?></td>
+      <td><?= htmlspecialchars($r['incoterm_code'] ?? '—') ?></td>
+      <td><?= htmlspecialchars($r['currency_code'] ?? '—') ?></td>
       <td><?= htmlspecialchars($r['current_stage_name'] ?? 'Quotation') ?></td>
       <td><?= htmlspecialchars(ucfirst($r['status'])) ?></td>
       <td><?= number_format((float) $r['total_fob_value'], 2) ?></td>

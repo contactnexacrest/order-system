@@ -58,6 +58,19 @@ involved) don't. It is not a substitute for those — see
 
 ## Prerequisites
 
+Settings the suite reads from the environment (QA Round 5, R5-13):
+
+- `BASE_URL` — which stack to drive (`http://127.0.0.1:8080` PHP, `:3000` Node).
+- `PW_CHROMIUM_PATH` — a specific Chromium binary; leave unset to use
+  Playwright's own installed browser (`npx playwright install chromium`).
+- `E2E_DB_USER` / `E2E_DB_PASSWORD` / `E2E_DB_NAME` — the dev database the
+  suite's DB helpers write to (defaults: `nexacrest_app` / `DevPass123!` /
+  `nexacrest_php_dev` or `nexacrest_node_dev` by stack).
+
+The two email specs (05, 08) switch the "Email sending" setting to what
+each test needs and restore it afterwards, so the suite passes on a fresh
+seed (which ships with email sending off).
+
 Both stacks need their own real dev database, schema+seed applied, and a
 known-working login. One-time setup, per stack:
 

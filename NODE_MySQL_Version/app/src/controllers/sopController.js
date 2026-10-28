@@ -37,6 +37,8 @@ marked.setOptions({ gfm: true });
 /** Rewrites the SOP's own relative links/images to routes this controller serves. */
 function rewriteRelativeLinks(markdown) {
   let out = markdown.split('](./images/').join('](/sop-assets/');
+  // QA Round 5, R5-05: README.md is the chapter list the /sop index page shows.
+  out = out.replace(/\]\(\.\/README\.md(#[\w-]*)?\)/g, '](/sop$1)');
   out = out.replace(/\]\(\.\/([\w-]+)\.md(#[\w-]*)?\)/g, '](/sop/$1$2)');
   return out;
 }

@@ -199,6 +199,39 @@ final class UserRepository
      * neither. Cleared here first so only a REAL blocker (an order,
      * document, audit_log entry, ...) ever reaches that message.
      */
+    /**
+     * QA Round 5, R5-09: where a user still appears, when delete() is
+     * refused — read from the database's own foreign keys to users (the
+     * same always-current source delete() relies on), so the message
+     * names the real blocker, e.g. "audit log (1)".
+     *
+     * @return array<string, int> table name => number of rows referencing this user
+     */
+    public static function referencingRows(int $userId): array
+    {
+        $pdo = Database::connection();
+        $columns = $pdo->query(
+            "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE
+             WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME = 'users' AND REFERENCED_COLUMN_NAME = 'id'
+             ORDER BY TABLE_NAME, COLUMN_NAME"
+        )->fetchAll();
+        $found = [];
+        foreach ($columns as $c) {
+            $table = (string) $c['TABLE_NAME'];
+            $column = (string) $c['COLUMN_NAME'];
+            if (!preg_match('/^\w+$/', $table) || !preg_match('/^\w+$/', $column) || $table === 'users' && $column === 'id') {
+                continue;
+            }
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM `{$table}` WHERE `{$column}` = :id");
+            $stmt->execute(['id' => $userId]);
+            $count = (int) $stmt->fetchColumn();
+            if ($count > 0) {
+                $found[$table] = ($found[$table] ?? 0) + $count;
+            }
+        }
+        return $found;
+    }
+
     public static function delete(int $userId): void
     {
         $pdo = Database::connection();

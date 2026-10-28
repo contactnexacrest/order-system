@@ -3,7 +3,7 @@
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { login, logout, ROLES } = require('./support/auth');
-const { resetClientPassword } = require('./support/db');
+const { resetClientPassword, getMailSending, setMailSending, lastEmailSentWithDocument } = require('./support/db');
 const { mark, sinceMark } = require('./support/mail');
 
 const DUMMY_FILE = path.join(__dirname, 'fixtures', 'dummy-signed-copy.pdf');
@@ -91,6 +91,16 @@ async function openDocumentReviewCard(page) {
 }
 
 test.describe('Email functionality — real attempts, right recipient, right attachment', () => {
+  // QA Round 5, R5-13: each test sets the email-sending switch it needs
+  // (the seed ships it off) and the previous value comes back afterwards.
+  // The portal invite walks a Quotation to Stage 2 the way the default
+  // mode does — approved counts as sent with sending off (security emails
+  // like the invite go out either way); the document send needs it on.
+  let previousMailSending;
+  test.beforeAll(() => { previousMailSending = getMailSending(); });
+  test.beforeEach(({}, testInfo) => setMailSending(testInfo.title.startsWith('client portal invite') ? '0' : '1'));
+  test.afterAll(() => setMailSending(previousMailSending));
+
   // Under the Notification Routing Plan (ActionNotificationService's
   // NONE_ACTION_TYPES), LOGIN_SUCCESS and PERMISSION_DENIED are
   // deliberately pure noise — no email at all, audit_log row only —
@@ -314,7 +324,10 @@ test.describe('Email functionality — real attempts, right recipient, right att
     // And the real send path (EmailService::deliverWithAttachments, the
     // same dev-fallback the app's own PHPUnit integration tests read back
     // from) actually ran with a real, non-empty PDF attachment.
+    // QA Round 5, R5-13: with no SMTP the send path logs its attempt
+    // (Attachments: ...pdf); with a real SMTP server it simply delivers,
+    // so a 'sent' email_log row carrying the document counts as well.
     const sinceSend = sinceMark(mailMark);
-    expect(sinceSend).toMatch(/Attachments:.*\.pdf/i);
+    expect(/Attachments:.*\.pdf/i.test(sinceSend) || lastEmailSentWithDocument(`email-attachment-buyer-${UNIQUE}@nexacrest.test`)).toBe(true);
   });
 });

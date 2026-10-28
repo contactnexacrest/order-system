@@ -1050,6 +1050,13 @@ app.use((err, req, res, next) => {
     res.status(413).send('<h1>413 — File too large</h1><p>The file you tried to upload is too large for this server to accept. Please use a smaller file and try again.</p>');
     return;
   }
+  // QA Round 5, R5-07: any other upload problem multer rejects (a file
+  // under a field name this form doesn't have, too many files, ...) is a
+  // bad request, not a server error — nothing has been stored.
+  if (err && err.name === 'MulterError') {
+    res.status(400).send('<h1>400 — Upload not accepted</h1><p>This form could not accept the file(s) you sent. Nothing was saved — go back and attach the file using the form\'s own upload field.</p>');
+    return;
+  }
   next(err);
 });
 
