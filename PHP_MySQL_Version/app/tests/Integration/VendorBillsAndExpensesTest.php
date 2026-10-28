@@ -272,6 +272,7 @@ final class VendorBillsAndExpensesTest extends DbTestCase
         self::assertStringContainsString('Page CHA Co', $page);
         self::assertStringContainsString('ADVANCE-1', $page);
         self::assertStringContainsString("Debit Note payment has cleared (Step 9d)", $page, 'on CIF the Mark Paid waits for 9d');
+        self::assertStringContainsString('the Supplier PO terms plan an advance of ₹14,175.00.', $page, '10a shows the planned advance as money, not 14175.00');
         self::assertStringContainsString('id="unpaid-vendor-bills-warning"', $page, '13h warns about unpaid bills');
         self::assertStringContainsString('you can still mark the order fully settled', $page);
         self::assertStringContainsString('id="order-expenses"', $page);

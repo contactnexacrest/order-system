@@ -682,7 +682,7 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
     $payBlocked = null;
     // Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one.
     if ($leg === 'balance' && (float) ($supplierPo['advance_amount_inr'] ?? 0) > 0 && empty($supplierPo['advance_paid_at'])) {
-        $payBlocked = 'Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' . $supplierPo['advance_amount_inr'] . '.';
+        $payBlocked = 'Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' . number_format((float) $supplierPo['advance_amount_inr'], 2) . '.';
     }
     // Owner decision (2026-10-27): 0% advance — nothing to pay in 7e; the whole amount is the balance (10a).
     $noAdvance = $leg === 'advance' && !$paidAt && (float) ($planned ?? 0) <= 0;

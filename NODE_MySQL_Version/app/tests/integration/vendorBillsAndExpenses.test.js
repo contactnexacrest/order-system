@@ -228,6 +228,7 @@ describe('vendor bills and order expenses', () => {
     expect(text).toContain('Page CHA Co');
     expect(text).toContain('ADVANCE-1');
     expect(text).toContain("Debit Note payment has cleared (Step 9d)");
+    expect(text).toContain('the Supplier PO terms plan an advance of ₹14,175.00.');
     expect(text).toContain('id="unpaid-vendor-bills-warning"');
     expect(text).toContain('you can still mark the order fully settled');
     expect(text).toContain('id="order-expenses"');

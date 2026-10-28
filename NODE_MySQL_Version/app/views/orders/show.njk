@@ -473,7 +473,7 @@
       <p class="muted small">Paid before supplier bills were recorded here.</p>
     {% else %}
       {# Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one. #}
-      {% set payBlocked = ('Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' + supplierPo.advance_amount_inr + '.') if (leg == 'balance' and (supplierPo.advance_amount_inr | float) > 0 and not supplierPo.advance_paid_at) else null %}
+      {% set payBlocked = ('Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' + (supplierPo.advance_amount_inr | money) + '.') if (leg == 'balance' and (supplierPo.advance_amount_inr | float) > 0 and not supplierPo.advance_paid_at) else null %}
       {# Owner decision (2026-10-27): 0% advance — nothing to pay in 7e; the whole amount is the balance (10a). #}
       {% set noAdvance = leg == 'advance' and not supplierPo.advance_paid_at and (supplierPo.advance_amount_inr | float(0)) <= 0 %}
       {% if noAdvance and not legBills.length %}
