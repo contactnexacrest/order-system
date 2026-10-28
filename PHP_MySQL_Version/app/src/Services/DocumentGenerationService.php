@@ -1578,7 +1578,7 @@ final class DocumentGenerationService
     {
         $clauses = TermsClauseRepository::forDocumentTypeCodeAndGroup($documentTypeCode, 'standard', $balanceTriggerOption);
         return array_map(
-            static fn(array $c) => strtr($c['text'], self::clauseTextReplacements($data)),
+            static fn(array $c) => strtr($c['text'], self::clauseTextReplacements($data, $documentTypeCode)),
             $clauses
         );
     }
@@ -1596,7 +1596,7 @@ final class DocumentGenerationService
     private static function resolveClauseGroup(string $documentTypeCode, string $clauseGroup, array $data, ?string $balanceTriggerOption): array
     {
         $clauses = TermsClauseRepository::forDocumentTypeCodeAndGroup($documentTypeCode, $clauseGroup, $balanceTriggerOption);
-        $replacements = self::clauseTextReplacements($data);
+        $replacements = self::clauseTextReplacements($data, $documentTypeCode);
         return array_map(
             static fn(array $c) => ['title' => $c['title'], 'text' => strtr($c['text'], $replacements)],
             $clauses
@@ -1604,18 +1604,25 @@ final class DocumentGenerationService
     }
 
     /** @return array<string,string> */
-    private static function clauseTextReplacements(array $data): array
+    private static function clauseTextReplacements(array $data, string $documentTypeCode = ''): array
     {
         $tolerance = CompanySettingsRepository::get('quantity_shortfall_tolerance_pct') ?? '5';
         $quotationValidityDays = CompanySettingsRepository::get('quotation_validity_days') ?? '30';
         $piValidityDays = CompanySettingsRepository::get('pi_validity_days') ?? '15';
 
         return [
-            // Owner decision (2026-10-29): with no advance (e.g. Letter of
+            // Owner decision (2026-10-28): with no advance (e.g. Letter of
             // Credit) the PI Validity clause doesn't ask the buyer to
             // "initiate the 0% advance payment". strtr() matches this longer
             // key before {advance_pct}.
             ' and initiate the {advance_pct}% advance payment' => empty($data['financial']['has_advance']) ? '' : ' and initiate the ' . $data['financial']['advance_pct'] . '% advance payment',
+            // Owner decision (2026-10-28): on a PI with no advance the
+            // Production Commencement clause no longer waits for a "0% advance
+            // payment" — production follows the Letter of Credit (or the
+            // buyer's written acceptance on other no-advance terms).
+            "after {advance_pct}% advance payment is received and CLEARED in NexaCrest's bank account" => ($documentTypeCode !== 'PI' || !empty($data['financial']['has_advance']))
+                ? 'after ' . $data['financial']['advance_pct'] . "% advance payment is received and CLEARED in NexaCrest's bank account"
+                : ((($data['financial']['payment_method'] ?? null) === 'LC') ? "after the Letter of Credit is opened and confirmed by NexaCrest's bank" : "after the Buyer's written acceptance of this document"),
             '{tolerance}'                => rtrim(rtrim($tolerance, '0'), '.'),
             '{advance_pct}'              => $data['financial']['advance_pct'],
             '{balance_pct}'              => $data['financial']['balance_pct'],

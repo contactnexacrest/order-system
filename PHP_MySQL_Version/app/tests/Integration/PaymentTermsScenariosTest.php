@@ -19,7 +19,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
  * amounts, the balance line following the order's own terms, the freight
  * note, the bank-charges sentence and Calendar Days.
  *
- * Owner decision (2026-10-29, confirmed twice): an order with no advance
+ * Owner decision (2026-10-28, confirmed twice): an order with no advance
  * (the Letter of Credit preset) says "NO ADVANCE PAYABLE — … payable by
  * Letter of Credit", without the advance sentences, and the CFR box reads
  * "Freight is paid separately".
@@ -89,6 +89,13 @@ final class PaymentTermsScenariosTest extends DbTestCase
                 self::assertStringNotContainsString('only once the advance is received', $text, $kind);
                 self::assertStringNotContainsString('initiate the 0% advance payment', $text, $kind);
                 self::assertStringContainsString('notify NexaCrest of acceptance within this period.', $text, $kind);
+                // Owner decision (2026-10-28): no "0% Advance" lines in Payment Terms, and
+                // production follows the Letter of Credit, not a "0% advance payment".
+                self::assertStringNotContainsString('0% Advance', $text, $kind);
+                self::assertStringNotContainsString('0% advance', $text, $kind);
+                self::assertStringContainsString("100% Payment on FOB Value by Letter of Credit — {$terms}", $text, $kind);
+                self::assertStringContainsString("100% Amount: {$currency} {$balance}", $text, $kind);
+                self::assertStringContainsString("Production commences only after the Letter of Credit is opened and confirmed by NexaCrest's bank", $text, $kind);
             }
             self::assertStringContainsString('Bank charges: ' . self::BANK, $text, $kind);
             if ($incoterm === 'CIF') {

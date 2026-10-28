@@ -141,11 +141,18 @@ function weightTable(order) {
   return out;
 }
 
-function paymentTermsBlock(context) {
+function paymentTermsBlock(context, isPi = false) {
   const financial = context.financial || {};
   const order = context.order || {};
   const currency = g(order, 'currency_code', '');
   const out = [];
+  if (isPi && !financial.has_advance) {
+    // Owner decision (2026-10-28): a PI with no advance (e.g. Letter of
+    // Credit) has no "0% Advance" lines — same as the PDF PI.
+    out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% Payment on FOB Value${financial.payment_method === 'LC' ? ' by Letter of Credit' : ''} — ${g(financial, 'balance_terms_text', '')} `, {}], starRun()]));
+    out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}], starRun()]));
+    return out.concat(freightAndCurrencyLines(order, currency));
+  }
   out.push(C.rich([['• ', {}], [`${g(financial, 'advance_pct', '')}% advance T/T (Telegraphic Transfer) on FOB Value against Proforma Invoice. `, {}], starRun()]));
   out.push(C.rich([[`   ${g(financial, 'advance_pct', '')}% Advance Amount:  ${currency} ${g(financial, 'advance_amount', '')}`, {}], starRun()]));
   // Owner decision (2026-10-28): the Word balance line now prints the
@@ -154,6 +161,11 @@ function paymentTermsBlock(context) {
   const balanceText = g(financial, 'balance_terms_text', '');
   out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% balance T/T on FOB Value ${balanceText} `, {}], starRun()]));
   out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Balance Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}], starRun()]));
+  return out.concat(freightAndCurrencyLines(order, currency));
+}
+
+function freightAndCurrencyLines(order, currency) {
+  const out = [];
   if (!order.is_fob) {
     out.push(
       C.rich([
@@ -384,7 +396,7 @@ function renderPi(context) {
             ]),
             C.plain(`Balance ${currency} ${g(financial, 'balance_amount')} — not payable now. ${g(financial, 'balance_terms_text', '')}${freightNote}`, { italics: true, size: 17, color: C.AMBER_NOTE }),
           ]
-          // Owner decision (2026-10-29): no advance (e.g. Letter of Credit) — say so, never "ADVANCE PAYABLE NOW: 0.00".
+          // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — say so, never "ADVANCE PAYABLE NOW: 0.00".
           : [
             C.rich([
               ['NO ADVANCE PAYABLE —  the full FOB value ', { bold: true, color: C.AMBER_LABEL, size: 19 }],
@@ -417,7 +429,7 @@ function renderPi(context) {
   );
 
   children.push(...C.sectionTitle('5. PAYMENT TERMS'));
-  children.push(...paymentTermsBlock(context));
+  children.push(...paymentTermsBlock(context, true));
   if (financial.has_advance) children.push(C.plain(`• ${g(financial, 'cleared_funds_text', '')}`));
 
   children.push(...C.sectionTitle('6. PRODUCTION & ESTIMATED SHIPMENT'));

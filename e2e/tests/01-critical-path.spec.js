@@ -65,7 +65,7 @@ function docForm(page, orderId, typeCode) {
 const DOC_GENERATE_STAGE = { BUYERPO: 2, PI: 3, OC: 4, SUPPO: 5, FDN: 6, PL: 7, BLI: 7, CI: 8, COOPREP: 9 };
 
 /**
- * Owner decisions (2026-10-28 / 2026-10-29): downloads the newest generated
+ * Owner decisions (2026-10-28 / 2026-10-28): downloads the newest generated
  * document of a type from the order page's document list — PDF and Word —
  * the way staff do, and returns each one's text (whitespace-flattened).
  */

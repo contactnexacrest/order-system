@@ -47,7 +47,7 @@ PRESETS.forEach(([preset, pct, advance, balance, terms], p) => {
  * the order's own terms, the freight note, the bank-charges sentence and
  * Calendar Days.
  *
- * Owner decision (2026-10-29, confirmed twice): an order with no advance
+ * Owner decision (2026-10-28, confirmed twice): an order with no advance
  * (the Letter of Credit preset) says "NO ADVANCE PAYABLE — … payable by
  * Letter of Credit", without the advance sentences, and the CFR box reads
  * "Freight is paid separately".
@@ -67,7 +67,7 @@ describe('PI / CI payment wording across every preset, incoterm and currency', (
     return result.insertId;
   }
 
-  const flat = (s) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;|&#x27;/g, "'").replace(/&nbsp;| /g, ' ').replace(/\s+/g, ' ').trim();
+  const flat = (s) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0*39;|&apos;|&#x27;/g, "'").replace(/&nbsp;| /g, ' ').replace(/\s+/g, ' ').trim();
 
   async function pdfText(orderId, type) {
     await documentGenerationService.generate(orderId, type, await createTestUser(), null, false, true);
@@ -117,6 +117,13 @@ describe('PI / CI payment wording across every preset, incoterm and currency', (
         hasNot(kind, text, 'only once the advance is received');
         hasNot(kind, text, 'initiate the 0% advance payment');
         if (kind === 'PI PDF') has(kind, text, 'notify NexaCrest of acceptance within this period.');
+        // Owner decision (2026-10-28): no "0% Advance" lines in Payment Terms, and
+        // production follows the Letter of Credit, not a "0% advance payment".
+        hasNot(kind, text, '0% Advance');
+        hasNot(kind, text, '0% advance');
+        has(kind, text, `100% Payment on FOB Value by Letter of Credit — ${terms}`);
+        has(kind, text, `100% Amount: ${currency} ${balance}`);
+        if (kind === 'PI PDF') has(kind, text, "Production commences only after the Letter of Credit is opened and confirmed by NexaCrest's bank");
       }
       has(kind, text, `Bank charges: ${BANK}`);
       if (incoterm === 'CIF') {

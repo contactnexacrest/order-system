@@ -251,7 +251,7 @@ async function assemble(orderId, documentTypeCode = null) {
       balance_terms_text: balanceTriggerSentence(order.balance_trigger_option || null, order.balance_days != null ? parseInt(order.balance_days, 10) : null, order.balance_trigger_wording || null),
       bank_charges_text: BANK_CHARGES_SENTENCE,
       cleared_funds_text: CLEARED_FUNDS_SENTENCE,
-      // Owner decision (2026-10-29): an order with no advance (e.g. the
+      // Owner decision (2026-10-28): an order with no advance (e.g. the
       // Letter of Credit preset) says so on the PI instead of "ADVANCE
       // PAYABLE NOW: 0.00", without the advance sentences.
       has_advance: advancePct > 0,

@@ -124,10 +124,13 @@ test.describe('Role-based navigation visibility', () => {
     expect(res.status()).toBe(403);
   });
 
-  test('CA has no order-management access at all — only the CA module', async ({ page }) => {
+  // Owner decision (2026-10-28, migration 2026-10-28d): the CA can open
+  // orders read-only (view_orders) to reach each order's CAFIN box — but
+  // still has no order-editing, client or report access.
+  test('CA sees orders read-only and the CA module — no order editing, clients or reports', async ({ page }) => {
     await login(page, 'ca');
     await expect(page.getByRole('link', { name: 'CA / Accounting' })).toBeVisible();
-    await expect(navLink(page, '/orders')).toHaveCount(0);
+    await expect(navLink(page, '/orders')).toHaveCount(1);
     await expect(navLink(page, '/clients')).toHaveCount(0);
     await expect(navLink(page, '/reports')).toHaveCount(0);
 

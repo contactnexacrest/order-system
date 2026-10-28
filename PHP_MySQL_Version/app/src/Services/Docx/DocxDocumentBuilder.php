@@ -197,11 +197,23 @@ final class DocxDocumentBuilder
         ));
     }
 
-    private static function paymentTermsBlock(Section $section, array $context): void
+    private static function paymentTermsBlock(Section $section, array $context, bool $isPi = false): void
     {
         $financial = $context['financial'] ?? [];
         $order = $context['order'] ?? [];
         $currency = self::g($order, 'currency_code', '');
+        if ($isPi && empty($financial['has_advance'])) {
+            // Owner decision (2026-10-28): a PI with no advance (e.g. Letter
+            // of Credit) has no "0% Advance" lines — same as the PDF PI.
+            DocxComponents::addRichParagraph($section, [
+                ['• ', []], [self::g($financial, 'balance_pct', '') . '% Payment on FOB Value' . (($financial['payment_method'] ?? null) === 'LC' ? ' by Letter of Credit' : '') . ' — ' . self::g($financial, 'balance_terms_text', '') . ' ', []], self::starRun(),
+            ]);
+            DocxComponents::addRichParagraph($section, [
+                ['   ' . self::g($financial, 'balance_pct', '') . '% Amount:  ' . $currency . ' ' . self::g($financial, 'balance_amount', ''), []], self::starRun(),
+            ]);
+            self::freightAndCurrencyLines($section, $order, $currency);
+            return;
+        }
         DocxComponents::addRichParagraph($section, [
             ['• ', []], [self::g($financial, 'advance_pct', '') . '% advance T/T (Telegraphic Transfer) on FOB Value against Proforma Invoice. ', []], self::starRun(),
         ]);
@@ -218,6 +230,12 @@ final class DocxDocumentBuilder
         DocxComponents::addRichParagraph($section, [
             ['   ' . self::g($financial, 'balance_pct', '') . '% Balance Amount:  ' . $currency . ' ' . self::g($financial, 'balance_amount', ''), []], self::starRun(),
         ]);
+        self::freightAndCurrencyLines($section, $order, $currency);
+    }
+
+    /** @param array<string,mixed> $order */
+    private static function freightAndCurrencyLines(Section $section, array $order, string $currency): void
+    {
         if (empty($order['is_fob'])) {
             DocxComponents::addRichParagraph($section, [
                 [!empty($order['is_cif']) ? '• Freight & Insurance (CFR/CIF orders only): ' : '• Freight (CFR order — buyer arranges insurance): ', []],
@@ -419,7 +437,7 @@ final class DocxDocumentBuilder
                 $run->addText('(' . self::g($financial, 'advance_pct') . '% of FOB value) — due by ' . self::g($order, 'pi_valid_until', 'To Be Confirmed'), ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
                 $cell->addText('Balance ' . $currency . ' ' . self::g($financial, 'balance_amount') . ' — not payable now. ' . self::g($financial, 'balance_terms_text', '') . $freight, ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
             } else {
-                // Owner decision (2026-10-29): no advance (e.g. Letter of Credit) — say so, never "ADVANCE PAYABLE NOW: 0.00".
+                // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — say so, never "ADVANCE PAYABLE NOW: 0.00".
                 $run->addText('NO ADVANCE PAYABLE —  the full FOB value ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
                 $run->addText($currency . ' ' . self::g($financial, 'balance_amount') . ' ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
                 $run->addText('is payable ' . (($financial['payment_method'] ?? null) === 'LC' ? 'by Letter of Credit' : 'as below') . '.', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
@@ -443,7 +461,7 @@ final class DocxDocumentBuilder
         ]);
 
         DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
-        self::paymentTermsBlock($section, $context);
+        self::paymentTermsBlock($section, $context, true);
         if (!empty($financial['has_advance'])) {
             DocxComponents::addPlainParagraph($section, '• ' . self::g($financial, 'cleared_funds_text', ''));
         }
