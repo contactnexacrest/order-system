@@ -21,7 +21,6 @@ const orderAnnexureRepository = require('../repositories/orderAnnexureRepository
 const orderAnnexureTermsRepository = require('../repositories/orderAnnexureTermsRepository');
 const annexureTermsSanitizer = require('../helpers/annexureTermsSanitizer');
 const amendmentRepository = require('../repositories/amendmentRepository');
-const { addWorkingDays } = require('./workingDaysCalculator');
 const { todayIst } = require('../helpers/dbDateTime');
 
 /**
@@ -44,6 +43,14 @@ const { todayIst } = require('../helpers/dbDateTime');
 // own document type still works — every real call site in this codebase
 // passes its type explicitly.
 const SUPPLIER_COST_VISIBLE_TO = ['SUPPO'];
+
+// Owner decision (2026-10-28): the one bank-charges sentence the PI
+// (advance box) and the CI (bank details) print, PDF and Word alike —
+// kept here once so the two documents can never drift apart.
+const BANK_CHARGES_SENTENCE = 'All bank charges outside India are for the Buyer\'s account — please remit the full amount (charges option "OUR").';
+
+// Owner decision (2026-10-28): printed under the PI's payment terms.
+const CLEARED_FUNDS_SENTENCE = 'The order is confirmed, and production starts, only once the advance is received in our account as cleared funds.';
 
 async function assemble(orderId, documentTypeCode = null) {
   const order = await orderRepository.find(orderId);
@@ -242,6 +249,8 @@ async function assemble(orderId, documentTypeCode = null) {
       // balance was due against a scanned BL copy. Now reuses this same
       // balance_terms_text, exactly like QT/PI/BuyerPO already correctly do.
       balance_terms_text: balanceTriggerSentence(order.balance_trigger_option || null, order.balance_days != null ? parseInt(order.balance_days, 10) : null, order.balance_trigger_wording || null),
+      bank_charges_text: BANK_CHARGES_SENTENCE,
+      cleared_funds_text: CLEARED_FUNDS_SENTENCE,
       // freight/insurance are indicative-only, not summed into the binding total for FOB — QT/PI/OC only, unaffected by item #18 below
       total_value: formatMoney(fobValue),
       // 90-item backlog item #18 (BLOCKER) — see this function's own
@@ -442,7 +451,10 @@ async function freightBlock(orderId, isCif) {
     // FDN's own "Payment Due: ... by [date]" line — 3 working days from
     // today (the date this debit note is being generated), per the same
     // hard rule stated in the banner above it.
-    payment_due_date: formatDate(await addWorkingDays(todayIst(), 3)),
+    // Owner decision (2026-10-28): buyer payment deadlines are Calendar
+    // Days everywhere — this date used to count working days, so it could
+    // land later than the "3 Calendar Days" printed beside it.
+    payment_due_date: formatDate(addCalendarDays(todayIst(), 3)),
   };
 }
 
@@ -978,6 +990,13 @@ function formatDate(value) {
 
 function round2(n) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/** 'YYYY-MM-DD' plus whole calendar days, as 'YYYY-MM-DD'. */
+function addCalendarDays(ymd, days) {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 /** number_format-then-rtrim-zeros-then-rtrim-dot, e.g. "10.00" -> "10", "12.50" -> "12.5". */

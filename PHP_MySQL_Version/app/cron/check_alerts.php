@@ -36,7 +36,6 @@ use App\Config\Database;
 use App\Repositories\CompanySettingsRepository;
 use App\Repositories\NotificationRepository;
 use App\Repositories\PermissionRepository;
-use App\Services\WorkingDaysCalculator;
 
 function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $relatedOrderId = null): int
 {
@@ -101,6 +100,10 @@ function run(): int
     // switched the comparison to WorkingDaysCalculator, matching the same
     // working-days-not-calendar-days fix already applied to the dispute
     // response deadline.
+    // Owner decision (2026-10-28): the clause, the FDN and every other buyer
+    // payment deadline now read "Calendar Days", so the overdue check counts
+    // calendar days too — the alert fires the day after the date printed on
+    // the FDN, not later.
     $fdnOverdueDays = (int) (CompanySettingsRepository::get('fdn_overdue_days_c') ?? '3');
     $stmt = $pdo->query(
         "SELECT o.id AS order_id, o.order_reference, d.generated_at
@@ -112,7 +115,7 @@ function run(): int
            AND ps.freight_cleared_at IS NULL"
     );
     foreach ($stmt->fetchAll() as $row) {
-        $dueDate = WorkingDaysCalculator::addWorkingDays(substr((string) $row['generated_at'], 0, 10), $fdnOverdueDays);
+        $dueDate = (new DateTimeImmutable(substr((string) $row['generated_at'], 0, 10)))->modify("+{$fdnOverdueDays} days")->format('Y-m-d');
         if ($dueDate < $today->format('Y-m-d')) {
             $created += notifyMdAndAdmin($mdAndAdminIds, 'fdn_overdue', "Freight payment overdue on order {$row['order_reference']} — FDN issued {$row['generated_at']}, still not cleared.", (int) $row['order_id']);
         }

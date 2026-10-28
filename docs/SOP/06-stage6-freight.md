@@ -65,7 +65,11 @@ these charges.
 The Debit Note itself states payment is due within **3 Calendar Days**
 of its own date (previously "3 working days" — every buyer payment
 obligation across the system now counts in Calendar Days, not Working
-Days, for consistency). Its GST/IGST line always reads "NIL — Freight
+Days, for consistency). The "by [date]" it prints is that date plus 3
+calendar days, and the overdue-freight alert to MD/Admin fires the day
+after it (owner decision 2026-10-28 — both used to count working days, so
+the printed date could fall later than the 3 Calendar Days stated beside
+it). Its GST/IGST line always reads "NIL — Freight
 recovery is a pure cost reimbursement, not a taxable service supply." This
 is a fixed, non-configurable statement, not a per-order choice — freight
 recovery is never treated as a taxable service supply, so there is no

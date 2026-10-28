@@ -46,6 +46,16 @@ final class DocumentDataAssembler
      */
     private const SUPPLIER_COST_VISIBLE_TO = ['SUPPO'];
 
+    /**
+     * Owner decision (2026-10-28): the one bank-charges sentence the PI
+     * (advance box) and the CI (bank details) print, PDF and Word alike —
+     * kept here once so the two documents can never drift apart.
+     */
+    public const BANK_CHARGES_SENTENCE = "All bank charges outside India are for the Buyer's account — please remit the full amount (charges option \"OUR\").";
+
+    /** Owner decision (2026-10-28): printed under the PI's payment terms. */
+    public const CLEARED_FUNDS_SENTENCE = 'The order is confirmed, and production starts, only once the advance is received in our account as cleared funds.';
+
     public static function assemble(int $orderId, ?string $documentTypeCode = null): array
     {
         $order = OrderRepository::find($orderId);
@@ -254,6 +264,8 @@ final class DocumentDataAssembler
                 // a scanned BL copy. Now reuses this same balance_terms_text,
                 // exactly like QT/PI/BuyerPO already correctly do.
                 'balance_terms_text' => self::balanceTriggerSentence($order['balance_trigger_option'] ?? null, isset($order['balance_days']) ? (int) $order['balance_days'] : null, $order['balance_trigger_wording'] ?? null),
+                'bank_charges_text'  => self::BANK_CHARGES_SENTENCE,
+                'cleared_funds_text' => self::CLEARED_FUNDS_SENTENCE,
                 'total_value'      => self::formatMoney($fobValue), // freight/insurance are indicative-only, not summed into the binding total for FOB — QT/PI/OC only, unaffected by item #18 below
                 // 90-item backlog item #18 (BLOCKER) — see this
                 // function's own freightForTotal/totalCommercialInvoiceValue
@@ -458,10 +470,14 @@ final class DocumentDataAssembler
             'freight_forwarder_name'    => $row['freight_forwarder_name'],
             'freight_forwarder_contact' => $row['freight_forwarder_contact'],
             'freight_cleared_at'        => self::formatDate($row['freight_cleared_at']),
-            // FDN's own "Payment Due: ... by [date]" line — 3 working days
+            // FDN's own "Payment Due: ... by [date]" line — 3 Calendar Days
             // from today (the date this debit note is being generated),
-            // per the same hard rule stated in the banner above it.
-            'payment_due_date'          => self::formatDate(WorkingDaysCalculator::addWorkingDays(date('Y-m-d'), 3)),
+            // per the same hard rule stated in the banner above it. Owner
+            // decision (2026-10-28): buyer payment deadlines are Calendar
+            // Days everywhere — this date used to count working days, so
+            // it could land later than the "3 Calendar Days" printed
+            // beside it.
+            'payment_due_date'          => self::formatDate((new \DateTimeImmutable('today'))->modify('+3 days')->format('Y-m-d')),
         ];
     }
 

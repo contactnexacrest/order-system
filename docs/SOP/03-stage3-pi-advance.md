@@ -105,6 +105,22 @@ Unlike the Quotation, generating the PI **does not pass Stage 3's gate** —
 this is the one stage where the gating action is a payment event, not a
 document.
 
+**What the PI asks the buyer to pay** (owner decision 2026-10-28). Under the
+second **TOTAL PI VALUE** the PI (PDF and Word) prints an amber box:
+
+- **ADVANCE PAYABLE NOW** — the advance amount, its % of the FOB value, and
+  "due by" the PI's own Valid Until date;
+- the **balance**, marked "not payable now", with the order's balance terms
+  (and, on CFR/CIF, that freight & insurance are paid against the Debit
+  Note);
+- **Bank charges:** "All bank charges outside India are for the Buyer's
+  account — please remit the full amount (charges option "OUR")."
+
+Payment Terms ends with: "The order is confirmed, and production starts,
+only once the advance is received in our account as cleared funds." Every
+buyer payment deadline on the PI, in PDF and Word alike, is in **Calendar
+Days**.
+
 ### Recording and clearing the advance payment
 
 Before anything is recorded, Payment Status shows everything blank:

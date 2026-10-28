@@ -31,7 +31,7 @@ All buyer-facing documents exist in two versions:
 
   PAYMENT TRIGGER — EXACT CLAUSE TEXT PER TIER:
   Tier 1 Balance Payment clause (QT, PI, OC, CI):
-    "60% Balance Payment by T/T within 3 Working Days of NexaCrest's
+    "60% Balance Payment by T/T within 3 Calendar Days of NexaCrest's
      Shipment Readiness Confirmation and before shipment booking is confirmed."
   Tier 2 Balance Payment clause (QT, PI, OC, CI):
     "60% Balance Payment by T/T within 7 Calendar Days of the BL date,
@@ -179,6 +179,22 @@ SECTION 3: SECTION STRUCTURE BY DOCUMENT
   9. EXPORT DOCUMENTATION (was 7)
   10. TERMS & CONDITIONS (was 8 — duplicate section number fixed)
   11. LEGAL TERMS & DEFINITIONS (was 8)
+
+  ADVANCE PAYABLE NOW BOX (added 28 October 2026 — owner decision):
+  An amber box directly under the second "TOTAL PI VALUE" (Section 5), three lines:
+    "ADVANCE PAYABLE NOW: [CCY] [advance amount] ([advance %]% of FOB value) —
+     due by [PI Valid Until date]"
+    "Balance [CCY] [balance amount] — not payable now. [tier balance clause]
+     Freight & insurance (CFR/CIF orders only) are paid separately against our
+     Debit Note."
+    "Bank charges: All bank charges outside India are for the Buyer's account —
+     please remit the full amount (charges option "OUR")."
+  Section 7 PAYMENT TERMS gains one last line:
+    "• The order is confirmed, and production starts, only once the advance is
+     received in our account as cleared funds."
+  The bank-charges sentence is word-for-word the same on the CI (Section 8 BANK
+  DETAILS, last row "Bank Charges"). The app keeps it in one place
+  (DocumentDataAssembler::BANK_CHARGES_SENTENCE / documentDataAssembler.js).
 
 3.3 ORDER CONFIRMATION (OC)
 -----------------------------

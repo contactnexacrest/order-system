@@ -3045,3 +3045,65 @@ SCHEDULE B / SCHEDULE A (compensation amount):
 ================================================================================
 END OF ADDENDUM SECTION 13
 ================================================================================
+
+
+================================================================================
+UPDATE — 28 October 2026 (owner decisions: PI advance box, bank charges,
+Calendar Days everywhere for buyer payments)
+================================================================================
+
+DOCUMENT: Tier1/02_ProformaInvoice and Tier2/02_ProformaInvoice
+  ADD #1
+  Section : 5. Product / Order Details — under the second TOTAL PI VALUE
+  OLD     : not present
+  NEW     : ADVANCE PAYABLE NOW box — advance amount and due date, the balance
+            "not payable now" with the tier's own balance clause, and
+            "Bank charges: All bank charges outside India are for the Buyer's
+            account — please remit the full amount (charges option "OUR")."
+  ADD #2
+  Section : 7. Payment Terms — last line
+  OLD     : not present
+  NEW     : • The order is confirmed, and production starts, only once the
+            advance is received in our account as cleared funds.
+  Note    : The buyer's bank needs one clear figure to remit; the PI is a
+            request for payment, not a promise to ship.
+
+DOCUMENT: Tier1/05_CommercialInvoice and Tier2/05_CommercialInvoice
+  ADD #1
+  Section : 8. Bank Details — last row
+  OLD     : not present
+  NEW     : Bank Charges | All bank charges outside India are for the Buyer's
+            account — please remit the full amount (charges option "OUR").
+  Note    : Same sentence as the PI; matches Sales & Supply Agreement 6.4.
+
+DOCUMENT: Tier1/05_CommercialInvoice
+  FIX #1
+  Section : 7. Invoice Value & Payment Settlement — BALANCE DUE NOW
+  OLD     : Payable by T/T within 7 Calendar Days of the date NexaCrest emails
+            the scanned BL copy / Against scanned copy of Bill of Lading
+  NEW     : Payable by T/T before shipment — within 3 Calendar Days of
+            receiving Shipment Readiness Confirmation from NexaCrest
+  Note    : Tier 1 pays BEFORE shipment — the Tier 2 clause had been copied in.
+
+DOCUMENT: Tier1+Tier2/01_Quotation, 02_ProformaInvoice, Tier1/03_OrderConfirmation
+  REPLACE #1
+  Section : Freight / Insurance / Payment Terms / Terms & Conditions
+  OLD     : Full payment required within 3 Working Days
+  NEW     : Full payment required within 3 Calendar Days
+  REPLACE #2 (Tier1/03_OrderConfirmation)
+  OLD     : payable by T/T within 3 Working Days of NexaCrest's Shipment
+            Readiness Confirmation
+  NEW     : payable by T/T within 3 Calendar Days of NexaCrest's Shipment
+            Readiness Confirmation
+  Note    : Calendar Days standardisation — buyer payment obligations always in
+            Calendar Days. NexaCrest's own obligations (couriering BL originals,
+            inspection notices, dispute replies) stay in Working Days.
+
+DOCUMENT: internal_documents/SOP_02_Accounts_FullGuide
+  REPLACE #1
+  OLD     : Track 60% Balance — 7 Working Days from BL Date
+  NEW     : Track 60% Balance — 7 Calendar Days from scanned BL email
+  Note    : Matches the Tier 2 clause.
+
+DEVELOPER SPEC: Section 1.1 Tier 1 clause "3 Working Days" -> "3 Calendar Days";
+  Section 3.2 documents the ADVANCE PAYABLE NOW box.

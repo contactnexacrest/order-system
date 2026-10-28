@@ -34,6 +34,14 @@ From **Documents**, **Generate Commercial Invoice** produces the CI —
 pre-filled with the actual shipped quantities and final figures rather than
 the estimates the PI was built on.
 
+The CI's **BALANCE DUE NOW** line states the order's own balance terms (the
+same sentence as the PI), in the PDF and the Word file alike, and its Bank
+Details end with a **Bank Charges** row — the same sentence as the PI:
+"All bank charges outside India are for the Buyer's account — please remit
+the full amount (charges option "OUR")." (Owner decision 2026-10-28; until
+then the Word CI always said "within N days of BL date", even on orders
+whose balance is due before shipment.)
+
 **Invoice date** (owner decision 2026-10-27). Step 11a has an **Invoice
 date (printed on the CI)** field just above the Generate button. It is
 **today** by default; pick an earlier date when the CI must carry the BL

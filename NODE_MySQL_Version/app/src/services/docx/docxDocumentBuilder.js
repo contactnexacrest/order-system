@@ -146,19 +146,19 @@ function paymentTermsBlock(context) {
   const order = context.order || {};
   const currency = g(order, 'currency_code', '');
   const out = [];
-  out.push(C.rich([['• ', {}], [`${g(financial, 'advance_pct', '')}% advance T/T on FOB Value against Proforma Invoice. `, {}], starRun()]));
+  out.push(C.rich([['• ', {}], [`${g(financial, 'advance_pct', '')}% advance T/T (Telegraphic Transfer) on FOB Value against Proforma Invoice. `, {}], starRun()]));
   out.push(C.rich([[`   ${g(financial, 'advance_pct', '')}% Advance Amount:  ${currency} ${g(financial, 'advance_amount', '')}`, {}], starRun()]));
-  const balanceText =
-    g(financial, 'balance_trigger_option', '') === 'A_BEFORE_SHIPMENT'
-      ? `payable before shipment — within ${g(financial, 'balance_days', '')} working days of receiving shipment readiness confirmation from NexaCrest.`
-      : `payable against scanned copy of Bill of Lading, within ${g(financial, 'balance_days', '')} days of BL date.`;
+  // Owner decision (2026-10-28): the Word balance line now prints the
+  // order's own balance terms — the same sentence as the PDF (Calendar
+  // Days, and the preset's own wording when it has one).
+  const balanceText = g(financial, 'balance_terms_text', '');
   out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% balance T/T on FOB Value ${balanceText} `, {}], starRun()]));
   out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Balance Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}], starRun()]));
   if (!order.is_fob) {
     out.push(
       C.rich([
         [order.is_cif ? '• Freight & Insurance (CFR/CIF orders only): ' : '• Freight (CFR order — buyer arranges insurance): ', {}],
-        ['Actual confirmed amounts invoiced separately by Freight Debit Note before shipment booking is confirmed. Payment required within 3 working days of Freight Debit Note date.', { color: '333333' }],
+        ['Actual confirmed amounts invoiced separately by Freight Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Freight Debit Note date.', { color: '333333' }],
       ])
     );
   }
@@ -367,6 +367,30 @@ function renderPi(context) {
       { label: `TOTAL PI VALUE (${currency})`, value: g(financial, 'total_value'), highlight: true },
     ])
   );
+  // Owner decision (2026-10-28): what to pay now, by when, and who bears
+  // the bank charges — same box as the PDF PI.
+  children.push(
+    ...C.colorBox(
+      C.AMBER_BG,
+      C.AMBER_BORDER,
+      [
+        C.rich([
+          ['ADVANCE PAYABLE NOW:  ', { bold: true, color: C.AMBER_LABEL, size: 19 }],
+          [`${currency} ${g(financial, 'advance_amount')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
+          [`(${g(financial, 'advance_pct')}% of FOB value) — due by ${g(order, 'pi_valid_until', 'To Be Confirmed')}`, { bold: true, color: C.AMBER_LABEL, size: 19 }],
+        ]),
+        C.plain(
+          `Balance ${currency} ${g(financial, 'balance_amount')} — not payable now. ${g(financial, 'balance_terms_text', '')}${!order.is_fob ? ` Freight${order.is_cif ? ' & insurance' : ''} are paid separately against our Debit Note.` : ''}`,
+          { italics: true, size: 17, color: C.AMBER_NOTE }
+        ),
+        C.rich([
+          ['Bank charges: ', { bold: true, color: C.AMBER_LABEL, size: 17 }],
+          [g(financial, 'bank_charges_text', ''), { bold: true, size: 17, color: C.AMBER_NOTE }],
+        ]),
+      ],
+      10
+    )
+  );
 
   children.push(...weightTable(order));
 
@@ -384,6 +408,7 @@ function renderPi(context) {
 
   children.push(...C.sectionTitle('5. PAYMENT TERMS'));
   children.push(...paymentTermsBlock(context));
+  children.push(C.plain(`• ${g(financial, 'cleared_funds_text', '')}`));
 
   children.push(...C.sectionTitle('6. PRODUCTION & ESTIMATED SHIPMENT'));
   children.push(
@@ -464,7 +489,7 @@ function renderOc(context) {
   children.push(
     ...C.colorBox(C.GREEN_BG, C.GREEN_BORDER, [
       C.plain('√  ORDER CONFIRMED', { bold: true, size: 26, color: C.GREEN_BORDER }),
-      C.plain(`This order is confirmed upon receipt and clearance of ${g(financial, 'advance_pct')}% advance T/T payment against the referenced Proforma Invoice.`, { italics: true, size: 19, color: C.GREEN_VALUE }),
+      C.plain(`This order is confirmed upon receipt and clearance of ${g(financial, 'advance_pct')}% advance T/T (Telegraphic Transfer) payment against the referenced Proforma Invoice.`, { italics: true, size: 19, color: C.GREEN_VALUE }),
     ])
   );
 
@@ -510,7 +535,7 @@ function renderOc(context) {
   if (!order.is_fob) {
     paymentRows.push({
       label: 'CFR / CIF Freight (if applicable)',
-      value: 'A Freight Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. Payment required within 3 working days of the Debit Note date. NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.',
+      value: 'A Freight Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. Payment required within 3 Calendar Days of the Debit Note date. NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.',
       labelBg: C.RED_BG,
       valueBg: C.RED_BG,
     });
@@ -1025,7 +1050,7 @@ function renderFdn(context) {
       C.rich(
         [
           ['Payment of this Freight Debit Note is required within ', { size: 19, color: C.RED_SUB }],
-          ['3 working days', { bold: true, size: 19, color: C.RED_TEXT }],
+          ['3 Calendar Days', { bold: true, size: 19, color: C.RED_TEXT }],
           [' of the date above. NexaCrest will confirm shipment booking and hand over cargo to the shipping line ', { size: 19, color: C.RED_SUB }],
           ['only upon receipt of full freight payment.', { bold: true, size: 19, color: C.RED_TEXT }],
         ],
@@ -1074,7 +1099,7 @@ function renderFdn(context) {
   children.push(...C.sectionTitle('5. PAYMENT INSTRUCTIONS'));
   children.push(
     ...C.colorBox(C.RED_BG, C.RED_BORDER, [
-      C.rich([['Payment Due: ', { bold: true }], [`Within 3 working days of this Debit Note date — by ${g(freight, 'payment_due_date', 'To Be Confirmed')}`, { color: C.RED_SUB }]]),
+      C.rich([['Payment Due: ', { bold: true }], [`Within 3 Calendar Days of this Debit Note date — by ${g(freight, 'payment_due_date', 'To Be Confirmed')}`, { color: C.RED_SUB }]]),
       C.rich([['Payment Method: ', { bold: true }], ['T/T (Telegraphic Transfer) to the NexaCrest bank account below', { color: C.RED_SUB }]]),
       C.rich([['Reference: ', { bold: true }], [`Quote Debit Note No. ${g(meta, 'document_reference')} and PI No. ${g(order, 'pi_ref', '—')} in the remittance`, { color: C.RED_SUB }]]),
       C.rich([
@@ -1534,7 +1559,7 @@ function renderCi(context) {
     [
       '→  BALANCE DUE NOW',
       `${currency} ${balanceAmt} *`,
-      `= FOB Value minus advance received\nPayable by T/T within ${g(financial, 'balance_days')} days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. ${g(meta, 'document_reference')}`,
+      `= FOB Value minus advance received\nPayable by T/T (Telegraphic Transfer). ${g(financial, 'balance_terms_text')}\nPayment Reference: Quote CI No. ${g(meta, 'document_reference')}`,
       true,
     ],
     [
@@ -1558,11 +1583,14 @@ function renderCi(context) {
   children.push(...C.sectionTitle('6. BANK DETAILS  (for balance T/T payment)'));
   children.push(
     ...C.kvTable(
-      bankDetailsRows(
-        context,
-        `Please quote CI No. ${g(meta, 'document_reference', '')} in your wire transfer remarks.`,
-        `${g(company, 'rbi_purpose_code_balance')} — enter in the "Purpose of Remittance" field of your wire transfer form.`
-      )
+      [
+        ...bankDetailsRows(
+          context,
+          `Please quote CI No. ${g(meta, 'document_reference', '')} in your wire transfer remarks.`,
+          `${g(company, 'rbi_purpose_code_balance')} — enter in the "Purpose of Remittance" field of your wire transfer form.`
+        ),
+        { label: 'Bank Charges', value: g(financial, 'bank_charges_text', '') },
+      ]
     )
   );
 

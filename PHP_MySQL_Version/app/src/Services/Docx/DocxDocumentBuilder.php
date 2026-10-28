@@ -208,9 +208,10 @@ final class DocxDocumentBuilder
         DocxComponents::addRichParagraph($section, [
             ['   ' . self::g($financial, 'advance_pct', '') . '% Advance Amount:  ' . $currency . ' ' . self::g($financial, 'advance_amount', ''), []], self::starRun(),
         ]);
-        $balanceText = self::g($financial, 'balance_trigger_option', '') === 'A_BEFORE_SHIPMENT'
-            ? 'payable before shipment — within ' . self::g($financial, 'balance_days', '') . ' working days of receiving shipment readiness confirmation from NexaCrest.'
-            : 'payable against scanned copy of Bill of Lading, within ' . self::g($financial, 'balance_days', '') . ' days of BL date.';
+        // Owner decision (2026-10-28): the Word balance line now prints the
+        // order's own balance terms — the same sentence as the PDF (Calendar
+        // Days, and the preset's own wording when it has one).
+        $balanceText = self::g($financial, 'balance_terms_text', '');
         DocxComponents::addRichParagraph($section, [
             ['• ', []], [self::g($financial, 'balance_pct', '') . '% balance T/T on FOB Value ' . $balanceText . ' ', []], self::starRun(),
         ]);
@@ -220,7 +221,7 @@ final class DocxDocumentBuilder
         if (empty($order['is_fob'])) {
             DocxComponents::addRichParagraph($section, [
                 [!empty($order['is_cif']) ? '• Freight & Insurance (CFR/CIF orders only): ' : '• Freight (CFR order — buyer arranges insurance): ', []],
-                ['Actual confirmed amounts invoiced separately by Freight Debit Note before shipment booking is confirmed. Payment required within 3 working days of Freight Debit Note date.', ['color' => '333333']],
+                ['Actual confirmed amounts invoiced separately by Freight Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Freight Debit Note date.', ['color' => '333333']],
             ]);
         }
         DocxComponents::addPlainParagraph($section, '   Currency: ' . $currency);
@@ -407,6 +408,18 @@ final class DocxDocumentBuilder
             ['label' => "Insurance ({$currency})", 'value' => $insuranceText],
             ['label' => "TOTAL PI VALUE ({$currency})", 'value' => self::g($financial, 'total_value'), 'highlight' => true],
         ]);
+        // Owner decision (2026-10-28): what to pay now, by when, and who
+        // bears the bank charges — same box as the PDF PI.
+        DocxComponents::addColorBox($section, DocxComponents::AMBER_BG, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) use ($order, $financial, $currency) {
+            $run = $cell->addTextRun();
+            $run->addText('ADVANCE PAYABLE NOW:  ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
+            $run->addText($currency . ' ' . self::g($financial, 'advance_amount') . '  ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
+            $run->addText('(' . self::g($financial, 'advance_pct') . '% of FOB value) — due by ' . self::g($order, 'pi_valid_until', 'To Be Confirmed'), ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
+            $cell->addText('Balance ' . $currency . ' ' . self::g($financial, 'balance_amount') . ' — not payable now. ' . self::g($financial, 'balance_terms_text', '') . (empty($order['is_fob']) ? ' Freight' . (!empty($order['is_cif']) ? ' & insurance' : '') . ' are paid separately against our Debit Note.' : ''), ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
+            $bank = $cell->addTextRun();
+            $bank->addText('Bank charges: ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 8.5]);
+            $bank->addText(self::g($financial, 'bank_charges_text', ''), ['bold' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
+        }, 10);
 
         self::weightTable($section, $order);
 
@@ -422,6 +435,7 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
         self::paymentTermsBlock($section, $context);
+        DocxComponents::addPlainParagraph($section, '• ' . self::g($financial, 'cleared_funds_text', ''));
 
         DocxComponents::addSectionTitle($section, '6. PRODUCTION & ESTIMATED SHIPMENT');
         DocxComponents::addKvTable($section, [[
@@ -528,7 +542,7 @@ final class DocxDocumentBuilder
         if (empty($order['is_fob'])) {
             $paymentRows[] = [
                 'label' => 'CFR / CIF Freight (if applicable)',
-                'value' => 'A Freight Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. Payment required within 3 working days of the Debit Note date. NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.',
+                'value' => 'A Freight Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. Payment required within 3 Calendar Days of the Debit Note date. NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.',
                 'labelBg' => DocxComponents::RED_BG,
                 'valueBg' => DocxComponents::RED_BG,
             ];
@@ -1012,7 +1026,7 @@ final class DocxDocumentBuilder
             $cell->addText("PAYMENT REQUIRED BEFORE SHIPMENT", ['bold' => true, 'size' => 10, 'color' => DocxComponents::RED_TEXT], ['alignment' => Jc::CENTER]);
             $run = $cell->addTextRun(['alignment' => Jc::CENTER]);
             $run->addText('Payment of this Freight Debit Note is required within ', ['size' => 9.5, 'color' => DocxComponents::RED_SUB]);
-            $run->addText('3 working days', ['bold' => true, 'size' => 9.5, 'color' => DocxComponents::RED_TEXT]);
+            $run->addText('3 Calendar Days', ['bold' => true, 'size' => 9.5, 'color' => DocxComponents::RED_TEXT]);
             $run->addText(' of the date above. NexaCrest will confirm shipment booking and hand over cargo to the shipping line ', ['size' => 9.5, 'color' => DocxComponents::RED_SUB]);
             $run->addText('only upon receipt of full freight payment.', ['bold' => true, 'size' => 9.5, 'color' => DocxComponents::RED_TEXT]);
         });
@@ -1054,7 +1068,7 @@ final class DocxDocumentBuilder
         DocxComponents::addColorBox($section, DocxComponents::RED_BG, DocxComponents::RED_BORDER, function (AbstractContainer $cell) use ($freight, $meta, $order) {
             $r1 = $cell->addTextRun();
             $r1->addText('Payment Due: ', ['bold' => true]);
-            $r1->addText('Within 3 working days of this Debit Note date — by ' . self::g($freight, 'payment_due_date', 'To Be Confirmed'), ['color' => DocxComponents::RED_SUB]);
+            $r1->addText('Within 3 Calendar Days of this Debit Note date — by ' . self::g($freight, 'payment_due_date', 'To Be Confirmed'), ['color' => DocxComponents::RED_SUB]);
             $r2 = $cell->addTextRun();
             $r2->addText('Payment Method: ', ['bold' => true]);
             $r2->addText('T/T (Telegraphic Transfer) to the NexaCrest bank account below', ['color' => DocxComponents::RED_SUB]);
@@ -1429,7 +1443,7 @@ final class DocxDocumentBuilder
             ["\u{221A}  Advance — " . (self::g($payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'), $currency . ' ' . $advanceAmt . ' *', 'Received: ' . self::g($payment, 'advance_cleared_at', 'To Be Confirmed') . "\nAgainst: PI No. " . self::g($order, 'pi_ref', 'To Be Confirmed')],
             ["\u{221A}  " . ($isCif || $isFob ? 'Freight & Insurance' : 'Freight') . " — {$freightStatus}", $freightAmtCell, $freightRemark2],
             ['SUBTOTAL ALREADY PAID', $subtotalPaid, 'Advance' . (!$isFob ? ' + FDN (if applicable)' : '')],
-            ["\u{2192}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', "= FOB Value minus advance received\nPayable by T/T (Telegraphic Transfer) within " . self::g($financial, 'balance_days') . " days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
+            ["\u{2192}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', "= FOB Value minus advance received\nPayable by T/T (Telegraphic Transfer). " . self::g($financial, 'balance_terms_text') . "\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
             ['VERIFICATION', "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = " . self::g($financial, 'fob_value') . " \u{221A}", $isFob ? 'Freight & Insurance not applicable on an FOB order.' : ($isCif ? 'Freight & Insurance is' : 'Freight is') . ' paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.'],
         ];
         self::threeColFinanceTable($section, 'SECTION B — PAYMENT SETTLEMENT', $sectionBRows, DocxComponents::NAVY_MID);
@@ -1441,11 +1455,11 @@ final class DocxDocumentBuilder
         ]);
 
         DocxComponents::addSectionTitle($section, '6. BANK DETAILS  (for balance T/T payment)');
-        DocxComponents::addKvTable($section, self::bankDetailsRows(
+        DocxComponents::addKvTable($section, array_merge(self::bankDetailsRows(
             $context,
             'Please quote CI No. ' . self::g($meta, 'document_reference', '') . ' in your wire transfer remarks.',
             self::g($company, 'rbi_purpose_code_balance') . ' — enter in the "Purpose of Remittance" field of your wire transfer form.'
-        ));
+        ), [['label' => 'Bank Charges', 'value' => self::g($financial, 'bank_charges_text', '')]]));
 
         DocxComponents::addSectionTitle($section, '7. DOCUMENTS PROVIDED WITH THIS SHIPMENT');
         self::documentsProvidedParagraphs($section, 'The following documents are provided with this shipment:', [

@@ -4,7 +4,6 @@ const env = require('../config/env'); // loads .env as a side effect — must ru
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const permissionRepository = require('../repositories/permissionRepository');
-const workingDaysCalculator = require('../services/workingDaysCalculator');
 const db = require('../config/db');
 const logger = require('../helpers/logger');
 const { todayIst } = require('../helpers/dbDateTime');
@@ -105,6 +104,10 @@ async function run() {
   // figure) and switched the comparison to workingDaysCalculator, matching
   // the same working-days-not-calendar-days fix already applied to the
   // dispute response deadline.
+  // Owner decision (2026-10-28): the clause, the FDN and every other buyer
+  // payment deadline now read "Calendar Days", so the overdue check counts
+  // calendar days too — the alert fires the day after the date printed on
+  // the FDN, not later.
   const fdnOverdueDays = parseInt((await companySettingsRepository.get('fdn_overdue_days_c')) || '3', 10);
   const overdueFreight = await db.query(
     `SELECT o.id AS order_id, o.order_reference, d.generated_at
@@ -117,7 +120,9 @@ async function run() {
   );
   const todayStr = today.toISOString().slice(0, 10);
   for (const row of overdueFreight) {
-    const dueDate = await workingDaysCalculator.addWorkingDays(String(row.generated_at).slice(0, 10), fdnOverdueDays);
+    const due = new Date(`${String(row.generated_at).slice(0, 10)}T00:00:00Z`);
+    due.setUTCDate(due.getUTCDate() + fdnOverdueDays);
+    const dueDate = due.toISOString().slice(0, 10);
     if (dueDate < todayStr) {
       created += await notifyMdAndAdmin(mdAndAdminIds, 'fdn_overdue', `Freight payment overdue on order ${row.order_reference} — FDN issued ${row.generated_at}, still not cleared.`, row.order_id);
     }
