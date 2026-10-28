@@ -47,10 +47,10 @@ PRESETS.forEach(([preset, pct, advance, balance, terms], p) => {
  * the order's own terms, the freight note, the bank-charges sentence and
  * Calendar Days.
  *
- * Not asserted here, reported to the owner instead (a document change needs
- * their double confirmation): the Letter of Credit preset (0% advance)
- * prints "ADVANCE PAYABLE NOW: … 0.00" and the cleared-funds sentence, and
- * the CFR box says "Freight are paid separately".
+ * Owner decision (2026-10-29, confirmed twice): an order with no advance
+ * (the Letter of Credit preset) says "NO ADVANCE PAYABLE — … payable by
+ * Letter of Credit", without the advance sentences, and the CFR box reads
+ * "Freight is paid separately".
  */
 describe('PI / CI payment wording across every preset, incoterm and currency', () => {
   afterAll(async () => {
@@ -107,13 +107,22 @@ describe('PI / CI payment wording across every preset, incoterm and currency', (
       if (pct !== '0') {
         has(kind, text, `ADVANCE PAYABLE NOW: ${currency} ${advance} (${pct}% of FOB value) — due by`);
         has(kind, text, 'only once the advance is received in our account as cleared funds.');
+        has(kind, text, `Balance ${currency} ${balance} — not payable now. ${terms}`);
+        // The T&C clauses are filled in by documentGenerationService, which the
+        // Word text here (built straight from the assembler) leaves out.
+        if (kind === 'PI PDF') has(kind, text, `acceptance and initiate the ${pct}% advance payment within this period.`);
+      } else {
+        has(kind, text, `NO ADVANCE PAYABLE — the full FOB value ${currency} ${balance} is payable by Letter of Credit. ${terms}`);
+        hasNot(kind, text, 'ADVANCE PAYABLE NOW');
+        hasNot(kind, text, 'only once the advance is received');
+        hasNot(kind, text, 'initiate the 0% advance payment');
+        if (kind === 'PI PDF') has(kind, text, 'notify NexaCrest of acceptance within this period.');
       }
-      has(kind, text, `Balance ${currency} ${balance} — not payable now. ${terms}`);
       has(kind, text, `Bank charges: ${BANK}`);
       if (incoterm === 'CIF') {
         has(kind, text, 'Freight & insurance are paid separately against our Debit Note.');
       } else if (incoterm === 'CFR') {
-        has(kind, text, 'paid separately against our Debit Note.');
+        has(kind, text, 'Freight is paid separately against our Debit Note.');
         hasNot(kind, text, 'Freight & insurance are paid separately');
       } else {
         hasNot(kind, text, 'paid separately against our Debit Note');

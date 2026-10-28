@@ -411,11 +411,20 @@ final class DocxDocumentBuilder
         // Owner decision (2026-10-28): what to pay now, by when, and who
         // bears the bank charges — same box as the PDF PI.
         DocxComponents::addColorBox($section, DocxComponents::AMBER_BG, DocxComponents::AMBER_BORDER, function (AbstractContainer $cell) use ($order, $financial, $currency) {
+            $freight = empty($order['is_fob']) ? ' Freight' . (!empty($order['is_cif']) ? ' & insurance are' : ' is') . ' paid separately against our Debit Note.' : '';
             $run = $cell->addTextRun();
-            $run->addText('ADVANCE PAYABLE NOW:  ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
-            $run->addText($currency . ' ' . self::g($financial, 'advance_amount') . '  ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
-            $run->addText('(' . self::g($financial, 'advance_pct') . '% of FOB value) — due by ' . self::g($order, 'pi_valid_until', 'To Be Confirmed'), ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
-            $cell->addText('Balance ' . $currency . ' ' . self::g($financial, 'balance_amount') . ' — not payable now. ' . self::g($financial, 'balance_terms_text', '') . (empty($order['is_fob']) ? ' Freight' . (!empty($order['is_cif']) ? ' & insurance' : '') . ' are paid separately against our Debit Note.' : ''), ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
+            if (!empty($financial['has_advance'])) {
+                $run->addText('ADVANCE PAYABLE NOW:  ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
+                $run->addText($currency . ' ' . self::g($financial, 'advance_amount') . '  ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
+                $run->addText('(' . self::g($financial, 'advance_pct') . '% of FOB value) — due by ' . self::g($order, 'pi_valid_until', 'To Be Confirmed'), ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
+                $cell->addText('Balance ' . $currency . ' ' . self::g($financial, 'balance_amount') . ' — not payable now. ' . self::g($financial, 'balance_terms_text', '') . $freight, ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
+            } else {
+                // Owner decision (2026-10-29): no advance (e.g. Letter of Credit) — say so, never "ADVANCE PAYABLE NOW: 0.00".
+                $run->addText('NO ADVANCE PAYABLE —  the full FOB value ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
+                $run->addText($currency . ' ' . self::g($financial, 'balance_amount') . ' ', ['bold' => true, 'size' => 11, 'color' => DocxComponents::AMBER_VALUE]);
+                $run->addText('is payable ' . (($financial['payment_method'] ?? null) === 'LC' ? 'by Letter of Credit' : 'as below') . '.', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 9.5]);
+                $cell->addText(self::g($financial, 'balance_terms_text', '') . $freight, ['italic' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
+            }
             $bank = $cell->addTextRun();
             $bank->addText('Bank charges: ', ['bold' => true, 'color' => DocxComponents::AMBER_LABEL, 'size' => 8.5]);
             $bank->addText(self::g($financial, 'bank_charges_text', ''), ['bold' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
@@ -435,7 +444,9 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
         self::paymentTermsBlock($section, $context);
-        DocxComponents::addPlainParagraph($section, '• ' . self::g($financial, 'cleared_funds_text', ''));
+        if (!empty($financial['has_advance'])) {
+            DocxComponents::addPlainParagraph($section, '• ' . self::g($financial, 'cleared_funds_text', ''));
+        }
 
         DocxComponents::addSectionTitle($section, '6. PRODUCTION & ESTIMATED SHIPMENT');
         DocxComponents::addKvTable($section, [[

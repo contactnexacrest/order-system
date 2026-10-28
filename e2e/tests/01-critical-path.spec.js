@@ -64,8 +64,40 @@ function docForm(page, orderId, typeCode) {
 // assumed from the TEST_PLAN's simplified summary.
 const DOC_GENERATE_STAGE = { BUYERPO: 2, PI: 3, OC: 4, SUPPO: 5, FDN: 6, PL: 7, BLI: 7, CI: 8, COOPREP: 9 };
 
-async function generateDocument(page, orderId, typeCode, expectedBannerSubstring) {
+/**
+ * Owner decisions (2026-10-28 / 2026-10-29): downloads the newest generated
+ * document of a type from the order page's document list — PDF and Word —
+ * the way staff do, and returns each one's text (whitespace-flattened).
+ */
+async function downloadedDocumentTexts(page, typeCode) {
+  const fs = require('fs');
+  const os = require('os');
+  const { execFileSync } = require('child_process');
+  const row = page.locator('tr', { hasText: `/${typeCode}/` }).filter({ has: page.locator('a[href*="format=pdf"]') }).first();
+  const flat = (s) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+  const texts = {};
+  for (const [kind, format] of [['PDF', 'pdf'], ['Word', 'docx']]) {
+    const href = await row.locator(`a[href*="format=${format}"]`).first().getAttribute('href');
+    const response = await page.request.get(href);
+    expect(response.ok(), `${typeCode} ${kind} download`).toBeTruthy();
+    const file = path.join(os.tmpdir(), `e2e-${typeCode}-${Date.now()}.${format}`);
+    fs.writeFileSync(file, await response.body());
+    try {
+      texts[kind] = format === 'pdf'
+        ? flat(execFileSync('pdftotext', [file, '-']).toString('utf8'))
+        : flat(execFileSync('unzip', ['-p', file, 'word/document.xml']).toString('utf8').replace(/<w:br\/>|<\/w:p>/g, ' ').replace(/<[^>]+>/g, ''));
+    } finally {
+      fs.unlinkSync(file);
+    }
+  }
+  return texts;
+}
+
+const BANK_CHARGES = 'All bank charges outside India are for the Buyer\'s account — please remit the full amount (charges option "OUR").';
+
+async function generateDocument(page, orderId, typeCode, expectedBannerSubstring, { docx = false } = {}) {
   await openStage(page, DOC_GENERATE_STAGE[typeCode] ?? 1);
+  if (docx) await docForm(page, orderId, typeCode).locator('input[name="generate_docx"]').check();
   await docForm(page, orderId, typeCode).locator('button[type="submit"]').click();
   await expect(page.locator('.alert')).toContainText(expectedBannerSubstring);
 }
@@ -334,8 +366,20 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
 
   await test.step('Stage 3 — PI & Advance Payment: PI approved, record then clear', async () => {
     await skipPiForm(page, orderId);
-    await generateDocument(page, orderId, 'PI', 'generated');
+    await generateDocument(page, orderId, 'PI', 'generated', { docx: true });
     await assignSelfAndApprove(page, 'PI');
+
+    // The downloaded PI (PDF and Word) says what to pay now: the advance
+    // box with the amount and due date, the balance not payable now, the
+    // freight & insurance Debit Note, bank charges and cleared funds.
+    for (const [kind, text] of Object.entries(await downloadedDocumentTexts(page, 'PI'))) {
+      expect(text, `PI ${kind}`).toMatch(/ADVANCE PAYABLE NOW: [A-Z]{3} [\d,]+\.\d{2} \(40% of FOB value\) — due by/);
+      expect(text, `PI ${kind}`).toMatch(/Balance [A-Z]{3} [\d,]+\.\d{2} — not payable now\. Payable before shipment — within 3 Calendar Days/);
+      expect(text, `PI ${kind}`).toContain('Freight & insurance are paid separately against our Debit Note.');
+      expect(text, `PI ${kind}`).toContain(`Bank charges: ${BANK_CHARGES}`);
+      expect(text, `PI ${kind}`).toContain('only once the advance is received in our account as cleared funds.');
+      if (kind === 'Word') expect(text, 'PI Word').not.toContain('3 working days');
+    }
 
     // 5d: the client sends their payment details through the Payment
     // Action Link — payment only, never the Buyer PO.
@@ -503,8 +547,19 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
   });
 
   await test.step('Stage 8 — Commercial Invoice & Balance Payment: generate CI, record, clear', async () => {
-    await generateDocument(page, orderId, 'CI', 'generated');
+    await generateDocument(page, orderId, 'CI', 'generated', { docx: true });
     await assignSelfAndApprove(page, 'CI');
+
+    // The downloaded CI (PDF and Word): the same bank-charges sentence as
+    // the PI, and the balance on the order's own (before-shipment) terms.
+    for (const [kind, text] of Object.entries(await downloadedDocumentTexts(page, 'CI'))) {
+      // The label and the sentence sit in two table cells, which a PDF's
+      // text can list apart — check both are there.
+      expect(text, `CI ${kind}`).toContain('Bank Charges');
+      expect(text, `CI ${kind}`).toContain(BANK_CHARGES);
+      expect(text, `CI ${kind}`).toContain('Payable before shipment — within 3 Calendar Days of receiving Shipment Readiness Confirmation');
+      if (kind === 'Word') expect(text, 'CI Word').not.toContain('days of BL date');
+    }
 
     // 11b: the scanned BL copy goes to the buyer before the balance comes in.
     await submitStepForm(page, 8, `/orders/${orderId}/scanned-bl-sent`, {}, /Mark Scanned BL Copy Sent/);

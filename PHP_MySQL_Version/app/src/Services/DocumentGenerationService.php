@@ -1611,6 +1611,11 @@ final class DocumentGenerationService
         $piValidityDays = CompanySettingsRepository::get('pi_validity_days') ?? '15';
 
         return [
+            // Owner decision (2026-10-29): with no advance (e.g. Letter of
+            // Credit) the PI Validity clause doesn't ask the buyer to
+            // "initiate the 0% advance payment". strtr() matches this longer
+            // key before {advance_pct}.
+            ' and initiate the {advance_pct}% advance payment' => empty($data['financial']['has_advance']) ? '' : ' and initiate the ' . $data['financial']['advance_pct'] . '% advance payment',
             '{tolerance}'                => rtrim(rtrim($tolerance, '0'), '.'),
             '{advance_pct}'              => $data['financial']['advance_pct'],
             '{balance_pct}'              => $data['financial']['balance_pct'],

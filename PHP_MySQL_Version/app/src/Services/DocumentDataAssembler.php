@@ -266,6 +266,11 @@ final class DocumentDataAssembler
                 'balance_terms_text' => self::balanceTriggerSentence($order['balance_trigger_option'] ?? null, isset($order['balance_days']) ? (int) $order['balance_days'] : null, $order['balance_trigger_wording'] ?? null),
                 'bank_charges_text'  => self::BANK_CHARGES_SENTENCE,
                 'cleared_funds_text' => self::CLEARED_FUNDS_SENTENCE,
+                // Owner decision (2026-10-29): an order with no advance (e.g.
+                // the Letter of Credit preset) says so on the PI instead of
+                // "ADVANCE PAYABLE NOW: 0.00", without the advance sentences.
+                'has_advance'      => $advancePct > 0,
+                'payment_method'   => $order['payment_method'] ?? null,
                 'total_value'      => self::formatMoney($fobValue), // freight/insurance are indicative-only, not summed into the binding total for FOB — QT/PI/OC only, unaffected by item #18 below
                 // 90-item backlog item #18 (BLOCKER) — see this
                 // function's own freightForTotal/totalCommercialInvoiceValue

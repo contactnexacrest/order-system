@@ -19,10 +19,10 @@ use PHPUnit\Framework\Attributes\DataProvider;
  * amounts, the balance line following the order's own terms, the freight
  * note, the bank-charges sentence and Calendar Days.
  *
- * Not asserted here, reported to the owner instead (a document change needs
- * their double confirmation): the Letter of Credit preset (0% advance)
- * prints "ADVANCE PAYABLE NOW: … 0.00" and the cleared-funds sentence, and
- * the CFR box says "Freight are paid separately".
+ * Owner decision (2026-10-29, confirmed twice): an order with no advance
+ * (the Letter of Credit preset) says "NO ADVANCE PAYABLE — … payable by
+ * Letter of Credit", without the advance sentences, and the CFR box reads
+ * "Freight is paid separately".
  * The Node suite has the same test (paymentTermsScenarios.test.js).
  */
 final class PaymentTermsScenariosTest extends DbTestCase
@@ -81,13 +81,20 @@ final class PaymentTermsScenariosTest extends DbTestCase
             if ($pct !== '0') {
                 self::assertStringContainsString("ADVANCE PAYABLE NOW: {$currency} {$advance} ({$pct}% of FOB value) — due by", $text, $kind);
                 self::assertStringContainsString('only once the advance is received in our account as cleared funds.', $text, $kind);
+                self::assertStringContainsString("Balance {$currency} {$balance} — not payable now. {$terms}", $text, $kind);
+                self::assertStringContainsString("acceptance and initiate the {$pct}% advance payment within this period.", $text, $kind);
+            } else {
+                self::assertStringContainsString("NO ADVANCE PAYABLE — the full FOB value {$currency} {$balance} is payable by Letter of Credit. {$terms}", $text, $kind);
+                self::assertStringNotContainsString('ADVANCE PAYABLE NOW', $text, $kind);
+                self::assertStringNotContainsString('only once the advance is received', $text, $kind);
+                self::assertStringNotContainsString('initiate the 0% advance payment', $text, $kind);
+                self::assertStringContainsString('notify NexaCrest of acceptance within this period.', $text, $kind);
             }
-            self::assertStringContainsString("Balance {$currency} {$balance} — not payable now. {$terms}", $text, $kind);
             self::assertStringContainsString('Bank charges: ' . self::BANK, $text, $kind);
             if ($incoterm === 'CIF') {
                 self::assertStringContainsString('Freight & insurance are paid separately against our Debit Note.', $text, $kind);
             } elseif ($incoterm === 'CFR') {
-                self::assertStringContainsString('paid separately against our Debit Note.', $text, $kind);
+                self::assertStringContainsString('Freight is paid separately against our Debit Note.', $text, $kind);
                 self::assertStringNotContainsString('Freight & insurance are paid separately', $text, $kind . ': no insurance on CFR');
             } else {
                 self::assertStringNotContainsString('paid separately against our Debit Note', $text, $kind . ': no Debit Note on FOB');

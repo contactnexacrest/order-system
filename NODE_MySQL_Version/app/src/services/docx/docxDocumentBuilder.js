@@ -369,20 +369,30 @@ function renderPi(context) {
   );
   // Owner decision (2026-10-28): what to pay now, by when, and who bears
   // the bank charges — same box as the PDF PI.
+  const freightNote = !order.is_fob ? ` Freight${order.is_cif ? ' & insurance are' : ' is'} paid separately against our Debit Note.` : '';
   children.push(
     ...C.colorBox(
       C.AMBER_BG,
       C.AMBER_BORDER,
       [
-        C.rich([
-          ['ADVANCE PAYABLE NOW:  ', { bold: true, color: C.AMBER_LABEL, size: 19 }],
-          [`${currency} ${g(financial, 'advance_amount')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
-          [`(${g(financial, 'advance_pct')}% of FOB value) — due by ${g(order, 'pi_valid_until', 'To Be Confirmed')}`, { bold: true, color: C.AMBER_LABEL, size: 19 }],
-        ]),
-        C.plain(
-          `Balance ${currency} ${g(financial, 'balance_amount')} — not payable now. ${g(financial, 'balance_terms_text', '')}${!order.is_fob ? ` Freight${order.is_cif ? ' & insurance' : ''} are paid separately against our Debit Note.` : ''}`,
-          { italics: true, size: 17, color: C.AMBER_NOTE }
-        ),
+        ...(financial.has_advance
+          ? [
+            C.rich([
+              ['ADVANCE PAYABLE NOW:  ', { bold: true, color: C.AMBER_LABEL, size: 19 }],
+              [`${currency} ${g(financial, 'advance_amount')}  `, { bold: true, size: 22, color: C.AMBER_VALUE }],
+              [`(${g(financial, 'advance_pct')}% of FOB value) — due by ${g(order, 'pi_valid_until', 'To Be Confirmed')}`, { bold: true, color: C.AMBER_LABEL, size: 19 }],
+            ]),
+            C.plain(`Balance ${currency} ${g(financial, 'balance_amount')} — not payable now. ${g(financial, 'balance_terms_text', '')}${freightNote}`, { italics: true, size: 17, color: C.AMBER_NOTE }),
+          ]
+          // Owner decision (2026-10-29): no advance (e.g. Letter of Credit) — say so, never "ADVANCE PAYABLE NOW: 0.00".
+          : [
+            C.rich([
+              ['NO ADVANCE PAYABLE —  the full FOB value ', { bold: true, color: C.AMBER_LABEL, size: 19 }],
+              [`${currency} ${g(financial, 'balance_amount')} `, { bold: true, size: 22, color: C.AMBER_VALUE }],
+              [`is payable ${financial.payment_method === 'LC' ? 'by Letter of Credit' : 'as below'}.`, { bold: true, color: C.AMBER_LABEL, size: 19 }],
+            ]),
+            C.plain(`${g(financial, 'balance_terms_text', '')}${freightNote}`, { italics: true, size: 17, color: C.AMBER_NOTE }),
+          ]),
         C.rich([
           ['Bank charges: ', { bold: true, color: C.AMBER_LABEL, size: 17 }],
           [g(financial, 'bank_charges_text', ''), { bold: true, size: 17, color: C.AMBER_NOTE }],
@@ -408,7 +418,7 @@ function renderPi(context) {
 
   children.push(...C.sectionTitle('5. PAYMENT TERMS'));
   children.push(...paymentTermsBlock(context));
-  children.push(C.plain(`• ${g(financial, 'cleared_funds_text', '')}`));
+  if (financial.has_advance) children.push(C.plain(`• ${g(financial, 'cleared_funds_text', '')}`));
 
   children.push(...C.sectionTitle('6. PRODUCTION & ESTIMATED SHIPMENT'));
   children.push(

@@ -111,8 +111,8 @@ second **TOTAL PI VALUE** the PI (PDF and Word) prints an amber box:
 - **ADVANCE PAYABLE NOW** — the advance amount, its % of the FOB value, and
   "due by" the PI's own Valid Until date;
 - the **balance**, marked "not payable now", with the order's balance terms
-  (and, on CFR/CIF, that freight & insurance are paid against the Debit
-  Note);
+  (and, on CFR, that freight is — on CIF, that freight & insurance are —
+  paid against the Debit Note);
 - **Bank charges:** "All bank charges outside India are for the Buyer's
   account — please remit the full amount (charges option "OUR")."
 
@@ -120,6 +120,13 @@ Payment Terms ends with: "The order is confirmed, and production starts,
 only once the advance is received in our account as cleared funds." Every
 buyer payment deadline on the PI, in PDF and Word alike, is in **Calendar
 Days**.
+
+**No advance** (owner decision 2026-10-29 — e.g. the *Irrevocable Letter of
+Credit at Sight* preset, 0% advance): the box reads **"NO ADVANCE PAYABLE —
+the full FOB value … is payable by Letter of Credit."** (or "… as below" on
+any other 0% terms) with the order's payment terms under it, never
+"ADVANCE PAYABLE NOW: 0.00". The cleared-funds sentence is left out, and the
+PI Validity clause asks only for acceptance within the validity period.
 
 ### Recording and clearing the advance payment
 

@@ -79,8 +79,14 @@
 
 {# Owner decision (2026-10-28): the PI is what the buyer pays the advance against — one boxed line saying exactly what to pay now, by when, and that bank charges outside India are the buyer's. #}
 <div class="banner banner-amber" style="border:1.2pt solid #C27A0E; padding:4pt 8pt; margin-top:4pt;">
+  {# Owner decision (2026-10-29): no advance (e.g. Letter of Credit) — say so, never "ADVANCE PAYABLE NOW: 0.00". #}
+  {% if financial.has_advance %}
   <span class="label">ADVANCE PAYABLE NOW:</span> &nbsp;<span class="value">{{ order.currency_code }} {{ financial.advance_amount }}</span> &nbsp;<span class="label">({{ financial.advance_pct }}% of FOB value) — due by {{ order.pi_valid_until ?: 'To Be Confirmed' }}</span><br>
-  <span class="note">Balance {{ order.currency_code }} {{ financial.balance_amount }} — not payable now. {{ financial.balance_terms_text }}{% if not order.is_fob %} Freight{% if order.is_cif %} &amp; insurance{% endif %} are paid separately against our Debit Note.{% endif %}</span><br>
+  <span class="note">Balance {{ order.currency_code }} {{ financial.balance_amount }} — not payable now. {{ financial.balance_terms_text }}{% if not order.is_fob %} Freight{% if order.is_cif %} &amp; insurance are{% else %} is{% endif %} paid separately against our Debit Note.{% endif %}</span><br>
+  {% else %}
+  <span class="label">NO ADVANCE PAYABLE —</span> &nbsp;<span class="label">the full FOB value</span> <span class="value">{{ order.currency_code }} {{ financial.balance_amount }}</span> <span class="label">is payable {% if financial.payment_method == 'LC' %}by Letter of Credit{% else %}as below{% endif %}.</span><br>
+  <span class="note">{{ financial.balance_terms_text }}{% if not order.is_fob %} Freight{% if order.is_cif %} &amp; insurance are{% else %} is{% endif %} paid separately against our Debit Note.{% endif %}</span><br>
+  {% endif %}
   <span class="label" style="font-size:8.5pt;">Bank charges:</span> <span class="note" style="font-style:normal; font-weight:bold;">{{ financial.bank_charges_text }}</span>
 </div>
 
@@ -114,7 +120,7 @@
   <p>&#8226; {% if order.is_cif %}Freight &amp; Insurance (CFR/CIF orders only){% else %}Freight (CFR order — buyer arranges insurance){% endif %}: <span class="sub-line">Actual confirmed amounts invoiced separately by Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Debit Note date.</span></p>
   {% endif %}
   <p>&nbsp;&nbsp;Currency: {{ order.currency_code }}</p>
-  <p>&#8226; {{ financial.cleared_funds_text }}</p>
+  {% if financial.has_advance %}<p>&#8226; {{ financial.cleared_funds_text }}</p>{% endif %}
 </div>
 
 <table class="kv">
