@@ -3107,3 +3107,60 @@ DOCUMENT: internal_documents/SOP_02_Accounts_FullGuide
 
 DEVELOPER SPEC: Section 1.1 Tier 1 clause "3 Working Days" -> "3 Calendar Days";
   Section 3.2 documents the ADVANCE PAYABLE NOW box.
+
+================================================================================
+28 OCTOBER 2026 — LATER CHANGES (app-generated PI; reference .docx unchanged)
+================================================================================
+
+DOCUMENT: 02_ProformaInvoice (app template, PDF and Word)
+  REPLACE #1
+  Section : Advance box — second line, CFR orders
+  OLD     : Freight are paid separately against our Debit Note.
+  NEW     : Freight is paid separately against our Debit Note.
+  Note    : Grammar. CIF keeps "Freight & insurance are paid separately …".
+
+  ADD #1
+  Section : Advance box — orders with no advance (Letter of Credit preset)
+  OLD     : ADVANCE PAYABLE NOW: [CCY] 0.00 (0% of FOB value) — due by [date]
+  NEW     : NO ADVANCE PAYABLE — the full FOB value [CCY] [FOB] is payable by
+            Letter of Credit.
+  Note    : A 0% advance must never read as something payable now. The
+            reference Tier 1 / Tier 2 PIs both carry an advance, so their
+            .docx files are unchanged.
+
+  REPLACE #2
+  Section : 7. Payment Terms — last line, orders with no advance
+  OLD     : • The order is confirmed, and production starts, only once the
+            advance is received in our account as cleared funds.
+  NEW     : (line left out — there is no advance)
+
+  REPLACE #3
+  Section : Terms & Conditions — Proforma Invoice Validity, orders with no
+            advance
+  OLD     : Buyer must notify NexaCrest of acceptance and initiate the 0%
+            advance payment within this period.
+  NEW     : Buyer must notify NexaCrest of acceptance within this period.
+
+  REPLACE #4
+  Section : 7. Payment Terms, orders with no advance
+  OLD     : • 0% Advance Payment on FOB Value against this document.
+              0% Advance Amount: [CCY] 0.00
+            • 100% Balance Payment on FOB Value [balance clause]
+              100% Balance Amount: [CCY] [FOB]
+  NEW     : • 100% Payment on FOB Value by Letter of Credit — [balance clause]
+              100% Amount: [CCY] [FOB]
+
+  REPLACE #5
+  Section : Terms & Conditions — Production Commencement, orders with no
+            advance (PI only)
+  OLD     : Production commences only after 0% advance payment is received and
+            CLEARED in NexaCrest's bank account, and …
+  NEW     : Production commences only after the Letter of Credit is opened and
+            confirmed by NexaCrest's bank, and …
+
+DOCUMENT: Quotation, Proforma Invoice (CFR orders) — QA Round 5, Q-R5-2
+  REPLACE #1
+  Section : Insurance row
+  NEW     : NIL — buyer arranges insurance (CFR).
+  Note    : On CFR the buyer insures; the Debit Note covers freight only.
+

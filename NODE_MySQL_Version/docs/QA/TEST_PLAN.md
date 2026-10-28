@@ -19,12 +19,14 @@ through those dedicated suites rather than duplicated here.
 
 ## 1. Scope and application shape
 
-- **2 stacks**, PHP/MySQL and Node/MySQL, route-for-route identical: **282
-  routes each** (`public_html/index.php` / `src/server.js`).
-- **84 database tables** (`docs/schema.sql`), 24 of which hang directly off
+- **2 stacks**, PHP/MySQL and Node/MySQL, route-for-route identical: **466
+  routes each** — 157 GET, 309 POST (`public_html/index.php` /
+  `src/server.js`; counts as of 28 Oct 2026).
+- **112 database tables** (`docs/schema.sql`), 24 of which (at the time
+  of the original inventory) hang directly off
   `orders.id` (the order-lifecycle-dependent tables — see
   `_inventory_raw.md` §3 for the full list).
-- **8 roles, 34 permissions** (`docs/seed.sql`), plus two mechanisms that
+- **8 roles, 60 permissions** (`docs/seed.sql`), plus two mechanisms that
   sit outside the role/permission matrix entirely and must be tested
   separately: per-user permission overrides (`user_permissions`) and the
   Super Admin tier (`users.is_super_admin`, `super_admin_delegations`),
@@ -48,16 +50,17 @@ through those dedicated suites rather than duplicated here.
 
 | Role | Permission scope |
 |---|---|
-| Admin, Managing Director, Executive Director | All 34 permissions (wildcard grant in seed.sql) |
-| Export Executive | manage_orders, generate_documents, download_pdf, view_reports, view_client_email_full, cross_verify_documents, view/browse product catalog, view_product_pricing, view_archived_orders |
-| Accounts Executive | manage_orders, download_pdf, view_reports, view_client_email_full, cross_verify_documents, view/browse product catalog, view_product_pricing, view_archived_orders, ca_module_view, inr_actual_view, inr_actual_edit, ca_module_manage, ca_fy_lock_override |
-| Logistics Executive | manage_orders, generate_documents, download_pdf, cross_verify_documents, view/browse product catalog, view_archived_orders |
-| Viewer / Auditor | view_reports, view_audit_log, view_product_catalog |
-| CA / Chartered Accountant | ca_module_view, inr_actual_view (view-only, no order-management access at all) |
+| Admin, Managing Director, Executive Director | All 60 permissions (wildcard grant in seed.sql), including `approve_payment_terms` and `view_cafin` |
+| Export Executive (16) | manage_orders, manage_payments, manage_shipping, close_orders, generate_documents, download_pdf, view_reports, view_client_email_full, cross_verify_documents, override_buyer_acknowledgment, respond_to_disputes, respond_to_complaints, view/browse product catalog, view_product_pricing, view_archived_orders |
+| Accounts Executive (20) | view_cafin, manage_orders, manage_payments, clear_payments, manage_supplier_payments, download_pdf, view_reports, view_all_orders, view_client_email_full, cross_verify_documents, override_buyer_acknowledgment, view/browse product catalog, view_product_pricing, view_archived_orders, ca_module_view, ca_module_manage, inr_actual_view, inr_actual_edit, ca_fy_lock_override |
+| Logistics Executive (10) | manage_orders, manage_shipping, close_orders, generate_documents, download_pdf, cross_verify_documents, override_buyer_acknowledgment, view/browse product catalog, view_archived_orders |
+| Viewer / Auditor (6) | view_reports, view_audit_log, view_product_catalog, view_orders, view_clients, view_all_orders |
+| CA / Chartered Accountant (4) | ca_module_view, inr_actual_view, view_cafin, view_orders (read-only — no order-editing access; sees only orders assigned to them) |
 
-34 permissions span 7 categories: admin (10), reports (3), orders (3),
-documents (6), clients (1), catalog (5), ca (6). Full grant list in
-`_inventory_raw.md` §1.
+60 permissions span 7 categories: admin (11), reports (3), orders (17),
+documents (6), clients (3), catalog (11), ca (9). `_inventory_raw.md` §1
+holds the original (pre-QA Round 5) grant list; `docs/seed.sql` is the
+source of truth.
 
 **Authorization test angle for every route**: a route's `PermissionCheck`
 requirement is necessary but not sufficient — QA-1 already found one case
@@ -344,7 +347,7 @@ Infrastructure (QA-2) is live on both stacks:
      correct against the real one.
 7. ✅ CSRF/IDOR/input-validation suite (P2) — `IdorAndInputValidationTest.php`/
    `idorAndInputValidation.test.js`:
-   - CSRF: a static scan confirming every one of the 177 `$router->post()`
+   - CSRF: a static scan confirming every one of the (now 309) `$router->post()`
      registrations in `public_html/index.php` (and their `app.post()`
      mirrors in `server.js`) includes `CsrfCheck::verify()`/`verifyCsrf`
      in its middleware list — spot-checking every POST route individually
@@ -356,9 +359,9 @@ Infrastructure (QA-2) is live on both stacks:
      calls) — confirms a Logistics Executive holding `manage_orders`
      cannot reach any CA/finance permission, an Accounts Executive can, a
      Viewer/Auditor cannot reach any order-mutating permission, and the CA
-     role itself (explicitly "no order-management access at all" per its
-     own seed.sql description) cannot reach `manage_orders` or
-     `inr_actual_edit` despite owning the CA module's view permissions.
+     role itself (no order-editing access — since 28 Oct it holds
+     `view_orders` read-only and `view_cafin`) cannot reach `manage_orders`
+     or `inr_actual_edit` despite owning the CA module's view permissions.
    - Public unauthenticated endpoints: token security for both intake
      links (`ClientIntakeRepository`/`clientIntakeRepository.js` and
      `PiIntakeRepository`/`piIntakeRepository.js`). Both already compare a
@@ -386,6 +389,27 @@ Infrastructure (QA-2) is live on both stacks:
    settings, not disposable per-test fixtures.
 
 This completes every tier QA-4 set out to build (P0 through P3).
+
+## 9. Added since (QA Round 5 and owner decisions, 27–28 Oct 2026)
+
+Each suite exists in both stacks (PHP `tests/Integration/…Test.php`, Node
+`tests/integration/….test.js`):
+
+| Suite | What it pins |
+|---|---|
+| `RouteMatrixTest` / `routeMatrix.test.js` | Every registered route through the real router and middleware: a permission-gated route refuses (403) a user with no permissions; every staff page without a parameter opens for Admin without a server error; every public page opens signed out |
+| `UngatedRoutesTest` / `ungatedRoutes.test.js` | The 88 routes with no permission check: each one's own guard (session, token, CSRF) and behaviour |
+| `OrderAccessGuardTest`, `PermittedLinksTest` | One order-access guard on every `/orders/{id}/*` route; links shown only where the viewer can open them |
+| `PaymentTermsApprovalTest` | Terms on a "Requires MD approval" preset block the Quotation until approved |
+| `ClientEmailUniqueTest`, `Round5ValidationTest` | One email per client; server checks matching the browser ones (no 500 on bad numbers, no empty saves) |
+| `CfrBuyerInsuresTest` | CFR documents: insurance NIL, the buyer insures |
+| `VendorBillsAndExpensesTest`, `VendorBillProformaTest` | Supplier and logistics bills: proforma / tax invoice, linking, part payments, overpayment refused, 7e invoice carried into 10a, Step 12 / ledger / CAFIN counting |
+| `CaFinancialSnapshotTest` | The CAFIN snapshot |
+| `PaymentTermsWordingTest`, `PaymentTermsScenariosTest` | PI / CI payment wording in PDF and Word: the advance box (or NO ADVANCE PAYABLE on Letter of Credit), bank charges, Calendar Days — across all 5 payment presets × FOB / CFR / CIF × USD / EUR / GBP |
+
+The Playwright suite in `e2e/` adds a browser-level check of the same
+wording: the critical path downloads the generated PI and CI (PDF and
+Word) and reads them (see `e2e/README.md`).
 
 ## Appendix
 

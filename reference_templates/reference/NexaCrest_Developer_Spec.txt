@@ -185,8 +185,9 @@ SECTION 3: SECTION STRUCTURE BY DOCUMENT
     "ADVANCE PAYABLE NOW: [CCY] [advance amount] ([advance %]% of FOB value) —
      due by [PI Valid Until date]"
     "Balance [CCY] [balance amount] — not payable now. [tier balance clause]
-     Freight & insurance (CFR/CIF orders only) are paid separately against our
-     Debit Note."
+     [CFR: Freight is paid separately against our Debit Note.]
+     [CIF: Freight & insurance are paid separately against our Debit Note.]"
+     (FOB: no freight sentence.)
     "Bank charges: All bank charges outside India are for the Buyer's account —
      please remit the full amount (charges option "OUR")."
   Section 7 PAYMENT TERMS gains one last line:
@@ -195,6 +196,26 @@ SECTION 3: SECTION STRUCTURE BY DOCUMENT
   The bank-charges sentence is word-for-word the same on the CI (Section 8 BANK
   DETAILS, last row "Bank Charges"). The app keeps it in one place
   (DocumentDataAssembler::BANK_CHARGES_SENTENCE / documentDataAssembler.js).
+
+  NO ADVANCE (owner decision 28 October 2026 — e.g. the Irrevocable Letter of
+  Credit at Sight preset, 0% advance): the box's first two lines become
+    "NO ADVANCE PAYABLE — the full FOB value [CCY] [FOB value] is payable by
+     Letter of Credit."   (other 0% terms: "… is payable as below.")
+    "[balance clause] [freight sentence as above]"
+  and the bank-charges line stays. The cleared-funds line in PAYMENT TERMS is
+  left out, and the PI Validity clause reads "Buyer must notify NexaCrest of
+  acceptance within this period." (no "initiate the 0% advance payment").
+  Section 7 PAYMENT TERMS has no "0% Advance" lines: "• 100% Payment on FOB
+  Value by Letter of Credit — [balance clause]" / "100% Amount: [CCY] [FOB]"
+  (other 0% terms: without "by Letter of Credit"). The Production
+  Commencement clause reads "Production commences only after the Letter of
+  Credit is opened and confirmed by NexaCrest's bank, and …" (other 0% terms:
+  "… after the Buyer's written acceptance of this document, and …").
+  Never print "ADVANCE PAYABLE NOW: … 0.00" or "0% advance".
+
+  CFR (owner decision Q-R5-2, 28 October 2026): Insurance reads "NIL — buyer
+  arranges insurance (CFR)." on the QT/PI, and the Debit Note covers freight
+  only.
 
 3.3 ORDER CONFIRMATION (OC)
 -----------------------------

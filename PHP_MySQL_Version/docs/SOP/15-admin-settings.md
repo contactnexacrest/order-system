@@ -102,7 +102,9 @@ own referential-integrity rules decide this, not a hand-picked checklist),
 so it only ever actually removes an account created by mistake with zero
 real activity. Any user who has done anything at all — even just logged in
 once — can only be archived, never deleted; trying anyway shows a clear
-"archive them instead" message rather than failing silently.
+message naming where they still appear ("… can't be deleted — they still
+appear in: …. History is never removed, so archive (deactivate) them
+instead.") rather than failing silently.
 
 Notice the **"Protected — founder"** tag on certain accounts: these
 specific users can't be edited, deactivated, archived, deleted, or

@@ -44,9 +44,9 @@ app/                    the application itself — this is what you deploy
   package.json / package-lock.json
   .env.example            template — copy to .env and fill in real values
 docs/
-  schema.sql              the MySQL schema — 98 tables, 172 foreign keys
-                          as of 2026-10-23 (plus this stack's own
-                          `sessions` table = 99; see the file's own
+  schema.sql              the MySQL schema — 112 tables, 216 foreign keys
+                          as of 2026-10-28 (plus this stack's own
+                          `sessions` table = 113; see the file's own
                           trailing changelog comments)
   seed.sql                seed data: roles/permissions, company settings,
                           lookup tables, one Admin user
@@ -706,6 +706,12 @@ role-by-role table from the spec — same note the PHP delivery made, since
 it's the same seed data. Review the matrix against your real org chart
 before going live; it's all DB rows, no code changes needed either way.
 
+**Current matrix (2026-10-28):** 8 roles — Admin, Managing Director and
+Executive Director hold all 60 permissions; the other five roles' lists
+are in `docs/QA/TEST_PLAN.md` §2. Added since: `view_cafin` (Admin, MD,
+ED, Accounts Executive, CA), `approve_payment_terms` (Admin, MD, ED), and
+`view_orders` for the CA (read-only).
+
 ## Final end-to-end verification pass (added 2026-09-21)
 
 Restarted both stacks fresh, confirmed this database's table count (66 —
@@ -749,3 +755,15 @@ card nested inside a `.step-group` (Step 8's 8a/8b split, in particular
 only the matched card itself and not its closed ancestor group. Fixed by
 climbing every ancestor `<details>`, not just the nearest one, in both
 stacks' identical inline script.
+
+## Follow-up (added 2026-10-28): 25–28 Oct — order page flow, vendor bills, CAFIN, QA Round 5, PI/CI payment wording
+
+Same delivery as the PHP/MySQL README's matching section — see there for
+the full write-up; this stack mirrors every item exactly (same four new
+tables, same 112-table total plus this stack's own `sessions` table, 60
+permissions, 466 routes). Full suite: 1795 Jest tests, plus the Playwright
+e2e suite green against `BASE_URL=http://127.0.0.1:3000`.
+
+**Upgrading an existing database:** run the files in `docs/migrations/`
+the database has not had yet, in filename order — run order and checks in
+the repository's `docs/migrations/README.md`.

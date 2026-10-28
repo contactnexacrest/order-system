@@ -16,6 +16,17 @@ Two parallel, always-in-parity stacks:
 Both stacks share the same MySQL schema and business rules, and every
 feature is built and verified in both before being considered done.
 
-See each folder's own README for setup and deployment instructions, and
-`docs/` for the architecture record and the running gap/requirements log
-this build is being executed against.
+Where to look:
+
+- **Setup and deployment:** each stack's own `README.md`.
+- **Architecture:** `PHP_MySQL_Version/docs/ARCHITECTURE.md` and
+  `NODE_MySQL_Version/docs/ARCHITECTURE.md` (same content, each with its
+  own file names).
+- **Upgrading a live database:** `docs/migrations/README.md` (run order,
+  checks), with the read-only checks in `docs/checks/`.
+- **Staff manual (SOP):** `docs/SOP/` (copied into each stack's
+  `docs/SOP`, where the in-app SOP reads it).
+- **QA test plan:** each stack's `docs/QA/TEST_PLAN.md`; the browser suite
+  is in `e2e/` (see `e2e/README.md`).
+- **Reference documents and spec:** `reference_templates/` (not read by the
+  app at runtime).

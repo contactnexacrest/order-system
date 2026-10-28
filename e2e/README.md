@@ -11,7 +11,12 @@ rendered pages, not a direct controller/HTTP call.
 - `00-login.spec.js` — basic login smoke test.
 - `01-critical-path.spec.js` — one real order, walked end-to-end through
   all 9 pipeline stages exactly as staff would in the browser, through
-  to `status = 'complete'`.
+  to `status = 'complete'`. Along the way it adds and pays the supplier's
+  and logistics partner's bills, and downloads the Proforma Invoice and
+  Commercial Invoice it generates (PDF and Word) to check their payment
+  wording: the ADVANCE PAYABLE NOW box, the balance on the order's own
+  terms, the freight & insurance Debit Note line, the bank-charges
+  sentence, the cleared-funds sentence and Calendar Days.
 - `01-role-visibility.spec.js` — every staff role (Admin, Managing
   Director, Executive Director, Export Executive, Accounts Executive,
   Logistics Executive, Viewer/Auditor, CA) logs in and the nav renders
@@ -20,11 +25,13 @@ rendered pages, not a direct controller/HTTP call.
 - `02-role-workflows.spec.js` — the same 9-stage order, but each stage's
   real work done by whichever role's actual permission grant covers it
   (not assumed from the TEST_PLAN's summaries), plus Viewer/Auditor
-  read-only confirmation, CA's view-only boundary, and a real client
-  portal login/workflow.
+  read-only confirmation, CA's view-only boundary, a real client
+  portal login/workflow, and the CAFIN generated automatically at Mark
+  Fully Settled.
 - `03-disputes-amendments.spec.js` — a real client-raised dispute
-  replied to and resolved by staff, and an amendment through its real
-  maker-checker approval rule.
+  replied to and resolved by staff (the Export Executive is assigned to
+  the order first — QA Round 5, R5-24: staff work only orders they can
+  open), and an amendment through its real maker-checker approval rule.
 - `04-intake-reorder.spec.js` — one client's full journey: cold public
   intake accepted into a client, a PI-stage confirmation applied, and a
   reorder request approved into a new order.
@@ -47,7 +54,10 @@ rendered pages, not a direct controller/HTTP call.
   stack's `app.js`: typed values put back into the form after the server
   rejects it (a duplicate email-template key), and the pre-submit checks
   the browser's own validation misses (a required field holding only
-  spaces, a numeric field typed with a comma).
+  spaces, a numeric field typed with a comma, a "Re-enter …" field that
+  does not match), plus the QA Round 5 R5-27 / R5-30 checks (an empty
+  dropdown option, a reference document cleared of its text, an order
+  message with neither text nor a file).
 
 This is real end-to-end coverage of the features above, not exhaustive
 coverage of the whole app — it proves these specific flows work on a
@@ -83,6 +93,7 @@ mysql -u nexacrest_app -p<password> <db_name> < <stack>/docs/seed.sql
 mysql -u nexacrest_app -p<password> <db_name> -e "
   UPDATE assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '<absolute STORAGE_BASE_PATH from .env>');
   UPDATE user_signature_assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '<same path>');
+  UPDATE reference_library_documents SET file_path = REPLACE(file_path, '__STORAGE_BASE_PATH__', '<same path>');
 "
 
 # the seeded admin's password is a placeholder staff are forced to change

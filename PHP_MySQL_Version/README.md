@@ -63,8 +63,8 @@ correctly once the password is changed.
 
 ## What's in this folder
 
-- `docs/schema.sql` — full database schema (98 tables, 172 foreign keys as
-  of 2026-10-23 — see `docs/schema.sql`'s own trailing `-- SECTION X …
+- `docs/schema.sql` — full database schema (112 tables, 216 foreign keys as
+  of 2026-10-28 — see `docs/schema.sql`'s own trailing `-- SECTION X …
   added YYYY-MM-DD` comments for the running changelog; 52 tables/76 FKs
   at the time of this Phase D delivery specifically), validated against a
   live MariaDB instance after every change in this delivery, including the
@@ -1249,6 +1249,13 @@ the seeded matrix. Phase D adds two new permissions: `cross_verify_documents`
 (Admin/MD-only, via the existing wildcard) — review both against your real
 org chart before going live.
 
+**Current matrix (2026-10-28):** 8 roles — Admin, Managing Director and
+Executive Director hold all 60 permissions; Export Executive, Accounts
+Executive, Logistics Executive, Viewer / Auditor and CA / Chartered
+Accountant hold the lists in `docs/QA/TEST_PLAN.md` §2. Added since:
+`view_cafin` (Admin, MD, ED, Accounts Executive, CA), `approve_payment_terms`
+(Admin, MD, ED), and `view_orders` for the CA (read-only).
+
 ## Document template fidelity verification pass (added 2026-09-21)
 
 Standing tracked item to re-verify every document type's fidelity, not just
@@ -1750,3 +1757,71 @@ Playwright e2e run green on both `BASE_URL`s (40/40 each).
    (filed later, once the order is complete and paid); root
    `ARCHITECTURE.html` was updated (schema section, state machine, and a
    new order-visibility callout) for this same set of features.
+
+## Follow-up (added 2026-10-28): 25–28 Oct — order page flow, vendor bills, CAFIN, QA Round 5, PI/CI payment wording
+
+Four new tables (`supplier_type_links`, `order_vendor_bills`,
+`order_vendor_bill_payments`, `order_expenses`) — both stacks now stand at
+**112 tables**, **60 permissions** and **466 routes** (157 GET, 309 POST),
+route-for-route identical. Full suite on both stacks at the time of
+writing: 1730 PHPUnit / 1795 Jest tests, and the Playwright e2e suite green
+on both `BASE_URL`s (41 + 6 + 1 each).
+
+**Upgrading an existing database:** run the files in `docs/migrations/`
+the database has not had yet, in filename order — the run order and the
+read-only checks for this release are in the repository's
+`docs/migrations/README.md`.
+
+What changed, by area (owner decisions; every item is in both stacks):
+
+1. **Order page flow.** The nine stages are worked as about 19 steps with
+   lettered sub-steps in five colour-coded sections (A–E). Every sub-step
+   locks until the one before it is done; a stage gate passes only once the
+   stage's own document is approved (email off) or sent (email on). New or
+   reworked steps: 4b Buyer PO copy (or the buyer's upload through the
+   Buyer Action Link), 7c Supplier Action Link, 7e / 10a supplier advance
+   and balance, Step 12 in sub-steps with the money picture on top, 13g
+   government benefits received or skipped, 13h Mark Fully Settled. Order
+   files are stored one folder per order-page step (a reorganise tool moves
+   existing files).
+2. **Links that need no login.** Buyer Action Link (one step at a time),
+   Payment Action Link (the client reports advance / Debit Note / balance
+   payments), Supplier Action Link, Vendor Details Link (a supplier or
+   logistics partner fills in its own bank details).
+3. **Suppliers and logistics partners.** Suppliers directory with several
+   types per supplier; logistics partners include freight forwarders;
+   Step 9a picks the forwarder from the directory.
+4. **Vendor bills and expenses.** Supplier bills (7e / 10a) and logistics
+   partner bills (CHA, transport, forwarder; Advance or Final — a Final
+   bill on CFR/CIF waits for Step 9d). Each bill is a **Proforma** (not a
+   cost; may say what it asks for now) or a **Tax invoice** (the cost); a
+   tax invoice can replace an earlier proforma from the same vendor; a bill
+   takes several payments and overpayment is refused. GST is picked as a
+   rate. Order expenses carry a receipt or a reason; actual travel replaces
+   the provisional travel %. Step 12, the ledger and CAFIN count tax
+   invoices plus payments on proformas not yet replaced.
+5. **CAFIN.** A complete internal order snapshot (order, supplier cost with
+   every bill and payment, every expense, benefits, profit, open items),
+   generated from the CAFIN box at any stage and automatically at Mark
+   Fully Settled. Seeing or downloading it needs the new **View & download
+   CAFIN** permission; it never reaches the client.
+6. **QA Round 5.** One order-access guard on every `/orders/{id}/*` route;
+   payment-terms approval before the Quotation (permission **Approve
+   payment terms**); one email per client; the CA role can open orders
+   read-only; links shown only where the viewer can open them; no server
+   error on bad numbers and no empty saves; matching page breaks between
+   PDF and Word; CFR documents say the buyer insures; a 0% GST Supplier PO
+   prints 0.00; versioned `app.js` / `app.css`; every route covered by a
+   test.
+7. **PI / CI payment wording** (each change shown to the owner as
+   before/after previews and confirmed twice). The PI says what to pay now
+   — an ADVANCE PAYABLE NOW box with the amount and due date, the balance
+   not payable now, freight against the Debit Note and who bears bank
+   charges — or, with no advance (Letter of Credit), NO ADVANCE PAYABLE —
+   the full FOB value is payable by Letter of Credit. The CI ends its bank
+   details with the same bank-charges sentence. Word copies use Calendar
+   Days like the PDFs.
+
+Docs updated in the same release: `docs/ARCHITECTURE.md`, the root
+`ARCHITECTURE.html`, `docs/QA/TEST_PLAN.md` (§9), `e2e/README.md`, the SOP
+(`docs/SOP`, copied into both stacks) and `docs/migrations/README.md`.

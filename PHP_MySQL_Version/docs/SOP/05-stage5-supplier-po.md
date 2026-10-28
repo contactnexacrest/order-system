@@ -184,11 +184,11 @@ Each leg is **bill first, then payment**:
    payment with its UTR and **Due ₹…** until nothing is left. A payment
    counts towards the step it is recorded from (7e advance, 10a balance).
 
-**Example** — supplier PO ₹5,31,000, 40% advance: in 7e add Proforma
-PI-045 for ₹5,31,000 asking ₹2,12,400 now, and pay ₹2,12,400. In 10a add
-Tax invoice TI-112 for ₹5,31,000 linked to PI-045 — it shows ₹2,12,400
-already paid and **Due ₹3,18,600**; pay that. The supplier is paid
-₹5,31,000 once, and only the tax invoice is counted as cost.
+**Example** — supplier PO ₹531,000.00, 40% advance: in 7e add Proforma
+PI-045 for ₹531,000.00 asking ₹212,400.00 now, and pay ₹212,400.00. In 10a
+add Tax invoice TI-112 for ₹531,000.00 linked to PI-045 — it shows
+₹212,400.00 already paid and **Due ₹318,600.00**; pay that. The supplier is
+paid ₹531,000.00 once, and only the tax invoice is counted as cost.
 
 - **A tax invoice added in 7e that is not fully paid** (the supplier sent
   the final bill up front) is shown in 10a as well — "Added in Step 7e —

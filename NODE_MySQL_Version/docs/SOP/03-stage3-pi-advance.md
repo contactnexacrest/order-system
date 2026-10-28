@@ -121,12 +121,16 @@ only once the advance is received in our account as cleared funds." Every
 buyer payment deadline on the PI, in PDF and Word alike, is in **Calendar
 Days**.
 
-**No advance** (owner decision 2026-10-29 — e.g. the *Irrevocable Letter of
+**No advance** (owner decision 2026-10-28 — e.g. the *Irrevocable Letter of
 Credit at Sight* preset, 0% advance): the box reads **"NO ADVANCE PAYABLE —
 the full FOB value … is payable by Letter of Credit."** (or "… as below" on
 any other 0% terms) with the order's payment terms under it, never
 "ADVANCE PAYABLE NOW: 0.00". The cleared-funds sentence is left out, and the
 PI Validity clause asks only for acceptance within the validity period.
+Payment Terms show no "0% Advance" lines: they read "100% Payment on FOB
+Value by Letter of Credit — …" and "100% Amount: …", and the Production
+Commencement clause says production starts once the Letter of Credit is
+opened and confirmed by NexaCrest's bank.
 
 ### Recording and clearing the advance payment
 
