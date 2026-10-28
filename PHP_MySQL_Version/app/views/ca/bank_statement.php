@@ -10,6 +10,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caBankUser['id'],
   <h1>Bank Statement</h1>
   <p class="muted">Upload a CSV export of the bank statement, then match each line to a settlement leg (revenue) or an imported expense. <a href="/ca/reconciliation">Reconciliation summary &rarr;</a></p>
 
+  <?php if (\App\Helpers\PermittedLinks::currentUserHas('inr_actual_edit')): // QA Round 5, R5-20: the route needs inr_actual_edit ?>
   <div class="section">
     <h2>Upload Statement</h2>
     <p class="muted small">CSV only, with a header row. Most bank export formats work — the importer looks for Date, Description/Narration, Reference, and either separate Credit/Debit columns or a single Amount + Type column. Uploading the same date range twice never creates duplicate lines.</p>
@@ -19,6 +20,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caBankUser['id'],
       <button type="submit" class="btn-sm">Upload</button>
     </form>
   </div>
+  <?php endif; ?>
 
   <div class="section">
     <h2>Statement Lines</h2>

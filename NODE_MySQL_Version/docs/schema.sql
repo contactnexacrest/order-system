@@ -701,12 +701,18 @@ CREATE TABLE orders (
   payment_action_token_hash       CHAR(64) NULL,
   payment_action_token_plain      TEXT     NULL,
   payment_action_token_expires_at DATETIME NULL,
+  -- QA Round 5, R5-03 (owner decision 2026-10-28, Option A): an order on a
+  -- payment preset marked "Requires MD approval" needs MD/ED approval of its
+  -- terms before the Quotation can be generated or sent.
+  payment_terms_approved_by BIGINT UNSIGNED NULL,
+  payment_terms_approved_at DATETIME NULL,
 
   is_sample_data          TINYINT(1) NOT NULL DEFAULT 0,  -- Phase E follow-up: 1 = Sample Data Playground record, hard-deletable via /sample-data — never set on a real order
   created_by              BIGINT UNSIGNED NULL,
   created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (client_id) REFERENCES clients(id),
   FOREIGN KEY (payment_preset_id) REFERENCES payment_presets(id),
+  FOREIGN KEY (payment_terms_approved_by) REFERENCES users(id),
   FOREIGN KEY (incoterm_id) REFERENCES incoterms(id),
   FOREIGN KEY (port_of_loading_id) REFERENCES ports(id),
   FOREIGN KEY (port_of_discharge_id) REFERENCES ports(id),

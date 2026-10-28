@@ -91,7 +91,8 @@ $insightsGroupVisible = $canReports || $canAudit;
 // if they knew the direct URL.
 $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermissions
     || $canUsers || $canFieldProtection || $canOverrides || $canSampleData || $canDataExport || $canManageLogisticsPartners || $canManageSuppliers || $canManagePaymentPresets
-    || $canManageHsCodes || $canManageComplianceTaskTypes || $canManageDropdownOptions || $canManageEmailTemplates;
+    || $canManageHsCodes || $canManageComplianceTaskTypes || $canManageDropdownOptions || $canManageEmailTemplates
+    || $canManagePorts; // QA Round 5, R5-19: Ports / Port Routes live in this group too (Node already had it)
 
 // Sidebar redesign (2026-09-23, "cover all" UI pass) — highlights the
 // current section so a fresher can see at a glance where they are, and
@@ -156,9 +157,12 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canOrders || $canViewClients): ?><a href="/clients" class="<?= $isActive('/clients') ? 'active' : '' ?>">Clients</a><?php endif; ?>
           <?php if ($canOrders || $canViewOrders): ?><a href="/orders" class="<?= $currentPath === '/orders' || (str_starts_with($currentPath, '/orders/') && !str_starts_with($currentPath, '/orders/archived')) ? 'active' : '' ?>">Orders</a><?php endif; ?>
           <?php if ($canViewArchivedOrders): ?><a href="/orders/archived" class="<?= $isActive('/orders/archived') ? 'active' : '' ?>">Archived Orders</a><?php endif; ?>
+          <?php // QA Round 5, R5-22: these three routes need manage_orders. ?>
+          <?php if ($canOrders): ?>
           <a href="/client-intake" class="<?= $isActive('/client-intake') ? 'active' : '' ?>">Quotation Intake Review<?= $clientIntakePendingCount > 0 ? ' <span class="nav-badge">' . (int) $clientIntakePendingCount . '</span>' : '' ?></a>
           <a href="/pi-intake-review" class="<?= $isActive('/pi-intake-review') ? 'active' : '' ?>">PI Intake Review<?= $piIntakePendingCount > 0 ? ' <span class="nav-badge">' . (int) $piIntakePendingCount . '</span>' : '' ?></a>
           <a href="/reorder-requests" class="<?= $isActive('/reorder-requests') ? 'active' : '' ?>">Reorder Requests</a>
+          <?php endif; ?>
           <?php if ($canViewDisputesList): ?><a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a><?php endif; ?>
           <?php if ($canViewComplaintsList): ?><a href="/complaints" class="<?= $isActive('/complaints') ? 'active' : '' ?>">Complaints</a><?php endif; ?>
         </div>

@@ -573,6 +573,13 @@ final class OrderController
         // External QA report L-23: order creation was never audit-logged.
         AuditLogRepository::log((int) $user['id'], 'ORDER_CREATED', 'orders', $orderId, 'order_reference', null, $orderReference);
 
+        // QA Round 5, R5-03: terms needing MD/ED approval — tell the approvers.
+        if (\App\Services\PaymentTermsApprovalService::isPending($orderId)) {
+            foreach (\App\Repositories\PermissionRepository::usersWithPermission('approve_payment_terms') as $approverUserId) {
+                \App\Repositories\NotificationRepository::create($approverUserId, null, 'payment_terms_approval_needed', $orderId, "Order {$orderReference}: payment terms need your approval before the Quotation can be generated.");
+            }
+        }
+
         Flash::set('success', "Order {$orderReference} created for {$client['company_legal_name']}.");
         header("Location: /orders/{$orderId}");
     }
@@ -1026,6 +1033,8 @@ final class OrderController
             'linkedCaExpenses' => $canViewCaLinks ? CaExpenseRepository::forOrder($orderId) : [],
             'canManageCaInternalDoc' => $canManageCaInternalDoc,
             'canViewCafin' => $canViewCafin,
+            'paymentTermsApproval' => \App\Services\PaymentTermsApprovalService::state($orderId),
+            'canApprovePaymentTerms' => PermissionService::can((int) $actor['id'], $actorRoleId, 'approve_payment_terms'),
             'caInternalDoc' => $canViewCafin ? DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CAFIN') : null,
             'canManageOrderFinancials' => $canManageOrderFinancials,
             'orderCostEntries' => $canManageOrderFinancials ? OrderCostEntryRepository::forOrder($orderId) : [],
@@ -1787,6 +1796,16 @@ final class OrderController
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
         $before = OrderRepository::find($orderId);
+        // QA Round 5, R5-01: on a locked (fully settled) order this is a
+        // locked-order edit like any other — "Override locked data", a
+        // reason, and an ORDER_EDITED_WHILE_LOCKED audit row.
+        if (!empty($before['is_locked'])) {
+            $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+            if (!OrderEditGuard::allow(null, true, (int) $user['id'], $roleId, trim((string) ($_POST['reason'] ?? '')), 'orders', $orderId, 'production_status')) {
+                header("Location: /orders/{$orderId}#step-production");
+                return;
+            }
+        }
         $text = trim((string) ($_POST['production_status_text'] ?? ''));
         if ($text !== '' && $text !== ($before['production_status_text'] ?? '')) {
             OrderRepository::setProductionStatus($orderId, $text);
@@ -1819,6 +1838,29 @@ final class OrderController
         }
         Flash::set('success', 'Production status updated.');
         header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * QA Round 5, R5-03 (owner decision 2026-10-28, Option A): MD/ED approve
+     * the payment terms of an order on a "Requires MD approval" preset —
+     * the Quotation can't be generated or sent until they do.
+     */
+    public function approvePaymentTerms(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        if (!OrderRepository::find($orderId)) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        if (!\App\Services\PaymentTermsApprovalService::isPending($orderId)) {
+            Flash::set('warning', 'These payment terms do not need approval, or are already approved.');
+        } else {
+            \App\Services\PaymentTermsApprovalService::approve($orderId, (int) $user['id']);
+            Flash::set('success', 'Payment terms approved — the Quotation can now be generated.');
+        }
+        header("Location: /orders/{$orderId}#step-1-quotation-prepare");
     }
 
     /** docs/schema.sql Section AF — per-order, staff-controlled, default off. */

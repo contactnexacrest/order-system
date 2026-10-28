@@ -12,6 +12,7 @@ const gettingStartedController = require('../../src/controllers/gettingStartedCo
 describe('Getting Started controller', () => {
   function fakeRes() {
     const res = {};
+    res.send = (body) => { res.sentBody = body; };
     res.renderView = (view, data, layout) => {
       res.renderedView = view;
       res.renderedData = data;

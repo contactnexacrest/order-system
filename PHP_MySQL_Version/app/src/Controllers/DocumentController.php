@@ -53,6 +53,13 @@ final class DocumentController
             return;
         }
 
+        // QA Round 5, R5-03: terms needing MD/ED approval block the Quotation.
+        if ($type === 'QT' && \App\Services\PaymentTermsApprovalService::isPending($orderId)) {
+            Flash::set('error', \App\Services\PaymentTermsApprovalService::pendingMessage($orderId));
+            header("Location: /orders/{$orderId}#step-1-quotation-prepare");
+            return;
+        }
+
         // PDF is always generated — the approval workflow, the draft->final
         // watermark swap, and the buyer email attachment all assume every
         // document has one, so it isn't actually a user-controllable choice
@@ -167,15 +174,16 @@ final class DocumentController
         // already carries everywhere else it's shown, so a staff member
         // without any CA permission can't fetch it just by knowing/
         // guessing its document id.
-        // Owner decision (2026-10-28): its own permission, view_cafin.
-        if ($document['document_type_code'] === 'CAFIN') {
-            $user = AuthService::currentUser();
-            $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-            if (!PermissionService::can((int) $user['id'], $roleId, 'view_cafin')) {
-                http_response_code(403);
-                echo 'You do not have permission to view this document.';
-                return;
-            }
+        // Owner decision (2026-10-28): its own permission, view_cafin — and
+        // view_cafin alone is enough for CAFIN (the CA holds it without
+        // "Download PDF"); every other document needs download_pdf.
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $requiredKey = $document['document_type_code'] === 'CAFIN' ? 'view_cafin' : 'download_pdf';
+        if (!PermissionService::can((int) $user['id'], $roleId, $requiredKey)) {
+            http_response_code(403);
+            echo 'You do not have permission to view this document.';
+            return;
         }
 
         $fileId = $format === 'docx' ? $document['docx_file_id'] : $document['pdf_file_id'];

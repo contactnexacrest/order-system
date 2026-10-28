@@ -67,6 +67,14 @@ final class ClientIntakeReviewController
             return;
         }
 
+        // QA Round 5, R5-02: an enquiry from an email another client already
+        // uses is not accepted as a new client.
+        if ($other = ClientRepository::findOtherWithEmail($submission['email'] ?? null)) {
+            Flash::set('error', ClientRepository::duplicateEmailMessage((string) $submission['email'], $other) . ' If this enquiry is from that same buyer, create the order under their existing client record and reject this submission.');
+            header('Location: /client-intake');
+            return;
+        }
+
         $clientUniqueNumber = ReferenceNumberService::generateClientUniqueNumber();
         $consigneeSameAsBuyer = (int) ($submission['consignee_same_as_buyer'] ?? 1) === 1;
         $clientId = ClientRepository::create([

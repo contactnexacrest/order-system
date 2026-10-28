@@ -146,6 +146,6 @@
     </tr>
     <?php endforeach; ?>
   </table>
-  <div class="btn-row"><a class="btn-sm btn-secondary" href="/audit-log">Full Audit Log</a> <a class="btn-sm btn-secondary" href="/reports">Reports</a></div>
+  <div class="btn-row"><?php if (\App\Helpers\PermittedLinks::currentUserMayOpen('/audit-log')): ?><a class="btn-sm btn-secondary" href="/audit-log">Full Audit Log</a> <?php endif; ?><a class="btn-sm btn-secondary" href="/reports">Reports</a></div>
 </div>
 <?php endif; ?>

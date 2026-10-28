@@ -43,6 +43,7 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('manage_report_definitions', 'Manage saved reports',         'Create/edit/delete saved report definitions.',          'reports'),
   ('view_reports',              'View reports',                 'Run and view reports and dashboards.',                  'reports'),
   ('manage_orders',             'Manage orders',                 'Create/edit orders and advance them through stage gates.', 'orders'),
+  ('approve_payment_terms',     'Approve payment terms',         'Approve an order''s payment terms when its preset is marked "Requires MD approval" — needed before the Quotation can be generated or sent. Default: Admin, MD, ED.', 'orders'),
   ('generate_documents',        'Generate documents',            'Generate QT/PI/OC/PL/CI/etc. for an order.',            'documents'),
   ('approve_documents',         'Approve documents',             'Approve/release a generated document to the buyer.',   'documents'),
   ('edit_locked_data',          'Override locked data',          'Edit a field that is normally locked after stage sign-off.', 'documents'),
@@ -195,7 +196,7 @@ INSERT INTO payment_presets
 SELECT 'Extended Terms — Before Shipment', 0, 30.00, 'against Proforma Invoice before production commences', 'CASH_ADVANCE',
        70.00, 'A_BEFORE_SHIPMENT', 3,
        'Payable before shipment — within {days} Calendar Days of receiving Shipment Readiness Confirmation from NexaCrest.',
-       c.id, 1, 1
+       c.id, 0, 1  -- owner decision (2026-10-28): no MD approval needed
 FROM currencies c WHERE c.code = 'USD';
 
 INSERT INTO payment_presets

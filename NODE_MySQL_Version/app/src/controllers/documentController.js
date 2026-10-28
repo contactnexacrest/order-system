@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const flash = require('../helpers/flash');
+const paymentTermsApprovalService = require('../services/paymentTermsApprovalService');
 const { todayIst } = require('../helpers/dbDateTime');
 const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
@@ -40,6 +41,13 @@ async function generate(req, res) {
   if (!ALLOWED_TYPES.includes(type)) {
     flash.set(req, 'error', `Unknown or unsupported document type: ${type}`);
     res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  // QA Round 5, R5-03: terms needing MD/ED approval block the Quotation.
+  if (type === 'QT' && (await paymentTermsApprovalService.isPending(orderId))) {
+    flash.set(req, 'error', await paymentTermsApprovalService.pendingMessage(orderId));
+    res.redirect(`/orders/${orderId}#step-1-quotation-prepare`);
     return;
   }
 
@@ -158,8 +166,11 @@ async function download(req, res) {
   // data) — CAFIN specifically needs the same ca_module_view gate its data
   // already carries everywhere else it's shown, so a staff member without
   // any CA permission can't fetch it just by knowing/guessing its document id.
-  // Owner decision (2026-10-28): its own permission, view_cafin.
-  if (document.document_type_code === 'CAFIN' && (!req.permissions || !req.permissions.view_cafin)) {
+  // Owner decision (2026-10-28): its own permission, view_cafin — and
+  // view_cafin alone is enough for CAFIN (the CA holds it without
+  // "Download PDF"); every other document needs download_pdf.
+  const requiredKey = document.document_type_code === 'CAFIN' ? 'view_cafin' : 'download_pdf';
+  if (!req.permissions || !req.permissions[requiredKey]) {
     res.status(403).send('You do not have permission to view this document.');
     return;
   }

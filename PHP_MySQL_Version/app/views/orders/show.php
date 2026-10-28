@@ -55,6 +55,13 @@ $canViewOrderComplaints = $canManageComplaints || $canRespondToComplaints;
 $canManageComplianceTaskTypes = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_compliance_task_types');
 // External QA report U-01: /orders/{id}/email/compose and .../email/send both require this (see public_html/index.php) — Accounts Executive and Viewer / Auditor both lack it.
 $canGenerateDocuments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'generate_documents');
+// QA Round 5, R5-20: every form and link on this page is shown only to
+// someone its route would let through (the route checks stay as well).
+$canApproveDocuments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'approve_documents');
+$canCrossVerifyDocuments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'cross_verify_documents');
+$canDownloadPdf = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'download_pdf');
+$canListOrders = \App\Helpers\PermittedLinks::currentUserMayOpen('/orders');
+$canOpenClient = \App\Helpers\PermittedLinks::currentUserMayOpen('/clients');
 // Phase 7: a narrow exception to a financial year lock — see CaFyLockGuard.
 $canOverrideFyLock = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'ca_fy_lock_override');
 // Order-Edit feature — product-row edits/duplication once Order Confirmation is reached — see OrderEditGuard.
@@ -939,9 +946,9 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
 ?>
 <div class="card page-wide">
   <?php if (($_GET['from'] ?? '') === 'kanban'): ?>
-  <p class="muted small"><a href="/orders">&larr; Back to Board</a></p>
+  <?php if ($canListOrders): ?><p class="muted small"><a href="/orders">&larr; Back to Board</a></p><?php endif; ?>
   <?php else: ?>
-  <p class="muted small"><a href="/orders">&larr; Back to Orders</a></p>
+  <?php if ($canListOrders): ?><p class="muted small"><a href="/orders">&larr; Back to Orders</a></p><?php endif; ?>
   <?php endif; ?>
   <h1><?= htmlspecialchars($order['order_reference']) ?>
     <?php if ($order['status'] !== 'active'): ?><span class="badge badge-<?= htmlspecialchars($order['status']) ?>"><?= htmlspecialchars($order['status']) ?></span><?php endif; ?>
@@ -1441,16 +1448,18 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <?php endif; ?>
         </td>
         <td>
-          <?php if ($d['pdf_file_id']): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf">PDF</a><?php endif; ?>
-          <?php if ($d['docx_file_id']): ?> · <a href="/documents/<?= (int) $d['id'] ?>/download?format=docx">DOCX (internal)</a><?php endif; ?>
+          <?php if ($d['pdf_file_id'] && $canDownloadPdf): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf">PDF</a><?php endif; ?>
+          <?php if ($d['docx_file_id'] && $canDownloadPdf): ?> · <a href="/documents/<?= (int) $d['id'] ?>/download?format=docx">DOCX (internal)</a><?php endif; ?>
         </td>
         <td>
           <?php if ($d['status'] === 'draft'): ?>
+          <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/<?= (int) $d['id'] ?>/delete" onsubmit="return confirmDeleteDraft(this);">
             <?= Csrf::field() ?>
             <input type="hidden" name="reason" class="delete-draft-reason">
             <button type="button" class="btn-sm btn-danger" onclick="promptDeleteDraft(this)">Delete Draft</button>
           </form>
+          <?php endif; ?>
           <?php endif; ?>
         </td>
       </tr>
@@ -1556,6 +1565,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
             <div class="review-step-body">
               <h3>Assign Reviewers<?php if (!empty($reviews)): ?><span class="review-pill info">Assigned</span><?php endif; ?></h3>
               <?php if (empty($reviews)): ?>
+                <?php if ($canApproveDocuments): // QA Round 5, R5-20 ?>
                 <form method="post" action="/documents/<?= (int) $d['id'] ?>/reviewers">
                   <?= Csrf::field() ?>
                   <label>Assign reviewer(s) * (minimum required: <?= (int) ($d['min_reviewers_default'] ?? 1) ?>)
@@ -1567,6 +1577,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                   </label>
                   <button type="submit" class="btn-sm">Assign Reviewers</button>
                 </form>
+                <?php endif; ?>
               <?php else: ?>
                 <table class="list">
                   <tr><th>Reviewer</th><th>Status</th><th>Comments</th><th>Reviewed</th></tr>
@@ -1613,6 +1624,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                 </form>
               <?php endif; ?>
 
+              <?php if ($canCrossVerifyDocuments): // QA Round 5, R5-20 ?>
               <form method="post" action="/documents/<?= (int) $d['id'] ?>/cross-verify" style="margin-top:6px">
                 <?= Csrf::field() ?>
                 <select name="result" required>
@@ -1622,6 +1634,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                 <input type="text" name="comments" placeholder="Comments (optional)">
                 <button type="submit" class="btn-sm">Record Cross-Verification</button>
               </form>
+              <?php endif; ?>
               <?php if (!empty($crossVerifications)): ?>
                 <p class="muted small">
                   <?php foreach ($crossVerifications as $cv): ?>
@@ -1711,7 +1724,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   <?php // Owner decision (2026-10-26, t4): pinned open above the five sections — the client conversation is needed at every step. ?>
   <details class="step-card step-card-reference" id="order-updates" open>
     <summary><h2>Order Communication <small class="muted">(with the client — any time)</small><?php if ($comments): ?> <span class="phase-pill"><?= count($comments) ?> message<?= count($comments) === 1 ? '' : 's' ?></span><?php endif; ?></h2></summary>
-    <p class="muted">A running conversation with the client for this order. Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment). Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.<?php if ($canGenerateDocuments): ?> Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.<?php endif; ?></p>
+    <p class="muted">A running conversation with the client for this order. <?php if ($mailSendingEnabled): ?>Anything you post here is emailed to the client immediately, with any attached images/videos (a large file becomes a secure download link instead of a raw attachment).<?php else: ?><strong>Email sending is turned off</strong> — anything you post here appears in the client's portal only; the client is NOT emailed.<?php endif; ?> Anything the client posts appears here too and notifies staff — nothing from either side is ever deleted.<?php if ($canGenerateDocuments): ?> Need something more formal — a payment reminder, a one-off notice? <a href="/orders/<?= (int) $order['id'] ?>/email/compose">Compose an email from a template</a>.<?php endif; ?></p>
     <div class="chat-thread">
       <?php if (empty($comments)): ?>
         <p class="chat-empty">No updates posted yet.</p>
@@ -1746,14 +1759,16 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         </div>
       <?php endforeach; ?>
     </div>
+    <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
     <form class="chat-post-form" method="post" action="/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
       <?= Csrf::field() ?>
       <textarea name="body" placeholder="Write an update for the client…"></textarea>
       <div class="chat-post-form-row">
         <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
-        <button type="submit" class="btn-sm" data-loading-text="Posting…">Post &amp; email client</button>
+        <button type="submit" class="btn-sm" data-loading-text="Posting…"><?= $mailSendingEnabled ? 'Post &amp; email client' : 'Post to client portal' ?></button>
       </div>
     </form>
+    <?php endif; ?>
   </details>
 
   <details class="phase-group" id="phase-booking"<?= $phaseOpen('booking') ?>>
@@ -1767,8 +1782,30 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       $__genTypes = array_column($documents, 'document_type_code');
       $__docBtnClass = static fn (string $code): string => 'btn-sm ' . (in_array($code, $__genTypes, true) ? 'btn-doc-regenerate' : 'btn-doc-new');
     ?>
+    <?php
+      // QA Round 5, R5-03 (owner decision 2026-10-28, Option A): terms on a
+      // "Requires MD approval" preset are approved before the Quotation.
+      $__termsPending = $paymentTermsApproval['required'] && !$paymentTermsApproval['approved'];
+      $__pct = static fn ($v): string => rtrim(rtrim(number_format((float) $v, 2), '0'), '.');
+    ?>
+    <?php if ($paymentTermsApproval['required']): ?>
+      <div id="payment-terms-approval">
+      <?php if ($__termsPending): ?>
+        <p class="review-banner warn">&#9888; <span><strong>Payment terms need MD/ED approval first</strong> — this order uses &ldquo;<?= htmlspecialchars((string) $paymentTermsApproval['preset_name']) ?>&rdquo; (advance <?= $__pct($order['advance_pct']) ?>% &middot; balance <?= $__pct($order['balance_pct']) ?>%). The Quotation can't be generated or sent until they are approved.<?= $canApprovePaymentTerms ? '' : ' Waiting for MD/ED approval.' ?></span></p>
+        <?php if ($canApprovePaymentTerms): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment-terms/approve" style="margin-bottom:10px;">
+            <?= Csrf::field() ?>
+            <button type="submit" class="btn-sm btn-success">Approve payment terms</button>
+          </form>
+        <?php endif; ?>
+      <?php else: ?>
+        <p class="review-banner ok">&#10003; <span><strong>Payment terms approved</strong> (&ldquo;<?= htmlspecialchars((string) $paymentTermsApproval['preset_name']) ?>&rdquo;)<?= $paymentTermsApproval['approved_by_name'] ? ' by ' . htmlspecialchars($paymentTermsApproval['approved_by_name']) . ' on ' . htmlspecialchars(date('d M Y', strtotime((string) $paymentTermsApproval['approved_at']))) : ' — quoted before approval was required' ?>.</span></p>
+      <?php endif; ?>
+      </div>
+    <?php endif; ?>
     <div class="btn-row">
-      <?php if ($stage1 && $stage1['status'] !== 'locked'): ?>
+      <?php if ($stage1 && $stage1['status'] !== 'locked' && !$__termsPending): ?>
+        <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="QT">
@@ -1776,9 +1813,11 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
           <?= $stepBadge('1a') ?><button type="submit" class="<?= $__docBtnClass('QT') ?>" data-loading-text="Generating…"><?= $hasQt ? 'Regenerate Quotation (new revision)' : 'Generate Quotation' ?></button><?= $__docAlreadyNote('QT') ?>
         </form>
+        <?php endif; ?>
       <?php endif; ?>
 
       <?php if ($order['include_annexure_a']): ?>
+        <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="ANNEXA">
@@ -1786,6 +1825,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
           <button type="submit" class="<?= $__docBtnClass('ANNEXA') ?>" data-loading-text="Generating…">Generate Annexure A</button><?= $__docAlreadyNote('ANNEXA') ?>
         </form>
+        <?php endif; ?>
       <?php endif; ?>
     </div>
     <?php if ($canManageOrders): ?>
@@ -1872,6 +1912,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <details class="step-card" id="step-4a-buyer-po-generate"<?= $subCardOpen('4', '4a') ?>>
       <summary><?= $stepStatusIcon($subStepStatus('4', '4a')) ?><h2>Step 4a &middot; Generate Buyer's PO</h2></summary>
       <?php if ($stage2 && $stage2['status'] !== 'locked'): ?>
+        <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="BUYERPO">
@@ -1879,6 +1920,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
           <?= $stepBadge('4a') ?><button type="submit" class="<?= $__docBtnClass('BUYERPO') ?>" data-loading-text="Generating…">Generate Buyer PO</button><?= $__docAlreadyNote('BUYERPO') ?>
         </form>
+        <?php endif; ?>
       <?php else: ?>
         <p class="muted">Generate the Quotation first to unlock this gate.</p>
       <?php endif; ?>
@@ -1925,11 +1967,13 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?php endforeach; ?>
           </table>
         <?php endif; ?>
+        <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
           <?= Csrf::field() ?>
           <input type="file" name="document" required>
           <?= $stepBadge('4c') ?><button type="submit" class="btn-sm"><?= empty($buyerPoDocuments) ? 'Attach Buyer PO Copy' : 'Attach Another Copy' ?></button>
         </form>
+        <?php endif; ?>
       <?php else: ?>
         <p class="muted">Generate the Quotation first to unlock this gate.</p>
       <?php endif; ?>
@@ -1965,7 +2009,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <p>
           Status: <strong><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $piIntake['status']))) ?></strong>
           <?php if ($piIntake['status'] === 'pending_review'): ?>
-            &nbsp;·&nbsp; <a href="/pi-intake-review">Review in PI Intake Review</a>
+            <?php if ($canManageOrders): ?>&nbsp;·&nbsp; <a href="/pi-intake-review">Review in PI Intake Review</a><?php endif; ?>
           <?php elseif ($piIntake['status'] === 'applied'): ?>
             &nbsp;·&nbsp; Applied by <?= htmlspecialchars($piIntake['reviewed_by_name'] ?? '—') ?> on <?= htmlspecialchars((string) $piIntake['reviewed_at']) ?>
           <?php endif; ?>
@@ -2009,7 +2053,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
     <details class="step-card step-card-reference" id="step-5b-pi-intake-apply"<?= $subCardOpen('5', '5b') ?>>
       <summary><?= $stepStatusIcon($subStepStatus('5', '5b')) ?><h2>Step 5b &middot; Apply the Client's PI-Stage Confirmation</h2></summary>
-      <p class="muted small">Once the client submits the PI-stage form, review and apply it at <a href="/pi-intake-review">PI Intake Review</a> — applying it overwrites the live client record with exactly what the buyer confirmed.</p>
+      <p class="muted small">Once the client submits the PI-stage form, review and apply it at <?= $canManageOrders ? '<a href="/pi-intake-review">PI Intake Review</a>' : 'PI Intake Review' ?> — applying it overwrites the live client record with exactly what the buyer confirmed.</p>
       <?php $renderPiFormSkip(); ?>
     </details>
 
@@ -2018,6 +2062,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <details class="step-card" id="step-5c-pi-generate"<?= $subCardOpen('5', '5c') ?>>
       <summary><?= $stepStatusIcon($subStepStatus('5', '5c')) ?><h2>Step 5c &middot; Generate Proforma Invoice</h2></summary>
       <?php if ($stage3 && $stage3['status'] !== 'locked'): ?>
+        <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
           <?= Csrf::field() ?>
           <input type="hidden" name="document_type" value="PI">
@@ -2025,6 +2070,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
           <?= $stepBadge('5c') ?><button type="submit" class="<?= $__docBtnClass('PI') ?>" data-loading-text="Generating…">Generate Proforma Invoice</button><?= $__docAlreadyNote('PI') ?>
         </form>
+        <?php endif; ?>
       <?php else: ?>
         <p class="muted">Record the Buyer PO first to unlock this gate.</p>
       <?php endif; ?>
@@ -2155,6 +2201,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <p class="muted small">The ECGC insurance premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 12) once the order is confirmed.</p>
     <?php endif; ?>
     <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
+      <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
         <input type="hidden" name="document_type" value="OC">
@@ -2162,6 +2209,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         <?= $stepBadge('6a') ?><button type="submit" class="<?= $__docBtnClass('OC') ?>" data-loading-text="Generating…">Generate Order Confirmation</button><?= $__docAlreadyNote('OC') ?>
       </form>
+      <?php endif; ?>
     <?php else: ?>
       <p class="muted">Clear the advance payment first to unlock this gate.</p>
     <?php endif; ?>
@@ -2195,20 +2243,24 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <div class="review-banner info">
           ℹ <span>Order Confirmation emailed to the buyer on <?= htmlspecialchars(Dates::human($ocAcknowledgment['sent_at'])) ?>. Awaiting their acknowledgement — the client can confirm it directly in their portal, or reply to the email (record that below). If there's no response by <?= htmlspecialchars(Dates::human($ocAcknowledgment['due_at'])) ?>, it auto-confirms and Step 7 (Supplier PO) unlocks on its own.</span>
         </div>
+        <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-acknowledgment">
           <?= Csrf::field() ?>
           <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
           <?= $stepBadge('6c') ?><button type="submit" class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Step 7)</button>
         </form>
+        <?php endif; ?>
       <?php elseif ($ocDocGenerated): ?>
         <div class="review-banner info">
           ℹ <span>Order Confirmation has been generated but hasn't gone out by email yet (still awaiting send/approval, or mail sending isn't configured). If the buyer has confirmed by phone, in person, or any channel other than the portal/email, record it below — Step 7 (Supplier PO) unlocks immediately.</span>
         </div>
+        <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-acknowledgment">
           <?= Csrf::field() ?>
           <label>Describe how the buyer confirmed (quote their reply, or note the call/meeting) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
           <?= $stepBadge('6c') ?><button type="submit" class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Step 7)</button>
         </form>
+        <?php endif; ?>
       <?php else: ?>
         <p class="muted">Generate the Order Confirmation above and send it to the buyer — once sent, they can acknowledge it from their portal (or reply by email, which you can record here), and it auto-confirms after 48 hours with no response.</p>
       <?php endif; ?>
@@ -2254,6 +2306,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <p class="small" style="color:var(--danger);font-weight:600;">No active suppliers yet. <?= $canManageSuppliers ? '<a href="/suppliers/create" target="_blank" rel="noopener">Add the first supplier</a>, then reload this page.' : 'Ask an Admin/MD/ED to add one in the Suppliers directory.' ?></p>
       <?php endif; ?>
 
+      <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po" id="supplier-po-form">
         <?= Csrf::field() ?>
         <div class="field-grid">
@@ -2326,6 +2379,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </div>
         <?= $stepBadge('7a') ?><button type="submit" class="btn-sm">Save Supplier PO Terms</button>
       </form>
+      <?php endif; ?>
       <script>
       (function () {
         var form = document.getElementById('supplier-po-form');
@@ -2453,6 +2507,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <div><span class="k">Total Payable (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['total_payable_inr'] ?? '—') ?></span></div>
         <div><span class="k">Status</span><span class="v"><?= htmlspecialchars($supplierPo['status']) ?></span></div>
       </div>
+      <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
         <input type="hidden" name="document_type" value="SUPPO">
@@ -2460,6 +2515,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         <?= $stepBadge('7b') ?><button type="submit" class="<?= $__docBtnClass('SUPPO') ?>" data-loading-text="Generating…">Generate Supplier PO</button><?= $__docAlreadyNote('SUPPO') ?>
       </form>
+      <?php endif; ?>
     <?php else: ?>
       <p class="muted">Save Supplier PO Terms first (Step 7a).</p>
     <?php endif; ?>
@@ -2490,11 +2546,13 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <?php endforeach; ?>
         </table>
       <?php endif; ?>
+      <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/documents" enctype="multipart/form-data" style="margin-top:6px">
         <?= Csrf::field() ?>
         <input type="file" name="document" required>
         <?= $stepBadge('7c') ?><button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
       </form>
+      <?php endif; ?>
       <?php
         // Owner request (2026-10-26, t4): the supplier can upload it themselves
         // through a no-login link (like the Buyer Action Link), and when they
@@ -2512,10 +2570,12 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           </div>
           <p class="muted small">Valid until <?= htmlspecialchars(Dates::human($supplierPo['supplier_action_token_expires_at'])) ?>.</p>
         <?php endif; ?>
+        <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/supplier-link" style="display:inline">
           <?= Csrf::field() ?>
           <button type="submit" class="btn-sm btn-secondary"><?= $supplierActionLinkValid ? 'Regenerate Supplier Link' : 'Generate Supplier Link' ?></button>
         </form>
+        <?php endif; ?>
       </div>
       <?php if (!empty($supplierPo['ack_skipped_at'])): ?>
         <p class="small" style="margin-top:8px;">&#10003; Recorded that the supplier did not acknowledge — <?= htmlspecialchars((string) $supplierPo['ack_skip_reason']) ?> <span class="muted">(<?= htmlspecialchars((string) $supplierPo['ack_skipped_at']) ?>)</span></p>
@@ -2575,14 +2635,21 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <div><span class="k">Est. Shipment</span><span class="v"><?= htmlspecialchars($order['est_shipment_date_text'] ?? 'To Be Confirmed') ?></span></div>
     </div>
     <p class="muted small">Every update here is logged<?php if ($canViewAuditLog): ?> — <a href="/orders/<?= (int) $order['id'] ?>/audit-log">view update history</a><?php endif; ?>. Changing either field notifies the client (order update + portal).</p>
-    <?php if ($stage4 && $stage4['status'] !== 'locked'): ?>
+    <?php if ($stage4 && $stage4['status'] !== 'locked' && (!$isLockedOrder || $canOverrideLockEdit)): ?>
+      <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/production-status">
         <?= Csrf::field() ?>
         <label>Production Status<input type="text" name="production_status_text" placeholder="e.g. Cutting and finishing in progress — 30% complete"></label>
         <label>Estimated Shipment<input type="text" name="est_shipment_date_text" placeholder="e.g. Week of 15 October 2026"></label>
         <label>Estimated Shipment Date <small class="muted">(drives the 7-day pre-shipment inspection reminder below)</small><input type="date" name="est_shipment_date" value="<?= htmlspecialchars($order['est_shipment_date'] ?? '') ?>"></label>
-        <button type="submit" class="btn-sm">Update</button>
+        <?php if ($isLockedOrder): ?>
+          <?php // QA Round 5, R5-01: a locked order's production status is a locked-order edit. ?>
+          <p class="notice notice-warning">This order is LOCKED (closed or marked lost). Changing its production status is logged as a locked-order edit override — a reason is required.</p>
+          <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this changing after the order was closed?"></textarea></label>
+        <?php endif; ?>
+        <button type="submit" class="btn-sm"><?= $isLockedOrder ? 'Override &amp; Update' : 'Update' ?></button>
       </form>
+      <?php endif; ?>
     <?php endif; ?>
 
     <?php if ($pendingInspectionTask && $canManageOrderFinancials): ?>
@@ -2668,6 +2735,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php if ($freightLocked): ?>
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     <?php elseif (!$freight): ?>
+      <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/freight-terms">
         <?= Csrf::field() ?>
         <label>Confirmed Freight Rate<input type="text" name="confirmed_freight_rate"></label>
@@ -2684,6 +2752,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <p class="muted small">Partners come from the Logistics Partners directory<?php if ($canManageLogisticsPartners): ?> — <a href="/logistics-partners/create" target="_blank" rel="noopener">add one</a> (opens in a new tab; reload this page afterwards)<?php else: ?> — ask an Admin/MD/ED to add one there<?php endif; ?>. Their name and contact are copied onto this order.</p>
         <?= $stepBadge('9a') ?><button type="submit" class="btn-sm">Save Freight Terms</button>
       </form>
+      <?php endif; ?>
     <?php else: ?>
       <div class="kv-grid">
         <div><span class="k">Confirmed Rate</span><span class="v"><?= $freight['confirmed_freight_rate'] !== null ? htmlspecialchars($freight['confirmed_freight_rate']) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></span></div>
@@ -2704,6 +2773,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php elseif (!$freight): ?>
       <p class="muted">Save Freight Terms first (Step 9a).</p>
     <?php else: ?>
+      <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
         <input type="hidden" name="document_type" value="FDN">
@@ -2711,6 +2781,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         <?= $stepBadge('9b') ?><button type="submit" class="<?= $__docBtnClass('FDN') ?>" data-loading-text="Generating…">Generate Debit Note</button><?= $__docAlreadyNote('FDN') ?>
       </form>
+      <?php endif; ?>
     <?php endif; ?>
   </details>
 
@@ -2794,6 +2865,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php if (!empty($packing['buyer_approval_file_id'])): ?>
         <p class="muted small">&#9989; Buyer's written approval of the quantity shortfall is on file (recorded <?= htmlspecialchars((string) ($packing['shortfall_notice_recorded_at'] ?? '')) ?>).</p>
       <?php endif; ?>
+      <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/packing" enctype="multipart/form-data">
         <?= Csrf::field() ?>
         <div class="kv-grid">
@@ -2842,6 +2914,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </table>
         <?= $stepBadge('10b') ?><button type="submit" class="btn-sm">Save Packing &amp; Crates</button>
       </form>
+      <?php endif; ?>
     <?php endif; ?>
   </details>
 
@@ -2852,6 +2925,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php if ($packingLocked): ?>
       <p class="muted"><?= $isFob ? 'Confirm the Supplier PO is signed first' : 'Clear the freight payment first' ?> to unlock this gate.</p>
     <?php elseif ($packing): ?>
+      <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
         <input type="hidden" name="document_type" value="PL">
@@ -2859,6 +2933,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         <?= $stepBadge('10c') ?><button type="submit" class="<?= $__docBtnClass('PL') ?>" data-loading-text="Generating…">Generate Packing List</button><?= $__docAlreadyNote('PL') ?>
       </form>
+      <?php endif; ?>
     <?php else: ?>
       <p class="muted">Save Packing &amp; Crates first (Step 10b).</p>
     <?php endif; ?>
@@ -2871,6 +2946,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php if ($packingLocked): ?>
       <p class="muted"><?= $isFob ? 'Confirm the Supplier PO is signed first' : 'Clear the freight payment first' ?> to unlock this gate.</p>
     <?php else: ?>
+      <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/shipping">
         <?= Csrf::field() ?>
         <div class="kv-grid">
@@ -2894,6 +2970,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </div>
         <?= $stepBadge('10d') ?><button type="submit" class="btn-sm">Save Shipping Details</button>
       </form>
+      <?php endif; ?>
     <?php endif; ?>
   </details>
 
@@ -2906,6 +2983,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php elseif ($shipping): ?>
       <h3 style="font-size:0.95em; margin-top:0;">BL Instruction Sheet (for your CHA / shipping line)</h3>
       <p class="muted small">Generates the shipping-booking worksheet your CHA or shipping line needs before confirming the BL booking — shipper, consignee/notify party, shipment and container details from above, cargo description from the order's products, and the mandatory BL-type instruction from Settings. Review the Shipping and Packing details above first; anything left blank there shows as "To Be Confirmed" on the sheet.</p>
+      <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
         <input type="hidden" name="document_type" value="BLI">
@@ -2913,6 +2991,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         <?= $stepBadge('10e') ?><button type="submit" class="<?= $__docBtnClass('BLI') ?>" data-loading-text="Generating…">Generate BL Instruction Sheet</button><?= $__docAlreadyNote('BLI') ?>
       </form>
+      <?php endif; ?>
     <?php else: ?>
       <p class="muted">Save Shipping Details first (Step 10d).</p>
     <?php endif; ?>
@@ -2967,13 +3046,16 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </table>
       <?php endif; ?>
       <?php if (!$latestDraftRound || $latestDraftRound['status'] !== 'pending'): ?>
+        <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/draft-bl" enctype="multipart/form-data">
           <?= Csrf::field() ?>
           <label>Draft BL from CHA *<input type="file" name="draft_bl" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip" required></label>
           <button type="submit" class="btn-sm">Log Draft BL for Review</button>
         </form>
+        <?php endif; ?>
       <?php endif; ?>
 
+      <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-issued" enctype="multipart/form-data">
         <?= Csrf::field() ?>
         <label>BL Number *<input type="text" name="bl_number" required></label>
@@ -2981,16 +3063,19 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip"></label>
         <?= $stepBadge('10f') ?><button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
       </form>
+      <?php endif; ?>
     <?php else: ?>
       <p>Bill of Lading recorded: <strong><?= htmlspecialchars((string) ($shipping['bl_number'] ?? '')) ?></strong> (<?= htmlspecialchars((string) ($shipping['bl_date'] ?? '')) ?>)</p>
       <?php if (!empty($shipping['bl_copy_file_id'])): ?>
         <p class="muted small"><a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">Download scanned BL copy</a></p>
       <?php else: ?>
+        <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-copy" enctype="multipart/form-data">
           <?= Csrf::field() ?>
           <label>Scanned BL Copy<input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip" required></label>
           <button type="submit" class="btn-sm">Attach Scanned BL Copy</button>
         </form>
+        <?php endif; ?>
       <?php endif; ?>
     <?php endif; ?>
   </details>
@@ -3014,6 +3099,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php else: ?>
         <p class="muted small">Scanned BL copy is on file (<a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">download</a>) — generate the Commercial Invoice against it.</p>
       <?php endif; ?>
+      <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
         <input type="hidden" name="document_type" value="CI">
@@ -3023,6 +3109,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         <?= $stepBadge('11a') ?><button type="submit" class="<?= $__docBtnClass('CI') ?>" data-loading-text="Generating…">Generate Commercial Invoice</button><?= $__docAlreadyNote('CI') ?>
       </form>
+      <?php endif; ?>
     <?php endif; ?>
   </details>
 
@@ -3033,10 +3120,12 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php if ($ciBalanceLocked): ?>
       <p class="muted">Confirm BL issuance first to unlock this gate.</p>
     <?php elseif ($shipping && !$shipping['scanned_bl_sent_to_buyer_at']): ?>
+      <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/scanned-bl-sent">
         <?= Csrf::field() ?>
         <?= $stepBadge('11b') ?><button type="submit" class="btn-sm">Mark Scanned BL Copy Sent to Buyer</button>
       </form>
+      <?php endif; ?>
     <?php elseif ($shipping): ?>
       <p class="muted small">Scanned BL copy sent to buyer.</p>
     <?php endif; ?>
@@ -3482,6 +3571,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php else: ?>
       <h3 style="font-size:0.95em; margin-top:0;">COO Prep Sheet (internal — for the Chamber of Commerce application)</h3>
       <p class="muted small">Generates an internal worksheet summarizing everything needed to apply for the Certificate of Origin with the Chamber of Commerce — shipper, consignee, shipment, and cargo details, the same source data as the BL Instruction Sheet. Never shown to the client.</p>
+      <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
         <input type="hidden" name="document_type" value="COOPREP">
@@ -3489,6 +3579,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
         <?= $stepBadge('13a') ?><button type="submit" class="<?= $__docBtnClass('COOPREP') ?>" data-loading-text="Generating…">Generate COO Prep Sheet</button><?= $__docAlreadyNote('COOPREP') ?>
       </form>
+      <?php endif; ?>
     <?php endif; ?>
   </details>
 
@@ -3540,13 +3631,15 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php if ($despatchLocked): ?>
       <p class="muted">Clear the balance payment first to unlock this gate.</p>
     <?php elseif ($blEndorsement): ?>
+      <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsement/generate" style="margin-top:8px;">
         <?= Csrf::field() ?>
         <?= $stepBadge('13d') ?><button type="submit" class="btn-sm btn-success">Generate / Print BL Endorsement</button>
       </form>
+      <?php endif; ?>
       <?php if ($blEndorsementDoc): ?>
         <p class="small" style="margin-top:6px;">
-          Latest: <a href="/documents/<?= (int) $blEndorsementDoc['id'] ?>/download?format=pdf"><?= htmlspecialchars($blEndorsementDoc['document_reference']) ?></a>
+          Latest: <?php if ($canDownloadPdf): ?><a href="/documents/<?= (int) $blEndorsementDoc['id'] ?>/download?format=pdf"><?= htmlspecialchars($blEndorsementDoc['document_reference']) ?></a><?php else: ?><?= htmlspecialchars($blEndorsementDoc['document_reference']) ?><?php endif; ?>
           (generated <?= htmlspecialchars((string) $blEndorsementDoc['generated_at']) ?>)
         </p>
       <?php endif; ?>
@@ -3877,7 +3970,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <button type="submit" class="btn-sm">Attach Document</button>
     </form>
     <?php endif; ?>
-    <p class="muted small" style="margin-top:8px;"><a href="/orders/<?= (int) $order['id'] ?>/additional-documents/removed">Show removed</a></p>
+    <?php if ($canManageOrders): ?><p class="muted small" style="margin-top:8px;"><a href="/orders/<?= (int) $order['id'] ?>/additional-documents/removed">Show removed</a></p><?php endif; ?>
   </details>
 
   <details class="step-card" id="order-feedback"<?= $stepCardOpen('16') ?>>
@@ -3935,8 +4028,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
        &nbsp;·&nbsp;
        <a href="/orders/<?= (int) $order['id'] ?>/audit-log">Audit Log</a>
        <?php endif; ?>
+       <?php if ($canManageOrders): ?>
        &nbsp;·&nbsp;
        <a href="/orders/<?= (int) $order['id'] ?>/dossier" class="js-slow-download" data-loading-text="Building ZIP…">Download Full Dossier (ZIP)</a>
+       <?php endif; ?>
     </p>
   </details>
 
@@ -3978,6 +4073,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
   <details class="step-card step-card-reference" style="border-color:#D9822B;">
     <summary><h2>Force-Generate a Document (privileged override)</h2></summary>
     <p class="muted small">Bypasses the normal stage sequence and, if this order is locked/complete, the lock itself. Use only to correct a genuine mistake — every use is logged with your reason against this order's audit trail.</p>
+    <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" onsubmit="return confirmDocumentRegeneration(this) && confirmFieldOverride(this, 'generating this document out of sequence');">
       <?= Csrf::field() ?>
       <input type="hidden" name="override_gate" value="1">
@@ -3994,6 +4090,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       </label>
       <button type="submit" class="btn-sm btn-danger" data-loading-text="Generating…">Force-Generate</button>
     </form>
+    <?php endif; ?>
   </details>
   <?php endif; ?>
 
@@ -4010,7 +4107,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <div><span class="k">Compliance Checklist</span><span class="v"><?= $complianceSummary['total'] === 0 ? 'No task types configured' : $complianceSummary['approved'] . ' of ' . $complianceSummary['total'] . ' resolved' ?> — <a href="#compliance-checklist">see checklist</a></span></div>
           <?php endif; ?>
           <div><span class="k">Documents Generated</span><span class="v"><?= count($documents) ?></span></div>
-          <div><span class="k">Client</span><span class="v"><a href="/clients/<?= (int) $order['client_id'] ?>"><?= htmlspecialchars($order['company_legal_name']) ?></a></span></div>
+          <div><span class="k">Client</span><span class="v"><?php if ($canOpenClient): ?><a href="/clients/<?= (int) $order['client_id'] ?>"><?= htmlspecialchars($order['company_legal_name']) ?></a><?php else: ?><?= htmlspecialchars($order['company_legal_name']) ?><?php endif; ?></span></div>
           <div><span class="k">Buyer Inquiry Ref</span><span class="v"><?= htmlspecialchars($order['buyer_inquiry_ref']) ?></span></div>
           <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v"><?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_name'] ?? '—') ?></span></div>
           <div><span class="k">Quotation Date</span><span class="v"><?= htmlspecialchars($order['quotation_date'] ?? '—') ?></span></div>
@@ -4064,7 +4161,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <ul class="sidebar-doc-list">
             <?php foreach ($documents as $d): ?>
               <li>
-                <?php if ($d['pdf_file_id']): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf"><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?></a><?php else: ?><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?><?php endif; ?>
+                <?php if ($d['pdf_file_id'] && $canDownloadPdf): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf"><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?></a><?php else: ?><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?><?php endif; ?>
                 <span class="muted small">Rev.<?= (int) $d['revision_number'] ?> &middot; <?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?></span>
               </li>
             <?php endforeach; ?>

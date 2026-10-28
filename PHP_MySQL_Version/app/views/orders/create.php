@@ -86,7 +86,7 @@
         <label>Production Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
           <input type="number" min="0" name="lead_time_max_days" value="<?= htmlspecialchars((string) ($old['lead_time_max_days'] ?? '')) ?>" placeholder="e.g. 60">
         </label>
-        <label>Sailing Lead Time Min (days) <small class="muted">(internal only — auto-suggested from <a href="/port-routes" target="_blank">Port Routes</a> once both ports are picked, still editable)</small>
+        <label>Sailing Lead Time Min (days) <small class="muted">(internal only — auto-suggested from <?= \App\Helpers\PermittedLinks::currentUserMayOpen('/port-routes') ? '<a href="/port-routes" target="_blank">Port Routes</a>' : 'Port Routes' ?> once both ports are picked, still editable)</small>
           <input type="number" min="0" name="sailing_lead_time_min_days" id="sailing-lead-time-min" value="<?= htmlspecialchars((string) ($old['sailing_lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 18">
         </label>
         <label>Sailing Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>

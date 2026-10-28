@@ -53,6 +53,15 @@ async function accept(req, res) {
     return;
   }
 
+  // QA Round 5, R5-02: an enquiry from an email another client already
+  // uses is not accepted as a new client.
+  const other = await clientRepository.findOtherWithEmail(submission.email);
+  if (other) {
+    flash.set(req, 'error', `${clientRepository.duplicateEmailMessage(submission.email, other)} If this enquiry is from that same buyer, create the order under their existing client record and reject this submission.`);
+    res.redirect('/client-intake');
+    return;
+  }
+
   const clientUniqueNumber = await referenceNumberService.generateClientUniqueNumber();
   const consigneeSameAsBuyer = parseInt(submission.consignee_same_as_buyer ?? 1, 10) === 1;
   const clientId = await clientRepository.create(

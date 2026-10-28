@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { marked } = require('marked');
+const permittedLinks = require('../helpers/permittedLinks');
 
 /**
  * Port of App\Controllers\SopController — staff-facing viewer for the
@@ -40,9 +41,10 @@ function rewriteRelativeLinks(markdown) {
   return out;
 }
 
-function renderMarkdownFile(filePath) {
+function renderMarkdownFile(filePath, permissions) {
   const raw = fs.readFileSync(filePath, 'utf8');
-  return marked.parse(rewriteRelativeLinks(raw));
+  // QA Round 5, R5-04: links to pages this user can't open become plain text.
+  return permittedLinks.filterHtml(marked.parse(rewriteRelativeLinks(raw)), permissions);
 }
 
 function extractTitle(filePath) {
@@ -88,7 +90,7 @@ function chapters(req) {
 
 async function index(req, res) {
   const readmePath = path.join(DOCS_DIR, 'README.md');
-  const contentHtml = fs.existsSync(readmePath) ? renderMarkdownFile(readmePath) : null;
+  const contentHtml = fs.existsSync(readmePath) ? renderMarkdownFile(readmePath, req.permissions) : null;
   res.renderView('sop/index', { contentHtml, chapters: chapters(req) }, 'layout/base');
 }
 
@@ -111,7 +113,7 @@ async function show(req, res) {
   }
 
   res.renderView('sop/show', {
-    contentHtml: renderMarkdownFile(filePath),
+    contentHtml: renderMarkdownFile(filePath, req.permissions),
     chapters: chapters(req),
     currentSlug: slug,
   }, 'layout/base');

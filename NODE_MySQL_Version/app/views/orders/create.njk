@@ -85,7 +85,7 @@
         <label>Production Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
           <input type="number" min="0" name="lead_time_max_days" value="{{ old.lead_time_max_days or '' }}" placeholder="e.g. 60">
         </label>
-        <label>Sailing Lead Time Min (days) <small class="muted">(internal only — auto-suggested from <a href="/port-routes" target="_blank">Port Routes</a> once both ports are picked, still editable)</small>
+        <label>Sailing Lead Time Min (days) <small class="muted">(internal only — auto-suggested from {% if permissions.manage_ports %}<a href="/port-routes" target="_blank">Port Routes</a>{% else %}Port Routes{% endif %} once both ports are picked, still editable)</small>
           <input type="number" min="0" name="sailing_lead_time_min_days" id="sailing-lead-time-min" value="{{ old.sailing_lead_time_min_days or '' }}" placeholder="e.g. 18">
         </label>
         <label>Sailing Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>

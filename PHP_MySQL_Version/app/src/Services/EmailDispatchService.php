@@ -77,6 +77,10 @@ final class EmailDispatchService
             if (!empty($document['document_type_never_shown_to_buyer'])) {
                 throw new \RuntimeException("{$document['document_type_name']} is an internal document and can never be sent to the buyer.");
             }
+            // QA Round 5, R5-03: terms needing MD/ED approval block sending the Quotation too.
+            if ($document['document_type_code'] === 'QT' && PaymentTermsApprovalService::isPending($orderId)) {
+                throw new \RuntimeException(PaymentTermsApprovalService::pendingMessage($orderId));
+            }
             // External QA report L-41: any active template could be picked
             // for any document — a Supplier PO going out under the subject
             // "Quotation SC/SPO/…" — because nothing tied templateKey to

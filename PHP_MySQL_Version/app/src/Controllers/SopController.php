@@ -127,7 +127,8 @@ final class SopController
         if ($raw === false) {
             throw new \RuntimeException("Could not read {$path}");
         }
-        return (string) $this->converter()->convert($this->rewriteRelativeLinks($raw));
+        // QA Round 5, R5-04: links to pages this user can't open become plain text.
+        return \App\Helpers\PermittedLinks::filterHtml((string) $this->converter()->convert($this->rewriteRelativeLinks($raw)));
     }
 
     public function index(array $params): void

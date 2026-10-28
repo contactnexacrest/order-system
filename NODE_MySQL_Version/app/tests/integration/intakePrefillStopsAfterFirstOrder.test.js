@@ -51,7 +51,7 @@ describe('intake prefill stops after the client\'s first order ("feedback-loop f
         billing_country: null,
         vat_eori_tax_no: null,
         contact_person: 'Jane Buyer',
-        email: 'jane@repeat-buyer.example',
+        email: `jane-${Math.random().toString(16).slice(2, 10)}@repeat-buyer.example`, // one email per client (R5-02)
         phone: null,
         country_of_destination: 'Netherlands',
         port_of_discharge_text: 'Rotterdam',

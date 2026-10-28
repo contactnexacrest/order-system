@@ -120,6 +120,7 @@ correctly once the password is changed.
    ```sql
    UPDATE assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/absolute/path/to/storage');
    UPDATE user_signature_assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/absolute/path/to/storage');
+   UPDATE reference_library_documents SET file_path = REPLACE(file_path, '__STORAGE_BASE_PATH__', '/absolute/path/to/storage');
    ```
    using the same absolute path you'll put in `.env` below. Skipping the
    second statement doesn't error anywhere — every document generates fine —

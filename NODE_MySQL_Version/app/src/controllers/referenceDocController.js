@@ -324,6 +324,13 @@ async function categoryDelete(req, res) {
 async function customDownload(req, res) {
   const id = parseInt(req.params.id, 10);
   const doc = await referenceLibraryRepository.find(id);
+  // QA Round 5, R5-18: the seeded documents' paths start with the
+  // __STORAGE_BASE_PATH__ placeholder (seed.sql can't know the install
+  // path) — resolve it here, so they download even if the install step
+  // that rewrites it was missed.
+  if (doc && doc.file_path) {
+    doc.file_path = String(doc.file_path).replace('__STORAGE_BASE_PATH__', String(env.storageBasePath()).replace(/\/+$/, ''));
+  }
   if (!doc || !doc.file_path || !fs.existsSync(doc.file_path)) {
     res.status(404).send('File is missing from storage.');
     return;

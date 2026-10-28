@@ -216,6 +216,11 @@ updates — e.g. "Cutting and finishing in progress — 30% complete" and
 with `manage_orders` can post an update any time Stage 4 or later is
 unlocked, independent of which stage is currently active.
 
+Once the order is fully settled (locked), changing it is a locked-order
+edit like any other (QA Round 5): only someone with **"Override locked
+data"** sees the form, it asks for a reason (minimum 10 characters), and
+the change is logged as `ORDER_EDITED_WHILE_LOCKED`.
+
 Every update to either field is audit-logged — who posted it, when, and
 the exact old/new text — the moment it's saved, under action types
 `PRODUCTION_STATUS_UPDATED` and `EST_SHIPMENT_DATE_UPDATED`. Re-saving the

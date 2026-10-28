@@ -515,6 +515,7 @@ $router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayme
 // vs. confirming-usable is the same record/clear duty split either way.
 $router->post('/orders/{id}/payment/lc', [$orders, 'recordLcDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/lc/confirm-usable', [$orders, 'confirmLcUsable'], [SessionAuth::required(), PermissionCheck::requires('clear_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment-terms/approve', [$orders, 'approvePaymentTerms'], [SessionAuth::required(), PermissionCheck::requires('approve_payment_terms'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
@@ -597,7 +598,7 @@ $router->post('/orders/{id}/compliance-tasks/mark-all-na', [$orders, 'markAllCom
 
 $router->post('/orders/{id}/documents/generate', [$documents, 'generate'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/documents/{documentId}/delete', [$documents, 'delete'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
-$router->get('/documents/{documentId}/download', [$documents, 'download'], [SessionAuth::required(), PermissionCheck::requires('download_pdf')]);
+$router->get('/documents/{documentId}/download', [$documents, 'download'], [SessionAuth::required(), PermissionCheck::requiresAny(['download_pdf', 'view_cafin'])]);
 // Batch 3 #13b/#13a — widened so a view-only visitor (view_orders/view_clients) can open what they can already see listed on the order/client page.
 $router->get('/file-store/{id}/download', [$fileStore, 'download'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_orders', 'view_clients'])]);
 

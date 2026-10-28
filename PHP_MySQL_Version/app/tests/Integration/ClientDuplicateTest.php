@@ -95,10 +95,11 @@ final class ClientDuplicateTest extends DbTestCase
     {
         $source = $this->createSourceClient();
         $_POST = [
-            'company_legal_name' => 'Acme Exports (Europe) Ltd', // the one changed field
+            'company_legal_name' => 'Acme Exports (Europe) Ltd', // the changed field
             'billing_address' => $source['billing_address'],
             'contact_person' => $source['contact_person'],
-            'email' => $source['email'],
+            // QA Round 5, R5-02: a duplicate needs its own email too.
+            'email' => 'europe-' . bin2hex(random_bytes(3)) . '@example.test',
             'phone' => $source['phone'],
             'country_of_destination' => $source['country_of_destination'],
             'coo_type' => $source['coo_type'],

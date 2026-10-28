@@ -33,7 +33,7 @@ final class IntakePreferencesPrefillOrderFormTest extends DbTestCase
             'billing_country'        => null,
             'vat_eori_tax_no'        => null,
             'contact_person'         => 'Jane Buyer',
-            'email'                  => 'jane@intake-prefill.example',
+            'email'                  => 'jane-' . bin2hex(random_bytes(4)) . '@intake-prefill.example', // one email per client (R5-02)
             'phone'                  => null,
             'country_of_destination' => 'Netherlands',
             'port_of_discharge_text' => $portText,

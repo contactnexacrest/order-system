@@ -17,6 +17,7 @@ const caExportBenefitRepository = require('../repositories/caExportBenefitReposi
 const caFyLockGuard = require('../services/caFyLockGuard');
 const orderAssigneeRepository = require('../repositories/orderAssigneeRepository');
 const orderAccessService = require('../services/orderAccessService');
+const paymentTermsApprovalService = require('../services/paymentTermsApprovalService');
 const orderAssignmentService = require('../services/orderAssignmentService');
 const orderDuplicationService = require('../services/orderDuplicationService');
 const orderEditGuard = require('../services/orderEditGuard');
@@ -566,6 +567,13 @@ async function store(req, res) {
   // External QA report L-23: order creation was never audit-logged.
   await auditLogRepository.log(user.id, 'ORDER_CREATED', 'orders', orderId, 'order_reference', null, orderReference);
 
+  // QA Round 5, R5-03: terms needing MD/ED approval — tell the approvers.
+  if (await paymentTermsApprovalService.isPending(orderId)) {
+    for (const approverUserId of await permissionRepository.usersWithPermission('approve_payment_terms')) {
+      await notificationRepository.create(approverUserId, null, 'payment_terms_approval_needed', orderId, `Order ${orderReference}: payment terms need your approval before the Quotation can be generated.`);
+    }
+  }
+
   flash.set(req, 'success', `Order ${orderReference} created for ${client.company_legal_name}.`);
   res.redirect(`/orders/${orderId}`);
 }
@@ -1093,6 +1101,8 @@ async function show(req, res) {
       linkedCaExpenses: req.permissions.ca_module_view ? await caExpenseRepository.forOrder(orderId) : [],
       canManageCaInternalDoc: !!req.permissions.ca_internal_doc_manage,
       canViewCafin,
+      paymentTermsApproval: await paymentTermsApprovalService.state(orderId),
+      canApprovePaymentTerms: !!req.permissions.approve_payment_terms,
       caInternalDoc: canViewCafin ? await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CAFIN') : null,
       // Reorder-to-supplier linking + Order Profitability Sheet (docs/schema.sql
       // Section AP) — gated on the new, deliberately stricter
@@ -1841,6 +1851,13 @@ async function updateProductionStatus(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
   const before = await orderRepository.find(orderId);
+  // QA Round 5, R5-01: on a locked (fully settled) order this is a
+  // locked-order edit like any other — "Override locked data", a reason,
+  // and an ORDER_EDITED_WHILE_LOCKED audit row.
+  if (before.is_locked && !(await orderEditGuard.allow(req, null, true, str(req.body.reason).trim(), 'orders', orderId, 'production_status'))) {
+    res.redirect(`/orders/${orderId}#step-production`);
+    return;
+  }
   const text = str(req.body.production_status_text);
   if (text !== '' && text !== (before.production_status_text || '')) {
     await orderRepository.setProductionStatus(orderId, text);
@@ -2003,6 +2020,26 @@ async function recordFeedback(req, res) {
 }
 
 /** docs/schema.sql Section AF — per-order, staff-controlled, default off. */
+/**
+ * QA Round 5, R5-03 (owner decision 2026-10-28, Option A): MD/ED approve
+ * the payment terms of an order on a "Requires MD approval" preset — the
+ * Quotation can't be generated or sent until they do.
+ */
+async function approvePaymentTerms(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  if (!(await orderRepository.find(orderId))) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  if (!(await paymentTermsApprovalService.isPending(orderId))) {
+    flash.set(req, 'warning', 'These payment terms do not need approval, or are already approved.');
+  } else {
+    await paymentTermsApprovalService.approve(orderId, req.user.id);
+    flash.set(req, 'success', 'Payment terms approved — the Quotation can now be generated.');
+  }
+  res.redirect(`/orders/${orderId}#step-1-quotation-prepare`);
+}
+
 async function setDisputeButtonVisible(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const visible = !!req.body.dispute_button_visible_to_client;
@@ -3791,7 +3828,7 @@ module.exports = {
   savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,
   saveBlEndorsement, generateBlEndorsement,
-  closeOrder, markFullySettled, overrideStatusLock, markLost, updateComplianceTask, markAllComplianceTasksNotApplicable,
+  approvePaymentTerms, closeOrder, markFullySettled, overrideStatusLock, markLost, updateComplianceTask, markAllComplianceTasksNotApplicable,
   requestCancellation, approveCancellation, rejectCancellation, completeCancellationRefund,
   recordAdvanceInrActual, deleteAdvanceInrActual, recordBalanceInrActual, deleteBalanceInrActual,
   recordFreightInrActual, deleteFreightInrActual,

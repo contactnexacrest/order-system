@@ -27,6 +27,35 @@ final class ClientRepository
         return $stmt->fetch() ?: null;
     }
 
+    /**
+     * QA Round 5, R5-02 (owner decision 2026-10-28): every client has its
+     * own email — the client portal logs in by email, so two clients
+     * sharing one would make that login ambiguous. Case- and
+     * space-insensitive.
+     *
+     * @return array|null the other client already using this email, or null
+     */
+    public static function findOtherWithEmail(?string $email, ?int $exceptClientId = null): ?array
+    {
+        $email = trim((string) $email);
+        if ($email === '') {
+            return null;
+        }
+        $stmt = Database::connection()->prepare(
+            'SELECT id, company_legal_name, client_unique_number FROM clients
+             WHERE LOWER(TRIM(email)) = LOWER(:email) AND id <> :except_id ORDER BY id LIMIT 1'
+        );
+        $stmt->execute(['email' => $email, 'except_id' => $exceptClientId ?? 0]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /** The message shown when findOtherWithEmail() finds a client. */
+    public static function duplicateEmailMessage(string $email, array $other): string
+    {
+        return "Another client already uses the email \"{$email}\" — {$other['company_legal_name']} (Buyer Inquiry Ref {$other['client_unique_number']}). "
+            . 'Each client needs its own email, because the client portal logs in by email.';
+    }
+
     /** CA / Accounting module (Phase 3) — caches the Zoho Books contact_id created for this client on first sync. */
     public static function setZohoContactId(int $id, string $zohoContactId): void
     {

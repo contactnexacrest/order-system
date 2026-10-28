@@ -2,6 +2,7 @@
 
 const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
+const paymentTermsApprovalService = require('./paymentTermsApprovalService');
 const clientRepository = require('../repositories/clientRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const documentRepository = require('../repositories/documentRepository');
@@ -145,6 +146,10 @@ async function buildPreview(orderId, documentId, templateKey, senderUserId) {
     // checklists, Amendment drafts, ...) even hit directly by a typed URL.
     if (document.document_type_never_shown_to_buyer) {
       throw new Error(`${document.document_type_name} is an internal document and can never be sent to the buyer.`);
+    }
+    // QA Round 5, R5-03: terms needing MD/ED approval block sending the Quotation too.
+    if (document.document_type_code === 'QT' && (await paymentTermsApprovalService.isPending(orderId))) {
+      throw new Error(await paymentTermsApprovalService.pendingMessage(orderId));
     }
     // External QA report L-41: any active template could be picked for
     // any document — a Supplier PO going out under the subject "Quotation

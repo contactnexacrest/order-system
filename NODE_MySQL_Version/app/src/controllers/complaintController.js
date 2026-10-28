@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const emailDispatchService = require('../services/emailDispatchService');
 const orderComplaintRepository = require('../repositories/orderComplaintRepository');
 const orderComplaintReplyRepository = require('../repositories/orderComplaintReplyRepository');
 const orderRepository = require('../repositories/orderRepository');
@@ -107,7 +108,10 @@ async function postReply(req, res) {
 
   await orderComplaintService.replyAsStaff(complaintId, req.user.id, body);
 
-  flash.set(req, 'success', 'Reply posted — the client has been emailed.');
+  // QA Round 5, R5-16: with email sending off, nothing was emailed — say so.
+  flash.set(req, 'success', (await emailDispatchService.mailSendingEnabled())
+    ? 'Reply posted — the client has been emailed.'
+    : 'Reply posted to the client portal. Email sending is turned off, so the client was NOT emailed — tell them yourself if it is urgent.');
   res.redirect(`/orders/${complaint.order_id}/complaints`);
 }
 

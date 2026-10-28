@@ -23,6 +23,8 @@ const dashboardRepository = require('../repositories/dashboardRepository');
 // every view — also preloads req.user and req.permissions once per request
 // so route guards and view templates both read the same resolved object.
 
+const orderAccessService = require('../services/orderAccessService');
+
 const LAST_ACTIVITY_KEY = '_last_activity_ts';
 
 function required() {
@@ -145,6 +147,15 @@ function required() {
       req.settingsExpiryWarningCount = (warnings.lut ? 1 : 0) + (warnings.rcmc ? 1 : 0);
     } else {
       req.settingsExpiryWarningCount = 0;
+    }
+
+    // QA Round 5, R5-24: the archived-order and assignment rules apply to
+    // every page and action of an order, not just its main page — checked
+    // once here for every staff route.
+    const denied = await orderAccessService.denialReasonForPath(req.path, user.id, req.permissions);
+    if (denied !== null) {
+      res.status(403).send(denied);
+      return;
     }
 
     next();

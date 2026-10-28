@@ -69,6 +69,14 @@ async function accept(req, res) {
     return;
   }
 
+  // QA Round 5, R5-02: the buyer's corrected email must not be one another client already uses.
+  const other = await clientRepository.findOtherWithEmail(submission.email, order.client_id);
+  if (other) {
+    flash.set(req, 'error', clientRepository.duplicateEmailMessage(submission.email, other));
+    res.redirect('/pi-intake-review');
+    return;
+  }
+
   const user = req.user;
   await clientRepository.update(order.client_id, {
     company_legal_name: submission.company_legal_name,

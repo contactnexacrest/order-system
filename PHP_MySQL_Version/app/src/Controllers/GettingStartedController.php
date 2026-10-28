@@ -26,8 +26,11 @@ final class GettingStartedController
     {
         $user = AuthService::currentUser();
 
+        // QA Round 5, R5-04: links to pages this user can't open become plain text.
+        ob_start();
         View::render('getting-started/show', [
             'userName' => $user['name'] ?? null,
         ], null);
+        echo \App\Helpers\PermittedLinks::filterHtml((string) ob_get_clean());
     }
 }

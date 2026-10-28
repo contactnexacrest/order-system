@@ -146,6 +146,6 @@
     </tr>
     {% endfor %}
   </table>
-  <div class="btn-row"><a class="btn-sm btn-secondary" href="/audit-log">Full Audit Log</a> <a class="btn-sm btn-secondary" href="/reports">Reports</a></div>
+  <div class="btn-row">{% if permissions.view_audit_log %}<a class="btn-sm btn-secondary" href="/audit-log">Full Audit Log</a> {% endif %}<a class="btn-sm btn-secondary" href="/reports">Reports</a></div>
 </div>
 {% endif %}

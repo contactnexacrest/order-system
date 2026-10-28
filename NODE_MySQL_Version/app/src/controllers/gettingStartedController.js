@@ -15,7 +15,12 @@
  * since this is meant to be the very first thing a new hire opens.
  */
 
+const permittedLinks = require('../helpers/permittedLinks');
+
 async function show(req, res) {
+  // QA Round 5, R5-04: links to pages this user can't open become plain text.
+  const send = res.send.bind(res);
+  res.send = (html) => send(permittedLinks.filterHtml(html, req.permissions));
   res.renderView('getting-started/show', {
     userName: (req.user && req.user.name) || null,
   }, null);

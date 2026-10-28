@@ -8,6 +8,7 @@
     <p>Claimed: <strong><?= number_format((float) $totalClaimed, 2) ?></strong> &middot; Received: <strong><?= number_format((float) $totalReceived, 2) ?></strong> &middot; Outstanding: <strong><?= number_format((float) $totalClaimed - (float) $totalReceived, 2) ?></strong></p>
   </div>
 
+  <?php if (\App\Helpers\PermittedLinks::currentUserHas('inr_actual_edit')): // QA Round 5, R5-20: the route needs inr_actual_edit ?>
   <div class="section">
     <h2>Record a Claim</h2>
     <form method="post" action="/ca/export-benefits">
@@ -43,6 +44,7 @@
       <button type="submit" class="btn btn-primary" style="margin-top:8px;">Record Claim</button>
     </form>
   </div>
+  <?php endif; ?>
 
   <div class="section">
     <h2>Claims</h2>

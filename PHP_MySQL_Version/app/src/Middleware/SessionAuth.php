@@ -100,6 +100,20 @@ final class SessionAuth
                 }
             }
 
+            // QA Round 5, R5-24: the archived-order and assignment rules
+            // apply to every page and action of an order, not just its
+            // main page — checked once here for every staff route.
+            $denied = \App\Services\OrderAccessService::denialReasonForPath(
+                (string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH),
+                (int) $userId,
+                $user['role_id'] !== null ? (int) $user['role_id'] : null
+            );
+            if ($denied !== null) {
+                http_response_code(403);
+                echo htmlspecialchars($denied, ENT_QUOTES, 'UTF-8');
+                return false;
+            }
+
             return true;
         };
     }

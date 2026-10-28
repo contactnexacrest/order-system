@@ -367,6 +367,13 @@ final class ReferenceDocController
     {
         $id = (int) $params['id'];
         $doc = ReferenceLibraryRepository::find($id);
+        // QA Round 5, R5-18: the seeded documents' paths start with the
+        // __STORAGE_BASE_PATH__ placeholder (seed.sql can't know the install
+        // path) — resolve it here, so they download even if the install step
+        // that rewrites it was missed.
+        if ($doc && !empty($doc['file_path'])) {
+            $doc['file_path'] = str_replace('__STORAGE_BASE_PATH__', rtrim(Env::storageBasePath(), '/'), (string) $doc['file_path']);
+        }
         if (!$doc || empty($doc['file_path']) || !is_file($doc['file_path'])) {
             http_response_code(404);
             echo 'File is missing from storage.';

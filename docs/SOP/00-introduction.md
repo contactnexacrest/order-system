@@ -253,7 +253,9 @@ Every section starts collapsed except the one holding the order's
 current step, which opens and scrolls to that step; inside it, the
 current step opens and the rest stay collapsed — click any heading to
 open it. Products, Payment Overview, Document Review & Approval and
-**Order Communication** (the conversation with the client, Step 15) stay
+**Order Communication** (the conversation with the client, Step 15 — when
+email sending is turned off in Settings, posts go to the client's portal
+only and the box and the confirmation say the client was *not* emailed) stay
 pinned above the sections. Order Communication is always open, since it's
 needed at every step; Document Review opens by itself only when a
 document is waiting on someone (otherwise it shows just the number of

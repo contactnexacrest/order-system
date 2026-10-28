@@ -82,6 +82,13 @@ final class PiIntakeReviewController
             return;
         }
 
+        // QA Round 5, R5-02: the buyer's corrected email must not be one another client already uses.
+        if ($other = ClientRepository::findOtherWithEmail($submission['email'] ?? null, (int) $order['client_id'])) {
+            Flash::set('error', ClientRepository::duplicateEmailMessage((string) $submission['email'], $other));
+            header('Location: /pi-intake-review');
+            return;
+        }
+
         $user = AuthService::currentUser();
         ClientRepository::update((int) $order['client_id'], [
             'company_legal_name'     => $submission['company_legal_name'],

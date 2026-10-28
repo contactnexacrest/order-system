@@ -81,6 +81,13 @@ Add Client** (`/clients/create`), fill in the same details by hand, save.
 Then from that client's page, **Add Order** to create the order shell
 (buyer inquiry ref, incoterm, payment preset, etc.).
 
+**One email per client** (QA Round 5, owner decision 2026-10-28). The
+client portal logs in by email, so two clients can't share one. Saving a
+client — new, duplicated, edited, or accepted from Quotation Intake Review
+— with an email another client already uses is refused, and the message
+names that other client. If the enquiry is really from the same buyer,
+create the order under their existing client record instead.
+
 ### Duplicating a client
 
 A client's page has a **Duplicate** button (same permission as Add Client).
@@ -270,6 +277,19 @@ The file itself downloads only through the client's own page
 screen) — never a public link.
 
 ### Both paths converge here — generating the Quotation
+
+**Payment terms that need MD/ED approval** (owner decision 2026-10-28).
+If the order's payment preset is marked **Requires MD approval** (by
+default: Established Buyer — Post-BL, Extended Terms — Post-BL, and
+Irrevocable Letter of Credit at Sight), Step 1 shows a yellow box *Payment
+terms need MD/ED approval first*, and the Generate Quotation button is
+hidden until the terms are approved. Anyone holding **Approve payment
+terms** (Admin, MD and ED by default — editable under Roles & Permissions)
+sees an **Approve payment terms** button there; everyone else sees
+*Waiting for MD/ED approval*. The approvers get a notification when such
+an order is created. Once approved, the box turns green and says who
+approved and when, and the Quotation can be generated and sent as usual.
+Sending a Quotation is refused too while the terms wait for approval.
 
 From the order page, under **Documents**, click **Generate Quotation**.
 This is the one action that passes Stage 1's gate. The order's stage

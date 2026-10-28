@@ -2,7 +2,7 @@
 
 const path = require('path');
 const { test, expect } = require('@playwright/test');
-const { login, logout, loginClient } = require('./support/auth');
+const { login, logout, loginClient, ROLES } = require('./support/auth');
 const { resetClientPassword } = require('./support/db');
 
 /**
@@ -153,6 +153,15 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
     await page.getByRole('button', { name: 'Create Order' }).click();
     await expect(page).toHaveURL(/\/orders\/\d+$/);
     orderId = Number(page.url().match(/\/orders\/(\d+)$/)[1]);
+
+    // QA Round 5, R5-24: the Export Executive works this order's disputes
+    // and amendments below, and every page of an order now needs the same
+    // assignment as the order page itself — so assign them, as staff would.
+    const assigneeForm = page.locator(`form[action="/orders/${orderId}/assignees"]`);
+    const exportExecValue = await assigneeForm.locator('option', { hasText: ROLES.exportExecutive.name }).first().getAttribute('value');
+    await assigneeForm.locator('select[name="user_id"]').selectOption(exportExecValue);
+    await assigneeForm.getByRole('button', { name: 'Add' }).click();
+    await expect(page.locator('.alert')).toContainText('added as an assignee');
 
     await generateDocument(page, orderId, 'QT', 'generated');
     await adminAssignSelfAndApprove(page, 'QT', 'Gulmohar Sontakke');

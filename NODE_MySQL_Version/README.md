@@ -126,6 +126,7 @@ storage/
    ```sql
    UPDATE assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/opt/nexacrest_node/storage');
    UPDATE user_signature_assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/opt/nexacrest_node/storage');
+   UPDATE reference_library_documents SET file_path = REPLACE(file_path, '__STORAGE_BASE_PATH__', '/opt/nexacrest_node/storage');
    ```
    Skipping this step doesn't break anything — every generated document
    just silently shows no logo/signature/seal/watermark image (the code

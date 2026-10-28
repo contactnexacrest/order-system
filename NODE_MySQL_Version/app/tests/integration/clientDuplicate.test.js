@@ -102,7 +102,8 @@ describe('Client duplicate (90-item backlog Phase 6)', () => {
       company_legal_name: 'Acme Exports (Europe) Ltd',
       billing_address: source.billing_address,
       contact_person: source.contact_person,
-      email: source.email,
+      // QA Round 5, R5-02: a duplicate needs its own email too.
+      email: `europe-${Math.random().toString(16).slice(2, 8)}@example.test`,
       phone: source.phone,
       country_of_destination: source.country_of_destination,
       coo_type: source.coo_type,

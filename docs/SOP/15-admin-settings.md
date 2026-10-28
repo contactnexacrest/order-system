@@ -53,7 +53,13 @@ Every order now also has a list of staff **assignees** (whoever created
 it is auto-assigned as the first one), and most roles only see orders
 they're assigned to — in the Orders list, the Kanban board, and the
 order detail page itself (a bookmarked or guessed URL to someone else's
-order is refused, not just hidden). An order can have more than one
+order is refused, not just hidden). The same rule — and the archived-
+order rule — covers every page and action of that order too (editing,
+Annexure A, amendments, the Full Report, its document and file
+downloads), not only its main page (QA Round 5). Links and buttons a
+person's permissions don't allow are no longer shown to them at all —
+on the order page, in the sidebar, and in the SOP / Getting Started text
+(a link there turns into plain text). An order can have more than one
 assignee at once: for example an Export Executive handling office/
 documentation work and a Logistics Executive handling CHA/factory work
 can both be assigned to the same order concurrently, since the two of
@@ -327,7 +333,9 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   Option** (Before Shipment vs. Against Scanned BL Copy), **Balance
   Days**, a **Currency**, a **Default** flag (exactly one preset may be
   default — saving one as default silently clears the flag on every
-  other preset), whether it **Requires MD Approval**, and whether it
+  other preset), whether it **Requires MD Approval** (MD/ED — anyone
+  holding **Approve payment terms** — must approve an order's terms on this
+  preset before its Quotation can be generated or sent; see Stage 1), and whether it
   **Includes BL Type / BL Consignee Instruction** on the generated BL
   Instruction Sheet (90-item backlog #32) — unchecking this on a preset
   omits both rows from every Stage 7 BL Instruction Sheet generated for

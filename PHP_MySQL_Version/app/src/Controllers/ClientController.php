@@ -59,6 +59,12 @@ final class ClientController
         }
 
         $data = self::collectClientFields($companyLegalName, $billingAddress);
+        if ($other = ClientRepository::findOtherWithEmail($data['email'] ?? null)) {
+            Flash::set('error', ClientRepository::duplicateEmailMessage((string) $data['email'], $other));
+            Flash::setOld($_POST);
+            header('Location: /clients/create');
+            return;
+        }
         $clientUniqueNumber = ReferenceNumberService::generateClientUniqueNumber();
         $clientId = ClientRepository::create($data, (int) $user['id'], $clientUniqueNumber);
         if (TestModeService::isEnabled()) {
@@ -121,6 +127,13 @@ final class ClientController
 
         if (self::isIdenticalToSource($data, $source)) {
             Flash::set('error', 'Change at least one detail before saving a duplicate — if nothing is different, there is no need for a new client record.');
+            Flash::setOld($_POST);
+            header("Location: /clients/{$source['id']}/duplicate");
+            return;
+        }
+
+        if ($other = ClientRepository::findOtherWithEmail($data['email'] ?? null)) {
+            Flash::set('error', ClientRepository::duplicateEmailMessage((string) $data['email'], $other));
             Flash::setOld($_POST);
             header("Location: /clients/{$source['id']}/duplicate");
             return;
@@ -261,6 +274,12 @@ final class ClientController
             'country_of_destination' => trim((string) ($_POST['country_of_destination'] ?? '')) ?: null,
             'coo_type'              => LookupRepository::sanitizeOption('coo_type', trim((string) ($_POST['coo_type'] ?? ''))) ?: null,
         ], self::collectPartyFields());
+
+        if ($other = ClientRepository::findOtherWithEmail($data['email'] ?? null, $clientId)) {
+            Flash::set('error', ClientRepository::duplicateEmailMessage((string) $data['email'], $other));
+            header("Location: /clients/{$clientId}/edit");
+            return;
+        }
 
         $changes = array_filter(
             array_map(

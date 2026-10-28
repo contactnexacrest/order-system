@@ -55,6 +55,13 @@ async function store(req, res) {
   }
 
   const data = await collectClientFields(req, companyLegalName, billingAddress);
+  const other = await clientRepository.findOtherWithEmail(data.email);
+  if (other) {
+    flash.set(req, 'error', clientRepository.duplicateEmailMessage(data.email, other));
+    flash.setOld(req, req.body);
+    res.redirect('/clients/create');
+    return;
+  }
   const clientUniqueNumber = await referenceNumberService.generateClientUniqueNumber();
   const clientId = await clientRepository.create(data, user.id, clientUniqueNumber);
   if (await testModeService.isEnabled()) {
@@ -113,6 +120,14 @@ async function duplicateStore(req, res) {
 
   if (isIdenticalToSource(data, source)) {
     flash.set(req, 'error', 'Change at least one detail before saving a duplicate — if nothing is different, there is no need for a new client record.');
+    flash.setOld(req, req.body);
+    res.redirect(`/clients/${source.id}/duplicate`);
+    return;
+  }
+
+  const other = await clientRepository.findOtherWithEmail(data.email);
+  if (other) {
+    flash.set(req, 'error', clientRepository.duplicateEmailMessage(data.email, other));
     flash.setOld(req, req.body);
     res.redirect(`/clients/${source.id}/duplicate`);
     return;
@@ -251,6 +266,13 @@ async function update(req, res) {
     coo_type: (await lookupRepository.sanitizeOption('coo_type', String(req.body.coo_type || '').trim())) || null,
     ...collectPartyFields(req),
   };
+
+  const other = await clientRepository.findOtherWithEmail(data.email, clientId);
+  if (other) {
+    flash.set(req, 'error', clientRepository.duplicateEmailMessage(data.email, other));
+    res.redirect(`/clients/${clientId}/edit`);
+    return;
+  }
 
   const user = req.user;
   const changes = Object.keys(data)

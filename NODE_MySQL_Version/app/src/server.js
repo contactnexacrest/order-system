@@ -787,6 +787,7 @@ app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('cl
 // vs. confirming-usable is the same record/clear duty split either way.
 app.post('/orders/:id/payment/lc', requireAuth, requirePermission('manage_payments'), upload.single('lc_file'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordLcDetails));
 app.post('/orders/:id/payment/lc/confirm-usable', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.confirmLcUsable));
+app.post('/orders/:id/payment-terms/approve', requireAuth, requirePermission('approve_payment_terms'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.approvePaymentTerms));
 app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
 app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_disputes'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));
 
@@ -864,7 +865,7 @@ app.post('/orders/:id/compliance-tasks/mark-all-na', requireAuth, requirePermiss
 
 app.post('/orders/:id/documents/generate', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.generate));
 app.post('/orders/:id/documents/:documentId/delete', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.deleteDraft));
-app.get('/documents/:documentId/download', requireAuth, requirePermission('download_pdf'), asyncHandler(documentController.download));
+app.get('/documents/:documentId/download', requireAuth, requirePermissionAny(['download_pdf', 'view_cafin']), asyncHandler(documentController.download));
 // Batch 3 #13b/#13a — widened so a view-only visitor (view_orders/view_clients) can open what they can already see listed on the order/client page.
 app.get('/file-store/:id/download', requireAuth, requirePermissionAny(['manage_orders', 'view_orders', 'view_clients']), asyncHandler(fileStoreController.download));
 

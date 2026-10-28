@@ -7,6 +7,7 @@ const orderCommentRepository = require('../repositories/orderCommentRepository')
 const orderRepository = require('../repositories/orderRepository');
 const fileUploadService = require('../services/fileUploadService');
 const orderCommentService = require('../services/orderCommentService');
+const emailDispatchService = require('../services/emailDispatchService');
 
 /** docs/schema.sql Section AI — staff side of the order progress chat. */
 
@@ -32,7 +33,10 @@ async function post(req, res) {
       'Order Update Attachment'
     );
     await orderCommentService.postAsStaff(orderId, req.user.id, body !== '' ? body : null, fileIds);
-    flash.set(req, 'success', 'Posted — the client has been emailed.');
+    // QA Round 5, R5-16: with email sending off, nothing was emailed — say so.
+    flash.set(req, 'success', (await emailDispatchService.mailSendingEnabled())
+      ? 'Posted — the client has been emailed.'
+      : 'Posted to the client portal. Email sending is turned off, so the client was NOT emailed — tell them yourself if it is urgent.');
   } catch (e) {
     flash.setErrorFromException(req, e);
   }
