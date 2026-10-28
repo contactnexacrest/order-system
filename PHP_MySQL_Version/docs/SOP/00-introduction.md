@@ -268,7 +268,7 @@ step-card still opens and closes with a plain click, and nothing is
 hidden behind a script that isn't there as a backup. Across the **top of
 the page**, above the step-cards (owner request 2026-10-27, so the
 step-cards and document tables get the full width), sit the "At a
-Glance" summary, the CAFIN box (Admin/MD/ED only — see [CA
+Glance" summary, the CAFIN box (only for holders of "View & download CAFIN" — see [CA
 Overview](./ca-01-overview.md)) and an **▸ All Documents (N) — quick
 links** button that opens the list of documents generated so far.
 

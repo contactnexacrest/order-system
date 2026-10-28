@@ -145,6 +145,13 @@ not one:
    document gate above, for the rare case something genuinely can't be
    resolved and the order needs closing anyway.
 
+   Once the order is settled, the final internal financial annexure
+   (CAFIN) is **generated automatically** (owner decision 2026-10-28) —
+   with the government benefits received, or without them if the order
+   was not eligible. It is never shown to the client. If it cannot be
+   generated, the order is still settled and a warning asks you to
+   generate it from the CAFIN box (see [CA Overview](./ca-01-overview.md)).
+
 The practical effect: a client never sees or cares about this internal
 distinction, but staff can despatch documents and move on the moment
 they're couriered, without the order sitting open indefinitely just

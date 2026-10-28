@@ -27,6 +27,20 @@ final class EmailDispatchController
     {
         $orderId = (int) $params['id'];
         $documentId = (int) $params['documentId'];
+        // QA Round 5, R5-23: an internal document (CAFIN, Supplier PO, BL
+        // instructions, ...) can never be sent to the buyer, so its send
+        // screen is never offered — same rule requestSend() enforces.
+        $document = DocumentRepository::find($documentId);
+        if (!$document || (int) $document['order_id'] !== $orderId) {
+            http_response_code(404);
+            echo 'Document not found.';
+            return;
+        }
+        if (!empty($document['document_type_never_shown_to_buyer'])) {
+            Flash::set('error', $document['document_type_name'] . ' is an internal document and can never be sent to the buyer.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $this->renderCompose($orderId, $documentId);
     }
 

@@ -4034,8 +4034,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </div>
       </div>
 
-      <?php if ($canManageOrderFinancials): ?>
-      <?php // Owner request (2026-10-27): CAFIN can be generated whenever it is wanted — at any stage, no "enable" step. ?>
+      <?php if ($canViewCafin): ?>
+      <?php // Owner request (2026-10-27): CAFIN can be generated whenever it is wanted — at any stage, no "enable" step. Shown to view_cafin holders (owner decision 2026-10-28). ?>
       <div class="sidebar-panel sidebar-cafin" id="order-cafin">
         <h3>Internal Financial Annexure (CAFIN) <span class="badge badge-internal">INTERNAL ONLY — never shown to the client</span></h3>
         <div class="sidebar-cafin-row">

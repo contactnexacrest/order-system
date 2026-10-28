@@ -25,9 +25,9 @@ use App\Tests\Support\DbTestCase;
  *     'internal', same mechanism as SUPPO/BLI/COOPREP/AMD),
  *   - excluded from the general staff dossier ZIP (which needs only the
  *     much broader manage_orders permission), and
- *   - gated by ca_module_view specifically on the generic document
- *     download route, so a staff member without any CA permission can't
- *     fetch it just by knowing/guessing its document id.
+ *   - gated by view_cafin (owner decision 2026-10-28) on every download
+ *     route and on the order page, so a staff member without it can't
+ *     see or fetch it just by knowing/guessing its document or file id.
  */
 final class CaInternalDocTest extends DbTestCase
 {
@@ -213,10 +213,10 @@ final class CaInternalDocTest extends DbTestCase
         @unlink($file['server_path']);
     }
 
-    public function testDocumentDownloadRefusesCafinWithoutCaModuleView(): void
+    public function testDocumentDownloadRefusesCafinWithoutViewCafin(): void
     {
         // Export Executive holds download_pdf (the route-level permission
-        // for /documents/{id}/download) but NOT ca_module_view — proving
+        // for /documents/{id}/download) but NOT view_cafin — proving
         // the CAFIN-specific in-method check is what actually blocks this,
         // not the route's own broader gate.
         $userId = $this->createTestUser('Export Executive');
@@ -237,11 +237,11 @@ final class CaInternalDocTest extends DbTestCase
         @unlink($file['server_path']);
     }
 
-    public function testDocumentDownloadAllowsCafinWithCaModuleView(): void
+    public function testDocumentDownloadAllowsCafinWithViewCafin(): void
     {
-        // Accounts Executive holds ca_module_view (but NOT
+        // Accounts Executive holds view_cafin (but NOT
         // ca_internal_doc_manage) — proving download access only needs
-        // the view permission, never the toggle/generate one.
+        // the view permission, never the generate one.
         $adminId = $this->createTestUser('Admin');
         $viewerId = $this->createTestUser('Accounts Executive');
         $orderId = $this->createTestOrder($this->createTestClient());
@@ -286,13 +286,13 @@ final class CaInternalDocTest extends DbTestCase
     }
 
     /**
-     * docs/schema.sql Section AP tightened this further: the whole Order
-     * Financials panel (not just the CAFIN toggle inside it) now requires
+     * docs/schema.sql Section AP: the Order Financials panel requires
      * manage_order_financials, which Accounts Executive does NOT get by
-     * default (unlike the broader ca_module_view it does hold) — so this
-     * viewer sees none of the panel at all, CAFIN sub-section included.
+     * default. The CAFIN box is separate (owner decision 2026-10-28): it
+     * follows view_cafin, which Accounts Executive holds by default — so
+     * this viewer sees the CAFIN box, read-only, but not Order Financials.
      */
-    public function testOrderShowPageHidesTheWholePanelFromANonPrivilegedCaViewer(): void
+    public function testAnAccountsExecutiveSeesTheCafinBoxButNotOrderFinancials(): void
     {
         $userId = $this->createTestUser('Accounts Executive');
         $orderId = $this->createTestOrder($this->createTestClient());
@@ -303,9 +303,125 @@ final class CaInternalDocTest extends DbTestCase
         $controller->show(['id' => (string) $orderId]);
         $output = ob_get_clean();
 
-        self::assertStringNotContainsString('id="order-cafin"', $output);
-        self::assertStringNotContainsString('Internal Financial Annexure (CAFIN)', $output);
+        self::assertStringContainsString('id="order-cafin"', $output);
+        self::assertStringNotContainsString('Generate CAFIN now (PDF)', $output);
         self::assertStringNotContainsString('Order Financials', $output);
+    }
+
+    /** Owner decision (2026-10-28): view_cafin can be taken away from one person (e.g. a CA after an audit). */
+    public function testRemovingViewCafinFromAPersonHidesTheBoxAndTheDocument(): void
+    {
+        $adminId = $this->createTestUser('Admin');
+        $userId = $this->createTestUser('Accounts Executive');
+        $pdo = Database::connection();
+        $permissionId = (int) $pdo->query("SELECT id FROM permissions WHERE permission_key = 'view_cafin'")->fetchColumn();
+        $pdo->prepare('INSERT INTO user_permissions (user_id, permission_id, is_enabled) VALUES (:user_id, :permission_id, 0)')
+            ->execute(['user_id' => $userId, 'permission_id' => $permissionId]);
+        \App\Services\PermissionService::resetCache();
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $result = DocumentGenerationService::generateCaInternalAnnexure($orderId, $adminId);
+
+        $_SESSION['_auth_user_id'] = $userId;
+        ob_start();
+        (new \App\Controllers\OrderController())->show(['id' => (string) $orderId]);
+        $output = ob_get_clean();
+
+        self::assertStringNotContainsString('id="order-cafin"', $output);
+        self::assertStringNotContainsString($result['document_reference'], $output);
+
+        @unlink(FileStoreRepository::find((int) $result['pdf_file_id'])['server_path']);
+    }
+
+    public function testTheSeedGivesViewCafinToAdminMdEdAccountsAndCaOnly(): void
+    {
+        $names = Database::connection()->query(
+            "SELECT r.name FROM role_permissions rp JOIN roles r ON r.id = rp.role_id JOIN permissions p ON p.id = rp.permission_id
+             WHERE p.permission_key = 'view_cafin' AND rp.is_enabled = 1 ORDER BY r.name"
+        )->fetchAll(\PDO::FETCH_COLUMN);
+        $expected = ['Accounts Executive', 'Admin', 'CA / Chartered Accountant', 'Executive Director', 'Managing Director'];
+        sort($expected);
+        sort($names);
+        self::assertSame($expected, $names);
+    }
+
+    /** QA Round 5, R5-21: /file-store/{id}/download applies the same gates. */
+    private function fileDownload(int $fileId, int $userId): int
+    {
+        http_response_code(200);
+        \App\Services\PermissionService::resetCache();
+        $_SESSION['_auth_user_id'] = $userId;
+        ob_start();
+        (new \App\Controllers\FileStoreController())->download(['id' => (string) $fileId]);
+        ob_end_clean();
+        return http_response_code();
+    }
+
+    public function testFileStoreDownloadRefusesTheCafinFileWithoutViewCafin(): void
+    {
+        $adminId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $result = DocumentGenerationService::generateCaInternalAnnexure($orderId, $adminId);
+
+        // Logistics Executive can open orders (view_all_orders) but holds no view_cafin.
+        $noCafinId = $this->createTestUser('Logistics Executive');
+        $this->assignIfNeeded($orderId, $noCafinId);
+        self::assertSame(403, $this->fileDownload((int) $result['pdf_file_id'], $noCafinId));
+        self::assertSame(200, $this->fileDownload((int) $result['pdf_file_id'], $this->createTestUser('Accounts Executive')));
+
+        @unlink(FileStoreRepository::find((int) $result['pdf_file_id'])['server_path']);
+    }
+
+    public function testFileStoreDownloadRefusesAFileOfAnOrderTheUserIsNotAssignedTo(): void
+    {
+        $userId = $this->createTestUser('Export Executive');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $fileId = $this->createTestFile($orderId);
+        file_put_contents(FileStoreRepository::find($fileId)['server_path'], '%PDF-test');
+
+        self::assertSame(403, $this->fileDownload($fileId, $userId));
+
+        Database::connection()->prepare('INSERT INTO order_assignees (order_id, user_id) VALUES (:o, :u)')->execute(['o' => $orderId, 'u' => $userId]);
+        self::assertSame(200, $this->fileDownload($fileId, $userId));
+
+        @unlink(FileStoreRepository::find($fileId)['server_path']);
+    }
+
+    public function testFileStoreDownloadRefusesARemovedFile(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $fileId = $this->createTestFile($orderId);
+        file_put_contents(FileStoreRepository::find($fileId)['server_path'], '%PDF-test');
+        Database::connection()->prepare('UPDATE file_store SET is_active = 0 WHERE id = :id')->execute(['id' => $fileId]);
+
+        self::assertSame(404, $this->fileDownload($fileId, $userId));
+
+        @unlink(FileStoreRepository::find($fileId)['server_path']);
+    }
+
+    /** QA Round 5, R5-23: an internal document's send screen is never offered. */
+    public function testTheEmailComposeScreenRefusesCafin(): void
+    {
+        $adminId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $result = DocumentGenerationService::generateCaInternalAnnexure($orderId, $adminId);
+        \App\Helpers\Flash::pull();
+
+        $_SESSION['_auth_user_id'] = $adminId;
+        ob_start();
+        (new \App\Controllers\EmailDispatchController())->compose(['id' => (string) $orderId, 'documentId' => (string) $result['document_id']]);
+        $output = ob_get_clean();
+
+        self::assertStringNotContainsString('<form', $output);
+        $flash = \App\Helpers\Flash::pull();
+        self::assertStringContainsString('internal document and can never be sent to the buyer', $flash[0]['message'] ?? '');
+
+        @unlink(FileStoreRepository::find((int) $result['pdf_file_id'])['server_path']);
+    }
+
+    private function assignIfNeeded(int $orderId, int $userId): void
+    {
+        Database::connection()->prepare('INSERT IGNORE INTO order_assignees (order_id, user_id) VALUES (:o, :u)')->execute(['o' => $orderId, 'u' => $userId]);
     }
 
     /**

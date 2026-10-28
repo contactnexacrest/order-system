@@ -40,6 +40,16 @@ async function index(req, res) {
   );
 }
 
+/**
+ * Owner decision (2026-10-28): CAFIN shows only to holders of the
+ * "View & download CAFIN" permission — the client and order reports list
+ * documents too, so it is taken out there as well.
+ */
+function withoutCafinUnlessAllowed(req, documents) {
+  if (req.permissions && req.permissions.view_cafin) return documents;
+  return documents.filter((d) => (d.document_type_code ?? d.type_code ?? '') !== 'CAFIN');
+}
+
 async function client(req, res) {
   const clientId = parseInt(req.params.clientId, 10);
   const data = await reportRepository.perClient(clientId);
@@ -47,6 +57,7 @@ async function client(req, res) {
     res.status(404).send('Client not found.');
     return;
   }
+  data.documents = withoutCafinUnlessAllowed(req, data.documents);
 
   if (req.query.format === 'csv') {
     const rows = data.orders.map((o) => ({
@@ -98,6 +109,7 @@ async function order(req, res) {
     res.status(404).send('Order not found.');
     return;
   }
+  data.documents = withoutCafinUnlessAllowed(req, data.documents);
 
   if (req.query.format === 'csv') {
     const { headers, rows } = orderAuditCsvRows(data.audit);

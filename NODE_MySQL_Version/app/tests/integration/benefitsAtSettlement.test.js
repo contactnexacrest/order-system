@@ -1,5 +1,12 @@
 'use strict';
 
+// Mark Fully Settled now also generates the final CAFIN (owner decision
+// 2026-10-28) — its PDF render is stubbed the same way caInternalDoc.test.js does.
+jest.mock('../../src/services/pdfRenderService', () => ({
+  renderPdfFromHtml: jest.fn().mockResolvedValue(Buffer.from('%PDF-fake')),
+  closeBrowser: jest.fn(),
+}));
+
 const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
@@ -87,6 +94,31 @@ describe('Benefits at settlement — Step 13g (owner decision 2026-10-27)', () =
     expect((await call(ordersController.markFullySettled, orderId, {})).message).toContain('still awaiting receipt (RODTEP)');
     await caExportBenefitRepository.markReceived(claimId, 9000, '2026-07-01');
     expect((await call(ordersController.markFullySettled, orderId, {})).type).toBe('success');
+  });
+
+  // Owner decision (2026-10-28): every settled order gets its final CAFIN automatically.
+  it('generates the final CAFIN automatically when the order is fully settled', async () => {
+    const orderId = await closedOrder();
+    await call(orderFinancialsController.skipExportBenefitClaim, orderId, { scheme_name: '', reason: 'Company decided not to file any claims' });
+    const req = { params: { id: String(orderId) }, user: { id: userId, role_id: null }, permissions: { close_orders: true }, body: {}, session: {} };
+    await ordersController.markFullySettled(req, res());
+    const messages = flash.pull(req);
+
+    expect((await orderRepository.find(orderId)).status).toBe('complete');
+    const cafin = await db.queryOne(
+      "SELECT d.document_reference FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE d.order_id = :id AND dt.code = 'CAFIN'",
+      { id: orderId }
+    );
+    expect(cafin).not.toBeNull();
+    expect(messages.map((m) => m.message)).toEqual([
+      'Order fully settled and closed.',
+      `Final internal financial annexure generated automatically: ${cafin.document_reference}.`,
+    ]);
+    const audit = await db.queryOne(
+      "SELECT COUNT(*) AS c FROM audit_log WHERE action_type = 'CA_INTERNAL_DOC_AUTO_GENERATED' AND entity_id = :id",
+      { id: orderId }
+    );
+    expect(Number(audit.c)).toBe(1);
   });
 
   it('shows 13g before 13h on the order page', async () => {

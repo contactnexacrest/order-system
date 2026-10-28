@@ -122,16 +122,32 @@ mis-click could quietly undo), this is built as three separate,
 structural guarantees:
 
 1. **Behind its own permission, and available any time** (owner request
-   2026-10-27). The order page has a **CAFIN box at the top, under At a
-   Glance** — shown only to staff with the Order Financials permission
-   (Admin, MD and ED by default). Someone who also holds
-   `ca_internal_doc_manage` sees one **Generate CAFIN now (PDF)** button
-   there, at any stage of the order — including after it is closed or
-   locked (benefits are often credited months later). There is no
-   per-order "enable" tick any more. The box also links the latest CAFIN;
-   anyone in it without `ca_internal_doc_manage` sees "Only Admin/MD/ED
-   (or someone specifically granted the permission) can generate it."
-   Step 12c simply points to the box.
+   2026-10-27; permission split out 2026-10-28). The order page has a
+   **CAFIN box at the top, under At a Glance** — shown only to staff with
+   the **View & download CAFIN** permission (`view_cafin`). By default
+   that is Admin, MD, ED, Accounts Executive and CA / Chartered
+   Accountant; Admin can give it to, or take it from, any role or any one
+   person under **Admin → Roles & Permissions** (for example, grant it to
+   the CA for an audit and remove it afterwards). Without it, the box,
+   CAFIN in every document list and every CAFIN download are all hidden or
+   refused. Someone who also holds `ca_internal_doc_manage` (Admin, MD and
+   ED by default) sees one **Generate CAFIN now (PDF)** button there, at
+   any stage of the order — including after it is closed or locked
+   (benefits are often credited months later). There is no per-order
+   "enable" tick any more. The box also links the latest CAFIN; anyone in
+   it without `ca_internal_doc_manage` sees "Only Admin/MD/ED (or someone
+   specifically granted the permission) can generate it." Step 12c simply
+   points to the box.
+
+   **Generated automatically at Mark Fully Settled** (owner decision
+   2026-10-28). When an order is marked fully settled (Step 13h), the
+   final CAFIN is generated at once — every payment, bill, expense and
+   benefit is final by then. Government benefits received appear in it;
+   if the order was not eligible, or the benefit was skipped, it is still
+   generated, without them. The confirmation reads "Final internal
+   financial annexure generated automatically: …". If generation fails,
+   the order is still settled and a warning asks you to generate it from
+   the CAFIN box. The manual button stays for any later regeneration.
 2. **A different document type entirely.** The generated PDF (document
    type code `CAFIN`) is not a variant of any buyer-facing document — it
    is its own internal-only document type, using the exact same
@@ -145,20 +161,19 @@ structural guarantees:
    "INTERNAL USE ONLY — NOT FOR CLIENT / BUYER" banner top and bottom, no
    shared header/logo/signature-block styling with any buyer document, so
    it could never be mistaken for one even printed on paper.
-3. **Viewing it needs `ca_module_view`, specifically — even on the
-   generic download link.** Once generated, anyone with `ca_module_view`
-   can open it (the CAFIN box shows the latest one generated, with its
-   reference and date) — the same permission that already lets
-   them see this data on-screen, so this adds no new exposure. But the
-   system's one generic "download any document" link is normally gated
-   only by the much broader "Download PDF" permission most staff hold —
-   for this one document type specifically, that link additionally
-   refuses anyone who doesn't hold `ca_module_view`, so a staff member
-   without any CA access can't fetch it just by knowing or guessing its
-   document ID. It's also deliberately left out of the "download
-   everything for this order" dossier ZIP staff use for handovers/
-   archiving, for the same reason — that ZIP only requires the broad
-   "manage orders" permission.
+3. **Viewing it needs `view_cafin`, on every path.** Once generated,
+   anyone with `view_cafin` can open it (the CAFIN box shows the latest
+   one generated, with its reference and date). The system's generic
+   "download any document" link and its generic file link are normally
+   gated only by much broader permissions most staff hold — for this one
+   document type, both additionally refuse anyone who doesn't hold
+   `view_cafin`, so a staff member without it can't fetch it just by
+   knowing or guessing its document or file ID (QA Round 5, R5-21). The
+   file link also refuses a removed file, and a file of an order the user
+   may not open. CAFIN never has a "send to buyer" screen (R5-23). It's
+   also deliberately left out of the "download everything for this order"
+   dossier ZIP staff use for handovers/archiving, for the same reason —
+   that ZIP only requires the broad "manage orders" permission.
 4. **Supplier cost is invisible to the template-assembly step itself for
    every other document type** (added alongside Order Financials) — not
    just kept off the client portal's document list. Every generated

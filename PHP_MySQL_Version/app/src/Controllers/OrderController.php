@@ -846,30 +846,18 @@ final class OrderController
         $actor = AuthService::currentUser();
         $actorRoleId = $actor['role_id'] !== null ? (int) $actor['role_id'] : null;
 
-        // Archiving only removes an order from the default listing — direct
-        // access by URL/bookmark still needs its own gate, or
-        // view_archived_orders would be meaningless (Super Admin already
-        // bypasses every permission).
-        if ((int) $order['is_archived'] === 1) {
-            $canView = PermissionService::can((int) $actor['id'], $actorRoleId, 'view_archived_orders');
-            if (!$canView) {
-                http_response_code(403);
-                echo 'This order has been archived. You need the "View archived orders" permission to open it.';
-                return;
-            }
-        }
-
-        // Order ownership / assignment visibility — a guessed/bookmarked
-        // URL must not bypass the same scoping the Orders list and Kanban
-        // board already apply. Visibility only: this never touches who may
-        // act on a step (manage_payments/clear_payments/manage_shipping/
-        // etc. are unaffected and checked exactly as before, below).
-        $seesAllOrders = PermissionService::can((int) $actor['id'], $actorRoleId, 'view_all_orders');
-        if (!$seesAllOrders && !OrderAssigneeRepository::isAssignedTo($orderId, (int) $actor['id'])) {
+        // Archiving only removes an order from the default listing, and a
+        // guessed/bookmarked URL must not bypass the order-assignment
+        // scoping the Orders list and Kanban board apply — both checked in
+        // OrderAccessService, shared with the file download route.
+        // Visibility only: never decides who may act on a step.
+        $accessDenied = \App\Services\OrderAccessService::denialReason($order, (int) $actor['id'], $actorRoleId);
+        if ($accessDenied !== null) {
             http_response_code(403);
-            echo 'This order is assigned to a different user. You can only open orders assigned to you.';
+            echo $accessDenied;
             return;
         }
+        $seesAllOrders = PermissionService::can((int) $actor['id'], $actorRoleId, 'view_all_orders');
         $canAssignOwner = PermissionService::can((int) $actor['id'], $actorRoleId, 'assign_order_owner');
 
         // CA / Accounting module (Phase 1) — INR-actual settlement widgets
@@ -901,7 +889,13 @@ final class OrderController
             $stageByNumber[(int) $s['stage_number']] = $s;
         }
 
+        // Owner decision (2026-10-28): CAFIN is only listed for people
+        // holding view_cafin — everyone else never sees that one exists.
+        $canViewCafin = PermissionService::can((int) $actor['id'], $actorRoleId, 'view_cafin');
         $documents = DocumentRepository::forOrder($orderId);
+        if (!$canViewCafin) {
+            $documents = array_values(array_filter($documents, static fn (array $d): bool => $d['document_type_code'] !== 'CAFIN'));
+        }
         $reviewsByDocument = [];
         $crossVerificationsByDocument = [];
         foreach ($documents as $d) {
@@ -1031,7 +1025,8 @@ final class OrderController
             'orderBenefitClaims' => $canManageOrderFinancials ? CaExportBenefitRepository::forOrder($orderId) : [],
             'linkedCaExpenses' => $canViewCaLinks ? CaExpenseRepository::forOrder($orderId) : [],
             'canManageCaInternalDoc' => $canManageCaInternalDoc,
-            'caInternalDoc' => $canViewCaLinks ? DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CAFIN') : null,
+            'canViewCafin' => $canViewCafin,
+            'caInternalDoc' => $canViewCafin ? DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CAFIN') : null,
             'canManageOrderFinancials' => $canManageOrderFinancials,
             'orderCostEntries' => $canManageOrderFinancials ? OrderCostEntryRepository::forOrder($orderId) : [],
             'costEntryCategories' => OrderCostEntryRepository::CATEGORIES,
@@ -3387,6 +3382,18 @@ final class OrderController
         OrderRepository::markComplete($orderId);
         AuditLogRepository::log((int) $user['id'], 'ORDER_FULLY_SETTLED', 'orders', $orderId, 'status', 'shipped_docs_sent', 'complete', $allowOverride ? $overrideReason : null);
         Flash::set('success', 'Order fully settled and closed.');
+        // Owner decision (2026-10-28): every settled order gets its final
+        // CAFIN automatically — all payments, bills, expenses and benefits
+        // are final by now. Never blocks settlement: if it fails, staff
+        // are told to generate it from the CAFIN box.
+        try {
+            $cafin = \App\Services\DocumentGenerationService::generateCaInternalAnnexure($orderId, (int) $user['id']);
+            AuditLogRepository::log((int) $user['id'], 'CA_INTERNAL_DOC_AUTO_GENERATED', 'orders', $orderId, 'document_reference', null, $cafin['document_reference'], 'Generated automatically when the order was fully settled');
+            Flash::set('success', "Final internal financial annexure generated automatically: {$cafin['document_reference']}.");
+        } catch (\Throwable $e) {
+            error_log('[CAFIN AUTO-GENERATION FAILED] order=' . $orderId . ' — ' . $e->getMessage());
+            Flash::set('warning', 'The order is settled, but the internal financial annexure (CAFIN) could not be generated automatically — generate it from the CAFIN box at the top of the order.');
+        }
         header("Location: /orders/{$orderId}");
     }
 

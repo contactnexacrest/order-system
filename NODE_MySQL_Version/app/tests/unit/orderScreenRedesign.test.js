@@ -198,7 +198,7 @@ describe('Order screen redesign (Point 2/4)', () => {
     const html = showNjk();
     const box = html.indexOf('id="order-cafin"');
     expect(box).toBeGreaterThan(html.indexOf('id="order-detail-sidebar"'));
-    expect(html).toContain('{% if canManageOrderFinancials %}\n      {# Owner request (2026-10-27): CAFIN');
+    expect(html).toContain('{% if canViewCafin %}\n      {# Owner request (2026-10-27): CAFIN');
     expect(html).toContain('Generate CAFIN now (PDF)');
     expect(html).not.toContain('Enable internal financial annexure for this order');
   });

@@ -48,6 +48,7 @@ final class ReportController
             echo 'Client not found.';
             return;
         }
+        $data['documents'] = self::withoutCafinUnlessAllowed($data['documents']);
 
         if (($_GET['format'] ?? '') === 'csv') {
             $rows = array_map(static fn(array $o): array => [
@@ -68,6 +69,22 @@ final class ReportController
         View::render('reports/client', $data + ['canViewFullEmail' => $canViewFullEmail], 'layout/base');
     }
 
+    /**
+     * Owner decision (2026-10-28): CAFIN is listed only for people holding
+     * view_cafin, in reports as on the order page.
+     *
+     * @param array<int, array<string,mixed>> $documents
+     * @return array<int, array<string,mixed>>
+     */
+    private static function withoutCafinUnlessAllowed(array $documents): array
+    {
+        $user = \App\Services\AuthService::currentUser();
+        if ($user && \App\Services\PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'view_cafin')) {
+            return $documents;
+        }
+        return array_values(array_filter($documents, static fn (array $d): bool => ($d['document_type_code'] ?? $d['type_code'] ?? '') !== 'CAFIN'));
+    }
+
     public function order(array $params): void
     {
         $orderId = (int) $params['orderId'];
@@ -77,6 +94,7 @@ final class ReportController
             echo 'Order not found.';
             return;
         }
+        $data['documents'] = self::withoutCafinUnlessAllowed($data['documents']);
 
         if (($_GET['format'] ?? '') === 'csv') {
             ['headers' => $headers, 'rows' => $csvRows] = self::orderAuditCsvRows($data['audit']);

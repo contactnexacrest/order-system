@@ -93,6 +93,28 @@ final class BenefitsAtSettlementTest extends DbTestCase
         self::assertSame('complete', OrderRepository::find($this->orderId)['status']);
     }
 
+    /** Owner decision (2026-10-28): every settled order gets its final CAFIN automatically. */
+    public function testSettlingGeneratesTheFinalCafinAutomatically(): void
+    {
+        $this->skip(['scheme_name' => '', 'reason' => 'Company decided not to file any claims']);
+        $_POST = [];
+        ob_start();
+        (new OrderController())->markFullySettled(['id' => (string) $this->orderId]);
+        ob_end_clean();
+        $messages = array_column(Flash::pull(), 'message');
+
+        self::assertSame('complete', OrderRepository::find($this->orderId)['status']);
+        $cafin = \App\Repositories\DocumentRepository::findLatestForOrderAndTypeCode($this->orderId, 'CAFIN');
+        self::assertNotNull($cafin);
+        self::assertSame([
+            'Order fully settled and closed.',
+            "Final internal financial annexure generated automatically: {$cafin['document_reference']}.",
+        ], $messages);
+        $stmt = \App\Config\Database::connection()->prepare("SELECT COUNT(*) FROM audit_log WHERE action_type = 'CA_INTERNAL_DOC_AUTO_GENERATED' AND entity_id = :id");
+        $stmt->execute(['id' => $this->orderId]);
+        self::assertSame(1, (int) $stmt->fetchColumn());
+    }
+
     public function testAReceivedClaimSettlesAndAWaitingOneBlocks(): void
     {
         $claimId = CaExportBenefitRepository::record($this->orderId, 'RODTEP', 'SB-1', 9000, '2026-06-20', 'INR', null, $this->userId);

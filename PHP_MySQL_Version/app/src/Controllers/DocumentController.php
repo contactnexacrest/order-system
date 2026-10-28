@@ -167,10 +167,11 @@ final class DocumentController
         // already carries everywhere else it's shown, so a staff member
         // without any CA permission can't fetch it just by knowing/
         // guessing its document id.
+        // Owner decision (2026-10-28): its own permission, view_cafin.
         if ($document['document_type_code'] === 'CAFIN') {
             $user = AuthService::currentUser();
             $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-            if (!PermissionService::can((int) $user['id'], $roleId, 'ca_module_view')) {
+            if (!PermissionService::can((int) $user['id'], $roleId, 'view_cafin')) {
                 http_response_code(403);
                 echo 'You do not have permission to view this document.';
                 return;

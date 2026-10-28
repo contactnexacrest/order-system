@@ -19,6 +19,19 @@ const emailDispatchService = require('../services/emailDispatchService');
 async function compose(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const documentId = parseInt(req.params.documentId, 10);
+  // QA Round 5, R5-23: an internal document (CAFIN, Supplier PO, BL
+  // instructions, ...) can never be sent to the buyer, so its send
+  // screen is never offered — same rule requestSend() enforces.
+  const document = await documentRepository.find(documentId);
+  if (!document || Number(document.order_id) !== orderId) {
+    res.status(404).send('Document not found.');
+    return;
+  }
+  if (Number(document.document_type_never_shown_to_buyer) === 1) {
+    flash.set(req, 'error', `${document.document_type_name} is an internal document and can never be sent to the buyer.`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await renderCompose(req, res, orderId, documentId);
 }
 

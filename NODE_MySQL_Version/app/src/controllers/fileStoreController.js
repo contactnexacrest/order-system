@@ -2,6 +2,8 @@
 
 const fs = require('fs');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
+const orderRepository = require('../repositories/orderRepository');
+const orderAccessService = require('../services/orderAccessService');
 
 /**
  * Real gap this closes: every "received" upload (dispute_document,
@@ -17,6 +19,29 @@ async function download(req, res) {
   const file = await fileStoreRepository.find(fileId);
   if (!file || !fs.existsSync(file.server_path)) {
     res.status(404).send('File is missing from storage.');
+    return;
+  }
+
+  // QA Round 5, R5-21: this route used to serve any file by its id.
+  // A removed file stays removed, an order's file needs the same
+  // access as the order page (assignment / view_all_orders, archived
+  // rule), and CAFIN needs view_cafin — the same gates as everywhere
+  // else these files are shown.
+  if (Number(file.is_active ?? 1) !== 1) {
+    res.status(404).send('This file has been removed.');
+    return;
+  }
+  const permissions = req.permissions || {};
+  if (file.order_id) {
+    const order = await orderRepository.find(Number(file.order_id));
+    const denied = order ? await orderAccessService.denialReason(order, req.user.id, permissions) : null;
+    if (denied !== null) {
+      res.status(403).send(denied);
+      return;
+    }
+  }
+  if ((await fileStoreRepository.documentTypeCodeFor(fileId)) === 'CAFIN' && !permissions.view_cafin) {
+    res.status(403).send('You do not have permission to view this document.');
     return;
   }
 

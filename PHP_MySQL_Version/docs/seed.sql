@@ -75,6 +75,7 @@ INSERT INTO permissions (permission_key, name, description, category) VALUES
   ('close_orders',               'Close or mark an order lost',    'Close a fully-despatched order or mark one lost — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer close an order.', 'orders'),
   ('data_export_run',            'Export database structure/data', 'Download a full structure-only and data-only dump of the live database, to migrate all historical records into a fresh reinstall. Kept separate from manage_company_settings since it can expose every record, including staff password hashes.', 'admin'),
   ('ca_internal_doc_manage',      'Manage internal CA financial annexure', 'Toggle the internal-only CA Financial Annexure (govt export benefits + expenses) for an order and generate it. Not auto-granted to Accounts Executive/CA roles — only Admin/MD/ED and Super Admin get it by default.', 'ca'),
+  ('view_cafin',                  'View & download CAFIN',          'See and download the internal CA Financial Annexure (CAFIN): the CAFIN box on the order page and CAFIN in document lists. Never reaches the client. Grant or remove per role or per person (e.g. a CA during an audit).', 'ca'),
   ('manage_disputes',             'Manage disputes',                'View/raise/update a dispute''s status, attach evidence, and enable/disable the client-facing dispute button. Not auto-inherited from manage_orders — only Admin/MD/ED and Super Admin get it by default.', 'orders'),
   ('respond_to_disputes',         'Respond to disputes',            'Post a reply in a dispute''s reply thread — kept separate from manage_disputes so sales roles can answer without also managing dispute status or the button.', 'orders'),
   ('manage_complaints',           'Manage complaints',              'View complaints, acknowledge/resolve them, and log one on a client''s behalf. Not auto-inherited from manage_orders — only Admin/MD/ED and Super Admin get it by default, same tier as manage_disputes.', 'orders'),
@@ -111,7 +112,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'Accounts Executive'
-  AND p.permission_key IN ('manage_orders','manage_payments','clear_payments','manage_supplier_payments','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit','ca_module_manage','ca_fy_lock_override','override_buyer_acknowledgment','view_all_orders');
+  AND p.permission_key IN ('view_cafin','manage_orders','manage_payments','clear_payments','manage_supplier_payments','download_pdf','view_reports','view_client_email_full','cross_verify_documents','view_product_catalog','browse_product_catalog','view_product_pricing','view_archived_orders','ca_module_view','inr_actual_view','inr_actual_edit','ca_module_manage','ca_fy_lock_override','override_buyer_acknowledgment','view_all_orders');
 
 INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
@@ -129,7 +130,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'CA / Chartered Accountant'
-  AND p.permission_key IN ('ca_module_view','inr_actual_view');
+  AND p.permission_key IN ('ca_module_view','inr_actual_view','view_cafin');
 
 -- ================================================================
 -- USERS — one seeded account to get in the door.

@@ -24,6 +24,9 @@ const caController = require('../../src/controllers/caController');
 const documentController = require('../../src/controllers/documentController');
 const ordersController = require('../../src/controllers/ordersController');
 const auditLogRepository = require('../../src/repositories/auditLogRepository');
+const fileStoreController = require('../../src/controllers/fileStoreController');
+const emailDispatchController = require('../../src/controllers/emailDispatchController');
+const flash = require('../../src/helpers/flash');
 const { createTestClient, createTestOrder, createTestFile } = require('../support/fixtures');
 
 /**
@@ -37,9 +40,9 @@ const { createTestClient, createTestOrder, createTestFile } = require('../suppor
  *     'internal', same mechanism as SUPPO/BLI/COOPREP/AMD),
  *   - excluded from the general staff dossier ZIP (which needs only the
  *     much broader manage_orders permission), and
- *   - gated by ca_module_view specifically on the generic document
- *     download route, so a staff member without any CA permission can't
- *     fetch it just by knowing/guessing its document id.
+ *   - gated by view_cafin (owner decision 2026-10-28) on every download
+ *     route and on the order page, so a staff member without it can't
+ *     see or fetch it just by knowing/guessing its document or file id.
  */
 describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
   afterAll(async () => {
@@ -240,17 +243,18 @@ describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
     fs.unlinkSync(file.server_path);
   });
 
-  it('document download refuses CAFIN without ca_module_view', async () => {
+  it('document download refuses CAFIN without view_cafin', async () => {
     // Export Executive holds download_pdf (the route-level permission for
-    // /documents/:id/download) but NOT ca_module_view — proving the
+    // /documents/:id/download) but NOT view_cafin — proving the
     // CAFIN-specific in-controller check is what actually blocks this,
-    // not the route's own broader gate.
+    // not the route's own broader gate. Owner decision (2026-10-28):
+    // ca_module_view alone is no longer enough either.
     const userId = await createTestUser('Export Executive');
     const orderId = await createTestOrder(await createTestClient());
     await orderRepository.setCaInternalDocEnabled(orderId, true);
     const result = await documentGenerationService.generateCaInternalAnnexure(orderId, userId);
 
-    const req = { params: { documentId: String(result.document_id) }, query: {}, permissions: {} };
+    const req = { params: { documentId: String(result.document_id) }, query: {}, permissions: { ca_module_view: true } };
     const res = fakeRes();
     await documentController.download(req, res);
 
@@ -261,16 +265,16 @@ describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
     fs.unlinkSync(file.server_path);
   });
 
-  it('document download allows CAFIN with ca_module_view', async () => {
-    // Accounts Executive holds ca_module_view (but NOT
+  it('document download allows CAFIN with view_cafin', async () => {
+    // Accounts Executive holds view_cafin (but NOT
     // ca_internal_doc_manage) — proving download access only needs the
-    // view permission, never the toggle/generate one.
+    // view permission, never the generate one.
     const adminId = await createTestUser('Admin');
     const orderId = await createTestOrder(await createTestClient());
     await orderRepository.setCaInternalDocEnabled(orderId, true);
     const result = await documentGenerationService.generateCaInternalAnnexure(orderId, adminId);
 
-    const req = { params: { documentId: String(result.document_id) }, query: {}, permissions: { ca_module_view: true } };
+    const req = { params: { documentId: String(result.document_id) }, query: {}, permissions: { view_cafin: true } };
     const res = fakeDownloadRes();
     const finished = new Promise((resolve) => res.on('finish', resolve));
     await documentController.download(req, res);
@@ -303,5 +307,107 @@ describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
 
     expect(res.renderedData.canViewCaLinks).toBe(true);
     expect(res.renderedData.canManageCaInternalDoc).toBe(false);
+  });
+
+  // Owner decision (2026-10-28): "View & download CAFIN" (view_cafin) decides
+  // who sees the CAFIN box and CAFIN in the document lists.
+  it('order show page hides the CAFIN box and the CAFIN document without view_cafin', async () => {
+    const adminId = await createTestUser('Admin');
+    const orderId = await createTestOrder(await createTestClient());
+    const result = await documentGenerationService.generateCaInternalAnnexure(orderId, adminId);
+
+    const hidden = fakeRes();
+    await ordersController.show({ params: { id: String(orderId) }, permissions: { ca_module_view: true, manage_order_financials: true, view_all_orders: true }, session: {} }, hidden);
+    expect(hidden.renderedData.canViewCafin).toBe(false);
+    expect(hidden.renderedData.caInternalDoc).toBeNull();
+    expect(hidden.renderedData.documents.map((d) => d.document_type_code)).not.toContain('CAFIN');
+
+    const shown = fakeRes();
+    await ordersController.show({ params: { id: String(orderId) }, permissions: { view_cafin: true, view_all_orders: true }, session: {} }, shown);
+    expect(shown.renderedData.canViewCafin).toBe(true);
+    expect(shown.renderedData.caInternalDoc.document_reference).toBe(result.document_reference);
+    expect(shown.renderedData.documents.map((d) => d.document_type_code)).toContain('CAFIN');
+
+    fs.unlinkSync((await fileStoreRepository.find(result.pdf_file_id)).server_path);
+  });
+
+  it('the seed gives view_cafin to Admin, MD, ED, Accounts Executive and CA only', async () => {
+    const rows = await db.query(
+      `SELECT r.name FROM role_permissions rp JOIN roles r ON r.id = rp.role_id JOIN permissions p ON p.id = rp.permission_id
+       WHERE p.permission_key = 'view_cafin' AND rp.is_enabled = 1 ORDER BY r.name`
+    );
+    expect(rows.map((r) => r.name).sort()).toEqual(['Accounts Executive', 'Admin', 'CA / Chartered Accountant', 'Executive Director', 'Managing Director'].sort());
+  });
+
+  // QA Round 5, R5-21: /file-store/:id/download applies the same gates.
+  describe('file-store download (QA Round 5, R5-21)', () => {
+    async function fileDownload(fileId, user, permissions) {
+      const res = fakeDownloadRes();
+      const finished = new Promise((resolve) => res.on('finish', resolve));
+      await fileStoreController.download({ params: { id: String(fileId) }, user, permissions }, res);
+      if (res.statusCode === 200) await finished;
+      return res;
+    }
+
+    it('refuses the CAFIN file without view_cafin and serves it with it', async () => {
+      const adminId = await createTestUser('Admin');
+      const orderId = await createTestOrder(await createTestClient());
+      const result = await documentGenerationService.generateCaInternalAnnexure(orderId, adminId);
+
+      const refused = await fileDownload(result.pdf_file_id, { id: adminId }, { view_orders: true, view_all_orders: true, ca_module_view: true });
+      expect(refused.statusCode).toBe(403);
+
+      const allowed = await fileDownload(result.pdf_file_id, { id: adminId }, { view_orders: true, view_all_orders: true, view_cafin: true });
+      expect(allowed.statusCode).toBe(200);
+
+      fs.unlinkSync((await fileStoreRepository.find(result.pdf_file_id)).server_path);
+    });
+
+    it('refuses a file of an order the user is not assigned to', async () => {
+      const userId = await createTestUser('Export Executive');
+      const orderId = await createTestOrder(await createTestClient());
+      const fileId = await createTestFile(orderId, null);
+      fs.writeFileSync((await fileStoreRepository.find(fileId)).server_path, '%PDF-test');
+
+      const refused = await fileDownload(fileId, { id: userId }, { view_orders: true });
+      expect(refused.statusCode).toBe(403);
+      expect(String(refused.body)).toContain('assigned to a different user');
+
+      await db.execute('INSERT INTO order_assignees (order_id, user_id) VALUES (:o, :u)', { o: orderId, u: userId });
+      const allowed = await fileDownload(fileId, { id: userId }, { view_orders: true });
+      expect(allowed.statusCode).toBe(200);
+
+      fs.unlinkSync((await fileStoreRepository.find(fileId)).server_path);
+    });
+
+    it('refuses a removed (inactive) file', async () => {
+      const userId = await createTestUser('Admin');
+      const orderId = await createTestOrder(await createTestClient());
+      const fileId = await createTestFile(orderId, null);
+      fs.writeFileSync((await fileStoreRepository.find(fileId)).server_path, '%PDF-test');
+      await db.execute('UPDATE file_store SET is_active = 0 WHERE id = :id', { id: fileId });
+
+      const res = await fileDownload(fileId, { id: userId }, { view_orders: true, view_all_orders: true });
+      expect(res.statusCode).toBe(404);
+
+      fs.unlinkSync((await fileStoreRepository.find(fileId)).server_path);
+    });
+  });
+
+  // QA Round 5, R5-23: an internal document's send screen is never offered.
+  it('the email compose screen refuses CAFIN', async () => {
+    const adminId = await createTestUser('Admin');
+    const orderId = await createTestOrder(await createTestClient());
+    const result = await documentGenerationService.generateCaInternalAnnexure(orderId, adminId);
+
+    const req = { params: { id: String(orderId), documentId: String(result.document_id) }, query: {}, user: { id: adminId }, permissions: {}, session: {} };
+    const res = fakeRes();
+    await emailDispatchController.compose(req, res);
+
+    expect(res.renderedView).toBeUndefined();
+    expect(res.redirectedTo).toBe(`/orders/${orderId}`);
+    expect(flash.pull(req)[0].message).toContain('internal document and can never be sent to the buyer');
+
+    fs.unlinkSync((await fileStoreRepository.find(result.pdf_file_id)).server_path);
   });
 });

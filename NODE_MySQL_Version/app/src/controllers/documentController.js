@@ -158,7 +158,8 @@ async function download(req, res) {
   // data) — CAFIN specifically needs the same ca_module_view gate its data
   // already carries everywhere else it's shown, so a staff member without
   // any CA permission can't fetch it just by knowing/guessing its document id.
-  if (document.document_type_code === 'CAFIN' && (!req.permissions || !req.permissions.ca_module_view)) {
+  // Owner decision (2026-10-28): its own permission, view_cafin.
+  if (document.document_type_code === 'CAFIN' && (!req.permissions || !req.permissions.view_cafin)) {
     res.status(403).send('You do not have permission to view this document.');
     return;
   }

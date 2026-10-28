@@ -97,6 +97,7 @@ const uiTemplateController = require('./controllers/uiTemplateController');
 const accountController = require('./controllers/accountController');
 const superAdminOnly = require('./middleware/superAdminOnly');
 const clientAuth = require('./middleware/clientAuth');
+const saveSessionBeforeRedirect = require('./middleware/saveSessionBeforeRedirect');
 
 const app = express();
 // QA-5 TM-03/TM-05/PAR-02: Express matches routes case-insensitively by
@@ -323,6 +324,8 @@ app.use(session({
     maxAge: null, // session cookie — idle timeout is enforced in app logic (SessionAuth), not the cookie
   },
 }));
+// QA Round 5, R5-15: a redirect waits for the session (and its flash message) to be saved.
+app.use(saveSessionBeforeRedirect);
 
 // asyncHandler is declared further below (used by every route registration);
 // these three global middleware run earlier in the stack and need the same

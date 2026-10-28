@@ -200,7 +200,18 @@ async function removedAdditionalDocumentsForClient(clientId) {
   );
 }
 
+/** QA Round 5, R5-21: the document type of the generated document this file belongs to, if any. */
+async function documentTypeCodeFor(fileId) {
+  const rows = await db.query(
+    `SELECT dt.code FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
+     WHERE d.pdf_file_id = :pdf OR d.docx_file_id = :docx LIMIT 1`,
+    { pdf: fileId, docx: fileId }
+  );
+  return rows.length ? rows[0].code : null;
+}
+
 module.exports = {
+  documentTypeCodeFor,
   insertGenerated, insertReceived, find, forOrder, forOrderExcludingInternalCaDocs,
   markAsAdditionalDocument, additionalDocumentsForOrder, additionalDocumentsForClient, deactivate,
   removedAdditionalDocumentsForOrder, removedAdditionalDocumentsForClient,

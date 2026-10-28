@@ -603,7 +603,9 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await openStage(page, 9);
       const settleForm = page.locator(`form[action="/orders/${orderId}/mark-fully-settled"]`);
       await settleForm.getByRole('button', { name: 'Mark Fully Settled' }).click();
-      await expect(page.locator('.alert')).toContainText('Order fully settled and closed');
+      await expect(page.locator('.alert', { hasText: 'Order fully settled and closed' })).toBeVisible();
+      // Owner decision (2026-10-28): the final CAFIN is generated automatically at settlement.
+      await expect(page.locator('.alert', { hasText: 'Final internal financial annexure generated automatically' })).toBeVisible();
     });
 
     await test.step('Order is genuinely complete — every role did only its own real work', async () => {

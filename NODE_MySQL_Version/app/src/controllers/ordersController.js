@@ -16,6 +16,7 @@ const caExpenseRepository = require('../repositories/caExpenseRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
 const orderAssigneeRepository = require('../repositories/orderAssigneeRepository');
+const orderAccessService = require('../services/orderAccessService');
 const orderAssignmentService = require('../services/orderAssignmentService');
 const orderDuplicationService = require('../services/orderDuplicationService');
 const orderEditGuard = require('../services/orderEditGuard');
@@ -810,31 +811,28 @@ async function show(req, res) {
     res.status(404).send('Order not found.');
     return;
   }
-  // Archiving only removes an order from the default listing — direct
-  // access by URL/bookmark still needs its own gate, or view_archived_orders
-  // would be meaningless (Super Admin already bypasses every permission).
-  if (order.is_archived && !req.permissions.view_archived_orders) {
-    res.status(403).send('This order has been archived. You need the "View archived orders" permission to open it.');
+  // Archiving only removes an order from the default listing, and a
+  // guessed/bookmarked URL must not bypass the order-assignment scoping
+  // the Orders list and Kanban board apply — both checked in
+  // orderAccessService, shared with the file download route. Visibility
+  // only: never decides who may act on a step.
+  const accessDenied = await orderAccessService.denialReason(order, req.user && req.user.id, req.permissions);
+  if (accessDenied !== null) {
+    res.status(403).send(accessDenied);
     return;
   }
-
-  // Order ownership / assignment visibility — a guessed/bookmarked URL
-  // must not bypass the same scoping the Orders list and Kanban board
-  // already apply. Visibility only: this never touches who may act on a
-  // step (manage_payments/clear_payments/manage_shipping/etc. are
-  // unaffected and checked exactly as before, below).
   const seesAllOrders = !!req.permissions.view_all_orders;
-  if (!seesAllOrders && !(await orderAssigneeRepository.isAssignedTo(orderId, req.user.id))) {
-    res.status(403).send('This order is assigned to a different user. You can only open orders assigned to you.');
-    return;
-  }
   const canAssignOwner = !!req.permissions.assign_order_owner;
 
   const stages = await orderStageRepository.forOrder(orderId);
   const stageByNumber = {};
   for (const s of stages) stageByNumber[s.stage_number] = s;
 
-  const documents = await documentRepository.forOrder(orderId);
+  // Owner decision (2026-10-28): CAFIN is visible only to holders of the
+  // "View & download CAFIN" permission — hidden from the document list too.
+  const canViewCafin = !!req.permissions.view_cafin;
+  let documents = await documentRepository.forOrder(orderId);
+  if (!canViewCafin) documents = documents.filter((d) => d.document_type_code !== 'CAFIN');
   const reviewsByDocument = {};
   const crossVerificationsByDocument = {};
   for (const d of documents) {
@@ -1094,7 +1092,8 @@ async function show(req, res) {
       orderBenefitClaims: req.permissions.manage_order_financials ? await caExportBenefitRepository.forOrder(orderId) : [],
       linkedCaExpenses: req.permissions.ca_module_view ? await caExpenseRepository.forOrder(orderId) : [],
       canManageCaInternalDoc: !!req.permissions.ca_internal_doc_manage,
-      caInternalDoc: req.permissions.ca_module_view ? await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CAFIN') : null,
+      canViewCafin,
+      caInternalDoc: canViewCafin ? await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CAFIN') : null,
       // Reorder-to-supplier linking + Order Profitability Sheet (docs/schema.sql
       // Section AP) — gated on the new, deliberately stricter
       // manage_order_financials permission rather than ca_module_view, per
@@ -3391,6 +3390,18 @@ async function markFullySettled(req, res) {
   await orderRepository.markComplete(orderId);
   await auditLogRepository.log(user.id, 'ORDER_FULLY_SETTLED', 'orders', orderId, 'status', 'shipped_docs_sent', 'complete', allowOverride ? overrideReason : null);
   flash.set(req, 'success', 'Order fully settled and closed.');
+  // Owner decision (2026-10-28): every settled order gets its final
+  // CAFIN automatically — all payments, bills, expenses and benefits
+  // are final by now. Never blocks settlement: if it fails, staff
+  // are told to generate it from the CAFIN box.
+  try {
+    const cafin = await documentGenerationService.generateCaInternalAnnexure(orderId, user.id);
+    await auditLogRepository.log(user.id, 'CA_INTERNAL_DOC_AUTO_GENERATED', 'orders', orderId, 'document_reference', null, cafin.document_reference, 'Generated automatically when the order was fully settled');
+    flash.set(req, 'success', `Final internal financial annexure generated automatically: ${cafin.document_reference}.`);
+  } catch (e) {
+    console.error(`[CAFIN AUTO-GENERATION FAILED] order=${orderId} — ${e && e.message}`);
+    flash.set(req, 'warning', 'The order is settled, but the internal financial annexure (CAFIN) could not be generated automatically — generate it from the CAFIN box at the top of the order.');
+  }
   res.redirect(`/orders/${orderId}`);
 }
 

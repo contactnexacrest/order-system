@@ -93,6 +93,18 @@ final class FileStoreRepository
         return $stmt->fetch() ?: null;
     }
 
+    /** The document type code (QT, PI, CAFIN, ...) this file is the PDF/DOCX of, or null for an uploaded file. */
+    public static function documentTypeCodeFor(int $fileId): ?string
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT dt.code FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
+             WHERE d.pdf_file_id = :pdf OR d.docx_file_id = :docx LIMIT 1'
+        );
+        $stmt->execute(['pdf' => $fileId, 'docx' => $fileId]);
+        $code = $stmt->fetchColumn();
+        return $code === false ? null : (string) $code;
+    }
+
     /**
      * Every live file for one order, generated or received — order_id is
      * set on file_store directly for both origins (insertGenerated() and
