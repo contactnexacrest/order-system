@@ -201,6 +201,19 @@ describe('Suppliers directory (Section BZ)', () => {
     expect(Number(po.balance_amount_inr)).toBe(53100);
   });
 
+  // Owner decision (2026-10-28): 0% GST is saved as 0, so the Supplier PO prints "0.00% — 0.00", not "X% — To Be Confirmed".
+  it('saves a 0% GST rate on the Supplier PO', async () => {
+    const orderId = await orderAtStage5();
+    const id = await supplierRepository.create({ supplier_legal_name: uniqueName('Zero GST Supplier'), types: ['Trader'] });
+    await ordersController.saveSupplierPo(fakeReq({ supplier_id: String(id), basic_value_inr: '45000.00', gst_rate_pct: '0', gst_amount_inr: '0', total_payable_inr: '45000.00' }, { id: String(orderId) }), fakeRes());
+
+    const po = await orderSupplierPoRepository.findLatestForOrder(orderId);
+    expect(po.gst_rate_pct).not.toBeNull();
+    expect(Number(po.gst_rate_pct)).toBe(0);
+    expect(po.gst_amount_inr).not.toBeNull();
+    expect(Number(po.gst_amount_inr)).toBe(0);
+  });
+
   it('picks a single type automatically and refuses an inactive supplier', async () => {
     const orderId = await orderAtStage5();
     const id = await supplierRepository.create({ supplier_legal_name: uniqueName('One Type Supplier'), types: ['Trader'] });

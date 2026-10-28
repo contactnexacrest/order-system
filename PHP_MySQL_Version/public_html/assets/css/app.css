@@ -48,6 +48,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   a:focus, button:focus, input:focus, select:focus, textarea:focus, summary:focus, [tabindex]:focus{
     outline:2px solid var(--gold);outline-offset:2px;
   }
+  /* QA Round 5, R5-10: the process-step tiles and info bubbles too. */
+  .process-step:focus{outline:2px solid var(--gold);outline-offset:2px;}
+  .info-bubble:focus{color:var(--navy);}
 }
 button, a.btn, input, select, textarea{transition:background-color .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease, transform .15s ease;}
 button:disabled, a.btn[aria-disabled="true"]{opacity:0.55;cursor:not-allowed;}
@@ -504,6 +507,16 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .step-group:has(> summary > .step-card-icon.current) > summary .step-group-num{background:var(--gold-strong);}
 .step-card:has(> summary > .step-card-icon.current){border-color:var(--gold);border-left:5px solid var(--gold);background:#FFF8EA;}
 .step-card:has(> summary > .step-card-icon.current) > summary h2{color:var(--gold-strong);}
+/* QA Round 5, R5-10: the same highlight through app.js's is-current /
+   is-locked classes, for Safari/iOS 14-15.3, which ignore :has(). Kept as
+   separate rules: one unsupported selector in a list drops the whole rule. */
+.phase-group.is-current{border:2px solid var(--gold);box-shadow:0 2px 10px rgba(201,150,43,0.18);}
+.phase-group.is-current > summary .phase-tag{background:var(--gold-strong);}
+.phase-group.is-locked > summary h2{color:var(--ink-soft);}
+.step-group.is-current{border:2px solid var(--gold);box-shadow:0 0 0 4px var(--gold-soft);background:#FFFCF5;}
+.step-group.is-current > summary .step-group-num{background:var(--gold-strong);}
+.step-card.is-current{border-color:var(--gold);border-left:5px solid var(--gold);background:#FFF8EA;}
+.step-card.is-current > summary h2{color:var(--gold-strong);}
 
 /* Payment Overview: real tabs (Snapshot/Ledger/Full Status are parallel
    views of the same data, not a sequence — unlike the step sub-steps
@@ -575,7 +588,9 @@ a.entity-card:hover{text-decoration:none;}
 .tag-navy{color:var(--navy);background:var(--navy-soft);}
 .tag-hint{font-size:0.66rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:6px;white-space:nowrap;color:var(--ink-soft);background:var(--bg);border:1px solid var(--line);margin-left:0.35rem;}
 .info-bubble{display:inline-flex;align-items:center;justify-content:center;width:1.1rem;height:1.1rem;margin-left:0.3rem;color:var(--ink-soft);cursor:help;font-size:0.95rem;vertical-align:-0.15rem;border-radius:50%;}
-.info-bubble:hover,.info-bubble:focus-visible{color:var(--navy);}
+/* R5-10: separate rules, so older Safari (no :focus-visible) keeps the hover colour. */
+.info-bubble:hover{color:var(--navy);}
+.info-bubble:focus-visible{color:var(--navy);}
 .mini-stage-track{display:flex;gap:3px;margin-bottom:0.4rem;}
 .mini-stage-seg{flex:1;height:5px;border-radius:3px;background:var(--line);}
 .mini-stage-seg.filled{background:var(--gold);}

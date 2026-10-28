@@ -2054,8 +2054,10 @@ final class OrderController
             'special_requirements'  => trim((string) ($_POST['special_requirements'] ?? '')) ?: null,
             'unit_price_inr'        => trim((string) ($_POST['unit_price_inr'] ?? '')) ?: null,
             'basic_value_inr'       => trim((string) ($_POST['basic_value_inr'] ?? '')) ?: null,
-            'gst_rate_pct'          => trim((string) ($_POST['gst_rate_pct'] ?? '')) ?: null,
-            'gst_amount_inr'        => trim((string) ($_POST['gst_amount_inr'] ?? '')) ?: null,
+            // Owner decision (2026-10-28): 0% GST is saved as 0, not left blank —
+            // PHP treats "0" as empty, which printed "X% — To Be Confirmed".
+            'gst_rate_pct'          => trim((string) ($_POST['gst_rate_pct'] ?? '')) !== '' ? trim((string) $_POST['gst_rate_pct']) : null,
+            'gst_amount_inr'        => trim((string) ($_POST['gst_amount_inr'] ?? '')) !== '' ? trim((string) $_POST['gst_amount_inr']) : null,
             'total_payable_inr'     => trim((string) ($_POST['total_payable_inr'] ?? '')) ?: null,
             // Owner decision (2026-10-27): 0% advance is saved as 0, not left blank.
             'advance_pct'           => trim((string) ($_POST['advance_pct'] ?? '')) !== '' ? trim((string) $_POST['advance_pct']) : null,

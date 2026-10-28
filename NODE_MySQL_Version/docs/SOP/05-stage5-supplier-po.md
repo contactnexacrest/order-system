@@ -76,6 +76,10 @@ auto-filled figure stays a plain, directly-editable field, so a genuine
 exception (a negotiated lump-sum total that doesn't follow the formula, for
 instance) can still be typed in by hand after the fact.
 
+**A 0% GST rate is allowed** (owner decision 2026-10-28). Type `0` in GST
+Rate: it is saved as 0 and the Supplier PO prints "0.00% — 0.00" for GST,
+not "X% — To Be Confirmed" (which is what a blank GST Rate prints).
+
 **A 0% advance is allowed** (owner decision 2026-10-27). Type `0` in
 Advance %: the form fills Advance Amount as 0.00 and the whole Total
 Payable as the Balance, and 0 is saved as 0 — not as "not filled in". The

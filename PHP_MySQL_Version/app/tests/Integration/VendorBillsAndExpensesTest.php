@@ -276,4 +276,17 @@ final class VendorBillsAndExpensesTest extends DbTestCase
         self::assertStringContainsString('you can still mark the order fully settled', $page);
         self::assertStringContainsString('id="order-expenses"', $page);
     }
+
+    /** Batch 5 parity: a Supplier PO with no advance entered means nothing to pay in 7e, on both stacks. */
+    public function testABlankSupplierAdvanceMeansNothingToPayIn7e(): void
+    {
+        [$orderId] = $this->orderWithSupplierPo('CIF');
+        Database::connection()->prepare('UPDATE order_supplier_po SET advance_pct = NULL, advance_amount_inr = NULL WHERE order_id = :id')->execute(['id' => $orderId]);
+
+        ob_start();
+        (new OrderController())->show(['id' => (string) $orderId]);
+        $page = (string) ob_get_clean();
+
+        self::assertStringContainsString('No advance on this order', $page);
+    }
 }

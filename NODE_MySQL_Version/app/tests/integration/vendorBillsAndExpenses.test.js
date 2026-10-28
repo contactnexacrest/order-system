@@ -232,4 +232,13 @@ describe('vendor bills and order expenses', () => {
     expect(text).toContain('you can still mark the order fully settled');
     expect(text).toContain('id="order-expenses"');
   });
+
+  // Batch 5 parity: a Supplier PO with no advance entered means nothing to pay in 7e, on both stacks.
+  it('a blank supplier advance means nothing to pay in 7e', async () => {
+    const [orderId] = await orderWithSupplierPo('CIF');
+    await db.execute('UPDATE order_supplier_po SET advance_pct = NULL, advance_amount_inr = NULL WHERE order_id = :id', { id: orderId });
+
+    const { text } = await agent.get(`/orders/${orderId}`);
+    expect(text).toContain('No advance on this order');
+  });
 });

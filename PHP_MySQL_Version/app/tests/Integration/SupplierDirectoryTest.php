@@ -212,6 +212,21 @@ final class SupplierDirectoryTest extends DbTestCase
         self::assertSame(53100.0, (float) $po['balance_amount_inr']);
     }
 
+    /** Owner decision (2026-10-28): 0% GST is saved as 0, so the Supplier PO prints "0.00% — 0.00", not "X% — To Be Confirmed". */
+    public function testSupplierPoSavesAZeroPercentGst(): void
+    {
+        $orderId = $this->orderAtStage5();
+        $id = SupplierRepository::create(['supplier_legal_name' => $this->uniqueName('Zero GST Supplier'), 'types' => ['Trader']]);
+        $_POST = ['supplier_id' => (string) $id, 'basic_value_inr' => '45000.00', 'gst_rate_pct' => '0', 'gst_amount_inr' => '0', 'total_payable_inr' => '45000.00'];
+        (new OrderController())->saveSupplierPo(['id' => (string) $orderId]);
+
+        $po = OrderSupplierPoRepository::findLatestForOrder($orderId);
+        self::assertNotNull($po['gst_rate_pct'], '0% GST is a real rate, not "not filled in"');
+        self::assertSame(0.0, (float) $po['gst_rate_pct']);
+        self::assertNotNull($po['gst_amount_inr']);
+        self::assertSame(0.0, (float) $po['gst_amount_inr']);
+    }
+
     public function testSupplierPoPicksASingleTypeAutomaticallyAndRefusesAnInactiveSupplier(): void
     {
         $orderId = $this->orderAtStage5();

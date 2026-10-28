@@ -276,7 +276,7 @@
     '7b': docComplete(documents, 'SUPPO', mailSendingEnabled),
     '7c': ((supplierPoDocuments and supplierPoDocuments.length > 0) or (supplierPo and supplierPo.ack_skipped_at)) if supplierPoCopyRequired else 'optional',
     '7d': supplierSigned,
-    '7e': supplierPo and (supplierPo.advance_paid_at or (supplierPo.advance_amount_inr | float) <= 0)
+    '7e': supplierPo and (supplierPo.advance_paid_at or (supplierPo.advance_amount_inr | float(0)) <= 0)
   },
   's9': {
     '9a': freight,
@@ -431,7 +431,7 @@
       {# Owner report (2026-10-27): the balance waits for the advance whenever the terms plan one. #}
       {% set payBlocked = ('Pay the supplier advance first (Step 7e) — the Supplier PO terms plan an advance of ₹' + supplierPo.advance_amount_inr + '.') if (leg == 'balance' and (supplierPo.advance_amount_inr | float) > 0 and not supplierPo.advance_paid_at) else null %}
       {# Owner decision (2026-10-27): 0% advance — nothing to pay in 7e; the whole amount is the balance (10a). #}
-      {% set noAdvance = leg == 'advance' and not supplierPo.advance_paid_at and (supplierPo.advance_amount_inr | float) <= 0 %}
+      {% set noAdvance = leg == 'advance' and not supplierPo.advance_paid_at and (supplierPo.advance_amount_inr | float(0)) <= 0 %}
       {% if noAdvance and not legBills.length %}
         <p class="review-banner ok">&#10003; <span><strong>No advance on this order</strong> — the Supplier PO terms plan no advance, so there is nothing to pay here. The full amount is paid as the supplier balance in <a href="#step-10a-supplier-balance-paid">Step 10a</a>.</span></p>
       {% else %}

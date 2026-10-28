@@ -656,6 +656,17 @@
     return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
   }
 
+  // QA Round 5, R5-10: Safari/iOS 14-15.3 ignore :has(), so app.css's
+  // "current step" highlight never showed there. Mark each step box whose
+  // own header carries the current/locked status icon with a class the
+  // stylesheet can use everywhere (the :has() rules stay for everyone else).
+  function initStepStatusClasses() {
+    document.querySelectorAll('summary > .step-card-icon.current, summary > .step-card-icon.locked').forEach(function (icon) {
+      var box = icon.parentElement.parentElement;
+      if (box) { box.classList.add(icon.classList.contains('current') ? 'is-current' : 'is-locked'); }
+    });
+  }
+
   function initFieldLabels() {
     document.querySelectorAll('input, select, textarea').forEach(function (el) {
       var type = (el.getAttribute('type') || '').toLowerCase();
@@ -703,6 +714,7 @@
     initGstCalc();
     initAutoReasons();
     initFieldLabels();
+    initStepStatusClasses();
   }
 
   if (document.readyState === 'loading') {

@@ -73,8 +73,9 @@ async function create(orderId, supplierId, supplierPoReference, data, status = '
       special: data.special_requirements ?? null,
       unit_price: data.unit_price_inr || null,
       basic_value: data.basic_value_inr || null,
-      gst_rate: data.gst_rate_pct || null,
-      gst_amount: data.gst_amount_inr || null,
+      // Owner decision (2026-10-28): 0% GST is kept as 0, only a blank stays NULL.
+      gst_rate: data.gst_rate_pct !== undefined && data.gst_rate_pct !== null && data.gst_rate_pct !== '' ? data.gst_rate_pct : null,
+      gst_amount: data.gst_amount_inr !== undefined && data.gst_amount_inr !== null && data.gst_amount_inr !== '' ? data.gst_amount_inr : null,
       total_payable: data.total_payable_inr || null,
       // Owner decision (2026-10-27): 0% advance is kept as 0, only a blank stays NULL.
       advance_pct: data.advance_pct !== undefined && data.advance_pct !== null && data.advance_pct !== '' ? data.advance_pct : null,
