@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Getting Started — NexaCrest Export Operations</title>
 <link rel="icon" href="/assets/img/favicon.ico?v=2" sizes="any">
-<link rel="stylesheet" href="/assets/css/app.css">
+<link rel="stylesheet" href="<?= \App\Helpers\View::asset('/assets/css/app.css') ?>">
 <style>
 /* Getting Started — a standalone first-day tour, not wrapped in the usual
    app shell (it has its own sidebar), but built entirely on app.css's own

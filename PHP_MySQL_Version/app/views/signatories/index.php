@@ -105,7 +105,7 @@
           <?php else: ?>
           <form method="post" action="/signatories/users/<?= (int) $u['id'] ?>/eligibility" style="display:flex;gap:4px;align-items:center">
             <?= Csrf::field() ?>
-            <select name="designation_id" aria-label="Designation">
+            <select name="designation_id" aria-label="Designation"<?= $u['is_signatory_eligible'] ? '' : ' required' ?>>
               <option value="">(none)</option>
               <?php foreach ($designations as $d): if (!$d['is_active'] && (int) $d['id'] !== (int) $u['designation_id']) continue; ?>
                 <option value="<?= (int) $d['id'] ?>" <?= (int) $u['designation_id'] === (int) $d['id'] ? 'selected' : '' ?>><?= htmlspecialchars($d['title']) ?></option>

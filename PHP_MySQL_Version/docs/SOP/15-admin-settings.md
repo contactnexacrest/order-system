@@ -460,11 +460,17 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   with no foreign key back to this table, so removing the row itself could
   orphan that reference. Exactly one option per list may be the **Default**
   (the radio column) — marking a new one silently clears the previous
-  default, same convention as Payment Presets below.
+  default, same convention as Payment Presets below. Every option needs a
+  name and a **Sort Order** that is a whole number (0 or more); if any row
+  breaks that, the whole save is refused with a message and nothing is
+  changed (QA Round 5, R5-30/R5-28 — a cleared name used to save an empty
+  option).
 - **Reference Library** (`/reference-docs`) — any authenticated staff
   member can view and download every entry here by default; adding,
   deleting, or re-uploading a file requires `manage_company_settings`,
-  the same gate as Company Settings itself. Alongside the system's own
+  the same gate as Company Settings itself. The system's own fixed
+  documents can't be saved empty — clearing the text and saving is
+  refused, so a slip can't wipe them (QA Round 5, R5-30). Alongside the system's own
   fixed reference documents (SOPs, the Stage Gate Reference, the
   Cross-Verification Checklist), this is where documents a client might
   ask to see to verify the business live — the Factory SOP, Quarry SOP,

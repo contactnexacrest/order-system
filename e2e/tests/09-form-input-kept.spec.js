@@ -121,4 +121,38 @@ test.describe('Form input is kept and checked before submit', () => {
     await expect(page).toHaveURL(/\/account$/);
     await expect(form.locator('.form-field-error')).toContainText('passwords do not match');
   });
+
+  // QA Round 5, R5-27 / R5-30: these forms used to send empty input to the
+  // server (or, for a reference document, save it empty and wipe it).
+  test('an empty dropdown option is stopped before submitting', async ({ page }) => {
+    await page.goto('/admin/dropdown-options');
+    const addForm = page.locator('form[action$="/create"]').first();
+    await addForm.locator('button[type="submit"]').click();
+
+    await expect(page).toHaveURL(/\/admin\/dropdown-options$/);
+    // The browser's own required-field wording ("Please fill out this field.").
+    await expect(addForm.locator('input[name="option_value"] + .form-field-error')).not.toBeEmpty();
+  });
+
+  test('a reference document cleared of its text is stopped before saving', async ({ page }) => {
+    await page.goto('/reference-docs/STAGEGATE/edit');
+    await page.locator('textarea[name="content"]').fill('   ');
+    await page.locator('form[action="/reference-docs/STAGEGATE"] button[type="submit"]').click();
+
+    await expect(page).toHaveURL(/\/reference-docs\/STAGEGATE\/edit$/);
+    await expect(page.locator('textarea[name="content"] + .form-field-error')).toHaveText('This field is required.');
+  });
+
+  test('an order message needs text or a file before posting', async ({ page }) => {
+    await page.goto('/orders');
+    const orderHref = await page.locator('a[href^="/orders/"]').evaluateAll(
+      (links) => links.map((a) => a.getAttribute('href')).find((h) => /^\/orders\/\d+$/.test(h))
+    );
+    await page.goto(orderHref);
+    const form = page.locator('form.chat-post-form');
+    await form.locator('button[type="submit"]').evaluate((button) => button.click());
+
+    await expect(page).toHaveURL(new RegExp(`${orderHref}$`));
+    await expect(form.locator('textarea[name="body"] + .form-field-error')).toHaveText('Write a message or attach a file before posting.');
+  });
 });

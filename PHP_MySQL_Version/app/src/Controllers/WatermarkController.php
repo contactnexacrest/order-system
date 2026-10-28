@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Helpers\FieldValidator;
 use App\Helpers\Flash;
 use App\Helpers\View;
 use App\Repositories\AssetRepository;
@@ -48,15 +49,29 @@ final class WatermarkController
             return;
         }
 
+        // QA Round 5, R5-28: the numbers are checked here as well as in the
+        // browser; a blank one takes its default (same on both stacks).
+        $number = static fn (string $name): string => trim((string) ($_POST[$name] ?? ''));
+        $numberError = FieldValidator::wholeNumber($number('font_size'), 'Font size', 1)
+            ?? FieldValidator::decimal($number('opacity'), 'Text opacity', 0, 1)
+            ?? FieldValidator::wholeNumber($number('angle'), 'Angle', -360)
+            ?? FieldValidator::decimal($number('image_opacity'), 'Image opacity', 0, 1);
+        if ($numberError !== null) {
+            Flash::set('error', $numberError);
+            header('Location: /watermarks');
+            return;
+        }
+        $orDefault = static fn (string $name, $default) => $number($name) === '' ? $default : $number($name);
+
         $data = [
             'mode' => $mode,
             'text_content' => trim((string) ($_POST['text_content'] ?? '')) ?: null,
             'font' => trim((string) ($_POST['font'] ?? '')) ?: null,
-            'font_size' => (int) ($_POST['font_size'] ?? 60) ?: null,
+            'font_size' => (int) $orDefault('font_size', 60),
             'color' => trim((string) ($_POST['color'] ?? '')) ?: '#CCCCCC',
-            'opacity' => (float) ($_POST['opacity'] ?? 0.3),
-            'angle' => (int) ($_POST['angle'] ?? 45),
-            'image_opacity' => (float) ($_POST['image_opacity'] ?? 0.15),
+            'opacity' => (float) $orDefault('opacity', 0.3),
+            'angle' => (int) $orDefault('angle', 45),
+            'image_opacity' => (float) $orDefault('image_opacity', 0.15),
             'image_position' => trim((string) ($_POST['image_position'] ?? 'center')),
         ];
 

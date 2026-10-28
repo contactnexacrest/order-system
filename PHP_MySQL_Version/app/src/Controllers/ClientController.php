@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Helpers\FieldValidator;
 use App\Helpers\Flash;
 use App\Helpers\ReasonValidator;
 use App\Helpers\View;
@@ -59,6 +60,12 @@ final class ClientController
         }
 
         $data = self::collectClientFields($companyLegalName, $billingAddress);
+        if ($emailError = self::clientEmailError($data)) {
+            Flash::set('error', $emailError);
+            Flash::setOld($_POST);
+            header('Location: /clients/create');
+            return;
+        }
         if ($other = ClientRepository::findOtherWithEmail($data['email'] ?? null)) {
             Flash::set('error', ClientRepository::duplicateEmailMessage((string) $data['email'], $other));
             Flash::setOld($_POST);
@@ -132,6 +139,12 @@ final class ClientController
             return;
         }
 
+        if ($emailError = self::clientEmailError($data)) {
+            Flash::set('error', $emailError);
+            Flash::setOld($_POST);
+            header("Location: /clients/{$source['id']}/duplicate");
+            return;
+        }
         if ($other = ClientRepository::findOtherWithEmail($data['email'] ?? null)) {
             Flash::set('error', ClientRepository::duplicateEmailMessage((string) $data['email'], $other));
             Flash::setOld($_POST);
@@ -152,6 +165,17 @@ final class ClientController
     }
 
     /** @return array<string,mixed> every field store()/duplicateStore() can set, shared so both build it identically. */
+    /** QA Round 5, R5-28: the server refuses a malformed e-mail the browser would have stopped. */
+    private static function clientEmailError(array $data): ?string
+    {
+        foreach (['email' => 'Email', 'consignee_email' => 'Consignee email', 'notify_party_email' => 'Notify party email'] as $field => $label) {
+            if ($error = FieldValidator::email((string) ($data[$field] ?? ''), $label)) {
+                return $error;
+            }
+        }
+        return null;
+    }
+
     private static function collectClientFields(string $companyLegalName, string $billingAddress): array
     {
         return array_merge([
@@ -275,6 +299,11 @@ final class ClientController
             'coo_type'              => LookupRepository::sanitizeOption('coo_type', trim((string) ($_POST['coo_type'] ?? ''))) ?: null,
         ], self::collectPartyFields());
 
+        if ($emailError = self::clientEmailError($data)) {
+            Flash::set('error', $emailError);
+            header("Location: /clients/{$clientId}/edit");
+            return;
+        }
         if ($other = ClientRepository::findOtherWithEmail($data['email'] ?? null, $clientId)) {
             Flash::set('error', ClientRepository::duplicateEmailMessage((string) $data['email'], $other));
             header("Location: /clients/{$clientId}/edit");

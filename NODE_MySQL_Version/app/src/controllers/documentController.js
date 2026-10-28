@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const { documentLabel } = require('../helpers/documentLabel');
 const flash = require('../helpers/flash');
 const paymentTermsApprovalService = require('../services/paymentTermsApprovalService');
 const { todayIst } = require('../helpers/dbDateTime');
@@ -127,7 +128,10 @@ async function generate(req, res) {
   // approved." Generating the QT here just creates the draft; it still has
   // to go through review before anything unlocks.
 
-  flash.set(req, 'success', `${type} generated: ${result.document_reference} Rev.${result.revision_number}.`);
+  // QA Round 5, R5-25: a document without its own reference (COOPREP) is named by its order.
+  flash.set(req, 'success', result.document_reference
+    ? `${type} generated: ${result.document_reference} Rev.${result.revision_number}.`
+    : `${await documentLabel(type, null, orderId)} generated — Rev.${result.revision_number}.`);
 
   // A revision (not a first-ever generation) of an earlier-stage document
   // while later-stage documents already exist means those later documents

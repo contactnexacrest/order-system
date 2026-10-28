@@ -114,9 +114,12 @@ async function forgotPassword(req, res) {
   const genericMessage = `If ${email} matches an account, a password reset link has been sent to it. The link expires in 45 minutes.`;
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  // QA Round 5: a blank or malformed address is answered on the form
+  // ("If  matches an account…" read oddly). This only checks the format,
+  // so it still never reveals whether an account exists.
   if (email === '' || !emailValid) {
-    flash.set(req, 'success', genericMessage);
-    res.redirect('/login');
+    flash.set(req, 'error', email === '' ? 'Enter your e-mail address.' : 'Enter a valid e-mail address.');
+    res.redirect('/forgot-password');
     return;
   }
 

@@ -1762,7 +1762,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
     <form class="chat-post-form" method="post" action="/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
       <?= Csrf::field() ?>
-      <textarea name="body" placeholder="Write an update for the client…"></textarea>
+      <textarea name="body" data-required-unless="attachments[]" data-required-unless-message="Write a message or attach a file before posting." placeholder="Write an update for the client…"></textarea>
       <div class="chat-post-form-row">
         <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
         <button type="submit" class="btn-sm" data-loading-text="Posting…"><?= $mailSendingEnabled ? 'Post &amp; email client' : 'Post to client portal' ?></button>
@@ -3379,7 +3379,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </div>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/travel-expenses">
             <?= Csrf::field() ?>
-            <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="text" name="factory_distance_km" value="<?= htmlspecialchars($orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? (string) $orderTravelExpenses['factory_distance_km'] : '') ?>"></label>
+            <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="number" min="0" step="any" name="factory_distance_km" value="<?= htmlspecialchars($orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? (string) $orderTravelExpenses['factory_distance_km'] : '') ?>"></label>
             <label>Travel Expense % of FOB Value *
               <select name="expense_pct" required>
                 <?php $savedPct = $orderTravelExpenses ? (string) (float) $orderTravelExpenses['expense_pct'] : ''; ?>
@@ -3389,7 +3389,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <option value="other" <?= !in_array($savedPct, ['5', '7', '10', '15'], true) && $savedPct !== '' ? 'selected' : '' ?>>Other — specify</option>
               </select>
             </label>
-            <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="text" name="expense_pct_other" value="<?= !in_array($savedPct, ['5', '7', '10', '15', ''], true) ? htmlspecialchars($savedPct) : '' ?>"></label>
+            <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="number" min="0" step="any" name="expense_pct_other" value="<?= !in_array($savedPct, ['5', '7', '10', '15', ''], true) ? htmlspecialchars($savedPct) : '' ?>"></label>
             <button type="submit" class="btn-sm">Save</button>
           </form>
         </div>

@@ -7,7 +7,7 @@
   <form method="post" action="/reference-docs/<?= htmlspecialchars($doc['code']) ?>">
     <?= Csrf::field() ?>
     <label for="reference-doc-content">Content</label>
-    <textarea id="reference-doc-content" name="content" rows="24" style="width:100%;font-family:monospace"><?= htmlspecialchars($doc['content'] ?? '') ?></textarea>
+    <textarea id="reference-doc-content" name="content" required rows="24" style="width:100%;font-family:monospace"><?= htmlspecialchars($doc['content'] ?? '') ?></textarea>
     <p><button type="submit" class="btn-sm btn-success">Save</button></p>
   </form>
 </div>

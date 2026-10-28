@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const fieldValidator = require('../helpers/fieldValidator');
 const testModeService = require('../services/testModeService');
 const auditLogRepository = require('../repositories/auditLogRepository');
 
@@ -42,6 +43,13 @@ async function updateTestEmail(req, res) {
   const email = String(req.body.test_email || '').trim();
   if (!email) {
     flash.set(req, 'error', 'Test email cannot be blank.');
+    res.redirect('/test-mode');
+    return;
+  }
+  // QA Round 5, R5-28: the server refuses what the browser's type="email" refuses.
+  const emailError = fieldValidator.email(email, 'Test email');
+  if (emailError) {
+    flash.set(req, 'error', emailError);
     res.redirect('/test-mode');
     return;
   }

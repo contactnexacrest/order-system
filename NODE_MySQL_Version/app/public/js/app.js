@@ -480,7 +480,7 @@
     // (e.g. the reason, when no receipt is attached).
     if (el.dataset.requiredUnless && el.form && value === '') {
       var file = el.form.elements.namedItem(el.dataset.requiredUnless);
-      if (file && file.files && file.files.length === 0) return 'Attach the receipt / bill, or give the reason no bill exists.';
+      if (file && file.files && file.files.length === 0) return el.dataset.requiredUnlessMessage || 'Attach the receipt / bill, or give the reason no bill exists.';
     }
     var bankMessage = bankError(el, value);
     if (bankMessage) return bankMessage;

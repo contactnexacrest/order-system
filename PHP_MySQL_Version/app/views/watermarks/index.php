@@ -38,13 +38,13 @@
             <input type="color" name="color" value="<?= htmlspecialchars($w['color'] ?? '#CCCCCC') ?>">
           </label>
           <label>Font size (pt)
-            <input type="number" name="font_size" value="<?= (int) ($w['font_size'] ?? 60) ?>" placeholder="e.g., 60" style="width:80px">
+            <input type="number" min="1" step="1" name="font_size" value="<?= (int) ($w['font_size'] ?? 60) ?>" placeholder="e.g., 60" style="width:80px">
           </label>
           <label>Opacity (0–1)
             <input type="number" step="0.05" min="0" max="1" name="opacity" value="<?= htmlspecialchars((string) ($w['opacity'] ?? 0.3)) ?>" placeholder="e.g., 0.3" style="width:80px">
           </label>
           <label>Angle (degrees)
-            <input type="number" name="angle" value="<?= (int) ($w['angle'] ?? 45) ?>" placeholder="e.g., 45" style="width:80px">
+            <input type="number" step="1" name="angle" value="<?= (int) ($w['angle'] ?? 45) ?>" placeholder="e.g., 45" style="width:80px">
           </label>
         </div>
       </fieldset>

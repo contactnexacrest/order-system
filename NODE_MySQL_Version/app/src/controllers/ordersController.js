@@ -6,6 +6,7 @@ const JSZip = require('jszip');
 const db = require('../config/db');
 const { parseDbDateTime } = require('../helpers/dbDateTime');
 const flash = require('../helpers/flash');
+const fieldValidator = require('../helpers/fieldValidator');
 const orderLineValidator = require('../helpers/orderLineValidator');
 const reasonValidator = require('../helpers/reasonValidator');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
@@ -400,6 +401,14 @@ async function store(req, res) {
     res.redirect(`/orders/create?client_id=${clientId}`);
     return;
   }
+  // QA Round 5, R5-29: a wrong number is refused with a message, never a database error.
+  const numberError = fieldValidator.orderNumbers(body);
+  if (numberError) {
+    flash.set(req, 'error', numberError);
+    flash.setOld(req, body);
+    res.redirect(`/orders/create?client_id=${clientId}`);
+    return;
+  }
 
   const descriptions = [].concat(body.product_description || []);
   const hasAtLeastOneProduct = descriptions.some((d) => str(d) !== '');
@@ -602,6 +611,12 @@ async function editDetails(req, res) {
       order[field] = await companySettingsRepository.get(`default_${field}`);
     }
   }
+  // QA Round 5, R5-29: after a refused save, show what was typed, not the saved values.
+  for (const [field, value] of Object.entries(flash.pullOld(req) || {})) {
+    if (Object.prototype.hasOwnProperty.call(order, field) && !Array.isArray(value)) {
+      order[field] = value;
+    }
+  }
   res.renderView(
     'orders/edit_details',
     {
@@ -635,6 +650,15 @@ async function updateDetails(req, res) {
   const currencyId = parseInt(body.currency_id || 0, 10);
   if (!incotermId || !currencyId) {
     flash.set(req, 'error', 'Incoterm and currency are both required.');
+    flash.setOld(req, body);
+    res.redirect(`/orders/${orderId}/edit`);
+    return;
+  }
+  // QA Round 5, R5-29: a wrong number is refused with a message, never a database error.
+  const numberError = fieldValidator.orderNumbers(body);
+  if (numberError) {
+    flash.set(req, 'error', numberError);
+    flash.setOld(req, body);
     res.redirect(`/orders/${orderId}/edit`);
     return;
   }
@@ -2397,6 +2421,14 @@ async function saveFreightTerms(req, res) {
   // Owner request (2026-10-27): the forwarder is picked from the Logistics
   // Partners directory (like the supplier in 7a from the Suppliers
   // directory); its name and contact are copied onto this order.
+  // QA Round 5, R5-29: a wrong number is refused with a message, never a database error.
+  const numberError = fieldValidator.decimal(str(body.confirmed_freight_rate), 'Confirmed freight rate')
+    || fieldValidator.decimal(str(body.insurance_amount), 'Insurance amount');
+  if (numberError) {
+    flash.set(req, 'error', numberError);
+    res.redirect(`/orders/${orderId}#step-9a-freight-terms`);
+    return;
+  }
   const partner = await logisticsPartnerRepository.find(parseInt(body.freight_forwarder_partner_id, 10) || 0);
   if (!partner || !Number(partner.is_active)) {
     flash.set(req, 'error', 'Choose the freight forwarder from the Logistics Partners directory.');
@@ -2623,6 +2655,13 @@ async function saveShipping(req, res) {
     return;
   }
   const body = req.body;
+  // QA Round 5, R5-28: the server applies the form's own "1 or more" rule.
+  const countError = fieldValidator.wholeNumber(str(body.container_count), 'Number of containers', 1);
+  if (countError) {
+    flash.set(req, 'error', countError);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await orderShippingRepository.upsert(orderId, {
     shipping_line: str(body.shipping_line) || null,
     vessel_name: str(body.vessel_name) || null,

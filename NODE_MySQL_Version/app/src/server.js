@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const env = require('./config/env'); // loads .env as a side effect — must be first
 const express = require('express');
@@ -192,6 +193,18 @@ njkEnv.addGlobal('docGenerated', (documents, code) => (documents || []).some((d)
 njkEnv.addGlobal('docStatus', (documents, code) => {
   const doc = (documents || []).find((d) => d.document_type_code === code);
   return doc ? doc.status : null;
+});
+// QA Round 5, R5-26: a public file's URL with its last-change time added
+// (?v=…), so after a deploy every browser fetches the new app.js / app.css
+// at once instead of keeping a cached copy. Mirrors PHP's View::asset().
+njkEnv.addGlobal('asset', (assetPath) => {
+  let version = '0';
+  try {
+    version = String(Math.floor(fs.statSync(path.join(__dirname, '..', 'public', assetPath)).mtimeMs / 1000));
+  } catch (e) {
+    // a missing file keeps ?v=0 — the page still loads
+  }
+  return `${assetPath}?v=${version}`;
 });
 njkEnv.addGlobal('annexureConfirmAttr', require('./helpers/annexureConfirmAttr').annexureConfirmAttr);
 njkEnv.addGlobal('stepBadge', require('./helpers/stepBadge').stepBadge);

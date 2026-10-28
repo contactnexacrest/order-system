@@ -51,6 +51,20 @@ async function update(req, res) {
   const activeInput = req.body.is_active || {};
   const defaultId = parseInt(req.body.default_id, 10) || 0;
 
+  // QA Round 5, R5-30 / R5-28: a cleared name used to save an empty
+  // option, and text in a sort order was saved as a number. Check every
+  // row first; a problem saves nothing.
+  for (const row of rows) {
+    const id = row.id;
+    if (Array.isArray(valueInput[id]) || Array.isArray(sortOrderInput[id])
+      || String(valueInput[id] ?? row.option_value).trim() === ''
+      || !/^\d+$/.test(String(sortOrderInput[id] ?? row.sort_order).trim())) {
+      flash.set(req, 'error', 'Every option needs a name and a sort order that is a whole number (0 or more) — nothing was saved.');
+      res.redirect('/admin/dropdown-options');
+      return;
+    }
+  }
+
   let changedCount = 0;
   for (const row of rows) {
     const id = row.id;

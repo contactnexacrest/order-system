@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Helpers\DocumentLabel;
 use App\Helpers\ReasonValidator;
 use App\Repositories\AuditLogRepository;
 use App\Repositories\DocumentCrossVerificationRepository;
@@ -78,7 +79,7 @@ final class ReviewWorkflowService
                 null,
                 'review_assigned',
                 (int) $document['order_id'],
-                "You've been assigned to review {$document['document_type_code']} {$document['document_reference']} Rev.{$document['revision_number']}."
+                'You\'ve been assigned to review ' . DocumentLabel::for($document['document_type_code'], $document['document_reference'], (int) $document['order_id']) . " Rev.{$document['revision_number']}."
             );
         }
 
@@ -164,7 +165,7 @@ final class ReviewWorkflowService
                     null,
                     'review_rejected',
                     (int) $document['order_id'],
-                    "{$document['document_type_code']} {$document['document_reference']} Rev.{$document['revision_number']} was rejected: {$comments}"
+                    DocumentLabel::for($document['document_type_code'], $document['document_reference'], (int) $document['order_id']) . " Rev.{$document['revision_number']} was rejected: {$comments}"
                 );
             }
         }

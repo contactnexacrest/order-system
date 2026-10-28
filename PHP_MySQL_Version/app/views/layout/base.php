@@ -119,8 +119,8 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32x32.png?v=2">
 <link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicon-16x16.png?v=2">
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png?v=2">
-<link rel="stylesheet" href="/assets/css/app.css">
-<script src="/assets/js/app.js" defer></script>
+<link rel="stylesheet" href="<?= \App\Helpers\View::asset('/assets/css/app.css') ?>">
+<script src="<?= \App\Helpers\View::asset('/assets/js/app.js') ?>" defer></script>
 </head>
 <body>
 <?php if (\App\Config\Env::isDevServer()): ?>

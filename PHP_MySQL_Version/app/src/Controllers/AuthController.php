@@ -137,9 +137,12 @@ final class AuthController
         $email = strtolower(trim((string) ($_POST['email'] ?? '')));
         $genericMessage = "If {$email} matches an account, a password reset link has been sent to it. The link expires in 45 minutes.";
 
+        // QA Round 5: a blank or malformed address is answered on the form
+        // ("If  matches an account…" read oddly). This only checks the format,
+        // so it still never reveals whether an account exists.
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            Flash::set('success', $genericMessage);
-            header('Location: /login');
+            Flash::set('error', $email === '' ? 'Enter your e-mail address.' : 'Enter a valid e-mail address.');
+            header('Location: /forgot-password');
             return;
         }
 

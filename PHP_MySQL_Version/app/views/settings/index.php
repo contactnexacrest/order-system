@@ -118,7 +118,8 @@
               ><?= htmlspecialchars($row['setting_value'] ?? '') ?></textarea>
             <?php else: ?>
               <input
-                type="text"
+                type="<?= $row['value_type'] === 'number' ? 'number' : 'text' ?>"
+                <?= $row['value_type'] === 'number' ? 'min="0" step="any"' : '' ?>
                 name="settings[<?= htmlspecialchars($row['setting_key']) ?>]"
                 data-key="<?= htmlspecialchars($row['setting_key']) ?>"
                 value="<?= htmlspecialchars($row['setting_value'] ?? '') ?>"

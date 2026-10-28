@@ -193,7 +193,7 @@
       <?php endif; ?>
       <div class="field-grid">
         <label>Agreement File (PDF/DOC/DOCX)
-          <input type="file" name="agreement_file" accept=".pdf,.doc,.docx">
+          <input type="file" name="agreement_file" required accept=".pdf,.doc,.docx">
         </label>
         <label>Expiry Date <small class="muted">(leave blank for no automatic expiry — only Force Expire will end it then)</small>
           <input type="date" name="agreement_expiry_date" value="<?= htmlspecialchars((string) ($client['agreement_expiry_date'] ?? '')) ?>">

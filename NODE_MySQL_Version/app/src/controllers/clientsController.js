@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const flash = require('../helpers/flash');
+const fieldValidator = require('../helpers/fieldValidator');
 const passwordHash = require('../helpers/passwordHash');
 const reasonValidator = require('../helpers/reasonValidator');
 const clientRepository = require('../repositories/clientRepository');
@@ -55,6 +56,13 @@ async function store(req, res) {
   }
 
   const data = await collectClientFields(req, companyLegalName, billingAddress);
+  const emailError = clientEmailError(data);
+  if (emailError) {
+    flash.set(req, 'error', emailError);
+    flash.setOld(req, req.body);
+    res.redirect('/clients/create');
+    return;
+  }
   const other = await clientRepository.findOtherWithEmail(data.email);
   if (other) {
     flash.set(req, 'error', clientRepository.duplicateEmailMessage(data.email, other));
@@ -125,6 +133,13 @@ async function duplicateStore(req, res) {
     return;
   }
 
+  const emailError = clientEmailError(data);
+  if (emailError) {
+    flash.set(req, 'error', emailError);
+    flash.setOld(req, req.body);
+    res.redirect(`/clients/${source.id}/duplicate`);
+    return;
+  }
   const other = await clientRepository.findOtherWithEmail(data.email);
   if (other) {
     flash.set(req, 'error', clientRepository.duplicateEmailMessage(data.email, other));
@@ -146,6 +161,15 @@ async function duplicateStore(req, res) {
 }
 
 /** Every field store()/duplicateStore() can set, shared so both build it identically. */
+/** QA Round 5, R5-28: the server refuses a malformed e-mail the browser would have stopped. */
+function clientEmailError(data) {
+  for (const [field, label] of [['email', 'Email'], ['consignee_email', 'Consignee email'], ['notify_party_email', 'Notify party email']]) {
+    const error = fieldValidator.email(String(data[field] || ''), label);
+    if (error) return error;
+  }
+  return null;
+}
+
 async function collectClientFields(req, companyLegalName, billingAddress) {
   return {
     company_legal_name: companyLegalName,
@@ -267,6 +291,12 @@ async function update(req, res) {
     ...collectPartyFields(req),
   };
 
+  const emailError = clientEmailError(data);
+  if (emailError) {
+    flash.set(req, 'error', emailError);
+    res.redirect(`/clients/${clientId}/edit`);
+    return;
+  }
   const other = await clientRepository.findOtherWithEmail(data.email, clientId);
   if (other) {
     flash.set(req, 'error', clientRepository.duplicateEmailMessage(data.email, other));

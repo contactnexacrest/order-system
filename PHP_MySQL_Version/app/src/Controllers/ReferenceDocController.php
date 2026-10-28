@@ -111,6 +111,12 @@ final class ReferenceDocController
         }
 
         $content = trim((string) ($_POST['content'] ?? ''));
+        // QA Round 5, R5-30: saving with the text cleared used to wipe the document.
+        if ($content === '') {
+            Flash::set('error', "{$doc['name']} can't be saved empty — nothing was changed.");
+            header("Location: /reference-docs/{$code}/edit");
+            return;
+        }
         $user = AuthService::currentUser();
         InternalReferenceDocRepository::upsert((int) $doc['document_type_id'], $content, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'REFERENCE_DOC_UPDATED', 'internal_reference_docs', (int) $doc['document_type_id'], 'content', null, null, "Updated {$code}");

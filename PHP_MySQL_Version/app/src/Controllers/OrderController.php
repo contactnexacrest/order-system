@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Config\Database;
 use App\Helpers\DeadlockRetry;
+use App\Helpers\FieldValidator;
 use App\Helpers\Flash;
 use App\Helpers\OrderLineValidator;
 use App\Helpers\ReasonValidator;
@@ -393,6 +394,13 @@ final class OrderController
             header('Location: /orders/create?client_id=' . $clientId);
             return;
         }
+        // QA Round 5, R5-29: a wrong number is refused with a message, never a database error.
+        if ($numberError = FieldValidator::orderNumbers($_POST)) {
+            Flash::set('error', $numberError);
+            Flash::setOld($_POST);
+            header('Location: /orders/create?client_id=' . $clientId);
+            return;
+        }
 
         $descriptions = $_POST['product_description'] ?? [];
         $hasAtLeastOneProduct = false;
@@ -612,6 +620,12 @@ final class OrderController
                 $order[$__field] = CompanySettingsRepository::get('default_' . $__field);
             }
         }
+        // QA Round 5, R5-29: after a refused save, show what was typed, not the saved values.
+        foreach (Flash::pullOld() as $__field => $__value) {
+            if (array_key_exists($__field, $order) && !is_array($__value)) {
+                $order[$__field] = $__value;
+            }
+        }
 
         View::render('orders/edit_details', [
             'order'           => $order,
@@ -645,6 +659,14 @@ final class OrderController
         $currencyId = (int) ($_POST['currency_id'] ?? 0);
         if (!$incotermId || !$currencyId) {
             Flash::set('error', 'Incoterm and currency are both required.');
+            Flash::setOld($_POST);
+            header("Location: /orders/{$orderId}/edit");
+            return;
+        }
+        // QA Round 5, R5-29: a wrong number is refused with a message, never a database error.
+        if ($numberError = FieldValidator::orderNumbers($_POST)) {
+            Flash::set('error', $numberError);
+            Flash::setOld($_POST);
             header("Location: /orders/{$orderId}/edit");
             return;
         }
@@ -2353,6 +2375,14 @@ final class OrderController
         // Owner request (2026-10-27): the forwarder is picked from the
         // Logistics Partners directory (like the supplier in 7a from the
         // Suppliers directory); its name and contact are copied onto this order.
+        // QA Round 5, R5-29: a wrong number is refused with a message, never a database error.
+        $numberError = FieldValidator::decimal(trim((string) ($_POST['confirmed_freight_rate'] ?? '')), 'Confirmed freight rate')
+            ?? FieldValidator::decimal(trim((string) ($_POST['insurance_amount'] ?? '')), 'Insurance amount');
+        if ($numberError !== null) {
+            Flash::set('error', $numberError);
+            header("Location: /orders/{$orderId}#step-9a-freight-terms");
+            return;
+        }
         $partner = \App\Repositories\LogisticsPartnerRepository::find((int) ($_POST['freight_forwarder_partner_id'] ?? 0));
         if (!$partner || !$partner['is_active']) {
             Flash::set('error', 'Choose the freight forwarder from the Logistics Partners directory.');
@@ -2577,6 +2607,12 @@ final class OrderController
         $orderId = (int) $params['id'];
         if (!StageGateService::isUnlocked($orderId, 7)) {
             Flash::set('error', 'Stage 7 has not been unlocked for this order yet — complete Stage 6 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        // QA Round 5, R5-28: the server applies the form's own "1 or more" rule.
+        if ($countError = FieldValidator::wholeNumber(trim((string) ($_POST['container_count'] ?? '')), 'Number of containers', 1)) {
+            Flash::set('error', $countError);
             header("Location: /orders/{$orderId}");
             return;
         }

@@ -1,5 +1,6 @@
 'use strict';
 
+const { documentLabel } = require('../helpers/documentLabel');
 const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const documentCrossVerificationRepository = require('../repositories/documentCrossVerificationRepository');
@@ -72,7 +73,7 @@ async function assignReviewers(documentId, reviewerIds, assignedByUserId) {
       null,
       'review_assigned',
       document.order_id,
-      `You've been assigned to review ${document.document_type_code} ${document.document_reference} Rev.${document.revision_number}.`
+      `You've been assigned to review ${await documentLabel(document.document_type_code, document.document_reference, document.order_id)} Rev.${document.revision_number}.`
     );
   }
 
@@ -149,7 +150,7 @@ async function reject(documentReviewId, reviewerUserId, comments) {
         null,
         'review_rejected',
         document.order_id,
-        `${document.document_type_code} ${document.document_reference} Rev.${document.revision_number} was rejected: ${comments}`
+        `${await documentLabel(document.document_type_code, document.document_reference, document.order_id)} Rev.${document.revision_number} was rejected: ${comments}`
       );
     }
   }

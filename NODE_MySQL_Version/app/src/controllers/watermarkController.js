@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const flash = require('../helpers/flash');
+const fieldValidator = require('../helpers/fieldValidator');
 const assetRepository = require('../repositories/assetRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const watermarkSettingsRepository = require('../repositories/watermarkSettingsRepository');
@@ -48,15 +49,29 @@ async function update(req, res) {
     return;
   }
 
+  // QA Round 5, R5-28: the numbers are checked here as well as in the
+  // browser; a blank one takes its default (same on both stacks).
+  const number = (name) => String(req.body[name] ?? '').trim();
+  const numberError = fieldValidator.wholeNumber(number('font_size'), 'Font size', 1)
+    || fieldValidator.decimal(number('opacity'), 'Text opacity', 0, 1)
+    || fieldValidator.wholeNumber(number('angle'), 'Angle', -360)
+    || fieldValidator.decimal(number('image_opacity'), 'Image opacity', 0, 1);
+  if (numberError) {
+    flash.set(req, 'error', numberError);
+    res.redirect('/watermarks');
+    return;
+  }
+  const orDefault = (name, fallback) => (number(name) === '' ? fallback : number(name));
+
   const data = {
     mode,
     text_content: String(req.body.text_content || '').trim() || null,
     font: String(req.body.font || '').trim() || null,
-    font_size: parseInt(req.body.font_size, 10) || 60,
+    font_size: parseInt(orDefault('font_size', 60), 10),
     color: String(req.body.color || '').trim() || '#CCCCCC',
-    opacity: parseFloat(req.body.opacity) || 0.3,
-    angle: parseInt(req.body.angle, 10) || 45,
-    image_opacity: parseFloat(req.body.image_opacity) || 0.15,
+    opacity: parseFloat(orDefault('opacity', 0.3)),
+    angle: parseInt(orDefault('angle', 45), 10),
+    image_opacity: parseFloat(orDefault('image_opacity', 0.15)),
     image_position: String(req.body.image_position || 'center').trim(),
   };
 

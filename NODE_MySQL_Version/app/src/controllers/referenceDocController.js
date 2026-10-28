@@ -97,6 +97,12 @@ async function update(req, res) {
   }
 
   const content = String(req.body.content || '').trim();
+  // QA Round 5, R5-30: saving with the text cleared used to wipe the document.
+  if (content === '') {
+    flash.set(req, 'error', `${doc.name} can't be saved empty — nothing was changed.`);
+    res.redirect(`/reference-docs/${code}/edit`);
+    return;
+  }
   await internalReferenceDocRepository.upsert(doc.document_type_id, content, req.user.id);
   await auditLogRepository.log(req.user.id, 'REFERENCE_DOC_UPDATED', 'internal_reference_docs', doc.document_type_id, 'content', null, null, `Updated ${code}`);
 

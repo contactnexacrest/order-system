@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Helpers\FieldValidator;
 use App\Helpers\Flash;
 use App\Helpers\ReasonValidator;
 use App\Helpers\View;
@@ -50,6 +51,17 @@ final class AmendmentController
 
         if ($error = ReasonValidator::check($reason)) {
             Flash::set('error', $error);
+            header("Location: /orders/{$orderId}/amendments");
+            return;
+        }
+        // QA Round 5, R5-28: text in a number field used to be saved as 0.
+        $raw = static fn (string $name): string => trim((string) ($_POST[$name] ?? ''));
+        $numberError = FieldValidator::decimal($raw('amended_advance_pct'), 'Amended advance %', 0, 100)
+            ?? FieldValidator::decimal($raw('amended_advance_amount'), 'Amended advance amount')
+            ?? FieldValidator::wholeNumber($raw('amended_balance_days'), 'Amended balance days', 1)
+            ?? FieldValidator::decimal($raw('amended_balance_amount'), 'Amended balance amount');
+        if ($numberError !== null) {
+            Flash::set('error', $numberError);
             header("Location: /orders/{$orderId}/amendments");
             return;
         }

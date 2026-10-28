@@ -104,7 +104,7 @@
           {% else %}
           <form method="post" action="/signatories/users/{{ u.id }}/eligibility" style="display:flex;gap:4px;align-items:center">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <select name="designation_id" aria-label="Designation">
+            <select name="designation_id" aria-label="Designation"{{ '' if u.is_signatory_eligible else ' required' }}>
               <option value="">(none)</option>
               {% for d in designations %}
                 {% if d.is_active or d.id == u.designation_id %}

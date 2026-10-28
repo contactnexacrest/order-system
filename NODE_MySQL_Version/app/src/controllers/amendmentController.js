@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const fieldValidator = require('../helpers/fieldValidator');
 const orderStorage = require('../helpers/orderStorage');
 const reasonValidator = require('../helpers/reasonValidator');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
@@ -41,6 +42,17 @@ async function create(req, res) {
   const reasonError = reasonValidator.check(reason);
   if (reasonError) {
     flash.set(req, 'error', reasonError);
+    res.redirect(`/orders/${orderId}/amendments`);
+    return;
+  }
+  // QA Round 5, R5-28: text in a number field used to be saved as 0.
+  const raw = (name) => String(req.body[name] ?? '').trim();
+  const numberError = fieldValidator.decimal(raw('amended_advance_pct'), 'Amended advance %', 0, 100)
+    || fieldValidator.decimal(raw('amended_advance_amount'), 'Amended advance amount')
+    || fieldValidator.wholeNumber(raw('amended_balance_days'), 'Amended balance days', 1)
+    || fieldValidator.decimal(raw('amended_balance_amount'), 'Amended balance amount');
+  if (numberError) {
+    flash.set(req, 'error', numberError);
     res.redirect(`/orders/${orderId}/amendments`);
     return;
   }

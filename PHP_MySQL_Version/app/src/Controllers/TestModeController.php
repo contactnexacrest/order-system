@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Helpers\FieldValidator;
 use App\Helpers\Flash;
 use App\Helpers\View;
 use App\Repositories\AuditLogRepository;
@@ -56,6 +57,12 @@ final class TestModeController
         $email = trim((string) ($_POST['test_email'] ?? ''));
         if ($email === '') {
             Flash::set('error', 'Test email cannot be blank.');
+            header('Location: /test-mode');
+            return;
+        }
+        // QA Round 5, R5-28: the server refuses what the browser's type="email" refuses.
+        if ($emailError = FieldValidator::email($email, 'Test email')) {
+            Flash::set('error', $emailError);
             header('Location: /test-mode');
             return;
         }

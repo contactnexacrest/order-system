@@ -110,7 +110,8 @@
               >{{ row.setting_value or '' }}</textarea>
             {% else %}
               <input
-                type="text"
+                type="{{ 'number' if row.value_type == 'number' else 'text' }}"
+                {{ 'min="0" step="any"' | safe if row.value_type == 'number' }}
                 name="settings[{{ row.setting_key }}]"
                 data-key="{{ row.setting_key }}"
                 value="{{ row.setting_value or '' }}"

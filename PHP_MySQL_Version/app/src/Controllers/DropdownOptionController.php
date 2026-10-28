@@ -63,6 +63,20 @@ final class DropdownOptionController
         $activeInput = $_POST['is_active'] ?? [];
         $defaultId = (int) ($_POST['default_id'] ?? 0);
 
+        // QA Round 5, R5-30 / R5-28: a cleared name used to save an empty
+        // option, and text in a sort order was saved as a number. Check every
+        // row first; a problem saves nothing.
+        foreach ($rows as $row) {
+            $id = (int) $row['id'];
+            if (is_array($valueInput[$id] ?? null) || is_array($sortOrderInput[$id] ?? null)
+                || trim((string) ($valueInput[$id] ?? $row['option_value'])) === ''
+                || !preg_match('/^\d+$/', trim((string) ($sortOrderInput[$id] ?? $row['sort_order'])))) {
+                Flash::set('error', 'Every option needs a name and a sort order that is a whole number (0 or more) — nothing was saved.');
+                header('Location: /admin/dropdown-options');
+                return;
+            }
+        }
+
         $changedCount = 0;
         foreach ($rows as $row) {
             $id = (int) $row['id'];

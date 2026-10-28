@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Helpers\DocumentLabel;
 use App\Helpers\Flash;
 use App\Helpers\ReasonValidator;
 use App\Repositories\AuditLogRepository;
@@ -134,7 +135,10 @@ final class DocumentController
         // document is approved." Generating the QT here just creates the
         // draft; it still has to go through review before anything unlocks.
 
-        Flash::set('success', "{$type} generated: {$result['document_reference']} Rev.{$result['revision_number']}.");
+        // QA Round 5, R5-25: a document without its own reference (COOPREP) is named by its order.
+        Flash::set('success', !empty($result['document_reference'])
+            ? "{$type} generated: {$result['document_reference']} Rev.{$result['revision_number']}."
+            : DocumentLabel::for($type, null, $orderId) . " generated — Rev.{$result['revision_number']}.");
 
         // A revision (not a first-ever generation) of an earlier-stage
         // document while later-stage documents already exist means those

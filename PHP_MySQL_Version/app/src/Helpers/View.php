@@ -49,4 +49,16 @@ final class View
     {
         return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
     }
+
+    /**
+     * QA Round 5, R5-26: a public file's URL with its last-change time
+     * added (?v=…), so after a deploy every browser fetches the new app.js /
+     * app.css at once instead of keeping a cached copy. Mirrors server.js's
+     * asset() template global on the Node stack.
+     */
+    public static function asset(string $path): string
+    {
+        $file = dirname(__DIR__, 3) . '/public_html' . $path;
+        return self::e($path . '?v=' . (is_file($file) ? (string) filemtime($file) : '0'));
+    }
 }
