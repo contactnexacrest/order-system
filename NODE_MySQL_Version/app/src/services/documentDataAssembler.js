@@ -63,6 +63,10 @@ async function assemble(orderId, documentTypeCode = null) {
   const balanceAmount = round2(fobValue - advanceAmount);
 
   const isFob = String(order.incoterm_code).toUpperCase() === 'FOB';
+  // QA Round 5, Q-R5-2: under Incoterms 2020 only CIF puts insurance
+  // on the seller. On FOB and CFR the buyer insures, so a stored
+  // insurance figure is never shown or charged.
+  const isCif = String(order.incoterm_code).toUpperCase() === 'CIF';
 
   // 90-item backlog item #18 (BLOCKER): for a non-FOB order, the
   // Commercial Invoice's own TOTAL COMMERCIAL INVOICE VALUE must
@@ -82,7 +86,7 @@ async function assemble(orderId, documentTypeCode = null) {
   if (freightForTotal === null) {
     const freightRow = await orderFreightRepository.find(orderId);
     if (freightRow && freightRow.confirmed_freight_rate !== null) {
-      freightForTotal = parseFloat(freightRow.confirmed_freight_rate) + parseFloat(freightRow.insurance_amount ?? 0);
+      freightForTotal = parseFloat(freightRow.confirmed_freight_rate) + (isCif ? parseFloat(freightRow.insurance_amount ?? 0) : 0);
     }
   }
   const totalCommercialInvoiceValue = (!isFob && freightForTotal !== null) ? fobValue + freightForTotal : fobValue;
@@ -145,6 +149,7 @@ async function assemble(orderId, documentTypeCode = null) {
       // seller's own port) instead of the buyer's discharge port.
       incoterm_label: `${order.incoterm_code} ${isFob ? portOfLoading : portOfDischarge} — Incoterms® 2020`,
       is_fob: isFob,
+      is_cif: isCif,
       port_of_loading: portOfLoading,
       port_of_discharge: portOfDischarge,
       container_type: order.container_type ?? 'To Be Confirmed',
@@ -269,7 +274,7 @@ async function assemble(orderId, documentTypeCode = null) {
     supplier_po: (documentTypeCode === null || SUPPLIER_COST_VISIBLE_TO.includes(documentTypeCode))
       ? await supplierPoBlock(orderId)
       : null,
-    freight: await freightBlock(orderId),
+    freight: await freightBlock(orderId, isCif),
     packing: await packingBlock(orderId),
     crates: await cratesBlock(orderId),
     shipping: await shippingBlock(orderId),
@@ -415,16 +420,16 @@ async function supplierPoBlock(orderId) {
   };
 }
 
-async function freightBlock(orderId) {
+async function freightBlock(orderId, isCif) {
   const row = await orderFreightRepository.find(orderId);
   if (!row) {
     return null;
   }
   const freightRaw = row.confirmed_freight_rate !== null ? parseFloat(row.confirmed_freight_rate) : null;
-  const insuranceRaw = row.insurance_amount !== null ? parseFloat(row.insurance_amount) : 0.0;
+  const insuranceRaw = isCif && row.insurance_amount !== null ? parseFloat(row.insurance_amount) : 0.0;
   return {
     confirmed_freight_rate: freightRaw !== null ? formatMoney(freightRaw) : null,
-    insurance_amount: row.insurance_amount !== null ? formatMoney(row.insurance_amount) : 'NIL',
+    insurance_amount: isCif && row.insurance_amount !== null ? formatMoney(row.insurance_amount) : 'NIL',
     // FDN's "TOTAL AMOUNT DUE" needs one number to wire, not a
     // formula string — computed here (not in the template) because
     // confirmed_freight_rate/insurance_amount above are already

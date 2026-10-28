@@ -298,7 +298,8 @@ tracks** rather than asking staff to re-enter them:
 - **Supplier cost** — `order_supplier_po.total_payable_inr`, already in
   INR, pulled automatically. Nothing to enter here.
 - **Ocean freight and insurance** — `order_freight.confirmed_freight_rate`
-  and `insurance_amount`, pulled automatically. **Assumption** (not
+  and `insurance_amount`, pulled automatically. Insurance counts on CIF
+  orders only; on FOB and CFR the buyer insures (QA Round 5, Q-R5-2). **Assumption** (not
   verified against a real invoice): both are treated as INR figures,
   the same convention `order_supplier_po` already uses, since in
   practice NexaCrest pays its freight forwarder domestically. If a

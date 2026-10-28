@@ -66,7 +66,8 @@ async function amountDue(order, leg) {
   if (leg === 'freight') {
     const freight = await orderFreightRepository.find(order.id);
     return freight && freight.confirmed_freight_rate !== null
-      ? Math.round((parseFloat(freight.confirmed_freight_rate) + (parseFloat(freight.insurance_amount) || 0)) * 100) / 100
+      // Q-R5-2: only a CIF seller insures; on CFR the Debit Note is freight only.
+      ? Math.round((parseFloat(freight.confirmed_freight_rate) + (String(order.incoterm_code || '').toUpperCase() === 'CIF' ? (parseFloat(freight.insurance_amount) || 0) : 0)) * 100) / 100
       : null;
   }
   return orderPaymentStatusRepository.balanceDue(fob, order.advance_pct, await orderPaymentStatusRepository.find(order.id));

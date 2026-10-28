@@ -10,26 +10,19 @@ use App\Services\DocumentGenerationService;
 use App\Tests\Support\DbTestCase;
 
 /**
- * External QA report N-14/L-17 — "Node quotation PDF now 5 pages vs PHP 6
- * pages... owner requires identical look." Root-caused by direct pt
- * measurement of generated PDFs (see this test's sibling in the Node
- * suite): for the identical HTML/CSS, DOMPDF lays out every data-table
- * row ~20% taller than Chromium does, and — confirmed by direct
- * experiment — DOMPDF does not honour an explicit CSS `line-height`
- * override for table row-height purposes the way Chromium does, so there
- * is no CSS-only lever that closes the gap. This is an upstream
- * DOMPDF-vs-Chromium rendering-engine difference, not a template bug:
- * the two stacks print the exact same words, in the exact same order,
- * with no data loss — only the page count differs. That is why this item
- * survived 2 prior QA retest rounds despite "Still open" fix attempts.
+ * External QA report N-14/L-17, QA Round 5 R5-12 — "Node quotation PDF 5
+ * pages vs PHP 6 pages... owner requires identical look."
  *
- * Rather than chase pixel parity across every shared template section
- * (which would mean degrading Chromium's more accurate layout to mimic
- * DOMPDF's inflated one, repeated across every document type), this test
- * pins each stack's CURRENT, already-reviewed page count for a Quotation
- * at a small size (1 product line) and a large size (60 lines, forcing
- * continuation pages) so a future template change can't silently drift
- * the page count further without a test noticing.
+ * Root cause (QA Round 5): DOMPDF builds a text line from the font's full
+ * height (Carlito ascender-descender x its 1.1 font-height ratio) and then
+ * multiplies that by line-height, while Chromium uses the font's own line
+ * metrics and rounds to whole pixels. Left at "normal", every PHP line and
+ * table row came out ~15% taller. _layout.html.twig now sets
+ * `line-height: 0.86` on body, which lands DOMPDF on Chromium's line pitch,
+ * and both layouts keep a section heading with the content that follows
+ * it. Both stacks now give the same page counts — these pins are the same
+ * numbers as Node's tests/manual/documentPageCountParity.js, so a future
+ * template change can't drift the two stacks apart without a test noticing.
  */
 final class DocumentPageCountParityTest extends DbTestCase
 {
@@ -62,7 +55,7 @@ final class DocumentPageCountParityTest extends DbTestCase
         if ($pageCount === null) {
             self::fail('Could not read the generated PDF with pdfinfo — install poppler-utils (e.g. apt install poppler-utils), which these PDF checks require, or the PDF itself is unreadable.');
         }
-        self::assertSame(6, $pageCount, 'PHP Quotation page count for a 1-line order drifted — see class docblock for the known DOMPDF/Chromium density gap before assuming this is a regression.');
+        self::assertSame(5, $pageCount, 'PHP Quotation page count for a 1-line order drifted from Node\'s (5) — see class docblock.');
     }
 
     public function testQuotationPageCountIsPinnedForALargeOrder(): void
@@ -79,6 +72,6 @@ final class DocumentPageCountParityTest extends DbTestCase
         if ($pageCount === null) {
             self::fail('Could not read the generated PDF with pdfinfo — install poppler-utils (e.g. apt install poppler-utils), which these PDF checks require, or the PDF itself is unreadable.');
         }
-        self::assertSame(9, $pageCount, 'PHP Quotation page count for a 60-line order drifted — see class docblock for the known DOMPDF/Chromium density gap before assuming this is a regression.');
+        self::assertSame(8, $pageCount, 'PHP Quotation page count for a 60-line order drifted from Node\'s (8) — see class docblock.');
     }
 }

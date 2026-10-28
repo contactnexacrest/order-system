@@ -2364,7 +2364,10 @@ final class OrderController
         ]));
         OrderFreightRepository::upsert($orderId, [
             'confirmed_freight_rate'    => trim((string) ($_POST['confirmed_freight_rate'] ?? '')) ?: null,
-            'insurance_amount'          => trim((string) ($_POST['insurance_amount'] ?? '')) ?: null,
+            // Q-R5-2: only a CIF seller insures — nothing is stored for FOB/CFR.
+            'insurance_amount'          => strtoupper((string) (OrderRepository::find($orderId)['incoterm_code'] ?? '')) === 'CIF'
+                ? (trim((string) ($_POST['insurance_amount'] ?? '')) ?: null)
+                : null,
             'freight_forwarder_name'    => $partner['partner_name'],
             'freight_forwarder_contact' => $contact !== '' ? $contact : null,
             'freight_forwarder_partner_id' => (int) $partner['id'],

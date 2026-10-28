@@ -131,10 +131,10 @@
     </fieldset>
 
     <fieldset id="freight-insurance-fieldset">
-      <legend>Indicative Freight / Insurance <small class="muted">(only relevant when Incoterm is not FOB)</small></legend>
+      <legend>Indicative Freight / Insurance <small class="muted">(only relevant when Incoterm is not FOB; insurance is CIF only)</small></legend>
       <div class="field-grid">
         <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit"><?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?></span></span>)<input type="text" name="indicative_freight_amount" value="<?= htmlspecialchars((string) ($order['indicative_freight_amount'] ?? '')) ?>" placeholder="e.g., 950"></label>
-        <label class="full">Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit"><?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?></span></span>)<input type="text" name="indicative_insurance_amount" value="<?= htmlspecialchars((string) ($order['indicative_insurance_amount'] ?? '')) ?>" placeholder="e.g., 150"></label>
+        <label id="insurance-field" class="full">Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit"><?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?></span></span>)<input type="text" name="indicative_insurance_amount" value="<?= htmlspecialchars((string) ($order['indicative_insurance_amount'] ?? '')) ?>" placeholder="e.g., 150"></label>
       </div>
     </fieldset>
 
@@ -196,6 +196,20 @@ function updateFreightFieldsAvailability(clearOnDisable) {
   // inputs are left out of the submission.
   fieldset.hidden = isFob;
   fieldset.disabled = isFob;
+  // QA Round 5, Q-R5-2: under Incoterms 2020 only a CIF seller insures —
+  // on FOB and CFR the buyer arranges insurance, so the field is CIF-only.
+  var insuranceField = document.getElementById('insurance-field');
+  if (insuranceField) {
+    var noInsurance = code !== 'CIF';
+    var insuranceOnly = insuranceField.querySelector('input');
+    // style.display, not just hidden: the sitewide label rule sets display:block.
+    insuranceField.hidden = noInsurance;
+    insuranceField.style.display = noInsurance ? 'none' : '';
+    if (insuranceOnly) {
+      insuranceOnly.disabled = noInsurance;
+      if (noInsurance && clearOnDisable) { insuranceOnly.value = ''; }
+    }
+  }
   if (isFob && clearOnDisable) {
     var freightInput = fieldset.querySelector('input[name="indicative_freight_amount"]');
     var insuranceInput = fieldset.querySelector('input[name="indicative_insurance_amount"]');

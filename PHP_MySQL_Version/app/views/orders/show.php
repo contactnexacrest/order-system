@@ -2739,7 +2739,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/freight-terms">
         <?= Csrf::field() ?>
         <label>Confirmed Freight Rate<input type="text" name="confirmed_freight_rate"></label>
+        <?php if (strtoupper((string) ($order['incoterm_code'] ?? '')) === 'CIF'): // Q-R5-2: only a CIF seller insures ?>
         <label>Insurance Amount (CIF only)<input type="text" name="insurance_amount"></label>
+        <?php endif; ?>
         <?php // Owner request (2026-10-27): the forwarder comes from the Logistics Partners directory, like the supplier in 7a. ?>
         <label>Freight Forwarder (Logistics Partner) *
           <select name="freight_forwarder_partner_id" required>
@@ -2756,7 +2758,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php else: ?>
       <div class="kv-grid">
         <div><span class="k">Confirmed Rate</span><span class="v"><?= $freight['confirmed_freight_rate'] !== null ? htmlspecialchars($freight['confirmed_freight_rate']) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></span></div>
-        <div><span class="k">Insurance</span><span class="v"><?= $freight['insurance_amount'] !== null ? htmlspecialchars($freight['insurance_amount']) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : 'NIL' ?></span></div>
+        <div><span class="k">Insurance</span><span class="v"><?= strtoupper((string) ($order['incoterm_code'] ?? '')) !== 'CIF' ? 'NIL — buyer arranges insurance' : ($freight['insurance_amount'] !== null ? htmlspecialchars($freight['insurance_amount']) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : 'NIL') ?></span></div>
         <div><span class="k">Forwarder</span><span class="v"><?= htmlspecialchars($freight['freight_forwarder_name'] ?? '—') ?></span></div>
         <div><span class="k">Forwarder Contact</span><span class="v"><?= htmlspecialchars($freight['freight_forwarder_contact'] ?? '—') ?></span></div>
       </div>

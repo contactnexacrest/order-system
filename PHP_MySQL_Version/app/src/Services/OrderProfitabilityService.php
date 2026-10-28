@@ -75,7 +75,9 @@ final class OrderProfitabilityService
 
         $freight = OrderFreightRepository::find($orderId);
         $freightCostInr = ($freight !== null && $freight['confirmed_freight_rate'] !== null) ? (float) $freight['confirmed_freight_rate'] : 0.0;
-        $insuranceCostInr = ($freight !== null && $freight['insurance_amount'] !== null) ? (float) $freight['insurance_amount'] : 0.0;
+        // Q-R5-2: insurance is a seller cost on CIF only; on FOB/CFR the buyer insures.
+        $isCif = strtoupper((string) ($order['incoterm_code'] ?? '')) === 'CIF';
+        $insuranceCostInr = ($isCif && $freight !== null && $freight['insurance_amount'] !== null) ? (float) $freight['insurance_amount'] : 0.0;
 
         // Owner decisions (2026-10-27): the logistics partners' bills (CHA,
         // transport, forwarder) are costs of the order. The forwarder's real

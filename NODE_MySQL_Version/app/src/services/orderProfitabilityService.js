@@ -70,7 +70,9 @@ async function computeForOrder(orderId) {
   let freightCostInr = freight && freight.confirmed_freight_rate !== null
     ? Number(freight.confirmed_freight_rate)
     : 0;
-  const insuranceCostInr = freight && freight.insurance_amount !== null
+  // Q-R5-2: insurance is a seller cost on CIF only; on FOB/CFR the buyer insures.
+  const isCif = String((order && order.incoterm_code) || '').toUpperCase() === 'CIF';
+  const insuranceCostInr = isCif && freight && freight.insurance_amount !== null
     ? Number(freight.insurance_amount)
     : 0;
 

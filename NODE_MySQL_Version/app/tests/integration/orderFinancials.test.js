@@ -139,7 +139,8 @@ describe('Order Financials (Section AP)', () => {
 
   it('profitability rolls up supplier/freight/other costs into total and margin', async () => {
     const userId = await createTestUser();
-    const orderId = await createTestOrder(await createTestClient());
+    // CIF: insurance is a seller cost only on CIF (QA Round 5, Q-R5-2).
+    const orderId = await createTestOrder(await createTestClient(), 'CIF');
     await orderProductRepository.add(orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 85.0, userId); // revenue 85000

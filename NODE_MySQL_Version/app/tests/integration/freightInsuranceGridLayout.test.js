@@ -14,6 +14,6 @@ describe('Freight/Insurance grid layout (External QA report U-17)', () => {
     const html = fs.readFileSync(path.join(__dirname, '../../views/orders/create.njk'), 'utf8');
 
     expect(html).toMatch(/<label>Freight \(indicative/);
-    expect(html).toMatch(/<label>Insurance \(indicative/);
+    expect(html).toMatch(/<label( id="insurance-field")?>Insurance \(indicative/);
   });
 });

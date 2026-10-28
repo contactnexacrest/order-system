@@ -79,7 +79,7 @@
 {%- endif -%}.</p>
 
 <div class="section-title">{{ section_numbers.invoice_value }}. INVOICE VALUE &amp; PAYMENT SETTLEMENT</div>
-<div class="banner" style="background:#E8F1FB; color:#185FA5;">FOB Value is the basis for all payments and required for Indian Shipping Bill &amp; IGST refund — shown separately below regardless of Incoterm.{% if not order.is_fob %} Freight &amp; Insurance is recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.{% else %} Freight &amp; Insurance is not applicable — buyer arranges, FOB.{% endif %}</div>
+<div class="banner" style="background:#E8F1FB; color:#185FA5;">FOB Value is the basis for all payments and required for Indian Shipping Bill &amp; IGST refund — shown separately below regardless of Incoterm.{% if not order.is_fob %} {% if order.is_cif %}Freight &amp; Insurance is{% else %}Freight is{% endif %} recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.{% else %} Freight &amp; Insurance is not applicable — buyer arranges, FOB.{% endif %}</div>
 
 <table class="kv" style="table-layout:fixed;">
   <tr><td colspan="3" style="background:#173B73; color:#FFFFFF; font-weight:bold; border-color:#173B73;">SECTION A — INVOICE VALUE</td></tr>
@@ -89,7 +89,7 @@
     <td class="v" style="width:40%; font-style:italic; font-size:8.5pt; color:#555555;">Sum of all product lines above — basis for all payments; required for Indian Shipping Bill &amp; IGST refund</td>
   </tr>
   <tr>
-    <td class="k">Freight &amp; Insurance</td>
+    <td class="k">Freight{% if order.is_cif or order.is_fob %} &amp; Insurance{% endif %}</td>
     <td class="v" style="text-align:right;">{% if order.is_fob %}NIL — FOB order <strong style="color:#C0392B;">*</strong>{% else %}{{ order.currency_code }} {{ financial.freight_insurance_amount or 'To Be Confirmed' }} <strong style="color:#C0392B;">*</strong>{% endif %}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">
       {% if order.is_fob %}FOB: buyer arranges — write NIL{% else %}Paid separately via Debit Note No. {{ order.fdn_ref or 'To Be Confirmed' }} dated {{ order.fdn_date or 'To Be Confirmed' }}. Included in the Total Commercial Invoice Value below.{% endif %}
@@ -98,7 +98,7 @@
   <tr>
     <td class="k" style="font-weight:bold;">TOTAL COMMERCIAL INVOICE VALUE</td>
     <td class="v" style="text-align:right; font-weight:bold;">{{ order.currency_code }} {{ financial.total_commercial_invoice_value }} <strong style="color:#C0392B;">*</strong></td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}= FOB Value (no freight/insurance on an FOB order){% else %}= FOB Value + Freight &amp; Insurance{% endif %} &middot; Currency: {{ order.currency_code }}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}= FOB Value (no freight/insurance on an FOB order){% else %}= FOB Value + Freight{% if order.is_cif %} &amp; Insurance{% endif %}{% endif %} &middot; Currency: {{ order.currency_code }}</td>
   </tr>
   <tr><td colspan="3" style="background:#173B73; color:#FFFFFF; font-weight:bold; border-color:#173B73;">SECTION B — PAYMENT SETTLEMENT</td></tr>
   <tr>
@@ -107,7 +107,7 @@
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Received: {{ payment_status.advance_cleared_at or 'To Be Confirmed' }}<br>Against: PI No. {{ order.pi_ref or 'To Be Confirmed' }}</td>
   </tr>
   <tr>
-    <td class="k">&#8730;&nbsp; Freight &amp; Insurance — {% if order.is_fob %}NIL (FOB){% else %}{{ 'PAID VIA DEBIT NOTE' if payment_status.freight_cleared_at else 'PENDING' }}{% endif %}</td>
+    <td class="k">&#8730;&nbsp; Freight{% if order.is_cif or order.is_fob %} &amp; Insurance{% endif %} — {% if order.is_fob %}NIL (FOB){% else %}{{ 'PAID VIA DEBIT NOTE' if payment_status.freight_cleared_at else 'PENDING' }}{% endif %}</td>
     <td class="v" style="text-align:right;">{% if order.is_fob %}NIL — FOB{% else %}{{ order.currency_code }} {{ payment_status.freight_amount or 'To Be Confirmed' }} <strong style="color:#C0392B;">*</strong>{% endif %}</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}FOB: buyer arranges — write NIL{% else %}CFR/CIF: Against Debit Note No. {{ order.fdn_ref or 'To Be Confirmed' }} dated {{ order.fdn_date or 'To Be Confirmed' }}{% endif %}</td>
   </tr>
@@ -124,7 +124,7 @@
   <tr>
     <td class="k">VERIFICATION</td>
     <td class="v" style="text-align:right;">Advance + Balance = FOB Value<br>{{ payment_status.advance_amount or financial.advance_amount }} + {{ payment_status.balance_amount or financial.balance_amount }} = {{ financial.fob_value }} &#8730;</td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}Freight &amp; Insurance not applicable on an FOB order.{% else %}Freight &amp; Insurance is paid separately via Debit Note, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.{% endif %}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}Freight &amp; Insurance not applicable on an FOB order.{% else %}Freight{% if order.is_cif %} &amp; Insurance is{% else %} is{% endif %} paid separately via Debit Note, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.{% endif %}</td>
   </tr>
 </table>
 <p class="mandatory-note" style="margin-top:6pt;"><strong>Total Invoice Value in Words ({{ order.currency_code }}):</strong> <span class="placeholder-italic">{{ financial.fob_value_in_words or '_________________________________________________________' }}</span> <strong style="color:#C0392B;">*</strong></p>

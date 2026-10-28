@@ -14,7 +14,14 @@
    */
   @page { margin: 0.5in 0.59in; }
   * { box-sizing: border-box; }
-  body { font-family: 'Aptos', sans-serif; font-size: 9.5pt; color: #000000; }
+  /* QA Round 5, R5-12: Dompdf builds a line from the font's full height
+     (Carlito ascender-descender x its 1.1 font-height ratio) and then
+     multiplies that by line-height, where Chromium (Node) uses the font's
+     own line gap and rounds to whole pixels. Left at "normal", every PHP
+     line and table row came out ~15% taller and PHP documents ran 1-2
+     pages longer than Node's. 0.86 lands Dompdf on Chromium's line pitch
+     (11.25pt at 9.5pt, 10.5pt at 9pt). Node keeps "normal". */
+  body { font-family: 'Aptos', sans-serif; font-size: 9.5pt; line-height: 0.86; color: #000000; }
 
   table { border-collapse: collapse; }
   img { -webkit-print-color-adjust: exact; }
@@ -71,12 +78,13 @@
   .step-no { display: block; background: #17233A; color: #FFFFFF; font-weight: bold; text-align: center; padding: 3pt 0; }
 
   /* --- Section title bar: solid navy, white bold text, no border --- */
-  .section-title { background: #17233A; color: #FFFFFF; font-size: 11pt; font-weight: bold; padding: 4pt 9pt; margin-top: 9pt; margin-bottom: 6pt; }
+  /* R5-12: a section heading never sits alone at the foot of a page. */
+  .section-title { background: #17233A; color: #FFFFFF; font-size: 11pt; font-weight: bold; padding: 4pt 9pt; margin-top: 9pt; margin-bottom: 6pt; page-break-after: avoid; break-after: avoid; }
   /* --- Point 7: Special Requirements/Instructions gets an amber title bar
      (instead of the ordinary navy one) plus a tinted box around its
      content, so it visually stands out from routine sections rather than
      blending into the surrounding terms. --- */
-  .section-title-highlight { background: #8A6D1D; color: #FFFFFF; font-size: 11pt; font-weight: bold; padding: 4pt 9pt; margin-top: 9pt; margin-bottom: 6pt; }
+  .section-title-highlight { background: #8A6D1D; color: #FFFFFF; font-size: 11pt; font-weight: bold; padding: 4pt 9pt; margin-top: 9pt; margin-bottom: 6pt; page-break-after: avoid; break-after: avoid; }
   .box-highlight-amber { background: #FAEEDA; border: 1px solid #8A6D1D; color: #5C4813; padding: 6pt 9pt; font-size: 9.5pt; margin-bottom: 6pt; }
 
   /* --- Key/value table: alternating white/shaded rows, bold navy labels --- */

@@ -69,10 +69,10 @@
 <table class="totals">
   <tr><td class="k">FOB Value ({{ order.currency_code }}) *</td><td class="v">{{ financial.fob_value }}</td></tr>
   <tr><td class="k">Freight ({{ order.currency_code }})</td><td class="v">
-    {% if order.is_fob %}NIL{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_freight_amount or 'XXX' }} per {{ order.container_type }}, {{ order.port_of_loading }} to {{ order.port_of_discharge }}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against our Debit Note, before the vessel is booked.{% endif %}
+    {% if order.is_fob %}NIL{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_freight_amount or 'XXX' }} per {{ order.container_type }}, {{ order.port_of_loading }} to {{ order.port_of_discharge }}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight{% if order.is_cif %} and insurance are{% else %} is{% endif %} paid in full in advance against our Debit Note, before the vessel is booked.{% endif %}
   </td></tr>
   <tr><td class="k">Insurance ({{ order.currency_code }})</td><td class="v">
-    {% if order.is_fob %}NIL{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_insurance_amount or 'XX' }}. Confirmed by Debit Note when cargo is ready.{% endif %}
+    {% if order.is_fob %}NIL{% elif not order.is_cif %}NIL — buyer arranges insurance (CFR).{% else %}Indicative approx. {{ order.currency_code }} {{ order.indicative_insurance_amount or 'XX' }}. Confirmed by Debit Note when cargo is ready.{% endif %}
   </td></tr>
   <tr class="highlight"><td class="k">TOTAL PI VALUE ({{ order.currency_code }}) *</td><td class="v">{{ financial.total_value }}</td></tr>
 </table>
@@ -94,7 +94,7 @@
   <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
   <tr><td class="k">Container Type</td><td class="v">{{ order.container_type }}</td></tr>
   <tr><td class="k">Est. Shipment Date</td><td class="v">{{ order.est_shipment_date_text }}</td></tr>
-  <tr><td class="k">Insurance</td><td class="v">{% if order.is_fob %}Buyer's responsibility.{% else %}Seller arranges — cost included in invoice.{% endif %}</td></tr>
+  <tr><td class="k">Insurance</td><td class="v">{% if not order.is_cif %}Buyer's responsibility.{% else %}Seller arranges — cost included in invoice.{% endif %}</td></tr>
 </table>
 
 <div class="section-title">{{ section_numbers.payment }}. PAYMENT TERMS</div>
@@ -104,7 +104,7 @@
   <p>&#8226; {{ financial.balance_pct }}% Balance Payment on FOB Value {{ financial.balance_terms_text }} <span class="mand-star">*</span></p>
   <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Balance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.balance_amount }} <span class="mand-star">*</span></p>
   {% if not order.is_fob %}
-  <p>&#8226; Freight &amp; Insurance (CFR/CIF orders only): <span class="sub-line">Actual confirmed amounts invoiced separately by Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Debit Note date.</span></p>
+  <p>&#8226; {% if order.is_cif %}Freight &amp; Insurance (CFR/CIF orders only){% else %}Freight (CFR order — buyer arranges insurance){% endif %}: <span class="sub-line">Actual confirmed amounts invoiced separately by Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Debit Note date.</span></p>
   {% endif %}
   <p>&nbsp;&nbsp;Currency: {{ order.currency_code }}</p>
 </div>

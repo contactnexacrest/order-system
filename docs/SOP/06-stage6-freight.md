@@ -8,6 +8,15 @@ then recovers that cost from the buyer via a separate Debit Note. On an
 FOB order this whole stage is irrelevant, since the buyer books and pays
 for their own freight directly.
 
+**Insurance is CIF only** (owner decision, QA Round 5, Q-R5-2). Under
+Incoterms 2020 a CFR seller pays freight only and the buyer insures the
+cargo. So on a CFR order the Insurance Amount box is not shown, the Debit
+Note and its payment link ask for freight only, the Quotation and
+Proforma Invoice print insurance as "NIL — buyer arranges insurance
+(CFR)" and "Buyer's responsibility", and the Commercial Invoice says
+"Freight" instead of "Freight & Insurance". An insurance figure stored on
+a CFR order before this rule is ignored everywhere.
+
 The internal code for this document type stays **FDN** (the **Generate
 Freight Debit Note** button, the reference number's old `SC/FDN/…`
 pattern pre-dating this change, and this chapter's own wording below all
@@ -43,7 +52,7 @@ On a CFR/CIF order, Stage 6 unlocks as a normal stage once Stage 5 passes:
 
 **Save Freight Terms** records the rate NexaCrest actually agreed with the
 shipping line/forwarder (confirmed freight rate, insurance amount on CIF
-orders) and the **Freight Forwarder**, chosen from the **Logistics
+orders — the box is shown on CIF orders only) and the **Freight Forwarder**, chosen from the **Logistics
 Partners** directory like the supplier in Step 7a comes from the
 Suppliers directory (owner request 2026-10-27). The directory has a
 **Freight Forwarder** service type for them (alongside CHA and

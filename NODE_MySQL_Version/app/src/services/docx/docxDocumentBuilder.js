@@ -157,7 +157,7 @@ function paymentTermsBlock(context) {
   if (!order.is_fob) {
     out.push(
       C.rich([
-        ['• Freight & Insurance (CFR/CIF orders only): ', {}],
+        [order.is_cif ? '• Freight & Insurance (CFR/CIF orders only): ' : '• Freight (CFR order — buyer arranges insurance): ', {}],
         ['Actual confirmed amounts invoiced separately by Freight Debit Note before shipment booking is confirmed. Payment required within 3 working days of Freight Debit Note date.', { color: '333333' }],
       ])
     );
@@ -222,8 +222,8 @@ function renderQt(context) {
 
   const freightText = order.is_fob
     ? 'NIL'
-    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against our Debit Note, before the vessel is booked.`;
-  const insuranceText = order.is_fob ? "NIL" : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
+    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight ${order.is_cif ? 'and insurance are' : 'is'} paid in full in advance against our Debit Note, before the vessel is booked.`;
+  const insuranceText = order.is_fob ? "NIL" : !order.is_cif ? 'NIL — buyer arranges insurance (CFR).' : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
   children.push(
     ...C.totalsTable([
       { label: `FOB Value (${currency}) *`, value: g(financial, 'fob_value') },
@@ -243,7 +243,7 @@ function renderQt(context) {
       { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
       { label: 'Container Type', value: g(order, 'container_type') },
       { label: 'Est. Lead Time', value: g(order, 'est_lead_time_text') },
-      { label: 'Insurance', value: order.is_fob ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.' },
+      { label: 'Insurance', value: !order.is_cif ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.' },
     ])
   );
 
@@ -357,8 +357,8 @@ function renderPi(context) {
 
   const freightText = order.is_fob
     ? 'NIL'
-    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against our Debit Note, before the vessel is booked.`;
-  const insuranceText = order.is_fob ? "NIL" : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
+    : `Indicative approx. ${currency} ${g(order, 'indicative_freight_amount', 'XXX')} per ${g(order, 'container_type')}, ${g(order, 'port_of_loading')} to ${g(order, 'port_of_discharge')}. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight ${order.is_cif ? 'and insurance are' : 'is'} paid in full in advance against our Debit Note, before the vessel is booked.`;
+  const insuranceText = order.is_fob ? "NIL" : !order.is_cif ? 'NIL — buyer arranges insurance (CFR).' : `Indicative approx. ${currency} ${g(order, 'indicative_insurance_amount', 'XX')}. Confirmed by Freight Debit Note when cargo is ready.`;
   children.push(
     ...C.totalsTable([
       { label: `FOB Value (${currency}) *`, value: g(financial, 'fob_value') },
@@ -378,7 +378,7 @@ function renderPi(context) {
       { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
       { label: 'Container Type', value: g(order, 'container_type') },
       { label: 'Est. Shipment Date', value: g(order, 'est_shipment_date_text') },
-      { label: 'Insurance', value: order.is_fob ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.' },
+      { label: 'Insurance', value: !order.is_cif ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.' },
     ])
   );
 
@@ -1491,6 +1491,7 @@ function renderCi(context) {
 
   children.push(...C.sectionTitle('5. INVOICE VALUE & PAYMENT SETTLEMENT'));
   const isFob = !!order.is_fob;
+  const isCif = !!order.is_cif;
   // 90-item backlog item #18 (BLOCKER) — see documentDataAssembler's
   // freightForTotal/totalCommercialInvoiceValue computation for the
   // full rationale. CI-only; financial.total_value (QT/PI/OC's own
@@ -1501,7 +1502,7 @@ function renderCi(context) {
         'FOB Value is the basis for all payments and required for Indian Shipping Bill & IGST refund — shown separately below regardless of Incoterm. '
           + (isFob
             ? 'Freight & Insurance is not applicable — buyer arranges, FOB.'
-            : 'Freight & Insurance is recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.'),
+            : `${isCif ? 'Freight & Insurance is' : 'Freight is'} recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.`),
         { color: C.BLUE_TEXT }
       ),
     ], 0)
@@ -1510,8 +1511,8 @@ function renderCi(context) {
   const freightRemark = isFob ? 'FOB: buyer arranges — write NIL' : `Paid separately via Freight Debit Note No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}. Included in the Total Commercial Invoice Value below.`;
   const sectionARows = [
     ['FOB Value (goods)', `${currency} ${g(financial, 'fob_value')} *`, 'Sum of all product lines above — basis for all payments; required for Indian Shipping Bill & IGST refund'],
-    ['Freight & Insurance', `${isFob ? 'NIL — FOB order' : `${currency} ${g(financial, 'freight_insurance_amount', 'To Be Confirmed')}`} *`, freightRemark],
-    ['TOTAL COMMERCIAL INVOICE VALUE', `${currency} ${g(financial, 'total_commercial_invoice_value')} *`, `${isFob ? '= FOB Value (no freight/insurance on an FOB order)' : '= FOB Value + Freight & Insurance'} · Currency: ${currency}`],
+    [isCif || isFob ? 'Freight & Insurance' : 'Freight', `${isFob ? 'NIL — FOB order' : `${currency} ${g(financial, 'freight_insurance_amount', 'To Be Confirmed')}`} *`, freightRemark],
+    ['TOTAL COMMERCIAL INVOICE VALUE', `${currency} ${g(financial, 'total_commercial_invoice_value')} *`, `${isFob ? '= FOB Value (no freight/insurance on an FOB order)' : isCif ? '= FOB Value + Freight & Insurance' : '= FOB Value + Freight'} · Currency: ${currency}`],
   ];
   children.push(...C.threeColFinanceTable('SECTION A — INVOICE VALUE', sectionARows, C.NAVY_MID));
 
@@ -1528,7 +1529,7 @@ function renderCi(context) {
       `${currency} ${advanceAmt} *`,
       `Received: ${g(payment, 'advance_cleared_at', 'To Be Confirmed')}\nAgainst: PI No. ${g(order, 'pi_ref', 'To Be Confirmed')}`,
     ],
-    [`√  Freight & Insurance — ${freightStatus}`, freightAmtCell, freightRemark2],
+    [`√  ${isCif || isFob ? 'Freight & Insurance' : 'Freight'} — ${freightStatus}`, freightAmtCell, freightRemark2],
     ['SUBTOTAL ALREADY PAID', subtotalPaid, `Advance${!isFob ? ' + FDN (if applicable)' : ''}`],
     [
       '→  BALANCE DUE NOW',
@@ -1541,7 +1542,7 @@ function renderCi(context) {
       `Advance + Balance = FOB Value\n${advanceAmt} + ${balanceAmt} = ${g(financial, 'fob_value')} √`,
       isFob
         ? 'Freight & Insurance not applicable on an FOB order.'
-        : 'Freight & Insurance is paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.',
+        : `${isCif ? 'Freight & Insurance is' : 'Freight is'} paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.`,
     ],
   ];
   children.push(...C.threeColFinanceTable('SECTION B — PAYMENT SETTLEMENT', sectionBRows, C.NAVY_MID));

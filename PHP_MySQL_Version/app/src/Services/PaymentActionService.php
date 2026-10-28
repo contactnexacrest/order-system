@@ -74,7 +74,8 @@ final class PaymentActionService
         if ($leg === 'freight') {
             $freight = OrderFreightRepository::find($orderId);
             return $freight && $freight['confirmed_freight_rate'] !== null
-                ? round((float) $freight['confirmed_freight_rate'] + (float) ($freight['insurance_amount'] ?? 0), 2)
+                // Q-R5-2: only a CIF seller insures; on CFR the Debit Note is freight only.
+                ? round((float) $freight['confirmed_freight_rate'] + (strtoupper((string) ($order['incoterm_code'] ?? '')) === 'CIF' ? (float) ($freight['insurance_amount'] ?? 0) : 0.0), 2)
                 : null;
         }
         return OrderPaymentStatusRepository::balanceDue($fob, (float) ($order['advance_pct'] ?? 0), OrderPaymentStatusRepository::find($orderId));

@@ -2258,7 +2258,9 @@
       <form method="post" action="/orders/{{ order.id }}/freight-terms">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Confirmed Freight Rate<input type="text" name="confirmed_freight_rate"></label>
+        {% if (order.incoterm_code or '') | upper == 'CIF' %}{# Q-R5-2: only a CIF seller insures #}
         <label>Insurance Amount (CIF only)<input type="text" name="insurance_amount"></label>
+        {% endif %}
         {# Owner request (2026-10-27): the forwarder comes from the Logistics Partners directory, like the supplier in 7a. #}
         <label>Freight Forwarder (Logistics Partner) *
           <select name="freight_forwarder_partner_id" required>
@@ -2275,7 +2277,7 @@
     {% else %}
       <div class="kv-grid">
         <div><span class="k">Confirmed Rate</span><span class="v">{{ (freight.confirmed_freight_rate ~ ' ' ~ (order.currency_code or '')) if freight.confirmed_freight_rate != null else '—' }}</span></div>
-        <div><span class="k">Insurance</span><span class="v">{{ (freight.insurance_amount ~ ' ' ~ (order.currency_code or '')) if freight.insurance_amount != null else 'NIL' }}</span></div>
+        <div><span class="k">Insurance</span><span class="v">{{ 'NIL — buyer arranges insurance' if (order.incoterm_code or '') | upper != 'CIF' else ((freight.insurance_amount ~ ' ' ~ (order.currency_code or '')) if freight.insurance_amount != null else 'NIL') }}</span></div>
         <div><span class="k">Forwarder</span><span class="v">{{ freight.freight_forwarder_name or '—' }}</span></div>
         <div><span class="k">Forwarder Contact</span><span class="v">{{ freight.freight_forwarder_contact or '—' }}</span></div>
       </div>

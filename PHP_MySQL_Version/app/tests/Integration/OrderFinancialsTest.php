@@ -127,7 +127,8 @@ final class OrderFinancialsTest extends DbTestCase
     public function testProfitabilityRollsUpSupplierFreightAndOtherCostsIntoTotalAndMargin(): void
     {
         $userId = $this->createTestUser('Admin');
-        $orderId = $this->createTestOrder($this->createTestClient());
+        // CIF: insurance is a seller cost only on CIF (QA Round 5, Q-R5-2).
+        $orderId = $this->createTestOrder($this->createTestClient(), 'CIF');
         OrderProductRepository::add($orderId, 1, 'Test Stone', null, null, '10', false, 'SQM', '100');
         OrderPaymentStatusRepository::initializeForOrder($orderId);
         OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', 85.0, $userId); // revenue 85000

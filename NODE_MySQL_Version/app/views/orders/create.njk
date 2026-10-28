@@ -112,10 +112,10 @@
     </fieldset>
 
     <fieldset id="freight-insurance-fieldset">
-      <legend>Indicative Freight / Insurance <small class="muted">(printed on the Quotation only for CFR/CIF — not needed for FOB)</small></legend>
+      <legend>Indicative Freight / Insurance <small class="muted">(printed on the Quotation only for CFR/CIF — not needed for FOB; insurance is CIF only)</small></legend>
       <div class="field-grid">
         <label>Freight (indicative, <span class="muted">in <span id="freight-currency-unit">order currency</span></span>)<input type="text" name="indicative_freight_amount" value="{{ old.indicative_freight_amount or '' }}" placeholder="e.g. 950"></label>
-        <label>Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit">order currency</span></span>)<input type="text" name="indicative_insurance_amount" value="{{ old.indicative_insurance_amount or '' }}" placeholder="e.g. 120"></label>
+        <label id="insurance-field">Insurance (indicative, <span class="muted">in <span id="insurance-currency-unit">order currency</span></span>)<input type="text" name="indicative_insurance_amount" value="{{ old.indicative_insurance_amount or '' }}" placeholder="e.g. 120"></label>
       </div>
       <p class="muted small">Ocean freight isn't booked yet at this stage, so rates can move before the actual booking. This is the current indicative rate only — the real rate is confirmed by Debit Note once cargo is packed and ready (Stage 6). Ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against the Debit Note, before the vessel is booked.</p>
     </fieldset>
@@ -218,6 +218,20 @@ function updateFreightFieldsAvailability(clearOnDisable) {
   // inputs are left out of the submission.
   fieldset.hidden = isFob;
   fieldset.disabled = isFob;
+  // QA Round 5, Q-R5-2: under Incoterms 2020 only a CIF seller insures —
+  // on FOB and CFR the buyer arranges insurance, so the field is CIF-only.
+  var insuranceField = document.getElementById('insurance-field');
+  if (insuranceField) {
+    var noInsurance = code !== 'CIF';
+    var insuranceOnly = insuranceField.querySelector('input');
+    // style.display, not just hidden: the sitewide label rule sets display:block.
+    insuranceField.hidden = noInsurance;
+    insuranceField.style.display = noInsurance ? 'none' : '';
+    if (insuranceOnly) {
+      insuranceOnly.disabled = noInsurance;
+      if (noInsurance && clearOnDisable) { insuranceOnly.value = ''; }
+    }
+  }
   if (isFob && clearOnDisable) {
     var freightInput = fieldset.querySelector('input[name="indicative_freight_amount"]');
     var insuranceInput = fieldset.querySelector('input[name="indicative_insurance_amount"]');

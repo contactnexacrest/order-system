@@ -2406,7 +2406,10 @@ async function saveFreightTerms(req, res) {
   const contact = [partner.contact_person_name, partner.contact_person_phone || partner.phone, partner.email].filter(Boolean).join(' · ');
   await orderFreightRepository.upsert(orderId, {
     confirmed_freight_rate: str(body.confirmed_freight_rate) || null,
-    insurance_amount: str(body.insurance_amount) || null,
+    // Q-R5-2: only a CIF seller insures — nothing is stored for FOB/CFR.
+    insurance_amount: String(((await orderRepository.find(orderId)) || {}).incoterm_code || '').toUpperCase() === 'CIF'
+      ? (str(body.insurance_amount) || null)
+      : null,
     freight_forwarder_name: partner.partner_name,
     freight_forwarder_contact: contact || null,
     freight_forwarder_partner_id: partner.id,

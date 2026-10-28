@@ -1,25 +1,15 @@
 'use strict';
 
 /**
- * External QA report N-14/L-17 — "Node quotation PDF now 5 pages vs PHP 6
- * pages... owner requires identical look." Root-caused by direct pt
- * measurement of generated PDFs (see PHP's sibling test,
- * tests/Integration/DocumentPageCountParityTest.php): for the identical
- * HTML/CSS, DOMPDF lays out every data-table row ~20% taller than
- * Chromium does, and — confirmed by direct experiment — DOMPDF does not
- * honour an explicit CSS `line-height` override for table row-height
- * purposes the way Chromium does, so there is no CSS-only lever that
- * closes the gap. This is an upstream DOMPDF-vs-Chromium rendering-engine
- * difference, not a template bug: both stacks print the exact same
- * words, in the exact same order, with no data loss — only the page
- * count differs. That is why this item survived 2 prior QA retest rounds.
- *
- * This pins Node's CURRENT, already-reviewed page count (rather than
- * chasing pixel parity with DOMPDF, which would mean degrading
- * Chromium's more accurate layout to mimic DOMPDF's inflated one, across
- * every shared template section) so a future template or Puppeteer/
- * Chromium upgrade can't silently drift the page count further without
- * someone noticing.
+ * External QA report N-14/L-17, QA Round 5 R5-12 — "Node quotation PDF 5
+ * pages vs PHP 6 pages... owner requires identical look." Fixed in QA
+ * Round 5: PHP's _layout.html.twig sets a line-height that lands DOMPDF on
+ * Chromium's line pitch, and both layouts keep a section heading with the
+ * content that follows it (see PHP's sibling,
+ * tests/Integration/DocumentPageCountParityTest.php, for the root cause).
+ * Both stacks now give the same page counts; these pins are the same
+ * numbers PHP's test asserts, so neither stack can drift without someone
+ * noticing.
  *
  * NOT a Jest test: jest.config.js's moduleNameMapper intentionally stubs
  * puppeteer-core for the whole suite (see

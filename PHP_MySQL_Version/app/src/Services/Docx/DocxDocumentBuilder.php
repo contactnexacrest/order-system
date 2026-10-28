@@ -219,7 +219,7 @@ final class DocxDocumentBuilder
         ]);
         if (empty($order['is_fob'])) {
             DocxComponents::addRichParagraph($section, [
-                ['• Freight & Insurance (CFR/CIF orders only): ', []],
+                [!empty($order['is_cif']) ? '• Freight & Insurance (CFR/CIF orders only): ' : '• Freight (CFR order — buyer arranges insurance): ', []],
                 ['Actual confirmed amounts invoiced separately by Freight Debit Note before shipment booking is confirmed. Payment required within 3 working days of Freight Debit Note date.', ['color' => '333333']],
             ]);
         }
@@ -277,8 +277,8 @@ final class DocxDocumentBuilder
 
         $freightText = !empty($order['is_fob'])
             ? 'NIL'
-            : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_freight_amount', 'XXX') . ' per ' . self::g($order, 'container_type') . ', ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge') . '. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against our Debit Note, before the vessel is booked.';
-        $insuranceText = !empty($order['is_fob']) ? "NIL" : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Freight Debit Note when cargo is ready.';
+            : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_freight_amount', 'XXX') . ' per ' . self::g($order, 'container_type') . ', ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge') . '. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight' . (!empty($order['is_cif']) ? ' and insurance are' : ' is') . ' paid in full in advance against our Debit Note, before the vessel is booked.';
+        $insuranceText = !empty($order['is_fob']) ? "NIL" : (empty($order['is_cif']) ? 'NIL — buyer arranges insurance (CFR).' : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Freight Debit Note when cargo is ready.');
         DocxComponents::addTotalsTable($section, [
             ['label' => "FOB Value ({$currency}) *", 'value' => self::g($financial, 'fob_value')],
             ['label' => "Freight ({$currency})", 'value' => $freightText],
@@ -295,7 +295,7 @@ final class DocxDocumentBuilder
             ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Container Type', 'value' => self::g($order, 'container_type')],
             ['label' => 'Est. Lead Time', 'value' => self::g($order, 'est_lead_time_text')],
-            ['label' => 'Insurance', 'value' => !empty($order['is_fob']) ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.'],
+            ['label' => 'Insurance', 'value' => empty($order['is_cif']) ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.'],
         ]);
 
         DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
@@ -399,8 +399,8 @@ final class DocxDocumentBuilder
 
         $freightText = !empty($order['is_fob'])
             ? 'NIL'
-            : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_freight_amount', 'XXX') . ' per ' . self::g($order, 'container_type') . ', ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge') . '. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight and insurance are paid in full in advance against our Debit Note, before the vessel is booked.';
-        $insuranceText = !empty($order['is_fob']) ? "NIL" : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Freight Debit Note when cargo is ready.';
+            : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_freight_amount', 'XXX') . ' per ' . self::g($order, 'container_type') . ', ' . self::g($order, 'port_of_loading') . ' to ' . self::g($order, 'port_of_discharge') . '. Current indicative rate only — ocean freight rates are changing often at the moment, so the rate confirmed at the time of vessel booking may be lower or higher. Freight' . (!empty($order['is_cif']) ? ' and insurance are' : ' is') . ' paid in full in advance against our Debit Note, before the vessel is booked.';
+        $insuranceText = !empty($order['is_fob']) ? "NIL" : (empty($order['is_cif']) ? 'NIL — buyer arranges insurance (CFR).' : 'Indicative approx. ' . $currency . ' ' . self::g($order, 'indicative_insurance_amount', 'XX') . '. Confirmed by Freight Debit Note when cargo is ready.');
         DocxComponents::addTotalsTable($section, [
             ['label' => "FOB Value ({$currency}) *", 'value' => self::g($financial, 'fob_value')],
             ['label' => "Freight ({$currency})", 'value' => $freightText],
@@ -417,7 +417,7 @@ final class DocxDocumentBuilder
             ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Container Type', 'value' => self::g($order, 'container_type')],
             ['label' => 'Est. Shipment Date', 'value' => self::g($order, 'est_shipment_date_text')],
-            ['label' => 'Insurance', 'value' => !empty($order['is_fob']) ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.'],
+            ['label' => 'Insurance', 'value' => empty($order['is_cif']) ? "Buyer's responsibility." : 'Seller arranges — cost included in invoice.'],
         ]);
 
         DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
@@ -1395,11 +1395,12 @@ final class DocxDocumentBuilder
 
         DocxComponents::addSectionTitle($section, '5. INVOICE VALUE & PAYMENT SETTLEMENT');
         $isFob = !empty($order['is_fob']);
-        DocxComponents::addColorBox($section, 'E8F1FB', DocxComponents::BLUE_TEXT, function (AbstractContainer $cell) use ($isFob) {
+        $isCif = !empty($order['is_cif']);
+        DocxComponents::addColorBox($section, 'E8F1FB', DocxComponents::BLUE_TEXT, function (AbstractContainer $cell) use ($isFob, $isCif) {
             $text = 'FOB Value is the basis for all payments and required for Indian Shipping Bill & IGST refund — shown separately below regardless of Incoterm. '
                 . ($isFob
                     ? 'Freight & Insurance is not applicable — buyer arranges, FOB.'
-                    : 'Freight & Insurance is recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.');
+                    : ($isCif ? 'Freight & Insurance is' : 'Freight is') . ' recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.');
             $cell->addText($text, ['color' => DocxComponents::BLUE_TEXT]);
         }, 0);
 
@@ -1413,8 +1414,8 @@ final class DocxDocumentBuilder
             : 'Paid separately via Freight Debit Note No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed') . '. Included in the Total Commercial Invoice Value below.';
         $sectionARows = [
             ['FOB Value (goods)', $currency . ' ' . self::g($financial, 'fob_value') . ' *', 'Sum of all product lines above — basis for all payments; required for Indian Shipping Bill & IGST refund'],
-            ['Freight & Insurance', ($isFob ? 'NIL — FOB order' : ($currency . ' ' . self::g($financial, 'freight_insurance_amount', 'To Be Confirmed'))) . ' *', $freightRemark],
-            ['TOTAL COMMERCIAL INVOICE VALUE', $currency . ' ' . self::g($financial, 'total_commercial_invoice_value') . ' *', ($isFob ? '= FOB Value (no freight/insurance on an FOB order)' : '= FOB Value + Freight & Insurance') . ' · Currency: ' . $currency],
+            [$isCif || $isFob ? 'Freight & Insurance' : 'Freight', ($isFob ? 'NIL — FOB order' : ($currency . ' ' . self::g($financial, 'freight_insurance_amount', 'To Be Confirmed'))) . ' *', $freightRemark],
+            ['TOTAL COMMERCIAL INVOICE VALUE', $currency . ' ' . self::g($financial, 'total_commercial_invoice_value') . ' *', ($isFob ? '= FOB Value (no freight/insurance on an FOB order)' : ($isCif ? '= FOB Value + Freight & Insurance' : '= FOB Value + Freight')) . ' · Currency: ' . $currency],
         ];
         self::threeColFinanceTable($section, 'SECTION A — INVOICE VALUE', $sectionARows, DocxComponents::NAVY_MID);
 
@@ -1426,10 +1427,10 @@ final class DocxDocumentBuilder
         $subtotalPaid = $currency . ' ' . $advanceAmt . (!$isFob && self::g($payment, 'freight_amount', null) !== '—' && self::g($payment, 'freight_amount', null) !== 'To Be Confirmed' ? ' + ' . self::g($payment, 'freight_amount') . ' (freight)' : '');
         $sectionBRows = [
             ["\u{221A}  Advance — " . (self::g($payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'), $currency . ' ' . $advanceAmt . ' *', 'Received: ' . self::g($payment, 'advance_cleared_at', 'To Be Confirmed') . "\nAgainst: PI No. " . self::g($order, 'pi_ref', 'To Be Confirmed')],
-            ["\u{221A}  Freight & Insurance — {$freightStatus}", $freightAmtCell, $freightRemark2],
+            ["\u{221A}  " . ($isCif || $isFob ? 'Freight & Insurance' : 'Freight') . " — {$freightStatus}", $freightAmtCell, $freightRemark2],
             ['SUBTOTAL ALREADY PAID', $subtotalPaid, 'Advance' . (!$isFob ? ' + FDN (if applicable)' : '')],
             ["\u{2192}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', "= FOB Value minus advance received\nPayable by T/T (Telegraphic Transfer) within " . self::g($financial, 'balance_days') . " days of BL date\nAgainst scanned copy of Bill of Lading\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
-            ['VERIFICATION', "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = " . self::g($financial, 'fob_value') . " \u{221A}", $isFob ? 'Freight & Insurance not applicable on an FOB order.' : 'Freight & Insurance is paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.'],
+            ['VERIFICATION', "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = " . self::g($financial, 'fob_value') . " \u{221A}", $isFob ? 'Freight & Insurance not applicable on an FOB order.' : ($isCif ? 'Freight & Insurance is' : 'Freight is') . ' paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.'],
         ];
         self::threeColFinanceTable($section, 'SECTION B — PAYMENT SETTLEMENT', $sectionBRows, DocxComponents::NAVY_MID);
 

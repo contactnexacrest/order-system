@@ -54,7 +54,9 @@ against the full CFR/CIF value, and a Commercial Invoice that understates
 it risks customs delay or a penalty for the buyer. The Freight & Insurance
 figure itself is whichever is on file — the actually-recorded Freight
 Debit Note payment if it's cleared, otherwise the Stage 6 confirmed
-freight+insurance figure. This only changes the CI; the Quotation,
+freight+insurance figure. On a CFR order the buyer insures, so the line
+reads **Freight** and carries freight only (QA Round 5, Q-R5-2); only a
+CIF order adds insurance. This only changes the CI; the Quotation,
 Proforma Invoice, and Order Confirmation's own "Total ... Value" fields,
 and Section B's advance/balance payment math on this same CI, are
 unaffected — freight is still paid separately via its own Debit Note, not

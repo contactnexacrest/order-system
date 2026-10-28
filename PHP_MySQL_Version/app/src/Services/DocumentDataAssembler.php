@@ -65,6 +65,10 @@ final class DocumentDataAssembler
         $balanceAmount = round($fobValue - $advanceAmount, 2);
 
         $isFob = strtoupper($order['incoterm_code']) === 'FOB';
+        // QA Round 5, Q-R5-2: under Incoterms 2020 only CIF puts insurance
+        // on the seller. On FOB and CFR the buyer insures, so a stored
+        // insurance figure is never shown or charged.
+        $isCif = strtoupper($order['incoterm_code']) === 'CIF';
 
         // 90-item backlog item #18 (BLOCKER): for a non-FOB order, the
         // Commercial Invoice's own TOTAL COMMERCIAL INVOICE VALUE must
@@ -88,7 +92,7 @@ final class DocumentDataAssembler
         if ($freightForTotal === null) {
             $freightRow = OrderFreightRepository::find($orderId);
             if ($freightRow && $freightRow['confirmed_freight_rate'] !== null) {
-                $freightForTotal = (float) $freightRow['confirmed_freight_rate'] + (float) ($freightRow['insurance_amount'] ?? 0);
+                $freightForTotal = (float) $freightRow['confirmed_freight_rate'] + ($isCif ? (float) ($freightRow['insurance_amount'] ?? 0) : 0.0);
             }
         }
         $totalCommercialInvoiceValue = (!$isFob && $freightForTotal !== null) ? $fobValue + $freightForTotal : $fobValue;
@@ -151,6 +155,7 @@ final class DocumentDataAssembler
                 // (the seller's own port) instead of the buyer's discharge port.
                 'incoterm_label'       => $order['incoterm_code'] . ' ' . ($isFob ? $portOfLoading : $portOfDischarge) . ' — Incoterms® 2020',
                 'is_fob'               => $isFob,
+                'is_cif'               => $isCif,
                 'port_of_loading'      => $portOfLoading,
                 'port_of_discharge'    => $portOfDischarge,
                 'container_type'       => $order['container_type'] ?? 'To Be Confirmed',
@@ -278,7 +283,7 @@ final class DocumentDataAssembler
             'supplier_po' => ($documentTypeCode === null || in_array($documentTypeCode, self::SUPPLIER_COST_VISIBLE_TO, true))
                 ? self::supplierPoBlock($orderId)
                 : null,
-            'freight'     => self::freightBlock($orderId),
+            'freight'     => self::freightBlock($orderId, $isCif),
             'packing'     => self::packingBlock($orderId),
             'crates'      => self::cratesBlock($orderId),
             'shipping'    => self::shippingBlock($orderId),
@@ -433,17 +438,17 @@ final class DocumentDataAssembler
         ];
     }
 
-    private static function freightBlock(int $orderId): ?array
+    private static function freightBlock(int $orderId, bool $isCif): ?array
     {
         $row = OrderFreightRepository::find($orderId);
         if (!$row) {
             return null;
         }
         $freightRaw = $row['confirmed_freight_rate'] !== null ? (float) $row['confirmed_freight_rate'] : null;
-        $insuranceRaw = $row['insurance_amount'] !== null ? (float) $row['insurance_amount'] : 0.0;
+        $insuranceRaw = $isCif && $row['insurance_amount'] !== null ? (float) $row['insurance_amount'] : 0.0;
         return [
             'confirmed_freight_rate'    => $freightRaw !== null ? self::formatMoney($freightRaw) : null,
-            'insurance_amount'          => $row['insurance_amount'] !== null ? self::formatMoney($row['insurance_amount']) : 'NIL',
+            'insurance_amount'          => $isCif && $row['insurance_amount'] !== null ? self::formatMoney($row['insurance_amount']) : 'NIL',
             // FDN's "TOTAL AMOUNT DUE" needs one number to wire, not a
             // formula string — computed here (not in Twig) because
             // confirmed_freight_rate/insurance_amount above are already

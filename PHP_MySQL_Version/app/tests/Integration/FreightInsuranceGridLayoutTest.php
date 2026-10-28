@@ -19,6 +19,6 @@ final class FreightInsuranceGridLayoutTest extends TestCase
         $html = (string) file_get_contents(dirname(__DIR__, 3) . '/app/views/orders/create.php');
 
         self::assertMatchesRegularExpression('/<label>Freight \(indicative/', $html);
-        self::assertMatchesRegularExpression('/<label>Insurance \(indicative/', $html, 'Insurance must no longer carry the full-width override class');
+        self::assertMatchesRegularExpression('/<label( id="insurance-field")?>Insurance \(indicative/', $html, 'Insurance must no longer carry the full-width override class');
     }
 }
