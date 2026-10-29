@@ -17,6 +17,7 @@ const zohoSyncLogRepository = require('../repositories/zohoSyncLogRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const zohoBooksService = require('../services/zohoBooksService');
 const caSyncService = require('../services/caSyncService');
+const zohoInvoiceData = require('../services/zohoInvoiceData');
 const caFyLockGuard = require('../services/caFyLockGuard');
 const bankStatementCsvParser = require('../services/bankStatementCsvParser');
 const csv = require('../helpers/csv');
@@ -156,6 +157,8 @@ async function zohoSync(req, res) {
     canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     isEnabled: await zohoBooksService.isEnabled(),
     pendingCount: (await caRepository.legsPendingZohoSync()).length,
+    heldCount: (await caRepository.legsHeldInZoho()).length,
+    legLabels: zohoInvoiceData.KIND_LABELS,
     log: await zohoSyncLogRepository.recent(100),
   }, 'layout/base');
 }
@@ -165,16 +168,17 @@ async function runZohoSync(req, res) {
   const result = await caSyncService.runFullSync('manual', user.id);
   const { revenue, expenses } = result;
 
+  const done = `${revenue.invoices} invoice(s) sent or updated, ${revenue.synced} payment(s) pushed, ${revenue.applied} payment(s) applied to invoices, ${expenses.imported} expense(s) imported`;
   if (revenue.failed > 0 || expenses.failed > 0) {
-    flash.set(req, 'warning', `Sync finished: ${revenue.synced} payment(s) pushed, ${expenses.imported} expense(s) imported, ${revenue.failed + expenses.failed} failed — see the log below for details.`);
-  } else if (revenue.synced > 0 || expenses.imported > 0) {
-    flash.set(req, 'success', `Sync finished: ${revenue.synced} payment(s) pushed, ${expenses.imported} expense(s) imported.`);
+    flash.set(req, 'warning', `Sync finished: ${done}, ${revenue.failed + expenses.failed} failed — see the log below for details.`);
+  } else if (revenue.synced > 0 || revenue.invoices > 0 || revenue.applied > 0 || expenses.imported > 0) {
+    flash.set(req, 'success', `Sync finished: ${done}.`);
   } else {
     flash.set(req, 'success', "Sync ran — nothing was pending (or Zoho Books isn't configured yet). See the log below.");
   }
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
-  await auditLogRepository.log(user.id, 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, `revenue: ${revenue.synced} synced/${revenue.failed} failed, expenses: ${expenses.imported} imported/${expenses.failed} failed`);
+  await auditLogRepository.log(user.id, 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, `revenue: ${revenue.invoices} invoices, ${revenue.synced} synced, ${revenue.applied} applied/${revenue.failed} failed, expenses: ${expenses.imported} imported/${expenses.failed} failed`);
   res.redirect('/ca/zoho-sync');
 }
 

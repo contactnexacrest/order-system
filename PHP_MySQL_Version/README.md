@@ -63,7 +63,7 @@ correctly once the password is changed.
 
 ## What's in this folder
 
-- `docs/schema.sql` — full database schema (112 tables, 216 foreign keys as
+- `docs/schema.sql` — full database schema (113 tables, 218 foreign keys as
   of 2026-10-28 — see `docs/schema.sql`'s own trailing `-- SECTION X …
   added YYYY-MM-DD` comments for the running changelog; 52 tables/76 FKs
   at the time of this Phase D delivery specifically), validated against a

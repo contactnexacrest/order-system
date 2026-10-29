@@ -27,8 +27,8 @@ mysql -u <user> -p <database> < docs/migrations/2026-10-28e-vendor-bill-proforma
 ## Latest releases — run in this order
 
 Run each file below that the database has not had yet, in this order, then
-deploy the code for both stacks. As of 28 Oct 2026 the live site still
-needs **27f, 27g, 28a, 28c, 28d and 28e**.
+deploy the code for both stacks. As of 29 Oct 2026 the live site still
+needs **27f, 27g, 28a, 28c, 28d, 28e and 29a**.
 
 | # | File | What it does |
 |---|---|---|
@@ -43,6 +43,7 @@ needs **27f, 27g, 28a, 28c, 28d and 28e**.
 | 9 | `2026-10-28c-payment-terms-approval.sql` | Payment-terms approval before the Quotation (permission "Approve payment terms": Admin, MD, ED) |
 | 10 | `2026-10-28d-ca-view-orders.sql` | The CA role can open orders read-only |
 | 11 | `2026-10-28e-vendor-bill-proforma-and-payments.sql` | Bills are a Proforma or a Tax invoice; a bill can take several payments. Existing paid bills are copied into the new payments table |
+| 12 | `2026-10-29a-zoho-stage2-invoices.sql` | Zoho Books Stage 2: remembers which Books invoice each order's Commercial Invoice and Debit Note became, and when each payment was applied to it |
 
 There is no `2026-10-28b` file; that letter was not used.
 

@@ -39,6 +39,7 @@ describe('Zoho Books Stage 1', () => {
   let contacts;
   let currencies;
   let organizationId;
+  let gstRegistered;
 
   function fakeZoho(method, url, payload) {
     requests.push({ method, url, payload });
@@ -48,6 +49,9 @@ describe('Zoho Books Stage 1', () => {
 
     if (p === '/oauth/v2/token') return json({ access_token: 'fake-access' });
     if (p === '/books/v3/organizations') return json({ code: 0, organizations: [{ organization_id: organizationId, name: 'NexaCrest TEST Org' }] });
+    const orgMatch = p.match(/^\/books\/v3\/organizations\/(\d+)$/);
+    if (orgMatch) return json({ code: 0, organization: { organization_id: orgMatch[1], is_registered_for_gst: gstRegistered } });
+    if (p === '/books/v3/invoices' && method === 'GET') return json({ code: 0, invoices: [] });
     if (p === '/books/v3/bankaccounts') return json({ code: 0, bankaccounts: [{ account_id: 'SBI-1', account_name: 'SBI Bank - Current Account' }] });
     if (p === '/books/v3/settings/currencies') return json({ code: 0, currencies });
     if (p === '/books/v3/contacts' && method === 'GET') {
@@ -81,6 +85,7 @@ describe('Zoho Books Stage 1', () => {
     contacts = {};
     currencies = [{ currency_id: 'C-USD', currency_code: 'USD' }, { currency_id: 'C-EUR', currency_code: 'EUR' }, { currency_id: 'C-INR', currency_code: 'INR' }];
     organizationId = '600';
+    gstRegistered = true;
     // The server-level lock (.env, zohoGuard): on, in test — so only TEST-
     // customers may be sent.
     process.env.ZOHO_INTEGRATION_ENABLED = 'true';
@@ -173,15 +178,32 @@ describe('Zoho Books Stage 1', () => {
   it('a foreign-currency payment creates an overseas customer and books the foreign amount at the actual rate', async () => {
     const clientId = await createTestClient();
 
-    const paymentId = await zohoBooksService.pushRevenuePayment(clientId, 'TEST-Overseas Buyer', 'USD', 1800, 151020, '2026-10-29', 'NX-1-advance');
+    const result = await zohoBooksService.pushRevenuePayment(clientId, 'TEST-Overseas Buyer', 'USD', 1800, 151020, '2026-10-29', 'NX-1-advance');
 
-    expect(paymentId).toBe('PAY-1');
-    expect(requestsTo('POST', '/books/v3/contacts')[0].payload).toEqual({ contact_name: 'TEST-Overseas Buyer', company_name: 'TEST-Overseas Buyer', contact_type: 'customer', gst_treatment: 'overseas', currency_id: 'C-USD' });
+    expect(result).toEqual({ payment_id: 'PAY-1', applied: 0 });
+    expect(requestsTo('POST', '/books/v3/contacts')[0].payload).toEqual({ contact_name: 'TEST-Overseas Buyer', company_name: 'TEST-Overseas Buyer', contact_type: 'customer', currency_id: 'C-USD', gst_treatment: 'overseas' });
     const payment = requestsTo('POST', '/books/v3/customerpayments')[0].payload;
     expect(payment.amount).toBe(1800);
     expect(payment.exchange_rate).toBe(83.9);
     expect(payment.account_id).toBe('SBI-1');
     expect((await clientRepository.find(clientId)).zoho_contact_id).toBe('CT-1');
+  });
+
+  it('a Books organisation not registered for GST gets the customer without GST treatment', async () => {
+    // Seen in the test organisation (change log Z-025): an organisation
+    // that is not GST-registered rejects gst_treatment.
+    gstRegistered = false;
+
+    await zohoBooksService.pushRevenuePayment(await createTestClient(), 'TEST-Plain Buyer', 'USD', 100, 8400, '2026-10-29', 'NX-7-advance');
+
+    expect(requestsTo('POST', '/books/v3/contacts')[0].payload).toEqual({ contact_name: 'TEST-Plain Buyer', company_name: 'TEST-Plain Buyer', contact_type: 'customer', currency_id: 'C-USD' });
+  });
+
+  it('one access token serves a run', async () => {
+    await zohoBooksService.pushRevenuePayment(await createTestClient(), 'TEST-Token Buyer A', 'USD', 100, 8400, '2026-10-29', 'NX-8-advance');
+    await zohoBooksService.pushRevenuePayment(await createTestClient(), 'TEST-Token Buyer B', 'USD', 100, 8400, '2026-10-29', 'NX-9-advance');
+
+    expect(requestsTo('POST', '/oauth/v2/token')).toHaveLength(1); // Zoho limits how many access tokens are issued
   });
 
   it('an INR payment goes in as rupees without a rate', async () => {
@@ -215,7 +237,7 @@ describe('Zoho Books Stage 1', () => {
     contacts['CT-7'] = { contact_id: 'CT-7', contact_name: 'TEST-Cleanup Buyer', currency_code: 'USD' };
     contacts['CT-8'] = { contact_id: 'CT-8', contact_name: 'Real Buyer', currency_code: 'USD' };
 
-    expect(await zohoBooksService.listTestContacts()).toEqual([{ contact_id: 'CT-7', name: 'TEST-Cleanup Buyer', payments: [{ payment_id: 'PAY-9', label: 'TEST-REF USD 100 on 2026-10-29' }] }]);
+    expect(await zohoBooksService.listTestContacts()).toEqual([{ contact_id: 'CT-7', name: 'TEST-Cleanup Buyer', payments: [{ payment_id: 'PAY-9', label: 'TEST-REF USD 100 on 2026-10-29' }], invoices: [] }]);
     await zohoBooksService.deleteRecord('customerpayment', 'PAY-9');
     await zohoBooksService.deleteRecord('contact', 'CT-7');
     await zohoBooksService.deleteRecord('contact', 'CT-404');

@@ -227,11 +227,23 @@ async function setFreightZohoSync(orderId, zohoReference) {
   );
 }
 
+/**
+ * Zoho integration Stage 2 — the leg's Books payment has been applied to
+ * its invoice (advance and balance to the Commercial Invoice, freight to
+ * the Debit Note). Written only by caSyncService.
+ */
+async function setLegZohoApplied(orderId, leg) {
+  if (!['advance', 'balance', 'freight'].includes(leg)) {
+    throw new Error(`Unknown payment leg ${leg}.`);
+  }
+  await db.execute(`UPDATE order_payment_status SET ${leg}_zoho_applied_at = NOW() WHERE order_id = :order_id`, { order_id: orderId });
+}
+
 module.exports = {
   initializeForOrder, find, balanceDue, recordAdvanceReceived, markAdvanceCleared, setBalanceAmount,
   recordFreightReceived, markFreightCleared, recordBalanceReceived, markBalanceCleared,
   setAdvanceInrActual, clearAdvanceInrActual, setBalanceInrActual, clearBalanceInrActual,
   setFreightInrActual, clearFreightInrActual, clearedSettlements, clearedOnDate,
   setLegExchangeRate, setAdvanceFirc, setBalanceFirc, setFreightFirc,
-  setAdvanceZohoSync, setBalanceZohoSync, setFreightZohoSync,
+  setAdvanceZohoSync, setBalanceZohoSync, setFreightZohoSync, setLegZohoApplied,
 };

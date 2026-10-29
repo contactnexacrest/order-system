@@ -34,10 +34,17 @@ final class ZohoBooksService
     /** @var (callable(string, string, array, array, bool): array{status:int, body:string})|null tests swap in a fake Zoho; null = real HTTP */
     private static $transport = null;
 
+    /** @var array<string, array{token: string, expires: int}> access tokens by refresh token — Zoho limits how many may be issued, so one run reuses one */
+    private static array $tokens = [];
+    /** @var array<string, bool> whether each Books organisation is GST-registered */
+    private static array $gstRegistered = [];
+
     /** Tests only: answer every Zoho request with $transport instead of the network (null restores real HTTP). */
     public static function setTransport(?callable $transport): void
     {
         self::$transport = $transport;
+        self::$tokens = [];
+        self::$gstRegistered = [];
     }
 
     /** On only when this server allows Zoho (.env, ZohoGuard) and the zoho_books_enabled setting is ticked. */
@@ -53,8 +60,13 @@ final class ZohoBooksService
      * its foreign amount at the actual rate (INR actual / foreign amount),
      * so the deposit account receives exactly the INR actual.
      *
+     * Stage 2: with $invoiceNumber (the leg's invoice already in Books),
+     * the payment is applied to it straight away, up to what the invoice
+     * still owes; without, it stays unapplied (an advance held until the
+     * CI is in Books) and applyPaymentToInvoice() applies it later.
+     *
      * @throws \RuntimeException on any missing config, HTTP failure, or unexpected response
-     * @return string the Zoho-side customerpayment_id
+     * @return array{payment_id: string, applied: float} the Zoho-side customerpayment_id and the amount applied to the invoice
      */
     public static function pushRevenuePayment(
         int $clientId,
@@ -63,28 +75,18 @@ final class ZohoBooksService
         ?float $foreignAmount,
         float $amountInr,
         string $date,
-        string $referenceNumber
-    ): string {
+        string $referenceNumber,
+        ?string $invoiceNumber = null
+    ): array {
         ZohoGuard::assertCustomerAllowed($companyLegalName);
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
 
         $contactId = self::findOrCreateContact($config, $accessToken, $clientId, $companyLegalName, $currencyCode);
-
-        $payload = [
-            'customer_id'      => $contactId,
-            'payment_mode'     => 'banktransfer',
-            'amount'           => round($amountInr, 2),
-            'date'             => $date,
-            'reference_number' => $referenceNumber,
-            'account_id'       => $config['depositAccountId'],
-        ];
-        if ($currencyCode !== 'INR') {
-            if ($foreignAmount === null || $foreignAmount <= 0) {
-                throw new \RuntimeException("Payment {$referenceNumber} has no {$currencyCode} amount recorded, so its rate cannot be worked out.");
-            }
-            $payload['amount'] = round($foreignAmount, 2);
-            $payload['exchange_rate'] = round($amountInr / $foreignAmount, 6);
+        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber);
+        $applied = 0.0;
+        if ($invoiceNumber !== null) {
+            [$payload['invoices'], $applied] = self::invoiceApplication($config, $accessToken, $invoiceNumber, $contactId, (float) $payload['amount']);
         }
 
         $response = self::request(
@@ -100,7 +102,141 @@ final class ZohoBooksService
             throw new \RuntimeException('Zoho Books customer payment failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
         }
 
-        return $paymentId;
+        return ['payment_id' => $paymentId, 'applied' => $applied];
+    }
+
+    /**
+     * Stage 2: applies a payment already in Books (pushed unapplied — the
+     * advance, held until the CI arrived) to its invoice, up to what the
+     * invoice still owes. Books needs the whole payment re-sent with the
+     * invoice added, so the same leg details are passed again.
+     *
+     * @throws \RuntimeException on any failure
+     * @return float the amount applied (in the order's currency)
+     */
+    public static function applyPaymentToInvoice(
+        string $paymentId,
+        int $clientId,
+        string $companyLegalName,
+        string $currencyCode,
+        ?float $foreignAmount,
+        float $amountInr,
+        string $date,
+        string $referenceNumber,
+        string $invoiceNumber
+    ): float {
+        ZohoGuard::assertCustomerAllowed($companyLegalName);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+
+        $contactId = self::findOrCreateContact($config, $accessToken, $clientId, $companyLegalName, $currencyCode);
+        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber);
+        [$payload['invoices'], $applied] = self::invoiceApplication($config, $accessToken, $invoiceNumber, $contactId, (float) $payload['amount']);
+        if ($applied <= 0) {
+            throw new \RuntimeException("Invoice {$invoiceNumber} in Zoho Books has nothing left to pay, so payment {$referenceNumber} stays unapplied there — ask the CA how to book it.");
+        }
+
+        $response = self::request(
+            'PUT',
+            "https://{$config['apiDomain']}/books/v3/customerpayments/" . rawurlencode($paymentId) . '?organization_id=' . rawurlencode($config['organizationId']),
+            $payload,
+            self::authHeaders($accessToken)
+        );
+        $decoded = json_decode($response['body'], true);
+        if ($response['status'] < 200 || $response['status'] >= 300 || !isset($decoded['payment'])) {
+            throw new \RuntimeException('Zoho Books payment update failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return $applied;
+    }
+
+    /**
+     * Stage 2: creates or updates the Books invoice for an order's
+     * Commercial Invoice or freight Debit Note (ZohoInvoiceData::build()),
+     * numbered with our own document reference, and marks it as sent (no
+     * email goes out) so payments can be applied to it. The invoice is
+     * always looked up by number first, so a retry never makes a second
+     * one — and an invoice with that number on another customer is refused.
+     *
+     * @param array<string, mixed> $invoice ZohoInvoiceData::build()
+     * @throws \RuntimeException on any failure
+     * @return array{zoho_invoice_id: string, zoho_invoice_number: string, status: string, created: bool}
+     */
+    public static function pushInvoice(array $invoice): array
+    {
+        ZohoGuard::assertCustomerAllowed((string) $invoice['company_legal_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $contactId = self::findOrCreateContact($config, $accessToken, (int) $invoice['client_id'], (string) $invoice['company_legal_name'], (string) $invoice['currency_code']);
+        $gst = self::isGstRegistered($config, $accessToken);
+
+        $lineItems = [];
+        foreach ($invoice['lines'] as $line) {
+            $item = ['name' => $line['name'], 'description' => $line['description'], 'quantity' => $line['quantity'], 'rate' => $line['rate']];
+            if ($line['unit'] !== null) {
+                $item['unit'] = $line['unit'];
+            }
+            if ($line['hs_code'] !== null) {
+                // A Books organisation that is not GST-registered rejects
+                // hsn_or_sac (seen in the test organisation, Z-028), so
+                // there the HS code goes into the description instead.
+                if ($gst) {
+                    $item['hsn_or_sac'] = $line['hs_code'];
+                } else {
+                    $item['description'] .= '. HS code ' . $line['hs_code'];
+                }
+            }
+            $lineItems[] = $item;
+        }
+        $payload = [
+            'customer_id' => $contactId,
+            'invoice_number' => $invoice['invoice_number'],
+            'date' => $invoice['date'],
+            'reference_number' => $invoice['reference_number'],
+            'line_items' => $lineItems,
+        ];
+        if ($invoice['due_date'] !== null) {
+            $payload['due_date'] = $invoice['due_date'];
+        }
+        if ($invoice['currency_code'] !== 'INR') {
+            $payload['exchange_rate'] = round((float) $invoice['exchange_rate'], 6);
+        }
+        if ($gst) {
+            $payload['gst_treatment'] = 'overseas';
+        }
+
+        $query = '?organization_id=' . rawurlencode($config['organizationId']) . '&ignore_auto_number_generation=true';
+        $existing = self::findInvoiceByNumber($config, $accessToken, (string) $invoice['invoice_number']);
+        if ($existing !== null && (string) $existing['customer_id'] !== $contactId) {
+            throw new \RuntimeException("Invoice number {$invoice['invoice_number']} is already used in Zoho Books for " . ($existing['customer_name'] ?? 'another customer') . '. Nothing was changed.');
+        }
+        if ($existing !== null && (string) ($existing['status'] ?? '') !== 'draft') {
+            // Books refuses to change a sent invoice without a reason
+            // (code 110701, seen in the test organisation, Z-049); it keeps
+            // the reason in the invoice's history.
+            $payload['reason'] = 'Revised in the order system: ' . ZohoInvoiceData::KIND_LABELS[$invoice['kind']] . " {$invoice['invoice_number']} revision {$invoice['revision']} approved.";
+        }
+        // Zoho has been seen answering HTTP 500 with a cut-off body to a
+        // create or update that did go through (test organisation, Z-029),
+        // so the result is read back from the invoice list, never from the
+        // response.
+        $response = $existing === null
+            ? self::request('POST', "https://{$config['apiDomain']}/books/v3/invoices{$query}", $payload, self::authHeaders($accessToken))
+            : self::request('PUT', "https://{$config['apiDomain']}/books/v3/invoices/" . rawurlencode((string) $existing['invoice_id']) . $query, $payload, self::authHeaders($accessToken));
+        $saved = self::findInvoiceByNumber($config, $accessToken, (string) $invoice['invoice_number']);
+        if ($saved === null || abs((float) $saved['total'] - (float) $invoice['total']) > 0.01) {
+            throw new \RuntimeException('Zoho Books invoice ' . ($existing === null ? 'creation' : 'update') . " for {$invoice['invoice_number']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+
+        $status = (string) ($saved['status'] ?? '');
+        if ($status === 'draft') {
+            $sent = self::request('POST', "https://{$config['apiDomain']}/books/v3/invoices/" . rawurlencode((string) $saved['invoice_id']) . '/status/sent?organization_id=' . rawurlencode($config['organizationId']), [], self::authHeaders($accessToken));
+            if ($sent['status'] < 200 || $sent['status'] >= 300) {
+                throw new \RuntimeException("Zoho Books invoice {$invoice['invoice_number']} was saved but could not be marked as sent (HTTP " . $sent['status'] . '): ' . substr($sent['body'], 0, 500));
+            }
+            $status = 'sent';
+        }
+
+        return ['zoho_invoice_id' => (string) $saved['invoice_id'], 'zoho_invoice_number' => (string) $saved['invoice_number'], 'status' => $status, 'created' => $existing === null];
     }
 
     /**
@@ -211,9 +347,10 @@ final class ZohoBooksService
     /** @return array{clientId:string, clientSecret:string, refreshToken:string, organizationId:string, depositAccountId:string, accountsDomain:string, apiDomain:string} */
     /**
      * Cleanup before go-live (cron/zoho_cleanup_test_records.php): every
-     * Books customer whose name starts with TEST-, with its payments.
+     * Books customer whose name starts with TEST-, with its payments and
+     * (Stage 2) its invoices.
      *
-     * @return list<array{contact_id: string, name: string, payments: list<array{payment_id: string, label: string}>}>
+     * @return list<array{contact_id: string, name: string, payments: list<array{payment_id: string, label: string}>, invoices: list<array{invoice_id: string, label: string}>}>
      */
     public static function listTestContacts(): array
     {
@@ -230,21 +367,29 @@ final class ZohoBooksService
                     'label' => implode(' ', array_filter([(string) ($payment['reference_number'] ?? ''), (string) ($payment['currency_code'] ?? ''), (string) ($payment['amount'] ?? ''), 'on ' . ($payment['date'] ?? '')], static fn (string $part): bool => $part !== '')),
                 ];
             }
-            $contacts[] = ['contact_id' => (string) $row['contact_id'], 'name' => (string) ($row['contact_name'] ?? ''), 'payments' => $payments];
+            $invoices = [];
+            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/invoices{$query}&customer_id=" . rawurlencode((string) $row['contact_id']), 'invoices') as $invoice) {
+                $invoices[] = [
+                    'invoice_id' => (string) $invoice['invoice_id'],
+                    'label' => implode(' ', array_filter([(string) ($invoice['invoice_number'] ?? ''), (string) ($invoice['currency_code'] ?? ''), (string) ($invoice['total'] ?? ''), 'on ' . ($invoice['date'] ?? '')], static fn (string $part): bool => $part !== '')),
+                ];
+            }
+            $contacts[] = ['contact_id' => (string) $row['contact_id'], 'name' => (string) ($row['contact_name'] ?? ''), 'payments' => $payments, 'invoices' => $invoices];
         }
         return $contacts;
     }
 
     /**
-     * Deletes one Books record made while testing — 'customerpayment' or
-     * 'contact' (payments first: Books refuses to delete a contact that
-     * still has transactions). A record already gone counts as deleted.
+     * Deletes one Books record made while testing — 'customerpayment',
+     * 'invoice' or 'contact' (payments, then invoices, then the contact:
+     * Books refuses to delete a contact that still has transactions). A
+     * record already gone counts as deleted.
      *
      * @throws \RuntimeException on any other failure
      */
     public static function deleteRecord(string $kind, string $id): void
     {
-        $paths = ['customerpayment' => 'customerpayments', 'contact' => 'contacts'];
+        $paths = ['customerpayment' => 'customerpayments', 'invoice' => 'invoices', 'contact' => 'contacts'];
         if (!isset($paths[$kind])) {
             throw new \InvalidArgumentException("Unknown Zoho Books record kind {$kind}.");
         }
@@ -334,9 +479,8 @@ final class ZohoBooksService
                 'contact_name'  => $companyLegalName,
                 'company_name'  => $companyLegalName,
                 'contact_type'  => 'customer',
-                'gst_treatment' => 'overseas',
                 'currency_id'   => $currencyId,
-            ],
+            ] + (self::isGstRegistered($config, $accessToken) ? ['gst_treatment' => 'overseas'] : []),
             self::authHeaders($accessToken)
         );
         $createDecoded = json_decode($createResponse['body'], true);
@@ -347,6 +491,84 @@ final class ZohoBooksService
 
         ClientRepository::setZohoContactId($clientId, $newContactId);
         return $newContactId;
+    }
+
+    /**
+     * The Customer Payment fields for one leg: the foreign amount at the
+     * actual rate (INR actual / foreign amount), into the deposit account.
+     *
+     * @return array<string, mixed>
+     */
+    private static function paymentPayload(array $config, string $contactId, string $currencyCode, ?float $foreignAmount, float $amountInr, string $date, string $referenceNumber): array
+    {
+        $payload = [
+            'customer_id'      => $contactId,
+            'payment_mode'     => 'banktransfer',
+            'amount'           => round($amountInr, 2),
+            'date'             => $date,
+            'reference_number' => $referenceNumber,
+            'account_id'       => $config['depositAccountId'],
+        ];
+        if ($currencyCode !== 'INR') {
+            if ($foreignAmount === null || $foreignAmount <= 0) {
+                throw new \RuntimeException("Payment {$referenceNumber} has no {$currencyCode} amount recorded, so its rate cannot be worked out.");
+            }
+            $payload['amount'] = round($foreignAmount, 2);
+            $payload['exchange_rate'] = round($amountInr / $foreignAmount, 6);
+        }
+        return $payload;
+    }
+
+    /**
+     * The "invoices" part of a payment: as much of $amount as invoice
+     * $invoiceNumber still owes.
+     *
+     * @return array{0: list<array{invoice_id: string, amount_applied: float}>, 1: float}
+     */
+    private static function invoiceApplication(array $config, string $accessToken, string $invoiceNumber, string $contactId, float $amount): array
+    {
+        $invoice = self::findInvoiceByNumber($config, $accessToken, $invoiceNumber);
+        if ($invoice === null || (string) $invoice['customer_id'] !== $contactId) {
+            throw new \RuntimeException("Invoice {$invoiceNumber} was not found in Zoho Books for this customer.");
+        }
+        $applied = round(min($amount, (float) ($invoice['balance'] ?? 0)), 2);
+        return [$applied > 0 ? [['invoice_id' => (string) $invoice['invoice_id'], 'amount_applied' => $applied]] : [], $applied];
+    }
+
+    /**
+     * One invoice by its exact number, from the invoice list (the
+     * single-invoice read has been seen failing with HTTP 500 in the test
+     * organisation, Z-029; the list does not).
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function findInvoiceByNumber(array $config, string $accessToken, string $invoiceNumber): ?array
+    {
+        $rows = self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/invoices?organization_id=" . rawurlencode($config['organizationId']) . '&invoice_number=' . rawurlencode($invoiceNumber), 'invoices');
+        foreach ($rows as $row) {
+            if ((string) ($row['invoice_number'] ?? '') === $invoiceNumber) {
+                return $row;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether the Books organisation is GST-registered. Only then are the
+     * GST fields (gst_treatment, hsn_or_sac) sent: an organisation that is
+     * not registered rejects them (the test organisation, Z-025 / Z-028).
+     */
+    private static function isGstRegistered(array $config, string $accessToken): bool
+    {
+        if (!isset(self::$gstRegistered[$config['organizationId']])) {
+            $response = self::request('GET', "https://{$config['apiDomain']}/books/v3/organizations/" . rawurlencode($config['organizationId']) . '?organization_id=' . rawurlencode($config['organizationId']), [], self::authHeaders($accessToken));
+            $decoded = json_decode($response['body'], true);
+            if ($response['status'] < 200 || $response['status'] >= 300 || !isset($decoded['organization'])) {
+                throw new \RuntimeException('Zoho Books organisation lookup failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+            self::$gstRegistered[$config['organizationId']] = (bool) ($decoded['organization']['is_registered_for_gst'] ?? false);
+        }
+        return self::$gstRegistered[$config['organizationId']];
     }
 
     private static function assertContactCurrency(string $companyLegalName, string $contactCurrency, string $currencyCode): void
@@ -374,6 +596,13 @@ final class ZohoBooksService
 
     private static function getAccessToken(string $accountsDomain, string $clientId, string $clientSecret, string $refreshToken): string
     {
+        // Zoho issues only a few access tokens per refresh token in ten
+        // minutes, and a Stage 2 run makes many calls: one token (valid an
+        // hour) is reused for 50 minutes.
+        $cached = self::$tokens[$refreshToken] ?? null;
+        if ($cached !== null && $cached['expires'] > time()) {
+            return $cached['token'];
+        }
         $response = self::request(
             'POST',
             "https://{$accountsDomain}/oauth/v2/token",
@@ -392,6 +621,7 @@ final class ZohoBooksService
             throw new \RuntimeException('Zoho Books OAuth token refresh failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
         }
 
+        self::$tokens[$refreshToken] = ['token' => (string) $decoded['access_token'], 'expires' => time() + 3000];
         return (string) $decoded['access_token'];
     }
 

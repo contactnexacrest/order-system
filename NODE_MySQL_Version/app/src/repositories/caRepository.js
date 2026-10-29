@@ -16,9 +16,9 @@ const zohoGuard = require('../services/zohoGuard');
 // further.
 
 const LEGS = [
-  { leg: 'advance', amountCol: 'advance_amount', clearedCol: 'advance_cleared_at', inrCol: 'advance_inr_actual', inrAtCol: 'advance_inr_actual_recorded_at', inrByCol: 'advance_inr_actual_recorded_by', rateCol: 'advance_exchange_rate', fircCol: 'advance_firc_reference', fircAtCol: 'advance_firc_received_at', zohoAtCol: 'advance_zoho_synced_at', zohoRefCol: 'advance_zoho_reference' },
-  { leg: 'balance', amountCol: 'balance_amount', clearedCol: 'balance_cleared_at', inrCol: 'balance_inr_actual', inrAtCol: 'balance_inr_actual_recorded_at', inrByCol: 'balance_inr_actual_recorded_by', rateCol: 'balance_exchange_rate', fircCol: 'balance_firc_reference', fircAtCol: 'balance_firc_received_at', zohoAtCol: 'balance_zoho_synced_at', zohoRefCol: 'balance_zoho_reference' },
-  { leg: 'freight', amountCol: 'freight_amount', clearedCol: 'freight_cleared_at', inrCol: 'freight_inr_actual', inrAtCol: 'freight_inr_actual_recorded_at', inrByCol: 'freight_inr_actual_recorded_by', rateCol: 'freight_exchange_rate', fircCol: 'freight_firc_reference', fircAtCol: 'freight_firc_received_at', zohoAtCol: 'freight_zoho_synced_at', zohoRefCol: 'freight_zoho_reference' },
+  { leg: 'advance', amountCol: 'advance_amount', clearedCol: 'advance_cleared_at', inrCol: 'advance_inr_actual', inrAtCol: 'advance_inr_actual_recorded_at', inrByCol: 'advance_inr_actual_recorded_by', rateCol: 'advance_exchange_rate', fircCol: 'advance_firc_reference', fircAtCol: 'advance_firc_received_at', zohoAtCol: 'advance_zoho_synced_at', zohoRefCol: 'advance_zoho_reference', zohoAppliedCol: 'advance_zoho_applied_at' },
+  { leg: 'balance', amountCol: 'balance_amount', clearedCol: 'balance_cleared_at', inrCol: 'balance_inr_actual', inrAtCol: 'balance_inr_actual_recorded_at', inrByCol: 'balance_inr_actual_recorded_by', rateCol: 'balance_exchange_rate', fircCol: 'balance_firc_reference', fircAtCol: 'balance_firc_received_at', zohoAtCol: 'balance_zoho_synced_at', zohoRefCol: 'balance_zoho_reference', zohoAppliedCol: 'balance_zoho_applied_at' },
+  { leg: 'freight', amountCol: 'freight_amount', clearedCol: 'freight_cleared_at', inrCol: 'freight_inr_actual', inrAtCol: 'freight_inr_actual_recorded_at', inrByCol: 'freight_inr_actual_recorded_by', rateCol: 'freight_exchange_rate', fircCol: 'freight_firc_reference', fircAtCol: 'freight_firc_received_at', zohoAtCol: 'freight_zoho_synced_at', zohoRefCol: 'freight_zoho_reference', zohoAppliedCol: 'freight_zoho_applied_at' },
 ];
 
 /**
@@ -71,6 +71,7 @@ async function settlementRegister() {
         firc_pending: fircPending,
         zoho_synced_at: ops[legDef.zohoAtCol] ?? null,
         zoho_reference: ops[legDef.zohoRefCol] ?? null,
+        zoho_applied_at: ops[legDef.zohoAppliedCol] ?? null,
         is_test_or_sample: Number(ops.is_test_or_sample || 0) === 1,
       });
     }
@@ -90,6 +91,18 @@ async function settlementRegister() {
 async function legsPendingZohoSync() {
   const rows = await settlementRegister();
   return rows.filter((r) => r.inr_actual !== null && r.zoho_synced_at === null
+    && (zohoGuard.isProduction() ? !r.is_test_or_sample : String(r.company_legal_name || '').startsWith(zohoGuard.TEST_PREFIX)));
+}
+
+/**
+ * Zoho integration Stage 2 — every leg already in Zoho Books as a payment
+ * that is not yet applied to its invoice (typically the advance, held
+ * until the Commercial Invoice is in Books). Same production / test rule
+ * as legsPendingZohoSync().
+ */
+async function legsHeldInZoho() {
+  const rows = await settlementRegister();
+  return rows.filter((r) => r.zoho_synced_at !== null && r.zoho_applied_at === null
     && (zohoGuard.isProduction() ? !r.is_test_or_sample : String(r.company_legal_name || '').startsWith(zohoGuard.TEST_PREFIX)));
 }
 
@@ -222,6 +235,6 @@ async function fyReadiness(fy) {
 }
 
 module.exports = {
-  settlementRegister, availableFinancialYears, availableCalendarYears, revenueReport, legsPendingZohoSync,
+  settlementRegister, availableFinancialYears, availableCalendarYears, revenueReport, legsPendingZohoSync, legsHeldInZoho,
   legsWithInrActualUnmatched, totalInrActualAll, fyReadiness,
 };

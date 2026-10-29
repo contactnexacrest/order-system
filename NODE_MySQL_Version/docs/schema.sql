@@ -4202,3 +4202,35 @@ CREATE TABLE order_vendor_bill_payments (
   CONSTRAINT fk_vendor_bill_payment_user FOREIGN KEY (paid_by) REFERENCES users(id),
   INDEX idx_vendor_bill_payments_bill (bill_id)
 ) ENGINE=InnoDB;
+
+-- ================================================================
+-- SECTION CI — ZOHO BOOKS STAGE 2: CI AND DEBIT NOTE AS INVOICES (2026-10-29)
+-- The Commercial Invoice and the freight Debit Note go to Zoho Books as
+-- export invoices; order_zoho_invoices remembers which Books invoice each
+-- became, with a fingerprint of what was sent (a revised CI updates it).
+-- *_zoho_applied_at: when a payment leg was applied to its invoice in
+-- Books (the advance is held there, unapplied, until the CI exists).
+-- docs/migrations/2026-10-29a-zoho-stage2-invoices.sql
+-- ================================================================
+CREATE TABLE order_zoho_invoices (
+  id                   BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id             BIGINT UNSIGNED NOT NULL,
+  kind                 VARCHAR(10)   NOT NULL,      -- 'ci' (Commercial Invoice) | 'dn' (freight Debit Note)
+  document_id          BIGINT UNSIGNED NOT NULL,    -- the documents row last sent
+  zoho_invoice_id      VARCHAR(100)  NOT NULL,
+  zoho_invoice_number  VARCHAR(100)  NOT NULL,
+  currency_code        CHAR(3)       NOT NULL,
+  total                DECIMAL(14,2) NOT NULL,      -- in the order's currency
+  exchange_rate        DECIMAL(14,6) NOT NULL,
+  pushed_hash          CHAR(64)      NOT NULL,      -- SHA-256 of what was sent; a change means "update it in Books"
+  pushed_at            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at           TIMESTAMP     NULL,
+  UNIQUE KEY uq_order_zoho_invoice (order_id, kind),
+  CONSTRAINT fk_order_zoho_invoice_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_order_zoho_invoice_document FOREIGN KEY (document_id) REFERENCES documents(id)
+) ENGINE=InnoDB;
+
+ALTER TABLE order_payment_status
+  ADD COLUMN advance_zoho_applied_at TIMESTAMP NULL AFTER advance_zoho_reference,
+  ADD COLUMN balance_zoho_applied_at TIMESTAMP NULL AFTER balance_zoho_reference,
+  ADD COLUMN freight_zoho_applied_at TIMESTAMP NULL AFTER freight_zoho_reference;

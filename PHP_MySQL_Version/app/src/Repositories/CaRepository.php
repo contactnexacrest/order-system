@@ -19,9 +19,9 @@ use App\Services\ZohoGuard;
 final class CaRepository
 {
     private const LEGS = [
-        ['leg' => 'advance', 'amount_col' => 'advance_amount', 'cleared_col' => 'advance_cleared_at', 'inr_col' => 'advance_inr_actual', 'inr_at_col' => 'advance_inr_actual_recorded_at', 'inr_by_col' => 'advance_inr_actual_recorded_by', 'rate_col' => 'advance_exchange_rate', 'firc_col' => 'advance_firc_reference', 'firc_at_col' => 'advance_firc_received_at', 'zoho_at_col' => 'advance_zoho_synced_at', 'zoho_ref_col' => 'advance_zoho_reference'],
-        ['leg' => 'balance', 'amount_col' => 'balance_amount', 'cleared_col' => 'balance_cleared_at', 'inr_col' => 'balance_inr_actual', 'inr_at_col' => 'balance_inr_actual_recorded_at', 'inr_by_col' => 'balance_inr_actual_recorded_by', 'rate_col' => 'balance_exchange_rate', 'firc_col' => 'balance_firc_reference', 'firc_at_col' => 'balance_firc_received_at', 'zoho_at_col' => 'balance_zoho_synced_at', 'zoho_ref_col' => 'balance_zoho_reference'],
-        ['leg' => 'freight', 'amount_col' => 'freight_amount', 'cleared_col' => 'freight_cleared_at', 'inr_col' => 'freight_inr_actual', 'inr_at_col' => 'freight_inr_actual_recorded_at', 'inr_by_col' => 'freight_inr_actual_recorded_by', 'rate_col' => 'freight_exchange_rate', 'firc_col' => 'freight_firc_reference', 'firc_at_col' => 'freight_firc_received_at', 'zoho_at_col' => 'freight_zoho_synced_at', 'zoho_ref_col' => 'freight_zoho_reference'],
+        ['leg' => 'advance', 'amount_col' => 'advance_amount', 'cleared_col' => 'advance_cleared_at', 'inr_col' => 'advance_inr_actual', 'inr_at_col' => 'advance_inr_actual_recorded_at', 'inr_by_col' => 'advance_inr_actual_recorded_by', 'rate_col' => 'advance_exchange_rate', 'firc_col' => 'advance_firc_reference', 'firc_at_col' => 'advance_firc_received_at', 'zoho_at_col' => 'advance_zoho_synced_at', 'zoho_ref_col' => 'advance_zoho_reference', 'zoho_applied_col' => 'advance_zoho_applied_at'],
+        ['leg' => 'balance', 'amount_col' => 'balance_amount', 'cleared_col' => 'balance_cleared_at', 'inr_col' => 'balance_inr_actual', 'inr_at_col' => 'balance_inr_actual_recorded_at', 'inr_by_col' => 'balance_inr_actual_recorded_by', 'rate_col' => 'balance_exchange_rate', 'firc_col' => 'balance_firc_reference', 'firc_at_col' => 'balance_firc_received_at', 'zoho_at_col' => 'balance_zoho_synced_at', 'zoho_ref_col' => 'balance_zoho_reference', 'zoho_applied_col' => 'balance_zoho_applied_at'],
+        ['leg' => 'freight', 'amount_col' => 'freight_amount', 'cleared_col' => 'freight_cleared_at', 'inr_col' => 'freight_inr_actual', 'inr_at_col' => 'freight_inr_actual_recorded_at', 'inr_by_col' => 'freight_inr_actual_recorded_by', 'rate_col' => 'freight_exchange_rate', 'firc_col' => 'freight_firc_reference', 'firc_at_col' => 'freight_firc_received_at', 'zoho_at_col' => 'freight_zoho_synced_at', 'zoho_ref_col' => 'freight_zoho_reference', 'zoho_applied_col' => 'freight_zoho_applied_at'],
     ];
 
     /**
@@ -78,6 +78,7 @@ final class CaRepository
                     'firc_pending' => $fircPending,
                     'zoho_synced_at' => $ops[$legDef['zoho_at_col']],
                     'zoho_reference' => $ops[$legDef['zoho_ref_col']],
+                    'zoho_applied_at' => $ops[$legDef['zoho_applied_col']],
                     'is_test_or_sample' => (int) ($ops['is_test_or_sample'] ?? 0) === 1,
                 ];
             }
@@ -101,6 +102,23 @@ final class CaRepository
         return array_values(array_filter(
             self::settlementRegister(),
             static fn(array $r): bool => $r['inr_actual'] !== null && $r['zoho_synced_at'] === null
+                && (ZohoGuard::isProduction() ? !$r['is_test_or_sample'] : str_starts_with((string) $r['company_legal_name'], ZohoGuard::TEST_PREFIX))
+        ));
+    }
+
+    /**
+     * Zoho integration Stage 2 — every leg already in Zoho Books as a
+     * payment that is not yet applied to its invoice (typically the
+     * advance, held until the Commercial Invoice is in Books). Same
+     * production / test rule as legsPendingZohoSync().
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public static function legsHeldInZoho(): array
+    {
+        return array_values(array_filter(
+            self::settlementRegister(),
+            static fn(array $r): bool => $r['zoho_synced_at'] !== null && $r['zoho_applied_at'] === null
                 && (ZohoGuard::isProduction() ? !$r['is_test_or_sample'] : str_starts_with((string) $r['company_legal_name'], ZohoGuard::TEST_PREFIX))
         ));
     }

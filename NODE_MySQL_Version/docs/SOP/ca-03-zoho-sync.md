@@ -26,7 +26,10 @@ it rather than creating duplicates.
 **Export buyers are set up as overseas customers** (2026-10-29). The
 customer is created with GST treatment **Overseas** and in the order's
 own currency (USD, EUR or GBP), so Zoho Books treats the sale as an
-export with no GST, and its GST return shows it as one. Each payment goes
+export with no GST, and its GST return shows it as one. (A Books
+organisation that is not GST-registered — like the test one — refuses the
+GST fields, so there the customer goes in without them and an HS code is
+written into the invoice line's description instead.) Each payment goes
 in as the **foreign amount at the actual rate** — for example USD 100.00
 at 83.955 — so the bank account in Books receives exactly the INR actual
 (₹8,395.50) recorded here.
@@ -40,9 +43,57 @@ booking it wrongly:
   Books customer has one currency, so a EUR payment cannot go onto a
   customer set up in USD. Ask the CA how to book it.
 
-Until invoices are sent to Zoho Books too (the next stage of the Zoho
-integration), each payment shows in Books as received but not yet applied
-to an invoice.
+## Commercial Invoices and Debit Notes in Zoho Books (2026-10-29)
+
+Once a **Commercial Invoice** or a freight **Debit Note** is approved (or
+sent), the next sync sends it to Zoho Books as an **export invoice** for
+the buyer:
+
+- **Same number and date as our document.** The Books invoice carries the
+  document's own reference (for example `SC/CI/2026/2810001`) and the date
+  printed on it. Books does not give it a number of its own.
+- **The CI lists the products only** — one line per product, with its
+  quantity, unit, unit price and HS code, so its total is the FOB value.
+  On CFR / CIF orders, ocean freight (and insurance on CIF) are billed on
+  the **Debit Note**, which goes to Books as its own invoice. Nothing is
+  counted twice.
+- **In the order's currency, at a recorded rate.** The CI uses the
+  exchange rate recorded for the balance leg in the INR Settlement
+  Register (else the advance leg's); the Debit Note the freight leg's
+  (else the advance leg's). With no rate recorded the invoice is not sent
+  and the Sync Log says so.
+- **Marked as sent in Books, but no email goes out.** This only lets
+  payments be applied to it.
+
+**Payments are applied to their invoice:** the advance and the balance to
+the CI, the freight payment to the Debit Note.
+
+- The **advance** usually arrives long before the CI. It goes to Books as
+  a payment received and is **held there, unapplied**, until the CI is in
+  Books; the next sync after that applies it to the CI.
+- The **balance** and the **freight** payment usually arrive after their
+  document, so they are applied as soon as they are sent.
+- The Zoho Books Sync page shows how many payments are still held.
+
+**A revised CI or Debit Note** (a new revision approved) updates the same
+Books invoice — never a second one — and Books records why it changed
+("Revised in the order system: …"). While a newer revision is still in
+draft or review, Books keeps the last approved version. A document
+flagged on the order page as possibly out of date is not sent until a
+revised one is approved.
+
+**What stops an invoice, with a message in the Sync Log** (it is retried
+on every sync until fixed):
+
+- no exchange rate recorded for its leg (set it in the INR Settlement
+  Register);
+- a product line without a confirmed quantity or unit price, or whose
+  quantity × unit price does not equal its value;
+- no confirmed freight rate (Debit Note);
+- the invoice number is already used in Books for another customer.
+
+Letter of Credit money is not sent to Books yet (only the advance,
+balance and freight legs are).
 
 ## The server switches in `.env` (2026-10-29)
 
@@ -121,6 +172,12 @@ created in Zoho Books.
   from the main system's Audit Log, exactly as this module was scoped to
   keep it.
 
+Each run first sends approved CIs and Debit Notes, then payments, then
+applies any held payment whose invoice is now in Books. Zoho lets a login
+be renewed only a few times in ten minutes, so pressing **Sync Now** or
+**Test Books Connection** many times in a row can be refused for a few
+minutes ("too many requests" in the Sync Log); wait and run it again.
+
 A **scheduled job** also runs automatically (hourly by default — see the
 deployment README for the exact setup on each stack) and does exactly the
 same thing as the button, so revenue gets synced even if nobody
@@ -133,17 +190,21 @@ nothing to sync yet.
 
 ## Testing and the clean-up before go-live
 
-Testing uses NexaCrest's real Zoho Books organisation (owner decision,
-2026-10-29), so everything made while testing must be removed before
-go-live:
+Stage 1 was tested in NexaCrest's real Zoho Books organisation (and its
+test records removed). From Stage 2 on, testing uses a **separate test
+Zoho account** with its own Books organisation, which is **not
+GST-registered**, so nothing from testing can reach the GST portal (owner
+decision, 2026-10-29). Whichever organisation is used, everything made
+while testing is removed before go-live:
 
 - Test customers' names start with **`TEST-`**. With
   `ZOHO_ENVIRONMENT=test`, nothing else can be sent.
 - **Keep GST e-invoicing off** and file no GST return from Zoho Books
   until the clean-up is done.
 - The clean-up script lists, and with `--apply` deletes, every `TEST-`
-  customer and its payments (payments first). With `--from-sync-log` it
-  also takes every payment and customer the **test** database pushed —
+  customer with its payments and invoices (payments first, then
+  invoices). With `--from-sync-log` it also takes every payment, invoice
+  and customer the **test** database pushed —
   it refuses to run where `ZOHO_ENVIRONMENT=production`. It is a dry run
   unless `--apply` is given:
   - PHP: `php app/cron/zoho_cleanup_test_records.php [--from-sync-log] [--apply] [--by "Name"] [--log docs/zoho/zoho-change-log.csv]`

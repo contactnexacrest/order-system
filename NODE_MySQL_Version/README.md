@@ -44,7 +44,7 @@ app/                    the application itself — this is what you deploy
   package.json / package-lock.json
   .env.example            template — copy to .env and fill in real values
 docs/
-  schema.sql              the MySQL schema — 112 tables, 216 foreign keys
+  schema.sql              the MySQL schema — 113 tables, 218 foreign keys
                           as of 2026-10-28 (plus this stack's own
                           `sessions` table = 113; see the file's own
                           trailing changelog comments)

@@ -26,9 +26,11 @@ use App\Services\CaSyncService;
 $result = CaSyncService::runFullSync('scheduled', null);
 
 echo sprintf(
-    "[%s] Zoho Books sync: revenue %d synced/%d failed/%d skipped; expenses %d imported/%d failed/%d skipped\n",
+    "[%s] Zoho Books sync: revenue %d invoices/%d synced/%d applied/%d failed/%d skipped; expenses %d imported/%d failed/%d skipped\n",
     date('Y-m-d H:i:s'),
+    $result['revenue']['invoices'],
     $result['revenue']['synced'],
+    $result['revenue']['applied'],
     $result['revenue']['failed'],
     $result['revenue']['skipped'],
     $result['expenses']['imported'],

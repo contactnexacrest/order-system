@@ -178,6 +178,7 @@ final class CaController
         View::render('ca/zoho_sync', [
             'isEnabled' => ZohoBooksService::isEnabled(),
             'pendingCount' => count(CaRepository::legsPendingZohoSync()),
+            'heldCount' => count(CaRepository::legsHeldInZoho()),
             'log' => ZohoSyncLogRepository::recent(100),
         ], 'layout/base');
     }
@@ -189,16 +190,17 @@ final class CaController
         $revenue = $result['revenue'];
         $expenses = $result['expenses'];
 
+        $done = "{$revenue['invoices']} invoice(s) sent or updated, {$revenue['synced']} payment(s) pushed, {$revenue['applied']} payment(s) applied to invoices, {$expenses['imported']} expense(s) imported";
         if ($revenue['failed'] > 0 || $expenses['failed'] > 0) {
-            Flash::set('warning', "Sync finished: {$revenue['synced']} payment(s) pushed, {$expenses['imported']} expense(s) imported, " . ($revenue['failed'] + $expenses['failed']) . ' failed — see the log below for details.');
-        } elseif ($revenue['synced'] > 0 || $expenses['imported'] > 0) {
-            Flash::set('success', "Sync finished: {$revenue['synced']} payment(s) pushed, {$expenses['imported']} expense(s) imported.");
+            Flash::set('warning', "Sync finished: {$done}, " . ($revenue['failed'] + $expenses['failed']) . ' failed — see the log below for details.');
+        } elseif ($revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $expenses['imported'] > 0) {
+            Flash::set('success', "Sync finished: {$done}.");
         } else {
             Flash::set('success', 'Sync ran — nothing was pending (or Zoho Books isn\'t configured yet). See the log below.');
         }
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
-        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['synced']} synced/{$revenue['failed']} failed, expenses: {$expenses['imported']} imported/{$expenses['failed']} failed");
+        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['invoices']} invoices, {$revenue['synced']} synced, {$revenue['applied']} applied/{$revenue['failed']} failed, expenses: {$expenses['imported']} imported/{$expenses['failed']} failed");
         header('Location: /ca/zoho-sync');
     }
 

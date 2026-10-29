@@ -234,6 +234,21 @@ final class OrderPaymentStatusRepository
     }
 
     /**
+     * Zoho integration Stage 2 — the leg's Books payment has been applied
+     * to its invoice (advance and balance to the Commercial Invoice,
+     * freight to the Debit Note). Written only by CaSyncService.
+     */
+    public static function setLegZohoApplied(int $orderId, string $leg): void
+    {
+        if (!in_array($leg, ['advance', 'balance', 'freight'], true)) {
+            throw new \InvalidArgumentException("Unknown payment leg {$leg}.");
+        }
+        Database::connection()->prepare(
+            "UPDATE order_payment_status SET {$leg}_zoho_applied_at = NOW() WHERE order_id = :order_id"
+        )->execute(['order_id' => $orderId]);
+    }
+
+    /**
      * Every order with at least one cleared settlement leg, for the CA
      * module's settlement register (CaRepository). Joined here rather than
      * in CaRepository since this is still just order_payment_status data —

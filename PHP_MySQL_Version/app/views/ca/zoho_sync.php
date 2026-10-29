@@ -1,13 +1,14 @@
 <div class="card page-wide">
   <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
   <h1>Zoho Books Sync</h1>
-  <p class="muted">Two independent, one-way directions: settlement legs with a recorded INR actual are pushed to Zoho Books as customer payments, and expenses recorded in Zoho Books are imported here (see <a href="/ca/expenses">Expenses</a>). Runs on demand here, or hourly via the scheduled job (see README's cron setup). If Zoho Books isn't configured, this is a routine no-op — nothing else in the app depends on it.</p>
+  <p class="muted">Two independent, one-way directions: approved Commercial Invoices and Debit Notes are sent to Zoho Books as export invoices, settlement legs with a recorded INR actual are pushed as customer payments and applied to them (the advance is held until the Commercial Invoice is there), and expenses recorded in Zoho Books are imported here (see <a href="/ca/expenses">Expenses</a>). Runs on demand here, or hourly via the scheduled job (see README's cron setup). If Zoho Books isn't configured, this is a routine no-op — nothing else in the app depends on it.</p>
 
   <div class="section">
     <h2>Status</h2>
     <div class="kv-grid">
       <div><span class="k">Zoho Books</span><span class="v"><?= $isEnabled ? '<span style="color:var(--success)">Enabled</span>' : '<span class="muted">Not configured</span>' ?></span></div>
       <div><span class="k">Legs Pending Sync</span><span class="v"><?= (int) $pendingCount ?></span></div>
+      <div><span class="k">Payments Held (not yet applied to an invoice)</span><span class="v"><?= (int) $heldCount ?></span></div>
     </div>
     <?php if (!$isEnabled): ?>
       <p class="muted small">Fill in every <code>zoho_books_*</code> setting and set <code>zoho_books_enabled</code> to on, under Admin &rarr; Settings, to start syncing.</p>
@@ -30,7 +31,7 @@
         <tr>
           <td><?= htmlspecialchars((string) $row['created_at']) ?></td>
           <td><?= htmlspecialchars($row['triggered_by']) ?><?= $row['triggered_by_name'] ? ' (' . htmlspecialchars($row['triggered_by_name']) . ')' : '' ?></td>
-          <td><?= $row['entity_id'] ? (\App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $row['entity_id']) ? '<a href="/orders/' . (int) $row['entity_id'] . '">Order #' . (int) $row['entity_id'] . '</a>' : 'Order #' . (int) $row['entity_id']) . ($row['leg'] ? ' — ' . htmlspecialchars(ucfirst($row['leg'])) : '') : '<span class="muted">—</span>' ?></td>
+          <td><?= $row['entity_id'] ? (\App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $row['entity_id']) ? '<a href="/orders/' . (int) $row['entity_id'] . '">Order #' . (int) $row['entity_id'] . '</a>' : 'Order #' . (int) $row['entity_id']) . ($row['leg'] ? ' — ' . htmlspecialchars(\App\Services\ZohoInvoiceData::KIND_LABELS[$row['leg']] ?? ucfirst($row['leg'])) : '') : '<span class="muted">—</span>' ?></td>
           <td>
             <?php if ($row['status'] === 'success'): ?>
               <span style="color:var(--success)">Success</span>

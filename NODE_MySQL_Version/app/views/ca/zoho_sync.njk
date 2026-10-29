@@ -1,13 +1,14 @@
 <div class="card page-wide">
   <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
   <h1>Zoho Books Sync</h1>
-  <p class="muted">Two independent, one-way directions: settlement legs with a recorded INR actual are pushed to Zoho Books as customer payments, and expenses recorded in Zoho Books are imported here (see <a href="/ca/expenses">Expenses</a>). Runs on demand here, or hourly via the scheduled job (see README's background-jobs section). If Zoho Books isn't configured, this is a routine no-op — nothing else in the app depends on it.</p>
+  <p class="muted">Two independent, one-way directions: approved Commercial Invoices and Debit Notes are sent to Zoho Books as export invoices, settlement legs with a recorded INR actual are pushed as customer payments and applied to them (the advance is held until the Commercial Invoice is there), and expenses recorded in Zoho Books are imported here (see <a href="/ca/expenses">Expenses</a>). Runs on demand here, or hourly via the scheduled job (see README's background-jobs section). If Zoho Books isn't configured, this is a routine no-op — nothing else in the app depends on it.</p>
 
   <div class="section">
     <h2>Status</h2>
     <div class="kv-grid">
       <div><span class="k">Zoho Books</span><span class="v">{% if isEnabled %}<span style="color:var(--success)">Enabled</span>{% else %}<span class="muted">Not configured</span>{% endif %}</span></div>
       <div><span class="k">Legs Pending Sync</span><span class="v">{{ pendingCount }}</span></div>
+      <div><span class="k">Payments Held (not yet applied to an invoice)</span><span class="v">{{ heldCount }}</span></div>
     </div>
     {% if not isEnabled %}
       <p class="muted small">Fill in every <code>zoho_books_*</code> setting and set <code>zoho_books_enabled</code> to on, under Admin &rarr; Settings, to start syncing.</p>
@@ -32,7 +33,7 @@
           <td>{{ row.triggered_by }}{% if row.triggered_by_name %} ({{ row.triggered_by_name }}){% endif %}</td>
           <td>
             {% if row.entity_id %}
-              {% if canOpenOrder(row.entity_id) %}<a href="/orders/{{ row.entity_id }}">Order #{{ row.entity_id }}</a>{% else %}Order #{{ row.entity_id }}{% endif %}{% if row.leg %} — {{ row.leg | capitalize }}{% endif %}
+              {% if canOpenOrder(row.entity_id) %}<a href="/orders/{{ row.entity_id }}">Order #{{ row.entity_id }}</a>{% else %}Order #{{ row.entity_id }}{% endif %}{% if row.leg %} — {{ legLabels[row.leg] or (row.leg | capitalize) }}{% endif %}
             {% else %}
               <span class="muted">—</span>
             {% endif %}

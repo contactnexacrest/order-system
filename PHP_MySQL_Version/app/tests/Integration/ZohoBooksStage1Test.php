@@ -37,6 +37,7 @@ final class ZohoBooksStage1Test extends DbTestCase
     private array $contacts = [];
     private array $currencies = [['currency_id' => 'C-USD', 'currency_code' => 'USD'], ['currency_id' => 'C-EUR', 'currency_code' => 'EUR'], ['currency_id' => 'C-INR', 'currency_code' => 'INR']];
     private string $organizationId = '600';
+    private bool $gstRegistered = true;
 
     protected function setUp(): void
     {
@@ -78,6 +79,12 @@ final class ZohoBooksStage1Test extends DbTestCase
         }
         if ($path === '/books/v3/organizations') {
             return $json(['code' => 0, 'organizations' => [['organization_id' => $this->organizationId, 'name' => 'NexaCrest TEST Org']]]);
+        }
+        if (preg_match('#^/books/v3/organizations/(\d+)$#', $path, $m) === 1) {
+            return $json(['code' => 0, 'organization' => ['organization_id' => $m[1], 'is_registered_for_gst' => $this->gstRegistered]]);
+        }
+        if ($path === '/books/v3/invoices' && $method === 'GET') {
+            return $json(['code' => 0, 'invoices' => []]);
         }
         if ($path === '/books/v3/bankaccounts') {
             return $json(['code' => 0, 'bankaccounts' => [['account_id' => 'SBI-1', 'account_name' => 'SBI Bank - Current Account']]]);
@@ -196,16 +203,35 @@ final class ZohoBooksStage1Test extends DbTestCase
     {
         $clientId = $this->createTestClient();
 
-        $paymentId = ZohoBooksService::pushRevenuePayment($clientId, 'TEST-Overseas Buyer', 'USD', 1800.0, 151020.0, '2026-10-29', 'NX-1-advance');
+        $result = ZohoBooksService::pushRevenuePayment($clientId, 'TEST-Overseas Buyer', 'USD', 1800.0, 151020.0, '2026-10-29', 'NX-1-advance');
 
-        self::assertSame('PAY-1', $paymentId);
+        self::assertSame(['payment_id' => 'PAY-1', 'applied' => 0.0], $result);
         $contact = $this->requestsTo('POST', '/books/v3/contacts')[0]['payload'];
-        self::assertSame(['contact_name' => 'TEST-Overseas Buyer', 'company_name' => 'TEST-Overseas Buyer', 'contact_type' => 'customer', 'gst_treatment' => 'overseas', 'currency_id' => 'C-USD'], $contact);
+        self::assertSame(['contact_name' => 'TEST-Overseas Buyer', 'company_name' => 'TEST-Overseas Buyer', 'contact_type' => 'customer', 'currency_id' => 'C-USD', 'gst_treatment' => 'overseas'], $contact);
         $payment = $this->requestsTo('POST', '/books/v3/customerpayments')[0]['payload'];
         self::assertSame(1800.0, $payment['amount']);
         self::assertSame(83.9, $payment['exchange_rate']);
         self::assertSame('SBI-1', $payment['account_id']);
         self::assertSame('CT-1', ClientRepository::find($clientId)['zoho_contact_id']);
+    }
+
+    public function testABooksOrganisationNotRegisteredForGstGetsTheCustomerWithoutGstTreatment(): void
+    {
+        // Seen in the test organisation (change log Z-025): an organisation
+        // that is not GST-registered rejects gst_treatment.
+        $this->gstRegistered = false;
+
+        ZohoBooksService::pushRevenuePayment($this->createTestClient(), 'TEST-Plain Buyer', 'USD', 100.0, 8400.0, '2026-10-29', 'NX-7-advance');
+
+        self::assertSame(['contact_name' => 'TEST-Plain Buyer', 'company_name' => 'TEST-Plain Buyer', 'contact_type' => 'customer', 'currency_id' => 'C-USD'], $this->requestsTo('POST', '/books/v3/contacts')[0]['payload']);
+    }
+
+    public function testOneAccessTokenServesARun(): void
+    {
+        ZohoBooksService::pushRevenuePayment($this->createTestClient(), 'TEST-Token Buyer A', 'USD', 100.0, 8400.0, '2026-10-29', 'NX-8-advance');
+        ZohoBooksService::pushRevenuePayment($this->createTestClient(), 'TEST-Token Buyer B', 'USD', 100.0, 8400.0, '2026-10-29', 'NX-9-advance');
+
+        self::assertCount(1, $this->requestsTo('POST', '/oauth/v2/token'), 'Zoho limits how many access tokens are issued');
     }
 
     public function testAnInrPaymentGoesInAsRupeesWithoutARate(): void
@@ -250,7 +276,7 @@ final class ZohoBooksStage1Test extends DbTestCase
 
         $list = ZohoBooksService::listTestContacts();
 
-        self::assertSame([['contact_id' => 'CT-7', 'name' => 'TEST-Cleanup Buyer', 'payments' => [['payment_id' => 'PAY-9', 'label' => 'TEST-REF USD 100 on 2026-10-29']]]], $list);
+        self::assertSame([['contact_id' => 'CT-7', 'name' => 'TEST-Cleanup Buyer', 'payments' => [['payment_id' => 'PAY-9', 'label' => 'TEST-REF USD 100 on 2026-10-29']], 'invoices' => []]], $list);
         ZohoBooksService::deleteRecord('customerpayment', 'PAY-9');
         ZohoBooksService::deleteRecord('contact', 'CT-7');
         ZohoBooksService::deleteRecord('contact', 'CT-404');

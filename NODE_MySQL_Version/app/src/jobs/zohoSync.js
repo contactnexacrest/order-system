@@ -28,7 +28,7 @@ async function run() {
 if (require.main === module) {
   run()
     .then((result) => {
-      console.log(`[zoho_sync] revenue ${result.revenue.synced} synced/${result.revenue.failed} failed/${result.revenue.skipped} skipped; expenses ${result.expenses.imported} imported/${result.expenses.failed} failed/${result.expenses.skipped} skipped.`);
+      console.log(`[zoho_sync] revenue ${result.revenue.invoices} invoices/${result.revenue.synced} synced/${result.revenue.applied} applied/${result.revenue.failed} failed/${result.revenue.skipped} skipped; expenses ${result.expenses.imported} imported/${result.expenses.failed} failed/${result.expenses.skipped} skipped.`);
       return db.pool.end();
     })
     .catch((e) => {

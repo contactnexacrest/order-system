@@ -8,13 +8,15 @@ declare(strict_types=1);
  * real Books organisation (owner decision), so every test record must go.
  *
  * What it removes:
- *   - every Books customer whose name starts with TEST-, with its payments;
+ *   - every Books customer whose name starts with TEST-, with its payments
+ *     and (Stage 2) its invoices;
  *   - with --from-sync-log, also every payment this database's sync log
- *     pushed and every customer this database created (clients.zoho_contact_id).
+ *     pushed, every invoice it sent (order_zoho_invoices) and every
+ *     customer this database created (clients.zoho_contact_id).
  *     Run that only on the TEST database, never on the live one.
- * Payments go first (Books refuses to delete a customer that still has
- * transactions); this database's Zoho references are then cleared so a
- * later sync starts clean.
+ * Payments go first, then invoices (Books refuses to delete a customer
+ * that still has transactions); this database's Zoho references are then
+ * cleared so a later sync starts clean.
  *
  * Usage:
  *   php app/cron/zoho_cleanup_test_records.php                     # dry run: lists what would go, changes nothing
@@ -47,11 +49,15 @@ $logFile = $option('--log');
 $pdo = Database::connection();
 $plan = []; // kind => [id => label]
 $plan['customerpayment'] = [];
+$plan['invoice'] = [];
 $plan['contact'] = [];
 
 foreach (ZohoBooksService::listTestContacts() as $contact) {
     foreach ($contact['payments'] as $payment) {
         $plan['customerpayment'][$payment['payment_id']] = "payment {$payment['label']} of {$contact['name']}";
+    }
+    foreach ($contact['invoices'] as $invoice) {
+        $plan['invoice'][$invoice['invoice_id']] = "invoice {$invoice['label']} of {$contact['name']}";
     }
     $plan['contact'][$contact['contact_id']] = "customer {$contact['name']}";
 }
@@ -59,6 +65,9 @@ if ($fromSyncLog) {
     $rows = $pdo->query("SELECT entity_id, leg, zoho_reference FROM zoho_sync_log WHERE sync_type = 'revenue_payment' AND status = 'success' AND zoho_reference IS NOT NULL")->fetchAll();
     foreach ($rows as $row) {
         $plan['customerpayment'][(string) $row['zoho_reference']] ??= "payment for order #{$row['entity_id']} ({$row['leg']}) from this database's sync log";
+    }
+    foreach ($pdo->query('SELECT order_id, kind, zoho_invoice_id, zoho_invoice_number FROM order_zoho_invoices')->fetchAll() as $row) {
+        $plan['invoice'][(string) $row['zoho_invoice_id']] ??= "invoice {$row['zoho_invoice_number']} for order #{$row['order_id']} ({$row['kind']}) from this database";
     }
     foreach ($pdo->query('SELECT company_legal_name, zoho_contact_id FROM clients WHERE zoho_contact_id IS NOT NULL')->fetchAll() as $row) {
         $plan['contact'][(string) $row['zoho_contact_id']] ??= "customer {$row['company_legal_name']} (created by this database)";
@@ -70,7 +79,7 @@ foreach ($plan as $kind => $items) {
         echo "{$kind} {$id}  {$label}\n";
     }
 }
-echo sprintf("\n%d payment(s) and %d customer(s) to delete from Zoho Books.\n", count($plan['customerpayment']), count($plan['contact']));
+echo sprintf("\n%d payment(s), %d invoice(s) and %d customer(s) to delete from Zoho Books.\n", count($plan['customerpayment']), count($plan['invoice']), count($plan['contact']));
 if (!$apply) {
     echo "Dry run — nothing changed. Run again with --apply to delete them.\n";
     exit(0);
@@ -87,15 +96,21 @@ foreach ($plan as $kind => $items) {
             $now = (new DateTimeImmutable('now', new DateTimeZone('Asia/Kolkata')))->format('Y-m-d H:i');
             $csvRows[] = [
                 'Z-NEW-' . (++$n), $now, $by, $by, 'Zoho API (cleanup script)', 'Zoho Books', 'Books org ' . (string) App\Repositories\CompanySettingsRepository::get('zoho_books_organization_id'),
-                $kind === 'contact' ? 'DELETE /books/v3/contacts/{id} (Books: Sales -> Customers)' : 'DELETE /books/v3/customerpayments/{id} (Books: Sales -> Payments Received)',
+                [
+                    'contact' => 'DELETE /books/v3/contacts/{id} (Books: Sales -> Customers)',
+                    'invoice' => 'DELETE /books/v3/invoices/{id} (Books: Sales -> Invoices)',
+                    'customerpayment' => 'DELETE /books/v3/customerpayments/{id} (Books: Sales -> Payments Received)',
+                ][$kind],
                 'Delete', "{$label}; Zoho ID {$id}", 'Exists', 'Deleted', 'Remove test data before go-live', 'Test', 'Yes', "{$now} / {$by}",
                 'cron/zoho_cleanup_test_records.php', '', '',
             ];
             if ($kind === 'contact') {
                 $pdo->prepare('UPDATE clients SET zoho_contact_id = NULL WHERE zoho_contact_id = :id')->execute(['id' => $id]);
+            } elseif ($kind === 'invoice') {
+                App\Repositories\OrderZohoInvoiceRepository::forgetZohoInvoice((string) $id);
             } else {
                 foreach (['advance', 'balance', 'freight'] as $leg) {
-                    $pdo->prepare("UPDATE order_payment_status SET {$leg}_zoho_synced_at = NULL, {$leg}_zoho_reference = NULL WHERE {$leg}_zoho_reference = :id")->execute(['id' => $id]);
+                    $pdo->prepare("UPDATE order_payment_status SET {$leg}_zoho_synced_at = NULL, {$leg}_zoho_reference = NULL, {$leg}_zoho_applied_at = NULL WHERE {$leg}_zoho_reference = :id")->execute(['id' => $id]);
                 }
             }
         } catch (\Throwable $e) {
