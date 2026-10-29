@@ -230,12 +230,16 @@ final class ZohoBooksService
         }
         // Zoho has been seen answering HTTP 500 with a cut-off body to a
         // create or update that did go through (test organisation, Z-029),
-        // so the result is read back from the invoice list, never from the
-        // response.
+        // so when the response cannot be read the result is read back from
+        // the invoice list (asked again if it lags behind the create).
         $response = $existing === null
             ? self::request('POST', "https://{$config['apiDomain']}/books/v3/invoices{$query}", $payload, self::authHeaders($accessToken))
             : self::request('PUT', "https://{$config['apiDomain']}/books/v3/invoices/" . rawurlencode((string) $existing['invoice_id']) . $query, $payload, self::authHeaders($accessToken));
-        $saved = self::findInvoiceByNumber($config, $accessToken, (string) $invoice['invoice_number']);
+        $decoded = json_decode($response['body'], true);
+        $saved = is_array($decoded) && ($decoded['code'] ?? null) === 0 && isset($decoded['invoice']['invoice_id']) && (string) ($decoded['invoice']['invoice_number'] ?? '') === (string) $invoice['invoice_number']
+            ? $decoded['invoice']
+            : null;
+        $saved ??= self::awaitInvoiceByNumber($config, $accessToken, (string) $invoice['invoice_number']);
         if ($saved === null || abs((float) $saved['total'] - (float) $invoice['total']) > 0.01) {
             throw new \RuntimeException('Zoho Books invoice ' . ($existing === null ? 'creation' : 'update') . " for {$invoice['invoice_number']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
         }
@@ -330,8 +334,9 @@ final class ZohoBooksService
                 'description' => "{$what} for order {$bill['buyer_inquiry_ref']}: taxable " . number_format((float) $bill['taxable_inr'], 2, '.', '') . ' + GST ' . number_format((float) $bill['gst_inr'], 2, '.', '') . (!empty($bill['note']) ? ". {$bill['note']}" : ''),
                 'rate' => $line['rate'],
                 'quantity' => 1,
-            ] + ($line['tax_id'] !== null ? ['tax_id' => $line['tax_id']] : [])],
-        ];
+            ] + ($line['tax_id'] !== null ? ['tax_id' => $line['tax_id']] : [])
+              + ($line['reverse_charge_tax_id'] !== null ? ['reverse_charge_tax_id' => $line['reverse_charge_tax_id']] : [])],
+        ] + ($line['reverse_charge_tax_id'] !== null ? ['is_reverse_charge_applied' => true] : []);
         $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/bills?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
         $saved = self::findBill($config, $accessToken, (string) $bill['bill_no'], $vendorId);
         if ($saved === null) {
@@ -768,12 +773,33 @@ final class ZohoBooksService
      */
     private static function invoiceApplication(array $config, string $accessToken, string $invoiceNumber, string $contactId, float $amount): array
     {
-        $invoice = self::findInvoiceByNumber($config, $accessToken, $invoiceNumber);
+        $invoice = self::awaitInvoiceByNumber($config, $accessToken, $invoiceNumber);
         if ($invoice === null || (string) $invoice['customer_id'] !== $contactId) {
             throw new \RuntimeException("Invoice {$invoiceNumber} was not found in Zoho Books for this customer.");
         }
         $applied = round(min($amount, (float) ($invoice['balance'] ?? 0)), 2);
         return [$applied > 0 ? [['invoice_id' => (string) $invoice['invoice_id'], 'amount_applied' => $applied]] : [], $applied];
+    }
+
+    /**
+     * findInvoiceByNumber(), asked up to three times a few seconds apart:
+     * for an invoice the app knows is in Books, as the list can lag a few
+     * seconds behind a create (test organisation, 2026-10-29).
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function awaitInvoiceByNumber(array $config, string $accessToken, string $invoiceNumber): ?array
+    {
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            if ($attempt > 0) {
+                sleep(3);
+            }
+            $invoice = self::findInvoiceByNumber($config, $accessToken, $invoiceNumber);
+            if ($invoice !== null) {
+                return $invoice;
+            }
+        }
+        return null;
     }
 
     /**
@@ -823,21 +849,35 @@ final class ZohoBooksService
     /**
      * The bill's one line: its value and GST tax (see pushBill()).
      *
-     * @return array{rate: float, tax_id: ?string}
+     * Owner decision 2026-10-29 (CA advice): a transport bill marked
+     * reverse charge (a GTA that charges no GST) goes with the 5% GST as
+     * reverse charge — the bill stays at its taxable value and Books
+     * works out the tax we owe and can claim back. IGST5 for a transporter
+     * registered in another state, else GST5 (Books treats a vendor with
+     * no GSTIN as in our own state).
+     *
+     * @return array{rate: float, tax_id: ?string, reverse_charge_tax_id: ?string}
      */
     private static function billTax(array $config, string $accessToken, array $bill): array
     {
         $taxable = round((float) $bill['taxable_inr'], 2);
         $gstAmount = round((float) $bill['gst_inr'], 2);
         if (!self::isGstRegistered($config, $accessToken)) {
-            return ['rate' => round((float) $bill['total_inr'], 2), 'tax_id' => null];
+            return ['rate' => round((float) $bill['total_inr'], 2), 'tax_id' => null, 'reverse_charge_tax_id' => null];
         }
         $vendorGstin = strtoupper(trim((string) ($bill['vendor_gstin'] ?? '')));
+        $otherState = $vendorGstin !== '' && substr($vendorGstin, 0, 2) !== substr(self::$orgGstin[$config['organizationId']] ?? '', 0, 2);
+        if (!empty($bill['gst_reverse_charge'])) {
+            if ($gstAmount > 0) {
+                throw new \RuntimeException("Bill {$bill['bill_no']} not sent: it is marked reverse charge but carries GST (" . number_format($gstAmount, 2, '.', '') . '). Under reverse charge the transporter charges no GST — correct the bill.');
+            }
+            return ['rate' => $taxable, 'tax_id' => null, 'reverse_charge_tax_id' => self::taxId($config, $accessToken, $otherState ? 'IGST5' : 'GST5')];
+        }
         if ($vendorGstin === '') {
             if ($gstAmount > 0) {
                 throw new \RuntimeException("Bill {$bill['bill_no']} not sent: it carries GST (" . number_format($gstAmount, 2, '.', '') . "), but {$bill['vendor_name']} has no GSTIN in the app. Add the GSTIN to the supplier / logistics partner, or correct the bill.");
             }
-            return ['rate' => $taxable, 'tax_id' => null];
+            return ['rate' => $taxable, 'tax_id' => null, 'reverse_charge_tax_id' => null];
         }
         $percent = null;
         foreach ([0, 5, 12, 18, 28, 40] as $candidate) {
@@ -849,8 +889,7 @@ final class ZohoBooksService
         if ($percent === null) {
             throw new \RuntimeException("Bill {$bill['bill_no']} not sent: GST " . number_format($gstAmount, 2, '.', '') . ' on taxable ' . number_format($taxable, 2, '.', '') . ' is not 5, 12, 18, 28 or 40 % — correct the bill (a bill with several GST rates needs the CA).');
         }
-        $interState = substr($vendorGstin, 0, 2) !== substr(self::$orgGstin[$config['organizationId']] ?? '', 0, 2);
-        return ['rate' => $taxable, 'tax_id' => self::taxId($config, $accessToken, ($interState ? 'IGST' : 'GST') . $percent)];
+        return ['rate' => $taxable, 'tax_id' => self::taxId($config, $accessToken, ($otherState ? 'IGST' : 'GST') . $percent), 'reverse_charge_tax_id' => null];
     }
 
     /** A Books tax's id by its name (GST18 = CGST + SGST group, IGST18, ...). */

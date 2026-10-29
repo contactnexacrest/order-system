@@ -153,6 +153,22 @@ async function addLogisticsBill(req, res) {
     back(req, res, orderId, anchor, 'error', base);
     return;
   }
+  // Owner decision 2026-10-29 (CA advice): reverse charge only for a
+  // road transporter (GTA) that charges no GST — so the bill's GST is 0.
+  const gstCharge = str(req.body.gst_charge) || 'forward';
+  if (!['forward', 'reverse'].includes(gstCharge)) {
+    back(req, res, orderId, anchor, 'error', 'Choose how GST is charged on the bill.');
+    return;
+  }
+  if (gstCharge === 'reverse' && service !== 'transport') {
+    back(req, res, orderId, anchor, 'error', 'Reverse charge applies only to a Transport bill.');
+    return;
+  }
+  if (gstCharge === 'reverse' && Number(base.gst_inr) !== 0) {
+    back(req, res, orderId, anchor, 'error', 'Under reverse charge the transporter charges no GST — pick GST rate 0%.');
+    return;
+  }
+  base.gst_reverse_charge = gstCharge === 'reverse' ? 1 : 0;
   const kind = await docKindFields(req, orderId, 'logistics', base, (b) => Number(b.logistics_partner_id) === Number(partner.id));
   if (typeof kind === 'string') {
     back(req, res, orderId, anchor, 'error', kind);

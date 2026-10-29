@@ -368,6 +368,7 @@
         {% if isProforma and b.requested_amount_inr !== null %}<br><small class="muted">Asks for &#8377;{{ b.requested_amount_inr | money }} now</small>{% endif %}
         {% if b.replaces_bill_no !== null %}<br><small class="muted">Replaces proforma {{ b.replaces_bill_no }}</small>{% endif %}
         {% if b.replaced_by !== null %}<br><small class="muted">Replaced by tax invoice {{ b.replaced_by }}</small>{% endif %}
+        {% if b.gst_reverse_charge | int %}<br><small class="muted">Reverse charge — we pay the 5% GST</small>{% endif %}
         {% if (b.id | int) in carriedIds %}<br><small class="muted">Added in Step 7e — shown here until fully paid</small>{% endif %}
         {% if b.note %}<br><small class="muted">{{ b.note }}</small>{% endif %}</td>
       <td style="text-align:right">{{ b.taxable_inr | money }}</td>
@@ -433,7 +434,7 @@
     <label>Bill date *<input type="date" name="bill_date" required max="{{ today() }}"></label>
     <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base></label>
     <label>GST rate (%) *
-      <select name="gst_rate_pct" required data-gst-rate>
+      <select name="gst_rate_pct" required data-gst-rate data-zero-if="gst_charge=reverse" data-zero-if-message="Under reverse charge the transporter charges no GST — pick 0%. We pay the 5% to the government ourselves.">
         {% for o in gstRates %}
           <option value="{{ o.option_value }}" {{ 'selected' if o.is_default else '' }}>{{ o.option_value }}%</option>
         {% endfor %}
@@ -2273,6 +2274,14 @@
           </select>
           <small class="muted">{{ 'Advance and Final bills can both be paid any time on an FOB order.' if isFob else 'An Advance bill can be paid any time; a Final bill waits for Step 9d.' }}</small>
         </label>
+        {# Owner decision 2026-10-29 (CA advice): a road transporter (GTA) that charges no GST is booked under reverse charge. #}
+        <label data-show-when="bill_for=transport">GST on this bill *
+          <select name="gst_charge" required>
+            <option value="forward" selected>Charged on the bill</option>
+            <option value="reverse">Reverse charge — no GST on the bill</option>
+          </select>
+          <small class="muted">Reverse charge: the bill shows no GST; we pay 5% to the government and claim it back. Pick GST rate 0% below.</small>
+        </label>
         {{ vendorBillFields(gstRates, 'invoice', vendorBillsView.replaceable(logisticsBillsList)) }}
         <div><button type="submit" class="btn-sm">Add Bill</button></div>
       </form>
@@ -2642,6 +2651,25 @@
         {% endif %}
       {% endif %}
     {% endif %}
+
+    {# Owner decision 2026-10-29: the shipping bill and its customs exchange rate — the CI and Debit Note go to Zoho Books at that rate. #}
+    <div id="shipping-bill" class="section">
+      <h3>Shipping Bill</h3>
+      {% if shipping and shipping.shipping_bill_no %}
+        <p>Shipping bill <strong>{{ shipping.shipping_bill_no }}</strong> dated {{ shipping.shipping_bill_date | shortDate }} &middot; customs exchange rate <strong>&#8377;{{ shipping.customs_exchange_rate | float }}</strong> for 1 {{ order.currency_code }}</p>
+      {% else %}
+        <p class="muted small">Not recorded yet. The Commercial Invoice and the Debit Note go to Zoho Books at the customs exchange rate printed on the shipping bill, so they wait for it.</p>
+      {% endif %}
+      {% if permissions.manage_shipping %}
+      <form method="post" action="/orders/{{ order.id }}/shipping-bill" class="field-grid">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Shipping Bill No. *<input type="text" name="shipping_bill_no" required maxlength="30" value="{{ shipping.shipping_bill_no if shipping and shipping.shipping_bill_no else '' }}"></label>
+        <label>Shipping Bill Date *<input type="date" name="shipping_bill_date" required max="{{ today() }}" value="{{ shipping.shipping_bill_date if shipping and shipping.shipping_bill_date else '' }}"></label>
+        <label>Customs Exchange Rate (&#8377; for 1 {{ order.currency_code }}) *<input type="number" name="customs_exchange_rate" required min="0.0001" max="100000" step="0.0001" value="{{ shipping.customs_exchange_rate if shipping and shipping.customs_exchange_rate else '' }}"><small class="muted">As printed on the shipping bill. An invoice already in Zoho Books keeps the rate it was sent at.</small></label>
+        <div><button type="submit" class="btn-sm">{{ 'Update Shipping Bill' if shipping and shipping.shipping_bill_no else 'Save Shipping Bill' }}</button></div>
+      </form>
+      {% endif %}
+    </div>
   </details>
 
   </details>

@@ -491,6 +491,16 @@
         return el.dataset.notMoreThanMessage || 'This cannot be more than ' + cap.value + '.';
       }
     }
+    // data-zero-if="<name>=<value>": must be 0 while that field has that
+    // value (e.g. the GST rate on a transport bill under reverse charge —
+    // the transporter charges no GST; we pay it to the government).
+    if (el.dataset.zeroIf && el.form && value !== '') {
+      var zeroCond = el.dataset.zeroIf.split('=');
+      var zeroField = el.form.elements.namedItem(zeroCond[0]);
+      if (zeroField && !zeroField.disabled && zeroField.value === zeroCond[1] && parseFloat(value) !== 0) {
+        return el.dataset.zeroIfMessage || 'This must be 0 here.';
+      }
+    }
     var bankMessage = bankError(el, value);
     if (bankMessage) return bankMessage;
     if (/^bank_account_number(_confirm)?$/.test(name) && value !== '' && !/^[0-9]{6,20}$/.test(value.replace(/\s+/g, ''))) {

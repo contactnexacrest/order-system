@@ -44,9 +44,9 @@ final class OrderVendorBillRepository
         $pdo = Database::connection();
         $pdo->prepare(
             'INSERT INTO order_vendor_bills (order_id, vendor_kind, supplier_po_id, logistics_partner_id, bill_for, payment_kind, doc_kind, requested_amount_inr, replaces_bill_id,
-                bill_no, bill_date, taxable_inr, gst_inr, total_inr, note, bill_file_id, created_by)
+                bill_no, bill_date, taxable_inr, gst_inr, gst_reverse_charge, total_inr, note, bill_file_id, created_by)
              VALUES (:order_id, :vendor_kind, :supplier_po_id, :logistics_partner_id, :bill_for, :payment_kind, :doc_kind, :requested_amount_inr, :replaces_bill_id,
-                :bill_no, :bill_date, :taxable_inr, :gst_inr, :total_inr, :note, :bill_file_id, :created_by)'
+                :bill_no, :bill_date, :taxable_inr, :gst_inr, :gst_reverse_charge, :total_inr, :note, :bill_file_id, :created_by)'
         )->execute([
             'order_id'             => $orderId,
             'vendor_kind'          => $vendorKind,
@@ -61,6 +61,7 @@ final class OrderVendorBillRepository
             'bill_date'            => $data['bill_date'],
             'taxable_inr'          => $data['taxable_inr'],
             'gst_inr'              => $data['gst_inr'],
+            'gst_reverse_charge'   => (int) ($data['gst_reverse_charge'] ?? 0),
             'total_inr'            => round((float) $data['taxable_inr'] + (float) $data['gst_inr'], 2),
             'note'                 => $data['note'] ?? null,
             'bill_file_id'         => $data['bill_file_id'] ?? null,

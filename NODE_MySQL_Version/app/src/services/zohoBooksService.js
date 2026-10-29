@@ -186,12 +186,16 @@ async function pushInvoice(invoice) {
     payload.reason = `Revised in the order system: ${KIND_LABELS[invoice.kind]} ${invoice.invoice_number} revision ${invoice.revision} approved.`;
   }
   // Zoho has been seen answering HTTP 500 with a cut-off body to a create
-  // or update that did go through (test organisation, Z-029), so the
-  // result is read back from the invoice list, never from the response.
+  // or update that did go through (test organisation, Z-029), so when the
+  // response cannot be read the result is read back from the invoice list
+  // (asked again if it lags behind the create).
   const res = existing
     ? await request('PUT', `https://${config.apiDomain}/books/v3/invoices/${encodeURIComponent(String(existing.invoice_id))}${query}`, payload, authHeaders(accessToken))
     : await request('POST', `https://${config.apiDomain}/books/v3/invoices${query}`, payload, authHeaders(accessToken));
-  const saved = await findInvoiceByNumber(config, accessToken, String(invoice.invoice_number));
+  const decoded = safeJson(res.body);
+  const saved = (decoded && decoded.code === 0 && decoded.invoice && decoded.invoice.invoice_id && String(decoded.invoice.invoice_number || '') === String(invoice.invoice_number)
+    ? decoded.invoice
+    : null) || await awaitInvoiceByNumber(config, accessToken, String(invoice.invoice_number));
   if (!saved || Math.abs(Number(saved.total) - Number(invoice.total)) > 0.01) {
     throw new Error(`Zoho Books invoice ${existing ? 'update' : 'creation'} for ${invoice.invoice_number} failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
   }
@@ -281,7 +285,9 @@ async function pushBill(bill) {
       rate: line.rate,
       quantity: 1,
       ...(line.tax_id !== null ? { tax_id: line.tax_id } : {}),
+      ...(line.reverse_charge_tax_id !== null ? { reverse_charge_tax_id: line.reverse_charge_tax_id } : {}),
     }],
+    ...(line.reverse_charge_tax_id !== null ? { is_reverse_charge_applied: true } : {}),
   };
   const res = await request('POST', `https://${config.apiDomain}/books/v3/bills?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
   const saved = await findBill(config, accessToken, String(bill.bill_no), vendorId);
@@ -671,7 +677,7 @@ function paymentPayload(config, contactId, currencyCode, foreignAmount, amountIn
 
 /** The "invoices" part of a payment: as much of amount as invoice invoiceNumber still owes. @return {Promise<[Array, number]>} */
 async function invoiceApplication(config, accessToken, invoiceNumber, contactId, amount) {
-  const invoice = await findInvoiceByNumber(config, accessToken, invoiceNumber);
+  const invoice = await awaitInvoiceByNumber(config, accessToken, invoiceNumber);
   if (!invoice || String(invoice.customer_id) !== contactId) {
     throw new Error(`Invoice ${invoiceNumber} was not found in Zoho Books for this customer.`);
   }
@@ -684,6 +690,24 @@ async function invoiceApplication(config, accessToken, invoiceNumber, contactId,
  * single-invoice read has been seen failing with HTTP 500 in the test
  * organisation, Z-029; the list does not).
  */
+/**
+ * findInvoiceByNumber(), asked up to three times a few seconds apart: for
+ * an invoice the app knows is in Books, as the list can lag a few seconds
+ * behind a create (test organisation, 2026-10-29).
+ */
+async function awaitInvoiceByNumber(config, accessToken, invoiceNumber) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((resolve) => { setTimeout(resolve, 3000); });
+    }
+    const invoice = await findInvoiceByNumber(config, accessToken, invoiceNumber);
+    if (invoice) {
+      return invoice;
+    }
+  }
+  return null;
+}
+
 async function findInvoiceByNumber(config, accessToken, invoiceNumber) {
   const rows = await getList(accessToken, `https://${config.apiDomain}/books/v3/invoices?organization_id=${encodeURIComponent(config.organizationId)}&invoice_number=${encodeURIComponent(invoiceNumber)}`, 'invoices');
   return rows.find((row) => String(row.invoice_number || '') === invoiceNumber) || null;
@@ -714,26 +738,43 @@ async function syncStartDate() {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
 }
 
-/** The bill's one line: its value and GST tax (see pushBill()). @return {Promise<{rate: number, tax_id: ?string}>} */
+/**
+ * The bill's one line: its value and GST tax (see pushBill()).
+ *
+ * Owner decision 2026-10-29 (CA advice): a transport bill marked
+ * reverse charge (a GTA that charges no GST) goes with the 5% GST as
+ * reverse charge — the bill stays at its taxable value and Books
+ * works out the tax we owe and can claim back. IGST5 for a transporter
+ * registered in another state, else GST5 (Books treats a vendor with
+ * no GSTIN as in our own state).
+ *
+ * @return {Promise<{rate: number, tax_id: ?string, reverse_charge_tax_id: ?string}>}
+ */
 async function billTax(config, accessToken, bill) {
   const taxable = round(Number(bill.taxable_inr), 2);
   const gstAmount = round(Number(bill.gst_inr), 2);
   if (!(await isGstRegistered(config, accessToken))) {
-    return { rate: round(Number(bill.total_inr), 2), tax_id: null };
+    return { rate: round(Number(bill.total_inr), 2), tax_id: null, reverse_charge_tax_id: null };
   }
   const vendorGstin = String(bill.vendor_gstin || '').trim().toUpperCase();
+  const otherState = vendorGstin !== '' && vendorGstin.slice(0, 2) !== String(orgGstin.get(config.organizationId) || '').slice(0, 2);
+  if (Number(bill.gst_reverse_charge)) {
+    if (gstAmount > 0) {
+      throw new Error(`Bill ${bill.bill_no} not sent: it is marked reverse charge but carries GST (${gstAmount.toFixed(2)}). Under reverse charge the transporter charges no GST — correct the bill.`);
+    }
+    return { rate: taxable, tax_id: null, reverse_charge_tax_id: await taxId(config, accessToken, otherState ? 'IGST5' : 'GST5') };
+  }
   if (vendorGstin === '') {
     if (gstAmount > 0) {
       throw new Error(`Bill ${bill.bill_no} not sent: it carries GST (${gstAmount.toFixed(2)}), but ${bill.vendor_name} has no GSTIN in the app. Add the GSTIN to the supplier / logistics partner, or correct the bill.`);
     }
-    return { rate: taxable, tax_id: null };
+    return { rate: taxable, tax_id: null, reverse_charge_tax_id: null };
   }
   const percent = [0, 5, 12, 18, 28, 40].find((candidate) => Math.abs(round(taxable * candidate / 100, 2) - gstAmount) <= 1);
   if (percent === undefined) {
     throw new Error(`Bill ${bill.bill_no} not sent: GST ${gstAmount.toFixed(2)} on taxable ${taxable.toFixed(2)} is not 5, 12, 18, 28 or 40 % — correct the bill (a bill with several GST rates needs the CA).`);
   }
-  const interState = vendorGstin.slice(0, 2) !== String(orgGstin.get(config.organizationId) || '').slice(0, 2);
-  return { rate: taxable, tax_id: await taxId(config, accessToken, `${interState ? 'IGST' : 'GST'}${percent}`) };
+  return { rate: taxable, tax_id: await taxId(config, accessToken, `${otherState ? 'IGST' : 'GST'}${percent}`), reverse_charge_tax_id: null };
 }
 
 /** A Books tax's id by its name (GST18 = CGST + SGST group, IGST18, ...). */

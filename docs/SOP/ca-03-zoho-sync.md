@@ -57,17 +57,22 @@ the buyer:
   On CFR / CIF orders, ocean freight (and insurance on CIF) are billed on
   the **Debit Note**, which goes to Books as its own invoice. Nothing is
   counted twice.
-- **In the order's currency, at a recorded rate.** The CI uses the
-  exchange rate recorded for the balance leg in the INR Settlement
-  Register (else the advance leg's); the Debit Note the freight leg's
-  (else the advance leg's). With no rate recorded the invoice is not sent
-  and the Sync Log says so. **The rate is fixed once the invoice is in
-  Books:** a rate recorded later (for example when the balance arrives)
-  does not change the invoice — each payment still goes in at its own
-  actual rate, and Books books the difference as exchange gain or loss.
+- **In the order's currency, at the shipping bill's customs rate**
+  (CA advice, 2026-10-29). The CI and the Debit Note use the **customs
+  exchange rate printed on the shipping bill**, so the GST return matches
+  the shipping bill. Record it on the order page: **Shipping Bill**
+  (number, date, customs exchange rate — staff with the shipping
+  permission). Until it is recorded the invoice is not sent and the Sync
+  Log says so. **The rate is fixed once the invoice is in Books:**
+  correcting it afterwards does not change the invoice — each payment
+  still goes in at its own actual rate (the INR Settlement Register), and
+  Books books the difference as exchange gain or loss.
 - **GST (2026-10-29).** In a GST-registered Books organisation the
   invoice goes in as an export to an overseas customer **without payment
-  of IGST** (under LUT), with each product's HS code. A GST invoice
+  of IGST** (under LUT), with each product's HS code. The **Debit Note**
+  is a zero-rated export invoice too: freight billed with export goods
+  is part of the export, so its lines carry the goods' HS code (the
+  first product's). A GST invoice
   number may have at most 16 characters: CIs and Debit Notes numbered
   before the 2-digit-year change (`SC/CI/2026/…`, 17 characters) are
   refused with a message — book those by hand if they fall after the
@@ -95,8 +100,8 @@ revised one is approved.
 **What stops an invoice, with a message in the Sync Log** (it is retried
 on every sync until fixed):
 
-- no exchange rate recorded for its leg (set it in the INR Settlement
-  Register);
+- no customs exchange rate recorded on the order (Shipping Bill, on the
+  order page);
 - a product line without a confirmed quantity or unit price, or whose
   quantity × unit price does not equal its value;
 - no confirmed freight rate (Debit Note);
@@ -152,10 +157,20 @@ bill goes in at its **taxable value plus GST at the bill's own rate**:
 **IGST** when the supplier's GSTIN is from another state, **CGST + SGST**
 when it is from Karnataka, like NexaCrest's. Books works out the place of
 supply from the GSTIN. A bill without GST from a registered supplier goes
-in at 0 %; from an unregistered one, without tax. Not handled yet — for
-the CA to decide: reverse charge (for example road transport by a goods
-transport agency) and input credit that is blocked. Order expenses go in
-without GST (Books marks them "out of scope").
+in at 0 %; from an unregistered one, without tax. Full input credit is
+taken on bills. Order expenses go in without GST (Books marks them "out
+of scope").
+
+**Reverse charge on road transport (CA advice, 2026-10-29).** A road
+transporter (goods transport agency) that charges no GST is booked under
+**reverse charge**: we pay the 5 % GST to the government ourselves and
+claim it back. When adding a **Transport** bill under Logistics partner
+bills, choose **GST on this bill → Reverse charge — no GST on the bill** and pick GST rate **0 %** (the app refuses anything
+else, and offers reverse charge only for Transport). The bill shows
+"Reverse charge" in the list. In Books it goes in at its taxable value
+with **reverse charge at 5 %** — IGST 5 % for a transporter registered in
+another state, else CGST + SGST 2.5 % each — and the Sync Log says
+"reverse charge". Every other bill: leave it at **Charged on the bill**.
 
 ## The server switches in `.env` (2026-10-29)
 

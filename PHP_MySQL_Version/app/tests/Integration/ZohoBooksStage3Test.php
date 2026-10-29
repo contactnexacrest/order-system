@@ -315,6 +315,40 @@ final class ZohoBooksStage3Test extends DbTestCase
         self::assertSame([], $this->bills);
     }
 
+    /** Owner decision 2026-10-29 (CA advice): a road transporter (GTA) that charges no GST is booked under reverse charge at 5%. */
+    public function testInAGstRegisteredOrganisationAReverseChargeTransportBillCarriesTheFivePercentAsReverseCharge(): void
+    {
+        $this->gstRegistered = true;
+        $o = $this->createOrder();
+        OrderVendorBillRepository::create($o['order'], 'logistics', [
+            'logistics_partner_id' => $o['partner'], 'bill_for' => 'transport', 'doc_kind' => 'invoice', 'bill_no' => 'TEST-GTA-1', 'bill_date' => '2026-10-27', 'taxable_inr' => 10000.0, 'gst_inr' => 0.0, 'gst_reverse_charge' => 1,
+        ], $this->userId);
+        $pdo = Database::connection();
+        $pdo->exec("INSERT INTO logistics_partners (partner_name, service_type, gstin) VALUES ('TEST-Stage3 GTA Chennai', 'transportation', '33ZZTPT4444Z1Z5')");
+        $tamilNadu = (int) $pdo->lastInsertId();
+        OrderVendorBillRepository::create($o['order'], 'logistics', [
+            'logistics_partner_id' => $tamilNadu, 'bill_for' => 'transport', 'doc_kind' => 'invoice', 'bill_no' => 'TEST-GTA-2', 'bill_date' => '2026-10-27', 'taxable_inr' => 8000.0, 'gst_inr' => 0.0, 'gst_reverse_charge' => 1,
+        ], $this->userId);
+        OrderVendorBillRepository::create($o['order'], 'logistics', [
+            'logistics_partner_id' => $tamilNadu, 'bill_for' => 'transport', 'doc_kind' => 'invoice', 'bill_no' => 'TEST-GTA-BAD', 'bill_date' => '2026-10-27', 'taxable_inr' => 1000.0, 'gst_inr' => 50.0, 'gst_reverse_charge' => 1,
+        ], $this->userId);
+
+        $result = $this->sync();
+
+        self::assertSame([2, 1], [$result['bills'], $result['failed']]);
+        $unregistered = $this->bills['BL-1']['payload'];
+        self::assertTrue($unregistered['is_reverse_charge_applied']);
+        self::assertSame(['rate' => 10000.0, 'reverse_charge_tax_id' => 'TX-GST5'], array_intersect_key($unregistered['line_items'][0], ['rate' => 1, 'tax_id' => 1, 'reverse_charge_tax_id' => 1]), 'no GSTIN: our own state, the GST group; the bill stays at its taxable value');
+        self::assertSame(10000.0, $this->bills['BL-1']['total']);
+        self::assertSame('TX-IGST5', $this->bills['BL-2']['payload']['line_items'][0]['reverse_charge_tax_id'], 'a transporter registered in another state: IGST');
+        self::assertArrayNotHasKey('tax_id', $this->bills['BL-2']['payload']['line_items'][0]);
+        self::assertSame([
+            'Sent bill TEST-GTA-1 from TEST-Stage3 Forwarder (INR 10000.00, reverse charge) as Zoho Books bill.',
+            'Sent bill TEST-GTA-2 from TEST-Stage3 GTA Chennai (INR 8000.00, reverse charge) as Zoho Books bill.',
+            'Bill TEST-GTA-BAD not sent: it is marked reverse charge but carries GST (50.00). Under reverse charge the transporter charges no GST — correct the bill.',
+        ], $this->messages($o['order'], 'vendor_bill'));
+    }
+
     public function testABillAlreadyInBooksIsReusedNotDuplicated(): void
     {
         $o = $this->createOrder();

@@ -278,6 +278,38 @@ describe('Zoho Books Stage 3', () => {
     expect(bills).toEqual({});
   });
 
+  // Owner decision 2026-10-29 (CA advice): a road transporter (GTA) that charges no GST is booked under reverse charge at 5%.
+  it('in a GST-registered organisation a reverse-charge transport bill carries the 5% as reverse charge', async () => {
+    gstRegistered = true;
+    const o = await createOrder();
+    await orderVendorBillRepository.create(o.order, 'logistics', {
+      logistics_partner_id: o.partner, bill_for: 'transport', doc_kind: 'invoice', bill_no: 'TEST-GTA-1', bill_date: '2026-10-27', taxable_inr: 10000, gst_inr: 0, gst_reverse_charge: 1,
+    }, userId);
+    const tamilNadu = (await db.execute("INSERT INTO logistics_partners (partner_name, service_type, gstin) VALUES ('TEST-Stage3 GTA Chennai', 'transportation', '33ZZTPT4444Z1Z5')")).insertId;
+    await orderVendorBillRepository.create(o.order, 'logistics', {
+      logistics_partner_id: tamilNadu, bill_for: 'transport', doc_kind: 'invoice', bill_no: 'TEST-GTA-2', bill_date: '2026-10-27', taxable_inr: 8000, gst_inr: 0, gst_reverse_charge: 1,
+    }, userId);
+    await orderVendorBillRepository.create(o.order, 'logistics', {
+      logistics_partner_id: tamilNadu, bill_for: 'transport', doc_kind: 'invoice', bill_no: 'TEST-GTA-BAD', bill_date: '2026-10-27', taxable_inr: 1000, gst_inr: 50, gst_reverse_charge: 1,
+    }, userId);
+
+    const result = await sync();
+
+    expect([result.bills, result.failed]).toEqual([2, 1]);
+    const unregistered = bills['BL-1'].payload;
+    expect(unregistered.is_reverse_charge_applied).toBe(true);
+    expect(unregistered.line_items[0]).toMatchObject({ rate: 10000, reverse_charge_tax_id: 'TX-GST5' }); // no GSTIN: our own state, the GST group; the bill stays at its taxable value
+    expect(unregistered.line_items[0]).not.toHaveProperty('tax_id');
+    expect(bills['BL-1'].total).toBe(10000);
+    expect(bills['BL-2'].payload.line_items[0].reverse_charge_tax_id).toBe('TX-IGST5'); // a transporter registered in another state: IGST
+    expect(bills['BL-2'].payload.line_items[0]).not.toHaveProperty('tax_id');
+    expect(await messages(o.order, 'vendor_bill')).toEqual([
+      'Sent bill TEST-GTA-1 from TEST-Stage3 Forwarder (INR 10000.00, reverse charge) as Zoho Books bill.',
+      'Sent bill TEST-GTA-2 from TEST-Stage3 GTA Chennai (INR 8000.00, reverse charge) as Zoho Books bill.',
+      'Bill TEST-GTA-BAD not sent: it is marked reverse charge but carries GST (50.00). Under reverse charge the transporter charges no GST — correct the bill.',
+    ]);
+  });
+
   it('a bill already in Books is reused, not duplicated', async () => {
     const o = await createOrder();
     contacts['VN-9'] = { contact_id: 'VN-9', contact_name: 'TEST-Stage3 Granite Supplier', contact_type: 'vendor' };

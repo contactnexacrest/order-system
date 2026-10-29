@@ -101,6 +101,15 @@ Once confirmed:
 
 ![BL recorded](./images/s7_bl_recorded.png)
 
+5. **Shipping Bill** (CA advice, 2026-10-29) — in the same step, below
+   the BL: the customs **shipping bill number**, its **date** and the
+   **customs exchange rate** printed on it (₹ for 1 unit of the order
+   currency). The Commercial Invoice and the Debit Note go to Zoho Books
+   at this rate, so the GST return matches the shipping bill — they wait
+   in the Zoho sync until it is recorded. It can be corrected later
+   (**Update Shipping Bill**); an invoice already in Zoho Books keeps the
+   rate it was sent at. Needs the shipping permission.
+
 ## What the client does (or doesn't)
 
 Nothing at this stage — packing, vessel booking, and BL issuance are all

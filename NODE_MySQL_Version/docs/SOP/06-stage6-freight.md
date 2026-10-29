@@ -117,6 +117,11 @@ CHA and transport can send one combined bill or separate bills):
   proforma counts towards it and the proforma stops counting;
 - bill number, bill date, taxable value, **GST rate (%)** — GST (₹) and
   the bill total fill in by themselves — the bill file and a note.
+- **GST on this bill** (Transport bills only, CA advice 2026-10-29) —
+  **Charged on the bill** (the usual case) or **Reverse charge — no GST on the bill**, for a road transporter whose bill
+  shows no GST: then pick GST rate **0 %**. We pay the 5 % to the
+  government ourselves and claim it back; Zoho Books books it that way
+  (see CA-03). The bill shows "Reverse charge" in the list.
 
 Each bill then gets the green **₹ Mark Paid** button (amount, date, mode,
 UTR), exactly like the supplier bills in Steps 7e / 10a: prefilled with

@@ -558,6 +558,7 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
           <?php if ($__isProforma && $b['requested_amount_inr'] !== null): ?><br><small class="muted">Asks for &#8377;<?= $money($b['requested_amount_inr']) ?> now</small><?php endif; ?>
           <?php if ($b['replaces_bill_no'] !== null): ?><br><small class="muted">Replaces proforma <?= htmlspecialchars($b['replaces_bill_no']) ?></small><?php endif; ?>
           <?php if ($b['replaced_by'] !== null): ?><br><small class="muted">Replaced by tax invoice <?= htmlspecialchars($b['replaced_by']) ?></small><?php endif; ?>
+          <?php if (!empty($b['gst_reverse_charge'])): ?><br><small class="muted">Reverse charge — we pay the 5% GST</small><?php endif; ?>
           <?php if (in_array((int) $b['id'], $carriedIds, true)): ?><br><small class="muted">Added in Step 7e — shown here until fully paid</small><?php endif; ?>
           <?php if (!empty($b['note'])): ?><br><small class="muted"><?= htmlspecialchars((string) $b['note']) ?></small><?php endif; ?></td>
         <td style="text-align:right"><?= $money($b['taxable_inr']) ?></td>
@@ -624,7 +625,7 @@ $vendorBillFields = static function (string $defaultKind = 'invoice', array $rep
     <label>Bill date *<input type="date" name="bill_date" required max="<?= date('Y-m-d') ?>"></label>
     <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base></label>
     <label>GST rate (%) *
-      <select name="gst_rate_pct" required data-gst-rate>
+      <select name="gst_rate_pct" required data-gst-rate data-zero-if="gst_charge=reverse" data-zero-if-message="Under reverse charge the transporter charges no GST — pick 0%. We pay the 5% to the government ourselves.">
         <?php foreach ($gstRates as $o): ?>
           <option value="<?= htmlspecialchars((string) $o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $o['option_value']) ?>%</option>
         <?php endforeach; ?>
@@ -2758,6 +2759,14 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           </select>
           <small class="muted"><?= $isFob ? 'Advance and Final bills can both be paid any time on an FOB order.' : 'An Advance bill can be paid any time; a Final bill waits for Step 9d.' ?></small>
         </label>
+        <?php // Owner decision 2026-10-29 (CA advice): a road transporter (GTA) that charges no GST is booked under reverse charge. ?>
+        <label data-show-when="bill_for=transport">GST on this bill *
+          <select name="gst_charge" required>
+            <option value="forward" selected>Charged on the bill</option>
+            <option value="reverse">Reverse charge — no GST on the bill</option>
+          </select>
+          <small class="muted">Reverse charge: the bill shows no GST; we pay 5% to the government and claim it back. Pick GST rate 0% below.</small>
+        </label>
         <?php $vendorBillFields('invoice', array_values(array_filter($__logisticsBills, static fn (array $b): bool => $b['doc_kind'] === 'proforma' && $b['replaced_by'] === null))); ?>
         <div><button type="submit" class="btn-sm">Add Bill</button></div>
       </form>
@@ -3128,6 +3137,25 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php endif; ?>
       <?php endif; ?>
     <?php endif; ?>
+
+    <?php // Owner decision 2026-10-29: the shipping bill and its customs exchange rate — the CI and Debit Note go to Zoho Books at that rate. ?>
+    <div id="shipping-bill" class="section">
+      <h3>Shipping Bill</h3>
+      <?php if (!empty($shipping['shipping_bill_no'])): ?>
+        <p>Shipping bill <strong><?= htmlspecialchars((string) $shipping['shipping_bill_no']) ?></strong> dated <?= htmlspecialchars(date('d M Y', strtotime((string) $shipping['shipping_bill_date']))) ?> &middot; customs exchange rate <strong>&#8377;<?= htmlspecialchars(rtrim(rtrim(number_format((float) $shipping['customs_exchange_rate'], 4, '.', ''), '0'), '.')) ?></strong> for 1 <?= htmlspecialchars((string) $order['currency_code']) ?></p>
+      <?php else: ?>
+        <p class="muted small">Not recorded yet. The Commercial Invoice and the Debit Note go to Zoho Books at the customs exchange rate printed on the shipping bill, so they wait for it.</p>
+      <?php endif; ?>
+      <?php if ($canManageShipping): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/shipping-bill" class="field-grid">
+        <?= Csrf::field() ?>
+        <label>Shipping Bill No. *<input type="text" name="shipping_bill_no" required maxlength="30" value="<?= htmlspecialchars((string) ($shipping['shipping_bill_no'] ?? '')) ?>"></label>
+        <label>Shipping Bill Date *<input type="date" name="shipping_bill_date" required max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars((string) ($shipping['shipping_bill_date'] ?? '')) ?>"></label>
+        <label>Customs Exchange Rate (&#8377; for 1 <?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="customs_exchange_rate" required min="0.0001" max="100000" step="0.0001" value="<?= htmlspecialchars((string) ($shipping['customs_exchange_rate'] ?? '')) ?>"><small class="muted">As printed on the shipping bill. An invoice already in Zoho Books keeps the rate it was sent at.</small></label>
+        <div><button type="submit" class="btn-sm"><?= !empty($shipping['shipping_bill_no']) ? 'Update Shipping Bill' : 'Save Shipping Bill' ?></button></div>
+      </form>
+      <?php endif; ?>
+    </div>
   </details>
 
   <?php $ciBalanceLocked = !$stage8 || $stage8['status'] === 'locked'; ?>

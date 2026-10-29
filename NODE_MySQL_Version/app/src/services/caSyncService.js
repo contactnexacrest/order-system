@@ -216,7 +216,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
     try {
       const zohoBillId = await zohoBooksService.pushBill(bill);
       await zohoPurchaseRepository.setBillSynced(bill.id, zohoBillId);
-      await log('vendor_bill', bill.order_id, 'bill', 'success', zohoBillId, `Sent bill ${bill.bill_no} from ${bill.vendor_name} (INR ${money(bill.total_inr)}) as Zoho Books bill.`);
+      await log('vendor_bill', bill.order_id, 'bill', 'success', zohoBillId, `Sent bill ${bill.bill_no} from ${bill.vendor_name} (INR ${money(bill.total_inr)}${Number(bill.gst_reverse_charge) ? ', reverse charge' : ''}) as Zoho Books bill.`);
       result.bills += 1;
     } catch (e) {
       await log('vendor_bill', bill.order_id, 'bill', 'error', null, e.message);

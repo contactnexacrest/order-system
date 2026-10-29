@@ -4258,3 +4258,18 @@ ALTER TABLE order_vendor_bill_payments
 ALTER TABLE order_expenses
   ADD COLUMN zoho_expense_id VARCHAR(100) NULL,
   ADD COLUMN zoho_synced_at TIMESTAMP NULL;
+
+-- ================================================================
+-- SECTION CK — SHIPPING BILL AND REVERSE CHARGE (owner decisions 2026-10-29)
+-- The shipping bill's number, date and customs exchange rate (INR per unit
+-- of the order currency): the CI and Debit Note go to Zoho Books at that
+-- rate. A transport bill from a goods transport agency that charges no GST
+-- can be marked reverse charge (NexaCrest pays the 5 % GST itself).
+-- docs/migrations/2026-10-29e-shipping-bill-and-reverse-charge.sql
+-- ================================================================
+ALTER TABLE order_shipping
+  ADD COLUMN shipping_bill_no VARCHAR(30) NULL,
+  ADD COLUMN shipping_bill_date DATE NULL,
+  ADD COLUMN customs_exchange_rate DECIMAL(12,4) NULL;
+ALTER TABLE order_vendor_bills
+  ADD COLUMN gst_reverse_charge TINYINT(1) NOT NULL DEFAULT 0;

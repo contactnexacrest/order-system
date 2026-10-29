@@ -2865,6 +2865,47 @@ async function attachBlCopy(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * Owner decision 2026-10-29: records the shipping bill — its number,
+ * date and the customs exchange rate printed on it. The CI and Debit
+ * Note go to Zoho Books at that rate, so the GST return matches the
+ * shipping bill. Can be corrected later; an invoice already in Zoho
+ * Books keeps the rate it was sent at.
+ */
+async function recordShippingBill(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    flash.set(req, 'error', 'Order not found.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const number = str(req.body.shipping_bill_no);
+  const date = str(req.body.shipping_bill_date);
+  const rate = str(req.body.customs_exchange_rate);
+  const m = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const d = m ? new Date(`${date}T00:00:00Z`) : null;
+  const isRealDate = d && d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() + 1 === Number(m[2]) && d.getUTCDate() === Number(m[3]);
+  let error = null;
+  if (number === '' || [...number].length > 30) {
+    error = 'Enter the shipping bill number (up to 30 characters).';
+  } else if (!isRealDate || date > todayYmd()) {
+    error = 'Enter the shipping bill date (not in the future).';
+  } else if (!/^\d+(\.\d+)?$/.test(rate) || Number(rate) <= 0 || Number(rate) > 100000) {
+    error = `Enter the customs exchange rate printed on the shipping bill (rupees for 1 ${order.currency_code || 'unit'}).`;
+  }
+  if (error !== null) {
+    flash.set(req, 'error', error);
+    res.redirect(`/orders/${orderId}#shipping-bill`);
+    return;
+  }
+  const before = await orderShippingRepository.find(orderId);
+  await orderShippingRepository.recordShippingBill(orderId, number, date, Number(rate));
+  await auditLogRepository.log(req.user.id, 'ORDER_SHIPPING_BILL_RECORDED', 'order_shipping', orderId, 'customs_exchange_rate', before?.customs_exchange_rate ?? null, rate, `Shipping bill ${number} dated ${date}`);
+  flash.set(req, 'success', `Shipping bill ${number} recorded (customs rate ${rate}).`);
+  res.redirect(`/orders/${orderId}#shipping-bill`);
+}
+
 async function recordScannedBlSent(req, res) {
   const orderId = parseInt(req.params.id, 10);
   await orderShippingRepository.recordScannedBlSent(orderId);
@@ -3868,7 +3909,7 @@ module.exports = {
   recordLcDetails, confirmLcUsable, updateProductionStatus,
   recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, skipPiForm, confirmSupplierSigned, uploadSupplierPoDocument, generateSupplierActionLink, skipSupplierPoAck, markSupplierAdvancePaid, markSupplierBalancePaid,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
-  savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordScannedBlSent,
+  savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordShippingBill, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,
   saveBlEndorsement, generateBlEndorsement,
   approvePaymentTerms, closeOrder, markFullySettled, overrideStatusLock, markLost, updateComplianceTask, markAllComplianceTasksNotApplicable,

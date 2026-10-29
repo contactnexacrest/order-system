@@ -179,6 +179,31 @@ final class VendorBillsAndExpensesTest extends DbTestCase
         self::assertSame('Choose whether the bill is an Advance or the Final bill.', $this->lastFlash()['message']);
     }
 
+    /** Owner decision 2026-10-29 (CA advice): reverse charge only on a Transport bill, and then the bill carries no GST. */
+    public function testReverseChargeIsOnlyForATransportBillWithNoGst(): void
+    {
+        $partnerId = LogisticsPartnerRepository::create(['partner_name' => 'RCM Check GTA', 'service_type' => 'transportation'], $this->userId);
+        [$orderId] = $this->orderWithSupplierPo('CIF');
+        $_FILES['bill_file'] = ['name' => 'bill.pdf', 'type' => 'application/pdf', 'tmp_name' => '', 'error' => UPLOAD_ERR_NO_FILE, 'size' => 0];
+        $base = ['logistics_partner_id' => (string) $partnerId, 'payment_kind' => 'final', 'bill_no' => 'R-1', 'bill_date' => date('Y-m-d'), 'taxable_inr' => '1000', 'gst_charge' => 'reverse'];
+
+        $_POST = $base + ['bill_for' => 'cha', 'gst_rate_pct' => '0'];
+        (new VendorBillController())->addLogisticsBill(['id' => (string) $orderId]);
+        self::assertSame('Reverse charge applies only to a Transport bill.', $this->lastFlash()['message']);
+
+        $_POST = $base + ['bill_for' => 'transport', 'gst_rate_pct' => '5'];
+        (new VendorBillController())->addLogisticsBill(['id' => (string) $orderId]);
+        self::assertSame('Under reverse charge the transporter charges no GST — pick GST rate 0%.', $this->lastFlash()['message']);
+
+        $_POST = ['gst_charge' => 'sideways', 'bill_for' => 'transport', 'gst_rate_pct' => '0'] + $base;
+        (new VendorBillController())->addLogisticsBill(['id' => (string) $orderId]);
+        self::assertSame('Choose how GST is charged on the bill.', $this->lastFlash()['message']);
+
+        $id = OrderVendorBillRepository::create($orderId, 'logistics', ['logistics_partner_id' => $partnerId, 'bill_for' => 'transport', 'bill_no' => 'R-2', 'bill_date' => date('Y-m-d'), 'taxable_inr' => 1000, 'gst_inr' => 0, 'gst_reverse_charge' => 1], $this->userId);
+        self::assertSame(1, (int) OrderVendorBillRepository::find($id)['gst_reverse_charge']);
+        self::assertSame(0, (int) OrderVendorBillRepository::find($this->logisticsBill($orderId, $partnerId, 'transport', 500))['gst_reverse_charge'], 'charged on the bill unless marked');
+    }
+
     public function testAnExpenseNeedsAReceiptOrAReasonAndRespectsTheFyLock(): void
     {
         [$orderId] = $this->orderWithSupplierPo();

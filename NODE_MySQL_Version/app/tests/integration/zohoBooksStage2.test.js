@@ -22,6 +22,8 @@ describe('Zoho Books Stage 2', () => {
   let payments;
   let gstRegistered;
   let invoiceWrites500;
+  // Make the invoice list miss an invoice just created, once (the list lags behind a create, seen in the test organisation).
+  let invoiceListLags;
 
   function storedInvoice(id, payload, status) {
     const total = payload.line_items.reduce((sum, line) => sum + Math.round(line.quantity * line.rate * 100) / 100, 0);
@@ -55,6 +57,10 @@ describe('Zoho Books Stage 2', () => {
     if ((m = p.match(/^\/books\/v3\/contacts\/(.+)$/))) return json({ code: 0, contact: contacts[m[1]] });
     if (p === '/books/v3/invoices' && method === 'GET') {
       const number = u.searchParams.get('invoice_number');
+      if (invoiceListLags && number !== null && Object.values(invoices).some((i) => i.invoice_number === number)) {
+        invoiceListLags = false;
+        return json({ code: 0, invoices: [] });
+      }
       const rows = Object.values(invoices).filter((i) => number === null || i.invoice_number === number);
       return json({ code: 0, invoices: rows.map((i) => ({ ...i, balance: invoiceBalance(i.invoice_id) })) });
     }
@@ -100,6 +106,7 @@ describe('Zoho Books Stage 2', () => {
     await db.execute('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:id)', { id: orderId });
     await db.execute(`UPDATE order_payment_status SET advance_amount = 300, advance_cleared_at = '2026-10-20 11:00:00', advance_inr_actual = 25230, advance_exchange_rate = 84.1,
                       balance_exchange_rate = 84.5, freight_exchange_rate = 84.3 WHERE order_id = :id`, { id: orderId });
+    await db.execute("INSERT INTO order_shipping (order_id, shipping_bill_no, shipping_bill_date, customs_exchange_rate) VALUES (:id, 'TEST-SB-1', '2026-10-27', 84.4)", { id: orderId });
     return orderId;
   }
 
@@ -121,6 +128,7 @@ describe('Zoho Books Stage 2', () => {
     payments = {};
     gstRegistered = false;
     invoiceWrites500 = false;
+    invoiceListLags = false;
     process.env.ZOHO_INTEGRATION_ENABLED = 'true';
     process.env.ZOHO_ENVIRONMENT = 'test';
     process.env.ZOHO_EINVOICE_ENABLED = 'false';
@@ -174,7 +182,7 @@ describe('Zoho Books Stage 2', () => {
         { name: 'Granite slab', description: 'Granite slab. Size: 60x60x2 cm. Finish: Polished. HS code 68022310', quantity: 100, rate: 10, unit: 'SQM' },
         { name: 'Sandstone tile', description: 'Sandstone tile. HS code 68029900', quantity: 50, rate: 5.5, unit: 'SQM' },
       ],
-      exchange_rate: 84.5,
+      exchange_rate: 84.4,
     });
     expect(requestsTo('POST', '/books/v3/invoices')[0].url).toContain('ignore_auto_number_generation=true');
     expect(payments['PAY-1'].invoices).toEqual([{ invoice_id: 'INV-1', amount_applied: 300 }]);
@@ -199,10 +207,10 @@ describe('Zoho Books Stage 2', () => {
     const debitNote = invoiceNamed('TEST-SC/DN/2026/2710001');
     expect(debitNote.total).toBe(215);
     expect(debitNote.payload.line_items).toEqual([
-      { name: 'Ocean freight', description: 'Ocean freight, Chennai to Hamburg (CIF)', quantity: 1, rate: 200 },
-      { name: 'Marine insurance', description: 'Marine insurance (CIF)', quantity: 1, rate: 15 },
+      { name: 'Ocean freight', description: 'Ocean freight, Chennai to Hamburg (CIF). HS code 68022310', quantity: 1, rate: 200 },
+      { name: 'Marine insurance', description: 'Marine insurance (CIF). HS code 68022310', quantity: 1, rate: 15 },
     ]);
-    expect(debitNote.payload.exchange_rate).toBe(84.3);
+    expect(debitNote.payload.exchange_rate).toBe(84.4); // the shipping bill customs rate, not the freight leg rate
     expect(debitNote.payload.date).toBe('2026-10-27');
     expect(invoiceBalance(debitNote.invoice_id)).toBe(0);
     expect(invoiceBalance(invoiceNamed('TEST-SC/CI/2026/2810002').invoice_id)).toBe(0); // advance 300 + balance 975 = the CI
@@ -261,6 +269,19 @@ describe('Zoho Books Stage 2', () => {
     expect(Object.keys(invoices)).toHaveLength(1);
   });
 
+  it('an invoice the list does not show yet is taken from the create response', async () => {
+    const orderId = await createCifOrder();
+    await approveDocument(orderId, 'CI', 'TEST-SC/CI/2026/2810017');
+    invoiceListLags = true;
+
+    const result = await sync();
+
+    expect([result.invoices, result.failed]).toEqual([1, 0]);
+    expect((await orderZohoInvoiceRepository.find(orderId, 'ci')).zoho_invoice_id).toBe('INV-1');
+    expect(invoices['INV-1'].status).toBe('sent');
+    expect(Object.keys(invoices)).toHaveLength(1);
+  });
+
   it('a GST-registered organisation gets HSN and overseas treatment', async () => {
     gstRegistered = true;
     const orderId = await createCifOrder();
@@ -288,17 +309,16 @@ describe('Zoho Books Stage 2', () => {
 
   it('the exchange rate is frozen once the invoice is in Books', async () => {
     const orderId = await createCifOrder();
-    await db.execute('UPDATE order_payment_status SET balance_exchange_rate = NULL WHERE order_id = :id', { id: orderId });
     await approveDocument(orderId, 'CI', 'TEST-SC/CI/2026/2810013');
     await sync();
-    expect(invoices['INV-1'].payload.exchange_rate).toBe(84.1); // sent at the advance rate (no balance rate yet)
+    expect(invoices['INV-1'].payload.exchange_rate).toBe(84.4); // sent at the shipping bill customs rate
 
-    // The balance arrives and its rate is recorded: the invoice must not be revalued.
-    await db.execute('UPDATE order_payment_status SET balance_exchange_rate = 86.2 WHERE order_id = :id', { id: orderId });
+    // The shipping bill's rate is corrected afterwards: the invoice in Books must not be revalued.
+    await db.execute('UPDATE order_shipping SET customs_exchange_rate = 86.2 WHERE order_id = :id', { id: orderId });
     await sync();
 
-    expect(requestsTo('PUT', '/books/v3/invoices/')).toHaveLength(0); // no update just because a later rate was recorded
-    expect(String((await orderZohoInvoiceRepository.find(orderId, 'ci')).exchange_rate)).toBe('84.100000');
+    expect(requestsTo('PUT', '/books/v3/invoices/')).toHaveLength(0); // no update just because the rate was changed later
+    expect(String((await orderZohoInvoiceRepository.find(orderId, 'ci')).exchange_rate)).toBe('84.400000');
   });
 
   it('only records dated on or after the go-live date go', async () => {
@@ -348,13 +368,13 @@ describe('Zoho Books Stage 2', () => {
   it('refuses not-ready cases with a message staff can act on', async () => {
     const orderId = await createCifOrder();
     await approveDocument(orderId, 'CI', 'TEST-SC/CI/2026/2810008');
-    await db.execute('UPDATE order_payment_status SET balance_exchange_rate = NULL, advance_exchange_rate = NULL WHERE order_id = :id', { id: orderId });
+    await db.execute('UPDATE order_shipping SET customs_exchange_rate = NULL WHERE order_id = :id', { id: orderId });
 
     await sync();
     let messages = (await logRows(orderId)).filter((r) => r.sync_type === 'invoice').map((r) => r.message);
-    expect(messages).toEqual(['Commercial Invoice not sent: no exchange rate is recorded for the balance or advance leg. Set it in CA / Accounting -> INR Settlement Register.']);
+    expect(messages).toEqual(["Commercial Invoice not sent: record the shipping bill's customs exchange rate on the order (Shipping Bill, on the order page) first."]);
 
-    await db.execute('UPDATE order_payment_status SET balance_exchange_rate = 84.5 WHERE order_id = :id', { id: orderId });
+    await db.execute('UPDATE order_shipping SET customs_exchange_rate = 84.4 WHERE order_id = :id', { id: orderId });
     await db.execute('UPDATE order_products SET quantity_is_tbc = 1 WHERE order_id = :id AND line_no = 2', { id: orderId });
     await sync();
     messages = (await logRows(orderId)).filter((r) => r.sync_type === 'invoice').map((r) => r.message);

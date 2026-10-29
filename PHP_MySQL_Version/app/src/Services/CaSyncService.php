@@ -219,7 +219,7 @@ final class CaSyncService
             try {
                 $zohoBillId = ZohoBooksService::pushBill($bill);
                 ZohoPurchaseRepository::setBillSynced((int) $bill['id'], $zohoBillId);
-                $log('vendor_bill', (int) $bill['order_id'], 'bill', 'success', $zohoBillId, "Sent bill {$bill['bill_no']} from {$bill['vendor_name']} (INR " . number_format((float) $bill['total_inr'], 2, '.', '') . ') as Zoho Books bill.');
+                $log('vendor_bill', (int) $bill['order_id'], 'bill', 'success', $zohoBillId, "Sent bill {$bill['bill_no']} from {$bill['vendor_name']} (INR " . number_format((float) $bill['total_inr'], 2, '.', '') . (!empty($bill['gst_reverse_charge']) ? ', reverse charge' : '') . ') as Zoho Books bill.');
                 $result['bills']++;
             } catch (\Throwable $e) {
                 $log('vendor_bill', (int) $bill['order_id'], 'bill', 'error', null, $e->getMessage());

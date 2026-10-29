@@ -38,9 +38,9 @@ const round2 = (n) => Math.round(n * 100) / 100;
 async function create(orderId, vendorKind, data, userId) {
   const result = await db.execute(
     `INSERT INTO order_vendor_bills (order_id, vendor_kind, supplier_po_id, logistics_partner_id, bill_for, payment_kind, doc_kind, requested_amount_inr, replaces_bill_id,
-        bill_no, bill_date, taxable_inr, gst_inr, total_inr, note, bill_file_id, created_by)
+        bill_no, bill_date, taxable_inr, gst_inr, gst_reverse_charge, total_inr, note, bill_file_id, created_by)
      VALUES (:order_id, :vendor_kind, :supplier_po_id, :logistics_partner_id, :bill_for, :payment_kind, :doc_kind, :requested_amount_inr, :replaces_bill_id,
-        :bill_no, :bill_date, :taxable_inr, :gst_inr, :total_inr, :note, :bill_file_id, :created_by)`,
+        :bill_no, :bill_date, :taxable_inr, :gst_inr, :gst_reverse_charge, :total_inr, :note, :bill_file_id, :created_by)`,
     {
       order_id: orderId,
       vendor_kind: vendorKind,
@@ -55,6 +55,7 @@ async function create(orderId, vendorKind, data, userId) {
       bill_date: data.bill_date,
       taxable_inr: data.taxable_inr,
       gst_inr: data.gst_inr,
+      gst_reverse_charge: Number(data.gst_reverse_charge || 0),
       total_inr: round2(Number(data.taxable_inr) + Number(data.gst_inr)),
       note: data.note ?? null,
       bill_file_id: data.bill_file_id ?? null,

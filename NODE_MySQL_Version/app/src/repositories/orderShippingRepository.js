@@ -49,6 +49,20 @@ async function recordBl(orderId, blNumber, blDate) {
 }
 
 /**
+ * Owner decision 2026-10-29: the shipping bill's number, date and the
+ * customs exchange rate printed on it (INR per unit of the order
+ * currency). The CI and Debit Note go to Zoho Books at that rate.
+ */
+async function recordShippingBill(orderId, number, date, customsRate) {
+  await db.execute(
+    `INSERT INTO order_shipping (order_id, shipping_bill_no, shipping_bill_date, customs_exchange_rate)
+     VALUES (:order_id, :no, :date, :rate)
+     ON DUPLICATE KEY UPDATE shipping_bill_no = VALUES(shipping_bill_no), shipping_bill_date = VALUES(shipping_bill_date), customs_exchange_rate = VALUES(customs_exchange_rate)`,
+    { order_id: orderId, no: number, date, rate: Math.round(customsRate * 10000) / 10000 }
+  );
+}
+
+/**
  * Attaches the actual scanned BL document to the already-recorded BL
  * number/date. Upserts (N-02) for the same reason as recordBl() above —
  * the scanned copy can be attached in a separate step from confirming
@@ -119,6 +133,6 @@ async function approveDraftBl(orderId, userId) {
 }
 
 module.exports = {
-  upsert, find, recordBl, attachBlCopy, recordBlOriginalsReceived, recordBlEndorsed, recordCourierSent, recordScannedBlSent,
+  upsert, find, recordBl, recordShippingBill, attachBlCopy, recordBlOriginalsReceived, recordBlEndorsed, recordCourierSent, recordScannedBlSent,
   attachDraftBl, approveDraftBl,
 };

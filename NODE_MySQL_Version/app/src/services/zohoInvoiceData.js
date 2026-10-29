@@ -6,6 +6,7 @@ const orderFreightRepository = require('../repositories/orderFreightRepository')
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
+const orderShippingRepository = require('../repositories/orderShippingRepository');
 
 /**
  * Zoho integration Stage 2 (2026-10-29) — what an order's Commercial
@@ -17,11 +18,15 @@ const orderRepository = require('../repositories/orderRepository');
  *   total is the FOB value. Freight and insurance are NOT on it — on
  *   CFR/CIF orders they are billed on the Debit Note, its own invoice, so
  *   Books does not count them twice.
- * - Debit Note: ocean freight, plus insurance on CIF.
+ * - Debit Note: ocean freight, plus insurance on CIF. Its lines carry the
+ *   goods' HS code (the first product's) — owner decision 2026-10-29 (CA
+ *   advice): freight billed with export goods is part of the zero-rated
+ *   export, so it goes under the goods' code.
  * - Number and date: the document's own reference and printed date.
- * - Exchange rate (INR per unit of the order currency): the rate recorded
- *   for the balance leg (CI) or the freight leg (Debit Note), else the
- *   advance leg's; with none recorded the invoice is not sent.
+ * - Exchange rate (INR per unit of the order currency): the customs
+ *   exchange rate on the shipping bill (owner decision 2026-10-29, CA
+ *   advice), so the GST return matches the shipping bill. Until it is
+ *   recorded on the order the invoice is not sent.
  *
  * Every "not ready" case throws an Error with a message staff can act on;
  * caSyncService logs it and retries on the next run.
@@ -51,12 +56,11 @@ async function build(orderId, kind, documentId) {
 
   let rate = 1;
   if (currency !== 'INR') {
-    const legs = kind === 'ci' ? ['balance', 'advance'] : ['freight', 'advance'];
-    const leg = legs.find((l) => payment[`${l}_exchange_rate`] !== null && payment[`${l}_exchange_rate`] !== undefined && Number(payment[`${l}_exchange_rate`]) > 0);
-    if (!leg) {
-      throw new Error(`${label} not sent: no exchange rate is recorded for the ${legs[0]} or advance leg. Set it in CA / Accounting -> INR Settlement Register.`);
+    const shipping = (await orderShippingRepository.find(orderId)) || {};
+    if (!(Number(shipping.customs_exchange_rate) > 0)) {
+      throw new Error(`${label} not sent: record the shipping bill's customs exchange rate on the order (Shipping Bill, on the order page) first.`);
     }
-    rate = Number(payment[`${leg}_exchange_rate`]);
+    rate = Number(shipping.customs_exchange_rate);
   }
 
   const date = String(documentRepository.printedDate(document)).slice(0, 10);
@@ -126,16 +130,18 @@ async function debitNoteLines(orderId, order, label) {
   const to = String(order.port_of_discharge_name || order.port_of_discharge_city || '');
   const route = from !== '' && to !== '' ? `${from} to ${to}` : '';
   const incoterm = String(order.incoterm_code || '').toUpperCase();
+  const goods = (await orderProductRepository.forOrder(orderId)).find((p) => Number(p.is_active ?? 1) === 1 && p.hs_code);
+  const hsCode = goods ? String(goods.hs_code) : null;
   const lines = [{
     name: 'Ocean freight',
     description: `Ocean freight${route !== '' ? `, ${route}` : ''} (${incoterm})`,
-    hs_code: null,
+    hs_code: hsCode,
     quantity: 1,
     unit: null,
     rate: Number(freight.confirmed_freight_rate),
   }];
   if (incoterm === 'CIF' && Number(freight.insurance_amount || 0) > 0) {
-    lines.push({ name: 'Marine insurance', description: 'Marine insurance (CIF)', hs_code: null, quantity: 1, unit: null, rate: Number(freight.insurance_amount) });
+    lines.push({ name: 'Marine insurance', description: 'Marine insurance (CIF)', hs_code: hsCode, quantity: 1, unit: null, rate: Number(freight.insurance_amount) });
   }
   return lines;
 }

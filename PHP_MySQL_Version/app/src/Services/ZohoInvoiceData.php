@@ -9,6 +9,7 @@ use App\Repositories\OrderFreightRepository;
 use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderProductRepository;
 use App\Repositories\OrderRepository;
+use App\Repositories\OrderShippingRepository;
 
 /**
  * Zoho integration Stage 2 (2026-10-29) — what an order's Commercial
@@ -20,11 +21,15 @@ use App\Repositories\OrderRepository;
  *   total is the FOB value. Freight and insurance are NOT on it — on
  *   CFR/CIF orders they are billed on the Debit Note, its own invoice, so
  *   Books does not count them twice.
- * - Debit Note: ocean freight, plus insurance on CIF.
+ * - Debit Note: ocean freight, plus insurance on CIF. Its lines carry the
+ *   goods' HS code (the first product's) — owner decision 2026-10-29 (CA
+ *   advice): freight billed with export goods is part of the zero-rated
+ *   export, so it goes under the goods' code.
  * - Number and date: the document's own reference and printed date.
- * - Exchange rate (INR per unit of the order currency): the rate recorded
- *   for the balance leg (CI) or the freight leg (Debit Note), else the
- *   advance leg's; with none recorded the invoice is not sent.
+ * - Exchange rate (INR per unit of the order currency): the customs
+ *   exchange rate on the shipping bill (owner decision 2026-10-29, CA
+ *   advice), so the GST return matches the shipping bill. Until it is
+ *   recorded on the order the invoice is not sent.
  *
  * Every "not ready" case throws a RuntimeException with a message staff
  * can act on; CaSyncService logs it and retries on the next run.
@@ -60,17 +65,11 @@ final class ZohoInvoiceData
 
         $rate = 1.0;
         if ($currency !== 'INR') {
-            $legs = $kind === 'ci' ? ['balance', 'advance'] : ['freight', 'advance'];
-            $rate = null;
-            foreach ($legs as $leg) {
-                if (!empty($payment["{$leg}_exchange_rate"]) && (float) $payment["{$leg}_exchange_rate"] > 0) {
-                    $rate = (float) $payment["{$leg}_exchange_rate"];
-                    break;
-                }
+            $shipping = OrderShippingRepository::find($orderId) ?? [];
+            if (empty($shipping['customs_exchange_rate']) || (float) $shipping['customs_exchange_rate'] <= 0) {
+                throw new \RuntimeException("{$label} not sent: record the shipping bill's customs exchange rate on the order (Shipping Bill, on the order page) first.");
             }
-            if ($rate === null) {
-                throw new \RuntimeException("{$label} not sent: no exchange rate is recorded for the {$legs[0]} or advance leg. Set it in CA / Accounting -> INR Settlement Register.");
-            }
+            $rate = (float) $shipping['customs_exchange_rate'];
         }
 
         $date = substr(DocumentRepository::printedDate($document), 0, 10);
@@ -150,16 +149,23 @@ final class ZohoInvoiceData
         $from = (string) ($order['port_of_loading_name'] ?: $order['port_of_loading_city'] ?: '');
         $to = (string) ($order['port_of_discharge_name'] ?: $order['port_of_discharge_city'] ?: '');
         $route = $from !== '' && $to !== '' ? "{$from} to {$to}" : '';
+        $hsCode = null;
+        foreach (OrderProductRepository::forOrder($orderId) as $product) {
+            if ((int) ($product['is_active'] ?? 1) === 1 && !empty($product['hs_code'])) {
+                $hsCode = (string) $product['hs_code'];
+                break;
+            }
+        }
         $lines = [[
             'name' => 'Ocean freight',
             'description' => 'Ocean freight' . ($route !== '' ? ', ' . $route : '') . ' (' . strtoupper((string) $order['incoterm_code']) . ')',
-            'hs_code' => null,
+            'hs_code' => $hsCode,
             'quantity' => 1.0,
             'unit' => null,
             'rate' => (float) $freight['confirmed_freight_rate'],
         ]];
         if (strtoupper((string) $order['incoterm_code']) === 'CIF' && (float) ($freight['insurance_amount'] ?? 0) > 0) {
-            $lines[] = ['name' => 'Marine insurance', 'description' => 'Marine insurance (CIF)', 'hs_code' => null, 'quantity' => 1.0, 'unit' => null, 'rate' => (float) $freight['insurance_amount']];
+            $lines[] = ['name' => 'Marine insurance', 'description' => 'Marine insurance (CIF)', 'hs_code' => $hsCode, 'quantity' => 1.0, 'unit' => null, 'rate' => (float) $freight['insurance_amount']];
         }
         return $lines;
     }

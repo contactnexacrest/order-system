@@ -151,6 +151,26 @@ describe('vendor bills and order expenses', () => {
     expect(lastFlash(req).message).toBe('Choose whether the bill is an Advance or the Final bill.');
   });
 
+  // Owner decision 2026-10-29 (CA advice): reverse charge only on a Transport bill, and then the bill carries no GST.
+  it('reverse charge is only for a transport bill with no GST', async () => {
+    const partnerId = await logisticsPartnerRepository.create({ partner_name: 'RCM Check GTA', service_type: 'transportation' }, adminId);
+    const [orderId] = await orderWithSupplierPo('CIF');
+    const base = { logistics_partner_id: String(partnerId), payment_kind: 'final', bill_no: 'R-1', bill_date: todayIst(), taxable_inr: '1000', gst_charge: 'reverse' };
+    const attempt = async (body) => {
+      const req = { ...fakeReq({ id: String(orderId) }, { ...base, ...body }), file: { originalname: 'bill.pdf' } };
+      await vendorBillController.addLogisticsBill(req, fakeRes());
+      return lastFlash(req).message;
+    };
+
+    expect(await attempt({ bill_for: 'cha', gst_rate_pct: '0' })).toBe('Reverse charge applies only to a Transport bill.');
+    expect(await attempt({ bill_for: 'transport', gst_rate_pct: '5' })).toBe('Under reverse charge the transporter charges no GST — pick GST rate 0%.');
+    expect(await attempt({ gst_charge: 'sideways', bill_for: 'transport', gst_rate_pct: '0' })).toBe('Choose how GST is charged on the bill.');
+
+    const id = await orderVendorBillRepository.create(orderId, 'logistics', { logistics_partner_id: partnerId, bill_for: 'transport', bill_no: 'R-2', bill_date: todayIst(), taxable_inr: 1000, gst_inr: 0, gst_reverse_charge: 1 }, adminId);
+    expect(Number((await orderVendorBillRepository.find(id)).gst_reverse_charge)).toBe(1);
+    expect(Number((await orderVendorBillRepository.find(await logisticsBill(orderId, partnerId, 'transport', 500))).gst_reverse_charge)).toBe(0); // charged on the bill unless marked
+  });
+
   it('an expense needs a receipt or a reason and respects the FY lock', async () => {
     const [orderId] = await orderWithSupplierPo();
     const base = { expense_date: todayIst(), category: 'hotel', details: 'Hotel Kota, 1 night', amount_inr: '3540', paid_by: 'company_card' };

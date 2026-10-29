@@ -2821,6 +2821,45 @@ final class OrderController
         header("Location: /orders/{$orderId}");
     }
 
+    /**
+     * Owner decision 2026-10-29: records the shipping bill — its number,
+     * date and the customs exchange rate printed on it. The CI and Debit
+     * Note go to Zoho Books at that rate, so the GST return matches the
+     * shipping bill. Can be corrected later; an invoice already in Zoho
+     * Books keeps the rate it was sent at.
+     */
+    public function recordShippingBill(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            Flash::set('error', 'Order not found.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $number = trim((string) ($_POST['shipping_bill_no'] ?? ''));
+        $date = trim((string) ($_POST['shipping_bill_date'] ?? ''));
+        $rate = trim((string) ($_POST['customs_exchange_rate'] ?? ''));
+        $error = null;
+        if ($number === '' || mb_strlen($number) > 30) {
+            $error = 'Enter the shipping bill number (up to 30 characters).';
+        } elseif (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || $date > date('Y-m-d')) {
+            $error = 'Enter the shipping bill date (not in the future).';
+        } elseif (!is_numeric($rate) || (float) $rate <= 0 || (float) $rate > 100000) {
+            $error = 'Enter the customs exchange rate printed on the shipping bill (rupees for 1 ' . ($order['currency_code'] ?? 'unit') . ').';
+        }
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}#shipping-bill");
+            return;
+        }
+        $before = OrderShippingRepository::find($orderId);
+        OrderShippingRepository::recordShippingBill($orderId, $number, $date, (float) $rate);
+        AuditLogRepository::log(AuthService::currentUserId(), 'ORDER_SHIPPING_BILL_RECORDED', 'order_shipping', $orderId, 'customs_exchange_rate', $before['customs_exchange_rate'] ?? null, $rate, "Shipping bill {$number} dated {$date}");
+        Flash::set('success', "Shipping bill {$number} recorded (customs rate {$rate}).");
+        header("Location: /orders/{$orderId}#shipping-bill");
+    }
+
     public function recordScannedBlSent(array $params): void
     {
         $orderId = (int) $params['id'];

@@ -33,6 +33,9 @@ final class ZohoBooksStage2Test extends DbTestCase
     /** Answer an invoice create/update with HTTP 500 although it went through (seen in the test organisation). */
     private bool $invoiceWrites500 = false;
 
+    /** Make the invoice list miss an invoice just created, once (the list lags behind a create, seen in the test organisation). */
+    private bool $invoiceListLags = false;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -90,6 +93,10 @@ final class ZohoBooksStage2Test extends DbTestCase
         }
         if (preg_match('#^/books/v3/contacts/(.+)$#', $path, $m) === 1) {
             return $json(['code' => 0, 'contact' => $this->contacts[$m[1]]]);
+        }
+        if ($path === '/books/v3/invoices' && $method === 'GET' && $this->invoiceListLags && isset($query['invoice_number']) && in_array($query['invoice_number'], array_column($this->invoices, 'invoice_number'), true)) {
+            $this->invoiceListLags = false;
+            return $json(['code' => 0, 'invoices' => []]);
         }
         if ($path === '/books/v3/invoices' && $method === 'GET') {
             $rows = array_values(array_filter($this->invoices, static fn (array $i): bool => !isset($query['invoice_number']) || $i['invoice_number'] === $query['invoice_number']));
@@ -149,7 +156,7 @@ final class ZohoBooksStage2Test extends DbTestCase
         return array_values(array_filter($this->requests, static fn (array $r): bool => $r['method'] === $method && str_starts_with((string) parse_url($r['url'], PHP_URL_PATH), $pathPrefix)));
     }
 
-    /** A TEST- CIF order in USD: two products (FOB 1,275.00), freight 200 + insurance 15, the advance of 300 received at 84.10. */
+    /** A TEST- CIF order in USD: two products (FOB 1,275.00), freight 200 + insurance 15, the advance of 300 received at 84.10, shipping bill customs rate 84.40. */
     private function createCifOrder(string $buyer = 'TEST-Stage2 Buyer'): int
     {
         $pdo = Database::connection();
@@ -164,6 +171,7 @@ final class ZohoBooksStage2Test extends DbTestCase
         $pdo->prepare("INSERT IGNORE INTO order_payment_status (order_id) VALUES (:id)")->execute(['id' => $orderId]);
         $pdo->prepare("UPDATE order_payment_status SET advance_amount = 300, advance_cleared_at = '2026-10-20 11:00:00', advance_inr_actual = 25230, advance_exchange_rate = 84.1,
                        balance_exchange_rate = 84.5, freight_exchange_rate = 84.3 WHERE order_id = :id")->execute(['id' => $orderId]);
+        $pdo->prepare("INSERT INTO order_shipping (order_id, shipping_bill_no, shipping_bill_date, customs_exchange_rate) VALUES (:id, 'TEST-SB-1', '2026-10-27', 84.4)")->execute(['id' => $orderId]);
         return $orderId;
     }
 
@@ -207,7 +215,7 @@ final class ZohoBooksStage2Test extends DbTestCase
         self::assertSame(['customer_id' => 'CT-1', 'invoice_number' => 'TEST-SC/CI/2026/2810001', 'date' => '2026-10-28', 'reference_number' => "NX-{$orderId}", 'line_items' => [
             ['name' => 'Granite slab', 'description' => 'Granite slab. Size: 60x60x2 cm. Finish: Polished. HS code 68022310', 'quantity' => 100.0, 'rate' => 10.0, 'unit' => 'SQM'],
             ['name' => 'Sandstone tile', 'description' => 'Sandstone tile. HS code 68029900', 'quantity' => 50.0, 'rate' => 5.5, 'unit' => 'SQM'],
-        ], 'exchange_rate' => 84.5], $invoice['payload']);
+        ], 'exchange_rate' => 84.4], $invoice['payload']);
         self::assertStringContainsString('ignore_auto_number_generation=true', $this->requestsTo('POST', '/books/v3/invoices')[0]['url']);
         self::assertSame([['invoice_id' => 'INV-1', 'amount_applied' => 300.0]], $this->payments['PAY-1']['invoices']);
         self::assertSame(300.0, $this->payments['PAY-1']['amount']);
@@ -233,10 +241,10 @@ final class ZohoBooksStage2Test extends DbTestCase
         $debitNote = array_values(array_filter($this->invoices, static fn (array $i): bool => $i['invoice_number'] === 'TEST-SC/DN/2026/2710001'))[0];
         self::assertSame(215.0, $debitNote['total']);
         self::assertSame([
-            ['name' => 'Ocean freight', 'description' => 'Ocean freight, Chennai to Hamburg (CIF)', 'quantity' => 1.0, 'rate' => 200.0],
-            ['name' => 'Marine insurance', 'description' => 'Marine insurance (CIF)', 'quantity' => 1.0, 'rate' => 15.0],
+            ['name' => 'Ocean freight', 'description' => 'Ocean freight, Chennai to Hamburg (CIF). HS code 68022310', 'quantity' => 1.0, 'rate' => 200.0],
+            ['name' => 'Marine insurance', 'description' => 'Marine insurance (CIF). HS code 68022310', 'quantity' => 1.0, 'rate' => 15.0],
         ], $debitNote['payload']['line_items']);
-        self::assertSame(84.3, $debitNote['payload']['exchange_rate']);
+        self::assertSame(84.4, $debitNote['payload']['exchange_rate'], 'the shipping bill customs rate, not the freight leg rate');
         self::assertSame('2026-10-27', $debitNote['payload']['date']);
         self::assertSame(0.0, $this->invoiceBalance($debitNote['invoice_id']));
         $ci = array_values(array_filter($this->invoices, static fn (array $i): bool => $i['invoice_number'] === 'TEST-SC/CI/2026/2810002'))[0];
@@ -306,6 +314,20 @@ final class ZohoBooksStage2Test extends DbTestCase
         self::assertCount(1, $this->invoices);
     }
 
+    public function testAnInvoiceTheListDoesNotShowYetIsTakenFromTheCreateResponse(): void
+    {
+        $orderId = $this->createCifOrder();
+        $this->approveDocument($orderId, 'CI', 'TEST-SC/CI/2026/2810017');
+        $this->invoiceListLags = true;
+
+        $result = $this->sync();
+
+        self::assertSame([1, 0], [$result['invoices'], $result['failed']]);
+        self::assertSame('INV-1', OrderZohoInvoiceRepository::find($orderId, 'ci')['zoho_invoice_id']);
+        self::assertSame('sent', $this->invoices['INV-1']['status']);
+        self::assertCount(1, $this->invoices);
+    }
+
     public function testAGstRegisteredOrganisationGetsHsnAndOverseasTreatment(): void
     {
         $this->gstRegistered = true;
@@ -336,17 +358,16 @@ final class ZohoBooksStage2Test extends DbTestCase
     public function testTheExchangeRateIsFrozenOnceTheInvoiceIsInBooks(): void
     {
         $orderId = $this->createCifOrder();
-        Database::connection()->exec("UPDATE order_payment_status SET balance_exchange_rate = NULL WHERE order_id = {$orderId}");
         $this->approveDocument($orderId, 'CI', 'TEST-SC/CI/2026/2810013');
         $this->sync();
-        self::assertSame(84.1, $this->invoices['INV-1']['payload']['exchange_rate'], 'sent at the advance rate (no balance rate yet)');
+        self::assertSame(84.4, $this->invoices['INV-1']['payload']['exchange_rate'], 'sent at the shipping bill customs rate');
 
-        // The balance arrives and its rate is recorded: the invoice must not be revalued.
-        Database::connection()->exec("UPDATE order_payment_status SET balance_exchange_rate = 86.2 WHERE order_id = {$orderId}");
+        // The shipping bill's rate is corrected afterwards: the invoice in Books must not be revalued.
+        Database::connection()->exec("UPDATE order_shipping SET customs_exchange_rate = 86.2 WHERE order_id = {$orderId}");
         $this->sync();
 
-        self::assertCount(0, $this->requestsTo('PUT', '/books/v3/invoices/'), 'no update just because a later rate was recorded');
-        self::assertSame('84.100000', (string) OrderZohoInvoiceRepository::find($orderId, 'ci')['exchange_rate']);
+        self::assertCount(0, $this->requestsTo('PUT', '/books/v3/invoices/'), 'no update just because the rate was changed later');
+        self::assertSame('84.400000', (string) OrderZohoInvoiceRepository::find($orderId, 'ci')['exchange_rate']);
     }
 
     public function testOnlyRecordsDatedOnOrAfterTheGoLiveDateGo(): void
@@ -402,13 +423,13 @@ final class ZohoBooksStage2Test extends DbTestCase
     {
         $orderId = $this->createCifOrder();
         $this->approveDocument($orderId, 'CI', 'TEST-SC/CI/2026/2810008');
-        Database::connection()->exec("UPDATE order_payment_status SET balance_exchange_rate = NULL, advance_exchange_rate = NULL WHERE order_id = {$orderId}");
+        Database::connection()->exec("UPDATE order_shipping SET customs_exchange_rate = NULL WHERE order_id = {$orderId}");
 
         $this->sync();
         $messages = array_column(array_filter($this->logRows($orderId), static fn (array $r): bool => $r['sync_type'] === 'invoice'), 'message');
-        self::assertSame(['Commercial Invoice not sent: no exchange rate is recorded for the balance or advance leg. Set it in CA / Accounting -> INR Settlement Register.'], array_values($messages));
+        self::assertSame(["Commercial Invoice not sent: record the shipping bill's customs exchange rate on the order (Shipping Bill, on the order page) first."], array_values($messages));
 
-        Database::connection()->exec("UPDATE order_payment_status SET balance_exchange_rate = 84.5 WHERE order_id = {$orderId}");
+        Database::connection()->exec("UPDATE order_shipping SET customs_exchange_rate = 84.4 WHERE order_id = {$orderId}");
         Database::connection()->exec("UPDATE order_products SET quantity_is_tbc = 1 WHERE order_id = {$orderId} AND line_no = 2");
         $this->sync();
         $messages = array_column(array_filter($this->logRows($orderId), static fn (array $r): bool => $r['sync_type'] === 'invoice'), 'message');

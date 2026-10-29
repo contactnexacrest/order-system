@@ -187,6 +187,22 @@ final class VendorBillController
             $this->back($orderId, $anchor, 'error', $fields);
             return;
         }
+        // Owner decision 2026-10-29 (CA advice): reverse charge only for a
+        // road transporter (GTA) that charges no GST — so the bill's GST is 0.
+        $gstCharge = (string) ($_POST['gst_charge'] ?? 'forward');
+        if (!in_array($gstCharge, ['forward', 'reverse'], true)) {
+            $this->back($orderId, $anchor, 'error', 'Choose how GST is charged on the bill.');
+            return;
+        }
+        if ($gstCharge === 'reverse' && $service !== 'transport') {
+            $this->back($orderId, $anchor, 'error', 'Reverse charge applies only to a Transport bill.');
+            return;
+        }
+        if ($gstCharge === 'reverse' && (float) $fields['gst_inr'] !== 0.0) {
+            $this->back($orderId, $anchor, 'error', 'Under reverse charge the transporter charges no GST — pick GST rate 0%.');
+            return;
+        }
+        $fields['gst_reverse_charge'] = $gstCharge === 'reverse' ? 1 : 0;
         $kind = $this->docKindFields($orderId, 'logistics', $fields, static fn (array $b): bool => (int) $b['logistics_partner_id'] === (int) $partner['id']);
         if (is_string($kind)) {
             $this->back($orderId, $anchor, 'error', $kind);
