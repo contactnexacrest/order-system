@@ -40,15 +40,21 @@ the normal order is meant to be the exception, not the routine.
 
 | # | Stage | What "passes" this gate | Chapter |
 |---|-------|--------------------------|---------|
-| 1 | Enquiry & Quotation | Quotation (QT) generated | [Chapter 1](./01-stage1-enquiry-quotation.md) |
+| 1 | Enquiry & Quotation | Quotation (QT) approved — or sent, when email sending is on | [Chapter 1](./01-stage1-enquiry-quotation.md) |
 | 2 | Buyer Purchase Order | Buyer's PO reference confirmed by staff | [Chapter 2](./02-stage2-buyer-po.md) |
-| 3 | Proforma Invoice | Advance payment marked cleared | [Chapter 3](./03-stage3-pi-advance.md) |
+| 3 | Proforma Invoice | Advance payment marked cleared (on a Letter of Credit order: LC confirmed usable) | [Chapter 3](./03-stage3-pi-advance.md) |
 | 4 | Order Confirmation | Buyer acknowledges the OC (or 48h auto-confirm) | [Chapter 4](./04-stage4-order-confirmation.md) |
 | 5 | Supplier Purchase Order | Supplier's signed PO confirmed by staff | [Chapter 5](./05-stage5-supplier-po.md) |
 | 6 | Freight Payment | Freight payment cleared (CFR/CIF only — auto-skipped for FOB) | [Chapter 6](./06-stage6-freight.md) |
 | 7 | Packing & BL Instruction | Bill of Lading number recorded | [Chapter 7](./07-stage7-packing-bl.md) |
 | 8 | Commercial Invoice & Balance | Balance payment cleared | [Chapter 8](./08-stage8-ci-balance.md) |
 | 9 | Document Despatch & Closure | Courier tracking number entered, order closed | [Chapter 9](./09-stage9-despatch-closure.md) |
+
+Stages 1–8 each produce a document (Quotation, Buyer PO, Proforma Invoice,
+Order Confirmation, Supplier PO, Debit Note, Packing List and BL
+Instruction Sheet, Commercial Invoice). The gating action is refused until
+that stage's document is finished — see "One rule that applies to every
+stage" below.
 
 Every order detail page (`/orders/{id}`) shows all 9 at the very top, two
 ways at once: first a horizontal line-with-dots **process stepper** —
@@ -72,9 +78,9 @@ matches the real order of work — not the 9 internal stage numbers above,
 which are a separate, coarser-grained tracker. The order's current step
 opens automatically; every other step-card stays collapsed until you
 click its heading, so the page never buries one step's actions behind
-another's. A persistent panel to the side (stacked below on a phone) always
-shows an "At a Glance" summary and the full list of documents generated
-so far, regardless of which step-card is open.
+another's. Across the top of the page, above the step-cards, an "At a
+Glance" summary and an **All Documents** quick-links button stay in view
+whichever step-card is open.
 
 ## Modules that sit alongside the 9 stages
 
@@ -96,6 +102,13 @@ independently of the main pipeline:
   signatories, watermarks, HS codes, company settings, email templates.
 - [**Test Mode**](./16-test-mode.md) — a sandboxed way to rehearse the
   system without touching real data or sending real emails.
+- [**Editing, Duplicating & Reordering**](./17-order-edit-duplication.md) —
+  changing an order after it's created, copying a product line or a whole
+  order, and a client's own repeat-order request.
+- [**Data Export / Migration**](./18-data-export-migration.md) —
+  downloading the database to move it into a fresh installation.
+- [**Complaints**](./19-complaints.md) — a buyer flagging a process issue
+  with no intent to cancel.
 
 ## How to read each chapter
 
@@ -115,16 +128,24 @@ Every stage/module chapter follows the same shape:
 
 ## One rule that applies to every stage
 
-**Passing a stage gate and getting a document approved are two separate
-things.** A stage gate passes the moment the specific gating action happens
-(e.g. generating the Quotation passes Stage 1, immediately, as a draft) —
-not when that document finishes being reviewed, approved, and sent to the
-buyer. Review/approval is tracked separately per document (see
-[Document Review & Approval](./13-document-review-approval.md)) and never
-blocks the pipeline from moving forward. In practice this means you can be
-several stages ahead of a document that's still sitting in "draft" or
-"in review" — that's normal, not a bug, though it's worth keeping an eye on
-so nothing old goes out to a buyer unreviewed.
+**A stage is complete only once its own document is finished** (owner
+decision 2026-10-25). Generating a document never passes a gate on its
+own. The stage's gating action (confirming the Buyer PO, clearing the
+advance, recording the OC acknowledgement, and so on) is refused until that
+stage's document is:
+
+- **approved**, while email sending is turned off in Company Settings (the
+  default: approval then counts as sent, and staff send the PDF to the
+  buyer themselves); or
+- **sent to the buyer** through the app, while email sending is on.
+
+Internal documents that never go to the buyer (the Supplier PO and the BL
+Instruction Sheet) only need to be approved. The Quotation has no separate
+gating button: Stage 1 passes by itself the moment the Quotation is
+approved (email off) or sent (email on). If a gating action is refused,
+the message names the document still outstanding — take it through
+[Document Review & Approval](./13-document-review-approval.md) and try
+again.
 
 ## How files are named and stored on disk
 
@@ -312,7 +333,7 @@ collapsed, since it's how staff get back their bearings while stepping
 through the page) is a quick row of counts — **Current Stage**,
 **Products** (line count), **Payment Legs** (how many of
 advance/freight/balance are cleared, with a jump link to
-[Payment Snapshot](#payment-snapshot-and-payment-ledger)), **Compliance
+[Payment Snapshot](./03-stage3-pi-advance.md#payment-snapshot-and-payment-ledger)), **Compliance
 Checklist** (resolved count, shown only to whoever holds `close_orders`
 — same gate as the checklist itself, see
 [Stage 9](./09-stage9-despatch-closure.md)), **Documents Generated** —
@@ -336,6 +357,14 @@ an explanatory line) still gets one. Where a figure could be read two ways
 packing), the field's label carries a small tag spelling out exactly which
 one it is, so nobody has to guess or check twice at the Packing List stage.
 
+**Every form is checked in the browser before it is sent.** Required
+fields, numbers, dates, minimum reason lengths and "Re-enter …" fields
+(which must match the field they confirm) are checked the moment you
+press the button. A problem shows as a message beside the field, and a
+closed step card holding that field opens by itself, so nothing is sent
+half-filled. The server checks everything again afterwards, so the
+browser check is a convenience, not the only safeguard.
+
 **A signature block never appears bare.** Every generated document's
 signature block (the "For [Company] / Authorised Signatory" block most
 document types carry, and the Buyer/Supplier PO's own "fill, sign and
@@ -349,9 +378,11 @@ can never be mistaken for, or substituted into, a different document.
 
 ## Roles in this system
 
-Six roles exist today (Admin → Settings → Roles & Permissions): **Admin**,
-**Managing Director**, **Export Executive**, **Accounts Executive**,
-**Logistics Executive**, **Viewer / Auditor**. Who can do what is governed
+Eight roles exist out of the box (sidebar: **Admin → Permissions**):
+**Admin**, **Managing Director**, **Executive Director**, **Export
+Executive**, **Accounts Executive**, **Logistics Executive**, **Viewer /
+Auditor**, and **CA / Chartered Accountant** (read-only CA / Accounting
+access, and read-only order pages). Who can do what is governed
 by permissions attached to a role (e.g. `manage_orders`, `generate_documents`,
 `approve_documents`, `view_reports`) — a Super Admin bypasses every
 permission check. This SOP describes actions by *what* they are, not which

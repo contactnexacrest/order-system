@@ -7,12 +7,13 @@ const logger = require('../helpers/logger');
 
 /**
  * CA / Accounting module — the scheduled half of the Zoho Books sync (the
- * other is the "Sync Now" button on /ca/zoho-sync). Runs both directions
- * — Phase 3's revenue push and Phase 4's expense import — via the same
+ * other is the "Sync Now" button on /ca/zoho-sync). Runs the same
  * caSyncService.runFullSync() the button calls, so the two never drift
- * apart. Safe to run as often as wanted — an already-synced revenue leg
- * is never re-pushed and an already-imported expense is never
- * re-inserted, and runFullSync() itself no-ops cleanly (logging a
+ * apart: it sends what is new to Zoho Books, imports the CA's expenses,
+ * and — once a day here, every time on Sync Now — checks the records
+ * already in Books and puts back any changed or deleted there (owner
+ * decision 2026-10-29). Safe to run as often as wanted — nothing already
+ * sent is sent twice, and runFullSync() itself no-ops cleanly (logging a
  * "skipped" row for each direction) when Zoho Books isn't configured, so
  * this never breaks the job itself or blocks anything else in the app
  * (CA module brief, point 5).

@@ -13,7 +13,9 @@ account page.
 ## The system does this automatically
 
 - **The portal login doesn't exist until Stage 3 → 4** (the advance payment
-  clearing) — see [Chapter 3](./03-stage3-pi-advance.md). Before that point,
+  clearing, or the Letter of Credit being confirmed usable) — see
+  [Chapter 3](./03-stage3-pi-advance.md). A client with a login from an
+  earlier order keeps it; no second one is created. Before that point,
   the buyer has no way to log in at all, regardless of what they've done on
   public forms — except via staff impersonation, below.
 - **Forgot password** — the sign-in screen has a "Forgot your password?"
@@ -124,6 +126,22 @@ themselves, and has no effect on what staff see in the staff-side Orders
 list or on that client's own page. Every change to a client's own
 override is logged (`CLIENT_ORDER_HISTORY_VISIBILITY_CHANGED`).
 
+## Document downloads visibility
+
+Whether the client sees the **Documents** section (and can download their
+order's PDFs) in the portal works the same two-level way:
+
+1. **A global default** (Settings → `client_portal_show_document_downloads`)
+   — on by default.
+2. **A per-client override** on the client's staff-side page ("Client
+   Portal Access" section, **Document downloads visible to this client in
+   the portal**): *Inherit global default*, *Always allow document
+   downloads*, or *Always hide document downloads*.
+
+This is independent of the order-history setting above. With downloads
+hidden, the client's order page simply has no Documents section; nothing
+else changes.
+
 ## What the client sees and does
 
 ### My Orders (the dashboard)
@@ -155,12 +173,15 @@ what landed an order in a given bucket:
 
 ### Inside an order
 
-Opening an order (**View documents**) shows, top to bottom:
+Opening an order (**View documents**) shows, top to bottom (with a
+**Reorder This** link at the top for a repeat order — see
+[Chapter 17](./17-order-edit-duplication.md)):
 
 1. **Order Confirmation — Your Acknowledgement Needed** — only appears
    when there's a pending OC acknowledgment; see
    [Chapter 4](./04-stage4-order-confirmation.md) for the full mechanics.
-2. **Documents** — every customer-facing document finalized so far, each
+2. **Documents** (unless downloads are hidden for this client — see
+   above) — every customer-facing document finalized so far, each
    with a direct PDF download; a short on-page line says as much, so the
    client knows these are final copies rather than wondering why nothing
    shows up before the first one is ready:
@@ -168,11 +189,15 @@ Opening an order (**View documents**) shows, top to bottom:
    ![Documents table in the client portal](./images/portal_documents.png)
 
 3. **Buyer PO** — lets the client upload a scanned copy of their own signed
-   Purchase Order at any time, once they've signed it, rather than relying
-   solely on emailing it to staff. Every past upload is listed (file name +
-   upload date); re-uploading a corrected copy never removes the earlier
-   one — see [Chapter 2](./02-stage2-buyer-po.md) for how this feeds the
-   same record the internal staff-side upload writes to.
+   Purchase Order, with **Your PO Number** (needed with the first signed
+   copy), rather than relying solely on emailing it to staff. Every past
+   upload is listed (file name + upload date); re-uploading a corrected
+   copy never removes the earlier one. The upload form closes once the
+   advance payment has cleared ("Contact your NexaCrest representative if
+   you need to submit an updated copy"), so in practice only a returning
+   client who already has a login uses it — see
+   [Chapter 2](./02-stage2-buyer-po.md) for how this feeds the same record
+   the internal staff-side upload writes to.
 4. **Order Updates** — a running two-way chat thread with staff, separate
    from every stage-specific action. Either side can post a message and
    attach photos/videos/PDFs at any time; there's no approval step, it's
@@ -194,8 +219,11 @@ Opening an order (**View documents**) shows, top to bottom:
    two-way conversation with staff so far. See
    [Complaints](./19-complaints.md) for the complete picture, including
    who at NexaCrest sees and answers it.
-8. **Order Feedback** — always available too: a 1-5 star rating plus
-   a feedback/testimonial box on how this specific order went. The box
+8. **Order Feedback** — available once the order's documents have been
+   sent (status Documents Sent or Complete); before that the section says
+   "Feedback will be available once this order's documents have been sent
+   to you." It is a 1-5 star rating plus a feedback/testimonial box on how
+   this specific order went. The box
    starts with a suggested testimonial written from that order's own
    details (product, quantity, destination port) — different wording per
    order, never the text this client left on an earlier order — with the

@@ -17,11 +17,11 @@ Proforma Invoice print insurance as "NIL — buyer arranges insurance
 "Freight" instead of "Freight & Insurance". An insurance figure stored on
 a CFR order before this rule is ignored everywhere.
 
-The internal code for this document type stays **FDN** (the **Generate
-Freight Debit Note** button, the reference number's old `SC/FDN/…`
-pattern pre-dating this change, and this chapter's own wording below all
-still say "Freight Debit Note") — only the printed document's own title
-changed, to plain **"Debit Note"**, since it's a buyer-facing paper and
+The internal code for this document type stays **FDN** (the reference
+number's old `SC/FDN/…` pattern pre-dating this change, and some of this
+chapter's own wording below, still say "Freight Debit Note"); the button
+on the order page and the printed document's own title both say plain
+**"Debit Note"**, since it's a buyer-facing paper and
 "Freight" in the name was confusing it with a line item rather than the
 document itself. New reference numbers generated after the rename use
 `SC/DN/{YY}/{DDMM}{NNN}` instead of `SC/FDN/…`; a Debit Note generated
@@ -50,7 +50,13 @@ On a CFR/CIF order, Stage 6 unlocks as a normal stage once Stage 5 passes:
 
 ![Stage 6 section — unlocked, no freight terms recorded yet](./images/s6_before_terms.png)
 
-**Save Freight Terms** records the rate NexaCrest actually agreed with the
+On the order page this is **Step 9 · Freight Payment** (section **C ·
+Shipment & Balance**), with four sub-steps: **9a** Save Freight Terms,
+**9b** Generate Debit Note, **9c** Record Freight Remittance, **9d** Mark
+Freight Cleared. On an FOB order Step 9 is shown greyed out as "Not
+applicable — FOB".
+
+**Save Freight Terms** (9a) records the rate NexaCrest actually agreed with the
 shipping line/forwarder (confirmed freight rate, insurance amount on CIF
 orders — the box is shown on CIF orders only) and the **Freight Forwarder**, chosen from the **Logistics
 Partners** directory like the supplier in Step 7a comes from the
@@ -58,9 +64,11 @@ Suppliers directory (owner request 2026-10-27). The directory has a
 **Freight Forwarder** service type for them (alongside CHA and
 Transportation) — add one at Logistics Partners → Add Partner. Their name
 and contact are copied onto the order when the terms are saved. This
-is internal record-keeping only and doesn't pass any gate. From **Documents**, **Generate Freight Debit
-Note** then produces the FDN — the actual invoice sent to the buyer for
-these charges.
+is internal record-keeping only and doesn't pass any gate. **Generate
+Debit Note** (9b) then produces the FDN — the actual invoice sent to the
+buyer for these charges. Take it through [Document Review &
+Approval](./13-document-review-approval.md): 9d is refused until the Debit
+Note is approved (email sending off) or sent (email sending on).
 
 The Debit Note itself states payment is due within **3 Calendar Days**
 of its own date (previously "3 working days" — every buyer payment
@@ -79,12 +87,14 @@ text ever reaches a document the buyer actually sees.
 Recording and clearing the payment itself follows the exact same
 two-step pattern as the advance payment in Stage 3:
 
-1. **Record Freight Remittance** — the amount and date once the buyer's
-   payment notification comes in. Does not pass the gate yet:
+1. **Record Freight Remittance** (9c) — the amount, the date and the **@
+   Exchange Rate** (₹ per 1 unit of the order currency) once the buyer's
+   payment notification comes in, exactly as for the advance. Does not
+   pass the gate yet:
 
    ![Stage 6 section — freight recorded, awaiting clearance](./images/s6_recorded_awaiting_clear.png)
 
-2. **Mark Freight Cleared (unlocks Stage 7)** — only once the funds are
+2. **Mark Freight Cleared (unlocks Stage 7)** (9d) — only once the funds are
    verified against the actual bank statement, same caution as every other
    payment-clearing action in this system. **This is the action that passes
    Stage 6's gate.**
@@ -141,7 +151,10 @@ count as Final, and as tax invoices. The table tags each row **Advance**
 or **Final** and **Proforma** or **Tax invoice**, and totals the cost
 (tax invoices, plus what is paid on a proforma until its tax invoice
 arrives), what is paid and what is still due. Every logistics bill flows into the
-order's financials (Step 12) as logistics cost.
+order's financials (Step 12) as logistics cost. When the Zoho Books
+integration is on, each tax invoice also goes to Zoho Books as a bill and
+each payment as a vendor payment (see [Zoho Books
+Sync](./ca-03-zoho-sync.md#bills-vendor-payments-and-order-expenses-in-zoho-books-2026-10-29)).
 
 ## What the client does (or doesn't)
 

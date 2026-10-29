@@ -179,6 +179,12 @@ you start noticing them:
   unfamiliar abbreviation means.
 - **Orange/amber highlights** mark something that needs your attention —
   a pending approval, a notice, a badge count.
+- **Forms are checked before they are sent.** A missing or wrong entry
+  (an empty required field, a number with a comma, a reason that is too
+  short, a "Re-enter" field that doesn't match) shows a red message right
+  beside the field, and a closed step card holding it opens by itself.
+  Fix it and press the button again. The server checks everything again
+  after that.
 - **Every action that matters is logged.** Staff actions, client actions,
   status changes — all of it is in the Audit Log, which is genuinely
   useful when you need to know "who did this and when," not just a
@@ -211,7 +217,7 @@ time, from the sidebar, so you never have to go hunting for it.
 |---|---|---|
 | Set up a new buyer/order | **Clients** → create client → create order | [Chapter 1](./01-stage1-enquiry-quotation.md) |
 | Check where an order currently stands | Open the order — the 9-dot tracker is at the top | [Chapter 00 above](#the-big-picture-one-order-nine-stages) |
-| Generate or re-send a document | Inside the order, under **Documents** | [Document Review & Approval](./13-document-review-approval.md) |
+| Generate or re-send a document | Inside the order: generate it in its own step, review and send it in **Document Review & Approval** | [Document Review & Approval](./13-document-review-approval.md) |
 | See what's overdue or needs approval | **Dashboard** | *(this chapter)* |
 | Handle a buyer wanting to cancel | **Disputes** | [Chapter 11](./11-disputes.md) |
 | Handle a buyer flagging a process issue (no cancel intent) | **Complaints** | [Chapter 19](./19-complaints.md) |

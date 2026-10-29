@@ -9,10 +9,14 @@ use App\Repositories\CompanySettingsRepository;
 use App\Repositories\LookupRepository;
 
 /**
- * CA / Accounting module — the Zoho Books connection. Phase 3 pushes a
- * settled revenue leg as a Customer Payment (one-way, this system to
- * Zoho); Phase 4 imports expenses (one-way, Zoho to this system) — both
- * via the same OAuth self-client refresh-token flow (same shape as
+ * CA / Accounting module — the Zoho Books connection. It sends what the
+ * app owns to Books (Commercial Invoices and Debit Notes, buyer and LC
+ * payments, suppliers' and logistics partners' bills and the payments to
+ * them, order expenses, order costs and export benefit journals), reads
+ * them back so ZohoRestoreService can put back anything changed or
+ * deleted there, and imports the expenses the CA books in Books (owner
+ * decisions 2026-10-29; see docs/SOP/ca-03-zoho-sync.md) — all via the
+ * same OAuth self-client refresh-token flow (same shape as
  * ZohoMailService, a separate credential set since Zoho Mail and Zoho
  * Books are different API scopes). Every public method here either
  * returns a result or throws — CaSyncService is the one place that

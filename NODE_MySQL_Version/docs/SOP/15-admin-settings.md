@@ -26,7 +26,7 @@ them.
 
 ### Roles & Permissions
 
-Create, edit, or delete roles; edit which permissions a role has; or grant
+Sidebar: **Admin → Permissions**. Create, edit, or delete roles; edit which permissions a role has; or grant
 one specific person an extra permission beyond what their role normally
 gives them (with a mandatory, logged reason):
 
@@ -155,13 +155,20 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   server (Bluehost)** — owner decision 2026-10-29: NexaCrest's mail is
   hosted with Bluehost and Zoho Mail is used only as a mail client, so the
   app never sends through Zoho Mail and its settings are not shown here.
-  A second button, **Test Books Connection** (2026-10-29), logs in to
-  Zoho Books with the `zoho_books` settings and shows the organisation
-  name and the bank account payments go into, or the exact error. It
-  only reads — nothing is created in Zoho Books. Above it, a line shows
+  The **Zoho_books** section of the same screen holds the Zoho Books
+  connection: the on/off switch (`zoho_books_enabled`), the login details,
+  organization ID, deposit bank account and the go-live date
+  (`zoho_books_sync_start_date`). A second button, **Test Books
+  Connection** (2026-10-29), logs in to Zoho Books with those settings and
+  checks the organisation, the deposit account and the currencies: it
+  shows the organisation name and the bank account payments go into, and
+  lists any buyer currency still to be turned on in Zoho Books — or the
+  exact error. It only reads — nothing is created in Zoho Books. Above it, a line shows
   what this server's `.env` allows: Zoho integration on or off, test or
   production, and whether GST e-invoice / e-way bill / GST filing is
-  blocked. See [Zoho Books Sync](./ca-03-zoho-sync.md).
+  blocked; a warning lists any of those `.env` lines that are missing (they
+  are then read as the safe choice: Zoho off, test, e-invoice off). See
+  [Zoho Books Sync](./ca-03-zoho-sync.md).
 
   **Which emails staff receive** (owner decision 2026-10-26). The audit
   trail records every action, but **recording an action never sends an

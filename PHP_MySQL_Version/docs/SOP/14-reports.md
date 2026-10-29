@@ -39,15 +39,23 @@ Everything starts from the **Reports** hub:
   regardless of when a leg actually cleared. This instead answers "what
   actually cleared/was paid on this specific day", both directions:
   incoming (buyer advance/balance/freight, from the same clearing dates
-  the Payments Report uses) and outgoing (supplier advance/balance,
-  recorded from the order page's new **Mark Advance Paid** / **Mark
-  Balance Paid** buttons on the Supplier PO section — Stage 5, visible to
-  the same roles that can see the Order Profitability Sheet).
+  the Payments Report uses) and outgoing (the supplier's advance and
+  balance — the payments recorded against the supplier's bills with **₹
+  Mark Paid** in Steps 7e and 10a, shown on the date of the latest payment
+  on that leg, with the total paid on it so far). The outgoing table is
+  shown only to staff with **Manage supplier payments**. Payments to
+  logistics partners are not listed here.
+- **Debtors / Receivables Ageing** — every outstanding (not yet cleared)
+  advance, balance or freight leg, bucketed Current, 1–30, 31–60, 61–90 and
+  90+ days overdue. Advance and freight count from the order's creation
+  date; the balance uses its own due date when one is set.
 
 - **Dispute Report** / **Amendment Report** — status and aging breakdowns
   across every order, not just one at a time.
 - **Trends** — orders created, quotations/PI sent, lost, and FOB value,
   month over month for the last 12 months.
+- **Conversion Rate Report** — the same funnel as Operations Queues,
+  shown as percentages.
 - **Sales Performance Report** — the KPI/growth view: for any period (a
   preset — This/Last Month, This/Last Quarter, This/Last Half-Year,
   This/Last Year — or a custom date range), how many orders were created,
@@ -68,6 +76,17 @@ Everything starts from the **Reports** hub:
   previous period shows "—" rather than a fake infinite percentage. This
   is the report to open when asking "how are we actually doing, and is it
   getting better or worse."
+- **Freight Cost Report** — confirmed freight/insurance terms and
+  invoiced freight, by forwarder, filtered by order creation date.
+- **Product Sales Report** — which products / HS codes drive FOB value,
+  highest first, filtered by order creation date.
+- **Supplier Performance Report** — all-time, per supplier: average days
+  from Supplier PO to signature, and the on-time % (packing date against
+  the PO's required delivery date).
+- **Order Profitability** — revenue, total cost, profit and margin % per
+  order for any date range, with a totals row. Visible only to Super
+  Admin and roles granted **Manage order financials**; see [Order
+  Financials](./ca-08-order-financials.md#the-order-profitability-report).
 - **Staff Productivity** — documents generated and audit-log activity per
   user (requires the separate `view_staff_reports` permission — this one
   isn't available to every role by default, unlike the others).

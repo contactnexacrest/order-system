@@ -39,7 +39,8 @@ silently skipped on a repeat upload.
 
 Every imported line starts unmatched. On the Bank Statement page, each
 unmatched line with a credit amount gets a dropdown of every settlement leg
-(advance/balance/freight) that has an INR actual on record but isn't
+(advance/balance/freight, and the *LC payment* on a Letter of Credit
+order) that has an INR actual on record but isn't
 matched to some other bank line yet; each unmatched line with a debit
 amount gets the same for imported expenses. Picking one and clicking
 **Match** links them. A line can be unmatched again at any time, freeing up

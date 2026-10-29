@@ -5,9 +5,10 @@ on Node.js/Express/MySQL, replacing the earlier PHP/MySQL delivery. It was
 built by re-reading the same three source documents (the spec, the schema,
 the architecture doc) and re-running the same phase-by-phase methodology
 (A → E) used for the PHP build — not a mechanical line-by-line transpile.
-The **database schema and seed data are unchanged** (`docs/schema.sql` /
-`docs/seed.sql` are byte-identical to the PHP delivery's), so the two
-builds can even share one live database if you ever wanted to run both
+The **database schema and seed data are the same** (`docs/schema.sql` /
+`docs/seed.sql` create the same tables and rows as the PHP delivery's;
+only comments, and one setting's description, name each stack's own
+files), so the two builds can even share one live database if you ever wanted to run both
 side by side during a migration window.
 
 Functionally this delivers the same application the PHP build did — same
@@ -35,9 +36,10 @@ app/                    the application itself — this is what you deploy
     jobs/                  background jobs — see "Background jobs" below
   views/                  Nunjucks templates for the app's own UI, one
                           folder per resource, mirrors PHP's views/ tree
-  templates/              the 11 business-document Nunjucks templates
-                          (QT, PI, OC, BUYERPO, SUPPO, FDN, PL, BLI, CI,
-                          COOPREP, AMD) rendered to PDF/DOCX
+  templates/              the business-document Nunjucks templates, one
+                          folder per type (QT, PI, OC, BUYERPO, SUPPO,
+                          FDN, PL, BLI, CI, COOPREP, AMD, ANNEXA, BLE,
+                          CAFIN) rendered to PDF/DOCX
   public/                 static CSS/JS/images served directly by Express
   node_modules/           every npm dependency, already installed — see
                           "About the node_modules folder" below
@@ -45,8 +47,8 @@ app/                    the application itself — this is what you deploy
   .env.example            template — copy to .env and fill in real values
 docs/
   schema.sql              the MySQL schema — 113 tables, 218 foreign keys
-                          as of 2026-10-28 (plus this stack's own
-                          `sessions` table = 113; see the file's own
+                          as of 2026-10-29 (plus this stack's own
+                          `sessions` table = 114; see the file's own
                           trailing changelog comments)
   seed.sql                seed data: roles/permissions, company settings,
                           lookup tables, one Admin user
@@ -72,9 +74,12 @@ storage/
 
 ## Requirements
 
-- **Node.js 20 LTS** (or 18 LTS) — check with `node --version`. Anything
-  older than 18 is not tested against.
-- **MySQL 8.0+ or MariaDB 10.6+** — same requirement as the PHP build.
+- **Node.js 22.12 or newer** (22 LTS) — check with `node --version`. The
+  bundled `puppeteer-core` needs 22.12+, and `nodemailer` / `node-cron`
+  need 20+, so the app does not run on Node 20 or 18.
+- **MySQL 8.0+** on the live server (MariaDB 10.6+ is fine for
+  development only) — same requirement as the PHP build. Migrations are
+  written for MySQL (see CLAUDE.md's MySQL rule).
 - **Chromium or Google Chrome** installed on the server (for PDF
   generation via Puppeteer) — see "Install Chromium" below. You do **not**
   need Puppeteer's own bundled Chromium download; this app uses
@@ -88,15 +93,15 @@ storage/
 
 ## First-time setup (a fresh Linux VPS)
 
-1. **Install Node.js 20 LTS.** On Ubuntu/Debian:
+1. **Install Node.js 22 LTS.** On Ubuntu/Debian:
    ```bash
-   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
    sudo apt-get install -y nodejs
    ```
-   On AlmaLinux/RHEL: `sudo dnf module install nodejs:20`.
+   On AlmaLinux/RHEL: `sudo dnf module install nodejs:22`.
 
-2. **Install MySQL/MariaDB** if not already present (`sudo apt install
-   mariadb-server` / `sudo dnf install mariadb-server`), then create the
+2. **Install MySQL 8** if not already present (`sudo apt install
+   mysql-server` / `sudo dnf install mysql-server`), then create the
    database and app user:
    ```sql
    CREATE DATABASE nexacrest CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -110,7 +115,7 @@ storage/
    mysql -u nexacrest_app -p nexacrest < docs/schema.sql
    mysql -u nexacrest_app -p nexacrest < docs/seed.sql
    ```
-   This creates all 98 tables (99 once this stack's own `sessions` store
+   This creates all 113 tables (114 once this stack's own `sessions` store
    is added at first run) and seeds: the roles/permissions matrix, one
    Admin login, company settings (with `PLACEHOLDER` values you must
    replace — see below), lookup tables (incoterms, currencies, ports, T&C
@@ -274,12 +279,24 @@ Four jobs need to run outside the request/response cycle:
   Idempotent — a row is only ever picked up once it has
   `acknowledged_at IS NULL AND due_at <= NOW()`, and acknowledging it (by
   any means) before this runs removes it from that set.
-- **`src/jobs/zohoSync.js`** — CA / Accounting module (Phase 3). Run
-  hourly. Pushes every settlement leg with an INR actual recorded but not
-  yet synced to Zoho Books as a customer payment; no-ops cleanly (one
-  logged "skipped" row, exit 0) if Zoho Books isn't configured yet. The
-  same `/ca/zoho-sync` page shows this job's log alongside the manual
-  "Sync Now" button's.
+- **`src/jobs/zohoSync.js`** — CA / Accounting module. Run hourly. Runs
+  the same `caSyncService.runFullSync()` as the "Sync Now" button on
+  `/ca/zoho-sync`: sends Zoho Books the Commercial Invoices and Debit
+  Notes (as export invoices), the buyer's payments and the LC payment
+  (applied to their invoice; an advance is held until the CI is in
+  Books), the suppliers and logistics partners (as vendors) with their
+  tax-invoice bills and payments, order expenses and paid cost entries
+  (as expenses) and received export benefits (as journals); then imports
+  the expenses the CA enters in Books. At most once every 23 hours a
+  scheduled run also checks every record already sent and re-creates or
+  restores any that was deleted or changed in Books (Sync Now always
+  checks). Only records dated on or after the go-live date
+  (`zoho_books_sync_start_date`) are sent; with
+  `ZOHO_ENVIRONMENT=production` nothing is sent until it is set. While
+  Zoho is off (`ZOHO_INTEGRATION_ENABLED` not `true` in `.env`, or the
+  Zoho Books switch in Admin → Company Settings off) it logs one "skipped" row per
+  part and exits 0. The `/ca/zoho-sync` page shows this job's log
+  alongside Sync Now's.
 
 All four are plain Node scripts, runnable directly and printing a
 one-line summary to stdout, exit code 0 on success:
@@ -316,6 +333,22 @@ execution is then tied to the web process's uptime (a restart briefly
 pauses all four jobs, and if you run multiple app instances behind a load
 balancer for scaling, each instance would independently fire the jobs —
 stick to a single instance, or use Option 1, if you ever scale out).
+
+Two more scripts in `src/jobs/` are run by hand, never scheduled:
+
+- **`src/jobs/zohoCleanupTestRecords.js`** — removes the records made in
+  Zoho Books while testing: customers and vendors named `TEST-…` with
+  their invoices, bills and payments, and expenses and journals marked
+  `TEST-`. A dry run by default (lists, changes nothing); `--apply`
+  deletes; `--from-sync-log` also removes everything this database sent
+  (refused when `ZOHO_ENVIRONMENT=production` — test database only);
+  `--by "Name"` and `--log ../docs/zoho/zoho-change-log.csv` add one row
+  per deletion to the Zoho change log (without `--log` the rows are
+  printed for pasting in). Run it before go-live.
+- **`src/jobs/reorganizeOrderFiles.js`** — one-off tidy-up that moves
+  older order files into the per-step folders (`01-quotation/`, …). A dry
+  run by default; `--apply` moves them. Back up `storage/` and the
+  database first.
 
 ## Database backups
 
@@ -775,3 +808,27 @@ e2e suite green against `BASE_URL=http://127.0.0.1:3000`.
 **Upgrading an existing database:** run the files in `docs/migrations/`
 the database has not had yet, in filename order — run order and checks in
 the repository's `docs/migrations/README.md`.
+
+## Follow-up (added 2026-10-29): Zoho Books integration, shipping bill, LC payment received, 2-digit-year references
+
+Same delivery as the PHP/MySQL README's matching section — see there for
+the full write-up; this stack mirrors every item exactly (one new table,
+`order_zoho_invoices`: 113 tables plus this stack's own `sessions` table,
+60 permissions, 471 routes — 158 GET, 313 POST). Full suite: 1,868 Jest
+tests in 336 suites, plus the 48-test Playwright e2e suite green against
+`BASE_URL=http://127.0.0.1:3000`.
+
+In this stack the pieces are `services/zohoGuard.js` (the `.env` safety
+switches), `zohoBooksService.js`, `zohoInvoiceData.js`,
+`caSyncService.js` (`runFullSync()`), `zohoRestoreService.js` (the app is
+the source of truth for what it sends) and `orderZohoMatchService.js`
+(the read-only "App vs Zoho" check at `/orders/:id/zoho-check`); the jobs
+are `src/jobs/zohoSync.js` (hourly) and `src/jobs/zohoCleanupTestRecords.js`
+(by hand). Tests: `zohoServerGuard.test.js`, `zohoBooksStage1.test.js` …
+`zohoBooksStage5.test.js`, `cafinLcAndZohoExpenses.test.js`,
+`shippingBill.test.js` — every Zoho request in them goes to a fake Zoho.
+
+**Upgrading an existing database:** run `2026-10-29a` to `2026-10-29f` and
+`2026-10-30a` from `docs/migrations/` (run order in the repository's
+`docs/migrations/README.md`). Before switching Zoho on, set the go-live
+date in Admin → Company Settings (Zoho Books).

@@ -9,9 +9,14 @@ that lifecycle in full — referenced from nearly every stage chapter earlier
 in this document rather than repeated in each one.
 
 The one rule stated in the [introduction](./00-introduction.md) is worth
-repeating here: **a stage gate passing and a document being approved are
-two completely separate things.** A document can sit in draft for days
-while the order moves several stages ahead — that's expected, not broken.
+repeating here: **a stage is complete only once its own document is
+finished** (owner decision 2026-10-25). While email sending is off in
+Company Settings, "finished" means **approved** — approval then counts as
+sent, and staff send the PDF to the buyer themselves. While email sending
+is on, it means **sent** to the buyer through the app. Internal documents
+(Supplier PO, BL Instruction Sheet) only need approval. So a document left
+in draft or review holds up its own stage's gating action — the refusal
+message names it.
 
 On the order page, the **Document Review & Approval** section opens on
 its own whenever the order has documents (and stays collapsed while it
@@ -70,9 +75,11 @@ created by accident.
 
 ### Generating and tracking documents
 
-The **Documents** section on every order lists every document generated so
-far with its own status, alongside the buttons to generate each type (PDF
-and/or DOCX, per type):
+Each document is generated from its own step on the order page (for
+example Step 1a for the Quotation, Step 5c for the PI) — PDF always, plus
+DOCX when that box is ticked. The **All Documents** table inside **Document
+Review & Approval** (pinned above the order's sections) lists every
+document generated so far with its own status:
 
 ![Documents table — multiple documents in various statuses](./images/review_documents_table.png)
 
@@ -119,7 +126,9 @@ rejected one in place.
 
 ### Sending to the buyer — a two-level approval
 
-Once approved, **Send Document** opens a compose/preview screen. When the
+This applies while email sending is **on**. Once approved, **Send to Buyer
+(deferred, 2-level approval)** — in the document's own review panel, under
+**Send to Buyer** — opens a compose/preview screen. When the
 document being sent has an obvious matching template (the normal case —
 e.g. Order Confirmation matches the "Order Confirmation" template), that
 template is pre-selected and its **exact** merged subject and body are
@@ -127,7 +136,7 @@ shown immediately, with no extra click needed:
 
 ![Send compose screen — exact preview of subject, body, and recipient](./images/review_send_compose.png)
 
-**Send Document is available for every customer-facing document type** —
+**Send to Buyer is available for every customer-facing document type** —
 Quotation, Proforma Invoice, Order Confirmation, Buyer PO Acceptance,
 Commercial Invoice, Freight Debit Note, Packing List, Annexure A, and BL
 Endorsement — driven by the document type's own category, not a
@@ -178,13 +187,17 @@ never gets buried below older rows still waiting out their own schedule.
 
 ### Admin-configurable: turning sending off, or skipping Level 2
 
-Two independent switches in Company Settings, both off by default (meaning:
-nothing changes from the behaviour above until an admin turns one on):
+Two independent switches in Company Settings:
 
-- **`mail_sending_enabled`** — a master kill switch for every non-security
-  email (2FA codes and password resets are never affected). Turn it off
-  while diagnosing a hosting SMTP problem, so nothing can accidentally reach
-  a real buyer while credentials are being worked out.
+- **`mail_sending_enabled`** — a master switch for every non-security
+  email (2FA codes and password resets are never affected). It is **off**
+  in a fresh installation. While it is off there is **no Send to Buyer**
+  at all: a buyer-facing document counts as **sent the moment it is
+  approved** (its panel says "Counted as sent on approval (email sending is
+  off) — send the PDF to the buyer yourself"), the OC acknowledgement clock
+  starts at approval, and staff send the PDF themselves outside the app.
+  Turn it on only once the SMTP server in `.env` works (use **Send Test
+  Email** on Company Settings).
 - **`mail_approval_queue_enabled`** — on by default, preserving the two-level
   flow above exactly. Turned **off**, Level 1's submit button sends the
   email immediately instead of queuing it for a second approver — useful
@@ -199,9 +212,8 @@ Separate from everything above — these are staff-uploaded extras that don't
 fit any fixed document type and aren't part of the order progress chat
 either. Both the order detail page and the client detail page carry their
 own **Additional Documents** section (its own step-card on the order
-page, Step 14 — between Amendments and Order Communication, next to the
-persistent "All Documents" sidebar panel that lists every document
-generated so far): a title (required), optional notes, and a file. Typical use:
+page, Step 14, in section **E · After-Sales & Records**): a title
+(required), optional notes, and a file. Typical use:
 a buyer-supplied certificate template, a special packing instruction sheet,
 a standing NDA on a client's own page. There's no approval workflow here —
 whoever can edit the order/client (`manage_orders`) can add or remove one;
@@ -214,15 +226,16 @@ too, just not add or remove them.
 ## What the client does (or doesn't)
 
 Nothing in this workflow involves the buyer directly — they simply receive
-the email once it clears both levels of approval and is actually sent.
+the email once it clears both levels of approval and is actually sent (or,
+while email sending is off, the PDF staff send them themselves).
 There's no visibility into drafts, review status, or pending approvals from
 their side; they only ever see the final result in their portal's Documents
 list (see [Client Portal](./12-client-portal.md)).
 
 ## What happens next
 
-None of this blocks the order's own stage progress — see the "one rule"
-note above. What it does gate is whether a document has actually reached
-the buyer in a form that reflects real, reviewed figures, which is the
-entire point of keeping generation, review, and sending as three separate
-steps rather than one.
+A finished document (approved, or sent while email sending is on) lets
+its own stage's gating action go through — see the "one rule" note above.
+It also makes sure a document only reaches the buyer in a form that
+reflects real, reviewed figures, which is the entire point of keeping
+generation, review, and sending as three separate steps rather than one.

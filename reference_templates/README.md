@@ -37,8 +37,10 @@ where the two disagree, the Developer Spec wins — it says so explicitly).
 ## Relationship to the live application
 
 These are reference/source documents, not something the app reads at
-runtime. The app's own Twig templates (`PHP_MySQL_Version/app/templates/`)
-and DOCX builders are what actually render buyer-facing PDFs/DOCX files, and
+runtime. The app's own document templates (Twig in
+`PHP_MySQL_Version/app/templates/`, Nunjucks in
+`NODE_MySQL_Version/app/templates/`) and DOCX builders are what actually
+render buyer-facing PDFs/DOCX files, and
 they are expected to match this folder's content. When this folder is
 updated, the application templates need a corresponding update pass — they
 are not generated from these files automatically.

@@ -388,13 +388,10 @@ final class CaController
 
     /**
      * Generates (or regenerates) the internal-only CA Financial Annexure
-     * for one order — refused unless toggleInternalDoc() has already
-     * turned it on for this specific order, so generation is never
-     * possible from a stale form left open after someone else disabled
-     * it. Same permission as the toggle; viewing/downloading the result
-     * afterwards only needs ca_module_view (see DocumentController::
-     * download()'s CAFIN-specific check) since it shows nothing beyond
-     * what that permission already exposes on this order's own page.
+     * for one order. Owner request 2026-10-27: CAFIN can be generated at
+     * any stage, whatever toggleInternalDoc() last set. Same permission as
+     * the toggle; downloading it needs view_cafin (see DocumentController::
+     * download()'s CAFIN-specific check), and it never reaches the client.
      */
     public function generateInternalDoc(array $params): void
     {

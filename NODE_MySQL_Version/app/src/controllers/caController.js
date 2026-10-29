@@ -368,13 +368,10 @@ async function toggleInternalDoc(req, res) {
 
 /**
  * Generates (or regenerates) the internal-only CA Financial Annexure for
- * one order — refused unless toggleInternalDoc() has already turned it
- * on for this specific order, so generation is never possible from a
- * stale form left open after someone else disabled it. Same permission
- * as the toggle; viewing/downloading the result afterwards only needs
- * ca_module_view (see documentController.download()'s CAFIN-specific
- * check) since it shows nothing beyond what that permission already
- * exposes on this order's own page.
+ * one order. Owner request 2026-10-27: CAFIN can be generated at any
+ * stage, whatever toggleInternalDoc() last set. Same permission as the
+ * toggle; downloading it needs view_cafin (see documentController.
+ * download()'s CAFIN-specific check), and it never reaches the client.
  */
 async function generateInternalDoc(req, res) {
   const orderId = parseInt(req.params.id, 10);

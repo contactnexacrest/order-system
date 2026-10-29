@@ -282,7 +282,7 @@ screen can change them:
 
 | Line | Values | What it does |
 |---|---|---|
-| `ZOHO_INTEGRATION_ENABLED` | `true` / `false` | `false`: this server never contacts Zoho, whatever Admin → Settings says. |
+| `ZOHO_INTEGRATION_ENABLED` | `true` / `false` | `false`: this server never contacts Zoho, whatever Admin → Company Settings says. |
 | `ZOHO_ENVIRONMENT` | `test` / `production` | `test`: only customers whose name starts with `TEST-` may go to Zoho. `production`: only real orders — test and sample orders are never sent. Use `production` on the live server only. |
 | `ZOHO_EINVOICE_ENABLED` | `true` / `false` | GST e-invoice (IRN), e-way bill and GST filing. Allowed only when this is `true` **and** `ZOHO_ENVIRONMENT=production`. Keep it `false` until NexaCrest must e-invoice (turnover above ₹5 crore) — an IRN cannot be deleted. |
 
@@ -309,7 +309,7 @@ rest of the app from working.
 
 ## Setting up the connection
 
-Under **Admin → Settings**, a `zoho_books` group of settings needs filling
+Under **Admin → Company Settings**, a `zoho_books` group of settings needs filling
 in. NexaCrest uses one Zoho API Console **Self Client** (scope
 `ZohoBooks.fullaccess.all`; the Zoho Mail scopes are not needed, because
 the app does not send through Zoho Mail):
@@ -377,6 +377,63 @@ The **INR Settlement Register** (Chapter 1's main table) also shows a
 **Zoho Books** column for each leg — "Synced [date]" once pushed, "Pending"
 once an INR actual is recorded but not yet synced, or blank if there's
 nothing to sync yet.
+
+## Go-live checklist (owner request 2026-10-29)
+
+Do these in order on the **live** server. Each step names who does it.
+
+**Before switching on**
+
+1. **Developer / host:** back up the database, then run every migration in
+   `docs/migrations` the live database does not have yet, in the order of
+   the README there (2026-10-29e, 2026-10-29f and 2026-10-30a are the
+   Zoho ones). Deploy the code and restart the Node app (PHP needs no
+   restart).
+2. **CA:** in the real Zoho Books organisation, check that the Chart of
+   Accounts has every account the sync uses, spelled exactly like this
+   (add any that are missing, or ask the developer to map to another):
+   Commission Expense, Company Card, Consultant Expense, Cost of Goods
+   Sold, Employee Reimbursements, Export Documentation Charges, Export
+   Incentive Income, Export Incentive e-Scrips, Inspection Charges,
+   Insurance Expense, Other Expenses, Packing Material, Postage,
+   Transportation Expense, Travel Expense. A missing one stops only the
+   records that need it; the Sync Log names it.
+3. **CA:** turn on in Books every currency the buyers pay in (Settings →
+   Currencies). Keep e-Invoicing and e-Way Bills **off**.
+4. **CA:** book by hand, as the opening position, everything dated
+   **before** the go-live date (open invoices, advances received, bills
+   not yet paid). The app sends only what is dated on or after it.
+5. **Developer / host:** in the live server's `.env`, set
+   `ZOHO_INTEGRATION_ENABLED=true` and `ZOHO_ENVIRONMENT=production`.
+   Keep `ZOHO_EINVOICE_ENABLED=false` until NexaCrest must e-invoice.
+6. **Admin:** in **Admin → Company Settings**, Zoho Books section, fill in the real
+   organisation's login details and organization ID
+   (60057714676 — NexaCrest International), the deposit account
+   (SBI Bank – Current Account) and the **go-live date**
+   (`zoho_books_sync_start_date`: the 1st of a month, ideally the start of
+   a GST return period). Press **Test Books Connection**: it must show the
+   organisation name and the deposit account, with no warnings.
+7. **Admin:** switch **Zoho Books enabled** on.
+
+**After switching on**
+
+8. **Accounts / CA:** press **Sync Now** once and read the Sync Log. Fix
+   anything it names (usually a missing account or currency) and sync
+   again.
+9. **CA:** for the first few orders, open **App vs Zoho** on the order
+   page: every line should say it matches.
+10. **Everyone:** from now on, correct anything the app sends **in the
+    app**; a change made only in Books to such a record is undone on the
+    next sync. Expenses the CA books in Books are the exception: they
+    follow Books (put the order's reference in **Reference #** to link
+    them to the order).
+11. **Developer:** log in `docs/zoho/zoho-change-log.csv` every manual
+    change made in Zoho while going live, as for testing. Records the app
+    creates on the live site stay in its own Sync Log.
+
+The test Zoho organisation (60093754195) was emptied of every test record
+on 2026-10-29 (last clean-up: change log Z-370 to Z-383); nothing from testing needs
+removing from the real organisation.
 
 ## Testing and the clean-up before go-live
 

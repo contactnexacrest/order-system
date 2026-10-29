@@ -27,9 +27,19 @@ path an order took through Stage 5/6, they arrive here identically.
 
 ## What staff do
 
-Three things happen in this section, each building toward the BL:
+On the order page this is **Step 10 · Packing & BL Instruction** (section
+**C · Shipment & Balance**). It opens with the **Compliance — before
+shipment** card (Fumigation, Phytosanitary, Pre-Shipment Inspection by
+default — see [Stage 9](./09-stage9-despatch-closure.md#compliance-checklist)),
+which runs alongside and never locks anything. Then:
 
-1. **Save Packing & Crates** — actual quantity packed (with its own unit,
+- **10a · Supplier Balance Paid** — paying the supplier's balance before
+  packing; covered in [Chapter 5](./05-stage5-supplier-po.md).
+- **10b · Save Packing & Crates**, **10c · Generate Packing List**,
+  **10d · Save Shipping Details**, **10e · Generate BL Instruction Sheet**
+  and **10f · Confirm BL Issued** — described below.
+
+1. **Save Packing & Crates** (10b) — actual quantity packed (with its own unit,
    defaulting to the order's own product unit when the order has one
    comparable unit across its lines), crate count, weights, CBM, packing
    date, and a crate-by-crate breakdown (marks & numbers, dimensions,
@@ -37,9 +47,9 @@ Three things happen in this section, each building toward the BL:
    from this order's own product lines, and its **HS Code** comes from
    that product's record — it is shown read-only and can't be typed (the
    server sets it again on save, whatever the form sends). Once saved, **Generate Packing
-   List** produces the PL document, which prints the quantity with its
+   List** (10c) produces the PL document, which prints the quantity with its
    unit.
-2. **Save Shipping Details** — shipping line, vessel name, voyage number,
+2. **Save Shipping Details** (10d) — shipping line, vessel name, voyage number,
    ETD/ETA, number of containers, container number(s), and seal number.
    Number of Containers is a simple count distinct from Container No. —
    it covers multi-container shipments (e.g. one product split across 2
@@ -53,7 +63,7 @@ Three things happen in this section, each building toward the BL:
    from (shipper/consignee/notify party, shipment and container details
    from above, cargo description from the order's products, and the
    mandatory BL-type instruction from Settings) before offering **Generate
-   BL Instruction Sheet**, which produces the instruction document sent to
+   BL Instruction Sheet** (10e), which produces the instruction document sent to
    the shipping line/forwarder telling them exactly how to issue the Bill
    of Lading. Anything left blank in Shipping/Packing above shows as "To Be
    Confirmed" on the generated sheet.
@@ -65,7 +75,7 @@ Three things happen in this section, each building toward the BL:
    to retain the BL as leverage, so that preset can have the checkbox
    unchecked and the sheet simply omits both rows for every order on it.
    Both seeded presets ship with it checked (unchanged behavior).
-3. **CHA Draft BL Review** — after the BL Instruction Sheet and packing
+3. **CHA Draft BL Review** (at the top of 10f) — after the BL Instruction Sheet and packing
    list go out to the CHA, the draft Bill of Lading they send back for
    checking goes through its own review loop here, before the real BL is
    ever confirmed:
@@ -89,11 +99,15 @@ Three things happen in this section, each building toward the BL:
    blocks or is required for **Confirm BL Issued** below; it exists so
    mistakes get caught on a draft rather than on the BL the shipping
    line actually issues.
-4. **Confirm BL Issued** — once the shipping line actually issues the BL,
-   staff type its number in here, with an optional scanned-copy upload on
-   the same form. **This is the action that passes Stage 7's gate.** If
-   the scanned copy isn't in hand yet, confirm with just the number and
-   attach the copy afterward from the same section once it arrives.
+4. **Confirm BL Issued (unlocks Stage 8)** (10f) — once the shipping line
+   actually issues the BL, staff type its **BL Number** and **BL Date**
+   here, with an optional scanned-copy upload on the same form. **This is
+   the action that passes Stage 7's gate.** It is refused until the
+   Packing List is approved (email sending off) or sent (email sending
+   on), and the BL Instruction Sheet is approved — the message names
+   whichever is outstanding. If the scanned copy isn't in hand yet,
+   confirm with just the number and attach the copy afterward (**Attach
+   Scanned BL Copy**, same step) once it arrives.
 
    ![Confirm BL Issued form](./images/s7_bl_confirm_before.png)
 
@@ -104,7 +118,7 @@ Once confirmed:
 5. **Shipping Bill** (CA advice, 2026-10-29) — in the same step, below
    the BL: the customs **shipping bill number**, its **date** and the
    **customs exchange rate** printed on it (₹ for 1 unit of the order
-   currency). The Commercial Invoice and the Debit Note go to Zoho Books
+   currency), then **Save Shipping Bill**. The Commercial Invoice and the Debit Note go to Zoho Books
    at this rate, so the GST return matches the shipping bill — they wait
    in the Zoho sync until it is recorded. It can be corrected later
    (**Update Shipping Bill**); an invoice already in Zoho Books keeps the

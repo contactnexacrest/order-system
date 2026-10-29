@@ -147,7 +147,7 @@ log, not the browser.
 log rather than a real inbox (neither stack has SMTP configured in a dev
 sandbox — see that file's own header comment). PHP's is stable
 (`PHP_MySQL_Version/storage/logs/error.log`, independent of how the
-server was started) but Node's email service only ever calls
+server was started; override it with `PHP_ERROR_LOG`) but Node's email service only ever calls
 `console.error` with no file sink of its own, so the Node dev server
 **must** be started with its output redirected to a file, or that one
 spec file fails outright with a clear error naming the missing path

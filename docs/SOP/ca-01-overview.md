@@ -68,7 +68,7 @@ everywhere else in the system, so in practice `ca_internal_doc_manage`
 starts out held only by them (and Super Admin) — anyone else needs an
 explicit grant. As with any permission, these can be granted individually
 to any other user (e.g. a Director who isn't normally in Accounts) via
-**Admin → Settings → Roles & Permissions** or a per-user override — see
+**Admin → Permissions** or a per-user override — see
 [Admin & Settings](./15-admin-settings.md).
 
 ## Recording an INR actual amount

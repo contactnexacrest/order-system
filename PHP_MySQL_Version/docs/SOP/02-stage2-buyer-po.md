@@ -46,7 +46,9 @@ Step 4 on the order page has four sub-steps, done in order:
    completes Step 4 (unless the buyer already did it through the link).
    While a copy is required (see the wet-signature gate below) this
    sub-step shows "Attach the buyer's signed PO copy in Step 4c first"
-   instead of the form until one is on file.
+   instead of the form until one is on file. It is also refused until the
+   Buyer PO document from 4a is **approved** (email sending off) or
+   **sent** to the buyer (email sending on) — the message names it if not.
 
 > **Common confusion this causes:** if staff attach the buyer's PO copy but
 > never separately type the reference number into "Confirm Buyer PO
@@ -87,10 +89,11 @@ buyer a public, no-login page — laid out like the Quotation details form,
 with numbered sections — to download the Buyer PO and upload the signed
 copy with their PO number, before any portal account exists.
 
-Once the client does get portal access (from Stage 3 onward, once a PI-stage
-or OC-stage link has been generated — see [Chapter 12](./12-client-portal.md)),
-a **"Buyer PO" section on their order page** lets them upload a scanned copy
-of their own signed PO themselves, rather than relying solely on emailing it
+A client who already has a portal login (a returning client from an
+earlier order — a new client's login is only created once the advance
+clears; see [Chapter 12](./12-client-portal.md)) also has a **"Buyer PO"
+section on their order page** that lets them upload a scanned copy of their
+own signed PO, with their PO number, rather than relying solely on emailing it
 to staff and waiting for a staff member to attach it internally. This writes
 to the exact same `order_buyer_po_documents` table the internal upload uses,
 so every copy — staff- or client-uploaded — shows up together with full

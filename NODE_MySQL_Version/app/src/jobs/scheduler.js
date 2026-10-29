@@ -9,8 +9,9 @@ const logger = require('../helpers/logger');
 
 /**
  * Optional in-process alternative to external OS-level cron/systemd timers
- * for the two background jobs this app needs (see checkAlerts.js and
- * dispatchDeferredEmails.js — both are also independently runnable via
+ * for the four background jobs this app needs (checkAlerts.js,
+ * dispatchDeferredEmails.js, autoConfirmOcAcknowledgments.js and
+ * zohoSync.js — each also independently runnable via
  * `node src/jobs/<name>.js`, which is what an external cron entry calls).
  *
  * Two ways to run this on a VPS (pick one — never both, or alerts/emails

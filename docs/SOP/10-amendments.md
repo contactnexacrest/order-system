@@ -35,7 +35,7 @@ From **Amendments** on the order page, the full sequence is:
    characters), who requested it (importer or NexaCrest), and only the
    specific terms actually changing (advance %/amount, balance terms text,
    balance trigger, balance days, balance amount) — anything left blank
-   stays unchanged. This is staff data entry only; it doesn't touch the
+   stays unchanged — and, optionally, the **Effective From** date. This is staff data entry only; it doesn't touch the
    order yet.
 
    ![Amendment created, pending MD approval](./images/amd_pending.png)

@@ -38,7 +38,7 @@ implementation detail.
 - [Client Portal](./12-client-portal.md) — everything the buyer can see and do, in one place.
 - [Document Review & Approval](./13-document-review-approval.md) — the draft → review → approved → sent lifecycle every document goes through.
 - [Reports](./14-reports.md) — every reporting screen and what question it answers.
-- [Admin & Settings](./15-admin-settings.md) — roles/permissions, users, signatories, watermarks, HS codes, company settings, email templates, UI Template Preference (Standard/Kanban).
+- [Admin & Settings](./15-admin-settings.md) — roles/permissions, users, signatories, watermarks, HS codes, suppliers, logistics partners, ports, payment presets, company settings (including the mail and Zoho Books connection tests), email templates, UI Template Preference (Standard/Kanban).
 - [Test Mode](./16-test-mode.md) — a sandboxed way to rehearse the system without touching real data or sending real email.
 - [Editing, Duplicating & Reordering](./17-order-edit-duplication.md) — changing an order after it's created, cloning a product line or a whole order, and a client's self-service repeat order.
 - [Data Export / Migration](./18-data-export-migration.md) — downloading a structure snapshot and a full data export of the live database, to migrate every historical record into a fresh reinstall without loss.

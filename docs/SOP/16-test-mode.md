@@ -25,6 +25,10 @@ email to an actual buyer.
   rehearsal activity leaks into real business reporting.
 - **No audit-log entries are recorded** for test records — rehearsal
   actions don't clutter the real audit trail.
+- **Nothing created in Test Mode reaches the real Zoho Books
+  organisation.** On the live server (`ZOHO_ENVIRONMENT=production`) the
+  sync sends real orders only — test and sample orders are always skipped
+  (see [Zoho Books Sync](./ca-03-zoho-sync.md#the-server-switches-in-env-2026-10-29)).
 - **Admin panel settings become frozen** — nobody, including a Super Admin,
   can change company settings, permissions, or any other admin
   configuration while Test Mode is active. This prevents a rehearsal

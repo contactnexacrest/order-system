@@ -19,8 +19,8 @@ through those dedicated suites rather than duplicated here.
 
 ## 1. Scope and application shape
 
-- **2 stacks**, PHP/MySQL and Node/MySQL, route-for-route identical: **467
-  routes each** — 157 GET, 310 POST (`public_html/index.php` /
+- **2 stacks**, PHP/MySQL and Node/MySQL, route-for-route identical: **471
+  routes each** — 158 GET, 313 POST (`public_html/index.php` /
   `src/server.js`; counts as of 29 Oct 2026).
 - **113 database tables** (`docs/schema.sql`), 24 of which (at the time
   of the original inventory) hang directly off
@@ -39,9 +39,11 @@ through those dedicated suites rather than duplicated here.
   own authentication (`ClientAuth`, not `SessionAuth`) and its own
   data-isolation requirements (a client must never reach another client's
   order).
-- **A CA/Accounts module** (15 routes, 4 tables) with a financial-year lock
-  mechanism that must reject writes once a period is locked, except through
-  the explicit override permission.
+- **A CA/Accounts module** (23 routes on the CA controller, 6 tables) with a
+  financial-year lock mechanism that must reject writes once a period is
+  locked, except through the explicit override permission, and the Zoho
+  Books sync, which must never reach Zoho unless `.env` allows it
+  (`ZohoGuard`).
 - **A Test Mode** that globally blocks client-facing routes and
   admin-settings writes while enabled — its own gate needs testing
   independent of anything else.
@@ -83,7 +85,7 @@ testing risk (elaborated in Section 6's priority tiers).
 | Reorder Requests | 4 + 2 client routes | order_reorder_requests, order_reorder_request_products | Staff review is not bypassable — a reorder request must never become a real order without approval |
 | Annexure | part of Orders' 61 | order_annexure_products, order_annexure_images | File upload validation |
 | Order Comments/Chat | part of Orders' 61 + 1 client route | order_comments, order_comment_attachments | Client must only see their own order's thread |
-| CA / Accounts | 15 | ca_expenses, ca_bank_statement_lines, ca_fy_locks, zoho_sync_log | **FY-lock enforcement** on every write path |
+| CA / Accounts | 23 | ca_expenses, ca_bank_statement_lines, ca_fy_locks, ca_export_benefits, zoho_sync_log, order_zoho_invoices | **FY-lock enforcement** on every write path; nothing sent to Zoho unless `.env` allows it |
 | Documents (generate/review/send) | 16 | documents, document_revisions, document_reviews, document_cross_verifications, file_store, email_log | Draft→review→approved→sent state machine; email approval gate |
 | Amendments | 7 | amendments | MD-approval gate cannot be skipped |
 | Disputes | 5 | disputes, dispute_documents | Working-day deadline math; client visibility toggle |
@@ -132,7 +134,7 @@ auto-skip of Stage 6 plus the 48h auto-confirm cron path for Stage 4.
 - **Test Mode**: global on/off toggle that blocks client-facing routes and
   admin-settings writes app-wide while enabled; distinct from the one-shot
   Sample Data Playground.
-- **CA module**: Zoho Books sync (CI / Debit Note invoices and payments applied to them; vendors, bills, vendor payments and order expenses) → expenses (read-only mirror) →
+- **CA module**: Zoho Books sync (CI / Debit Note invoices and payments applied to them, the LC payment; vendors, bills, vendor payments, order expenses and paid cost entries; export benefits as journals; records deleted or changed in Books put back; the per-order "App vs Zoho" check) → expenses entered in Books (imported; Books owns them) →
   bank reconciliation (CSV import + manual matching) → FY lock/unlock with
   a logged override permission.
 
@@ -390,7 +392,7 @@ Infrastructure (QA-2) is live on both stacks:
 
 This completes every tier QA-4 set out to build (P0 through P3).
 
-## 9. Added since (QA Round 5 and owner decisions, 27–28 Oct 2026)
+## 9. Added since (QA Round 5 and owner decisions, 27–29 Oct 2026)
 
 Each suite exists in both stacks (PHP `tests/Integration/…Test.php`, Node
 `tests/integration/….test.js`):
@@ -406,6 +408,12 @@ Each suite exists in both stacks (PHP `tests/Integration/…Test.php`, Node
 | `VendorBillsAndExpensesTest`, `VendorBillProformaTest` | Supplier and logistics bills: proforma / tax invoice, linking, part payments, overpayment refused, 7e invoice carried into 10a, Step 12 / ledger / CAFIN counting |
 | `CaFinancialSnapshotTest` | The CAFIN snapshot |
 | `PaymentTermsWordingTest`, `PaymentTermsScenariosTest` | PI / CI payment wording in PDF and Word: the advance box (or NO ADVANCE PAYABLE on Letter of Credit), bank charges, Calendar Days — across all 5 payment presets × FOB / CFR / CIF × USD / EUR / GBP |
+| `ZohoServerGuardTest` / `zohoServerGuard.test.js` | The `.env` Zoho switches: off = no request made; `test` = only `TEST-` customers; e-invoice / e-way bill / GST filing blocked unless production with `ZOHO_EINVOICE_ENABLED=true`; Zoho Mail never sends |
+| `ZohoBooksStage1Test` … `ZohoBooksStage5Test` | Zoho Books: overseas customers and payments at the actual rate, the Test Books connection button and the TEST- clean-up (1); CI and Debit Note as export invoices with payments applied (2); vendors, bills, vendor payments and order expenses (3); cost entries, the LC payment, export-benefit journals and the App vs Zoho check (4); the app restores what it sent, Books owns the expenses the CA enters, a locked FY is left to the CA (5) |
+| `CafinLcAndZohoExpensesTest` | CAFIN counts the LC payment as money received and expenses booked in Books for the order; the scheduled restore check runs once a day, Sync Now always |
+| `ShippingBillTest` | The shipping bill's number, date and customs exchange rate on the order |
+
+Every Zoho test sends its requests to a fake Zoho, never the real one.
 
 The Playwright suite in `e2e/` adds a browser-level check of the same
 wording: the critical path downloads the generated PI and CI (PDF and

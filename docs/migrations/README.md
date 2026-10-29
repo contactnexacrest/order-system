@@ -10,7 +10,7 @@ has not had yet, **in filename order**. The two stacks share one database
 design, so the same files serve PHP and Node.
 
 ```bash
-mysql -u <user> -p <database> < docs/migrations/2026-10-28e-vendor-bill-proforma-and-payments.sql
+mysql -u <user> -p <database> < docs/migrations/2026-10-30a-lc-payment-firc.sql
 ```
 
 ## Rules every file follows
@@ -49,9 +49,14 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f and 30a**.
 | 15 | `2026-10-29d-zoho-sync-start-date.sql` | Zoho Books go-live date setting (`zoho_books_sync_start_date`): only records dated on or after it go to Books; on the live server nothing is sent until it is set |
 | 16 | `2026-10-29e-shipping-bill-and-reverse-charge.sql` | The shipping bill's number, date and customs exchange rate on the order (the CI and Debit Note go to Zoho Books at that rate), and the reverse-charge mark on transport bills |
 | 17 | `2026-10-29f-zoho-costs-lc-benefits.sql` | Order costs say what they were paid from and remember their Zoho Books expense; LC orders record the money the bank paid under the LC; export benefits remember their Zoho Books journal |
-| 18 | `2026-10-30a-lc-payment-firc.sql` | The LC payment's FIRC / eBRC reference and date, so it joins the INR Settlement Register like the other legs |
+| 18 | `2026-10-30a-lc-payment-firc.sql` | The LC payment's FIRC / eBRC reference and date, so it joins the INR Settlement Register like the other legs; the setting `zoho_books_restore_checked_at` (when the scheduled Zoho sync last checked the records already in Books — once a day) |
 
 There is no `2026-10-28b` file; that letter was not used.
+
+Switching Zoho Books on after these migrations follows the **Go-live
+checklist** in `docs/SOP/ca-03-zoho-sync.md` (`.env` switches, then the
+go-live date and login in Admin → Company Settings, Zoho Books section). Without the
+go-live date, a production server sends nothing to Zoho Books.
 
 ## Checks after 2026-10-28
 
@@ -76,6 +81,7 @@ SELECT COUNT(*), SUM(paid_amount_inr) FROM order_vendor_bills WHERE paid_at IS N
 
 ## Older files
 
-Everything before 2026-10-25 was applied to the live site in earlier
-releases. Read a file's first lines before running it on an older copy;
-not every early file is safe to run twice.
+Everything before 2026-10-27a (including `2026-10-25` and the
+`2026-10-26` files) was applied to the live site in earlier releases.
+Read a file's first lines before running it on an older copy; not every
+early file is safe to run twice.

@@ -64,7 +64,7 @@ correctly once the password is changed.
 ## What's in this folder
 
 - `docs/schema.sql` — full database schema (113 tables, 218 foreign keys as
-  of 2026-10-28 — see `docs/schema.sql`'s own trailing `-- SECTION X …
+  of 2026-10-29 — see `docs/schema.sql`'s own trailing `-- SECTION X …
   added YYYY-MM-DD` comments for the running changelog; 52 tables/76 FKs
   at the time of this Phase D delivery specifically), validated against a
   live MariaDB instance after every change in this delivery, including the
@@ -74,17 +74,20 @@ correctly once the password is changed.
   payment presets, stages, document types, the 21 real Terms & Conditions
   clauses, 9 email templates for the deferred-send pipeline, and the new
   `cross_verify_documents`/`approve_email_send` permissions.
-- `app/cron/` — the two scheduled jobs Phase D needs (see "Bluehost cron
-  setup" below): `dispatch_deferred_emails.php` and `check_alerts.php`.
-  Empty in Phase A–C; populated in this delivery.
+- `app/cron/` — the four scheduled jobs (see "Bluehost cron setup" below):
+  `dispatch_deferred_emails.php`, `auto_confirm_oc_acknowledgments.php`,
+  `check_alerts.php` and `zoho_sync.php`; plus two scripts run by hand,
+  never from cron: `zoho_cleanup_test_records.php` and
+  `reorganize_order_files.php`.
 - `docs/ARCHITECTURE.md` — the full architecture proposal and the record of
   every open question and how it was resolved.
 - `docs/architecture-diagram.html` — the three diagrams (hosting boundary,
   document pipeline, stage gates).
 - `app/` — all PHP application code. Outside web root, as required.
-- `app/templates/` — the Twig templates for all 10 referenced document
-  types (QT, PI, OC, BUYERPO, SUPPO, FDN, PL, BLI, CI, COOPREP), plus the
-  shared `_layout.html.twig` they all extend. (COOPREP is internal-only —
+- `app/templates/` — the Twig templates, one folder per generated
+  document type (QT, PI, OC, BUYERPO, SUPPO, FDN, PL, BLI, CI, COOPREP,
+  AMD, ANNEXA, BLE, CAFIN), plus the shared `_layout.html.twig` they all
+  extend and a few shared partials. (COOPREP is internal-only —
   never sent to the buyer — and has no reference number of its own by
   design; see `document_types.ref_format` and the note in "Real bugs found
   and fixed during Phase C" below.)
@@ -361,16 +364,42 @@ exist as polling scripts rather than a queue consumer):
   creates in-app notifications for Admin/MD (see "Real bugs found" below —
   this has a same-day dedup guard so it doesn't re-notify on every run
   while a condition remains unresolved).
-- `zoho_sync.php` — CA / Accounting module (Phase 3). Recommended hourly.
-  Pushes every settlement leg with an INR actual recorded but not yet
-  synced to Zoho Books as a customer payment; no-ops cleanly (one logged
-  "skipped" row, exit 0) if Zoho Books isn't configured yet. Same
-  `/ca/zoho-sync` page shows this job's log alongside the manual "Sync
-  Now" button's.
+- `zoho_sync.php` — CA / Accounting module. Recommended hourly. Runs the
+  same `CaSyncService::runFullSync()` as the "Sync Now" button on
+  `/ca/zoho-sync`: sends Zoho Books the Commercial Invoices and Debit Notes
+  (as export invoices), the buyer's payments and the LC payment (applied
+  to their invoice; an advance is held until the CI is in Books), the
+  suppliers and logistics partners (as vendors) with their tax-invoice
+  bills and payments, order expenses and paid cost entries (as expenses)
+  and received export benefits (as journals); then imports the expenses
+  the CA enters in Books. At most once every 23 hours a scheduled run also
+  checks every record already sent and re-creates or restores any that
+  was deleted or changed in Books (Sync Now always checks). Only records
+  dated on or after the go-live date (`zoho_books_sync_start_date`) are
+  sent; with `ZOHO_ENVIRONMENT=production` nothing is sent until it is
+  set. While Zoho is off (`ZOHO_INTEGRATION_ENABLED` not `true` in `.env`,
+  or the Zoho Books switch in Admin → Company Settings off) it logs one "skipped"
+  row per part and exits 0. The `/ca/zoho-sync` page shows this job's log
+  alongside Sync Now's.
 
 All four scripts print a one-line summary to stdout and exit 0 on
 success — redirect that to a log file (as above) so a Bluehost cron failure notice
 actually tells you something.
+
+Two more scripts in `app/cron/` are run by hand, never from cron:
+
+- `zoho_cleanup_test_records.php` — removes the records made in Zoho Books
+  while testing: customers and vendors named `TEST-…` with their invoices,
+  bills and payments, and expenses and journals marked `TEST-`. A dry run
+  by default (lists, changes nothing); `--apply` deletes; `--from-sync-log`
+  also removes everything this database sent (refused when
+  `ZOHO_ENVIRONMENT=production` — test database only); `--by "Name"` and
+  `--log ../docs/zoho/zoho-change-log.csv` add one row per deletion to the
+  Zoho change log (without `--log` the rows are printed for pasting in).
+  Run it before go-live.
+- `reorganize_order_files.php` — one-off tidy-up that moves older order
+  files into the per-step folders (`01-quotation/`, …). A dry run by
+  default; `--apply` moves them. Back up `storage/` and the database first.
 
 ### Bluehost database backups (Section 14)
 
@@ -1833,3 +1862,91 @@ What changed, by area (owner decisions; every item is in both stacks):
 Docs updated in the same release: `docs/ARCHITECTURE.md`, the root
 `ARCHITECTURE.html`, `docs/QA/TEST_PLAN.md` (§9), `e2e/README.md`, the SOP
 (`docs/SOP`, copied into both stacks) and `docs/migrations/README.md`.
+
+## Follow-up (added 2026-10-29): Zoho Books integration, shipping bill, LC payment received, 2-digit-year references
+
+One new table (`order_zoho_invoices`) — both stacks now stand at
+**113 tables**, **60 permissions** and **471 routes** (158 GET, 313 POST),
+route-for-route identical. Full suite on both stacks at the time of
+writing: 1,803 PHPUnit / 1,868 Jest tests (336 suites), and the 48-test
+Playwright e2e suite green on both `BASE_URL`s.
+
+**Upgrading an existing database:** run `2026-10-29a` to `2026-10-29f` and
+`2026-10-30a` from `docs/migrations/` (run order in the repository's
+`docs/migrations/README.md`). Before switching Zoho on, set the go-live
+date in Admin → Company Settings (Zoho Books).
+
+What changed, by area (owner decisions; every item is in both stacks):
+
+1. **Zoho safety switches.** `ZOHO_INTEGRATION_ENABLED`, `ZOHO_ENVIRONMENT`
+   and `ZOHO_EINVOICE_ENABLED` in `app/.env` (see "First-time setup",
+   step 3) are read only by `ZohoGuard` — no screen can change them — and
+   every Zoho request goes through it. A missing or unknown value counts
+   as off / test / off. In `test`, only customers named `TEST-…` may be
+   sent. GST e-invoice, e-way bill and GST filing requests are blocked
+   unless the integration is on, the environment is `production` and
+   `ZOHO_EINVOICE_ENABLED=true`. Zoho's Indian data centre (`zoho.in`) is
+   the default. Zoho Mail is not used to send (`ZohoMailService::IN_USE`
+   is `false`); all mail goes through SMTP.
+2. **Zoho Books connection.** The Books credentials (self-client ID,
+   secret and refresh token, organisation, deposit account) and the
+   "Zoho Books enabled" switch are company settings (Admin → Company Settings,
+   Zoho Books), with a "Test Books connection" button
+   (`POST /settings/test-zoho-books`). Books syncs only when both the
+   `.env` switch and this setting are on.
+3. **What goes to Books** (`CaSyncService::runFullSync()`, from Sync Now on
+   `/ca/zoho-sync` or the hourly `cron/zoho_sync.php`; requests built by
+   `ZohoBooksService`, invoice content by `ZohoInvoiceData`):
+   - buyers as "overseas" customers in the order's currency; payments in
+     the foreign amount at the actual rate;
+   - the Commercial Invoice and the freight Debit Note as export invoices
+     numbered with our own references, at the shipping bill's customs
+     exchange rate; payments applied to them (the advance held until the
+     CI is in Books);
+   - suppliers and logistics partners as vendors, their tax invoices as
+     bills (a proforma is not sent), payments to them as vendor payments,
+     order expenses as expenses (a transport bill marked reverse charge
+     goes with 5% GST as reverse charge);
+   - paid order cost entries as expenses, the LC payment as a customer
+     payment applied to the CI, received export benefits as journals.
+   Expenses the CA enters in Books are imported (Books owns those: their
+   changes and deletions follow; a Reference # naming an order links the
+   expense to it).
+4. **The app is the source of truth for what it sends**
+   (`ZohoRestoreService`). A record deleted in Books is sent again; one
+   changed there is put back. A record in a financial year the CA has
+   locked is never changed automatically — it is logged for the CA. A
+   scheduled run checks at most once every 23 hours (Zoho limits API calls
+   per day); Sync Now always checks.
+5. **Go-live date** (`zoho_books_sync_start_date`): only records dated on
+   or after it go to Books; anything earlier is booked by the CA. With
+   `ZOHO_ENVIRONMENT=production`, nothing is sent until it is set.
+6. **App vs Zoho check** — `/orders/{id}/zoho-check` (`ca_module_manage`,
+   `OrderZohoMatchService`): for each of the order's records, whether
+   Books matches, differs, is missing it, or holds one the app does not.
+   Read only.
+7. **Test clean-up** — `cron/zoho_cleanup_test_records.php` (see "Bluehost
+   cron setup"). Every change made in Zoho, by anyone, is logged in the
+   repository's `docs/zoho/zoho-change-log.csv`.
+8. **Shipping bill** — its number, date and customs exchange rate on the
+   order page (`POST /orders/{id}/shipping-bill`, `manage_shipping`); the
+   CI and Debit Note wait for it before going to Books.
+9. **LC payment received** — what the bank paid under the LC (amount,
+   rupees credited, bank charges; `POST /orders/{id}/lc-received`) and its
+   FIRC / eBRC (`POST /orders/{id}/payment/lc/firc`). It is its own leg in
+   the INR Settlement Register, and CAFIN counts it as money received.
+   CAFIN also counts expenses booked in Books and linked to the order,
+   except a possible duplicate of a cost entered in the app.
+10. **2-digit year in reference numbers** — `SC/CI/26/2910001` instead of
+    `SC/CI/2026/2910001` (a GST invoice number may have at most 16
+    characters). Numbers already issued keep `2026`; `{YYYY}` still works
+    in a format set by hand.
+
+Tests added (both stacks): `ZohoServerGuardTest`, `ZohoBooksStage1Test` …
+`ZohoBooksStage5Test`, `CafinLcAndZohoExpensesTest`, `ShippingBillTest`
+(Node: the same names in camelCase, `.test.js`). Every Zoho request in
+them goes to a fake Zoho; they never reach the real one.
+
+Docs updated in the same release: `docs/ARCHITECTURE.md`, the root
+`ARCHITECTURE.html`, `docs/QA/TEST_PLAN.md` (§9),
+`docs/migrations/README.md` and the SOP chapter ca-03 (Zoho Books Sync).

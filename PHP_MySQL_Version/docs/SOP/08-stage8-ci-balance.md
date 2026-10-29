@@ -16,12 +16,16 @@ remaining balance payment before the final closure stage.
 
 ## What staff do
 
-This section bundles two independent things — sending the buyer proof of
-shipment, and collecting final payment:
+On the order page this is **Step 11 · Commercial Invoice & Balance**
+(section **C · Shipment & Balance**): **11a** Generate Commercial Invoice,
+**11b** Mark Scanned BL Copy Sent to Buyer, **11c** Record Balance
+Remittance, **11d** Mark Balance Cleared. It bundles two independent
+things — sending the buyer proof of shipment, and collecting final
+payment:
 
 ![Stage 8 section — before anything actioned](./images/s8_before.png)
 
-**Mark Scanned BL Copy Sent to Buyer** is a simple confirmation that the
+**Mark Scanned BL Copy Sent to Buyer** (11b) is a simple confirmation that the
 buyer has been sent a copy of the Bill of Lading now that it's been
 issued — purely a record-keeping checkbox, it doesn't affect the gate.
 
@@ -30,9 +34,14 @@ against the BL, so Step 11a shows a reminder until the scanned BL copy is
 attached in Step 10f ("Attach Scanned BL Copy"), and a download link to it
 once it is. (An FOB order raises its CI before shipment, so no reminder.)
 
-From **Documents**, **Generate Commercial Invoice** produces the CI —
-pre-filled with the actual shipped quantities and final figures rather than
-the estimates the PI was built on.
+**Generate Commercial Invoice** (11a) produces the CI — pre-filled with the
+actual shipped quantities and final figures rather than the estimates the
+PI was built on. Take it through [Document Review &
+Approval](./13-document-review-approval.md): 11d is refused until the CI is
+approved (email sending off) or sent (email sending on). When the Zoho
+Books integration is on, the approved CI goes to Zoho Books as an export
+invoice at the shipping bill's customs rate (see [Zoho Books
+Sync](./ca-03-zoho-sync.md)).
 
 The CI's **BALANCE DUE NOW** line states the order's own balance terms (the
 same sentence as the PI), in the PDF and the Word file alike, and its Bank
@@ -85,15 +94,15 @@ agreed to.
 Recording and clearing the balance payment follows the same two-step
 pattern as every other payment in this pipeline:
 
-1. **Record Balance Remittance** — amount and date once the buyer's payment
-   notification arrives. Refused until the Commercial Invoice above has
+1. **Record Balance Remittance** (11c) — amount, date and **@ Exchange
+   Rate** once the buyer's payment notification arrives. Refused until the Commercial Invoice above has
    actually been generated — the buyer can't be remitting against an
    invoice they were never sent — and, like every stage-gated action,
    until Stage 8 itself has unlocked.
 
    ![Stage 8 section — balance recorded, awaiting clearance](./images/s8_recorded_awaiting_clear.png)
 
-2. **Mark Balance Cleared (unlocks Stage 9)** — the confirmation dialog here
+2. **Mark Balance Cleared (unlocks Stage 9)** (11d) — the confirmation dialog here
    carries an extra warning beyond the usual "confirm the funds have
    landed": *"...and that the BL hasn't been released early if this is a
    post-BL preset"* — a reminder that some payment presets are specifically
@@ -102,6 +111,12 @@ pattern as every other payment in this pipeline:
    that preset. **This is the action that passes Stage 8's gate.**
 
    ![Stage 8 section — balance payment cleared](./images/s8_cleared.png)
+
+**On a Letter of Credit order** the money the bank pays under the LC, once
+the documents are presented, is also recorded in **Step 12a → LC Payment
+Received** (date the bank paid, amount, rupees credited, bank charges).
+That is what goes to Zoho Books as the buyer's payment against the CI —
+see [Order Financials](./ca-08-order-financials.md#4-letter-of-credit--bank-loan).
 
 ## What the client does (or doesn't)
 

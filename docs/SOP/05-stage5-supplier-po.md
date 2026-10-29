@@ -87,10 +87,10 @@ Supplier PO then prints **"Advance (0.00%) \* 0.00"** and the full balance,
 instead of "Advance (X%) \* To Be Confirmed". Step 7e completes by itself
 (see below).
 
-**Save Supplier PO Terms** creates the internal procurement record (and
+**Save Supplier PO Terms** (7a) creates the internal procurement record (and
 generates the Supplier PO reference) — it does **not** generate the document
-or pass any gate by itself. From **Documents**, **Generate Supplier PO**
-produces the actual PDF, pre-filled with everything just entered, with a
+or pass any gate by itself. **Generate Supplier PO** (7b) produces the
+actual PDF, pre-filled with everything just entered, with a
 blank acceptance section for the supplier to sign. Once terms are saved, the
 section shows what's on file and offers the one action that matters here:
 
@@ -125,13 +125,12 @@ order:
    in Step 7c first" instead of the button until one is on file (or the
    skip is recorded).
 
-> **Document-generated gate:** "Confirm Supplier Signed & Returned PO" is
-> also refused if the Supplier PO document itself was never generated —
-> the supplier can't have signed and returned a document they were never
-> actually sent. Unlike the wet-signature gate below, this one has no
-> toggle: saving terms alone was never enough for the gate to pass, and
-> now neither is confirming a signature with no SUPPO document on record
-> either.
+> **Document gate:** "Confirm Supplier Signed & Returned PO" is also
+> refused until the Supplier PO document has been generated **and
+> approved** in Document Review & Approval (it is an internal document, so
+> approval is enough — it never needs a "sent to buyer") — the supplier
+> can't have signed and returned a document they were never actually sent.
+> Unlike the wet-signature gate below, this one has no toggle.
 
 > **Wet-signature gate:** by default (**Admin & Settings → the
 > `wet_signature_required_supplier_po` toggle**, on unless an Admin has
@@ -212,7 +211,12 @@ amount planned for that leg and — once paid — how much and when.
 
 The paid date feeds the Reports hub's **Today's Payments** view (see
 Chapter 14), and every bill and payment flows into the order's
-financials (Step 12, [CA chapter 8](./ca-08-order-financials.md)).
+financials (Step 12, [CA chapter 8](./ca-08-order-financials.md)). When
+the Zoho Books integration is on, each tax invoice goes to Zoho Books as
+a bill and each payment as a vendor payment on the next sync (a proforma
+is not a bill; a payment on it is held in Books as an advance to the
+supplier)
+(see [Zoho Books Sync](./ca-03-zoho-sync.md#bills-vendor-payments-and-order-expenses-in-zoho-books-2026-10-29)).
 
 Once confirmed:
 
@@ -243,12 +247,15 @@ Instruction) is where both paths meet again.
 
 ## Production & Estimated Shipment — and where its history lives
 
-The order-detail page carries a standing "Production & Estimated
-Shipment" panel (just above Stage 6) where staff post free-text progress
-updates — e.g. "Cutting and finishing in progress — 30% complete" and
-"Week of 15 October 2026." It isn't gated to Stage 5 specifically; anyone
-with `manage_orders` can post an update any time Stage 4 or later is
-unlocked, independent of which stage is currently active.
+The order page carries **Step 8a · Production & Estimated Shipment**
+(Step 8, in section **B · Procurement & Production**) where staff post
+free-text progress updates — **Production Status** (e.g. "Cutting and
+finishing in progress — 30% complete") and **Estimated Shipment** (e.g.
+"Week of 15 October 2026") — plus an **Estimated Shipment Date** (a real
+date, which drives the pre-shipment inspection reminder below), then press
+**Update**. It isn't gated to Stage 5 specifically; anyone with
+`manage_orders` can post an update any time Stage 4 or later is unlocked,
+independent of which stage is currently active.
 
 Once the order is fully settled (locked), changing it is a locked-order
 edit like any other (QA Round 5): only someone with **"Override locked
@@ -281,5 +288,5 @@ gets a reminder to confirm production completion and prepare for the
 3rd-party inspection. See the [Compliance
 Checklist](./09-stage9-despatch-closure.md#compliance-checklist) in
 Stage 9 for that task, and
-[Order Financials](./ca-08-order-financials.md#4-travel-expenses--factory-visits)
+[Order Financials](./ca-08-order-financials.md#5-travel-expenses--factory-visits)
 for recording the travel cost of these factory visits.

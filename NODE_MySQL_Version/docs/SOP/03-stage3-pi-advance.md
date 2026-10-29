@@ -11,7 +11,8 @@ collect the advance payment before production or procurement begins.
 
 - **Nothing progresses this stage on its own.** The one thing the system
   does automatically is the client-portal login: the moment staff mark the
-  advance payment cleared, a client login is created behind the scenes —
+  advance payment cleared (or, on a Letter of Credit order, confirm the LC
+  usable), a client login is created behind the scenes —
   the buyer never had to ask for one and staff never had to create one by
   hand. See "What happens next" below.
 - The Balance Due date shown in Payment Status reads **"event-triggered"**
@@ -22,12 +23,32 @@ collect the advance payment before production or procurement begins.
 
 ## What staff do
 
+On the order page this is **Step 5 · Proforma Invoice & Payment**, worked
+in this order:
+
+| Sub-step | Cash advance order | Letter of Credit order |
+|---|---|---|
+| **5a** | Generate PI Form Link | same |
+| **5b** | Apply the Client's PI-Stage Confirmation | same |
+| **5c** | Generate Proforma Invoice | same |
+| **5d** | Record Advance Remittance | Record LC Details |
+| **5e** | Mark Advance Cleared | Confirm LC Usable |
+
+Which column applies comes from the order's payment preset: an order on a
+Letter of Credit preset (e.g. *Irrevocable Letter of Credit at Sight*)
+shows "payment method for this order: **Letter of Credit**" above 5d and
+the LC cards; every other order shows **Cash Advance**. Each sub-step opens
+once the one before it is done. If the client won't use the PI-stage form,
+open **Client won't use the PI-stage form? Skip it** in 5a or 5b, give a
+short reason and press **Skip PI Form — go to Generate PI**.
+
 ### First, optionally: the PI-stage intake form
 
 This is a **second, separate confirmation step** from the Quotation-stage
 intake in Chapter 1 — different form, different purpose, different review
 queue. Once the Quotation is out, staff can generate a one-time link
-(**Regenerate PI Form Link**, on the order page) and send it to the buyer to
+(**Generate PI Form Link** in Step 5a — **Regenerate PI Form Link** once
+one exists; **Copy Link** copies the current one) and send it to the buyer to
 confirm the exact details that will appear on the PI and later shipping
 documents — consignee details, notify party, port of discharge, confirmed
 Incoterm, container type, payment-terms confirmation, and Country of Origin
@@ -100,10 +121,12 @@ confused with each other — where staff either:
 
 ### Generating the PI
 
-From the order page, under **Documents**, **Generate Proforma Invoice**.
-Unlike the Quotation, generating the PI **does not pass Stage 3's gate** —
-this is the one stage where the gating action is a payment event, not a
-document.
+In **Step 5c**, click **Generate Proforma Invoice** (PDF always; tick DOCX
+for an editable copy). Generating the PI **does not pass Stage 3's gate** —
+the gating action here is a payment event (5e). But 5e is refused until the
+PI is **approved** (email sending off) or **sent** to the buyer (email
+sending on), so take it through
+[Document Review & Approval](./13-document-review-approval.md) first.
 
 **What the PI asks the buyer to pay** (owner decision 2026-10-28). Under the
 second **TOTAL PI VALUE** the PI (PDF and Word) prints an amber box:
@@ -147,7 +170,7 @@ This is two separate steps, deliberately kept apart so a wire transfer that's
 been sent but not yet reconciled against the bank statement isn't confused
 with money that's actually landed:
 
-1. **Record Advance Remittance** — the card shows the **advance due**
+1. **Record Advance Remittance** (5d) — the card shows the **advance due**
    (e.g. *USD 3,000.00 — 40% of the order value USD 7,500.00*) and fills it
    in. Enter what the bank actually received. An amount above the whole
    order value is refused; an amount that differs from the advance due by
@@ -163,8 +186,10 @@ with money that's actually landed:
 
    ![Payment Status after recording, before clearing](./images/s3_payment_status_recorded.png)
 
-2. **Mark Advance Cleared (unlocks Stage 4)** — staff confirm only once the
-   funds have actually been verified against the bank statement. A
+2. **Mark Advance Cleared (unlocks Stage 4)** (5e) — staff confirm only once
+   the funds have actually been verified against the bank statement, and
+   enter the **Cleared On** date. Only staff who can clear payments see
+   this button; others see "awaiting Accounts to confirm it cleared". A
    confirmation dialog spells out exactly what this does before it happens:
    *"Mark the advance payment cleared? This unlocks Stage 4 and
    auto-provisions the client portal login — confirm the funds have
@@ -172,6 +197,26 @@ with money that's actually landed:
    gate.**
 
    ![Payment Status after clearing — balance amount now shown, stage 4 unlocked](./images/s3_payment_status_cleared.png)
+
+### Letter of Credit orders: 5d Record LC Details, 5e Confirm LC Usable
+
+On a Letter of Credit order there is no advance to record. Instead:
+
+1. **Record LC Details** (5d) — the **Issuing Bank**, **LC Number**, **LC
+   Amount** (required, in the order currency), **LC Charges** billed to
+   the client, and optionally the LC document itself. This does not pass
+   the gate.
+2. **Confirm LC Usable (unlocks Stage 4)** (5e) — once the advising bank
+   has confirmed the LC. The dialog warns that this unlocks Stage 4 and
+   creates the client's portal login. **This is the action that passes
+   Stage 3's gate** on an LC order. Like 5e on a cash order, it is refused
+   until the PI is approved (email off) or sent (email on).
+
+The **Payment Action Link** box is not shown on an LC order's 5d. When the
+bank later pays under the LC, that money is recorded in **Step 12a → LC
+Payment Received** (see [Order
+Financials](./ca-08-order-financials.md#4-letter-of-credit--bank-loan)); a
+bank loan taken against the LC is recorded there too.
 
 If the buyer has self-reported a payment through their own portal (see
 [Client Portal](./12-client-portal.md)), it appears further down this same
@@ -286,7 +331,8 @@ to see the needed things."
 
 ## What happens next
 
-The moment staff mark the advance payment cleared:
+The moment staff mark the advance payment cleared (or confirm the LC
+usable):
 
 ![Stage tracker — Stage 3 gate passed, Stage 4 now in progress](./images/s3_stage_tracker_after.png)
 

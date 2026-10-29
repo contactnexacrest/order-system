@@ -57,7 +57,10 @@ done:
   still open at once; **Undo skip** reopens it). A wrong entry is fixed
   under **Correct or delete a recorded claim** (reason required). 13g is
   done once every eligible scheme is received or skipped (and every scheme
-  was answered in 12b).
+  was answered in 12b). When the Zoho Books integration is on, a received
+  Duty Drawback, RoDTEP or RoSCTL benefit goes to Zoho Books as a journal
+  on the next sync (see [Zoho Books
+  Sync](./ca-03-zoho-sync.md#export-benefits-in-zoho-books-owner-decision-2026-10-29)).
 - **13h · Mark Fully Settled** — the final close (see "Closing the order
   — two phases" below); locked until 13g is done. Step 13 shows its green
   tick only once this is done. A user with "Override locked data" can
@@ -131,16 +134,20 @@ not one:
    **blocked** while any of the following is still outstanding, checked
    in order — record/resolve the first one it finds, then try again:
    1. A government export benefit claim linked to this order still
-      awaiting receipt — record it as received first (see [Order
+      awaiting receipt — record it as received in **Step 13g**, or skip
+      it there with a reason (see [Order
       Financials](./ca-08-order-financials.md)).
    2. A Compliance Checklist task still **Not Started** or **Pending
       Approval** — approve it or mark it Not Applicable with a reason
       first (see "Compliance Checklist" below).
    3. An Export Benefit Scheme Eligibility row still **Pending** — mark
       it Eligible or Not Eligible first (see [Order
-      Financials](./ca-08-order-financials.md#export-benefit-scheme-eligibility)).
+      Financials](./ca-08-order-financials.md#1-export-benefit-scheme-eligibility)).
+   4. A scheme marked Eligible that has no claim yet — record the claim
+      and the money received in **Step 13g**, or skip it there with a
+      reason.
 
-   Every one of these three checks shares the same
+   Every one of these four checks shares the same
    **"Override locked data"** reason-required escape hatch as the
    document gate above, for the rare case something genuinely can't be
    resolved and the order needs closing anyway.

@@ -11,8 +11,9 @@ even if the buyer never responds at all.
 ## The system does this automatically
 
 - The acknowledgment clock starts the moment the OC is actually **emailed**
-  to the buyer (not when it's generated, and not when it's merely approved
-  internally) — see
+  to the buyer (not when it's generated). While email sending is turned
+  off in Company Settings, an approved OC counts as sent, so the clock
+  starts when it is **approved** — see
   [Document Review & Approval](./13-document-review-approval.md) for the
   full draft → review → approved → sent path every document goes through
   first. The window defaults to 48 hours and is admin-configurable
@@ -25,8 +26,8 @@ even if the buyer never responds at all.
 
 ## What staff do
 
-Generate the Order Confirmation from the order page under **Documents**
-(**Generate Order Confirmation**), same as any other document, then take it
+Generate the Order Confirmation in **Step 6a** (**Generate Order
+Confirmation**), same as any other document, then take it
 through the normal review/approval/send cycle before it reaches the buyer —
 see [Document Review & Approval](./13-document-review-approval.md) for that
 full workflow. Generating or even approving the OC does **not** pass Stage
@@ -67,15 +68,15 @@ this requires typing in the evidence (quoting the buyer's reply is normal
 practice) before it's accepted; there's no way to record this without some
 note attached. Once submitted, this **passes Stage 4's gate** directly.
 
-This action no longer requires the OC to have actually been emailed first —
-only that it's been **generated**. If the send itself is stuck (a hosting
-SMTP problem, or a deferred send still waiting on Level-2 approval — see
-[Document Review & Approval](./13-document-review-approval.md)), staff can
-still record the acknowledgment and move the order forward instead of being
-stuck waiting on a send that may never complete. This is also how staff
-handle a buyer who cannot use the portal at all (no email, not
-tech-comfortable, etc.) — recording what the buyer confirmed by phone or in
-person, with that conversation described as the evidence note.
+Recording it needs the OC to be **issued**: **approved** while email
+sending is off, or **sent** to the buyer while email sending is on (owner
+decision 2026-10-25). If it isn't, the button is refused with a message
+naming the Order Confirmation. Before the OC is emailed the card shows
+**Record Buyer's Acknowledgement** with a box to "describe how the buyer
+confirmed" — this is how staff handle a buyer who cannot use the portal at
+all (no email, not tech-comfortable, etc.): record what the buyer confirmed
+by phone or in person, with that conversation described as the evidence
+note. Both buttons say "(unlocks Step 7)".
 
 By default any user who can manage the order can use this. An admin can
 restrict it to a specific permission instead — turn on

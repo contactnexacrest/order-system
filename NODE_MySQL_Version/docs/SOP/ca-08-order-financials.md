@@ -40,7 +40,7 @@ auto-granted to the Accounts Executive or CA / Chartered Accountant
 roles, unlike `ca_module_view`/`inr_actual_edit`/`inr_actual_delete`.
 Only Admin, Managing Director, Executive Director, and Super Admin hold
 it by default — the same tier as `ca_internal_doc_manage`. Anyone else
-needs an explicit grant via **Admin → Settings → Roles & Permissions**
+needs an explicit grant via **Admin → Permissions**
 or a per-user override.
 
 ## The Order Financials box (order's own page)

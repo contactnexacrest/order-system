@@ -194,7 +194,8 @@ flowchart TB
   mysql[("MySQL 8 / MariaDB<br/>113 tables, shared schema")]
   storage[("Storage volume<br/>outside web root<br/>assets · generated docs")]
   smtp["SMTP<br/>Nodemailer / PHPMailer"]
-  cron["Cron / node-cron<br/>LUT·RCMC·payment·dispute alerts<br/>deferred email dispatch"]
+  cron["Cron / node-cron<br/>LUT·RCMC·payment·dispute alerts<br/>deferred email dispatch<br/>Zoho Books sync (hourly)"]
+  zoho["Zoho Books API (zoho.in)<br/>only through ZohoGuard<br/>off unless .env allows it"]
 
   browser -->|HTTPS| nginx --> node
   nginx --> phpfpm
@@ -210,11 +211,15 @@ flowchart TB
   phpfpm --> smtp
   cron --> node
   cron --> phpfpm
+  node -.-> zoho
+  phpfpm -.-> zoho
     </pre>
   </div>
   <p class="sheet-cap">FIG. A — SYSTEM CONTEXT: EITHER STACK TALKS TO THE SAME MYSQL SCHEMA AND THE SAME STORAGE VOLUME</p>
 
   <div class="callout note"><b>How to use this document.</b> Sections are lettered like drawing sheets (A–P) and cross-reference each other. Diagrams are the primary explanation; prose fills gaps a diagram can't carry. Section O is written specifically for "I need to change X" — start there if you already know the app and just need to extend it.</div>
+
+  <div class="callout note"><b>Zoho Books (CA module, 29 Oct 2026).</b> The only outside system the app writes to. Three <code>.env</code> switches, read only by <code>ZohoGuard</code> / <code>zohoGuard.js</code> (no screen can change them): <code>ZOHO_INTEGRATION_ENABLED</code> (false = no Zoho call at all), <code>ZOHO_ENVIRONMENT</code> (<code>test</code> = only customers named <code>TEST-…</code>; <code>production</code> = only real orders) and <code>ZOHO_EINVOICE_ENABLED</code> (GST e-invoice / e-way bill / GST filing, only in production). Books also needs its credentials and the "Zoho Books enabled" setting in Admin → Company Settings, and a go-live date (<code>zoho_books_sync_start_date</code>): only records dated on or after it are sent. <code>CaSyncService::runFullSync()</code> — from Sync Now on <code>/ca/zoho-sync</code> or the hourly job — sends the CI and Debit Note as export invoices, the buyer's and the LC payments, vendors, bills, vendor payments, order expenses and paid cost entries, and export benefits as journals, and imports the expenses the CA enters in Books. <code>ZohoRestoreService</code> puts back anything the app sent that was deleted or changed in Books (a locked financial year is logged for the CA instead); <code>OrderZohoMatchService</code> is the read-only "App vs Zoho" check on <code>/orders/{id}/zoho-check</code>. Zoho Mail is not used to send — all mail goes through SMTP. Records made while testing are removed with the clean-up script (<code>zoho_cleanup_test_records.php</code> / <code>zohoCleanupTestRecords.js</code>), and every change made in Zoho is logged in <code>docs/zoho/zoho-change-log.csv</code>.</div>
 </section>
 
 <section id="b">
@@ -224,7 +229,7 @@ flowchart TB
   <div class="tablewrap"><table>
     <caption>Stack-by-stack equivalents</caption>
     <tr><th>Concern</th><th>Node.js stack</th><th>PHP stack</th></tr>
-    <tr><td>Runtime</td><td>Node.js 20 LTS, one long-lived process</td><td>PHP 8.1+ under PHP-FPM, fresh per request</td></tr>
+    <tr><td>Runtime</td><td>Node.js 22 LTS (22.12+), one long-lived process</td><td>PHP 8.1+ under PHP-FPM, fresh per request</td></tr>
     <tr><td>Entry point</td><td><code>app/src/server.js</code> — every route registered here</td><td><code>public_html/index.php</code> — every route registered here</td></tr>
     <tr><td>Router</td><td>Express.js</td><td>Hand-rolled <code>App\Helpers\Router</code> (regex path match, per-route middleware array)</td></tr>
     <tr><td>App-UI templating</td><td>Nunjucks (<code>views/*.njk</code>)</td><td>Plain PHP includes via <code>App\Helpers\View</code> (<code>views/*.php</code>)</td></tr>
@@ -259,9 +264,12 @@ flowchart TB
 │   │   │                    csrfCheck, testModeGate, clientAuth,
 │   │   │                    superAdminOnly
 │   │   ├── <span class="dir">helpers/</span>         csrf, flash, dates, masking
-│   │   └── <span class="dir">jobs/</span>            checkAlerts.js, dispatchDeferredEmails.js
+│   │   └── <span class="dir">jobs/</span>            checkAlerts.js, dispatchDeferredEmails.js,
+│   │                        autoConfirmOcAcknowledgments.js, zohoSync.js,
+│   │                        scheduler.js; by hand: zohoCleanupTestRecords.js,
+│   │                        reorganizeOrderFiles.js
 │   ├── <span class="dir">views/</span>            Nunjucks — app's own screens
-│   ├── <span class="dir">templates/</span>        Nunjucks — the 11 business documents
+│   ├── <span class="dir">templates/</span>        Nunjucks — one folder per document type (14)
 │   ├── <span class="dir">public/</span>           static css/js
 │   └── <span class="dir">node_modules/</span>     committed — ready to run
 ├── <span class="dir">docs/</span>              schema.sql · seed.sql · ARCHITECTURE.md
@@ -283,7 +291,11 @@ flowchart TB
 │   │   └── <span class="dir">Helpers/</span>         Router.php, View.php, Csrf.php,
 │   │                        Flash.php
 │   ├── <span class="dir">views/</span>            plain-PHP — app's own screens
-│   ├── <span class="dir">templates/</span>        Twig — the 11 business documents
+│   ├── <span class="dir">templates/</span>        Twig — one folder per document type (14)
+│   ├── <span class="dir">cron/</span>             check_alerts.php, dispatch_deferred_emails.php,
+│   │                    auto_confirm_oc_acknowledgments.php, zoho_sync.php;
+│   │                    by hand: zoho_cleanup_test_records.php,
+│   │                    reorganize_order_files.php
 │   ├── <span class="dir">vendor/</span>           committed — ready to run
 │   └── bootstrap.php       autoload + env + session start
 ├── <span class="dir">public_html/</span>
@@ -380,7 +392,7 @@ erDiagram
   DOCUMENT_TYPES ||--o{ DOCUMENTS : "of type"
     </pre>
   </div>
-  <p class="sheet-cap">FIG. E1 — CORE ENTITY RELATIONSHIPS (SIMPLIFIED — 23 OF 98 TABLES SHOWN)</p>
+  <p class="sheet-cap">FIG. E1 — CORE ENTITY RELATIONSHIPS (SIMPLIFIED — 23 OF 113 TABLES SHOWN)</p>
 
   <div class="tablewrap"><table>
     <caption>Schema sections, in build order</caption>
@@ -394,15 +406,18 @@ erDiagram
     <tr><td>W–Z</td><td>Order archiving; role/permission management tooling; custom reference-library entries; protected founder accounts</td><td>AA–AG</td><td>Client self-service: intake self-correction link + PI-stage intake, HS code master list, client data lock, payment self-report, buyer OC acknowledgment, per-order dispute visibility toggle, reference-number sequence counter</td></tr>
     <tr><td>AH–AN</td><td>Client-facing document revision numbers; order progress chat + email template CRUD + per-user notification prefs; client reorder requests; Supplier PO signing timestamp; HS code bulk import + product guide; expense-to-order linking; internal-only CA financial annexure</td><td>AO–AV</td><td>Dispute replies + granular dispute permissions; reorder-to-supplier linking + order profitability; logistics partners directory; pre-closure compliance task checklist; mail redirect/CC; Annexure A content mode; deferred-mail admin controls + OC-ack override; staff client-portal impersonation</td></tr>
     <tr><td>AY–BD</td><td>RBAC scoping (reference-library categories, view-only tiers); additional documents at order/client level; Legal Terms &amp; Definitions (admin-configurable); consignee/notify-party self-service on client-facing forms; Bill of Lading endorsement; dropdown-options admin screen</td><td>BE–BJ</td><td>Client Agreement file upload + expiry; QT/PI intake structured billing address; Buyer Action Link (OC ack + Buyer PO upload, no login); ports admin screen; indicative freight as a single value, not a range</td></tr>
-    <tr><td>BK–BP</td><td>Action notifications; supplier factory addresses; supplier payment dates; user 3-way status (active/inactive/archived); document drift flag (External QA report M-08); formal order-cancellation workflow — request/approve/reject/refund (External QA report M-09)</td><td></td><td></td></tr>
+    <tr><td>BK–BP</td><td>Action notifications; supplier factory addresses; supplier payment dates; user 3-way status (active/inactive/archived); document drift flag (External QA report M-08); formal order-cancellation workflow — request/approve/reject/refund (External QA report M-09)</td><td>BQ–BX</td><td>UI template selection; Letter of Credit + bank loan interest tracking; CHA draft BL review loop; shipment date + pre-shipment inspection reminder; two-phase order closure; order feedback; travel expense recording; complaint split from dispute</td></tr>
+    <tr><td>BY–CD</td><td>Supplier PO payment amount capture; Suppliers directory; order page flow; audit log no longer emails; draft / scanned BL accept any common file; benefits at settlement (13g) + vendor bank details</td><td>CE–CH</td><td>Vendor bills &amp; order expenses; document date; logistics bill Advance / Final; proforma / tax invoice and part payments</td></tr>
+    <tr><td>CI–CJ</td><td>Zoho Books Stage 2 (<code>order_zoho_invoices</code>: CI and Debit Note as Books invoices) and Stage 3 (vendors, bills, vendor payments, order expenses in Books)</td><td>CK–CM</td><td>Shipping bill + customs exchange rate, reverse charge on transport bills; cost entries, LC payment received and export benefits in Books; the LC payment's FIRC / eBRC in the INR Settlement Register</td></tr>
   </table></div>
-  <p class="sheet-cap">Lettered sections run A–BP (not every letter used — AW/AX skipped) — see <code>docs/schema.sql</code>'s own trailing comments for the exact column-level diff each one added.</p>
+  <p class="sheet-cap">Lettered sections run A–CM (not every letter used — AW/AX skipped) — see <code>docs/schema.sql</code>'s own trailing comments for the exact column-level diff each one added.</p>
 
   <div class="callout note"><b>Latest additions (2026-10-24, dated comments, not yet lettered).</b> <code>order_assignees</code> — who can see an order at all (list, Kanban, detail page); replaces an earlier single <code>orders.assigned_to</code> column from the same day. An order has 0, 1, or more assignees (e.g. an Export Executive on office work and a Logistics Executive on CHA/factory work, concurrently, on the <em>same</em> order) rather than two fixed role-based slots — the creator becomes the first assignee automatically, changeable afterward only by <code>assign_order_owner</code> (Admin/MD/ED). <code>view_all_orders</code> (Accounts Executive, Viewer/Auditor, plus Admin/MD/ED via their existing blanket grant) bypasses assignee scoping entirely; everyone else only sees orders they're assigned to. Visibility-only — never consulted by the stage-gate/permission system in §F that decides who may <em>act</em>. Alongside it, <code>order_export_benefit_schemes</code> — see §G's closure callout below.</div>
 
   <div class="callout note"><b>Additions 2026-10-25 → 2026-10-28.</b> Four new tables (112 in all): <code>supplier_type_links</code> (Suppliers directory — one supplier, several types); <code>order_vendor_bills</code> (Section CE — the supplier's Step 7e / 10a bills and the logistics partners' bills: CHA, transport, freight forwarder; a logistics bill is an Advance or the Final bill, Section CG) and <code>order_vendor_bill_payments</code> (Section CH — each bill is a <b>Proforma</b> or a <b>Tax invoice</b>, a tax invoice can replace an earlier proforma from the same vendor, and a bill takes several payments); <code>order_expenses</code> (the order's actual expenses, each with a receipt or a reason). New columns: <code>documents.document_date</code> (the CI can carry its own date, Section CF) and <code>orders.payment_terms_approved_by / _at</code>. Each change ships as a guarded, re-runnable migration — run order in <code>docs/migrations/README.md</code>.</div>
   <div class="callout note"><b>Addition 2026-10-29 (Zoho Books Stage 2).</b> One new table (113 in all): <code>order_zoho_invoices</code> (Section CI — which Zoho Books invoice each order's Commercial Invoice and freight Debit Note became, with a fingerprint of what was sent, so a revised document updates the same Books invoice). New columns <code>order_payment_status.{advance,balance,freight}_zoho_applied_at</code> — when each payment was applied to its invoice in Books (the advance is held there until the CI arrives). Migration <code>2026-10-29a-zoho-stage2-invoices.sql</code>.</div>
   <div class="callout note"><b>Addition 2026-10-29 (Zoho Books Stage 3).</b> No new table. New columns (Section CJ): <code>suppliers.zoho_contact_id</code> and <code>logistics_partners.zoho_contact_id</code> (the Books vendor), <code>order_vendor_bills.zoho_bill_id / zoho_synced_at</code> (a tax invoice as a Books bill), <code>order_vendor_bill_payments.zoho_payment_id / zoho_synced_at / zoho_applied_at</code> (each payment as a Books vendor payment; one paid on a proforma is held as an advance until the replacing tax invoice is in Books) and <code>order_expenses.zoho_expense_id / zoho_synced_at</code> (each order expense as a Books expense, which the expense import skips). Migration <code>2026-10-29b-zoho-stage3-purchases.sql</code>.</div>
+  <div class="callout note"><b>Additions 2026-10-29 → 2026-10-30 (Sections CK–CM).</b> No new table. <code>order_shipping.shipping_bill_no / shipping_bill_date / customs_exchange_rate</code> (the CI and Debit Note go to Books at that rate) and <code>order_vendor_bills.gst_reverse_charge</code> (migration <code>2026-10-29e</code>); <code>order_cost_entries.paid_from</code> + Books expense id, <code>order_lc_details.lc_received_*</code> (the money the bank paid under the LC) + Books payment id, <code>ca_export_benefits.zoho_journal_id</code> (migration <code>2026-10-29f</code>); <code>order_lc_details.lc_firc_reference / lc_firc_received_at</code> (migration <code>2026-10-30a</code>). Settings <code>zoho_books_sync_start_date</code> (go-live date, <code>2026-10-29d</code>) and <code>zoho_books_restore_checked_at</code> (<code>2026-10-30a</code>). Migration <code>2026-10-29c</code> switches reference formats to the 2-digit year (<code>{YY}</code>).</div>
 
   <div class="callout note"><b>No <code>ON DELETE CASCADE</code> anywhere.</b> Every deletion routine in the app (Sample Data clear, Test Mode delete) walks the FK graph by hand, children before parents, and explicitly breaks the one real reference cycle — <code>documents.docx_file_id/pdf_file_id</code> ↔ <code>file_store.linked_document_id</code> — before deleting either side. If you add a table that hangs off <code>orders</code> or <code>clients</code>, you must add it to both deletion routines or it will silently orphan on cleanup.</div>
 </section>
@@ -710,7 +725,8 @@ flowchart TB
   <div class="tablewrap"><table>
     <caption>Selected company_settings keys (editable at /settings, no deploy needed)</caption>
     <tr><th>Key</th><th>Controls</th></tr>
-    <tr><td><code>order_ref_format</code> / <code>master_tracking_ref_format</code></td><td>Reference-number templates (<code>{YYYY}</code>, <code>{DDMM}</code>, <code>{NNN}</code> placeholders)</td></tr>
+    <tr><td><code>order_ref_format</code> / <code>master_tracking_ref_format</code></td><td>Reference-number templates (<code>{YY}</code>, <code>{DDMM}</code>, <code>{NNN}</code> placeholders; <code>{YYYY}</code> still works when set by hand)</td></tr>
+    <tr><td><code>zoho_books_enabled</code> / <code>zoho_books_sync_start_date</code></td><td>Zoho Books on/off (also needs <code>ZOHO_INTEGRATION_ENABLED=true</code> in <code>.env</code>) and its go-live date — only records dated on or after it are sent</td></tr>
     <tr><td><code>quantity_shortfall_tolerance_pct</code></td><td>Allowed under-delivery % before a hard-rule block fires</td></tr>
     <tr><td><code>quotation_validity_days</code></td><td>Days a QT stays valid from issue</td></tr>
     <tr><td><code>lut_alert_days_x</code> / <code>lut_escalation_days_y</code></td><td>LUT-expiry reminder + escalation windows (checked by the alerts cron)</td></tr>
@@ -726,8 +742,8 @@ flowchart TB
     <tr><th>Object</th><th>Count / shape</th></tr>
     <tr><td>Order pipeline stages</td><td>9, linear with one conditional skip (Stage 6, FOB Incoterm)</td></tr>
     <tr><td>Generated document types</td><td>22 total — 9 customer-facing (QT/PI/OC/PL/CI/FDN/BUYERPO/ANNEXA/BLE), 2 procurement-only (SUPPO, COOPREP), 11 internal (AMD generated on demand + BLI + 4 cross-verification checklists + 2 SOP references + CAFIN + STAGEGATE + WALLREF)</td></tr>
-    <tr><td>Database tables</td><td>112 in both stacks (plus Node's own <code>sessions</code>), in lettered schema sections A–BP and CE–CH, plus a few dated-but-unlettered additions (see §E)</td></tr>
-    <tr><td>Routes</td><td>467 per stack, route-for-route identical (157 GET, 310 POST), every one covered by a test</td></tr>
+    <tr><td>Database tables</td><td>113 in both stacks (plus Node's own <code>sessions</code>), in lettered schema sections A–CM, plus a few dated-but-unlettered additions (see §E)</td></tr>
+    <tr><td>Routes</td><td>471 per stack, route-for-route identical (158 GET, 313 POST), every one covered by a test</td></tr>
     <tr><td>Permissions</td><td>60 in 7 categories, 8 roles (see §F)</td></tr>
     <tr><td>Auth surfaces</td><td>3, structurally separate — staff session, client-portal session, and unauthenticated public intake</td></tr>
     <tr><td>File formats generated</td><td>PDF (always) + DOCX (optional, internal-only)</td></tr>
@@ -738,7 +754,7 @@ flowchart TB
 </main>
 </div>
 
-<footer>NEXACREST BLUEPRINT · REV. 2026-10-24 · BOTH STACKS, ONE SCHEMA · OPEN THIS FILE DIRECTLY IN ANY BROWSER</footer>
+<footer>NEXACREST BLUEPRINT · REV. 2026-10-29 · BOTH STACKS, ONE SCHEMA · OPEN THIS FILE DIRECTLY IN ANY BROWSER</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>

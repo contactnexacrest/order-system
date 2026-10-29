@@ -36,12 +36,14 @@ in exactly one place, rather than two competing ones, is deliberate.
 
 ## The pre/post-confirmation line
 
-Before **Order Confirmation** (Stage 4) is issued, an order is still
-being set up — editing its details or product lines needs nothing beyond
-the ordinary "Manage orders" permission, same as it always has.
+Until the order reaches **Stage 4 (Order Confirmation)** — that is, until
+the advance payment clears or the Letter of Credit is confirmed usable —
+it is still being set up: editing its details or product lines needs
+nothing beyond the ordinary "Manage orders" permission, same as it always
+has.
 
-Once Order Confirmation is issued, the order's terms are meant to be
-settled. From that point on, changing a core detail or a product line
+Once the order reaches Stage 4, its terms are meant to be settled. From
+that point on, changing a core detail or a product line
 needs the separate **"Edit an order after confirmation"** permission
 (granted by default to Admin, Managing Director, and Executive Director —
 adjustable any time from Roles & Permissions) — and every such change

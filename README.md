@@ -21,12 +21,20 @@ Where to look:
 - **Setup and deployment:** each stack's own `README.md`.
 - **Architecture:** `PHP_MySQL_Version/docs/ARCHITECTURE.md` and
   `NODE_MySQL_Version/docs/ARCHITECTURE.md` (same content, each with its
-  own file names).
+  own file names), and the diagram-led overview of both stacks in
+  `ARCHITECTURE.html` (open it in a browser).
 - **Upgrading a live database:** `docs/migrations/README.md` (run order,
   checks), with the read-only checks in `docs/checks/`.
 - **Staff manual (SOP):** `docs/SOP/` (copied into each stack's
   `docs/SOP`, where the in-app SOP reads it).
-- **QA test plan:** each stack's `docs/QA/TEST_PLAN.md`; the browser suite
-  is in `e2e/` (see `e2e/README.md`).
+- **Scheduled jobs:** each stack's README — "Bluehost cron setup" (PHP,
+  `app/cron/`) and "Background jobs" (Node, `src/jobs/`).
+- **Zoho Books integration:** the "Zoho Books" follow-up section of each
+  stack's README, the `.env` switches in each `app/.env.example`, and SOP
+  chapter `ca-03-zoho-sync.md`. Every change made in Zoho is logged in
+  `docs/zoho/zoho-change-log.csv`.
+- **QA test plan:** each stack's `docs/QA/TEST_PLAN.md`; the unit and
+  integration tests are in each stack's `app/tests/` (PHPUnit for PHP, Jest
+  for Node), and the browser suite is in `e2e/` (see `e2e/README.md`).
 - **Reference documents and spec:** `reference_templates/` (not read by the
   app at runtime).
