@@ -344,8 +344,12 @@ tracks** rather than asking staff to re-enter them:
      contributes nothing and never marks revenue estimated on its own
      account.
   6. On an **LC order**, the LC payment the bank made (section 4 above)
-     counts as the advance leg at the rupees credited, unless an advance
-     INR actual is already recorded.
+     counts at the rupees credited, in place of the first buyer leg no
+     money has come in for yet: the advance, otherwise the balance (an
+     order switched to LC after its cash advance came in). If both had
+     already come in, it is added on top. Revenue therefore always equals
+     the money received from the buyer (owner decision 2026-10-29, CAFIN
+     change confirmed twice).
 - **Government export benefits.** Every claim linked to this order (see
   "Government Export Benefits Claimed" above). A claim already marked
   **received** contributes its real `received_amount`; one still only

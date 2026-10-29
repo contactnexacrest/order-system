@@ -61,7 +61,8 @@ async function computeForOrder(orderId) {
   const currencyCode = (order && order.currency_code) || null;
   const payment = await withLcPayment(order, await orderPaymentStatusRepository.find(orderId));
 
-  const [revenueInr, revenueIsEstimated] = revenueInInr(fobValue, payment);
+  const [revenueBeforeLcExtra, revenueIsEstimated] = revenueInInr(fobValue, payment);
+  const revenueInr = revenueBeforeLcExtra + Number((payment && payment.lc_extra_inr) || 0);
 
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
   const supplierCostInr = supplierPo && supplierPo.total_payable_inr !== null
@@ -183,24 +184,34 @@ async function exportBenefitsInInr(orderId) {
 
 /**
  * Owner decision 2026-10-29 (CAFIN change confirmed twice): on an LC
- * order the LC replaces the cash advance, so the money the bank paid
- * under the LC (the rupees credited) takes the advance leg's place in
- * the revenue.
+ * order the money the bank paid under the LC (the rupees credited)
+ * counts in the revenue. It takes the place of the first buyer leg no
+ * money has come in for yet — the advance, else the balance (an order
+ * switched to LC after its cash advance came in) — and when both had
+ * already come in it is added on top as `lc_extra_inr`, so the revenue
+ * always equals the money received from the buyer.
  */
 async function withLcPayment(order, payment) {
-  if (!payment || !order || (order.payment_method || '') !== 'LC' || payment.advance_inr_actual !== null) {
+  if (!payment || !order || (order.payment_method || '') !== 'LC') {
     return payment;
   }
   const lc = await orderLcDetailRepository.find(Number(order.id));
   if (!lc || lc.lc_received_at === null || Number(lc.lc_received_amount) <= 0) {
     return payment;
   }
-  return {
-    ...payment,
-    advance_amount: Number(lc.lc_received_amount),
-    advance_inr_actual: Number(lc.lc_inr_credited),
-    advance_exchange_rate: Number(lc.lc_inr_credited) / Number(lc.lc_received_amount),
-  };
+  const amount = Number(lc.lc_received_amount);
+  const credited = Number(lc.lc_inr_credited);
+  for (const leg of ['advance', 'balance']) {
+    if (payment[`${leg}_inr_actual`] === null && !payment[`${leg}_cleared_at`]) {
+      return {
+        ...payment,
+        [`${leg}_amount`]: amount,
+        [`${leg}_inr_actual`]: credited,
+        [`${leg}_exchange_rate`]: credited / amount,
+      };
+    }
+  }
+  return { ...payment, lc_extra_inr: credited };
 }
 
 /**

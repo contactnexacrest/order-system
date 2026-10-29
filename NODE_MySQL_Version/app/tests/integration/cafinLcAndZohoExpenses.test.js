@@ -120,6 +120,28 @@ describe('CAFIN: the LC payment and the expenses booked in Zoho Books', () => {
     expect(ledger.expenses_inr).toBe(6550);
   });
 
+  // Owner decision 2026-10-29 (CAFIN change confirmed twice): an order
+  // switched to LC after its cash advance came in — the LC pays the
+  // balance, so the revenue is advance + LC, exactly the money received;
+  // and LC money on top of two legs already paid is added, not dropped.
+  it('an order switched to LC after its cash advance counts the LC as the balance', async () => {
+    const orderId = await createTestOrder(await createTestClient(), 'CIF', 'Standard — New Buyer', 'EUR');
+    await db.execute("UPDATE orders SET payment_method = 'LC' WHERE id = :id", { id: orderId });
+    await db.execute('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:id)', { id: orderId });
+    await db.execute(`UPDATE order_payment_status SET advance_amount = 1800, advance_exchange_rate = 89, advance_inr_actual = 160200,
+      advance_remittance_received_at = '2026-10-20 10:00:00', advance_cleared_at = '2026-10-20 10:00:00', balance_amount = 2700, balance_exchange_rate = 89.5 WHERE order_id = :id`, { id: orderId });
+    await db.execute("INSERT INTO order_lc_details (order_id, lc_number, lc_amount, lc_confirmed_at) VALUES (:id, 'LC-T-2', 2700, '2026-10-22 10:00:00')", { id: orderId });
+    await orderLcDetailRepository.recordReceived(orderId, '2026-10-28', 2700, 240300, 600, userId);
+
+    const profit = await orderProfitabilityService.computeForOrder(orderId);
+    expect(profit.revenue_inr).toBe(400500); // advance ₹160,200 + LC ₹240,300 — not the balance estimated at ₹241,650
+    expect(profit.revenue_is_estimated).toBe(false);
+    expect((await caFinancialSnapshotService.build(orderId)).receipts_inr).toBe('400,500.00'); // revenue equals the money received
+
+    await db.execute("UPDATE order_payment_status SET balance_inr_actual = 241650, balance_remittance_received_at = '2026-10-29 10:00:00', balance_cleared_at = '2026-10-29 10:00:00' WHERE order_id = :id", { id: orderId });
+    expect((await orderProfitabilityService.computeForOrder(orderId)).revenue_inr).toBe(642150); // both legs paid as well: the LC money is added on top
+  });
+
   it('the scheduled sync checks the records in Books once a day, Sync Now always', async () => {
     await companySettingsRepository.set('zoho_books_restore_checked_at', '');
     await zohoRestoreService.markScheduledCheckDone();

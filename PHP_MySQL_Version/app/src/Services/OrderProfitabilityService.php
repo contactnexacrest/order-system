@@ -69,6 +69,7 @@ final class OrderProfitabilityService
         $payment = self::withLcPayment($order, OrderPaymentStatusRepository::find($orderId));
 
         [$revenueInr, $isEstimated] = self::revenueInInr($fobValue, $payment);
+        $revenueInr += (float) ($payment['lc_extra_inr'] ?? 0.0);
 
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
         $supplierCostInr = ($supplierPo !== null && $supplierPo['total_payable_inr'] !== null) ? (float) $supplierPo['total_payable_inr'] : 0.0;
@@ -191,25 +192,36 @@ final class OrderProfitabilityService
 
     /**
      * Owner decision 2026-10-29 (CAFIN change confirmed twice): on an LC
-     * order the LC replaces the cash advance, so the money the bank paid
-     * under the LC (the rupees credited) takes the advance leg's place in
-     * the revenue.
+     * order the money the bank paid under the LC (the rupees credited)
+     * counts in the revenue. It takes the place of the first buyer leg no
+     * money has come in for yet — the advance, else the balance (an order
+     * switched to LC after its cash advance came in) — and when both had
+     * already come in it is added on top as 'lc_extra_inr', so the revenue
+     * always equals the money received from the buyer.
      *
      * @param array<string,mixed>|null $payment
      * @return array<string,mixed>|null
      */
     private static function withLcPayment(?array $order, ?array $payment): ?array
     {
-        if ($payment === null || ($order['payment_method'] ?? '') !== 'LC' || $payment['advance_inr_actual'] !== null) {
+        if ($payment === null || ($order['payment_method'] ?? '') !== 'LC') {
             return $payment;
         }
         $lc = \App\Repositories\OrderLcDetailRepository::find((int) $order['id']);
         if ($lc === null || $lc['lc_received_at'] === null || (float) $lc['lc_received_amount'] <= 0) {
             return $payment;
         }
-        $payment['advance_amount'] = (float) $lc['lc_received_amount'];
-        $payment['advance_inr_actual'] = (float) $lc['lc_inr_credited'];
-        $payment['advance_exchange_rate'] = (float) $lc['lc_inr_credited'] / (float) $lc['lc_received_amount'];
+        $amount = (float) $lc['lc_received_amount'];
+        $credited = (float) $lc['lc_inr_credited'];
+        foreach (['advance', 'balance'] as $leg) {
+            if ($payment[$leg . '_inr_actual'] === null && empty($payment[$leg . '_cleared_at'])) {
+                $payment[$leg . '_amount'] = $amount;
+                $payment[$leg . '_inr_actual'] = $credited;
+                $payment[$leg . '_exchange_rate'] = $credited / $amount;
+                return $payment;
+            }
+        }
+        $payment['lc_extra_inr'] = $credited;
         return $payment;
     }
 
