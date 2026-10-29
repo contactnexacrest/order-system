@@ -48,8 +48,8 @@
       <?php foreach ($rows as $r): ?>
       <tr>
         <td><a href="/orders/<?= (int) $r['id'] ?>"><?= htmlspecialchars($r['order_reference']) ?></a></td>
-        <td><?= htmlspecialchars($r['company_legal_name']) ?></td>
-        <td><?= htmlspecialchars($r['currency_code']) ?></td>
+        <td><?= htmlspecialchars((string) $r['company_legal_name']) ?></td>
+        <td><?= htmlspecialchars((string) $r['currency_code']) ?></td>
         <td><?= htmlspecialchars(ucfirst($r['status'])) ?></td>
         <td>
           <?php if ($r['advance_amount'] === null): ?>—<?php else: ?>
