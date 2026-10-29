@@ -197,14 +197,14 @@ final class DocxDocumentBuilder
         ));
     }
 
-    private static function paymentTermsBlock(Section $section, array $context, bool $isPi = false): void
+    private static function paymentTermsBlock(Section $section, array $context, bool $noAdvanceWording = false): void
     {
         $financial = $context['financial'] ?? [];
         $order = $context['order'] ?? [];
         $currency = self::g($order, 'currency_code', '');
-        if ($isPi && empty($financial['has_advance'])) {
-            // Owner decision (2026-10-28): a PI with no advance (e.g. Letter
-            // of Credit) has no "0% Advance" lines — same as the PDF PI.
+        if ($noAdvanceWording && empty($financial['has_advance'])) {
+            // Owner decision (2026-10-28): a QT / PI with no advance (e.g.
+            // Letter of Credit) has no "0% Advance" lines — same as the PDF.
             DocxComponents::addRichParagraph($section, [
                 ['• ', []], [self::g($financial, 'balance_pct', '') . '% Payment on FOB Value' . (($financial['payment_method'] ?? null) === 'LC' ? ' by Letter of Credit' : '') . ' — ' . self::g($financial, 'balance_terms_text', '') . ' ', []], self::starRun(),
             ]);
@@ -318,7 +318,7 @@ final class DocxDocumentBuilder
         ]);
 
         DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
-        self::paymentTermsBlock($section, $context);
+        self::paymentTermsBlock($section, $context, true);
 
         DocxComponents::addSectionTitle($section, '6. DOCUMENTS TO BE PROVIDED');
         self::documentsProvidedParagraphs($section, 'Upon shipment, the following documents will be provided:', [
@@ -530,7 +530,11 @@ final class DocxDocumentBuilder
         ]);
         DocxComponents::addColorBox($section, DocxComponents::GREEN_BG, DocxComponents::GREEN_BORDER, function (AbstractContainer $cell) use ($financial) {
             $cell->addText("\u{221A}  ORDER CONFIRMED", ['bold' => true, 'size' => 13, 'color' => DocxComponents::GREEN_BORDER]);
-            $cell->addText('This order is confirmed upon receipt and clearance of ' . self::g($financial, 'advance_pct') . '% advance T/T (Telegraphic Transfer) payment against the referenced Proforma Invoice.', ['italic' => true, 'size' => 9.5, 'color' => DocxComponents::GREEN_VALUE]);
+            // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no "0% advance" sentence.
+            $confirmed = !empty($financial['has_advance'])
+                ? 'This order is confirmed upon receipt and clearance of ' . self::g($financial, 'advance_pct') . '% advance T/T (Telegraphic Transfer) payment against the referenced Proforma Invoice.'
+                : ((($financial['payment_method'] ?? null) === 'LC') ? 'This order is confirmed upon receipt of the Letter of Credit against the referenced Proforma Invoice.' : "This order is confirmed upon the Buyer's written acceptance of the referenced Proforma Invoice.");
+            $cell->addText($confirmed, ['italic' => true, 'size' => 9.5, 'color' => DocxComponents::GREEN_VALUE]);
         });
 
         self::addDefaultSection1($section, $context, 'SELLER / EXPORTER');
@@ -561,13 +565,16 @@ final class DocxDocumentBuilder
         ]);
 
         DocxComponents::addSectionTitle($section, '4. PAYMENT STATUS');
-        $paymentRows = [
+        $hasAdvance = !empty($financial['has_advance']);
+        $paymentRows = array_merge($hasAdvance ? [
             ['label' => self::g($financial, 'advance_pct') . '% Advance Due (' . $currency . ') *', 'value' => self::g($financial, 'advance_amount')],
             ['label' => 'Advance Received (' . $currency . ') *', 'value' => self::g($payment, 'advance_amount', 'To Be Confirmed')],
             ['label' => 'Advance T/T Received On *', 'value' => self::g($payment, 'advance_remittance_received_at', 'To Be Confirmed')],
-            ['label' => 'Balance Due (' . $currency . ') *', 'value' => (self::g($payment, 'balance_amount') !== '—' ? self::g($payment, 'balance_amount') : self::g($financial, 'balance_amount')) . '  —  ' . self::g($financial, 'balance_terms_text')],
+        ] : [], [
+            // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no advance rows.
+            ['label' => ($hasAdvance ? 'Balance Due' : ((($financial['payment_method'] ?? null) === 'LC') ? 'Payable by Letter of Credit' : 'Payment Due')) . ' (' . $currency . ') *', 'value' => (self::g($payment, 'balance_amount') !== '—' ? self::g($payment, 'balance_amount') : self::g($financial, 'balance_amount')) . '  —  ' . self::g($financial, 'balance_terms_text')],
             ['label' => 'Currency', 'value' => $currency],
-        ];
+        ]);
         if (empty($order['is_fob'])) {
             $paymentRows[] = [
                 'label' => 'CFR / CIF Freight (if applicable)',

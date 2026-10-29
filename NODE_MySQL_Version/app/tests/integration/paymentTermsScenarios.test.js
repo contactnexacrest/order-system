@@ -142,6 +142,33 @@ describe('PI / CI payment wording across every preset, incoterm and currency', (
       has(kind, text, terms);
       has(kind, text, `${currency} ${balance}`);
     }
+    // Owner decision (2026-10-28): the Quotation and Order Confirmation of an
+    // order with no advance (Letter of Credit) say so too — no "0% advance".
+    const qt = { 'QT PDF': await pdfText(orderId, 'QT'), 'QT Word': await wordText(orderId, 'QT') };
+    for (const [kind, text] of Object.entries(qt)) {
+      if (pct !== '0') {
+        has(kind, text, `${pct}% Advance Amount: ${currency} ${advance}`);
+      } else {
+        hasNot(kind, text, '0% Advance');
+        hasNot(kind, text, '0% advance');
+        has(kind, text, `100% Payment on FOB Value by Letter of Credit — ${terms}`);
+        if (kind === 'QT PDF') has(kind, text, "Production commences only after the Letter of Credit is opened and confirmed by NexaCrest's bank");
+        hasNot(kind, text, 'details for advance payment');
+      }
+    }
+    const oc = { 'OC PDF': await pdfText(orderId, 'OC'), 'OC Word': await wordText(orderId, 'OC') };
+    for (const [kind, text] of Object.entries(oc)) {
+      if (pct !== '0') {
+        has(kind, text, `This order is confirmed upon receipt and clearance of ${pct}% advance T/T`);
+        has(kind, text, `${pct}% Advance Due (${currency})`);
+      } else {
+        hasNot(kind, text, '0% advance');
+        hasNot(kind, text, 'Advance Due');
+        has(kind, text, 'This order is confirmed upon receipt of the Letter of Credit against the referenced Proforma Invoice.');
+        has(kind, text, `Payable by Letter of Credit (${currency})`);
+      }
+    }
+
     hasNot('PI Word', pi['PI Word'], '3 working days');
     hasNot('CI Word', ci['CI Word'], '3 working days');
   });

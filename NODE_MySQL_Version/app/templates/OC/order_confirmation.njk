@@ -17,7 +17,7 @@
 {% endblock %}
 
 {% block banner %}
-<div class="banner banner-green"><span class="headline">&#8730;&nbsp; ORDER CONFIRMED</span><br><span class="sub">This order is confirmed upon receipt and clearance of {{ financial.advance_pct }}% advance T/T (Telegraphic Transfer) payment against the referenced Proforma Invoice.</span></div>
+<div class="banner banner-green"><span class="headline">&#8730;&nbsp; ORDER CONFIRMED</span><br><span class="sub">{% if financial.has_advance %}This order is confirmed upon receipt and clearance of {{ financial.advance_pct }}% advance T/T (Telegraphic Transfer) payment against the referenced Proforma Invoice.{% elseif financial.payment_method == 'LC' %}This order is confirmed upon receipt of the Letter of Credit against the referenced Proforma Invoice.{% else %}This order is confirmed upon the Buyer's written acceptance of the referenced Proforma Invoice.{% endif %}</span></div>
 {% endblock %}
 
 {% block body %}
@@ -46,10 +46,13 @@
 
 <div class="section-title">{{ section_numbers.payment_status }}. PAYMENT STATUS</div>
 <table class="kv">
+  {% if financial.has_advance %}
   <tr><td class="k">{{ financial.advance_pct }}% Advance Due ({{ order.currency_code }}) *</td><td class="v">{{ financial.advance_amount }}</td></tr>
   <tr><td class="k">Advance Received ({{ order.currency_code }}) *</td><td class="v">{{ payment_status.advance_amount or 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Advance T/T Received On *</td><td class="v">{{ payment_status.advance_remittance_received_at or 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Balance Due ({{ order.currency_code }}) *</td><td class="v">{{ payment_status.balance_amount or financial.balance_amount }} <span style="font-size:8.5pt; color:#5B6573;">&nbsp;—&nbsp;{{ financial.balance_terms_text }}</span></td></tr>
+  {% endif %}
+  {# Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no advance rows; the amount is the full payment. #}
+  <tr><td class="k">{% if financial.has_advance %}Balance Due{% elseif financial.payment_method == 'LC' %}Payable by Letter of Credit{% else %}Payment Due{% endif %} ({{ order.currency_code }}) *</td><td class="v">{{ payment_status.balance_amount or financial.balance_amount }} <span style="font-size:8.5pt; color:#5B6573;">&nbsp;—&nbsp;{{ financial.balance_terms_text }}</span></td></tr>
   <tr><td class="k">Currency</td><td class="v" style="font-weight:bold;">{{ order.currency_code }}</td></tr>
   {% if not order.is_fob %}
   <tr><td class="k" style="background:#FBEAEA; color:#8A1F1F;">CFR / CIF Freight <span style="font-weight:normal; font-style:italic; font-size:8.5pt;">(if applicable)</span></td><td class="v" style="background:#FBEAEA; color:#5A1414; font-size:8.5pt;">A Debit Note will be raised when cargo is packed and ready, stating the actual confirmed freight amount. <strong style="color:#8A1F1F;">Payment required within 3 Calendar Days of the Debit Note date.</strong> <strong style="color:#8A1F1F;">NexaCrest will confirm shipment booking and hand over cargo to the shipping line only upon receipt of full freight payment.</strong></td></tr>

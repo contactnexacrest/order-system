@@ -141,14 +141,14 @@ function weightTable(order) {
   return out;
 }
 
-function paymentTermsBlock(context, isPi = false) {
+function paymentTermsBlock(context, noAdvanceWording = false) {
   const financial = context.financial || {};
   const order = context.order || {};
   const currency = g(order, 'currency_code', '');
   const out = [];
-  if (isPi && !financial.has_advance) {
-    // Owner decision (2026-10-28): a PI with no advance (e.g. Letter of
-    // Credit) has no "0% Advance" lines — same as the PDF PI.
+  if (noAdvanceWording && !financial.has_advance) {
+    // Owner decision (2026-10-28): a QT / PI with no advance (e.g. Letter of
+    // Credit) has no "0% Advance" lines — same as the PDF.
     out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% Payment on FOB Value${financial.payment_method === 'LC' ? ' by Letter of Credit' : ''} — ${g(financial, 'balance_terms_text', '')} `, {}], starRun()]));
     out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}], starRun()]));
     return out.concat(freightAndCurrencyLines(order, currency));
@@ -260,7 +260,7 @@ function renderQt(context) {
   );
 
   children.push(...C.sectionTitle('5. PAYMENT TERMS'));
-  children.push(...paymentTermsBlock(context));
+  children.push(...paymentTermsBlock(context, true));
 
   children.push(...C.sectionTitle('6. DOCUMENTS TO BE PROVIDED'));
   children.push(
@@ -511,7 +511,13 @@ function renderOc(context) {
   children.push(
     ...C.colorBox(C.GREEN_BG, C.GREEN_BORDER, [
       C.plain('√  ORDER CONFIRMED', { bold: true, size: 26, color: C.GREEN_BORDER }),
-      C.plain(`This order is confirmed upon receipt and clearance of ${g(financial, 'advance_pct')}% advance T/T (Telegraphic Transfer) payment against the referenced Proforma Invoice.`, { italics: true, size: 19, color: C.GREEN_VALUE }),
+      // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no "0% advance" sentence.
+      C.plain(
+        financial.has_advance
+          ? `This order is confirmed upon receipt and clearance of ${g(financial, 'advance_pct')}% advance T/T (Telegraphic Transfer) payment against the referenced Proforma Invoice.`
+          : (financial.payment_method === 'LC' ? 'This order is confirmed upon receipt of the Letter of Credit against the referenced Proforma Invoice.' : "This order is confirmed upon the Buyer's written acceptance of the referenced Proforma Invoice."),
+        { italics: true, size: 19, color: C.GREEN_VALUE }
+      ),
     ])
   );
 
@@ -548,10 +554,13 @@ function renderOc(context) {
 
   children.push(...C.sectionTitle('4. PAYMENT STATUS'));
   const paymentRows = [
-    { label: `${g(financial, 'advance_pct')}% Advance Due (${currency}) *`, value: g(financial, 'advance_amount') },
-    { label: `Advance Received (${currency}) *`, value: g(payment, 'advance_amount', 'To Be Confirmed') },
-    { label: 'Advance T/T Received On *', value: g(payment, 'advance_remittance_received_at', 'To Be Confirmed') },
-    { label: `Balance Due (${currency}) *`, value: `${g(payment, 'balance_amount') !== '—' ? g(payment, 'balance_amount') : g(financial, 'balance_amount')}  —  ${g(financial, 'balance_terms_text')}` },
+    ...(financial.has_advance ? [
+      { label: `${g(financial, 'advance_pct')}% Advance Due (${currency}) *`, value: g(financial, 'advance_amount') },
+      { label: `Advance Received (${currency}) *`, value: g(payment, 'advance_amount', 'To Be Confirmed') },
+      { label: 'Advance T/T Received On *', value: g(payment, 'advance_remittance_received_at', 'To Be Confirmed') },
+    ] : []),
+    // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no advance rows.
+    { label: `${financial.has_advance ? 'Balance Due' : (financial.payment_method === 'LC' ? 'Payable by Letter of Credit' : 'Payment Due')} (${currency}) *`, value: `${g(payment, 'balance_amount') !== '—' ? g(payment, 'balance_amount') : g(financial, 'balance_amount')}  —  ${g(financial, 'balance_terms_text')}` },
     { label: 'Currency', value: currency },
   ];
   if (!order.is_fob) {

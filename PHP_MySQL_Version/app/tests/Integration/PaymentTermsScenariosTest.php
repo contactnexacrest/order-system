@@ -114,6 +114,33 @@ final class PaymentTermsScenariosTest extends DbTestCase
             self::assertStringContainsString($terms, $text, $kind);
             self::assertStringContainsString("{$currency} {$balance}", $text, $kind);
         }
+        // Owner decision (2026-10-28): the Quotation and Order Confirmation of an
+        // order with no advance (Letter of Credit) say so too — no "0% advance".
+        [$qtPdf, $qtWord] = $this->generate($orderId, 'QT');
+        [$ocPdf, $ocWord] = $this->generate($orderId, 'OC');
+        foreach (['QT PDF' => $qtPdf, 'QT Word' => $qtWord] as $kind => $text) {
+            if ($pct !== '0') {
+                self::assertStringContainsString("{$pct}% Advance Amount: {$currency} {$advance}", $text, $kind);
+            } else {
+                self::assertStringNotContainsString('0% Advance', $text, $kind);
+                self::assertStringNotContainsString('0% advance', $text, $kind);
+                self::assertStringContainsString("100% Payment on FOB Value by Letter of Credit — {$terms}", $text, $kind);
+                self::assertStringContainsString("Production commences only after the Letter of Credit is opened and confirmed by NexaCrest's bank", $text, $kind);
+                self::assertStringNotContainsString('details for advance payment', $text, $kind);
+            }
+        }
+        foreach (['OC PDF' => $ocPdf, 'OC Word' => $ocWord] as $kind => $text) {
+            if ($pct !== '0') {
+                self::assertStringContainsString("This order is confirmed upon receipt and clearance of {$pct}% advance T/T", $text, $kind);
+                self::assertStringContainsString("{$pct}% Advance Due ({$currency})", $text, $kind);
+            } else {
+                self::assertStringNotContainsString('0% advance', $text, $kind);
+                self::assertStringNotContainsString('Advance Due', $text, $kind);
+                self::assertStringContainsString('This order is confirmed upon receipt of the Letter of Credit against the referenced Proforma Invoice.', $text, $kind);
+                self::assertStringContainsString("Payable by Letter of Credit ({$currency})", $text, $kind);
+            }
+        }
+
         foreach (['PI Word' => $piWord, 'CI Word' => $ciWord] as $kind => $text) {
             self::assertStringNotContainsString('3 working days', $text, $kind . ': buyer deadlines read Calendar Days');
         }

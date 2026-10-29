@@ -3158,6 +3158,30 @@ DOCUMENT: 02_ProformaInvoice (app template, PDF and Word)
   NEW     : Production commences only after the Letter of Credit is opened and
             confirmed by NexaCrest's bank, and …
 
+DOCUMENT: 01_Quotation (app template, PDF and Word) — orders with no advance
+  REPLACE #1  Payment Terms — same as the PI (REPLACE #4 above)
+  REPLACE #2  Production Commencement clause — same as the PI (REPLACE #5)
+  REPLACE #3  Bank Details Notice: "Bank details for advance payment …" /
+              "Full bank details for advance payment …" -> "… for payment …"
+  REPLACE #4  Unconfirmed Quantity Pricing: "Total order value and advance
+              payment amount will be confirmed …" -> "Total order value will be
+              confirmed …"
+
+DOCUMENT: 03_OrderConfirmation (app template, PDF and Word) — orders with no
+          advance
+  REPLACE #1
+  Section : Green banner
+  OLD     : This order is confirmed upon receipt and clearance of 0% advance T/T
+            (Telegraphic Transfer) payment against the referenced Proforma
+            Invoice.
+  NEW     : This order is confirmed upon receipt of the Letter of Credit against
+            the referenced Proforma Invoice.
+  REPLACE #2
+  Section : Payment Status
+  OLD     : 0% Advance Due 0.00 / Advance Received / Advance T/T Received On /
+            Balance Due ([CCY])
+  NEW     : Payable by Letter of Credit ([CCY]) — the amount and terms as before
+
 DOCUMENT: Quotation, Proforma Invoice (CFR orders) — QA Round 5, Q-R5-2
   REPLACE #1
   Section : Insurance row

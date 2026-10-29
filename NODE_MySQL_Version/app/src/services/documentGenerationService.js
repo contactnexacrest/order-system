@@ -1467,13 +1467,18 @@ async function clauseTextReplacements(data, documentTypeCode = '') {
     // the PI Validity clause doesn't ask the buyer to "initiate the 0%
     // advance payment". Listed first so it is replaced before {advance_pct}.
     ' and initiate the {advance_pct}% advance payment': data.financial.has_advance ? ` and initiate the ${data.financial.advance_pct}% advance payment` : '',
-    // Owner decision (2026-10-28): on a PI with no advance the Production
+    // Owner decision (2026-10-28): on a QT / PI with no advance the Production
     // Commencement clause no longer waits for a "0% advance payment" —
     // production follows the Letter of Credit (or the buyer's written
     // acceptance on other no-advance terms).
-    "after {advance_pct}% advance payment is received and CLEARED in NexaCrest's bank account": documentTypeCode !== 'PI' || data.financial.has_advance
+    "after {advance_pct}% advance payment is received and CLEARED in NexaCrest's bank account": !['QT', 'PI'].includes(documentTypeCode) || data.financial.has_advance
       ? `after ${data.financial.advance_pct}% advance payment is received and CLEARED in NexaCrest's bank account`
       : (data.financial.payment_method === 'LC' ? "after the Letter of Credit is opened and confirmed by NexaCrest's bank" : "after the Buyer's written acceptance of this document"),
+    // Owner decision (2026-10-28): the Quotation's bank-details and quantity
+    // notices don't speak of an "advance payment" when the order has none.
+    'Bank details for advance payment': data.financial.has_advance ? 'Bank details for advance payment' : 'Bank details for payment',
+    'bank details for advance payment': data.financial.has_advance ? 'bank details for advance payment' : 'bank details for payment',
+    'Total order value and advance payment amount will be confirmed': data.financial.has_advance ? 'Total order value and advance payment amount will be confirmed' : 'Total order value will be confirmed',
     '{tolerance}': trimTrailingZeros(String(tolerance)),
     '{advance_pct}': data.financial.advance_pct,
     '{balance_pct}': data.financial.balance_pct,

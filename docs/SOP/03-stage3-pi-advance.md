@@ -130,7 +130,12 @@ PI Validity clause asks only for acceptance within the validity period.
 Payment Terms show no "0% Advance" lines: they read "100% Payment on FOB
 Value by Letter of Credit — …" and "100% Amount: …", and the Production
 Commencement clause says production starts once the Letter of Credit is
-opened and confirmed by NexaCrest's bank.
+opened and confirmed by NexaCrest's bank. The **Quotation** carries the same
+Payment Terms and production clause, and its bank-details notes speak of
+"payment", not "advance payment". The **Order Confirmation** reads "This
+order is confirmed upon receipt of the Letter of Credit against the
+referenced Proforma Invoice", and its Payment Status shows one row,
+"Payable by Letter of Credit", instead of the advance rows.
 
 ### Recording and clearing the advance payment
 

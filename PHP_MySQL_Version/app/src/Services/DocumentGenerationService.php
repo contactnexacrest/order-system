@@ -1616,13 +1616,19 @@ final class DocumentGenerationService
             // "initiate the 0% advance payment". strtr() matches this longer
             // key before {advance_pct}.
             ' and initiate the {advance_pct}% advance payment' => empty($data['financial']['has_advance']) ? '' : ' and initiate the ' . $data['financial']['advance_pct'] . '% advance payment',
-            // Owner decision (2026-10-28): on a PI with no advance the
+            // Owner decision (2026-10-28): on a QT / PI with no advance the
             // Production Commencement clause no longer waits for a "0% advance
             // payment" — production follows the Letter of Credit (or the
             // buyer's written acceptance on other no-advance terms).
-            "after {advance_pct}% advance payment is received and CLEARED in NexaCrest's bank account" => ($documentTypeCode !== 'PI' || !empty($data['financial']['has_advance']))
+            "after {advance_pct}% advance payment is received and CLEARED in NexaCrest's bank account" => (!in_array($documentTypeCode, ['QT', 'PI'], true) || !empty($data['financial']['has_advance']))
                 ? 'after ' . $data['financial']['advance_pct'] . "% advance payment is received and CLEARED in NexaCrest's bank account"
                 : ((($data['financial']['payment_method'] ?? null) === 'LC') ? "after the Letter of Credit is opened and confirmed by NexaCrest's bank" : "after the Buyer's written acceptance of this document"),
+            // Owner decision (2026-10-28): the Quotation's bank-details and
+            // quantity notices don't speak of an "advance payment" when the
+            // order has none.
+            'Bank details for advance payment' => empty($data['financial']['has_advance']) ? 'Bank details for payment' : 'Bank details for advance payment',
+            'bank details for advance payment' => empty($data['financial']['has_advance']) ? 'bank details for payment' : 'bank details for advance payment',
+            'Total order value and advance payment amount will be confirmed' => empty($data['financial']['has_advance']) ? 'Total order value will be confirmed' : 'Total order value and advance payment amount will be confirmed',
             '{tolerance}'                => rtrim(rtrim($tolerance, '0'), '.'),
             '{advance_pct}'              => $data['financial']['advance_pct'],
             '{balance_pct}'              => $data['financial']['balance_pct'],

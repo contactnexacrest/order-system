@@ -211,6 +211,15 @@ SECTION 3: SECTION STRUCTURE BY DOCUMENT
   Commencement clause reads "Production commences only after the Letter of
   Credit is opened and confirmed by NexaCrest's bank, and …" (other 0% terms:
   "… after the Buyer's written acceptance of this document, and …").
+  The QUOTATION (no advance) has the same Payment Terms lines and Production
+  Commencement clause; its Bank Details Notice reads "Bank details for
+  payment …" and its quantity notice "Total order value will be confirmed …".
+  The ORDER CONFIRMATION (no advance): banner "This order is confirmed upon
+  receipt of the Letter of Credit against the referenced Proforma Invoice."
+  (other 0% terms: "… upon the Buyer's written acceptance of the referenced
+  Proforma Invoice."); Payment Status drops the Advance Due / Advance
+  Received / Advance T/T Received On rows and labels the amount "Payable by
+  Letter of Credit" (other 0% terms: "Payment Due").
   Never print "ADVANCE PAYABLE NOW: … 0.00" or "0% advance".
 
   CFR (owner decision Q-R5-2, 28 October 2026): Insurance reads "NIL — buyer
