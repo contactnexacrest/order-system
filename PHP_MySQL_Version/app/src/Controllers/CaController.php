@@ -179,6 +179,7 @@ final class CaController
             'isEnabled' => ZohoBooksService::isEnabled(),
             'pendingCount' => count(CaRepository::legsPendingZohoSync()),
             'heldCount' => count(CaRepository::legsHeldInZoho()),
+            'purchasesPendingCount' => count(\App\Repositories\ZohoPurchaseRepository::billsToSync()) + count(\App\Repositories\ZohoPurchaseRepository::paymentsToSync()) + count(\App\Repositories\ZohoPurchaseRepository::expensesToSync()),
             'log' => ZohoSyncLogRepository::recent(100),
         ], 'layout/base');
     }
@@ -189,18 +190,21 @@ final class CaController
         $result = CaSyncService::runFullSync('manual', (int) $user['id']);
         $revenue = $result['revenue'];
         $expenses = $result['expenses'];
+        $purchases = $result['purchases'];
 
-        $done = "{$revenue['invoices']} invoice(s) sent or updated, {$revenue['synced']} payment(s) pushed, {$revenue['applied']} payment(s) applied to invoices, {$expenses['imported']} expense(s) imported";
-        if ($revenue['failed'] > 0 || $expenses['failed'] > 0) {
-            Flash::set('warning', "Sync finished: {$done}, " . ($revenue['failed'] + $expenses['failed']) . ' failed — see the log below for details.');
-        } elseif ($revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $expenses['imported'] > 0) {
+        $done = "{$revenue['invoices']} invoice(s) sent or updated, {$revenue['synced']} payment(s) pushed, {$revenue['applied']} payment(s) applied to invoices, "
+            . "{$purchases['bills']} bill(s), {$purchases['payments']} vendor payment(s) ({$purchases['applied']} applied to bills) and {$purchases['expenses']} order expense(s) sent, {$expenses['imported']} expense(s) imported";
+        $failed = $revenue['failed'] + $purchases['failed'] + $expenses['failed'];
+        if ($failed > 0) {
+            Flash::set('warning', "Sync finished: {$done}, {$failed} failed — see the log below for details.");
+        } elseif ($revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $purchases['bills'] + $purchases['payments'] + $purchases['applied'] + $purchases['expenses'] > 0 || $expenses['imported'] > 0) {
             Flash::set('success', "Sync finished: {$done}.");
         } else {
             Flash::set('success', 'Sync ran — nothing was pending (or Zoho Books isn\'t configured yet). See the log below.');
         }
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
-        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['invoices']} invoices, {$revenue['synced']} synced, {$revenue['applied']} applied/{$revenue['failed']} failed, expenses: {$expenses['imported']} imported/{$expenses['failed']} failed");
+        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['invoices']} invoices, {$revenue['synced']} synced, {$revenue['applied']} applied/{$revenue['failed']} failed, purchases: {$purchases['bills']} bills, {$purchases['payments']} payments, {$purchases['applied']} applied, {$purchases['expenses']} expenses/{$purchases['failed']} failed, expenses: {$expenses['imported']} imported/{$expenses['failed']} failed");
         header('Location: /ca/zoho-sync');
     }
 

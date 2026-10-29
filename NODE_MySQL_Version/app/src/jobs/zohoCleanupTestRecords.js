@@ -7,6 +7,7 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const zohoBooksService = require('../services/zohoBooksService');
 const zohoGuard = require('../services/zohoGuard');
 const orderZohoInvoiceRepository = require('../repositories/orderZohoInvoiceRepository');
+const zohoPurchaseRepository = require('../repositories/zohoPurchaseRepository');
 
 /**
  * Port of cron/zoho_cleanup_test_records.php. Zoho integration Stage 1
@@ -16,13 +17,15 @@ const orderZohoInvoiceRepository = require('../repositories/orderZohoInvoiceRepo
  *
  * What it removes:
  *   - every Books customer whose name starts with TEST-, with its payments
- *     and (Stage 2) its invoices;
+ *     and (Stage 2) its invoices; (Stage 3) every TEST- vendor with its
+ *     payments and bills, and every expense whose description starts TEST-;
  *   - with --from-sync-log, also every payment this database's sync log
- *     pushed, every invoice it sent (order_zoho_invoices) and every
- *     customer this database created (clients.zoho_contact_id).
+ *     pushed, every invoice it sent (order_zoho_invoices), every customer
+ *     this database created (clients.zoho_contact_id), and every vendor,
+ *     bill, vendor payment and expense it sent (Stage 3).
  *     Run that only on the TEST database, never on the live one.
- * Payments go first, then invoices (Books refuses to delete a customer
- * that still has transactions); this database's Zoho references are then
+ * Payments go first, then invoices, bills and expenses (Books refuses to
+ * delete a contact that still has transactions); this database's Zoho references are then
  * cleared so a later sync starts clean.
  *
  * Usage:
@@ -51,7 +54,7 @@ async function run(args) {
   const by = option('--by') || process.env.USER || 'unknown';
   const logFile = option('--log');
 
-  const plan = { customerpayment: new Map(), invoice: new Map(), contact: new Map() };
+  const plan = { customerpayment: new Map(), vendorpayment: new Map(), invoice: new Map(), bill: new Map(), expense: new Map(), contact: new Map() };
   for (const contact of await zohoBooksService.listTestContacts()) {
     for (const payment of contact.payments) {
       plan.customerpayment.set(payment.payment_id, `payment ${payment.label} of ${contact.name}`);
@@ -59,7 +62,16 @@ async function run(args) {
     for (const invoice of contact.invoices) {
       plan.invoice.set(invoice.invoice_id, `invoice ${invoice.label} of ${contact.name}`);
     }
-    plan.contact.set(contact.contact_id, `customer ${contact.name}`);
+    for (const payment of contact.vendor_payments) {
+      plan.vendorpayment.set(payment.payment_id, `vendor payment ${payment.label} to ${contact.name}`);
+    }
+    for (const bill of contact.bills) {
+      plan.bill.set(bill.bill_id, `bill ${bill.label} from ${contact.name}`);
+    }
+    plan.contact.set(contact.contact_id, `${contact.bills.length > 0 || contact.vendor_payments.length > 0 ? 'vendor' : 'contact'} ${contact.name}`);
+  }
+  for (const expense of await zohoBooksService.listTestExpenses()) {
+    plan.expense.set(expense.expense_id, `expense ${expense.label}`);
   }
   if (fromSyncLog) {
     const rows = await db.query("SELECT entity_id, leg, zoho_reference FROM zoho_sync_log WHERE sync_type = 'revenue_payment' AND status = 'success' AND zoho_reference IS NOT NULL");
@@ -75,12 +87,15 @@ async function run(args) {
       const id = String(row.zoho_contact_id);
       if (!plan.contact.has(id)) plan.contact.set(id, `customer ${row.company_legal_name} (created by this database)`);
     }
+    for (const record of await zohoPurchaseRepository.pushedRecords()) {
+      if (!plan[record.kind].has(record.id)) plan[record.kind].set(record.id, record.label);
+    }
   }
 
   for (const [kind, items] of Object.entries(plan)) {
     for (const [id, label] of items) console.log(`${kind} ${id}  ${label}`);
   }
-  console.log(`\n${plan.customerpayment.size} payment(s), ${plan.invoice.size} invoice(s) and ${plan.contact.size} customer(s) to delete from Zoho Books.`);
+  console.log(`\n${plan.customerpayment.size} customer payment(s), ${plan.vendorpayment.size} vendor payment(s), ${plan.invoice.size} invoice(s), ${plan.bill.size} bill(s), ${plan.expense.size} expense(s) and ${plan.contact.size} customer/vendor contact(s) to delete from Zoho Books.`);
   if (!apply) {
     console.log('Dry run — nothing changed. Run again with --apply to delete them.');
     return 0;
@@ -93,25 +108,29 @@ async function run(args) {
   for (const [kind, items] of Object.entries(plan)) {
     for (const [id, label] of items) {
       try {
-        await zohoBooksService.deleteRecord(kind, id);
-        console.log(`deleted ${kind} ${id}`);
+        const deleted = await zohoBooksService.deleteRecord(kind, id);
+        console.log(`${deleted ? 'deleted' : 'already gone'} ${kind} ${id}`);
         const now = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
-        n += 1;
-        csvRows.push([
+        if (deleted) n += 1;
+        if (deleted) csvRows.push([
           `Z-NEW-${n}`, now, by, by, 'Zoho API (cleanup script)', 'Zoho Books', `Books org ${orgId}`,
           {
-            contact: 'DELETE /books/v3/contacts/{id} (Books: Sales -> Customers)',
+            contact: 'DELETE /books/v3/contacts/{id} (Books: Sales -> Customers / Purchases -> Vendors)',
             invoice: 'DELETE /books/v3/invoices/{id} (Books: Sales -> Invoices)',
+            vendorpayment: 'DELETE /books/v3/vendorpayments/{id} (Books: Purchases -> Payments Made)',
+            bill: 'DELETE /books/v3/bills/{id} (Books: Purchases -> Bills)',
+            expense: 'DELETE /books/v3/expenses/{id} (Books: Purchases -> Expenses)',
             customerpayment: 'DELETE /books/v3/customerpayments/{id} (Books: Sales -> Payments Received)',
           }[kind],
           'Delete', `${label}; Zoho ID ${id}`, 'Exists', 'Deleted', 'Remove test data before go-live', 'Test', 'Yes', `${now} / ${by}`,
           'src/jobs/zohoCleanupTestRecords.js', '', '',
         ]);
+        await zohoPurchaseRepository.forgetZohoRecord(kind, id);
         if (kind === 'contact') {
           await db.execute('UPDATE clients SET zoho_contact_id = NULL WHERE zoho_contact_id = :id', { id });
         } else if (kind === 'invoice') {
           await orderZohoInvoiceRepository.forgetZohoInvoice(id);
-        } else {
+        } else if (kind === 'customerpayment') {
           for (const leg of ['advance', 'balance', 'freight']) {
             await db.execute(`UPDATE order_payment_status SET ${leg}_zoho_synced_at = NULL, ${leg}_zoho_reference = NULL, ${leg}_zoho_applied_at = NULL WHERE ${leg}_zoho_reference = :id`, { id });
           }

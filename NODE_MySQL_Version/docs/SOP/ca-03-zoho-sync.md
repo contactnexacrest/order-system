@@ -95,6 +95,47 @@ on every sync until fixed):
 Letter of Credit money is not sent to Books yet (only the advance,
 balance and freight legs are).
 
+## Bills, vendor payments and order expenses in Zoho Books (2026-10-29)
+
+What the order pays out goes to Zoho Books too, on the same sync:
+
+- **Vendors.** A supplier or logistics partner becomes a **vendor** in
+  Books the first time one of its bills or payments is sent (with its
+  PAN; in a GST-registered organisation also its GSTIN). The system
+  remembers the vendor, so it is never created twice.
+- **Bills.** A supplier's or logistics partner's **tax invoice** becomes a
+  Books **bill**, with the vendor's own bill number and date, at its total
+  in INR. A **proforma** is an advance request, not a bill, so it is not
+  sent. Supplier bills are booked to *Cost of Goods Sold*; CHA, transport
+  and ocean freight bills to *Transportation Expense*; other logistics
+  bills to *Other Expenses*.
+- **Payments to vendors.** Each payment recorded against a bill becomes a
+  Books **vendor payment** from the deposit bank account, with its UTR /
+  reference. It is applied to the bill when the bill is in Books. A
+  payment made on a **proforma** is held in Books as an **advance** to
+  the vendor, and is applied to the tax invoice that replaces the
+  proforma once that tax invoice is sent.
+- **Order expenses.** Each expense recorded on an order becomes a Books
+  **expense**: travel, hotel, food and local conveyance to *Travel
+  Expense*, courier to *Postage*, samples and other to *Other Expenses*.
+  Paid from the company account: the deposit bank account; paid by
+  staff: *Employee Reimbursements*; paid by company card: an account
+  named *Company Card* (add it in Books before the first card expense).
+  The expense import (chapter CA-04) **skips** these, so an order expense
+  is never brought back in a second time.
+- **Not sent:** the manual cost lines (ECGC, documentation, bank charges
+  and the like) — they would count the same cost twice where a bill
+  already covers it.
+
+**What stops a bill, payment or expense, with a message in the Sync Log**
+(retried on every sync until fixed):
+
+- a Books account above does not exist (add it in Zoho Books →
+  Accountant → Chart of Accounts, or ask the CA which to use);
+- a bill **with GST** while the Books organisation is GST-registered:
+  how GST and input credit on bills are booked is for the CA to set up
+  first, so the system does not guess it.
+
 ## The server switches in `.env` (2026-10-29)
 
 Three lines in the server's `.env` file decide what this server may do
@@ -198,13 +239,17 @@ decision, 2026-10-29). Whichever organisation is used, everything made
 while testing is removed before go-live:
 
 - Test customers' names start with **`TEST-`**. With
-  `ZOHO_ENVIRONMENT=test`, nothing else can be sent.
+  `ZOHO_ENVIRONMENT=test`, nothing else can be sent; a bill or vendor
+  payment also needs a vendor whose name starts with `TEST-`.
 - **Keep GST e-invoicing off** and file no GST return from Zoho Books
   until the clean-up is done.
 - The clean-up script lists, and with `--apply` deletes, every `TEST-`
-  customer with its payments and invoices (payments first, then
-  invoices). With `--from-sync-log` it also takes every payment, invoice
-  and customer the **test** database pushed —
+  customer with its payments and invoices, every `TEST-` vendor with its
+  payments and bills, and every expense whose description starts with
+  `TEST-` (payments first, then invoices, bills and expenses). With
+  `--from-sync-log` it also takes every record the **test** database
+  pushed — a record already gone is reported as such, not logged as a
+  deletion —
   it refuses to run where `ZOHO_ENVIRONMENT=production`. It is a dry run
   unless `--apply` is given:
   - PHP: `php app/cron/zoho_cleanup_test_records.php [--from-sync-log] [--apply] [--by "Name"] [--log docs/zoho/zoho-change-log.csv]`

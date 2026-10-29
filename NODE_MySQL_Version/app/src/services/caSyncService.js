@@ -5,6 +5,7 @@ const caExpenseRepository = require('../repositories/caExpenseRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderZohoInvoiceRepository = require('../repositories/orderZohoInvoiceRepository');
 const zohoSyncLogRepository = require('../repositories/zohoSyncLogRepository');
+const zohoPurchaseRepository = require('../repositories/zohoPurchaseRepository');
 const zohoBooksService = require('../services/zohoBooksService');
 const zohoGuard = require('../services/zohoGuard');
 const zohoInvoiceData = require('../services/zohoInvoiceData');
@@ -22,6 +23,9 @@ const zohoInvoiceData = require('../services/zohoInvoiceData');
 async function runFullSync(triggeredBy, triggeredByUserId) {
   return {
     revenue: await syncPendingRevenue(triggeredBy, triggeredByUserId),
+    // Stage 3 runs before the expense import, so the order expenses it sends
+    // are already marked and the import skips them.
+    purchases: await syncPurchases(triggeredBy, triggeredByUserId),
     expenses: await importPendingExpenses(triggeredBy, triggeredByUserId),
   };
 }
@@ -162,6 +166,89 @@ async function markSynced(orderId, leg, zohoReference) {
   return undefined;
 }
 
+/**
+ * Stage 3 (2026-10-29): what the app pays out. First the suppliers' and
+ * logistics partners' tax invoices (as Books bills, under the vendor,
+ * created on first use), then each payment made to them — applied to its
+ * bill when that is in Books; a payment on a proforma is held as an advance
+ * until the tax invoice that replaces it is in Books — then held payments
+ * whose bill has now arrived, then the order's expenses. Every item is
+ * logged on its own; one failing never stops the others.
+ *
+ * @return {Promise<{bills: number, payments: number, applied: number, expenses: number, failed: number, skipped: number}>}
+ */
+async function syncPurchases(triggeredBy, triggeredByUserId) {
+  const result = { bills: 0, payments: 0, applied: 0, expenses: 0, failed: 0, skipped: 0 };
+  if (!(await zohoBooksService.isEnabled())) {
+    await zohoSyncLogRepository.log('vendor_bill', null, null, null, 'skipped', null, `${offReason()} — no bills, vendor payments or expenses sent.`, triggeredBy, triggeredByUserId);
+    result.skipped = 1;
+    return result;
+  }
+  const log = (type, orderId, leg, status, reference, message) => zohoSyncLogRepository.log(type, 'order', orderId, leg, status, reference, message, triggeredBy, triggeredByUserId);
+  const money = (n) => Number(n).toFixed(2);
+
+  for (const bill of await zohoPurchaseRepository.billsToSync()) {
+    try {
+      const zohoBillId = await zohoBooksService.pushBill(bill);
+      await zohoPurchaseRepository.setBillSynced(bill.id, zohoBillId);
+      await log('vendor_bill', bill.order_id, 'bill', 'success', zohoBillId, `Sent bill ${bill.bill_no} from ${bill.vendor_name} (INR ${money(bill.total_inr)}) as Zoho Books bill.`);
+      result.bills += 1;
+    } catch (e) {
+      await log('vendor_bill', bill.order_id, 'bill', 'error', null, e.message);
+      result.failed += 1;
+    }
+  }
+
+  for (const { payment, bill } of await zohoPurchaseRepository.paymentsToSync()) {
+    const target = await zohoPurchaseRepository.targetBillFor((await zohoPurchaseRepository.findBill(bill.id)) || bill);
+    try {
+      const pushed = await zohoBooksService.pushVendorPayment(payment, bill, target);
+      await zohoPurchaseRepository.setPaymentSynced(payment.id, pushed.payment_id, pushed.applied > 0);
+      let note;
+      if (!target) note = `, held unapplied until the tax invoice for proforma ${bill.bill_no} is in Zoho Books.`;
+      else note = pushed.applied > 0 ? `, applied ${money(pushed.applied)} to bill ${target.bill_no}.` : `, held unapplied: bill ${target.bill_no} has nothing left to pay.`;
+      await log('vendor_payment', bill.order_id, 'payment', 'success', pushed.payment_id, `Pushed payment ${payment.payment_ref} (INR ${money(payment.amount_inr)}) to ${bill.vendor_name} as Zoho Books vendor payment${note}`);
+      result.payments += 1;
+      result.applied += pushed.applied > 0 ? 1 : 0;
+    } catch (e) {
+      await log('vendor_payment', bill.order_id, 'payment', 'error', null, e.message);
+      result.failed += 1;
+    }
+  }
+
+  for (const { payment, bill } of await zohoPurchaseRepository.heldPayments()) {
+    const target = await zohoPurchaseRepository.targetBillFor(bill);
+    if (!target) continue; // its tax invoice is not in Books yet — nothing to do
+    try {
+      const amount = await zohoBooksService.applyVendorPayment(payment, bill, target);
+      await zohoPurchaseRepository.setPaymentApplied(payment.id);
+      await log('vendor_payment_apply', bill.order_id, 'payment', 'success', String(payment.zoho_payment_id), `Applied ${money(amount)} of payment ${payment.payment_ref} to bill ${target.bill_no}.`);
+      result.applied += 1;
+    } catch (e) {
+      await log('vendor_payment_apply', bill.order_id, 'payment', 'error', String(payment.zoho_payment_id), e.message);
+      result.failed += 1;
+    }
+  }
+
+  for (const expense of await zohoPurchaseRepository.expensesToSync()) {
+    try {
+      const zohoExpenseId = await zohoBooksService.pushExpense(expense);
+      await zohoPurchaseRepository.setExpenseSynced(expense.id, zohoExpenseId);
+      await log('order_expense', expense.order_id, 'expense', 'success', zohoExpenseId, `Sent expense "${expense.details}" (INR ${money(expense.amount_inr)}) as Zoho Books expense.`);
+      result.expenses += 1;
+    } catch (e) {
+      await log('order_expense', expense.order_id, 'expense', 'error', null, e.message);
+      result.failed += 1;
+    }
+  }
+
+  if (result.bills + result.payments + result.applied + result.expenses + result.failed === 0) {
+    await zohoSyncLogRepository.log('vendor_bill', null, null, null, 'skipped', null, 'Nothing pending — every tax invoice, vendor payment and order expense is already in Zoho Books.', triggeredBy, triggeredByUserId);
+    result.skipped = 1;
+  }
+  return result;
+}
+
 async function importPendingExpenses(triggeredBy, triggeredByUserId) {
   if (!(await zohoBooksService.isEnabled())) {
     await zohoSyncLogRepository.log('expense_import', null, null, null, 'skipped', null, `${offReason()} — nothing imported.`, triggeredBy, triggeredByUserId);
@@ -178,7 +265,9 @@ async function importPendingExpenses(triggeredBy, triggeredByUserId) {
 
   let imported = 0;
   for (const expense of expenses) {
-    if (await caExpenseRepository.existsByZohoId(expense.zohoExpenseId)) {
+    // Stage 3: an order expense this app sent to Books is already here as
+    // that order expense — never import it a second time.
+    if ((await caExpenseRepository.existsByZohoId(expense.zohoExpenseId)) || (await zohoPurchaseRepository.isPushedExpense(expense.zohoExpenseId))) {
       continue;
     }
     const id = await caExpenseRepository.insert(
@@ -218,4 +307,4 @@ function offReason() {
     : 'Zoho is switched off on this server (ZOHO_INTEGRATION_ENABLED in .env)';
 }
 
-module.exports = { runFullSync, syncPendingRevenue, importPendingExpenses };
+module.exports = { runFullSync, syncPendingRevenue, syncPurchases, importPendingExpenses };

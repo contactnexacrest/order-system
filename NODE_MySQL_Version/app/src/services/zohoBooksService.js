@@ -6,6 +6,9 @@ const lookupRepository = require('../repositories/lookupRepository');
 const zohoGuard = require('./zohoGuard');
 const { todayIst } = require('../helpers/dbDateTime');
 const { KIND_LABELS } = require('./zohoInvoiceData');
+const { LOGISTICS_SERVICES } = require('../repositories/orderVendorBillRepository');
+const { CATEGORIES: EXPENSE_CATEGORIES } = require('../repositories/orderExpenseRepository');
+const zohoPurchaseRepository = require('../repositories/zohoPurchaseRepository');
 
 /**
  * CA / Accounting module — the Zoho Books connection. Phase 3 pushes a
@@ -36,12 +39,15 @@ let transport = null;
 const tokens = new Map();
 // Whether each Books organisation is GST-registered.
 const gstRegistered = new Map();
+// Account id by name, per organisation.
+const accounts = new Map();
 
 /** Tests only: answer every Zoho request with fn(method, url, payload, headers, formEncoded) instead of the network (null restores real HTTP). */
 function setTransport(fn) {
   transport = fn;
   tokens.clear();
   gstRegistered.clear();
+  accounts.clear();
 }
 
 /** On only when this server allows Zoho (.env, zohoGuard) and the zoho_books_enabled setting is ticked. */
@@ -190,6 +196,171 @@ async function pushInvoice(invoice) {
   return { zoho_invoice_id: String(saved.invoice_id), zoho_invoice_number: String(saved.invoice_number), status, created: !existing };
 }
 
+// Stage 3: which Books account a bill or an expense is booked to, by
+// account name (looked up in the organisation's chart of accounts).
+// Defaults chosen 2026-10-29 for the CA to confirm.
+const BILL_ACCOUNTS = {
+  supplier: 'Cost of Goods Sold',
+  cha: 'Transportation Expense',
+  transport: 'Transportation Expense',
+  cha_transport: 'Transportation Expense',
+  ocean_freight: 'Transportation Expense',
+  other: 'Other Expenses',
+};
+const EXPENSE_ACCOUNTS = {
+  travel_fuel: 'Travel Expense',
+  travel_ticket: 'Travel Expense',
+  local_conveyance: 'Travel Expense',
+  hotel: 'Travel Expense',
+  food: 'Travel Expense',
+  courier: 'Postage',
+  samples: 'Other Expenses',
+  other: 'Other Expenses',
+};
+// What an expense was paid from: the company account is the deposit
+// account; these are found by name.
+const PAID_THROUGH_ACCOUNTS = { company_card: 'Company Card', staff: 'Employee Reimbursements' };
+
+const money = (n) => Number(n).toFixed(2);
+
+/**
+ * Stage 3: a supplier's or logistics partner's tax invoice as a Books bill,
+ * under the vendor (created on first use). Bills go in at their total in
+ * INR. A bill with GST is refused while the organisation is GST-registered:
+ * which GST tax and input credit to book is the CA's call, not guessed
+ * here. The bill is looked up by number for that vendor first, so a retry
+ * never makes a second one.
+ *
+ * @throws on any failure
+ * @return {Promise<string>} the Zoho bill_id
+ */
+async function pushBill(bill) {
+  zohoGuard.assertCustomerAllowed(String(bill.buyer_name));
+  assertVendorAllowed(String(bill.vendor_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  if (Number(bill.gst_inr) > 0 && (await isGstRegistered(config, accessToken))) {
+    throw new Error(`Bill ${bill.bill_no} not sent: it carries GST, and how GST on bills is booked in a GST-registered Zoho Books organisation is still for the CA to decide.`);
+  }
+  const vendorId = await findOrCreateVendor(config, accessToken, bill);
+  const existing = await findBill(config, accessToken, String(bill.bill_no), vendorId);
+  if (existing) return String(existing.bill_id);
+
+  const forKey = bill.vendor_kind === 'supplier' ? 'supplier' : String(bill.bill_for);
+  const what = bill.vendor_kind === 'supplier'
+    ? `Supplier ${bill.bill_for === 'balance' ? 'balance' : 'advance'} bill`
+    : `${LOGISTICS_SERVICES[bill.bill_for] || 'Logistics'} bill`;
+  const payload = {
+    vendor_id: vendorId,
+    bill_number: String(bill.bill_no),
+    date: String(bill.bill_date),
+    reference_number: String(bill.buyer_inquiry_ref),
+    line_items: [{
+      account_id: await accountId(config, accessToken, BILL_ACCOUNTS[forKey] || BILL_ACCOUNTS.other),
+      name: what,
+      description: `${what} for order ${bill.buyer_inquiry_ref}: taxable ${money(bill.taxable_inr)} + GST ${money(bill.gst_inr)}${bill.note ? `. ${bill.note}` : ''}`,
+      rate: round(Number(bill.total_inr), 2),
+      quantity: 1,
+    }],
+  };
+  const res = await request('POST', `https://${config.apiDomain}/books/v3/bills?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
+  const saved = await findBill(config, accessToken, String(bill.bill_no), vendorId);
+  if (!saved) {
+    throw new Error(`Zoho Books bill creation for ${bill.bill_no} failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+  return String(saved.bill_id);
+}
+
+/**
+ * Stage 3: one payment to a vendor as a Books vendor payment from the
+ * deposit account. With targetBill (the tax invoice already in Books) it is
+ * applied to that bill, up to what the bill still owes; without, it is held
+ * unapplied (an advance paid on a proforma) until applyVendorPayment().
+ *
+ * @throws on any failure
+ * @return {Promise<{payment_id: string, applied: number}>}
+ */
+async function pushVendorPayment(payment, bill, targetBill) {
+  zohoGuard.assertCustomerAllowed(String(bill.buyer_name));
+  assertVendorAllowed(String(bill.vendor_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const vendorId = await findOrCreateVendor(config, accessToken, bill);
+  const payload = vendorPaymentPayload(config, vendorId, payment);
+  let applied = 0;
+  if (targetBill) {
+    [payload.bills, applied] = await billApplication(config, accessToken, targetBill, vendorId, payload.amount);
+  }
+  const res = await request('POST', `https://${config.apiDomain}/books/v3/vendorpayments?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
+  const decoded = safeJson(res.body);
+  const paymentId = decoded && decoded.vendorpayment && decoded.vendorpayment.payment_id;
+  if (!res.ok || typeof paymentId !== 'string') {
+    throw new Error(`Zoho Books vendor payment failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+  return { payment_id: paymentId, applied };
+}
+
+/**
+ * Stage 3: applies a vendor payment held unapplied (paid on a proforma) to
+ * the tax invoice that replaced it, now that it is in Books.
+ *
+ * @throws on any failure
+ * @return {Promise<number>} the amount applied
+ */
+async function applyVendorPayment(payment, bill, targetBill) {
+  zohoGuard.assertCustomerAllowed(String(bill.buyer_name));
+  assertVendorAllowed(String(bill.vendor_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const vendorId = await findOrCreateVendor(config, accessToken, bill);
+  const payload = vendorPaymentPayload(config, vendorId, payment);
+  let applied;
+  [payload.bills, applied] = await billApplication(config, accessToken, targetBill, vendorId, payload.amount);
+  if (applied <= 0) {
+    throw new Error(`Bill ${targetBill.bill_no} in Zoho Books has nothing left to pay, so payment ${payment.payment_ref} stays unapplied there — ask the CA how to book it.`);
+  }
+  const res = await request('PUT', `https://${config.apiDomain}/books/v3/vendorpayments/${encodeURIComponent(String(payment.zoho_payment_id))}?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
+  const decoded = safeJson(res.body);
+  if (!res.ok || !decoded || !decoded.vendorpayment) {
+    throw new Error(`Zoho Books vendor payment update failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+  return applied;
+}
+
+/**
+ * Stage 3: one order expense as a Books expense, paid through the deposit
+ * account (company account), "Company Card" or "Employee Reimbursements"
+ * (paid by staff). Its description starts with the buyer's name and order
+ * reference, so a TEST- order's expenses are found by the clean-up script.
+ *
+ * @throws on any failure
+ * @return {Promise<string>} the Zoho expense_id
+ */
+async function pushExpense(expense) {
+  zohoGuard.assertCustomerAllowed(String(expense.buyer_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const paidThrough = expense.paid_by === 'company_account'
+    ? config.depositAccountId
+    : await accountId(config, accessToken, PAID_THROUGH_ACCOUNTS[expense.paid_by] || 'Employee Reimbursements');
+  const label = EXPENSE_CATEGORIES[expense.category] || 'Expense';
+  const payload = {
+    account_id: await accountId(config, accessToken, EXPENSE_ACCOUNTS[expense.category] || EXPENSE_ACCOUNTS.other),
+    paid_through_account_id: paidThrough,
+    amount: round(Number(expense.amount_inr), 2),
+    date: String(expense.expense_date),
+    reference_number: `${expense.buyer_inquiry_ref}-EXP-${expense.id}`,
+    description: `${expense.buyer_name} / ${expense.buyer_inquiry_ref}: ${label} — ${expense.details}${expense.paid_by === 'staff' && expense.staff_name ? ` (paid by ${expense.staff_name})` : ''}`,
+  };
+  const res = await request('POST', `https://${config.apiDomain}/books/v3/expenses?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
+  const decoded = safeJson(res.body);
+  const expenseId = decoded && decoded.expense && decoded.expense.expense_id;
+  if (!res.ok || typeof expenseId !== 'string') {
+    throw new Error(`Zoho Books expense failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+  return expenseId;
+}
+
 /**
  * The "Test Books connection" button (Admin -> Settings): logs in with the
  * saved credentials and checks the organisation and the deposit account
@@ -298,21 +469,63 @@ async function listTestContacts() {
       invoice_id: String(i.invoice_id),
       label: [i.invoice_number || '', i.currency_code || '', i.total ?? '', `on ${i.date || ''}`].map(String).filter((part) => part !== '').join(' '),
     }));
-    contacts.push({ contact_id: String(row.contact_id), name: String(row.contact_name || ''), payments, invoices });
+    // Stage 3: a TEST- vendor's payments and bills.
+    let vendorPayments = [];
+    let bills = [];
+    if (row.contact_type === 'vendor') {
+      vendorPayments = (await getList(accessToken, `https://${config.apiDomain}/books/v3/vendorpayments${query}&vendor_id=${encodeURIComponent(String(row.contact_id))}`, 'vendorpayments'))
+        .map((vp) => ({ payment_id: String(vp.payment_id), label: `${vp.reference_number || ''} INR ${vp.amount ?? ''} on ${vp.date || ''}`.trim() }));
+      bills = (await getList(accessToken, `https://${config.apiDomain}/books/v3/bills${query}&vendor_id=${encodeURIComponent(String(row.contact_id))}`, 'bills'))
+        .map((b) => ({ bill_id: String(b.bill_id), label: `${b.bill_number || ''} INR ${b.total ?? ''} on ${b.date || ''}`.trim() }));
+    }
+    contacts.push({ contact_id: String(row.contact_id), name: String(row.contact_name || ''), payments, invoices, vendor_payments: vendorPayments, bills });
   }
   return contacts;
 }
 
 /**
+ * Stage 3 clean-up: every Books expense whose description starts with
+ * TEST- (an order expense's description starts with the buyer's name).
+ *
+ * @return {Promise<Array<{expense_id: string, label: string}>>}
+ */
+async function listTestExpenses() {
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const out = [];
+  let page = 1;
+  let more;
+  do {
+    const res = await request('GET', `https://${config.apiDomain}/books/v3/expenses?organization_id=${encodeURIComponent(config.organizationId)}&page=${page}&per_page=200`, null, authHeaders(accessToken));
+    const decoded = safeJson(res.body);
+    if (!res.ok || !decoded || !Array.isArray(decoded.expenses)) {
+      throw new Error(`Zoho Books expense list failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+    }
+    for (const row of decoded.expenses) {
+      if (String(row.description || '').startsWith(zohoGuard.TEST_PREFIX)) {
+        out.push({ expense_id: String(row.expense_id), label: `${row.description || ''} INR ${row.total ?? ''} on ${row.date || ''}`.trim() });
+      }
+    }
+    more = Boolean(decoded.page_context && decoded.page_context.has_more_page);
+    page += 1;
+  } while (more);
+  return out;
+}
+
+/**
  * Deletes one Books record made while testing — 'customerpayment',
- * 'invoice' or 'contact' (payments, then invoices, then the contact: Books
- * refuses to delete a contact that still has transactions). A record
- * already gone counts as deleted.
+ * 'invoice', 'vendorpayment', 'bill', 'expense' or 'contact' (payments, then
+ * invoices and bills, then the contact: Books refuses to delete a contact
+ * that still has transactions). A record already gone counts as deleted,
+ * and returns false so the clean-up does not log a deletion that never
+ * happened.
+ *
+ * @return {Promise<boolean>} true when Books deleted it, false when it was already gone
  *
  * @throws on any other failure
  */
 async function deleteRecord(kind, id) {
-  const paths = { customerpayment: 'customerpayments', invoice: 'invoices', contact: 'contacts' };
+  const paths = { customerpayment: 'customerpayments', invoice: 'invoices', vendorpayment: 'vendorpayments', bill: 'bills', expense: 'expenses', contact: 'contacts' };
   if (!paths[kind]) {
     throw new Error(`Unknown Zoho Books record kind ${kind}.`);
   }
@@ -320,11 +533,12 @@ async function deleteRecord(kind, id) {
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
   const res = await request('DELETE', `https://${config.apiDomain}/books/v3/${paths[kind]}/${encodeURIComponent(id)}?organization_id=${encodeURIComponent(config.organizationId)}`, null, authHeaders(accessToken));
   if (res.status === 404) {
-    return;
+    return false;
   }
   if (!res.ok) {
     throw new Error(`Zoho Books ${kind} ${id} delete failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
   }
+  return true;
 }
 
 async function loadConfig() {
@@ -470,6 +684,79 @@ async function isGstRegistered(config, accessToken) {
   return gstRegistered.get(config.organizationId);
 }
 
+/** In test, only vendors whose name starts with TEST- may be sent, so the clean-up script finds them. */
+function assertVendorAllowed(name) {
+  if (!zohoGuard.isProduction() && !name.startsWith(zohoGuard.TEST_PREFIX)) {
+    throw new Error(`Not sent: ZOHO_ENVIRONMENT is test, and only vendors whose name starts with TEST- may go to Zoho (this one is "${name}").`);
+  }
+}
+
+/** The bill's vendor in Books (supplier or logistics partner), created on first use and remembered on its row. */
+async function findOrCreateVendor(config, accessToken, bill) {
+  if (bill.vendor_zoho_contact_id) return String(bill.vendor_zoho_contact_id);
+  const name = String(bill.vendor_name);
+  const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const match = (await getList(accessToken, `https://${config.apiDomain}/books/v3/contacts${query}&contact_type=vendor&contact_name=${encodeURIComponent(name)}`, 'contacts'))
+    .find((row) => String(row.contact_name || '') === name);
+  let found = match ? String(match.contact_id) : null;
+  if (!found) {
+    const payload = { contact_name: name, company_name: name, contact_type: 'vendor' };
+    if (await isGstRegistered(config, accessToken)) {
+      Object.assign(payload, bill.vendor_gstin ? { gst_treatment: 'business_gst', gst_no: String(bill.vendor_gstin) } : { gst_treatment: 'business_none' });
+    }
+    if (bill.vendor_pan) payload.pan_no = String(bill.vendor_pan);
+    const res = await request('POST', `https://${config.apiDomain}/books/v3/contacts${query}`, payload, authHeaders(accessToken));
+    const decoded = safeJson(res.body);
+    found = decoded && decoded.contact && decoded.contact.contact_id;
+    if (!res.ok || typeof found !== 'string') {
+      throw new Error(`Zoho Books vendor creation failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+    }
+  }
+  await zohoPurchaseRepository.setVendorContactId(String(bill.vendor_kind), Number(bill.vendor_id), found);
+  return found;
+}
+
+/** One bill by its number for this vendor. */
+async function findBill(config, accessToken, billNumber, vendorId) {
+  const rows = await getList(accessToken, `https://${config.apiDomain}/books/v3/bills?organization_id=${encodeURIComponent(config.organizationId)}&vendor_id=${encodeURIComponent(vendorId)}&bill_number=${encodeURIComponent(billNumber)}`, 'bills');
+  return rows.find((row) => String(row.bill_number || '') === billNumber && String(row.vendor_id ?? vendorId) === vendorId) || null;
+}
+
+function vendorPaymentPayload(config, vendorId, payment) {
+  return {
+    vendor_id: vendorId,
+    amount: round(Number(payment.amount_inr), 2),
+    date: String(payment.paid_at),
+    payment_mode: String(payment.payment_mode),
+    reference_number: String(payment.payment_ref),
+    paid_through_account_id: config.depositAccountId,
+  };
+}
+
+/** As much of amount as the bill still owes. @return {Promise<[Array, number]>} */
+async function billApplication(config, accessToken, targetBill, vendorId, amount) {
+  const row = await findBill(config, accessToken, String(targetBill.bill_no), vendorId);
+  if (!row) throw new Error(`Bill ${targetBill.bill_no} was not found in Zoho Books for this vendor.`);
+  const applied = round(Math.min(amount, Number(row.balance || 0)), 2);
+  return [applied > 0 ? [{ bill_id: String(row.bill_id), amount_applied: applied }] : [], applied];
+}
+
+/** A Books account's id by its name; a missing account is refused with where to add it. */
+async function accountId(config, accessToken, name) {
+  if (!accounts.has(config.organizationId)) {
+    const byName = new Map();
+    for (const row of await getList(accessToken, `https://${config.apiDomain}/books/v3/chartofaccounts?organization_id=${encodeURIComponent(config.organizationId)}`, 'chartofaccounts')) {
+      byName.set(String(row.account_name), String(row.account_id));
+    }
+    accounts.set(config.organizationId, byName);
+  }
+  const id = accounts.get(config.organizationId).get(name);
+  if (!id) {
+    throw new Error(`Zoho Books has no account named "${name}". Add it in Zoho Books -> Accountant -> Chart of Accounts (or ask the CA which account to use), then sync again.`);
+  }
+  return id;
+}
+
 function assertContactCurrency(companyLegalName, contactCurrency, currencyCode) {
   if (contactCurrency !== '' && contactCurrency !== currencyCode) {
     throw new Error(`${companyLegalName} is set up in Zoho Books in ${contactCurrency}, but this payment is in ${currencyCode}. A Zoho Books customer has one currency — ask the CA how to book it.`);
@@ -537,4 +824,8 @@ function safeJson(text) {
   }
 }
 
-module.exports = { isEnabled, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, testConnection, listExpenses, listTestContacts, deleteRecord, setTransport };
+module.exports = {
+  BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS,
+  isEnabled, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense,
+  testConnection, listExpenses, listTestContacts, listTestExpenses, deleteRecord, setTransport,
+};

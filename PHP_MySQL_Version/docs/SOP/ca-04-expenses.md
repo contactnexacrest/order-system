@@ -18,6 +18,14 @@ system's Expenses page is a read-only mirror, built so a CA or the
 Accounts team can see revenue and expenses side by side for reconciliation
 without needing separate logins or separate exports.
 
+**Since Zoho Books Stage 3 (2026-10-29), once it is switched on:** the
+supplier's and logistics partners' tax invoices, the payments made to them
+and the expenses recorded on an order are sent to Zoho Books **from this
+system** (chapter CA-03). Do **not** also enter those in Zoho Books by hand,
+or they are counted twice. Expenses that belong to no order (salaries,
+rent, office costs and the like) are still entered in Zoho Books as
+before.
+
 ## What gets imported
 
 Every expense recorded in Zoho Books is imported: its category (Zoho
@@ -32,6 +40,11 @@ creates duplicates. There's no manual "delete" for an imported expense
 either; if an expense is corrected or removed in Zoho Books, that
 correction doesn't currently flow back automatically (see "What this
 doesn't do yet" below).
+
+**Order expenses sent from this system (2026-10-29).** Expenses recorded
+on an order are sent to Zoho Books as expenses (chapter CA-03). The import
+recognises them and skips them, so they are not listed here a second
+time — they stay on the order where they were entered.
 
 ## TDS — a local-only note
 
@@ -65,8 +78,10 @@ detail on configuring the connection and reading the log.
 
 ## Export-related costs (ECGC insurance, COO fees, CHA charges, Transport, etc.)
 
-These are ordinary expenses like any other — as long as your Accounts
-team books them in Zoho Books (under whatever category name you use
+CHA, transport and freight forwarder bills recorded on an order go to
+Zoho Books from this system once Stage 3 is switched on (see above); for
+the rest, these are ordinary expenses like any other — as long as your
+Accounts team books them in Zoho Books (under whatever category name you use
 there, e.g. "ECGC Insurance", "CHA Charges", "Freight/Transport", "COO
 Certification Fees"), the next sync pulls them in here exactly like any
 other expense, with that category name intact for filtering. There is

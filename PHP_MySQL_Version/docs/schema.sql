@@ -4236,3 +4236,25 @@ ALTER TABLE order_payment_status
   ADD COLUMN advance_zoho_applied_at TIMESTAMP NULL AFTER advance_zoho_reference,
   ADD COLUMN balance_zoho_applied_at TIMESTAMP NULL AFTER balance_zoho_reference,
   ADD COLUMN freight_zoho_applied_at TIMESTAMP NULL AFTER freight_zoho_reference;
+
+-- ================================================================
+-- SECTION CJ — ZOHO BOOKS STAGE 3: VENDORS, BILLS, VENDOR PAYMENTS, EXPENSES (2026-10-29)
+-- Suppliers and logistics partners become Books vendors; a tax invoice
+-- becomes a Books bill; each payment to a vendor becomes a Books vendor
+-- payment applied to its bill (a payment on a proforma is held as an
+-- advance until the tax invoice that replaces it is in Books); each order
+-- expense becomes a Books expense, which the expense import skips.
+-- docs/migrations/2026-10-29b-zoho-stage3-purchases.sql
+-- ================================================================
+ALTER TABLE suppliers ADD COLUMN zoho_contact_id VARCHAR(100) NULL;
+ALTER TABLE logistics_partners ADD COLUMN zoho_contact_id VARCHAR(100) NULL;
+ALTER TABLE order_vendor_bills
+  ADD COLUMN zoho_bill_id VARCHAR(100) NULL,
+  ADD COLUMN zoho_synced_at TIMESTAMP NULL;
+ALTER TABLE order_vendor_bill_payments
+  ADD COLUMN zoho_payment_id VARCHAR(100) NULL,
+  ADD COLUMN zoho_synced_at TIMESTAMP NULL,
+  ADD COLUMN zoho_applied_at TIMESTAMP NULL;
+ALTER TABLE order_expenses
+  ADD COLUMN zoho_expense_id VARCHAR(100) NULL,
+  ADD COLUMN zoho_synced_at TIMESTAMP NULL;

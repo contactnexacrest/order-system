@@ -8,6 +8,7 @@ use App\Repositories\CaExpenseRepository;
 use App\Repositories\CaRepository;
 use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderZohoInvoiceRepository;
+use App\Repositories\ZohoPurchaseRepository;
 use App\Repositories\ZohoSyncLogRepository;
 
 /**
@@ -23,11 +24,14 @@ use App\Repositories\ZohoSyncLogRepository;
  */
 final class CaSyncService
 {
-    /** @return array{revenue: array{synced:int, failed:int, skipped:int, invoices:int, applied:int}, expenses: array{imported:int, failed:int, skipped:int}} */
+    /** @return array{revenue: array{synced:int, failed:int, skipped:int, invoices:int, applied:int}, purchases: array{bills:int, payments:int, applied:int, expenses:int, failed:int, skipped:int}, expenses: array{imported:int, failed:int, skipped:int}} */
     public static function runFullSync(string $triggeredBy, ?int $triggeredByUserId): array
     {
         return [
             'revenue' => self::syncPendingRevenue($triggeredBy, $triggeredByUserId),
+            // Stage 3 runs before the expense import, so the order expenses it
+            // sends are already marked and the import skips them.
+            'purchases' => self::syncPurchases($triggeredBy, $triggeredByUserId),
             'expenses' => self::importPendingExpenses($triggeredBy, $triggeredByUserId),
         ];
     }
@@ -164,6 +168,93 @@ final class CaSyncService
     }
 
     /**
+     * Stage 3 (2026-10-29): what the app pays out. First the suppliers' and
+     * logistics partners' tax invoices (as Books bills, under the vendor,
+     * created on first use), then each payment made to them — applied to
+     * its bill when that is in Books; a payment on a proforma is held as
+     * an advance until the tax invoice that replaces it is in Books — then
+     * held payments whose bill has now arrived, then the order's expenses.
+     * Every item is logged on its own; one failing never stops the others.
+     *
+     * @return array{bills:int, payments:int, applied:int, expenses:int, failed:int, skipped:int}
+     */
+    public static function syncPurchases(string $triggeredBy, ?int $triggeredByUserId): array
+    {
+        $result = ['bills' => 0, 'payments' => 0, 'applied' => 0, 'expenses' => 0, 'failed' => 0, 'skipped' => 0];
+        if (!ZohoBooksService::isEnabled()) {
+            ZohoSyncLogRepository::log('vendor_bill', null, null, null, 'skipped', null, self::offReason() . ' — no bills, vendor payments or expenses sent.', $triggeredBy, $triggeredByUserId);
+            $result['skipped'] = 1;
+            return $result;
+        }
+        $log = static function (string $type, int $orderId, ?string $leg, string $status, ?string $reference, string $message) use ($triggeredBy, $triggeredByUserId): void {
+            ZohoSyncLogRepository::log($type, 'order', $orderId, $leg, $status, $reference, $message, $triggeredBy, $triggeredByUserId);
+        };
+
+        foreach (ZohoPurchaseRepository::billsToSync() as $bill) {
+            try {
+                $zohoBillId = ZohoBooksService::pushBill($bill);
+                ZohoPurchaseRepository::setBillSynced((int) $bill['id'], $zohoBillId);
+                $log('vendor_bill', (int) $bill['order_id'], 'bill', 'success', $zohoBillId, "Sent bill {$bill['bill_no']} from {$bill['vendor_name']} (INR " . number_format((float) $bill['total_inr'], 2, '.', '') . ') as Zoho Books bill.');
+                $result['bills']++;
+            } catch (\Throwable $e) {
+                $log('vendor_bill', (int) $bill['order_id'], 'bill', 'error', null, $e->getMessage());
+                $result['failed']++;
+            }
+        }
+
+        foreach (ZohoPurchaseRepository::paymentsToSync() as ['payment' => $payment, 'bill' => $bill]) {
+            $target = ZohoPurchaseRepository::targetBillFor(ZohoPurchaseRepository::findBill((int) $bill['id']) ?? $bill);
+            try {
+                $pushed = ZohoBooksService::pushVendorPayment($payment, $bill, $target);
+                ZohoPurchaseRepository::setPaymentSynced((int) $payment['id'], $pushed['payment_id'], $pushed['applied'] > 0);
+                $note = $target === null
+                    ? ", held unapplied until the tax invoice for proforma {$bill['bill_no']} is in Zoho Books."
+                    : ($pushed['applied'] > 0 ? ', applied ' . number_format($pushed['applied'], 2, '.', '') . " to bill {$target['bill_no']}." : ", held unapplied: bill {$target['bill_no']} has nothing left to pay.");
+                $log('vendor_payment', (int) $bill['order_id'], 'payment', 'success', $pushed['payment_id'], "Pushed payment {$payment['payment_ref']} (INR " . number_format((float) $payment['amount_inr'], 2, '.', '') . ") to {$bill['vendor_name']} as Zoho Books vendor payment{$note}");
+                $result['payments']++;
+                $result['applied'] += $pushed['applied'] > 0 ? 1 : 0;
+            } catch (\Throwable $e) {
+                $log('vendor_payment', (int) $bill['order_id'], 'payment', 'error', null, $e->getMessage());
+                $result['failed']++;
+            }
+        }
+
+        foreach (ZohoPurchaseRepository::heldPayments() as ['payment' => $payment, 'bill' => $bill]) {
+            $target = ZohoPurchaseRepository::targetBillFor($bill);
+            if ($target === null) {
+                continue; // its tax invoice is not in Books yet — nothing to do
+            }
+            try {
+                $amount = ZohoBooksService::applyVendorPayment($payment, $bill, $target);
+                ZohoPurchaseRepository::setPaymentApplied((int) $payment['id']);
+                $log('vendor_payment_apply', (int) $bill['order_id'], 'payment', 'success', (string) $payment['zoho_payment_id'], 'Applied ' . number_format($amount, 2, '.', '') . " of payment {$payment['payment_ref']} to bill {$target['bill_no']}.");
+                $result['applied']++;
+            } catch (\Throwable $e) {
+                $log('vendor_payment_apply', (int) $bill['order_id'], 'payment', 'error', (string) $payment['zoho_payment_id'], $e->getMessage());
+                $result['failed']++;
+            }
+        }
+
+        foreach (ZohoPurchaseRepository::expensesToSync() as $expense) {
+            try {
+                $zohoExpenseId = ZohoBooksService::pushExpense($expense);
+                ZohoPurchaseRepository::setExpenseSynced((int) $expense['id'], $zohoExpenseId);
+                $log('order_expense', (int) $expense['order_id'], 'expense', 'success', $zohoExpenseId, "Sent expense \"{$expense['details']}\" (INR " . number_format((float) $expense['amount_inr'], 2, '.', '') . ') as Zoho Books expense.');
+                $result['expenses']++;
+            } catch (\Throwable $e) {
+                $log('order_expense', (int) $expense['order_id'], 'expense', 'error', null, $e->getMessage());
+                $result['failed']++;
+            }
+        }
+
+        if ($result['bills'] + $result['payments'] + $result['applied'] + $result['expenses'] + $result['failed'] === 0) {
+            ZohoSyncLogRepository::log('vendor_bill', null, null, null, 'skipped', null, 'Nothing pending — every tax invoice, vendor payment and order expense is already in Zoho Books.', $triggeredBy, $triggeredByUserId);
+            $result['skipped'] = 1;
+        }
+        return $result;
+    }
+
+    /**
      * @return array{imported:int, failed:int, skipped:int}
      */
     public static function importPendingExpenses(string $triggeredBy, ?int $triggeredByUserId): array
@@ -182,7 +273,9 @@ final class CaSyncService
 
         $imported = 0;
         foreach ($expenses as $expense) {
-            if (CaExpenseRepository::existsByZohoId($expense['zohoExpenseId'])) {
+            // Stage 3: an order expense this app sent to Books is already
+            // here as that order expense — never import it a second time.
+            if (CaExpenseRepository::existsByZohoId($expense['zohoExpenseId']) || ZohoPurchaseRepository::isPushedExpense($expense['zohoExpenseId'])) {
                 continue;
             }
             $id = CaExpenseRepository::insert(

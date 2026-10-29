@@ -276,7 +276,7 @@ final class ZohoBooksStage1Test extends DbTestCase
 
         $list = ZohoBooksService::listTestContacts();
 
-        self::assertSame([['contact_id' => 'CT-7', 'name' => 'TEST-Cleanup Buyer', 'payments' => [['payment_id' => 'PAY-9', 'label' => 'TEST-REF USD 100 on 2026-10-29']], 'invoices' => []]], $list);
+        self::assertSame([['contact_id' => 'CT-7', 'name' => 'TEST-Cleanup Buyer', 'payments' => [['payment_id' => 'PAY-9', 'label' => 'TEST-REF USD 100 on 2026-10-29']], 'invoices' => [], 'vendor_payments' => [], 'bills' => []]], $list);
         ZohoBooksService::deleteRecord('customerpayment', 'PAY-9');
         ZohoBooksService::deleteRecord('contact', 'CT-7');
         ZohoBooksService::deleteRecord('contact', 'CT-404');

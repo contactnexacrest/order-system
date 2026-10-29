@@ -237,7 +237,7 @@ describe('Zoho Books Stage 1', () => {
     contacts['CT-7'] = { contact_id: 'CT-7', contact_name: 'TEST-Cleanup Buyer', currency_code: 'USD' };
     contacts['CT-8'] = { contact_id: 'CT-8', contact_name: 'Real Buyer', currency_code: 'USD' };
 
-    expect(await zohoBooksService.listTestContacts()).toEqual([{ contact_id: 'CT-7', name: 'TEST-Cleanup Buyer', payments: [{ payment_id: 'PAY-9', label: 'TEST-REF USD 100 on 2026-10-29' }], invoices: [] }]);
+    expect(await zohoBooksService.listTestContacts()).toEqual([{ contact_id: 'CT-7', name: 'TEST-Cleanup Buyer', payments: [{ payment_id: 'PAY-9', label: 'TEST-REF USD 100 on 2026-10-29' }], invoices: [], vendor_payments: [], bills: [] }]);
     await zohoBooksService.deleteRecord('customerpayment', 'PAY-9');
     await zohoBooksService.deleteRecord('contact', 'CT-7');
     await zohoBooksService.deleteRecord('contact', 'CT-404');

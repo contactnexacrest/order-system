@@ -132,7 +132,7 @@ auto-skip of Stage 6 plus the 48h auto-confirm cron path for Stage 4.
 - **Test Mode**: global on/off toggle that blocks client-facing routes and
   admin-settings writes app-wide while enabled; distinct from the one-shot
   Sample Data Playground.
-- **CA module**: Zoho Books revenue sync (CI / Debit Note invoices, payments applied to them) → expenses (read-only mirror) →
+- **CA module**: Zoho Books sync (CI / Debit Note invoices and payments applied to them; vendors, bills, vendor payments and order expenses) → expenses (read-only mirror) →
   bank reconciliation (CSV import + manual matching) → FY lock/unlock with
   a logged override permission.
 

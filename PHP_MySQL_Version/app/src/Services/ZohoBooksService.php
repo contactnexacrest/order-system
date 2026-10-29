@@ -45,6 +45,7 @@ final class ZohoBooksService
         self::$transport = $transport;
         self::$tokens = [];
         self::$gstRegistered = [];
+        self::$accounts = [];
     }
 
     /** On only when this server allows Zoho (.env, ZohoGuard) and the zoho_books_enabled setting is ticked. */
@@ -240,6 +241,181 @@ final class ZohoBooksService
     }
 
     /**
+     * Stage 3: which Books account a bill or an expense is booked to, by
+     * account name (looked up in the organisation's chart of accounts).
+     * Defaults chosen 2026-10-29 for the CA to confirm.
+     */
+    public const BILL_ACCOUNTS = [
+        'supplier'      => 'Cost of Goods Sold',
+        'cha'           => 'Transportation Expense',
+        'transport'     => 'Transportation Expense',
+        'cha_transport' => 'Transportation Expense',
+        'ocean_freight' => 'Transportation Expense',
+        'other'         => 'Other Expenses',
+    ];
+    public const EXPENSE_ACCOUNTS = [
+        'travel_fuel'      => 'Travel Expense',
+        'travel_ticket'    => 'Travel Expense',
+        'local_conveyance' => 'Travel Expense',
+        'hotel'            => 'Travel Expense',
+        'food'             => 'Travel Expense',
+        'courier'          => 'Postage',
+        'samples'          => 'Other Expenses',
+        'other'            => 'Other Expenses',
+    ];
+    /** What an expense was paid from: the company account is the deposit account; these are found by name. */
+    public const PAID_THROUGH_ACCOUNTS = ['company_card' => 'Company Card', 'staff' => 'Employee Reimbursements'];
+
+    /** @var array<string, array<string, string>> account id by name, per organisation */
+    private static array $accounts = [];
+
+    /**
+     * Stage 3: a supplier's or logistics partner's tax invoice as a Books
+     * bill, under the vendor (created on first use). Bills go in at their
+     * total in INR. A bill with GST is refused while the organisation is
+     * GST-registered: which GST tax and input credit to book is the CA's
+     * call, not guessed here. The bill is looked up by number for that
+     * vendor first, so a retry never makes a second one.
+     *
+     * @param array<string,mixed> $bill ZohoPurchaseRepository row
+     * @throws \RuntimeException on any failure
+     * @return string the Zoho bill_id
+     */
+    public static function pushBill(array $bill): string
+    {
+        ZohoGuard::assertCustomerAllowed((string) $bill['buyer_name']);
+        self::assertVendorAllowed((string) $bill['vendor_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        if ((float) $bill['gst_inr'] > 0 && self::isGstRegistered($config, $accessToken)) {
+            throw new \RuntimeException("Bill {$bill['bill_no']} not sent: it carries GST, and how GST on bills is booked in a GST-registered Zoho Books organisation is still for the CA to decide.");
+        }
+        $vendorId = self::findOrCreateVendor($config, $accessToken, $bill);
+        $existing = self::findBill($config, $accessToken, (string) $bill['bill_no'], $vendorId);
+        if ($existing !== null) {
+            return (string) $existing['bill_id'];
+        }
+
+        $forKey = $bill['vendor_kind'] === 'supplier' ? 'supplier' : (string) $bill['bill_for'];
+        $what = $bill['vendor_kind'] === 'supplier'
+            ? 'Supplier ' . ($bill['bill_for'] === 'balance' ? 'balance' : 'advance') . ' bill'
+            : (\App\Repositories\OrderVendorBillRepository::LOGISTICS_SERVICES[$bill['bill_for']] ?? 'Logistics') . ' bill';
+        $payload = [
+            'vendor_id' => $vendorId,
+            'bill_number' => (string) $bill['bill_no'],
+            'date' => (string) $bill['bill_date'],
+            'reference_number' => (string) $bill['buyer_inquiry_ref'],
+            'line_items' => [[
+                'account_id' => self::accountId($config, $accessToken, self::BILL_ACCOUNTS[$forKey] ?? self::BILL_ACCOUNTS['other']),
+                'name' => $what,
+                'description' => "{$what} for order {$bill['buyer_inquiry_ref']}: taxable " . number_format((float) $bill['taxable_inr'], 2, '.', '') . ' + GST ' . number_format((float) $bill['gst_inr'], 2, '.', '') . (!empty($bill['note']) ? ". {$bill['note']}" : ''),
+                'rate' => round((float) $bill['total_inr'], 2),
+                'quantity' => 1,
+            ]],
+        ];
+        $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/bills?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
+        $saved = self::findBill($config, $accessToken, (string) $bill['bill_no'], $vendorId);
+        if ($saved === null) {
+            throw new \RuntimeException("Zoho Books bill creation for {$bill['bill_no']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return (string) $saved['bill_id'];
+    }
+
+    /**
+     * Stage 3: one payment to a vendor as a Books vendor payment from the
+     * deposit account. With $targetBill (the tax invoice already in
+     * Books) it is applied to that bill, up to what the bill still owes;
+     * without, it is held unapplied (an advance paid on a proforma) until
+     * applyVendorPayment().
+     *
+     * @throws \RuntimeException on any failure
+     * @return array{payment_id: string, applied: float}
+     */
+    public static function pushVendorPayment(array $payment, array $bill, ?array $targetBill): array
+    {
+        ZohoGuard::assertCustomerAllowed((string) $bill['buyer_name']);
+        self::assertVendorAllowed((string) $bill['vendor_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $vendorId = self::findOrCreateVendor($config, $accessToken, $bill);
+        $payload = self::vendorPaymentPayload($config, $vendorId, $payment);
+        $applied = 0.0;
+        if ($targetBill !== null) {
+            [$payload['bills'], $applied] = self::billApplication($config, $accessToken, $targetBill, $vendorId, (float) $payload['amount']);
+        }
+        $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/vendorpayments?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
+        $decoded = json_decode($response['body'], true);
+        $paymentId = $decoded['vendorpayment']['payment_id'] ?? null;
+        if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($paymentId)) {
+            throw new \RuntimeException('Zoho Books vendor payment failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return ['payment_id' => $paymentId, 'applied' => $applied];
+    }
+
+    /**
+     * Stage 3: applies a vendor payment held unapplied (paid on a proforma)
+     * to the tax invoice that replaced it, now that it is in Books.
+     *
+     * @throws \RuntimeException on any failure
+     * @return float the amount applied
+     */
+    public static function applyVendorPayment(array $payment, array $bill, array $targetBill): float
+    {
+        ZohoGuard::assertCustomerAllowed((string) $bill['buyer_name']);
+        self::assertVendorAllowed((string) $bill['vendor_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $vendorId = self::findOrCreateVendor($config, $accessToken, $bill);
+        $payload = self::vendorPaymentPayload($config, $vendorId, $payment);
+        [$payload['bills'], $applied] = self::billApplication($config, $accessToken, $targetBill, $vendorId, (float) $payload['amount']);
+        if ($applied <= 0) {
+            throw new \RuntimeException("Bill {$targetBill['bill_no']} in Zoho Books has nothing left to pay, so payment {$payment['payment_ref']} stays unapplied there — ask the CA how to book it.");
+        }
+        $response = self::request('PUT', "https://{$config['apiDomain']}/books/v3/vendorpayments/" . rawurlencode((string) $payment['zoho_payment_id']) . '?organization_id=' . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
+        $decoded = json_decode($response['body'], true);
+        if ($response['status'] < 200 || $response['status'] >= 300 || !isset($decoded['vendorpayment'])) {
+            throw new \RuntimeException('Zoho Books vendor payment update failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return $applied;
+    }
+
+    /**
+     * Stage 3: one order expense as a Books expense, paid through the
+     * deposit account (company account), "Company Card" or "Employee
+     * Reimbursements" (paid by staff). Its description starts with the
+     * buyer's name and order reference, so a TEST- order's expenses are
+     * found by the clean-up script.
+     *
+     * @throws \RuntimeException on any failure
+     * @return string the Zoho expense_id
+     */
+    public static function pushExpense(array $expense): string
+    {
+        ZohoGuard::assertCustomerAllowed((string) $expense['buyer_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $paidThrough = $expense['paid_by'] === 'company_account'
+            ? $config['depositAccountId']
+            : self::accountId($config, $accessToken, self::PAID_THROUGH_ACCOUNTS[$expense['paid_by']] ?? 'Employee Reimbursements');
+        $label = \App\Repositories\OrderExpenseRepository::CATEGORIES[$expense['category']] ?? 'Expense';
+        $payload = [
+            'account_id' => self::accountId($config, $accessToken, self::EXPENSE_ACCOUNTS[$expense['category']] ?? self::EXPENSE_ACCOUNTS['other']),
+            'paid_through_account_id' => $paidThrough,
+            'amount' => round((float) $expense['amount_inr'], 2),
+            'date' => (string) $expense['expense_date'],
+            'reference_number' => "{$expense['buyer_inquiry_ref']}-EXP-{$expense['id']}",
+            'description' => "{$expense['buyer_name']} / {$expense['buyer_inquiry_ref']}: {$label} — {$expense['details']}" . ($expense['paid_by'] === 'staff' && !empty($expense['staff_name']) ? " (paid by {$expense['staff_name']})" : ''),
+        ];
+        $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/expenses?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
+        $decoded = json_decode($response['body'], true);
+        $expenseId = $decoded['expense']['expense_id'] ?? null;
+        if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($expenseId)) {
+            throw new \RuntimeException('Zoho Books expense failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return $expenseId;
+    }
+
+    /**
      * The "Test Books connection" button (Admin -> Settings): logs in with
      * the saved credentials and checks the organisation and the deposit
      * account exist, and which of this system's active currencies Books
@@ -374,22 +550,64 @@ final class ZohoBooksService
                     'label' => implode(' ', array_filter([(string) ($invoice['invoice_number'] ?? ''), (string) ($invoice['currency_code'] ?? ''), (string) ($invoice['total'] ?? ''), 'on ' . ($invoice['date'] ?? '')], static fn (string $part): bool => $part !== '')),
                 ];
             }
-            $contacts[] = ['contact_id' => (string) $row['contact_id'], 'name' => (string) ($row['contact_name'] ?? ''), 'payments' => $payments, 'invoices' => $invoices];
+            // Stage 3: a TEST- vendor's payments and bills.
+            $vendorPayments = [];
+            $bills = [];
+            if (($row['contact_type'] ?? '') === 'vendor') {
+                foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/vendorpayments{$query}&vendor_id=" . rawurlencode((string) $row['contact_id']), 'vendorpayments') as $payment) {
+                    $vendorPayments[] = ['payment_id' => (string) $payment['payment_id'], 'label' => trim(($payment['reference_number'] ?? '') . ' INR ' . ($payment['amount'] ?? '') . ' on ' . ($payment['date'] ?? ''))];
+                }
+                foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/bills{$query}&vendor_id=" . rawurlencode((string) $row['contact_id']), 'bills') as $bill) {
+                    $bills[] = ['bill_id' => (string) $bill['bill_id'], 'label' => trim(($bill['bill_number'] ?? '') . ' INR ' . ($bill['total'] ?? '') . ' on ' . ($bill['date'] ?? ''))];
+                }
+            }
+            $contacts[] = ['contact_id' => (string) $row['contact_id'], 'name' => (string) ($row['contact_name'] ?? ''), 'payments' => $payments, 'invoices' => $invoices, 'vendor_payments' => $vendorPayments, 'bills' => $bills];
         }
         return $contacts;
     }
 
     /**
+     * Stage 3 clean-up: every Books expense whose description starts with
+     * TEST- (an order expense's description starts with the buyer's name).
+     *
+     * @return list<array{expense_id: string, label: string}>
+     */
+    public static function listTestExpenses(): array
+    {
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $out = [];
+        $page = 1;
+        do {
+            $response = self::request('GET', "https://{$config['apiDomain']}/books/v3/expenses?organization_id=" . rawurlencode($config['organizationId']) . "&page={$page}&per_page=200", [], self::authHeaders($accessToken));
+            $decoded = json_decode($response['body'], true);
+            if ($response['status'] < 200 || $response['status'] >= 300 || !isset($decoded['expenses'])) {
+                throw new \RuntimeException('Zoho Books expense list failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+            foreach ($decoded['expenses'] as $row) {
+                if (str_starts_with((string) ($row['description'] ?? ''), ZohoGuard::TEST_PREFIX)) {
+                    $out[] = ['expense_id' => (string) $row['expense_id'], 'label' => trim(($row['description'] ?? '') . ' INR ' . ($row['total'] ?? '') . ' on ' . ($row['date'] ?? ''))];
+                }
+            }
+            $page++;
+        } while ((bool) ($decoded['page_context']['has_more_page'] ?? false));
+        return $out;
+    }
+
+    /**
      * Deletes one Books record made while testing — 'customerpayment',
-     * 'invoice' or 'contact' (payments, then invoices, then the contact:
-     * Books refuses to delete a contact that still has transactions). A
-     * record already gone counts as deleted.
+     * 'invoice', 'vendorpayment', 'bill', 'expense' or 'contact' (payments,
+     * then invoices and bills, then the contact: Books refuses to delete a
+     * contact that still has transactions). A record already gone counts as
+     * deleted, and returns false so the clean-up does not log a deletion that
+     * never happened.
      *
      * @throws \RuntimeException on any other failure
+     * @return bool true when Books deleted it, false when it was already gone
      */
-    public static function deleteRecord(string $kind, string $id): void
+    public static function deleteRecord(string $kind, string $id): bool
     {
-        $paths = ['customerpayment' => 'customerpayments', 'invoice' => 'invoices', 'contact' => 'contacts'];
+        $paths = ['customerpayment' => 'customerpayments', 'invoice' => 'invoices', 'vendorpayment' => 'vendorpayments', 'bill' => 'bills', 'expense' => 'expenses', 'contact' => 'contacts'];
         if (!isset($paths[$kind])) {
             throw new \InvalidArgumentException("Unknown Zoho Books record kind {$kind}.");
         }
@@ -397,11 +615,12 @@ final class ZohoBooksService
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
         $response = self::request('DELETE', "https://{$config['apiDomain']}/books/v3/{$paths[$kind]}/" . rawurlencode($id) . '?organization_id=' . rawurlencode($config['organizationId']), [], self::authHeaders($accessToken));
         if ($response['status'] === 404) {
-            return;
+            return false;
         }
         if ($response['status'] < 200 || $response['status'] >= 300) {
             throw new \RuntimeException("Zoho Books {$kind} {$id} delete failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
         }
+        return true;
     }
 
     private static function config(): array
@@ -569,6 +788,101 @@ final class ZohoBooksService
             self::$gstRegistered[$config['organizationId']] = (bool) ($decoded['organization']['is_registered_for_gst'] ?? false);
         }
         return self::$gstRegistered[$config['organizationId']];
+    }
+
+    /** In test, only vendors whose name starts with TEST- may be sent, so the clean-up script finds them. */
+    private static function assertVendorAllowed(string $name): void
+    {
+        if (!ZohoGuard::isProduction() && !str_starts_with($name, ZohoGuard::TEST_PREFIX)) {
+            throw new \RuntimeException("Not sent: ZOHO_ENVIRONMENT is test, and only vendors whose name starts with TEST- may go to Zoho (this one is \"{$name}\").");
+        }
+    }
+
+    /** The bill's vendor in Books (supplier or logistics partner), created on first use and remembered on its row. */
+    private static function findOrCreateVendor(array $config, string $accessToken, array $bill): string
+    {
+        if (!empty($bill['vendor_zoho_contact_id'])) {
+            return (string) $bill['vendor_zoho_contact_id'];
+        }
+        $name = (string) $bill['vendor_name'];
+        $query = '?organization_id=' . rawurlencode($config['organizationId']);
+        $found = null;
+        foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/contacts{$query}&contact_type=vendor&contact_name=" . rawurlencode($name), 'contacts') as $row) {
+            if ((string) ($row['contact_name'] ?? '') === $name) {
+                $found = (string) $row['contact_id'];
+            }
+        }
+        if ($found === null) {
+            $payload = ['contact_name' => $name, 'company_name' => $name, 'contact_type' => 'vendor'];
+            if (self::isGstRegistered($config, $accessToken)) {
+                $payload += !empty($bill['vendor_gstin'])
+                    ? ['gst_treatment' => 'business_gst', 'gst_no' => (string) $bill['vendor_gstin']]
+                    : ['gst_treatment' => 'business_none'];
+            }
+            if (!empty($bill['vendor_pan'])) {
+                $payload['pan_no'] = (string) $bill['vendor_pan'];
+            }
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts{$query}", $payload, self::authHeaders($accessToken));
+            $decoded = json_decode($response['body'], true);
+            $found = $decoded['contact']['contact_id'] ?? null;
+            if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($found)) {
+                throw new \RuntimeException('Zoho Books vendor creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+        }
+        \App\Repositories\ZohoPurchaseRepository::setVendorContactId((string) $bill['vendor_kind'], (int) $bill['vendor_id'], $found);
+        return $found;
+    }
+
+    /** @return array<string, mixed>|null one bill by its number for this vendor */
+    private static function findBill(array $config, string $accessToken, string $billNumber, string $vendorId): ?array
+    {
+        $rows = self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/bills?organization_id=" . rawurlencode($config['organizationId']) . '&vendor_id=' . rawurlencode($vendorId) . '&bill_number=' . rawurlencode($billNumber), 'bills');
+        foreach ($rows as $row) {
+            if ((string) ($row['bill_number'] ?? '') === $billNumber && (string) ($row['vendor_id'] ?? $vendorId) === $vendorId) {
+                return $row;
+            }
+        }
+        return null;
+    }
+
+    /** @return array<string, mixed> */
+    private static function vendorPaymentPayload(array $config, string $vendorId, array $payment): array
+    {
+        return [
+            'vendor_id' => $vendorId,
+            'amount' => round((float) $payment['amount_inr'], 2),
+            'date' => (string) $payment['paid_at'],
+            'payment_mode' => (string) $payment['payment_mode'],
+            'reference_number' => (string) $payment['payment_ref'],
+            'paid_through_account_id' => $config['depositAccountId'],
+        ];
+    }
+
+    /** @return array{0: list<array{bill_id: string, amount_applied: float}>, 1: float} as much of $amount as the bill still owes */
+    private static function billApplication(array $config, string $accessToken, array $targetBill, string $vendorId, float $amount): array
+    {
+        $row = self::findBill($config, $accessToken, (string) $targetBill['bill_no'], $vendorId);
+        if ($row === null) {
+            throw new \RuntimeException("Bill {$targetBill['bill_no']} was not found in Zoho Books for this vendor.");
+        }
+        $applied = round(min($amount, (float) ($row['balance'] ?? 0)), 2);
+        return [$applied > 0 ? [['bill_id' => (string) $row['bill_id'], 'amount_applied' => $applied]] : [], $applied];
+    }
+
+    /** A Books account's id by its name; a missing account is refused with where to add it. */
+    private static function accountId(array $config, string $accessToken, string $name): string
+    {
+        if (!isset(self::$accounts[$config['organizationId']])) {
+            self::$accounts[$config['organizationId']] = [];
+            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/chartofaccounts?organization_id=" . rawurlencode($config['organizationId']), 'chartofaccounts') as $row) {
+                self::$accounts[$config['organizationId']][(string) $row['account_name']] = (string) $row['account_id'];
+            }
+        }
+        $id = self::$accounts[$config['organizationId']][$name] ?? null;
+        if ($id === null) {
+            throw new \RuntimeException("Zoho Books has no account named \"{$name}\". Add it in Zoho Books -> Accountant -> Chart of Accounts (or ask the CA which account to use), then sync again.");
+        }
+        return $id;
     }
 
     private static function assertContactCurrency(string $companyLegalName, string $contactCurrency, string $currencyCode): void
