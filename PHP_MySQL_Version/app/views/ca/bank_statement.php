@@ -43,7 +43,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caBankUser['id'],
                   : ($l['matched_expense_id'] !== null ? \App\Repositories\CaFyLockRepository::lockMessageForDate($l['matched_expense_date'] ?? null) : null);
             ?>
             <?php if ($l['matched_order_id'] !== null): ?>
-              Revenue: <?= \App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $l['matched_order_id']) ? '<a href="/orders/' . (int) $l['matched_order_id'] . '">' . htmlspecialchars($l['matched_order_ref']) . '</a>' : htmlspecialchars($l['matched_order_ref']) ?> — <?= htmlspecialchars(ucfirst($l['matched_leg'])) ?>
+              Revenue: <?= \App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $l['matched_order_id']) ? '<a href="/orders/' . (int) $l['matched_order_id'] . '">' . htmlspecialchars($l['matched_order_ref']) . '</a>' : htmlspecialchars($l['matched_order_ref']) ?> — <?= htmlspecialchars(\App\Repositories\CaRepository::legLabel($l['matched_leg'])) ?>
               <?php if ($matchLockMessage !== null && !$canOverrideFyLock): ?>
                 <br><span class="muted small">&#128274; <?= htmlspecialchars($matchLockMessage) ?></span>
               <?php else: ?>
@@ -77,7 +77,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caBankUser['id'],
                     <?php foreach ($unmatchedRevenueLegs as $leg): ?>
                       <?php $legLocked = \App\Repositories\CaFyLockRepository::lockMessageForDate($leg['cleared_at']) !== null; ?>
                       <option value="<?= (int) $leg['order_id'] ?>|<?= htmlspecialchars($leg['leg']) ?>">
-                        <?= htmlspecialchars($leg['buyer_inquiry_ref']) ?> — <?= htmlspecialchars(ucfirst($leg['leg'])) ?> — &#8377;<?= number_format((float) $leg['inr_actual'], 2) ?><?= $legLocked ? ' (locked FY — override)' : '' ?>
+                        <?= htmlspecialchars($leg['buyer_inquiry_ref']) ?> — <?= htmlspecialchars(\App\Repositories\CaRepository::legLabel($leg['leg'])) ?> — &#8377;<?= number_format((float) $leg['inr_actual'], 2) ?><?= $legLocked ? ' (locked FY — override)' : '' ?>
                       </option>
                     <?php endforeach; ?>
                   </select>

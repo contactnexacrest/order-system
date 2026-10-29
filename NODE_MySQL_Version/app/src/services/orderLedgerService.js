@@ -1,9 +1,11 @@
 'use strict';
 
+const caExpenseRepository = require('../repositories/caExpenseRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderExpenseRepository = require('../repositories/orderExpenseRepository');
+const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
 const orderVendorBillRepository = require('../repositories/orderVendorBillRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
@@ -78,6 +80,21 @@ async function forOrder(orderId, orderCurrency, full) {
       rows.push(info(payment[`${leg}_cleared_at`], `${label} cleared (funds confirmed)`, amount, orderCurrency, 'Staff-recorded'));
     }
   }
+  // Owner decision 2026-10-29 (confirmed twice): the money the bank paid under an LC.
+  const lc = await orderLcDetailRepository.find(orderId);
+  if (lc && lc.lc_received_at !== null && Number(lc.lc_received_amount) > 0) {
+    rows.push({
+      date: str(lc.lc_received_at),
+      event: 'LC payment received (paid by the bank under the LC)',
+      direction: 'in',
+      amount: lc.lc_received_amount,
+      currency: orderCurrency,
+      rate: Number(lc.lc_inr_credited) / Number(lc.lc_received_amount),
+      inr: Number(lc.lc_inr_credited),
+      inr_basis: 'actual',
+      source: 'Staff-recorded',
+    });
+  }
   for (const report of await clientPaymentReportRepository.forOrder(orderId)) {
     const type = str(report.payment_type);
     rows.push(info(
@@ -130,6 +147,12 @@ async function forOrder(orderId, orderCurrency, full) {
     if (entry.category === 'travel_expenses' && expenseSummary.has_travel) continue;
     const label = orderCostEntryRepository.CATEGORIES[entry.category] || entry.category;
     rows.push(out(entry.incurred_at || entry.created_at, `Expense — ${label}${entry.description ? `: ${entry.description}` : ''}`, entry.amount_inr, 'Order cost entry'));
+  }
+  // Owner decision 2026-10-29 (confirmed twice): expenses booked in Zoho Books for this order (not a possible duplicate).
+  for (const zohoExpense of await caExpenseRepository.forOrderCounted(orderId)) {
+    if (zohoExpense.counted) {
+      rows.push(out(zohoExpense.expense_date, `Expense — booked in Zoho Books: ${zohoExpense.category}${zohoExpense.description ? `: ${zohoExpense.description}` : ''}`, zohoExpense.amount, 'Zoho Books expense'));
+    }
   }
   for (const benefit of await caExportBenefitRepository.forOrder(orderId)) {
     rows.push(info(benefit.claimed_at, `Export benefit claimed — ${benefit.scheme_name}`, benefit.claimed_amount, str(benefit.currency_code), 'Export benefit claim'));

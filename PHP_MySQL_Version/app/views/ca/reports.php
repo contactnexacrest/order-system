@@ -81,7 +81,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caReportsUser['id
         <tr>
           <td><?= \App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $r['order_id']) ? '<a href="/orders/' . (int) $r['order_id'] . '">' . htmlspecialchars($r['buyer_inquiry_ref']) . '</a>' : htmlspecialchars($r['buyer_inquiry_ref']) ?></td>
           <td><?= htmlspecialchars($r['company_legal_name']) ?></td>
-          <td><?= htmlspecialchars(ucfirst($r['leg'])) ?></td>
+          <td><?= htmlspecialchars(\App\Repositories\CaRepository::legLabel($r['leg'])) ?></td>
           <td><?= htmlspecialchars((string) $r['cleared_at']) ?></td>
           <td><?= $r['foreign_amount'] !== null ? number_format((float) $r['foreign_amount'], 2) : '—' ?> <?= htmlspecialchars($r['currency_code']) ?></td>
           <td><?= $r['inr_actual'] !== null ? '&#8377;' . number_format((float) $r['inr_actual'], 2) : '<span class="muted">—</span>' ?></td>

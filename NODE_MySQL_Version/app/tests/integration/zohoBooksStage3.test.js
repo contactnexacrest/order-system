@@ -67,6 +67,10 @@ describe('Zoho Books Stage 3', () => {
       bills[id] = { bill_id: id, bill_number: payload.bill_number, vendor_id: payload.vendor_id, total: Math.round(line.rate * (1 + percent / 100) * 100) / 100, payload };
       return json({ code: 0, bill: bills[id] }, 201);
     }
+    if (p === '/books/v3/vendorpayments' && method === 'GET') {
+      const rows = Object.entries(vendorPayments).map(([id, x]) => ({ payment_id: id, amount: x.amount, vendor_id: x.vendor_id }));
+      return json({ code: 0, vendorpayments: rows.filter((r) => q('vendor_id') === null || r.vendor_id === q('vendor_id')) });
+    }
     if (p === '/books/v3/vendorpayments' && method === 'POST') {
       const id = `VP-${Object.keys(vendorPayments).length + 1}`;
       vendorPayments[id] = payload;

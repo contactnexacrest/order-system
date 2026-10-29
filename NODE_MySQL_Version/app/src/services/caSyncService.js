@@ -13,6 +13,11 @@ const zohoPurchaseRepository = require('../repositories/zohoPurchaseRepository')
 const zohoBooksService = require('../services/zohoBooksService');
 const zohoGuard = require('../services/zohoGuard');
 const zohoInvoiceData = require('../services/zohoInvoiceData');
+const zohoRestoreService = require('../services/zohoRestoreService');
+const auditLogRepository = require('../repositories/auditLogRepository');
+const caFyLockRepository = require('../repositories/caFyLockRepository');
+const financialYear = require('../helpers/financialYear');
+const db = require('../config/db');
 
 /**
  * CA / Accounting module — orchestrates a Zoho Books sync run, from either
@@ -25,7 +30,9 @@ const zohoInvoiceData = require('../services/zohoInvoiceData');
  * not present, then it shouldn't be a blocker for our application."
  */
 async function runFullSync(triggeredBy, triggeredByUserId) {
-  return {
+  // The day's full check of the records already in Books (zohoRestoreService.due()).
+  const dailyCheck = triggeredBy !== 'manual' && (await zohoBooksService.isEnabled()) && (await zohoRestoreService.due(triggeredBy));
+  const result = {
     revenue: await syncPendingRevenue(triggeredBy, triggeredByUserId),
     // Stage 3 runs before the expense import, so the order expenses it sends
     // are already marked and the import skips them.
@@ -33,6 +40,10 @@ async function runFullSync(triggeredBy, triggeredByUserId) {
     expenses: await importPendingExpenses(triggeredBy, triggeredByUserId),
     benefits: await syncBenefits(triggeredBy, triggeredByUserId),
   };
+  if (dailyCheck) {
+    await zohoRestoreService.markScheduledCheckDone();
+  }
+  return result;
 }
 
 /**
@@ -57,7 +68,9 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
     return { synced: 0, failed: 1, skipped: 0, invoices: 0, applied: 0 };
   }
 
-  let failed = 0;
+  // Owner decision 2026-10-29: put back what was deleted or changed in Books.
+  const restore = await zohoRestoreService.revenue(startDate, triggeredBy, triggeredByUserId);
+  let failed = restore.failed;
   let invoices = 0;
   for (const item of await orderZohoInvoiceRepository.documentsToSync(startDate)) {
     const label = zohoInvoiceData.KIND_LABELS[item.kind];
@@ -86,7 +99,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
         pushed_hash: hash,
       });
       const what = !known && pushed.created ? 'Sent' : 'Updated';
-      await zohoSyncLogRepository.log('invoice', 'order', item.order_id, item.kind, 'success', pushed.zoho_invoice_id, `${what} ${label} ${invoice.invoice_number} as Zoho Books invoice (${invoice.currency_code} ${invoice.total.toFixed(2)} @ ${invoice.exchange_rate}).`, triggeredBy, triggeredByUserId);
+      await zohoSyncLogRepository.log('invoice', 'order', item.order_id, item.kind, 'success', pushed.zoho_invoice_id, `${zohoRestoreService.note(`invoice:${item.order_id}:${item.kind}`)}${what} ${label} ${invoice.invoice_number} as Zoho Books invoice (${invoice.currency_code} ${invoice.total.toFixed(2)} @ ${invoice.exchange_rate}).`, triggeredBy, triggeredByUserId);
       invoices += 1;
     } catch (e) {
       await zohoSyncLogRepository.log('invoice', 'order', item.order_id, item.kind, 'error', null, e.message, triggeredBy, triggeredByUserId);
@@ -94,7 +107,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
     }
   }
 
-  let synced = 0;
+  let synced = restore.restored;
   let applied = 0;
   for (const leg of await caRepository.legsPendingZohoSync()) {
     if (startDate !== null && String(leg.cleared_at).slice(0, 10) < startDate) {
@@ -119,7 +132,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
         await orderPaymentStatusRepository.setLegZohoApplied(leg.order_id, leg.leg);
         applied += 1;
       }
-      await zohoSyncLogRepository.log('revenue_payment', 'order_payment_status', leg.order_id, leg.leg, 'success', zohoReference, `Pushed as Zoho Books customer payment ${zohoReference}${appliedNote(leg.leg, target, result.applied)}`, triggeredBy, triggeredByUserId);
+      await zohoSyncLogRepository.log('revenue_payment', 'order_payment_status', leg.order_id, leg.leg, 'success', zohoReference, `${zohoRestoreService.note(`leg:${leg.order_id}:${leg.leg}`)}Pushed as Zoho Books customer payment ${zohoReference}${appliedNote(leg.leg, target, result.applied)}`, triggeredBy, triggeredByUserId);
       synced += 1;
     } catch (e) {
       await zohoSyncLogRepository.log('revenue_payment', 'order_payment_status', leg.order_id, leg.leg, 'error', null, e.message, triggeredBy, triggeredByUserId);
@@ -169,7 +182,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
         const result = await zohoBooksService.pushRevenuePayment(...args, target ? target.zoho_invoice_number : null, Number(lc.lc_bank_charges_inr));
         await orderLcDetailRepository.setZohoSynced(orderId, result.payment_id, result.applied > 0);
         applied += result.applied > 0 ? 1 : 0;
-        await zohoSyncLogRepository.log('revenue_payment', 'order_lc_details', orderId, 'lc', 'success', result.payment_id, `Pushed LC payment as Zoho Books customer payment ${result.payment_id}${appliedNote('lc', target, result.applied)}`, triggeredBy, triggeredByUserId);
+        await zohoSyncLogRepository.log('revenue_payment', 'order_lc_details', orderId, 'lc', 'success', result.payment_id, `${zohoRestoreService.note(`lc:${orderId}`)}Pushed LC payment as Zoho Books customer payment ${result.payment_id}${appliedNote('lc', target, result.applied)}`, triggeredBy, triggeredByUserId);
         synced += 1;
       } else if (target) {
         const amount = await zohoBooksService.applyPaymentToInvoice(String(lc.lc_zoho_payment_id), ...args, target.zoho_invoice_number, Number(lc.lc_bank_charges_inr));
@@ -246,12 +259,16 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
   }
   const log = (type, orderId, leg, status, reference, message) => zohoSyncLogRepository.log(type, 'order', orderId, leg, status, reference, message, triggeredBy, triggeredByUserId);
   const money = (n) => Number(n).toFixed(2);
+  // Owner decision 2026-10-29: put back what was deleted or changed in Books.
+  for (const [key, count] of Object.entries(await zohoRestoreService.purchases(startDate, triggeredBy, triggeredByUserId))) {
+    result[key] += count;
+  }
 
   for (const bill of await zohoPurchaseRepository.billsToSync(startDate)) {
     try {
       const zohoBillId = await zohoBooksService.pushBill(bill);
       await zohoPurchaseRepository.setBillSynced(bill.id, zohoBillId);
-      await log('vendor_bill', bill.order_id, 'bill', 'success', zohoBillId, `Sent bill ${bill.bill_no} from ${bill.vendor_name} (INR ${money(bill.total_inr)}${Number(bill.gst_reverse_charge) ? ', reverse charge' : ''}) as Zoho Books bill.`);
+      await log('vendor_bill', bill.order_id, 'bill', 'success', zohoBillId, `${zohoRestoreService.note(`bill:${bill.id}`)}Sent bill ${bill.bill_no} from ${bill.vendor_name} (INR ${money(bill.total_inr)}${Number(bill.gst_reverse_charge) ? ', reverse charge' : ''}) as Zoho Books bill.`);
       result.bills += 1;
     } catch (e) {
       await log('vendor_bill', bill.order_id, 'bill', 'error', null, e.message);
@@ -267,7 +284,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
       let note;
       if (!target) note = `, held unapplied until the tax invoice for proforma ${bill.bill_no} is in Zoho Books.`;
       else note = pushed.applied > 0 ? `, applied ${money(pushed.applied)} to bill ${target.bill_no}.` : `, held unapplied: bill ${target.bill_no} has nothing left to pay.`;
-      await log('vendor_payment', bill.order_id, 'payment', 'success', pushed.payment_id, `Pushed payment ${payment.payment_ref} (INR ${money(payment.amount_inr)}) to ${bill.vendor_name} as Zoho Books vendor payment${note}`);
+      await log('vendor_payment', bill.order_id, 'payment', 'success', pushed.payment_id, `${zohoRestoreService.note(`vpay:${payment.id}`)}Pushed payment ${payment.payment_ref} (INR ${money(payment.amount_inr)}) to ${bill.vendor_name} as Zoho Books vendor payment${note}`);
       result.payments += 1;
       result.applied += pushed.applied > 0 ? 1 : 0;
     } catch (e) {
@@ -294,7 +311,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
     try {
       const zohoExpenseId = await zohoBooksService.pushExpense(expense);
       await zohoPurchaseRepository.setExpenseSynced(expense.id, zohoExpenseId);
-      await log('order_expense', expense.order_id, 'expense', 'success', zohoExpenseId, `Sent expense "${expense.details}" (INR ${money(expense.amount_inr)}) as Zoho Books expense.`);
+      await log('order_expense', expense.order_id, 'expense', 'success', zohoExpenseId, `${zohoRestoreService.note(`exp:${expense.id}`)}Sent expense "${expense.details}" (INR ${money(expense.amount_inr)}) as Zoho Books expense.`);
       result.expenses += 1;
     } catch (e) {
       await log('order_expense', expense.order_id, 'expense', 'error', null, e.message);
@@ -314,7 +331,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
     try {
       const zohoExpenseId = await zohoBooksService.pushCostEntry(cost, cost.zoho_expense_id !== null ? String(cost.zoho_expense_id) : null);
       await zohoPurchaseRepository.setCostEntrySynced(cost.id, zohoExpenseId, hash);
-      await log('order_cost', cost.order_id, 'cost', 'success', zohoExpenseId, `${cost.zoho_expense_id !== null ? 'Updated' : 'Sent'} order cost "${label}" (INR ${money(cost.amount_inr)}) as Zoho Books expense.`);
+      await log('order_cost', cost.order_id, 'cost', 'success', zohoExpenseId, `${zohoRestoreService.note(`cost:${cost.id}`)}${cost.zoho_expense_id !== null ? 'Updated' : 'Sent'} order cost "${label}" (INR ${money(cost.amount_inr)}) as Zoho Books expense.`);
       result.expenses += 1;
     } catch (e) {
       await log('order_cost', cost.order_id, 'cost', 'error', null, e.message);
@@ -329,10 +346,24 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
   return result;
 }
 
+/**
+ * The expenses the CA enters in Zoho Books come into the app's Expenses
+ * register. Owner decisions 2026-10-29 — Books is the source of truth for
+ * these: an expense changed in Books is changed here too, and one deleted in
+ * Books is removed here (with the old values in the audit log). Not
+ * automatically, but logged for the CA: one dated in a locked financial
+ * year, and one matched to a bank statement line (unmatch it first). A new
+ * expense whose Reference # names an order (its buyer enquiry or order
+ * reference) is linked to that order. Expenses the app itself sent are never
+ * imported.
+ *
+ * @return {Promise<{imported: number, updated: number, removed: number, failed: number, skipped: number}>}
+ */
 async function importPendingExpenses(triggeredBy, triggeredByUserId) {
+  const none = { imported: 0, updated: 0, removed: 0, failed: 0, skipped: 0 };
   if (!(await zohoBooksService.isEnabled())) {
     await zohoSyncLogRepository.log('expense_import', null, null, null, 'skipped', null, `${offReason()} — nothing imported.`, triggeredBy, triggeredByUserId);
-    return { imported: 0, failed: 0, skipped: 1 };
+    return { ...none, skipped: 1 };
   }
 
   let expenses;
@@ -340,45 +371,100 @@ async function importPendingExpenses(triggeredBy, triggeredByUserId) {
     expenses = await zohoBooksService.listExpenses();
   } catch (e) {
     await zohoSyncLogRepository.log('expense_import', null, null, null, 'error', null, e.message, triggeredBy, triggeredByUserId);
-    return { imported: 0, failed: 1, skipped: 0 };
+    return { ...none, failed: 1 };
   }
 
-  let imported = 0;
+  const result = { ...none };
+  const money = (n) => Number(n).toFixed(2);
+  const log = (id, status, zohoId, message) => zohoSyncLogRepository.log('expense_import', 'ca_expenses', id, null, status, zohoId, message, triggeredBy, triggeredByUserId);
+  const locked = async (date) => {
+    const fy = financialYear.label(String(date).slice(0, 10));
+    return (await caFyLockRepository.isLocked(fy)) ? fy : null;
+  };
+  const logOnce = async (id, zohoId, message) => {
+    const last = await db.queryOne("SELECT message FROM zoho_sync_log WHERE sync_type = 'expense_import' AND zoho_reference <=> :ref ORDER BY id DESC LIMIT 1", { ref: zohoId });
+    if (!last || last.message !== message) await log(id, 'error', zohoId, message);
+  };
+  const known = await caExpenseRepository.allByZohoId();
+  const seen = new Set();
   for (const expense of expenses) {
+    const zohoId = expense.zohoExpenseId;
+    seen.add(zohoId);
     // Stage 3: an order expense this app sent to Books is already here as
     // that order expense — never import it a second time.
-    if ((await caExpenseRepository.existsByZohoId(expense.zohoExpenseId)) || (await zohoPurchaseRepository.isPushedExpense(expense.zohoExpenseId))) {
+    if (await zohoPurchaseRepository.isPushedExpense(zohoId)) {
       continue;
     }
-    const id = await caExpenseRepository.insert(
-      expense.zohoExpenseId,
-      expense.category,
-      expense.description,
-      expense.vendorName,
-      expense.amount,
-      expense.currencyCode,
-      expense.expenseDate
-    );
-    await zohoSyncLogRepository.log(
-      'expense_import',
-      'ca_expenses',
-      id,
-      null,
-      'success',
-      expense.zohoExpenseId,
-      `Imported expense ${expense.zohoExpenseId} (${expense.category}, ${expense.amount} ${expense.currencyCode}).`,
-      triggeredBy,
-      triggeredByUserId
-    );
-    imported += 1;
+    const mine = known.get(zohoId);
+    if (!mine) {
+      const id = await caExpenseRepository.insert(zohoId, expense.category, expense.description, expense.vendorName, expense.amount, expense.currencyCode, expense.expenseDate);
+      const orderId = await caExpenseRepository.orderIdForReference(expense.referenceNumber);
+      if (orderId !== null) await caExpenseRepository.linkToOrder(id, orderId);
+      await log(id, 'success', zohoId, `Imported expense ${zohoId} (${expense.category}, ${expense.amount} ${expense.currencyCode})${orderId !== null ? `, linked to order #${orderId} by its Reference #` : ''}.`);
+      result.imported += 1;
+      continue;
+    }
+    const changes = {};
+    for (const [col, field] of [['category', 'category'], ['description', 'description'], ['vendor_name', 'vendorName'], ['currency_code', 'currencyCode'], ['expense_date', 'expenseDate']]) {
+      const before = String(mine[col] ?? '');
+      const after = String(expense[field] ?? '');
+      if (before !== after) changes[col] = [before, after];
+    }
+    if (Math.abs(Number(mine.amount) - Number(expense.amount)) > 0.004) {
+      changes.amount = [money(mine.amount), money(expense.amount)];
+    }
+    const cols = Object.keys(changes);
+    if (cols.length === 0) continue;
+    const id = Number(mine.id);
+    const what = cols.map((col) => `${col} ${changes[col][0]} → ${changes[col][1]}`).join(', ');
+    const fy = (await locked(mine.expense_date)) ?? (await locked(expense.expenseDate));
+    if (fy !== null) {
+      await logOnce(id, zohoId, `Expense ${zohoId} was changed in Zoho Books (${what}), but it is dated in FY ${fy}, which is locked: not changed here — CA to decide.`);
+      continue;
+    }
+    await caExpenseRepository.updateFromZoho(id, expense.category, expense.description, expense.vendorName, Number(expense.amount), expense.currencyCode, expense.expenseDate);
+    if (mine.order_id === null) {
+      const orderId = await caExpenseRepository.orderIdForReference(expense.referenceNumber);
+      if (orderId !== null) await caExpenseRepository.linkToOrder(id, orderId);
+    }
+    await auditLogRepository.log(triggeredByUserId, 'CA_EXPENSE_UPDATED_FROM_ZOHO', 'ca_expenses', id, cols.join(','),
+      JSON.stringify(Object.fromEntries(cols.map((c) => [c, changes[c][0]]))), JSON.stringify(Object.fromEntries(cols.map((c) => [c, changes[c][1]]))), 'Changed in Zoho Books');
+    await log(id, 'success', zohoId, `Updated expense ${zohoId} from Zoho Books: ${what}.`);
+    result.updated += 1;
   }
 
-  if (imported === 0) {
-    await zohoSyncLogRepository.log('expense_import', null, null, null, 'skipped', null, 'Nothing new — every expense in Zoho Books is already imported.', triggeredBy, triggeredByUserId);
-    return { imported: 0, failed: 0, skipped: 1 };
+  // Deleted in Books. A whole list gone at once is far more likely a wrong
+  // organisation or a Books problem than the CA's deletions: nothing is
+  // removed then, and the CA is told.
+  let gone = [...known.entries()].filter(([zohoId]) => !seen.has(zohoId));
+  if (gone.length > 10 && gone.length > known.size / 2) {
+    await zohoSyncLogRepository.log('expense_import', null, null, null, 'error', null, `${gone.length} of the ${known.size} imported expenses are no longer in Zoho Books. Nothing was removed: check that the app is connected to the right Books organisation, then ask the CA.`, triggeredBy, triggeredByUserId);
+    result.failed += 1;
+    gone = [];
+  }
+  for (const [zohoId, mine] of gone) {
+    const id = Number(mine.id);
+    const label = `Expense ${zohoId} (${mine.category}, ${mine.amount} ${mine.currency_code}, ${mine.expense_date})`;
+    const fy = await locked(mine.expense_date);
+    if (fy !== null) {
+      await logOnce(id, zohoId, `${label} was deleted in Zoho Books, but it is dated in FY ${fy}, which is locked: kept here — CA to decide.`);
+      continue;
+    }
+    if (await caExpenseRepository.isBankMatched(id)) {
+      await logOnce(id, zohoId, `${label} was deleted in Zoho Books, but it is matched to a bank statement line: kept here — unmatch it in Bank Statement first, then it is removed on the next sync.`);
+      continue;
+    }
+    await caExpenseRepository.remove(id);
+    await auditLogRepository.log(triggeredByUserId, 'CA_EXPENSE_REMOVED_FROM_ZOHO', 'ca_expenses', id, null, JSON.stringify(mine), null, 'Deleted in Zoho Books');
+    await log(id, 'success', zohoId, `Removed ${label}: it was deleted in Zoho Books.`);
+    result.removed += 1;
   }
 
-  return { imported, failed: 0, skipped: 0 };
+  if (result.imported + result.updated + result.removed + result.failed === 0) {
+    await zohoSyncLogRepository.log('expense_import', null, null, null, 'skipped', null, 'Nothing new — every expense in Zoho Books is already imported and up to date.', triggeredBy, triggeredByUserId);
+    result.skipped = 1;
+  }
+  return result;
 }
 
 function offReason() {
@@ -406,6 +492,8 @@ async function syncBenefits(triggeredBy, triggeredByUserId) {
     result.failed = 1;
     return result;
   }
+  // Owner decision 2026-10-29: put back what was deleted or changed in Books.
+  result.failed += (await zohoRestoreService.benefits(startDate, triggeredBy, triggeredByUserId)).failed;
   for (const benefit of await caExportBenefitRepository.forZohoSync(startDate)) {
     const id = Number(benefit.id);
     const orderId = benefit.order_id !== null ? Number(benefit.order_id) : null;
@@ -426,7 +514,7 @@ async function syncBenefits(triggeredBy, triggeredByUserId) {
       }
       const newId = await zohoBooksService.pushBenefitJournal(benefit, journalId);
       await caExportBenefitRepository.setZohoJournal(id, newId, hash);
-      await zohoSyncLogRepository.log('export_benefit', 'order', orderId, 'journal', 'success', newId, `${journalId !== null ? 'Updated' : 'Sent'} export benefit ${what} (claim #${id}) received on ${benefit.received_at} as Zoho Books journal.`, triggeredBy, triggeredByUserId);
+      await zohoSyncLogRepository.log('export_benefit', 'order', orderId, 'journal', 'success', newId, `${zohoRestoreService.note(`ben:${id}`)}${journalId !== null ? 'Updated' : 'Sent'} export benefit ${what} (claim #${id}) received on ${benefit.received_at} as Zoho Books journal.`, triggeredBy, triggeredByUserId);
       result.journals += 1;
     } catch (e) {
       await zohoSyncLogRepository.log('export_benefit', 'order', orderId, 'journal', 'error', journalId, e.message, triggeredBy, triggeredByUserId);

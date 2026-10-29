@@ -7,6 +7,8 @@ const { todayIst } = require('../helpers/dbDateTime');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const orderExpenseRepository = require('../repositories/orderExpenseRepository');
 const orderRepository = require('../repositories/orderRepository');
+const zohoSyncLogRepository = require('../repositories/zohoSyncLogRepository');
+const zohoBooksService = require('../services/zohoBooksService');
 const caFyLockGuard = require('../services/caFyLockGuard');
 const fileUploadService = require('../services/fileUploadService');
 
@@ -108,9 +110,20 @@ async function remove(req, res) {
     res.redirect(`/orders/${orderId}#financials-12a`);
     return;
   }
+  // Owner decision 2026-10-29: Zoho Books must match the app — an expense
+  // already in Books is removed there first.
+  if (expense.zoho_expense_id) {
+    try {
+      await zohoBooksService.deleteRecord('expense', String(expense.zoho_expense_id));
+    } catch (e) {
+      back(req, res, orderId, 'error', `This expense is in Zoho Books and could not be removed there, so nothing was changed: ${e.message}`);
+      return;
+    }
+    await zohoSyncLogRepository.log('order_expense', 'order', orderId, 'expense', 'success', String(expense.zoho_expense_id), `Removed expense "${expense.details}" (INR ${Number(expense.amount_inr).toFixed(2)}) from Zoho Books: it was removed in the app.`, 'manual', req.user.id);
+  }
   await orderExpenseRepository.remove(expense.id);
   await auditLogRepository.log(req.user.id, 'ORDER_EXPENSE_REMOVED', 'order_expenses', expense.id, 'amount_inr', String(expense.amount_inr), null, String(expense.details));
-  back(req, res, orderId, 'success', 'Expense removed.');
+  back(req, res, orderId, 'success', expense.zoho_expense_id ? 'Expense removed, here and in Zoho Books.' : 'Expense removed.');
 }
 
 module.exports = { add, remove };

@@ -269,17 +269,20 @@ const money = (n) => Number(n).toFixed(2);
  * In an organisation that is not GST-registered the bill goes in at its
  * total.
  *
+ * With zohoBillId (owner decision 2026-10-29: a bill changed directly in
+ * Books) the same bill is put back to the app's values instead.
+ *
  * @throws on any failure
  * @return {Promise<string>} the Zoho bill_id
  */
-async function pushBill(bill) {
+async function pushBill(bill, zohoBillId = null) {
   zohoGuard.assertCustomerAllowed(String(bill.buyer_name));
   assertVendorAllowed(String(bill.vendor_name));
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
   const line = await billTax(config, accessToken, bill);
   const vendorId = await findOrCreateVendor(config, accessToken, bill);
-  const existing = await findBill(config, accessToken, String(bill.bill_no), vendorId);
+  const existing = zohoBillId === null ? await findBill(config, accessToken, String(bill.bill_no), vendorId) : null;
   if (existing) return String(existing.bill_id);
 
   const forKey = bill.vendor_kind === 'supplier' ? 'supplier' : String(bill.bill_for);
@@ -302,6 +305,13 @@ async function pushBill(bill) {
     }],
     ...(line.reverse_charge_tax_id !== null ? { is_reverse_charge_applied: true } : {}),
   };
+  if (zohoBillId !== null) {
+    const put = await request('PUT', `https://${config.apiDomain}/books/v3/bills/${encodeURIComponent(zohoBillId)}?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
+    if (!put.ok) {
+      throw new Error(`Zoho Books bill update for ${bill.bill_no} failed (HTTP ${put.status}): ${put.body.slice(0, 500)}`);
+    }
+    return zohoBillId;
+  }
   const res = await request('POST', `https://${config.apiDomain}/books/v3/bills?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
   const saved = await findBill(config, accessToken, String(bill.bill_no), vendorId);
   if (!saved) {
@@ -343,6 +353,50 @@ async function pushVendorPayment(payment, bill, targetBill) {
 }
 
 /**
+ * Owner decision 2026-10-29: puts a vendor payment changed directly in Books
+ * back to the app's values — applied in full to its bill when it was applied
+ * before (zohoBillId).
+ *
+ * @throws on any failure
+ */
+async function restoreVendorPayment(payment, bill, zohoBillId) {
+  zohoGuard.assertCustomerAllowed(String(bill.buyer_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const vendorId = await findOrCreateVendor(config, accessToken, bill);
+  const payload = vendorPaymentPayload(config, vendorId, payment);
+  if (zohoBillId !== null) {
+    payload.bills = [{ bill_id: zohoBillId, amount_applied: payload.amount }];
+  }
+  const res = await request('PUT', `https://${config.apiDomain}/books/v3/vendorpayments/${encodeURIComponent(String(payment.zoho_payment_id))}?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
+  if (!res.ok) {
+    throw new Error(`Zoho Books vendor payment ${payment.payment_ref} could not be put back (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+}
+
+/**
+ * Owner decision 2026-10-29: puts a customer payment changed directly in
+ * Books back to the app's values (same amount, rate and bank charges as
+ * sent) — applied in full to its invoice when it was applied before.
+ *
+ * @throws on any failure
+ */
+async function restoreRevenuePayment(paymentId, clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, zohoInvoiceId, bankChargesInr = 0) {
+  zohoGuard.assertCustomerAllowed(companyLegalName);
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const contactId = await findOrCreateContact(config, accessToken, clientId, companyLegalName, currencyCode);
+  const payload = paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr);
+  if (zohoInvoiceId !== null) {
+    payload.invoices = [{ invoice_id: zohoInvoiceId, amount_applied: payload.amount }];
+  }
+  const res = await request('PUT', `https://${config.apiDomain}/books/v3/customerpayments/${encodeURIComponent(paymentId)}?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
+  if (!res.ok) {
+    throw new Error(`Zoho Books payment ${referenceNumber} could not be put back (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+}
+
+/**
  * Stage 3: applies a vendor payment held unapplied (paid on a proforma) to
  * the tax invoice that replaced it, now that it is in Books.
  *
@@ -375,10 +429,13 @@ async function applyVendorPayment(payment, bill, targetBill) {
  * (paid by staff). Its description starts with the buyer's name and order
  * reference, so a TEST- order's expenses are found by the clean-up script.
  *
+ * With zohoExpenseId (owner decision 2026-10-29: an expense changed directly
+ * in Books) the same expense is put back to the app's values.
+ *
  * @throws on any failure
  * @return {Promise<string>} the Zoho expense_id
  */
-async function pushExpense(expense) {
+async function pushExpense(expense, zohoExpenseId = null) {
   zohoGuard.assertCustomerAllowed(String(expense.buyer_name));
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
@@ -394,7 +451,8 @@ async function pushExpense(expense) {
     reference_number: `${expense.buyer_inquiry_ref}-EXP-${expense.id}`,
     description: `${expense.buyer_name} / ${expense.buyer_inquiry_ref}: ${label} — ${expense.details}${expense.paid_by === 'staff' && expense.staff_name ? ` (paid by ${expense.staff_name})` : ''}`,
   };
-  const res = await request('POST', `https://${config.apiDomain}/books/v3/expenses?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
+  const url = `https://${config.apiDomain}/books/v3/expenses${zohoExpenseId !== null ? `/${encodeURIComponent(zohoExpenseId)}` : ''}?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const res = await request(zohoExpenseId !== null ? 'PUT' : 'POST', url, payload, authHeaders(accessToken));
   const decoded = safeJson(res.body);
   const expenseId = decoded && decoded.expense && decoded.expense.expense_id;
   if (!res.ok || typeof expenseId !== 'string') {
@@ -514,29 +572,60 @@ async function contactRecords(contactId, vendor) {
   const org = `organization_id=${encodeURIComponent(config.organizationId)}`;
   const out = {};
   for (const key of vendor ? ['bills', 'vendorpayments'] : ['invoices', 'customerpayments']) {
-    out[key] = await getList(accessToken, `https://${config.apiDomain}/books/v3/${key}?${org}&${vendor ? 'vendor_id=' : 'customer_id='}${encodeURIComponent(contactId)}&per_page=200`, key);
+    out[key] = await getAllPages(accessToken, `https://${config.apiDomain}/books/v3/${key}?${org}&${vendor ? 'vendor_id=' : 'customer_id='}${encodeURIComponent(contactId)}`, key);
   }
   return out;
 }
 
-/** One Books expense or journal by id, for the per-order check (reads only). Null when Books no longer has it. */
-async function readRecord(kind, id) {
-  const paths = { expense: 'expenses', journal: 'journals' };
+/**
+ * Owner decision 2026-10-29 (the app is the source of truth for what it
+ * sends): every Books expense and every journal, id => total, read in full
+ * pages — so one sync reads each list once, not each record.
+ *
+ * @return {Promise<Object<string, number>>}
+ */
+async function totalsById(kind) {
+  const [path, idKey] = { expense: ['expenses', 'expense_id'], journal: ['journals', 'journal_id'] }[kind];
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
-  const res = await request('GET', `https://${config.apiDomain}/books/v3/${paths[kind]}/${encodeURIComponent(id)}?organization_id=${encodeURIComponent(config.organizationId)}`, null, authHeaders(accessToken));
+  const out = {};
+  for (const row of await getAllPages(accessToken, `https://${config.apiDomain}/books/v3/${path}?organization_id=${encodeURIComponent(config.organizationId)}`, path)) {
+    out[String(row[idKey])] = Number(row.total || 0);
+  }
+  return out;
+}
+
+/**
+ * Whether Books still has this invoice (looked up by its number, the way the
+ * app finds invoices — the single-invoice read can fail). The row, or null.
+ */
+async function invoiceByNumber(invoiceNumber) {
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  return findInvoiceByNumber(config, accessToken, invoiceNumber);
+}
+
+/** One Books record by id — an expense, journal, bill, customer payment or vendor payment (reads only). Null when Books no longer has it. */
+async function readRecord(kind, id) {
+  const [path, key] = {
+    expense: ['expenses', 'expense'], journal: ['journals', 'journal'], bill: ['bills', 'bill'],
+    customerpayment: ['customerpayments', 'payment'], vendorpayment: ['vendorpayments', 'vendorpayment'],
+  }[kind];
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const res = await request('GET', `https://${config.apiDomain}/books/v3/${path}/${encodeURIComponent(id)}?organization_id=${encodeURIComponent(config.organizationId)}`, null, authHeaders(accessToken));
   if (res.status === 404) {
     return null;
   }
   const decoded = safeJson(res.body);
-  if (!res.ok || !decoded || !decoded[kind]) {
+  if (!res.ok || !decoded || !decoded[key]) {
     // Books answers an unknown id with an error code rather than 404 for some records.
     if (decoded && [1002, 4000, 4500, 1004].includes(Number(decoded.code || 0))) {
       return null;
     }
     throw new Error(`Zoho Books ${kind} ${id} read failed (HTTP ${res.status}): ${res.body.slice(0, 300)}`);
   }
-  return decoded[kind];
+  return decoded[key];
 }
 
 /**
@@ -615,6 +704,7 @@ async function listExpenses() {
         amount: parseFloat(row.total || 0),
         currencyCode: row.currency_code || 'INR',
         expenseDate: row.date || todayIst(),
+        referenceNumber: String(row.reference_number || ''),
       });
     }
 
@@ -1035,6 +1125,24 @@ function assertContactCurrency(companyLegalName, contactCurrency, currencyCode) 
   }
 }
 
+/** Every page of a Books list (per_page 200), for lists that can grow past one page. */
+async function getAllPages(accessToken, url, key) {
+  const rows = [];
+  let page = 1;
+  let more = true;
+  while (more) {
+    const res = await request('GET', `${url}&page=${page}&per_page=200`, null, authHeaders(accessToken));
+    const decoded = safeJson(res.body);
+    if (!res.ok || !decoded || !Array.isArray(decoded[key])) {
+      throw new Error(`Zoho Books ${key} request failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+    }
+    rows.push(...decoded[key]);
+    more = !!(decoded.page_context && decoded.page_context.has_more_page);
+    page += 1;
+  }
+  return rows;
+}
+
 /** The `key` list of a Books GET, or throws. */
 async function getList(accessToken, url, key) {
   const res = await request('GET', url, null, authHeaders(accessToken));
@@ -1099,6 +1207,7 @@ function safeJson(text) {
 module.exports = {
   BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS, COST_ACCOUNTS, BENEFIT_INCOME_ACCOUNT, BENEFIT_SCRIP_ACCOUNT,
   isEnabled, syncStartDate, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense,
-  pushCostEntry, pushBenefitJournal, listTestJournals, contactRecords, readRecord,
+  pushCostEntry, pushBenefitJournal, listTestJournals, contactRecords, readRecord, totalsById, invoiceByNumber,
+  restoreVendorPayment, restoreRevenuePayment,
   testConnection, listExpenses, listTestContacts, listTestExpenses, deleteRecord, setTransport,
 };

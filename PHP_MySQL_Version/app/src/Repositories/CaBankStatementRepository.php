@@ -70,6 +70,7 @@ final class CaBankStatementRepository
                     WHEN 'advance' THEN ops.advance_cleared_at
                     WHEN 'balance' THEN ops.balance_cleared_at
                     WHEN 'freight' THEN ops.freight_cleared_at
+                    WHEN 'lc' THEN (SELECT l.lc_received_at FROM order_lc_details l WHERE l.order_id = bsl.matched_order_id)
                 END AS matched_leg_cleared_at,
                 ce.expense_date AS matched_expense_date
              FROM ca_bank_statement_lines bsl

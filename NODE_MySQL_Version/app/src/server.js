@@ -150,6 +150,8 @@ njkEnv.addFilter('money', (value) => {
   if (Number.isNaN(num)) return value;
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 });
+// Owner decision 2026-10-29: how a settlement leg is named on the CA pages ('lc' → 'LC payment').
+njkEnv.addFilter('legLabel', (leg) => require('./repositories/caRepository').legLabel(leg));
 // Mirrors PHP's number_format($v, 4) — used for CA exchange rates, which
 // are recorded and displayed to 4 decimal places (e.g. "88.5000"), not
 // the 2-decimal "money" convention used for amounts.
@@ -764,6 +766,7 @@ app.post('/orders/:id/financials/skip/undo', requireAuth, requirePermission('man
 app.post('/orders/:id/export-benefit-schemes', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.setExportBenefitSchemeStatus));
 app.post('/orders/:id/lc-details', requireAuth, requirePermission('manage_order_financials'), upload.single('lc_file'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveLcDetails));
 app.post('/orders/:id/lc-received', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.recordLcReceived));
+app.post('/orders/:id/payment/lc/firc', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.recordLcFirc));
 app.post('/orders/:id/inspection-fee', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveInspectionFee));
 app.post('/orders/:id/travel-expenses', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveTravelExpenses));
 app.post('/orders/:id/cost-entries', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addCostEntry));

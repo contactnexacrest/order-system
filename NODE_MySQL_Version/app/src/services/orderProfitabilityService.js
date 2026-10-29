@@ -1,10 +1,12 @@
 'use strict';
 
+const caExpenseRepository = require('../repositories/caExpenseRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderExpenseRepository = require('../repositories/orderExpenseRepository');
 const orderVendorBillRepository = require('../repositories/orderVendorBillRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
+const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
@@ -57,7 +59,7 @@ async function computeForOrder(orderId) {
   const order = await orderRepository.find(orderId);
   const fobValue = await orderProductRepository.totalFobValue(orderId);
   const currencyCode = (order && order.currency_code) || null;
-  const payment = await orderPaymentStatusRepository.find(orderId);
+  const payment = await withLcPayment(order, await orderPaymentStatusRepository.find(orderId));
 
   const [revenueInr, revenueIsEstimated] = revenueInInr(fobValue, payment);
 
@@ -112,7 +114,15 @@ async function computeForOrder(orderId) {
 
   const [exportBenefitsInr, exportBenefitsIsEstimated] = await exportBenefitsInInr(orderId);
 
-  const totalCostInr = supplierCostInr + freightCostInr + insuranceCostInr + otherCostsInr + logisticsCostInr + expenses.total;
+  // Owner decision 2026-10-29 (CAFIN change confirmed twice): expenses
+  // booked in Zoho Books and linked to this order count in its cost —
+  // except a possible duplicate of a cost already entered in the app.
+  let zohoExpensesInr = 0;
+  for (const zohoExpense of await caExpenseRepository.forOrderCounted(orderId)) {
+    zohoExpensesInr += zohoExpense.counted ? Number(zohoExpense.amount) : 0;
+  }
+
+  const totalCostInr = supplierCostInr + freightCostInr + insuranceCostInr + otherCostsInr + logisticsCostInr + expenses.total + zohoExpensesInr;
   const profitInr = revenueInr + exportBenefitsInr - totalCostInr;
   const marginPct = revenueInr > 0 ? round2(profitInr / revenueInr * 100) : null;
 
@@ -120,6 +130,7 @@ async function computeForOrder(orderId) {
     currency_code: currencyCode,
     fob_value_foreign: fobValue,
     revenue_inr: round2(revenueInr),
+    zoho_expenses_inr: round2(zohoExpensesInr),
     revenue_is_estimated: revenueIsEstimated,
     export_benefits_inr: round2(exportBenefitsInr),
     export_benefits_is_estimated: exportBenefitsIsEstimated,
@@ -168,6 +179,28 @@ async function exportBenefitsInInr(orderId) {
     }
   }
   return [total, isEstimated];
+}
+
+/**
+ * Owner decision 2026-10-29 (CAFIN change confirmed twice): on an LC
+ * order the LC replaces the cash advance, so the money the bank paid
+ * under the LC (the rupees credited) takes the advance leg's place in
+ * the revenue.
+ */
+async function withLcPayment(order, payment) {
+  if (!payment || !order || (order.payment_method || '') !== 'LC' || payment.advance_inr_actual !== null) {
+    return payment;
+  }
+  const lc = await orderLcDetailRepository.find(Number(order.id));
+  if (!lc || lc.lc_received_at === null || Number(lc.lc_received_amount) <= 0) {
+    return payment;
+  }
+  return {
+    ...payment,
+    advance_amount: Number(lc.lc_received_amount),
+    advance_inr_actual: Number(lc.lc_inr_credited),
+    advance_exchange_rate: Number(lc.lc_inr_credited) / Number(lc.lc_received_amount),
+  };
 }
 
 /**

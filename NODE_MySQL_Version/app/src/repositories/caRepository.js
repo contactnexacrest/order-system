@@ -4,6 +4,7 @@ const orderPaymentStatusRepository = require('./orderPaymentStatusRepository');
 const companySettingsRepository = require('./companySettingsRepository');
 const caBankStatementRepository = require('./caBankStatementRepository');
 const caExpenseRepository = require('./caExpenseRepository');
+const orderLcDetailRepository = require('./orderLcDetailRepository');
 const financialYear = require('../helpers/financialYear');
 const zohoGuard = require('../services/zohoGuard');
 
@@ -76,8 +77,44 @@ async function settlementRegister() {
       });
     }
   }
+  // Owner decision 2026-10-29 (CAFIN change confirmed twice): the money
+  // the bank paid under an LC is its own leg, at the rupees credited, with
+  // its own FIRC / eBRC proof.
+  for (const lc of await orderLcDetailRepository.receivedForRegister()) {
+    const clearedAtTs = new Date(lc.lc_received_at).getTime();
+    const daysSinceCleared = Number.isNaN(clearedAtTs) ? 0 : Math.floor((now - clearedAtTs) / 86400000);
+    rows.push({
+      order_id: Number(lc.order_id),
+      client_id: Number(lc.client_id),
+      buyer_inquiry_ref: lc.buyer_inquiry_ref,
+      company_legal_name: lc.company_legal_name,
+      currency_code: lc.currency_code,
+      leg: 'lc',
+      foreign_amount: parseFloat(lc.lc_received_amount),
+      cleared_at: lc.lc_received_at,
+      inr_actual: parseFloat(lc.lc_inr_credited),
+      inr_actual_recorded_at: lc.lc_received_at,
+      inr_actual_recorded_by: lc.lc_received_by !== null ? Number(lc.lc_received_by) : null,
+      exchange_rate: null,
+      expected_inr: null,
+      forex_gain_loss: null,
+      firc_reference: lc.lc_firc_reference ?? null,
+      firc_received_at: lc.lc_firc_received_at ?? null,
+      firc_pending: (lc.lc_firc_reference === null || lc.lc_firc_reference === undefined) && daysSinceCleared >= alertDays,
+      zoho_synced_at: lc.lc_zoho_synced_at ?? null,
+      zoho_reference: lc.lc_zoho_payment_id ?? null,
+      zoho_applied_at: lc.lc_zoho_applied_at ?? null,
+      is_test_or_sample: Number(lc.is_test_or_sample || 0) === 1,
+    });
+  }
   rows.sort((a, b) => String(b.cleared_at).localeCompare(String(a.cleared_at)));
   return rows;
+}
+
+/** How a leg is named on the CA pages. */
+function legLabel(leg) {
+  const s = String(leg || '');
+  return s === 'lc' ? 'LC payment' : s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /**
@@ -90,7 +127,7 @@ async function settlementRegister() {
  */
 async function legsPendingZohoSync() {
   const rows = await settlementRegister();
-  return rows.filter((r) => r.inr_actual !== null && r.zoho_synced_at === null
+  return rows.filter((r) => r.leg !== 'lc' && r.inr_actual !== null && r.zoho_synced_at === null
     && (zohoGuard.isProduction() ? !r.is_test_or_sample : String(r.company_legal_name || '').startsWith(zohoGuard.TEST_PREFIX)));
 }
 
@@ -102,7 +139,7 @@ async function legsPendingZohoSync() {
  */
 async function legsHeldInZoho() {
   const rows = await settlementRegister();
-  return rows.filter((r) => r.zoho_synced_at !== null && r.zoho_applied_at === null
+  return rows.filter((r) => r.leg !== 'lc' && r.zoho_synced_at !== null && r.zoho_applied_at === null
     && (zohoGuard.isProduction() ? !r.is_test_or_sample : String(r.company_legal_name || '').startsWith(zohoGuard.TEST_PREFIX)));
 }
 
@@ -235,6 +272,6 @@ async function fyReadiness(fy) {
 }
 
 module.exports = {
-  settlementRegister, availableFinancialYears, availableCalendarYears, revenueReport, legsPendingZohoSync, legsHeldInZoho,
+  settlementRegister, legLabel, availableFinancialYears, availableCalendarYears, revenueReport, legsPendingZohoSync, legsHeldInZoho,
   legsWithInrActualUnmatched, totalInrActualAll, fyReadiness,
 };

@@ -227,18 +227,18 @@ final class CaController
         $benefits = $result['benefits'];
 
         $done = "{$revenue['invoices']} invoice(s) sent or updated, {$revenue['synced']} payment(s) pushed, {$revenue['applied']} payment(s) applied to invoices, "
-            . "{$purchases['bills']} bill(s), {$purchases['payments']} vendor payment(s) ({$purchases['applied']} applied to bills) and {$purchases['expenses']} order expense(s) / cost(s) sent, {$benefits['journals']} export benefit journal(s) sent or updated, {$expenses['imported']} expense(s) imported";
+            . "{$purchases['bills']} bill(s), {$purchases['payments']} vendor payment(s) ({$purchases['applied']} applied to bills) and {$purchases['expenses']} order expense(s) / cost(s) sent, {$benefits['journals']} export benefit journal(s) sent or updated, {$expenses['imported']} expense(s) imported, {$expenses['updated']} updated and {$expenses['removed']} removed as in Zoho Books";
         $failed = $revenue['failed'] + $purchases['failed'] + $expenses['failed'] + $benefits['failed'];
         if ($failed > 0) {
             Flash::set('warning', "Sync finished: {$done}, {$failed} failed — see the log below for details.");
-        } elseif ($revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $purchases['bills'] + $purchases['payments'] + $purchases['applied'] + $purchases['expenses'] > 0 || $benefits['journals'] + $benefits['removed'] > 0 || $expenses['imported'] > 0) {
+        } elseif ($revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $purchases['bills'] + $purchases['payments'] + $purchases['applied'] + $purchases['expenses'] > 0 || $benefits['journals'] + $benefits['removed'] > 0 || $expenses['imported'] + $expenses['updated'] + $expenses['removed'] > 0) {
             Flash::set('success', "Sync finished: {$done}.");
         } else {
             Flash::set('success', 'Sync ran — nothing was pending (or Zoho Books isn\'t configured yet). See the log below.');
         }
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
-        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['invoices']} invoices, {$revenue['synced']} synced, {$revenue['applied']} applied/{$revenue['failed']} failed, purchases: {$purchases['bills']} bills, {$purchases['payments']} payments, {$purchases['applied']} applied, {$purchases['expenses']} expenses/{$purchases['failed']} failed, benefits: {$benefits['journals']} journals, {$benefits['removed']} removed/{$benefits['failed']} failed, expenses: {$expenses['imported']} imported/{$expenses['failed']} failed");
+        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['invoices']} invoices, {$revenue['synced']} synced, {$revenue['applied']} applied/{$revenue['failed']} failed, purchases: {$purchases['bills']} bills, {$purchases['payments']} payments, {$purchases['applied']} applied, {$purchases['expenses']} expenses/{$purchases['failed']} failed, benefits: {$benefits['journals']} journals, {$benefits['removed']} removed/{$benefits['failed']} failed, expenses: {$expenses['imported']} imported, {$expenses['updated']} updated, {$expenses['removed']} removed/{$expenses['failed']} failed");
         header('Location: /ca/zoho-sync');
     }
 
@@ -631,7 +631,7 @@ final class CaController
         $user = AuthService::currentUser();
         $orderId = (int) ($_POST['order_id'] ?? 0);
         $leg = (string) ($_POST['leg'] ?? '');
-        if ($orderId <= 0 || !in_array($leg, ['advance', 'balance', 'freight'], true)) {
+        if ($orderId <= 0 || !in_array($leg, ['advance', 'balance', 'freight', 'lc'], true)) {
             Flash::set('error', 'Choose a revenue leg to match.');
             header('Location: /ca/bank-statement');
             return;
@@ -639,7 +639,7 @@ final class CaController
 
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $ops = OrderPaymentStatusRepository::find($orderId) ?? [];
-        $clearedAt = $ops[$leg . '_cleared_at'] ?? null;
+        $clearedAt = $leg === 'lc' ? (\App\Repositories\OrderLcDetailRepository::find($orderId)['lc_received_at'] ?? null) : ($ops[$leg . '_cleared_at'] ?? null);
         if (!CaFyLockGuard::allow($clearedAt, (int) $user['id'], $roleId, 'order_payment_status', $orderId, "{$leg}_bank_match")) {
             header('Location: /ca/bank-statement');
             return;
@@ -683,7 +683,8 @@ final class CaController
         if ($line !== null) {
             if ($line['matched_order_id'] !== null && $line['matched_leg'] !== null) {
                 $ops = OrderPaymentStatusRepository::find((int) $line['matched_order_id']) ?? [];
-                $allowed = CaFyLockGuard::allow($ops[$line['matched_leg'] . '_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', (int) $line['matched_order_id'], "{$line['matched_leg']}_bank_unmatch");
+                $matchedDate = $line['matched_leg'] === 'lc' ? (\App\Repositories\OrderLcDetailRepository::find((int) $line['matched_order_id'])['lc_received_at'] ?? null) : ($ops[$line['matched_leg'] . '_cleared_at'] ?? null);
+                $allowed = CaFyLockGuard::allow($matchedDate, (int) $user['id'], $roleId, 'order_payment_status', (int) $line['matched_order_id'], "{$line['matched_leg']}_bank_unmatch");
             } elseif ($line['matched_expense_id'] !== null) {
                 $expense = CaExpenseRepository::find((int) $line['matched_expense_id']);
                 $allowed = CaFyLockGuard::allow($expense !== null ? $expense['expense_date'] : null, (int) $user['id'], $roleId, 'ca_expenses', (int) $line['matched_expense_id'], 'bank_unmatch');

@@ -4299,3 +4299,14 @@ ALTER TABLE ca_export_benefits
   ADD COLUMN zoho_journal_id VARCHAR(50) NULL,
   ADD COLUMN zoho_synced_at TIMESTAMP NULL,
   ADD COLUMN zoho_pushed_hash CHAR(64) NULL;
+
+-- ================================================================
+-- SECTION CM — LC PAYMENT IN THE INR SETTLEMENT REGISTER
+-- (owner decision 2026-10-29, CAFIN change confirmed twice)
+-- The money the bank pays under an LC is its own leg in the INR
+-- Settlement Register, with its FIRC / eBRC realization proof.
+-- docs/migrations/2026-10-30a-lc-payment-firc.sql
+-- ================================================================
+ALTER TABLE order_lc_details
+  ADD COLUMN lc_firc_reference VARCHAR(100) NULL,
+  ADD COLUMN lc_firc_received_at DATE NULL;

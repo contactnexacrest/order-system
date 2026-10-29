@@ -314,11 +314,14 @@ final class ZohoBooksService
      * decide): reverse charge and blocked input credit. In an organisation
      * that is not GST-registered the bill goes in at its total.
      *
+     * With $zohoBillId (owner decision 2026-10-29: a bill changed directly
+     * in Books) the same bill is put back to the app's values instead.
+     *
      * @param array<string,mixed> $bill ZohoPurchaseRepository row
      * @throws \RuntimeException on any failure
      * @return string the Zoho bill_id
      */
-    public static function pushBill(array $bill): string
+    public static function pushBill(array $bill, ?string $zohoBillId = null): string
     {
         ZohoGuard::assertCustomerAllowed((string) $bill['buyer_name']);
         self::assertVendorAllowed((string) $bill['vendor_name']);
@@ -326,7 +329,7 @@ final class ZohoBooksService
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
         $line = self::billTax($config, $accessToken, $bill);
         $vendorId = self::findOrCreateVendor($config, $accessToken, $bill);
-        $existing = self::findBill($config, $accessToken, (string) $bill['bill_no'], $vendorId);
+        $existing = $zohoBillId === null ? self::findBill($config, $accessToken, (string) $bill['bill_no'], $vendorId) : null;
         if ($existing !== null) {
             return (string) $existing['bill_id'];
         }
@@ -349,6 +352,13 @@ final class ZohoBooksService
             ] + ($line['tax_id'] !== null ? ['tax_id' => $line['tax_id']] : [])
               + ($line['reverse_charge_tax_id'] !== null ? ['reverse_charge_tax_id' => $line['reverse_charge_tax_id']] : [])],
         ] + ($line['reverse_charge_tax_id'] !== null ? ['is_reverse_charge_applied' => true] : []);
+        if ($zohoBillId !== null) {
+            $response = self::request('PUT', "https://{$config['apiDomain']}/books/v3/bills/" . rawurlencode($zohoBillId) . '?organization_id=' . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
+            if ($response['status'] < 200 || $response['status'] >= 300) {
+                throw new \RuntimeException("Zoho Books bill update for {$bill['bill_no']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+            return $zohoBillId;
+        }
         $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/bills?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
         $saved = self::findBill($config, $accessToken, (string) $bill['bill_no'], $vendorId);
         if ($saved === null) {
@@ -392,6 +402,52 @@ final class ZohoBooksService
     }
 
     /**
+     * Owner decision 2026-10-29: puts a vendor payment changed directly in
+     * Books back to the app's values — applied in full to its bill when it
+     * was applied before ($zohoBillId).
+     *
+     * @throws \RuntimeException on any failure
+     */
+    public static function restoreVendorPayment(array $payment, array $bill, ?string $zohoBillId): void
+    {
+        ZohoGuard::assertCustomerAllowed((string) $bill['buyer_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $vendorId = self::findOrCreateVendor($config, $accessToken, $bill);
+        $payload = self::vendorPaymentPayload($config, $vendorId, $payment);
+        if ($zohoBillId !== null) {
+            $payload['bills'] = [['bill_id' => $zohoBillId, 'amount_applied' => $payload['amount']]];
+        }
+        $response = self::request('PUT', "https://{$config['apiDomain']}/books/v3/vendorpayments/" . rawurlencode((string) $payment['zoho_payment_id']) . '?organization_id=' . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            throw new \RuntimeException("Zoho Books vendor payment {$payment['payment_ref']} could not be put back (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+    }
+
+    /**
+     * Owner decision 2026-10-29: puts a customer payment changed directly in
+     * Books back to the app's values (same amount, rate and bank charges as
+     * sent) — applied in full to its invoice when it was applied before.
+     *
+     * @throws \RuntimeException on any failure
+     */
+    public static function restoreRevenuePayment(string $paymentId, int $clientId, string $companyLegalName, string $currencyCode, ?float $foreignAmount, float $amountInr, string $date, string $referenceNumber, ?string $zohoInvoiceId, float $bankChargesInr = 0.0): void
+    {
+        ZohoGuard::assertCustomerAllowed($companyLegalName);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $contactId = self::findOrCreateContact($config, $accessToken, $clientId, $companyLegalName, $currencyCode);
+        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber, $bankChargesInr);
+        if ($zohoInvoiceId !== null) {
+            $payload['invoices'] = [['invoice_id' => $zohoInvoiceId, 'amount_applied' => $payload['amount']]];
+        }
+        $response = self::request('PUT', "https://{$config['apiDomain']}/books/v3/customerpayments/" . rawurlencode($paymentId) . '?organization_id=' . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            throw new \RuntimeException("Zoho Books payment {$referenceNumber} could not be put back (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+    }
+
+    /**
      * Stage 3: applies a vendor payment held unapplied (paid on a proforma)
      * to the tax invoice that replaced it, now that it is in Books.
      *
@@ -425,10 +481,13 @@ final class ZohoBooksService
      * buyer's name and order reference, so a TEST- order's expenses are
      * found by the clean-up script.
      *
+     * With $zohoExpenseId (owner decision 2026-10-29: an expense changed
+     * directly in Books) the same expense is put back to the app's values.
+     *
      * @throws \RuntimeException on any failure
      * @return string the Zoho expense_id
      */
-    public static function pushExpense(array $expense): string
+    public static function pushExpense(array $expense, ?string $zohoExpenseId = null): string
     {
         ZohoGuard::assertCustomerAllowed((string) $expense['buyer_name']);
         $config = self::config();
@@ -445,7 +504,8 @@ final class ZohoBooksService
             'reference_number' => "{$expense['buyer_inquiry_ref']}-EXP-{$expense['id']}",
             'description' => "{$expense['buyer_name']} / {$expense['buyer_inquiry_ref']}: {$label} — {$expense['details']}" . ($expense['paid_by'] === 'staff' && !empty($expense['staff_name']) ? " (paid by {$expense['staff_name']})" : ''),
         ];
-        $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/expenses?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
+        $url = "https://{$config['apiDomain']}/books/v3/expenses" . ($zohoExpenseId !== null ? '/' . rawurlencode($zohoExpenseId) : '') . '?organization_id=' . rawurlencode($config['organizationId']);
+        $response = self::request($zohoExpenseId !== null ? 'PUT' : 'POST', $url, $payload, self::authHeaders($accessToken));
         $decoded = json_decode($response['body'], true);
         $expenseId = $decoded['expense']['expense_id'] ?? null;
         if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($expenseId)) {
@@ -582,35 +642,68 @@ final class ZohoBooksService
         $org = 'organization_id=' . rawurlencode($config['organizationId']);
         $out = [];
         foreach ($vendor ? ['bills' => 'bills', 'vendorpayments' => 'vendorpayments'] : ['invoices' => 'invoices', 'customerpayments' => 'customerpayments'] as $path => $key) {
-            $out[$key] = self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/{$path}?{$org}&" . ($vendor ? 'vendor_id=' : 'customer_id=') . rawurlencode($contactId) . '&per_page=200', $key);
+            $out[$key] = self::getAllPages($config, $accessToken, "https://{$config['apiDomain']}/books/v3/{$path}?{$org}&" . ($vendor ? 'vendor_id=' : 'customer_id=') . rawurlencode($contactId), $key);
         }
         return $out;
     }
 
     /**
-     * One Books expense or journal by id, for the per-order check (reads
-     * only). Null when Books no longer has it.
+     * Owner decision 2026-10-29 (the app is the source of truth for what it
+     * sends): every Books expense and every journal, id => total, read in
+     * full pages — so one sync reads each list once, not each record.
+     *
+     * @return array<string, float>
+     */
+    public static function totalsById(string $kind): array
+    {
+        [$path, $key, $idKey] = ['expense' => ['expenses', 'expenses', 'expense_id'], 'journal' => ['journals', 'journals', 'journal_id']][$kind];
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $out = [];
+        foreach (self::getAllPages($config, $accessToken, "https://{$config['apiDomain']}/books/v3/{$path}?organization_id=" . rawurlencode($config['organizationId']), $key) as $row) {
+            $out[(string) $row[$idKey]] = (float) ($row['total'] ?? 0);
+        }
+        return $out;
+    }
+
+    /**
+     * Whether Books still has this invoice (looked up by its number, the
+     * way the app finds invoices — the single-invoice read can fail). The
+     * row, or null.
+     *
+     * @return array<string,mixed>|null
+     */
+    public static function invoiceByNumber(string $invoiceNumber): ?array
+    {
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        return self::findInvoiceByNumber($config, $accessToken, $invoiceNumber);
+    }
+
+    /**
+     * One Books record by id — an expense, journal, bill, customer payment
+     * or vendor payment (reads only). Null when Books no longer has it.
      *
      * @return array<string,mixed>|null
      */
     public static function readRecord(string $kind, string $id): ?array
     {
-        $paths = ['expense' => 'expenses', 'journal' => 'journals'];
+        [$path, $key] = ['expense' => ['expenses', 'expense'], 'journal' => ['journals', 'journal'], 'bill' => ['bills', 'bill'], 'customerpayment' => ['customerpayments', 'payment'], 'vendorpayment' => ['vendorpayments', 'vendorpayment']][$kind];
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
-        $response = self::request('GET', "https://{$config['apiDomain']}/books/v3/{$paths[$kind]}/" . rawurlencode($id) . '?organization_id=' . rawurlencode($config['organizationId']), [], self::authHeaders($accessToken));
+        $response = self::request('GET', "https://{$config['apiDomain']}/books/v3/{$path}/" . rawurlencode($id) . '?organization_id=' . rawurlencode($config['organizationId']), [], self::authHeaders($accessToken));
         if ($response['status'] === 404) {
             return null;
         }
         $decoded = json_decode($response['body'], true);
-        if ($response['status'] < 200 || $response['status'] >= 300 || !isset($decoded[$kind])) {
+        if ($response['status'] < 200 || $response['status'] >= 300 || !isset($decoded[$key])) {
             // Books answers an unknown id with an error code rather than 404 for some records.
             if (is_array($decoded) && in_array((int) ($decoded['code'] ?? 0), [1002, 4000, 4500, 1004], true)) {
                 return null;
             }
             throw new \RuntimeException("Zoho Books {$kind} {$id} read failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 300));
         }
-        return $decoded[$kind];
+        return $decoded[$key];
     }
 
     /**
@@ -708,6 +801,7 @@ final class ZohoBooksService
                     'amount' => (float) ($row['total'] ?? 0),
                     'currencyCode' => (string) ($row['currency_code'] ?? 'INR'),
                     'expenseDate' => (string) ($row['date'] ?? date('Y-m-d')),
+                    'referenceNumber' => (string) ($row['reference_number'] ?? ''),
                 ];
             }
 
@@ -1193,6 +1287,23 @@ final class ZohoBooksService
         if ($contactCurrency !== '' && $contactCurrency !== $currencyCode) {
             throw new \RuntimeException("{$companyLegalName} is set up in Zoho Books in {$contactCurrency}, but this payment is in {$currencyCode}. A Zoho Books customer has one currency — ask the CA how to book it.");
         }
+    }
+
+    /** Every page of a Books list (per_page 200), for lists that can grow past one page. */
+    private static function getAllPages(array $config, string $accessToken, string $url, string $key): array
+    {
+        $rows = [];
+        $page = 1;
+        do {
+            $response = self::request('GET', "{$url}&page={$page}&per_page=200", [], self::authHeaders($accessToken));
+            $decoded = json_decode($response['body'], true);
+            if ($response['status'] < 200 || $response['status'] >= 300 || !is_array($decoded) || !isset($decoded[$key]) || !is_array($decoded[$key])) {
+                throw new \RuntimeException("Zoho Books {$key} request failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+            $rows = array_merge($rows, $decoded[$key]);
+            $page++;
+        } while ((bool) ($decoded['page_context']['has_more_page'] ?? false));
+        return $rows;
     }
 
     /** @return list<array<string, mixed>> the $key list of a Books GET, or throws */

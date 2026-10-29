@@ -684,6 +684,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('zoho_books_organization_id',    '', 'string',  'zoho_books', 'Zoho Books organization ID — required on every Books API call.', 1),
   ('zoho_books_deposit_account_id', '', 'string',  'zoho_books', 'The Zoho Books chart-of-accounts account ID that synced customer payments are recorded as deposited into (e.g. your bank account in Zoho Books).', 1),
   ('zoho_books_sync_start_date',    '', 'date', 'zoho_books', 'Go-live date for Zoho Books (YYYY-MM-DD). Only CIs, Debit Notes, payments, bills, vendor payments and order expenses dated on or after it are sent; anything earlier is booked by the CA as the opening position. Required on the live server (ZOHO_ENVIRONMENT=production): without it nothing is sent.', 0),
+  ('zoho_books_restore_checked_at', '', 'string', 'zoho_books', 'Set by the app: when the scheduled Zoho sync last checked every record already in Zoho Books and put back what had been deleted or changed there (once a day; Sync Now always checks). Leave it as it is.', 0),
   ('zoho_books_accounts_domain',    'accounts.zoho.in', 'string', 'zoho_books', 'Zoho OAuth token endpoint domain — region-specific, matching whichever data center the Zoho One account lives in.', 0),
   ('zoho_books_api_domain',         'www.zohoapis.in', 'string', 'zoho_books', 'Zoho Books API domain — matches zoho_books_accounts_domain''s region (www.zohoapis.com / .eu / .in / .com.cn / .com.au).', 0);
 

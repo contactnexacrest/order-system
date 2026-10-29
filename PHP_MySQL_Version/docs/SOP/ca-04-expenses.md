@@ -37,9 +37,27 @@ currency, and date.
 Each Zoho expense is only ever imported once — the system remembers which
 Zoho expense IDs it has already pulled, so running a sync repeatedly never
 creates duplicates. There's no manual "delete" for an imported expense
-either; if an expense is corrected or removed in Zoho Books, that
-correction doesn't currently flow back automatically (see "What this
-doesn't do yet" below).
+here: Zoho Books is where these are corrected.
+
+**Corrections and deletions in Zoho Books follow (owner decision
+2026-10-29).** Zoho Books is the source of truth for the expenses the CA
+enters there, so every sync also brings over what changed:
+
+- **Changed in Books** (amount, date, category, description, vendor or
+  currency) → changed here too. The Sync Log says what changed (for example
+  *amount 2350.00 → 2400.00*), and the Audit Log keeps the old and new
+  values. A link to an order and the TDS note stay as they were.
+- **Deleted in Books** → removed here too, with the old row kept in the
+  Audit Log.
+- **Not automatically**, logged once in the Sync Log for the CA instead:
+  an expense dated in a **locked financial year** (chapter CA-06) is not
+  changed or removed here; and an expense **matched to a bank statement
+  line** (chapter CA-05) is not removed — unmatch it on the Bank Statement
+  page first, and the next sync removes it.
+- If most of the imported expenses disappear from Books at once (more than
+  ten, and more than half), nothing is removed: that is far more likely the
+  app being connected to the wrong Books organisation than real deletions.
+  The Sync Log says so; check the connection, then ask the CA.
 
 **Order expenses sent from this system (2026-10-29).** Expenses recorded
 on an order are sent to Zoho Books as expenses (chapter CA-03). The import
@@ -98,6 +116,17 @@ instead.
 
 ## Linking an expense to the order it belongs to
 
+**Automatically, by the Reference # (owner decision 2026-10-29).** When the
+CA enters an order's expense in Zoho Books, put the order's **buyer
+enquiry reference or order reference** (for example `NX-1042`) in the
+expense's **Reference #**. The import then links it to that order by
+itself, and the Sync Log says *"linked to order #n by its Reference #"*.
+Capital or small letters do not matter, and other words may stand next to
+it. When no order, or more than one, matches, it is not linked — link it
+by hand as below.
+
+**By hand:**
+
 An expense like ECGC insurance or a third-party inspection fee is
 genuinely tied to one shipment, not the business in general — the
 Expenses list lets anyone with the "Add/edit INR actual" permission link
@@ -118,6 +147,18 @@ Entry, and the order's own Profitability Sheet — so opening one order
 shows every financial detail tied to it at a glance, not just the
 separate CA-module list screens.
 
+**Not counted twice (owner decision 2026-10-29).** On the order page, a
+linked Zoho expense that has the same amount and the same date as a cost
+already entered in the app for that order (an order expense, an order cost,
+or a supplier / logistics tax invoice) is marked *"possible duplicate of a
+cost entered in the app — not counted"*; one not in rupees is marked *"not
+in rupees — not counted"*. The CA checks it and unlinks the duplicate or
+corrects the app entry. Every other linked Zoho expense **counts in the
+order's cost**: the order's total costs and profit, the Order Profitability
+report, and section C5 of the CA Financial Annexure (owner decision
+2026-10-29, CAFIN change confirmed twice). An expense not linked to any
+order (salaries, rent) is never part of an order's cost.
+
 ## Export CSV
 
 An **Export CSV** link above the Expenses list downloads every imported
@@ -128,9 +169,8 @@ with what's on screen.
 
 ## What this doesn't do yet
 
-- No expense editing or deletion here — corrections happen in Zoho Books;
-  this system doesn't currently detect or re-import a correction to an
-  expense it has already pulled.
+- No expense editing or deletion here — corrections happen in Zoho Books,
+  and the next sync brings them over (see "What gets imported").
 - No automatic expense/revenue reconciliation against your actual bank
   statement yet — that's a later phase (bank-statement import and
   matching). For now, this page is the expense side of the picture;

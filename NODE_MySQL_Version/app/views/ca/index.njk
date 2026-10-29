@@ -52,7 +52,7 @@
         <tr>
           <td>{% if canOpenOrder(s.order_id) %}<a href="/orders/{{ s.order_id }}">{{ s.buyer_inquiry_ref }}</a>{% else %}{{ s.buyer_inquiry_ref }}{% endif %}</td>
           <td>{{ s.company_legal_name }}</td>
-          <td>{{ s.leg | capitalize }}</td>
+          <td>{{ s.leg | legLabel }}</td>
           <td>{{ (s.foreign_amount | money) if s.foreign_amount != null else '—' }}</td>
           <td>{{ s.currency_code }}</td>
           <td>{{ (s.exchange_rate | rate4) if s.exchange_rate != null else '—' }}</td>

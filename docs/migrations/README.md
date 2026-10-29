@@ -28,7 +28,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-10-28e-vendor-bill-proforma
 
 Run each file below that the database has not had yet, in this order, then
 deploy the code for both stacks. As of 29 Oct 2026 the live site still
-needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e and 29f**.
+needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f and 30a**.
 
 | # | File | What it does |
 |---|---|---|
@@ -49,6 +49,7 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e and 29f**.
 | 15 | `2026-10-29d-zoho-sync-start-date.sql` | Zoho Books go-live date setting (`zoho_books_sync_start_date`): only records dated on or after it go to Books; on the live server nothing is sent until it is set |
 | 16 | `2026-10-29e-shipping-bill-and-reverse-charge.sql` | The shipping bill's number, date and customs exchange rate on the order (the CI and Debit Note go to Zoho Books at that rate), and the reverse-charge mark on transport bills |
 | 17 | `2026-10-29f-zoho-costs-lc-benefits.sql` | Order costs say what they were paid from and remember their Zoho Books expense; LC orders record the money the bank paid under the LC; export benefits remember their Zoho Books journal |
+| 18 | `2026-10-30a-lc-payment-firc.sql` | The LC payment's FIRC / eBRC reference and date, so it joins the INR Settlement Register like the other legs |
 
 There is no `2026-10-28b` file; that letter was not used.
 

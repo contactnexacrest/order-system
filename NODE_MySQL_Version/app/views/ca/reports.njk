@@ -74,7 +74,7 @@
         <tr>
           <td>{% if canOpenOrder(r.order_id) %}<a href="/orders/{{ r.order_id }}">{{ r.buyer_inquiry_ref }}</a>{% else %}{{ r.buyer_inquiry_ref }}{% endif %}</td>
           <td>{{ r.company_legal_name }}</td>
-          <td>{{ r.leg | capitalize }}</td>
+          <td>{{ r.leg | legLabel }}</td>
           <td>{{ r.cleared_at }}</td>
           <td>{{ (r.foreign_amount | money) if r.foreign_amount != null else '—' }} {{ r.currency_code }}</td>
           <td>{% if r.inr_actual != null %}&#8377;{{ r.inr_actual | money }}{% else %}<span class="muted">—</span>{% endif %}</td>

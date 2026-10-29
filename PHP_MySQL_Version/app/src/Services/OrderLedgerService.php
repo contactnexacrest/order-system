@@ -57,6 +57,21 @@ final class OrderLedgerService
                 $rows[] = self::info((string) $payment[$leg . '_cleared_at'], "{$label} cleared (funds confirmed)", $amount, $orderCurrency, 'Staff-recorded');
             }
         }
+        // Owner decision 2026-10-29 (confirmed twice): the money the bank paid under an LC.
+        $lc = \App\Repositories\OrderLcDetailRepository::find($orderId);
+        if ($lc !== null && $lc['lc_received_at'] !== null && (float) $lc['lc_received_amount'] > 0) {
+            $rows[] = [
+                'date' => (string) $lc['lc_received_at'],
+                'event' => 'LC payment received (paid by the bank under the LC)',
+                'direction' => 'in',
+                'amount' => $lc['lc_received_amount'],
+                'currency' => $orderCurrency,
+                'rate' => (float) $lc['lc_inr_credited'] / (float) $lc['lc_received_amount'],
+                'inr' => (float) $lc['lc_inr_credited'],
+                'inr_basis' => 'actual',
+                'source' => 'Staff-recorded',
+            ];
+        }
         foreach (ClientPaymentReportRepository::forOrder($orderId) as $report) {
             $rows[] = self::info(
                 (string) ($report['payment_date'] ?? $report['reported_at']),
@@ -115,6 +130,12 @@ final class OrderLedgerService
                 $entry['amount_inr'],
                 'Order cost entry'
             );
+        }
+        // Owner decision 2026-10-29 (confirmed twice): expenses booked in Zoho Books for this order (not a possible duplicate).
+        foreach (\App\Repositories\CaExpenseRepository::forOrderCounted($orderId) as $zohoExpense) {
+            if ($zohoExpense['counted']) {
+                $rows[] = self::out((string) $zohoExpense['expense_date'], 'Expense — booked in Zoho Books: ' . $zohoExpense['category'] . (!empty($zohoExpense['description']) ? ": {$zohoExpense['description']}" : ''), $zohoExpense['amount'], 'Zoho Books expense');
+            }
         }
         foreach (CaExportBenefitRepository::forOrder($orderId) as $benefit) {
             $rows[] = self::info((string) $benefit['claimed_at'], "Export benefit claimed — {$benefit['scheme_name']}", $benefit['claimed_amount'], (string) $benefit['currency_code'], 'Export benefit claim');

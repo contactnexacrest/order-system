@@ -4,10 +4,10 @@ const db = require('../config/db');
 const financialYear = require('../helpers/financialYear');
 
 // CA / Accounting module (Phase 4) — expenses imported one-way from Zoho
-// Books. No create/update path for the expense data itself (Zoho Books
-// stays the one place expenses are entered) — the only write this
-// repository exposes besides the import insert is setTds(), a local-only
-// annotation that never pushes back to Zoho.
+// Books. Zoho Books stays the one place expenses are entered: the import
+// inserts them and mirrors later changes and deletions made there
+// (updateFromZoho(), remove()). The only local writes are setTds() and the
+// order link, annotations that never push back to Zoho.
 
 async function existsByZohoId(zohoExpenseId) {
   const row = await db.queryOne('SELECT 1 AS present FROM ca_expenses WHERE zoho_expense_id = :id', { id: zohoExpenseId });
@@ -60,6 +60,80 @@ async function forOrder(orderId) {
  */
 async function linkToOrder(id, orderId) {
   await db.execute('UPDATE ca_expenses SET order_id = :order_id WHERE id = :id', { order_id: orderId, id });
+}
+
+/**
+ * Owner decision 2026-10-29 (Books is the source of truth for what the CA
+ * enters there): every expense imported so far, keyed by its Zoho id, so the
+ * import can mirror Books' changes and deletions.
+ *
+ * @return {Promise<Map<string, object>>}
+ */
+async function allByZohoId() {
+  return new Map((await db.query('SELECT * FROM ca_expenses')).map((r) => [String(r.zoho_expense_id), r]));
+}
+
+/** Books changed it: the imported copy follows (the order link and the TDS note stay). */
+async function updateFromZoho(id, category, description, vendorName, amount, currencyCode, expenseDate) {
+  await db.execute(
+    'UPDATE ca_expenses SET category = :category, description = :description, vendor_name = :vendor_name, amount = :amount, currency_code = :currency_code, expense_date = :expense_date WHERE id = :id',
+    { category, description, vendor_name: vendorName, amount, currency_code: currencyCode, expense_date: expenseDate, id }
+  );
+}
+
+async function remove(id) {
+  await db.execute('DELETE FROM ca_expenses WHERE id = :id', { id });
+}
+
+/** Whether a bank statement line is matched to this expense (it then is not removed automatically). */
+async function isBankMatched(id) {
+  return !!(await db.queryOne('SELECT 1 AS present FROM ca_bank_statement_lines WHERE matched_expense_id = :id LIMIT 1', { id }));
+}
+
+/**
+ * Owner decision 2026-10-29 (order-wise import): the order whose buyer
+ * enquiry reference or order reference appears, as a whole word, in a Books
+ * expense's Reference # — or null when none or more than one does.
+ */
+async function orderIdForReference(reference) {
+  const tokens = [...new Set(String(reference || '').split(/[\s,;]+/).map((t) => t.trim().toLowerCase()).filter(Boolean))];
+  if (tokens.length === 0) return null;
+  const params = Object.fromEntries(tokens.map((t, i) => [`t${i}`, t]));
+  const marks = tokens.map((_, i) => `:t${i}`).join(',');
+  const rows = await db.query(`SELECT id FROM orders WHERE LOWER(buyer_inquiry_ref) IN (${marks}) OR LOWER(order_reference) IN (${marks})`, params);
+  const ids = [...new Set(rows.map((r) => Number(r.id)))];
+  return ids.length === 1 ? ids[0] : null;
+}
+
+/**
+ * Owner decision 2026-10-29: the expenses booked in Zoho Books and linked to
+ * this order, each marked whether it counts as this order's cost. It does
+ * not when it has the same amount and date as a cost already entered in the
+ * app for this order (an order expense, an order cost or a supplier /
+ * logistics tax invoice) — a possible duplicate for the CA to check — nor
+ * when it is not in rupees. The counted ones are part of the order's cost,
+ * profit, cash position and CAFIN (C5) — CAFIN change confirmed twice by
+ * the owner, 2026-10-29.
+ *
+ * @return {Promise<object[]>} each with `counted` (bool) and `reason` (string|null)
+ */
+async function forOrderCounted(orderId) {
+  const rows = await db.query(
+    `SELECT amount_inr AS a, expense_date AS d FROM order_expenses WHERE order_id = :o1
+     UNION ALL SELECT amount_inr, COALESCE(incurred_at, DATE(created_at)) FROM order_cost_entries WHERE order_id = :o2
+     UNION ALL SELECT total_inr, bill_date FROM order_vendor_bills WHERE order_id = :o3 AND doc_kind = 'invoice'`,
+    { o1: orderId, o2: orderId, o3: orderId }
+  );
+  const app = new Set(rows.map((r) => `${Number(r.a).toFixed(2)}|${r.d}`));
+  return (await forOrder(orderId)).map((e) => {
+    let reason = null;
+    if (String(e.currency_code).toUpperCase() !== 'INR') {
+      reason = 'not in rupees — not counted';
+    } else if (app.has(`${Number(e.amount).toFixed(2)}|${e.expense_date}`)) {
+      reason = 'possible duplicate of a cost entered in the app — not counted';
+    }
+    return { ...e, counted: reason === null, reason };
+  });
 }
 
 /** All-time total of every imported expense — used by the reconciliation summary. */
@@ -125,4 +199,7 @@ async function tdsSummary() {
   return rows;
 }
 
-module.exports = { existsByZohoId, insert, all, find, forOrder, linkToOrder, setTds, totalAll, availableFinancialYears, tdsSummary };
+module.exports = {
+  existsByZohoId, insert, all, find, forOrder, linkToOrder, setTds, totalAll, availableFinancialYears, tdsSummary,
+  allByZohoId, updateFromZoho, remove, isBankMatched, orderIdForReference, forOrderCounted,
+};

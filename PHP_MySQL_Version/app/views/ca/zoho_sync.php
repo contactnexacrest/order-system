@@ -35,7 +35,8 @@
         <tr>
           <td><?= htmlspecialchars((string) $row['created_at']) ?></td>
           <td><?= htmlspecialchars($row['triggered_by']) ?><?= $row['triggered_by_name'] ? ' (' . htmlspecialchars($row['triggered_by_name']) . ')' : '' ?></td>
-          <td><?= $row['entity_id'] ? (\App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $row['entity_id']) ? '<a href="/orders/' . (int) $row['entity_id'] . '">Order #' . (int) $row['entity_id'] . '</a>' : 'Order #' . (int) $row['entity_id']) . ($row['leg'] ? ' — ' . htmlspecialchars(\App\Services\ZohoInvoiceData::KIND_LABELS[$row['leg']] ?? ucfirst($row['leg'])) : '') : '<span class="muted">—</span>' ?></td>
+          <?php // Only rows about an order link to it; an imported expense (entity ca_expenses) is an expense, not an order. ?>
+          <td><?php if (!$row['entity_id']): ?><span class="muted">—</span><?php elseif ($row['entity_type'] === 'ca_expenses'): ?><a href="/ca/expenses">Expense #<?= (int) $row['entity_id'] ?></a><?php else: ?><?= (\App\Services\OrderAccessService::currentUserMayOpenOrderId((int) $row['entity_id']) ? '<a href="/orders/' . (int) $row['entity_id'] . '">Order #' . (int) $row['entity_id'] . '</a>' : 'Order #' . (int) $row['entity_id']) . ($row['leg'] ? ' — ' . htmlspecialchars(\App\Services\ZohoInvoiceData::KIND_LABELS[$row['leg']] ?? ucfirst($row['leg'])) : '') ?><?php endif; ?></td>
           <td>
             <?php if ($row['status'] === 'success'): ?>
               <span style="color:var(--success)">Success</span>

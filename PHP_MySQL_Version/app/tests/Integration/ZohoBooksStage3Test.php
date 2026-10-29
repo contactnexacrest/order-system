@@ -116,6 +116,10 @@ final class ZohoBooksStage3Test extends DbTestCase
             $this->bills[$id] = ['bill_id' => $id, 'bill_number' => $payload['bill_number'], 'vendor_id' => $payload['vendor_id'], 'total' => round($line['rate'] * (1 + $percent / 100), 2), 'payload' => $payload];
             return $json(['code' => 0, 'bill' => $this->bills[$id]], 201);
         }
+        if ($path === '/books/v3/vendorpayments' && $method === 'GET') {
+            $rows = array_map(static fn (string $id, array $p): array => ['payment_id' => $id, 'amount' => $p['amount'], 'vendor_id' => $p['vendor_id']], array_keys($this->vendorPayments), $this->vendorPayments);
+            return $json(['code' => 0, 'vendorpayments' => array_values(array_filter($rows, static fn (array $r): bool => !isset($query['vendor_id']) || $r['vendor_id'] === $query['vendor_id']))]);
+        }
         if ($path === '/books/v3/vendorpayments' && $method === 'POST') {
             $id = 'VP-' . (count($this->vendorPayments) + 1);
             $this->vendorPayments[$id] = $payload;

@@ -214,18 +214,18 @@ async function runZohoSync(req, res) {
   const { revenue, purchases, expenses, benefits } = result;
 
   const done = `${revenue.invoices} invoice(s) sent or updated, ${revenue.synced} payment(s) pushed, ${revenue.applied} payment(s) applied to invoices, `
-    + `${purchases.bills} bill(s), ${purchases.payments} vendor payment(s) (${purchases.applied} applied to bills) and ${purchases.expenses} order expense(s) / cost(s) sent, ${benefits.journals} export benefit journal(s) sent or updated, ${expenses.imported} expense(s) imported`;
+    + `${purchases.bills} bill(s), ${purchases.payments} vendor payment(s) (${purchases.applied} applied to bills) and ${purchases.expenses} order expense(s) / cost(s) sent, ${benefits.journals} export benefit journal(s) sent or updated, ${expenses.imported} expense(s) imported, ${expenses.updated} updated and ${expenses.removed} removed as in Zoho Books`;
   const failed = revenue.failed + purchases.failed + expenses.failed + benefits.failed;
   if (failed > 0) {
     flash.set(req, 'warning', `Sync finished: ${done}, ${failed} failed — see the log below for details.`);
-  } else if (revenue.synced > 0 || revenue.invoices > 0 || revenue.applied > 0 || purchases.bills + purchases.payments + purchases.applied + purchases.expenses > 0 || benefits.journals + benefits.removed > 0 || expenses.imported > 0) {
+  } else if (revenue.synced > 0 || revenue.invoices > 0 || revenue.applied > 0 || purchases.bills + purchases.payments + purchases.applied + purchases.expenses > 0 || benefits.journals + benefits.removed > 0 || expenses.imported + expenses.updated + expenses.removed > 0) {
     flash.set(req, 'success', `Sync finished: ${done}.`);
   } else {
     flash.set(req, 'success', "Sync ran — nothing was pending (or Zoho Books isn't configured yet). See the log below.");
   }
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
-  await auditLogRepository.log(user.id, 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, `revenue: ${revenue.invoices} invoices, ${revenue.synced} synced, ${revenue.applied} applied/${revenue.failed} failed, purchases: ${purchases.bills} bills, ${purchases.payments} payments, ${purchases.applied} applied, ${purchases.expenses} expenses/${purchases.failed} failed, benefits: ${benefits.journals} journals, ${benefits.removed} removed/${benefits.failed} failed, expenses: ${expenses.imported} imported/${expenses.failed} failed`);
+  await auditLogRepository.log(user.id, 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, `revenue: ${revenue.invoices} invoices, ${revenue.synced} synced, ${revenue.applied} applied/${revenue.failed} failed, purchases: ${purchases.bills} bills, ${purchases.payments} payments, ${purchases.applied} applied, ${purchases.expenses} expenses/${purchases.failed} failed, benefits: ${benefits.journals} journals, ${benefits.removed} removed/${benefits.failed} failed, expenses: ${expenses.imported} imported, ${expenses.updated} updated, ${expenses.removed} removed/${expenses.failed} failed`);
   res.redirect('/ca/zoho-sync');
 }
 
@@ -609,14 +609,15 @@ async function matchBankLineToRevenue(req, res) {
   const user = req.user;
   const orderId = parseInt(req.body.order_id, 10) || 0;
   const leg = String(req.body.leg || '');
-  if (orderId <= 0 || !['advance', 'balance', 'freight'].includes(leg)) {
+  if (orderId <= 0 || !['advance', 'balance', 'freight', 'lc'].includes(leg)) {
     flash.set(req, 'error', 'Choose a revenue leg to match.');
     res.redirect('/ca/bank-statement');
     return;
   }
 
   const ops = (await orderPaymentStatusRepository.find(orderId)) || {};
-  if (!(await caFyLockGuard.allow(req, ops[`${leg}_cleared_at`] ?? null, 'order_payment_status', orderId, `${leg}_bank_match`))) {
+  const clearedAt = leg === 'lc' ? ((await orderLcDetailRepository.find(orderId)) || {}).lc_received_at ?? null : (ops[`${leg}_cleared_at`] ?? null);
+  if (!(await caFyLockGuard.allow(req, clearedAt, 'order_payment_status', orderId, `${leg}_bank_match`))) {
     res.redirect('/ca/bank-statement');
     return;
   }
@@ -654,7 +655,8 @@ async function unmatchBankLine(req, res) {
   if (line) {
     if (line.matched_order_id !== null && line.matched_leg !== null) {
       const ops = (await orderPaymentStatusRepository.find(line.matched_order_id)) || {};
-      allowed = await caFyLockGuard.allow(req, ops[`${line.matched_leg}_cleared_at`] ?? null, 'order_payment_status', line.matched_order_id, `${line.matched_leg}_bank_unmatch`);
+      const matchedDate = line.matched_leg === 'lc' ? ((await orderLcDetailRepository.find(line.matched_order_id)) || {}).lc_received_at ?? null : (ops[`${line.matched_leg}_cleared_at`] ?? null);
+      allowed = await caFyLockGuard.allow(req, matchedDate, 'order_payment_status', line.matched_order_id, `${line.matched_leg}_bank_unmatch`);
     } else if (line.matched_expense_id !== null) {
       const expense = await caExpenseRepository.find(line.matched_expense_id);
       allowed = await caFyLockGuard.allow(req, expense ? expense.expense_date : null, 'ca_expenses', line.matched_expense_id, 'bank_unmatch');

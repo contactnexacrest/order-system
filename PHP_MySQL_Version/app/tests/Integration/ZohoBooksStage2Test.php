@@ -118,6 +118,10 @@ final class ZohoBooksStage2Test extends DbTestCase
             $this->invoices[$m[1]] = $this->storedInvoice($m[1], $payload, $this->invoices[$m[1]]['status']);
             return $json(['code' => 0, 'invoice' => $this->invoices[$m[1]]]);
         }
+        if ($path === '/books/v3/customerpayments' && $method === 'GET') {
+            $rows = array_map(static fn (string $id, array $p): array => ['payment_id' => $id, 'amount' => $p['amount'], 'reference_number' => $p['reference_number'], 'customer_id' => $p['customer_id']], array_keys($this->payments), $this->payments);
+            return $json(['code' => 0, 'customerpayments' => array_values(array_filter($rows, static fn (array $r): bool => !isset($query['customer_id']) || $r['customer_id'] === $query['customer_id']))]);
+        }
         if ($path === '/books/v3/customerpayments' && $method === 'POST') {
             $id = 'PAY-' . (count($this->payments) + 1);
             $this->payments[$id] = $payload;

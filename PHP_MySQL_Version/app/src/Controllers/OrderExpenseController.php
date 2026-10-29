@@ -117,8 +117,19 @@ final class OrderExpenseController
             header("Location: /orders/{$orderId}#financials-12a");
             return;
         }
+        // Owner decision 2026-10-29: Zoho Books must match the app — an
+        // expense already in Books is removed there first.
+        if (!empty($expense['zoho_expense_id'])) {
+            try {
+                \App\Services\ZohoBooksService::deleteRecord('expense', (string) $expense['zoho_expense_id']);
+            } catch (\Throwable $e) {
+                $this->back($orderId, 'error', 'This expense is in Zoho Books and could not be removed there, so nothing was changed: ' . $e->getMessage());
+                return;
+            }
+            \App\Repositories\ZohoSyncLogRepository::log('order_expense', 'order', $orderId, 'expense', 'success', (string) $expense['zoho_expense_id'], 'Removed expense "' . $expense['details'] . '" (INR ' . number_format((float) $expense['amount_inr'], 2, '.', '') . ') from Zoho Books: it was removed in the app.', 'manual', (int) $user['id']);
+        }
         OrderExpenseRepository::delete((int) $expense['id']);
         AuditLogRepository::log((int) $user['id'], 'ORDER_EXPENSE_REMOVED', 'order_expenses', (int) $expense['id'], 'amount_inr', (string) $expense['amount_inr'], null, (string) $expense['details']);
-        $this->back($orderId, 'success', 'Expense removed.');
+        $this->back($orderId, 'success', !empty($expense['zoho_expense_id']) ? 'Expense removed, here and in Zoho Books.' : 'Expense removed.');
     }
 }

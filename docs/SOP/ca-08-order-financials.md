@@ -55,7 +55,7 @@ later):
 
 | Sub-step | What you do | Done when |
 |---|---|---|
-| **12a · Order Costs** | One table of every cost on the order, and a **+ Add a cost** button that opens and closes like **+ Add an expense** (owner request 2026-10-27), with a type picker inside (other cost, travel, inspection fee, LC/bank loan — each opens its own short form; parts 4–6 below). Actual order expenses with receipts are added under **+ Add an expense** (see "Order expenses" below); supplier and logistics bills come in by themselves. Zoho-linked expenses are listed under it for reference. | You click **Costs are complete** (you can still add a cost later, or **Reopen costs**). |
+| **12a · Order Costs** | One table of every cost on the order, and a **+ Add a cost** button that opens and closes like **+ Add an expense** (owner request 2026-10-27), with a type picker inside (other cost, travel, inspection fee, LC/bank loan — each opens its own short form; parts 4–6 below). Actual order expenses with receipts are added under **+ Add an expense** (see "Order expenses" below); supplier and logistics bills come in by themselves. Expenses booked in Zoho Books and linked to the order are listed under it and count in its cost, except a possible duplicate (part 3 below). | You click **Costs are complete** (you can still add a cost later, or **Reopen costs**). |
 | **12b · Export Benefit Eligibility** | Answer Eligible / Not Eligible for every scheme (part 1). | No scheme is still Pending. |
 | **12c · Review Profit & Complete** | Read the Profitability Summary (part 7), generate the Internal Annexure if needed, then **Mark Step 12 complete** (needs 12a and 12b done). | Marked complete — or skipped with a reason. |
 
@@ -153,6 +153,13 @@ lock](./ca-06-fy-lock.md)). A voucher entered more than 30 days after the
 expense keeps its real date and is marked "added later". Staff-paid
 amounts are totalled as "to reimburse".
 
+Once Zoho Books is switched on, each expense goes to Books on the next
+sync. **Removing** one that is already in Books removes it from Books too
+(owner decision 2026-10-29): the confirmation says so, and if Books cannot
+be reached at that moment nothing is removed and the message says why. An
+expense changed or deleted directly in Books is put back from the app on
+the next sync (see [CA-03](./ca-03-zoho-sync.md)).
+
 **Travel:** the Travel Expense % (part 5) is a **provisional** budget.
 Once any actual travel expense is recorded (fuel/tolls, tickets, local
 conveyance, hotel or food), the actual figures replace the provisional %
@@ -178,7 +185,19 @@ every payment against it.
 Every expense linked to this order (see
 [Expenses](./ca-04-expenses.md#linking-an-expense-to-the-order-it-belongs-to)).
 Read-only here — linking/unlinking an expense is still done from the
-Expenses register, since that's also where the TDS annotation lives.
+Expenses register, since that's also where the TDS annotation lives. An
+expense whose Reference # in Zoho Books names this order is linked by
+itself (owner decision 2026-10-29).
+
+**Not counted twice (owner decision 2026-10-29).** A linked Zoho expense
+with the same amount and date as a cost already entered here (an order
+expense, an order cost, or a supplier / logistics tax invoice) shows the
+note *"possible duplicate of a cost entered in the app — not counted"*;
+one not in rupees shows *"not in rupees — not counted"*. Every other
+linked Zoho expense counts in the order's cost and profit, and in section
+C5 of the CA Financial Annexure (owner decision 2026-10-29, CAFIN change
+confirmed twice); the Step 12c summary shows the total as **Expenses Booked
+in Zoho Books (INR)**.
 
 ### 4. Letter of Credit & Bank Loan
 
@@ -203,6 +222,16 @@ currency, the **rupees credited** (from the bank's credit advice) and the
 against the Commercial Invoice (see
 [CA-03](./ca-03-zoho-sync.md)); until then it can be corrected here, after
 that only in Books.
+
+The LC payment is **money received from the buyer** (owner decision
+2026-10-29, CAFIN change confirmed twice): it counts in the order's
+revenue at the rupees credited (so the bank charges are already out of the
+profit), in the cash position, as the first line of "Money received from
+the buyer" in the CA Financial Annexure, and as its own *LC payment* line
+in the INR Settlement Register (chapter CA-01). Once the bank issues the
+FIRC / eBRC for it, enter its **reference** and **date** in the small
+**FIRC / eBRC** form under the LC payment (users who may edit INR actual
+amounts).
 
 ### 5. Travel Expenses — Factory Visits
 
@@ -314,6 +343,9 @@ tracks** rather than asking staff to re-enter them:
      this leg is never recorded at all (Stage 6 auto-skips), so it
      contributes nothing and never marks revenue estimated on its own
      account.
+  6. On an **LC order**, the LC payment the bank made (section 4 above)
+     counts as the advance leg at the rupees credited, unless an advance
+     INR actual is already recorded.
 - **Government export benefits.** Every claim linked to this order (see
   "Government Export Benefits Claimed" above). A claim already marked
   **received** contributes its real `received_amount`; one still only
@@ -335,8 +367,11 @@ tracks** rather than asking staff to re-enter them:
   actual conversion difference is — there is currently no separate
   foreign-currency freight cost field to handle that case.
 - **Other order costs** — the sum of every Order Cost Entry above.
+- **Expenses booked in Zoho Books** — the linked Zoho expenses that count
+  (section 3 above: not a possible duplicate, in rupees).
 - **Total order cost** = supplier cost + freight + insurance + other
-  costs.
+  costs + logistics bills + order expenses + expenses booked in Zoho
+  Books.
 - **Order profit** = revenue + government export benefits − total order
   cost.
 - **Order margin %** = profit ÷ revenue × 100, shown as "—" (not 0%)

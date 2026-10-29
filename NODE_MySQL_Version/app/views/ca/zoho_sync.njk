@@ -36,7 +36,10 @@
           <td>{{ row.created_at }}</td>
           <td>{{ row.triggered_by }}{% if row.triggered_by_name %} ({{ row.triggered_by_name }}){% endif %}</td>
           <td>
-            {% if row.entity_id %}
+            {# Only rows about an order link to it; an imported expense (entity ca_expenses) is an expense, not an order. #}
+            {% if row.entity_id and row.entity_type == 'ca_expenses' %}
+              <a href="/ca/expenses">Expense #{{ row.entity_id }}</a>
+            {% elif row.entity_id %}
               {% if canOpenOrder(row.entity_id) %}<a href="/orders/{{ row.entity_id }}">Order #{{ row.entity_id }}</a>{% else %}Order #{{ row.entity_id }}{% endif %}{% if row.leg %} — {{ legLabels[row.leg] or (row.leg | capitalize) }}{% endif %}
             {% else %}
               <span class="muted">—</span>

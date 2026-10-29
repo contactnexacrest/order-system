@@ -756,6 +756,40 @@ async function recordLcReceived(req, res) {
   back('success', `LC payment recorded: ${currency} ${amount}, ₹${inr} credited.`);
 }
 
+/**
+ * Owner decision 2026-10-29 (CAFIN change confirmed twice): the LC
+ * payment's FIRC / eBRC realization proof, like the other legs'.
+ */
+async function recordLcFirc(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const reference = String(req.body.lc_firc_reference || '').trim();
+  const back = (type, message) => {
+    flash.set(req, type, message);
+    res.redirect(`/orders/${orderId}#lc-received`);
+  };
+  if (reference === '' || [...reference].length > 100) {
+    back('error', 'Enter the FIRC/eBRC reference.');
+    return;
+  }
+  const lc = await orderLcDetailRepository.find(orderId);
+  if (!lc || lc.lc_received_at === null) {
+    back('error', 'Record the LC payment itself before entering its FIRC/eBRC reference.');
+    return;
+  }
+  if (!(await caFyLockGuard.allow(req, String(lc.lc_received_at), 'order_lc_details', orderId, 'lc_firc_reference'))) {
+    res.redirect(`/orders/${orderId}#lc-received`);
+    return;
+  }
+  const receivedAt = String(req.body.lc_firc_received_at || '').trim() || todayIst();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(receivedAt)) {
+    back('error', 'Enter a valid FIRC/eBRC date.');
+    return;
+  }
+  await orderLcDetailRepository.setFirc(orderId, reference, receivedAt);
+  await auditLogRepository.log(req.user.id, 'CA_FIRC_RECORDED', 'order_lc_details', orderId, 'lc_firc_reference', lc.lc_firc_reference, reference);
+  back('success', 'LC payment FIRC/eBRC reference recorded.');
+}
+
 async function deleteCostEntry(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const entryId = parseInt(req.params.entryId, 10);
@@ -970,4 +1004,4 @@ async function saveExportBenefits(req, res) {
   back();
 }
 
-module.exports = { skipExportBenefitClaim, correctExportBenefit, deleteExportBenefit, confirmCosts, completeFinancials, saveExportBenefits, skipFinancials, undoSkipFinancials, addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, recordLcReceived, saveInspectionFee, saveTravelExpenses };
+module.exports = { skipExportBenefitClaim, correctExportBenefit, deleteExportBenefit, confirmCosts, completeFinancials, saveExportBenefits, skipFinancials, undoSkipFinancials, addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, recordLcReceived, recordLcFirc, saveInspectionFee, saveTravelExpenses };

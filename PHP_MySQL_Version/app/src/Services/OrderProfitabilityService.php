@@ -66,7 +66,7 @@ final class OrderProfitabilityService
         $order = OrderRepository::find($orderId);
         $fobValue = OrderProductRepository::totalFobValue($orderId);
         $currencyCode = $order['currency_code'] ?? null;
-        $payment = OrderPaymentStatusRepository::find($orderId);
+        $payment = self::withLcPayment($order, OrderPaymentStatusRepository::find($orderId));
 
         [$revenueInr, $isEstimated] = self::revenueInInr($fobValue, $payment);
 
@@ -117,7 +117,15 @@ final class OrderProfitabilityService
 
         [$exportBenefitsInr, $exportBenefitsIsEstimated] = self::exportBenefitsInInr($orderId);
 
-        $totalCostInr = $supplierCostInr + $freightCostInr + $insuranceCostInr + $otherCostsInr + $logisticsCostInr + $expenses['total'];
+        // Owner decision 2026-10-29 (CAFIN change confirmed twice): expenses
+        // booked in Zoho Books and linked to this order count in its cost —
+        // except a possible duplicate of a cost already entered in the app.
+        $zohoExpensesInr = 0.0;
+        foreach (\App\Repositories\CaExpenseRepository::forOrderCounted($orderId) as $zohoExpense) {
+            $zohoExpensesInr += $zohoExpense['counted'] ? (float) $zohoExpense['amount'] : 0.0;
+        }
+
+        $totalCostInr = $supplierCostInr + $freightCostInr + $insuranceCostInr + $otherCostsInr + $logisticsCostInr + $expenses['total'] + $zohoExpensesInr;
         $profitInr = $revenueInr + $exportBenefitsInr - $totalCostInr;
         $marginPct = $revenueInr > 0 ? round($profitInr / $revenueInr * 100, 2) : null;
 
@@ -125,6 +133,7 @@ final class OrderProfitabilityService
             'currency_code'        => $currencyCode,
             'fob_value_foreign'    => $fobValue,
             'revenue_inr'          => round($revenueInr, 2),
+            'zoho_expenses_inr'    => round($zohoExpensesInr, 2),
             'revenue_is_estimated' => $isEstimated,
             'export_benefits_inr'  => round($exportBenefitsInr, 2),
             'export_benefits_is_estimated' => $exportBenefitsIsEstimated,
@@ -178,6 +187,30 @@ final class OrderProfitabilityService
             }
         }
         return [$total, $isEstimated];
+    }
+
+    /**
+     * Owner decision 2026-10-29 (CAFIN change confirmed twice): on an LC
+     * order the LC replaces the cash advance, so the money the bank paid
+     * under the LC (the rupees credited) takes the advance leg's place in
+     * the revenue.
+     *
+     * @param array<string,mixed>|null $payment
+     * @return array<string,mixed>|null
+     */
+    private static function withLcPayment(?array $order, ?array $payment): ?array
+    {
+        if ($payment === null || ($order['payment_method'] ?? '') !== 'LC' || $payment['advance_inr_actual'] !== null) {
+            return $payment;
+        }
+        $lc = \App\Repositories\OrderLcDetailRepository::find((int) $order['id']);
+        if ($lc === null || $lc['lc_received_at'] === null || (float) $lc['lc_received_amount'] <= 0) {
+            return $payment;
+        }
+        $payment['advance_amount'] = (float) $lc['lc_received_amount'];
+        $payment['advance_inr_actual'] = (float) $lc['lc_inr_credited'];
+        $payment['advance_exchange_rate'] = (float) $lc['lc_inr_credited'] / (float) $lc['lc_received_amount'];
+        return $payment;
     }
 
     /**

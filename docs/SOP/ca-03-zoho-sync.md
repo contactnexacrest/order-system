@@ -14,7 +14,8 @@ This system is the source of truth for revenue — every order, its
 payments, and its INR actuals live here. Zoho Books is treated as the
 statutory/filing copy: revenue flows **one way, from this system to
 Zoho Books**, never the other way. Nothing you do in Zoho Books changes
-anything in this system.
+anything in this system — and what the app sent is put back in Books if
+someone deletes or changes it there (see *Who owns what* below).
 
 Concretely: once a settlement leg has an **INR actual** recorded (see
 Chapter 1), the sync pushes it to Zoho Books as a **Customer Payment**
@@ -235,6 +236,44 @@ journals. Each line says one of:
 The page only reads: it changes nothing in the app or in Books. Correct
 whichever side is wrong.
 
+## Who owns what: the app and Zoho Books (owner decision 2026-10-29)
+
+**The app owns what it sends.** Commercial Invoices and Debit Notes, the
+buyer's payments (advance, balance, freight) and the LC payment, the
+suppliers' and logistics partners' bills, the payments made to them, the
+order expenses, the order costs and the export benefit journals are
+entered in the app and only copied to Books. Each of these already sent —
+dated on or after the go-live date — is checked against Books at the start
+of every **Sync Now**, and by the scheduled job **once a day** (its first
+run after 23 hours; the hourly runs in between only send what is new, to
+stay inside Zoho's daily API limit):
+
+- **Deleted in Books** → sent again. Its Sync Log row starts *"Re-created
+  in Zoho Books — it had been deleted there."* A payment is applied to its
+  invoice or bill again; an invoice or bill sent again gets its payments
+  applied again.
+- **A different amount in Books** → put back to the app's amount, in the
+  same Books record (never a second one). The Sync Log row starts
+  *"Restored to the app's values — it had been changed in Zoho Books."*
+  and says what Books had.
+- **Dated in a financial year the CA has locked** (chapter CA-06) →
+  nothing is changed in Books. The Sync Log says *"… which is locked: not
+  restored — CA to decide."* once (not again on every sync while it stays
+  that way). The CA decides whether to unlock the year or correct Books by
+  hand.
+
+So a correction belongs in the app: change it there, and the next sync
+updates Books. A change made only in Books is undone. Each restore is its
+own Sync Log row, and the counts in the Sync Now message include them.
+
+**Books owns the expenses the CA enters there** (chapter CA-04): the
+import follows Books for those — new ones come in, changed ones are
+changed here, deleted ones are removed here.
+
+**Removing an order expense in the app removes it from Books too.** If
+Books cannot be reached at that moment, nothing is removed and the message
+says why; try again later.
+
 ## The server switches in `.env` (2026-10-29)
 
 Three lines in the server's `.env` file decide what this server may do
@@ -314,14 +353,17 @@ created in Zoho Books.
   detail).
 - The **Sync Log** — every sync attempt ever made, manual or scheduled,
   success or failure, with the Zoho reference created (on success) or the
-  error message (on failure). This is its own independent log, separate
-  from the main system's Audit Log, exactly as this module was scoped to
-  keep it.
+  error message (on failure). A row about an order links to the order; a
+  row about an imported expense shows *Expense #n* and links to the
+  Expenses page. This is its own independent log, separate from the main
+  system's Audit Log, exactly as this module was scoped to keep it.
 
-Each run first sends approved CIs and Debit Notes, then payments (and LC
-payments), then applies any held payment whose invoice is now in Books;
-then bills, vendor payments, order expenses and order costs; then the
-expense import; then received export benefits as journals. Zoho lets a login
+Each Sync Now (and the scheduled job once a day) first checks what was already sent (see *Who owns what* above),
+then sends approved CIs and Debit Notes, then payments (and LC payments),
+then applies any held payment whose invoice is now in Books; then bills,
+vendor payments, order expenses and order costs; then the expense import
+(new, changed and deleted expenses); then received export benefits as
+journals. Zoho lets a login
 be renewed only a few times in ten minutes, so pressing **Sync Now** or
 **Test Books Connection** many times in a row can be refused for a few
 minutes ("too many requests" in the Sync Log); wait and run it again.

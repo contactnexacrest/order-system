@@ -41,7 +41,7 @@
         {% for leg in unmatchedRevenueLegs %}
         <tr>
           <td>{% if canOpenOrder(leg.order_id) %}<a href="/orders/{{ leg.order_id }}">{{ leg.buyer_inquiry_ref }}</a>{% else %}{{ leg.buyer_inquiry_ref }}{% endif %}</td>
-          <td>{{ leg.leg | capitalize }}</td>
+          <td>{{ leg.leg | legLabel }}</td>
           <td>{{ leg.cleared_at }}</td>
           <td>&#8377;{{ leg.inr_actual | money }}</td>
         </tr>

@@ -78,6 +78,10 @@ describe('Zoho Books Stage 2', () => {
       invoices[m[1]] = storedInvoice(m[1], payload, invoices[m[1]].status);
       return json({ code: 0, invoice: invoices[m[1]] });
     }
+    if (p === '/books/v3/customerpayments' && method === 'GET') {
+      const rows = Object.entries(payments).map(([id, x]) => ({ payment_id: id, amount: x.amount, reference_number: x.reference_number, customer_id: x.customer_id }));
+      return json({ code: 0, customerpayments: rows.filter((r) => u.searchParams.get('customer_id') === null || r.customer_id === u.searchParams.get('customer_id')) });
+    }
     if (p === '/books/v3/customerpayments' && method === 'POST') {
       const id = `PAY-${Object.keys(payments).length + 1}`;
       payments[id] = payload;

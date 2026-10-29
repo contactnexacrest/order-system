@@ -153,4 +153,29 @@ final class OrderLcDetailRepository
     {
         Database::connection()->prepare('UPDATE order_lc_details SET lc_zoho_payment_id = NULL, lc_zoho_synced_at = NULL, lc_zoho_applied_at = NULL WHERE lc_zoho_payment_id = :id')->execute(['id' => $paymentId]);
     }
+
+    /**
+     * Owner decision 2026-10-29 (CAFIN change confirmed twice): every LC
+     * payment received, for the INR Settlement Register.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function receivedForRegister(): array
+    {
+        return Database::connection()->query(
+            'SELECT l.*, o.client_id, o.buyer_inquiry_ref, o.company_legal_name, o.currency_code,
+                    (o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1) AS is_test_or_sample
+             FROM order_lc_details l
+             JOIN orders o ON o.id = l.order_id
+             JOIN clients c ON c.id = o.client_id
+             WHERE l.lc_received_at IS NOT NULL AND l.lc_received_amount > 0'
+        )->fetchAll();
+    }
+
+    /** The LC payment's FIRC / eBRC realization proof (owner decision 2026-10-29). */
+    public static function setFirc(int $orderId, string $reference, string $receivedAt): void
+    {
+        Database::connection()->prepare('UPDATE order_lc_details SET lc_firc_reference = :ref, lc_firc_received_at = :received_at WHERE order_id = :order_id')
+            ->execute(['ref' => $reference, 'received_at' => $receivedAt, 'order_id' => $orderId]);
+    }
 }

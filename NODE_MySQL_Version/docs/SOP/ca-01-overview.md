@@ -228,6 +228,13 @@ order pipeline, one row per leg, with:
   so anything still outstanding is easy to spot at a glance,
 - when it was recorded and by whom.
 
+On an LC order the money the bank paid under the LC is its own row,
+*LC payment* (owner decision 2026-10-29), with the rupees credited as its
+INR actual, its own FIRC / eBRC (entered under the LC payment on the
+order page) and its own bank-statement match. It goes to Zoho Books
+through the order's LC step, so it is never counted in "waiting to be
+pushed".
+
 This is read-only in Phase 1 — it exists so a CA (or anyone else with the
 view permission) can see every settlement's INR status in one place
 without opening each order individually. Recording or correcting a value

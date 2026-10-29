@@ -83,8 +83,44 @@ final class CaRepository
                 ];
             }
         }
+        // Owner decision 2026-10-29 (CAFIN change confirmed twice): the money
+        // the bank paid under an LC is its own leg, at the rupees credited,
+        // with its own FIRC / eBRC proof.
+        foreach (OrderLcDetailRepository::receivedForRegister() as $lc) {
+            $clearedAtTs = strtotime((string) $lc['lc_received_at']);
+            $daysSinceCleared = $clearedAtTs !== false ? (int) floor(($todayTs - $clearedAtTs) / 86400) : 0;
+            $rows[] = [
+                'order_id' => (int) $lc['order_id'],
+                'client_id' => (int) $lc['client_id'],
+                'buyer_inquiry_ref' => $lc['buyer_inquiry_ref'],
+                'company_legal_name' => $lc['company_legal_name'],
+                'currency_code' => $lc['currency_code'],
+                'leg' => 'lc',
+                'foreign_amount' => (float) $lc['lc_received_amount'],
+                'cleared_at' => $lc['lc_received_at'],
+                'inr_actual' => (float) $lc['lc_inr_credited'],
+                'inr_actual_recorded_at' => $lc['lc_received_at'],
+                'inr_actual_recorded_by' => $lc['lc_received_by'] !== null ? (int) $lc['lc_received_by'] : null,
+                'exchange_rate' => null,
+                'expected_inr' => null,
+                'forex_gain_loss' => null,
+                'firc_reference' => $lc['lc_firc_reference'],
+                'firc_received_at' => $lc['lc_firc_received_at'],
+                'firc_pending' => $lc['lc_firc_reference'] === null && $daysSinceCleared >= $alertDays,
+                'zoho_synced_at' => $lc['lc_zoho_synced_at'],
+                'zoho_reference' => $lc['lc_zoho_payment_id'],
+                'zoho_applied_at' => $lc['lc_zoho_applied_at'],
+                'is_test_or_sample' => (int) ($lc['is_test_or_sample'] ?? 0) === 1,
+            ];
+        }
         usort($rows, static fn(array $a, array $b): int => strcmp((string) $b['cleared_at'], (string) $a['cleared_at']));
         return $rows;
+    }
+
+    /** How a leg is named on the CA pages. */
+    public static function legLabel(string $leg): string
+    {
+        return $leg === 'lc' ? 'LC payment' : ucfirst($leg);
     }
 
     /**
@@ -101,7 +137,7 @@ final class CaRepository
     {
         return array_values(array_filter(
             self::settlementRegister(),
-            static fn(array $r): bool => $r['inr_actual'] !== null && $r['zoho_synced_at'] === null
+            static fn(array $r): bool => $r['leg'] !== 'lc' && $r['inr_actual'] !== null && $r['zoho_synced_at'] === null
                 && (ZohoGuard::isProduction() ? !$r['is_test_or_sample'] : str_starts_with((string) $r['company_legal_name'], ZohoGuard::TEST_PREFIX))
         ));
     }
@@ -118,7 +154,7 @@ final class CaRepository
     {
         return array_values(array_filter(
             self::settlementRegister(),
-            static fn(array $r): bool => $r['zoho_synced_at'] !== null && $r['zoho_applied_at'] === null
+            static fn(array $r): bool => $r['leg'] !== 'lc' && $r['zoho_synced_at'] !== null && $r['zoho_applied_at'] === null
                 && (ZohoGuard::isProduction() ? !$r['is_test_or_sample'] : str_starts_with((string) $r['company_legal_name'], ZohoGuard::TEST_PREFIX))
         ));
     }

@@ -9,10 +9,10 @@ use App\Helpers\FinancialYear;
 
 /**
  * CA / Accounting module (Phase 4) — expenses imported one-way from Zoho
- * Books. No create/update path for the expense data itself (Zoho Books
- * stays the one place expenses are entered) — the only write this
- * repository exposes besides the import insert is setTds(), a local-only
- * annotation that never pushes back to Zoho.
+ * Books. Zoho Books stays the one place expenses are entered: the import
+ * inserts them and mirrors later changes and deletions made there
+ * (updateFromZoho(), delete()). The only local writes are setTds() and the
+ * order link, annotations that never push back to Zoho.
  */
 final class CaExpenseRepository
 {
@@ -166,5 +166,97 @@ final class CaExpenseRepository
         }
         unset($r);
         return $rows;
+    }
+
+    /**
+     * Owner decision 2026-10-29 (Books is the source of truth for what the
+     * CA enters there): every expense imported so far, keyed by its Zoho id,
+     * so the import can mirror Books' changes and deletions.
+     *
+     * @return array<string, array<string,mixed>>
+     */
+    public static function allByZohoId(): array
+    {
+        $out = [];
+        foreach (Database::connection()->query('SELECT * FROM ca_expenses')->fetchAll() as $row) {
+            $out[(string) $row['zoho_expense_id']] = $row;
+        }
+        return $out;
+    }
+
+    /** Books changed it: the imported copy follows (the order link and the TDS note stay). */
+    public static function updateFromZoho(int $id, string $category, ?string $description, ?string $vendorName, float $amount, string $currencyCode, string $expenseDate): void
+    {
+        Database::connection()->prepare(
+            'UPDATE ca_expenses SET category = :category, description = :description, vendor_name = :vendor_name, amount = :amount, currency_code = :currency_code, expense_date = :expense_date WHERE id = :id'
+        )->execute(['category' => $category, 'description' => $description, 'vendor_name' => $vendorName, 'amount' => $amount, 'currency_code' => $currencyCode, 'expense_date' => $expenseDate, 'id' => $id]);
+    }
+
+    public static function delete(int $id): void
+    {
+        Database::connection()->prepare('DELETE FROM ca_expenses WHERE id = :id')->execute(['id' => $id]);
+    }
+
+    /** Whether a bank statement line is matched to this expense (it then is not removed automatically). */
+    public static function isBankMatched(int $id): bool
+    {
+        $stmt = Database::connection()->prepare('SELECT 1 FROM ca_bank_statement_lines WHERE matched_expense_id = :id LIMIT 1');
+        $stmt->execute(['id' => $id]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    /**
+     * Owner decision 2026-10-29 (order-wise import): the order whose buyer
+     * enquiry reference or order reference appears, as a whole word, in a
+     * Books expense's Reference # — or null when none or more than one does.
+     */
+    public static function orderIdForReference(?string $reference): ?int
+    {
+        $tokens = array_values(array_unique(array_filter(array_map(static fn (string $t): string => strtolower(trim($t)), preg_split('/[\s,;]+/', (string) $reference) ?: []))));
+        if ($tokens === []) {
+            return null;
+        }
+        $marks = implode(',', array_fill(0, count($tokens), '?'));
+        $stmt = Database::connection()->prepare("SELECT id FROM orders WHERE LOWER(buyer_inquiry_ref) IN ({$marks}) OR LOWER(order_reference) IN ({$marks})");
+        $stmt->execute([...$tokens, ...$tokens]);
+        $ids = array_values(array_unique(array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN))));
+        return count($ids) === 1 ? $ids[0] : null;
+    }
+
+    /**
+     * Owner decision 2026-10-29: the expenses booked in Zoho Books and linked
+     * to this order, each marked whether it counts as this order's cost. It
+     * does not when it has the same amount and date as a cost already
+     * entered in the app for this order (an order expense, an order cost or
+     * a supplier / logistics tax invoice) — a possible duplicate for the CA
+     * to check — nor when it is not in rupees. The counted ones are part of
+     * the order's cost, profit, cash position and CAFIN (C5) — CAFIN change
+     * confirmed twice by the owner, 2026-10-29.
+     *
+     * @return list<array<string,mixed>> each with 'counted' (bool) and 'reason' (?string)
+     */
+    public static function forOrderCounted(int $orderId): array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT amount_inr AS a, expense_date AS d FROM order_expenses WHERE order_id = :o1
+             UNION ALL SELECT amount_inr, COALESCE(incurred_at, DATE(created_at)) FROM order_cost_entries WHERE order_id = :o2
+             UNION ALL SELECT total_inr, bill_date FROM order_vendor_bills WHERE order_id = :o3 AND doc_kind = 'invoice'"
+        );
+        $stmt->execute(['o1' => $orderId, 'o2' => $orderId, 'o3' => $orderId]);
+        $app = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $app[number_format((float) $r['a'], 2, '.', '') . '|' . $r['d']] = true;
+        }
+        $out = [];
+        foreach (self::forOrder($orderId) as $e) {
+            $reason = null;
+            if (strtoupper((string) $e['currency_code']) !== 'INR') {
+                $reason = 'not in rupees — not counted';
+            } elseif (isset($app[number_format((float) $e['amount'], 2, '.', '') . '|' . $e['expense_date']])) {
+                $reason = 'possible duplicate of a cost entered in the app — not counted';
+            }
+            $out[] = $e + ['counted' => $reason === null, 'reason' => $reason];
+        }
+        return $out;
     }
 }

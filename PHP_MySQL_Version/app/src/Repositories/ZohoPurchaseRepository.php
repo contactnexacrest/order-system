@@ -74,6 +74,51 @@ final class ZohoPurchaseRepository
         return array_values(array_filter(self::payments('p.zoho_payment_id IS NULL'), static fn (array $p): bool => $startDate === null || (string) $p['payment']['paid_at'] >= $startDate));
     }
 
+    /**
+     * Owner decision 2026-10-29 (the app is the source of truth): what the
+     * app has already sent — tax invoices, vendor payments (each with its
+     * bill) and order expenses — so a sync can check Books still matches.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function sentBills(): array
+    {
+        $rows = Database::connection()->query(self::BILL_SELECT . " WHERE b.doc_kind = 'invoice' AND b.zoho_bill_id IS NOT NULL ORDER BY b.bill_date, b.id")->fetchAll();
+        return array_values(array_filter($rows, static fn (array $r): bool => self::allowed($r)));
+    }
+
+    /** @return list<array{payment: array<string,mixed>, bill: array<string,mixed>}> */
+    public static function sentPayments(): array
+    {
+        return self::payments('p.zoho_payment_id IS NOT NULL');
+    }
+
+    /** @return list<array<string,mixed>> */
+    public static function sentExpenses(): array
+    {
+        $rows = Database::connection()->query(
+            'SELECT e.*, o.buyer_inquiry_ref, o.company_legal_name AS buyer_name,
+                    (o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1) AS is_test_or_sample
+             FROM order_expenses e
+             JOIN orders o ON o.id = e.order_id
+             JOIN clients c ON c.id = o.client_id
+             WHERE e.zoho_expense_id IS NOT NULL
+             ORDER BY e.expense_date, e.id'
+        )->fetchAll();
+        return array_values(array_filter($rows, static fn (array $r): bool => ZohoGuard::isProduction()
+            ? (int) $r['is_test_or_sample'] !== 1
+            : str_starts_with((string) $r['buyer_name'], ZohoGuard::TEST_PREFIX)));
+    }
+
+    /** A bill sent again after it was deleted in Books: its payments (and those on the proforma it replaces) must be applied to it again. */
+    public static function resetPaymentsAppliedTo(int $billId): void
+    {
+        $pdo = Database::connection();
+        $replaces = $pdo->query('SELECT replaces_bill_id FROM order_vendor_bills WHERE id = ' . $billId)->fetchColumn();
+        $ids = array_filter([$billId, $replaces !== false && $replaces !== null ? (int) $replaces : null]);
+        $pdo->exec('UPDATE order_vendor_bill_payments SET zoho_applied_at = NULL WHERE zoho_payment_id IS NOT NULL AND bill_id IN (' . implode(',', array_map('intval', $ids)) . ')');
+    }
+
     /** @return list<array<string,mixed>> payments in Books but not yet applied to a bill (advances on a proforma) */
     public static function heldPayments(): array
     {

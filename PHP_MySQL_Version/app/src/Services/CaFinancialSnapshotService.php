@@ -147,6 +147,23 @@ final class CaFinancialSnapshotService
                 'basis' => $actual !== null ? 'INR actual' : ($rate !== null ? 'at recorded rate' : 'no rate yet'),
             ];
         }
+        // Owner decision 2026-10-29 (confirmed twice): the money the bank paid under an LC, at the rupees credited.
+        $lc = \App\Repositories\OrderLcDetailRepository::find($orderId);
+        if ($lc !== null && $lc['lc_received_at'] !== null && (float) $lc['lc_received_amount'] > 0) {
+            $amount = (float) $lc['lc_received_amount'];
+            $inr = (float) $lc['lc_inr_credited'];
+            $receiptsForeign += $amount;
+            $receiptsInr += $inr;
+            array_unshift($receipts, [
+                'leg' => 'LC payment (paid by the bank under the LC)',
+                'amount' => self::money($amount),
+                'rate' => number_format($inr / $amount, 4),
+                'inr' => self::money($inr),
+                'received' => self::date($lc['lc_received_at']),
+                'cleared' => self::date($lc['lc_received_at']),
+                'basis' => 'rupees credited (after ₹' . self::money($lc['lc_bank_charges_inr']) . ' bank charges)',
+            ]);
+        }
 
         // B — supplier.
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
@@ -265,9 +282,9 @@ final class CaFinancialSnapshotService
         // C5 — Zoho Books.
         $zoho = [];
         $zohoTotal = 0.0;
-        foreach (CaExpenseRepository::forOrder($orderId) as $z) {
-            $zohoTotal += (float) $z['amount'];
-            $zoho[] = ['category' => (string) $z['category'], 'description' => (string) ($z['description'] ?: '—'), 'vendor' => (string) ($z['vendor_name'] ?: '—'), 'amount' => $z['currency_code'] . ' ' . self::money($z['amount']), 'date' => self::date($z['expense_date'])];
+        foreach (CaExpenseRepository::forOrderCounted($orderId) as $z) {
+            $zohoTotal += $z['counted'] ? (float) $z['amount'] : 0.0;
+            $zoho[] = ['category' => (string) $z['category'], 'description' => (string) ($z['description'] ?: '—'), 'vendor' => (string) ($z['vendor_name'] ?: '—'), 'amount' => $z['currency_code'] . ' ' . self::money($z['amount']), 'date' => self::date($z['expense_date']), 'tag' => $z['reason']];
         }
 
         $c3 = $profit['other_costs_inr'];
@@ -276,8 +293,9 @@ final class CaFinancialSnapshotService
             ['C2 Logistics partner bills', self::money($profit['logistics_cost_inr'])],
             ['C3 Other order costs', self::money($c3)],
             ['C4 Order expenses', self::money($profit['expenses_inr'])],
+            ['C5 Expenses booked in Zoho Books', self::money($profit['zoho_expenses_inr'])],
         ];
-        $expensesTotal = $c1 + $profit['logistics_cost_inr'] + $c3 + $profit['expenses_inr'];
+        $expensesTotal = $c1 + $profit['logistics_cost_inr'] + $c3 + $profit['expenses_inr'] + $profit['zoho_expenses_inr'];
 
         // D — benefits.
         $benefits = [];
@@ -311,6 +329,7 @@ final class CaFinancialSnapshotService
             ['line', '− Logistics partner bills (C2)', null, self::money($profit['logistics_cost_inr'])],
             ['line', '− Other order costs (C3)', null, self::money($c3)],
             ['line', '− Order expenses (C4)', null, self::money($profit['expenses_inr'])],
+            ['line', '− Expenses booked in Zoho Books (C5)', null, self::money($profit['zoho_expenses_inr'])],
             ['sub', 'Total cost', null, self::money($profit['total_cost_inr'])],
             ['grand', 'ORDER PROFIT', null, self::money($profit['profit_inr'])],
             ['grand', 'MARGIN', null, $profit['margin_pct'] !== null ? number_format((float) $profit['margin_pct'], 2) . '%' : '—'],

@@ -171,16 +171,16 @@
   <tr class="totals"><td colspan="3">SUBTOTAL</td><td class="num">{{ snapshot.expenses_total }}</td><td colspan="2"></td></tr>
 </table>
 {% endif %}
-<div class="sub-title">C5. Expenses linked from Zoho Books</div>
+<div class="sub-title">C5. Expenses booked in Zoho Books (linked to this order)</div>
 {% if not snapshot.zoho.length %}
   <div class="empty-note">None linked to this order.</div>
 {% else %}
 <table class="data">
   <tr><th>Category</th><th>Description</th><th>Vendor</th><th class="num">Amount</th><th>Date</th></tr>
   {% for z in snapshot.zoho %}
-  <tr><td>{{ z.category }}</td><td>{{ z.description }}</td><td>{{ z.vendor }}</td><td class="num">{{ z.amount }}</td><td>{{ z.date }}</td></tr>
+  <tr><td>{{ z.category }}{% if z.tag %} <span class="tag">{{ z.tag }}</span>{% endif %}</td><td>{{ z.description }}</td><td>{{ z.vendor }}</td><td class="num">{{ z.amount }}</td><td>{{ z.date }}</td></tr>
   {% endfor %}
-  <tr class="totals"><td colspan="3">TOTAL (for reference — kept in Zoho Books)</td><td class="num">{{ snapshot.zoho_total }}</td><td></td></tr>
+  <tr class="totals"><td colspan="3">SUBTOTAL (counted in this order's cost)</td><td class="num">{{ snapshot.zoho_total }}</td><td></td></tr>
 </table>
 {% endif %}
 <div class="sub-title">Expenses summary</div>

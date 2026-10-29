@@ -611,6 +611,43 @@ final class OrderFinancialsController
     }
 
     /**
+     * Owner decision 2026-10-29 (CAFIN change confirmed twice): the LC
+     * payment's FIRC / eBRC realization proof, like the other legs'.
+     */
+    public function recordLcFirc(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $reference = trim((string) ($_POST['lc_firc_reference'] ?? ''));
+        $back = static function (string $type, string $message) use ($orderId): void {
+            Flash::set($type, $message);
+            header("Location: /orders/{$orderId}#lc-received");
+        };
+        if ($reference === '' || mb_strlen($reference) > 100) {
+            $back('error', 'Enter the FIRC/eBRC reference.');
+            return;
+        }
+        $lc = OrderLcDetailRepository::find($orderId);
+        if ($lc === null || $lc['lc_received_at'] === null) {
+            $back('error', 'Record the LC payment itself before entering its FIRC/eBRC reference.');
+            return;
+        }
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow((string) $lc['lc_received_at'], (int) $user['id'], $roleId, 'order_lc_details', $orderId, 'lc_firc_reference')) {
+            header("Location: /orders/{$orderId}#lc-received");
+            return;
+        }
+        $receivedAt = trim((string) ($_POST['lc_firc_received_at'] ?? '')) ?: date('Y-m-d');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $receivedAt)) {
+            $back('error', 'Enter a valid FIRC/eBRC date.');
+            return;
+        }
+        OrderLcDetailRepository::setFirc($orderId, $reference, $receivedAt);
+        AuditLogRepository::log((int) $user['id'], 'CA_FIRC_RECORDED', 'order_lc_details', $orderId, 'lc_firc_reference', $lc['lc_firc_reference'], $reference);
+        $back('success', 'LC payment FIRC/eBRC reference recorded.');
+    }
+
+    /**
      * Export process step 8a: who pays the 3rd-party pre-shipment
      * inspection fee for this order. When NexaCrest pays, the amount is
      * kept in sync with a single order_cost_entries row (category

@@ -7,6 +7,7 @@ const documentRepository = require('../repositories/documentRepository');
 const orderComplianceTaskRepository = require('../repositories/orderComplianceTaskRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
 const orderExpenseRepository = require('../repositories/orderExpenseRepository');
+const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
@@ -111,6 +112,23 @@ async function build(orderId) {
       received: date(payment[`${leg}_remittance_received_at`]),
       cleared: date(payment[`${leg}_cleared_at`]),
       basis: actual !== null ? 'INR actual' : (rate !== null ? 'at recorded rate' : 'no rate yet'),
+    });
+  }
+  // Owner decision 2026-10-29 (confirmed twice): the money the bank paid under an LC, at the rupees credited.
+  const lc = await orderLcDetailRepository.find(orderId);
+  if (lc && lc.lc_received_at !== null && Number(lc.lc_received_amount) > 0) {
+    const amount = Number(lc.lc_received_amount);
+    const inr = Number(lc.lc_inr_credited);
+    receiptsForeign += amount;
+    receiptsInr += inr;
+    receipts.unshift({
+      leg: 'LC payment (paid by the bank under the LC)',
+      amount: money(amount),
+      rate: (inr / amount).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 }),
+      inr: money(inr),
+      received: date(lc.lc_received_at),
+      cleared: date(lc.lc_received_at),
+      basis: `rupees credited (after ₹${money(lc.lc_bank_charges_inr)} bank charges)`,
     });
   }
 
@@ -223,9 +241,9 @@ async function build(orderId) {
 
   // C5 — Zoho Books.
   let zohoTotal = 0;
-  const zoho = (await caExpenseRepository.forOrder(orderId)).map((z) => {
-    zohoTotal += Number(z.amount);
-    return { category: String(z.category), description: String(z.description || '—'), vendor: String(z.vendor_name || '—'), amount: `${z.currency_code} ${money(z.amount)}`, date: date(z.expense_date) };
+  const zoho = (await caExpenseRepository.forOrderCounted(orderId)).map((z) => {
+    zohoTotal += z.counted ? Number(z.amount) : 0;
+    return { category: String(z.category), description: String(z.description || '—'), vendor: String(z.vendor_name || '—'), amount: `${z.currency_code} ${money(z.amount)}`, date: date(z.expense_date), tag: z.reason };
   });
 
   const c3 = profit.other_costs_inr;
@@ -234,8 +252,9 @@ async function build(orderId) {
     ['C2 Logistics partner bills', money(profit.logistics_cost_inr)],
     ['C3 Other order costs', money(c3)],
     ['C4 Order expenses', money(profit.expenses_inr)],
+    ['C5 Expenses booked in Zoho Books', money(profit.zoho_expenses_inr)],
   ];
-  const expensesTotal = c1 + profit.logistics_cost_inr + c3 + profit.expenses_inr;
+  const expensesTotal = c1 + profit.logistics_cost_inr + c3 + profit.expenses_inr + profit.zoho_expenses_inr;
 
   // D — benefits.
   let claimed = 0;
@@ -267,6 +286,7 @@ async function build(orderId) {
     ['line', '− Logistics partner bills (C2)', null, money(profit.logistics_cost_inr)],
     ['line', '− Other order costs (C3)', null, money(c3)],
     ['line', '− Order expenses (C4)', null, money(profit.expenses_inr)],
+    ['line', '− Expenses booked in Zoho Books (C5)', null, money(profit.zoho_expenses_inr)],
     ['sub', 'Total cost', null, money(profit.total_cost_inr)],
     ['grand', 'ORDER PROFIT', null, money(profit.profit_inr)],
     ['grand', 'MARGIN', null, profit.margin_pct !== null ? `${money(profit.margin_pct)}%` : '—'],

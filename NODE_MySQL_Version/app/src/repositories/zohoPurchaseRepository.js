@@ -71,6 +71,40 @@ const paymentsToSync = async (startDate = null) => (await payments('p.zoho_payme
 /** Payments in Books but not yet applied to a bill (advances on a proforma). */
 const heldPayments = () => payments('p.zoho_payment_id IS NOT NULL AND p.zoho_applied_at IS NULL');
 
+/**
+ * Owner decision 2026-10-29 (the app is the source of truth): what the app
+ * has already sent — tax invoices, vendor payments (each with its bill) and
+ * order expenses — so a sync can check Books still matches.
+ */
+async function sentBills() {
+  const rows = await db.query(`${BILL_SELECT} WHERE b.doc_kind = 'invoice' AND b.zoho_bill_id IS NOT NULL ORDER BY b.bill_date, b.id`);
+  return rows.filter(allowed);
+}
+
+const sentPayments = () => payments('p.zoho_payment_id IS NOT NULL');
+
+async function sentExpenses() {
+  const rows = await db.query(
+    `SELECT e.*, o.buyer_inquiry_ref, o.company_legal_name AS buyer_name,
+            (o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1) AS is_test_or_sample
+     FROM order_expenses e
+     JOIN orders o ON o.id = e.order_id
+     JOIN clients c ON c.id = o.client_id
+     WHERE e.zoho_expense_id IS NOT NULL
+     ORDER BY e.expense_date, e.id`
+  );
+  return rows.filter((r) => (zohoGuard.isProduction()
+    ? Number(r.is_test_or_sample) !== 1
+    : String(r.buyer_name || '').startsWith(zohoGuard.TEST_PREFIX)));
+}
+
+/** A bill sent again after it was deleted in Books: its payments (and those on the proforma it replaces) must be applied to it again. */
+async function resetPaymentsAppliedTo(billId) {
+  const row = await db.queryOne('SELECT replaces_bill_id FROM order_vendor_bills WHERE id = :id', { id: billId });
+  const ids = [Number(billId), row && row.replaces_bill_id !== null ? Number(row.replaces_bill_id) : null].filter(Boolean);
+  await db.execute(`UPDATE order_vendor_bill_payments SET zoho_applied_at = NULL WHERE zoho_payment_id IS NOT NULL AND bill_id IN (${ids.join(',')})`);
+}
+
 /** Order expenses not yet in Books (dated on or after startDate, when given). */
 async function expensesToSync(startDate = null) {
   const rows = await db.query(
@@ -178,4 +212,5 @@ async function pushedRecords() {
 module.exports = {
   billsToSync, findBill, targetBillFor, paymentsToSync, heldPayments, expensesToSync, costEntriesToSync, setCostEntrySynced, isPushedExpense,
   setVendorContactId, setBillSynced, setPaymentSynced, setPaymentApplied, setExpenseSynced, forgetZohoRecord, pushedRecords,
+  sentBills, sentPayments, sentExpenses, resetPaymentsAppliedTo,
 };

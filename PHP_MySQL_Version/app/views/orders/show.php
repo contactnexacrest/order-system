@@ -3371,7 +3371,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <td><?= htmlspecialchars(\App\Repositories\OrderExpenseRepository::PAID_BY[$e['paid_by']] ?? (string) $e['paid_by']) ?><?= $e['paid_by'] === 'staff' && !empty($e['staff_name']) ? ' — ' . htmlspecialchars((string) $e['staff_name']) : '' ?></td>
             <td><?php if (!empty($e['receipt_file_id'])): ?><a href="/file-store/<?= (int) $e['receipt_file_id'] ?>/download">receipt</a><?php else: ?><span class="vendor-bill-due">No bill — <?= htmlspecialchars((string) $e['no_receipt_reason']) ?></span><?php endif; ?></td>
             <td>
-              <form method="post" action="/orders/<?= (int) $order['id'] ?>/expenses/<?= (int) $e['id'] ?>/delete" data-confirm="Remove this expense?">
+              <form method="post" action="/orders/<?= (int) $order['id'] ?>/expenses/<?= (int) $e['id'] ?>/delete" data-confirm="<?= !empty($e['zoho_expense_id']) ? 'Remove this expense? It is in Zoho Books too, and is removed there as well.' : 'Remove this expense?' ?>">
                 <?= Csrf::field() ?>
                 <button type="submit" class="btn-sm btn-danger">Remove</button>
               </form>
@@ -3405,7 +3405,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </details>
       </div>
       <details class="fin-zoho">
-        <summary class="muted small">Linked from Zoho Books (<?= count($linkedCaExpenses) ?>) — for reference</summary>
+        <summary class="muted small">Booked in Zoho Books and linked to this order (<?= count($linkedCaExpenses) ?>) — counted in the order's cost</summary>
         <?php if (empty($linkedCaExpenses)): ?>
           <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
         <?php else: ?>
@@ -3414,7 +3414,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?php foreach ($linkedCaExpenses as $e): ?>
             <tr>
               <td><?= htmlspecialchars((string) $e['expense_date']) ?></td>
-              <td><?= htmlspecialchars($e['category']) ?></td>
+              <td><?= htmlspecialchars($e['category']) ?><?php if (!empty($e['reason'])): ?><br><small class="muted"><?= htmlspecialchars((string) $e['reason']) ?></small><?php endif; ?></td>
               <td><?= htmlspecialchars((string) ($e['vendor_name'] ?? '—')) ?></td>
               <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
             </tr>
@@ -3548,6 +3548,21 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php else: ?>
         <p class="muted small">Not recorded yet. When the bank pays under the LC (after the documents are presented), record it here: it goes to Zoho Books as the buyer's payment against the Commercial Invoice.</p>
       <?php endif; ?>
+      <?php if (!empty($orderLcDetails['lc_received_at'])): ?>
+        <?php // Owner decision 2026-10-29 (CAFIN change confirmed twice): the LC payment's FIRC / eBRC, like the other legs'. ?>
+        <?php if (!empty($orderLcDetails['lc_firc_reference'])): ?>
+          <p class="small">FIRC/eBRC: <strong><?= htmlspecialchars((string) $orderLcDetails['lc_firc_reference']) ?></strong> (<?= htmlspecialchars(\App\Helpers\Dates::short((string) $orderLcDetails['lc_firc_received_at'])) ?>)</p>
+        <?php elseif (!empty($canEditInrActual)): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/lc/firc" class="field-grid">
+            <?= Csrf::field() ?>
+            <label>FIRC/eBRC reference *<input type="text" name="lc_firc_reference" required maxlength="100"></label>
+            <label>FIRC/eBRC date<input type="date" name="lc_firc_received_at" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
+            <div><button type="submit" class="btn-sm">Record FIRC/eBRC</button></div>
+          </form>
+        <?php else: ?>
+          <p class="muted small">FIRC/eBRC not recorded yet.</p>
+        <?php endif; ?>
+      <?php endif; ?>
       <?php if (empty($orderLcDetails['lc_confirmed_at'])): ?>
         <p class="muted small">Confirm the LC usable (Step 5e) first.</p>
       <?php elseif (empty($orderLcDetails['lc_zoho_synced_at'])): ?>
@@ -3622,6 +3637,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <div><span class="k">Insurance (INR)</span><span class="v"><?= number_format($profitability['insurance_cost_inr'], 2) ?></span></div>
             <div><span class="k">Logistics Bills — CHA / Transport (INR)</span><span class="v"><?= number_format($profitability['logistics_cost_inr'], 2) ?></span></div>
             <div><span class="k">Order Expenses (INR)</span><span class="v"><?= number_format($profitability['expenses_inr'], 2) ?></span></div>
+            <div><span class="k">Expenses Booked in Zoho Books (INR)</span><span class="v"><?= number_format($profitability['zoho_expenses_inr'], 2) ?></span></div>
             <div><span class="k">Other Costs (INR)<?= $profitability['travel_is_provisional'] ? '' : ' — travel % replaced by actual travel' ?></span><span class="v"><?= number_format($profitability['other_costs_inr'], 2) ?></span></div>
             <div><span class="k">Total Order Cost (INR)</span><span class="v"><?= number_format($profitability['total_cost_inr'], 2) ?></span></div>
             <div><span class="k">Order Profit (INR)</span><span class="v"><?= number_format($profitability['profit_inr'], 2) ?></span></div>
