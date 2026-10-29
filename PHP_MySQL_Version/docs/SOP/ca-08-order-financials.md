@@ -195,6 +195,15 @@ matching **Bank Loan Interest (LC order)** row in Other Order Costs
 category isn't needed; change the figure here and the cost entry
 updates itself.
 
+**LC Payment Received** (owner decision 2026-10-29) — shown in Step 12a
+on an LC order once the LC is confirmed usable: when the bank pays under
+the LC, record the **date the bank paid**, the **amount** in the order
+currency, the **rupees credited** (from the bank's credit advice) and the
+**bank charges deducted**. It goes to Zoho Books as the buyer's payment
+against the Commercial Invoice (see
+[CA-03](./ca-03-zoho-sync.md)); until then it can be corrected here, after
+that only in Books.
+
 ### 5. Travel Expenses — Factory Visits
 
 Every order needs several trips to the factory during production (a
@@ -235,14 +244,26 @@ else in the system:
 | Travel Expenses (Factory Visits) | Auto-synced from Travel Expenses above — see there. |
 | Other | Anything not covered above. |
 
-Each entry records a category, amount (INR), date, and an optional free-
-text description, and can be removed with a **Remove** button (a
+Each entry records a category, amount (INR), date, what it was **paid
+from** (company account or company card — owner decision 2026-10-29),
+and an optional free-text description, and can be removed with a
+**Remove** button (a
 correction, not a routine action — same reasoning as INR-actual delete
 being its own permission elsewhere in this module). The three
 auto-synced categories (Bank Loan Interest, Travel Expenses) are driven
 from their own forms above rather than typed here directly, but still
 show up in this same table and count the same way toward the
 Profitability Summary below.
+
+**Zoho Books (owner decision 2026-10-29).** ECGC, due diligence,
+documentation, commission, packing, the inspection fee and Other go to
+Zoho Books as expenses on the next sync (the table says "In Zoho Books"
+once sent); removing one here removes it there too. CHA, inland
+transport, port charges, bank charges, bank-loan interest and the travel
+% are not sent — the table says why under each. CHA, transport and port
+charges belong on logistics partner bills instead. The pre-shipment
+inspection fee's own form asks what it was paid from when NexaCrest
+pays. See [CA-03](./ca-03-zoho-sync.md).
 
 **Supplier cost, ocean freight, and insurance are never entered here** —
 see "What feeds the Profitability Sheet" below for where those come

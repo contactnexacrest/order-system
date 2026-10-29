@@ -161,10 +161,21 @@ describe('Shipment date + pre-shipment inspection (Section BT)', () => {
     expect(await orderInspectionFeeRepository.find(orderId)).toBeNull();
   });
 
-  it('nexacrest payer with an amount creates a matching cost entry', async () => {
+  it('a NexaCrest-paid fee must say what it was paid from', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
     const req = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500' } });
+
+    await orderFinancialsController.saveInspectionFee(req, fakeRes());
+
+    expect(flash.pull(req)[0].message).toBe('Choose what the inspection fee was paid from.');
+    expect(await orderCostEntryRepository.forOrder(orderId)).toEqual([]);
+  });
+
+  it('nexacrest payer with an amount creates a matching cost entry', async () => {
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient());
+    const req = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500', paid_from: 'company_account' } });
 
     await orderFinancialsController.saveInspectionFee(req, fakeRes());
 
@@ -173,6 +184,7 @@ describe('Shipment date + pre-shipment inspection (Section BT)', () => {
     expect(entries.length).toBe(1);
     expect(entries[0].category).toBe('inspection_fee');
     expect(Number(entries[0].amount_inr)).toBe(2500);
+    expect(entries[0].paid_from).toBe('company_account'); // owner decision 2026-10-29: what it was paid from, for Zoho Books
 
     const saved = await orderInspectionFeeRepository.find(orderId);
     expect(Number(saved.cost_entry_id)).toBe(Number(entries[0].id));
@@ -181,7 +193,7 @@ describe('Shipment date + pre-shipment inspection (Section BT)', () => {
   it('client payer never creates a cost entry and removes an existing one', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
-    const req1 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500' } });
+    const req1 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500', paid_from: 'company_account' } });
     await orderFinancialsController.saveInspectionFee(req1, fakeRes());
     expect((await orderCostEntryRepository.forOrder(orderId)).length).toBe(1);
 
@@ -195,11 +207,11 @@ describe('Shipment date + pre-shipment inspection (Section BT)', () => {
   it('re-saving nexacrest with a different amount updates the same cost entry', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
-    const req1 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500' } });
+    const req1 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500', paid_from: 'company_account' } });
     await orderFinancialsController.saveInspectionFee(req1, fakeRes());
     const firstEntryId = Number((await orderCostEntryRepository.forOrder(orderId))[0].id);
 
-    const req2 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '3000' } });
+    const req2 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '3000', paid_from: 'company_account' } });
     await orderFinancialsController.saveInspectionFee(req2, fakeRes());
 
     const entries = await orderCostEntryRepository.forOrder(orderId);

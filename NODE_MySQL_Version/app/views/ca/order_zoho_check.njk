@@ -1,0 +1,42 @@
+{# Owner decision 2026-10-29: the per-order "App vs Zoho" check — reads only. #}
+{% set badges = { match: 'badge-success', not_sent: 'badge-warning', before_go_live: 'badge-complete', different: 'badge-danger', missing: 'badge-danger', books_only: 'badge-danger' } %}
+<div class="card page-wide">
+  <p class="muted small" style="margin-top:0;"><a href="/orders/{{ order.id }}#order-financials">&larr; Order {{ order.buyer_inquiry_ref }}</a> &middot; <a href="/ca/zoho-sync">Zoho Books Sync</a></p>
+  <h1>App vs Zoho Books</h1>
+  <p class="muted">Order {{ order.buyer_inquiry_ref }} &middot; {{ order.company_legal_name }}. Every record of this order in the app, beside what Zoho Books holds for it. This page only reads; it changes nothing in the app or in Books.</p>
+
+  {% if error !== null %}
+    <div class="alert alert-error">{{ error }}</div>
+  {% else %}
+    {% set problems = result.counts.different + result.counts.missing + result.counts.books_only %}
+    <div class="section">
+      <h2>{% if problems == 0 and result.counts.not_sent == 0 %}Everything matches{% elif problems > 0 %}{{ problems }} difference(s) to look at{% else %}Waiting to be sent{% endif %}</h2>
+      <div class="kv-grid">
+        {% for key, label in statusLabels %}
+          <div><span class="k">{{ label }}</span><span class="v">{{ result.counts[key] }}</span></div>
+        {% endfor %}
+      </div>
+      <p class="muted small">"Not in Zoho Books yet" goes on the next sync (the note says why it has not gone so far). "Before the go-live date"{% if startDateLabel %} ({{ startDateLabel }}){% endif %}: the CA books it by hand. "Different", "Missing" and "Only in Zoho Books" mean someone changed Books directly, or the app changed after sending: correct the side that is wrong.</p>
+    </div>
+
+    <div class="section">
+      {% if result.rows.length == 0 %}
+        <p class="muted">This order has nothing that goes to Zoho Books yet.</p>
+      {% else %}
+        <table class="list">
+          <tr><th>Part</th><th>Record</th><th style="text-align:right">In the app</th><th style="text-align:right">In Zoho Books</th><th>Status</th><th>Note</th></tr>
+          {% for row in result.rows %}
+          <tr>
+            <td>{{ row.group }}</td>
+            <td>{{ row.item }}</td>
+            <td style="text-align:right; white-space:nowrap;">{{ row.app if row.app !== null else '—' }}</td>
+            <td style="text-align:right; white-space:nowrap;">{{ row.books if row.books !== null else '—' }}</td>
+            <td><span class="badge {{ badges[row.status] }}" style="margin-left:0;">{{ statusLabels[row.status] }}</span></td>
+            <td class="small">{{ row.note }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

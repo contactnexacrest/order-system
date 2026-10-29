@@ -306,7 +306,7 @@ describe('Order Financials (Section AP)', () => {
 
     const req = fakeReq({
       params: { id: String(orderId) },
-      body: { category: 'cha_charges', amount_inr: '1234.56', incurred_at: '2026-06-01', description: 'Test CHA' },
+      body: { category: 'cha_charges', amount_inr: '1234.56', incurred_at: '2026-06-01', description: 'Test CHA', paid_from: 'company_card' },
       user: { id: userId },
     });
     await orderFinancialsController.addCostEntry(req, fakeRes());
@@ -314,6 +314,11 @@ describe('Order Financials (Section AP)', () => {
     const rows = await orderCostEntryRepository.forOrder(orderId);
     expect(rows).toHaveLength(1);
     expect(parseFloat(rows[0].amount_inr)).toBeCloseTo(1234.56, 2);
+    expect(rows[0].paid_from).toBe('company_card');
+
+    const refused = fakeReq({ params: { id: String(orderId) }, body: { category: 'ecgc_insurance', amount_inr: '500', incurred_at: '2026-06-01' }, user: { id: userId } });
+    await orderFinancialsController.addCostEntry(refused, fakeRes());
+    expect(await orderCostEntryRepository.forOrder(orderId)).toHaveLength(1); // refused: owner decision 2026-10-29, a cost says what it was paid from
 
     const row = await db.queryOne(
       "SELECT COUNT(*) AS c FROM audit_log WHERE action_type = 'ORDER_COST_ENTRY_RECORDED' AND entity_id = :id",

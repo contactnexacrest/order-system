@@ -179,11 +179,42 @@ final class CaController
         View::render('ca/zoho_sync', [
             'isEnabled' => ZohoBooksService::isEnabled(),
             'startDate' => $startDate,
-            'pendingCount' => count(array_filter(CaRepository::legsPendingZohoSync(), static fn (array $leg): bool => $startDate === null || substr((string) $leg['cleared_at'], 0, 10) >= $startDate)),
-            'heldCount' => count(CaRepository::legsHeldInZoho()),
-            'purchasesPendingCount' => count(\App\Repositories\ZohoPurchaseRepository::billsToSync($startDate)) + count(\App\Repositories\ZohoPurchaseRepository::paymentsToSync($startDate)) + count(\App\Repositories\ZohoPurchaseRepository::expensesToSync($startDate)),
+            'pendingCount' => count(array_filter(CaRepository::legsPendingZohoSync(), static fn (array $leg): bool => $startDate === null || substr((string) $leg['cleared_at'], 0, 10) >= $startDate))
+                + count(array_filter(\App\Repositories\OrderLcDetailRepository::receiptsForZohoSync(), static fn (array $lc): bool => $lc['lc_zoho_synced_at'] === null && ($startDate === null || (string) $lc['lc_received_at'] >= $startDate))),
+            'heldCount' => count(CaRepository::legsHeldInZoho()) + count(array_filter(\App\Repositories\OrderLcDetailRepository::receiptsForZohoSync(), static fn (array $lc): bool => $lc['lc_zoho_synced_at'] !== null)),
+            'purchasesPendingCount' => count(\App\Repositories\ZohoPurchaseRepository::billsToSync($startDate)) + count(\App\Repositories\ZohoPurchaseRepository::paymentsToSync($startDate)) + count(\App\Repositories\ZohoPurchaseRepository::expensesToSync($startDate))
+                + count(array_filter(\App\Repositories\ZohoPurchaseRepository::costEntriesToSync($startDate), static fn (array $c): bool => $c['zoho_expense_id'] === null)),
+            'benefitsPendingCount' => count(array_filter(\App\Repositories\CaExportBenefitRepository::forZohoSync($startDate), static fn (array $b): bool => $b['zoho_journal_id'] === null)),
             'log' => ZohoSyncLogRepository::recent(100),
         ], 'layout/base');
+    }
+
+    /**
+     * Owner decision 2026-10-29: the per-order "App vs Zoho" check — every
+     * record of the order in the app beside what Zoho Books holds for it.
+     * Reads only.
+     */
+    public function orderZohoCheck(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = \App\Repositories\OrderRepository::find($orderId);
+        if ($order === null || !\App\Services\OrderAccessService::currentUserMayOpenOrderId($orderId)) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $result = null;
+        $error = null;
+        if (!ZohoBooksService::isEnabled()) {
+            $error = 'Zoho Books is not enabled on this server, so there is nothing to compare with.';
+        } else {
+            try {
+                $result = \App\Services\OrderZohoMatchService::check($orderId);
+            } catch (\Throwable $e) {
+                $error = 'Could not read Zoho Books: ' . $e->getMessage();
+            }
+        }
+        View::render('ca/order_zoho_check', ['order' => $order, 'result' => $result, 'error' => $error, 'startDate' => ZohoBooksService::syncStartDate()], 'layout/base');
     }
 
     public function runZohoSync(array $params): void
@@ -193,20 +224,21 @@ final class CaController
         $revenue = $result['revenue'];
         $expenses = $result['expenses'];
         $purchases = $result['purchases'];
+        $benefits = $result['benefits'];
 
         $done = "{$revenue['invoices']} invoice(s) sent or updated, {$revenue['synced']} payment(s) pushed, {$revenue['applied']} payment(s) applied to invoices, "
-            . "{$purchases['bills']} bill(s), {$purchases['payments']} vendor payment(s) ({$purchases['applied']} applied to bills) and {$purchases['expenses']} order expense(s) sent, {$expenses['imported']} expense(s) imported";
-        $failed = $revenue['failed'] + $purchases['failed'] + $expenses['failed'];
+            . "{$purchases['bills']} bill(s), {$purchases['payments']} vendor payment(s) ({$purchases['applied']} applied to bills) and {$purchases['expenses']} order expense(s) / cost(s) sent, {$benefits['journals']} export benefit journal(s) sent or updated, {$expenses['imported']} expense(s) imported";
+        $failed = $revenue['failed'] + $purchases['failed'] + $expenses['failed'] + $benefits['failed'];
         if ($failed > 0) {
             Flash::set('warning', "Sync finished: {$done}, {$failed} failed — see the log below for details.");
-        } elseif ($revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $purchases['bills'] + $purchases['payments'] + $purchases['applied'] + $purchases['expenses'] > 0 || $expenses['imported'] > 0) {
+        } elseif ($revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $purchases['bills'] + $purchases['payments'] + $purchases['applied'] + $purchases['expenses'] > 0 || $benefits['journals'] + $benefits['removed'] > 0 || $expenses['imported'] > 0) {
             Flash::set('success', "Sync finished: {$done}.");
         } else {
             Flash::set('success', 'Sync ran — nothing was pending (or Zoho Books isn\'t configured yet). See the log below.');
         }
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
-        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['invoices']} invoices, {$revenue['synced']} synced, {$revenue['applied']} applied/{$revenue['failed']} failed, purchases: {$purchases['bills']} bills, {$purchases['payments']} payments, {$purchases['applied']} applied, {$purchases['expenses']} expenses/{$purchases['failed']} failed, expenses: {$expenses['imported']} imported/{$expenses['failed']} failed");
+        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['invoices']} invoices, {$revenue['synced']} synced, {$revenue['applied']} applied/{$revenue['failed']} failed, purchases: {$purchases['bills']} bills, {$purchases['payments']} payments, {$purchases['applied']} applied, {$purchases['expenses']} expenses/{$purchases['failed']} failed, benefits: {$benefits['journals']} journals, {$benefits['removed']} removed/{$benefits['failed']} failed, expenses: {$expenses['imported']} imported/{$expenses['failed']} failed");
         header('Location: /ca/zoho-sync');
     }
 

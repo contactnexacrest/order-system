@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Repositories\CaExpenseRepository;
+use App\Repositories\CaExportBenefitRepository;
 use App\Repositories\CaRepository;
+use App\Repositories\OrderLcDetailRepository;
 use App\Repositories\OrderPaymentStatusRepository;
 use App\Repositories\OrderZohoInvoiceRepository;
 use App\Repositories\ZohoPurchaseRepository;
@@ -33,7 +35,63 @@ final class CaSyncService
             // sends are already marked and the import skips them.
             'purchases' => self::syncPurchases($triggeredBy, $triggeredByUserId),
             'expenses' => self::importPendingExpenses($triggeredBy, $triggeredByUserId),
+            'benefits' => self::syncBenefits($triggeredBy, $triggeredByUserId),
         ];
+    }
+
+    /**
+     * Owner decision 2026-10-29: export benefits as Books journals when
+     * received (CaExportBenefitRepository::forZohoSync()) — sent once,
+     * updated when the receipt is corrected, removed from Books when the
+     * receipt is cleared. Each logged on its own.
+     *
+     * @return array{journals:int, removed:int, failed:int, skipped:int}
+     */
+    public static function syncBenefits(string $triggeredBy, ?int $triggeredByUserId): array
+    {
+        $result = ['journals' => 0, 'removed' => 0, 'failed' => 0, 'skipped' => 0];
+        if (!ZohoBooksService::isEnabled()) {
+            ZohoSyncLogRepository::log('export_benefit', null, null, null, 'skipped', null, self::offReason() . ' — nothing synced.', $triggeredBy, $triggeredByUserId);
+            $result['skipped'] = 1;
+            return $result;
+        }
+        $startDate = ZohoBooksService::syncStartDate();
+        if ($startDate === null && ZohoGuard::isProduction()) {
+            ZohoSyncLogRepository::log('export_benefit', null, null, null, 'error', null, self::NO_START_DATE, $triggeredBy, $triggeredByUserId);
+            $result['failed'] = 1;
+            return $result;
+        }
+        foreach (CaExportBenefitRepository::forZohoSync($startDate) as $benefit) {
+            $id = (int) $benefit['id'];
+            $journalId = $benefit['zoho_journal_id'] !== null ? (string) $benefit['zoho_journal_id'] : null;
+            $received = $benefit['received_amount'] !== null && (float) $benefit['received_amount'] > 0;
+            $what = "{$benefit['scheme_name']}" . ($received ? ' ' . number_format((float) $benefit['received_amount'], 2, '.', '') : '');
+            try {
+                if (!$received) {
+                    ZohoBooksService::deleteRecord('journal', (string) $journalId);
+                    CaExportBenefitRepository::setZohoJournal($id, null, null);
+                    ZohoSyncLogRepository::log('export_benefit', 'order', $benefit['order_id'] !== null ? (int) $benefit['order_id'] : null, 'journal', 'success', $journalId, "Removed the Zoho Books journal of export benefit {$what} (claim #{$id}): its receipt was cleared in the app.", $triggeredBy, $triggeredByUserId);
+                    $result['removed']++;
+                    continue;
+                }
+                $hash = hash('sha256', (string) json_encode([$benefit['scheme_name'], round((float) $benefit['received_amount'], 2), (string) $benefit['received_at'], $benefit['reference_number'], $benefit['order_id']]));
+                if ($journalId !== null && $benefit['zoho_pushed_hash'] === $hash) {
+                    continue;
+                }
+                $newId = ZohoBooksService::pushBenefitJournal($benefit, $journalId);
+                CaExportBenefitRepository::setZohoJournal($id, $newId, $hash);
+                ZohoSyncLogRepository::log('export_benefit', 'order', $benefit['order_id'] !== null ? (int) $benefit['order_id'] : null, 'journal', 'success', $newId, ($journalId !== null ? 'Updated' : 'Sent') . " export benefit {$what} (claim #{$id}) received on {$benefit['received_at']} as Zoho Books journal.", $triggeredBy, $triggeredByUserId);
+                $result['journals']++;
+            } catch (\Throwable $e) {
+                ZohoSyncLogRepository::log('export_benefit', 'order', $benefit['order_id'] !== null ? (int) $benefit['order_id'] : null, 'journal', 'error', $journalId, $e->getMessage(), $triggeredBy, $triggeredByUserId);
+                $result['failed']++;
+            }
+        }
+        if ($result['journals'] + $result['removed'] + $result['failed'] === 0) {
+            ZohoSyncLogRepository::log('export_benefit', null, null, null, 'skipped', null, 'Nothing pending — every received export benefit is already in Zoho Books.', $triggeredBy, $triggeredByUserId);
+            $result['skipped'] = 1;
+        }
+        return $result;
     }
 
     /**
@@ -155,6 +213,36 @@ final class CaSyncService
             }
         }
 
+        // Owner decision 2026-10-29: the money the bank paid under an LC — a
+        // customer payment applied to the CI (held until the CI is in Books,
+        // like the advance), with the bank charges the bank kept.
+        foreach (OrderLcDetailRepository::receiptsForZohoSync() as $lc) {
+            if ($lc['lc_zoho_synced_at'] === null && $startDate !== null && (string) $lc['lc_received_at'] < $startDate) {
+                continue; // before the go-live date: the CA books it as the opening position
+            }
+            $orderId = (int) $lc['order_id'];
+            $reference = $lc['buyer_inquiry_ref'] . '-lc';
+            $target = OrderZohoInvoiceRepository::find($orderId, 'ci');
+            $args = [(int) $lc['client_id'], (string) $lc['company_legal_name'], (string) ($lc['currency_code'] ?? 'INR'), (float) $lc['lc_received_amount'], (float) $lc['lc_inr_credited'], (string) $lc['lc_received_at'], $reference];
+            try {
+                if ($lc['lc_zoho_synced_at'] === null) {
+                    $result = ZohoBooksService::pushRevenuePayment(...[...$args, $target['zoho_invoice_number'] ?? null, (float) $lc['lc_bank_charges_inr']]);
+                    OrderLcDetailRepository::setZohoSynced($orderId, $result['payment_id'], $result['applied'] > 0);
+                    $applied += $result['applied'] > 0 ? 1 : 0;
+                    ZohoSyncLogRepository::log('revenue_payment', 'order_lc_details', $orderId, 'lc', 'success', $result['payment_id'], "Pushed LC payment as Zoho Books customer payment {$result['payment_id']}" . self::appliedNote('lc', $target, $result['applied']), $triggeredBy, $triggeredByUserId);
+                    $synced++;
+                } elseif ($target !== null) {
+                    $amount = ZohoBooksService::applyPaymentToInvoice((string) $lc['lc_zoho_payment_id'], ...[...$args, $target['zoho_invoice_number'], (float) $lc['lc_bank_charges_inr']]);
+                    OrderLcDetailRepository::setZohoApplied($orderId);
+                    ZohoSyncLogRepository::log('payment_apply', 'order_lc_details', $orderId, 'lc', 'success', (string) $lc['lc_zoho_payment_id'], 'Applied ' . number_format($amount, 2, '.', '') . " of LC payment {$lc['lc_zoho_payment_id']} to Commercial Invoice {$target['zoho_invoice_number']}.", $triggeredBy, $triggeredByUserId);
+                    $applied++;
+                }
+            } catch (\Throwable $e) {
+                ZohoSyncLogRepository::log($lc['lc_zoho_synced_at'] === null ? 'revenue_payment' : 'payment_apply', 'order_lc_details', $orderId, 'lc', 'error', $lc['lc_zoho_payment_id'], $e->getMessage(), $triggeredBy, $triggeredByUserId);
+                $failed++;
+            }
+        }
+
         if ($synced === 0 && $failed === 0 && $invoices === 0 && $applied === 0) {
             ZohoSyncLogRepository::log('revenue_payment', null, null, null, 'skipped', null, 'Nothing pending — every approved CI / Debit Note and every recorded INR actual is already in Zoho Books.', $triggeredBy, $triggeredByUserId);
             return ['synced' => 0, 'failed' => 0, 'skipped' => 1, 'invoices' => 0, 'applied' => 0];
@@ -167,7 +255,7 @@ final class CaSyncService
     private const NO_START_DATE = 'Nothing sent: set the Zoho Books go-live date (zoho_books_sync_start_date) in Admin -> Settings first. Only records dated on or after it go to Zoho Books; the CA books everything earlier as the opening position.';
 
     /** Which invoice each payment leg is paid against: the advance and the balance against the CI, freight against the Debit Note. */
-    private const LEG_INVOICE = ['advance' => 'ci', 'balance' => 'ci', 'freight' => 'dn'];
+    private const LEG_INVOICE = ['advance' => 'ci', 'balance' => 'ci', 'freight' => 'dn', 'lc' => 'ci'];
 
     /** The leg's invoice, when it is already in Zoho Books. */
     private static function invoiceFor(int $orderId, string $leg): ?array
@@ -272,8 +360,28 @@ final class CaSyncService
             }
         }
 
+        // Owner decision 2026-10-29: the order's real paid cost entries, as
+        // Books expenses — sent once, and updated when the amount, date or
+        // "paid from" changes afterwards. Counted with the expenses.
+        foreach (ZohoPurchaseRepository::costEntriesToSync($startDate) as $cost) {
+            $hash = hash('sha256', (string) json_encode([$cost['category'], round((float) $cost['amount_inr'], 2), (string) $cost['cost_date'], $cost['paid_from'], $cost['description']]));
+            if ($cost['zoho_expense_id'] !== null && $cost['zoho_pushed_hash'] === $hash) {
+                continue;
+            }
+            $label = \App\Repositories\OrderCostEntryRepository::CATEGORIES[$cost['category']] ?? (string) $cost['category'];
+            try {
+                $zohoExpenseId = ZohoBooksService::pushCostEntry($cost, $cost['zoho_expense_id'] !== null ? (string) $cost['zoho_expense_id'] : null);
+                ZohoPurchaseRepository::setCostEntrySynced((int) $cost['id'], $zohoExpenseId, $hash);
+                $log('order_cost', (int) $cost['order_id'], 'cost', 'success', $zohoExpenseId, ($cost['zoho_expense_id'] !== null ? 'Updated' : 'Sent') . " order cost \"{$label}\" (INR " . number_format((float) $cost['amount_inr'], 2, '.', '') . ') as Zoho Books expense.');
+                $result['expenses']++;
+            } catch (\Throwable $e) {
+                $log('order_cost', (int) $cost['order_id'], 'cost', 'error', null, $e->getMessage());
+                $result['failed']++;
+            }
+        }
+
         if ($result['bills'] + $result['payments'] + $result['applied'] + $result['expenses'] + $result['failed'] === 0) {
-            ZohoSyncLogRepository::log('vendor_bill', null, null, null, 'skipped', null, 'Nothing pending — every tax invoice, vendor payment and order expense is already in Zoho Books.', $triggeredBy, $triggeredByUserId);
+            ZohoSyncLogRepository::log('vendor_bill', null, null, null, 'skipped', null, 'Nothing pending — every tax invoice, vendor payment, order expense and order cost is already in Zoho Books.', $triggeredBy, $triggeredByUserId);
             $result['skipped'] = 1;
         }
         return $result;

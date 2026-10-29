@@ -905,6 +905,8 @@ final class OrderController
         // glance, not just in the separate CA module list screens.
         $canViewCaLinks = PermissionService::can((int) $actor['id'], $actorRoleId, 'ca_module_view');
         $canManageCaInternalDoc = PermissionService::can((int) $actor['id'], $actorRoleId, 'ca_internal_doc_manage');
+        // Owner decision 2026-10-29: the per-order "App vs Zoho" check, for whoever runs the Zoho sync.
+        $canCheckZoho = PermissionService::can((int) $actor['id'], $actorRoleId, 'ca_module_manage');
 
         // Reorder-to-supplier linking + Order Profitability Sheet (docs/schema.sql
         // Section AP) — gated on the new, deliberately stricter
@@ -1050,6 +1052,7 @@ final class OrderController
             'canEditInrActual' => $canEditInrActual,
             'canDeleteInrActual' => $canDeleteInrActual,
             'canViewCaLinks' => $canViewCaLinks,
+            'canCheckZoho' => $canCheckZoho,
             'linkedExportBenefits' => $canViewCaLinks ? CaExportBenefitRepository::forOrder($orderId) : [],
             // Owner request (2026-10-26): Step 12c lists this order's claims for manage_order_financials holders.
             'orderBenefitClaims' => $canManageOrderFinancials ? CaExportBenefitRepository::forOrder($orderId) : [],

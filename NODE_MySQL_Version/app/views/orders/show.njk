@@ -2794,6 +2794,7 @@
   <details class="step-group" id="order-financials"{{ stepCardOpen('s12') }}>
     <summary>{{ stepStatusIcon(stepStates['s12']) }}<span class="step-group-num">STEP 12</span><h3>Closure &mdash; Financials, Benefits &amp; Costs</h3><span class="fin-progress">{{ fin.doneCount }} of 3 done</span></summary>
     <p class="muted small">Everything financial about this order, in three short parts (government benefits are recorded later, in Step 13g) — visible only to Super Admin and roles granted "Manage order financials". Work top to bottom; the next unfinished part opens by itself.</p>
+    {% if canCheckZoho %}<p class="small"><a href="/orders/{{ order.id }}/zoho-check">Check this order against Zoho Books &rarr;</a> <span class="muted">(reads only)</span></p>{% endif %}
 
     <div class="fin-kpis">
       <div class="fin-kpi"><span class="l">Received from buyer{{ ' (estimated)' if profitability and profitability.revenue_is_estimated else '' }}</span><span class="v">{% if profitability %}&#8377;{{ profitability.revenue_inr | money }}{% else %}—{% endif %}</span></div>
@@ -2809,16 +2810,18 @@
           <p class="muted">No other costs recorded for this order yet.</p>
         {% else %}
           <table class="list">
-            <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Recorded By</th><th></th></tr>
+            <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Paid from</th><th>Recorded By</th><th></th></tr>
             {% for c in orderCostEntries %}
             <tr>
               <td>{{ c.incurred_at or '—' }}</td>
               <td>{{ costEntryCategories[c.category] or c.category }}</td>
-              <td>{{ c.description or '—' }}</td>
+              <td>{{ c.description or '—' }}
+                {% if costEntryNotInZoho[c.category] %}<br><small class="muted">{{ costEntryNotInZoho[c.category] }}</small>{% elif c.zoho_expense_id %}<br><small class="muted">In Zoho Books</small>{% endif %}</td>
               <td>{{ c.amount_inr | money }}</td>
+              <td>{{ costEntryPaidFrom[c.paid_from] or '—' }}</td>
               <td>{{ c.recorded_by_name }}</td>
               <td>
-                <form method="post" action="/orders/{{ order.id }}/cost-entries/{{ c.id }}/delete" onsubmit="return confirm('Remove this cost entry?');">
+                <form method="post" action="/orders/{{ order.id }}/cost-entries/{{ c.id }}/delete" onsubmit="return confirm({{ ('Remove this cost entry? It is in Zoho Books too, and is removed there as well.' if c.zoho_expense_id else 'Remove this cost entry?') | json }});">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                   <button type="submit" class="btn-sm btn-danger">Remove</button>
                 </form>
@@ -2929,6 +2932,13 @@
             <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
             <label>Date<input type="date" name="incurred_at" value="{{ today() }}"></label>
             <label>Description<input type="text" name="description"></label>
+            {# Owner decision 2026-10-29: real paid costs go to Zoho Books as expenses, paid from here. #}
+            <label>Paid from *
+              <select name="paid_from" required>
+                {% for key, label in costEntryPaidFrom %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+              </select>
+            </label>
+            <p class="muted small">CHA, inland transport and port charges belong on <a href="#logistics-bills">logistics partner bills</a>; bank charges and loan interest the CA books from the bank statement — those entries here are not sent to Zoho Books.</p>
             <button type="submit" class="btn-sm">Record Cost</button>
           </form>
         </div>
@@ -2975,6 +2985,14 @@
               </select>
             </label>
             <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" value="{{ orderInspectionFee.fee_amount if orderInspectionFee and orderInspectionFee.fee_amount != null else '' }}"></label>
+            {# Owner decision 2026-10-29: the fee goes to Zoho Books as an expense, paid from here. #}
+            {% set feeEntry = (orderCostEntries | whereEq('id', orderInspectionFee.cost_entry_id) | first) if orderInspectionFee and orderInspectionFee.cost_entry_id else null %}
+            {% set feePaidFrom = feeEntry.paid_from if feeEntry else null %}
+            <label data-show-when="fee_payer=nexacrest">Paid from *
+              <select name="paid_from" required>
+                {% for key, label in costEntryPaidFrom %}<option value="{{ key }}"{{ ' selected' if feePaidFrom == key }}>{{ label }}</option>{% endfor %}
+              </select>
+            </label>
             <button type="submit" class="btn-sm">Save</button>
           </form>
         </details>
@@ -3008,6 +3026,30 @@
         </div>
         {% endif %}
       </details>
+      {% if isLcPayment %}
+      {# Owner decision 2026-10-29: the money the bank actually paid under the LC — it goes to Zoho Books as a payment against the CI. #}
+      <div id="lc-received">
+      <h3 style="font-size:0.95em; margin-top:12px;">LC Payment Received</h3>
+      {% set lcCur = order.currency_code or 'INR' %}
+      {% if orderLcDetails and orderLcDetails.lc_received_at %}
+        <p>Paid by the bank on <strong>{{ orderLcDetails.lc_received_at | shortDate }}</strong>: {{ lcCur }} {{ orderLcDetails.lc_received_amount | money }} &middot; &#8377;{{ orderLcDetails.lc_inr_credited | money }} credited &middot; &#8377;{{ orderLcDetails.lc_bank_charges_inr | money }} bank charges{% if orderLcDetails.lc_zoho_synced_at %} &middot; <span class="muted">in Zoho Books</span>{% endif %}</p>
+      {% else %}
+        <p class="muted small">Not recorded yet. When the bank pays under the LC (after the documents are presented), record it here: it goes to Zoho Books as the buyer's payment against the Commercial Invoice.</p>
+      {% endif %}
+      {% if not (orderLcDetails and orderLcDetails.lc_confirmed_at) %}
+        <p class="muted small">Confirm the LC usable (Step 5e) first.</p>
+      {% elif not orderLcDetails.lc_zoho_synced_at %}
+      <form method="post" action="/orders/{{ order.id }}/lc-received" class="field-grid">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Date the bank paid *<input type="date" name="lc_received_at" required max="{{ today() }}" value="{{ orderLcDetails.lc_received_at or '' }}"></label>
+        <label>Amount paid under the LC ({{ lcCur }}) *<input type="number" name="lc_received_amount" required min="0.01" step="0.01" value="{{ orderLcDetails.lc_received_amount if orderLcDetails.lc_received_amount != null else '' }}"></label>
+        <label>Rupees credited (&#8377;) *<input type="number" name="lc_inr_credited" required min="0.01" step="0.01" value="{{ orderLcDetails.lc_inr_credited if orderLcDetails.lc_inr_credited != null else '' }}"><small class="muted">As on the bank's credit advice.</small></label>
+        <label>Bank charges deducted (&#8377;)<input type="number" name="lc_bank_charges_inr" min="0" step="0.01" value="{{ orderLcDetails.lc_bank_charges_inr if orderLcDetails.lc_bank_charges_inr != null else '0' }}"></label>
+        <div><button type="submit" class="btn-sm">{{ 'Update LC Payment' if orderLcDetails.lc_received_at else 'Record LC Payment' }}</button></div>
+      </form>
+      {% endif %}
+      </div>
+      {% endif %}
       <form method="post" action="/orders/{{ order.id }}/financials/costs-confirmed" class="fin-confirm">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         {% if order.financials_costs_confirmed_at %}

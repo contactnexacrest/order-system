@@ -85,4 +85,55 @@ async function confirmUsable(orderId, confirmedBy) {
   );
 }
 
-module.exports = { find, upsert, recordLegDetails, confirmUsable };
+/**
+ * Owner decision 2026-10-29: the money the bank actually paid under the
+ * LC — date, amount in the order currency, rupees credited and bank
+ * charges deducted. It goes to Zoho Books as a customer payment applied to
+ * the CI (caSyncService), so it can be corrected only until then.
+ */
+async function recordReceived(orderId, receivedAt, amount, inrCredited, bankChargesInr, userId) {
+  const r2 = (v) => Math.round(Number(v) * 100) / 100;
+  await db.execute(
+    `UPDATE order_lc_details
+        SET lc_received_at = :received_at, lc_received_amount = :amount, lc_inr_credited = :inr,
+            lc_bank_charges_inr = :charges, lc_received_by = :user_id
+      WHERE order_id = :order_id AND lc_zoho_synced_at IS NULL`,
+    { received_at: receivedAt, amount: r2(amount), inr: r2(inrCredited), charges: r2(bankChargesInr), user_id: userId, order_id: orderId }
+  );
+}
+
+/**
+ * Owner decision 2026-10-29: every LC payment received, for the Zoho sync —
+ * not yet in Books, or in Books but not yet applied to the CI. Same
+ * production / test rule as the other payments.
+ */
+async function receiptsForZohoSync() {
+  const zohoGuard = require('../services/zohoGuard');
+  const rows = await db.query(
+    `SELECT l.*, o.client_id, o.buyer_inquiry_ref, o.company_legal_name, o.currency_code,
+            (o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1) AS is_test_or_sample
+     FROM order_lc_details l
+     JOIN orders o ON o.id = l.order_id
+     JOIN clients c ON c.id = o.client_id
+     WHERE l.lc_received_at IS NOT NULL AND (l.lc_zoho_synced_at IS NULL OR l.lc_zoho_applied_at IS NULL)
+     ORDER BY l.lc_received_at, l.order_id`
+  );
+  return rows.filter((r) => (zohoGuard.isProduction()
+    ? Number(r.is_test_or_sample) !== 1
+    : String(r.company_legal_name || '').startsWith(zohoGuard.TEST_PREFIX)));
+}
+
+async function setZohoSynced(orderId, paymentId, applied) {
+  await db.execute(`UPDATE order_lc_details SET lc_zoho_payment_id = :id, lc_zoho_synced_at = NOW(), lc_zoho_applied_at = ${applied ? 'NOW()' : 'NULL'} WHERE order_id = :order_id`, { id: paymentId, order_id: orderId });
+}
+
+async function setZohoApplied(orderId) {
+  await db.execute('UPDATE order_lc_details SET lc_zoho_applied_at = NOW() WHERE order_id = :order_id', { order_id: orderId });
+}
+
+/** The clean-up script removed this payment from Books: forget it here too. */
+async function forgetZohoPayment(paymentId) {
+  await db.execute('UPDATE order_lc_details SET lc_zoho_payment_id = NULL, lc_zoho_synced_at = NULL, lc_zoho_applied_at = NULL WHERE lc_zoho_payment_id = :id', { id: paymentId });
+}
+
+module.exports = { find, upsert, recordLegDetails, confirmUsable, recordReceived, receiptsForZohoSync, setZohoSynced, setZohoApplied, forgetZohoPayment };

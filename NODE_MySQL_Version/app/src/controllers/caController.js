@@ -19,6 +19,8 @@ const zohoBooksService = require('../services/zohoBooksService');
 const caSyncService = require('../services/caSyncService');
 const zohoInvoiceData = require('../services/zohoInvoiceData');
 const zohoPurchaseRepository = require('../repositories/zohoPurchaseRepository');
+const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
+const orderZohoMatchService = require('../services/orderZohoMatchService');
 const caFyLockGuard = require('../services/caFyLockGuard');
 const bankStatementCsvParser = require('../services/bankStatementCsvParser');
 const csv = require('../helpers/csv');
@@ -155,37 +157,75 @@ async function reports(req, res) {
  */
 async function zohoSync(req, res) {
   const startDate = await zohoBooksService.syncStartDate();
+  const lcReceipts = await orderLcDetailRepository.receiptsForZohoSync();
   res.renderView('ca/zoho_sync', {
     startDate,
     startDateLabel: startDate ? new Date(`${startDate}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
     canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     isEnabled: await zohoBooksService.isEnabled(),
-    pendingCount: (await caRepository.legsPendingZohoSync()).filter((leg) => startDate === null || String(leg.cleared_at).slice(0, 10) >= startDate).length,
-    heldCount: (await caRepository.legsHeldInZoho()).length,
-    purchasesPendingCount: (await zohoPurchaseRepository.billsToSync(startDate)).length + (await zohoPurchaseRepository.paymentsToSync(startDate)).length + (await zohoPurchaseRepository.expensesToSync(startDate)).length,
+    pendingCount: (await caRepository.legsPendingZohoSync()).filter((leg) => startDate === null || String(leg.cleared_at).slice(0, 10) >= startDate).length
+      + lcReceipts.filter((lc) => lc.lc_zoho_synced_at === null && (startDate === null || String(lc.lc_received_at) >= startDate)).length,
+    heldCount: (await caRepository.legsHeldInZoho()).length + lcReceipts.filter((lc) => lc.lc_zoho_synced_at !== null).length,
+    purchasesPendingCount: (await zohoPurchaseRepository.billsToSync(startDate)).length + (await zohoPurchaseRepository.paymentsToSync(startDate)).length + (await zohoPurchaseRepository.expensesToSync(startDate)).length
+      + (await zohoPurchaseRepository.costEntriesToSync(startDate)).filter((c) => c.zoho_expense_id === null).length,
+    benefitsPendingCount: (await caExportBenefitRepository.forZohoSync(startDate)).filter((b) => b.zoho_journal_id === null).length,
     legLabels: zohoInvoiceData.KIND_LABELS,
     log: await zohoSyncLogRepository.recent(100),
+  }, 'layout/base');
+}
+
+/**
+ * Owner decision 2026-10-29: the per-order "App vs Zoho" check — every
+ * record of the order in the app beside what Zoho Books holds for it.
+ * Reads only. (sessionAuth already applies the order's visibility rules to
+ * every /orders/:id/ path.)
+ */
+async function orderZohoCheck(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  let result = null;
+  let error = null;
+  if (!(await zohoBooksService.isEnabled())) {
+    error = 'Zoho Books is not enabled on this server, so there is nothing to compare with.';
+  } else {
+    try {
+      result = await orderZohoMatchService.check(orderId);
+    } catch (e) {
+      error = `Could not read Zoho Books: ${e.message}`;
+    }
+  }
+  const startDate = await zohoBooksService.syncStartDate();
+  res.renderView('ca/order_zoho_check', {
+    order,
+    result,
+    error,
+    startDateLabel: startDate ? new Date(`${startDate}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
+    statusLabels: orderZohoMatchService.STATUS_LABELS,
   }, 'layout/base');
 }
 
 async function runZohoSync(req, res) {
   const user = req.user;
   const result = await caSyncService.runFullSync('manual', user.id);
-  const { revenue, purchases, expenses } = result;
+  const { revenue, purchases, expenses, benefits } = result;
 
   const done = `${revenue.invoices} invoice(s) sent or updated, ${revenue.synced} payment(s) pushed, ${revenue.applied} payment(s) applied to invoices, `
-    + `${purchases.bills} bill(s), ${purchases.payments} vendor payment(s) (${purchases.applied} applied to bills) and ${purchases.expenses} order expense(s) sent, ${expenses.imported} expense(s) imported`;
-  const failed = revenue.failed + purchases.failed + expenses.failed;
+    + `${purchases.bills} bill(s), ${purchases.payments} vendor payment(s) (${purchases.applied} applied to bills) and ${purchases.expenses} order expense(s) / cost(s) sent, ${benefits.journals} export benefit journal(s) sent or updated, ${expenses.imported} expense(s) imported`;
+  const failed = revenue.failed + purchases.failed + expenses.failed + benefits.failed;
   if (failed > 0) {
     flash.set(req, 'warning', `Sync finished: ${done}, ${failed} failed — see the log below for details.`);
-  } else if (revenue.synced > 0 || revenue.invoices > 0 || revenue.applied > 0 || purchases.bills + purchases.payments + purchases.applied + purchases.expenses > 0 || expenses.imported > 0) {
+  } else if (revenue.synced > 0 || revenue.invoices > 0 || revenue.applied > 0 || purchases.bills + purchases.payments + purchases.applied + purchases.expenses > 0 || benefits.journals + benefits.removed > 0 || expenses.imported > 0) {
     flash.set(req, 'success', `Sync finished: ${done}.`);
   } else {
     flash.set(req, 'success', "Sync ran — nothing was pending (or Zoho Books isn't configured yet). See the log below.");
   }
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
-  await auditLogRepository.log(user.id, 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, `revenue: ${revenue.invoices} invoices, ${revenue.synced} synced, ${revenue.applied} applied/${revenue.failed} failed, purchases: ${purchases.bills} bills, ${purchases.payments} payments, ${purchases.applied} applied, ${purchases.expenses} expenses/${purchases.failed} failed, expenses: ${expenses.imported} imported/${expenses.failed} failed`);
+  await auditLogRepository.log(user.id, 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, `revenue: ${revenue.invoices} invoices, ${revenue.synced} synced, ${revenue.applied} applied/${revenue.failed} failed, purchases: ${purchases.bills} bills, ${purchases.payments} payments, ${purchases.applied} applied, ${purchases.expenses} expenses/${purchases.failed} failed, benefits: ${benefits.journals} journals, ${benefits.removed} removed/${benefits.failed} failed, expenses: ${expenses.imported} imported/${expenses.failed} failed`);
   res.redirect('/ca/zoho-sync');
 }
 
@@ -747,7 +787,7 @@ async function tdsSummary(req, res) {
 }
 
 module.exports = {
-  index, reports, zohoSync, runZohoSync, expenses, setExpenseTds, linkExpenseToOrder, tdsSummary,
+  index, reports, zohoSync, runZohoSync, orderZohoCheck, expenses, setExpenseTds, linkExpenseToOrder, tdsSummary,
   exportBenefits, recordExportBenefit, markExportBenefitReceived,
   bankStatement, uploadBankStatement, matchBankLineToRevenue, matchBankLineToExpense, unmatchBankLine, reconciliation,
   fyLocks, lockFinancialYear, unlockFinancialYear,

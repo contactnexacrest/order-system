@@ -107,8 +107,17 @@ on every sync until fixed):
 - no confirmed freight rate (Debit Note);
 - the invoice number is already used in Books for another customer.
 
-Letter of Credit money is not sent to Books yet (only the advance,
-balance and freight legs are).
+**Letter of Credit orders (owner decision 2026-10-29).** On an LC order
+the bank pays under the LC once the documents are presented. Record that
+payment on the order page (Step 12a, **LC Payment Received**): the date
+the bank paid, the amount in the order currency, the rupees credited and
+the bank charges deducted. The next sync sends it as a **customer
+payment applied to the Commercial Invoice** (held until the CI is in
+Books, like the advance): the full order-currency amount, at (rupees
+credited + bank charges) / amount, with the bank charges booked as bank
+charges. Once it is in Books it cannot be changed in the app — ask the
+CA to correct it in Books. The bank loan against the LC and its interest
+are **not** sent: the CA books them from the bank statement.
 
 ## Bills, vendor payments and order expenses in Zoho Books (2026-10-29)
 
@@ -138,9 +147,21 @@ What the order pays out goes to Zoho Books too, on the same sync:
   named *Company Card* (add it in Books before the first card expense).
   The expense import (chapter CA-04) **skips** these, so an order expense
   is never brought back in a second time.
-- **Not sent:** the manual cost lines (ECGC, documentation, bank charges
-  and the like) — they would count the same cost twice where a bill
-  already covers it.
+- **Order costs (owner decision 2026-10-29).** The real paid costs in
+  the order's cost lines (Step 12a) go as Books **expenses** too, from
+  what they were paid from (a new **Paid from** field: company account =
+  the deposit bank account, company card = *Company Card*): ECGC to
+  *Insurance Expense*, buyer due diligence to *Consultant Expense*,
+  documentation to *Export Documentation Charges*, commission to
+  *Commission Expense*, packing / wooden crates to *Packing Material*,
+  the pre-shipment inspection fee to *Inspection Charges* and other to
+  *Other Expenses* (the CA adds the accounts that do not exist yet).
+  A cost corrected later (for example the inspection fee) is updated in
+  Books; a cost removed in the app is removed from Books at the same
+  time. **Not sent:** the travel % (a budget only), bank-loan interest
+  and bank charges (the CA books them from the bank statement), and CHA,
+  inland transport and port charges entered as cost lines (record those
+  as logistics partner bills, which go to Books themselves).
 
 **What stops a bill, payment or expense, with a message in the Sync Log**
 (retried on every sync until fixed):
@@ -171,6 +192,48 @@ else, and offers reverse charge only for Transport). The bill shows
 with **reverse charge at 5 %** — IGST 5 % for a transporter registered in
 another state, else CGST + SGST 2.5 % each — and the Sync Log says
 "reverse charge". Every other bill: leave it at **Charged on the bill**.
+
+## Export benefits in Zoho Books (owner decision 2026-10-29)
+
+When a claim is marked **received** (chapter CA-07), the next sync sends
+it to Books as a **journal**, dated the day it was received, against
+*Export Incentive Income*:
+
+- **Duty Drawback** is paid into the bank: the journal debits the deposit
+  bank account.
+- **RoDTEP** and **RoSCTL** arrive as e-scrips in the ICEGATE ledger, not
+  in the bank: the journal debits *Export Incentive e-Scrips* (an asset
+  account; using or selling the scrips later is for the CA).
+- Any other scheme is not sent (the Sync Log says so): the CA books it by
+  hand.
+
+A claim only filed, not yet received, is not booked. A corrected receipt
+updates the journal; a receipt cleared in the app removes it from Books.
+A claim whose receipt is in Books cannot be deleted straight away: clear
+its receipt first, run the sync (which removes the journal), then delete
+it. The CA adds *Export Incentive Income* (income) and *Export Incentive
+e-Scrips* (other current asset) in Books before the first one.
+
+## Checking an order against Zoho Books (owner decision 2026-10-29)
+
+On the order page, Step 12, **Check this order against Zoho Books** (for
+whoever runs the Zoho sync) opens a page that puts every record of the
+order beside what Books holds for it: the Commercial Invoice and Debit
+Note, the buyer's payments and the LC payment, the bills and the payments
+made against them, the order expenses and costs, and the export benefit
+journals. Each line says one of:
+
+| Status | Meaning |
+|---|---|
+| Matches | Books has it, with the same amount. |
+| Not in Zoho Books yet | It goes on the next sync; the note gives the last error, if any. |
+| Before the go-live date | The CA books it by hand (opening position). |
+| Different in Zoho Books | Books has it with another amount — someone changed it there, or the app changed after sending. |
+| Missing in Zoho Books | The app sent it, but Books no longer has it. |
+| Only in Zoho Books | An invoice, payment or bill in Books under this order's reference that the app did not send. |
+
+The page only reads: it changes nothing in the app or in Books. Correct
+whichever side is wrong.
 
 ## The server switches in `.env` (2026-10-29)
 
@@ -255,8 +318,10 @@ created in Zoho Books.
   from the main system's Audit Log, exactly as this module was scoped to
   keep it.
 
-Each run first sends approved CIs and Debit Notes, then payments, then
-applies any held payment whose invoice is now in Books. Zoho lets a login
+Each run first sends approved CIs and Debit Notes, then payments (and LC
+payments), then applies any held payment whose invoice is now in Books;
+then bills, vendor payments, order expenses and order costs; then the
+expense import; then received export benefits as journals. Zoho lets a login
 be renewed only a few times in ten minutes, so pressing **Sync Now** or
 **Test Books Connection** many times in a row can be refused for a few
 minutes ("too many requests" in the Sync Log); wait and run it again.
@@ -287,8 +352,10 @@ while testing is removed before go-live:
   until the clean-up is done.
 - The clean-up script lists, and with `--apply` deletes, every `TEST-`
   customer with its payments and invoices, every `TEST-` vendor with its
-  payments and bills, and every expense whose description starts with
-  `TEST-` (payments first, then invoices, bills and expenses). With
+  payments and bills, every expense whose description starts with
+  `TEST-`, and every journal whose notes start with `TEST-` (export
+  benefits) — payments first, then invoices, bills, expenses and
+  journals. With
   `--from-sync-log` it also takes every record the **test** database
   pushed — a record already gone is reported as such, not logged as a
   deletion —

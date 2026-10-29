@@ -58,6 +58,13 @@ separate field from the claimed amount, since DGFT/Customs frequently
 pays a different (usually lower) figure after their own review — the
 system keeps both on record rather than assuming they always match.
 
+Owner decision 2026-10-29: a received Duty Drawback, RoDTEP or RoSCTL
+claim goes to Zoho Books as a journal on the next sync (see
+[CA-03](./ca-03-zoho-sync.md#export-benefits-in-zoho-books-owner-decision-2026-10-29)).
+Correcting the received amount updates it there; clearing it removes it
+there. A claim whose receipt is in Books is deleted only after its
+receipt is cleared and the sync has run.
+
 ## Where a linked claim shows up
 
 A claim tied to an order (via the order-reference field when recording
@@ -120,5 +127,7 @@ what's on screen.
 ## What this doesn't do yet
 
 - No automatic pull from ICEGATE/DGFT — every claim is entered manually.
-- No push to Zoho Books — this data stays local to this system, since
-  Zoho Books has no natural home for it either.
+- Only received claims of Duty Drawback, RoDTEP and RoSCTL go to Zoho
+  Books (as journals, owner decision 2026-10-29 — see
+  [CA-03](./ca-03-zoho-sync.md#export-benefits-in-zoho-books-owner-decision-2026-10-29));
+  other schemes, and claims not yet received, stay local to this system.

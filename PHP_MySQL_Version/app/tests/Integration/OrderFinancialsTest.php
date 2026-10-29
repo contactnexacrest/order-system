@@ -317,7 +317,7 @@ final class OrderFinancialsTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
 
         $_SESSION['_auth_user_id'] = $userId;
-        $_POST = ['category' => 'cha_charges', 'amount_inr' => '1234.56', 'incurred_at' => '2026-06-01', 'description' => 'Test CHA'];
+        $_POST = ['category' => 'cha_charges', 'amount_inr' => '1234.56', 'incurred_at' => '2026-06-01', 'description' => 'Test CHA', 'paid_from' => 'company_card'];
         $controller = new OrderFinancialsController();
         ob_start();
         $controller->addCostEntry(['id' => (string) $orderId]);
@@ -326,6 +326,13 @@ final class OrderFinancialsTest extends DbTestCase
         $rows = OrderCostEntryRepository::forOrder($orderId);
         self::assertCount(1, $rows);
         self::assertSame('1234.56', $rows[0]['amount_inr']);
+        self::assertSame('company_card', $rows[0]['paid_from']);
+
+        $_POST = ['category' => 'ecgc_insurance', 'amount_inr' => '500', 'incurred_at' => '2026-06-01'];
+        ob_start();
+        $controller->addCostEntry(['id' => (string) $orderId]);
+        ob_get_clean();
+        self::assertCount(1, OrderCostEntryRepository::forOrder($orderId), 'refused: owner decision 2026-10-29, a cost says what it was paid from');
 
         $count = (int) Database::connection()
             ->query("SELECT COUNT(*) FROM audit_log WHERE action_type = 'ORDER_COST_ENTRY_RECORDED' AND entity_id = {$rows[0]['id']}")

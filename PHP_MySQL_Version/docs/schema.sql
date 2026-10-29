@@ -4273,3 +4273,31 @@ ALTER TABLE order_shipping
   ADD COLUMN customs_exchange_rate DECIMAL(12,4) NULL;
 ALTER TABLE order_vendor_bills
   ADD COLUMN gst_reverse_charge TINYINT(1) NOT NULL DEFAULT 0;
+
+-- ================================================================
+-- SECTION CL — COST ENTRIES, LC RECEIPT AND EXPORT BENEFITS IN ZOHO BOOKS
+-- (owner decisions 2026-10-29)
+-- Real paid cost entries go to Zoho Books as expenses (paid_from says
+-- from where); the money the bank pays under an LC goes as a customer
+-- payment applied to the CI; an export benefit goes as a journal when
+-- received. Each table remembers what is already in Books.
+-- docs/migrations/2026-10-29f-zoho-costs-lc-benefits.sql
+-- ================================================================
+ALTER TABLE order_cost_entries
+  ADD COLUMN paid_from ENUM('company_account','company_card') NULL,
+  ADD COLUMN zoho_expense_id VARCHAR(50) NULL,
+  ADD COLUMN zoho_synced_at TIMESTAMP NULL,
+  ADD COLUMN zoho_pushed_hash CHAR(64) NULL;
+ALTER TABLE order_lc_details
+  ADD COLUMN lc_received_at DATE NULL,
+  ADD COLUMN lc_received_amount DECIMAL(14,2) NULL,
+  ADD COLUMN lc_inr_credited DECIMAL(14,2) NULL,
+  ADD COLUMN lc_bank_charges_inr DECIMAL(14,2) NULL,
+  ADD COLUMN lc_received_by BIGINT UNSIGNED NULL,
+  ADD COLUMN lc_zoho_payment_id VARCHAR(50) NULL,
+  ADD COLUMN lc_zoho_synced_at TIMESTAMP NULL,
+  ADD COLUMN lc_zoho_applied_at TIMESTAMP NULL;
+ALTER TABLE ca_export_benefits
+  ADD COLUMN zoho_journal_id VARCHAR(50) NULL,
+  ADD COLUMN zoho_synced_at TIMESTAMP NULL,
+  ADD COLUMN zoho_pushed_hash CHAR(64) NULL;

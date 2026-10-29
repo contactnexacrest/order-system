@@ -744,6 +744,7 @@ app.get('/ca', requireAuth, requirePermission('ca_module_view'), asyncHandler(ca
 app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reports));
 app.get('/ca/zoho-sync', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.zohoSync));
 app.post('/ca/zoho-sync/run', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.runZohoSync));
+app.get('/orders/:id/zoho-check', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.orderZohoCheck));
 app.get('/ca/expenses', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.expenses));
 app.get('/ca/tds-summary', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.tdsSummary));
 app.post('/ca/expenses/:id/tds', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.setExpenseTds));
@@ -762,6 +763,7 @@ app.post('/orders/:id/financials/skip', requireAuth, requirePermission('manage_o
 app.post('/orders/:id/financials/skip/undo', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.undoSkipFinancials));
 app.post('/orders/:id/export-benefit-schemes', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.setExportBenefitSchemeStatus));
 app.post('/orders/:id/lc-details', requireAuth, requirePermission('manage_order_financials'), upload.single('lc_file'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveLcDetails));
+app.post('/orders/:id/lc-received', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.recordLcReceived));
 app.post('/orders/:id/inspection-fee', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveInspectionFee));
 app.post('/orders/:id/travel-expenses', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveTravelExpenses));
 app.post('/orders/:id/cost-entries', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addCostEntry));

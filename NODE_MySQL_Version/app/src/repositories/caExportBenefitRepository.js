@@ -63,6 +63,35 @@ async function markReceived(id, receivedAmount, receivedAt) {
   );
 }
 
+/**
+ * Owner decision 2026-10-29: export benefits go to Zoho Books as a journal
+ * when received. Every received claim (dated on or after startDate when
+ * given) and every claim already in Books — so a corrected or cleared
+ * receipt is updated or removed there too. Same production / test rule as
+ * the rest of the sync: in production no claim of a test or sample order;
+ * in test only claims of TEST- orders.
+ */
+async function forZohoSync(startDate = null) {
+  const zohoGuard = require('../services/zohoGuard');
+  const rows = await db.query(
+    `SELECT ceb.*, o.buyer_inquiry_ref, o.company_legal_name AS buyer_name,
+            COALESCE(o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1, 0) AS is_test_or_sample
+     FROM ca_export_benefits ceb
+     LEFT JOIN orders o ON o.id = ceb.order_id
+     LEFT JOIN clients c ON c.id = o.client_id
+     WHERE (ceb.received_amount IS NOT NULL AND ceb.received_amount > 0) OR ceb.zoho_journal_id IS NOT NULL
+     ORDER BY ceb.received_at, ceb.id`
+  );
+  return rows.filter((r) => (r.zoho_journal_id !== null || startDate === null || String(r.received_at) >= startDate)
+    && (zohoGuard.isProduction()
+      ? Number(r.is_test_or_sample) !== 1
+      : String(r.buyer_name || '').startsWith(zohoGuard.TEST_PREFIX)));
+}
+
+async function setZohoJournal(id, journalId, hash) {
+  await db.execute(`UPDATE ca_export_benefits SET zoho_journal_id = :journal, zoho_synced_at = ${journalId !== null ? 'NOW()' : 'NULL'}, zoho_pushed_hash = :hash WHERE id = :id`, { journal: journalId, hash, id });
+}
+
 async function totalClaimed() {
   const row = await db.queryOne('SELECT COALESCE(SUM(claimed_amount), 0) AS total FROM ca_export_benefits');
   return parseFloat(row.total);
@@ -95,4 +124,4 @@ async function remove(id) {
   await db.execute('DELETE FROM ca_export_benefits WHERE id = :id', { id });
 }
 
-module.exports = { correct, remove, record, find, all, forOrder, markReceived, totalClaimed, totalReceived, availableFinancialYears };
+module.exports = { correct, remove, record, find, all, forOrder, markReceived, forZohoSync, setZohoJournal, totalClaimed, totalReceived, availableFinancialYears };

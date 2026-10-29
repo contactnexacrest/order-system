@@ -3302,6 +3302,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
   <details class="step-group" id="order-financials"<?= $stepCardOpen('12') ?>>
     <summary><?= $stepStatusIcon($stepStates['12']) ?><span class="step-group-num">STEP 12</span><h3>Closure &mdash; Financials, Benefits &amp; Costs</h3><span class="fin-progress"><?= count(array_filter($__finDone)) ?> of 3 done</span></summary>
     <p class="muted small">Everything financial about this order, in three short parts (government benefits are recorded later, in Step 13g) — visible only to Super Admin and roles granted "Manage order financials". Work top to bottom; the next unfinished part opens by itself.</p>
+    <?php if (!empty($canCheckZoho)): ?><p class="small"><a href="/orders/<?= (int) $order['id'] ?>/zoho-check">Check this order against Zoho Books &rarr;</a> <span class="muted">(reads only)</span></p><?php endif; ?>
 
     <div class="fin-kpis">
       <div class="fin-kpi"><span class="l">Received from buyer<?= $profitability && $profitability['revenue_is_estimated'] ? ' (estimated)' : '' ?></span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['revenue_inr'], 2) : '—' ?></span></div>
@@ -3317,16 +3318,18 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <p class="muted">No other costs recorded for this order yet.</p>
         <?php else: ?>
           <table class="list">
-            <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Recorded By</th><th></th></tr>
+            <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (INR)</th><th>Paid from</th><th>Recorded By</th><th></th></tr>
             <?php foreach ($orderCostEntries as $c): ?>
             <tr>
               <td><?= htmlspecialchars((string) ($c['incurred_at'] ?? '—')) ?></td>
               <td><?= htmlspecialchars($costEntryCategories[$c['category']] ?? $c['category']) ?></td>
-              <td><?= htmlspecialchars($c['description'] ?? '—') ?></td>
+              <td><?= htmlspecialchars($c['description'] ?? '—') ?>
+                <?php if (isset(\App\Repositories\OrderCostEntryRepository::NOT_IN_ZOHO[$c['category']])): ?><br><small class="muted"><?= htmlspecialchars(\App\Repositories\OrderCostEntryRepository::NOT_IN_ZOHO[$c['category']]) ?></small><?php elseif (!empty($c['zoho_expense_id'])): ?><br><small class="muted">In Zoho Books</small><?php endif; ?></td>
               <td><?= number_format((float) $c['amount_inr'], 2) ?></td>
+              <td><?= htmlspecialchars(\App\Repositories\OrderCostEntryRepository::PAID_FROM[$c['paid_from'] ?? ''] ?? '—') ?></td>
               <td><?= htmlspecialchars($c['recorded_by_name']) ?></td>
               <td>
-                <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries/<?= (int) $c['id'] ?>/delete" onsubmit="return confirm('Remove this cost entry?');">
+                <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries/<?= (int) $c['id'] ?>/delete" onsubmit="return confirm(<?= htmlspecialchars(json_encode(!empty($c['zoho_expense_id']) ? 'Remove this cost entry? It is in Zoho Books too, and is removed there as well.' : 'Remove this cost entry?')) ?>);">
                   <?= Csrf::field() ?>
                   <button type="submit" class="btn-sm btn-danger">Remove</button>
                 </form>
@@ -3442,6 +3445,13 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
             <label>Date<input type="date" name="incurred_at" value="<?= date('Y-m-d') ?>"></label>
             <label>Description<input type="text" name="description"></label>
+            <?php // Owner decision 2026-10-29: real paid costs go to Zoho Books as expenses, paid from here. ?>
+            <label>Paid from *
+              <select name="paid_from" required>
+                <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+              </select>
+            </label>
+            <p class="muted small">CHA, inland transport and port charges belong on <a href="#logistics-bills">logistics partner bills</a>; bank charges and loan interest the CA books from the bank statement — those entries here are not sent to Zoho Books.</p>
             <button type="submit" class="btn-sm">Record Cost</button>
           </form>
         </div>
@@ -3488,6 +3498,13 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               </select>
             </label>
             <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" value="<?= htmlspecialchars($orderInspectionFee && $orderInspectionFee['fee_amount'] !== null ? (string) $orderInspectionFee['fee_amount'] : '') ?>"></label>
+            <?php // Owner decision 2026-10-29: the fee goes to Zoho Books as an expense, paid from here. ?>
+            <?php $__feePaidFrom = null; foreach ($orderCostEntries as $__c) { if ($orderInspectionFee && (int) $__c['id'] === (int) ($orderInspectionFee['cost_entry_id'] ?? 0)) { $__feePaidFrom = $__c['paid_from']; } } ?>
+            <label data-show-when="fee_payer=nexacrest">Paid from *
+              <select name="paid_from" required>
+                <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__feePaidFrom === $__key ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+              </select>
+            </label>
             <button type="submit" class="btn-sm">Save</button>
           </form>
         </details>
@@ -3521,6 +3538,30 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </div>
         <?php endif; ?>
       </details>
+      <?php if ($isLcPayment): ?>
+      <?php // Owner decision 2026-10-29: the money the bank actually paid under the LC — it goes to Zoho Books as a payment against the CI. ?>
+      <div id="lc-received">
+      <h3 style="font-size:0.95em; margin-top:12px;">LC Payment Received</h3>
+      <?php $__cur = (string) ($order['currency_code'] ?? 'INR'); ?>
+      <?php if (!empty($orderLcDetails['lc_received_at'])): ?>
+        <p>Paid by the bank on <strong><?= htmlspecialchars(\App\Helpers\Dates::short((string) $orderLcDetails['lc_received_at'])) ?></strong>: <?= htmlspecialchars($__cur) ?> <?= number_format((float) $orderLcDetails['lc_received_amount'], 2) ?> &middot; &#8377;<?= number_format((float) $orderLcDetails['lc_inr_credited'], 2) ?> credited &middot; &#8377;<?= number_format((float) $orderLcDetails['lc_bank_charges_inr'], 2) ?> bank charges<?= !empty($orderLcDetails['lc_zoho_synced_at']) ? ' &middot; <span class="muted">in Zoho Books</span>' : '' ?></p>
+      <?php else: ?>
+        <p class="muted small">Not recorded yet. When the bank pays under the LC (after the documents are presented), record it here: it goes to Zoho Books as the buyer's payment against the Commercial Invoice.</p>
+      <?php endif; ?>
+      <?php if (empty($orderLcDetails['lc_confirmed_at'])): ?>
+        <p class="muted small">Confirm the LC usable (Step 5e) first.</p>
+      <?php elseif (empty($orderLcDetails['lc_zoho_synced_at'])): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/lc-received" class="field-grid">
+        <?= Csrf::field() ?>
+        <label>Date the bank paid *<input type="date" name="lc_received_at" required max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_received_at'] ?? '')) ?>"></label>
+        <label>Amount paid under the LC (<?= htmlspecialchars($__cur) ?>) *<input type="number" name="lc_received_amount" required min="0.01" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_received_amount'] ?? '')) ?>"></label>
+        <label>Rupees credited (&#8377;) *<input type="number" name="lc_inr_credited" required min="0.01" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_inr_credited'] ?? '')) ?>"><small class="muted">As on the bank's credit advice.</small></label>
+        <label>Bank charges deducted (&#8377;)<input type="number" name="lc_bank_charges_inr" min="0" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_bank_charges_inr'] ?? '0')) ?>"></label>
+        <div><button type="submit" class="btn-sm"><?= !empty($orderLcDetails['lc_received_at']) ? 'Update LC Payment' : 'Record LC Payment' ?></button></div>
+      </form>
+      <?php endif; ?>
+      </div>
+      <?php endif; ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/financials/costs-confirmed" class="fin-confirm">
         <?= Csrf::field() ?>
         <?php if (!empty($order['financials_costs_confirmed_at'])): ?>

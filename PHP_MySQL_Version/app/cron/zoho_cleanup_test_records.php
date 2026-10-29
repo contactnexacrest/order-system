@@ -11,6 +11,7 @@ declare(strict_types=1);
  *   - every Books customer whose name starts with TEST-, with its payments
  *     and (Stage 2) its invoices; (Stage 3) every TEST- vendor with its
  *     payments and bills, and every expense whose description starts TEST-;
+ *     every journal whose notes start TEST- (export benefits, 2026-10-29);
  *   - with --from-sync-log, also every payment this database's sync log
  *     pushed, every invoice it sent (order_zoho_invoices), every customer
  *     this database created (clients.zoho_contact_id), and every vendor,
@@ -55,6 +56,7 @@ $plan['vendorpayment'] = [];
 $plan['invoice'] = [];
 $plan['bill'] = [];
 $plan['expense'] = [];
+$plan['journal'] = [];
 $plan['contact'] = [];
 
 foreach (ZohoBooksService::listTestContacts() as $contact) {
@@ -75,6 +77,9 @@ foreach (ZohoBooksService::listTestContacts() as $contact) {
 foreach (ZohoBooksService::listTestExpenses() as $expense) {
     $plan['expense'][$expense['expense_id']] = "expense {$expense['label']}";
 }
+foreach (ZohoBooksService::listTestJournals() as $journal) {
+    $plan['journal'][$journal['journal_id']] = "journal {$journal['label']}";
+}
 if ($fromSyncLog) {
     $rows = $pdo->query("SELECT entity_id, leg, zoho_reference FROM zoho_sync_log WHERE sync_type = 'revenue_payment' AND status = 'success' AND zoho_reference IS NOT NULL")->fetchAll();
     foreach ($rows as $row) {
@@ -85,6 +90,9 @@ if ($fromSyncLog) {
     }
     foreach ($pdo->query('SELECT company_legal_name, zoho_contact_id FROM clients WHERE zoho_contact_id IS NOT NULL')->fetchAll() as $row) {
         $plan['contact'][(string) $row['zoho_contact_id']] ??= "customer {$row['company_legal_name']} (created by this database)";
+    }
+    foreach ($pdo->query('SELECT id, scheme_name, received_amount, zoho_journal_id FROM ca_export_benefits WHERE zoho_journal_id IS NOT NULL')->fetchAll() as $row) {
+        $plan['journal'][(string) $row['zoho_journal_id']] ??= "journal for export benefit #{$row['id']} {$row['scheme_name']} INR {$row['received_amount']} (created by this database)";
     }
     foreach (App\Repositories\ZohoPurchaseRepository::pushedRecords() as $record) {
         $plan[$record['kind']][$record['id']] ??= $record['label'];
@@ -97,8 +105,8 @@ foreach ($plan as $kind => $items) {
     }
 }
 echo sprintf(
-    "\n%d customer payment(s), %d vendor payment(s), %d invoice(s), %d bill(s), %d expense(s) and %d customer/vendor contact(s) to delete from Zoho Books.\n",
-    count($plan['customerpayment']), count($plan['vendorpayment']), count($plan['invoice']), count($plan['bill']), count($plan['expense']), count($plan['contact'])
+    "\n%d customer payment(s), %d vendor payment(s), %d invoice(s), %d bill(s), %d expense(s), %d journal(s) and %d customer/vendor contact(s) to delete from Zoho Books.\n",
+    count($plan['customerpayment']), count($plan['vendorpayment']), count($plan['invoice']), count($plan['bill']), count($plan['expense']), count($plan['journal']), count($plan['contact'])
 );
 if (!$apply) {
     echo "Dry run — nothing changed. Run again with --apply to delete them.\n";
@@ -124,6 +132,7 @@ foreach ($plan as $kind => $items) {
                         'bill' => 'DELETE /books/v3/bills/{id} (Books: Purchases -> Bills)',
                         'expense' => 'DELETE /books/v3/expenses/{id} (Books: Purchases -> Expenses)',
                         'customerpayment' => 'DELETE /books/v3/customerpayments/{id} (Books: Sales -> Payments Received)',
+                        'journal' => 'DELETE /books/v3/journals/{id} (Books: Accountant -> Manual Journals)',
                     ][$kind],
                     'Delete', "{$label}; Zoho ID {$id}", 'Exists', 'Deleted', 'Remove test data before go-live', 'Test', 'Yes', "{$now} / {$by}",
                     'cron/zoho_cleanup_test_records.php', '', '',
@@ -138,6 +147,9 @@ foreach ($plan as $kind => $items) {
                 foreach (['advance', 'balance', 'freight'] as $leg) {
                     $pdo->prepare("UPDATE order_payment_status SET {$leg}_zoho_synced_at = NULL, {$leg}_zoho_reference = NULL, {$leg}_zoho_applied_at = NULL WHERE {$leg}_zoho_reference = :id")->execute(['id' => $id]);
                 }
+                App\Repositories\OrderLcDetailRepository::forgetZohoPayment((string) $id);
+            } elseif ($kind === 'journal') {
+                $pdo->prepare('UPDATE ca_export_benefits SET zoho_journal_id = NULL, zoho_synced_at = NULL, zoho_pushed_hash = NULL WHERE zoho_journal_id = :id')->execute(['id' => $id]);
             }
         } catch (\Throwable $e) {
             $failed++;

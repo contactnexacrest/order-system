@@ -111,6 +111,39 @@ final class CaExportBenefitRepository
         Database::connection()->prepare('DELETE FROM ca_export_benefits WHERE id = :id')->execute(['id' => $id]);
     }
 
+    /**
+     * Owner decision 2026-10-29: export benefits go to Zoho Books as a
+     * journal when received. Every received claim (dated on or after
+     * $startDate when given) and every claim already in Books — so a
+     * corrected or cleared receipt is updated or removed there too. Same
+     * production / test rule as the rest of the sync: in production no
+     * claim of a test or sample order; in test only claims of TEST- orders.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function forZohoSync(?string $startDate = null): array
+    {
+        $rows = Database::connection()->query(
+            'SELECT ceb.*, o.buyer_inquiry_ref, o.company_legal_name AS buyer_name,
+                    COALESCE(o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1, 0) AS is_test_or_sample
+             FROM ca_export_benefits ceb
+             LEFT JOIN orders o ON o.id = ceb.order_id
+             LEFT JOIN clients c ON c.id = o.client_id
+             WHERE (ceb.received_amount IS NOT NULL AND ceb.received_amount > 0) OR ceb.zoho_journal_id IS NOT NULL
+             ORDER BY ceb.received_at, ceb.id'
+        )->fetchAll();
+        return array_values(array_filter($rows, static fn (array $r): bool => ($r['zoho_journal_id'] !== null || $startDate === null || (string) $r['received_at'] >= $startDate)
+            && (\App\Services\ZohoGuard::isProduction()
+                ? (int) $r['is_test_or_sample'] !== 1
+                : str_starts_with((string) ($r['buyer_name'] ?? ''), \App\Services\ZohoGuard::TEST_PREFIX))));
+    }
+
+    public static function setZohoJournal(int $id, ?string $journalId, ?string $hash): void
+    {
+        Database::connection()->prepare('UPDATE ca_export_benefits SET zoho_journal_id = :journal, zoho_synced_at = ' . ($journalId !== null ? 'NOW()' : 'NULL') . ', zoho_pushed_hash = :hash WHERE id = :id')
+            ->execute(['journal' => $journalId, 'hash' => $hash, 'id' => $id]);
+    }
+
     public static function totalClaimed(): float
     {
         return (float) Database::connection()->query('SELECT COALESCE(SUM(claimed_amount), 0) FROM ca_export_benefits')->fetchColumn();

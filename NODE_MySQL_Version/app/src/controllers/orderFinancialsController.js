@@ -13,7 +13,9 @@ const orderTravelExpenseRepository = require('../repositories/orderTravelExpense
 const orderProductRepository = require('../repositories/orderProductRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
+const zohoSyncLogRepository = require('../repositories/zohoSyncLogRepository');
 const caFyLockGuard = require('../services/caFyLockGuard');
+const zohoBooksService = require('../services/zohoBooksService');
 const benefitSettlementService = require('../services/benefitSettlementService');
 const fileUploadService = require('../services/fileUploadService');
 const { todayIst } = require('../helpers/dbDateTime');
@@ -184,6 +186,14 @@ async function deleteExportBenefit(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const benefit = await benefitForChange(req, res, 'delete');
   if (!benefit) {
+    return;
+  }
+  // Owner decision 2026-10-29: Zoho Books must match the app. A claim whose
+  // receipt is in Books goes only once that journal is removed: clearing
+  // the receipt does that on the next sync.
+  if (benefit.zoho_journal_id) {
+    flash.set(req, 'error', `This ${benefit.scheme_name} receipt is in Zoho Books. First correct the claim and leave the received amount empty, then run the Zoho sync (it removes the journal there), then delete the claim.`);
+    res.redirect(`/orders/${orderId}#step-13g-benefits`);
     return;
   }
   await caExportBenefitRepository.remove(benefit.id);
@@ -372,8 +382,15 @@ async function addCostEntry(req, res) {
   }
 
   const description = String(req.body.description || '').trim() || null;
+  // Owner decision 2026-10-29: what the cost was paid from (it goes to Zoho Books from there).
+  const paidFrom = String(req.body.paid_from || '');
+  if (!Object.prototype.hasOwnProperty.call(orderCostEntryRepository.PAID_FROM, paidFrom)) {
+    flash.set(req, 'error', 'Choose what the cost was paid from.');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
 
-  const id = await orderCostEntryRepository.create(orderId, category, description, parseFloat(amount), incurredAt, user.id);
+  const id = await orderCostEntryRepository.create(orderId, category, description, parseFloat(amount), incurredAt, user.id, paidFrom);
   await auditLogRepository.log(user.id, 'ORDER_COST_ENTRY_RECORDED', 'order_cost_entries', id, null, null, category);
   flash.set(req, 'success', 'Cost entry recorded.');
   res.redirect(`/orders/${orderId}#order-financials`);
@@ -533,6 +550,13 @@ async function saveInspectionFee(req, res) {
     return;
   }
   const feeAmount = rawAmount !== '' ? parseFloat(rawAmount) : null;
+  // Owner decision 2026-10-29: when NexaCrest pays, what it was paid from (the fee goes to Zoho Books from there).
+  const paidFrom = String(req.body.paid_from || '');
+  if (feePayer === 'nexacrest' && feeAmount !== null && feeAmount > 0 && !Object.prototype.hasOwnProperty.call(orderCostEntryRepository.PAID_FROM, paidFrom)) {
+    flash.set(req, 'error', 'Choose what the inspection fee was paid from.');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
 
   let costEntryId = existing ? existing.cost_entry_id : null;
   let staleCostEntryIdToDelete = null;
@@ -542,7 +566,15 @@ async function saveInspectionFee(req, res) {
     } else {
       costEntryId = await orderCostEntryRepository.create(orderId, 'inspection_fee', 'Pre-shipment inspection fee', feeAmount, todayIst(), user.id);
     }
+    await orderCostEntryRepository.setPaidFrom(costEntryId, paidFrom);
   } else if (costEntryId) {
+    // A fee already in Zoho Books is removed there first (owner decision 2026-10-29).
+    const zohoError = await removeFromZoho((await orderCostEntryRepository.find(costEntryId)) || {}, user.id);
+    if (zohoError !== null) {
+      flash.set(req, 'error', zohoError);
+      res.redirect(`/orders/${orderId}#order-financials`);
+      return;
+    }
     // order_inspection_fees.cost_entry_id FK must stop pointing at this
     // row BEFORE it's deleted, not after — same ordering as the LC
     // interest sync above.
@@ -645,6 +677,85 @@ async function saveTravelExpenses(req, res) {
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
+/**
+ * Owner decision 2026-10-29: Zoho Books must match the app — a cost entry
+ * already in Books is removed there first. Returns why it could not be, or
+ * null.
+ */
+async function removeFromZoho(entry, userId) {
+  if (!entry.zoho_expense_id) {
+    return null;
+  }
+  try {
+    await zohoBooksService.deleteRecord('expense', String(entry.zoho_expense_id));
+  } catch (e) {
+    return `This cost is in Zoho Books and could not be removed there, so nothing was changed: ${e.message}`;
+  }
+  await zohoSyncLogRepository.log('order_cost', 'order', Number(entry.order_id), 'cost', 'success', String(entry.zoho_expense_id), `Removed order cost "${orderCostEntryRepository.CATEGORIES[entry.category] || entry.category}" (INR ${Number(entry.amount_inr).toFixed(2)}) from Zoho Books: it was removed in the app.`, 'manual', userId);
+  return null;
+}
+
+/**
+ * Owner decision 2026-10-29: records the money the bank actually paid
+ * under the LC — the date, the amount in the order currency, the rupees
+ * credited and the bank charges deducted. It goes to Zoho Books as a
+ * customer payment applied to the CI, so it can be corrected only until
+ * then.
+ */
+async function recordLcReceived(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const back = (type, message) => {
+    flash.set(req, type, message);
+    res.redirect(`/orders/${orderId}#lc-received`);
+  };
+  const lc = await orderLcDetailRepository.find(orderId);
+  if ((order.payment_method || '') !== 'LC' || !lc || lc.lc_confirmed_at === null) {
+    back('error', 'Record the LC and confirm it usable (Step 5) first.');
+    return;
+  }
+  if (lc.lc_zoho_synced_at !== null) {
+    back('error', 'This LC payment is already in Zoho Books, so it cannot be changed here. Ask the CA to correct it there.');
+    return;
+  }
+  const currency = String(order.currency_code || 'INR');
+  const receivedAt = String(req.body.lc_received_at || '').trim();
+  const amount = String(req.body.lc_received_amount || '').trim();
+  const inr = String(req.body.lc_inr_credited || '').trim();
+  const charges = String(req.body.lc_bank_charges_inr || '').trim() || '0';
+  const isNumeric = (v) => v !== '' && /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(v);
+  const m = receivedAt.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const d = m ? new Date(`${receivedAt}T00:00:00Z`) : null;
+  const isRealDate = d && d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() + 1 === Number(m[2]) && d.getUTCDate() === Number(m[3]);
+  if (!isRealDate || receivedAt > todayIst()) {
+    back('error', 'Enter the date the bank paid (not in the future).');
+    return;
+  }
+  if (!isNumeric(amount) || Number(amount) <= 0) {
+    back('error', `Enter the amount paid under the LC (${currency}).`);
+    return;
+  }
+  if (!isNumeric(inr) || Number(inr) <= 0) {
+    back('error', 'Enter the rupees credited to the bank account.');
+    return;
+  }
+  if (!isNumeric(charges) || Number(charges) < 0) {
+    back('error', 'Enter the bank charges deducted (₹), or 0.');
+    return;
+  }
+  if (!(await caFyLockGuard.allow(req, receivedAt, 'order_lc_details', orderId, 'record'))) {
+    res.redirect(`/orders/${orderId}#lc-received`);
+    return;
+  }
+  await orderLcDetailRepository.recordReceived(orderId, receivedAt, Number(amount), Number(inr), Number(charges), req.user.id);
+  await auditLogRepository.log(req.user.id, 'ORDER_LC_PAYMENT_RECEIVED', 'order_lc_details', orderId, 'lc_received_amount', lc.lc_received_amount, amount, `${currency} ${amount} on ${receivedAt}: ₹${inr} credited, ₹${charges} bank charges`);
+  back('success', `LC payment recorded: ${currency} ${amount}, ₹${inr} credited.`);
+}
+
 async function deleteCostEntry(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const entryId = parseInt(req.params.entryId, 10);
@@ -660,9 +771,15 @@ async function deleteCostEntry(req, res) {
     return;
   }
 
+  const zohoError = await removeFromZoho(entry, user.id);
+  if (zohoError !== null) {
+    flash.set(req, 'error', zohoError);
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
   await orderCostEntryRepository.remove(entryId);
   await auditLogRepository.log(user.id, 'ORDER_COST_ENTRY_DELETED', 'order_cost_entries', entryId, null, entry.category, null);
-  flash.set(req, 'success', 'Cost entry removed.');
+  flash.set(req, 'success', entry.zoho_expense_id ? 'Cost entry removed, here and in Zoho Books.' : 'Cost entry removed.');
   res.redirect(`/orders/${orderId}#order-financials`);
 }
 
@@ -853,4 +970,4 @@ async function saveExportBenefits(req, res) {
   back();
 }
 
-module.exports = { skipExportBenefitClaim, correctExportBenefit, deleteExportBenefit, confirmCosts, completeFinancials, saveExportBenefits, skipFinancials, undoSkipFinancials, addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, saveInspectionFee, saveTravelExpenses };
+module.exports = { skipExportBenefitClaim, correctExportBenefit, deleteExportBenefit, confirmCosts, completeFinancials, saveExportBenefits, skipFinancials, undoSkipFinancials, addExportBenefit, markExportBenefitReceived, setExportBenefitSchemeStatus, addCostEntry, deleteCostEntry, saveLcDetails, recordLcReceived, saveInspectionFee, saveTravelExpenses };

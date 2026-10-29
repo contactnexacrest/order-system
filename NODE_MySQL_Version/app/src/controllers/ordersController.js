@@ -1120,6 +1120,8 @@ async function show(req, res) {
       // order page shows every financial detail tied to it at a glance,
       // not just in the separate CA module list screens.
       canViewCaLinks: !!req.permissions.ca_module_view,
+      // Owner decision 2026-10-29: the per-order "App vs Zoho" check, for whoever runs the Zoho sync.
+      canCheckZoho: !!req.permissions.ca_module_manage,
       linkedExportBenefits: req.permissions.ca_module_view ? await caExportBenefitRepository.forOrder(orderId) : [],
       // Owner request (2026-10-26): Step 12c lists this order's claims for manage_order_financials holders.
       orderBenefitClaims: req.permissions.manage_order_financials ? await caExportBenefitRepository.forOrder(orderId) : [],
@@ -1139,6 +1141,8 @@ async function show(req, res) {
       ledger: await orderLedgerService.forOrder(orderId, order.currency_code || '', !!req.permissions.manage_order_financials),
       orderCostEntries: req.permissions.manage_order_financials ? await orderCostEntryRepository.forOrder(orderId) : [],
       costEntryCategories: orderCostEntryRepository.CATEGORIES,
+      costEntryPaidFrom: orderCostEntryRepository.PAID_FROM,
+      costEntryNotInZoho: orderCostEntryRepository.NOT_IN_ZOHO,
       // Not gated on manage_order_financials like the cost-entry fields
       // above — Step 5d/5e (LC payment leg) needs this for anyone viewing
       // the order page, not just Order Financials staff.

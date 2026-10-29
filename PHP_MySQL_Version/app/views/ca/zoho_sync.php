@@ -1,7 +1,7 @@
 <div class="card page-wide">
   <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
   <h1>Zoho Books Sync</h1>
-  <p class="muted">Two independent, one-way directions: approved Commercial Invoices and Debit Notes are sent to Zoho Books as export invoices, settlement legs with a recorded INR actual are pushed as customer payments and applied to them (the advance is held until the Commercial Invoice is there), suppliers' and logistics partners' tax invoices, the payments made to them and the order expenses are sent as bills, vendor payments and expenses, and expenses recorded in Zoho Books are imported here (see <a href="/ca/expenses">Expenses</a>). Runs on demand here, or hourly via the scheduled job (see README's cron setup). If Zoho Books isn't configured, this is a routine no-op — nothing else in the app depends on it.</p>
+  <p class="muted">Two independent, one-way directions: approved Commercial Invoices and Debit Notes are sent to Zoho Books as export invoices, settlement legs with a recorded INR actual are pushed as customer payments and applied to them (the advance is held until the Commercial Invoice is there), suppliers' and logistics partners' tax invoices, the payments made to them, the order expenses and the real paid order costs are sent as bills, vendor payments and expenses, the money paid under an LC as a customer payment, received export benefits as journals, and expenses recorded in Zoho Books are imported here (see <a href="/ca/expenses">Expenses</a>). Runs on demand here, or hourly via the scheduled job (see README's cron setup). If Zoho Books isn't configured, this is a routine no-op — nothing else in the app depends on it.</p>
 
   <div class="section">
     <h2>Status</h2>
@@ -10,7 +10,8 @@
       <div><span class="k">Go-live Date</span><span class="v"><?= $startDate !== null ? htmlspecialchars(date('d M Y', strtotime($startDate))) : '<span class="muted">Not set</span>' ?></span></div>
       <div><span class="k">Legs Pending Sync</span><span class="v"><?= (int) $pendingCount ?></span></div>
       <div><span class="k">Payments Held (not yet applied to an invoice)</span><span class="v"><?= (int) $heldCount ?></span></div>
-      <div><span class="k">Bills, Vendor Payments &amp; Order Expenses Pending</span><span class="v"><?= (int) $purchasesPendingCount ?></span></div>
+      <div><span class="k">Bills, Vendor Payments, Order Expenses &amp; Costs Pending</span><span class="v"><?= (int) $purchasesPendingCount ?></span></div>
+      <div><span class="k">Export Benefits Pending</span><span class="v"><?= (int) $benefitsPendingCount ?></span></div>
     </div>
     <p class="muted small">Only records dated on or after the go-live date go to Zoho Books; the CA books everything earlier as the opening position. Set it under Admin &rarr; Settings (<code>zoho_books_sync_start_date</code>). On the live server nothing is sent until it is set.</p>
     <?php if (!$isEnabled): ?>

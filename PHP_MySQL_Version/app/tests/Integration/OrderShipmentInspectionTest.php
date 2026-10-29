@@ -145,7 +145,7 @@ final class OrderShipmentInspectionTest extends DbTestCase
         self::assertNull(OrderInspectionFeeRepository::find($orderId));
     }
 
-    public function testNexacrestPayerWithAnAmountCreatesAMatchingCostEntry(): void
+    public function testNexacrestPaidFeeMustSayWhatItWasPaidFrom(): void
     {
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
@@ -156,11 +156,27 @@ final class OrderShipmentInspectionTest extends DbTestCase
         (new OrderFinancialsController())->saveInspectionFee(['id' => (string) $orderId]);
         ob_end_clean();
 
+        self::assertSame('Choose what the inspection fee was paid from.', Flash::pull()[0]['message']);
+        self::assertSame([], OrderCostEntryRepository::forOrder($orderId));
+    }
+
+    public function testNexacrestPayerWithAnAmountCreatesAMatchingCostEntry(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $_SESSION['_auth_user_id'] = $userId;
+        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500', 'paid_from' => 'company_account'];
+
+        ob_start();
+        (new OrderFinancialsController())->saveInspectionFee(['id' => (string) $orderId]);
+        ob_end_clean();
+
         self::assertSame('success', Flash::pull()[0]['type']);
         $entries = OrderCostEntryRepository::forOrder($orderId);
         self::assertCount(1, $entries);
         self::assertSame('inspection_fee', $entries[0]['category']);
         self::assertSame('2500.00', $entries[0]['amount_inr']);
+        self::assertSame('company_account', $entries[0]['paid_from'], 'owner decision 2026-10-29: what it was paid from, for Zoho Books');
 
         $saved = OrderInspectionFeeRepository::find($orderId);
         self::assertSame((int) $entries[0]['id'], (int) $saved['cost_entry_id']);
@@ -171,7 +187,7 @@ final class OrderShipmentInspectionTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $_SESSION['_auth_user_id'] = $userId;
-        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500'];
+        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500', 'paid_from' => 'company_account'];
         ob_start();
         (new OrderFinancialsController())->saveInspectionFee(['id' => (string) $orderId]);
         ob_end_clean();
@@ -191,13 +207,13 @@ final class OrderShipmentInspectionTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $_SESSION['_auth_user_id'] = $userId;
-        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500'];
+        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500', 'paid_from' => 'company_account'];
         ob_start();
         (new OrderFinancialsController())->saveInspectionFee(['id' => (string) $orderId]);
         ob_end_clean();
         $firstEntryId = (int) OrderCostEntryRepository::forOrder($orderId)[0]['id'];
 
-        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '3000'];
+        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '3000', 'paid_from' => 'company_account'];
         ob_start();
         (new OrderFinancialsController())->saveInspectionFee(['id' => (string) $orderId]);
         ob_end_clean();

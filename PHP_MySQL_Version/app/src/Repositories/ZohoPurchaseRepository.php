@@ -112,11 +112,44 @@ final class ZohoPurchaseRepository
                 : str_starts_with((string) $r['buyer_name'], ZohoGuard::TEST_PREFIX))));
     }
 
+    /**
+     * Owner decision 2026-10-29: the order cost entries that go to Books
+     * (OrderCostEntryRepository::ZOHO_CATEGORIES), dated on or after
+     * $startDate when given — those not yet in Books and those already
+     * there (CaSyncService updates one whose amount, date or "paid from"
+     * changed since, e.g. a corrected inspection fee).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function costEntriesToSync(?string $startDate = null): array
+    {
+        $categories = "'" . implode("','", \App\Repositories\OrderCostEntryRepository::ZOHO_CATEGORIES) . "'";
+        $rows = Database::connection()->query(
+            "SELECT ce.*, COALESCE(ce.incurred_at, DATE(ce.created_at)) AS cost_date, o.buyer_inquiry_ref, o.company_legal_name AS buyer_name,
+                    (o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1) AS is_test_or_sample
+             FROM order_cost_entries ce
+             JOIN orders o ON o.id = ce.order_id
+             JOIN clients c ON c.id = o.client_id
+             WHERE ce.category IN ({$categories})
+             ORDER BY cost_date, ce.id"
+        )->fetchAll();
+        return array_values(array_filter($rows, static fn (array $r): bool => ($startDate === null || (string) $r['cost_date'] >= $startDate)
+            && (ZohoGuard::isProduction()
+                ? (int) $r['is_test_or_sample'] !== 1
+                : str_starts_with((string) $r['buyer_name'], ZohoGuard::TEST_PREFIX))));
+    }
+
+    public static function setCostEntrySynced(int $costEntryId, string $zohoExpenseId, string $hash): void
+    {
+        Database::connection()->prepare('UPDATE order_cost_entries SET zoho_expense_id = :zoho, zoho_synced_at = NOW(), zoho_pushed_hash = :hash WHERE id = :id')
+            ->execute(['zoho' => $zohoExpenseId, 'hash' => $hash, 'id' => $costEntryId]);
+    }
+
     /** Zoho expense ids this app created — the expense import must not bring them back. */
     public static function isPushedExpense(string $zohoExpenseId): bool
     {
-        $stmt = Database::connection()->prepare('SELECT 1 FROM order_expenses WHERE zoho_expense_id = :id');
-        $stmt->execute(['id' => $zohoExpenseId]);
+        $stmt = Database::connection()->prepare('SELECT 1 FROM order_expenses WHERE zoho_expense_id = :id UNION ALL SELECT 1 FROM order_cost_entries WHERE zoho_expense_id = :id2');
+        $stmt->execute(['id' => $zohoExpenseId, 'id2' => $zohoExpenseId]);
         return (bool) $stmt->fetchColumn();
     }
 
@@ -154,7 +187,7 @@ final class ZohoPurchaseRepository
             'contact' => ['UPDATE suppliers SET zoho_contact_id = NULL WHERE zoho_contact_id = :id', 'UPDATE logistics_partners SET zoho_contact_id = NULL WHERE zoho_contact_id = :id'],
             'bill' => ['UPDATE order_vendor_bills SET zoho_bill_id = NULL, zoho_synced_at = NULL WHERE zoho_bill_id = :id'],
             'vendorpayment' => ['UPDATE order_vendor_bill_payments SET zoho_payment_id = NULL, zoho_synced_at = NULL, zoho_applied_at = NULL WHERE zoho_payment_id = :id'],
-            'expense' => ['UPDATE order_expenses SET zoho_expense_id = NULL, zoho_synced_at = NULL WHERE zoho_expense_id = :id'],
+            'expense' => ['UPDATE order_expenses SET zoho_expense_id = NULL, zoho_synced_at = NULL WHERE zoho_expense_id = :id', 'UPDATE order_cost_entries SET zoho_expense_id = NULL, zoho_synced_at = NULL, zoho_pushed_hash = NULL WHERE zoho_expense_id = :id'],
         ][$kind] ?? [];
         foreach ($sql as $statement) {
             Database::connection()->prepare($statement)->execute(['id' => $zohoId]);
@@ -171,6 +204,9 @@ final class ZohoPurchaseRepository
         }
         foreach ($pdo->query('SELECT zoho_expense_id, details, amount_inr FROM order_expenses WHERE zoho_expense_id IS NOT NULL')->fetchAll() as $r) {
             $out[] = ['kind' => 'expense', 'id' => (string) $r['zoho_expense_id'], 'label' => "expense {$r['details']} INR {$r['amount_inr']} (created by this database)"];
+        }
+        foreach ($pdo->query('SELECT zoho_expense_id, category, amount_inr FROM order_cost_entries WHERE zoho_expense_id IS NOT NULL')->fetchAll() as $r) {
+            $out[] = ['kind' => 'expense', 'id' => (string) $r['zoho_expense_id'], 'label' => "order cost {$r['category']} INR {$r['amount_inr']} (created by this database)"];
         }
         foreach ($pdo->query('SELECT zoho_bill_id, bill_no, total_inr FROM order_vendor_bills WHERE zoho_bill_id IS NOT NULL')->fetchAll() as $r) {
             $out[] = ['kind' => 'bill', 'id' => (string) $r['zoho_bill_id'], 'label' => "bill {$r['bill_no']} INR {$r['total_inr']} (created by this database)"];

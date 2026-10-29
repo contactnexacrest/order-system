@@ -88,9 +88,38 @@ async function expensesToSync(startDate = null) {
       : String(r.buyer_name || '').startsWith(zohoGuard.TEST_PREFIX)));
 }
 
+/**
+ * Owner decision 2026-10-29: the order cost entries that go to Books
+ * (orderCostEntryRepository.ZOHO_CATEGORIES), dated on or after startDate
+ * when given — those not yet in Books and those already there (caSyncService
+ * updates one whose amount, date or "paid from" changed since, e.g. a
+ * corrected inspection fee).
+ */
+async function costEntriesToSync(startDate = null) {
+  const { ZOHO_CATEGORIES } = require('./orderCostEntryRepository');
+  const categories = ZOHO_CATEGORIES.map((c) => `'${c}'`).join(',');
+  const rows = await db.query(
+    `SELECT ce.*, COALESCE(ce.incurred_at, DATE(ce.created_at)) AS cost_date, o.buyer_inquiry_ref, o.company_legal_name AS buyer_name,
+            (o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1) AS is_test_or_sample
+     FROM order_cost_entries ce
+     JOIN orders o ON o.id = ce.order_id
+     JOIN clients c ON c.id = o.client_id
+     WHERE ce.category IN (${categories})
+     ORDER BY cost_date, ce.id`
+  );
+  return rows.filter((r) => (startDate === null || String(r.cost_date) >= startDate)
+    && (zohoGuard.isProduction()
+      ? Number(r.is_test_or_sample) !== 1
+      : String(r.buyer_name || '').startsWith(zohoGuard.TEST_PREFIX)));
+}
+
+async function setCostEntrySynced(costEntryId, zohoExpenseId, hash) {
+  await db.execute('UPDATE order_cost_entries SET zoho_expense_id = :zoho, zoho_synced_at = NOW(), zoho_pushed_hash = :hash WHERE id = :id', { zoho: zohoExpenseId, hash, id: costEntryId });
+}
+
 /** Zoho expense ids this app created — the expense import must not bring them back. */
 async function isPushedExpense(zohoExpenseId) {
-  return Boolean(await db.queryOne('SELECT 1 AS x FROM order_expenses WHERE zoho_expense_id = :id', { id: zohoExpenseId }));
+  return Boolean(await db.queryOne('SELECT 1 AS x FROM order_expenses WHERE zoho_expense_id = :id UNION ALL SELECT 1 FROM order_cost_entries WHERE zoho_expense_id = :id2', { id: zohoExpenseId, id2: zohoExpenseId }));
 }
 
 async function setVendorContactId(vendorKind, vendorId, contactId) {
@@ -120,7 +149,7 @@ async function forgetZohoRecord(kind, zohoId) {
     contact: ['UPDATE suppliers SET zoho_contact_id = NULL WHERE zoho_contact_id = :id', 'UPDATE logistics_partners SET zoho_contact_id = NULL WHERE zoho_contact_id = :id'],
     bill: ['UPDATE order_vendor_bills SET zoho_bill_id = NULL, zoho_synced_at = NULL WHERE zoho_bill_id = :id'],
     vendorpayment: ['UPDATE order_vendor_bill_payments SET zoho_payment_id = NULL, zoho_synced_at = NULL, zoho_applied_at = NULL WHERE zoho_payment_id = :id'],
-    expense: ['UPDATE order_expenses SET zoho_expense_id = NULL, zoho_synced_at = NULL WHERE zoho_expense_id = :id'],
+    expense: ['UPDATE order_expenses SET zoho_expense_id = NULL, zoho_synced_at = NULL WHERE zoho_expense_id = :id', 'UPDATE order_cost_entries SET zoho_expense_id = NULL, zoho_synced_at = NULL, zoho_pushed_hash = NULL WHERE zoho_expense_id = :id'],
   }[kind] || [];
   for (const statement of sql) await db.execute(statement, { id: zohoId });
 }
@@ -134,6 +163,9 @@ async function pushedRecords() {
   for (const r of await db.query('SELECT zoho_expense_id, details, amount_inr FROM order_expenses WHERE zoho_expense_id IS NOT NULL')) {
     out.push({ kind: 'expense', id: String(r.zoho_expense_id), label: `expense ${r.details} INR ${r.amount_inr} (created by this database)` });
   }
+  for (const r of await db.query('SELECT zoho_expense_id, category, amount_inr FROM order_cost_entries WHERE zoho_expense_id IS NOT NULL')) {
+    out.push({ kind: 'expense', id: String(r.zoho_expense_id), label: `order cost ${r.category} INR ${r.amount_inr} (created by this database)` });
+  }
   for (const r of await db.query('SELECT zoho_bill_id, bill_no, total_inr FROM order_vendor_bills WHERE zoho_bill_id IS NOT NULL')) {
     out.push({ kind: 'bill', id: String(r.zoho_bill_id), label: `bill ${r.bill_no} INR ${r.total_inr} (created by this database)` });
   }
@@ -144,6 +176,6 @@ async function pushedRecords() {
 }
 
 module.exports = {
-  billsToSync, findBill, targetBillFor, paymentsToSync, heldPayments, expensesToSync, isPushedExpense,
+  billsToSync, findBill, targetBillFor, paymentsToSync, heldPayments, expensesToSync, costEntriesToSync, setCostEntrySynced, isPushedExpense,
   setVendorContactId, setBillSynced, setPaymentSynced, setPaymentApplied, setExpenseSynced, forgetZohoRecord, pushedRecords,
 };

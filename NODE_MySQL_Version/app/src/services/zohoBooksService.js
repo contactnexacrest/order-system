@@ -76,13 +76,13 @@ async function isEnabled() {
  * @throws on any missing config, HTTP failure, or unexpected response
  * @return {Promise<{payment_id: string, applied: number}>} the Zoho-side customerpayment_id and the amount applied to the invoice
  */
-async function pushRevenuePayment(clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, invoiceNumber = null) {
+async function pushRevenuePayment(clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, invoiceNumber = null, bankChargesInr = 0) {
   zohoGuard.assertCustomerAllowed(companyLegalName);
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
 
   const contactId = await findOrCreateContact(config, accessToken, clientId, companyLegalName, currencyCode);
-  const payload = paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber);
+  const payload = paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr);
   let applied = 0;
   if (invoiceNumber !== null && invoiceNumber !== undefined) {
     [payload.invoices, applied] = await invoiceApplication(config, accessToken, invoiceNumber, contactId, payload.amount);
@@ -106,13 +106,13 @@ async function pushRevenuePayment(clientId, companyLegalName, currencyCode, fore
  * @throws on any failure
  * @return {Promise<number>} the amount applied (in the order's currency)
  */
-async function applyPaymentToInvoice(paymentId, clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, invoiceNumber) {
+async function applyPaymentToInvoice(paymentId, clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, invoiceNumber, bankChargesInr = 0) {
   zohoGuard.assertCustomerAllowed(companyLegalName);
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
 
   const contactId = await findOrCreateContact(config, accessToken, clientId, companyLegalName, currencyCode);
-  const payload = paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber);
+  const payload = paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr);
   let applied;
   [payload.invoices, applied] = await invoiceApplication(config, accessToken, invoiceNumber, contactId, payload.amount);
   if (applied <= 0) {
@@ -236,6 +236,19 @@ const EXPENSE_ACCOUNTS = {
 // What an expense was paid from: the company account is the deposit
 // account; these are found by name.
 const PAID_THROUGH_ACCOUNTS = { company_card: 'Company Card', staff: 'Employee Reimbursements' };
+/** Owner decision 2026-10-29: the Books expense account for each order cost entry that goes to Books. */
+const COST_ACCOUNTS = {
+  ecgc_insurance: 'Insurance Expense',
+  due_diligence: 'Consultant Expense',
+  documentation: 'Export Documentation Charges',
+  commission: 'Commission Expense',
+  packing_crates: 'Packing Material',
+  inspection_fee: 'Inspection Charges',
+  other: 'Other Expenses',
+};
+/** Owner decision 2026-10-29: where an export benefit lands when received. */
+const BENEFIT_INCOME_ACCOUNT = 'Export Incentive Income';
+const BENEFIT_SCRIP_ACCOUNT = 'Export Incentive e-Scrips';
 
 const money = (n) => Number(n).toFixed(2);
 
@@ -388,6 +401,142 @@ async function pushExpense(expense) {
     throw new Error(`Zoho Books expense failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
   }
   return expenseId;
+}
+
+/**
+ * Owner decision 2026-10-29: one order cost entry as a Books expense, from
+ * the account it was paid from (company account = the deposit account).
+ * With zohoExpenseId (already in Books) the same expense is updated, e.g.
+ * after the inspection fee was corrected.
+ *
+ * @throws on any failure
+ * @return {Promise<string>} the Zoho expense_id
+ */
+async function pushCostEntry(cost, zohoExpenseId = null) {
+  const { CATEGORIES, PAID_FROM } = require('../repositories/orderCostEntryRepository');
+  zohoGuard.assertCustomerAllowed(String(cost.buyer_name));
+  const label = CATEGORIES[cost.category] || 'Order cost';
+  if (!PAID_FROM[cost.paid_from || '']) {
+    throw new Error(`Order cost "${label}" (INR ${Number(cost.amount_inr).toFixed(2)}) not sent: it does not say what it was paid from. Remove it and record it again with "Paid from".`);
+  }
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const payload = {
+    account_id: await accountId(config, accessToken, COST_ACCOUNTS[cost.category] || COST_ACCOUNTS.other),
+    paid_through_account_id: cost.paid_from === 'company_account' ? config.depositAccountId : await accountId(config, accessToken, PAID_THROUGH_ACCOUNTS.company_card),
+    amount: round(Number(cost.amount_inr), 2),
+    date: String(cost.cost_date),
+    reference_number: `${cost.buyer_inquiry_ref}-COST-${cost.id}`,
+    description: `${cost.buyer_name} / ${cost.buyer_inquiry_ref}: ${label}${cost.description ? ` — ${cost.description}` : ''}`,
+  };
+  const url = `https://${config.apiDomain}/books/v3/expenses${zohoExpenseId !== null ? `/${encodeURIComponent(zohoExpenseId)}` : ''}?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const res = await request(zohoExpenseId !== null ? 'PUT' : 'POST', url, payload, authHeaders(accessToken));
+  const decoded = safeJson(res.body);
+  const expenseId = decoded && decoded.expense && decoded.expense.expense_id;
+  if (!res.ok || typeof expenseId !== 'string') {
+    throw new Error(`Zoho Books expense for order cost "${label}" failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+  return expenseId;
+}
+
+/**
+ * Owner decision 2026-10-29: an export benefit, when received, as a Books
+ * journal — Duty Drawback paid into the bank (the deposit account), RoDTEP
+ * / RoSCTL credited as e-scrips (an asset account), against Export
+ * Incentive Income. Any other scheme is refused: the CA books it by hand.
+ * With journalId (already in Books) the same journal is updated, e.g.
+ * after a corrected receipt.
+ *
+ * @throws on any failure
+ * @return {Promise<string>} the Zoho journal_id
+ */
+async function pushBenefitJournal(benefit, journalId = null) {
+  const scheme = String(benefit.scheme_name);
+  const what = `${scheme} ${Number(benefit.received_amount).toFixed(2)}`;
+  if (benefit.buyer_name) {
+    zohoGuard.assertCustomerAllowed(String(benefit.buyer_name));
+  }
+  if (String(benefit.currency_code).toUpperCase() !== 'INR') {
+    throw new Error(`Export benefit ${what} not sent: it is recorded in ${benefit.currency_code}, not rupees. Ask the CA to book it.`);
+  }
+  const key = scheme.replace(/[ -]/g, '').toUpperCase();
+  let kind = null;
+  if (key.includes('DRAWBACK')) kind = 'bank';
+  else if (['RODTEP', 'ROSCTL'].includes(key)) kind = 'scrip';
+  if (kind === null) {
+    throw new Error(`Export benefit ${what} not sent: only Duty Drawback, RoDTEP and RoSCTL go to Zoho Books automatically. Ask the CA to book "${scheme}" by hand.`);
+  }
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const amount = round(Number(benefit.received_amount), 2);
+  const orderRef = String(benefit.buyer_inquiry_ref || '');
+  const notes = (`${benefit.buyer_name || ''}${orderRef !== '' ? ` / ${orderRef}` : ''}: ${scheme} received${benefit.reference_number ? ` (claim ${benefit.reference_number})` : ''}`).replace(/^[ :]+|[ :]+$/g, '');
+  const payload = {
+    journal_date: String(benefit.received_at),
+    reference_number: `${orderRef !== '' ? `${orderRef}-` : ''}BEN-${benefit.id}`,
+    notes,
+    line_items: [
+      { account_id: kind === 'bank' ? config.depositAccountId : await accountId(config, accessToken, BENEFIT_SCRIP_ACCOUNT), debit_or_credit: 'debit', amount, description: kind === 'bank' ? `${scheme} paid into the bank` : `${scheme} e-scrip credited` },
+      { account_id: await accountId(config, accessToken, BENEFIT_INCOME_ACCOUNT), debit_or_credit: 'credit', amount, description: `${scheme} received` },
+    ],
+  };
+  const url = `https://${config.apiDomain}/books/v3/journals${journalId !== null ? `/${encodeURIComponent(journalId)}` : ''}?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const res = await request(journalId !== null ? 'PUT' : 'POST', url, payload, authHeaders(accessToken));
+  const decoded = safeJson(res.body);
+  const id = decoded && decoded.journal && decoded.journal.journal_id;
+  if (!res.ok || id === undefined || id === null) {
+    throw new Error(`Zoho Books journal for export benefit ${what} failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+  return String(id);
+}
+
+/** Clean-up before go-live: every Books journal whose notes start with TEST- (export benefits of TEST- orders). */
+async function listTestJournals() {
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const out = [];
+  for (const row of await getList(accessToken, `https://${config.apiDomain}/books/v3/journals?organization_id=${encodeURIComponent(config.organizationId)}`, 'journals')) {
+    if (String(row.notes || '').startsWith(zohoGuard.TEST_PREFIX)) {
+      out.push({ journal_id: String(row.journal_id), label: `${row.notes || ''} INR ${row.total ?? ''} on ${row.journal_date || ''}`.trim() });
+    }
+  }
+  return out;
+}
+
+/**
+ * Owner decision 2026-10-29 (the per-order "App vs Zoho" check): reads
+ * only. A contact's invoices and customer payments (a customer), or bills
+ * and vendor payments (a vendor), from the Books lists.
+ */
+async function contactRecords(contactId, vendor) {
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const org = `organization_id=${encodeURIComponent(config.organizationId)}`;
+  const out = {};
+  for (const key of vendor ? ['bills', 'vendorpayments'] : ['invoices', 'customerpayments']) {
+    out[key] = await getList(accessToken, `https://${config.apiDomain}/books/v3/${key}?${org}&${vendor ? 'vendor_id=' : 'customer_id='}${encodeURIComponent(contactId)}&per_page=200`, key);
+  }
+  return out;
+}
+
+/** One Books expense or journal by id, for the per-order check (reads only). Null when Books no longer has it. */
+async function readRecord(kind, id) {
+  const paths = { expense: 'expenses', journal: 'journals' };
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const res = await request('GET', `https://${config.apiDomain}/books/v3/${paths[kind]}/${encodeURIComponent(id)}?organization_id=${encodeURIComponent(config.organizationId)}`, null, authHeaders(accessToken));
+  if (res.status === 404) {
+    return null;
+  }
+  const decoded = safeJson(res.body);
+  if (!res.ok || !decoded || !decoded[kind]) {
+    // Books answers an unknown id with an error code rather than 404 for some records.
+    if (decoded && [1002, 4000, 4500, 1004].includes(Number(decoded.code || 0))) {
+      return null;
+    }
+    throw new Error(`Zoho Books ${kind} ${id} read failed (HTTP ${res.status}): ${res.body.slice(0, 300)}`);
+  }
+  return decoded[kind];
 }
 
 /**
@@ -554,7 +703,7 @@ async function listTestExpenses() {
  * @throws on any other failure
  */
 async function deleteRecord(kind, id) {
-  const paths = { customerpayment: 'customerpayments', invoice: 'invoices', vendorpayment: 'vendorpayments', bill: 'bills', expense: 'expenses', contact: 'contacts' };
+  const paths = { customerpayment: 'customerpayments', invoice: 'invoices', vendorpayment: 'vendorpayments', bill: 'bills', expense: 'expenses', journal: 'journals', contact: 'contacts' };
   if (!paths[kind]) {
     throw new Error(`Unknown Zoho Books record kind ${kind}.`);
   }
@@ -656,21 +805,35 @@ async function findOrCreateContact(config, accessToken, clientId, companyLegalNa
  * The Customer Payment fields for one leg: the foreign amount at the
  * actual rate (INR actual / foreign amount), into the deposit account.
  */
-function paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber) {
+/**
+ * amountInr is what reached the deposit account. bankChargesInr (the LC
+ * receipt, owner decision 2026-10-29) is what the bank kept: the payment
+ * then covers both, at (credited + charges) / foreign amount, and Books
+ * books the charges as bank charges — in the payment's own currency.
+ */
+function paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr = 0) {
+  const charges = Number(bankChargesInr) || 0;
   const payload = {
     customer_id: contactId,
     payment_mode: 'banktransfer',
-    amount: round(amountInr, 2),
+    amount: round(amountInr + charges, 2),
     date,
     reference_number: referenceNumber,
     account_id: config.depositAccountId,
   };
+  if (charges > 0) {
+    payload.bank_charges = round(charges, 2);
+  }
   if (currencyCode !== 'INR') {
     if (foreignAmount === null || foreignAmount === undefined || foreignAmount <= 0) {
       throw new Error(`Payment ${referenceNumber} has no ${currencyCode} amount recorded, so its rate cannot be worked out.`);
     }
+    const rate = (amountInr + charges) / foreignAmount;
     payload.amount = round(foreignAmount, 2);
-    payload.exchange_rate = round(amountInr / foreignAmount, 6);
+    payload.exchange_rate = round(rate, 6);
+    if (charges > 0) {
+      payload.bank_charges = round(charges / rate, 2);
+    }
   }
   return payload;
 }
@@ -934,7 +1097,8 @@ function safeJson(text) {
 }
 
 module.exports = {
-  BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS,
+  BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS, COST_ACCOUNTS, BENEFIT_INCOME_ACCOUNT, BENEFIT_SCRIP_ACCOUNT,
   isEnabled, syncStartDate, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense,
+  pushCostEntry, pushBenefitJournal, listTestJournals, contactRecords, readRecord,
   testConnection, listExpenses, listTestContacts, listTestExpenses, deleteRecord, setTransport,
 };

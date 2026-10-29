@@ -83,14 +83,15 @@ final class ZohoBooksService
         float $amountInr,
         string $date,
         string $referenceNumber,
-        ?string $invoiceNumber = null
+        ?string $invoiceNumber = null,
+        float $bankChargesInr = 0.0
     ): array {
         ZohoGuard::assertCustomerAllowed($companyLegalName);
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
 
         $contactId = self::findOrCreateContact($config, $accessToken, $clientId, $companyLegalName, $currencyCode);
-        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber);
+        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber, $bankChargesInr);
         $applied = 0.0;
         if ($invoiceNumber !== null) {
             [$payload['invoices'], $applied] = self::invoiceApplication($config, $accessToken, $invoiceNumber, $contactId, (float) $payload['amount']);
@@ -130,14 +131,15 @@ final class ZohoBooksService
         float $amountInr,
         string $date,
         string $referenceNumber,
-        string $invoiceNumber
+        string $invoiceNumber,
+        float $bankChargesInr = 0.0
     ): float {
         ZohoGuard::assertCustomerAllowed($companyLegalName);
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
 
         $contactId = self::findOrCreateContact($config, $accessToken, $clientId, $companyLegalName, $currencyCode);
-        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber);
+        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber, $bankChargesInr);
         [$payload['invoices'], $applied] = self::invoiceApplication($config, $accessToken, $invoiceNumber, $contactId, (float) $payload['amount']);
         if ($applied <= 0) {
             throw new \RuntimeException("Invoice {$invoiceNumber} in Zoho Books has nothing left to pay, so payment {$referenceNumber} stays unapplied there — ask the CA how to book it.");
@@ -281,6 +283,16 @@ final class ZohoBooksService
     ];
     /** What an expense was paid from: the company account is the deposit account; these are found by name. */
     public const PAID_THROUGH_ACCOUNTS = ['company_card' => 'Company Card', 'staff' => 'Employee Reimbursements'];
+    /** Owner decision 2026-10-29: the Books expense account for each order cost entry that goes to Books. */
+    public const COST_ACCOUNTS = [
+        'ecgc_insurance' => 'Insurance Expense',
+        'due_diligence'  => 'Consultant Expense',
+        'documentation'  => 'Export Documentation Charges',
+        'commission'     => 'Commission Expense',
+        'packing_crates' => 'Packing Material',
+        'inspection_fee' => 'Inspection Charges',
+        'other'          => 'Other Expenses',
+    ];
 
     /** @var array<string, array<string, string>> account id by name, per organisation */
     private static array $accounts = [];
@@ -440,6 +452,165 @@ final class ZohoBooksService
             throw new \RuntimeException('Zoho Books expense failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
         }
         return $expenseId;
+    }
+
+    /**
+     * Owner decision 2026-10-29: one order cost entry as a Books expense,
+     * from the account it was paid from (company account = the deposit
+     * account). With $zohoExpenseId (already in Books) the same expense is
+     * updated, e.g. after the inspection fee was corrected.
+     *
+     * @param array<string,mixed> $cost ZohoPurchaseRepository::costEntriesToSync() row
+     * @throws \RuntimeException on any failure
+     * @return string the Zoho expense_id
+     */
+    public static function pushCostEntry(array $cost, ?string $zohoExpenseId = null): string
+    {
+        ZohoGuard::assertCustomerAllowed((string) $cost['buyer_name']);
+        $label = \App\Repositories\OrderCostEntryRepository::CATEGORIES[$cost['category']] ?? 'Order cost';
+        if (!isset(\App\Repositories\OrderCostEntryRepository::PAID_FROM[$cost['paid_from'] ?? ''])) {
+            throw new \RuntimeException("Order cost \"{$label}\" (INR " . number_format((float) $cost['amount_inr'], 2, '.', '') . ') not sent: it does not say what it was paid from. Remove it and record it again with "Paid from".');
+        }
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $payload = [
+            'account_id' => self::accountId($config, $accessToken, self::COST_ACCOUNTS[$cost['category']] ?? self::COST_ACCOUNTS['other']),
+            'paid_through_account_id' => $cost['paid_from'] === 'company_account' ? $config['depositAccountId'] : self::accountId($config, $accessToken, self::PAID_THROUGH_ACCOUNTS['company_card']),
+            'amount' => round((float) $cost['amount_inr'], 2),
+            'date' => (string) $cost['cost_date'],
+            'reference_number' => "{$cost['buyer_inquiry_ref']}-COST-{$cost['id']}",
+            'description' => "{$cost['buyer_name']} / {$cost['buyer_inquiry_ref']}: {$label}" . (!empty($cost['description']) ? " — {$cost['description']}" : ''),
+        ];
+        $url = "https://{$config['apiDomain']}/books/v3/expenses" . ($zohoExpenseId !== null ? '/' . rawurlencode($zohoExpenseId) : '') . '?organization_id=' . rawurlencode($config['organizationId']);
+        $response = self::request($zohoExpenseId !== null ? 'PUT' : 'POST', $url, $payload, self::authHeaders($accessToken));
+        $decoded = json_decode($response['body'], true);
+        $expenseId = $decoded['expense']['expense_id'] ?? null;
+        if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($expenseId)) {
+            throw new \RuntimeException('Zoho Books expense for order cost "' . $label . '" failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return $expenseId;
+    }
+
+    /** Owner decision 2026-10-29: where an export benefit lands when received. */
+    public const BENEFIT_INCOME_ACCOUNT = 'Export Incentive Income';
+    public const BENEFIT_SCRIP_ACCOUNT = 'Export Incentive e-Scrips';
+
+    /**
+     * Owner decision 2026-10-29: an export benefit, when received, as a
+     * Books journal — Duty Drawback paid into the bank (the deposit
+     * account), RoDTEP / RoSCTL credited as e-scrips (an asset account),
+     * against Export Incentive Income. Any other scheme is refused: the CA
+     * books it by hand. With $journalId (already in Books) the same journal
+     * is updated, e.g. after a corrected receipt.
+     *
+     * @param array<string,mixed> $benefit CaExportBenefitRepository::forZohoSync() row
+     * @throws \RuntimeException on any failure
+     * @return string the Zoho journal_id
+     */
+    public static function pushBenefitJournal(array $benefit, ?string $journalId = null): string
+    {
+        $scheme = (string) $benefit['scheme_name'];
+        $what = "{$scheme} " . number_format((float) $benefit['received_amount'], 2, '.', '');
+        if (!empty($benefit['buyer_name'])) {
+            ZohoGuard::assertCustomerAllowed((string) $benefit['buyer_name']);
+        }
+        if (strtoupper((string) $benefit['currency_code']) !== 'INR') {
+            throw new \RuntimeException("Export benefit {$what} not sent: it is recorded in {$benefit['currency_code']}, not rupees. Ask the CA to book it.");
+        }
+        $key = strtoupper(str_replace([' ', '-'], '', $scheme));
+        $kind = match (true) {
+            str_contains($key, 'DRAWBACK') => 'bank',
+            in_array($key, ['RODTEP', 'ROSCTL'], true) => 'scrip',
+            default => null,
+        };
+        if ($kind === null) {
+            throw new \RuntimeException("Export benefit {$what} not sent: only Duty Drawback, RoDTEP and RoSCTL go to Zoho Books automatically. Ask the CA to book \"{$scheme}\" by hand.");
+        }
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $amount = round((float) $benefit['received_amount'], 2);
+        $orderRef = (string) ($benefit['buyer_inquiry_ref'] ?? '');
+        $payload = [
+            'journal_date' => (string) $benefit['received_at'],
+            'reference_number' => ($orderRef !== '' ? "{$orderRef}-" : '') . 'BEN-' . $benefit['id'],
+            'notes' => trim(($benefit['buyer_name'] ?? '') . ($orderRef !== '' ? " / {$orderRef}" : '') . ": {$scheme} received" . (!empty($benefit['reference_number']) ? " (claim {$benefit['reference_number']})" : ''), ' :'),
+            'line_items' => [
+                ['account_id' => $kind === 'bank' ? $config['depositAccountId'] : self::accountId($config, $accessToken, self::BENEFIT_SCRIP_ACCOUNT), 'debit_or_credit' => 'debit', 'amount' => $amount, 'description' => $kind === 'bank' ? "{$scheme} paid into the bank" : "{$scheme} e-scrip credited"],
+                ['account_id' => self::accountId($config, $accessToken, self::BENEFIT_INCOME_ACCOUNT), 'debit_or_credit' => 'credit', 'amount' => $amount, 'description' => "{$scheme} received"],
+            ],
+        ];
+        $url = "https://{$config['apiDomain']}/books/v3/journals" . ($journalId !== null ? '/' . rawurlencode($journalId) : '') . '?organization_id=' . rawurlencode($config['organizationId']);
+        $response = self::request($journalId !== null ? 'PUT' : 'POST', $url, $payload, self::authHeaders($accessToken));
+        $decoded = json_decode($response['body'], true);
+        $id = $decoded['journal']['journal_id'] ?? null;
+        if ($response['status'] < 200 || $response['status'] >= 300 || $id === null) {
+            throw new \RuntimeException("Zoho Books journal for export benefit {$what} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return (string) $id;
+    }
+
+    /**
+     * Clean-up before go-live: every Books journal whose notes start with
+     * TEST- (export benefits of TEST- orders).
+     *
+     * @return list<array{journal_id: string, label: string}>
+     */
+    public static function listTestJournals(): array
+    {
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $out = [];
+        foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/journals?organization_id=" . rawurlencode($config['organizationId']), 'journals') as $row) {
+            if (str_starts_with((string) ($row['notes'] ?? ''), ZohoGuard::TEST_PREFIX)) {
+                $out[] = ['journal_id' => (string) $row['journal_id'], 'label' => trim(($row['notes'] ?? '') . ' INR ' . ($row['total'] ?? '') . ' on ' . ($row['journal_date'] ?? ''))];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Owner decision 2026-10-29 (the per-order "App vs Zoho" check): reads
+     * only. A contact's invoices and customer payments (a customer), or
+     * bills and vendor payments (a vendor), from the Books lists.
+     *
+     * @return array<string, list<array<string,mixed>>> keyed invoices / customerpayments, or bills / vendorpayments
+     */
+    public static function contactRecords(string $contactId, bool $vendor): array
+    {
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $org = 'organization_id=' . rawurlencode($config['organizationId']);
+        $out = [];
+        foreach ($vendor ? ['bills' => 'bills', 'vendorpayments' => 'vendorpayments'] : ['invoices' => 'invoices', 'customerpayments' => 'customerpayments'] as $path => $key) {
+            $out[$key] = self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/{$path}?{$org}&" . ($vendor ? 'vendor_id=' : 'customer_id=') . rawurlencode($contactId) . '&per_page=200', $key);
+        }
+        return $out;
+    }
+
+    /**
+     * One Books expense or journal by id, for the per-order check (reads
+     * only). Null when Books no longer has it.
+     *
+     * @return array<string,mixed>|null
+     */
+    public static function readRecord(string $kind, string $id): ?array
+    {
+        $paths = ['expense' => 'expenses', 'journal' => 'journals'];
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $response = self::request('GET', "https://{$config['apiDomain']}/books/v3/{$paths[$kind]}/" . rawurlencode($id) . '?organization_id=' . rawurlencode($config['organizationId']), [], self::authHeaders($accessToken));
+        if ($response['status'] === 404) {
+            return null;
+        }
+        $decoded = json_decode($response['body'], true);
+        if ($response['status'] < 200 || $response['status'] >= 300 || !isset($decoded[$kind])) {
+            // Books answers an unknown id with an error code rather than 404 for some records.
+            if (is_array($decoded) && in_array((int) ($decoded['code'] ?? 0), [1002, 4000, 4500, 1004], true)) {
+                return null;
+            }
+            throw new \RuntimeException("Zoho Books {$kind} {$id} read failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 300));
+        }
+        return $decoded[$kind];
     }
 
     /**
@@ -634,7 +805,7 @@ final class ZohoBooksService
      */
     public static function deleteRecord(string $kind, string $id): bool
     {
-        $paths = ['customerpayment' => 'customerpayments', 'invoice' => 'invoices', 'vendorpayment' => 'vendorpayments', 'bill' => 'bills', 'expense' => 'expenses', 'contact' => 'contacts'];
+        $paths = ['customerpayment' => 'customerpayments', 'invoice' => 'invoices', 'vendorpayment' => 'vendorpayments', 'bill' => 'bills', 'expense' => 'expenses', 'journal' => 'journals', 'contact' => 'contacts'];
         if (!isset($paths[$kind])) {
             throw new \InvalidArgumentException("Unknown Zoho Books record kind {$kind}.");
         }
@@ -745,22 +916,36 @@ final class ZohoBooksService
      *
      * @return array<string, mixed>
      */
-    private static function paymentPayload(array $config, string $contactId, string $currencyCode, ?float $foreignAmount, float $amountInr, string $date, string $referenceNumber): array
+    /**
+     * $amountInr is what reached the deposit account. $bankChargesInr (the
+     * LC receipt, owner decision 2026-10-29) is what the bank kept: the
+     * payment then covers both, at (credited + charges) / foreign amount,
+     * and Books books the charges as bank charges — in the payment's own
+     * currency.
+     */
+    private static function paymentPayload(array $config, string $contactId, string $currencyCode, ?float $foreignAmount, float $amountInr, string $date, string $referenceNumber, float $bankChargesInr = 0.0): array
     {
         $payload = [
             'customer_id'      => $contactId,
             'payment_mode'     => 'banktransfer',
-            'amount'           => round($amountInr, 2),
+            'amount'           => round($amountInr + $bankChargesInr, 2),
             'date'             => $date,
             'reference_number' => $referenceNumber,
             'account_id'       => $config['depositAccountId'],
         ];
+        if ($bankChargesInr > 0) {
+            $payload['bank_charges'] = round($bankChargesInr, 2);
+        }
         if ($currencyCode !== 'INR') {
             if ($foreignAmount === null || $foreignAmount <= 0) {
                 throw new \RuntimeException("Payment {$referenceNumber} has no {$currencyCode} amount recorded, so its rate cannot be worked out.");
             }
+            $rate = ($amountInr + $bankChargesInr) / $foreignAmount;
             $payload['amount'] = round($foreignAmount, 2);
-            $payload['exchange_rate'] = round($amountInr / $foreignAmount, 6);
+            $payload['exchange_rate'] = round($rate, 6);
+            if ($bankChargesInr > 0) {
+                $payload['bank_charges'] = round($bankChargesInr / $rate, 2);
+            }
         }
         return $payload;
     }

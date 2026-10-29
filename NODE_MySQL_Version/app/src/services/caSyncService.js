@@ -1,7 +1,11 @@
 'use strict';
 
 const caRepository = require('../repositories/caRepository');
+const crypto = require('crypto');
 const caExpenseRepository = require('../repositories/caExpenseRepository');
+const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
+const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
+const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderZohoInvoiceRepository = require('../repositories/orderZohoInvoiceRepository');
 const zohoSyncLogRepository = require('../repositories/zohoSyncLogRepository');
@@ -27,6 +31,7 @@ async function runFullSync(triggeredBy, triggeredByUserId) {
     // are already marked and the import skips them.
     purchases: await syncPurchases(triggeredBy, triggeredByUserId),
     expenses: await importPendingExpenses(triggeredBy, triggeredByUserId),
+    benefits: await syncBenefits(triggeredBy, triggeredByUserId),
   };
 }
 
@@ -148,6 +153,36 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
     }
   }
 
+  // Owner decision 2026-10-29: the money the bank paid under an LC — a
+  // customer payment applied to the CI (held until the CI is in Books, like
+  // the advance), with the bank charges the bank kept.
+  for (const lc of await orderLcDetailRepository.receiptsForZohoSync()) {
+    if (lc.lc_zoho_synced_at === null && startDate !== null && String(lc.lc_received_at) < startDate) {
+      continue; // before the go-live date: the CA books it as the opening position
+    }
+    const orderId = Number(lc.order_id);
+    const reference = `${lc.buyer_inquiry_ref}-lc`;
+    const target = await orderZohoInvoiceRepository.find(orderId, 'ci');
+    const args = [Number(lc.client_id), String(lc.company_legal_name), String(lc.currency_code || 'INR'), Number(lc.lc_received_amount), Number(lc.lc_inr_credited), String(lc.lc_received_at), reference];
+    try {
+      if (lc.lc_zoho_synced_at === null) {
+        const result = await zohoBooksService.pushRevenuePayment(...args, target ? target.zoho_invoice_number : null, Number(lc.lc_bank_charges_inr));
+        await orderLcDetailRepository.setZohoSynced(orderId, result.payment_id, result.applied > 0);
+        applied += result.applied > 0 ? 1 : 0;
+        await zohoSyncLogRepository.log('revenue_payment', 'order_lc_details', orderId, 'lc', 'success', result.payment_id, `Pushed LC payment as Zoho Books customer payment ${result.payment_id}${appliedNote('lc', target, result.applied)}`, triggeredBy, triggeredByUserId);
+        synced += 1;
+      } else if (target) {
+        const amount = await zohoBooksService.applyPaymentToInvoice(String(lc.lc_zoho_payment_id), ...args, target.zoho_invoice_number, Number(lc.lc_bank_charges_inr));
+        await orderLcDetailRepository.setZohoApplied(orderId);
+        await zohoSyncLogRepository.log('payment_apply', 'order_lc_details', orderId, 'lc', 'success', String(lc.lc_zoho_payment_id), `Applied ${amount.toFixed(2)} of LC payment ${lc.lc_zoho_payment_id} to Commercial Invoice ${target.zoho_invoice_number}.`, triggeredBy, triggeredByUserId);
+        applied += 1;
+      }
+    } catch (e) {
+      await zohoSyncLogRepository.log(lc.lc_zoho_synced_at === null ? 'revenue_payment' : 'payment_apply', 'order_lc_details', orderId, 'lc', 'error', lc.lc_zoho_payment_id, e.message, triggeredBy, triggeredByUserId);
+      failed += 1;
+    }
+  }
+
   if (synced === 0 && failed === 0 && invoices === 0 && applied === 0) {
     await zohoSyncLogRepository.log('revenue_payment', null, null, null, 'skipped', null, 'Nothing pending — every approved CI / Debit Note and every recorded INR actual is already in Zoho Books.', triggeredBy, triggeredByUserId);
     return { synced: 0, failed: 0, skipped: 1, invoices: 0, applied: 0 };
@@ -161,7 +196,7 @@ const NO_START_DATE = 'Nothing sent: set the Zoho Books go-live date (zoho_books
 
 // Which invoice each payment leg is paid against: the advance and the
 // balance against the CI, freight against the Debit Note.
-const LEG_INVOICE = { advance: 'ci', balance: 'ci', freight: 'dn' };
+const LEG_INVOICE = { advance: 'ci', balance: 'ci', freight: 'dn', lc: 'ci' };
 
 /** The leg's invoice, when it is already in Zoho Books. */
 async function invoiceFor(orderId, leg) {
@@ -267,8 +302,28 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
     }
   }
 
+  // Owner decision 2026-10-29: the order's real paid cost entries, as Books
+  // expenses — sent once, and updated when the amount, date or "paid from"
+  // changes afterwards. Counted with the expenses.
+  for (const cost of await zohoPurchaseRepository.costEntriesToSync(startDate)) {
+    const hash = crypto.createHash('sha256').update(JSON.stringify([cost.category, Math.round(Number(cost.amount_inr) * 100) / 100, String(cost.cost_date), cost.paid_from, cost.description])).digest('hex');
+    if (cost.zoho_expense_id !== null && cost.zoho_pushed_hash === hash) {
+      continue;
+    }
+    const label = orderCostEntryRepository.CATEGORIES[cost.category] || String(cost.category);
+    try {
+      const zohoExpenseId = await zohoBooksService.pushCostEntry(cost, cost.zoho_expense_id !== null ? String(cost.zoho_expense_id) : null);
+      await zohoPurchaseRepository.setCostEntrySynced(cost.id, zohoExpenseId, hash);
+      await log('order_cost', cost.order_id, 'cost', 'success', zohoExpenseId, `${cost.zoho_expense_id !== null ? 'Updated' : 'Sent'} order cost "${label}" (INR ${money(cost.amount_inr)}) as Zoho Books expense.`);
+      result.expenses += 1;
+    } catch (e) {
+      await log('order_cost', cost.order_id, 'cost', 'error', null, e.message);
+      result.failed += 1;
+    }
+  }
+
   if (result.bills + result.payments + result.applied + result.expenses + result.failed === 0) {
-    await zohoSyncLogRepository.log('vendor_bill', null, null, null, 'skipped', null, 'Nothing pending — every tax invoice, vendor payment and order expense is already in Zoho Books.', triggeredBy, triggeredByUserId);
+    await zohoSyncLogRepository.log('vendor_bill', null, null, null, 'skipped', null, 'Nothing pending — every tax invoice, vendor payment, order expense and order cost is already in Zoho Books.', triggeredBy, triggeredByUserId);
     result.skipped = 1;
   }
   return result;
@@ -332,4 +387,57 @@ function offReason() {
     : 'Zoho is switched off on this server (ZOHO_INTEGRATION_ENABLED in .env)';
 }
 
-module.exports = { runFullSync, syncPendingRevenue, syncPurchases, importPendingExpenses };
+/**
+ * Owner decision 2026-10-29: export benefits as Books journals when
+ * received (caExportBenefitRepository.forZohoSync()) — sent once, updated
+ * when the receipt is corrected, removed from Books when the receipt is
+ * cleared. Each logged on its own.
+ */
+async function syncBenefits(triggeredBy, triggeredByUserId) {
+  const result = { journals: 0, removed: 0, failed: 0, skipped: 0 };
+  if (!(await zohoBooksService.isEnabled())) {
+    await zohoSyncLogRepository.log('export_benefit', null, null, null, 'skipped', null, `${offReason()} — nothing synced.`, triggeredBy, triggeredByUserId);
+    result.skipped = 1;
+    return result;
+  }
+  const startDate = await zohoBooksService.syncStartDate();
+  if (startDate === null && zohoGuard.isProduction()) {
+    await zohoSyncLogRepository.log('export_benefit', null, null, null, 'error', null, NO_START_DATE, triggeredBy, triggeredByUserId);
+    result.failed = 1;
+    return result;
+  }
+  for (const benefit of await caExportBenefitRepository.forZohoSync(startDate)) {
+    const id = Number(benefit.id);
+    const orderId = benefit.order_id !== null ? Number(benefit.order_id) : null;
+    const journalId = benefit.zoho_journal_id !== null ? String(benefit.zoho_journal_id) : null;
+    const received = benefit.received_amount !== null && Number(benefit.received_amount) > 0;
+    const what = `${benefit.scheme_name}${received ? ` ${Number(benefit.received_amount).toFixed(2)}` : ''}`;
+    try {
+      if (!received) {
+        await zohoBooksService.deleteRecord('journal', journalId);
+        await caExportBenefitRepository.setZohoJournal(id, null, null);
+        await zohoSyncLogRepository.log('export_benefit', 'order', orderId, 'journal', 'success', journalId, `Removed the Zoho Books journal of export benefit ${what} (claim #${id}): its receipt was cleared in the app.`, triggeredBy, triggeredByUserId);
+        result.removed += 1;
+        continue;
+      }
+      const hash = crypto.createHash('sha256').update(JSON.stringify([benefit.scheme_name, Math.round(Number(benefit.received_amount) * 100) / 100, String(benefit.received_at), benefit.reference_number, benefit.order_id])).digest('hex');
+      if (journalId !== null && benefit.zoho_pushed_hash === hash) {
+        continue;
+      }
+      const newId = await zohoBooksService.pushBenefitJournal(benefit, journalId);
+      await caExportBenefitRepository.setZohoJournal(id, newId, hash);
+      await zohoSyncLogRepository.log('export_benefit', 'order', orderId, 'journal', 'success', newId, `${journalId !== null ? 'Updated' : 'Sent'} export benefit ${what} (claim #${id}) received on ${benefit.received_at} as Zoho Books journal.`, triggeredBy, triggeredByUserId);
+      result.journals += 1;
+    } catch (e) {
+      await zohoSyncLogRepository.log('export_benefit', 'order', orderId, 'journal', 'error', journalId, e.message, triggeredBy, triggeredByUserId);
+      result.failed += 1;
+    }
+  }
+  if (result.journals + result.removed + result.failed === 0) {
+    await zohoSyncLogRepository.log('export_benefit', null, null, null, 'skipped', null, 'Nothing pending — every received export benefit is already in Zoho Books.', triggeredBy, triggeredByUserId);
+    result.skipped = 1;
+  }
+  return result;
+}
+
+module.exports = { runFullSync, syncPendingRevenue, syncPurchases, importPendingExpenses, syncBenefits };

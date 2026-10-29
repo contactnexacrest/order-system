@@ -204,6 +204,14 @@ final class OrderFinancialsController
             return;
         }
         [$benefit, , $userId] = $found;
+        // Owner decision 2026-10-29: Zoho Books must match the app. A claim
+        // whose receipt is in Books goes only once that journal is removed:
+        // clearing the receipt does that on the next sync.
+        if (!empty($benefit['zoho_journal_id'])) {
+            Flash::set('error', "This {$benefit['scheme_name']} receipt is in Zoho Books. First correct the claim and leave the received amount empty, then run the Zoho sync (it removes the journal there), then delete the claim.");
+            header("Location: /orders/{$orderId}#step-13g-benefits");
+            return;
+        }
         CaExportBenefitRepository::delete((int) $benefit['id']);
         AuditLogRepository::log(
             $userId,
@@ -407,8 +415,15 @@ final class OrderFinancialsController
         }
 
         $description = trim((string) ($_POST['description'] ?? '')) ?: null;
+        // Owner decision 2026-10-29: what the cost was paid from (it goes to Zoho Books from there).
+        $paidFrom = (string) ($_POST['paid_from'] ?? '');
+        if (!array_key_exists($paidFrom, OrderCostEntryRepository::PAID_FROM)) {
+            Flash::set('error', 'Choose what the cost was paid from.');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
 
-        $id = OrderCostEntryRepository::create($orderId, $category, $description, (float) $amount, $incurredAt, (int) $user['id']);
+        $id = OrderCostEntryRepository::create($orderId, $category, $description, (float) $amount, $incurredAt, (int) $user['id'], $paidFrom);
         AuditLogRepository::log((int) $user['id'], 'ORDER_COST_ENTRY_RECORDED', 'order_cost_entries', $id, null, null, $category);
         Flash::set('success', 'Cost entry recorded.');
         header("Location: /orders/{$orderId}#order-financials");
@@ -535,6 +550,67 @@ final class OrderFinancialsController
     }
 
     /**
+     * Owner decision 2026-10-29: records the money the bank actually paid
+     * under the LC — the date, the amount in the order currency, the rupees
+     * credited and the bank charges deducted. It goes to Zoho Books as a
+     * customer payment applied to the CI, so it can be corrected only until
+     * then.
+     */
+    public function recordLcReceived(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $back = static function (string $type, string $message) use ($orderId): void {
+            Flash::set($type, $message);
+            header("Location: /orders/{$orderId}#lc-received");
+        };
+        $lc = OrderLcDetailRepository::find($orderId);
+        if (($order['payment_method'] ?? '') !== 'LC' || $lc === null || $lc['lc_confirmed_at'] === null) {
+            $back('error', 'Record the LC and confirm it usable (Step 5) first.');
+            return;
+        }
+        if ($lc['lc_zoho_synced_at'] !== null) {
+            $back('error', 'This LC payment is already in Zoho Books, so it cannot be changed here. Ask the CA to correct it there.');
+            return;
+        }
+        $currency = (string) ($order['currency_code'] ?? 'INR');
+        $receivedAt = trim((string) ($_POST['lc_received_at'] ?? ''));
+        $amount = trim((string) ($_POST['lc_received_amount'] ?? ''));
+        $inr = trim((string) ($_POST['lc_inr_credited'] ?? ''));
+        $charges = trim((string) ($_POST['lc_bank_charges_inr'] ?? '')) ?: '0';
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $receivedAt, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || $receivedAt > date('Y-m-d')) {
+            $back('error', 'Enter the date the bank paid (not in the future).');
+            return;
+        }
+        if (!is_numeric($amount) || (float) $amount <= 0) {
+            $back('error', "Enter the amount paid under the LC ({$currency}).");
+            return;
+        }
+        if (!is_numeric($inr) || (float) $inr <= 0) {
+            $back('error', 'Enter the rupees credited to the bank account.');
+            return;
+        }
+        if (!is_numeric($charges) || (float) $charges < 0) {
+            $back('error', 'Enter the bank charges deducted (₹), or 0.');
+            return;
+        }
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        if (!CaFyLockGuard::allow($receivedAt, (int) $user['id'], $roleId, 'order_lc_details', $orderId, 'record')) {
+            header("Location: /orders/{$orderId}#lc-received");
+            return;
+        }
+        OrderLcDetailRepository::recordReceived($orderId, $receivedAt, (float) $amount, (float) $inr, (float) $charges, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_LC_PAYMENT_RECEIVED', 'order_lc_details', $orderId, 'lc_received_amount', $lc['lc_received_amount'], $amount, "{$currency} {$amount} on {$receivedAt}: ₹{$inr} credited, ₹{$charges} bank charges");
+        $back('success', "LC payment recorded: {$currency} {$amount}, ₹{$inr} credited.");
+    }
+
+    /**
      * Export process step 8a: who pays the 3rd-party pre-shipment
      * inspection fee for this order. When NexaCrest pays, the amount is
      * kept in sync with a single order_cost_entries row (category
@@ -567,6 +643,13 @@ final class OrderFinancialsController
             return;
         }
         $feeAmount = $rawAmount !== '' ? (float) $rawAmount : null;
+        // Owner decision 2026-10-29: when NexaCrest pays, what it was paid from (the fee goes to Zoho Books from there).
+        $paidFrom = (string) ($_POST['paid_from'] ?? '');
+        if ($feePayer === 'nexacrest' && $feeAmount !== null && $feeAmount > 0 && !array_key_exists($paidFrom, OrderCostEntryRepository::PAID_FROM)) {
+            Flash::set('error', 'Choose what the inspection fee was paid from.');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
 
         $costEntryId = $existing['cost_entry_id'] ?? null;
         $staleCostEntryIdToDelete = null;
@@ -583,7 +666,15 @@ final class OrderFinancialsController
                     (int) $user['id']
                 );
             }
+            OrderCostEntryRepository::setPaidFrom((int) $costEntryId, $paidFrom);
         } elseif ($costEntryId) {
+            // A fee already in Zoho Books is removed there first (owner decision 2026-10-29).
+            $zohoError = self::removeFromZoho(OrderCostEntryRepository::find((int) $costEntryId) ?? [], (int) $user['id']);
+            if ($zohoError !== null) {
+                Flash::set('error', $zohoError);
+                header("Location: /orders/{$orderId}#order-financials");
+                return;
+            }
             // order_inspection_fees.cost_entry_id FK must stop pointing at
             // this row BEFORE it's deleted, not after — same ordering as
             // the LC interest sync above.
@@ -699,6 +790,25 @@ final class OrderFinancialsController
         header("Location: /orders/{$orderId}#order-financials");
     }
 
+    /**
+     * Owner decision 2026-10-29: Zoho Books must match the app — a cost
+     * entry already in Books is removed there first. Returns why it could
+     * not be, or null.
+     */
+    private static function removeFromZoho(array $entry, int $userId): ?string
+    {
+        if (empty($entry['zoho_expense_id'])) {
+            return null;
+        }
+        try {
+            \App\Services\ZohoBooksService::deleteRecord('expense', (string) $entry['zoho_expense_id']);
+        } catch (\Throwable $e) {
+            return 'This cost is in Zoho Books and could not be removed there, so nothing was changed: ' . $e->getMessage();
+        }
+        \App\Repositories\ZohoSyncLogRepository::log('order_cost', 'order', (int) $entry['order_id'], 'cost', 'success', (string) $entry['zoho_expense_id'], 'Removed order cost "' . (OrderCostEntryRepository::CATEGORIES[$entry['category']] ?? $entry['category']) . '" (INR ' . number_format((float) $entry['amount_inr'], 2, '.', '') . ') from Zoho Books: it was removed in the app.', 'manual', $userId);
+        return null;
+    }
+
     public function deleteCostEntry(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -717,9 +827,15 @@ final class OrderFinancialsController
             return;
         }
 
+        $zohoError = self::removeFromZoho($entry, (int) $user['id']);
+        if ($zohoError !== null) {
+            Flash::set('error', $zohoError);
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
         OrderCostEntryRepository::delete($entryId);
         AuditLogRepository::log((int) $user['id'], 'ORDER_COST_ENTRY_DELETED', 'order_cost_entries', $entryId, null, $entry['category'], null);
-        Flash::set('success', 'Cost entry removed.');
+        Flash::set('success', !empty($entry['zoho_expense_id']) ? 'Cost entry removed, here and in Zoho Books.' : 'Cost entry removed.');
         header("Location: /orders/{$orderId}#order-financials");
     }
 

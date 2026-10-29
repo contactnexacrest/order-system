@@ -28,7 +28,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-10-28e-vendor-bill-proforma
 
 Run each file below that the database has not had yet, in this order, then
 deploy the code for both stacks. As of 29 Oct 2026 the live site still
-needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d and 29e**.
+needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e and 29f**.
 
 | # | File | What it does |
 |---|---|---|
@@ -48,6 +48,7 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d and 29e**.
 | 14 | `2026-10-29c-two-digit-year-references.sql` | Every new reference number uses the 2-digit year (`SC/CI/26/2910001`) — a GST invoice number may have at most 16 characters. Numbers already issued keep `2026` |
 | 15 | `2026-10-29d-zoho-sync-start-date.sql` | Zoho Books go-live date setting (`zoho_books_sync_start_date`): only records dated on or after it go to Books; on the live server nothing is sent until it is set |
 | 16 | `2026-10-29e-shipping-bill-and-reverse-charge.sql` | The shipping bill's number, date and customs exchange rate on the order (the CI and Debit Note go to Zoho Books at that rate), and the reverse-charge mark on transport bills |
+| 17 | `2026-10-29f-zoho-costs-lc-benefits.sql` | Order costs say what they were paid from and remember their Zoho Books expense; LC orders record the money the bank paid under the LC; export benefits remember their Zoho Books journal |
 
 There is no `2026-10-28b` file; that letter was not used.
 
