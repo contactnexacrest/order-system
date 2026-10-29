@@ -18,6 +18,10 @@ use App\Tests\Support\DbTestCase;
  * order's reference reads e.g. "SC/ORD/2026/004-7" instead of
  * "SC/OC/2026/004-7". Existing orders' own order_reference values are
  * never touched — this only governs orders created from here on.
+ *
+ * Owner decision 2026-10-29 (confirmed twice): every reference uses the
+ * 2-digit year — SC/ORD/26/004-7, SC/CI/26/2910001 — because a GST tax
+ * invoice number may have at most 16 characters.
  */
 final class OrderReferenceFormatTest extends DbTestCase
 {
@@ -62,7 +66,8 @@ final class OrderReferenceFormatTest extends DbTestCase
         $orderId = (int) Database::connection()->query('SELECT MAX(id) FROM orders')->fetchColumn();
         $order = OrderRepository::find($orderId);
 
-        self::assertMatchesRegularExpression('#^SC/ORD/\d{4}/\d{3}-\d+$#', $order['order_reference']);
+        self::assertMatchesRegularExpression('#^SC/ORD/\d{2}/\d{3}-\d+$#', $order['order_reference']);
+        self::assertStringStartsWith('SC/ORD/' . date('y') . '/', $order['order_reference']);
     }
 
     public function testDuplicatedOrderReferenceAlsoUsesTheOrdPrefix(): void
@@ -73,6 +78,23 @@ final class OrderReferenceFormatTest extends DbTestCase
         $newOrderId = OrderDuplicationService::duplicate($sourceOrderId, $this->userId);
         $newOrder = OrderRepository::find($newOrderId);
 
-        self::assertMatchesRegularExpression('#^SC/ORD/\d{4}/\d{3}-\d+$#', $newOrder['order_reference']);
+        self::assertMatchesRegularExpression('#^SC/ORD/\d{2}/\d{3}-\d+$#', $newOrder['order_reference']);
+    }
+
+    public function testEveryReferenceFormatUsesTheTwoDigitYear(): void
+    {
+        $pdo = Database::connection();
+        self::assertSame(0, (int) $pdo->query("SELECT COUNT(*) FROM document_types WHERE ref_format LIKE '%{YYYY}%'")->fetchColumn());
+        self::assertSame(0, (int) $pdo->query("SELECT COUNT(*) FROM company_settings WHERE setting_key IN ('master_tracking_ref_format', 'order_ref_format') AND setting_value LIKE '%{YYYY}%'")->fetchColumn());
+    }
+
+    public function testANewCommercialInvoiceAndDebitNoteNumberFitTheGstSixteenCharacterLimit(): void
+    {
+        foreach (['CI' => 'SC/CI/', 'FDN' => 'SC/DN/'] as $code => $prefix) {
+            $typeId = (int) Database::connection()->query("SELECT id FROM document_types WHERE code = '{$code}'")->fetchColumn();
+            $reference = (string) \App\Services\ReferenceNumberService::generateDocumentRef($typeId);
+            self::assertMatchesRegularExpression('#^' . preg_quote($prefix, '#') . date('y') . '/' . date('dm') . '\d{3}$#', $reference);
+            self::assertLessThanOrEqual(16, strlen($reference), "{$reference} must fit the GST invoice number limit");
+        }
     }
 }

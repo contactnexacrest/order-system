@@ -24,7 +24,7 @@ still say "Freight Debit Note") — only the printed document's own title
 changed, to plain **"Debit Note"**, since it's a buyer-facing paper and
 "Freight" in the name was confusing it with a line item rather than the
 document itself. New reference numbers generated after the rename use
-`SC/DN/{YYYY}/{DDMM}{NNN}` instead of `SC/FDN/…`; a Debit Note generated
+`SC/DN/{YY}/{DDMM}{NNN}` instead of `SC/FDN/…`; a Debit Note generated
 before the rename keeps its original `SC/FDN/…` reference — it is never
 retroactively renumbered.
 

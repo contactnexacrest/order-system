@@ -251,28 +251,28 @@ INSERT INTO stages_master (stage_number, stage_slug, stage_name, sequence, is_ac
 -- DOCUMENT TYPES
 -- ================================================================
 INSERT INTO document_types (code, name, category, ref_format, never_shown_to_buyer, revision_enabled, min_reviewers_default, is_active) VALUES
-  ('QT',        'Quotation',                          'customer_facing', 'SC/QT/{YYYY}/{DDMM}{NNN}',  0, 1, 1, 1),
+  ('QT',        'Quotation',                          'customer_facing', 'SC/QT/{YY}/{DDMM}{NNN}',  0, 1, 1, 1),
   ('ANNEXA',    'Annexure A',                          'customer_facing', NULL,                        0, 1, 1, 1),
-  ('BUYERPO',   'Buyer PO — Order Acceptance',         'customer_facing', 'SC/PO/{YYYY}/{DDMM}{NNN}', 0, 0, 1, 1),
-  ('PI',        'Proforma Invoice',                    'customer_facing', 'SC/PI/{YYYY}/{DDMM}{NNN}',  0, 1, 1, 1),
-  ('OC',        'Order Confirmation',                  'customer_facing', 'SC/OC/{YYYY}/{DDMM}{NNN}',  0, 1, 1, 1),
-  ('SUPPO',     'Supplier PO — Material Procurement',  'procurement',     'SC/SPO/{YYYY}/{DDMM}{NNN}', 1, 1, 1, 1),
-  ('FDN',       'Freight Debit Note',                  'customer_facing', 'SC/FDN/{YYYY}/{DDMM}{NNN}', 0, 1, 1, 1),
-  ('PL',        'Packing List',                        'customer_facing', 'SC/PL/{YYYY}/{DDMM}{NNN}',  0, 1, 1, 1),
-  ('BLI',       'BL Instruction Sheet',                'internal',        'SC/BLI/{YYYY}/{DDMM}{NNN}', 1, 1, 1, 1),
-  ('CI',        'Commercial Invoice',                  'customer_facing', 'SC/CI/{YYYY}/{DDMM}{NNN}',  0, 1, 1, 1),
+  ('BUYERPO',   'Buyer PO — Order Acceptance',         'customer_facing', 'SC/PO/{YY}/{DDMM}{NNN}', 0, 0, 1, 1),
+  ('PI',        'Proforma Invoice',                    'customer_facing', 'SC/PI/{YY}/{DDMM}{NNN}',  0, 1, 1, 1),
+  ('OC',        'Order Confirmation',                  'customer_facing', 'SC/OC/{YY}/{DDMM}{NNN}',  0, 1, 1, 1),
+  ('SUPPO',     'Supplier PO — Material Procurement',  'procurement',     'SC/SPO/{YY}/{DDMM}{NNN}', 1, 1, 1, 1),
+  ('FDN',       'Freight Debit Note',                  'customer_facing', 'SC/FDN/{YY}/{DDMM}{NNN}', 0, 1, 1, 1),
+  ('PL',        'Packing List',                        'customer_facing', 'SC/PL/{YY}/{DDMM}{NNN}',  0, 1, 1, 1),
+  ('BLI',       'BL Instruction Sheet',                'internal',        'SC/BLI/{YY}/{DDMM}{NNN}', 1, 1, 1, 1),
+  ('CI',        'Commercial Invoice',                  'customer_facing', 'SC/CI/{YY}/{DDMM}{NNN}',  0, 1, 1, 1),
   ('COOPREP',   'Certificate of Origin Preparation',   'procurement',     NULL,                        1, 1, 1, 1),
   ('CHECKLIST', 'Cross-Verification Checklist 1 of 4 — Sales / Documentation Officer', 'internal', NULL, 1, 0, 1, 1),
   ('CHECKLIST_2_FINANCE',  'Cross-Verification Checklist 2 of 4 — Accounts / Finance',              'internal', NULL, 1, 0, 1, 1),
   ('CHECKLIST_3_PACKING',  'Cross-Verification Checklist 3 of 4 — Packing / Dispatch Supervisor',   'internal', NULL, 1, 0, 1, 1),
   ('CHECKLIST_4_SHIPPING', 'Cross-Verification Checklist 4 of 4 — Shipping / Logistics Coordinator', 'internal', NULL, 1, 0, 1, 1),
-  ('AMD',       'Payment Terms Amendment',              'internal',       'SC/AMD/{YYYY}/{DDMM}{NNN}', 1, 1, 1, 1),
+  ('AMD',       'Payment Terms Amendment',              'internal',       'SC/AMD/{YY}/{DDMM}{NNN}', 1, 1, 1, 1),
   ('SOP_A_SALES', 'SOP — Sales Process, Tier A (Standard — New Buyer)', 'internal', NULL,               1, 1, 1, 1),
   ('SOP_B_SALES', 'SOP — Sales Process, Tier B (Established Buyer — Post-BL)', 'internal', NULL,        1, 1, 1, 1),
   ('STAGEGATE', 'Stage Gate Reference',                 'internal',       NULL,                        1, 0, 1, 1),
   ('WALLREF',   'Wall Reference',                       'internal',       NULL,                        1, 0, 1, 1),
-  ('CAFIN',     'CA Financial Annexure — Government Benefits & Expenses (Internal Only)', 'internal', 'SC/CAFIN/{YYYY}/{DDMM}{NNN}', 1, 1, 0, 1),
-  ('BLE',       'Bill of Lading Endorsement',           'customer_facing', 'SC/BLE/{YYYY}/{DDMM}{NNN}', 0, 1, 1, 1);
+  ('CAFIN',     'CA Financial Annexure — Government Benefits & Expenses (Internal Only)', 'internal', 'SC/CAFIN/{YY}/{DDMM}{NNN}', 1, 1, 0, 1),
+  ('BLE',       'Bill of Lading Endorsement',           'customer_facing', 'SC/BLE/{YY}/{DDMM}{NNN}', 0, 1, 1, 1);
 
 -- ================================================================
 -- TC_CLAUSES / TC_CLAUSE_DOCUMENTS — real Terms & Conditions text
@@ -646,9 +646,9 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   -- this exact wording was previously hardcoded straight into the
   -- Annexure A template with no governance or audit trail.
   ('annexure_product_note', 'Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.', 'string', 'documents', 'Printed in the amber "Note:" banner above every Annexure A''s Product Specification section.', 0),
-  ('master_tracking_ref_format', 'NC/SC/{YYYY}/{DDMM}{NNN}', 'string', 'formats', 'Buyer inquiry reference format — matches the format already in use on your existing documents.', 0),
+  ('master_tracking_ref_format', 'NC/SC/{YY}/{DDMM}{NNN}', 'string', 'formats', 'Buyer inquiry reference format — matches the format already in use on your existing documents.', 0),
   ('client_number_format',  'SC-CL-{NNNN}', 'string', 'formats', 'Placeholder client numbering format — confirm against your actual convention.', 0),
-  ('order_ref_format',      'SC/ORD/{YYYY}/{NNN}', 'string', 'formats', 'Placeholder order reference format — confirm against your actual convention.', 0),
+  ('order_ref_format',      'SC/ORD/{YY}/{NNN}', 'string', 'formats', 'Placeholder order reference format — confirm against your actual convention.', 0),
   ('dispute_response_days_n', '10', 'number', 'disputes', 'WORKING days allowed for a dispute response before escalation — must match the "ten (10) working days" figure in the Dispute Resolution & Public Communications clause below verbatim, since that clause is the legally binding promise printed on QT/PI/OC/BUYERPO. (Corrected from an earlier placeholder of 7, which did not match the clause text.) response_due_date is computed via WorkingDaysCalculator, which skips weekly_off_days and company_holidays — plain calendar-day arithmetic would silently undercount the deadline by counting Sundays/holidays as working days.', 0),
   ('weekly_off_days', 'sunday', 'string', 'disputes', 'Comma-separated lowercase weekday name(s) that never count as a working day, used by WorkingDaysCalculator (Addition beyond the spec''s named key list — needed to make dispute_response_days_n''s "working days" figure actually computable; NexaCrest''s standard Mon-Sat working week per this same section''s holiday calendar).', 0),
   ('zoho_mail_enabled',   '0', 'boolean', 'zoho', 'Master on/off switch for sending through the Zoho Mail API. Off by default (no credentials configured yet) — when off, or on any Zoho send failure, mail goes out through the existing SMTP path instead. Never a hard dependency.', 0),
@@ -1608,7 +1608,7 @@ UPDATE tc_clauses SET status = 'inactive' WHERE clause_title = 'Cancellation' AN
 -- not the code string; renaming the code itself would be a breaking,
 -- retroactive change for no benefit) — only the buyer-facing name and
 -- reference prefix change. ---
-UPDATE document_types SET name = 'Debit Note', ref_format = 'SC/DN/{YYYY}/{DDMM}{NNN}' WHERE code = 'FDN';
+UPDATE document_types SET name = 'Debit Note', ref_format = 'SC/DN/{YY}/{DDMM}{NNN}' WHERE code = 'FDN';
 
 -- --- 90-item backlog #71: ANNEXA was seeded with ref_format = NULL,
 -- the same NULL used for genuinely internal/non-generated document types
@@ -1617,7 +1617,7 @@ UPDATE document_types SET name = 'Debit Note', ref_format = 'SC/DN/{YYYY}/{DDMM}
 -- send lifecycle as QT/PI/OC, so it never got a real reference to print
 -- on its own meta bar. Gives it the same numbering convention as every
 -- other customer-facing document type. ---
-UPDATE document_types SET ref_format = 'SC/ANX/{YYYY}/{DDMM}{NNN}' WHERE code = 'ANNEXA';
+UPDATE document_types SET ref_format = 'SC/ANX/{YY}/{DDMM}{NNN}' WHERE code = 'ANNEXA';
 
 -- ================================================================
 -- SECTION BQ — UI TEMPLATE SELECTION (added 2026-10-23)

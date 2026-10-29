@@ -359,7 +359,7 @@ async function createSampleClient(companyName, billingAddress, userId, email = n
  */
 async function createSampleOrderShell(clientId, incoterm, currency, loadingPort, preset, userId, portOfDischargeText = null, includeAnnexureA = false) {
   const client = await clientRepository.find(clientId);
-  const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/ORD/{YYYY}/{NNN}';
+  const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/ORD/{YY}/{NNN}';
   const now = new Date();
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
   const quotationDate = formatDate(now);
@@ -373,6 +373,7 @@ async function createSampleOrderShell(clientId, incoterm, currency, loadingPort,
       order_reference:
         orderRefFormat
           .replace(/\{YYYY\}/g, String(now.getFullYear()))
+          .replace(/\{YY\}/g, String(now.getFullYear()).slice(2))
           .replace(/\{NNN\}/g, String(sequenceNo).padStart(3, '0'))
         + '-' + clientId,
       buyer_inquiry_ref: client.client_unique_number,

@@ -467,7 +467,7 @@ final class OrderController
         $portOfDischargeId = !empty($_POST['port_of_discharge_id']) ? (int) $_POST['port_of_discharge_id'] : null;
         $portOfDischargeText = trim((string) ($_POST['port_of_discharge_text'] ?? ''));
 
-        $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/ORD/{YYYY}/{NNN}';
+        $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/ORD/{YY}/{NNN}';
         $testModeEnabled = TestModeService::isEnabled();
 
         // QA-5 ORD-05: the order row, its stage/payment-status rows, and
@@ -508,6 +508,7 @@ final class OrderController
                     'order_reference'       => TestModeService::applyReferencePrefix(
                         strtr($orderRefFormat, [
                             '{YYYY}' => date('Y'),
+                            '{YY}'   => date('y'),
                             '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
                         ]) . '-' . $clientId, // client suffix keeps this globally unique even though the format string isn't scoped per-client
                         $testModeEnabled

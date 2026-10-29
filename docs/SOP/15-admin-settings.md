@@ -179,7 +179,7 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
     raised a complaint or dispute, left feedback, or asked for a reorder.
 
   The email's subject is the notification itself (e.g. "NexaCrest — The
-  buyer reported an advance payment on order SC/ORD/2026/014 — verify it
+  buyer reported an advance payment on order SC/ORD/26/014 — verify it
   against the bank statement"), so an inbox shows at a glance what each
   one is. Each staff member can turn these emails off on their own **My
   Account** page (**Email me my notifications**); they still appear in

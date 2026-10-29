@@ -16,7 +16,7 @@ and doesn't block or unlock any stage gate.
 
 ## The system does this automatically
 
-- Generates the amendment reference (e.g. `SC/AMD/2026/2609002`) the moment
+- Generates the amendment reference (e.g. `SC/AMD/26/2609002`) the moment
   a request is created.
 - The moment a signed copy is uploaded, the system **activates the
   amendment and updates the order's live payment terms immediately** —

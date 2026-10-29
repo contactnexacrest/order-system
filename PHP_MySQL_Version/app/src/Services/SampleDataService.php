@@ -376,7 +376,7 @@ final class SampleDataService
         bool $includeAnnexureA = false
     ): int {
         $client = ClientRepository::find($clientId);
-        $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/ORD/{YYYY}/{NNN}';
+        $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/ORD/{YY}/{NNN}';
 
         // QA-5 CONC-03: see OrderRepository::createWithNextSequence()'s docblock.
         $result = OrderRepository::createWithNextSequence($clientId, function (int $sequenceNo) use (
@@ -386,6 +386,7 @@ final class SampleDataService
             return [
                 'order_reference'       => strtr($orderRefFormat, [
                     '{YYYY}' => date('Y'),
+                    '{YY}'   => date('y'),
                     '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
                 ]) . '-' . $clientId,
                 'buyer_inquiry_ref'     => $client['client_unique_number'],

@@ -47,7 +47,7 @@ final class OrderDuplicationService
         }
         $client = ClientRepository::find((int) $source['client_id']);
 
-        $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/ORD/{YYYY}/{NNN}';
+        $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/ORD/{YY}/{NNN}';
         $testModeEnabled = TestModeService::isEnabled();
 
         // QA-5 CONC-03: see OrderRepository::createWithNextSequence()'s docblock.
@@ -58,6 +58,7 @@ final class OrderDuplicationService
                 'order_reference'       => TestModeService::applyReferencePrefix(
                     strtr($orderRefFormat, [
                         '{YYYY}' => date('Y'),
+                        '{YY}'   => date('y'),
                         '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
                     ]) . '-' . $source['client_id'],
                     $testModeEnabled

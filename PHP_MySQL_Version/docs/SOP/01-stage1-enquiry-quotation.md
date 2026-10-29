@@ -17,7 +17,7 @@ client record.
   generated, not after anyone reviews or sends it (see the "one rule that
   applies to every stage" note in the [introduction](./00-introduction.md)).
 - The system auto-generates the **Buyer Inquiry Ref** (e.g.
-  `NC/SC/2026/2009001`) the moment a client record is created — staff never
+  `NC/SC/26/2009001`) the moment a client record is created — staff never
   type this themselves.
 
 ## What staff do

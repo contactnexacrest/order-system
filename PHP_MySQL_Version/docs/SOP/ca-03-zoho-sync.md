@@ -50,7 +50,7 @@ sent), the next sync sends it to Zoho Books as an **export invoice** for
 the buyer:
 
 - **Same number and date as our document.** The Books invoice carries the
-  document's own reference (for example `SC/CI/2026/2810001`) and the date
+  document's own reference (for example `SC/CI/26/2810001`) and the date
   printed on it. Books does not give it a number of its own.
 - **The CI lists the products only** — one line per product, with its
   quantity, unit, unit price and HS code, so its total is the FOB value.

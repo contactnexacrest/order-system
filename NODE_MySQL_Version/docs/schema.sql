@@ -174,7 +174,7 @@ CREATE TABLE document_types (
                                                        -- SOP_A_SALES, SOP_B_SALES, STAGEGATE, WALLREF
   name                  VARCHAR(150) NOT NULL,
   category              ENUM('customer_facing','internal','procurement') NOT NULL,
-  ref_format            VARCHAR(100) NULL,            -- e.g. 'SC/QT/{YYYY}/{DDMM}{NNN}' ; NULL for AMD-style internal-only or no-ref docs
+  ref_format            VARCHAR(100) NULL,            -- e.g. 'SC/QT/{YY}/{DDMM}{NNN}' ; NULL for AMD-style internal-only or no-ref docs
   never_shown_to_buyer  TINYINT(1) NOT NULL DEFAULT 0, -- hard flag for AMD (Business Rule #20)
   revision_enabled      TINYINT(1) NOT NULL DEFAULT 1,
   min_reviewers_default INT NOT NULL DEFAULT 1,

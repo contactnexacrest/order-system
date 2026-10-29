@@ -475,7 +475,7 @@ async function store(req, res) {
   // cannot itself await.
   const sanitizedCooType = await lookupRepository.sanitizeOption('coo_type', str(body.coo_type));
 
-  const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/ORD/{YYYY}/{NNN}';
+  const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/ORD/{YY}/{NNN}';
   const testModeEnabled = await testModeService.isEnabled();
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
 
@@ -501,6 +501,7 @@ async function store(req, res) {
         order_reference: testModeService.applyReferencePrefix(
           orderRefFormat
             .replace(/\{YYYY\}/g, String(new Date().getFullYear()))
+            .replace(/\{YY\}/g, String(new Date().getFullYear()).slice(2))
             .replace(/\{NNN\}/g, String(sequenceNo).padStart(3, '0')) + `-${clientId}`, // client suffix keeps this globally unique even though the format string isn't scoped per-client
           testModeEnabled
         ),

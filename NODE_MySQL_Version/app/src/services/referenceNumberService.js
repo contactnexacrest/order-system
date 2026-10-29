@@ -114,8 +114,11 @@ function pad2(n) {
  * prefix (docs/schema.sql Section V, requirement: test reference numbers
  * must be identifiable) is applied exactly once here rather than at each
  * of the three call sites below. `now` is passed in from the caller so
- * the {YYYY}/{DDMM} rendered here always matches the same clock instant
- * used to compute the counter's scope key.
+ * the year/{DDMM} rendered here always matches the same clock instant
+ * used to compute the counter's scope key. {YY} is the 2-digit year every
+ * format uses since 2026-10-29 (owner decision: a GST tax invoice number
+ * may have at most 16 characters, and one style everywhere); {YYYY} still
+ * works for a format set by hand.
  */
 async function render(format, seq, now) {
   const yyyy = String(now.getFullYear());
@@ -124,6 +127,7 @@ async function render(format, seq, now) {
   const nnn = String(seq).padStart(3, '0');
   const rendered = format
     .replace(/\{YYYY\}/g, yyyy)
+    .replace(/\{YY\}/g, yyyy.slice(2))
     .replace(/\{DDMM\}/g, dd + mm)
     .replace(/\{NNN\}/g, nnn);
   const testMode = await testModeService.isEnabled();
@@ -135,7 +139,7 @@ function ymd(now) {
 }
 
 async function generateClientUniqueNumber() {
-  const format = (await companySettingsRepository.get('master_tracking_ref_format')) || 'NC/SC/{YYYY}/{DDMM}{NNN}';
+  const format = (await companySettingsRepository.get('master_tracking_ref_format')) || 'NC/SC/{YY}/{DDMM}{NNN}';
   const now = new Date();
   const seq = await nextSeq('client_unique:' + ymd(now));
   return render(format, seq, now);

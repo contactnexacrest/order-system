@@ -178,7 +178,7 @@ database before applying.
   `received/` for files that came in from the buyer, supplier or CHA.
 - **`{random-id}.{ext}`** — the actual filename on disk is always a random
   identifier, generated fresh for that one file, never the document's own
-  reference number (e.g. `SC/QT/2026/1809001`) and never the name the file
+  reference number (e.g. `SC/QT/26/1809001`) and never the name the file
   was uploaded with. Two reasons: a real document reference contains `/`
   characters a filename can't hold, and giving every file an unpredictable
   name means nothing about what a file is, or which order it belongs to,
@@ -191,8 +191,14 @@ database before applying.
   characters of their own (they're reference numbers, not folder names),
   so each is run through the same sanitizer before being used as a path
   segment: anything that isn't a letter, digit, underscore, or hyphen
-  becomes a hyphen. `SC/ORD/2026/003-42` on screen becomes
-  `SC-ORD-2026-003-42` as a folder name — same identity, just filesystem-safe.
+  becomes a hyphen. `SC/ORD/26/003-42` on screen becomes
+  `SC-ORD-26-003-42` as a folder name — same identity, just filesystem-safe.
+- **Reference numbers use a 2-digit year** (2026-10-29): `SC/CI/26/2910001`,
+  `NC/SC/26/2910010`, `SC/ORD/26/003-42`. A GST tax invoice number may have
+  at most 16 characters, and the Commercial Invoice and Debit Note had 17 with
+  the full year, so every reference now uses the same short style. Numbers
+  issued before that day keep their 4-digit year (`…/2026/…`), and their
+  folders keep their names; both styles appear side by side for a while.
 
 This whole structure sits under whatever `STORAGE_BASE_PATH` is configured
 to (see [Admin & Company Settings](./15-admin-settings.md) and the

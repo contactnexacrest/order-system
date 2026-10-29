@@ -41,7 +41,7 @@ describe('Debit Note terminology (External QA report L-07)', () => {
     const row = await db.queryOne("SELECT name, ref_format FROM document_types WHERE code = 'FDN'");
 
     expect(row.name).toBe('Debit Note');
-    expect(row.ref_format).toBe('SC/DN/{YYYY}/{DDMM}{NNN}');
+    expect(row.ref_format).toBe('SC/DN/{YY}/{DDMM}{NNN}');
   });
 
   // External QA report U-09: screen text (the staff-facing order page's

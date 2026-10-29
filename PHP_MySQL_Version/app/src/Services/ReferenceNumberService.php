@@ -8,7 +8,7 @@ use App\Config\Database;
 use App\Repositories\CompanySettingsRepository;
 
 /**
- * Generates the NC/SC/{YYYY}/{DDMM}{NNN}-style reference numbers used
+ * Generates the NC/SC/{YY}/{DDMM}{NNN}-style reference numbers used
  * throughout the source documents. Format strings are DB-driven
  * (company_settings.master_tracking_ref_format, and each row's
  * document_types.ref_format) — never hardcoded — per the "everything
@@ -30,7 +30,7 @@ final class ReferenceNumberService
      */
     public static function generateClientUniqueNumber(): string
     {
-        $format = CompanySettingsRepository::get('master_tracking_ref_format') ?? 'NC/SC/{YYYY}/{DDMM}{NNN}';
+        $format = CompanySettingsRepository::get('master_tracking_ref_format') ?? 'NC/SC/{YY}/{DDMM}{NNN}';
         $now = new \DateTimeImmutable();
         $seq = self::nextSeq('client_unique:' . $now->format('Ymd'));
         return self::render($format, $seq, $now);
@@ -58,7 +58,7 @@ final class ReferenceNumberService
     }
 
     /**
-     * SC/AMD/{YYYY}/{DDMM}{NNN} — minted at amendment REQUEST time (Section
+     * SC/AMD/{YY}/{DDMM}{NNN} — minted at amendment REQUEST time (Section
      * 8), well before any `documents` row exists for it (an amendment is
      * only ever turned into a generated PDF after MD approval — see
      * AmendmentService::generateDocument()). generateDocumentRef() above
@@ -202,13 +202,17 @@ final class ReferenceNumberService
      * prefix (docs/schema.sql Section V, requirement: test reference
      * numbers must be identifiable) is applied exactly once here rather
      * than at each of the three call sites above. $now is passed in from
-     * the caller so the {YYYY}/{DDMM} rendered here always matches the
-     * same clock instant used to compute the counter's scope key.
+     * the caller so the year/{DDMM} rendered here always matches the
+     * same clock instant used to compute the counter's scope key. {YY} is
+     * the 2-digit year every format uses since 2026-10-29 (owner decision:
+     * a GST tax invoice number may have at most 16 characters, and one
+     * style everywhere); {YYYY} still works for a format set by hand.
      */
     private static function render(string $format, int $seq, \DateTimeImmutable $now): string
     {
         $replacements = [
             '{YYYY}' => $now->format('Y'),
+            '{YY}'   => $now->format('y'),
             '{DDMM}' => $now->format('dm'),
             '{NNN}'  => str_pad((string) $seq, 3, '0', STR_PAD_LEFT),
         ];

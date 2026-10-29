@@ -44,7 +44,7 @@ final class DebitNoteTerminologyTest extends DbTestCase
             ->fetch();
 
         self::assertSame('Debit Note', $row['name']);
-        self::assertSame('SC/DN/{YYYY}/{DDMM}{NNN}', $row['ref_format']);
+        self::assertSame('SC/DN/{YY}/{DDMM}{NNN}', $row['ref_format']);
     }
 
     /**
