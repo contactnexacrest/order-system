@@ -1,0 +1,119 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Zoho integration Stage 1 (2026-10-29) — removes the records made in
+ * Zoho Books while testing, before go-live. Testing runs in NexaCrest's
+ * real Books organisation (owner decision), so every test record must go.
+ *
+ * What it removes:
+ *   - every Books customer whose name starts with TEST-, with its payments;
+ *   - with --from-sync-log, also every payment this database's sync log
+ *     pushed and every customer this database created (clients.zoho_contact_id).
+ *     Run that only on the TEST database, never on the live one.
+ * Payments go first (Books refuses to delete a customer that still has
+ * transactions); this database's Zoho references are then cleared so a
+ * later sync starts clean.
+ *
+ * Usage:
+ *   php app/cron/zoho_cleanup_test_records.php                     # dry run: lists what would go, changes nothing
+ *   php app/cron/zoho_cleanup_test_records.php --apply             # deletes them
+ *   ... --from-sync-log                                            # include this database's synced records
+ *   ... --by "Name"                                                # who is running it (for the change log)
+ *   ... --log ../docs/zoho/zoho-change-log.csv                     # append one row per deletion to the change log
+ * Without --log, the change-log rows are printed for pasting in.
+ */
+
+require __DIR__ . '/../bootstrap.php';
+
+use App\Config\Database;
+use App\Services\ZohoBooksService;
+
+$args = array_slice($argv, 1);
+$apply = in_array('--apply', $args, true);
+$fromSyncLog = in_array('--from-sync-log', $args, true);
+if ($fromSyncLog && App\Services\ZohoGuard::isProduction()) {
+    fwrite(STDERR, "Refused: --from-sync-log would take this database's real payments and customers. It runs only where ZOHO_ENVIRONMENT=test.\n");
+    exit(1);
+}
+$option = static function (string $name) use ($args): ?string {
+    $i = array_search($name, $args, true);
+    return $i !== false && isset($args[$i + 1]) ? $args[$i + 1] : null;
+};
+$by = $option('--by') ?? (getenv('USER') ?: 'unknown');
+$logFile = $option('--log');
+
+$pdo = Database::connection();
+$plan = []; // kind => [id => label]
+$plan['customerpayment'] = [];
+$plan['contact'] = [];
+
+foreach (ZohoBooksService::listTestContacts() as $contact) {
+    foreach ($contact['payments'] as $payment) {
+        $plan['customerpayment'][$payment['payment_id']] = "payment {$payment['label']} of {$contact['name']}";
+    }
+    $plan['contact'][$contact['contact_id']] = "customer {$contact['name']}";
+}
+if ($fromSyncLog) {
+    $rows = $pdo->query("SELECT entity_id, leg, zoho_reference FROM zoho_sync_log WHERE sync_type = 'revenue_payment' AND status = 'success' AND zoho_reference IS NOT NULL")->fetchAll();
+    foreach ($rows as $row) {
+        $plan['customerpayment'][(string) $row['zoho_reference']] ??= "payment for order #{$row['entity_id']} ({$row['leg']}) from this database's sync log";
+    }
+    foreach ($pdo->query('SELECT company_legal_name, zoho_contact_id FROM clients WHERE zoho_contact_id IS NOT NULL')->fetchAll() as $row) {
+        $plan['contact'][(string) $row['zoho_contact_id']] ??= "customer {$row['company_legal_name']} (created by this database)";
+    }
+}
+
+foreach ($plan as $kind => $items) {
+    foreach ($items as $id => $label) {
+        echo "{$kind} {$id}  {$label}\n";
+    }
+}
+echo sprintf("\n%d payment(s) and %d customer(s) to delete from Zoho Books.\n", count($plan['customerpayment']), count($plan['contact']));
+if (!$apply) {
+    echo "Dry run — nothing changed. Run again with --apply to delete them.\n";
+    exit(0);
+}
+
+$csvRows = [];
+$failed = 0;
+$n = 0;
+foreach ($plan as $kind => $items) {
+    foreach ($items as $id => $label) {
+        try {
+            ZohoBooksService::deleteRecord($kind, (string) $id);
+            echo "deleted {$kind} {$id}\n";
+            $now = (new DateTimeImmutable('now', new DateTimeZone('Asia/Kolkata')))->format('Y-m-d H:i');
+            $csvRows[] = [
+                'Z-NEW-' . (++$n), $now, $by, $by, 'Zoho API (cleanup script)', 'Zoho Books', 'Books org ' . (string) App\Repositories\CompanySettingsRepository::get('zoho_books_organization_id'),
+                $kind === 'contact' ? 'DELETE /books/v3/contacts/{id} (Books: Sales -> Customers)' : 'DELETE /books/v3/customerpayments/{id} (Books: Sales -> Payments Received)',
+                'Delete', "{$label}; Zoho ID {$id}", 'Exists', 'Deleted', 'Remove test data before go-live', 'Test', 'Yes', "{$now} / {$by}",
+                'cron/zoho_cleanup_test_records.php', '', '',
+            ];
+            if ($kind === 'contact') {
+                $pdo->prepare('UPDATE clients SET zoho_contact_id = NULL WHERE zoho_contact_id = :id')->execute(['id' => $id]);
+            } else {
+                foreach (['advance', 'balance', 'freight'] as $leg) {
+                    $pdo->prepare("UPDATE order_payment_status SET {$leg}_zoho_synced_at = NULL, {$leg}_zoho_reference = NULL WHERE {$leg}_zoho_reference = :id")->execute(['id' => $id]);
+                }
+            }
+        } catch (\Throwable $e) {
+            $failed++;
+            echo "! {$kind} {$id}: {$e->getMessage()}\n";
+        }
+    }
+}
+
+$out = $logFile !== null ? fopen($logFile, 'ab') : fopen('php://stdout', 'wb');
+if ($logFile === null && $csvRows !== []) {
+    echo "\nRows for docs/zoho/zoho-change-log.csv (renumber Z-NEW-n to the next Log IDs):\n";
+}
+foreach ($csvRows as $row) {
+    fputcsv($out, $row, ',', '"', '', "\r\n");
+}
+if ($logFile !== null) {
+    fclose($out);
+    echo count($csvRows) . " row(s) added to {$logFile} — renumber Z-NEW-n to the next Log IDs.\n";
+}
+exit($failed > 0 ? 1 : 0);

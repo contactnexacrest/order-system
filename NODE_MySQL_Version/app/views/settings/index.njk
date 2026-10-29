@@ -162,6 +162,24 @@
     </form>
   </div>
   {% endif %}
+
+  {% if grouped.zoho_books %}
+  <div class="section">
+    <h2>Test Zoho Books Connection</h2>
+    <p class="muted">Logs in to Zoho Books with the details above and checks the organisation, the deposit account and the currencies. It only reads — nothing is created in Zoho. Save your changes above first.</p>
+    <p class="zoho-server-status"><strong>This server (set in .env):</strong>
+      Zoho integration <strong>{{ 'ON' if zohoServer.enabled else 'OFF' }}</strong> ·
+      environment <strong>{{ zohoServer.environment }}</strong> ·
+      GST e-invoice / e-way bill / GST filing <strong>{{ 'allowed' if zohoServer.government else 'blocked' }}</strong></p>
+    {% if zohoServer.missing.length %}
+    <div class="alert alert-warning">Not written out in .env: {{ zohoServer.missing | join(', ') }}. Read as the safe choice (Zoho off, test, e-invoice off) — add them to .env with their values.</div>
+    {% endif %}
+    <form method="post" action="/settings/test-zoho-books">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm">Test Books Connection</button>
+    </form>
+  </div>
+  {% endif %}
 </div>
 <script>
 /* 90-item backlog #27: ~20 settings categories as plain <details>/<summary>

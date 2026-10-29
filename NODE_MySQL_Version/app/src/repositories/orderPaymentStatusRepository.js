@@ -133,9 +133,11 @@ async function clearFreightInrActual(orderId) {
  */
 async function clearedSettlements() {
   return db.query(
-    `SELECT ops.*, o.buyer_inquiry_ref, o.client_id, o.company_legal_name, o.currency_code
+    `SELECT ops.*, o.buyer_inquiry_ref, o.client_id, o.company_legal_name, o.currency_code,
+            (o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1) AS is_test_or_sample
      FROM order_payment_status ops
      JOIN orders o ON o.id = ops.order_id
+     JOIN clients c ON c.id = o.client_id
      WHERE ops.advance_cleared_at IS NOT NULL
         OR ops.balance_cleared_at IS NOT NULL
         OR ops.freight_cleared_at IS NOT NULL

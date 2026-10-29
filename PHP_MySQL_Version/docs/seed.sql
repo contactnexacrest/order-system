@@ -657,8 +657,8 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('zoho_refresh_token',  '', 'string',  'zoho', 'Zoho OAuth refresh token (mail.send scope) — exchanged for a short-lived access token on each send.', 1),
   ('zoho_account_id',     '', 'string',  'zoho', 'Zoho Mail account ID (from Zoho Mail API''s accounts endpoint) that mail is sent from.', 1),
   ('zoho_from_address',   '', 'string',  'zoho', 'The Zoho mailbox address mail is sent from — must be one of the Zoho account''s own verified addresses.', 0),
-  ('zoho_accounts_domain', 'accounts.zoho.com', 'string', 'zoho', 'Zoho OAuth token endpoint domain — Zoho is region-specific (accounts.zoho.com / .eu / .in / .com.cn / .com.au, matching whichever data center the Zoho One account lives in).', 0),
-  ('zoho_api_domain',      'mail.zoho.com', 'string', 'zoho', 'Zoho Mail API domain — matches zoho_accounts_domain''s region (mail.zoho.com / .eu / .in / .com.cn / .com.au).', 0),
+  ('zoho_accounts_domain', 'accounts.zoho.in', 'string', 'zoho', 'Zoho OAuth token endpoint domain — Zoho is region-specific (accounts.zoho.com / .eu / .in / .com.cn / .com.au, matching whichever data center the Zoho One account lives in).', 0),
+  ('zoho_api_domain',      'mail.zoho.in', 'string', 'zoho', 'Zoho Mail API domain — matches zoho_accounts_domain''s region (mail.zoho.com / .eu / .in / .com.cn / .com.au).', 0),
   -- 90-item backlog "default weight/volume values": New Order's Estimated
   -- Weight & Volume fieldset used to start every order blank, unlike
   -- Package Type/Package Count which already had a configured/hardcoded
@@ -683,8 +683,8 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('zoho_books_refresh_token',      '', 'string',  'zoho_books', 'Zoho Books OAuth refresh token (ZohoBooks.fullaccess scope) — exchanged for a short-lived access token on each sync.', 1),
   ('zoho_books_organization_id',    '', 'string',  'zoho_books', 'Zoho Books organization ID — required on every Books API call.', 1),
   ('zoho_books_deposit_account_id', '', 'string',  'zoho_books', 'The Zoho Books chart-of-accounts account ID that synced customer payments are recorded as deposited into (e.g. your bank account in Zoho Books).', 1),
-  ('zoho_books_accounts_domain',    'accounts.zoho.com', 'string', 'zoho_books', 'Zoho OAuth token endpoint domain — region-specific, matching whichever data center the Zoho One account lives in.', 0),
-  ('zoho_books_api_domain',         'www.zohoapis.com', 'string', 'zoho_books', 'Zoho Books API domain — matches zoho_books_accounts_domain''s region (www.zohoapis.com / .eu / .in / .com.cn / .com.au).', 0);
+  ('zoho_books_accounts_domain',    'accounts.zoho.in', 'string', 'zoho_books', 'Zoho OAuth token endpoint domain — region-specific, matching whichever data center the Zoho One account lives in.', 0),
+  ('zoho_books_api_domain',         'www.zohoapis.in', 'string', 'zoho_books', 'Zoho Books API domain — matches zoho_books_accounts_domain''s region (www.zohoapis.com / .eu / .in / .com.cn / .com.au).', 0);
 
 -- Addition beyond the spec's named key list: the signature/seal on generated
 -- documents are electronic marks, not a scan of a wet-ink signature or a

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Helpers\FinancialYear;
+use App\Services\ZohoGuard;
 
 /**
  * CA / Accounting module — independent of the order-pipeline system
@@ -77,6 +78,7 @@ final class CaRepository
                     'firc_pending' => $fircPending,
                     'zoho_synced_at' => $ops[$legDef['zoho_at_col']],
                     'zoho_reference' => $ops[$legDef['zoho_ref_col']],
+                    'is_test_or_sample' => (int) ($ops['is_test_or_sample'] ?? 0) === 1,
                 ];
             }
         }
@@ -87,7 +89,10 @@ final class CaRepository
     /**
      * Every leg with an INR actual on record that hasn't been pushed to
      * Zoho Books yet — what CaSyncService::syncPendingRevenue() works
-     * through on each run (manual or scheduled).
+     * through on each run (manual or scheduled). Owner decision
+     * 2026-10-29: in production, test and sample orders never go to Zoho;
+     * in test (ZOHO_ENVIRONMENT in .env), only TEST- customers do, so the
+     * clean-up script finds everything testing made.
      *
      * @return array<int, array<string,mixed>>
      */
@@ -96,6 +101,7 @@ final class CaRepository
         return array_values(array_filter(
             self::settlementRegister(),
             static fn(array $r): bool => $r['inr_actual'] !== null && $r['zoho_synced_at'] === null
+                && (ZohoGuard::isProduction() ? !$r['is_test_or_sample'] : str_starts_with((string) $r['company_legal_name'], ZohoGuard::TEST_PREFIX))
         ));
     }
 

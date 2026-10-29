@@ -14,7 +14,7 @@ use App\Repositories\CompanySettingsRepository;
  * fail loudly and correctly on any bad response.
  *
  * NOTE: written against Zoho Mail API v1's documented shape
- * (accounts.zoho.com OAuth token endpoint; mail.zoho.com/api/accounts/
+ * (accounts.zoho.in OAuth token endpoint; mail.zoho.in/api/accounts/
  * {accountId}/messages to send, .../messages/attachments to pre-upload an
  * attachment). This account has no live Zoho credentials yet to verify
  * the exact request/response shape against — re-check field names here
@@ -23,9 +23,19 @@ use App\Repositories\CompanySettingsRepository;
  */
 final class ZohoMailService
 {
+    /**
+     * Owner decision 2026-10-29: NexaCrest's mail is hosted with Bluehost
+     * and the app sends only through Bluehost SMTP. Zoho Mail is used as a
+     * mail client only, never to send the app's mail. This class is kept
+     * as it is so it can be used again later by setting IN_USE to true —
+     * while it is false, the zoho_mail_enabled setting is ignored and its
+     * settings and test button are hidden from Admin -> Settings.
+     */
+    public const IN_USE = false;
+
     public static function isEnabled(): bool
     {
-        return (string) CompanySettingsRepository::get('zoho_mail_enabled') === '1';
+        return self::IN_USE && (string) CompanySettingsRepository::get('zoho_mail_enabled') === '1';
     }
 
     /**
@@ -45,8 +55,8 @@ final class ZohoMailService
             throw new \RuntimeException('Zoho Mail is enabled but not fully configured — fill in every zoho_* setting.');
         }
 
-        $accountsDomain = (string) (CompanySettingsRepository::get('zoho_accounts_domain') ?: 'accounts.zoho.com');
-        $apiDomain = (string) (CompanySettingsRepository::get('zoho_api_domain') ?: 'mail.zoho.com');
+        $accountsDomain = (string) (CompanySettingsRepository::get('zoho_accounts_domain') ?: 'accounts.zoho.in');
+        $apiDomain = (string) (CompanySettingsRepository::get('zoho_api_domain') ?: 'mail.zoho.in');
 
         $accessToken = self::getAccessToken($accountsDomain, $clientId, $clientSecret, $refreshToken);
 

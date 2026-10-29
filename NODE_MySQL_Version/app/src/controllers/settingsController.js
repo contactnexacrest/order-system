@@ -8,6 +8,8 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const lookupRepository = require('../repositories/lookupRepository');
 const uiTemplateRepository = require('../repositories/uiTemplateRepository');
 const zohoMailService = require('../services/zohoMailService');
+const zohoBooksService = require('../services/zohoBooksService');
+const zohoGuard = require('../services/zohoGuard');
 const emailService = require('../services/emailService');
 const superAdminService = require('../services/superAdminService');
 
@@ -18,6 +20,9 @@ async function index(req, res) {
   const grouped = {};
   for (const row of settings) {
     (grouped[row.category] ||= []).push(row);
+  }
+  if (!zohoMailService.IN_USE) {
+    delete grouped.zoho; // mail goes through Bluehost SMTP only (owner decision 2026-10-29)
   }
   const isSuperAdmin = await superAdminService.isEffective(req.user.id);
   // 90-item backlog #31: rbi_purpose_code_advance/balance/freight were
@@ -38,6 +43,12 @@ async function index(req, res) {
   const activeUiTemplates = await uiTemplateRepository.active();
   res.renderView('settings/index', {
     grouped,
+    zohoServer: {
+      enabled: zohoGuard.integrationEnabled(),
+      environment: zohoGuard.environment(),
+      government: zohoGuard.governmentFeaturesAllowed(),
+      missing: zohoGuard.missingVariables(),
+    },
     isSuperAdmin,
     rbiPurposeCodes,
     rbiPurposeCodeValues: rbiPurposeCodes.map((o) => o.option_value),
@@ -173,6 +184,11 @@ async function update(req, res) {
  * actually verifying the Zoho credentials just entered.
  */
 async function testZohoEmail(req, res) {
+  if (!zohoMailService.IN_USE) {
+    flash.set(req, 'error', 'Zoho Mail is not used by this application — all mail goes through the SMTP server in .env (Bluehost).');
+    res.redirect('/settings');
+    return;
+  }
   const to = String(req.body.test_to || '').trim();
   if (to === '' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
     flash.set(req, 'error', 'Enter a valid email address to send the test to.');
@@ -192,6 +208,27 @@ async function testZohoEmail(req, res) {
     await auditLogRepository.log(req.user.id, 'SETTINGS_TEST_ZOHO_EMAIL_SENT', 'company_settings', null, null, null, to);
   } catch (e) {
     flash.set(req, 'error', `Zoho test send failed: ${e.message}`);
+  }
+  res.redirect('/settings');
+}
+
+/**
+ * Zoho integration Stage 1 (2026-10-29) — the "Test Books connection"
+ * button: logs in to Zoho Books with the saved zoho_books_* settings and
+ * reports the organisation, the deposit account and any currency Books has
+ * not turned on. Reads only; creates nothing in Zoho.
+ */
+async function testZohoBooks(req, res) {
+  try {
+    const result = await zohoBooksService.testConnection();
+    let message = `Connected to Zoho Books: ${result.organization}. Payments are deposited into ${result.deposit_account}.`;
+    if (result.missing_currencies.length > 0) {
+      message += ` Turn on these currencies in Zoho Books -> Settings -> Currencies: ${result.missing_currencies.join(', ')}.`;
+    }
+    flash.set(req, result.missing_currencies.length === 0 ? 'success' : 'warning', message);
+    await auditLogRepository.log(req.user.id, 'SETTINGS_TEST_ZOHO_BOOKS_CONNECTED', 'company_settings', null, null, null, result.organization);
+  } catch (e) {
+    flash.set(req, 'error', `Zoho Books connection failed: ${e.message}`);
   }
   res.redirect('/settings');
 }
@@ -227,4 +264,4 @@ async function testSmtpEmail(req, res) {
   res.redirect('/settings');
 }
 
-module.exports = { index, update, testZohoEmail, testSmtpEmail };
+module.exports = { index, update, testZohoEmail, testZohoBooks, testSmtpEmail };

@@ -35,7 +35,7 @@ final class CaSyncService
     public static function syncPendingRevenue(string $triggeredBy, ?int $triggeredByUserId): array
     {
         if (!ZohoBooksService::isEnabled()) {
-            ZohoSyncLogRepository::log('revenue_payment', null, null, null, 'skipped', null, 'Zoho Books is not enabled/configured — nothing synced.', $triggeredBy, $triggeredByUserId);
+            ZohoSyncLogRepository::log('revenue_payment', null, null, null, 'skipped', null, self::offReason() . ' — nothing synced.', $triggeredBy, $triggeredByUserId);
             return ['synced' => 0, 'failed' => 0, 'skipped' => 1];
         }
 
@@ -47,6 +47,8 @@ final class CaSyncService
                 $zohoReference = ZohoBooksService::pushRevenuePayment(
                     $leg['client_id'],
                     $leg['company_legal_name'],
+                    (string) ($leg['currency_code'] ?? 'INR'),
+                    $leg['foreign_amount'] !== null ? (float) $leg['foreign_amount'] : null,
                     (float) $leg['inr_actual'],
                     substr((string) $leg['cleared_at'], 0, 10),
                     $referenceNumber
@@ -74,7 +76,7 @@ final class CaSyncService
     public static function importPendingExpenses(string $triggeredBy, ?int $triggeredByUserId): array
     {
         if (!ZohoBooksService::isEnabled()) {
-            ZohoSyncLogRepository::log('expense_import', null, null, null, 'skipped', null, 'Zoho Books is not enabled/configured — nothing imported.', $triggeredBy, $triggeredByUserId);
+            ZohoSyncLogRepository::log('expense_import', null, null, null, 'skipped', null, self::offReason() . ' — nothing imported.', $triggeredBy, $triggeredByUserId);
             return ['imported' => 0, 'failed' => 0, 'skipped' => 1];
         }
 
@@ -128,5 +130,12 @@ final class CaSyncService
             'balance' => OrderPaymentStatusRepository::setBalanceZohoSync($orderId, $zohoReference),
             'freight' => OrderPaymentStatusRepository::setFreightZohoSync($orderId, $zohoReference),
         };
+    }
+
+    private static function offReason(): string
+    {
+        return ZohoGuard::integrationEnabled()
+            ? 'Zoho Books is not enabled/configured'
+            : 'Zoho is switched off on this server (ZOHO_INTEGRATION_ENABLED in .env)';
     }
 }

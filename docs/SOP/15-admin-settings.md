@@ -147,12 +147,21 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   default CC are marked **Super Admin only** right on the screen — anyone
   else sees them
   read-only, with no unlock option, since a standing CC address silently
-  sees every client email that goes out. Below the main form, two **Send
-  Test Email** buttons — one for the SMTP server configured in `.env`,
-  one for Zoho Mail if it's enabled — send one real email straight through
-  that transport only, bypassing Test Mode, Mail Redirect, and each
-  other's fallback, so a connection/credential problem shows up as an
-  actual error on screen instead of a silent log line.
+  sees every client email that goes out. Below the main form, a **Send
+  Test Email** button for the SMTP server configured in `.env` sends one
+  real email straight through it, bypassing Test Mode and Mail Redirect,
+  so a connection/credential problem shows up as an actual error on
+  screen instead of a silent log line. **All mail goes through that SMTP
+  server (Bluehost)** — owner decision 2026-10-29: NexaCrest's mail is
+  hosted with Bluehost and Zoho Mail is used only as a mail client, so the
+  app never sends through Zoho Mail and its settings are not shown here.
+  A second button, **Test Books Connection** (2026-10-29), logs in to
+  Zoho Books with the `zoho_books` settings and shows the organisation
+  name and the bank account payments go into, or the exact error. It
+  only reads — nothing is created in Zoho Books. Above it, a line shows
+  what this server's `.env` allows: Zoho integration on or off, test or
+  production, and whether GST e-invoice / e-way bill / GST filing is
+  blocked. See [Zoho Books Sync](./ca-03-zoho-sync.md).
 
   **Which emails staff receive** (owner decision 2026-10-26). The audit
   trail records every action, but **recording an action never sends an

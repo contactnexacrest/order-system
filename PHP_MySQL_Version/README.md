@@ -132,6 +132,14 @@ correctly once the password is changed.
    folder in this project), and SMTP details when you have them. Leave the
    `SMS_GATEWAY_*` values blank unless you've signed up for an SMS
    provider — the app works fine without them (email 2FA only).
+   Keep the three Zoho lines written out (never commented out):
+   `ZOHO_INTEGRATION_ENABLED=false`, `ZOHO_ENVIRONMENT=test`,
+   `ZOHO_EINVOICE_ENABLED=false`. The app works fully without Zoho. On the
+   live server, once Zoho Books is set up, set `ZOHO_INTEGRATION_ENABLED=true`
+   and `ZOHO_ENVIRONMENT=production`; leave `ZOHO_EINVOICE_ENABLED=false`
+   until NexaCrest must e-invoice. Mail always goes through the SMTP
+   server (Bluehost) — Zoho Mail is not used to send. See SOP
+   [ca-03 Zoho Books Sync](docs/SOP/ca-03-zoho-sync.md).
 4. **Dependencies — already included, nothing to run.** `app/vendor/` in
    this delivery is a real, working copy of DOMPDF, PHPWord, Twig, and
    PHPMailer — the document generation pipeline needs all four.

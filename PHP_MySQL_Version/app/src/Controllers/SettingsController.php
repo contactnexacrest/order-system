@@ -17,6 +17,8 @@ use App\Repositories\UiTemplateRepository;
 use App\Services\AuthService;
 use App\Services\EmailService;
 use App\Services\SuperAdminService;
+use App\Services\ZohoBooksService;
+use App\Services\ZohoGuard;
 use App\Services\ZohoMailService;
 
 final class SettingsController
@@ -28,9 +30,18 @@ final class SettingsController
         foreach ($settings as $row) {
             $grouped[$row['category']][] = $row;
         }
+        if (!ZohoMailService::IN_USE) {
+            unset($grouped['zoho']); // mail goes through Bluehost SMTP only (owner decision 2026-10-29)
+        }
         $user = AuthService::currentUser();
         View::render('settings/index', [
             'grouped' => $grouped,
+            'zohoServer' => [
+                'enabled' => ZohoGuard::integrationEnabled(),
+                'environment' => ZohoGuard::environment(),
+                'government' => ZohoGuard::governmentFeaturesAllowed(),
+                'missing' => ZohoGuard::missingVariables(),
+            ],
             'isSuperAdmin' => SuperAdminService::isEffective((int) $user['id']),
             // External QA report L-34: PHP's own post_max_size/
             // upload_max_filesize silently caps every upload below
@@ -241,6 +252,11 @@ final class SettingsController
     public function testZohoEmail(array $params): void
     {
         $user = AuthService::currentUser();
+        if (!ZohoMailService::IN_USE) {
+            Flash::set('error', 'Zoho Mail is not used by this application — all mail goes through the SMTP server in .env (Bluehost).');
+            header('Location: /settings');
+            return;
+        }
         $to = trim((string) ($_POST['test_to'] ?? ''));
         if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
             Flash::set('error', 'Enter a valid email address to send the test to.');
@@ -260,6 +276,29 @@ final class SettingsController
             AuditLogRepository::log((int) $user['id'], 'SETTINGS_TEST_ZOHO_EMAIL_SENT', 'company_settings', null, null, null, $to);
         } catch (\Throwable $e) {
             Flash::set('error', 'Zoho test send failed: ' . $e->getMessage());
+        }
+        header('Location: /settings');
+    }
+
+    /**
+     * Zoho integration Stage 1 (2026-10-29) — the "Test Books connection"
+     * button: logs in to Zoho Books with the saved zoho_books_* settings
+     * and reports the organisation, the deposit account and any currency
+     * Books has not turned on. Reads only; creates nothing in Zoho.
+     */
+    public function testZohoBooks(array $params): void
+    {
+        $user = AuthService::currentUser();
+        try {
+            $result = ZohoBooksService::testConnection();
+            $message = "Connected to Zoho Books: {$result['organization']}. Payments are deposited into {$result['deposit_account']}.";
+            if ($result['missing_currencies'] !== []) {
+                $message .= ' Turn on these currencies in Zoho Books -> Settings -> Currencies: ' . implode(', ', $result['missing_currencies']) . '.';
+            }
+            Flash::set($result['missing_currencies'] === [] ? 'success' : 'warning', $message);
+            AuditLogRepository::log((int) $user['id'], 'SETTINGS_TEST_ZOHO_BOOKS_CONNECTED', 'company_settings', null, null, null, $result['organization']);
+        } catch (\Throwable $e) {
+            Flash::set('error', 'Zoho Books connection failed: ' . $e->getMessage());
         }
         header('Location: /settings');
     }

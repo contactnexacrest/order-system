@@ -5,6 +5,7 @@ const companySettingsRepository = require('./companySettingsRepository');
 const caBankStatementRepository = require('./caBankStatementRepository');
 const caExpenseRepository = require('./caExpenseRepository');
 const financialYear = require('../helpers/financialYear');
+const zohoGuard = require('../services/zohoGuard');
 
 // CA / Accounting module — independent of the order-pipeline system
 // (nav-gated on ca_module_view, never on manage_orders). Phase 1 was the
@@ -70,6 +71,7 @@ async function settlementRegister() {
         firc_pending: fircPending,
         zoho_synced_at: ops[legDef.zohoAtCol] ?? null,
         zoho_reference: ops[legDef.zohoRefCol] ?? null,
+        is_test_or_sample: Number(ops.is_test_or_sample || 0) === 1,
       });
     }
   }
@@ -80,11 +82,15 @@ async function settlementRegister() {
 /**
  * Every leg with an INR actual on record that hasn't been pushed to Zoho
  * Books yet — what caSyncService.syncPendingRevenue() works through on
- * each run (manual or scheduled).
+ * each run (manual or scheduled). Owner decision 2026-10-29: in
+ * production, test and sample orders never go to Zoho; in test
+ * (ZOHO_ENVIRONMENT in .env), only TEST- customers do, so the clean-up
+ * script finds everything testing made.
  */
 async function legsPendingZohoSync() {
   const rows = await settlementRegister();
-  return rows.filter((r) => r.inr_actual !== null && r.zoho_synced_at === null);
+  return rows.filter((r) => r.inr_actual !== null && r.zoho_synced_at === null
+    && (zohoGuard.isProduction() ? !r.is_test_or_sample : String(r.company_legal_name || '').startsWith(zohoGuard.TEST_PREFIX)));
 }
 
 /**

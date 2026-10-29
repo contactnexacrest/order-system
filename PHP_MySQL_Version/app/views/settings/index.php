@@ -170,6 +170,24 @@
     </form>
   </div>
   <?php endif; ?>
+
+  <?php if (isset($grouped['zoho_books'])): ?>
+  <div class="section">
+    <h2>Test Zoho Books Connection</h2>
+    <p class="muted">Logs in to Zoho Books with the details above and checks the organisation, the deposit account and the currencies. It only reads — nothing is created in Zoho. Save your changes above first.</p>
+    <p class="zoho-server-status"><strong>This server (set in .env):</strong>
+      Zoho integration <strong><?= $zohoServer['enabled'] ? 'ON' : 'OFF' ?></strong> ·
+      environment <strong><?= htmlspecialchars($zohoServer['environment']) ?></strong> ·
+      GST e-invoice / e-way bill / GST filing <strong><?= $zohoServer['government'] ? 'allowed' : 'blocked' ?></strong></p>
+    <?php if ($zohoServer['missing'] !== []): ?>
+    <div class="alert alert-warning">Not written out in .env: <?= htmlspecialchars(implode(', ', $zohoServer['missing'])) ?>. Read as the safe choice (Zoho off, test, e-invoice off) — add them to .env with their values.</div>
+    <?php endif; ?>
+    <form method="post" action="/settings/test-zoho-books">
+      <?= Csrf::field() ?>
+      <button type="submit" class="btn-sm">Test Books Connection</button>
+    </form>
+  </div>
+  <?php endif; ?>
 </div>
 <script>
 /* 90-item backlog #27: ~20 settings categories as plain <details>/<summary>

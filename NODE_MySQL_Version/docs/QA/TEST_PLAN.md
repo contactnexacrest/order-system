@@ -19,9 +19,9 @@ through those dedicated suites rather than duplicated here.
 
 ## 1. Scope and application shape
 
-- **2 stacks**, PHP/MySQL and Node/MySQL, route-for-route identical: **466
-  routes each** — 157 GET, 309 POST (`public_html/index.php` /
-  `src/server.js`; counts as of 28 Oct 2026).
+- **2 stacks**, PHP/MySQL and Node/MySQL, route-for-route identical: **467
+  routes each** — 157 GET, 310 POST (`public_html/index.php` /
+  `src/server.js`; counts as of 29 Oct 2026).
 - **112 database tables** (`docs/schema.sql`), 24 of which (at the time
   of the original inventory) hang directly off
   `orders.id` (the order-lifecycle-dependent tables — see

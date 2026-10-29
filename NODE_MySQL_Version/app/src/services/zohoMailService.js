@@ -11,7 +11,7 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
  * fail loudly and correctly on any bad response.
  *
  * NOTE: written against Zoho Mail API v1's documented shape
- * (accounts.zoho.com OAuth token endpoint; mail.zoho.com/api/accounts/
+ * (accounts.zoho.in OAuth token endpoint; mail.zoho.in/api/accounts/
  * {accountId}/messages to send, .../messages/attachments to pre-upload an
  * attachment). This account has no live Zoho credentials yet to verify
  * the exact request/response shape against — re-check field names here
@@ -19,8 +19,18 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
  * configured, using the "Send Test Email" button on /settings.
  */
 
+/**
+ * Owner decision 2026-10-29: NexaCrest's mail is hosted with Bluehost and
+ * the app sends only through Bluehost SMTP. Zoho Mail is used as a mail
+ * client only, never to send the app's mail. This module is kept as it is
+ * so it can be used again later by setting IN_USE to true — while it is
+ * false, the zoho_mail_enabled setting is ignored and its settings and
+ * test button are hidden from Admin -> Settings.
+ */
+const IN_USE = false;
+
 async function isEnabled() {
-  return (await companySettingsRepository.get('zoho_mail_enabled')) === '1';
+  return IN_USE && (await companySettingsRepository.get('zoho_mail_enabled')) === '1';
 }
 
 /**
@@ -39,8 +49,8 @@ async function send(to, subject, body, attachments = [], cc = []) {
     throw new Error('Zoho Mail is enabled but not fully configured — fill in every zoho_* setting.');
   }
 
-  const accountsDomain = (await companySettingsRepository.get('zoho_accounts_domain')) || 'accounts.zoho.com';
-  const apiDomain = (await companySettingsRepository.get('zoho_api_domain')) || 'mail.zoho.com';
+  const accountsDomain = (await companySettingsRepository.get('zoho_accounts_domain')) || 'accounts.zoho.in';
+  const apiDomain = (await companySettingsRepository.get('zoho_api_domain')) || 'mail.zoho.in';
 
   const accessToken = await getAccessToken(accountsDomain, clientId, clientSecret, refreshToken);
 
@@ -126,4 +136,4 @@ async function uploadAttachment(apiDomain, accountId, accessToken, filePath, nam
   };
 }
 
-module.exports = { isEnabled, send };
+module.exports = { isEnabled, send, IN_USE };

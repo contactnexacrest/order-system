@@ -5,6 +5,7 @@ const caExpenseRepository = require('../repositories/caExpenseRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const zohoSyncLogRepository = require('../repositories/zohoSyncLogRepository');
 const zohoBooksService = require('../services/zohoBooksService');
+const zohoGuard = require('../services/zohoGuard');
 
 /**
  * CA / Accounting module — orchestrates a Zoho Books sync run, from either
@@ -25,7 +26,7 @@ async function runFullSync(triggeredBy, triggeredByUserId) {
 
 async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
   if (!(await zohoBooksService.isEnabled())) {
-    await zohoSyncLogRepository.log('revenue_payment', null, null, null, 'skipped', null, 'Zoho Books is not enabled/configured — nothing synced.', triggeredBy, triggeredByUserId);
+    await zohoSyncLogRepository.log('revenue_payment', null, null, null, 'skipped', null, `${offReason()} — nothing synced.`, triggeredBy, triggeredByUserId);
     return { synced: 0, failed: 0, skipped: 1 };
   }
 
@@ -37,6 +38,8 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
       const zohoReference = await zohoBooksService.pushRevenuePayment(
         leg.client_id,
         leg.company_legal_name,
+        leg.currency_code || 'INR',
+        leg.foreign_amount,
         leg.inr_actual,
         String(leg.cleared_at).slice(0, 10),
         referenceNumber
@@ -67,7 +70,7 @@ async function markSynced(orderId, leg, zohoReference) {
 
 async function importPendingExpenses(triggeredBy, triggeredByUserId) {
   if (!(await zohoBooksService.isEnabled())) {
-    await zohoSyncLogRepository.log('expense_import', null, null, null, 'skipped', null, 'Zoho Books is not enabled/configured — nothing imported.', triggeredBy, triggeredByUserId);
+    await zohoSyncLogRepository.log('expense_import', null, null, null, 'skipped', null, `${offReason()} — nothing imported.`, triggeredBy, triggeredByUserId);
     return { imported: 0, failed: 0, skipped: 1 };
   }
 
@@ -113,6 +116,12 @@ async function importPendingExpenses(triggeredBy, triggeredByUserId) {
   }
 
   return { imported, failed: 0, skipped: 0 };
+}
+
+function offReason() {
+  return zohoGuard.integrationEnabled()
+    ? 'Zoho Books is not enabled/configured'
+    : 'Zoho is switched off on this server (ZOHO_INTEGRATION_ENABLED in .env)';
 }
 
 module.exports = { runFullSync, syncPendingRevenue, importPendingExpenses };
