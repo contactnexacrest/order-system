@@ -61,7 +61,17 @@ the buyer:
   exchange rate recorded for the balance leg in the INR Settlement
   Register (else the advance leg's); the Debit Note the freight leg's
   (else the advance leg's). With no rate recorded the invoice is not sent
-  and the Sync Log says so.
+  and the Sync Log says so. **The rate is fixed once the invoice is in
+  Books:** a rate recorded later (for example when the balance arrives)
+  does not change the invoice — each payment still goes in at its own
+  actual rate, and Books books the difference as exchange gain or loss.
+- **GST (2026-10-29).** In a GST-registered Books organisation the
+  invoice goes in as an export to an overseas customer **without payment
+  of IGST** (under LUT), with each product's HS code. A GST invoice
+  number may have at most 16 characters: CIs and Debit Notes numbered
+  before the 2-digit-year change (`SC/CI/2026/…`, 17 characters) are
+  refused with a message — book those by hand if they fall after the
+  go-live date.
 - **Marked as sent in Books, but no email goes out.** This only lets
   payments be applied to it.
 
@@ -132,9 +142,20 @@ What the order pays out goes to Zoho Books too, on the same sync:
 
 - a Books account above does not exist (add it in Zoho Books →
   Accountant → Chart of Accounts, or ask the CA which to use);
-- a bill **with GST** while the Books organisation is GST-registered:
-  how GST and input credit on bills are booked is for the CA to set up
-  first, so the system does not guess it.
+- in a GST-registered Books organisation, a bill whose GST is not 5, 12,
+  18, 28 or 40 % of its taxable value, or a bill with GST from a supplier
+  or logistics partner with **no GSTIN** in the app (add the GSTIN, or
+  correct the bill).
+
+**GST on bills (2026-10-29).** In a GST-registered Books organisation a
+bill goes in at its **taxable value plus GST at the bill's own rate**:
+**IGST** when the supplier's GSTIN is from another state, **CGST + SGST**
+when it is from Karnataka, like NexaCrest's. Books works out the place of
+supply from the GSTIN. A bill without GST from a registered supplier goes
+in at 0 %; from an unregistered one, without tax. Not handled yet — for
+the CA to decide: reverse charge (for example road transport by a goods
+transport agency) and input credit that is blocked. Order expenses go in
+without GST (Books marks them "out of scope").
 
 ## The server switches in `.env` (2026-10-29)
 
@@ -187,6 +208,12 @@ the app does not send through Zoho Mail):
   Zoho's Indian data centre (`accounts.zoho.in` / `www.zohoapis.in`), where
   NexaCrest's Zoho One account lives. Change them only if the account
   moves region.
+- `zoho_books_sync_start_date` — the **go-live date** (2026-10-29). Only
+  CIs, Debit Notes, payments, bills, vendor payments and order expenses
+  dated on or after it go to Zoho Books; the CA books everything earlier
+  (for example an advance received before go-live) by hand as the opening
+  position. **On the live server nothing is sent until it is set.** Pick
+  the 1st of a month, ideally the start of a GST return period.
 - `zoho_books_enabled` — flip this on once everything above is filled in.
   This is the master switch the sync checks before doing anything.
 

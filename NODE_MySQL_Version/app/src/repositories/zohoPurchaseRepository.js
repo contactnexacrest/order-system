@@ -35,10 +35,10 @@ function allowed(row) {
   return String(row.buyer_name || '').startsWith(zohoGuard.TEST_PREFIX) && String(row.vendor_name || '').startsWith(zohoGuard.TEST_PREFIX);
 }
 
-/** Tax invoices not yet in Books. */
-async function billsToSync() {
+/** Tax invoices not yet in Books (dated on or after startDate, when given). */
+async function billsToSync(startDate = null) {
   const rows = await db.query(`${BILL_SELECT} WHERE b.doc_kind = 'invoice' AND b.zoho_bill_id IS NULL ORDER BY b.bill_date, b.id`);
-  return rows.filter(allowed);
+  return rows.filter((r) => allowed(r) && (startDate === null || String(r.bill_date) >= startDate));
 }
 
 async function findBill(billId) {
@@ -65,13 +65,14 @@ async function payments(where) {
   return out;
 }
 
-/** Payments to vendors not yet in Books, each with its bill. */
-const paymentsToSync = () => payments('p.zoho_payment_id IS NULL');
+/** Payments to vendors not yet in Books (paid on or after startDate, when given), each with its bill. */
+const paymentsToSync = async (startDate = null) => (await payments('p.zoho_payment_id IS NULL'))
+  .filter((p) => startDate === null || String(p.payment.paid_at) >= startDate);
 /** Payments in Books but not yet applied to a bill (advances on a proforma). */
 const heldPayments = () => payments('p.zoho_payment_id IS NOT NULL AND p.zoho_applied_at IS NULL');
 
-/** Order expenses not yet in Books. */
-async function expensesToSync() {
+/** Order expenses not yet in Books (dated on or after startDate, when given). */
+async function expensesToSync(startDate = null) {
   const rows = await db.query(
     `SELECT e.*, o.buyer_inquiry_ref, o.company_legal_name AS buyer_name,
             (o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1) AS is_test_or_sample
@@ -81,9 +82,10 @@ async function expensesToSync() {
      WHERE e.zoho_expense_id IS NULL
      ORDER BY e.expense_date, e.id`
   );
-  return rows.filter((r) => (zohoGuard.isProduction()
-    ? Number(r.is_test_or_sample) !== 1
-    : String(r.buyer_name || '').startsWith(zohoGuard.TEST_PREFIX)));
+  return rows.filter((r) => (startDate === null || String(r.expense_date) >= startDate)
+    && (zohoGuard.isProduction()
+      ? Number(r.is_test_or_sample) !== 1
+      : String(r.buyer_name || '').startsWith(zohoGuard.TEST_PREFIX)));
 }
 
 /** Zoho expense ids this app created — the expense import must not bring them back. */

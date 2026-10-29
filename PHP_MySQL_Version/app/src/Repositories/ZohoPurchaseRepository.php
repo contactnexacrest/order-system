@@ -39,11 +39,11 @@ final class ZohoPurchaseRepository
         LEFT JOIN suppliers s ON s.id = po.supplier_id AND b.vendor_kind = 'supplier'
         LEFT JOIN logistics_partners lp ON lp.id = b.logistics_partner_id AND b.vendor_kind = 'logistics'";
 
-    /** @return list<array<string,mixed>> tax invoices not yet in Books */
-    public static function billsToSync(): array
+    /** @return list<array<string,mixed>> tax invoices not yet in Books (dated on or after $startDate, when given) */
+    public static function billsToSync(?string $startDate = null): array
     {
         $rows = Database::connection()->query(self::BILL_SELECT . " WHERE b.doc_kind = 'invoice' AND b.zoho_bill_id IS NULL ORDER BY b.bill_date, b.id")->fetchAll();
-        return array_values(array_filter($rows, [self::class, 'allowed']));
+        return array_values(array_filter($rows, static fn (array $r): bool => self::allowed($r) && ($startDate === null || (string) $r['bill_date'] >= $startDate)));
     }
 
     public static function findBill(int $billId): ?array
@@ -68,10 +68,10 @@ final class ZohoPurchaseRepository
         return $stmt->fetch() ?: null;
     }
 
-    /** @return list<array<string,mixed>> payments to vendors not yet in Books, each with its bill */
-    public static function paymentsToSync(): array
+    /** @return list<array<string,mixed>> payments to vendors not yet in Books (paid on or after $startDate, when given), each with its bill */
+    public static function paymentsToSync(?string $startDate = null): array
     {
-        return self::payments('p.zoho_payment_id IS NULL');
+        return array_values(array_filter(self::payments('p.zoho_payment_id IS NULL'), static fn (array $p): bool => $startDate === null || (string) $p['payment']['paid_at'] >= $startDate));
     }
 
     /** @return list<array<string,mixed>> payments in Books but not yet applied to a bill (advances on a proforma) */
@@ -94,8 +94,8 @@ final class ZohoPurchaseRepository
         return $out;
     }
 
-    /** @return list<array<string,mixed>> order expenses not yet in Books */
-    public static function expensesToSync(): array
+    /** @return list<array<string,mixed>> order expenses not yet in Books (dated on or after $startDate, when given) */
+    public static function expensesToSync(?string $startDate = null): array
     {
         $rows = Database::connection()->query(
             'SELECT e.*, o.buyer_inquiry_ref, o.company_legal_name AS buyer_name,
@@ -106,9 +106,10 @@ final class ZohoPurchaseRepository
              WHERE e.zoho_expense_id IS NULL
              ORDER BY e.expense_date, e.id'
         )->fetchAll();
-        return array_values(array_filter($rows, static fn (array $r): bool => ZohoGuard::isProduction()
-            ? (int) $r['is_test_or_sample'] !== 1
-            : str_starts_with((string) $r['buyer_name'], ZohoGuard::TEST_PREFIX)));
+        return array_values(array_filter($rows, static fn (array $r): bool => ($startDate === null || (string) $r['expense_date'] >= $startDate)
+            && (ZohoGuard::isProduction()
+                ? (int) $r['is_test_or_sample'] !== 1
+                : str_starts_with((string) $r['buyer_name'], ZohoGuard::TEST_PREFIX))));
     }
 
     /** Zoho expense ids this app created — the expense import must not bring them back. */

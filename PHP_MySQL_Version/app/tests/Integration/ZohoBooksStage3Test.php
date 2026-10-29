@@ -84,7 +84,15 @@ final class ZohoBooksStage3Test extends DbTestCase
             return $json(['access_token' => 'fake-access']);
         }
         if (preg_match('#^/books/v3/organizations/(\d+)$#', $path, $m) === 1) {
-            return $json(['code' => 0, 'organization' => ['organization_id' => $m[1], 'is_registered_for_gst' => $this->gstRegistered]]);
+            return $json(['code' => 0, 'organization' => ['organization_id' => $m[1], 'is_registered_for_gst' => $this->gstRegistered, 'tax_settings' => ['tax_reg_no' => $this->gstRegistered ? '29AAKCN8733G1ZZ' : '']]]);
+        }
+        if ($path === '/books/v3/settings/taxes') {
+            $taxes = [];
+            foreach ([0, 5, 12, 18, 28, 40] as $rate) {
+                $taxes[] = ['tax_id' => "TX-GST{$rate}", 'tax_name' => "GST{$rate}", 'tax_percentage' => $rate];
+                $taxes[] = ['tax_id' => "TX-IGST{$rate}", 'tax_name' => "IGST{$rate}", 'tax_percentage' => $rate];
+            }
+            return $json(['code' => 0, 'taxes' => $taxes]);
         }
         if ($path === '/books/v3/chartofaccounts') {
             return $json(['code' => 0, 'chartofaccounts' => $this->accounts]);
@@ -103,7 +111,9 @@ final class ZohoBooksStage3Test extends DbTestCase
         }
         if ($path === '/books/v3/bills' && $method === 'POST') {
             $id = 'BL-' . (count($this->bills) + 1);
-            $this->bills[$id] = ['bill_id' => $id, 'bill_number' => $payload['bill_number'], 'vendor_id' => $payload['vendor_id'], 'total' => $payload['line_items'][0]['rate'], 'payload' => $payload];
+            $line = $payload['line_items'][0];
+            $percent = isset($line['tax_id']) ? (int) preg_replace('/\D/', '', $line['tax_id']) : 0;
+            $this->bills[$id] = ['bill_id' => $id, 'bill_number' => $payload['bill_number'], 'vendor_id' => $payload['vendor_id'], 'total' => round($line['rate'] * (1 + $percent / 100), 2), 'payload' => $payload];
             return $json(['code' => 0, 'bill' => $this->bills[$id]], 201);
         }
         if ($path === '/books/v3/vendorpayments' && $method === 'POST') {
@@ -252,21 +262,57 @@ final class ZohoBooksStage3Test extends DbTestCase
         self::assertSame([], $this->expenses);
     }
 
-    public function testInAGstRegisteredOrganisationABillWithGstIsRefusedAndTheVendorGetsItsGstin(): void
+    public function testInAGstRegisteredOrganisationABillCarriesItsGstIgstForAnotherStateCgstSgstForKarnataka(): void
     {
         $this->gstRegistered = true;
         $o = $this->createOrder();
-        $this->supplierBill($o, 'invoice', 'TEST-INV-GST', 100000.0, 18000.0);
-        $noGst = OrderVendorBillRepository::create($o['order'], 'logistics', [
+        Database::connection()->exec("UPDATE suppliers SET gstin = '08ZZTPT1111Z1ZG' WHERE id = {$o['supplier']}");
+        $this->supplierBill($o, 'invoice', 'TEST-INV-RJ', 100000.0, 18000.0);
+        Database::connection()->exec("UPDATE logistics_partners SET gstin = '29ZZTPT2222Z1Z6' WHERE id = {$o['partner']}");
+        OrderVendorBillRepository::create($o['order'], 'logistics', [
+            'logistics_partner_id' => $o['partner'], 'bill_for' => 'cha', 'doc_kind' => 'invoice', 'bill_no' => 'TEST-CHA-KA', 'bill_date' => '2026-10-27', 'taxable_inr' => 10000.0, 'gst_inr' => 1800.0,
+        ], $this->userId);
+
+        self::assertSame(2, $this->sync()['bills']);
+
+        $rajasthan = $this->bills['BL-1'];
+        self::assertSame(['rate' => 100000.0, 'tax_id' => 'TX-IGST18'], array_intersect_key($rajasthan['payload']['line_items'][0], ['rate' => 1, 'tax_id' => 1]), 'another state: IGST on the taxable value');
+        self::assertSame(118000.0, $rajasthan['total']);
+        self::assertSame(['gst_treatment' => 'business_gst', 'gst_no' => '08ZZTPT1111Z1ZG'], array_intersect_key($this->contacts['VN-1']['payload'], ['gst_treatment' => 1, 'gst_no' => 1]));
+        self::assertSame('TX-GST18', $this->bills['BL-2']['payload']['line_items'][0]['tax_id'], 'Karnataka, like NexaCrest: CGST + SGST (the GST group)');
+        self::assertSame(11800.0, $this->bills['BL-2']['total']);
+    }
+
+    public function testInAGstRegisteredOrganisationABillWithoutGstFromARegisteredVendorGoesInAtZeroAndFromAnUnregisteredOneWithoutTax(): void
+    {
+        $this->gstRegistered = true;
+        $o = $this->createOrder();
+        $this->supplierBill($o, 'invoice', 'TEST-INV-ZERO', 5000.0, 0.0);
+        OrderVendorBillRepository::create($o['order'], 'logistics', [
             'logistics_partner_id' => $o['partner'], 'bill_for' => 'other', 'doc_kind' => 'invoice', 'bill_no' => 'TEST-NOGST-1', 'bill_date' => '2026-10-27', 'taxable_inr' => 500.0, 'gst_inr' => 0.0,
         ], $this->userId);
 
-        $result = $this->sync();
+        self::assertSame(2, $this->sync()['bills']);
+        self::assertSame('TX-GST0', $this->bills['BL-1']['payload']['line_items'][0]['tax_id'], 'registered supplier in Karnataka (29...)');
+        self::assertArrayNotHasKey('tax_id', $this->bills['BL-2']['payload']['line_items'][0], 'unregistered forwarder: no tax');
+        self::assertSame('business_none', $this->contacts['VN-2']['payload']['gst_treatment']);
+    }
 
-        self::assertSame([1, 1], [$result['bills'], $result['failed']]);
-        self::assertSame('Bill TEST-INV-GST not sent: it carries GST, and how GST on bills is booked in a GST-registered Zoho Books organisation is still for the CA to decide.', $this->messages($o['order'], 'vendor_bill')[0]);
-        self::assertSame('business_none', $this->contacts['VN-1']['payload']['gst_treatment'], 'the forwarder has no GSTIN');
-        self::assertNotNull(ZohoPurchaseRepository::findBill($noGst)['zoho_bill_id']);
+    public function testInAGstRegisteredOrganisationGstFromAVendorWithoutGstinOrAnOddRateIsRefused(): void
+    {
+        $this->gstRegistered = true;
+        $o = $this->createOrder();
+        $this->supplierBill($o, 'invoice', 'TEST-INV-ODD', 100000.0, 15000.0);
+        OrderVendorBillRepository::create($o['order'], 'logistics', [
+            'logistics_partner_id' => $o['partner'], 'bill_for' => 'transport', 'doc_kind' => 'invoice', 'bill_no' => 'TEST-TR-NOGSTIN', 'bill_date' => '2026-10-27', 'taxable_inr' => 2000.0, 'gst_inr' => 360.0,
+        ], $this->userId);
+
+        self::assertSame(2, $this->sync()['failed']);
+        self::assertSame([
+            'Bill TEST-INV-ODD not sent: GST 15000.00 on taxable 100000.00 is not 5, 12, 18, 28 or 40 % — correct the bill (a bill with several GST rates needs the CA).',
+            'Bill TEST-TR-NOGSTIN not sent: it carries GST (360.00), but TEST-Stage3 Forwarder has no GSTIN in the app. Add the GSTIN to the supplier / logistics partner, or correct the bill.',
+        ], $this->messages($o['order'], 'vendor_bill'));
+        self::assertSame([], $this->bills);
     }
 
     public function testABillAlreadyInBooksIsReusedNotDuplicated(): void

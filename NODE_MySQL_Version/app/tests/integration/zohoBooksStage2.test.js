@@ -264,7 +264,7 @@ describe('Zoho Books Stage 2', () => {
   it('a GST-registered organisation gets HSN and overseas treatment', async () => {
     gstRegistered = true;
     const orderId = await createCifOrder();
-    await approveDocument(orderId, 'CI', 'TEST-SC/CI/2026/2810006');
+    await approveDocument(orderId, 'CI', 'SC/CI/26/2810006');
 
     await sync();
 
@@ -272,6 +272,66 @@ describe('Zoho Books Stage 2', () => {
     expect(payload.gst_treatment).toBe('overseas');
     expect(payload.line_items[0].hsn_or_sac).toBe('68022310');
     expect(payload.line_items[0].description).toBe('Granite slab. Size: 60x60x2 cm. Finish: Polished');
+  });
+
+  it('in a GST-registered organisation an invoice number longer than 16 characters is refused', async () => {
+    gstRegistered = true;
+    const orderId = await createCifOrder();
+    await approveDocument(orderId, 'CI', 'SC/CI/2026/2810012');
+
+    await sync();
+
+    expect(invoices).toEqual({});
+    const rows = (await logRows(orderId)).filter((r) => r.sync_type === 'invoice');
+    expect(rows[0].message).toBe('Commercial Invoice SC/CI/2026/2810012 not sent: a GST invoice number may have at most 16 characters and this one has 18. Book it in Zoho Books by hand, or generate it again after the 2-digit-year change (SC/CI/26/...).');
+  });
+
+  it('the exchange rate is frozen once the invoice is in Books', async () => {
+    const orderId = await createCifOrder();
+    await db.execute('UPDATE order_payment_status SET balance_exchange_rate = NULL WHERE order_id = :id', { id: orderId });
+    await approveDocument(orderId, 'CI', 'TEST-SC/CI/2026/2810013');
+    await sync();
+    expect(invoices['INV-1'].payload.exchange_rate).toBe(84.1); // sent at the advance rate (no balance rate yet)
+
+    // The balance arrives and its rate is recorded: the invoice must not be revalued.
+    await db.execute('UPDATE order_payment_status SET balance_exchange_rate = 86.2 WHERE order_id = :id', { id: orderId });
+    await sync();
+
+    expect(requestsTo('PUT', '/books/v3/invoices/')).toHaveLength(0); // no update just because a later rate was recorded
+    expect(String((await orderZohoInvoiceRepository.find(orderId, 'ci')).exchange_rate)).toBe('84.100000');
+  });
+
+  it('only records dated on or after the go-live date go', async () => {
+    await companySettingsRepository.set('zoho_books_sync_start_date', '2026-10-28');
+    try {
+      const before = await createCifOrder();
+      await approveDocument(before, 'CI', 'TEST-SC/CI/2026/2710014', 0, '2026-10-27'); // advance cleared 2026-10-20
+      const after = await createCifOrder();
+      await approveDocument(after, 'CI', 'TEST-SC/CI/2026/2810015', 0, '2026-10-28');
+      await db.execute("UPDATE order_payment_status SET advance_cleared_at = '2026-10-28 09:00:00' WHERE order_id = :id", { id: after });
+
+      const result = await sync();
+
+      expect(Object.values(invoices).map((i) => i.invoice_number)).toEqual(['TEST-SC/CI/2026/2810015']);
+      expect([result.invoices, result.synced]).toEqual([1, 1]); // only the order from the go-live date on
+    } finally {
+      await db.execute("UPDATE company_settings SET setting_value = '' WHERE setting_key = 'zoho_books_sync_start_date'");
+    }
+  });
+
+  it('in production nothing is sent until the go-live date is set', async () => {
+    process.env.ZOHO_ENVIRONMENT = 'production';
+    const orderId = await createCifOrder('Real Buyer Stage2 GmbH');
+    await approveDocument(orderId, 'CI', 'SC/CI/26/2810016');
+
+    const result = await sync();
+
+    expect(result.failed).toBe(1);
+    expect(requestsTo('POST', '/books/')).toEqual([]);
+    const last = await db.queryOne('SELECT status, message FROM zoho_sync_log ORDER BY id DESC LIMIT 1');
+    expect(last.status).toBe('error');
+    expect(last.message.startsWith('Nothing sent: set the Zoho Books go-live date (zoho_books_sync_start_date) in Admin -> Settings first.')).toBe(true);
+    await db.execute("UPDATE orders SET company_legal_name = 'OLD-Real Buyer Stage2 GmbH' WHERE id = :id", { id: orderId });
   });
 
   it('an invoice number used by another customer is refused', async () => {

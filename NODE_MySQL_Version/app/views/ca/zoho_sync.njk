@@ -7,10 +7,12 @@
     <h2>Status</h2>
     <div class="kv-grid">
       <div><span class="k">Zoho Books</span><span class="v">{% if isEnabled %}<span style="color:var(--success)">Enabled</span>{% else %}<span class="muted">Not configured</span>{% endif %}</span></div>
+      <div><span class="k">Go-live Date</span><span class="v">{% if startDateLabel %}{{ startDateLabel }}{% else %}<span class="muted">Not set</span>{% endif %}</span></div>
       <div><span class="k">Legs Pending Sync</span><span class="v">{{ pendingCount }}</span></div>
       <div><span class="k">Payments Held (not yet applied to an invoice)</span><span class="v">{{ heldCount }}</span></div>
       <div><span class="k">Bills, Vendor Payments &amp; Order Expenses Pending</span><span class="v">{{ purchasesPendingCount }}</span></div>
     </div>
+    <p class="muted small">Only records dated on or after the go-live date go to Zoho Books; the CA books everything earlier as the opening position. Set it under Admin &rarr; Settings (<code>zoho_books_sync_start_date</code>). On the live server nothing is sent until it is set.</p>
     {% if not isEnabled %}
       <p class="muted small">Fill in every <code>zoho_books_*</code> setting and set <code>zoho_books_enabled</code> to on, under Admin &rarr; Settings, to start syncing.</p>
     {% endif %}

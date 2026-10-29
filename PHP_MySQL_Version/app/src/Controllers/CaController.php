@@ -175,11 +175,13 @@ final class CaController
      */
     public function zohoSync(array $params): void
     {
+        $startDate = ZohoBooksService::syncStartDate();
         View::render('ca/zoho_sync', [
             'isEnabled' => ZohoBooksService::isEnabled(),
-            'pendingCount' => count(CaRepository::legsPendingZohoSync()),
+            'startDate' => $startDate,
+            'pendingCount' => count(array_filter(CaRepository::legsPendingZohoSync(), static fn (array $leg): bool => $startDate === null || substr((string) $leg['cleared_at'], 0, 10) >= $startDate)),
             'heldCount' => count(CaRepository::legsHeldInZoho()),
-            'purchasesPendingCount' => count(\App\Repositories\ZohoPurchaseRepository::billsToSync()) + count(\App\Repositories\ZohoPurchaseRepository::paymentsToSync()) + count(\App\Repositories\ZohoPurchaseRepository::expensesToSync()),
+            'purchasesPendingCount' => count(\App\Repositories\ZohoPurchaseRepository::billsToSync($startDate)) + count(\App\Repositories\ZohoPurchaseRepository::paymentsToSync($startDate)) + count(\App\Repositories\ZohoPurchaseRepository::expensesToSync($startDate)),
             'log' => ZohoSyncLogRepository::recent(100),
         ], 'layout/base');
     }

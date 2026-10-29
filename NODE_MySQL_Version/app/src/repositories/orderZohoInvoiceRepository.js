@@ -51,13 +51,14 @@ async function forgetZohoInvoice(zohoInvoiceId) {
  * so Books keeps the last approved version until the revision is
  * approved. Same rule as the payment legs (caRepository.legsPendingZohoSync):
  * in production, test and sample orders never go; in test, only TEST-
- * customers do.
+ * customers do. With startDate (zoho_books_sync_start_date), only documents
+ * dated on or after it.
  *
  * @return {Promise<Array<{order_id: number, kind: string, document_id: number}>>}
  */
-async function documentsToSync() {
+async function documentsToSync(startDate = null) {
   const rows = await db.query(
-    `SELECT d.id AS document_id, d.order_id, dt.code, o.company_legal_name,
+    `SELECT d.id AS document_id, d.order_id, dt.code, o.company_legal_name, COALESCE(d.document_date, DATE(d.generated_at)) AS printed_date,
             (o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1) AS is_test_or_sample
      FROM documents d
      JOIN document_types dt ON dt.id = d.document_type_id
@@ -78,6 +79,7 @@ async function documentsToSync() {
     .filter((row) => (zohoGuard.isProduction()
       ? Number(row.is_test_or_sample) !== 1
       : String(row.company_legal_name || '').startsWith(zohoGuard.TEST_PREFIX)))
+    .filter((row) => startDate === null || String(row.printed_date).slice(0, 10) >= startDate)
     .map((row) => ({ order_id: Number(row.order_id), kind: kinds[row.code], document_id: Number(row.document_id) }));
 }
 

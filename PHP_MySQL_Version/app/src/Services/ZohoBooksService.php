@@ -38,6 +38,10 @@ final class ZohoBooksService
     private static array $tokens = [];
     /** @var array<string, bool> whether each Books organisation is GST-registered */
     private static array $gstRegistered = [];
+    /** @var array<string, string> each GST-registered Books organisation's own GSTIN */
+    private static array $orgGstin = [];
+    /** @var array<string, array<string, string>> tax id by tax name (GST18, IGST18, ...), per organisation */
+    private static array $taxes = [];
 
     /** Tests only: answer every Zoho request with $transport instead of the network (null restores real HTTP). */
     public static function setTransport(?callable $transport): void
@@ -45,6 +49,8 @@ final class ZohoBooksService
         self::$transport = $transport;
         self::$tokens = [];
         self::$gstRegistered = [];
+        self::$orgGstin = [];
+        self::$taxes = [];
         self::$accounts = [];
     }
 
@@ -205,6 +211,12 @@ final class ZohoBooksService
             $payload['gst_treatment'] = 'overseas';
         }
 
+        if ($gst && strlen((string) $invoice['invoice_number']) > 16) {
+            // GST: a tax invoice number may have at most 16 characters (Books
+            // refuses longer ones in a GST-registered organisation, Z-134).
+            // Every reference has used the 2-digit year since 2026-10-29.
+            throw new \RuntimeException(ZohoInvoiceData::KIND_LABELS[$invoice['kind']] . " {$invoice['invoice_number']} not sent: a GST invoice number may have at most 16 characters and this one has " . strlen((string) $invoice['invoice_number']) . '. Book it in Zoho Books by hand, or generate it again after the 2-digit-year change (SC/CI/26/...).');
+        }
         $query = '?organization_id=' . rawurlencode($config['organizationId']) . '&ignore_auto_number_generation=true';
         $existing = self::findInvoiceByNumber($config, $accessToken, (string) $invoice['invoice_number']);
         if ($existing !== null && (string) $existing['customer_id'] !== $contactId) {
@@ -271,11 +283,20 @@ final class ZohoBooksService
 
     /**
      * Stage 3: a supplier's or logistics partner's tax invoice as a Books
-     * bill, under the vendor (created on first use). Bills go in at their
-     * total in INR. A bill with GST is refused while the organisation is
-     * GST-registered: which GST tax and input credit to book is the CA's
-     * call, not guessed here. The bill is looked up by number for that
-     * vendor first, so a retry never makes a second one.
+     * bill, under the vendor (created on first use), looked up by number
+     * for that vendor first so a retry never makes a second one.
+     *
+     * In a GST-registered organisation the bill carries its GST: the
+     * taxable value at the bill's own rate (GST / taxable: 5, 12, 18, 28
+     * or 40 %) as IGST when the vendor's GSTIN is from another state, or
+     * CGST + SGST (Books' GST group) when it is from NexaCrest's state —
+     * compared by the first two digits of the two GSTINs. A bill without
+     * GST from a registered vendor goes in at 0 %; from an unregistered
+     * vendor, without tax. Refused with a message staff can act on: GST
+     * from a vendor with no GSTIN in the app, a GST amount that is not one
+     * of the GST rates of the taxable value. Not handled yet (CA to
+     * decide): reverse charge and blocked input credit. In an organisation
+     * that is not GST-registered the bill goes in at its total.
      *
      * @param array<string,mixed> $bill ZohoPurchaseRepository row
      * @throws \RuntimeException on any failure
@@ -287,9 +308,7 @@ final class ZohoBooksService
         self::assertVendorAllowed((string) $bill['vendor_name']);
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
-        if ((float) $bill['gst_inr'] > 0 && self::isGstRegistered($config, $accessToken)) {
-            throw new \RuntimeException("Bill {$bill['bill_no']} not sent: it carries GST, and how GST on bills is booked in a GST-registered Zoho Books organisation is still for the CA to decide.");
-        }
+        $line = self::billTax($config, $accessToken, $bill);
         $vendorId = self::findOrCreateVendor($config, $accessToken, $bill);
         $existing = self::findBill($config, $accessToken, (string) $bill['bill_no'], $vendorId);
         if ($existing !== null) {
@@ -309,14 +328,17 @@ final class ZohoBooksService
                 'account_id' => self::accountId($config, $accessToken, self::BILL_ACCOUNTS[$forKey] ?? self::BILL_ACCOUNTS['other']),
                 'name' => $what,
                 'description' => "{$what} for order {$bill['buyer_inquiry_ref']}: taxable " . number_format((float) $bill['taxable_inr'], 2, '.', '') . ' + GST ' . number_format((float) $bill['gst_inr'], 2, '.', '') . (!empty($bill['note']) ? ". {$bill['note']}" : ''),
-                'rate' => round((float) $bill['total_inr'], 2),
+                'rate' => $line['rate'],
                 'quantity' => 1,
-            ]],
+            ] + ($line['tax_id'] !== null ? ['tax_id' => $line['tax_id']] : [])],
         ];
         $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/bills?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
         $saved = self::findBill($config, $accessToken, (string) $bill['bill_no'], $vendorId);
         if ($saved === null) {
             throw new \RuntimeException("Zoho Books bill creation for {$bill['bill_no']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        if (abs((float) ($saved['total'] ?? $bill['total_inr']) - (float) $bill['total_inr']) > 1.0) {
+            throw new \RuntimeException("Bill {$bill['bill_no']} was created in Zoho Books with total " . $saved['total'] . ', but the app has ' . $bill['total_inr'] . ' — check it in Books with the CA.');
         }
         return (string) $saved['bill_id'];
     }
@@ -786,8 +808,65 @@ final class ZohoBooksService
                 throw new \RuntimeException('Zoho Books organisation lookup failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
             }
             self::$gstRegistered[$config['organizationId']] = (bool) ($decoded['organization']['is_registered_for_gst'] ?? false);
+            self::$orgGstin[$config['organizationId']] = strtoupper((string) ($decoded['organization']['tax_settings']['tax_reg_no'] ?? ''));
         }
         return self::$gstRegistered[$config['organizationId']];
+    }
+
+    /** The Books sync go-live date (zoho_books_sync_start_date), or null when not set. */
+    public static function syncStartDate(): ?string
+    {
+        $date = trim((string) CompanySettingsRepository::get('zoho_books_sync_start_date'));
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1 ? $date : null;
+    }
+
+    /**
+     * The bill's one line: its value and GST tax (see pushBill()).
+     *
+     * @return array{rate: float, tax_id: ?string}
+     */
+    private static function billTax(array $config, string $accessToken, array $bill): array
+    {
+        $taxable = round((float) $bill['taxable_inr'], 2);
+        $gstAmount = round((float) $bill['gst_inr'], 2);
+        if (!self::isGstRegistered($config, $accessToken)) {
+            return ['rate' => round((float) $bill['total_inr'], 2), 'tax_id' => null];
+        }
+        $vendorGstin = strtoupper(trim((string) ($bill['vendor_gstin'] ?? '')));
+        if ($vendorGstin === '') {
+            if ($gstAmount > 0) {
+                throw new \RuntimeException("Bill {$bill['bill_no']} not sent: it carries GST (" . number_format($gstAmount, 2, '.', '') . "), but {$bill['vendor_name']} has no GSTIN in the app. Add the GSTIN to the supplier / logistics partner, or correct the bill.");
+            }
+            return ['rate' => $taxable, 'tax_id' => null];
+        }
+        $percent = null;
+        foreach ([0, 5, 12, 18, 28, 40] as $candidate) {
+            if (abs(round($taxable * $candidate / 100, 2) - $gstAmount) <= 1.0) {
+                $percent = $candidate;
+                break;
+            }
+        }
+        if ($percent === null) {
+            throw new \RuntimeException("Bill {$bill['bill_no']} not sent: GST " . number_format($gstAmount, 2, '.', '') . ' on taxable ' . number_format($taxable, 2, '.', '') . ' is not 5, 12, 18, 28 or 40 % — correct the bill (a bill with several GST rates needs the CA).');
+        }
+        $interState = substr($vendorGstin, 0, 2) !== substr(self::$orgGstin[$config['organizationId']] ?? '', 0, 2);
+        return ['rate' => $taxable, 'tax_id' => self::taxId($config, $accessToken, ($interState ? 'IGST' : 'GST') . $percent)];
+    }
+
+    /** A Books tax's id by its name (GST18 = CGST + SGST group, IGST18, ...). */
+    private static function taxId(array $config, string $accessToken, string $name): string
+    {
+        if (!isset(self::$taxes[$config['organizationId']])) {
+            self::$taxes[$config['organizationId']] = [];
+            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/settings/taxes?organization_id=" . rawurlencode($config['organizationId']), 'taxes') as $row) {
+                self::$taxes[$config['organizationId']][(string) $row['tax_name']] = (string) $row['tax_id'];
+            }
+        }
+        $id = self::$taxes[$config['organizationId']][$name] ?? null;
+        if ($id === null) {
+            throw new \RuntimeException("Zoho Books has no tax named \"{$name}\". Check Zoho Books -> Settings -> Taxes (or ask the CA), then sync again.");
+        }
+        return $id;
     }
 
     /** In test, only vendors whose name starts with TEST- may be sent, so the clean-up script finds them. */

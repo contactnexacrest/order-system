@@ -53,15 +53,28 @@ final class CaSyncService
             ZohoSyncLogRepository::log('revenue_payment', null, null, null, 'skipped', null, self::offReason() . ' — nothing synced.', $triggeredBy, $triggeredByUserId);
             return ['synced' => 0, 'failed' => 0, 'skipped' => 1, 'invoices' => 0, 'applied' => 0];
         }
+        $startDate = ZohoBooksService::syncStartDate();
+        if ($startDate === null && ZohoGuard::isProduction()) {
+            ZohoSyncLogRepository::log('revenue_payment', null, null, null, 'error', null, self::NO_START_DATE, $triggeredBy, $triggeredByUserId);
+            return ['synced' => 0, 'failed' => 1, 'skipped' => 0, 'invoices' => 0, 'applied' => 0];
+        }
 
         $failed = 0;
         $invoices = 0;
-        foreach (OrderZohoInvoiceRepository::documentsToSync() as $item) {
+        foreach (OrderZohoInvoiceRepository::documentsToSync($startDate) as $item) {
             $label = ZohoInvoiceData::KIND_LABELS[$item['kind']];
             try {
                 $invoice = ZohoInvoiceData::build($item['order_id'], $item['kind'], $item['document_id']);
-                $hash = ZohoInvoiceData::fingerprint($invoice);
                 $known = OrderZohoInvoiceRepository::find($item['order_id'], $item['kind']);
+                if ($known !== null) {
+                    // The rate is frozen once the invoice is in Books: a rate
+                    // recorded later (the balance arriving) must not revalue
+                    // an invoice that may sit in a filed GST month. Each
+                    // payment still goes in at its own actual rate, and Books
+                    // books the difference as exchange gain or loss.
+                    $invoice['exchange_rate'] = (float) $known['exchange_rate'];
+                }
+                $hash = ZohoInvoiceData::fingerprint($invoice);
                 if ($known !== null && $known['pushed_hash'] === $hash) {
                     continue;
                 }
@@ -86,6 +99,9 @@ final class CaSyncService
         $synced = 0;
         $applied = 0;
         foreach (CaRepository::legsPendingZohoSync() as $leg) {
+            if ($startDate !== null && substr((string) $leg['cleared_at'], 0, 10) < $startDate) {
+                continue; // before the go-live date: the CA books it as the opening position
+            }
             $referenceNumber = $leg['buyer_inquiry_ref'] . '-' . $leg['leg'];
             $target = self::invoiceFor((int) $leg['order_id'], $leg['leg']);
             try {
@@ -147,6 +163,9 @@ final class CaSyncService
         return ['synced' => $synced, 'failed' => $failed, 'skipped' => 0, 'invoices' => $invoices, 'applied' => $applied];
     }
 
+    /** In production nothing goes to Books until the go-live date is set. */
+    private const NO_START_DATE = 'Nothing sent: set the Zoho Books go-live date (zoho_books_sync_start_date) in Admin -> Settings first. Only records dated on or after it go to Zoho Books; the CA books everything earlier as the opening position.';
+
     /** Which invoice each payment leg is paid against: the advance and the balance against the CI, freight against the Debit Note. */
     private const LEG_INVOICE = ['advance' => 'ci', 'balance' => 'ci', 'freight' => 'dn'];
 
@@ -186,11 +205,17 @@ final class CaSyncService
             $result['skipped'] = 1;
             return $result;
         }
+        $startDate = ZohoBooksService::syncStartDate();
+        if ($startDate === null && ZohoGuard::isProduction()) {
+            ZohoSyncLogRepository::log('vendor_bill', null, null, null, 'error', null, self::NO_START_DATE, $triggeredBy, $triggeredByUserId);
+            $result['failed'] = 1;
+            return $result;
+        }
         $log = static function (string $type, int $orderId, ?string $leg, string $status, ?string $reference, string $message) use ($triggeredBy, $triggeredByUserId): void {
             ZohoSyncLogRepository::log($type, 'order', $orderId, $leg, $status, $reference, $message, $triggeredBy, $triggeredByUserId);
         };
 
-        foreach (ZohoPurchaseRepository::billsToSync() as $bill) {
+        foreach (ZohoPurchaseRepository::billsToSync($startDate) as $bill) {
             try {
                 $zohoBillId = ZohoBooksService::pushBill($bill);
                 ZohoPurchaseRepository::setBillSynced((int) $bill['id'], $zohoBillId);
@@ -202,7 +227,7 @@ final class CaSyncService
             }
         }
 
-        foreach (ZohoPurchaseRepository::paymentsToSync() as ['payment' => $payment, 'bill' => $bill]) {
+        foreach (ZohoPurchaseRepository::paymentsToSync($startDate) as ['payment' => $payment, 'bill' => $bill]) {
             $target = ZohoPurchaseRepository::targetBillFor(ZohoPurchaseRepository::findBill((int) $bill['id']) ?? $bill);
             try {
                 $pushed = ZohoBooksService::pushVendorPayment($payment, $bill, $target);
@@ -235,7 +260,7 @@ final class CaSyncService
             }
         }
 
-        foreach (ZohoPurchaseRepository::expensesToSync() as $expense) {
+        foreach (ZohoPurchaseRepository::expensesToSync($startDate) as $expense) {
             try {
                 $zohoExpenseId = ZohoBooksService::pushExpense($expense);
                 ZohoPurchaseRepository::setExpenseSynced((int) $expense['id'], $zohoExpenseId);

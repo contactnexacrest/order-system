@@ -41,12 +41,18 @@ const tokens = new Map();
 const gstRegistered = new Map();
 // Account id by name, per organisation.
 const accounts = new Map();
+// Each GST-registered Books organisation's own GSTIN.
+const orgGstin = new Map();
+// Tax id by tax name (GST18, IGST18, ...), per organisation.
+const taxes = new Map();
 
 /** Tests only: answer every Zoho request with fn(method, url, payload, headers, formEncoded) instead of the network (null restores real HTTP). */
 function setTransport(fn) {
   transport = fn;
   tokens.clear();
   gstRegistered.clear();
+  orgGstin.clear();
+  taxes.clear();
   accounts.clear();
 }
 
@@ -162,6 +168,12 @@ async function pushInvoice(invoice) {
   if (invoice.currency_code !== 'INR') payload.exchange_rate = round(Number(invoice.exchange_rate), 6);
   if (gst) payload.gst_treatment = 'overseas';
 
+  if (gst && String(invoice.invoice_number).length > 16) {
+    // GST: a tax invoice number may have at most 16 characters (Books
+    // refuses longer ones in a GST-registered organisation, Z-134). Every
+    // reference has used the 2-digit year since 2026-10-29.
+    throw new Error(`${KIND_LABELS[invoice.kind]} ${invoice.invoice_number} not sent: a GST invoice number may have at most 16 characters and this one has ${String(invoice.invoice_number).length}. Book it in Zoho Books by hand, or generate it again after the 2-digit-year change (SC/CI/26/...).`);
+  }
   const query = `?organization_id=${encodeURIComponent(config.organizationId)}&ignore_auto_number_generation=true`;
   const existing = await findInvoiceByNumber(config, accessToken, String(invoice.invoice_number));
   if (existing && String(existing.customer_id) !== contactId) {
@@ -225,11 +237,20 @@ const money = (n) => Number(n).toFixed(2);
 
 /**
  * Stage 3: a supplier's or logistics partner's tax invoice as a Books bill,
- * under the vendor (created on first use). Bills go in at their total in
- * INR. A bill with GST is refused while the organisation is GST-registered:
- * which GST tax and input credit to book is the CA's call, not guessed
- * here. The bill is looked up by number for that vendor first, so a retry
- * never makes a second one.
+ * under the vendor (created on first use), looked up by number for that
+ * vendor first so a retry never makes a second one.
+ *
+ * In a GST-registered organisation the bill carries its GST: the taxable
+ * value at the bill's own rate (GST / taxable: 5, 12, 18, 28 or 40 %) as
+ * IGST when the vendor's GSTIN is from another state, or CGST + SGST
+ * (Books' GST group) when it is from NexaCrest's state — compared by the
+ * first two digits of the two GSTINs. A bill without GST from a registered
+ * vendor goes in at 0 %; from an unregistered vendor, without tax. Refused
+ * with a message staff can act on: GST from a vendor with no GSTIN in the
+ * app, a GST amount that is not one of the GST rates of the taxable value.
+ * Not handled yet (CA to decide): reverse charge and blocked input credit.
+ * In an organisation that is not GST-registered the bill goes in at its
+ * total.
  *
  * @throws on any failure
  * @return {Promise<string>} the Zoho bill_id
@@ -239,9 +260,7 @@ async function pushBill(bill) {
   assertVendorAllowed(String(bill.vendor_name));
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
-  if (Number(bill.gst_inr) > 0 && (await isGstRegistered(config, accessToken))) {
-    throw new Error(`Bill ${bill.bill_no} not sent: it carries GST, and how GST on bills is booked in a GST-registered Zoho Books organisation is still for the CA to decide.`);
-  }
+  const line = await billTax(config, accessToken, bill);
   const vendorId = await findOrCreateVendor(config, accessToken, bill);
   const existing = await findBill(config, accessToken, String(bill.bill_no), vendorId);
   if (existing) return String(existing.bill_id);
@@ -259,14 +278,18 @@ async function pushBill(bill) {
       account_id: await accountId(config, accessToken, BILL_ACCOUNTS[forKey] || BILL_ACCOUNTS.other),
       name: what,
       description: `${what} for order ${bill.buyer_inquiry_ref}: taxable ${money(bill.taxable_inr)} + GST ${money(bill.gst_inr)}${bill.note ? `. ${bill.note}` : ''}`,
-      rate: round(Number(bill.total_inr), 2),
+      rate: line.rate,
       quantity: 1,
+      ...(line.tax_id !== null ? { tax_id: line.tax_id } : {}),
     }],
   };
   const res = await request('POST', `https://${config.apiDomain}/books/v3/bills?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
   const saved = await findBill(config, accessToken, String(bill.bill_no), vendorId);
   if (!saved) {
     throw new Error(`Zoho Books bill creation for ${bill.bill_no} failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+  if (Math.abs(Number(saved.total ?? bill.total_inr) - Number(bill.total_inr)) > 1) {
+    throw new Error(`Bill ${bill.bill_no} was created in Zoho Books with total ${saved.total}, but the app has ${bill.total_inr} — check it in Books with the CA.`);
   }
   return String(saved.bill_id);
 }
@@ -680,8 +703,53 @@ async function isGstRegistered(config, accessToken) {
       throw new Error(`Zoho Books organisation lookup failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
     }
     gstRegistered.set(config.organizationId, Boolean(decoded.organization.is_registered_for_gst));
+    orgGstin.set(config.organizationId, String((decoded.organization.tax_settings && decoded.organization.tax_settings.tax_reg_no) || '').toUpperCase());
   }
   return gstRegistered.get(config.organizationId);
+}
+
+/** The Books sync go-live date (zoho_books_sync_start_date), or null when not set. */
+async function syncStartDate() {
+  const date = String((await companySettingsRepository.get('zoho_books_sync_start_date')) || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+}
+
+/** The bill's one line: its value and GST tax (see pushBill()). @return {Promise<{rate: number, tax_id: ?string}>} */
+async function billTax(config, accessToken, bill) {
+  const taxable = round(Number(bill.taxable_inr), 2);
+  const gstAmount = round(Number(bill.gst_inr), 2);
+  if (!(await isGstRegistered(config, accessToken))) {
+    return { rate: round(Number(bill.total_inr), 2), tax_id: null };
+  }
+  const vendorGstin = String(bill.vendor_gstin || '').trim().toUpperCase();
+  if (vendorGstin === '') {
+    if (gstAmount > 0) {
+      throw new Error(`Bill ${bill.bill_no} not sent: it carries GST (${gstAmount.toFixed(2)}), but ${bill.vendor_name} has no GSTIN in the app. Add the GSTIN to the supplier / logistics partner, or correct the bill.`);
+    }
+    return { rate: taxable, tax_id: null };
+  }
+  const percent = [0, 5, 12, 18, 28, 40].find((candidate) => Math.abs(round(taxable * candidate / 100, 2) - gstAmount) <= 1);
+  if (percent === undefined) {
+    throw new Error(`Bill ${bill.bill_no} not sent: GST ${gstAmount.toFixed(2)} on taxable ${taxable.toFixed(2)} is not 5, 12, 18, 28 or 40 % — correct the bill (a bill with several GST rates needs the CA).`);
+  }
+  const interState = vendorGstin.slice(0, 2) !== String(orgGstin.get(config.organizationId) || '').slice(0, 2);
+  return { rate: taxable, tax_id: await taxId(config, accessToken, `${interState ? 'IGST' : 'GST'}${percent}`) };
+}
+
+/** A Books tax's id by its name (GST18 = CGST + SGST group, IGST18, ...). */
+async function taxId(config, accessToken, name) {
+  if (!taxes.has(config.organizationId)) {
+    const byName = new Map();
+    for (const row of await getList(accessToken, `https://${config.apiDomain}/books/v3/settings/taxes?organization_id=${encodeURIComponent(config.organizationId)}`, 'taxes')) {
+      byName.set(String(row.tax_name), String(row.tax_id));
+    }
+    taxes.set(config.organizationId, byName);
+  }
+  const id = taxes.get(config.organizationId).get(name);
+  if (!id) {
+    throw new Error(`Zoho Books has no tax named "${name}". Check Zoho Books -> Settings -> Taxes (or ask the CA), then sync again.`);
+  }
+  return id;
 }
 
 /** In test, only vendors whose name starts with TEST- may be sent, so the clean-up script finds them. */
@@ -826,6 +894,6 @@ function safeJson(text) {
 
 module.exports = {
   BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS,
-  isEnabled, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense,
+  isEnabled, syncStartDate, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense,
   testConnection, listExpenses, listTestContacts, listTestExpenses, deleteRecord, setTransport,
 };

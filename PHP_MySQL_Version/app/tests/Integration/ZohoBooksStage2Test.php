@@ -310,7 +310,7 @@ final class ZohoBooksStage2Test extends DbTestCase
     {
         $this->gstRegistered = true;
         $orderId = $this->createCifOrder();
-        $this->approveDocument($orderId, 'CI', 'TEST-SC/CI/2026/2810006');
+        $this->approveDocument($orderId, 'CI', 'SC/CI/26/2810006');
 
         $this->sync();
 
@@ -318,6 +318,70 @@ final class ZohoBooksStage2Test extends DbTestCase
         self::assertSame('overseas', $payload['gst_treatment']);
         self::assertSame('68022310', $payload['line_items'][0]['hsn_or_sac']);
         self::assertSame('Granite slab. Size: 60x60x2 cm. Finish: Polished', $payload['line_items'][0]['description']);
+    }
+
+    public function testInAGstRegisteredOrganisationAnInvoiceNumberLongerThanSixteenCharactersIsRefused(): void
+    {
+        $this->gstRegistered = true;
+        $orderId = $this->createCifOrder();
+        $this->approveDocument($orderId, 'CI', 'SC/CI/2026/2810012');
+
+        $this->sync();
+
+        self::assertSame([], $this->invoices);
+        $rows = array_values(array_filter($this->logRows($orderId), static fn (array $r): bool => $r['sync_type'] === 'invoice'));
+        self::assertSame('Commercial Invoice SC/CI/2026/2810012 not sent: a GST invoice number may have at most 16 characters and this one has 18. Book it in Zoho Books by hand, or generate it again after the 2-digit-year change (SC/CI/26/...).', $rows[0]['message']);
+    }
+
+    public function testTheExchangeRateIsFrozenOnceTheInvoiceIsInBooks(): void
+    {
+        $orderId = $this->createCifOrder();
+        Database::connection()->exec("UPDATE order_payment_status SET balance_exchange_rate = NULL WHERE order_id = {$orderId}");
+        $this->approveDocument($orderId, 'CI', 'TEST-SC/CI/2026/2810013');
+        $this->sync();
+        self::assertSame(84.1, $this->invoices['INV-1']['payload']['exchange_rate'], 'sent at the advance rate (no balance rate yet)');
+
+        // The balance arrives and its rate is recorded: the invoice must not be revalued.
+        Database::connection()->exec("UPDATE order_payment_status SET balance_exchange_rate = 86.2 WHERE order_id = {$orderId}");
+        $this->sync();
+
+        self::assertCount(0, $this->requestsTo('PUT', '/books/v3/invoices/'), 'no update just because a later rate was recorded');
+        self::assertSame('84.100000', (string) OrderZohoInvoiceRepository::find($orderId, 'ci')['exchange_rate']);
+    }
+
+    public function testOnlyRecordsDatedOnOrAfterTheGoLiveDateGo(): void
+    {
+        CompanySettingsRepository::set('zoho_books_sync_start_date', '2026-10-28');
+        try {
+            $before = $this->createCifOrder();
+            $this->approveDocument($before, 'CI', 'TEST-SC/CI/2026/2710014', 0, '2026-10-27'); // advance cleared 2026-10-20
+            $after = $this->createCifOrder();
+            $this->approveDocument($after, 'CI', 'TEST-SC/CI/2026/2810015', 0, '2026-10-28');
+            Database::connection()->exec("UPDATE order_payment_status SET advance_cleared_at = '2026-10-28 09:00:00' WHERE order_id = {$after}");
+
+            $result = $this->sync();
+
+            self::assertSame(['TEST-SC/CI/2026/2810015'], array_values(array_column($this->invoices, 'invoice_number')));
+            self::assertSame([1, 1], [$result['invoices'], $result['synced']], 'only the order from the go-live date on');
+        } finally {
+            Database::connection()->exec("UPDATE company_settings SET setting_value = '' WHERE setting_key = 'zoho_books_sync_start_date'");
+        }
+    }
+
+    public function testInProductionNothingIsSentUntilTheGoLiveDateIsSet(): void
+    {
+        $_ENV['ZOHO_ENVIRONMENT'] = 'production';
+        $orderId = $this->createCifOrder('Real Buyer Stage2 GmbH');
+        $this->approveDocument($orderId, 'CI', 'SC/CI/26/2810016');
+
+        $result = $this->sync();
+
+        self::assertSame(1, $result['failed']);
+        self::assertSame([], $this->requestsTo('POST', '/books/'));
+        $last = Database::connection()->query("SELECT status, message FROM zoho_sync_log ORDER BY id DESC LIMIT 1")->fetch();
+        self::assertSame('error', $last['status']);
+        self::assertStringStartsWith('Nothing sent: set the Zoho Books go-live date (zoho_books_sync_start_date) in Admin -> Settings first.', $last['message']);
+        Database::connection()->exec("UPDATE orders SET company_legal_name = 'OLD-Real Buyer Stage2 GmbH' WHERE id = {$orderId}");
     }
 
     public function testAnInvoiceNumberUsedByAnotherCustomerIsRefused(): void

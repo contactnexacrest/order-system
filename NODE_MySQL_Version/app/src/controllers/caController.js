@@ -154,12 +154,15 @@ async function reports(req, res) {
  * error detail and can call an external API.
  */
 async function zohoSync(req, res) {
+  const startDate = await zohoBooksService.syncStartDate();
   res.renderView('ca/zoho_sync', {
+    startDate,
+    startDateLabel: startDate ? new Date(`${startDate}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
     canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     isEnabled: await zohoBooksService.isEnabled(),
-    pendingCount: (await caRepository.legsPendingZohoSync()).length,
+    pendingCount: (await caRepository.legsPendingZohoSync()).filter((leg) => startDate === null || String(leg.cleared_at).slice(0, 10) >= startDate).length,
     heldCount: (await caRepository.legsHeldInZoho()).length,
-    purchasesPendingCount: (await zohoPurchaseRepository.billsToSync()).length + (await zohoPurchaseRepository.paymentsToSync()).length + (await zohoPurchaseRepository.expensesToSync()).length,
+    purchasesPendingCount: (await zohoPurchaseRepository.billsToSync(startDate)).length + (await zohoPurchaseRepository.paymentsToSync(startDate)).length + (await zohoPurchaseRepository.expensesToSync(startDate)).length,
     legLabels: zohoInvoiceData.KIND_LABELS,
     log: await zohoSyncLogRepository.recent(100),
   }, 'layout/base');

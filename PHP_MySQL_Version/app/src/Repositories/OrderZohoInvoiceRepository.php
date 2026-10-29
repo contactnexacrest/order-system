@@ -65,12 +65,15 @@ final class OrderZohoInvoiceRepository
      * legs (CaRepository::legsPendingZohoSync): in production, test and
      * sample orders never go; in test, only TEST- customers do.
      *
+     * With $startDate (zoho_books_sync_start_date), only documents dated
+     * on or after it.
+     *
      * @return list<array{order_id:int, kind:string, document_id:int}>
      */
-    public static function documentsToSync(): array
+    public static function documentsToSync(?string $startDate = null): array
     {
         $rows = Database::connection()->query(
-            "SELECT d.id AS document_id, d.order_id, dt.code, o.company_legal_name,
+            "SELECT d.id AS document_id, d.order_id, dt.code, o.company_legal_name, COALESCE(d.document_date, DATE(d.generated_at)) AS printed_date,
                     (o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1) AS is_test_or_sample
              FROM documents d
              JOIN document_types dt ON dt.id = d.document_type_id
@@ -93,7 +96,7 @@ final class OrderZohoInvoiceRepository
             $allowed = ZohoGuard::isProduction()
                 ? (int) $row['is_test_or_sample'] !== 1
                 : str_starts_with((string) $row['company_legal_name'], ZohoGuard::TEST_PREFIX);
-            if ($allowed) {
+            if ($allowed && ($startDate === null || (string) $row['printed_date'] >= $startDate)) {
                 $out[] = ['order_id' => (int) $row['order_id'], 'kind' => $kinds[$row['code']], 'document_id' => (int) $row['document_id']];
             }
         }

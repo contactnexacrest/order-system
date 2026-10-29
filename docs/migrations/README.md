@@ -28,7 +28,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-10-28e-vendor-bill-proforma
 
 Run each file below that the database has not had yet, in this order, then
 deploy the code for both stacks. As of 29 Oct 2026 the live site still
-needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b and 29c**.
+needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c and 29d**.
 
 | # | File | What it does |
 |---|---|---|
@@ -46,6 +46,7 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b and 29c**.
 | 12 | `2026-10-29a-zoho-stage2-invoices.sql` | Zoho Books Stage 2: remembers which Books invoice each order's Commercial Invoice and Debit Note became, and when each payment was applied to it |
 | 13 | `2026-10-29b-zoho-stage3-purchases.sql` | Zoho Books Stage 3: remembers each supplier's and logistics partner's Books vendor, and which bills, vendor payments and order expenses are in Books |
 | 14 | `2026-10-29c-two-digit-year-references.sql` | Every new reference number uses the 2-digit year (`SC/CI/26/2910001`) — a GST invoice number may have at most 16 characters. Numbers already issued keep `2026` |
+| 15 | `2026-10-29d-zoho-sync-start-date.sql` | Zoho Books go-live date setting (`zoho_books_sync_start_date`): only records dated on or after it go to Books; on the live server nothing is sent until it is set |
 
 There is no `2026-10-28b` file; that letter was not used.
 

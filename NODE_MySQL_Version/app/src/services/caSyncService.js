@@ -46,15 +46,28 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
     await zohoSyncLogRepository.log('revenue_payment', null, null, null, 'skipped', null, `${offReason()} — nothing synced.`, triggeredBy, triggeredByUserId);
     return { synced: 0, failed: 0, skipped: 1, invoices: 0, applied: 0 };
   }
+  const startDate = await zohoBooksService.syncStartDate();
+  if (startDate === null && zohoGuard.isProduction()) {
+    await zohoSyncLogRepository.log('revenue_payment', null, null, null, 'error', null, NO_START_DATE, triggeredBy, triggeredByUserId);
+    return { synced: 0, failed: 1, skipped: 0, invoices: 0, applied: 0 };
+  }
 
   let failed = 0;
   let invoices = 0;
-  for (const item of await orderZohoInvoiceRepository.documentsToSync()) {
+  for (const item of await orderZohoInvoiceRepository.documentsToSync(startDate)) {
     const label = zohoInvoiceData.KIND_LABELS[item.kind];
     try {
       const invoice = await zohoInvoiceData.build(item.order_id, item.kind, item.document_id);
-      const hash = zohoInvoiceData.fingerprint(invoice);
       const known = await orderZohoInvoiceRepository.find(item.order_id, item.kind);
+      if (known) {
+        // The rate is frozen once the invoice is in Books: a rate recorded
+        // later (the balance arriving) must not revalue an invoice that may
+        // sit in a filed GST month. Each payment still goes in at its own
+        // actual rate, and Books books the difference as exchange gain or
+        // loss.
+        invoice.exchange_rate = Number(known.exchange_rate);
+      }
+      const hash = zohoInvoiceData.fingerprint(invoice);
       if (known && known.pushed_hash === hash) {
         continue;
       }
@@ -79,6 +92,9 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
   let synced = 0;
   let applied = 0;
   for (const leg of await caRepository.legsPendingZohoSync()) {
+    if (startDate !== null && String(leg.cleared_at).slice(0, 10) < startDate) {
+      continue; // before the go-live date: the CA books it as the opening position
+    }
     const referenceNumber = `${leg.buyer_inquiry_ref}-${leg.leg}`;
     const target = await invoiceFor(leg.order_id, leg.leg);
     try {
@@ -140,6 +156,9 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
   return { synced, failed, skipped: 0, invoices, applied };
 }
 
+// In production nothing goes to Books until the go-live date is set.
+const NO_START_DATE = 'Nothing sent: set the Zoho Books go-live date (zoho_books_sync_start_date) in Admin -> Settings first. Only records dated on or after it go to Zoho Books; the CA books everything earlier as the opening position.';
+
 // Which invoice each payment leg is paid against: the advance and the
 // balance against the CI, freight against the Debit Note.
 const LEG_INVOICE = { advance: 'ci', balance: 'ci', freight: 'dn' };
@@ -184,10 +203,16 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
     result.skipped = 1;
     return result;
   }
+  const startDate = await zohoBooksService.syncStartDate();
+  if (startDate === null && zohoGuard.isProduction()) {
+    await zohoSyncLogRepository.log('vendor_bill', null, null, null, 'error', null, NO_START_DATE, triggeredBy, triggeredByUserId);
+    result.failed = 1;
+    return result;
+  }
   const log = (type, orderId, leg, status, reference, message) => zohoSyncLogRepository.log(type, 'order', orderId, leg, status, reference, message, triggeredBy, triggeredByUserId);
   const money = (n) => Number(n).toFixed(2);
 
-  for (const bill of await zohoPurchaseRepository.billsToSync()) {
+  for (const bill of await zohoPurchaseRepository.billsToSync(startDate)) {
     try {
       const zohoBillId = await zohoBooksService.pushBill(bill);
       await zohoPurchaseRepository.setBillSynced(bill.id, zohoBillId);
@@ -199,7 +224,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
     }
   }
 
-  for (const { payment, bill } of await zohoPurchaseRepository.paymentsToSync()) {
+  for (const { payment, bill } of await zohoPurchaseRepository.paymentsToSync(startDate)) {
     const target = await zohoPurchaseRepository.targetBillFor((await zohoPurchaseRepository.findBill(bill.id)) || bill);
     try {
       const pushed = await zohoBooksService.pushVendorPayment(payment, bill, target);
@@ -230,7 +255,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
     }
   }
 
-  for (const expense of await zohoPurchaseRepository.expensesToSync()) {
+  for (const expense of await zohoPurchaseRepository.expensesToSync(startDate)) {
     try {
       const zohoExpenseId = await zohoBooksService.pushExpense(expense);
       await zohoPurchaseRepository.setExpenseSynced(expense.id, zohoExpenseId);

@@ -45,7 +45,10 @@ describe('Zoho Books Stage 3', () => {
     let m;
 
     if (p === '/oauth/v2/token') return json({ access_token: 'fake-access' });
-    if ((m = p.match(/^\/books\/v3\/organizations\/(\d+)$/))) return json({ code: 0, organization: { organization_id: m[1], is_registered_for_gst: gstRegistered } });
+    if ((m = p.match(/^\/books\/v3\/organizations\/(\d+)$/))) return json({ code: 0, organization: { organization_id: m[1], is_registered_for_gst: gstRegistered, tax_settings: { tax_reg_no: gstRegistered ? '29AAKCN8733G1ZZ' : '' } } });
+    if (p === '/books/v3/settings/taxes') {
+      return json({ code: 0, taxes: [0, 5, 12, 18, 28, 40].flatMap((rate) => [{ tax_id: `TX-GST${rate}`, tax_name: `GST${rate}`, tax_percentage: rate }, { tax_id: `TX-IGST${rate}`, tax_name: `IGST${rate}`, tax_percentage: rate }]) });
+    }
     if (p === '/books/v3/chartofaccounts') return json({ code: 0, chartofaccounts: accounts });
     if (p === '/books/v3/contacts' && method === 'GET') return json({ code: 0, contacts: Object.values(contacts).filter((c) => c.contact_name === q('contact_name')) });
     if (p === '/books/v3/contacts' && method === 'POST') {
@@ -59,7 +62,9 @@ describe('Zoho Books Stage 3', () => {
     }
     if (p === '/books/v3/bills' && method === 'POST') {
       const id = `BL-${Object.keys(bills).length + 1}`;
-      bills[id] = { bill_id: id, bill_number: payload.bill_number, vendor_id: payload.vendor_id, total: payload.line_items[0].rate, payload };
+      const line = payload.line_items[0];
+      const percent = line.tax_id ? Number(line.tax_id.replace(/\D/g, '')) : 0;
+      bills[id] = { bill_id: id, bill_number: payload.bill_number, vendor_id: payload.vendor_id, total: Math.round(line.rate * (1 + percent / 100) * 100) / 100, payload };
       return json({ code: 0, bill: bills[id] }, 201);
     }
     if (p === '/books/v3/vendorpayments' && method === 'POST') {
@@ -223,20 +228,54 @@ describe('Zoho Books Stage 3', () => {
     expect(expenses).toEqual({});
   });
 
-  it('in a GST-registered organisation a bill with GST is refused and the vendor gets its GST treatment', async () => {
+  it('in a GST-registered organisation a bill carries its GST: IGST for another state, CGST + SGST for Karnataka', async () => {
     gstRegistered = true;
     const o = await createOrder();
-    await supplierBill(o, 'invoice', 'TEST-INV-GST', 100000, 18000);
-    const noGst = await orderVendorBillRepository.create(o.order, 'logistics', {
+    await db.execute("UPDATE suppliers SET gstin = '08ZZTPT1111Z1ZG' WHERE id = :id", { id: o.supplier });
+    await supplierBill(o, 'invoice', 'TEST-INV-RJ', 100000, 18000);
+    await db.execute("UPDATE logistics_partners SET gstin = '29ZZTPT2222Z1Z6' WHERE id = :id", { id: o.partner });
+    await orderVendorBillRepository.create(o.order, 'logistics', {
+      logistics_partner_id: o.partner, bill_for: 'cha', doc_kind: 'invoice', bill_no: 'TEST-CHA-KA', bill_date: '2026-10-27', taxable_inr: 10000, gst_inr: 1800,
+    }, userId);
+
+    expect((await sync()).bills).toBe(2);
+
+    const rajasthan = bills['BL-1'];
+    expect([rajasthan.payload.line_items[0].rate, rajasthan.payload.line_items[0].tax_id]).toEqual([100000, 'TX-IGST18']); // another state: IGST on the taxable value
+    expect(rajasthan.total).toBe(118000);
+    expect([contacts['VN-1'].payload.gst_treatment, contacts['VN-1'].payload.gst_no]).toEqual(['business_gst', '08ZZTPT1111Z1ZG']);
+    expect(bills['BL-2'].payload.line_items[0].tax_id).toBe('TX-GST18'); // Karnataka, like NexaCrest: CGST + SGST (the GST group)
+    expect(bills['BL-2'].total).toBe(11800);
+  });
+
+  it('in a GST-registered organisation a bill without GST goes in at 0 % from a registered vendor and without tax from an unregistered one', async () => {
+    gstRegistered = true;
+    const o = await createOrder();
+    await supplierBill(o, 'invoice', 'TEST-INV-ZERO', 5000, 0);
+    await orderVendorBillRepository.create(o.order, 'logistics', {
       logistics_partner_id: o.partner, bill_for: 'other', doc_kind: 'invoice', bill_no: 'TEST-NOGST-1', bill_date: '2026-10-27', taxable_inr: 500, gst_inr: 0,
     }, userId);
 
-    const result = await sync();
+    expect((await sync()).bills).toBe(2);
+    expect(bills['BL-1'].payload.line_items[0].tax_id).toBe('TX-GST0'); // registered supplier in Karnataka (29...)
+    expect(bills['BL-2'].payload.line_items[0]).not.toHaveProperty('tax_id'); // unregistered forwarder: no tax
+    expect(contacts['VN-2'].payload.gst_treatment).toBe('business_none');
+  });
 
-    expect([result.bills, result.failed]).toEqual([1, 1]);
-    expect((await messages(o.order, 'vendor_bill'))[0]).toBe('Bill TEST-INV-GST not sent: it carries GST, and how GST on bills is booked in a GST-registered Zoho Books organisation is still for the CA to decide.');
-    expect(contacts['VN-1'].payload.gst_treatment).toBe('business_none'); // the forwarder has no GSTIN
-    expect((await zohoPurchaseRepository.findBill(noGst)).zoho_bill_id).not.toBeNull();
+  it('in a GST-registered organisation GST from a vendor without GSTIN or an odd rate is refused', async () => {
+    gstRegistered = true;
+    const o = await createOrder();
+    await supplierBill(o, 'invoice', 'TEST-INV-ODD', 100000, 15000);
+    await orderVendorBillRepository.create(o.order, 'logistics', {
+      logistics_partner_id: o.partner, bill_for: 'transport', doc_kind: 'invoice', bill_no: 'TEST-TR-NOGSTIN', bill_date: '2026-10-27', taxable_inr: 2000, gst_inr: 360,
+    }, userId);
+
+    expect((await sync()).failed).toBe(2);
+    expect(await messages(o.order, 'vendor_bill')).toEqual([
+      'Bill TEST-INV-ODD not sent: GST 15000.00 on taxable 100000.00 is not 5, 12, 18, 28 or 40 % — correct the bill (a bill with several GST rates needs the CA).',
+      'Bill TEST-TR-NOGSTIN not sent: it carries GST (360.00), but TEST-Stage3 Forwarder has no GSTIN in the app. Add the GSTIN to the supplier / logistics partner, or correct the bill.',
+    ]);
+    expect(bills).toEqual({});
   });
 
   it('a bill already in Books is reused, not duplicated', async () => {
