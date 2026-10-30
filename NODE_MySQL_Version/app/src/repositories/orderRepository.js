@@ -636,6 +636,10 @@ async function setProductionStatus(orderId, text) {
   await db.execute('UPDATE orders SET production_status_text = :text WHERE id = :id', { text, id: orderId });
 }
 
+async function setBuyerPoReceivedOn(orderId, receivedOn) {
+  await db.execute('UPDATE orders SET buyer_po_received_on = :d WHERE id = :id', { d: receivedOn, id: orderId });
+}
+
 /** receivedOn: the day the buyer's PO arrived (Step 4d) — kept as it is when null. */
 async function setBuyersPoRef(orderId, ref, receivedOn = null) {
   await db.execute(
@@ -948,7 +952,7 @@ async function setFinancialsCompleted(orderId, userId) {
 
 module.exports = {
   all, allVisibleTo, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
-  setProductionStatus, setBuyersPoRef, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
+  setProductionStatus, setBuyersPoRef, setBuyerPoReceivedOn, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,
   generateBuyerActionToken, findByValidBuyerActionToken, applyClientSnapshot, markPiFormSkipped,
   generatePaymentActionToken, ensurePaymentActionToken, findByValidPaymentActionToken,

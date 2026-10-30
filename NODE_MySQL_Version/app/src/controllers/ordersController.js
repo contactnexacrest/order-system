@@ -1475,6 +1475,53 @@ async function downloadDossier(req, res) {
   res.send(buffer);
 }
 
+/**
+ * Owner decision 2026-10-30: corrects the date the buyer's PO was received
+ * after Step 4d (it is Day 1 of an associate's 10 days), with a reason,
+ * audit-logged. An incentive already fixed keeps its figures until it is
+ * worked out again on the order's incentive card.
+ */
+async function correctBuyerPoReceivedDate(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order || String(order.buyers_po_ref || '') === '' || order.buyers_po_ref === 'NIL') {
+    flash.set(req, 'error', "Confirm the buyer's PO received (Step 4d) first.");
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const receivedOn = str(req.body.buyer_po_received_on);
+  const orderDate = String(order.created_at || '').slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(receivedOn);
+  const realDate = m && (() => {
+    const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
+  })();
+  if (!realDate || receivedOn > todayIst() || receivedOn < orderDate) {
+    flash.set(req, 'error', `Enter the date the buyer's PO was received: not in the future and not before the order was created (${orderDate}).`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const reason = str(req.body.reason);
+  const reasonError = reasonValidator.check(reason);
+  if (reasonError !== null) {
+    flash.set(req, 'error', reasonError);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const old = order.buyer_po_received_on ? String(order.buyer_po_received_on).slice(0, 10) : null;
+  if (old === receivedOn) {
+    flash.set(req, 'success', 'No change: that is already the date on file.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  await orderRepository.setBuyerPoReceivedOn(orderId, receivedOn);
+  await auditLogRepository.log(req.user.id, 'BUYER_PO_RECEIVED_DATE_CORRECTED', 'orders', orderId, 'buyer_po_received_on', old, receivedOn, reason);
+  const incentive = await require('../repositories/incentiveRepository').forOrder(orderId);
+  flash.set(req, 'success', `Date the buyer's PO was received corrected to ${dates.short(receivedOn)}.`
+    + (incentive && incentive.locked_at ? ' This order\'s incentive is already fixed; use "Work it out again" on its incentive card for the new date to count.' : ''));
+  res.redirect(`/orders/${orderId}`);
+}
+
 /** Stage 1->2 manual gate: buyer's signed PO received. */
 async function recordBuyerPo(req, res) {
   const orderId = parseInt(req.params.id, 10);
@@ -3970,7 +4017,7 @@ async function completeCancellationRefund(req, res) {
 module.exports = {
   index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, addAssignee, removeAssignee, downloadDossier, generatePiFormLink, generateBuyerActionLink, generatePaymentActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
-  recordBuyerPo, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
+  recordBuyerPo, correctBuyerPoReceivedDate, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, updateProductionStatus,
   recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, skipPiForm, confirmSupplierSigned, uploadSupplierPoDocument, generateSupplierActionLink, skipSupplierPoAck, markSupplierAdvancePaid, markSupplierBalancePaid,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,

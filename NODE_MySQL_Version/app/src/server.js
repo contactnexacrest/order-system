@@ -759,6 +759,7 @@ app.post('/orders/:id/products/:productId', requireAuth, requirePermission('mana
 app.post('/orders/:id/products/:productId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteProduct));
 app.post('/orders/:id/products/:productId/duplicate', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.duplicateProduct));
 app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBuyerPo));
+app.post('/orders/:id/buyer-po/received-date', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.correctBuyerPoReceivedDate));
 app.post('/orders/:id/buyer-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadBuyerPoDocument));
 // Batch 3 #13b — free-form extra documents attached to this order (schema.sql Section AZ).
 app.post('/orders/:id/additional-documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadAdditionalDocument));

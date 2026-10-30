@@ -1559,6 +1559,17 @@
       <summary>{{ stepStatusIcon(flow.subStepStatus('s4', '4d')) }}<h2>Step 4d &middot; Confirm Buyer's PO Received</h2></summary>
       {% if hasBuyerPo %}
         <p>Buyer PO recorded: <strong>{{ order.buyers_po_ref }}</strong>{% if order.buyer_po_received_on %} &middot; received on {{ order.buyer_po_received_on | shortDate }}{% endif %}</p>
+        {% if canManageOrders and order.buyers_po_ref != 'NIL' %}
+          <details class="rate-correction" id="buyer-po-date-correct" style="margin-top:6px;">
+            <summary class="muted small">{{ 'Correct the date received' if order.buyer_po_received_on else 'Record the date the PO was received' }}</summary>
+            <form method="post" action="/orders/{{ order.id }}/buyer-po/received-date" class="field-grid">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <label>Date the buyer's PO was received *<input type="date" name="buyer_po_received_on" required min="{{ (order.created_at | string) | truncate(10, true, '') }}" max="{{ today() }}" value="{{ order.buyer_po_received_on or '' }}"></label>
+              <label>Reason for the change *<input type="text" name="reason" required minlength="10" maxlength="500"></label>
+              <button type="submit" class="btn-sm">Save date</button>
+            </form>
+          </details>
+        {% endif %}
       {% elif not (stage2 and stage2.status != 'locked') %}
         <p class="muted">Generate the Quotation first to unlock this gate.</p>
       {% elif buyerPoCopyRequired and not (buyerPoDocuments and buyerPoDocuments.length > 0) %}

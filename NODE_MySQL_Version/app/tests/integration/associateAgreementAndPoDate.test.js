@@ -97,6 +97,23 @@ describe('Associate agreement on file and the buyer PO received date', () => {
 
     await orderRepository.setBuyersPoRef(orderId, 'PO-77A');
     expect((await orderRepository.find(orderId)).buyer_po_received_on).toBe(created); // changing only the reference keeps the date
+
+    // Correcting it afterwards (owner decision 2026-10-30): with a reason, audit-logged.
+    await db.execute('UPDATE orders SET created_at = DATE_SUB(created_at, INTERVAL 5 DAY) WHERE id = :o', { o: orderId });
+    html = (await agent.get(`/orders/${orderId}`)).text;
+    expect(html).toContain(`action="/orders/${orderId}/buyer-po/received-date"`);
+    const earlier = shiftDays(todayIst(), -3);
+    const correct = async (fields) => {
+      const token = (await agent.get(`/orders/${orderId}`)).text.match(/name="_csrf"\s+value="([^"]+)"/)[1];
+      await agent.post(`/orders/${orderId}/buyer-po/received-date`).type('form').send({ _csrf: token, ...fields });
+      return (await agent.get(`/orders/${orderId}`)).text;
+    };
+    expect(await correct({ buyer_po_received_on: earlier, reason: 'short' })).toMatch(/alert-error/); // a reason of at least 10 characters is needed
+    expect(await correct({ buyer_po_received_on: shiftDays(todayIst(), -9), reason: 'The PO email arrived earlier than recorded.' })).toMatch(/alert-error/); // not before the order was created
+    expect(await correct({ buyer_po_received_on: earlier, reason: 'The PO email arrived earlier than recorded.' })).toContain('received on ' + dates.short(earlier));
+    expect((await orderRepository.find(orderId)).buyer_po_received_on).toBe(earlier);
+    const audit = await db.queryOne("SELECT COUNT(*) AS n FROM audit_log WHERE action_type = 'BUYER_PO_RECEIVED_DATE_CORRECTED' AND entity_id = :id", { id: orderId });
+    expect(Number(audit.n)).toBe(1);
   });
 
   it('the ten days count from the client\'s first PO received', async () => {

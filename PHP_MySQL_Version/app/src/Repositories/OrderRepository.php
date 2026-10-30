@@ -683,6 +683,11 @@ final class OrderRepository
     }
 
     /** Captures the buyer's PO/ref number once it's been signed and received (Stage 1->2 manual gate). */
+    public static function setBuyerPoReceivedOn(int $orderId, string $receivedOn): void
+    {
+        Database::connection()->prepare('UPDATE orders SET buyer_po_received_on = :d WHERE id = :id')->execute(['d' => $receivedOn, 'id' => $orderId]);
+    }
+
     /** $receivedOn: the day the buyer's PO arrived (Step 4d) — kept as it is when null. */
     public static function setBuyersPoRef(int $orderId, string $ref, ?string $receivedOn = null): void
     {

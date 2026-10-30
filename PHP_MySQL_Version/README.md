@@ -2022,3 +2022,18 @@ name ends in `_INTERNAL`. The CSV helper now leaves a plain negative number
   context `associate_agreement`). **119 tables**, **232 foreign keys**,
   **63 permissions**, **488 routes** (165 GET, 323 POST).
   Tests: `AssociateAgreementAndPoDateTest` / `associateAgreementAndPoDate.test.js`.
+
+## Follow-up (added 2026-10-30): correcting the buyer PO received date
+
+- Under Step 4d's "Buyer PO recorded", **Correct the date received** (or
+  **Record the date the PO was received** on an order confirmed before the
+  date was asked) takes the date (not in the future, not before the order)
+  and a reason of at least 10 characters; audit-logged as
+  `BUYER_PO_RECEIVED_DATE_CORRECTED`. Route
+  `POST /orders/{id}/buyer-po/received-date` (`manage_orders`, order lock
+  guard). An incentive already fixed keeps its figures until it is worked
+  out again on the order's incentive card.
+- Test fix: `UngatedRoutesTest` builds its router before preparing a
+  request, so each test in it passes when run on its own.
+- **489 routes** (165 GET, 324 POST). Tests:
+  `AssociateAgreementAndPoDateTest` / `associateAgreementAndPoDate.test.js`.

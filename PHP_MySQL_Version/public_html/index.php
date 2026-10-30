@@ -444,6 +444,7 @@ $router->post('/orders/{id}/archive', [$orders, 'archive'], [SessionAuth::requir
 $router->post('/orders/{id}/unarchive', [$orders, 'unarchive'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/duplicate', [$orders, 'duplicateOrder'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/buyer-po', [$orders, 'recordBuyerPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/buyer-po/received-date', [$orders, 'correctBuyerPoReceivedDate'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/buyer-po/documents', [$orders, 'uploadBuyerPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 // Batch 3 #13b — free-form extra documents attached to this order (schema.sql Section AZ).
 $router->post('/orders/{id}/additional-documents', [$orders, 'uploadAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);

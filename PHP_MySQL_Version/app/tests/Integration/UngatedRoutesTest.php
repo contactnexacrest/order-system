@@ -269,10 +269,13 @@ final class UngatedRoutesTest extends DbTestCase
     /** @return array{0: int, 1: string} the response code and body, through the whole route */
     private function dispatch(string $method, string $path, array $post = []): array
     {
+        // Built first: building runs index.php for a dummy path, which would
+        // otherwise overwrite the request (and leave a 404) prepared below.
+        $router = self::router();
         $this->prepareRequest($method, $path, $post);
         ob_start();
         try {
-            self::router()->dispatch($method, $path);
+            $router->dispatch($method, $path);
         } finally {
             $body = (string) ob_get_clean();
         }
@@ -287,6 +290,7 @@ final class UngatedRoutesTest extends DbTestCase
     private function refusedBy(array $route, array $post = []): ?string
     {
         $path = self::concrete($route['pattern']);
+        self::router(); // built before the request is prepared, as in dispatch()
         $this->prepareRequest($route['method'], $path, $post);
         foreach ((new \ReflectionProperty(Router::class, 'routes'))->getValue(self::router()) as $registered) {
             if ($registered['method'] !== $route['method'] || $registered['pattern'] !== $route['pattern']) {

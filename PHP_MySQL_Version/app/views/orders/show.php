@@ -2069,6 +2069,17 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <summary><?= $stepStatusIcon($subStepStatus('4', '4d')) ?><h2>Step 4d &middot; Confirm Buyer's PO Received</h2></summary>
       <?php if ($hasBuyerPo): ?>
         <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong><?php if (!empty($order['buyer_po_received_on'])): ?> &middot; received on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $order['buyer_po_received_on'])) ?><?php endif; ?></p>
+        <?php if ($canManageOrders && $order['buyers_po_ref'] !== 'NIL'): ?>
+          <details class="rate-correction" id="buyer-po-date-correct" style="margin-top:6px;">
+            <summary class="muted small"><?= empty($order['buyer_po_received_on']) ? 'Record the date the PO was received' : 'Correct the date received' ?></summary>
+            <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/received-date" class="field-grid">
+              <?= Csrf::field() ?>
+              <label>Date the buyer's PO was received *<input type="date" name="buyer_po_received_on" required min="<?= htmlspecialchars(substr((string) $order['created_at'], 0, 10)) ?>" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars((string) ($order['buyer_po_received_on'] ?? '')) ?>"></label>
+              <label>Reason for the change *<input type="text" name="reason" required minlength="10" maxlength="500"></label>
+              <button type="submit" class="btn-sm">Save date</button>
+            </form>
+          </details>
+        <?php endif; ?>
       <?php elseif (!$stage2 || $stage2['status'] === 'locked'): ?>
         <p class="muted">Generate the Quotation first to unlock this gate.</p>
       <?php elseif ($buyerPoCopyRequired && empty($buyerPoDocuments)): ?>

@@ -49,6 +49,12 @@ Step 4 on the order page has four sub-steps, done in order:
    this date is **Day 1** of the Associate Agreement's 10 days (chapter
    20). When the buyer completes Step 4 themselves through the link or
    the portal, the day they upload is recorded as the date received.
+   Typed the wrong date, or confirmed before the date was asked? Under
+   "Buyer PO recorded", **Correct the date received** (or **Record the
+   date the PO was received**) takes the date and a reason of at least 10
+   characters; the change is recorded in the audit log. If the order's
+   team incentive is already fixed, use **Work it out again** on its
+   incentive card for the new date to count.
    **This is the action that passes Stage 2's gate** and
    completes Step 4 (unless the buyer already did it through the link).
    While a copy is required (see the wet-signature gate below) this

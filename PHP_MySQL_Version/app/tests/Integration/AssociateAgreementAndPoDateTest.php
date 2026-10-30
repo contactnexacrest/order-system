@@ -93,6 +93,24 @@ final class AssociateAgreementAndPoDateTest extends DbTestCase
 
         OrderRepository::setBuyersPoRef($orderId, 'PO-77A');
         self::assertSame($created, OrderRepository::find($orderId)['buyer_po_received_on'], 'changing only the reference keeps the date');
+
+        // Correcting it afterwards (owner decision 2026-10-30): with a reason, audit-logged.
+        Database::connection()->prepare('UPDATE orders SET created_at = DATE_SUB(created_at, INTERVAL 5 DAY) WHERE id = :o')->execute(['o' => $orderId]);
+        ob_start();
+        (new OrderController())->show(['id' => (string) $orderId]);
+        self::assertStringContainsString('action="/orders/' . $orderId . '/buyer-po/received-date"', (string) ob_get_clean());
+        $earlier = date('Y-m-d', strtotime('-3 days'));
+        $_POST = ['buyer_po_received_on' => $earlier, 'reason' => 'short'];
+        (new OrderController())->correctBuyerPoReceivedDate(['id' => (string) $orderId]);
+        self::assertSame('error', Flash::pull()[0]['type'], 'a reason of at least 10 characters is needed');
+        $_POST = ['buyer_po_received_on' => date('Y-m-d', strtotime('-9 days')), 'reason' => 'The PO email arrived earlier than recorded.'];
+        (new OrderController())->correctBuyerPoReceivedDate(['id' => (string) $orderId]);
+        self::assertSame('error', Flash::pull()[0]['type'], 'not before the order was created');
+        $_POST = ['buyer_po_received_on' => $earlier, 'reason' => 'The PO email arrived earlier than recorded.'];
+        (new OrderController())->correctBuyerPoReceivedDate(['id' => (string) $orderId]);
+        self::assertSame('success', Flash::pull()[0]['type']);
+        self::assertSame($earlier, OrderRepository::find($orderId)['buyer_po_received_on']);
+        self::assertSame(1, (int) Database::connection()->query("SELECT COUNT(*) FROM audit_log WHERE action_type = 'BUYER_PO_RECEIVED_DATE_CORRECTED' AND entity_id = {$orderId}")->fetchColumn());
     }
 
     public function testTheTenDaysCountFromTheClientsFirstPoReceived(): void

@@ -1377,6 +1377,49 @@ final class OrderController
         unlink($zipPath);
     }
 
+    /**
+     * Owner decision 2026-10-30: corrects the date the buyer's PO was
+     * received after Step 4d (it is Day 1 of an associate's 10 days), with a
+     * reason, audit-logged. An incentive already fixed keeps its figures
+     * until it is worked out again on the order's incentive card.
+     */
+    public function correctBuyerPoReceivedDate(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        $user = AuthService::currentUser();
+        if ($order === null || (string) ($order['buyers_po_ref'] ?? '') === '' || $order['buyers_po_ref'] === 'NIL') {
+            Flash::set('error', "Confirm the buyer's PO received (Step 4d) first.");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $receivedOn = trim((string) ($_POST['buyer_po_received_on'] ?? ''));
+        $orderDate = substr((string) $order['created_at'], 0, 10);
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $receivedOn, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || $receivedOn > date('Y-m-d') || $receivedOn < $orderDate) {
+            Flash::set('error', "Enter the date the buyer's PO was received: not in the future and not before the order was created ({$orderDate}).");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        if (($reasonError = ReasonValidator::check($reason)) !== null) {
+            Flash::set('error', $reasonError);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $old = $order['buyer_po_received_on'] !== null ? (string) $order['buyer_po_received_on'] : null;
+        if ($old === $receivedOn) {
+            Flash::set('success', 'No change: that is already the date on file.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        OrderRepository::setBuyerPoReceivedOn($orderId, $receivedOn);
+        AuditLogRepository::log((int) $user['id'], 'BUYER_PO_RECEIVED_DATE_CORRECTED', 'orders', $orderId, 'buyer_po_received_on', $old, $receivedOn, $reason);
+        $locked = !empty(\App\Repositories\IncentiveRepository::forOrder($orderId)['locked_at']);
+        Flash::set('success', 'Date the buyer\'s PO was received corrected to ' . \App\Helpers\Dates::short($receivedOn) . '.'
+            . ($locked ? ' This order\'s incentive is already fixed; use "Work it out again" on its incentive card for the new date to count.' : ''));
+        header("Location: /orders/{$orderId}");
+    }
+
     /** Stage 1->2 manual gate: buyer's signed PO received. */
     public function recordBuyerPo(array $params): void
     {
