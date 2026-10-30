@@ -65,6 +65,11 @@ final class IncentiveController
             }
             $table[] = ['from' => (float) $from, 'reward' => (float) $reward];
         }
+        // QA Round 6, R6-N12: two rows with one profit threshold — which reward applies would be undefined.
+        $froms = array_column($table, 'from');
+        if (count($froms) !== count(array_unique($froms, SORT_REGULAR))) {
+            $errors[] = 'Two reward table rows have the same order profit — each row needs its own.';
+        }
         $split = [];
         foreach (array_keys(IncentiveRepository::ROLES) as $role) {
             $v = $_POST['split'][$role] ?? '';
@@ -418,7 +423,12 @@ final class IncentiveController
             AuditLogRepository::log((int) $user['id'], 'INCENTIVE_PAID', 'incentive_payouts', $id, 'status', 'due', 'paid');
             $count++;
         }
-        Flash::set('success', $count === 1 ? 'Payment recorded.' : "{$count} payments recorded.");
+        // QA Round 6, R6-N11: nothing selected (or all already paid) is not a success.
+        if ($count === 0) {
+            Flash::set('warning', 'Nothing was recorded — no payout due for payment was selected.');
+        } else {
+            Flash::set('success', $count === 1 ? 'Payment recorded.' : "{$count} payments recorded.");
+        }
         header('Location: /incentives/payouts?month=' . rawurlencode($month));
     }
 }

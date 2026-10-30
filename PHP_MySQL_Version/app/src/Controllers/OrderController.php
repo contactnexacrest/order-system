@@ -1972,9 +1972,23 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
-        if (!OrderRepository::find($orderId)) {
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
             http_response_code(404);
             echo 'Order not found.';
+            return;
+        }
+        // QA Round 6, R6-N13: nothing to approve on an order that is cancelled or lost.
+        if (in_array($order['status'], ['cancelled', 'lost'], true)) {
+            Flash::set('error', 'This order is ' . $order['status'] . ' — its payment terms cannot be approved.');
+            header("Location: /orders/{$orderId}#step-1-quotation-prepare");
+            return;
+        }
+        // Owner decision D-117 (QA Round 6, Q-R6-1): Admin, MD and ED may approve
+        // the terms of an order they created; anyone else needs a second person.
+        if ((int) ($order['created_by'] ?? 0) === (int) $user['id'] && !MakerCheckerGuard::selfApprovalAllowed((int) $user['id'])) {
+            Flash::set('error', 'You created this order, so its payment terms must be approved by someone else (MD, ED or Admin).');
+            header("Location: /orders/{$orderId}#step-1-quotation-prepare");
             return;
         }
         if (!\App\Services\PaymentTermsApprovalService::isPending($orderId)

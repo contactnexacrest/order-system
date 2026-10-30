@@ -107,6 +107,7 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
     public function testReportAdvancePaymentViaTokenRecordsItBeforeAdvanceClears(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        $this->createTestDocument($orderId, 'PI', 'sent'); // QA Round 6, R6-N24: a payment is reported against an issued PI.
         $token = OrderRepository::generateBuyerActionToken($orderId);
         $_POST['transaction_ref'] = 'UTR123456789';
         $_POST['amount'] = '5000.00';
@@ -241,6 +242,7 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
     public function testReportAdvancePaymentViaTokenIsAuditLogged(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
+        $this->createTestDocument($orderId, 'PI', 'sent'); // QA Round 6, R6-N24: a payment is reported against an issued PI.
         $token = OrderRepository::generateBuyerActionToken($orderId);
         $_POST['transaction_ref'] = 'UTR123456789';
 
@@ -257,6 +259,7 @@ final class BuyerAdvancePaymentGateTest extends DbTestCase
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
+        $this->createTestDocument($orderId, 'PI', 'sent'); // QA Round 6, R6-N24: a payment is reported against an issued PI.
         $_SESSION['_client_portal_client_id'] = $clientId;
         $_POST = ['payment_type' => 'balance', 'transaction_ref' => 'UTR999888777'];
 

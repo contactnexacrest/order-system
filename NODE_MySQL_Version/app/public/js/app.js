@@ -507,6 +507,17 @@
     if (value !== '' && el.dataset.maxValue !== undefined && parseFloat(value) > parseFloat(el.dataset.maxValue)) {
       return 'This can be at most ' + el.dataset.maxValue + '.';
     }
+    // data-unique-among="<name prefix>": no other field of the form whose
+    // name starts with that prefix may hold the same number (e.g. the
+    // reward table's "profit from" rows — QA Round 6, R6-N12).
+    if (el.dataset.uniqueAmong && el.form && value !== '') {
+      var peers = el.form.querySelectorAll('[name^="' + el.dataset.uniqueAmong + '"]');
+      for (var ui = 0; ui < peers.length; ui++) {
+        if (peers[ui] !== el && peers[ui].value.trim() !== '' && parseFloat(peers[ui].value) === parseFloat(value)) {
+          return el.dataset.uniqueAmongMessage || 'This value is already used in another row.';
+        }
+      }
+    }
     // data-zero-if="<name>=<value>": must be 0 while that field has that
     // value (e.g. the GST rate on a transport bill under reverse charge —
     // the transporter charges no GST; we pay it to the government).

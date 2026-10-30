@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const db = require('../config/db');
 
 const env = require('../config/env');
 const { parseDbDateTime, formatForDb } = require('../helpers/dbDateTime');
@@ -218,7 +219,27 @@ async function changePassword(clientId, newPassword) {
   await auditLogRepository.log(null, 'CLIENT_PASSWORD_CHANGED', 'clients', clientId);
 }
 
+/**
+ * QA Round 6, R6-N24: why the buyer cannot report a payment on this order yet
+ * (or any more) — null when they can. Nothing is owed before a Proforma
+ * Invoice has been issued, nor on a cancelled or lost order. Used by the
+ * portal and by the e-mailed buyer link. Port of
+ * ClientPortalService::paymentReportRefusal().
+ */
+async function paymentReportRefusal(order) {
+  if (['cancelled', 'lost'].includes(order.status)) {
+    return `This order is ${order.status}, so there is no payment to report on it.`;
+  }
+  const pi = await db.queryOne(
+    `SELECT 1 AS found FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
+     WHERE d.order_id = :order_id AND dt.code = 'PI' AND d.status IN ('approved', 'sent', 'superseded') LIMIT 1`,
+    { order_id: Number(order.id) }
+  );
+  return pi ? null : 'A payment can be reported once we have sent you the Proforma Invoice for this order.';
+}
+
 module.exports = {
+  paymentReportRefusal,
   SESSION_CLIENT_ID,
   provisionIfNeeded,
   attemptLogin,

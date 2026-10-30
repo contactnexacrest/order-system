@@ -117,7 +117,7 @@
     </div>
     <form class="chat-post-form" method="post" action="/client/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
       <?= Csrf::field() ?>
-      <textarea name="body" placeholder="Write a message…"></textarea>
+      <textarea name="body" placeholder="Write a message…"><?= htmlspecialchars($oldCommentBody ?? '') ?></textarea>
       <div class="chat-post-form-row">
         <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
         <button type="submit" class="btn-sm" data-loading-text="Sending…">Send</button>
@@ -127,6 +127,9 @@
 
   <div class="section">
     <h2>Report a Payment</h2>
+    <?php if (!empty($paymentReportRefusal)): ?>
+    <p class="muted"><strong><?= htmlspecialchars($paymentReportRefusal) ?></strong></p>
+    <?php else: ?>
     <p class="muted">Made a payment on this order? Let us know the transaction details below — our team will verify it against our bank statement before updating your order.</p>
     <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/report-payment" enctype="multipart/form-data">
       <?= Csrf::field() ?>
@@ -147,6 +150,7 @@
       </div>
       <button type="submit">Submit Payment Details</button>
     </form>
+    <?php endif; ?>
 
     <?php if (!empty($paymentReports)): ?>
       <h3 style="margin-top:20px">Previously Reported</h3>

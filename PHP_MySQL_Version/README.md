@@ -2038,7 +2038,7 @@ name ends in `_INTERNAL`. The CSV helper now leaves a plain negative number
 - **489 routes** (165 GET, 324 POST). Tests:
   `AssociateAgreementAndPoDateTest` / `associateAgreementAndPoDate.test.js`.
 
-## Follow-up (added 2026-10-31): QA Round 6, batches 1–3
+## Follow-up (added 2026-10-31): QA Round 6, batches 1–4
 
 - **Order access (Batch 1).** Disputes, complaints, amendments and the other
   records that belong to an order follow the order's assignment and archived
@@ -2066,3 +2066,17 @@ name ends in `_INTERNAL`. The CSV helper now leaves a plain negative number
     Saving order details is now audit-logged (`ORDER_DETAILS_UPDATED`).
   Tests: `QaRound6AccessTest`, `QaRound6InputTest`, `QaRound6ConcurrencyTest`
   (Node: `qaRound6Access`, `qaRound6Input`, `qaRound6Concurrency`).
+- **Smaller fixes (Batch 4).**
+  - Payment terms of a cancelled or lost order cannot be approved; only
+    Admin, MD and ED may approve the terms of an order they created (D-117).
+  - "Mark all paid" with nothing selected is a warning; two reward-table
+    rows with the same profit are refused (`data-unique-among` in app.js).
+  - The buyer's payment report needs an issued Proforma Invoice and an
+    order that is not cancelled or lost (portal and e-mailed link).
+  - A file sent under an unexpected field name is refused with a message
+    and the typed text kept (both stacks).
+  - Insurance belongs to CIF only (D-049): a CFR/FOB order stores none.
+  - Node: urlencoded forms are parsed with qs `allowSparse` (dependency
+    `qs` added), so `field[<id>]` keeps its id — dropdown-option edits
+    were silently not saved before.
+  Tests: `QaRound6SmallFixesTest` / `qaRound6SmallFixes.test.js`.

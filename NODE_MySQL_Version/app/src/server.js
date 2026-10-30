@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const env = require('./config/env'); // loads .env as a side effect — must be first
 const express = require('express');
+const qs = require('qs');
 const session = require('express-session');
 const { ConnectSessionKnexStore } = require('connect-session-knex');
 const knex = require('knex');
@@ -344,7 +345,19 @@ app.use((req, res, next) => {
 // through multer's own, separate, much larger limit — see uploadLarge
 // below) while the friendly 413 handler further down still catches
 // anything that somehow still exceeds this.
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+// QA Round 6, R6-N25: Express's own form parser turned a numbered field
+// name such as option_value[30] into a squashed list (qs drops the gaps) —
+// with small record ids the value landed under the wrong key, so an edit on
+// the dropdown-options page was silently not saved (and bad values were not
+// refused). Parsed here with the same qs settings plus allowSparse, so a
+// field keeps its id as PHP reads it; name[] is still a list.
+app.use(express.text({ type: 'application/x-www-form-urlencoded', limit: '2mb' }));
+app.use((req, res, next) => {
+  if (typeof req.body === 'string' && req.is('application/x-www-form-urlencoded')) {
+    req.body = qs.parse(req.body, { allowPrototypes: true, allowSparse: true, arrayLimit: 100, depth: Infinity, parameterLimit: 10000 });
+  }
+  next();
+});
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -1168,7 +1181,18 @@ app.use((err, req, res, next) => {
   // under a field name this form doesn't have, too many files, ...) is a
   // bad request, not a server error — nothing has been stored.
   if (err && err.name === 'MulterError') {
-    res.status(400).send('<h1>400 — Upload not accepted</h1><p>This form could not accept the file(s) you sent. Nothing was saved — go back and attach the file using the form\'s own upload field.</p>');
+    // QA Round 6, R6-N03: back to the form with a message (and what was
+    // typed so far), the same as PHP, instead of a bare error page.
+    const message = 'That file could not be accepted by this form — nothing was saved. Attach files with the form\'s own upload button and try again.';
+    if (req.xhr || String(req.get('Accept') || '').includes('application/json')) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    flash.set(req, 'error', message);
+    if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+      flash.setOld(req, req.body);
+    }
+    res.redirect(safeRedirectBack(req));
     return;
   }
   next(err);

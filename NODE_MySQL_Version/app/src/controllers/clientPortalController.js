@@ -306,6 +306,8 @@ async function showOrder(req, res) {
   res.renderView('client_portal/order_show', {
     client,
     order,
+    paymentReportRefusal: await clientPortalService.paymentReportRefusal(order),
+    oldCommentBody: String((flash.pullOld(req) || {}).body || ''),
     products: await orderProductRepository.forOrder(orderId),
     totalFobValue: await orderProductRepository.totalFobValue(orderId),
     documents: await documentRepository.customerFacingForOrder(orderId),
@@ -530,6 +532,12 @@ async function reportPayment(req, res) {
     return;
   }
 
+  const refusal = await clientPortalService.paymentReportRefusal(order);
+  if (refusal) {
+    flash.set(req, 'error', refusal);
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
   const paymentType = String(req.body.payment_type || '');
   const transactionRef = String(req.body.transaction_ref || '').trim();
   if (!['advance', 'balance', 'freight'].includes(paymentType) || transactionRef === '') {

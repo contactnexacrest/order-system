@@ -23,6 +23,25 @@ use App\Repositories\LoginAttemptRepository;
  */
 final class ClientPortalService
 {
+    /**
+     * QA Round 6, R6-N24: why the buyer cannot report a payment on this order
+     * yet (or any more) — null when they can. Nothing is owed before a
+     * Proforma Invoice has been issued, nor on a cancelled or lost order.
+     * Used by the portal and by the e-mailed buyer link.
+     */
+    public static function paymentReportRefusal(array $order): ?string
+    {
+        if (in_array($order['status'] ?? '', ['cancelled', 'lost'], true)) {
+            return 'This order is ' . $order['status'] . ', so there is no payment to report on it.';
+        }
+        $stmt = \App\Config\Database::connection()->prepare(
+            "SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
+             WHERE d.order_id = :order_id AND dt.code = 'PI' AND d.status IN ('approved', 'sent', 'superseded') LIMIT 1"
+        );
+        $stmt->execute(['order_id' => (int) $order['id']]);
+        return $stmt->fetchColumn() ? null : 'A payment can be reported once we have sent you the Proforma Invoice for this order.';
+    }
+
     private const SESSION_CLIENT_ID = '_client_portal_client_id';
     // docs/schema.sql Section AV — set only when the current client-portal
     // session was started by staff (impersonate()), not a real client

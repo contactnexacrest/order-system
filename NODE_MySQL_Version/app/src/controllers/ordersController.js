@@ -2211,8 +2211,22 @@ async function recordFeedback(req, res) {
  */
 async function approvePaymentTerms(req, res) {
   const orderId = parseInt(req.params.id, 10);
-  if (!(await orderRepository.find(orderId))) {
+  const order = await orderRepository.find(orderId);
+  if (!order) {
     res.status(404).send('Order not found.');
+    return;
+  }
+  // QA Round 6, R6-N13: nothing to approve on an order that is cancelled or lost.
+  if (['cancelled', 'lost'].includes(order.status)) {
+    flash.set(req, 'error', `This order is ${order.status} — its payment terms cannot be approved.`);
+    res.redirect(`/orders/${orderId}#step-1-quotation-prepare`);
+    return;
+  }
+  // Owner decision D-117 (QA Round 6, Q-R6-1): Admin, MD and ED may approve
+  // the terms of an order they created; anyone else needs a second person.
+  if (Number(order.created_by || 0) === Number(req.user.id) && !(await makerCheckerGuard.selfApprovalAllowed(req.user.id))) {
+    flash.set(req, 'error', 'You created this order, so its payment terms must be approved by someone else (MD, ED or Admin).');
+    res.redirect(`/orders/${orderId}#step-1-quotation-prepare`);
     return;
   }
   if (!(await paymentTermsApprovalService.isPending(orderId))

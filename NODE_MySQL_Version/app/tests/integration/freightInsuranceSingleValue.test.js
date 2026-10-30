@@ -28,7 +28,8 @@ describe('Freight/Insurance single indicative value (90-item backlog #67)', () =
   });
 
   it('indicative_freight_amount round-trips through updateDetails', async () => {
-    const orderId = await createTestOrder(await createTestClient());
+    // CIF: only a CIF order keeps an insurance amount (owner decision D-049).
+    const orderId = await createTestOrder(await createTestClient(), 'CIF');
     const order = await orderRepository.find(orderId);
     expect(order).not.toBeNull();
     expect(Object.prototype.hasOwnProperty.call(order, 'indicative_freight_amount')).toBe(true);

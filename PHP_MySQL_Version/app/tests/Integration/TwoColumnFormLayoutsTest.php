@@ -65,6 +65,7 @@ final class TwoColumnFormLayoutsTest extends DbTestCase
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
+        $this->createTestDocument($orderId, 'PI', 'sent'); // QA Round 6, R6-N24: the form appears once the PI is issued.
         $_SESSION['_client_portal_client_id'] = $clientId;
 
         ob_start();

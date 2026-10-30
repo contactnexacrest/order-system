@@ -25,7 +25,8 @@ final class FreightInsuranceSingleValueTest extends DbTestCase
 {
     public function testIndicativeFreightAmountRoundTripsThroughUpdateDetails(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
+        // CIF: only a CIF order keeps an insurance amount (owner decision D-049).
+        $orderId = $this->createTestOrder($this->createTestClient(), 'CIF');
         $order = OrderRepository::find($orderId);
         self::assertNotNull($order);
         self::assertArrayHasKey('indicative_freight_amount', $order, 'indicative_freight_low/high must be consolidated into a single indicative_freight_amount column');

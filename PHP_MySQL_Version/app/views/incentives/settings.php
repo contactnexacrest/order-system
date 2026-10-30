@@ -38,7 +38,7 @@ $__cutoffLabel = $settings['cutoff'] === 'last'
       <table class="list"><tr><th>Order profit from (&#8377;)</th><th>Team reward (&#8377;)</th></tr>
         <?php foreach ($__table as $i => $t): ?>
           <tr>
-            <td><input type="number" name="table_from[<?= $i ?>]" min="1" step="1" value="<?= $t['from'] === '' ? '' : (int) round((float) $t['from']) ?>" aria-label="Order profit from, row <?= $i + 1 ?>"></td>
+            <td><input type="number" data-unique-among="table_from[" data-unique-among-message="Another row already starts at this profit." name="table_from[<?= $i ?>]" min="1" step="1" value="<?= $t['from'] === '' ? '' : (int) round((float) $t['from']) ?>" aria-label="Order profit from, row <?= $i + 1 ?>"></td>
             <td><input type="number" name="table_reward[<?= $i ?>]" min="1" step="1" value="<?= $t['reward'] === '' ? '' : (int) round((float) $t['reward']) ?>" aria-label="Team reward, row <?= $i + 1 ?>"></td>
           </tr>
         <?php endforeach; ?>

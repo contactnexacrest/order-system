@@ -98,6 +98,11 @@ async function saveSettings(req, res) {
     }
     table.push({ from: Number(from), reward: Number(reward) });
   }
+  // QA Round 6, R6-N12: two rows with one profit threshold — which reward applies would be undefined.
+  const thresholds = table.map((t) => t.from);
+  if (new Set(thresholds).size !== thresholds.length) {
+    errors.push('Two reward table rows have the same order profit — each row needs its own.');
+  }
   const split = {};
   const postedSplit = body.split || {};
   for (const role of Object.keys(incentiveRepository.ROLES)) {
@@ -488,7 +493,12 @@ async function markPaid(req, res) {
     await auditLogRepository.log(req.user.id, 'INCENTIVE_PAID', 'incentive_payouts', id, 'status', 'due', 'paid');
     count++;
   }
-  flash.set(req, 'success', count === 1 ? 'Payment recorded.' : `${count} payments recorded.`);
+  // QA Round 6, R6-N11: nothing selected (or all already paid) is not a success.
+  if (count === 0) {
+    flash.set(req, 'warning', 'Nothing was recorded — no payout due for payment was selected.');
+  } else {
+    flash.set(req, 'success', count === 1 ? 'Payment recorded.' : `${count} payments recorded.`);
+  }
   res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
 }
 

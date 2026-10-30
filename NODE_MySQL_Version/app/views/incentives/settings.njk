@@ -26,7 +26,7 @@
       <table class="list"><tr><th>Order profit from (&#8377;)</th><th>Team reward (&#8377;)</th></tr>
         {% for t in tableRows %}
           <tr>
-            <td><input type="number" name="table_from[{{ loop.index0 }}]" min="1" step="1" value="{{ t.from }}" aria-label="Order profit from, row {{ loop.index }}"></td>
+            <td><input type="number" data-unique-among="table_from[" data-unique-among-message="Another row already starts at this profit." name="table_from[{{ loop.index0 }}]" min="1" step="1" value="{{ t.from }}" aria-label="Order profit from, row {{ loop.index }}"></td>
             <td><input type="number" name="table_reward[{{ loop.index0 }}]" min="1" step="1" value="{{ t.reward }}" aria-label="Team reward, row {{ loop.index }}"></td>
           </tr>
         {% endfor %}

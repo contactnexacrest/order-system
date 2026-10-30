@@ -4,7 +4,7 @@ const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
 const stageGateService = require('../../src/services/stageGateService');
-const { createTestClient, createTestOrder, createTestClientLogin } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestClientLogin, createTestDocument } = require('../support/fixtures');
 const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
 
 function extractCsrf(html) {
@@ -68,6 +68,7 @@ describe('Two-column form layouts (90-item backlog "2-column layouts for Report-
     const clientId = await createTestClient(email);
     await createTestClientLogin(clientId, 'JestTwoColTest123!');
     const orderId = await createTestOrder(clientId);
+    await createTestDocument(orderId, 'PI', 'sent'); // QA Round 6, R6-N24: the form appears once the PI is issued.
 
     const agent = request.agent(app);
     const loginPage = await agent.get('/client/login');

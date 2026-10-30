@@ -237,6 +237,10 @@ final class BuyerActionService
         if (self::advanceAlreadyCleared($orderId)) {
             return ['ok' => false, 'message' => 'The advance payment has already been marked cleared on this order — no further report is needed.'];
         }
+        // QA Round 6, R6-N24: same rule as the portal.
+        if ($refusal = ClientPortalService::paymentReportRefusal($order)) {
+            return ['ok' => false, 'message' => $refusal];
+        }
 
         $transactionRef = trim((string) ($_POST['transaction_ref'] ?? ''));
         if ($transactionRef === '') {

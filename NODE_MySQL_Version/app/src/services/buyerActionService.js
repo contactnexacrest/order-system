@@ -212,6 +212,11 @@ async function reportAdvancePayment(req, order) {
   if (await advanceAlreadyCleared(orderId)) {
     return { ok: false, message: 'The advance payment has already been marked cleared on this order — no further report is needed.' };
   }
+  // QA Round 6, R6-N24: same rule as the portal.
+  const refusal = await require('./clientPortalService').paymentReportRefusal(order);
+  if (refusal) {
+    return { ok: false, message: refusal };
+  }
 
   const transactionRef = String(req.body.transaction_ref || '').trim();
   if (transactionRef === '') {

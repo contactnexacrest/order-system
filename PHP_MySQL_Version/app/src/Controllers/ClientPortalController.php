@@ -302,6 +302,8 @@ final class ClientPortalController
         View::render('client_portal/order_show', [
             'client' => $client,
             'order' => $order,
+            'paymentReportRefusal' => ClientPortalService::paymentReportRefusal($order),
+            'oldCommentBody' => (string) (Flash::pullOld()['body'] ?? ''),
             'products' => OrderProductRepository::forOrder($orderId),
             'totalFobValue' => OrderProductRepository::totalFobValue($orderId),
             'documents' => DocumentRepository::customerFacingForOrder($orderId),
@@ -456,6 +458,17 @@ final class ClientPortalController
         }
 
         $body = trim((string) ($_POST['body'] ?? ''));
+        // QA Round 6, R6-N03: a file under any other field name is refused (as
+        // on Node), not silently dropped — and what was typed is kept.
+        foreach ($_FILES as $field => $file) {
+            $errors = (array) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($field !== 'attachments' && array_filter($errors, static fn ($e): bool => (int) $e !== UPLOAD_ERR_NO_FILE) !== []) {
+                Flash::set('error', 'That file could not be accepted by this form — nothing was saved. Attach files with the form\'s own upload button and try again.');
+                Flash::setOld($_POST);
+                header("Location: /client/orders/{$orderId}");
+                return;
+            }
+        }
         try {
             $subPath = \App\Helpers\OrderStorage::folder($order, 'order_updates');
             $fileIds = FileUploadService::handleMultipleUploads(
@@ -732,6 +745,12 @@ final class ClientPortalController
         if (!$order || (int) $order['client_id'] !== $clientId) {
             http_response_code(404);
             echo 'Order not found.';
+            return;
+        }
+
+        if ($refusal = ClientPortalService::paymentReportRefusal($order)) {
+            Flash::set('error', $refusal);
+            header("Location: /client/orders/{$orderId}");
             return;
         }
 

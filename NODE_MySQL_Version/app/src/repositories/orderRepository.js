@@ -436,7 +436,8 @@ async function insertOrderRow(executor, data, createdBy) {
       sailing_lead_time_min_days: data.sailing_lead_time_min_days ?? null,
       sailing_lead_time_max_days: data.sailing_lead_time_max_days ?? null,
       indicative_freight_amount: data.indicative_freight_amount || null,
-      indicative_insurance_amount: data.indicative_insurance_amount || null,
+      // Owner decision D-049 (QA Round 6, Q-R5-2): only a CIF order carries an insurance amount.
+      indicative_insurance_amount: snapshot.incoterm_code === 'CIF' ? (data.indicative_insurance_amount || null) : null,
       buyers_po_ref: data.buyers_po_ref ?? 'NIL',
       quotation_date: data.quotation_date,
       quotation_valid_until: data.quotation_valid_until,
@@ -601,7 +602,8 @@ async function updateDetails(orderId, data) {
       estimated_package_count: data.estimated_package_count || null,
       estimated_package_type: data.estimated_package_type || null,
       indicative_freight_amount: data.indicative_freight_amount || null,
-      indicative_insurance_amount: data.indicative_insurance_amount || null,
+      // Owner decision D-049 (QA Round 6, Q-R5-2): only a CIF order carries an insurance amount.
+      indicative_insurance_amount: snapshot.incoterm_code === 'CIF' ? (data.indicative_insurance_amount || null) : null,
       incoterm_code: snapshot.incoterm_code,
       currency_code: snapshot.currency_code,
       port_of_loading_name: snapshot.port_of_loading_name,

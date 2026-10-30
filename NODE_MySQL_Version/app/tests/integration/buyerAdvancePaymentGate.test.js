@@ -8,7 +8,7 @@ const clientPaymentReportRepository = require('../../src/repositories/clientPaym
 const buyerActionController = require('../../src/controllers/buyerActionController');
 const clientPortalController = require('../../src/controllers/clientPortalController');
 const flash = require('../../src/helpers/flash');
-const { createTestClient, createTestOrder } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestDocument } = require('../support/fixtures');
 
 /**
  * Port of BuyerAdvancePaymentGateTest.php. 90-item backlog #19/#48.
@@ -103,6 +103,7 @@ describe('Buyer advance-payment gate (90-item backlog #19/#48)', () => {
 
   it('reportPayment() via token records the advance payment before it clears', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    await createTestDocument(orderId, 'PI', 'sent'); // QA Round 6, R6-N24: a payment is reported against an issued PI.
     const token = await orderRepository.generateBuyerActionToken(orderId);
     const req = fakeReq({ token }, {
       transaction_ref: 'UTR123456789',
@@ -128,6 +129,7 @@ describe('Buyer advance-payment gate (90-item backlog #19/#48)', () => {
   // to reopen the order and see the row in clientPaymentReports.
   it('reportPayment() via token is audit-logged', async () => {
     const orderId = await createTestOrder(await createTestClient());
+    await createTestDocument(orderId, 'PI', 'sent'); // QA Round 6, R6-N24: a payment is reported against an issued PI.
     const token = await orderRepository.generateBuyerActionToken(orderId);
     const req = fakeReq({ token }, { transaction_ref: 'UTR123456789' });
 
@@ -143,6 +145,7 @@ describe('Buyer advance-payment gate (90-item backlog #19/#48)', () => {
   it('clientPortalController.reportPayment() is audit-logged', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
+    await createTestDocument(orderId, 'PI', 'sent'); // QA Round 6, R6-N24: a payment is reported against an issued PI.
     const req = fakeReq({ id: String(orderId) }, { payment_type: 'balance', transaction_ref: 'UTR999888777' }, { _client_portal_client_id: clientId });
 
     await clientPortalController.reportPayment(req, fakeRes());

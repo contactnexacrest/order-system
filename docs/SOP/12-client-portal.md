@@ -210,7 +210,9 @@ Opening an order (**View documents**) shows, top to bottom (with a
    purely informational, staff still verify against the bank statement
    before recording anything themselves. The amount, if given, must be
    above 0, and the date paid cannot be in the future — the same check on
-   the e-mailed buyer link (QA Round 6, R6-N19/N20/N21).
+   the e-mailed buyer link (QA Round 6, R6-N19/N20/N21). The form appears
+   only once the Proforma Invoice has been issued, and not on a cancelled
+   or lost order (R6-N24).
 6. **Raise a Dispute** — only shown when staff have switched it on for this
    specific order; see [Disputes](./11-disputes.md). For cancel-intent
    messages only — a process flaw with no intent to cancel belongs in
