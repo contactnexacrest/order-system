@@ -8,6 +8,7 @@
   {% endif %}
   <form method="post" action="{{ ('/suppliers/' + supplier.id + '/update') if isEdit else '/suppliers' }}">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    {% if editFingerprint %}<input type="hidden" name="edit_fingerprint" value="{{ editFingerprint }}">{% endif %}
     <fieldset>
       <legend>Supplier Details</legend>
       <div class="field-grid">

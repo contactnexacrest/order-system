@@ -33,6 +33,7 @@
   <?php if ((!$isLocked || $canOverrideLock) && (!$isPostConfirmation || $canOverride)): ?>
   <form method="post" action="/orders/<?= (int) $order['id'] ?>/edit">
     <?= Csrf::field() ?>
+    <?= \App\Helpers\EditFingerprint::input($editFingerprint) ?>
 
     <fieldset>
       <legend>Commercial Terms</legend>

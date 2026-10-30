@@ -80,6 +80,7 @@ final class SupplierController
         }
         View::render('suppliers/form', [
             'supplier' => $supplier,
+            'editFingerprint' => \App\Helpers\EditFingerprint::of($supplier, SupplierRepository::EDIT_FIELDS),
             'supplierTypes' => self::typeOptions($supplier['types']),
             'factoryAddresses' => SupplierFactoryAddressRepository::forSupplier($id),
             'usedOnAnOrder' => SupplierRepository::isUsedOnAnOrder($id),
@@ -98,6 +99,12 @@ final class SupplierController
             return;
         }
 
+        // QA Round 6, R6-N27: someone else saved this supplier since the form was opened.
+        if ($conflict = \App\Helpers\EditFingerprint::conflict($supplier, SupplierRepository::EDIT_FIELDS, 'suppliers', $id, 'supplier')) {
+            Flash::set('error', $conflict);
+            header("Location: /suppliers/{$id}/edit");
+            return;
+        }
         $data = $this->collectFormData($supplier['types']);
         if ($data === null) {
             header("Location: /suppliers/{$id}/edit");

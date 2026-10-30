@@ -188,11 +188,14 @@ final class IncentiveRepository
         return $stmt->fetch() ?: null;
     }
 
-    public static function markPayoutPaid(int $id, string $paidOn, float $paidInr, ?float $tdsInr, int $userId): void
+    /** @return bool whether this call marked it paid (false: it already was — QA Round 6, R6-N17) */
+    public static function markPayoutPaid(int $id, string $paidOn, float $paidInr, ?float $tdsInr, int $userId): bool
     {
-        Database::connection()->prepare(
+        $stmt = Database::connection()->prepare(
             "UPDATE incentive_payouts SET status = 'paid', paid_on = :d, paid_inr = :p, tds_inr = :t, paid_by = :u WHERE id = :id AND status = 'due'"
-        )->execute(['d' => $paidOn, 'p' => $paidInr, 't' => $tdsInr, 'u' => $userId, 'id' => $id]);
+        );
+        $stmt->execute(['d' => $paidOn, 'p' => $paidInr, 't' => $tdsInr, 'u' => $userId, 'id' => $id]);
+        return $stmt->rowCount() === 1;
     }
 
     public static function deleteOrderPayouts(int $orderId): void

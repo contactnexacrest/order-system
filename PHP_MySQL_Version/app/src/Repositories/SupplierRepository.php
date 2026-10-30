@@ -15,6 +15,13 @@ use App\Config\Database;
  */
 final class SupplierRepository
 {
+    /** QA Round 6, R6-N27: the columns the supplier edit form saves (its edit fingerprint). */
+    public const EDIT_FIELDS = [
+        'supplier_legal_name', 'address', 'city', 'state', 'gstin', 'pan', 'contact_person', 'contact_person_phone',
+        'contact_person_whatsapp', 'phone', 'email', 'whatsapp_number', 'notes', 'bank_account_name', 'bank_name',
+        'bank_branch', 'bank_account_number', 'bank_ifsc', 'bank_account_type', 'bank_upi_id',
+    ];
+
     /** Directory columns written by create()/update(), besides the name. */
     private const FIELDS = [
         'address', 'city', 'state', 'gstin', 'pan', 'contact_person', 'contact_person_phone',

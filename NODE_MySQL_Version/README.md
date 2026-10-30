@@ -920,3 +920,32 @@ name ends in `_INTERNAL`. The CSV helper now leaves a plain negative number
   request, so each test in it passes when run on its own.
 - **489 routes** (165 GET, 324 POST). Tests:
   `AssociateAgreementAndPoDateTest` / `associateAgreementAndPoDate.test.js`.
+
+## Follow-up (added 2026-10-31): QA Round 6, batches 1–3
+
+- **Order access (Batch 1).** Disputes, complaints, amendments and the other
+  records that belong to an order follow the order's assignment and archived
+  rules; reports and a client's page list only orders the user may see; the
+  Export Executive's respond permissions open the Disputes / Complaints
+  lists; CAFIN download also needs the order; a link that would answer 403
+  is shown as plain text.
+- **Bad input (Batch 2).** An id in a URL must be a positive whole number
+  (else 404); an action on an order or record that does not exist answers
+  "not found" after the route's own checks; money, quantity, rate, date and
+  range limits; incentive payout and buyer payment-report checks.
+- **Simultaneous and repeated saves (Batch 3).**
+  - `clients.email` is unique (index `uq_clients_email`, migration
+    `docs/migrations/2026-10-31a-client-email-unique.sql` — run the
+    duplicate-email check first). Two saves of one email at once: the second
+    gets "Another client already uses this email".
+  - A repeated click records and logs once: a payment leg with the same
+    amount, day and rate; a payout already paid; payment terms already
+    approved.
+  - One generation per order and document type at a time (a MySQL named
+    lock `nx_docgen_<order>_<type>`); a second one meanwhile is asked to wait.
+  - The order details, client and supplier edit forms carry an
+    `edit_fingerprint` of the values they were opened with; a save on a form
+    opened before someone else's save is refused ("changed by … — reload").
+    Saving order details is now audit-logged (`ORDER_DETAILS_UPDATED`).
+  Tests: `QaRound6AccessTest`, `QaRound6InputTest`, `QaRound6ConcurrencyTest`
+  (Node: `qaRound6Access`, `qaRound6Input`, `qaRound6Concurrency`).

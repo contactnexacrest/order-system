@@ -25,7 +25,7 @@ describe('clientRepository — Buyer/Consignee/Notify Party split', () => {
       billing_postcode: 'BC123',
       vat_eori_tax_no: 'DE123456789',
       contact_person: 'Buyer Contact',
-      email: 'buyer@jest-test.example',
+      email: `buyer-${Math.random().toString(16).slice(2, 10)}@jest-test.example`, // QA Round 6, R6-N16: clients.email is unique
       phone: '+49 111',
       country_of_destination: 'Germany',
       coo_type: 'Non-Preferential',

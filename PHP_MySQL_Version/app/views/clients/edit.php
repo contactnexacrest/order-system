@@ -23,6 +23,7 @@
 
   <form method="post" action="/clients/<?= (int) $client['id'] ?>/update">
     <?= Csrf::field() ?>
+    <?= \App\Helpers\EditFingerprint::input($editFingerprint) ?>
     <?php $fieldsetDisabled = $locked && !$isSuperAdmin; ?>
     <fieldset <?= $fieldsetDisabled ? 'disabled' : '' ?>>
       <legend>Buyer Details</legend>

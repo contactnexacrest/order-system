@@ -187,7 +187,22 @@ async function recordLegReceivedWithRate(orderId, leg, amount, receivedAt, rate,
   if (!EXCHANGE_RATE_LEGS.includes(leg)) {
     throw new Error(`Unknown settlement leg: ${leg}`);
   }
-  await db.transaction(async (c) => {
+  return db.transaction(async (c) => {
+    // QA Round 6, R6-N17: a second click with the same details (amount, day
+    // received, rate) records nothing more — the row is locked, so of two
+    // clicks at the same moment the second waits and sees the first one's
+    // values. Port of OrderPaymentStatusRepository::legAlreadyRecorded().
+    const current = await c.queryOne(
+      `SELECT ${leg}_amount AS amount, DATE_FORMAT(${leg}_remittance_received_at, '%Y-%m-%d') AS received_on, ${leg}_exchange_rate AS rate
+       FROM order_payment_status WHERE order_id = :order_id FOR UPDATE`,
+      { order_id: orderId }
+    );
+    if (current && current.amount !== null && current.rate !== null
+      && Math.abs(Number(current.amount) - Math.round(Number(amount) * 100) / 100) < 0.005
+      && String(current.received_on) === String(receivedAt).slice(0, 10)
+      && Math.abs(Number(current.rate) - Math.round(Number(rate) * 10000) / 10000) < 0.00005) {
+      return false;
+    }
     await c.execute(
       `UPDATE order_payment_status SET ${leg}_amount = :amount, ${leg}_remittance_received_at = :received_at WHERE order_id = :order_id`,
       { amount, received_at: receivedAt, order_id: orderId }
@@ -196,6 +211,7 @@ async function recordLegReceivedWithRate(orderId, leg, amount, receivedAt, rate,
       `UPDATE order_payment_status SET ${leg}_exchange_rate = :rate, ${leg}_exchange_rate_set_at = NOW(), ${leg}_exchange_rate_set_by = :set_by WHERE order_id = :order_id`,
       { rate, set_by: setBy, order_id: orderId }
     );
+    return true;
   });
 }
 

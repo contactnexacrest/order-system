@@ -6,6 +6,10 @@ const emailDispatchService = require('../../src/services/emailDispatchService');
 const auditLogRepository = require('../../src/repositories/auditLogRepository');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const BUYER_EMAIL = `buyer-${process.pid}-${Date.now()}@example.test`;
+
 /**
  * Port of EmailSendNowOverrideTest.php. 90-item backlog Phase 4: the
  * deferred-dispatch job's own docblock anticipated a "future 'send now'
@@ -17,6 +21,10 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * awaitingDispatch() now sorting most-recent-first.
  */
 describe('emailDispatchService.sendNowOverride (90-item backlog Phase 4)', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[BUYER_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([BUYER_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   async function createTestDocument(orderId, typeCode = 'QT', status = 'draft', pdfFileId = null) {
     const type = await db.queryOne('SELECT id FROM document_types WHERE code = :code', { code: typeCode });
     const result = await db.execute(
@@ -44,7 +52,7 @@ describe('emailDispatchService.sendNowOverride (90-item backlog Phase 4)', () =>
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', null);
-    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', '2030-01-01 00:00:00', 1);
+    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', '2030-01-01 00:00:00', 1);
     // Deliberately not approved — still 'pending_approval'.
 
     await expect(emailDispatchService.sendNowOverride(emailLogId, 1))
@@ -56,7 +64,7 @@ describe('emailDispatchService.sendNowOverride (90-item backlog Phase 4)', () =>
     const orderId = await createTestOrder(clientId);
     const fileId = await createTestFile(orderId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', fileId);
-    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', '2030-01-01 00:00:00', 1);
+    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', '2030-01-01 00:00:00', 1);
     await emailLogRepository.approve(emailLogId, 1);
 
     await emailDispatchService.sendNowOverride(emailLogId, 1);
@@ -73,7 +81,7 @@ describe('emailDispatchService.sendNowOverride (90-item backlog Phase 4)', () =>
     const orderId = await createTestOrder(clientId);
     const fileId = await createTestFile(orderId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', fileId);
-    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, 1);
+    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', null, 1);
     await emailLogRepository.approve(emailLogId, 1);
     await emailDispatchService.dispatch(await emailLogRepository.find(emailLogId));
 
@@ -84,11 +92,11 @@ describe('emailDispatchService.sendNowOverride (90-item backlog Phase 4)', () =>
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
     const documentIdA = await createTestDocument(orderId, 'QT', 'approved', null);
-    const olderId = await emailLogRepository.create(orderId, documentIdA, 'send_qt', 'buyer@example.test', 'Subject A', 'Body', null, 1);
+    const olderId = await emailLogRepository.create(orderId, documentIdA, 'send_qt', BUYER_EMAIL, 'Subject A', 'Body', null, 1);
     await db.execute('UPDATE email_log SET created_at = DATE_SUB(NOW(), INTERVAL 1 DAY) WHERE id = :id', { id: olderId });
 
     const documentIdB = await createTestDocument(orderId, 'PI', 'approved', null);
-    const newerId = await emailLogRepository.create(orderId, documentIdB, 'send_pi', 'buyer@example.test', 'Subject B', 'Body', null, 1);
+    const newerId = await emailLogRepository.create(orderId, documentIdB, 'send_pi', BUYER_EMAIL, 'Subject B', 'Body', null, 1);
 
     const rows = await emailLogRepository.awaitingDispatch();
     const ids = rows.map((r) => r.id);

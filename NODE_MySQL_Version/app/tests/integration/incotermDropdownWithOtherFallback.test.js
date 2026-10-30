@@ -8,6 +8,10 @@ const clientIntakeController = require('../../src/controllers/clientIntakeContro
 const piIntakeRepository = require('../../src/repositories/piIntakeRepository');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const BUYER_EMAIL = `buyer-${process.pid}-${Date.now()}@example.test`;
+
 /**
  * Port of IncotermDropdownWithOtherFallbackTest.php. User-reported batch
  * item 2: "On client side also, we should give dropdown for Incoterms +
@@ -20,6 +24,10 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * saves exactly as before.
  */
 describe('Incoterm dropdown with free-text fallback (user-reported batch, item 2)', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[BUYER_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([BUYER_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   afterAll(async () => {
     await db.pool.end();
   });
@@ -85,7 +93,7 @@ describe('Incoterm dropdown with free-text fallback (user-reported batch, item 2
         company_legal_name: 'Test Buyer', billing_address: '1 Test Street',
         billing_address_line1: '1 Test Street', billing_address_line2: null,
         billing_city: 'Testville', billing_postcode: null, billing_country: 'Testland',
-        vat_eori_tax_no: 'VAT123', contact_person: 'Test Contact', email: 'buyer@example.test',
+        vat_eori_tax_no: 'VAT123', contact_person: 'Test Contact', email: BUYER_EMAIL,
         phone: null, country_of_destination: 'Testland', port_of_discharge_text: null,
         coo_type: null, incoterm_preference: 'My Own Custom Incoterm Wording',
         container_type_text: null, buyer_own_reference: null, notes: null,
@@ -96,7 +104,7 @@ describe('Incoterm dropdown with free-text fallback (user-reported batch, item 2
       },
       '127.0.0.1'
     );
-    const link = await clientIntakeController.issueCorrectionLink(id, 'buyer@example.test');
+    const link = await clientIntakeController.issueCorrectionLink(id, BUYER_EMAIL);
     const rawToken = link.slice(link.lastIndexOf('/') + 1);
 
     const res = await request(app).get(`/quotation-details/edit/${rawToken}`);

@@ -5,6 +5,10 @@ const emailLogRepository = require('../../src/repositories/emailLogRepository');
 const emailDispatchService = require('../../src/services/emailDispatchService');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const BUYER_EMAIL = `buyer-${process.pid}-${Date.now()}@example.test`;
+
 /**
  * QA-5 EML-06 (external QA report cross-verification): an overlapping run
  * of the deferred-email dispatch job — a slow run still going when the
@@ -17,6 +21,10 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * attempts can ever proceed.
  */
 describe('emailDispatchService — EML-06 double-send guard', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[BUYER_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([BUYER_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   async function createTestDocument(orderId, typeCode = 'QT', status = 'draft', pdfFileId = null) {
     const type = await db.queryOne('SELECT id FROM document_types WHERE code = :code', { code: typeCode });
     const result = await db.execute(
@@ -44,7 +52,7 @@ describe('emailDispatchService — EML-06 double-send guard', () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', null);
-    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, 1);
+    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', null, 1);
     await emailLogRepository.approve(emailLogId, 1);
 
     await expect(emailLogRepository.claimForSend(emailLogId)).resolves.toBe(true);
@@ -57,7 +65,7 @@ describe('emailDispatchService — EML-06 double-send guard', () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', null);
-    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, 1);
+    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', null, 1);
     // Deliberately not approved — still 'pending_approval'.
 
     await expect(emailLogRepository.claimForSend(emailLogId)).resolves.toBe(false);
@@ -74,7 +82,7 @@ describe('emailDispatchService — EML-06 double-send guard', () => {
     const orderId = await createTestOrder(clientId);
     const fileId = await createTestFile(orderId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', fileId);
-    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, 1);
+    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', null, 1);
     await emailLogRepository.approve(emailLogId, 1);
 
     // First call: whatever real-world outcome (sent or failed — SMTP may

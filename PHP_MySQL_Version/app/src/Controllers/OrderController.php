@@ -611,6 +611,8 @@ final class OrderController
             echo 'Order not found.';
             return;
         }
+        // QA Round 6, R6-N27: taken from the saved order, before defaults or typed values are shown in the form.
+        $editFingerprint = \App\Helpers\EditFingerprint::of($order, OrderRepository::EDIT_DETAIL_FIELDS);
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         // Owner request (2026-10-25): show the configured default instead
@@ -630,6 +632,7 @@ final class OrderController
         }
 
         View::render('orders/edit_details', [
+            'editFingerprint' => $editFingerprint,
             'order'           => $order,
             'incoterms'       => LookupRepository::incoterms(),
             'currencies'      => LookupRepository::currencies(),
@@ -673,6 +676,13 @@ final class OrderController
             return;
         }
 
+        // QA Round 6, R6-N27: someone else saved this form since it was opened.
+        if ($conflict = \App\Helpers\EditFingerprint::conflict($order, OrderRepository::EDIT_DETAIL_FIELDS, 'orders', $orderId, 'order')) {
+            Flash::set('error', $conflict);
+            header("Location: /orders/{$orderId}/edit");
+            return;
+        }
+
         $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
         $reason = trim((string) ($_POST['reason'] ?? ''));
         if (!OrderEditGuard::allow($currentStageNumber, (bool) $order['is_locked'], (int) $user['id'], $roleId, $reason, 'orders', $orderId, 'order_details')) {
@@ -707,6 +717,7 @@ final class OrderController
             'indicative_insurance_amount' => trim((string) ($_POST['indicative_insurance_amount'] ?? '')),
         ]);
 
+        AuditLogRepository::log((int) $user['id'], 'ORDER_DETAILS_UPDATED', 'orders', $orderId);
         Flash::set('success', 'Order details updated.');
         header("Location: /orders/{$orderId}");
     }
@@ -1662,13 +1673,23 @@ final class OrderController
         }
         // QA Round 6, R6-N22: the amount, its rate and their audit rows are
         // saved together or not at all.
-        \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): void {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): bool {
+            // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
+            if (OrderPaymentStatusRepository::legAlreadyRecorded($orderId, 'advance', $amount, $receivedAt, $rate)) {
+                return false;
+            }
             OrderPaymentStatusRepository::recordAdvanceReceived($orderId, $amount, $receivedAt);
             OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', $rate, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'advance_exchange_rate', null, (string) $rate);
             // External QA report L-23: advance payment recording was never audit-logged.
             AuditLogRepository::log(AuthService::currentUserId(), 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'advance_amount', null, (string) $amount);
+            return true;
         });
+        if (!$recorded) {
+            Flash::set('warning', 'Advance remittance already recorded with these details — nothing changed.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
 
         // docs/schema.sql Section AC — fallback lock trigger. The PI-details
         // form (client's own consent) is the primary trigger; if a client
@@ -1956,10 +1977,10 @@ final class OrderController
             echo 'Order not found.';
             return;
         }
-        if (!\App\Services\PaymentTermsApprovalService::isPending($orderId)) {
+        if (!\App\Services\PaymentTermsApprovalService::isPending($orderId)
+            || !\App\Services\PaymentTermsApprovalService::approve($orderId, (int) $user['id'])) {
             Flash::set('warning', 'These payment terms do not need approval, or are already approved.');
         } else {
-            \App\Services\PaymentTermsApprovalService::approve($orderId, (int) $user['id']);
             Flash::set('success', 'Payment terms approved — the Quotation can now be generated.');
         }
         header("Location: /orders/{$orderId}#step-1-quotation-prepare");
@@ -2526,14 +2547,24 @@ final class OrderController
             return;
         }
         // QA Round 6, R6-N22: saved together or not at all.
-        \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): void {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): bool {
+            // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
+            if (OrderPaymentStatusRepository::legAlreadyRecorded($orderId, 'freight', $amount, $receivedAt, $rate)) {
+                return false;
+            }
             OrderPaymentStatusRepository::recordFreightReceived($orderId, $amount, $receivedAt);
             OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'freight', $rate, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'freight_exchange_rate', null, (string) $rate);
             // External QA report N-08: this action never reached the audit
             // log, so it never notified anyone either.
             AuditLogRepository::log(AuthService::currentUserId(), 'FREIGHT_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'freight_amount', null, (string) $amount);
+            return true;
         });
+        if (!$recorded) {
+            Flash::set('warning', 'Freight remittance already recorded with these details — nothing changed.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         Flash::set('success', $this->remittanceStatement($orderId, $amount, $rate) . ' ' . 'Freight remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
@@ -2998,13 +3029,23 @@ final class OrderController
             return;
         }
         // QA Round 6, R6-N22: saved together or not at all.
-        \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): void {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): bool {
+            // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
+            if (OrderPaymentStatusRepository::legAlreadyRecorded($orderId, 'balance', $amount, $receivedAt, $rate)) {
+                return false;
+            }
             OrderPaymentStatusRepository::recordBalanceReceived($orderId, $amount, $receivedAt);
             OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'balance', $rate, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'balance_exchange_rate', null, (string) $rate);
             // External QA report L-23: balance payment recording was never audit-logged.
             AuditLogRepository::log(AuthService::currentUserId(), 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'balance_amount', null, (string) $amount);
+            return true;
         });
+        if (!$recorded) {
+            Flash::set('warning', 'Balance remittance already recorded with these details — nothing changed.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         Flash::set('success', $this->remittanceStatement($orderId, $amount, $rate) . ' ' . 'Balance remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }

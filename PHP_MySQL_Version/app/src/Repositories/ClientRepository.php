@@ -140,7 +140,7 @@ final class ClientRepository
             'consignee_email'         => $data['consignee_email'] ?? null,
             'vat_eori_tax_no'         => $data['vat_eori_tax_no'] ?? null,
             'contact_person'          => $data['contact_person'] ?? null,
-            'email'                   => $data['email'] ?? null,
+            'email'                   => trim((string) ($data['email'] ?? '')) ?: null, // QA Round 6, R6-N16: blank = no email (clients.email is unique)
             'phone'                   => $data['phone'] ?? null,
             'country_of_destination'  => $data['country_of_destination'] ?? null,
             'coo_type'                => $data['coo_type'] ?? 'To Be Confirmed',
@@ -221,7 +221,7 @@ final class ClientRepository
             'consignee_email'         => $data['consignee_email'] ?? null,
             'vat_eori_tax_no'         => $data['vat_eori_tax_no'] ?? null,
             'contact_person'          => $data['contact_person'] ?? null,
-            'email'                   => $data['email'] ?? null,
+            'email'                   => trim((string) ($data['email'] ?? '')) ?: null, // QA Round 6, R6-N16: blank = no email (clients.email is unique)
             'phone'                   => $data['phone'] ?? null,
             'country_of_destination'  => $data['country_of_destination'] ?? null,
             'coo_type'                => $data['coo_type'] ?? null,

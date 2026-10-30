@@ -88,7 +88,10 @@ client portal logs in by email, so two clients can't share one. Saving a
 client — new, duplicated, edited, or accepted from Quotation Intake Review
 — with an email another client already uses is refused, and the message
 names that other client. If the enquiry is really from the same buyer,
-create the order under their existing client record instead.
+create the order under their existing client record instead. The database
+itself refuses a shared email too (QA Round 6, R6-N16), so two people
+saving the same email at the same moment can't both succeed — the second
+sees "Another client already uses this email".
 
 ### Duplicating a client
 

@@ -22,6 +22,13 @@ final class ClientLoginEmailAmbiguityTest extends DbTestCase
     private const PASSWORD_A = 'Client-A-Password-1!';
     private const PASSWORD_B = 'Client-B-Password-2!';
 
+    /**
+     * QA Round 6, R6-N16: clients.email is unique once
+     * docs/migrations/2026-10-31a has run, so two clients can no longer share
+     * one. The login guard is for a live database that still has a shared
+     * email (the migration refuses to add the index until they are fixed) —
+     * these tests recreate that by dropping the index for their own run.
+     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -32,6 +39,15 @@ final class ClientLoginEmailAmbiguityTest extends DbTestCase
             @session_start();
         }
         $_SESSION = [];
+        Database::connection()->exec('ALTER TABLE clients DROP INDEX uq_clients_email');
+    }
+
+    protected function tearDown(): void
+    {
+        $pdo = Database::connection();
+        $pdo->exec("UPDATE clients SET email = NULL WHERE email LIKE 'shared-%@nexacrest.test'");
+        $pdo->exec('ALTER TABLE clients ADD UNIQUE KEY uq_clients_email (email)');
+        parent::tearDown();
     }
 
     public function testASharedEmailRefusesLoginForEitherClientsPassword(): void

@@ -7,6 +7,10 @@ const emailLogRepository = require('../../src/repositories/emailLogRepository');
 const emailDispatchService = require('../../src/services/emailDispatchService');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const JANE_EMAIL = `jane-${process.pid}-${Date.now()}@buyer.example`;
+
 /**
  * Port of EmailApprovalPreviewTest.php. The Email Send Approvals screen
  * used to show only Order/To/Subject/Status/Scheduled/Requested/Action —
@@ -17,6 +21,10 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * both, so "approve" is an informed decision rather than a blind one.
  */
 describe('email approvals screen — exact preview + attachment link', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[JANE_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([JANE_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   afterAll(async () => {
     await db.pool.end();
   });
@@ -42,7 +50,7 @@ describe('email approvals screen — exact preview + attachment link', () => {
 
   async function setClientEmail(clientId) {
     await db.execute('UPDATE clients SET email = :email, contact_person = :contact WHERE id = :id', {
-      email: 'jane@buyer.example',
+      email: JANE_EMAIL,
       contact: 'Jane Buyer',
       id: clientId,
     });

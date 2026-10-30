@@ -24,7 +24,9 @@ async function findByEmail(email) {
     { email }
   );
 
-  // CP-08: clients.email has no uniqueness constraint — two different
+  // CP-08: clients.email had no uniqueness constraint (it has since QA Round 6
+  // R6-N16, docs/migrations/2026-10-31a — but a live database that still has a
+  // shared email keeps it until those are fixed) — two different
   // client records (a data-entry mistake, or a deliberate edit) can end up
   // sharing the same address. Picking one of several matches here (the old
   // query's LIMIT 1) would silently resolve "log in with this email" to an

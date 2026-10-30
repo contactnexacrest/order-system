@@ -14,6 +14,10 @@ const makerCheckerGuard = require('../../src/services/makerCheckerGuard');
 const reviewWorkflowService = require('../../src/services/reviewWorkflowService');
 const { createTestClient, createTestOrder, createTestFile } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const BUYER_EMAIL = `buyer-${process.pid}-${Date.now()}@example.test`;
+
 /**
  * QA-5 (external QA report cross-verification): maker-checker separation
  * — the person who created/requested an item must not also be the one who
@@ -26,6 +30,10 @@ const { createTestClient, createTestOrder, createTestFile } = require('../suppor
  * document).
  */
 describe('Maker-checker guard (QA-5)', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[BUYER_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([BUYER_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   // These approvals are asserted to stay 'approved' — the email-on
   // behaviour. With mail_sending_enabled off (the seed default since
   // 2026-10-25) an approved buyer-sendable document is marked 'sent'
@@ -206,11 +214,11 @@ describe('Maker-checker guard (QA-5)', () => {
   it('the requester cannot approve their own email send', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
-    await db.execute('UPDATE clients SET email = :e WHERE id = :id', { e: 'buyer@example.test', id: clientId });
+    await db.execute('UPDATE clients SET email = :e WHERE id = :id', { e: BUYER_EMAIL, id: clientId });
     const fileId = await createTestFile(orderId, null);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', fileId);
     const requester = await createTestUser('Export Executive');
-    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, requester);
+    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', null, requester);
 
     await expect(emailDispatchService.approveSend(emailLogId, requester)).rejects.toThrow('a different privileged user must approve');
   });
@@ -218,12 +226,12 @@ describe('Maker-checker guard (QA-5)', () => {
   it('a Super Admin can approve their own email send', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
-    await db.execute('UPDATE clients SET email = :e WHERE id = :id', { e: 'buyer@example.test', id: clientId });
+    await db.execute('UPDATE clients SET email = :e WHERE id = :id', { e: BUYER_EMAIL, id: clientId });
     const fileId = await createTestFile(orderId, null);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', fileId);
     const requester = await createTestUser('Export Executive');
     await makeSuperAdmin(requester);
-    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, requester);
+    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', null, requester);
 
     await emailDispatchService.approveSend(emailLogId, requester);
 

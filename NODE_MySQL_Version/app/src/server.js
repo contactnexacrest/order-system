@@ -1201,8 +1201,16 @@ const MESSAGE_FOR_SQLSTATE = {
   23000: "That couldn't be saved — either this already exists, or it refers to something that no longer exists. Please check your input and try again.",
 };
 
+// QA Round 6, R6-N16: two saves of one client email at the same moment both
+// pass the "already used" check; the unique index uq_clients_email
+// (docs/migrations/2026-10-31a) refuses the second. Port of
+// Router::CLIENT_EMAIL_TAKEN.
+const CLIENT_EMAIL_TAKEN = 'Another client already uses this email — each client needs its own (the client portal logs in by it). Nothing was saved.';
+
 app.use((err, req, res, next) => {
-  const message = err ? MESSAGE_FOR_SQLSTATE[err.sqlState] : undefined;
+  const message = err && err.sqlState === '23000' && String(err.message || '').includes('uq_clients_email')
+    ? CLIENT_EMAIL_TAKEN
+    : (err ? MESSAGE_FOR_SQLSTATE[err.sqlState] : undefined);
   if (!message) {
     next(err);
     return;

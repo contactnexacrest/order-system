@@ -162,11 +162,13 @@ async function findPayout(id) {
   return db.queryOne('SELECT * FROM incentive_payouts WHERE id = :id', { id });
 }
 
+/** @returns {Promise<boolean>} whether this call marked it paid (false: it already was — QA Round 6, R6-N17) */
 async function markPayoutPaid(id, paidOn, paidInr, tdsInr, userId) {
-  await db.execute(
+  const result = await db.execute(
     "UPDATE incentive_payouts SET status = 'paid', paid_on = :d, paid_inr = :p, tds_inr = :t, paid_by = :u WHERE id = :id AND status = 'due'",
     { d: paidOn, p: paidInr, t: tdsInr, u: userId, id }
   );
+  return result.affectedRows === 1;
 }
 
 async function deleteOrderPayouts(orderId, c = db) {

@@ -9,6 +9,10 @@ const flash = require('../../src/helpers/flash');
 const { annexureConfirmAttr } = require('../../src/helpers/annexureConfirmAttr');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const BUYER_EMAIL = `buyer-${process.pid}-${Date.now()}@example.test`;
+
 /**
  * Port of AnnexureLockWarningTest.php. 90-item backlog #73/#74: once an
  * order's Annexure A document has been approved/sent, nothing told staff
@@ -22,6 +26,10 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * style used everywhere else.
  */
 describe('Annexure lock warning + resend confirmation (90-item backlog #73/#74)', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[BUYER_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([BUYER_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   afterAll(async () => {
     await db.pool.end();
   });
@@ -124,7 +132,7 @@ describe('Annexure lock warning + resend confirmation (90-item backlog #73/#74)'
   // ---------------------------------------------------------------
 
   it('compose() exposes document_type_code and status for the resend check', async () => {
-    const orderId = await createTestOrder(await createTestClient('buyer@example.test'));
+    const orderId = await createTestOrder(await createTestClient(BUYER_EMAIL));
     const documentId = await createTestDocument(orderId, 'ANNEXA', 'sent');
     const res = fakeRes();
 
@@ -135,7 +143,7 @@ describe('Annexure lock warning + resend confirmation (90-item backlog #73/#74)'
   });
 
   it('compose() for a non-Annexure sent document does not report ANNEXA', async () => {
-    const orderId = await createTestOrder(await createTestClient('buyer@example.test'));
+    const orderId = await createTestOrder(await createTestClient(BUYER_EMAIL));
     const documentId = await createTestDocument(orderId, 'QT', 'sent');
     const res = fakeRes();
 

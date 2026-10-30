@@ -9,11 +9,19 @@ const piIntakeRepository = require('../../src/repositories/piIntakeRepository');
 const permissionService = require('../../src/services/permissionService');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const BUYER_EMAIL = `buyer-${process.pid}-${Date.now()}@example.test`;
+
 /**
  * QA-4 P2 (docs/QA/TEST_PLAN.md Section 6): CSRF, staff-side IDOR beyond
  * the client portal, and public unauthenticated endpoints.
  */
 describe('IDOR and input validation (QA-4 P2)', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[BUYER_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([BUYER_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   afterAll(async () => {
     await db.pool.end();
   });
@@ -162,7 +170,7 @@ describe('IDOR and input validation (QA-4 P2)', () => {
         billing_address: '1 Test Street',
         vat_eori_tax_no: 'VAT123',
         contact_person: 'Test Contact',
-        email: 'buyer@example.test',
+        email: BUYER_EMAIL,
         phone: '',
         country_of_destination: 'Testland',
         port_of_discharge_text: '',

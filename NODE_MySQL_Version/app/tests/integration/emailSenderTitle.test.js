@@ -6,6 +6,10 @@ const companySettingsRepository = require('../../src/repositories/companySetting
 const emailDispatchService = require('../../src/services/emailDispatchService');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const BUYER_EMAIL = `buyer-${process.pid}-${Date.now()}@example.test`;
+
 /**
  * QA-5 (EML-08 — external QA report cross-verification): {sender_title}
  * (and the {sender_signature} fallback that embeds it) always resolved to
@@ -16,6 +20,10 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * dealing with.
  */
 describe('Email sender title (QA-5 EML-08)', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[BUYER_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([BUYER_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   afterAll(async () => {
     await db.pool.end();
   });
@@ -51,7 +59,7 @@ describe('Email sender title (QA-5 EML-08)', () => {
     await db.execute('UPDATE users SET designation_id = :did WHERE id = :id', { did: designationId, id: senderId });
 
     const clientId = await createTestClient();
-    await setClientEmail(clientId, 'buyer@example.test');
+    await setClientEmail(clientId, BUYER_EMAIL);
     const orderId = await createTestOrder(clientId);
 
     const preview = await emailDispatchService.buildPreview(orderId, null, 'payment_followup', senderId);
@@ -69,7 +77,7 @@ describe('Email sender title (QA-5 EML-08)', () => {
     const senderId = await createTestUser('Export Executive'); // designation_id left NULL
 
     const clientId = await createTestClient();
-    await setClientEmail(clientId, 'buyer@example.test');
+    await setClientEmail(clientId, BUYER_EMAIL);
     const orderId = await createTestOrder(clientId);
 
     const preview = await emailDispatchService.buildPreview(orderId, null, 'payment_followup', senderId);

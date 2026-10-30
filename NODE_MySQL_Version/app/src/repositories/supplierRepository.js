@@ -143,6 +143,14 @@ async function markTest(id) {
   await db.execute('UPDATE suppliers SET is_test_data = 1 WHERE id = :id', { id });
 }
 
+/** QA Round 6, R6-N27: the columns the supplier edit form saves (its edit fingerprint). */
+const EDIT_FIELDS = [
+  'supplier_legal_name', 'address', 'city', 'state', 'gstin', 'pan', 'contact_person', 'contact_person_phone',
+  'contact_person_whatsapp', 'phone', 'email', 'whatsapp_number', 'notes', 'bank_account_name', 'bank_name',
+  'bank_branch', 'bank_account_number', 'bank_ifsc', 'bank_account_type', 'bank_upi_id',
+];
+
 module.exports = {
+  EDIT_FIELDS,
   all, find, create, update, setTypes, toggleActive, isUsedOnAnOrder, idsUsedOnOrders, remove, markSample, markTest,
 };

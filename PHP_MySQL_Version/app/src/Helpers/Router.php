@@ -178,6 +178,12 @@ final class Router
                     // own fix direction for the ideal per-field/HTML
                     // maxlength UX this does not replace).
                     $message = self::MESSAGE_FOR_SQLSTATE[$e->getCode()] ?? null;
+                    // QA Round 6, R6-N16: two saves of one client email at
+                    // the same moment both pass the "already used" check;
+                    // the unique index refuses the second.
+                    if ($e->getCode() === '23000' && str_contains($e->getMessage(), self::CLIENT_EMAIL_INDEX)) {
+                        $message = self::CLIENT_EMAIL_TAKEN;
+                    }
                     if ($message !== null) {
                         self::handleBadInput($message);
                         return;
@@ -205,6 +211,10 @@ final class Router
         // exist (R-04).
         '23000' => "That couldn't be saved — either this already exists, or it refers to something that no longer exists. Please check your input and try again.",
     ];
+
+    /** QA Round 6, R6-N16: the unique index on clients.email (docs/migrations/2026-10-31a). */
+    public const CLIENT_EMAIL_INDEX = 'uq_clients_email';
+    public const CLIENT_EMAIL_TAKEN = 'Another client already uses this email — each client needs its own (the client portal logs in by it). Nothing was saved.';
 
     private static function handleBadInput(string $message): void
     {

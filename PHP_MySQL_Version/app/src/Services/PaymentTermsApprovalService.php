@@ -53,11 +53,21 @@ final class PaymentTermsApprovalService
         return "The payment terms on this order (\"{$preset}\") need MD/ED approval before the Quotation can be generated or sent — approve them in Step 1, or ask someone who can.";
     }
 
-    public static function approve(int $orderId, int $userId): void
+    /**
+     * @return bool whether this call approved them — false when they were
+     * already approved, e.g. by a second click a moment earlier (QA Round 6,
+     * R6-N17): approved and logged once.
+     */
+    public static function approve(int $orderId, int $userId): bool
     {
-        Database::connection()->prepare(
-            'UPDATE orders SET payment_terms_approved_by = :user_id, payment_terms_approved_at = NOW() WHERE id = :id'
-        )->execute(['user_id' => $userId, 'id' => $orderId]);
+        $stmt = Database::connection()->prepare(
+            'UPDATE orders SET payment_terms_approved_by = :user_id, payment_terms_approved_at = NOW() WHERE id = :id AND payment_terms_approved_at IS NULL'
+        );
+        $stmt->execute(['user_id' => $userId, 'id' => $orderId]);
+        if ($stmt->rowCount() !== 1) {
+            return false;
+        }
         AuditLogRepository::log($userId, 'PAYMENT_TERMS_APPROVED', 'orders', $orderId, 'payment_terms_approved_at', null, date('Y-m-d H:i:s'));
+        return true;
     }
 }

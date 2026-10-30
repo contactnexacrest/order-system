@@ -411,7 +411,10 @@ final class IncentiveController
                 header('Location: /incentives/payouts?month=' . rawurlencode($month));
                 return;
             }
-            IncentiveService::markPaid($id, $paidOn, $paidInr, $tds, (int) $user['id']);
+            // QA Round 6, R6-N17: a second click records and logs nothing more.
+            if (!IncentiveService::markPaid($id, $paidOn, $paidInr, $tds, (int) $user['id'])) {
+                continue;
+            }
             AuditLogRepository::log((int) $user['id'], 'INCENTIVE_PAID', 'incentive_payouts', $id, 'status', 'due', 'paid');
             $count++;
         }

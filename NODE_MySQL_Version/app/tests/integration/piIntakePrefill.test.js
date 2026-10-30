@@ -6,6 +6,11 @@ const db = require('../../src/config/db');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 const piIntakeRepository = require('../../src/repositories/piIntakeRepository');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const JANE_EMAIL = `jane-${process.pid}-${Date.now()}@buyer.example`;
+const INTAKE_EMAIL = `intake-${process.pid}-${Date.now()}@buyer.test`;
+
 /**
  * The PI-details form used to start completely blank even though the
  * client had already given most of this same information at the
@@ -17,6 +22,10 @@ const piIntakeRepository = require('../../src/repositories/piIntakeRepository');
  * fields the client hasn't answered themselves yet.
  */
 describe('PI intake prefill from client/order data', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[JANE_EMAIL, INTAKE_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([JANE_EMAIL, INTAKE_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   afterAll(async () => {
     await db.pool.end();
   });
@@ -33,7 +42,7 @@ describe('PI intake prefill from client/order data', () => {
         consignee_address: 'Same',
         vat: 'NL123456789B01',
         contact: 'Jane Buyer',
-        email: 'jane@buyer.example',
+        email: JANE_EMAIL,
         phone: '+31-6-12345678',
         notify: 'Acme Freight Forwarders',
         country: 'Netherlands',
@@ -62,7 +71,7 @@ describe('PI intake prefill from client/order data', () => {
     expect(row.consignee_address).toBe('Same');
     expect(row.vat_eori_tax_no).toBe('NL123456789B01');
     expect(row.contact_person).toBe('Jane Buyer');
-    expect(row.email).toBe('jane@buyer.example');
+    expect(row.email).toBe(JANE_EMAIL);
     expect(row.phone).toBe('+31-6-12345678');
     expect(row.notify_party).toBe('Acme Freight Forwarders');
     expect(row.country_of_destination).toBe('Netherlands');
@@ -164,8 +173,8 @@ describe('PI intake prefill from client/order data', () => {
     await db.execute('UPDATE orders SET port_of_discharge_text = NULL, port_of_discharge_name = NULL, container_type = NULL WHERE id = :id', { id: orderId });
     await db.execute(
       `INSERT INTO client_intake_submissions (company_legal_name, billing_address, contact_person, email, country_of_destination, port_of_discharge_text, container_type_text, status, converted_client_id, access_token_hash, access_token_expires_at)
-       VALUES ('Jest Test Buyer', '1 Test Street', 'Test Contact', 'intake@buyer.test', 'Belgium', 'Antwerp, Belgium', '1x40ft HC', 'converted', :client_id, :hash, NOW() + INTERVAL 1 DAY)`,
-      { client_id: clientId, hash: require('crypto').randomBytes(32).toString('hex') }
+       VALUES ('Jest Test Buyer', '1 Test Street', 'Test Contact', :intake_email, 'Belgium', 'Antwerp, Belgium', '1x40ft HC', 'converted', :client_id, :hash, NOW() + INTERVAL 1 DAY)`,
+      { intake_email: INTAKE_EMAIL, client_id: clientId, hash: require('crypto').randomBytes(32).toString('hex') }
     );
 
     const row = await piIntakeRepository.findValidByToken(await piIntakeRepository.createLink(orderId, null));

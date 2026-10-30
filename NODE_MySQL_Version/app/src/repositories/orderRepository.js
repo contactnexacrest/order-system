@@ -950,7 +950,17 @@ async function setFinancialsCompleted(orderId, userId) {
   );
 }
 
+/** QA Round 6, R6-N27: the columns the order details form edits (its edit fingerprint). */
+const EDIT_DETAIL_FIELDS = [
+  'incoterm_id', 'currency_id', 'port_of_loading_id', 'port_of_discharge_id', 'port_of_discharge_text', 'coo_type',
+  'container_type', 'buyers_po_ref', 'special_requirements', 'est_lead_time_text', 'lead_time_min_days', 'lead_time_max_days',
+  'sailing_lead_time_min_days', 'sailing_lead_time_max_days', 'estimated_total_cbm', 'estimated_gross_weight_kg',
+  'estimated_net_weight_kg', 'estimated_package_count', 'estimated_package_type', 'indicative_freight_amount',
+  'indicative_insurance_amount',
+];
+
 module.exports = {
+  EDIT_DETAIL_FIELDS,
   all, allVisibleTo, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setBuyerPoReceivedOn, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,
   setIncludeAnnexureA, setAnnexureMode, setDisputeButtonVisible, setCaInternalDocEnabled, findOrdersDuplicatedFrom,

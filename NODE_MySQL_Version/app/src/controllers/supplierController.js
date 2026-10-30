@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const editFingerprintHelper = require('../helpers/editFingerprint');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const supplierFactoryAddressRepository = require('../repositories/supplierFactoryAddressRepository');
@@ -128,6 +129,7 @@ async function editForm(req, res) {
   }
   res.renderView('suppliers/form', {
     supplier,
+    editFingerprint: editFingerprintHelper.of(supplier, supplierRepository.EDIT_FIELDS),
     supplierTypes: await typeOptions(supplier.types),
     factoryAddresses: await supplierFactoryAddressRepository.forSupplier(id),
     usedOnAnOrder: await supplierRepository.isUsedOnAnOrder(id),
@@ -147,6 +149,13 @@ async function update(req, res) {
     return;
   }
 
+  // QA Round 6, R6-N27: someone else saved this supplier since the form was opened.
+  const conflict = await editFingerprintHelper.conflict(req.body, supplier, supplierRepository.EDIT_FIELDS, 'suppliers', id, 'supplier');
+  if (conflict) {
+    flash.set(req, 'error', conflict);
+    res.redirect(`/suppliers/${id}/edit`);
+    return;
+  }
   const result = await collectFormData(req, supplier.types);
   if (result.error) {
     flash.set(req, 'error', result.error);

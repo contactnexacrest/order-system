@@ -40,15 +40,24 @@ async function pendingMessage(orderId) {
   return `The payment terms on this order ("${preset}") need MD/ED approval before the Quotation can be generated or sent — approve them in Step 1, or ask someone who can.`;
 }
 
+/**
+ * @returns {Promise<boolean>} whether this call approved them — false when
+ * they were already approved, e.g. by a second click a moment earlier (QA
+ * Round 6, R6-N17): approved and logged once.
+ */
 async function approve(orderId, userId) {
-  await db.execute(
-    'UPDATE orders SET payment_terms_approved_by = :user_id, payment_terms_approved_at = NOW() WHERE id = :id',
+  const result = await db.execute(
+    'UPDATE orders SET payment_terms_approved_by = :user_id, payment_terms_approved_at = NOW() WHERE id = :id AND payment_terms_approved_at IS NULL',
     { user_id: userId, id: orderId }
   );
+  if (result.affectedRows !== 1) {
+    return false;
+  }
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
   await auditLogRepository.log(userId, 'PAYMENT_TERMS_APPROVED', 'orders', orderId, 'payment_terms_approved_at', null, stamp);
+  return true;
 }
 
 module.exports = { state, isPending, pendingMessage, approve };

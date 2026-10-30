@@ -3,6 +3,10 @@
 const db = require('../../src/config/db');
 const emailLogRepository = require('../../src/repositories/emailLogRepository');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const BUYER_EMAIL = `buyer-${process.pid}-${Date.now()}@example.test`;
+
 /**
  * Port of EmailApprovalsPendingCountTest.php. User-reported batch item
  * 16: the Email Approvals sidebar link (layout/base.njk) gave no
@@ -14,6 +18,10 @@ const emailLogRepository = require('../../src/repositories/emailLogRepository');
  * what staff see when they click through.
  */
 describe('Email Approvals pending count (90-item backlog item 16)', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[BUYER_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([BUYER_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   afterAll(async () => {
     await db.pool.end();
   });
@@ -32,7 +40,7 @@ describe('Email Approvals pending count (90-item backlog item 16)', () => {
     const before = await emailLogRepository.awaitingDispatchCount();
     const userId = await createTestUser();
 
-    const pendingId = await emailLogRepository.create(null, null, null, 'buyer@example.test', 'Subject', 'Body', null, userId);
+    const pendingId = await emailLogRepository.create(null, null, null, BUYER_EMAIL, 'Subject', 'Body', null, userId);
     expect(await emailLogRepository.awaitingDispatchCount()).toBe(before + 1);
 
     const toApproveId = await emailLogRepository.create(null, null, null, 'buyer2@example.test', 'Subject', 'Body', null, userId);

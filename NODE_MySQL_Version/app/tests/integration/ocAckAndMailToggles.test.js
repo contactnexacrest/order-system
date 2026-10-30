@@ -12,6 +12,10 @@ const permissionRepository = require('../../src/repositories/permissionRepositor
 const superAdminService = require('../../src/services/superAdminService');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const BUYER_EMAIL = `buyer-${process.pid}-${Date.now()}@example.test`;
+
 /**
  * docs/schema.sql Section AU — four related gaps found during live testing:
  * (1) the Stage 4 "buyer acknowledged by email" override only worked once
@@ -23,6 +27,10 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * hardcoded.
  */
 describe('OC acknowledgment override + mail toggles (Section AU)', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[BUYER_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([BUYER_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   const SETTING_KEYS = [
     'mail_sending_enabled', 'mail_approval_queue_enabled',
     'oc_ack_override_restricted', 'oc_ack_auto_confirm_hours',
@@ -252,7 +260,7 @@ describe('OC acknowledgment override + mail toggles (Section AU)', () => {
 
   it('approval queue disabled dispatches immediately instead of queuing', async () => {
     await companySettingsRepository.set('mail_approval_queue_enabled', '0');
-    const clientId = await createTestClient('buyer@example.test');
+    const clientId = await createTestClient(BUYER_EMAIL);
     const orderId = await createTestOrder(clientId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved');
     const userId = await createTestUser('Export Executive');
@@ -268,7 +276,7 @@ describe('OC acknowledgment override + mail toggles (Section AU)', () => {
 
   it('approval queue enabled by default still queues for Level 2', async () => {
     // mail_approval_queue_enabled left at its seeded default ('1').
-    const clientId = await createTestClient('buyer@example.test');
+    const clientId = await createTestClient(BUYER_EMAIL);
     const orderId = await createTestOrder(clientId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved');
     const userId = await createTestUser('Export Executive');

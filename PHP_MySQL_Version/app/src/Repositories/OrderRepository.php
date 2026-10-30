@@ -9,6 +9,15 @@ use App\Services\ReferenceNumberService;
 
 final class OrderRepository
 {
+    /** QA Round 6, R6-N27: the columns the order details form edits (its edit fingerprint). */
+    public const EDIT_DETAIL_FIELDS = [
+        'incoterm_id', 'currency_id', 'port_of_loading_id', 'port_of_discharge_id', 'port_of_discharge_text', 'coo_type',
+        'container_type', 'buyers_po_ref', 'special_requirements', 'est_lead_time_text', 'lead_time_min_days', 'lead_time_max_days',
+        'sailing_lead_time_min_days', 'sailing_lead_time_max_days', 'estimated_total_cbm', 'estimated_gross_weight_kg',
+        'estimated_net_weight_kg', 'estimated_package_count', 'estimated_package_type', 'indicative_freight_amount',
+        'indicative_insurance_amount',
+    ];
+
     /** @return array<int, array<string,mixed>> */
     /**
      * Also carries incoterm_code, current_stage_number, and total_fob_value —

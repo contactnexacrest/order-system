@@ -104,6 +104,13 @@ final class DocumentController
             $allowOverride = true;
         }
 
+        // QA Round 6, R6-N18: a double click (or several) made one revision
+        // each — one generation per order and document type at a time.
+        if ($busy = self::claimGeneration($orderId, $type)) {
+            Flash::set('warning', $busy);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         try {
             $result = DocumentGenerationService::generate($orderId, $type, (int) $user['id'], null, $generateDocx, $allowOverride, $documentDate);
         } catch (StageGateBlockedException $e) {
@@ -115,6 +122,8 @@ final class DocumentController
             Flash::set('error', 'Document generation failed. Check the server error log for details.');
             header("Location: /orders/{$orderId}");
             return;
+        } finally {
+            self::releaseGeneration($orderId, $type);
         }
 
         if ($allowOverride) {
@@ -273,5 +282,24 @@ final class DocumentController
 
         Flash::set('success', "Draft document {$reference} deleted.");
         header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * QA Round 6, R6-N18: one generation per order and document type at a
+     * time — a MySQL named lock, so of several posts at the same moment (a
+     * double click) only the first makes a revision.
+     *
+     * @return string|null why it cannot be generated right now; null when claimed
+     */
+    private static function claimGeneration(int $orderId, string $type): ?string
+    {
+        $lock = \App\Config\Database::connection()->prepare('SELECT GET_LOCK(:name, 0)');
+        $lock->execute(['name' => "nx_docgen_{$orderId}_{$type}"]);
+        return (int) $lock->fetchColumn() === 1 ? null : 'This document is being generated right now — wait a moment, then refresh the page.';
+    }
+
+    private static function releaseGeneration(int $orderId, string $type): void
+    {
+        \App\Config\Database::connection()->prepare('SELECT RELEASE_LOCK(:name)')->execute(['name' => "nx_docgen_{$orderId}_{$type}"]);
     }
 }

@@ -238,6 +238,7 @@ final class ClientController
         $user = AuthService::currentUser();
         View::render('clients/edit', [
             'client' => $client,
+            'editFingerprint' => \App\Helpers\EditFingerprint::of($client, self::editFields()),
             'isSuperAdmin' => SuperAdminService::isEffective((int) $user['id']),
             'cooTypes' => LookupRepository::dropdownOptions('coo_type'),
         ], 'layout/base');
@@ -305,6 +306,12 @@ final class ClientController
             header("Location: /clients/{$clientId}/edit");
             return;
         }
+        // QA Round 6, R6-N27: someone else saved this client since the form was opened.
+        if ($conflict = \App\Helpers\EditFingerprint::conflict($client, self::editFields(), 'clients', $clientId, 'client')) {
+            Flash::set('error', $conflict);
+            header("Location: /clients/{$clientId}/edit");
+            return;
+        }
         if ($other = ClientRepository::findOtherWithEmail($data['email'] ?? null, $clientId)) {
             Flash::set('error', ClientRepository::duplicateEmailMessage((string) $data['email'], $other));
             header("Location: /clients/{$clientId}/edit");
@@ -349,6 +356,24 @@ final class ClientController
      * previously-typed value from silently overwriting a flip back to
      * same-as-buyer/consignee from this same request.
      */
+    /**
+     * QA Round 6, R6-N27: the columns the client edit form saves (its edit
+     * fingerprint) — the same keys update() builds $data from.
+     *
+     * @return list<string>
+     */
+    public static function editFields(): array
+    {
+        $post = $_POST;
+        $_POST = [];
+        try {
+            $party = array_keys(self::collectPartyFields());
+        } finally {
+            $_POST = $post;
+        }
+        return array_merge(['company_legal_name', 'billing_address', 'vat_eori_tax_no', 'contact_person', 'email', 'phone', 'country_of_destination', 'coo_type'], $party);
+    }
+
     private static function collectPartyFields(): array
     {
         $consigneeSameAsBuyer = !empty($_POST['consignee_same_as_buyer']);

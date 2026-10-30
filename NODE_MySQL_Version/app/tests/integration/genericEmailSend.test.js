@@ -11,6 +11,10 @@ const emailDispatchService = require('../../src/services/emailDispatchService');
 const emailDispatchController = require('../../src/controllers/emailDispatchController');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const JANE_EMAIL = `jane-${process.pid}-${Date.now()}@buyer.example`;
+
 /**
  * Port of GenericEmailSendTest.php. External QA report L-42: four seeded
  * email templates — payment_followup, shipment_readiness, bl_copy_sent,
@@ -22,12 +26,16 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * document-less row failed before even looking at its template (EM-NODOC).
  */
 describe('Generic (document-less) email send (External QA report L-42)', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[JANE_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([JANE_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   afterAll(async () => {
     await db.pool.end();
   });
 
   async function setClientEmail(clientId) {
-    await db.execute('UPDATE clients SET email = :email WHERE id = :id', { email: 'jane@buyer.example', id: clientId });
+    await db.execute('UPDATE clients SET email = :email WHERE id = :id', { email: JANE_EMAIL, id: clientId });
   }
 
   function fakeRes() {
@@ -121,7 +129,7 @@ describe('Generic (document-less) email send (External QA report L-42)', () => {
     const clientId = await createTestClient();
     await setClientEmail(clientId);
     const orderId = await createTestOrder(clientId);
-    const id = await emailLogRepository.create(orderId, null, 'bl_copy_sent', 'jane@buyer.example', 'Subject', 'Body', null, 1);
+    const id = await emailLogRepository.create(orderId, null, 'bl_copy_sent', JANE_EMAIL, 'Subject', 'Body', null, 1);
     await emailLogRepository.approve(id, 1);
 
     const sent = await emailDispatchService.dispatch(await emailLogRepository.find(id));
@@ -144,7 +152,7 @@ describe('Generic (document-less) email send (External QA report L-42)', () => {
     await orderShippingRepository.upsert(orderId, { shipping_line: 'Maersk' });
     await orderShippingRepository.attachBlCopy(orderId, fileResult.insertId);
 
-    const id = await emailLogRepository.create(orderId, null, 'bl_copy_sent', 'jane@buyer.example', 'Subject', 'Body', null, 1);
+    const id = await emailLogRepository.create(orderId, null, 'bl_copy_sent', JANE_EMAIL, 'Subject', 'Body', null, 1);
     await emailLogRepository.approve(id, 1);
 
     try {

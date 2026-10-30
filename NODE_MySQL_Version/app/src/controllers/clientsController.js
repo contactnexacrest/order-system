@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const editFingerprintHelper = require('../helpers/editFingerprint');
 const path = require('path');
 const crypto = require('crypto');
 const flash = require('../helpers/flash');
@@ -243,7 +244,7 @@ async function editForm(req, res) {
     res.status(404).send('Client not found.');
     return;
   }
-  res.renderView('clients/edit', { client, isSuperAdmin: await superAdminService.isEffective(req.user.id), cooTypes: await lookupRepository.dropdownOptions('coo_type') }, 'layout/base');
+  res.renderView('clients/edit', { client, editFingerprint: editFingerprintHelper.of(client, editFields()), isSuperAdmin: await superAdminService.isEffective(req.user.id), cooTypes: await lookupRepository.dropdownOptions('coo_type') }, 'layout/base');
 }
 
 /**
@@ -299,6 +300,13 @@ async function update(req, res) {
     res.redirect(`/clients/${clientId}/edit`);
     return;
   }
+  // QA Round 6, R6-N27: someone else saved this client since the form was opened.
+  const conflict = await editFingerprintHelper.conflict(req.body, client, editFields(), 'clients', clientId, 'client');
+  if (conflict) {
+    flash.set(req, 'error', conflict);
+    res.redirect(`/clients/${clientId}/edit`);
+    return;
+  }
   const other = await clientRepository.findOtherWithEmail(data.email, clientId);
   if (other) {
     flash.set(req, 'error', clientRepository.duplicateEmailMessage(data.email, other));
@@ -337,6 +345,16 @@ async function update(req, res) {
  * previously-typed value from silently overwriting a flip back to
  * same-as-buyer/consignee from this same request.
  */
+/**
+ * QA Round 6, R6-N27: the columns the client edit form saves (its edit
+ * fingerprint) — the same keys update() builds data from. Port of
+ * ClientController::editFields().
+ */
+function editFields() {
+  return ['company_legal_name', 'billing_address', 'vat_eori_tax_no', 'contact_person', 'email', 'phone', 'country_of_destination', 'coo_type',
+    ...Object.keys(collectPartyFields({ body: {} }))];
+}
+
 function collectPartyFields(req) {
   const consigneeSameAsBuyer = !!req.body.consignee_same_as_buyer;
   const notifySameAsConsignee = !!req.body.notify_party_same_as_consignee;

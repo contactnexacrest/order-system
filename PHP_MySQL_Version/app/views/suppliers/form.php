@@ -13,6 +13,7 @@ $selectedTypes = $supplier['types'] ?? [];
   <?php endif; ?>
   <form method="post" action="<?= $isEdit ? '/suppliers/' . (int) $supplier['id'] . '/update' : '/suppliers' ?>">
     <?= Csrf::field() ?>
+    <?= $isEdit && isset($editFingerprint) ? \App\Helpers\EditFingerprint::input($editFingerprint) : '' ?>
     <fieldset>
       <legend>Supplier Details</legend>
       <div class="field-grid">

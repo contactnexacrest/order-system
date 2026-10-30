@@ -481,7 +481,10 @@ async function markPaid(req, res) {
       res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
       return;
     }
-    await incentiveService.markPaid(id, paidOn, paidInr, tds, req.user.id);
+    // QA Round 6, R6-N17: a second click records and logs nothing more.
+    if (!(await incentiveService.markPaid(id, paidOn, paidInr, tds, req.user.id))) {
+      continue;
+    }
     await auditLogRepository.log(req.user.id, 'INCENTIVE_PAID', 'incentive_payouts', id, 'status', 'due', 'paid');
     count++;
   }

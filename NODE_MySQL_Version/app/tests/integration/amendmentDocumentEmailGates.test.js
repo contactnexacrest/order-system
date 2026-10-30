@@ -16,6 +16,10 @@ const emailDispatchService = require('../../src/services/emailDispatchService');
 const mailSenderService = require('../../src/services/mailSenderService');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const BUYER_EMAIL = `buyer-${process.pid}-${Date.now()}@example.test`;
+
 /**
  * QA-4 P0.4 (docs/QA/TEST_PLAN.md Section 6): "an amendment cannot activate
  * without MD approval; a document cannot be marked sent without passing
@@ -23,6 +27,10 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * approve_email_send approval where required."
  */
 describe('Amendment / document-review / email-approval gates (QA-4 P0.4)', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[BUYER_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([BUYER_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   // These approvals are asserted to stay 'approved' — the email-on
   // behaviour. With mail_sending_enabled off (the seed default since
   // 2026-10-25) an approved buyer-sendable document is marked 'sent'
@@ -221,7 +229,7 @@ describe('Amendment / document-review / email-approval gates (QA-4 P0.4)', () =>
   it('buildPreview refuses a non-approved document', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
-    await setClientEmail(clientId, 'buyer@example.test');
+    await setClientEmail(clientId, BUYER_EMAIL);
     const documentId = await createTestDocument(orderId, 'QT', 'in_review');
 
     await expect(emailDispatchService.buildPreview(orderId, documentId, 'send_qt', 1)).rejects.toThrow('must clear internal review first');
@@ -235,10 +243,10 @@ describe('Amendment / document-review / email-approval gates (QA-4 P0.4)', () =>
   it('refuses and marks failed when the document was reverted to draft after the send was queued', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
-    await setClientEmail(clientId, 'buyer@example.test');
+    await setClientEmail(clientId, BUYER_EMAIL);
     const { fileId } = await createTestFileOnDisk(orderId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', fileId);
-    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, 1);
+    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', null, 1);
     // QA-5 EML-06: dispatch() now also requires email_log itself to be
     // 'approved' (the atomic send-claim) — a real cron-dispatched row is
     // always approved first, so this scenario needs it too.
@@ -272,10 +280,10 @@ describe('Amendment / document-review / email-approval gates (QA-4 P0.4)', () =>
   it('still attempts to send a genuinely approved document', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
-    await setClientEmail(clientId, 'buyer@example.test');
+    await setClientEmail(clientId, BUYER_EMAIL);
     const { fileId } = await createTestFileOnDisk(orderId);
     const documentId = await createTestDocument(orderId, 'QT', 'approved', fileId);
-    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, 1);
+    const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', null, 1);
     // QA-5 EML-06: dispatch() now also requires email_log itself to be
     // 'approved' (the atomic send-claim) — a real cron-dispatched row is
     // always approved first, so this scenario needs it too.

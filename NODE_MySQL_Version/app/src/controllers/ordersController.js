@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const editFingerprintHelper = require('../helpers/editFingerprint');
 const recordCheck = require('../helpers/recordCheck');
 const orderStorage = require('../helpers/orderStorage');
 const JSZip = require('jszip');
@@ -605,6 +606,8 @@ async function editDetails(req, res) {
     res.status(404).send('Order not found.');
     return;
   }
+  // QA Round 6, R6-N27: taken from the saved order, before defaults or typed values are shown in the form.
+  const editFingerprint = editFingerprintHelper.of(order, orderRepository.EDIT_DETAIL_FIELDS);
   // Owner request (2026-10-25): show the configured default instead of an
   // "e.g." placeholder when this order has no estimate saved — the same
   // default the New Order form pre-fills. Only fills a gap; a saved value
@@ -624,6 +627,7 @@ async function editDetails(req, res) {
     'orders/edit_details',
     {
       order,
+      editFingerprint,
       incoterms: await lookupRepository.incoterms(),
       currencies: await lookupRepository.currencies(),
       loadingPorts: await lookupRepository.ports('loading'),
@@ -666,6 +670,14 @@ async function updateDetails(req, res) {
     return;
   }
 
+  // QA Round 6, R6-N27: someone else saved this form since it was opened.
+  const conflict = await editFingerprintHelper.conflict(body, order, orderRepository.EDIT_DETAIL_FIELDS, 'orders', orderId, 'order');
+  if (conflict) {
+    flash.set(req, 'error', conflict);
+    res.redirect(`/orders/${orderId}/edit`);
+    return;
+  }
+
   const reason = str(body.reason);
   if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'orders', orderId, 'order_details'))) {
     res.redirect(`/orders/${orderId}/edit`);
@@ -699,6 +711,7 @@ async function updateDetails(req, res) {
     indicative_insurance_amount: str(body.indicative_insurance_amount),
   });
 
+  await auditLogRepository.log(req.user ? req.user.id : null, 'ORDER_DETAILS_UPDATED', 'orders', orderId);
   flash.set(req, 'success', 'Order details updated.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1777,7 +1790,12 @@ async function recordAdvancePayment(req, res) {
     return;
   }
   // QA Round 6, R6-N22: saved together or not at all.
-  await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'advance', amount, receivedAt, rate, req.user ? req.user.id : null);
+  // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
+  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'advance', amount, receivedAt, rate, req.user ? req.user.id : null))) {
+    flash.set(req, 'warning', 'Advance remittance already recorded with these details — nothing changed.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'advance_exchange_rate', null, String(rate));
   // External QA report L-23: advance payment recording was never audit-logged.
   await auditLogRepository.log(req.user ? req.user.id : null, 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', orderId, 'advance_amount', null, String(amount));
@@ -2197,10 +2215,10 @@ async function approvePaymentTerms(req, res) {
     res.status(404).send('Order not found.');
     return;
   }
-  if (!(await paymentTermsApprovalService.isPending(orderId))) {
+  if (!(await paymentTermsApprovalService.isPending(orderId))
+    || !(await paymentTermsApprovalService.approve(orderId, req.user.id))) {
     flash.set(req, 'warning', 'These payment terms do not need approval, or are already approved.');
   } else {
-    await paymentTermsApprovalService.approve(orderId, req.user.id);
     flash.set(req, 'success', 'Payment terms approved — the Quotation can now be generated.');
   }
   res.redirect(`/orders/${orderId}#step-1-quotation-prepare`);
@@ -2631,7 +2649,12 @@ async function recordFreightPayment(req, res) {
   }
 
   // QA Round 6, R6-N22: saved together or not at all.
-  await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'freight', amount, receivedAt, rate, req.user ? req.user.id : null);
+  // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
+  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'freight', amount, receivedAt, rate, req.user ? req.user.id : null))) {
+    flash.set(req, 'warning', 'Freight remittance already recorded with these details — nothing changed.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'freight_exchange_rate', null, String(rate));
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
@@ -3104,7 +3127,12 @@ async function recordBalancePayment(req, res) {
   }
 
   // QA Round 6, R6-N22: saved together or not at all.
-  await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'balance', amount, receivedAt, rate, req.user ? req.user.id : null);
+  // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
+  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'balance', amount, receivedAt, rate, req.user ? req.user.id : null))) {
+    flash.set(req, 'warning', 'Balance remittance already recorded with these details — nothing changed.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'balance_exchange_rate', null, String(rate));
   // External QA report L-23: balance payment recording was never audit-logged.
   await auditLogRepository.log(req.user ? req.user.id : null, 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', orderId, 'balance_amount', null, String(amount));

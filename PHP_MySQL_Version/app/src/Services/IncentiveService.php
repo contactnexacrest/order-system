@@ -437,18 +437,25 @@ final class IncentiveService
      * is paid, the order's cost entry takes the amounts actually paid and
      * goes to Zoho Books with the next sync.
      */
-    public static function markPaid(int $payoutId, string $paidOn, float $paidInr, ?float $tdsInr, int $userId): void
+    /**
+     * @return bool whether this call recorded the payment — false when the
+     * payout was already paid, e.g. by a second click a moment earlier
+     * (QA Round 6, R6-N17), so the caller logs it once.
+     */
+    public static function markPaid(int $payoutId, string $paidOn, float $paidInr, ?float $tdsInr, int $userId): bool
     {
         $payout = IncentiveRepository::findPayout($payoutId);
         if ($payout === null || $payout['status'] !== 'due') {
-            return;
+            return false;
         }
-        IncentiveRepository::markPayoutPaid($payoutId, $paidOn, $paidInr, $tdsInr, $userId);
+        if (!IncentiveRepository::markPayoutPaid($payoutId, $paidOn, $paidInr, $tdsInr, $userId)) {
+            return false;
+        }
         $kind = $payout['payee_kind'] === 'staff' ? 'team' : 'associate';
         $rows = array_filter(IncentiveRepository::payoutsForOrder((int) $payout['order_id']), static fn (array $p): bool => $p['payee_kind'] === $payout['payee_kind']);
         foreach ($rows as $p) {
             if ($p['status'] !== 'paid') {
-                return;
+                return true;
             }
         }
         $entry = IncentiveRepository::costEntries((int) $payout['order_id'])[$kind] ?? null;
@@ -456,5 +463,6 @@ final class IncentiveService
             IncentiveRepository::settleCostEntry((int) $entry['id'], round(array_sum(array_map(static fn (array $p): float => (float) $p['paid_inr'], $rows)), 2),
                 max(array_map(static fn (array $p): string => (string) $p['paid_on'], $rows)));
         }
+        return true;
     }
 }

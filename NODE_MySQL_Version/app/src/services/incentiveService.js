@@ -481,22 +481,30 @@ async function unlock(orderId, userId) {
  * paid, the order's cost entry takes the amounts actually paid and goes to
  * Zoho Books with the next sync.
  */
+/**
+ * @returns {Promise<boolean>} whether this call recorded the payment — false
+ * when the payout was already paid, e.g. by a second click a moment earlier
+ * (QA Round 6, R6-N17), so the caller logs it once.
+ */
 async function markPaid(payoutId, paidOn, paidInr, tdsInr, userId) {
   const payout = await incentiveRepository.findPayout(payoutId);
   if (!payout || payout.status !== 'due') {
-    return;
+    return false;
   }
-  await incentiveRepository.markPayoutPaid(payoutId, paidOn, paidInr, tdsInr, userId);
+  if (!(await incentiveRepository.markPayoutPaid(payoutId, paidOn, paidInr, tdsInr, userId))) {
+    return false;
+  }
   const kind = payout.payee_kind === 'staff' ? 'team' : 'associate';
   const rows = (await incentiveRepository.payoutsForOrder(Number(payout.order_id))).filter((p) => p.payee_kind === payout.payee_kind);
   if (rows.some((p) => p.status !== 'paid')) {
-    return;
+    return true;
   }
   const entry = (await incentiveRepository.costEntries(Number(payout.order_id)))[kind];
   if (entry) {
     await incentiveRepository.settleCostEntry(Number(entry.id), round2(rows.reduce((sum, p) => sum + Number(p.paid_inr), 0)),
       rows.map((p) => String(p.paid_on).slice(0, 10)).sort().pop());
   }
+  return true;
 }
 
 module.exports = {

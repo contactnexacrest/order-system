@@ -286,4 +286,29 @@ final class OrderPaymentStatusRepository
              ORDER BY o.id DESC"
         )->fetchAll();
     }
+
+    /**
+     * QA Round 6, R6-N17: whether this leg already holds exactly this
+     * remittance (amount, day received, rate) — a second click of the same
+     * form. Locks the row (FOR UPDATE), so call it inside the transaction
+     * that records the leg: of two clicks at the same moment, the second
+     * waits and then sees the first one's values.
+     */
+    public static function legAlreadyRecorded(int $orderId, string $leg, float $amount, string $receivedAt, float $rate): bool
+    {
+        if (!in_array($leg, ['advance', 'balance', 'freight'], true)) {
+            throw new \InvalidArgumentException("Unknown payment leg {$leg}");
+        }
+        $stmt = Database::connection()->prepare(
+            "SELECT {$leg}_amount AS amount, DATE({$leg}_remittance_received_at) AS received_on, {$leg}_exchange_rate AS rate
+             FROM order_payment_status WHERE order_id = :order_id FOR UPDATE"
+        );
+        $stmt->execute(['order_id' => $orderId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $row !== false && $row['amount'] !== null && $row['rate'] !== null
+            && abs((float) $row['amount'] - round($amount, 2)) < 0.005
+            && (string) $row['received_on'] === substr($receivedAt, 0, 10)
+            && abs((float) $row['rate'] - round($rate, 4)) < 0.00005;
+    }
+
 }

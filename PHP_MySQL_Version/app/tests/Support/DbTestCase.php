@@ -17,6 +17,25 @@ abstract class DbTestCase extends TestCase
 {
     private const DB_NAME = 'nexacrest_phpunit_test';
 
+    /**
+     * QA Round 6, R6-N16: clients.email is unique. Older tests give their
+     * test client one of these fixed emails (and assert on it); one left
+     * behind by an earlier test is cleared first, so each test can use it.
+     */
+    private const FIXED_TEST_CLIENT_EMAILS = [
+        'buyer@example.test', 'buyer@phpunit-test.example', 'jane@buyer.example', 'original@buyer.test',
+        'renamed@buyer.test', 'confirmed@buyer.test', 'updated@buyer.test', 'intake@buyer.test',
+    ];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $placeholders = implode(',', array_fill(0, count(self::FIXED_TEST_CLIENT_EMAILS), '?'));
+        \App\Config\Database::connection()
+            ->prepare("UPDATE clients SET email = NULL WHERE email IN ({$placeholders})")
+            ->execute(self::FIXED_TEST_CLIENT_EMAILS);
+    }
+
     public static function rebuildDatabase(): void
     {
         self::runSql('', sprintf(

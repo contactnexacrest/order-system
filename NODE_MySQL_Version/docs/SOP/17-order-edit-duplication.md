@@ -92,6 +92,13 @@ ambiguous that a lock is being bypassed. Once the order is actually
 change again — "Override Lock & Save" — and require "Override locked
 data" specifically rather than "Edit an order after confirmation."
 
+**Two people editing at once** (QA Round 6, R6-N27). If someone else saves
+the order's details after you opened the form, your save is refused with
+"This order was changed by <name> at <time> after you opened this page.
+Reload the page to see the change, then make yours again." — so nobody's
+change is silently undone. The client and supplier edit forms work the same
+way. Saving order details is recorded in the audit log.
+
 ## Product lines: edit, add, remove, duplicate
 
 The order page's Products section is fully editable (again, subject to

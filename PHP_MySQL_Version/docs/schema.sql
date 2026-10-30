@@ -452,7 +452,9 @@ CREATE TABLE clients (
   created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   modified_by           BIGINT UNSIGNED NULL,
   modified_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (duplicate_of_client_id) REFERENCES clients(id)
+  FOREIGN KEY (duplicate_of_client_id) REFERENCES clients(id),
+  -- QA Round 6, R6-N16: one email per client (D-129), race-safe. NULL = none.
+  UNIQUE KEY uq_clients_email (email)
 ) ENGINE=InnoDB;
 
 CREATE TABLE suppliers (

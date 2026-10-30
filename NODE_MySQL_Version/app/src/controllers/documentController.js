@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const db = require('../config/db');
 const { documentLabel } = require('../helpers/documentLabel');
 const flash = require('../helpers/flash');
 const paymentTermsApprovalService = require('../services/paymentTermsApprovalService');
@@ -33,6 +34,38 @@ async function pickedDocumentDate(date, orderId) {
   const order = await orderRepository.find(orderId);
   if (order && order.created_at && value < String(order.created_at).slice(0, 10)) return false;
   return value;
+}
+
+/**
+ * QA Round 6, R6-N18: one generation per order and document type at a time —
+ * a MySQL named lock held on its own pool connection (a named lock belongs to
+ * one connection), so of several posts at the same moment only the first
+ * makes a revision. Port of DocumentController::claimGeneration().
+ *
+ * @returns {Promise<{release: function(): Promise<void>}|null>} null when another request holds it
+ */
+async function claimGeneration(orderId, type) {
+  const name = `nx_docgen_${orderId}_${type}`;
+  const conn = await db.pool.getConnection();
+  try {
+    const [[row]] = await conn.query('SELECT GET_LOCK(?, 0) AS got', [name]);
+    if (Number(row.got) !== 1) {
+      conn.release();
+      return null;
+    }
+  } catch (err) {
+    conn.release();
+    throw err;
+  }
+  return {
+    async release() {
+      try {
+        await conn.query('SELECT RELEASE_LOCK(?)', [name]);
+      } finally {
+        conn.release();
+      }
+    },
+  };
 }
 
 async function generate(req, res) {
@@ -95,6 +128,14 @@ async function generate(req, res) {
     allowOverride = true;
   }
 
+  // QA Round 6, R6-N18: a double click (or several) made one revision each
+  // — one generation per order and document type at a time.
+  const generationLock = await claimGeneration(orderId, type);
+  if (!generationLock) {
+    flash.set(req, 'warning', 'This document is being generated right now — wait a moment, then refresh the page.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   let result;
   try {
     result = await documentGenerationService.generate(orderId, type, user.id, null, generateDocx, allowOverride, documentDate);
@@ -108,6 +149,8 @@ async function generate(req, res) {
     flash.set(req, 'error', 'Document generation failed. Check the server error log for details.');
     res.redirect(`/orders/${orderId}`);
     return;
+  } finally {
+    await generationLock.release();
   }
 
   if (allowOverride) {

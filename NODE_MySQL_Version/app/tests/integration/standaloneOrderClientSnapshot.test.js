@@ -7,6 +7,13 @@ const orderStageRepository = require('../../src/repositories/orderStageRepositor
 const orderDuplicationService = require('../../src/services/orderDuplicationService');
 const { createTestOrder } = require('../support/fixtures');
 
+// QA Round 6, R6-N16: clients.email is unique, and Jest runs files in
+// parallel on one database — this file's fixed test emails are its own.
+const ORIGINAL_EMAIL = `original-${process.pid}-${Date.now()}@buyer.test`;
+const RENAMED_EMAIL = `renamed-${process.pid}-${Date.now()}@buyer.test`;
+const CONFIRMED_EMAIL = `confirmed-${process.pid}-${Date.now()}@buyer.test`;
+const UPDATED_EMAIL = `updated-${process.pid}-${Date.now()}@buyer.test`;
+
 /**
  * Port of StandaloneOrderClientSnapshotTest.php. 90-item backlog
  * "standalone order" follow-on: `clients` is fully admin-editable
@@ -24,6 +31,10 @@ const { createTestOrder } = require('../support/fixtures');
  * client details (a duplicate is a new commercial decision made today).
  */
 describe('Standalone order client snapshot (90-item backlog "standalone order" follow-on)', () => {
+  beforeEach(async () => {
+    await db.execute(`UPDATE clients SET email = NULL WHERE email IN (${[ORIGINAL_EMAIL, RENAMED_EMAIL, CONFIRMED_EMAIL, UPDATED_EMAIL].map((e, i) => `:e${i}`).join(', ')})`, Object.fromEntries([ORIGINAL_EMAIL, RENAMED_EMAIL, CONFIRMED_EMAIL, UPDATED_EMAIL].map((e, i) => [`e${i}`, e])));
+  });
+
   afterAll(async () => {
     await db.pool.end();
   });
@@ -41,7 +52,7 @@ describe('Standalone order client snapshot (90-item backlog "standalone order" f
         addr: '1 Original Street, Original City',
         vat: 'VAT-ORIGINAL',
         contact: 'Original Contact',
-        email: 'original@buyer.test',
+        email: ORIGINAL_EMAIL,
         phone: '1000000000',
         country: 'Netherlands',
       }
@@ -143,7 +154,7 @@ describe('Standalone order client snapshot (90-item backlog "standalone order" f
     expect(order.billing_address).toBe('1 Original Street, Original City');
     expect(order.vat_eori_tax_no).toBe('VAT-ORIGINAL');
     expect(order.contact_person).toBe('Original Contact');
-    expect(order.client_email).toBe('original@buyer.test');
+    expect(order.client_email).toBe(ORIGINAL_EMAIL);
     expect(order.client_phone).toBe('1000000000');
     expect(order.country_of_destination).toBe('Netherlands');
   });
@@ -156,14 +167,14 @@ describe('Standalone order client snapshot (90-item backlog "standalone order" f
     await clientRepository.update(clientId, updateData({
       company_legal_name: 'Renamed Buyer Ltd', billing_address: 'Renamed Address',
       vat_eori_tax_no: 'VAT-RENAMED', contact_person: 'Renamed Contact',
-      email: 'renamed@buyer.test', phone: '2000000000', country_of_destination: 'Germany',
+      email: RENAMED_EMAIL, phone: '2000000000', country_of_destination: 'Germany',
     }));
 
     const order = await orderRepository.find(orderId);
     expect(order.company_legal_name).toBe('Original Buyer Ltd');
     expect(order.billing_address).toBe('1 Original Street, Original City');
     expect(order.vat_eori_tax_no).toBe('VAT-ORIGINAL');
-    expect(order.client_email).toBe('original@buyer.test');
+    expect(order.client_email).toBe(ORIGINAL_EMAIL);
     expect(order.country_of_destination).toBe('Netherlands');
   });
 
@@ -178,7 +189,7 @@ describe('Standalone order client snapshot (90-item backlog "standalone order" f
     await clientRepository.update(clientId, updateData({
       company_legal_name: 'Confirmed Buyer Ltd', billing_address: 'Confirmed Address',
       vat_eori_tax_no: 'VAT-CONFIRMED', contact_person: 'Confirmed Contact',
-      email: 'confirmed@buyer.test', phone: '3000000000', country_of_destination: 'France',
+      email: CONFIRMED_EMAIL, phone: '3000000000', country_of_destination: 'France',
     }));
     await orderRepository.applyClientSnapshot(orderA, clientId);
 
@@ -200,7 +211,7 @@ describe('Standalone order client snapshot (90-item backlog "standalone order" f
     await clientRepository.update(clientId, updateData({
       company_legal_name: 'Updated Buyer Ltd', billing_address: 'Updated Address',
       vat_eori_tax_no: 'VAT-UPDATED', contact_person: 'Updated Contact',
-      email: 'updated@buyer.test', phone: '4000000000', country_of_destination: 'Italy',
+      email: UPDATED_EMAIL, phone: '4000000000', country_of_destination: 'Italy',
     }));
 
     const adminUserId = await createTestUser('Admin');
