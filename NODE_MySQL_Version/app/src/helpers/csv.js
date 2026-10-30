@@ -16,7 +16,8 @@
 // values with a literal single quote, which every spreadsheet app renders
 // as plain text instead of evaluating.
 function neutralizeFormula(s) {
-  if (s !== '' && ['=', '+', '-', '@', '\t', '\r'].includes(s[0])) {
+  // A plain (negative) number such as -1250.50 is not a formula: it stays a number Excel can add up.
+  if (s !== '' && ['=', '+', '-', '@', '\t', '\r'].includes(s[0]) && !/^-\d+(\.\d+)?$/.test(s)) {
     return "'" + s;
   }
   return s;

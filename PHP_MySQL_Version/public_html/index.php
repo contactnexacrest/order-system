@@ -454,6 +454,7 @@ $router->post('/orders/{id}/products/{productId}', [$orders, 'updateProduct'], [
 $router->post('/orders/{id}/products/{productId}/delete', [$orders, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}/duplicate', [$orders, 'duplicateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->get('/ca', [$ca, 'index'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
+$router->get('/ca/cafin-export', [$ca, 'cafinExport'], [SessionAuth::required(), PermissionCheck::requires('view_cafin')]);
 $router->get('/ca/reports', [$ca, 'reports'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->get('/ca/zoho-sync', [$ca, 'zohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
 $router->post('/ca/zoho-sync/run', [$ca, 'runZohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);

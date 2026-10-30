@@ -52,6 +52,7 @@ final class CsvFormulaInjectionTest extends TestCase
             [''],
             ['john@example.com'],
             ['A-1 Warehouse'],
+            ['-1250.50'], // a plain negative number stays a number Excel can add up
         ];
     }
 

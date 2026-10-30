@@ -765,6 +765,7 @@ app.post('/orders/:id/additional-documents', requireAuth, requirePermission('man
 app.post('/orders/:id/additional-documents/:fileId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteAdditionalDocument));
 app.get('/orders/:id/additional-documents/removed', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.showRemovedAdditionalDocuments));
 app.get('/ca', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.index));
+app.get('/ca/cafin-export', requireAuth, requirePermission('view_cafin'), asyncHandler(caController.cafinExport));
 app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reports));
 app.get('/ca/zoho-sync', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.zohoSync));
 app.post('/ca/zoho-sync/run', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.runZohoSync));

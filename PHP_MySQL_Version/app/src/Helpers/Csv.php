@@ -27,7 +27,8 @@ final class Csv
      */
     private static function neutralizeFormula(string $value): string
     {
-        if ($value !== '' && str_contains("=+-@\t\r", $value[0])) {
+        // A plain (negative) number such as -1250.50 is not a formula: it stays a number Excel can add up.
+        if ($value !== '' && str_contains("=+-@\t\r", $value[0]) && !preg_match('/^-\d+(\.\d+)?$/', $value)) {
             return "'" . $value;
         }
         return $value;

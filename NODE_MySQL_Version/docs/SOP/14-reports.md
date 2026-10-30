@@ -108,6 +108,10 @@ list (Conversion Rate) exports as a Metric/Value pair per row instead;
 the Per-Order Report exports its own Full Audit Trail section, the one
 of its three sections genuinely worth pulling into a spreadsheet.
 
+Staff who may see CAFIN also find **CAFIN export** here: the CA Financial
+Annexure of every order of a financial year as CSV, internal only (see
+[CA-01](./ca-01-overview.md#cafin-export-csv-for-all-orders)).
+
 ## What the client does (or doesn't)
 
 Nothing — Reports is an entirely internal, staff-only module. Nothing here

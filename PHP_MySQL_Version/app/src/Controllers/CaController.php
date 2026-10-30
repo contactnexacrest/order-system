@@ -105,6 +105,38 @@ final class CaController
         return ['headers' => ['Claimed On', 'Scheme', 'Order Ref', 'Reference', 'Claimed Amount', 'Currency', 'Received Amount', 'Received On', 'Status'], 'rows' => $rows];
     }
 
+    /**
+     * Owner request 2026-10-30: CAFIN as CSV for every order of a financial
+     * year — a summary row per order, or every CAFIN line — for whoever may
+     * see CAFIN (view_cafin). Internal only: never offered to the client.
+     */
+    public function cafinExport(array $params): void
+    {
+        $years = \App\Services\CafinExportService::financialYears();
+        $fy = (string) ($_GET['fy'] ?? '');
+        $fy = in_array($fy, $years, true) ? $fy : FinancialYear::current();
+        $status = (string) ($_GET['status'] ?? 'all');
+        $status = isset(\App\Services\CafinExportService::STATUSES[$status]) ? $status : 'all';
+        $format = (string) ($_GET['format'] ?? '');
+        $orderIds = \App\Services\CafinExportService::orderIds($fy, $status);
+        if ($format === 'summary' || $format === 'detail') {
+            $user = AuthService::currentUser();
+            AuditLogRepository::log((int) $user['id'], 'CAFIN_CSV_EXPORTED', 'orders', null, 'cafin_csv', null, "{$format} · FY {$fy} · {$status} · " . count($orderIds) . ' orders');
+            $name = 'CAFIN_' . $format . '_FY' . $fy . ($status !== 'all' ? '_' . $status : '') . '_INTERNAL.csv';
+            if ($format === 'summary') {
+                Csv::stream($name, \App\Services\CafinExportService::SUMMARY_HEADERS, \App\Services\CafinExportService::summaryRows($orderIds));
+            }
+            Csv::stream($name, \App\Services\CafinExportService::DETAIL_HEADERS, \App\Services\CafinExportService::detailRows($orderIds));
+        }
+        View::render('ca/cafin_export', [
+            'years' => $years,
+            'fy' => $fy,
+            'status' => $status,
+            'statuses' => \App\Services\CafinExportService::STATUSES,
+            'orderCount' => count($orderIds),
+        ], 'layout/base');
+    }
+
     public function index(array $params): void
     {
         $user = AuthService::currentUser();

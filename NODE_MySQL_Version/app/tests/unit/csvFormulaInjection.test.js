@@ -32,6 +32,10 @@ describe('csv.stream neutralizes spreadsheet formula injection (QA-5 RPT-02)', (
     expect(firstDataLine(value)).toBe(`'${value}`);
   });
 
+  it('leaves a plain negative number as a number', () => {
+    expect(firstDataLine('-1250.50')).toBe('-1250.50');
+  });
+
   it('neutralizes a leading tab', () => {
     expect(firstDataLine('\t=1+1')).toBe("'\t=1+1");
   });

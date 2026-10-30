@@ -83,6 +83,14 @@ $__uid = $__u ? (int) $__u['id'] : 0;
   </div>
   <?php endif; ?>
 
+  <?php if ($__u && \App\Services\PermissionService::can($__uid, $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_cafin')): ?>
+  <div class="section">
+    <h2>CAFIN export</h2>
+    <p class="muted">The CA Financial Annexure of every order of a financial year, as CSV: a summary row per order, or every CAFIN line. Internal only — never for the client.</p>
+    <a class="btn-sm" href="/ca/cafin-export">Open CAFIN export</a>
+  </div>
+  <?php endif; ?>
+
   <div class="section">
     <h2>Find an Order</h2>
     <p class="muted">Search by order reference or client company name to jump straight to that order's Full Report.</p>

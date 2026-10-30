@@ -92,6 +92,38 @@ async function usersById() {
   return map;
 }
 
+/**
+ * Owner request 2026-10-30: CAFIN as CSV for every order of a financial
+ * year — a summary row per order, or every CAFIN line — for whoever may
+ * see CAFIN (view_cafin). Internal only: never offered to the client.
+ */
+async function cafinExport(req, res) {
+  const cafinExportService = require('../services/cafinExportService');
+  const q = req.query || {};
+  const years = await cafinExportService.financialYears();
+  const fy = years.includes(String(q.fy || '')) ? String(q.fy) : financialYear.current();
+  const status = cafinExportService.STATUSES[String(q.status || 'all')] ? String(q.status || 'all') : 'all';
+  const format = String(q.format || '');
+  const ids = await cafinExportService.orderIds(fy, status);
+  if (format === 'summary' || format === 'detail') {
+    await auditLogRepository.log(req.user.id, 'CAFIN_CSV_EXPORTED', 'orders', null, 'cafin_csv', null, `${format} · FY ${fy} · ${status} · ${ids.length} orders`);
+    const name = `CAFIN_${format}_FY${fy}${status !== 'all' ? `_${status}` : ''}_INTERNAL.csv`;
+    if (format === 'summary') {
+      csv.stream(res, name, cafinExportService.SUMMARY_HEADERS, await cafinExportService.summaryRows(ids));
+    } else {
+      csv.stream(res, name, cafinExportService.DETAIL_HEADERS, await cafinExportService.detailRows(ids));
+    }
+    return;
+  }
+  res.renderView('ca/cafin_export', {
+    years,
+    fy,
+    status,
+    statuses: cafinExportService.STATUSES,
+    orderCount: ids.length,
+  });
+}
+
 async function index(req, res) {
   res.renderView('ca/index', {
     canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
@@ -786,7 +818,7 @@ async function tdsSummary(req, res) {
 }
 
 module.exports = {
-  index, reports, zohoSync, runZohoSync, orderZohoCheck, expenses, setExpenseTds, linkExpenseToOrder, tdsSummary,
+  index, cafinExport, reports, zohoSync, runZohoSync, orderZohoCheck, expenses, setExpenseTds, linkExpenseToOrder, tdsSummary,
   exportBenefits, recordExportBenefit, markExportBenefitReceived,
   bankStatement, uploadBankStatement, matchBankLineToRevenue, matchBankLineToExpense, unmatchBankLine, reconciliation,
   fyLocks, lockFinancialYear, unlockFinancialYear,

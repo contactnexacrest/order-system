@@ -1,5 +1,6 @@
 'use strict';
 
+const csv = require('../helpers/csv');
 const flash = require('../helpers/flash');
 const associateRepository = require('../repositories/associateRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
@@ -341,11 +342,6 @@ async function mine(req, res) {
   }, 'layout/base');
 }
 
-function csvCell(v) {
-  const s = v === null || v === undefined ? '' : String(v);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
 async function payouts(req, res) {
   await incentiveService.lockDue(req.user.id);
   const months = await incentiveRepository.payoutMonths();
@@ -356,15 +352,11 @@ async function payouts(req, res) {
   }
   const rows = await incentiveRepository.payoutsForMonth(month);
   if ((req.query || {}).format === 'csv') {
-    const lines = [['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)']];
-    for (const r of rows) {
-      lines.push([r.user_name ?? r.associate_name, r.payee_kind, r.buyer_inquiry_ref || r.order_reference,
+    csv.stream(res, `incentives-${month}.csv`,
+      ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)'],
+      rows.map((r) => [r.user_name ?? r.associate_name, r.payee_kind, r.buyer_inquiry_ref || r.order_reference,
         r.payee_kind === 'associate' ? 'Associate (agreement)' : (incentiveRepository.ROLES[r.role] ?? r.role),
-        r.amount_inr, r.amount_fc, r.currency_code, r.status, r.paid_on, r.paid_inr, r.tds_inr]);
-    }
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="incentives-${month}.csv"`);
-    res.send(`﻿${lines.map((l) => l.map(csvCell).join(',')).join('\n')}\n`);
+        r.amount_inr, r.amount_fc, r.currency_code, r.status, r.paid_on, r.paid_inr, r.tds_inr]));
     return;
   }
   let staffTotal = 0;

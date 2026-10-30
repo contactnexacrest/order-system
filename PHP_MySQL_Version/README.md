@@ -1967,6 +1967,18 @@ in the incentive month (incentive cut-off day, default the 20th) and sent
 to Zoho Books as Commission Expense once paid. Permissions:
 `manage_incentives` (Admin, MD — not ED), `pay_incentives` (Admin, MD,
 Accounts Executive), `view_own_incentives`. Both stacks now stand at
-**119 tables**, **231 foreign keys**, **63 permissions** and **486 routes**
-(163 GET, 323 POST). Tests: `TeamIncentiveTest` / `teamIncentive.test.js`.
+**119 tables**, **231 foreign keys**, **63 permissions** and **487 routes**
+(164 GET, 323 POST). Tests: `TeamIncentiveTest` / `teamIncentive.test.js`.
 SOP: chapter 20 (Incentives).
+
+## Follow-up (added 2026-10-30): CAFIN export (CSV) for all orders
+
+`CafinExportService` (Node: `cafinExportService`) and `GET /ca/cafin-export`
+(`view_cafin`): the CAFIN of every order of a financial year (by order date,
+filtered by status; test and sample orders left out) as a **summary** CSV
+(one row per order) or a **detail** CSV (every CAFIN line, sections A–F),
+from the same calculation as the CAFIN PDF. Linked from the CA hub and the
+Reports page; each download is audit-logged (`CAFIN_CSV_EXPORTED`); the file
+name ends in `_INTERNAL`. The CSV helper now leaves a plain negative number
+(e.g. `-1250.50`) as a number instead of quoting it as text. Routes: 487
+(164 GET, 323 POST). Tests: `CafinExportTest` / `cafinExport.test.js`.

@@ -199,6 +199,28 @@ side, to check exactly what each contains — nothing here blocks staff
 access, it only makes sure the two document sets can never cross paths on
 the client's side.
 
+### CAFIN export (CSV) for all orders
+
+Owner request 2026-10-30. **CA / Accounting → CAFIN export (CSV, all
+orders)** (also on the Reports page) takes the CAFIN of every order of a
+financial year out as a spreadsheet, for whoever may see CAFIN ("View
+CAFIN"). Choose the **financial year** (by order date) and which
+**orders** (all, in progress, fully settled, or lost and cancelled); test
+and sample orders are always left out. Then download:
+
+- **Summary**: one row per order: order, client, status, currency and FOB
+  value; revenue, benefits, supplier cost, the C1–C5 expenses (the team
+  incentive and associate commission shown inside C3), total cost, profit
+  and margin; and the cash position so far. Amounts in rupees, as plain
+  numbers Excel can add up.
+- **Detail**: every line of every order's CAFIN, sections A to F, with the
+  order and the section on each row.
+
+Both come from the same calculation as the CAFIN PDF, so the figures always
+agree with it. The file name ends in `_INTERNAL`. Like CAFIN itself it must
+never be sent to a client or buyer, and every download is recorded in the
+audit log.
+
 ## The CA / Accounting hub page
 
 **CA / Accounting** in the sidebar (visible only with `ca_module_view`)
