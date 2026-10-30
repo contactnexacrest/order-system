@@ -93,21 +93,17 @@ describe('Nav links match their own route permissions (External QA report U-01)'
     expect(res.text).toContain(`href="/orders/${orderId}/disputes"`);
   });
 
-  test('CA role sees only its assigned orders as links on the CA pages', async () => {
+  test('CA role sees every order as a link on the CA pages', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
     const { userId: adminId } = await loginAs('Admin');
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     await orderPaymentStatusRepository.markAdvanceCleared(orderId, new Date(), adminId);
-    const { agent, userId: caId } = await loginAs('CA / Chartered Accountant');
+    const { agent } = await loginAs('CA / Chartered Accountant');
 
-    const indexRes = await agent.get('/ca');
-    expect(indexRes.text).not.toContain(`href="/orders/${orderId}"`);
-
-    // Owner decision (2026-10-28): the CA has view_orders — an order
-    // assigned to them is a real link.
-    await db.execute('INSERT INTO order_assignees (order_id, user_id) VALUES (:o, :u)', { o: orderId, u: caId });
-    expect((await agent.get('/ca')).text).toContain(`href="/orders/${orderId}"`);
+    // Owner decision 2026-10-30: the CA holds view_all_orders (read-only) —
+    // every order is a real link, not only those assigned to the CA.
+    expect((await agent.get('/ca')).text).toContain(`href="/orders/${orderId}"`); // the CA opens every order, assigned or not
 
     const expensesRes = await agent.get('/ca/expenses');
     expect(expensesRes.text).not.toContain('href="/ca/zoho-sync"');

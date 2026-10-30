@@ -1567,7 +1567,8 @@
         <form method="post" action="/orders/{{ order.id }}/buyer-po">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
-          {{ stepBadge('4d') | safe }}<button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
+          {{ stageGateNotice(2, "confirm the buyer's PO received") | safe }}
+          {{ stepBadge('4d') | safe }}<button type="submit"{{ stageGateDisabled(2) | safe }} class="btn-sm">Confirm Buyer PO Received</button>
         </form>
       {% endif %}
     </details>
@@ -1685,7 +1686,8 @@
         {% else %}
         <form method="post" action="/orders/{{ order.id }}/payment/lc/confirm-usable" onsubmit="return confirm('Confirm this LC usable? This unlocks Stage 4 and auto-provisions the client portal login — confirm the advising bank has actually confirmed first.');">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          {{ stepBadge('5e') | safe }}<button type="submit" class="btn-sm btn-success">Confirm LC Usable (unlocks Stage 4)</button>
+          {{ stageGateNotice(3, "confirm the LC usable") | safe }}
+          {{ stepBadge('5e') | safe }}<button type="submit"{{ stageGateDisabled(3) | safe }} class="btn-sm btn-success">Confirm LC Usable (unlocks Stage 4)</button>
         </form>
         {% endif %}
       {% elif not stage3 or stage3.status == 'locked' %}
@@ -1737,7 +1739,8 @@
         <form method="post" action="/orders/{{ order.id }}/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Cleared On<input type="date" name="advance_cleared_at"></label>
-          {{ stepBadge('5e') | safe }}<button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
+          {{ stageGateNotice(3, "mark the advance cleared") | safe }}
+          {{ stepBadge('5e') | safe }}<button type="submit"{{ stageGateDisabled(3) | safe }} class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
         </form>
         {% endif %}
       {% elif not stage3 or stage3.status == 'locked' %}
@@ -1818,18 +1821,20 @@
         <form method="post" action="/orders/{{ order.id }}/oc-acknowledgment">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
-          {{ stepBadge('6c') | safe }}<button type="submit" class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Step 7)</button>
+          {{ stageGateNotice(4, "record the buyer's acknowledgement") | safe }}
+          {{ stepBadge('6c') | safe }}<button type="submit"{{ stageGateDisabled(4) | safe }} class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Step 7)</button>
         </form>
         {% endif %}
       {% elif ocDocGenerated %}
         <div class="review-banner info">
-          ℹ <span>Order Confirmation has been generated but hasn't gone out by email yet (still awaiting send/approval, or mail sending isn't configured). If the buyer has confirmed by phone, in person, or any channel other than the portal/email, record it below — Step 7 (Supplier PO) unlocks immediately.</span>
+          ℹ <span>Order Confirmation has been generated but hasn't gone out by email yet (still awaiting send/approval, or mail sending isn't configured). If the buyer has confirmed by phone, in person, or any channel other than the portal/email, record it below once the Order Confirmation is approved (and sent to the buyer, when email is on); Step 7 (Supplier PO) then unlocks.</span>
         </div>
         {% if permissions.manage_orders %}{# QA Round 5, R5-20 #}
         <form method="post" action="/orders/{{ order.id }}/oc-acknowledgment">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Describe how the buyer confirmed (quote their reply, or note the call/meeting) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
-          {{ stepBadge('6c') | safe }}<button type="submit" class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Step 7)</button>
+          {{ stageGateNotice(4, "record the buyer's acknowledgement") | safe }}
+          {{ stepBadge('6c') | safe }}<button type="submit"{{ stageGateDisabled(4) | safe }} class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Step 7)</button>
         </form>
         {% endif %}
       {% else %}
@@ -2168,7 +2173,8 @@
       {% elif supplierPo and supplierPo.status != 'signed' and suppoDocGenerated %}
         <form method="post" action="/orders/{{ order.id }}/supplier-po/signed">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          {{ stepBadge('7d') | safe }}<button type="submit" class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
+          {{ stageGateNotice(5, "confirm the supplier signed the PO") | safe }}
+          {{ stepBadge('7d') | safe }}<button type="submit"{{ stageGateDisabled(5) | safe }} class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
         </form>
       {% elif supplierPo and supplierPo.status != 'signed' %}
         <p class="muted small">Generate the Supplier PO document above before confirming the supplier's signature — they can't have signed and returned a document that was never sent.</p>
@@ -2197,7 +2203,7 @@
       <div><span class="k">Production Status</span><span class="v">{{ order.production_status_text or 'Not yet commenced' }}</span></div>
       <div><span class="k">Est. Shipment</span><span class="v">{{ order.est_shipment_date_text or 'To Be Confirmed' }}</span></div>
     </div>
-    <p class="muted small">Every update here is logged{% if permissions.view_audit_log %} — <a href="/orders/{{ order.id }}/audit-log">view update history</a>{% endif %}. Changing either field notifies the client (order update + portal).</p>
+    <p class="muted small">Every update here is logged{% if permissions.view_audit_log %} — <a href="/orders/{{ order.id }}/audit-log">view update history</a>{% endif %}. Changing the estimated shipment date notifies the client (order update + portal); the production status is for the team.</p>
     {% if stage4 and stage4.status != 'locked' and (not isLockedOrder or canOverrideLockEdit) %}
       {% if permissions.manage_orders %}{# QA Round 5, R5-20 #}
       <form method="post" action="/orders/{{ order.id }}/production-status">
@@ -2398,7 +2404,8 @@
       <form method="post" action="/orders/{{ order.id }}/payment/freight/clear" onsubmit="return confirm('Mark the freight payment cleared? This unlocks Stage 7 — confirm the funds have actually landed first.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Cleared On<input type="date" name="freight_cleared_at"></label>
-        {{ stepBadge('9d') | safe }}<button type="submit" class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
+        {{ stageGateNotice(6, "mark the freight cleared") | safe }}
+        {{ stepBadge('9d') | safe }}<button type="submit"{{ stageGateDisabled(6) | safe }} class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
       </form>
     {% else %}
       <p class="muted">Record the freight remittance first (Step 9c).</p>
@@ -2633,7 +2640,8 @@
           <label>BL Number *<input type="text" name="bl_number" required></label>
           <label>BL Date<input type="date" name="bl_date"></label>
           <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip"></label>
-          {{ stepBadge('10f') | safe }}<button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
+          {{ stageGateNotice(7, "confirm the BL issued") | safe }}
+          {{ stepBadge('10f') | safe }}<button type="submit"{{ stageGateDisabled(7) | safe }} class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
         </form>
         {% endif %}
       {% else %}
@@ -2769,7 +2777,8 @@
       <form method="post" action="/orders/{{ order.id }}/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Cleared On<input type="date" name="balance_cleared_at"></label>
-        {{ stepBadge('11d') | safe }}<button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
+        {{ stageGateNotice(8, "mark the balance cleared") | safe }}
+        {{ stepBadge('11d') | safe }}<button type="submit"{{ stageGateDisabled(8) | safe }} class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
       </form>
       {% endif %}
     {% else %}

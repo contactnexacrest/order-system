@@ -451,6 +451,45 @@ final class DocumentGenerationService
         return $blockedBy;
     }
 
+    /**
+     * Owner decision 2026-10-30: the order page says, before the click, what
+     * a stage's documents still need — the same rule stageDocumentBlockedBy()
+     * enforces. One entry per unfinished document: 'generate' (none yet),
+     * 'approve' (internal, or email sending off), 'approve_send' (buyer-facing,
+     * email on, not approved yet) or 'send' (approved, not sent yet).
+     *
+     * @return list<array{name:string, todo:string}>
+     */
+    public static function stageDocumentGate(int $orderId, int $stageNumber): array
+    {
+        $documents = DocumentRepository::forOrder($orderId);
+        $mailOn = EmailDispatchService::mailSendingEnabled();
+        $out = [];
+        foreach (self::STAGE_DOCUMENTS[$stageNumber] ?? [] as $code) {
+            $latest = null;
+            foreach ($documents as $doc) {
+                if ($doc['document_type_code'] === $code && $doc['status'] !== 'superseded') {
+                    $latest = $doc;
+                    break;
+                }
+            }
+            if ($latest !== null && self::isDocumentComplete($latest)) {
+                continue;
+            }
+            $type = $latest ?? self::findDocumentType($code) ?? [];
+            $name = (string) ($latest['document_type_name'] ?? $type['name'] ?? $code);
+            $internal = !empty($latest['document_type_never_shown_to_buyer'] ?? $type['never_shown_to_buyer'] ?? false);
+            $todo = match (true) {
+                $latest === null => 'generate',
+                $internal || !$mailOn => 'approve',
+                $latest['status'] === 'approved' => 'send',
+                default => 'approve_send',
+            };
+            $out[] = ['name' => $name, 'todo' => $todo, 'buyer_facing' => !$internal];
+        }
+        return $out;
+    }
+
     /** The error shown when a stage gate is refused by stageDocumentBlockedBy(). */
     public static function stageDocumentBlockedMessage(array $blockedBy): string
     {

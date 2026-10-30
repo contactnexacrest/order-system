@@ -547,6 +547,37 @@ async function stageDocumentBlockedBy(orderId, stageNumber) {
   return blockedBy;
 }
 
+/**
+ * Owner decision 2026-10-30: the order page says, before the click, what
+ * a stage's documents still need — the same rule stageDocumentBlockedBy()
+ * enforces. One entry per unfinished document: 'generate' (none yet),
+ * 'approve' (internal, or email sending off), 'approve_send' (buyer-facing,
+ * email on, not approved yet) or 'send' (approved, not sent yet).
+ *
+ * @returns {Promise<Array<{name: string, todo: string, buyer_facing: boolean}>>}
+ */
+async function stageDocumentGate(orderId, stageNumber) {
+  const documents = await documentRepository.forOrder(orderId);
+  const mailOn = await emailDispatchService.mailSendingEnabled();
+  const out = [];
+  for (const code of STAGE_DOCUMENTS[stageNumber] || []) {
+    const latest = documents.find((doc) => doc.document_type_code === code && doc.status !== 'superseded') || null;
+    if (latest && isDocumentComplete(latest, mailOn)) {
+      continue;
+    }
+    const type = latest || (await findDocumentType(code)) || {};
+    const name = String((latest && latest.document_type_name) || type.name || code);
+    const internal = Boolean(Number(latest ? latest.document_type_never_shown_to_buyer : type.never_shown_to_buyer));
+    let todo;
+    if (!latest) todo = 'generate';
+    else if (internal || !mailOn) todo = 'approve';
+    else if (latest.status === 'approved') todo = 'send';
+    else todo = 'approve_send';
+    out.push({ name, todo, buyer_facing: !internal });
+  }
+  return out;
+}
+
 /** The error shown when a stage gate is refused by stageDocumentBlockedBy(). */
 async function stageDocumentBlockedMessage(blockedBy) {
   const what = (await emailDispatchService.mailSendingEnabled()) ? 'approved and sent to the buyer' : 'approved';
@@ -1547,6 +1578,7 @@ module.exports = {
   STAGE_DOCUMENTS,
   isDocumentComplete,
   stageDocumentBlockedBy,
+  stageDocumentGate,
   stageDocumentBlockedMessage,
   templatesEnvironment,
   StageGateBlockedError,

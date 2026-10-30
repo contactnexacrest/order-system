@@ -22,6 +22,32 @@ $canManagePayments = PermissionService::can((int) $currentUser['id'], $currentUs
 // bank actually received it) is split out of manage_payments (recording
 // what the client says they sent) so the same person can't do both.
 $canClearPayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'clear_payments');
+// Owner decision 2026-10-30: each stage's gating button says, before the
+// click, which of the stage's documents still need generating, approving or
+// sending (the rule stageDocumentBlockedBy() enforces), and stays disabled
+// until they are done.
+$stageGate = [];
+foreach ([2, 3, 4, 5, 6, 7, 8] as $__gs) {
+    $stageGate[$__gs] = \App\Services\DocumentGenerationService::stageDocumentGate((int) $order['id'], $__gs);
+}
+$stageGateDisabled = static fn (int $stage): string => $stageGate[$stage] !== [] ? ' disabled title="See the note above: this stage\'s document is not finished yet."' : '';
+$stageGateNotice = static function (int $stage, string $action) use ($stageGate): string {
+    if ($stageGate[$stage] === []) {
+        return '';
+    }
+    $mailOn = \App\Services\EmailDispatchService::mailSendingEnabled();
+    $items = array_map(static function (array $d) use ($mailOn): string {
+        $todo = match ($d['todo']) {
+            'generate' => 'not generated yet — generate it, then get it approved' . ($d['buyer_facing'] && $mailOn ? ' and sent to the buyer' : ''),
+            'approve' => 'waiting for approval',
+            'approve_send' => 'waiting for approval, then sending to the buyer',
+            default => 'approved — waiting to be sent to the buyer',
+        };
+        return '<strong>' . htmlspecialchars($d['name']) . '</strong>: ' . $todo;
+    }, $stageGate[$stage]);
+    return '<p class="review-banner info stage-gate">&#8505; <span>Before you can ' . htmlspecialchars($action) . ': ' . implode('; ', $items)
+        . '. <a href="/reviews">Open Document Review &amp; Approval</a></span></p>';
+};
 // Owner decision 2026-10-30: the team incentive box (Step 12d) — manage_incentives only.
 $canManageIncentives = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_incentives');
 if ($canManageIncentives) {
@@ -2051,7 +2077,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po">
           <?= Csrf::field() ?>
           <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
-          <?= $stepBadge('4d') ?><button type="submit" class="btn-sm">Confirm Buyer PO Received</button>
+          <?= $stageGateNotice(2, "confirm the buyer's PO received") ?>
+          <?= $stepBadge('4d') ?><button type="submit"<?= $stageGateDisabled(2) ?> class="btn-sm">Confirm Buyer PO Received</button>
         </form>
       <?php endif; ?>
     </details>
@@ -2170,7 +2197,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php else: ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/lc/confirm-usable" onsubmit="return confirm('Confirm this LC usable? This unlocks Stage 4 and auto-provisions the client portal login — confirm the advising bank has actually confirmed first.');">
           <?= Csrf::field() ?>
-          <?= $stepBadge('5e') ?><button type="submit" class="btn-sm btn-success">Confirm LC Usable (unlocks Stage 4)</button>
+          <?= $stageGateNotice(3, "confirm the LC usable") ?>
+          <?= $stepBadge('5e') ?><button type="submit"<?= $stageGateDisabled(3) ?> class="btn-sm btn-success">Confirm LC Usable (unlocks Stage 4)</button>
         </form>
         <?php endif; ?>
       <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
@@ -2222,7 +2250,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
           <?= Csrf::field() ?>
           <label>Cleared On<input type="date" name="advance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
-          <?= $stepBadge('5e') ?><button type="submit" class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
+          <?= $stageGateNotice(3, "mark the advance cleared") ?>
+          <?= $stepBadge('5e') ?><button type="submit"<?= $stageGateDisabled(3) ?> class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
         </form>
         <?php endif; ?>
       <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
@@ -2305,18 +2334,20 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-acknowledgment">
           <?= Csrf::field() ?>
           <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
-          <?= $stepBadge('6c') ?><button type="submit" class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Step 7)</button>
+          <?= $stageGateNotice(4, "record the buyer's acknowledgement") ?>
+          <?= $stepBadge('6c') ?><button type="submit"<?= $stageGateDisabled(4) ?> class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Step 7)</button>
         </form>
         <?php endif; ?>
       <?php elseif ($ocDocGenerated): ?>
         <div class="review-banner info">
-          ℹ <span>Order Confirmation has been generated but hasn't gone out by email yet (still awaiting send/approval, or mail sending isn't configured). If the buyer has confirmed by phone, in person, or any channel other than the portal/email, record it below — Step 7 (Supplier PO) unlocks immediately.</span>
+          ℹ <span>Order Confirmation has been generated but hasn't gone out by email yet (still awaiting send/approval, or mail sending isn't configured). If the buyer has confirmed by phone, in person, or any channel other than the portal/email, record it below once the Order Confirmation is approved (and sent to the buyer, when email is on); Step 7 (Supplier PO) then unlocks.</span>
         </div>
         <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-acknowledgment">
           <?= Csrf::field() ?>
           <label>Describe how the buyer confirmed (quote their reply, or note the call/meeting) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
-          <?= $stepBadge('6c') ?><button type="submit" class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Step 7)</button>
+          <?= $stageGateNotice(4, "record the buyer's acknowledgement") ?>
+          <?= $stepBadge('6c') ?><button type="submit"<?= $stageGateDisabled(4) ?> class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Step 7)</button>
         </form>
         <?php endif; ?>
       <?php else: ?>
@@ -2662,7 +2693,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php elseif ($supplierPo && $supplierPo['status'] !== 'signed' && $suppoDocGenerated): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/signed">
         <?= Csrf::field() ?>
-        <?= $stepBadge('7d') ?><button type="submit" class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
+        <?= $stageGateNotice(5, "confirm the supplier signed the PO") ?>
+        <?= $stepBadge('7d') ?><button type="submit"<?= $stageGateDisabled(5) ?> class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
       </form>
     <?php elseif ($supplierPo && $supplierPo['status'] !== 'signed'): ?>
       <p class="muted small">Generate the Supplier PO document above before confirming the supplier's signature — they can't have signed and returned a document that was never sent.</p>
@@ -2692,7 +2724,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <div><span class="k">Production Status</span><span class="v"><?= htmlspecialchars($order['production_status_text'] ?? 'Not yet commenced') ?></span></div>
       <div><span class="k">Est. Shipment</span><span class="v"><?= htmlspecialchars($order['est_shipment_date_text'] ?? 'To Be Confirmed') ?></span></div>
     </div>
-    <p class="muted small">Every update here is logged<?php if ($canViewAuditLog): ?> — <a href="/orders/<?= (int) $order['id'] ?>/audit-log">view update history</a><?php endif; ?>. Changing either field notifies the client (order update + portal).</p>
+    <p class="muted small">Every update here is logged<?php if ($canViewAuditLog): ?> — <a href="/orders/<?= (int) $order['id'] ?>/audit-log">view update history</a><?php endif; ?>. Changing the estimated shipment date notifies the client (order update + portal); the production status is for the team.</p>
     <?php if ($stage4 && $stage4['status'] !== 'locked' && (!$isLockedOrder || $canOverrideLockEdit)): ?>
       <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/production-status">
@@ -2892,7 +2924,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight/clear" onsubmit="return confirm('Mark the freight payment cleared? This unlocks Stage 7 — confirm the funds have actually landed first.');">
         <?= Csrf::field() ?>
         <label>Cleared On<input type="date" name="freight_cleared_at" value="<?= date('Y-m-d') ?>"></label>
-        <?= $stepBadge('9d') ?><button type="submit" class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
+        <?= $stageGateNotice(6, "mark the freight cleared") ?>
+        <?= $stepBadge('9d') ?><button type="submit"<?= $stageGateDisabled(6) ?> class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
       </form>
     <?php else: ?>
       <p class="muted">Record the freight remittance first (Step 9c).</p>
@@ -3129,7 +3162,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label>BL Number *<input type="text" name="bl_number" required></label>
         <label>BL Date<input type="date" name="bl_date" value="<?= date('Y-m-d') ?>"></label>
         <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip"></label>
-        <?= $stepBadge('10f') ?><button type="submit" class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
+        <?= $stageGateNotice(7, "confirm the BL issued") ?>
+        <?= $stepBadge('10f') ?><button type="submit"<?= $stageGateDisabled(7) ?> class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
       </form>
       <?php endif; ?>
     <?php else: ?>
@@ -3264,7 +3298,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
         <?= Csrf::field() ?>
         <label>Cleared On<input type="date" name="balance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
-        <?= $stepBadge('11d') ?><button type="submit" class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
+        <?= $stageGateNotice(8, "mark the balance cleared") ?>
+        <?= $stepBadge('11d') ?><button type="submit"<?= $stageGateDisabled(8) ?> class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
       </form>
       <?php endif; ?>
     <?php else: ?>

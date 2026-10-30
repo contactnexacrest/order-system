@@ -10,7 +10,7 @@ has not had yet, **in filename order**. The two stacks share one database
 design, so the same files serve PHP and Node.
 
 ```bash
-mysql -u <user> -p <database> < docs/migrations/2026-10-30b-team-incentives.sql
+mysql -u <user> -p <database> < docs/migrations/2026-10-30c-ca-view-all-orders.sql
 ```
 
 ## Rules every file follows
@@ -28,7 +28,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-10-30b-team-incentives.sql
 
 Run each file below that the database has not had yet, in this order, then
 deploy the code for both stacks. As of 29 Oct 2026 the live site still
-needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a and 30b**.
+needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b and 30c**.
 
 | # | File | What it does |
 |---|---|---|
@@ -51,6 +51,7 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a and 30b*
 | 17 | `2026-10-29f-zoho-costs-lc-benefits.sql` | Order costs say what they were paid from and remember their Zoho Books expense; LC orders record the money the bank paid under the LC; export benefits remember their Zoho Books journal |
 | 18 | `2026-10-30a-lc-payment-firc.sql` | The LC payment's FIRC / eBRC reference and date, so it joins the INR Settlement Register like the other legs; the setting `zoho_books_restore_checked_at` (when the scheduled Zoho sync last checked the records already in Books — once a day) |
 | 19 | `2026-10-30b-team-incentives.sql` | Team incentives and associates: the settings (switched **off** until management turns them on), each person's incentive role, each order's incentive and people, the payouts by incentive month, the associate register and the client's associate, the marker on the order's commission cost line, and the permissions Manage team incentives (Admin, MD), Pay incentives (Admin, MD, Accounts Executive) and View own incentives |
+| 20 | `2026-10-30c-ca-view-all-orders.sql` | The CA / Chartered Accountant role sees every order, read-only (`view_all_orders`), not only the orders assigned to it |
 
 There is no `2026-10-28b` file; that letter was not used.
 

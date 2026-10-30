@@ -142,10 +142,15 @@ stage's document is:
 Internal documents that never go to the buyer (the Supplier PO and the BL
 Instruction Sheet) only need to be approved. The Quotation has no separate
 gating button: Stage 1 passes by itself the moment the Quotation is
-approved (email off) or sent (email on). If a gating action is refused,
-the message names the document still outstanding — take it through
-[Document Review & Approval](./13-document-review-approval.md) and try
-again.
+approved (email off) or sent (email on).
+
+You see this before you click (owner decision 2026-10-30): while a stage's
+document is not finished, a note above the step's button says what is
+still needed (for example "Proforma Invoice: waiting for approval, then
+sending to the buyer"), with a link to
+[Document Review & Approval](./13-document-review-approval.md), and the
+button stays greyed out. Once the document is finished, the note goes and
+the button works.
 
 ## How files are named and stored on disk
 

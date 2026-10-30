@@ -1027,9 +1027,36 @@ async function show(req, res) {
     };
   }
 
+  // Owner decision 2026-10-30: each stage's gating button says, before the
+  // click, which of the stage's documents still need generating, approving or
+  // sending (the rule stageDocumentBlockedBy() enforces), and stays disabled
+  // until they are done.
+  const stageGate = {};
+  for (const stage of [2, 3, 4, 5, 6, 7, 8]) {
+    stageGate[stage] = await documentGenerationService.stageDocumentGate(orderId, stage);
+  }
+  const stageGateMailOn = await require('../services/emailDispatchService').mailSendingEnabled();
+  const gateEscape = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  const stageGateDisabled = (stage) => (stageGate[stage].length ? ' disabled title="See the note above: this stage\'s document is not finished yet."' : '');
+  const stageGateNotice = (stage, action) => {
+    if (!stageGate[stage].length) return '';
+    const items = stageGate[stage].map((d) => {
+      let todo;
+      if (d.todo === 'generate') todo = 'not generated yet — generate it, then get it approved' + (d.buyer_facing && stageGateMailOn ? ' and sent to the buyer' : '');
+      else if (d.todo === 'approve') todo = 'waiting for approval';
+      else if (d.todo === 'approve_send') todo = 'waiting for approval, then sending to the buyer';
+      else todo = 'approved — waiting to be sent to the buyer';
+      return '<strong>' + gateEscape(d.name) + '</strong>: ' + todo;
+    });
+    return '<p class="review-banner info stage-gate">&#8505; <span>Before you can ' + gateEscape(action) + ': ' + items.join('; ')
+      + '. <a href="/reviews">Open Document Review &amp; Approval</a></span></p>';
+  };
+
   res.renderView(
     'orders/show',
     {
+      stageGateDisabled,
+      stageGateNotice,
       canManageIncentives,
       ...incentiveView,
       vendorBills,

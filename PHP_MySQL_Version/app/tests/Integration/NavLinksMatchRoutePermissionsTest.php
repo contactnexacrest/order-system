@@ -88,7 +88,7 @@ final class NavLinksMatchRoutePermissionsTest extends DbTestCase
         self::assertStringContainsString("href=\"/orders/{$orderId}/disputes\"", $html, 'Export Executive holds respond_to_disputes, which the order-level route accepts');
     }
 
-    public function testCaRoleSeesOnlyItsAssignedOrdersAsLinksOnTheCaPages(): void
+    public function testCaRoleSeesEveryOrderAsALinkOnTheCaPages(): void
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
@@ -101,16 +101,9 @@ final class NavLinksMatchRoutePermissionsTest extends DbTestCase
         ob_start();
         (new CaController())->index([]);
         $html = (string) ob_get_clean();
-        self::assertStringNotContainsString("href=\"/orders/{$orderId}\"", $html, 'the CA (view_orders, not view_all_orders) only opens orders assigned to them');
-
-        // Owner decision (2026-10-28): the CA has view_orders — an order
-        // assigned to them is a real link.
-        \App\Config\Database::connection()->prepare('INSERT INTO order_assignees (order_id, user_id) VALUES (:o, :u)')->execute(['o' => $orderId, 'u' => $caId]);
-        \App\Services\PermissionService::resetCache();
-        ob_start();
-        (new CaController())->index([]);
-        $html = (string) ob_get_clean();
-        self::assertStringContainsString("href=\"/orders/{$orderId}\"", $html);
+        // Owner decision 2026-10-30: the CA holds view_all_orders (read-only) —
+        // every order is a real link, not only those assigned to the CA.
+        self::assertStringContainsString("href=\"/orders/{$orderId}\"", $html, 'the CA opens every order, assigned or not');
 
         ob_start();
         (new CaController())->expenses([]);

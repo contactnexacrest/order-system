@@ -131,7 +131,7 @@ INSERT INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1
 FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'CA / Chartered Accountant'
-  AND p.permission_key IN ('ca_module_view','inr_actual_view','view_cafin','view_orders'); -- view_orders: owner decision 2026-10-28 (read-only, so the CA can open an order and its CAFIN box)
+  AND p.permission_key IN ('ca_module_view','inr_actual_view','view_cafin','view_orders','view_all_orders'); -- view_orders: owner decision 2026-10-28 (read-only, so the CA can open an order and its CAFIN box); view_all_orders: owner decision 2026-10-30 (every order, not only assigned ones)
 
 -- Team incentives (owner decision 2026-10-30): you and the MD manage them,
 -- Accounts pays them, staff see their own. Executive Director is left out of

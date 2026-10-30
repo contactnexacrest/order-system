@@ -1982,3 +1982,16 @@ Reports page; each download is audit-logged (`CAFIN_CSV_EXPORTED`); the file
 name ends in `_INTERNAL`. The CSV helper now leaves a plain negative number
 (e.g. `-1250.50`) as a number instead of quoting it as text. Routes: 487
 (164 GET, 323 POST). Tests: `CafinExportTest` / `cafinExport.test.js`.
+
+## Follow-up (added 2026-10-30): stage document notice, Step 8a hint, CA sees all orders
+
+- Each stage's gating button (Steps 4d, 5e, 6c, 7d, 9d, 10f, 11d) now says
+  before the click which of the stage's documents still need generating,
+  approving or sending, and stays disabled until then
+  (`DocumentGenerationService::stageDocumentGate()` / Node
+  `stageDocumentGate`, the same rule `stageDocumentBlockedBy()` enforces).
+  Tests: `StageDocumentGateNoticeTest` / `stageDocumentGateNotice.test.js`.
+- Step 8a's hint now says only the estimated shipment date notifies the
+  client.
+- The CA / Chartered Accountant role holds `view_all_orders` (read-only):
+  migration `docs/migrations/2026-10-30c-ca-view-all-orders.sql`.

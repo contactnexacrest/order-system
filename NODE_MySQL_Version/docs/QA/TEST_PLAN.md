@@ -57,7 +57,7 @@ through those dedicated suites rather than duplicated here.
 | Accounts Executive (20) | view_cafin, manage_orders, manage_payments, clear_payments, manage_supplier_payments, download_pdf, view_reports, view_all_orders, view_client_email_full, cross_verify_documents, override_buyer_acknowledgment, view/browse product catalog, view_product_pricing, view_archived_orders, ca_module_view, ca_module_manage, inr_actual_view, inr_actual_edit, ca_fy_lock_override |
 | Logistics Executive (10) | manage_orders, manage_shipping, close_orders, generate_documents, download_pdf, cross_verify_documents, override_buyer_acknowledgment, view/browse product catalog, view_archived_orders |
 | Viewer / Auditor (6) | view_reports, view_audit_log, view_product_catalog, view_orders, view_clients, view_all_orders |
-| CA / Chartered Accountant (4) | ca_module_view, inr_actual_view, view_cafin, view_orders (read-only — no order-editing access; sees only orders assigned to them) |
+| CA / Chartered Accountant (5) | ca_module_view, inr_actual_view, view_cafin, view_orders, view_all_orders (read-only — no order-editing access; sees every order, owner decision 2026-10-30) |
 
 63 permissions span 8 categories: admin (11), reports (3), orders (17),
 documents (6), clients (3), catalog (11), ca (9), incentives (3: `manage_incentives`, `pay_incentives` — also Accounts Executive, `view_own_incentives` — also Export, Accounts and Logistics Executive). `_inventory_raw.md` §1
