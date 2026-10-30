@@ -819,7 +819,7 @@
                   {% endfor %}
                 </select>
               </label>
-              <label>Qty<input type="text" name="quantity" value="{{ p.quantity or '' }}"></label>
+              <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="{{ p.quantity or '' }}"></label>
               <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
               <label>Unit
                 <select name="unit">
@@ -828,7 +828,7 @@
                   {% endfor %}
                 </select>
               </label>
-              <label>Unit Price<input type="text" name="unit_price" value="{{ p.unit_price or '' }}"></label>
+              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ p.unit_price or '' }}"></label>
               <label>HS Code<input type="text" name="hs_code" value="{{ p.hs_code }}" list="hs_code_list_edit" required></label>
             </div>
             {% if productReasonRequired %}
@@ -865,7 +865,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Qty<input type="text" name="quantity"></label>
+            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999"></label>
             <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
             <label>Unit
               <select name="unit">
@@ -874,7 +874,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Unit Price<input type="text" name="unit_price"></label>
+            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99"></label>
             <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
           </div>
           {% if productReasonRequired %}

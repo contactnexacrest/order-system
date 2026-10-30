@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const recordCheck = require('../helpers/recordCheck');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companyHolidayRepository = require('../repositories/companyHolidayRepository');
 
@@ -92,6 +93,7 @@ async function update(req, res) {
 
 async function remove(req, res) {
   const id = parseInt(req.params.id, 10);
+  if (await recordCheck.missing(req, res, 'company_holidays', id, '/holidays', 'holiday')) return;
   await companyHolidayRepository.remove(id);
   await auditLogRepository.log(req.user.id, 'HOLIDAY_REMOVED', 'company_holidays', id);
   flash.set(req, 'success', 'Holiday removed.');

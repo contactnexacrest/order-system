@@ -1278,7 +1278,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                   <?php endforeach; ?>
                 </select>
               </label>
-              <label>Qty<input type="text" name="quantity" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>"></label>
+              <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>"></label>
               <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" <?= $p['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
               <label>Unit
                 <select name="unit">
@@ -1288,7 +1288,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                   <?php endforeach; ?>
                 </select>
               </label>
-              <label>Unit Price<input type="text" name="unit_price" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>"></label>
+              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>"></label>
               <label>HS Code<input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" required></label>
             </div>
             <?php if ($__productReasonRequired): ?>
@@ -1325,7 +1325,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                 <?php endforeach; ?>
               </select>
             </label>
-            <label>Qty<input type="text" name="quantity"></label>
+            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999"></label>
             <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
             <label>Unit
               <select name="unit">
@@ -1334,7 +1334,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                 <?php endforeach; ?>
               </select>
             </label>
-            <label>Unit Price<input type="text" name="unit_price"></label>
+            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99"></label>
             <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
           </div>
           <?php if ($__productReasonRequired): ?>

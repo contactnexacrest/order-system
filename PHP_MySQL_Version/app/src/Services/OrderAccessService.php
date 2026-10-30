@@ -73,6 +73,34 @@ final class OrderAccessService
         '#^/ca/export-benefits/(\d+)(?:/|$)#' => 'SELECT order_id FROM ca_export_benefits WHERE id = :id',
     ];
 
+    /**
+     * QA Round 6, R6-N04: the "not found" answer for a staff URL whose
+     * order, document or order-linked record does not exist — so an action
+     * on it never reports success or writes an audit row. Null when the
+     * path is not one of these, or its record exists.
+     */
+    public static function missingRecordForPath(string $path): ?string
+    {
+        $pdo = \App\Config\Database::connection();
+        if (preg_match('#^/(?:orders|reports/order)/(\d+)(?:/|$)#', $path, $m)) {
+            $stmt = $pdo->prepare('SELECT 1 FROM orders WHERE id = :id');
+            $stmt->execute(['id' => (int) $m[1]]);
+            return $stmt->fetchColumn() ? null : 'Order not found.';
+        }
+        $tables = ['#^/documents/(\d+)(?:/|$)#' => 'documents'] + array_combine(array_keys(self::CHILD_ROUTES), array_map(
+            static fn (string $sql): string => (string) preg_replace('#^.*?FROM (\w+).*$#s', '$1', $sql),
+            self::CHILD_ROUTES
+        ));
+        foreach ($tables as $pattern => $table) {
+            if (preg_match($pattern, $path, $m)) {
+                $stmt = $pdo->prepare("SELECT 1 FROM {$table} WHERE id = :id");
+                $stmt->execute(['id' => (int) $m[1]]);
+                return $stmt->fetchColumn() ? null : 'Not found.';
+            }
+        }
+        return null;
+    }
+
     /** @return string|null why this user may not open the order this path belongs to */
     public static function denialReasonForPath(string $path, int $userId, ?int $roleId): ?string
     {

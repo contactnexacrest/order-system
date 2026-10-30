@@ -125,6 +125,12 @@ final class IncentiveController
 
     public function associates(array $params): void
     {
+        // QA Round 6, R6-N07: editing an associate that does not exist is "not found".
+        if (isset($params['id']) && AssociateRepository::find((int) $params['id']) === null) {
+            http_response_code(404);
+            echo 'Associate not found.';
+            return;
+        }
         $associates = AssociateRepository::all();
         $clientsByAssociate = [];
         foreach ($associates as $a) {
@@ -253,6 +259,9 @@ final class IncentiveController
     {
         $user = AuthService::currentUser();
         $clientId = (int) $params['clientId'];
+        if (\App\Helpers\RecordCheck::missing('clients', $clientId, '/associates', 'client link', ['associate_id' => (int) $params['id']])) {
+            return;
+        }
         AssociateRepository::linkClient($clientId, null, null);
         AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_CLIENT_UNLINKED', 'clients', $clientId, 'associate_id', (string) $params['id'], null);
         Flash::set('success', 'Client unlinked from the associate.');
@@ -346,7 +355,7 @@ final class IncentiveController
         IncentiveService::lockDue((int) $user['id']);
         $months = IncentiveRepository::payoutMonths();
         $month = (string) ($_GET['month'] ?? '');
-        if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+        if (!IncentiveService::isMonth($month)) {
             $month = $months[0] ?? IncentiveService::incentiveMonth(date('Y-m-d'), IncentiveService::settings()['cutoff']);
         }
         $rows = IncentiveRepository::payoutsForMonth($month);
@@ -369,6 +378,7 @@ final class IncentiveController
     {
         $user = AuthService::currentUser();
         $month = (string) ($_POST['month'] ?? '');
+        $month = IncentiveService::isMonth($month) ? $month : '';
         $ids = isset($params['payoutId']) ? [(int) $params['payoutId']] : array_map('intval', (array) ($_POST['payout_ids'] ?? []));
         $paidOn = (string) ($_POST['paid_on'] ?? '');
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $paidOn) || $paidOn > date('Y-m-d')) {
@@ -386,6 +396,18 @@ final class IncentiveController
             $tds = isset($params['payoutId']) && is_numeric($_POST['tds_inr'] ?? null) ? (float) $_POST['tds_inr'] : null;
             if ($paidInr <= 0 || ($tds !== null && ($tds < 0 || $tds > $paidInr))) {
                 Flash::set('error', 'Enter the amount paid above 0, and TDS between 0 and that amount.');
+                header('Location: /incentives/payouts?month=' . rawurlencode($month));
+                return;
+            }
+            // QA Round 6, R6-N10: never more than the payout, never before its month.
+            if ($paidInr > (float) $payout['amount_inr'] + 0.005) {
+                Flash::set('error', 'The amount paid cannot be more than the payout (₹' . number_format((float) $payout['amount_inr'], 2) . ').');
+                header('Location: /incentives/payouts?month=' . rawurlencode($month));
+                return;
+            }
+            $earliest = IncentiveService::earliestPaidOn((string) $payout['incentive_month']);
+            if ($paidOn < $earliest) {
+                Flash::set('error', 'The date paid cannot be before ' . \App\Helpers\Dates::short($earliest) . ' for a payout of ' . $payout['incentive_month'] . '.');
                 header('Location: /incentives/payouts?month=' . rawurlencode($month));
                 return;
             }

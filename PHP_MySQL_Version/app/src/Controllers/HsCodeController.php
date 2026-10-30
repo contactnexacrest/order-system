@@ -147,6 +147,9 @@ final class HsCodeController
     public function deleteProductGuideEntry(array $params): void
     {
         $id = (int) ($params['id'] ?? 0);
+        if (\App\Helpers\RecordCheck::missing('hs_code_product_examples', $id, '/hs-codes', 'product guide entry')) {
+            return;
+        }
         $user = AuthService::currentUser();
         HsCodeProductGuideRepository::delete($id);
         AuditLogRepository::log((int) $user['id'], 'HS_CODE_GUIDE_DELETED', 'hs_code_product_examples', $id, null, null, null);
@@ -157,6 +160,9 @@ final class HsCodeController
     public function toggleActive(array $params): void
     {
         $id = (int) ($params['id'] ?? 0);
+        if (\App\Helpers\RecordCheck::missing('hs_codes', $id, '/hs-codes', 'HS code')) {
+            return;
+        }
         $user = AuthService::currentUser();
         HsCodeRepository::toggleActive($id);
         AuditLogRepository::log((int) $user['id'], 'HS_CODE_TOGGLED', 'hs_codes', $id, null, null, null);

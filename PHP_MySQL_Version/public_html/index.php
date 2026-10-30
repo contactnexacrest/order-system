@@ -75,6 +75,24 @@ use App\Middleware\SessionAuth;
 
 $router = new Router();
 
+// QA Round 6, R6-N04: for a signed-in staff member, a page or action of an
+// order, document or order-linked record that does not exist answers 404 —
+// checked after the route's own sign-in / permission / CSRF checks, so a
+// user without the permission is refused as before and never learns
+// whether the record exists.
+$router->beforeHandler(static function (string $path): bool {
+    if (\App\Services\AuthService::currentUser() === null) {
+        return true;
+    }
+    $missing = \App\Services\OrderAccessService::missingRecordForPath($path);
+    if ($missing === null) {
+        return true;
+    }
+    http_response_code(404);
+    echo $missing;
+    return false;
+});
+
 $auth = new AuthController();
 $dashboard = new DashboardController();
 $settings = new SettingsController();

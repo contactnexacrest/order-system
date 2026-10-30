@@ -64,7 +64,9 @@ associates (outside people who introduced a client; see below).
    (salary TDS). Pay an associate against their invoice; the CA advises the
    TDS.
 3. Record each payment: the date, the amount actually paid and any TDS,
-   then **Mark paid**. **Mark all paid** records every due line of the
+   then **Mark paid**. The amount paid cannot be more than the payout, and
+   the date cannot be in the future or before the 1st of the month before
+   the payout's incentive month (QA Round 6, R6-N10). **Mark all paid** records every due line of the
    month at the amounts shown. **Download list (CSV)** gives the list for
    payroll.
 

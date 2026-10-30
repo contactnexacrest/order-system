@@ -451,6 +451,39 @@ const uploadLarge = multer({ storage: multer.memoryStorage(), limits: { fileSize
 // just has to be generous enough not to reject a valid upload first).
 const uploadMedia = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
+// QA Round 6, R6-N05/N07: a record id in a URL (:id, :orderId, ...) is a
+// positive whole number (1-15 digits) — "-1", "0", "1.5", "abc" or a
+// 20-digit id skip the route (404) instead of reaching a query. Port of
+// Router::ID_PATTERN.
+const ID_PATTERN = /^[1-9][0-9]{0,14}$/;
+const ID_PARAMS = ['id', 'addressId', 'amendmentId', 'benefitId', 'billId', 'cancellationId', 'chargeId', 'clientId', 'complaintId',
+  'disputeId', 'documentId', 'emailLogId', 'entryId', 'expenseId', 'fileId', 'imageId', 'orderId', 'payoutId', 'productId',
+  'reportId', 'requestId', 'reviewId', 'roundId', 'supplierId', 'userId'];
+app.param(ID_PARAMS, (req, res, next, value) => (ID_PATTERN.test(String(value)) ? next() : next('route')));
+
+// QA Round 6, R6-N04: for a signed-in staff member, a page or action of an
+// order, document or order-linked record that does not exist answers 404 —
+// placed just before each route's handler, after its own sign-in /
+// permission / CSRF checks, so a user without the permission is refused as
+// before and never learns whether the record exists. Port of the PHP
+// Router::beforeHandler() check in public_html/index.php.
+async function missingRecordGuard(req, res, next) {
+  if (!req.user) return next();
+  try {
+    const missing = await orderAccessService.missingRecordForPath(req.path);
+    if (missing === null) return next();
+    res.status(404).send(missing);
+  } catch (err) {
+    next(err);
+  }
+}
+for (const method of ['get', 'post']) {
+  const register = app[method].bind(app);
+  app[method] = (path, ...handlers) => (handlers.length === 0
+    ? register(path) // app.get('setting') reads a setting
+    : register(path, ...handlers.slice(0, -1), missingRecordGuard, handlers[handlers.length - 1]));
+}
+
 function asyncHandler(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 }

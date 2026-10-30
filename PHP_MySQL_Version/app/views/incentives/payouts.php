@@ -50,8 +50,8 @@ $__payDay = date('j M', strtotime(date('Y-m-t', strtotime($month . '-01'))));
               <?= Csrf::field() ?>
               <input type="hidden" name="month" value="<?= htmlspecialchars($month) ?>">
               <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">
-                <input type="date" name="paid_on" required max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>" aria-label="Paid on" title="Paid on" style="width:10.5em">
-                <input type="number" name="paid_inr" required min="0.01" step="0.01" value="<?= number_format((float) $r['amount_inr'], 2, '.', '') ?>" aria-label="Amount paid (₹)" title="Amount paid (₹)" style="width:8.5em">
+                <input type="date" name="paid_on" required min="<?= \App\Services\IncentiveService::earliestPaidOn((string) $r['incentive_month']) ?>" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>" aria-label="Paid on" title="Paid on" style="width:10.5em">
+                <input type="number" name="paid_inr" required min="0.01" max="<?= number_format((float) $r['amount_inr'], 2, '.', '') ?>" step="0.01" value="<?= number_format((float) $r['amount_inr'], 2, '.', '') ?>" aria-label="Amount paid (₹)" title="Amount paid (₹)" style="width:8.5em">
                 <input type="number" name="tds_inr" min="0" step="0.01" placeholder="TDS ₹" aria-label="TDS (₹)" title="TDS (₹), if any" style="width:7em" data-not-more-than="[name=paid_inr]" data-not-more-than-message="TDS cannot be more than the amount paid.">
                 <button type="submit" class="btn-sm">Mark paid</button>
               </div>
@@ -70,7 +70,7 @@ $__payDay = date('j M', strtotime(date('Y-m-t', strtotime($month . '-01'))));
         <?= Csrf::field() ?>
         <input type="hidden" name="month" value="<?= htmlspecialchars($month) ?>">
         <?php foreach ($__dueIds as $id): ?><input type="hidden" name="payout_ids[]" value="<?= $id ?>"><?php endforeach; ?>
-        <label class="small">Paid on <input type="date" name="paid_on" required max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
+        <label class="small">Paid on <input type="date" name="paid_on" required min="<?= \App\Services\IncentiveService::earliestPaidOn($month) ?>" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
         <button type="submit" class="btn-sm">Mark all paid</button>
       </form>
     <?php endif; ?>

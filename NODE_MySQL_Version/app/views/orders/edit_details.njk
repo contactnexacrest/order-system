@@ -98,13 +98,13 @@
           <input type="text" name="est_lead_time_text" value="{{ order.est_lead_time_text or '' }}" placeholder="e.g. 45-60 days from advance receipt">
         </label>
         <label>Production Lead Time Min (days) <small class="muted">(internal only, not shown on documents)</small>
-          <input type="number" min="0" name="lead_time_min_days" value="{{ order.lead_time_min_days or '' }}" placeholder="e.g. 45">
+          <input type="number" min="0" data-not-more-than="[name=lead_time_max_days]" data-not-more-than-message="The minimum cannot be more than the maximum." name="lead_time_min_days" value="{{ order.lead_time_min_days or '' }}" placeholder="e.g. 45">
         </label>
         <label>Production Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
           <input type="number" min="0" name="lead_time_max_days" value="{{ order.lead_time_max_days or '' }}" placeholder="e.g. 60">
         </label>
         <label>Sailing Lead Time Min (days) <small class="muted">(internal only — auto-suggested from {% if permissions.manage_ports %}<a href="/port-routes" target="_blank">Port Routes</a>{% else %}Port Routes{% endif %} once both ports are picked, still editable)</small>
-          <input type="number" min="0" name="sailing_lead_time_min_days" id="sailing-lead-time-min" value="{{ order.sailing_lead_time_min_days or '' }}" placeholder="e.g. 18">
+          <input type="number" min="0" data-not-more-than="[name=sailing_lead_time_max_days]" data-not-more-than-message="The minimum cannot be more than the maximum." name="sailing_lead_time_min_days" id="sailing-lead-time-min" value="{{ order.sailing_lead_time_min_days or '' }}" placeholder="e.g. 18">
         </label>
         <label>Sailing Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
           <input type="number" min="0" name="sailing_lead_time_max_days" id="sailing-lead-time-max" value="{{ order.sailing_lead_time_max_days or '' }}" placeholder="e.g. 24">
@@ -118,7 +118,7 @@
         <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="{{ order.estimated_total_cbm or '' }}"></label>
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="{{ order.estimated_package_count or '' }}" placeholder="e.g. 45 crates"></label>
         <label>Gross Weight (kg)<input type="text" name="estimated_gross_weight_kg" value="{{ order.estimated_gross_weight_kg or '' }}"></label>
-        <label>Net Weight (kg)<input type="text" name="estimated_net_weight_kg" value="{{ order.estimated_net_weight_kg or '' }}"></label>
+        <label>Net Weight (kg)<input type="text" data-not-more-than="[name=estimated_gross_weight_kg]" data-not-more-than-message="The net weight cannot be more than the gross weight." name="estimated_net_weight_kg" value="{{ order.estimated_net_weight_kg or '' }}"></label>
         <label class="full">Package Type
           <select name="estimated_package_type">
             {% for o in packageTypes %}

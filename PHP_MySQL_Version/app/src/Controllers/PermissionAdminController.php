@@ -72,6 +72,9 @@ final class PermissionAdminController
     {
         $user = AuthService::currentUser();
         $id = (int) ($params['id'] ?? 0);
+        if (\App\Helpers\RecordCheck::missing('user_permissions', $id, '/admin/permissions', 'extra permission')) {
+            return;
+        }
         // The affected user's own id is only readable off this row before
         // it's deleted — captured into the audit row (entity_id is this
         // grant row's own id, which no longer resolves once it's gone).

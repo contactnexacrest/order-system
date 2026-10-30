@@ -140,8 +140,8 @@
           </select>
         </label>
         <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required></label>
-        <label>Amount Paid<input type="text" name="amount" placeholder="e.g. 12500.00"></label>
-        <label>Date Paid<input type="date" name="payment_date"></label>
+        <label>Amount Paid<input type="number" name="amount" min="0.01" max="999999999999.99" step="0.01" placeholder="e.g. 12500.00"></label>
+        <label>Date Paid<input type="date" name="payment_date" max="<?= date('Y-m-d') ?>"></label>
         <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
         <label>Payment Screenshot / Proof of Payment (optional)<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png"></label>
       </div>

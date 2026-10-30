@@ -62,6 +62,22 @@ final class IncentiveService
         ];
     }
 
+    /** QA Round 6, R6-N29: a real incentive month, YYYY-MM with MM 01-12. */
+    public static function isMonth(string $month): bool
+    {
+        return (bool) preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month);
+    }
+
+    /**
+     * QA Round 6, R6-N10: the earliest date a payout of this incentive month
+     * can have been paid — the 1st of the month before it (the cycle runs
+     * from the cut-off day of the previous month).
+     */
+    public static function earliestPaidOn(string $month): string
+    {
+        return self::isMonth($month) ? date('Y-m-01', (int) strtotime($month . '-01 -1 month')) : '2000-01-01';
+    }
+
     /** The incentive month (YYYY-MM) a full payment on $date belongs to. */
     public static function incentiveMonth(string $date, string $cutoff): string
     {

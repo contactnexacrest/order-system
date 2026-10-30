@@ -67,6 +67,25 @@ const CHILD_ROUTES = [
   [/^\/ca\/export-benefits\/(\d+)(?:\/|$)/, 'SELECT order_id FROM ca_export_benefits WHERE id = :id'],
 ];
 
+/**
+ * QA Round 6, R6-N04: the "not found" answer for a staff URL whose order,
+ * document or order-linked record does not exist — so an action on it
+ * never reports success or writes an audit row. Null when the path is not
+ * one of these, or its record exists.
+ *
+ * @returns {Promise<string|null>}
+ */
+async function missingRecordForPath(path) {
+  let m = /^\/(?:orders|reports\/order)\/(\d+)(?:\/|$)/.exec(path);
+  if (m) return (await db.queryOne('SELECT 1 AS found FROM orders WHERE id = :id', { id: parseInt(m[1], 10) })) ? null : 'Order not found.';
+  const tables = [[/^\/documents\/(\d+)(?:\/|$)/, 'documents'], ...CHILD_ROUTES.map(([pattern, sql]) => [pattern, /FROM (\w+)/.exec(sql)[1]])];
+  for (const [pattern, table] of tables) {
+    m = pattern.exec(path);
+    if (m) return (await db.queryOne(`SELECT 1 AS found FROM ${table} WHERE id = :id`, { id: parseInt(m[1], 10) })) ? null : 'Not found.';
+  }
+  return null;
+}
+
 /** @returns {Promise<string|null>} why this user may not open the order this path belongs to */
 async function denialReasonForPath(path, userId, permissions) {
   const orderId = await orderIdForPath(path);
@@ -130,4 +149,4 @@ function visibilitySql(userId, permissions, alias = 'o') {
   return { sql, params };
 }
 
-module.exports = { denialReason, orderIdForPath, denialReasonForPath, orderLinkChecker, orderVisibilityChecker, visibleRows, visibilitySql };
+module.exports = { denialReason, missingRecordForPath, orderIdForPath, denialReasonForPath, orderLinkChecker, orderVisibilityChecker, visibleRows, visibilitySql };

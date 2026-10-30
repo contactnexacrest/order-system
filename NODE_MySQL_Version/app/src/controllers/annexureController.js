@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const recordCheck = require('../helpers/recordCheck');
 const orderStorage = require('../helpers/orderStorage');
 const orderAnnexureRepository = require('../repositories/orderAnnexureRepository');
 const orderAnnexureTermsRepository = require('../repositories/orderAnnexureTermsRepository');
@@ -151,6 +152,7 @@ async function updateProduct(req, res) {
 async function deleteProduct(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const productId = parseInt(req.params.productId, 10);
+  if (await recordCheck.missing(req, res, 'order_annexure_products', productId, `/orders/${orderId}/annexure`, 'product entry', { order_id: orderId })) return;
   await orderAnnexureRepository.deleteProduct(productId);
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
@@ -193,6 +195,12 @@ async function uploadImage(req, res) {
 async function removeImage(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const imageId = parseInt(req.params.imageId, 10);
+  // QA Round 6, R6-N04: only an image of this order's annexure.
+  if (!(await recordCheck.found('SELECT 1 AS found FROM order_annexure_images i JOIN order_annexure_products p ON p.id = i.order_annexure_product_id WHERE i.id = :i AND p.order_id = :o', { i: imageId, o: orderId }))) {
+    flash.set(req, 'error', 'That image was not found — it may have been removed already. Nothing was changed.');
+    res.redirect(`/orders/${orderId}/annexure`);
+    return;
+  }
   await orderAnnexureRepository.removeImage(imageId);
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.

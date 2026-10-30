@@ -124,8 +124,8 @@ async function order(req, res) {
 async function aggregate(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
-  const stageId = req.query.stage_id ? parseInt(req.query.stage_id, 10) : null;
-  const incotermId = req.query.incoterm_id ? parseInt(req.query.incoterm_id, 10) : null;
+  const stageId = req.query.stage_id ? (parseInt(req.query.stage_id, 10) || null) : null;
+  const incotermId = req.query.incoterm_id ? (parseInt(req.query.incoterm_id, 10) || null) : null;
   const country = str(req.query.country) || null;
 
   const rows = await reportRepository.aggregate(dateFrom, dateTo, stageId, incotermId, country, orderAccessService.visibilitySql(req.user.id, req.permissions));

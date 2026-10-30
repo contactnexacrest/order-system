@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const recordCheck = require('../helpers/recordCheck');
 const { scalarString } = require('../helpers/input');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const permissionRepository = require('../repositories/permissionRepository');
@@ -63,6 +64,7 @@ async function grantOverride(req, res) {
 async function removeOverride(req, res) {
   const user = req.user;
   const id = parseInt(req.params.id, 10) || 0;
+  if (await recordCheck.missing(req, res, 'user_permissions', id, '/admin/permissions', 'extra permission')) return;
   // The affected user's own id is only readable off this row before it's
   // deleted — captured into the audit row (entity_id is this grant row's
   // own id, which no longer resolves once it's gone).

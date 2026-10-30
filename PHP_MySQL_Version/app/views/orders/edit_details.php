@@ -99,13 +99,13 @@
           <input type="text" name="est_lead_time_text" value="<?= htmlspecialchars($order['est_lead_time_text'] ?? '') ?>" placeholder="e.g. 45-60 days from advance receipt">
         </label>
         <label>Production Lead Time Min (days) <small class="muted">(internal only, not shown on documents)</small>
-          <input type="number" min="0" name="lead_time_min_days" value="<?= htmlspecialchars((string) ($order['lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 45">
+          <input type="number" min="0" data-not-more-than="[name=lead_time_max_days]" data-not-more-than-message="The minimum cannot be more than the maximum." name="lead_time_min_days" value="<?= htmlspecialchars((string) ($order['lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 45">
         </label>
         <label>Production Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
           <input type="number" min="0" name="lead_time_max_days" value="<?= htmlspecialchars((string) ($order['lead_time_max_days'] ?? '')) ?>" placeholder="e.g. 60">
         </label>
         <label>Sailing Lead Time Min (days) <small class="muted">(internal only — auto-suggested from <?= \App\Helpers\PermittedLinks::currentUserMayOpen('/port-routes') ? '<a href="/port-routes" target="_blank">Port Routes</a>' : 'Port Routes' ?> once both ports are picked, still editable)</small>
-          <input type="number" min="0" name="sailing_lead_time_min_days" id="sailing-lead-time-min" value="<?= htmlspecialchars((string) ($order['sailing_lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 18">
+          <input type="number" min="0" data-not-more-than="[name=sailing_lead_time_max_days]" data-not-more-than-message="The minimum cannot be more than the maximum." name="sailing_lead_time_min_days" id="sailing-lead-time-min" value="<?= htmlspecialchars((string) ($order['sailing_lead_time_min_days'] ?? '')) ?>" placeholder="e.g. 18">
         </label>
         <label>Sailing Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
           <input type="number" min="0" name="sailing_lead_time_max_days" id="sailing-lead-time-max" value="<?= htmlspecialchars((string) ($order['sailing_lead_time_max_days'] ?? '')) ?>" placeholder="e.g. 24">
@@ -119,7 +119,7 @@
         <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="<?= htmlspecialchars((string) ($order['estimated_total_cbm'] ?? '')) ?>"></label>
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="<?= htmlspecialchars((string) ($order['estimated_package_count'] ?? '')) ?>" placeholder="e.g. 45 crates"></label>
         <label>Gross Weight (kg)<input type="text" name="estimated_gross_weight_kg" value="<?= htmlspecialchars((string) ($order['estimated_gross_weight_kg'] ?? '')) ?>"></label>
-        <label>Net Weight (kg)<input type="text" name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($order['estimated_net_weight_kg'] ?? '')) ?>"></label>
+        <label>Net Weight (kg)<input type="text" data-not-more-than="[name=estimated_gross_weight_kg]" data-not-more-than-message="The net weight cannot be more than the gross weight." name="estimated_net_weight_kg" value="<?= htmlspecialchars((string) ($order['estimated_net_weight_kg'] ?? '')) ?>"></label>
         <label class="full">Package Type
           <select name="estimated_package_type">
             <?php foreach ($packageTypes as $o): ?>

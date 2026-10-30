@@ -102,6 +102,9 @@ final class HolidayController
     public function delete(array $params): void
     {
         $id = (int) ($params['id'] ?? 0);
+        if (\App\Helpers\RecordCheck::missing('company_holidays', $id, '/holidays', 'holiday')) {
+            return;
+        }
         $user = AuthService::currentUser();
         CompanyHolidayRepository::delete($id);
         AuditLogRepository::log((int) $user['id'], 'HOLIDAY_REMOVED', 'company_holidays', $id);

@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const fieldValidator = require('../helpers/fieldValidator');
 const orderStorage = require('../helpers/orderStorage');
 const crypto = require('crypto');
 
@@ -533,6 +534,14 @@ async function reportPayment(req, res) {
   const transactionRef = String(req.body.transaction_ref || '').trim();
   if (!['advance', 'balance', 'freight'].includes(paymentType) || transactionRef === '') {
     flash.set(req, 'error', 'Select which payment this is for and enter the transaction ID/UTR.');
+    res.redirect(`/client/orders/${orderId}`);
+    return;
+  }
+  // QA Round 6, R6-N19/N20/N21: an amount above 0 that can be stored, and a
+  // real payment date that is not in the future.
+  const reportError = fieldValidator.reportedPayment(req.body.amount, req.body.payment_date);
+  if (reportError !== null) {
+    flash.set(req, 'error', reportError);
     res.redirect(`/client/orders/${orderId}`);
     return;
   }

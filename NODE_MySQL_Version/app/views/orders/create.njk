@@ -80,13 +80,13 @@
           <input type="text" name="est_lead_time_text" value="{{ old.est_lead_time_text or '' }}" placeholder="e.g. 45-60 days from advance receipt">
         </label>
         <label>Production Lead Time Min (days) <small class="muted">(internal only, not shown on documents)</small>
-          <input type="number" min="0" name="lead_time_min_days" value="{{ old.lead_time_min_days or '' }}" placeholder="e.g. 45">
+          <input type="number" min="0" data-not-more-than="[name=lead_time_max_days]" data-not-more-than-message="The minimum cannot be more than the maximum." name="lead_time_min_days" value="{{ old.lead_time_min_days or '' }}" placeholder="e.g. 45">
         </label>
         <label>Production Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
           <input type="number" min="0" name="lead_time_max_days" value="{{ old.lead_time_max_days or '' }}" placeholder="e.g. 60">
         </label>
         <label>Sailing Lead Time Min (days) <small class="muted">(internal only — auto-suggested from {% if permissions.manage_ports %}<a href="/port-routes" target="_blank">Port Routes</a>{% else %}Port Routes{% endif %} once both ports are picked, still editable)</small>
-          <input type="number" min="0" name="sailing_lead_time_min_days" id="sailing-lead-time-min" value="{{ old.sailing_lead_time_min_days or '' }}" placeholder="e.g. 18">
+          <input type="number" min="0" data-not-more-than="[name=sailing_lead_time_max_days]" data-not-more-than-message="The minimum cannot be more than the maximum." name="sailing_lead_time_min_days" id="sailing-lead-time-min" value="{{ old.sailing_lead_time_min_days or '' }}" placeholder="e.g. 18">
         </label>
         <label>Sailing Lead Time Max (days) <small class="muted">(internal only, not shown on documents)</small>
           <input type="number" min="0" name="sailing_lead_time_max_days" id="sailing-lead-time-max" value="{{ old.sailing_lead_time_max_days or '' }}" placeholder="e.g. 24">
@@ -100,7 +100,7 @@
         <label>Total CBM (m&sup3;)<input type="text" name="estimated_total_cbm" value="{{ old.estimated_total_cbm or '' }}"></label>
         <label>No. of Packages / Crates<input type="text" name="estimated_package_count" value="{{ old.estimated_package_count or '' }}" placeholder="e.g. 45 crates"></label>
         <label>Gross Weight, kg <span class="tag-hint">product + packing</span><input type="text" name="estimated_gross_weight_kg" value="{{ old.estimated_gross_weight_kg or '' }}"></label>
-        <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" name="estimated_net_weight_kg" value="{{ old.estimated_net_weight_kg or '' }}"></label>
+        <label>Net Weight, kg <span class="tag-hint">product only</span><input type="text" data-not-more-than="[name=estimated_gross_weight_kg]" data-not-more-than-message="The net weight cannot be more than the gross weight." name="estimated_net_weight_kg" value="{{ old.estimated_net_weight_kg or '' }}"></label>
         <label class="full">Package Type
           <select name="estimated_package_type">
             {% for o in packageTypes %}
@@ -141,7 +141,7 @@
               {% endfor %}
             </select>
           </label>
-          <label>Qty<input type="text" name="product_quantity[]" value="{{ old.product_quantity[loop.index0] or '' if old.product_quantity else '' }}" placeholder="e.g. 100"></label>
+          <label>Qty<input type="text" name="product_quantity[]" data-max-decimals="3" data-max-value="99999999999.999" value="{{ old.product_quantity[loop.index0] or '' if old.product_quantity else '' }}" placeholder="e.g. 100"></label>
           <label>Unit
             {% set unitVal = (old.product_unit[loop.index0] or '') if old.product_unit else '' %}
             <select name="product_unit[]">
@@ -150,7 +150,7 @@
               {% endfor %}
             </select>
           </label>
-          <label>Unit Price<input type="text" name="product_unit_price[]" value="{{ old.product_unit_price[loop.index0] or '' if old.product_unit_price else '' }}" placeholder="e.g. 45.00"></label>
+          <label>Unit Price<input type="text" name="product_unit_price[]" data-max-decimals="2" data-max-value="999999999999.99" value="{{ old.product_unit_price[loop.index0] or '' if old.product_unit_price else '' }}" placeholder="e.g. 45.00"></label>
           <label>HS Code<input type="text" name="product_hs_code[]" value="{{ old.product_hs_code[loop.index0] or '' if old.product_hs_code else '' }}" list="hs_code_list" placeholder="Type to search…" autocomplete="off" required></label>
           <div class="product-row-actions">
             <button type="button" class="btn-sm btn-secondary duplicate-row" title="Clone this line with its values — handy when only the name or dimensions differ">Duplicate</button>

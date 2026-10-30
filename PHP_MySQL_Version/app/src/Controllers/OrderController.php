@@ -445,9 +445,10 @@ final class OrderController
             if (trim((string) $description) === '') {
                 continue;
             }
-            $quantityError = OrderLineValidator::checkQuantity(
+            $quantityError = OrderLineValidator::checkLine(
                 (string) ($_POST['product_quantity'][$i] ?? ''),
-                !empty($_POST['product_quantity_tbc'][$i])
+                !empty($_POST['product_quantity_tbc'][$i]),
+                (string) ($_POST['product_unit_price'][$i] ?? '')
             );
             if ($quantityError !== null) {
                 Flash::set('error', 'Product line ' . ($i + 1) . ": {$quantityError}");
@@ -738,6 +739,13 @@ final class OrderController
             return;
         }
 
+        // QA Round 6, R6-N14/N15: quantity, price and line value within what can be stored.
+        if ($lineError = OrderLineValidator::checkLine((string) ($_POST['quantity'] ?? ''), !empty($_POST['quantity_is_tbc']), (string) ($_POST['unit_price'] ?? ''))) {
+            Flash::set('error', 'Product line: ' . $lineError);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
@@ -783,6 +791,13 @@ final class OrderController
         }
         if ($hsCode === '' || !HsCodeRepository::isActiveCode($hsCode)) {
             Flash::set('error', "HS code \"{$hsCode}\" is not on the HS Code master list — add it there first (HS Codes, under Admin).");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        // QA Round 6, R6-N14/N15: quantity, price and line value within what can be stored.
+        if ($lineError = OrderLineValidator::checkLine((string) ($_POST['quantity'] ?? ''), !empty($_POST['quantity_is_tbc']), (string) ($_POST['unit_price'] ?? ''))) {
+            Flash::set('error', 'Product line: ' . $lineError);
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -2917,7 +2932,7 @@ final class OrderController
             $error = 'Enter the shipping bill number (up to 30 characters).';
         } elseif (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || $date > date('Y-m-d')) {
             $error = 'Enter the shipping bill date (not in the future).';
-        } elseif (!is_numeric($rate) || (float) $rate <= 0 || (float) $rate > 100000) {
+        } elseif (!is_numeric($rate) || round((float) $rate, 4) <= 0 || (float) $rate > 100000) { // QA Round 6, R6-N23: at least 0.0001 once stored
             $error = 'Enter the customs exchange rate printed on the shipping bill (rupees for 1 ' . ($order['currency_code'] ?? 'unit') . ').';
         }
         if ($error !== null) {
@@ -3084,6 +3099,12 @@ final class OrderController
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        // QA Round 6, R6-N04: nothing to remove is not a removal.
+        if (((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_inr_actual'] ?? null) === null) {
+            Flash::set('error', 'No advance INR actual amount is recorded on this order — nothing was removed.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'advance_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;
@@ -3126,6 +3147,12 @@ final class OrderController
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        // QA Round 6, R6-N04: nothing to remove is not a removal.
+        if (((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_inr_actual'] ?? null) === null) {
+            Flash::set('error', 'No balance INR actual amount is recorded on this order — nothing was removed.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'balance_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;
@@ -3168,6 +3195,12 @@ final class OrderController
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        // QA Round 6, R6-N04: nothing to remove is not a removal.
+        if (((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_inr_actual'] ?? null) === null) {
+            Flash::set('error', 'No freight INR actual amount is recorded on this order — nothing was removed.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         if (!CaFyLockGuard::allow((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null, (int) $user['id'], $roleId, 'order_payment_status', $orderId, 'freight_inr_actual')) {
             header("Location: /orders/{$orderId}");
             return;

@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const recordCheck = require('../helpers/recordCheck');
 const path = require('path');
 const crypto = require('crypto');
 const env = require('../config/env');
@@ -54,6 +55,7 @@ async function createDesignation(req, res) {
 
 async function toggleDesignation(req, res) {
   const id = parseInt(req.params.id, 10) || 0;
+  if (await recordCheck.missing(req, res, 'designations', id, '/signatories', 'designation')) return;
   await signatoryRepository.toggleDesignationActive(id);
   // External QA report N-08: this action never reached the audit log, so
   // it never notified anyone either.
@@ -113,6 +115,7 @@ async function deleteDesignation(req, res) {
 
 async function setEligibility(req, res) {
   const userId = parseInt(req.params.id, 10) || 0;
+  if (await recordCheck.missing(req, res, 'users', userId, '/signatories', 'user')) return;
   const eligible = String(req.body.eligible || '0') === '1';
   const designationId = req.body.designation_id !== undefined && req.body.designation_id !== '' ? parseInt(req.body.designation_id, 10) : null;
 
@@ -185,6 +188,7 @@ async function uploadUserAsset(req, res) {
 
 async function deactivateUserAsset(req, res) {
   const id = parseInt(req.params.id, 10) || 0;
+  if (await recordCheck.missing(req, res, 'user_signature_assets', id, '/signatories', 'signature or seal')) return;
   await signatoryRepository.deactivateUserAsset(id);
   // External QA report N-08: this action never reached the audit log, so
   // it never notified anyone either.
@@ -219,6 +223,7 @@ async function setGlobalDefault(req, res) {
 
 async function setDocumentTypeDefault(req, res) {
   const documentTypeId = parseInt(req.params.id, 10) || 0;
+  if (await recordCheck.missing(req, res, 'document_types', documentTypeId, '/signatories', 'document type')) return;
   const userId = req.body.user_id !== undefined && req.body.user_id !== '' ? parseInt(req.body.user_id, 10) : null;
   const useDesignationSeal = String(req.body.use_designation_seal || '0') === '1';
 

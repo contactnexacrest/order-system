@@ -48,6 +48,55 @@ final class OrderLineValidator
         if ((float) $value < 0) {
             return "unit price must not be negative (got \"{$rawValue}\")";
         }
+        // QA Round 6, R6-N14/N15: what the DECIMAL(14,2) column can hold —
+        // no more than 2 decimals (0.0001 was stored as 0.00) and no more
+        // than 999,999,999,999.99 (a larger price was an HTTP 500).
+        if (self::decimals($value) > 2) {
+            return "unit price can have at most 2 decimals (got \"{$rawValue}\")";
+        }
+        if ((float) $value > self::MAX_PRICE) {
+            return 'unit price can be at most ' . number_format(self::MAX_PRICE, 2) . " (got \"{$rawValue}\")";
+        }
         return null;
+    }
+
+    /** QA Round 6, R6-N14: DECIMAL(14,2) for price and line value, DECIMAL(14,3) for quantity. */
+    public const MAX_PRICE = 999999999999.99;
+    public const MAX_QUANTITY = 99999999999.999;
+
+    /**
+     * QA Round 6, R6-N14/N15: one line's quantity, unit price and line
+     * value (quantity x price) — every place a product line is saved
+     * (order create, add line, edit line) uses this.
+     */
+    public static function checkLine(string $rawQuantity, bool $isTbc, string $rawPrice): ?string
+    {
+        $error = self::checkQuantity($rawQuantity, $isTbc) ?? self::checkUnitPrice($rawPrice);
+        if ($error !== null) {
+            return $error;
+        }
+        $quantity = trim($rawQuantity);
+        if ($quantity !== '' && !$isTbc) {
+            if (self::decimals($quantity) > 3) {
+                return "quantity can have at most 3 decimals (got \"{$rawQuantity}\")";
+            }
+            if ((float) $quantity > self::MAX_QUANTITY) {
+                return 'quantity can be at most ' . number_format(self::MAX_QUANTITY, 3) . " (got \"{$rawQuantity}\")";
+            }
+            if (trim($rawPrice) !== '' && (float) $quantity * (float) trim($rawPrice) > self::MAX_PRICE) {
+                return 'the line value (quantity x unit price) can be at most ' . number_format(self::MAX_PRICE, 2);
+            }
+        }
+        return null;
+    }
+
+    private static function decimals(string $value): int
+    {
+        $value = strtolower($value);
+        if (str_contains($value, 'e')) {
+            return 99;
+        }
+        $dot = strpos($value, '.');
+        return $dot === false ? 0 : strlen(rtrim(substr($value, $dot + 1), '0'));
     }
 }

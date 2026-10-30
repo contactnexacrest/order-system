@@ -50,6 +50,29 @@ final class FieldValidator
         return null;
     }
 
+    /**
+     * QA Round 6, R6-N19/N20/N21: a payment the buyer reports (portal or
+     * e-mailed link) — the amount, if given, above 0 and storable; the date,
+     * if given, a real day that is not in the future.
+     */
+    public static function reportedPayment(string $amount, string $date): ?string
+    {
+        $amount = trim($amount);
+        $date = trim($date);
+        if ($amount !== '') {
+            if (!is_numeric($amount)) {
+                return 'The amount paid must be a number.';
+            }
+            if ($error = self::moneyAmount((float) $amount, 'The amount paid')) {
+                return $error;
+            }
+        }
+        if ($date !== '' && (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || $date > date('Y-m-d'))) {
+            return 'Enter the date you paid (today or earlier).';
+        }
+        return null;
+    }
+
     public static function wholeNumber(string $value, string $label, int $min = 0): ?string
     {
         if ($value === '') {
@@ -108,6 +131,17 @@ final class FieldValidator
         ] as $name => $label) {
             if ($error = self::decimal($value($name), $label)) {
                 return $error;
+            }
+        }
+        // QA Round 6, R6-N28: a range's minimum is not above its maximum,
+        // and the net weight is not above the gross weight.
+        foreach ([
+            ['lead_time_min_days', 'lead_time_max_days', 'The production lead time minimum cannot be more than its maximum.'],
+            ['sailing_lead_time_min_days', 'sailing_lead_time_max_days', 'The sailing time minimum cannot be more than its maximum.'],
+            ['estimated_net_weight_kg', 'estimated_gross_weight_kg', 'The net weight cannot be more than the gross weight.'],
+        ] as [$low, $high, $message]) {
+            if ($value($low) !== '' && $value($high) !== '' && (float) $value($low) > (float) $value($high)) {
+                return $message;
             }
         }
         return null;

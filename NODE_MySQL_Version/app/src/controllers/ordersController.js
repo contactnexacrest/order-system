@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const recordCheck = require('../helpers/recordCheck');
 const orderStorage = require('../helpers/orderStorage');
 const JSZip = require('jszip');
 const db = require('../config/db');
@@ -289,7 +290,7 @@ async function duplicateOrder(req, res) {
 }
 
 async function create(req, res) {
-  const preselectedClientId = req.query.client_id ? parseInt(req.query.client_id, 10) : null;
+  const preselectedClientId = req.query.client_id ? (parseInt(req.query.client_id, 10) || null) : null;
   const incoterms = await lookupRepository.incoterms();
 
   // Batch 3 #4 — if we're showing this page again after a validation failure on submit,
@@ -452,7 +453,7 @@ async function store(req, res) {
     const quantityTbcInput = body.product_quantity_tbc || {};
     for (let i = 0; i < descriptions.length; i++) {
       if (str(descriptions[i]) === '') continue;
-      const quantityError = orderLineValidator.checkQuantity(quantitiesInput[i], !!quantityTbcInput[i]);
+      const quantityError = orderLineValidator.checkLine(quantitiesInput[i], !!quantityTbcInput[i], unitPricesInput[i]);
       if (quantityError) {
         flash.set(req, 'error', `Product line ${i + 1}: ${quantityError}`);
         flash.setOld(req, body);
@@ -729,6 +730,14 @@ async function addProduct(req, res) {
     return;
   }
 
+  // QA Round 6, R6-N14/N15: quantity, price and line value within what can be stored.
+  const lineError = orderLineValidator.checkLine(str(body.quantity), !!body.quantity_is_tbc, str(body.unit_price));
+  if (lineError) {
+    flash.set(req, 'error', `Product line: ${lineError}`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
   const reason = str(body.reason);
   if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'order_products', orderId, 'product_added'))) {
     res.redirect(`/orders/${orderId}`);
@@ -770,6 +779,14 @@ async function updateProduct(req, res) {
   }
   if (hsCode === '' || !(await hsCodeRepository.isActiveCode(hsCode))) {
     flash.set(req, 'error', `HS code "${hsCode}" is not on the HS Code master list — add it there first (HS Codes, under Admin).`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  // QA Round 6, R6-N14/N15: quantity, price and line value within what can be stored.
+  const lineError = orderLineValidator.checkLine(str(body.quantity), !!body.quantity_is_tbc, str(body.unit_price));
+  if (lineError) {
+    flash.set(req, 'error', `Product line: ${lineError}`);
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -1995,6 +2012,11 @@ async function updateProductionStatus(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
   const before = await orderRepository.find(orderId);
+  // QA Round 6, R6-N06: a missing order is "not found", not a crash.
+  if (!before) {
+    res.status(404).send('Order not found.');
+    return;
+  }
   // QA Round 5, R5-01: on a locked (fully settled) order this is a
   // locked-order edit like any other — "Override locked data", a reason,
   // and an ORDER_EDITED_WHILE_LOCKED audit row.
@@ -3017,7 +3039,7 @@ async function recordShippingBill(req, res) {
     error = 'Enter the shipping bill number (up to 30 characters).';
   } else if (!isRealDate || date > todayYmd()) {
     error = 'Enter the shipping bill date (not in the future).';
-  } else if (!/^\d+(\.\d+)?$/.test(rate) || Number(rate) <= 0 || Number(rate) > 100000) {
+  } else if (!/^\d+(\.\d+)?$/.test(rate) || Math.round(Number(rate) * 10000) <= 0 || Number(rate) > 100000) { // QA Round 6, R6-N23: at least 0.0001 once stored
     error = `Enter the customs exchange rate printed on the shipping bill (rupees for 1 ${order.currency_code || 'unit'}).`;
   }
   if (error !== null) {
@@ -3185,6 +3207,12 @@ async function recordAdvanceInrActual(req, res) {
 async function deleteAdvanceInrActual(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  // QA Round 6, R6-N04: nothing to remove is not a removal.
+  if ((((await orderPaymentStatusRepository.find(orderId)) || {}).advance_inr_actual ?? null) === null) {
+    flash.set(req, 'error', 'No advance INR actual amount is recorded on this order — nothing was removed.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).advance_cleared_at ?? null, 'order_payment_status', orderId, 'advance_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;
@@ -3223,6 +3251,12 @@ async function recordBalanceInrActual(req, res) {
 async function deleteBalanceInrActual(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  // QA Round 6, R6-N04: nothing to remove is not a removal.
+  if ((((await orderPaymentStatusRepository.find(orderId)) || {}).balance_inr_actual ?? null) === null) {
+    flash.set(req, 'error', 'No balance INR actual amount is recorded on this order — nothing was removed.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).balance_cleared_at ?? null, 'order_payment_status', orderId, 'balance_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;
@@ -3261,6 +3295,12 @@ async function recordFreightInrActual(req, res) {
 async function deleteFreightInrActual(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  // QA Round 6, R6-N04: nothing to remove is not a removal.
+  if ((((await orderPaymentStatusRepository.find(orderId)) || {}).freight_inr_actual ?? null) === null) {
+    flash.set(req, 'error', 'No freight INR actual amount is recorded on this order — nothing was removed.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   if (!(await caFyLockGuard.allow(req, ((await orderPaymentStatusRepository.find(orderId)) || {}).freight_cleared_at ?? null, 'order_payment_status', orderId, 'freight_inr_actual'))) {
     res.redirect(`/orders/${orderId}`);
     return;

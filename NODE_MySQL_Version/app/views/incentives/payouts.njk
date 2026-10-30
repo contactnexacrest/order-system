@@ -26,8 +26,8 @@
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <input type="hidden" name="month" value="{{ month }}">
               <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">
-                <input type="date" name="paid_on" required max="{{ today() }}" value="{{ today() }}" aria-label="Paid on" title="Paid on" style="width:10.5em">
-                <input type="number" name="paid_inr" required min="0.01" step="0.01" value="{{ r.amountPlain }}" aria-label="Amount paid (₹)" title="Amount paid (₹)" style="width:8.5em">
+                <input type="date" name="paid_on" required min="{{ r.earliestPaidOn }}" max="{{ today() }}" value="{{ today() }}" aria-label="Paid on" title="Paid on" style="width:10.5em">
+                <input type="number" name="paid_inr" required min="0.01" max="{{ r.amountPlain }}" step="0.01" value="{{ r.amountPlain }}" aria-label="Amount paid (₹)" title="Amount paid (₹)" style="width:8.5em">
                 <input type="number" name="tds_inr" min="0" step="0.01" placeholder="TDS ₹" aria-label="TDS (₹)" title="TDS (₹), if any" style="width:7em" data-not-more-than="[name=paid_inr]" data-not-more-than-message="TDS cannot be more than the amount paid.">
                 <button type="submit" class="btn-sm">Mark paid</button>
               </div>
@@ -46,7 +46,7 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="hidden" name="month" value="{{ month }}">
         {% for id in dueIds %}<input type="hidden" name="payout_ids[]" value="{{ id }}">{% endfor %}
-        <label class="small">Paid on <input type="date" name="paid_on" required max="{{ today() }}" value="{{ today() }}"></label>
+        <label class="small">Paid on <input type="date" name="paid_on" required min="{{ earliestPaidOn }}" max="{{ today() }}" value="{{ today() }}"></label>
         <button type="submit" class="btn-sm">Mark all paid</button>
       </form>
     {% endif %}

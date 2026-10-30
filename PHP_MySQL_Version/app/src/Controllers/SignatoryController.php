@@ -65,6 +65,9 @@ final class SignatoryController
     public function toggleDesignation(array $params): void
     {
         $id = (int) ($params['id'] ?? 0);
+        if (\App\Helpers\RecordCheck::missing('designations', $id, '/signatories', 'designation')) {
+            return;
+        }
         SignatoryRepository::toggleDesignationActive($id);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
@@ -131,6 +134,9 @@ final class SignatoryController
     {
         $user = AuthService::currentUser();
         $userId = (int) ($params['id'] ?? 0);
+        if (\App\Helpers\RecordCheck::missing('users', $userId, '/signatories', 'user')) {
+            return;
+        }
         $eligible = ($_POST['eligible'] ?? '0') === '1';
         $designationId = ($_POST['designation_id'] ?? '') !== '' ? (int) $_POST['designation_id'] : null;
 
@@ -216,6 +222,9 @@ final class SignatoryController
     public function deactivateUserAsset(array $params): void
     {
         $id = (int) ($params['id'] ?? 0);
+        if (\App\Helpers\RecordCheck::missing('user_signature_assets', $id, '/signatories', 'signature or seal')) {
+            return;
+        }
         SignatoryRepository::deactivateUserAsset($id);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
@@ -256,6 +265,9 @@ final class SignatoryController
     {
         $user = AuthService::currentUser();
         $documentTypeId = (int) ($params['id'] ?? 0);
+        if (\App\Helpers\RecordCheck::missing('document_types', $documentTypeId, '/signatories', 'document type')) {
+            return;
+        }
         $userId = ($_POST['user_id'] ?? '') !== '' ? (int) $_POST['user_id'] : null;
         $useDesignationSeal = ($_POST['use_designation_seal'] ?? '0') === '1';
 

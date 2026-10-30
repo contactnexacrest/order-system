@@ -1,6 +1,7 @@
 'use strict';
 
 const flash = require('../helpers/flash');
+const recordCheck = require('../helpers/recordCheck');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const hsCodeRepository = require('../repositories/hsCodeRepository');
 const hsCodeProductGuideRepository = require('../repositories/hsCodeProductGuideRepository');
@@ -122,6 +123,7 @@ async function importProductGuide(req, res) {
 
 async function deleteProductGuideEntry(req, res) {
   const id = parseInt(req.params.id, 10) || 0;
+  if (await recordCheck.missing(req, res, 'hs_code_product_examples', id, '/hs-codes', 'product guide entry')) return;
   await hsCodeProductGuideRepository.remove(id);
   await auditLogRepository.log(req.user.id, 'HS_CODE_GUIDE_DELETED', 'hs_code_product_examples', id, null, null, null);
   flash.set(req, 'success', 'Product guide entry removed.');
@@ -130,6 +132,7 @@ async function deleteProductGuideEntry(req, res) {
 
 async function toggleActive(req, res) {
   const id = parseInt(req.params.id, 10) || 0;
+  if (await recordCheck.missing(req, res, 'hs_codes', id, '/hs-codes', 'HS code')) return;
   await hsCodeRepository.toggleActive(id);
   await auditLogRepository.log(req.user.id, 'HS_CODE_TOGGLED', 'hs_codes', id, null, null, null);
   flash.set(req, 'success', 'Status updated.');

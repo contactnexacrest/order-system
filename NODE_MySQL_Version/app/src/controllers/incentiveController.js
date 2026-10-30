@@ -1,7 +1,9 @@
 'use strict';
 
 const fs = require('fs');
+const recordCheck = require('../helpers/recordCheck');
 const csv = require('../helpers/csv');
+const dates = require('../helpers/dates');
 const flash = require('../helpers/flash');
 const associateRepository = require('../repositories/associateRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
@@ -159,6 +161,11 @@ async function saveSettings(req, res) {
 }
 
 async function associates(req, res) {
+  // QA Round 6, R6-N07: editing an associate that does not exist is "not found".
+  if (req.params.id !== undefined && !(await associateRepository.find(parseInt(req.params.id, 10)))) {
+    res.status(404).send('Associate not found.');
+    return;
+  }
   const list = await associateRepository.all();
   const clientsByAssociate = {};
   for (const a of list) {
@@ -291,6 +298,7 @@ async function linkClient(req, res) {
 
 async function unlinkClient(req, res) {
   const clientId = parseInt(req.params.clientId, 10);
+  if (await recordCheck.missing(req, res, 'clients', clientId, '/associates', 'client link', { associate_id: parseInt(req.params.id, 10) })) return;
   await associateRepository.linkClient(clientId, null, null);
   await auditLogRepository.log(req.user.id, 'ASSOCIATE_CLIENT_UNLINKED', 'clients', clientId, 'associate_id', String(req.params.id), null);
   flash.set(req, 'success', 'Client unlinked from the associate.');
@@ -393,7 +401,7 @@ async function payouts(req, res) {
   const months = await incentiveRepository.payoutMonths();
   const s = await incentiveService.settings();
   let month = String((req.query || {}).month || '');
-  if (!/^\d{4}-\d{2}$/.test(month)) {
+  if (!incentiveService.isMonth(month)) {
     month = months[0] || incentiveService.incentiveMonth(todayIso(), s.cutoff);
   }
   const rows = await incentiveRepository.payoutsForMonth(month);
@@ -422,6 +430,7 @@ async function payouts(req, res) {
       dueIds.push(Number(r.id));
     }
     r.amountPlain = Number(r.amount_inr).toFixed(2);
+    r.earliestPaidOn = incentiveService.earliestPaidOn(String(r.incentive_month));
   }
   res.renderView('incentives/payouts', {
     staffTotal,
@@ -431,13 +440,14 @@ async function payouts(req, res) {
     month,
     months: [...new Set([month, ...months])],
     rows,
+    earliestPaidOn: incentiveService.earliestPaidOn(month),
     cutoff: s.cutoff,
   }, 'layout/base');
 }
 
 async function markPaid(req, res) {
   const body = req.body || {};
-  const month = String(body.month || '');
+  const month = incentiveService.isMonth(body.month) ? String(body.month) : '';
   const single = req.params.payoutId !== undefined;
   const ids = single ? [parseInt(req.params.payoutId, 10)] : asArray(body.payout_ids).map((v) => parseInt(v, 10));
   const paidOn = String(body.paid_on || '');
@@ -456,6 +466,18 @@ async function markPaid(req, res) {
     const tds = single && isNum(body.tds_inr) ? Number(body.tds_inr) : null;
     if (paidInr <= 0 || (tds !== null && (tds < 0 || tds > paidInr))) {
       flash.set(req, 'error', 'Enter the amount paid above 0, and TDS between 0 and that amount.');
+      res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+      return;
+    }
+    // QA Round 6, R6-N10: never more than the payout, never before its month.
+    if (paidInr > Number(payout.amount_inr) + 0.005) {
+      flash.set(req, 'error', `The amount paid cannot be more than the payout (₹${Number(payout.amount_inr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`);
+      res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+      return;
+    }
+    const earliest = incentiveService.earliestPaidOn(String(payout.incentive_month));
+    if (paidOn < earliest) {
+      flash.set(req, 'error', `The date paid cannot be before ${dates.short(earliest)} for a payout of ${payout.incentive_month}.`);
       res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
       return;
     }

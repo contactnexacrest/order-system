@@ -1,6 +1,7 @@
 'use strict';
 
 const auditLogRepository = require('../repositories/auditLogRepository');
+const fieldValidator = require('../helpers/fieldValidator');
 const orderStorage = require('../helpers/orderStorage');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
 const orderBuyerPoDocumentRepository = require('../repositories/orderBuyerPoDocumentRepository');
@@ -215,6 +216,11 @@ async function reportAdvancePayment(req, order) {
   const transactionRef = String(req.body.transaction_ref || '').trim();
   if (transactionRef === '') {
     return { ok: false, message: 'Enter the transaction ID/UTR for your advance payment.' };
+  }
+  // QA Round 6, R6-N19/N20/N21: same amount and date checks as the portal.
+  const reportError = fieldValidator.reportedPayment(req.body.amount, req.body.payment_date);
+  if (reportError) {
+    return { ok: false, message: reportError };
   }
 
   let screenshotFileId = null;

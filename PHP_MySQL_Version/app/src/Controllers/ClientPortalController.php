@@ -742,6 +742,14 @@ final class ClientPortalController
             header("Location: /client/orders/{$orderId}");
             return;
         }
+        // QA Round 6, R6-N19/N20/N21: an amount above 0 that can be stored,
+        // and a real payment date that is not in the future.
+        $reportError = \App\Helpers\FieldValidator::reportedPayment((string) ($_POST['amount'] ?? ''), (string) ($_POST['payment_date'] ?? ''));
+        if ($reportError !== null) {
+            Flash::set('error', $reportError);
+            header("Location: /client/orders/{$orderId}");
+            return;
+        }
 
         $screenshotFileId = null;
         if (!empty($_FILES['screenshot']['name'])) {

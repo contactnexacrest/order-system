@@ -22,12 +22,13 @@ function pageQuery(filters, page) {
 
 async function index(req, res) {
   const entityType = String(req.query.entity_type || '').trim() || null;
-  const entityId = req.query.entity_id !== undefined && req.query.entity_id !== '' ? parseInt(req.query.entity_id, 10) : null;
-  const userId = req.query.user_id !== undefined && req.query.user_id !== '' ? parseInt(req.query.user_id, 10) : null;
+  const entityId = req.query.entity_id !== undefined && req.query.entity_id !== '' ? (parseInt(req.query.entity_id, 10) || null) : null;
+  const userId = req.query.user_id !== undefined && req.query.user_id !== '' ? (parseInt(req.query.user_id, 10) || null) : null;
   const actionType = String(req.query.action_type || '').trim() || null;
   const dateFrom = String(req.query.date_from || '').trim() || null;
   const dateTo = String(req.query.date_to || '').trim() || null;
-  const page = Math.max(1, parseInt(req.query.page || 1, 10));
+  // QA Round 6, R6-N30: a page that is not a number ("abc") is page 1, not a LIMIT NaN error.
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
 
   const rows = await auditLogRepository.search({
     entityType,

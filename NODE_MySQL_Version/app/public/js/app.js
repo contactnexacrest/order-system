@@ -495,6 +495,18 @@
         return el.dataset.notMoreThanMessage || 'This cannot be more than ' + cap.value + '.';
       }
     }
+    // data-max-decimals="n" / data-max-value="x": a number the database can
+    // hold as entered (QA Round 6, R6-N14/N15/N21/N23) — 0.0001 for a
+    // 2-decimal price was silently saved as 0.00, and a too-large value was
+    // a server error.
+    if (value !== '' && el.dataset.maxDecimals !== undefined && /^\d*\.?\d+$/.test(value)) {
+      var decimalsPart = value.indexOf('.') === -1 ? '' : value.slice(value.indexOf('.') + 1).replace(/0+$/, '');
+      var maxDecimals = parseInt(el.dataset.maxDecimals, 10);
+      if (decimalsPart.length > maxDecimals) return maxDecimals === 0 ? 'Enter a whole number.' : 'Use at most ' + maxDecimals + ' decimal' + (maxDecimals === 1 ? '' : 's') + '.';
+    }
+    if (value !== '' && el.dataset.maxValue !== undefined && parseFloat(value) > parseFloat(el.dataset.maxValue)) {
+      return 'This can be at most ' + el.dataset.maxValue + '.';
+    }
     // data-zero-if="<name>=<value>": must be 0 while that field has that
     // value (e.g. the GST rate on a transport bill under reverse charge —
     // the transporter charges no GST; we pay it to the government).

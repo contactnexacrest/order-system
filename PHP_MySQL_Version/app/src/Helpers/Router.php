@@ -67,6 +67,27 @@ final class Router
         return 'Strict-Transport-Security: max-age=31536000; includeSubDomains';
     }
 
+    /** QA Round 6, R6-N05/N07: what a {id} / {...Id} route segment must look like. */
+    public const ID_PATTERN = '[1-9][0-9]{0,14}';
+
+    public static function isIdParam(string $name): bool
+    {
+        return $name === 'id' || str_ends_with($name, 'Id');
+    }
+
+    /** @var (callable(string): bool)|null runs after a route's middleware, before its handler; false stops the request */
+    private $beforeHandler = null;
+
+    /**
+     * QA Round 6, R6-N04: one check every route gets once its own
+     * middleware (sign-in, permission, CSRF) has passed — so it never
+     * answers before those do.
+     */
+    public function beforeHandler(callable $check): void
+    {
+        $this->beforeHandler = $check;
+    }
+
     /** @var array<int, array{method:string, pattern:string, paramNames:array<int,string>, regex:string, handler:callable, middleware:array<int,callable>}> */
     private array $routes = [];
 
@@ -85,7 +106,10 @@ final class Router
         $paramNames = [];
         $regex = preg_replace_callback('#\{([a-zA-Z_][a-zA-Z0-9_]*)\}#', function ($m) use (&$paramNames) {
             $paramNames[] = $m[1];
-            return '([^/]+)';
+            // QA Round 6, R6-N05/N07: a record id is a positive whole number
+            // (1-15 digits) — "-1", "0", "1.5", "abc" or a 20-digit id
+            // match no route (404) instead of reaching a query.
+            return self::isIdParam($m[1]) ? '(' . self::ID_PATTERN . ')' : '([^/]+)';
         }, $path);
         $regex = '#^' . $regex . '$#';
 
@@ -128,6 +152,9 @@ final class Router
                         if ($result === false) {
                             return; // middleware already sent a response (redirect/403/etc.)
                         }
+                    }
+                    if ($this->beforeHandler !== null && ($this->beforeHandler)($path) === false) {
+                        return;
                     }
 
                     ($route['handler'])($params);

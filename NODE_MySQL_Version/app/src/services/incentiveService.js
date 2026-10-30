@@ -85,6 +85,25 @@ async function settings() {
 }
 
 /** The incentive month (YYYY-MM) a full payment on date belongs to. */
+/** QA Round 6, R6-N29: a real incentive month, YYYY-MM with MM 01-12. */
+function isMonth(month) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(month));
+}
+
+/**
+ * QA Round 6, R6-N10: the earliest date a payout of this incentive month
+ * can have been paid — the 1st of the month before it (the cycle runs from
+ * the cut-off day of the previous month). Port of
+ * IncentiveService::earliestPaidOn().
+ */
+function earliestPaidOn(month) {
+  if (!isMonth(month)) return '2000-01-01';
+  let [y, m] = String(month).split('-').map(Number);
+  m -= 1;
+  if (m === 0) { m = 12; y -= 1; }
+  return `${y}-${String(m).padStart(2, '0')}-01`;
+}
+
 function incentiveMonth(date, cutoff) {
   const [y, m, d] = String(date).slice(0, 10).split('-').map(Number);
   if (cutoff === 'last' || d <= parseInt(cutoff, 10)) {
@@ -485,6 +504,8 @@ module.exports = {
   fmt2,
   settings,
   incentiveMonth,
+  isMonth,
+  earliestPaidOn,
   cycleLabel,
   monthLabel,
   monthName,

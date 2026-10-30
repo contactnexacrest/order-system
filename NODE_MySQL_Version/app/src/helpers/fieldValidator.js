@@ -1,6 +1,7 @@
 'use strict';
 
 const { scalarString } = require('./input');
+const { todayIst } = require('./dbDateTime');
 
 /**
  * QA Round 5, R5-28/R5-29: the server checks the same simple rules the
@@ -66,6 +67,16 @@ function orderNumbers(body) {
     const error = decimal(value(name), label);
     if (error) return error;
   }
+  // QA Round 6, R6-N28: a range's minimum is not above its maximum, and the
+  // net weight is not above the gross weight.
+  const pairs = [
+    ['lead_time_min_days', 'lead_time_max_days', 'The production lead time minimum cannot be more than its maximum.'],
+    ['sailing_lead_time_min_days', 'sailing_lead_time_max_days', 'The sailing time minimum cannot be more than its maximum.'],
+    ['estimated_net_weight_kg', 'estimated_gross_weight_kg', 'The net weight cannot be more than the gross weight.'],
+  ];
+  for (const [low, high, message] of pairs) {
+    if (value(low) !== '' && value(high) !== '' && Number(value(low)) > Number(value(high))) return message;
+  }
   return null;
 }
 
@@ -90,4 +101,27 @@ function moneyAmount(amount, label) {
   return null;
 }
 
-module.exports = { MAX_RATE, MAX_AMOUNT, wholeNumber, decimal, email, orderNumbers, exchangeRate, moneyAmount };
+/**
+ * QA Round 6, R6-N19/N20/N21: a payment the buyer reports (portal or
+ * e-mailed link) — the amount, if given, above 0 and storable; the date, if
+ * given, a real day that is not in the future. Port of
+ * FieldValidator::reportedPayment().
+ */
+function reportedPayment(amount, date) {
+  const a = String(amount ?? '').trim();
+  const d = String(date ?? '').trim();
+  if (a !== '') {
+    if (!/^-?\d*\.?\d+$/.test(a)) return 'The amount paid must be a number.';
+    const error = moneyAmount(Number(a), 'The amount paid');
+    if (error) return error;
+  }
+  if (d !== '') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+    const day = m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : null;
+    const real = day && day.getUTCFullYear() === Number(m[1]) && day.getUTCMonth() + 1 === Number(m[2]) && day.getUTCDate() === Number(m[3]);
+    if (!real || d > todayIst()) return 'Enter the date you paid (today or earlier).';
+  }
+  return null;
+}
+
+module.exports = { MAX_RATE, MAX_AMOUNT, wholeNumber, decimal, email, orderNumbers, exchangeRate, moneyAmount, reportedPayment };

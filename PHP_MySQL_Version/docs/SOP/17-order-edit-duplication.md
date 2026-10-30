@@ -100,6 +100,15 @@ description, dimensions, finish, quantity, unit, unit price, HS code —
 with Save, Duplicate, and Remove actions, plus an "Add Product Line" form
 at the bottom.
 
+Quantity and unit price are checked wherever a line is saved — creating
+the order, adding a line, editing a line (QA Round 6, R6-N14/N15): the
+unit price has at most 2 decimals (0.0001 is refused, not saved as 0.00)
+and at most 999,999,999,999.99; the quantity has at most 3 decimals; the
+line value (quantity × unit price) at most 999,999,999,999.99. On the
+order's details, a minimum lead time or sailing time above its maximum,
+and a net weight above the gross weight, are refused with a message
+beside the field (R6-N28).
+
 **Duplicate** is the one built specifically for the common case: a second
 size or a renamed variant of a product already on the order. It clones
 every field on that line into a new one — nothing needs re-typing except

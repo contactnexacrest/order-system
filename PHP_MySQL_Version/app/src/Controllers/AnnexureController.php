@@ -166,6 +166,9 @@ final class AnnexureController
     {
         $orderId = (int) $params['id'];
         $productId = (int) $params['productId'];
+        if (\App\Helpers\RecordCheck::missing('order_annexure_products', $productId, "/orders/{$orderId}/annexure", 'product entry', ['order_id' => $orderId])) {
+            return;
+        }
         OrderAnnexureRepository::deleteProduct($productId);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
@@ -210,6 +213,12 @@ final class AnnexureController
     {
         $orderId = (int) $params['id'];
         $imageId = (int) $params['imageId'];
+        // QA Round 6, R6-N04: only an image of this order's annexure.
+        if (!\App\Helpers\RecordCheck::found('SELECT 1 FROM order_annexure_images i JOIN order_annexure_products p ON p.id = i.order_annexure_product_id WHERE i.id = :i AND p.order_id = :o', ['i' => $imageId, 'o' => $orderId])) {
+            Flash::set('error', 'That image was not found — it may have been removed already. Nothing was changed.');
+            header("Location: /orders/{$orderId}/annexure");
+            return;
+        }
         OrderAnnexureRepository::removeImage($imageId);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.

@@ -242,6 +242,10 @@ final class BuyerActionService
         if ($transactionRef === '') {
             return ['ok' => false, 'message' => 'Enter the transaction ID/UTR for your advance payment.'];
         }
+        // QA Round 6, R6-N19/N20/N21: same amount and date checks as the portal.
+        if ($error = \App\Helpers\FieldValidator::reportedPayment((string) ($_POST['amount'] ?? ''), (string) ($_POST['payment_date'] ?? ''))) {
+            return ['ok' => false, 'message' => $error];
+        }
 
         $screenshotFileId = null;
         if (!empty($_FILES['screenshot']['name'])) {
