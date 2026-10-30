@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NexaCrest Order Workflow</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+[hidden]{display:none!important}
+body{margin:0}
+img{max-width:100%}
+/* Layout: one reading column — sticky toolbar (order ref, role, search, progress), then sections A–E as
+   collapsible bands, each a numbered list of step rows with a tick box. Matches the application's own
+   navy/gold palette so the guide reads like part of the app. */
+:root{
+  --bg:#FBF8F2; --surface:#FFFFFF; --ink:#1F2430; --muted:#6F6A5E; --line:#EADFC8;
+  --navy:#013090; --navy-soft:#E9EEFB; --gold:#C9962B; --gold-soft:#F7EAD1;
+  --ok:#2F6B3E; --ok-soft:#E3F0E5; --warn:#A5402B; --warn-soft:#F5E2DD;
+  --a:#1F4E9E; --b:#2B7A86; --c:#B7791F; --d:#2D7D56; --e:#6B3FA0;
+  --font-body:'Poppins','Segoe UI',Arial,sans-serif; --font-mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12151C; --surface:#1A1F29; --ink:#E9E6DE; --muted:#A39E92; --line:#2E3442;
+  --navy:#8FAEF5; --navy-soft:#1E2A47; --gold:#E0B357; --gold-soft:#3A2F17;
+  --ok:#7FC593; --ok-soft:#1C3324; --warn:#F09A84; --warn-soft:#3D221C;
+  --a:#7FA6EC; --b:#6CC3CF; --c:#E5B160; --d:#79C79C; --e:#B596E3; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12151C; --surface:#1A1F29; --ink:#E9E6DE; --muted:#A39E92; --line:#2E3442;
+  --navy:#8FAEF5; --navy-soft:#1E2A47; --gold:#E0B357; --gold-soft:#3A2F17;
+  --ok:#7FC593; --ok-soft:#1C3324; --warn:#F09A84; --warn-soft:#3D221C;
+  --a:#7FA6EC; --b:#6CC3CF; --c:#E5B160; --d:#79C79C; --e:#B596E3; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{text-wrap:balance;margin:0}
+header.top{padding-top:28px;display:flex;flex-direction:column;gap:8px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:600}
+h1{font-size:28px;line-height:1.2;color:var(--navy);font-weight:700}
+.lede{color:var(--muted);max-width:68ch;margin:0}
+
+/* toolbar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:12px 14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 18px -14px rgba(0,0,0,.5)}
+.bar-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.bar label{font-size:12px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;gap:3px;min-width:0}
+.bar input[type=text],.bar input[type=search]{font:inherit;font-size:14px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:100%}
+.bar .grow{flex:1 1 220px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:13px;font-weight:500;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.chip[aria-pressed=true]{background:var(--navy);border-color:var(--navy);color:var(--surface)}
+.btn{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:8px;border:1px solid var(--navy);background:var(--navy-soft);color:var(--navy);cursor:pointer}
+.btn:hover{background:var(--navy);color:var(--surface)}
+.btn.quiet{border-color:var(--line);background:transparent;color:var(--muted)}
+.progress{display:flex;align-items:center;gap:10px;font-size:13px;font-variant-numeric:tabular-nums}
+.track{flex:1;height:8px;border-radius:999px;background:var(--gold-soft);overflow:hidden}
+.fill{height:100%;width:0;background:var(--gold);transition:width .25s}
+.confirm{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--warn)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* rules */
+.rules{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.rules h2{font-size:16px;color:var(--navy);margin-bottom:8px}
+.rules ul{margin:0;padding-left:20px;display:grid;gap:4px;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));column-gap:24px}
+.rules li{font-size:14px}
+.roles-key{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13px;color:var(--muted)}
+
+/* sections */
+details.sec{border-radius:12px;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--sc)}
+details.sec>summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+details.sec>summary::-webkit-details-marker{display:none}
+.sec-letter{font-weight:700;font-size:15px;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;background:var(--sc);color:var(--surface);flex:none}
+.sec-title{flex:1 1 240px;min-width:0}
+.sec-title h2{font-size:18px;color:var(--sc)}
+.sec-title p{margin:0;font-size:13px;color:var(--muted)}
+.sec-count{font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+.sec-body{padding:0 16px 14px;display:flex;flex-direction:column;gap:10px}
+.group{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sc);padding-top:6px;border-top:1px solid var(--line)}
+.group:first-child{border-top:0;padding-top:0}
+
+.step{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:10px 12px;border-radius:10px;background:var(--bg);border:1px solid transparent}
+.step.done{background:var(--ok-soft)}
+.step.done .st-title{text-decoration:line-through;text-decoration-color:var(--ok)}
+.step input[type=checkbox]{width:20px;height:20px;margin:2px 0 0;accent-color:var(--ok);cursor:pointer}
+.st-head{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;min-width:0}
+.st-id{font-family:var(--font-mono);font-size:13px;color:var(--sc);font-weight:500}
+.st-title{font-weight:600;font-size:15px}
+.st-body{grid-column:2;min-width:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.st-body p{margin:0}
+.done-when{color:var(--ok);font-size:13px}
+.done-when b{font-weight:600}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--navy-soft);color:var(--navy)}
+.tag.cond{background:var(--gold-soft);color:var(--ink)}
+.tag.side{background:var(--line);color:var(--ink)}
+.note{font-size:13px;padding:6px 10px;border-radius:8px;background:var(--warn-soft);color:var(--warn)}
+.empty{padding:16px;text-align:center;color:var(--muted)}
+footer{font-size:12.5px;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}}
+@media (max-width:520px){h1{font-size:23px}.bar{position:static}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <span class="kicker">NexaCrest International · Export Operations</span>
+    <h1>Order Workflow — step by step</h1>
+    <p class="lede">The order of work for every export order in the application, from quotation to fully settled. Each step matches a card on the order page with the same number. Tick steps off as you go; type an order reference to keep a separate checklist for each order.</p>
+  </header>
+
+  <div class="bar" role="region" aria-label="Checklist controls">
+    <div class="bar-row">
+      <label class="grow" for="orderRef">Order reference (your ticks are kept per order, on this device)
+        <input type="text" id="orderRef" placeholder="e.g. SC/ORD/26/001-344" autocomplete="off">
+      </label>
+      <label class="grow" for="q">Find a step
+        <input type="search" id="q" placeholder="e.g. debit note, BL, supplier advance" autocomplete="off">
+      </label>
+    </div>
+    <div class="bar-row">
+      <div class="chips" role="group" aria-label="Show steps for">
+        <button class="chip" data-role="all" aria-pressed="true">Everyone</button>
+        <button class="chip" data-role="export" aria-pressed="false">Export Executive</button>
+        <button class="chip" data-role="accounts" aria-pressed="false">Accounts</button>
+        <button class="chip" data-role="logistics" aria-pressed="false">Logistics</button>
+        <button class="chip" data-role="mgmt" aria-pressed="false">MD / ED / Admin</button>
+      </div>
+      <span style="flex:1"></span>
+      <button class="btn quiet" id="expandAll">Open all</button>
+      <button class="btn quiet" id="collapseAll">Close all</button>
+      <button class="btn quiet" id="resetBtn">Clear ticks</button>
+    </div>
+    <div class="confirm" id="resetConfirm" hidden>Clear every tick for this order?
+      <button class="btn" id="resetYes">Yes, clear</button><button class="btn quiet" id="resetNo">Keep</button></div>
+    <div class="progress"><span id="progText">0 of 0 steps done</span><div class="track" aria-hidden="true"><div class="fill" id="progFill"></div></div></div>
+  </div>
+
+  <section class="rules" aria-labelledby="rulesH">
+    <h2 id="rulesH">Rules for every order</h2>
+    <ul>
+      <li>Work top to bottom. A step opens only when the one before it is done; the current step is outlined in gold on the order page.</li>
+      <li>Every document follows the same path: <b>Generate → Review &amp; Approve → Send</b> (or mark sent when email is off). Until it has, the step's button stays greyed out with a note saying what the document still needs.</li>
+      <li>Skip a step only with a real reason. <b>Not Applicable</b> fills its reason for you; <b>Skipped</b> always needs one typed.</li>
+      <li>Supplier and buyer never cross: no buyer name, price or document ever goes to a supplier, and the other way round.</li>
+      <li><b>CAFIN</b> (internal financial annexure) is for MD / ED / Admin, Accounts and the CA only, and never goes to the client — not by email, link, download or portal.</li>
+      <li>Record every money receipt with that day's exchange rate, and every payment with its date, mode and UTR. Reference numbers use the 2-digit year (SC/CI/26/…).</li>
+      <li>Vendor bills: attach the bill, say whether it is a proforma or the tax invoice, pick GST as a % — the amount and total fill in themselves. A bill can be paid in parts.</li>
+      <li>Talk to the client through <b>Order Communication</b> on the order page so the history stays with the order.</li>
+    </ul>
+    <div class="roles-key" style="margin-top:10px">
+      <span><span class="tag">Export</span> Export Executive</span>
+      <span><span class="tag">Accounts</span> Accounts Executive</span>
+      <span><span class="tag">Logistics</span> Logistics Executive</span>
+      <span><span class="tag">MD/ED/Admin</span> Management</span>
+      <span><span class="tag cond">Only if…</span> conditional step</span>
+      <span><span class="tag side">Alongside</span> runs in parallel, never blocks</span>
+    </div>
+  </section>
+
+  <main id="sections" class="wrap" style="gap:14px"></main>
+  <p class="empty" id="noMatch" hidden>No step matches that search for the chosen role.</p>
+
+  <footer>Step numbers match the cards on the order page. Generated from the application on 30 Oct 2026.</footer>
+</div>
+
+<script>
+(function () {
+  var R = { export: 'Export', accounts: 'Accounts', logistics: 'Logistics', mgmt: 'MD/ED/Admin' };
+  // [id, title, roles[], what to do, done when, tag: '' | 'cond:text' | 'side', note]
+  var SECTIONS = [
+    { key: 'A', color: 'var(--a)', title: 'Order Booking', sub: 'Quotation → Buyer PO → PI & advance → Order Confirmation', groups: [
+      { name: 'Step 1–3 · Quotation', steps: [
+        ['1', 'Prepare Quotation', ['export'], 'Create the order from the client enquiry (or from Quotation Intake Review if the client filled the quotation-details form). Enter products, quantity, prices, Incoterm, port and payment preset, then generate the Quotation (QT).', 'the QT is generated and approved in Document Review & Approval.'],
+        ['1', 'Approve Payment Terms', ['mgmt'], 'When the payment preset is marked "Requires MD approval", the MD / ED / Admin approves the payment terms before the Quotation can be generated.', 'the payment terms are approved.', 'cond:Presets that need MD approval'],
+        ['2', 'Send Quotation to Client', ['export'], 'Send the approved QT to the buyer (or mark it sent when email is off).', 'the QT is marked sent.'],
+        ['3', 'Client Accepts Quotation', ['export'], 'Record the buyer\'s acceptance against this QT version. If they ask for changes, revise the QT — the earlier version is kept.', 'acceptance is recorded.']
+      ]},
+      { name: 'Step 4 · Buyer\'s PO', steps: [
+        ['4a', 'Generate Buyer\'s PO', ['export'], 'Generate the buyer-facing PO with the agreed terms and send it for signature.', 'the Buyer\'s PO is generated and sent.'],
+        ['4b', 'Send Buyer PO Action Link', ['export'], 'Send the no-login link: the buyer downloads the PO, uploads the signed copy and enters their PO number. When they do, Step 4 completes by itself.', 'the buyer has uploaded the signed PO.', 'cond:Optional'],
+        ['4c', 'Attach Buyer\'s PO Copy', ['export'], 'If the signed PO came by email instead, upload it here.', 'the signed copy is attached.', 'cond:Optional'],
+        ['4d', 'Confirm Buyer\'s PO Received', ['export'], 'Check signature, version and any changes; record the buyer\'s PO reference and the date the PO was received (the day it arrived, not the date printed on it). When the buyer completes Step 4 through the link, their upload day is recorded.', 'the Buyer\'s PO is confirmed.']
+      ]},
+      { name: 'Step 5 · Proforma Invoice & payment', steps: [
+        ['5a', 'Generate PI Form Link', ['export'], 'Send the client the PI form link for consignee, notify party, billing and shipping details.', 'the link is sent.'],
+        ['5b', 'Apply the Client\'s PI-Stage Confirmation', ['export'], 'Check the submitted details (consignee, notify party, ports, identifiers) and apply them — or Skip with reason, e.g. repeat buyer with unchanged details.', 'details are applied or the step is skipped with a reason.'],
+        ['5c', 'Generate Proforma Invoice', ['export'], 'Generate the PI, approve it and send it to the buyer.', 'the PI is approved and sent.'],
+        ['5d', 'Record LC Details', ['accounts', 'mgmt'], 'Upload the final Letter of Credit and record LC number, bank, amount, issue and expiry dates.', 'LC details are recorded.', 'cond:LC orders only'],
+        ['5e', 'Confirm LC Usable', ['accounts', 'mgmt'], 'Review the LC terms and amendments; confirm it can be used.', 'the LC is confirmed usable.', 'cond:LC orders only'],
+        ['5d', 'Record Advance Remittance', ['accounts', 'export'], 'When the buyer\'s advance arrives (they can upload proof through the Payment Action Link), record the amount received together with that day\'s exchange rate.', 'the remittance is recorded.', 'cond:Advance orders'],
+        ['5e', 'Mark Advance Cleared', ['accounts'], 'Confirm the money is actually in the bank (INR credited, charges) and mark the advance cleared.', 'the advance shows as cleared.', 'cond:Advance orders'],
+        ['LC', 'LC Payment Received, Letter of Credit & Bank Loan costs', ['mgmt', 'accounts'], 'On LC orders, record the money the bank paid under the LC (with the INR credited and bank charges) and its FIRC / eBRC. If a bank loan is taken for the order, record the loan, interest payments and the interest charged to this order.', 'LC money and financing costs are recorded.', 'side']
+      ]},
+      { name: 'Step 6 · Order Confirmation', steps: [
+        ['6a', 'Generate Order Confirmation', ['export'], 'Generate the OC once the advance is cleared; approve it.', 'the OC is approved.'],
+        ['6b', 'Send Buyer Action Link (OC acknowledgement)', ['export'], 'Send the buyer the link to acknowledge the OC.', 'the link is sent.'],
+        ['6c', 'Record Buyer\'s Acknowledgement', ['export'], 'Record that the buyer acknowledged this OC version. Change requests go through Amendments.', 'the acknowledgement is recorded.']
+      ]}
+    ]},
+    { key: 'B', color: 'var(--b)', title: 'Procurement & Production', sub: 'Supplier PO → production & estimated shipment', groups: [
+      { name: 'Alongside Step 7', steps: [
+        ['CL', 'Compliance Checklist — order tasks', ['mgmt', 'export'], 'Due Diligence, ECGC cover (filed after the OC, so no fee is paid before the buyer commits) and other order tasks: mark each Approved, Not Applicable or Skipped, then Save Checklist.', 'every order task is resolved.', 'side']
+      ]},
+      { name: 'Step 7 · Supplier PO', steps: [
+        ['7a', 'Save Supplier PO Terms', ['export', 'accounts'], 'Pick the supplier from the Suppliers directory; enter material, grade, finish, size, quantity, unit price, GST % and advance %. An advance of 0% is allowed — the whole amount then becomes the balance.', 'the terms are saved.'],
+        ['7b', 'Generate Supplier PO', ['export', 'accounts'], 'Generate the Supplier PO, approve it and send it to the supplier. It never shows the buyer or the buyer\'s prices.', 'the Supplier PO is approved and sent.'],
+        ['7c', 'Attach Supplier PO Acknowledgment', ['export'], 'Send the Supplier Action Link or upload the signed PO yourself — or record that the supplier did not acknowledge, with a reason.', 'the acknowledgment is on file or skipped with a reason.', 'cond:Optional'],
+        ['7d', 'Confirm Supplier Signed & Returned PO', ['export'], 'Confirm the signed PO. Any change to price, quantity or lead time must be reviewed before it changes what we promised the buyer.', 'the signed PO is confirmed.'],
+        ['7e', 'Supplier Advance Paid', ['accounts'], 'Add the supplier\'s advance bill (proforma invoice, GST %, bill attached), then press the green ₹ Mark Paid with date, mode and UTR — in one payment or several. With 0% advance this step completes by itself.', 'the advance bill is paid (or no advance is planned).']
+      ]},
+      { name: 'Step 8 · Production', steps: [
+        ['8a', 'Production & Estimated Shipment', ['export'], 'Keep the production status and estimated shipment date up to date — the client sees the estimate. A reminder arrives 7 days before, to arrange the pre-shipment inspection when one applies.', 'production is complete and the shipment date is set.']
+      ]}
+    ]},
+    { key: 'C', color: 'var(--c)', title: 'Shipment & Balance', sub: 'Freight → packing & BL → commercial invoice & balance', groups: [
+      { name: 'Alongside Steps 9–11', steps: [
+        ['LB', 'Logistics Partner Bills & Payments', ['accounts'], 'Add each CHA, transport and freight-forwarder bill, marked Advance or Final, with GST % and the bill attached. An Advance can be paid any time; on CFR/CIF orders a Final bill is paid only after Step 9d. CHA/logistics payments are made in India.', 'every logistics bill is paid.', 'side']
+      ]},
+      { name: 'Step 9 · Freight payment', steps: [
+        ['9a', 'Save Freight Terms', ['logistics'], 'Record the forwarder\'s freight quote (and insurance for CIF).', 'freight terms are saved.', 'cond:CFR / CIF only — not applicable on FOB'],
+        ['9b', 'Generate Debit Note', ['logistics'], 'Generate the freight Debit Note, approve it and send it to the buyer.', 'the Debit Note is sent.', 'cond:CFR / CIF only'],
+        ['9c', 'Record Freight Remittance', ['accounts'], 'Record the buyer\'s freight payment with that day\'s exchange rate. Freight is a separate item from the goods balance.', 'the remittance is recorded.', 'cond:CFR / CIF only'],
+        ['9d', 'Mark Freight Cleared', ['accounts', 'logistics'], 'Confirm the freight money is in the bank and mark it cleared. Final logistics bills can be paid from here on.', 'freight shows as cleared.', 'cond:CFR / CIF only']
+      ]},
+      { name: 'Step 10 · Packing & BL instruction', steps: [
+        ['CL', 'Compliance Checklist — shipment tasks', ['logistics', 'mgmt'], 'Fumigation, phytosanitary certificate, pre-shipment inspection and other shipment tasks: Approved, Not Applicable or Skipped.', 'every shipment task is resolved.', 'side'],
+        ['10a', 'Supplier Balance Paid (before packing)', ['accounts'], 'Add the supplier\'s tax invoice for the balance and Mark Paid. When an advance was planned, it must be paid first.', 'the supplier balance is paid.'],
+        ['10b', 'Save Packing & Crates', ['logistics'], 'Enter crate numbers, marks, products, quantities, net/gross weights and dimensions.', 'packing is saved.'],
+        ['10c', 'Generate Packing List', ['logistics'], 'Generate and approve the Packing List.', 'the Packing List is approved.'],
+        ['10d', 'Save Shipping Details', ['logistics'], 'Record booking, vessel, container and seal details.', 'shipping details are saved.'],
+        ['10e', 'Generate BL Instruction Sheet', ['logistics'], 'Generate the BL instructions from the approved consignee/notify details and packing list; send them with the packing list to the CHA.', 'instructions are sent to the CHA.'],
+        ['10f', 'Confirm BL Issued', ['logistics'], 'Check each draft BL from the CHA against the instructions until it is right, then confirm the BL and attach the scanned BL copy.', 'the BL is issued and the scan is attached.'],
+        ['SB', 'Record the Shipping Bill', ['logistics', 'accounts'], 'Record the shipping bill number, date and the customs exchange rate printed on it. The Commercial Invoice and Debit Note go to Zoho Books at that rate, so they wait for it.', 'the shipping bill is recorded.', 'side']
+      ]},
+      { name: 'Step 11 · Commercial Invoice & balance', steps: [
+        ['11a', 'Generate Commercial Invoice', ['export', 'accounts'], 'Generate the CI. Its date is today by default; pick an earlier date when the CI must carry the BL date (never a future date). FOB orders raise the CI before shipment.', 'the CI is approved.'],
+        ['11b', 'Mark Scanned BL Copy Sent to Buyer', ['export'], 'Send the scanned BL and the CI to the buyer with the payment instructions and due date.', 'it is marked sent.'],
+        ['11c', 'Record Balance Remittance', ['accounts'], 'Record the buyer\'s balance payment with that day\'s exchange rate.', 'the remittance is recorded.'],
+        ['11d', 'Mark Balance Cleared', ['accounts'], 'Confirm the money is in the bank and mark the balance cleared.', 'the balance shows as cleared.']
+      ]}
+    ]},
+    { key: 'D', color: 'var(--d)', title: 'Closure & Settlement', sub: 'Financials & benefits → documents despatched → fully settled', groups: [
+      { name: 'Step 12 · Financials, benefits & costs', steps: [
+        ['12a', 'Order Costs', ['mgmt'], 'Add the order\'s costs (ECGC, inspection fee, bank charges, LC interest, travel %). Supplier and logistics bills come in automatically; add actual expenses with a receipt (or a reason) under + Add an expense.', 'all costs are recorded.'],
+        ['12b', 'Export Benefit Eligibility', ['mgmt'], 'For each scheme (RoDTEP, Duty Drawback…) choose Eligible or Not Eligible — Not Eligible fills its reason.', 'no scheme is left Pending.'],
+        ['12c', 'Review Profit & Complete Step 12', ['mgmt'], 'Review revenue, costs, profit and margin, then mark Step 12 complete (or skip with a reason).', 'Step 12 is complete.'],
+        ['12d', 'Team Incentive', ['mgmt'], 'Owner and MD only: set the reward for this order (₹0 = the reward table), exclude it, change who did a role, or switch associate commission. It is fixed by itself when the buyer has fully paid and becomes the order\'s Commission cost; Accounts pays it with the salary on the last day of the month.', 'the incentive is fixed and paid.', 'side']
+      ]},
+      { name: 'Step 13 · Documents & settlement', steps: [
+        ['13a', 'Generate COO Prep Sheet', ['logistics'], 'Generate the Certificate of Origin preparation sheet.', 'the sheet is generated.'],
+        ['13b', 'Record Original BLs Received from CHA', ['logistics'], 'Record when the original BLs arrive from the CHA.', 'receipt is recorded.'],
+        ['13c', 'Save BL Endorsement Details', ['logistics'], 'Enter the endorsement details.', 'details are saved.'],
+        ['13d', 'Generate / Print BL Endorsement', ['logistics'], 'Generate and print the endorsement.', 'it is printed.'],
+        ['13e', 'Mark Original BLs Endorsed', ['logistics', 'mgmt'], 'Confirm the original BLs are endorsed by NexaCrest. Keep one BL copy in company records.', 'BLs are endorsed.'],
+        ['13f', 'Close Order (Document Despatch)', ['logistics', 'mgmt'], 'Send the final document package to the client once the required payments are cleared. The order is then closed for the client; internal work continues.', 'documents are despatched.'],
+        ['13g', 'Government Benefits — Claimed & Received', ['mgmt', 'accounts'], 'For each eligible scheme record the claim and the money received — or skip the claim with a reason.', 'every eligible scheme is received or skipped.'],
+        ['13h', 'Mark Fully Settled', ['mgmt'], 'When every payment, bill, expense and benefit is resolved, mark the order fully settled.', 'the order is fully settled.']
+      ]},
+      { name: 'Finish', steps: [
+        ['19', 'Order Complete', ['mgmt'], 'The order shows complete and is locked; history stays available.', 'the order shows Complete.'],
+        ['CF', 'CAFIN — internal financial annexure', ['mgmt', 'accounts'], 'Generate it from the CAFIN box at the top of the order page whenever needed — any stage, even after closure. The CA page also exports CAFIN for every order of a financial year as CSV. Internal only.', 'generated when needed.', 'side', 'Never send, attach or show CAFIN to the client.']
+      ]}
+    ]},
+    { key: 'E', color: 'var(--e)', title: 'After-Sales & Records', sub: 'Use whenever needed — these never block the order', groups: [
+      { name: 'Any time', steps: [
+        ['DR', 'Document Review & Approval', ['export', 'mgmt'], 'Every generated document is reviewed and approved here before it is sent.', 'no document is waiting for action.', 'side'],
+        ['ZB', 'Check against Zoho Books', ['accounts', 'mgmt'], 'Once Zoho Books is switched on, the order page\'s "Check this order against Zoho Books" compares the invoices, payments, bills and expenses with Books (it only reads).', 'everything shows as a match.', 'side'],
+        ['OC', 'Order Communication', ['export'], 'Messages with the client about this order.', '—', 'side'],
+        ['AM', 'Amendments', ['mgmt', 'export'], 'Record a mutually agreed change to the terms; affected documents are flagged for regeneration.', 'the amendment is recorded.', 'side'],
+        ['14', 'Additional Documents', ['export', 'logistics'], 'Upload any other document the order needs.', '—', 'side'],
+        ['16', 'Order Feedback', ['export'], 'Record the client\'s feedback after delivery.', 'feedback is recorded.', 'side'],
+        ['17', 'Complaints', ['export', 'mgmt'], 'Log and resolve a client complaint.', 'the complaint is closed.', 'side'],
+        ['18', 'Disputes', ['mgmt'], 'Log a dispute and its response deadline; overdue disputes raise an alert.', 'the dispute is resolved.', 'side']
+      ]}
+    ]}
+  ];
+
+  var role = 'all', query = '', ticks = {};
+  var store = { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+  var $ = function (id) { return document.getElementById(id); };
+  var refKey = function () { return 'nx-wf-ticks:' + (($('orderRef').value || '').trim().toUpperCase() || 'default'); };
+  var stepKey = function (sec, g, i) { return sec + '-' + g + '-' + i; };
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function render() {
+    var main = $('sections'); var html = '';
+    SECTIONS.forEach(function (sec) {
+      html += '<details class="sec" open data-sec="' + sec.key + '" style="--sc:' + sec.color + '"><summary><span class="sec-letter">' + sec.key + '</span>'
+        + '<span class="sec-title"><h2>' + esc(sec.title) + '</h2><p>' + esc(sec.sub) + '</p></span><span class="sec-count" data-count="' + sec.key + '"></span></summary><div class="sec-body">';
+      sec.groups.forEach(function (g, gi) {
+        html += '<div class="group" data-group>' + esc(g.name) + '</div>';
+        g.steps.forEach(function (s, si) {
+          var k = stepKey(sec.key, gi, si), tag = s[5] || '', note = s[6] || '';
+          var tags = s[2].map(function (r) { return '<span class="tag">' + R[r] + '</span>'; }).join('');
+          if (tag === 'side') tags += '<span class="tag side">Alongside</span>';
+          else if (tag.indexOf('cond:') === 0) tags += '<span class="tag cond">' + esc(tag.slice(5)) + '</span>';
+          var text = (s[0] + ' ' + s[1] + ' ' + s[3] + ' ' + tag).toLowerCase();
+          html += '<div class="step" data-key="' + k + '" data-roles="' + s[2].join(' ') + '" data-text="' + esc(text) + '">'
+            + '<input type="checkbox" id="cb-' + k + '" aria-label="Done: ' + esc(s[0] + ' ' + s[1]) + '">'
+            + '<label class="st-head" for="cb-' + k + '"><span class="st-id">' + esc(s[0]) + '</span><span class="st-title">' + esc(s[1]) + '</span></label>'
+            + '<div class="st-body"><p>' + esc(s[3]) + '</p>'
+            + (s[4] && s[4] !== '—' ? '<p class="done-when"><b>Done when</b> ' + esc(s[4]) + '</p>' : '')
+            + (note ? '<p class="note">' + esc(note) + '</p>' : '')
+            + '<div class="tags">' + tags + '</div></div></div>';
+        });
+      });
+      html += '</div></details>';
+    });
+    main.innerHTML = html;
+    main.addEventListener('change', function (e) {
+      var cb = e.target; if (!cb.matches('input[type=checkbox]')) return;
+      var key = cb.closest('.step').dataset.key;
+      if (cb.checked) ticks[key] = 1; else delete ticks[key];
+      store.set(refKey(), JSON.stringify(ticks)); paint();
+    });
+  }
+
+  function loadTicks() {
+    try { ticks = JSON.parse(store.get(refKey()) || '{}') || {}; } catch (e) { ticks = {}; }
+    document.querySelectorAll('.step').forEach(function (el) { el.querySelector('input').checked = !!ticks[el.dataset.key]; });
+    paint();
+  }
+
+  function paint() {
+    var total = 0, done = 0, shown = 0;
+    SECTIONS.forEach(function (sec) {
+      var box = document.querySelector('[data-sec="' + sec.key + '"]'), t = 0, d = 0, vis = 0;
+      box.querySelectorAll('.step').forEach(function (el) {
+        var ok = (role === 'all' || el.dataset.roles.split(' ').indexOf(role) !== -1) && (!query || el.dataset.text.indexOf(query) !== -1);
+        el.hidden = !ok; if (ok) vis++;
+        var isDone = el.querySelector('input').checked; el.classList.toggle('done', isDone);
+        t++; if (isDone) d++;
+      });
+      box.querySelectorAll('[data-group]').forEach(function (gEl) {
+        var n = gEl.nextElementSibling, any = false;
+        while (n && !n.hasAttribute('data-group')) { if (!n.hidden) any = true; n = n.nextElementSibling; }
+        gEl.hidden = !any;
+      });
+      box.hidden = vis === 0; if (query && vis) box.open = true;
+      box.querySelector('[data-count]').textContent = d + ' / ' + t + ' done';
+      total += t; done += d; shown += vis;
+    });
+    $('progText').textContent = done + ' of ' + total + ' steps done';
+    $('progFill').style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+    $('noMatch').hidden = shown !== 0;
+  }
+
+  render();
+  var savedRef = store.get('nx-wf-lastref'); if (savedRef) $('orderRef').value = savedRef;
+  loadTicks();
+  $('orderRef').addEventListener('input', function () { store.set('nx-wf-lastref', this.value); loadTicks(); });
+  $('q').addEventListener('input', function () { query = this.value.trim().toLowerCase(); paint(); });
+  document.querySelectorAll('.chip').forEach(function (b) {
+    b.addEventListener('click', function () {
+      role = b.dataset.role;
+      document.querySelectorAll('.chip').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      paint();
+    });
+  });
+  $('expandAll').onclick = function () { document.querySelectorAll('details.sec').forEach(function (d) { d.open = true; }); };
+  $('collapseAll').onclick = function () { document.querySelectorAll('details.sec').forEach(function (d) { d.open = false; }); };
+  $('resetBtn').onclick = function () { $('resetConfirm').hidden = false; };
+  $('resetNo').onclick = function () { $('resetConfirm').hidden = true; };
+  $('resetYes').onclick = function () { ticks = {}; store.set(refKey(), '{}'); $('resetConfirm').hidden = true; loadTicks(); };
+})();
+</script>
+</body>
+</html>

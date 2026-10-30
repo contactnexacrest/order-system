@@ -27,6 +27,8 @@ Where to look:
   checks), with the read-only checks in `docs/checks/`.
 - **Staff manual (SOP):** `docs/SOP/` (copied into each stack's
   `docs/SOP`, where the in-app SOP reads it).
+- **Order workflow:** `docs/workflow/` — the workflow specification and the
+  staff step-by-step checklist (HTML), kept in step with the order page.
 - **Scheduled jobs:** each stack's README — "Bluehost cron setup" (PHP,
   `app/cron/`) and "Background jobs" (Node, `src/jobs/`).
 - **Zoho Books integration:** the "Zoho Books" follow-up section of each
