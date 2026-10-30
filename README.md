@@ -27,6 +27,9 @@ Where to look:
   checks), with the read-only checks in `docs/checks/`.
 - **Staff manual (SOP):** `docs/SOP/` (copied into each stack's
   `docs/SOP`, where the in-app SOP reads it).
+- **Owner decisions:** `docs/decisions/owner-decisions-register.md` — every
+  decision already taken (standing rules, decisions by area, every test finding
+  with its outcome, open points). Check it before raising any test finding.
 - **Order workflow:** `docs/workflow/` — the workflow specification and the
   staff step-by-step checklist (HTML), kept in step with the order page.
 - **Scheduled jobs:** each stack's README — "Bluehost cron setup" (PHP,
