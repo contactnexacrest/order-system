@@ -316,7 +316,12 @@ final class CaController
 
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $expense = CaExpenseRepository::find($id);
-        if (!CaFyLockGuard::allow($expense !== null ? $expense['expense_date'] : null, (int) $user['id'], $roleId, 'ca_expenses', $id, 'tds')) {
+        if ($expense === null) {
+            Flash::set('error', 'That expense was not found — it may have been removed already. Nothing was changed.');
+            header('Location: /ca/expenses');
+            return;
+        }
+        if (!CaFyLockGuard::allow($expense['expense_date'], (int) $user['id'], $roleId, 'ca_expenses', $id, 'tds')) {
             header('Location: /ca/expenses');
             return;
         }
@@ -684,6 +689,9 @@ final class CaController
         $lineId = (int) $params['id'];
         $user = AuthService::currentUser();
         $expenseId = (int) ($_POST['expense_id'] ?? 0);
+        if (\App\Helpers\RecordCheck::missing('ca_bank_statement_lines', $lineId, '/ca/bank-statement', 'bank line')) {
+            return;
+        }
         if ($expenseId <= 0) {
             Flash::set('error', 'Choose an expense to match.');
             header('Location: /ca/bank-statement');
@@ -708,16 +716,19 @@ final class CaController
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $line = CaBankStatementRepository::find($lineId);
+        if ($line === null) {
+            Flash::set('error', 'That bank line was not found — it may have been removed already. Nothing was changed.');
+            header('Location: /ca/bank-statement');
+            return;
+        }
         $allowed = true;
-        if ($line !== null) {
-            if ($line['matched_order_id'] !== null && $line['matched_leg'] !== null) {
-                $ops = OrderPaymentStatusRepository::find((int) $line['matched_order_id']) ?? [];
-                $matchedDate = $line['matched_leg'] === 'lc' ? (\App\Repositories\OrderLcDetailRepository::find((int) $line['matched_order_id'])['lc_received_at'] ?? null) : ($ops[$line['matched_leg'] . '_cleared_at'] ?? null);
-                $allowed = CaFyLockGuard::allow($matchedDate, (int) $user['id'], $roleId, 'order_payment_status', (int) $line['matched_order_id'], "{$line['matched_leg']}_bank_unmatch");
-            } elseif ($line['matched_expense_id'] !== null) {
-                $expense = CaExpenseRepository::find((int) $line['matched_expense_id']);
-                $allowed = CaFyLockGuard::allow($expense !== null ? $expense['expense_date'] : null, (int) $user['id'], $roleId, 'ca_expenses', (int) $line['matched_expense_id'], 'bank_unmatch');
-            }
+        if ($line['matched_order_id'] !== null && $line['matched_leg'] !== null) {
+            $ops = OrderPaymentStatusRepository::find((int) $line['matched_order_id']) ?? [];
+            $matchedDate = $line['matched_leg'] === 'lc' ? (\App\Repositories\OrderLcDetailRepository::find((int) $line['matched_order_id'])['lc_received_at'] ?? null) : ($ops[$line['matched_leg'] . '_cleared_at'] ?? null);
+            $allowed = CaFyLockGuard::allow($matchedDate, (int) $user['id'], $roleId, 'order_payment_status', (int) $line['matched_order_id'], "{$line['matched_leg']}_bank_unmatch");
+        } elseif ($line['matched_expense_id'] !== null) {
+            $expense = CaExpenseRepository::find((int) $line['matched_expense_id']);
+            $allowed = CaFyLockGuard::allow($expense !== null ? $expense['expense_date'] : null, (int) $user['id'], $roleId, 'ca_expenses', (int) $line['matched_expense_id'], 'bank_unmatch');
         }
         if (!$allowed) {
             header('Location: /ca/bank-statement');

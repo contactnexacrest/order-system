@@ -169,6 +169,7 @@ Every change in this area follows R6 (before/after, confirmed twice). All curren
 | D-082 | **Formal order cancellation:** a reason, approval by another person (strict: only a Super Admin may approve their own), refund handling and audit. | 23 Oct | | M-09, N-04; 15b6ce5, 8b2b6e4 |
 | D-083 | **Foreign-currency amounts are converted at the order's rate before being treated as INR** (for example the travel %). The four financial formulas are pinned by tests, and Supplier PO payments are validated. | 27 Sep; 23 Oct | | QA-4 P1, N-03, R-11; 870d1c8, c7c3ec9, 2a22f6f |
 | D-084 | **Buyer money arrives in INR in the SBI current account only** (no EEFC account). This is the Zoho deposit account. | 29 Oct | | S2 M-11 |
+| D-205 | **Payment terms are never approved on a cancelled or lost order.** The approval is refused with a message and nothing is recorded. | 30 Oct | | R6-N13; R6 Batch 4, 92512ba |
 
 ### 3.5 Suppliers, logistics partners and vendor bills
 
@@ -244,6 +245,7 @@ Every change in this area follows R6 (before/after, confirmed twice). All curren
 | D-132 | **Disputes are raised per order (as now).** Complaints are separate from disputes. | 28 Oct; 23 Oct | | Q-R5-3; S2 L-6; Task #39 |
 | D-133 | **Client feedback opens only after the shipping documents are sent or the order is complete.** | 23 Oct | | N-12; f88f6e0 |
 | D-134 | **Portal account rules.** The portal has forgot-password, an idle timeout, and sessions that end when the client is deactivated. Staff and portal sessions do not interfere with each other, and clients receive self-service notifications. | 27 Sep; 14 Oct; 23 Oct | | CP-06, CP-12, CP-13, L-10, #72/#88, #6, Task #35; aec5939, 26ccdcc, 3306a43, f29c6a5, 518b012 |
+| D-206 | **The buyer can report a payment only once the Proforma Invoice has been issued, and never on a cancelled or lost order.** The portal shows a one-line reason instead of the form; the server refuses it on the portal and on the e-mailed buyer link. A file sent under an unexpected field name on the buyer's message is refused with a message and the typed text is kept (both stacks). | 30 Oct | | R6-N24, R6-N03; R6 Batch 4, 92512ba |
 
 ### 3.10 Email and notifications
 
@@ -268,6 +270,7 @@ Every change in this area follows R6 (before/after, confirmed twice). All curren
 | D-146 | **Batch 6 choices.** Settings number boxes refuse letters but are not required. A custom reference entry may be a file only. There is no phone-number format rule. Forgot-password with a blank or malformed email answers "Enter your e-mail address." on the form. | 28 Oct | | S2 §15 (Batch 6 choices, Extra); 2b619c3 |
 | D-147 | **Fixed lists are dropdowns, not free text.** This covers country, Incoterm, container type, unit, package type, finish, dimensional tolerance, factory address, RBI purpose code, GST rate and CoO type. Admin maintains them through the generic dropdown admin. | 14–27 Oct | | U-06, M-05, #31, #36, #43/#66, UR-12; 74cccbd, 59453f2, 6a40a03, bdd0119, ad7b4b7, 761a42e |
 | D-148 | **Dates:** the Buyer PO received date cannot be in the future or before the order. It is recorded at Step 4d (or as the buyer's own upload day when they confirm through the link or portal), and can be corrected later with a reason (audit-logged). For CI date rules see D-055. | 30 Oct | | S3; a40cd19, 381638b |
+| D-207 | **Values the database cannot hold, and impossible ones, are refused with a message — never a 500, never stored silently as something else.** Record ids in a URL must be whole positive numbers (anything else is "not found"); unit prices and exchange rates within the column size and not rounding to zero; client payment reports positive, not in the future, within range; inverted min/max ranges refused (lead time, sailing time, net vs gross weight); impossible months and page numbers ignored. A payment amount and its exchange rate are saved together or not at all. Browser rules added where a form allows it (`data-max-decimals`, `data-max-value`). | 30 Oct | | R6-N05, N07, N14, N15, N19, N20, N21, N22, N23, N28, N29, N30; R6 Batch 1–2, 854a866, aa10739 |
 
 ### 3.12 Uploads and files
 
@@ -316,6 +319,7 @@ Every change in this area follows R6 (before/after, confirmed twice). All curren
 | D-174 | **Incentive cycle:** from the 21st of last month to the 20th of this month, paid with salary on the last day of the month. The cut-off day is configurable by Admin. Wording: salary is "fixed pay"; the incentive is "**Incentive pay**" (not "variable pay"); the setting is the "**incentive cut-off day**" (not "salary cut-off day"). | 30 Oct | | S3; 9027f23 |
 | D-175 | **Associates (outside agents, India or abroad)** earn commission per their agreement: a ladder of 0.70 / 1.00 / 1.50 / 1.75 / 2.00% of product FOB value. It is deducted from the profit first, before the team incentive. Only the client's first 10 days count, from the first Buyer PO received date (Day 1 = Step 4d). Repeat orders earn nothing. | 30 Oct | | S3; 9027f23, a40cd19 |
 | D-176 | **The signed associate agreement is uploaded as a PDF with its signing date** (each requires the other). Only holders of `manage_incentives` (owner/MD) can open it, and every opening is audit-logged. | 30 Oct | | S3; a40cd19 |
+| D-208 | **Payout and reward-table checks.** A payout cannot be marked paid above its amount or before its incentive month; "Mark all paid" with nothing selected is a warning ("Nothing was recorded…"); two reward-table rows may not start at the same order profit (checked beside the field and on the server). | 30 Oct | | R6-N10, N11, N12; R6 Batch 2 and 4, aa10739, 92512ba |
 
 ### 3.16 Reference numbers
 
@@ -333,6 +337,7 @@ Every change in this area follows R6 (before/after, confirmed twice). All curren
 | D-181 | **Passwords set by an admin are shown once and never emailed.** Password-reset links are capped per account, not per IP. (These are builder decisions recorded in the README; not challenged.) | — | | README "Judgment calls" |
 | D-182 | **Sitewide protections:** security headers (frame, referrer, HSTS, nosniff); CSRF on every POST; a rate limit on the public quotation-intake form; CSV cells neutralised against formula injection; no insecure secret fallbacks in `.env`; route-level permission tests. | 27 Sep; 15 Oct; 28 Oct | | AUTH-14, QA-4 P2, INT-05, RPT-02, R5-14; 93c55b8, 1a83a80, 10eec13, 7d3df98, a9c69cc, 09613c1 |
 | D-183 | **Deliberately not built yet (builder scope).** No SMS 2FA provider; reports export as CSV, not .xlsx; no scheduled emailing of saved reports; no generic amendment of other fields; an existing user's name, email or role cannot be edited from /users. A new test failing on these is a known gap, not a regression. | — | | README |
+| D-209 | **An action on a record that does not exist says "not found" and changes and logs nothing** — on every route, after the route's own permission check (so a user without the permission never learns whether the record exists). Batch 5 found and fixed three more routes that still said "success": unmatching a bank line, setting TDS on an expense, and saving an associate. | 30 Oct | | R6-N04, N06; R6 Batch 2 aa10739, Batch 5 |
 
 ### 3.18 Data, migrations and deployment
 
@@ -346,6 +351,7 @@ Every change in this area follows R6 (before/after, confirmed twice). All curren
 | D-189 | **Deploys reach browsers at once.** app.js and app.css load with a version stamp. | 28 Oct | | R5-26; 2b619c3 |
 | D-190 | **Read-only live checks after deploy:** duplicate client emails, blank dropdowns/reference documents, and Reference Library paths. They are in `docs/checks/`. | 28 Oct | | R5-02, R5-18, R5-30 |
 | D-191 | **Dependencies.** `sanitize-html` is deliberately pinned at 2.17.0 (2.18 breaks Jest/require, and the advisory does not apply). Non-major npm security fixes are applied; 5 low-severity issues remain in Jest (development only). | 30 Oct | | S3; 9e02119, 5c316c2 |
+| D-210 | **Simultaneous and repeated saves.** One email per client is enforced by the database (unique index, migration `2026-10-31a-client-email-unique.sql`, applied only when no duplicates remain). Repeated clicks record a payment leg, a payout or an approval once. Only one generation of a document type per order runs at a time. A save of order details, a client or a supplier is refused when someone else saved that form after it was opened, naming who and when. | 30 Oct | | R6-N16, N17, N18, N27; R6 Batch 3, e34782c |
 
 ### 3.19 Testing
 
@@ -357,6 +363,7 @@ Every change in this area follows R6 (before/after, confirmed twice). All curren
 | D-195 | **Route coverage:** a route-matrix test (378 permission-checked routes) and a test of the 88 routes with no permission check, on both stacks. | 28 Oct | | R5-14; S2 Q-6; 1e89633, 09613c1 |
 | D-196 | **Payment-wording scenario tests:** 5 presets × FOB/CFR/CIF × USD/EUR/GBP, PDF and Word, on both stacks, plus e2e PI/CI download checks. This was the owner's "batch 8 scenario tests". | 28 Oct | | S2 Q-4, Q-5; 480db14, a9d9a10 |
 | D-197 | **No PHP deprecation in the test run** (the Payments report with an order that has no currency yet was fixed). | 29 Oct | | S3; 88275e6 |
+| D-211 | **Every route has a behaviour test on both stacks (R5-14 closed).** `RouteBehaviourTest.php` / `routeBehaviour.test.js` drive each of the 124 routes QA Round 6 listed (plus 5 found since) as a permitted user and check the change, the audit row or the page, and that a missing id is "not found" with nothing written. PHPUnit also gained the 21 routes only Jest covered (file uploads are checked by their refusal, since PHP cannot upload inside PHPUnit). QA's own route search now finds 0 untested routes. Extends D-195 (which proves the refusals). | 30 Oct | | R5-14; R6 Batch 5 |
 
 ### 3.20 Documentation and process
 
@@ -390,6 +397,7 @@ Every finding ID found in the repository history and the session transcripts, so
 3. External QA report (L / M / R / U / TI / Q series, 22–23 Oct).
 4. QA Round 4 (N series, 23 Oct).
 5. QA Round 5 (R5 and Q-R5 series, 28 Oct).
+6. QA Round 6 (R6-N and Q-R6 series, 30 Oct).
 
 **IDs not found anywhere** (repository or transcripts): H-xx, K-xx, M-01, M-04, U-15, TI-01 to TI-04, and Owner Decision #2 (probably the maker-checker rule, D-117). If new statistics use these IDs, their earlier handling cannot be shown; treat them as new points.
 
@@ -652,7 +660,7 @@ Every finding ID found in the repository history and the session transcripts, so
 | R5-11 | QA R5 | Phone sizes: tap targets, text, input zoom | Fixed | D-043 | 1e89633 |
 | R5-12 | QA R5 | PHP documents 1–2 pages longer than Node | Fixed | D-057 | 380c2e0 |
 | R5-13 | QA R5 | e2e paths and settings hard-coded; mail left on | Fixed | D-194 | 1e89633 |
-| R5-14 | QA R5 | Not every route tested | Fixed | D-195 | 1e89633, 09613c1 |
+| R5-14 | QA R5 | Not every route tested | Fixed | D-195; re-opened by QA R6, closed by D-211 | 1e89633, 09613c1, R6 Batch 5 |
 | R5-15 | QA R5 | Node flash message sometimes missing | Fixed | | d570d23 |
 | R5-16 | QA R5 | "Emailed" message while mail off | Fixed | D-138 | cdee07c |
 | R5-17 | QA R5 | Blank SMTP encryption differed between stacks | Fixed | D-140 | 1e89633 |
@@ -679,6 +687,49 @@ Every finding ID found in the repository history and the session transcripts, so
 | Q-R5-3 | QA R5 question | Dispute button per order or per client | Kept as is | Per order, D-132 | — |
 | Q-R5-4 | QA R5 question | Notify only when action is needed, or on every action | Kept as is | Only when action is needed, D-135 | — |
 | Q-R5-5 | QA R5 question | Hide CAFIN from staff without CA rights | Fixed | `view_cafin`, D-109 | d570d23 |
+
+### 4.6 Round 6: QA Round 6, R6-N and Q-R6 series (30 Oct; fixed in five batches, D-202)
+
+| Finding ID | Round | One-line finding | Outcome | Register row / note | Commit |
+|---|---|---|---|---|---|
+| R6-N01 | QA R6 | Client and report pages listed and linked orders the user may not open | Fixed | D-118 (Q-R6-4, D-204) | 854a866 |
+| R6-N02 | QA R6 | Links still shown that answer 403 | Fixed | R23 | 854a866 |
+| R6-N03 | QA R6 | Buyer's message with an unexpected file field: dropped (PHP) / bare 400 (Node) | Fixed | D-206 | 92512ba |
+| R6-N04 | QA R6 | Actions on missing records reported success and wrote audit rows | Fixed | D-209 (3 more routes in Batch 5) | aa10739, Batch 5 |
+| R6-N05 | QA R6 | Negative or huge ids gave a 500 | Fixed | D-207 | aa10739 |
+| R6-N06 (Node) | QA R6 | Production status on a missing order crashed Node | Fixed | D-209 | aa10739 |
+| R6-N07 | QA R6 | Malformed ids (1.5, 1') acted on another record | Fixed | D-207 | aa10739 |
+| R6-N08 (High) | QA R6 | Assignment rule bypassed through dispute, complaint and amendment routes | Fixed | D-118 | 854a866 |
+| R6-N09 | QA R6 | Export Executive held respond permissions but the lists answered 403 | Fixed | D-203 (Q-R6-3) | 854a866 |
+| R6-N10 | QA R6 | Payout marked paid above its amount and on any past date | Fixed | D-208 | aa10739 |
+| R6-N11 | QA R6 | "Mark all paid" with nothing selected showed green "0 recorded" | Fixed | D-208 | 92512ba |
+| R6-N12 | QA R6 | Reward table accepted two rows with the same profit | Fixed | D-208 | 92512ba |
+| R6-N13 | QA R6 | Payment terms approved on a cancelled order | Fixed | D-205 | 92512ba |
+| R6-N14 | QA R6 | Unit price above the column size gave a 500 | Fixed | D-207 | aa10739 |
+| R6-N15 | QA R6 | Unit price below 0.01 stored as 0.00 | Fixed | D-207 | aa10739 |
+| R6-N16 | QA R6 | Duplicate client email under simultaneous saves | Fixed | D-210, D-129 (live migration) | e34782c |
+| R6-N17 | QA R6 | Repeated clicks recorded several times | Fixed | D-210 | e34782c |
+| R6-N18 | QA R6 | Rapid "Generate Quotation" made several revisions | Fixed | D-210 (no document content change) | e34782c |
+| R6-N19 | QA R6 | Buyer could report a negative payment | Fixed | D-207 | aa10739 |
+| R6-N20 | QA R6 | Buyer could report a payment dated in the future | Fixed | D-207 | aa10739 |
+| R6-N21 | QA R6 | Huge reported amount gave the buyer a 500 | Fixed | D-207 | aa10739 |
+| R6-N22 (High) | QA R6 | Exchange rate too large: 500 after the advance was already saved | Fixed | D-207 (saved together or not at all) | 854a866 |
+| R6-N23 | QA R6 | Exchange rate 0.00001 stored as 0.0000 | Fixed | D-207 | aa10739 |
+| R6-N24 | QA R6 | Buyer could report a payment before the PI or on a cancelled order | Fixed | D-206 | 92512ba |
+| R6-N25 (Node) | QA R6 | Dropdown Options: invalid values ignored with "updated" — in fact no Node edit there was saved | Fixed | Node form reading matches PHP (`qs`, live: `npm install`) | 92512ba |
+| R6-N26 | QA R6 | "Skip PI form" empty reason showed only the browser bubble | Kept as is | Works on an open step; QA submitted the copy inside a locked step | — |
+| R6-N27 | QA R6 | Second editor silently undid the first person's changes | Fixed | D-210 | e34782c |
+| R6-N28 | QA R6 | Order edit accepted inverted min/max ranges | Fixed | D-207 | aa10739 |
+| R6-N29 | QA R6 | Payouts page with month 13–99 gave a 500 | Fixed | D-207 | aa10739 |
+| R6-N30 (Node) | QA R6 | Audit log with page=abc gave a 500 | Fixed | D-207 | aa10739 |
+| R5-14 (re-test) | QA R6 | 124 routes still without a behaviour test | Fixed | D-211 | Batch 5 |
+| R5-02 / R5-04 / R5-27 / R5-28 / R5-29 (re-test "partly") | QA R6 | Remaining parts re-raised as R6-N16, N01/N02, N26, N25, N14/N21/N22 | Fixed / Kept as is | See those rows | — |
+| Q-R6-1 | QA R6 question | Creator approving their own payment terms | Fixed | D-117: only Admin/MD/ED may (D-204) | 92512ba |
+| Q-R6-2 | QA R6 question | CAFIN download without access to the order | Fixed | D-118, D-109 (D-204) | 854a866 |
+| Q-R6-3 | QA R6 question | Export Executive respond permissions | Fixed | D-203 | 854a866 |
+| Q-R6-4 | QA R6 question | Reports listing orders the user is not assigned to | Fixed | D-118 (D-204) | 854a866 |
+| Q-NEW-3 / Q-MAIL-3 | QA R6 question | Generator approving their own document; requester approving their own send | Kept as is | D-117 (Admin/MD/ED may; others refused) | — |
+| Q-R5-2 (re-raised) | QA R6 question | CFR order kept an insurance amount | Fixed | D-049: cleared on save for non-CIF, no document change (D-204) | 92512ba |
 
 ---
 

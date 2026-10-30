@@ -2038,7 +2038,7 @@ name ends in `_INTERNAL`. The CSV helper now leaves a plain negative number
 - **489 routes** (165 GET, 324 POST). Tests:
   `AssociateAgreementAndPoDateTest` / `associateAgreementAndPoDate.test.js`.
 
-## Follow-up (added 2026-10-31): QA Round 6, batches 1–4
+## Follow-up (added 2026-10-31): QA Round 6, batches 1–5
 
 - **Order access (Batch 1).** Disputes, complaints, amendments and the other
   records that belong to an order follow the order's assignment and archived
@@ -2080,3 +2080,13 @@ name ends in `_INTERNAL`. The CSV helper now leaves a plain negative number
     `qs` added), so `field[<id>]` keeps its id — dropdown-option edits
     were silently not saved before.
   Tests: `QaRound6SmallFixesTest` / `qaRound6SmallFixes.test.js`.
+- **Route coverage (Batch 5, R5-14).** `RouteBehaviourTest` drives each of
+  the 124 routes QA listed as untested (plus 5 found since) through the real
+  Router as a permitted user and checks what it does — the record changed,
+  the audit row, the page — and that a missing id is "not found" with
+  nothing written. It also covers the 21 routes only Jest tested (uploads by
+  their refusal: PHP cannot complete an upload inside PHPUnit). Found and
+  fixed while writing it: unmatching a bank line, setting TDS on an expense
+  and saving an associate reported success for a record that does not exist.
+  Node: `routeBehaviour.test.js` (its `/sample-data` checks live in
+  `sampleDataLoadClear.test.js`, since Jest runs files side by side).

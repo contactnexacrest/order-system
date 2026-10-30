@@ -197,6 +197,7 @@ async function associates(req, res) {
 
 async function saveAssociate(req, res) {
   const id = req.params.id ? parseInt(req.params.id, 10) : null;
+  if (id !== null && await recordCheck.missing(req, res, 'associates', id, '/associates', 'associate')) return;
   const body = req.body || {};
   const data = {};
   for (const f of associateRepository.FIELDS) {

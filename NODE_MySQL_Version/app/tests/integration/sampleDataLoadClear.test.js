@@ -7,6 +7,9 @@ jest.mock('../../src/services/pdfRenderService', () => ({
   closeBrowser: jest.fn(),
 }));
 
+const bcrypt = require('bcrypt');
+const request = require('supertest');
+const app = require('../../src/server');
 const db = require('../../src/config/db');
 const sampleDataService = require('../../src/services/sampleDataService');
 
@@ -68,5 +71,31 @@ describe('Sample data load / clear', () => {
     expect(rows).toHaveLength(2);
     expect([rows[0].status, Number(rows[0].stage_number)]).toEqual(['pending_review', 3]);
     expect([rows[1].status, Number(rows[1].stage_number)]).toEqual(['applied', 8]);
+  });
+
+  // QA Round 6, R5-14 (routeBehaviour.test.js / RouteBehaviourTest.php): the
+  // same load and clear through the real routes, as a user holding
+  // manage_sample_data. Kept in this file so it never races the checks above.
+  it('loads and clears through the /sample-data routes', async () => {
+    const role = await db.queryOne("SELECT id FROM roles WHERE name = 'Admin'");
+    const email = `jest-sample-${Math.random().toString(16).slice(2, 10)}@nexacrest.test`;
+    await db.execute(
+      `INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled, is_super_admin)
+       VALUES ('Jest Sample Data', :email, NULL, :hash, :role_id, 1, 0, 0, 1)`,
+      { email, hash: await bcrypt.hash('JestSample5!', 10), role_id: role.id }
+    );
+    const agent = request.agent(app);
+    const csrfOf = (html) => html.match(/name="_csrf"\s+value="([^"]+)"/)[1];
+    const loginCsrf = csrfOf((await agent.get('/login')).text);
+    await agent.post('/login').type('form').send({ _csrf: loginCsrf, email, password: 'JestSample5!' });
+    const page = await agent.get('/sample-data');
+    expect(page.status).toBe(200);
+    const flashAfter = async (res) => ((await agent.get(res.headers.location)).text.match(/class="alert alert-(\w+)">([\s\S]*?)<\/div>/) || []).slice(1).join(' ');
+
+    const csrf = csrfOf(page.text);
+    expect(await flashAfter(await agent.post('/sample-data/load').type('form').send({ _csrf: csrf }))).toContain('success Sample data loaded');
+    expect(Number((await db.queryOne('SELECT COUNT(*) AS c FROM orders WHERE is_sample_data = 1')).c)).toBe(10);
+    expect(await flashAfter(await agent.post('/sample-data/clear').type('form').send({ _csrf: csrf }))).toContain('success Sample data cleared');
+    expect(Number((await db.queryOne('SELECT COUNT(*) AS c FROM orders WHERE is_sample_data = 1')).c)).toBe(0);
   });
 });

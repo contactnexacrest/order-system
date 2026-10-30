@@ -154,6 +154,9 @@ final class IncentiveController
     {
         $user = AuthService::currentUser();
         $id = isset($params['id']) ? (int) $params['id'] : null;
+        if ($id !== null && \App\Helpers\RecordCheck::missing('associates', $id, '/associates', 'associate')) {
+            return;
+        }
         $data = [];
         foreach (AssociateRepository::FIELDS as $f) {
             $v = trim((string) ($_POST[$f] ?? ''));

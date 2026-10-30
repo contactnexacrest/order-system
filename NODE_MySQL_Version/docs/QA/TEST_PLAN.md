@@ -400,6 +400,7 @@ Each suite exists in both stacks (PHP `tests/Integration/…Test.php`, Node
 | Suite | What it pins |
 |---|---|
 | `RouteMatrixTest` / `routeMatrix.test.js` | Every registered route through the real router and middleware: a permission-gated route refuses (403) a user with no permissions; every staff page without a parameter opens for Admin without a server error; every public page opens signed out |
+| `RouteBehaviourTest` / `routeBehaviour.test.js` | QA Round 6, R5-14: each route that had no behaviour test (124, plus 5 found since, plus the 21 only Jest covered) driven as a permitted user — the record changed, the audit row written or the page shown — and every route with a record id answers a missing id as "not found" with no audit row. Node's `/sample-data` checks are in `sampleDataLoadClear.test.js` (Jest runs files side by side) |
 | `UngatedRoutesTest` / `ungatedRoutes.test.js` | The 88 routes with no permission check: each one's own guard (session, token, CSRF) and behaviour |
 | `OrderAccessGuardTest`, `PermittedLinksTest` | One order-access guard on every `/orders/{id}/*` route; links shown only where the viewer can open them |
 | `PaymentTermsApprovalTest` | Terms on a "Requires MD approval" preset block the Quotation until approved |

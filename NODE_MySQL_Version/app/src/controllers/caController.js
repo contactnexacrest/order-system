@@ -13,6 +13,7 @@ const userRepository = require('../repositories/userRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const financialYear = require('../helpers/financialYear');
 const flash = require('../helpers/flash');
+const recordCheck = require('../helpers/recordCheck');
 const zohoSyncLogRepository = require('../repositories/zohoSyncLogRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const zohoBooksService = require('../services/zohoBooksService');
@@ -294,7 +295,12 @@ async function setExpenseTds(req, res) {
   const user = req.user;
 
   const expense = await caExpenseRepository.find(id);
-  if (!(await caFyLockGuard.allow(req, expense ? expense.expense_date : null, 'ca_expenses', id, 'tds'))) {
+  if (!expense) {
+    flash.set(req, 'error', 'That expense was not found — it may have been removed already. Nothing was changed.');
+    res.redirect('/ca/expenses');
+    return;
+  }
+  if (!(await caFyLockGuard.allow(req, expense.expense_date, 'ca_expenses', id, 'tds'))) {
     res.redirect('/ca/expenses');
     return;
   }
@@ -660,6 +666,9 @@ async function matchBankLineToExpense(req, res) {
   const lineId = parseInt(req.params.id, 10);
   const user = req.user;
   const expenseId = parseInt(req.body.expense_id, 10) || 0;
+  if (await recordCheck.missing(req, res, 'ca_bank_statement_lines', lineId, '/ca/bank-statement', 'bank line')) {
+    return;
+  }
   if (expenseId <= 0) {
     flash.set(req, 'error', 'Choose an expense to match.');
     res.redirect('/ca/bank-statement');
@@ -680,16 +689,19 @@ async function matchBankLineToExpense(req, res) {
 async function unmatchBankLine(req, res) {
   const lineId = parseInt(req.params.id, 10);
   const line = await caBankStatementRepository.find(lineId);
+  if (!line) {
+    flash.set(req, 'error', 'That bank line was not found — it may have been removed already. Nothing was changed.');
+    res.redirect('/ca/bank-statement');
+    return;
+  }
   let allowed = true;
-  if (line) {
-    if (line.matched_order_id !== null && line.matched_leg !== null) {
-      const ops = (await orderPaymentStatusRepository.find(line.matched_order_id)) || {};
-      const matchedDate = line.matched_leg === 'lc' ? ((await orderLcDetailRepository.find(line.matched_order_id)) || {}).lc_received_at ?? null : (ops[`${line.matched_leg}_cleared_at`] ?? null);
-      allowed = await caFyLockGuard.allow(req, matchedDate, 'order_payment_status', line.matched_order_id, `${line.matched_leg}_bank_unmatch`);
-    } else if (line.matched_expense_id !== null) {
-      const expense = await caExpenseRepository.find(line.matched_expense_id);
-      allowed = await caFyLockGuard.allow(req, expense ? expense.expense_date : null, 'ca_expenses', line.matched_expense_id, 'bank_unmatch');
-    }
+  if (line.matched_order_id !== null && line.matched_leg !== null) {
+    const ops = (await orderPaymentStatusRepository.find(line.matched_order_id)) || {};
+    const matchedDate = line.matched_leg === 'lc' ? ((await orderLcDetailRepository.find(line.matched_order_id)) || {}).lc_received_at ?? null : (ops[`${line.matched_leg}_cleared_at`] ?? null);
+    allowed = await caFyLockGuard.allow(req, matchedDate, 'order_payment_status', line.matched_order_id, `${line.matched_leg}_bank_unmatch`);
+  } else if (line.matched_expense_id !== null) {
+    const expense = await caExpenseRepository.find(line.matched_expense_id);
+    allowed = await caFyLockGuard.allow(req, expense ? expense.expense_date : null, 'ca_expenses', line.matched_expense_id, 'bank_unmatch');
   }
   if (!allowed) {
     res.redirect('/ca/bank-statement');
