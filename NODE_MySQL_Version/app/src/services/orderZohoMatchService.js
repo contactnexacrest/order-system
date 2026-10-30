@@ -166,7 +166,8 @@ async function check(orderId) {
     await expense(`${label} — ${e.details}`, Number(e.amount_inr), e.zoho_expense_id, notSent(e.expense_date), errorFor('order_expense', 'expense'));
   }
   for (const c of await orderCostEntryRepository.forOrder(orderId)) {
-    if (!orderCostEntryRepository.ZOHO_CATEGORIES.includes(c.category)) continue;
+    // An incentive line goes to Books once it is paid, not when it is fixed.
+    if (!orderCostEntryRepository.ZOHO_CATEGORIES.includes(c.category) || (c.incentive_kind !== null && c.paid_from === null)) continue;
     const label = orderCostEntryRepository.CATEGORIES[c.category];
     await expense(`Cost: ${label}${c.description ? ` — ${c.description}` : ''}`, Number(c.amount_inr), c.zoho_expense_id, notSent(c.incurred_at || c.created_at), errorFor('order_cost', 'cost'));
   }

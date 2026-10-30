@@ -183,15 +183,20 @@ final class TeamIncentiveTest extends DbTestCase
     public function testPayingEveryoneSendsTheTeamIncentiveToZohoBooksAsPaid(): void
     {
         $orderId = $this->paidOrder($this->createTestClient());
+        Database::connection()->prepare("UPDATE orders SET company_legal_name = 'TEST-Incentive Sync Buyer' WHERE id = :o")->execute(['o' => $orderId]);
+        $toSync = static fn (): array => array_map('intval', array_column(\App\Repositories\ZohoPurchaseRepository::costEntriesToSync(null), 'id'));
         IncentiveService::lockIfDue($orderId, $this->admin);
+        self::assertNotContains((int) IncentiveRepository::costEntries($orderId)['team']['id'], $toSync(), 'fixed but not paid: not picked up by the Zoho sync');
         $rows = IncentiveRepository::payoutsForOrder($orderId);
         IncentiveService::markPaid((int) $rows[0]['id'], '2026-11-30', (float) $rows[0]['amount_inr'], null, $this->admin);
         self::assertNull(IncentiveRepository::costEntries($orderId)['team']['paid_from'], 'not all paid yet: not sent');
+        self::assertNotContains((int) IncentiveRepository::costEntries($orderId)['team']['id'], $toSync());
         foreach (array_slice($rows, 1) as $r) {
             IncentiveService::markPaid((int) $r['id'], '2026-11-30', (float) $r['amount_inr'], null, $this->admin);
         }
         $entry = IncentiveRepository::costEntries($orderId)['team'];
         self::assertSame(['company_account', '2026-11-30', '50000.00'], [$entry['paid_from'], $entry['incurred_at'], $entry['amount_inr']]);
+        self::assertContains((int) $entry['id'], $toSync(), 'all paid: the sync sends it as a Books expense');
         self::assertSame('Part of this order\'s incentive is already paid, so its figures can no longer be worked out again.', IncentiveService::unlock($orderId, $this->admin));
     }
 

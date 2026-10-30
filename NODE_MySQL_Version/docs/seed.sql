@@ -615,7 +615,8 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
   ('order_additional_document',  'pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 15728640, 'Batch 3 #13b — a free-form extra document attached to an order that does not fit any fixed document type (e.g. a buyer-supplied certificate template, a special packing instruction sheet).'),
   ('client_additional_document', 'pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 15728640, 'Batch 3 #13b — same as order_additional_document, but attached to a client rather than one specific order (e.g. a standing NDA, a general compliance certificate).'),
   ('client_agreement_file',      'pdf,doc,docx', 15728640, 'Item 2 — the actual signed copy of a client''s commercial agreement, tied to that client''s expiry/renew tracking (clients.agreement_file_path etc — see schema.sql Section BE).'),
-  ('order_lc_copy',              'pdf,jpg,jpeg,png', 10485760, 'Export process step 5-1a: the final Letter of Credit document for this order, when the client opted for LC payment.');
+  ('order_lc_copy',              'pdf,jpg,jpeg,png', 10485760, 'Export process step 5-1a: the final Letter of Credit document for this order, when the client opted for LC payment.'),
+  ('associate_agreement',        'pdf', 15728640, 'The signed Commission Structure and Associate Agreement of an associate (associates.agreement_file_id) — internal, manage_incentives only.');
 
 -- ================================================================
 -- COMPANY_SETTINGS — every key schema.sql reserves for this table.

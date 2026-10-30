@@ -1,7 +1,7 @@
 {% set a0 = editing or {} %}
 <div class="card">
   <h1>Associates</h1>
-  <p class="muted">Outside people, in India or abroad, who introduce new clients under a signed agreement. They earn the agreement's rate on the product value of a client's first orders (the client's first 10 days count as one order), once the buyer has fully paid; nothing on repeat orders. Their commission is a cost of the order, deducted before the team incentive is worked out. Only people with "Manage team incentives" see this page.</p>
+  <p class="muted">Outside people, in India or abroad, who introduce new clients under a signed agreement. They earn the agreement's rate on the product value of a client's first orders (everything in the 10 days from the client's first PO received counts as one order), once the buyer has fully paid; nothing on repeat orders. Their commission is a cost of the order, deducted before the team incentive is worked out. Only people with "Manage team incentives" see this page.</p>
 
   <table class="list">
     <tr><th>Name</th><th>Based in</th><th>Paid in</th><th>Agreement signed</th><th>Rates (orders 1–5 / 6–10 / 11–20 / 21–40 / 41+)</th><th>Clients introduced</th><th>Status</th><th></th></tr>
@@ -10,7 +10,8 @@
         <td>{{ a.name }}</td>
         <td>{% if a.based_in == 'india' %}India{% else %}Abroad{% if a.country %} — {{ a.country }}{% endif %}{% endif %}</td>
         <td>{{ a.currency_code }}</td>
-        <td>{{ (a.agreement_signed_on | shortDate) if a.agreement_signed_on else '—' }}</td>
+        <td>{{ (a.agreement_signed_on | shortDate) if a.agreement_signed_on else '—' }}
+          {% if a.agreement_file_id %}<br><a href="/associates/{{ a.id }}/agreement" class="small">Signed copy</a>{% elif a.agreement_signed_on %}<br><small class="muted">no copy on file</small>{% endif %}</td>
         <td>{{ a.rateText }}</td>
         <td>
           {% for c in clientsByAssociate[a.id] %}
@@ -39,7 +40,7 @@
 
 <div class="card" id="associate-form">
   <h2>{{ ('Edit ' + a0.name) if editing else 'Add an associate' }}</h2>
-  <form method="post" action="{{ ('/associates/' + editing.id + '/update') if editing else '/associates' }}">
+  <form method="post" action="{{ ('/associates/' + editing.id + '/update') if editing else '/associates' }}" enctype="multipart/form-data">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <div class="field-grid">
       <label>Name *<input type="text" name="name" required maxlength="150" value="{{ a0.name or '' }}"></label>
@@ -53,7 +54,8 @@
       <label>Email<input type="email" name="email" maxlength="190" value="{{ a0.email or '' }}"></label>
       <label>Phone<input type="tel" name="phone" maxlength="40" value="{{ a0.phone or '' }}"></label>
       <label>PAN / tax ID<input type="text" name="tax_id" maxlength="50" value="{{ a0.tax_id or '' }}"></label>
-      <label>Agreement signed on<input type="date" name="agreement_signed_on" max="{{ today() }}" value="{{ a0.agreement_signed_on or '' }}"></label>
+      <label>Agreement signed on<input type="date" name="agreement_signed_on" max="{{ today() }}" value="{{ a0.agreement_signed_on or '' }}"{% if a0.agreement_file_id %} required{% else %} data-required-if="agreement_file" data-required-if-message="Enter the date the agreement was signed."{% endif %}></label>
+      <label>Signed agreement (PDF){% if a0.agreement_file_id %} &middot; <a href="/associates/{{ a0.id }}/agreement">copy on file</a>, choose a file only to replace it{% endif %}<input type="file" name="agreement_file" accept=".pdf,application/pdf"{% if not a0.agreement_file_id %} data-required-if="agreement_signed_on" data-required-if-message="Attach the signed agreement (PDF) with its signing date."{% endif %}></label>
     </div>
     <fieldset><legend>Commission rates (% of product value, from the agreement)</legend>
       <div class="field-grid">

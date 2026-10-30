@@ -25,8 +25,8 @@ final class AssociateRepository
     public static function all(): array
     {
         return Database::connection()->query(
-            'SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.associate_id = a.id) AS client_count
-             FROM associates a ORDER BY a.status, a.name'
+            'SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.associate_id = a.id) AS client_count, f.original_filename AS agreement_file_name
+             FROM associates a LEFT JOIN file_store f ON f.id = a.agreement_file_id ORDER BY a.status, a.name'
         )->fetchAll();
     }
 
@@ -52,6 +52,20 @@ final class AssociateRepository
         $sets = implode(', ', array_map(static fn (string $f): string => "{$f} = :{$f}", self::FIELDS));
         Database::connection()->prepare("UPDATE associates SET {$sets} WHERE id = :id")
             ->execute(array_intersect_key($data, array_flip(self::FIELDS)) + ['id' => $id]);
+    }
+
+    /** The signed agreement (owner decision 2026-10-30): a file_store row, replaced by a newer upload. */
+    public static function setAgreementFile(int $id, int $fileId): void
+    {
+        Database::connection()->prepare('UPDATE associates SET agreement_file_id = :f WHERE id = :id')->execute(['f' => $fileId, 'id' => $id]);
+    }
+
+    /** Whether the file is an associate's signed agreement (manage_incentives only, wherever it is served). */
+    public static function isAgreementFile(int $fileId): bool
+    {
+        $stmt = Database::connection()->prepare('SELECT 1 FROM associates WHERE agreement_file_id = :f LIMIT 1');
+        $stmt->execute(['f' => $fileId]);
+        return $stmt->fetchColumn() !== false;
     }
 
     /** The rate (%) for the associate's Nth commission order. */

@@ -1400,14 +1400,23 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision 2026-10-30: the day the PO arrived is the associate
+        // agreement's Day 1, so it is recorded here (not the click date).
+        $receivedOn = trim((string) ($_POST['buyer_po_received_on'] ?? ''));
+        $orderDate = substr((string) (OrderRepository::find($orderId)['created_at'] ?? ''), 0, 10);
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $receivedOn, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || $receivedOn > date('Y-m-d') || $receivedOn < $orderDate) {
+            Flash::set('error', "Enter the date the buyer's PO was received: not in the future and not before the order was created ({$orderDate}).");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         if (WetSignatureGuardService::buyerPoBlocked($orderId)) {
             Flash::set('error', 'Wet-signature required: upload the buyer\'s signed PO copy ("Attach Buyer PO copy") before confirming this gate.');
             header("Location: /orders/{$orderId}");
             return;
         }
-        OrderRepository::setBuyersPoRef($orderId, $ref);
+        OrderRepository::setBuyersPoRef($orderId, $ref, $receivedOn);
         StageGateService::passAndUnlockNext($orderId, 2, (int) $user['id']);
-        Flash::set('success', "Buyer PO recorded ({$ref}). Stage 3 (PI / Production) unlocked.");
+        Flash::set('success', "Buyer PO recorded ({$ref}, received " . \App\Helpers\Dates::short($receivedOn) . '). Stage 3 (PI / Production) unlocked.');
         header("Location: /orders/{$orderId}");
     }
 

@@ -469,11 +469,15 @@
     var mismatch = matchError(el);
     if (mismatch) return mismatch;
     // data-required-if="<name>=<value>": required while that field has that value
-    // (e.g. the staff member's name when an expense was paid by staff).
+    // (e.g. the staff member's name when an expense was paid by staff);
+    // data-required-if="<name>": required once that field is filled (e.g. the
+    // signed agreement's file once its signing date is entered).
     if (el.dataset.requiredIf && el.form && value === '') {
       var cond = el.dataset.requiredIf.split('=');
       var other = el.form.elements.namedItem(cond[0]);
-      if (other && 'value' in other && other.value === cond[1]) return 'This field is required.';
+      if (other && 'value' in other && (cond.length === 1 ? other.value.trim() !== '' : other.value === cond[1])) {
+        return el.dataset.requiredIfMessage || 'This field is required.';
+      }
     }
     // data-required-unless="<file field>": required when that file field is empty
     // (e.g. the reason, when no receipt is attached).

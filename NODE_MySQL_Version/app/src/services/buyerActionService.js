@@ -13,6 +13,7 @@ const orderStageRepository = require('../repositories/orderStageRepository');
 const stageGateService = require('./stageGateService');
 const documentGenerationService = require('./documentGenerationService');
 const fileUploadService = require('./fileUploadService');
+const { todayIst } = require('../helpers/dbDateTime');
 
 
 /**
@@ -127,7 +128,7 @@ async function uploadBuyerPo(req, order) {
   const reference = order.order_reference || `#${orderId}`;
 
   if (awaitingPo && (await documentGenerationService.stageDocumentBlockedBy(orderId, 2)).length === 0) {
-    await orderRepository.setBuyersPoRef(orderId, poRef);
+    await orderRepository.setBuyersPoRef(orderId, poRef, todayIst()); // the day the buyer sent it
     await stageGateService.passAndUnlockNext(orderId, 2, null);
     await auditLogRepository.log(null, 'BUYER_PO_CONFIRMED_BY_CLIENT', 'orders', orderId, 'buyers_po_ref', null, poRef, 'The buyer uploaded their signed PO with its number — Step 4 completed.');
     await notificationRepository.notifyOrderTeam(orderId, 'buyer_po_uploaded_by_client', `The buyer uploaded their signed PO (${poRef}) on order ${reference} — Step 4 is complete and Stage 3 (PI) is open.`);

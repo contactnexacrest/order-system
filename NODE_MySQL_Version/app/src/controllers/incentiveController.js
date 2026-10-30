@@ -1,14 +1,17 @@
 'use strict';
 
+const fs = require('fs');
 const csv = require('../helpers/csv');
 const flash = require('../helpers/flash');
 const associateRepository = require('../repositories/associateRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
+const fileStoreRepository = require('../repositories/fileStoreRepository');
 const incentiveRepository = require('../repositories/incentiveRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const orderRepository = require('../repositories/orderRepository');
 const userRepository = require('../repositories/userRepository');
 const incentiveService = require('../services/incentiveService');
+const fileUploadService = require('../services/fileUploadService');
 
 /**
  * Port of IncentiveController.php. Team incentive program and associates
@@ -211,21 +214,64 @@ async function saveAssociate(req, res) {
     }
   }
   data.status = data.status === 'inactive' ? 'inactive' : 'active';
+  // Owner decision 2026-10-30: the signed agreement is kept with its date —
+  // a signing date needs the signed copy on file, and the other way round.
+  const existing = id !== null ? await associateRepository.find(id) : null;
+  const hasUpload = Boolean(req.file && req.file.originalname);
+  if (data.agreement_signed_on !== null && !hasUpload && !(existing && existing.agreement_file_id)) {
+    errors.push('Attach the signed agreement (PDF) with its signing date.');
+  }
+  if ((hasUpload || (existing && existing.agreement_file_id)) && data.agreement_signed_on === null) {
+    errors.push('Enter the date the agreement was signed with its signed copy.');
+  }
   if (errors.length) {
     flash.set(req, 'error', errors.join(' '));
     res.redirect(id ? `/associates/${id}/edit` : '/associates');
     return;
   }
+  let fileId = null;
+  if (hasUpload) {
+    try {
+      fileId = await fileUploadService.handleUpload(req, 'agreement_file', 'associate_agreement', 'associates/agreements', null, null, req.user.id, null, data.name, 'Signed associate agreement');
+    } catch (e) {
+      flash.setErrorFromException(req, e);
+      res.redirect(id ? `/associates/${id}/edit` : '/associates');
+      return;
+    }
+  }
+  let savedId = id;
   if (id === null) {
-    const newId = await associateRepository.create(data, req.user.id);
-    await auditLogRepository.log(req.user.id, 'ASSOCIATE_ADDED', 'associates', newId, null, null, data.name);
+    savedId = await associateRepository.create(data, req.user.id);
+    await auditLogRepository.log(req.user.id, 'ASSOCIATE_ADDED', 'associates', savedId, null, null, data.name);
     flash.set(req, 'success', `Associate "${data.name}" added.`);
   } else {
     await associateRepository.update(id, data);
     await auditLogRepository.log(req.user.id, 'ASSOCIATE_UPDATED', 'associates', id, null, null, JSON.stringify(data));
     flash.set(req, 'success', `Associate "${data.name}" saved.`);
   }
+  if (fileId !== null) {
+    await associateRepository.setAgreementFile(savedId, fileId);
+    await auditLogRepository.log(req.user.id, 'ASSOCIATE_AGREEMENT_UPLOADED', 'associates', savedId, 'agreement_file_id', existing && existing.agreement_file_id ? String(existing.agreement_file_id) : null, String(fileId));
+  }
   res.redirect('/associates');
+}
+
+/** The signed agreement — internal (manage_incentives only), every download audit-logged. */
+async function downloadAgreement(req, res) {
+  const associate = await associateRepository.find(parseInt(req.params.id, 10));
+  const file = associate && associate.agreement_file_id ? await fileStoreRepository.find(Number(associate.agreement_file_id)) : null;
+  if (!file || !fs.existsSync(file.server_path)) {
+    res.status(404).send('No signed agreement is on file for this associate.');
+    return;
+  }
+  await auditLogRepository.log(req.user.id, 'ASSOCIATE_AGREEMENT_DOWNLOADED', 'associates', Number(associate.id), null, null, file.original_filename);
+  // eslint-disable-next-line no-control-regex
+  const name = String(file.original_filename).replace(/[\x00-\x1F\x7F"/\\]/g, '-');
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+  res.setHeader('Content-Length', String(fs.statSync(file.server_path).size));
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.send(fs.readFileSync(file.server_path));
 }
 
 async function linkClient(req, res) {
@@ -426,6 +472,7 @@ module.exports = {
   saveSettings,
   associates,
   saveAssociate,
+  downloadAgreement,
   linkClient,
   unlinkClient,
   saveOrder,

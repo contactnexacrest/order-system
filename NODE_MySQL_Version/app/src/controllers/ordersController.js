@@ -88,6 +88,7 @@ const fileUploadService = require('../services/fileUploadService');
 const testModeService = require('../services/testModeService');
 const wetSignatureGuardService = require('../services/wetSignatureGuardService');
 const { todayIst } = require('../helpers/dbDateTime');
+const dates = require('../helpers/dates');
 
 // Port of App\Controllers\OrderController.
 
@@ -1497,14 +1498,28 @@ async function recordBuyerPo(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner decision 2026-10-30: the day the PO arrived is the associate
+  // agreement's Day 1, so it is recorded here (not the click date).
+  const receivedOn = str(req.body.buyer_po_received_on);
+  const orderDate = String((await orderRepository.find(orderId))?.created_at || '').slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(receivedOn);
+  const realDate = m && (() => {
+    const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
+  })();
+  if (!realDate || receivedOn > todayIst() || receivedOn < orderDate) {
+    flash.set(req, 'error', `Enter the date the buyer's PO was received: not in the future and not before the order was created (${orderDate}).`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   if (await wetSignatureGuardService.buyerPoBlocked(orderId)) {
     flash.set(req, 'error', 'Wet-signature required: upload the buyer\'s signed PO copy ("Attach Buyer PO copy") before confirming this gate.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  await orderRepository.setBuyersPoRef(orderId, ref);
+  await orderRepository.setBuyersPoRef(orderId, ref, receivedOn);
   await stageGateService.passAndUnlockNext(orderId, 2, user.id);
-  flash.set(req, 'success', `Buyer PO recorded (${ref}). Stage 3 (PI / Production) unlocked.`);
+  flash.set(req, 'success', `Buyer PO recorded (${ref}, received ${dates.short(receivedOn)}). Stage 3 (PI / Production) unlocked.`);
   res.redirect(`/orders/${orderId}`);
 }
 

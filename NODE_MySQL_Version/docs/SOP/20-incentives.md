@@ -88,3 +88,20 @@ and links each client to the associate who introduced it. An associate is
 paid the agreement's rate on the client's first orders once the buyer has
 fully paid; nothing on repeat orders. Their payment appears on the Incentive
 Payouts list in the same incentive month.
+
+**The 10 days.** Everything from the client in the 10 days from the day
+the client's **first PO was received** (Day 1, recorded at Step 4d) counts
+as one order under the agreement: for a first PO received on 4 March, POs
+received up to 13 March (Day 10) are part of it, and a PO received on 14
+March (Day 11) or later is a repeat order with no commission. Orders
+confirmed before the PO date was recorded count from their order date.
+On an order's incentive card, "Associate commission" can still be set to
+Yes or No by hand when management decides otherwise.
+
+**The signed agreement.** On **Associates**, add or edit the associate and
+enter **Agreement signed on** together with **Signed agreement (PDF)**:
+one is refused without the other. The list then shows a **Signed copy**
+link under the date. Choosing a new file on Edit replaces the copy on file
+(the earlier one stays in storage). Only people with "Manage team
+incentives" can open the copy; the general file link refuses everyone
+else, and every upload and download is recorded in the audit log.

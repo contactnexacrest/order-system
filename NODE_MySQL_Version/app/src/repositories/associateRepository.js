@@ -28,8 +28,8 @@ function pick(data) {
 /** With the number of clients each introduced. */
 async function all() {
   return db.query(
-    `SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.associate_id = a.id) AS client_count
-     FROM associates a ORDER BY a.status, a.name`
+    `SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.associate_id = a.id) AS client_count, f.original_filename AS agreement_file_name
+     FROM associates a LEFT JOIN file_store f ON f.id = a.agreement_file_id ORDER BY a.status, a.name`
   );
 }
 
@@ -101,4 +101,14 @@ async function orderNumberForClient(associateId, clientId) {
   return Number(row.n) + 1;
 }
 
-module.exports = { TIERS, FIELDS, all, find, create, update, rateFor, clients, linkClient, unlinkedClients, orderNumberForClient };
+/** The signed agreement (owner decision 2026-10-30): a file_store row, replaced by a newer upload. */
+async function setAgreementFile(id, fileId) {
+  await db.execute('UPDATE associates SET agreement_file_id = :f WHERE id = :id', { f: fileId, id });
+}
+
+/** Whether the file is an associate's signed agreement (manage_incentives only, wherever it is served). */
+async function isAgreementFile(fileId) {
+  return (await db.queryOne('SELECT 1 AS yes FROM associates WHERE agreement_file_id = :f LIMIT 1', { f: fileId })) !== null;
+}
+
+module.exports = { TIERS, FIELDS, all, find, create, update, setAgreementFile, isAgreementFile, rateFor, clients, linkClient, unlinkedClients, orderNumberForClient };

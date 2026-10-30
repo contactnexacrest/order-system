@@ -10,7 +10,7 @@ has not had yet, **in filename order**. The two stacks share one database
 design, so the same files serve PHP and Node.
 
 ```bash
-mysql -u <user> -p <database> < docs/migrations/2026-10-30c-ca-view-all-orders.sql
+mysql -u <user> -p <database> < docs/migrations/2026-10-30d-associate-agreement-po-date.sql
 ```
 
 ## Rules every file follows
@@ -27,8 +27,8 @@ mysql -u <user> -p <database> < docs/migrations/2026-10-30c-ca-view-all-orders.s
 ## Latest releases — run in this order
 
 Run each file below that the database has not had yet, in this order, then
-deploy the code for both stacks. As of 29 Oct 2026 the live site still
-needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b and 30c**.
+deploy the code for both stacks. As of 30 Oct 2026 the live site still
+needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30c and 30d**.
 
 | # | File | What it does |
 |---|---|---|
@@ -52,6 +52,7 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b and
 | 18 | `2026-10-30a-lc-payment-firc.sql` | The LC payment's FIRC / eBRC reference and date, so it joins the INR Settlement Register like the other legs; the setting `zoho_books_restore_checked_at` (when the scheduled Zoho sync last checked the records already in Books — once a day) |
 | 19 | `2026-10-30b-team-incentives.sql` | Team incentives and associates: the settings (switched **off** until management turns them on), each person's incentive role, each order's incentive and people, the payouts by incentive month, the associate register and the client's associate, the marker on the order's commission cost line, and the permissions Manage team incentives (Admin, MD), Pay incentives (Admin, MD, Accounts Executive) and View own incentives |
 | 20 | `2026-10-30c-ca-view-all-orders.sql` | The CA / Chartered Accountant role sees every order, read-only (`view_all_orders`), not only the orders assigned to it |
+| 21 | `2026-10-30d-associate-agreement-po-date.sql` | The associate's signed agreement kept as a PDF (upload context `associate_agreement`), and the date the buyer's PO was received (Step 4d) — Day 1 of the associate's 10 days |
 
 There is no `2026-10-28b` file; that letter was not used.
 

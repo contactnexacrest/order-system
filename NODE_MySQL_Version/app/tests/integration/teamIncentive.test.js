@@ -9,6 +9,7 @@ const orderFinancialsController = require('../../src/controllers/orderFinancials
 const associateRepository = require('../../src/repositories/associateRepository');
 const incentiveRepository = require('../../src/repositories/incentiveRepository');
 const permissionRepository = require('../../src/repositories/permissionRepository');
+const zohoPurchaseRepository = require('../../src/repositories/zohoPurchaseRepository');
 const incentiveService = require('../../src/services/incentiveService');
 const orderProfitabilityService = require('../../src/services/orderProfitabilityService');
 const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
@@ -186,15 +187,20 @@ describe('Team incentive program and associates', () => {
 
   it('paying everyone sends the team incentive to Zoho Books as paid', async () => {
     const orderId = await paidOrder(await createTestClient());
+    await db.execute("UPDATE orders SET company_legal_name = 'TEST-Incentive Sync Buyer' WHERE id = :o", { o: orderId });
+    const toSync = async () => (await zohoPurchaseRepository.costEntriesToSync(null)).map((r) => Number(r.id));
     await incentiveService.lockIfDue(orderId, admin);
+    expect(await toSync()).not.toContain(Number((await incentiveRepository.costEntries(orderId)).team.id)); // fixed but not paid: not picked up by the Zoho sync
     const rows = await incentiveRepository.payoutsForOrder(orderId);
     await incentiveService.markPaid(Number(rows[0].id), '2026-11-30', Number(rows[0].amount_inr), null, admin);
     expect((await incentiveRepository.costEntries(orderId)).team.paid_from).toBeNull(); // not all paid yet: not sent
+    expect(await toSync()).not.toContain(Number((await incentiveRepository.costEntries(orderId)).team.id));
     for (const r of rows.slice(1)) {
       await incentiveService.markPaid(Number(r.id), '2026-11-30', Number(r.amount_inr), null, admin);
     }
     const entry = (await incentiveRepository.costEntries(orderId)).team;
     expect([entry.paid_from, String(entry.incurred_at).slice(0, 10), entry.amount_inr]).toEqual(['company_account', '2026-11-30', '50000.00']);
+    expect(await toSync()).toContain(Number(entry.id)); // all paid: the sync sends it as a Books expense
     expect(await incentiveService.unlock(orderId, admin)).toBe('Part of this order\'s incentive is already paid, so its figures can no longer be worked out again.');
   });
 

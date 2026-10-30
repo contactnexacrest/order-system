@@ -2068,7 +2068,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <details class="step-card" id="step-4d-buyer-po-confirm"<?= $subCardOpen('4', '4d') ?>>
       <summary><?= $stepStatusIcon($subStepStatus('4', '4d')) ?><h2>Step 4d &middot; Confirm Buyer's PO Received</h2></summary>
       <?php if ($hasBuyerPo): ?>
-        <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong></p>
+        <p>Buyer PO recorded: <strong><?= htmlspecialchars($order['buyers_po_ref']) ?></strong><?php if (!empty($order['buyer_po_received_on'])): ?> &middot; received on <?= htmlspecialchars(\App\Helpers\Dates::short((string) $order['buyer_po_received_on'])) ?><?php endif; ?></p>
       <?php elseif (!$stage2 || $stage2['status'] === 'locked'): ?>
         <p class="muted">Generate the Quotation first to unlock this gate.</p>
       <?php elseif ($buyerPoCopyRequired && empty($buyerPoDocuments)): ?>
@@ -2077,6 +2077,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po">
           <?= Csrf::field() ?>
           <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
+          <label>Date the buyer's PO was received *<input type="date" name="buyer_po_received_on" required min="<?= htmlspecialchars(substr((string) $order['created_at'], 0, 10)) ?>" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
+          <p class="muted small">The day it arrived by email or post, not the date printed on it. For an associate's client, this is Day 1 of the agreement's 10 days.</p>
           <?= $stageGateNotice(2, "confirm the buyer's PO received") ?>
           <?= $stepBadge('4d') ?><button type="submit"<?= $stageGateDisabled(2) ?> class="btn-sm">Confirm Buyer PO Received</button>
         </form>

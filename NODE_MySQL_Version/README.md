@@ -46,8 +46,8 @@ app/                    the application itself — this is what you deploy
   package.json / package-lock.json
   .env.example            template — copy to .env and fill in real values
 docs/
-  schema.sql              the MySQL schema — 119 tables, 231 foreign keys
-                          as of 2026-10-29 (plus this stack's own
+  schema.sql              the MySQL schema — 119 tables, 232 foreign keys
+                          as of 2026-10-30 (plus this stack's own
                           `sessions` table = 120; see the file's own
                           trailing changelog comments)
   seed.sql                seed data: roles/permissions, company settings,
@@ -877,3 +877,27 @@ name ends in `_INTERNAL`. The CSV helper now leaves a plain negative number
   client.
 - The CA / Chartered Accountant role holds `view_all_orders` (read-only):
   migration `docs/migrations/2026-10-30c-ca-view-all-orders.sql`.
+
+## Follow-up (added 2026-10-30): associate agreement on file, buyer PO received date
+
+- **Signed associate agreement.** Associates → Add / Edit takes the signed
+  agreement as a PDF with its signing date; one is refused without the
+  other (browser: `data-required-if`, extended in the sitewide `app.js` to
+  mean "required once that field is filled" when no `=value` is given).
+  The list shows a "Signed copy" link. Download `GET /associates/{id}/agreement`
+  (`manage_incentives`), every upload and download audit-logged
+  (`ASSOCIATE_AGREEMENT_UPLOADED` / `ASSOCIATE_AGREEMENT_DOWNLOADED`); the
+  general `/file-store/{id}/download` refuses an agreement file to anyone
+  without `manage_incentives`.
+- **Buyer PO received date.** Step 4d asks for the date the buyer's PO was
+  received (required, not in the future, not before the order date); a
+  buyer completing Step 4 through the Buyer Action Link or the portal
+  records the day of upload. The associate's 10 days now count from the
+  client's first PO received (agreement clause 4.1), falling back to the
+  order date for orders confirmed before this change. The date is not
+  shown on any generated document.
+- Migration `docs/migrations/2026-10-30d-associate-agreement-po-date.sql`
+  (`associates.agreement_file_id`, `orders.buyer_po_received_on`, upload
+  context `associate_agreement`). **119 tables**, **232 foreign keys**,
+  **63 permissions**, **488 routes** (165 GET, 323 POST).
+  Tests: `AssociateAgreementAndPoDateTest` / `associateAgreementAndPoDate.test.js`.

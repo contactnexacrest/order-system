@@ -176,6 +176,8 @@ final class ZohoPurchaseRepository
              JOIN orders o ON o.id = ce.order_id
              JOIN clients c ON c.id = o.client_id
              WHERE ce.category IN ({$categories})
+               -- a team incentive / associate commission line goes once it is paid (settled), not when it is fixed
+               AND (ce.incentive_kind IS NULL OR ce.paid_from IS NOT NULL)
              ORDER BY cost_date, ce.id"
         )->fetchAll();
         return array_values(array_filter($rows, static fn (array $r): bool => ($startDate === null || (string) $r['cost_date'] >= $startDate)

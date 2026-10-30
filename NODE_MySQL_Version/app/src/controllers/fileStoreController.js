@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const associateRepository = require('../repositories/associateRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
 const orderRepository = require('../repositories/orderRepository');
 const orderAccessService = require('../services/orderAccessService');
@@ -41,6 +42,10 @@ async function download(req, res) {
     }
   }
   if ((await fileStoreRepository.documentTypeCodeFor(fileId)) === 'CAFIN' && !permissions.view_cafin) {
+    res.status(403).send('You do not have permission to view this document.');
+    return;
+  }
+  if ((await associateRepository.isAgreementFile(fileId)) && !permissions.manage_incentives) {
     res.status(403).send('You do not have permission to view this document.');
     return;
   }

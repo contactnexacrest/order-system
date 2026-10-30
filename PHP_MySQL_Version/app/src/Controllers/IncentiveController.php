@@ -13,6 +13,7 @@ use App\Repositories\LookupRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\UserRepository;
 use App\Services\AuthService;
+use App\Services\FileUploadService;
 use App\Services\IncentiveService;
 
 /**
@@ -170,10 +171,31 @@ final class IncentiveController
             }
         }
         $data['status'] = $data['status'] === 'inactive' ? 'inactive' : 'active';
+        // Owner decision 2026-10-30: the signed agreement is kept with its
+        // date — a signing date needs the signed copy on file, and the other
+        // way round.
+        $existing = $id !== null ? AssociateRepository::find($id) : null;
+        $hasUpload = !empty($_FILES['agreement_file']['name']);
+        if ($data['agreement_signed_on'] !== null && !$hasUpload && empty($existing['agreement_file_id'])) {
+            $errors[] = 'Attach the signed agreement (PDF) with its signing date.';
+        }
+        if (($hasUpload || !empty($existing['agreement_file_id'])) && $data['agreement_signed_on'] === null) {
+            $errors[] = 'Enter the date the agreement was signed with its signed copy.';
+        }
         if ($errors !== []) {
             Flash::set('error', implode(' ', $errors));
             header('Location: ' . ($id ? "/associates/{$id}/edit" : '/associates'));
             return;
+        }
+        $fileId = null;
+        if ($hasUpload) {
+            try {
+                $fileId = FileUploadService::handleUpload('agreement_file', 'associate_agreement', 'associates/agreements', null, null, (int) $user['id'], null, (string) $data['name'], 'Signed associate agreement');
+            } catch (\Throwable $e) {
+                Flash::setErrorFromException($e);
+                header('Location: ' . ($id ? "/associates/{$id}/edit" : '/associates'));
+                return;
+            }
         }
         if ($id === null) {
             $id = AssociateRepository::create($data, (int) $user['id']);
@@ -184,7 +206,30 @@ final class IncentiveController
             AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_UPDATED', 'associates', $id, null, null, (string) json_encode($data));
             Flash::set('success', "Associate \"{$data['name']}\" saved.");
         }
+        if ($fileId !== null) {
+            AssociateRepository::setAgreementFile($id, $fileId);
+            AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_AGREEMENT_UPLOADED', 'associates', $id, 'agreement_file_id', isset($existing['agreement_file_id']) ? (string) $existing['agreement_file_id'] : null, (string) $fileId);
+        }
         header('Location: /associates');
+    }
+
+    /** The signed agreement — internal (manage_incentives only), every download audit-logged. */
+    public function downloadAgreement(array $params): void
+    {
+        $associate = AssociateRepository::find((int) $params['id']);
+        $file = !empty($associate['agreement_file_id']) ? \App\Repositories\FileStoreRepository::find((int) $associate['agreement_file_id']) : null;
+        if ($file === null || !is_file((string) $file['server_path'])) {
+            http_response_code(404);
+            echo 'No signed agreement is on file for this associate.';
+            return;
+        }
+        AuditLogRepository::log((int) AuthService::currentUser()['id'], 'ASSOCIATE_AGREEMENT_DOWNLOADED', 'associates', (int) $associate['id'], null, null, (string) $file['original_filename']);
+        $name = preg_replace('/[\x00-\x1F\x7F"\/\\\\]/', '-', (string) $file['original_filename']) ?? 'agreement.pdf';
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . $name . '"');
+        header('Content-Length: ' . (string) filesize((string) $file['server_path']));
+        header('Cache-Control: private, no-store');
+        readfile((string) $file['server_path']);
     }
 
     public function linkClient(array $params): void

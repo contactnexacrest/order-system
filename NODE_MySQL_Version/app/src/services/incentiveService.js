@@ -18,8 +18,8 @@ const userRepository = require('../repositories/userRepository');
  * - An order's figures are fixed ("locked") when the buyer has fully paid:
  *   every buyer payment it has (advance or LC, balance, freight) cleared.
  * - Associate commission: the client's associate, on the client's first
- *   orders (Day 1 = the client's first order, plus 9 days: the agreement's
- *   10 days), at the ladder rate for the associate's Nth client, on the
+ *   orders (Day 1 = the client's first PO received, plus 9 days: the
+ *   agreement's 10 days), at the ladder rate for the associate's Nth client, on the
  *   product (FOB) value. It is deducted from the profit first.
  * - Team reward: the amount set on the order (above 0), else the reward
  *   table for the profit left after the associate, if it reaches the
@@ -175,18 +175,29 @@ async function isClientsFirstOrder(order) {
   return row !== null && Number(row.id) === Number(order.id);
 }
 
-/** Whether the order falls in the client's first 10 days (Day 1 = the client's first order). */
+/**
+ * Whether the order falls in the client's first 10 days. Day 1 is the day
+ * the client's first PO was received (agreement clause 4.1, Step 4d); an
+ * order confirmed before that date was recorded counts from its order date
+ * instead.
+ */
 async function withinFirstTenDays(order) {
   const row = await db.queryOne(
-    `SELECT MIN(created_at) AS day_one FROM orders WHERE client_id = :c AND is_test_data = 0 AND is_sample_data = 0 AND status NOT IN ('cancelled','lost')`,
+    `SELECT MIN(COALESCE(buyer_po_received_on, DATE(created_at))) AS day_one FROM orders
+     WHERE client_id = :c AND is_test_data = 0 AND is_sample_data = 0 AND status NOT IN ('cancelled','lost')`,
     { c: order.client_id }
   );
   if (!row || !row.day_one) {
     return false;
   }
   const toDay = (s) => Date.UTC(...String(s).slice(0, 10).split('-').map((v, i) => (i === 1 ? Number(v) - 1 : Number(v))));
-  const days = Math.floor((toDay(order.created_at) - toDay(row.day_one)) / 86400000);
+  const days = Math.floor((toDay(poDate(order)) - toDay(row.day_one)) / 86400000);
   return days <= 9;
+}
+
+/** The day the order's PO was received, else its order date. */
+function poDate(order) {
+  return String(order.buyer_po_received_on || order.created_at).slice(0, 10);
 }
 
 /** Rupees per unit of the order currency actually received for the products (advance or LC, and balance). */
@@ -482,6 +493,7 @@ module.exports = {
   fullyPaidOn,
   isClientsFirstOrder,
   withinFirstTenDays,
+  poDate,
   peopleFor,
   calculate,
   lock,

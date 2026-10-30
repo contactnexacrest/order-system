@@ -6,7 +6,7 @@ $__v = static fn (string $k, $default = '') => htmlspecialchars((string) ($__a[$
 ?>
 <div class="card">
   <h1>Associates</h1>
-  <p class="muted">Outside people, in India or abroad, who introduce new clients under a signed agreement. They earn the agreement's rate on the product value of a client's first orders (the client's first 10 days count as one order), once the buyer has fully paid; nothing on repeat orders. Their commission is a cost of the order, deducted before the team incentive is worked out. Only people with "Manage team incentives" see this page.</p>
+  <p class="muted">Outside people, in India or abroad, who introduce new clients under a signed agreement. They earn the agreement's rate on the product value of a client's first orders (everything in the 10 days from the client's first PO received counts as one order), once the buyer has fully paid; nothing on repeat orders. Their commission is a cost of the order, deducted before the team incentive is worked out. Only people with "Manage team incentives" see this page.</p>
 
   <table class="list">
     <tr><th>Name</th><th>Based in</th><th>Paid in</th><th>Agreement signed</th><th>Rates (orders 1–5 / 6–10 / 11–20 / 21–40 / 41+)</th><th>Clients introduced</th><th>Status</th><th></th></tr>
@@ -15,7 +15,8 @@ $__v = static fn (string $k, $default = '') => htmlspecialchars((string) ($__a[$
         <td><?= htmlspecialchars((string) $a['name']) ?></td>
         <td><?= $a['based_in'] === 'india' ? 'India' : htmlspecialchars('Abroad' . ($a['country'] ? ' — ' . $a['country'] : '')) ?></td>
         <td><?= htmlspecialchars((string) $a['currency_code']) ?></td>
-        <td><?= $a['agreement_signed_on'] ? htmlspecialchars(\App\Helpers\Dates::short((string) $a['agreement_signed_on'])) : '—' ?></td>
+        <td><?= $a['agreement_signed_on'] ? htmlspecialchars(\App\Helpers\Dates::short((string) $a['agreement_signed_on'])) : '—' ?>
+          <?php if (!empty($a['agreement_file_id'])): ?><br><a href="/associates/<?= (int) $a['id'] ?>/agreement" class="small">Signed copy</a><?php elseif ($a['agreement_signed_on']): ?><br><small class="muted">no copy on file</small><?php endif; ?></td>
         <td><?= htmlspecialchars(implode(' / ', array_map(static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'), '.') . '%', [$a['rate_1_5'], $a['rate_6_10'], $a['rate_11_20'], $a['rate_21_40'], $a['rate_41_plus']]))) ?></td>
         <td>
           <?php foreach ($clientsByAssociate[(int) $a['id']] as $c): ?>
@@ -44,7 +45,7 @@ $__v = static fn (string $k, $default = '') => htmlspecialchars((string) ($__a[$
 
 <div class="card" id="associate-form">
   <h2><?= $editing ? 'Edit ' . $__v('name') : 'Add an associate' ?></h2>
-  <form method="post" action="<?= $editing ? '/associates/' . (int) $editing['id'] . '/update' : '/associates' ?>">
+  <form method="post" action="<?= $editing ? '/associates/' . (int) $editing['id'] . '/update' : '/associates' ?>" enctype="multipart/form-data">
     <?= Csrf::field() ?>
     <div class="field-grid">
       <label>Name *<input type="text" name="name" required maxlength="150" value="<?= $__v('name') ?>"></label>
@@ -58,7 +59,8 @@ $__v = static fn (string $k, $default = '') => htmlspecialchars((string) ($__a[$
       <label>Email<input type="email" name="email" maxlength="190" value="<?= $__v('email') ?>"></label>
       <label>Phone<input type="tel" name="phone" maxlength="40" value="<?= $__v('phone') ?>"></label>
       <label>PAN / tax ID<input type="text" name="tax_id" maxlength="50" value="<?= $__v('tax_id') ?>"></label>
-      <label>Agreement signed on<input type="date" name="agreement_signed_on" max="<?= date('Y-m-d') ?>" value="<?= $__v('agreement_signed_on') ?>"></label>
+      <label>Agreement signed on<input type="date" name="agreement_signed_on" max="<?= date('Y-m-d') ?>" value="<?= $__v('agreement_signed_on') ?>"<?= !empty($__a['agreement_file_id']) ? ' required' : ' data-required-if="agreement_file" data-required-if-message="Enter the date the agreement was signed."' ?>></label>
+      <label>Signed agreement (PDF)<?= !empty($__a['agreement_file_id']) ? ' &middot; <a href="/associates/' . (int) $__a['id'] . '/agreement">copy on file</a>, choose a file only to replace it' : '' ?><input type="file" name="agreement_file" accept=".pdf,application/pdf"<?= !empty($__a['agreement_file_id']) ? '' : ' data-required-if="agreement_signed_on" data-required-if-message="Attach the signed agreement (PDF) with its signing date."' ?>></label>
     </div>
     <fieldset><legend>Commission rates (% of product value, from the agreement)</legend>
       <div class="field-grid">

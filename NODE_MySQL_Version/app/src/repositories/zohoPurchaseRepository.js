@@ -139,6 +139,8 @@ async function costEntriesToSync(startDate = null) {
      JOIN orders o ON o.id = ce.order_id
      JOIN clients c ON c.id = o.client_id
      WHERE ce.category IN (${categories})
+       -- a team incentive / associate commission line goes once it is paid (settled), not when it is fixed
+       AND (ce.incentive_kind IS NULL OR ce.paid_from IS NOT NULL)
      ORDER BY cost_date, ce.id`
   );
   return rows.filter((r) => (startDate === null || String(r.cost_date) >= startDate)

@@ -57,6 +57,11 @@ final class FileStoreController
             echo 'You do not have permission to view this document.';
             return;
         }
+        if (\App\Repositories\AssociateRepository::isAgreementFile($fileId) && !PermissionService::can((int) $user['id'], $roleId, 'manage_incentives')) {
+            http_response_code(403);
+            echo 'You do not have permission to view this document.';
+            return;
+        }
 
         $safeDownloadName = str_replace(['/', '\\'], '-', $file['original_filename']);
         $safeDownloadName = preg_replace('/[\x00-\x1F\x7F"]/', '', $safeDownloadName) ?? $safeDownloadName;

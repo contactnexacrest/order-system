@@ -73,7 +73,7 @@ $__sourceText = [
       <label><input type="checkbox" name="is_excluded" value="1"<?= !empty($__inc['is_excluded']) ? ' checked' : '' ?>> Exclude this order (no team reward)</label>
       <label>Associate commission on this order
         <select name="associate_mode">
-          <?php foreach (['auto' => 'Automatic (client\'s first 10 days)', 'yes' => 'Yes', 'no' => 'No'] as $__v => $__l): ?>
+          <?php foreach (['auto' => 'Automatic (10 days from the client\'s first PO)', 'yes' => 'Yes', 'no' => 'No'] as $__v => $__l): ?>
             <option value="<?= $__v ?>"<?= ($__inc['associate_mode'] ?? 'auto') === $__v ? ' selected' : '' ?>><?= $__l ?></option>
           <?php endforeach; ?>
         </select>

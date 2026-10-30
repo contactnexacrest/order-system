@@ -146,7 +146,7 @@ final class BuyerActionService
         $reference = $order['order_reference'] ?? "#{$orderId}";
 
         if ($awaitingPo && DocumentGenerationService::stageDocumentBlockedBy($orderId, 2) === []) {
-            OrderRepository::setBuyersPoRef($orderId, $poRef);
+            OrderRepository::setBuyersPoRef($orderId, $poRef, date('Y-m-d')); // the day the buyer sent it
             StageGateService::passAndUnlockNext($orderId, 2, null);
             AuditLogRepository::log(null, 'BUYER_PO_CONFIRMED_BY_CLIENT', 'orders', $orderId, 'buyers_po_ref', null, $poRef, 'The buyer uploaded their signed PO with its number — Step 4 completed.');
             NotificationRepository::notifyOrderTeam($orderId, 'buyer_po_uploaded_by_client', "The buyer uploaded their signed PO ({$poRef}) on order {$reference} — Step 4 is complete and Stage 3 (PI) is open.");

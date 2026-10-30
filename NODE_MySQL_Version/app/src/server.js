@@ -796,9 +796,10 @@ app.post('/orders/:id/travel-expenses', requireAuth, requirePermission('manage_o
 app.get('/incentives/settings', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.settings));
 app.post('/incentives/settings', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveSettings));
 app.get('/associates', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.associates));
-app.post('/associates', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveAssociate));
+app.post('/associates', requireAuth, requirePermission('manage_incentives'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(incentiveController.saveAssociate));
 app.get('/associates/:id/edit', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.associates));
-app.post('/associates/:id/update', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveAssociate));
+app.post('/associates/:id/update', requireAuth, requirePermission('manage_incentives'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(incentiveController.saveAssociate));
+app.get('/associates/:id/agreement', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.downloadAgreement));
 app.post('/associates/:id/clients', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.linkClient));
 app.post('/associates/:id/clients/:clientId/unlink', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.unlinkClient));
 // Owner decision 2026-10-30: the team incentive is fixed when the buyer has fully paid, which is often when the order is closed; it writes only the incentive's own rows (manage_incentives).

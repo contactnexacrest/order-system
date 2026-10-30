@@ -65,7 +65,7 @@
       <label><input type="checkbox" name="is_excluded" value="1"{{ ' checked' if (inc and inc.is_excluded == 1) else '' }}> Exclude this order (no team reward)</label>
       <label>Associate commission on this order
         <select name="associate_mode">
-          {% for v, l in { 'auto': "Automatic (client's first 10 days)", 'yes': 'Yes', 'no': 'No' } %}
+          {% for v, l in { 'auto': "Automatic (10 days from the client's first PO)", 'yes': 'Yes', 'no': 'No' } %}
             <option value="{{ v }}"{{ ' selected' if ((inc.associate_mode if inc else 'auto') or 'auto') == v else '' }}>{{ l }}</option>
           {% endfor %}
         </select>

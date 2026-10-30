@@ -9,6 +9,7 @@ app/.env
 # Runtime-generated documents (PDFs/DOCX per order) and scratch files —
 # not source, and can contain buyer data that shouldn't sit in git history.
 storage/clients/*
+storage/associates/*
 storage/temp/*
 storage/logs/*
 storage/internal/reference_library/*

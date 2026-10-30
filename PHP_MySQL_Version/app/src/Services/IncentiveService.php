@@ -21,8 +21,8 @@ use App\Repositories\UserRepository;
  * - An order's figures are fixed ("locked") when the buyer has fully paid:
  *   every buyer payment it has (advance or LC, balance, freight) cleared.
  * - Associate commission: the client's associate, on the client's first
- *   orders (Day 1 = the client's first order, plus 9 days: the agreement's
- *   10 days), at the ladder rate for the associate's Nth client, on the
+ *   orders (Day 1 = the client's first PO received, plus 9 days: the
+ *   agreement's 10 days), at the ladder rate for the associate's Nth client, on the
  *   product (FOB) value. It is deducted from the profit first.
  * - Team reward: the amount set on the order (above 0), else the reward
  *   table for the profit left after the associate, if it reaches the
@@ -129,19 +129,31 @@ final class IncentiveService
         return (int) $stmt->fetchColumn() === (int) $order['id'];
     }
 
-    /** Whether the order falls in the client's first 10 days (Day 1 = the client's first order). */
+    /**
+     * Whether the order falls in the client's first 10 days. Day 1 is the
+     * day the client's first PO was received (agreement clause 4.1, Step
+     * 4d); an order confirmed before that date was recorded counts from
+     * its order date instead.
+     */
     public static function withinFirstTenDays(array $order): bool
     {
         $stmt = Database::connection()->prepare(
-            "SELECT MIN(created_at) FROM orders WHERE client_id = :c AND is_test_data = 0 AND is_sample_data = 0 AND status NOT IN ('cancelled','lost')"
+            "SELECT MIN(COALESCE(buyer_po_received_on, DATE(created_at))) FROM orders
+             WHERE client_id = :c AND is_test_data = 0 AND is_sample_data = 0 AND status NOT IN ('cancelled','lost')"
         );
         $stmt->execute(['c' => $order['client_id']]);
         $dayOne = (string) $stmt->fetchColumn();
         if ($dayOne === '') {
             return false;
         }
-        $days = (int) floor((strtotime(substr((string) $order['created_at'], 0, 10)) - strtotime(substr($dayOne, 0, 10))) / 86400);
+        $days = (int) floor((strtotime(self::poDate($order)) - strtotime(substr($dayOne, 0, 10))) / 86400);
         return $days <= 9;
+    }
+
+    /** The day the order's PO was received, else its order date. */
+    public static function poDate(array $order): string
+    {
+        return substr((string) (($order['buyer_po_received_on'] ?? null) ?: $order['created_at']), 0, 10);
     }
 
     /** Rupees per unit of the order currency actually received for the products (advance or LC, and balance). */

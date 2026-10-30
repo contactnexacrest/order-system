@@ -154,7 +154,8 @@ final class OrderZohoMatchService
             self::expense($add, $compare, "{$label} — {$e['details']}", (float) $e['amount_inr'], $e['zoho_expense_id'] ?? null, $notSent((string) $e['expense_date']), $errorFor('order_expense', 'expense'));
         }
         foreach (OrderCostEntryRepository::forOrder($orderId) as $c) {
-            if (!in_array($c['category'], OrderCostEntryRepository::ZOHO_CATEGORIES, true)) {
+            // An incentive line goes to Books once it is paid, not when it is fixed.
+            if (!in_array($c['category'], OrderCostEntryRepository::ZOHO_CATEGORIES, true) || ($c['incentive_kind'] !== null && $c['paid_from'] === null)) {
                 continue;
             }
             $label = OrderCostEntryRepository::CATEGORIES[$c['category']];

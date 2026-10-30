@@ -488,6 +488,7 @@ $router->get('/associates', [$incentives, 'associates'], [SessionAuth::required(
 $router->post('/associates', [$incentives, 'saveAssociate'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
 $router->get('/associates/{id}/edit', [$incentives, 'associates'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives')]);
 $router->post('/associates/{id}/update', [$incentives, 'saveAssociate'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
+$router->get('/associates/{id}/agreement', [$incentives, 'downloadAgreement'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives')]);
 $router->post('/associates/{id}/clients', [$incentives, 'linkClient'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
 $router->post('/associates/{id}/clients/{clientId}/unlink', [$incentives, 'unlinkClient'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/incentive', [$incentives, 'saveOrder'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);

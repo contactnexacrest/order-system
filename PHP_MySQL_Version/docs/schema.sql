@@ -651,6 +651,8 @@ CREATE TABLE orders (
   indicative_freight_high  DECIMAL(14,2) NULL,
   indicative_insurance_amount DECIMAL(14,2) NULL,
   buyers_po_ref            VARCHAR(100) NULL,              -- buyer's own internal PO/ref — 'NIL' if none
+  buyer_po_received_on     DATE NULL,                      -- the day the buyer's PO arrived (Step 4d) — the associate
+                                                            -- agreement's Day 1; docs/migrations/2026-10-30d
 
   -- Per-document dates/refs the QT/PI/OC templates show explicitly.
   quotation_date           DATE NULL,
@@ -4333,6 +4335,7 @@ CREATE TABLE associates (
   phone               VARCHAR(40) NULL,
   tax_id              VARCHAR(50) NULL,
   agreement_signed_on DATE NULL,
+  agreement_file_id   BIGINT UNSIGNED NULL,            -- the signed agreement (file_store, context associate_agreement) — docs/migrations/2026-10-30d
   rate_1_5            DECIMAL(5,2) NOT NULL DEFAULT 0.70,
   rate_6_10           DECIMAL(5,2) NOT NULL DEFAULT 1.00,
   rate_11_20          DECIMAL(5,2) NOT NULL DEFAULT 1.50,
@@ -4342,7 +4345,8 @@ CREATE TABLE associates (
   notes               VARCHAR(500) NULL,
   created_by          BIGINT UNSIGNED NULL,
   created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (created_by) REFERENCES users(id)
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  CONSTRAINT fk_associates_agreement_file FOREIGN KEY (agreement_file_id) REFERENCES file_store(id)
 ) ENGINE=InnoDB;
 ALTER TABLE clients
   ADD COLUMN associate_id BIGINT UNSIGNED NULL,

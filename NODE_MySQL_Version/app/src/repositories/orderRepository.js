@@ -636,8 +636,12 @@ async function setProductionStatus(orderId, text) {
   await db.execute('UPDATE orders SET production_status_text = :text WHERE id = :id', { text, id: orderId });
 }
 
-async function setBuyersPoRef(orderId, ref) {
-  await db.execute('UPDATE orders SET buyers_po_ref = :ref WHERE id = :id', { ref, id: orderId });
+/** receivedOn: the day the buyer's PO arrived (Step 4d) — kept as it is when null. */
+async function setBuyersPoRef(orderId, ref, receivedOn = null) {
+  await db.execute(
+    'UPDATE orders SET buyers_po_ref = :ref, buyer_po_received_on = COALESCE(:received, buyer_po_received_on) WHERE id = :id',
+    { ref, received: receivedOn, id: orderId }
+  );
 }
 
 /**

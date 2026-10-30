@@ -42,7 +42,14 @@ Step 4 on the order page has four sub-steps, done in order:
    pass the gate on its own.
 
 4. **4d · Confirm Buyer PO Received** — type the buyer's own PO reference
-   number. **This is the action that passes Stage 2's gate** and
+   number and the **date the PO was received** (the day it arrived by
+   email or post, not the date printed on it; it starts at today and can't
+   be in the future or before the order was created). The page then shows
+   "received on" with that date. For a client introduced by an associate,
+   this date is **Day 1** of the Associate Agreement's 10 days (chapter
+   20). When the buyer completes Step 4 themselves through the link or
+   the portal, the day they upload is recorded as the date received.
+   **This is the action that passes Stage 2's gate** and
    completes Step 4 (unless the buyer already did it through the link).
    While a copy is required (see the wet-signature gate below) this
    sub-step shows "Attach the buyer's signed PO copy in Step 4c first"
