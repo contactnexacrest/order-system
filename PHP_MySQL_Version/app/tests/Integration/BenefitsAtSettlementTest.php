@@ -135,6 +135,7 @@ final class BenefitsAtSettlementTest extends DbTestCase
         self::assertStringContainsString('Step 13h &middot; Mark Fully Settled', $html);
         self::assertLessThan(strpos($html, 'id="step-despatch"'), strpos($html, 'id="step-13g-benefits"'));
         self::assertStringContainsString('Skip — not claiming', $html);
-        self::assertStringNotContainsString('Step 12d', $html);
+        // The old Step 12d (Review Profit) is Step 12c now; Step 12d is the team incentive (2026-10-30).
+        self::assertStringNotContainsString('Step 12d &middot; Review Profit', $html);
     }
 }

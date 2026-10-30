@@ -104,6 +104,10 @@ describe('orderLockGuard middleware (External QA report L-28)', () => {
       // are credited months later) — so it must stay reachable on a locked
       // order. It writes no order data.
       '/orders/:id/ca-internal-doc/generate',
+      // Owner decision 2026-10-30: the team incentive is fixed when the
+      // buyer has fully paid, which is often when the order is closed;
+      // it writes only the incentive's own rows (manage_incentives).
+      '/orders/:id/incentive', '/orders/:id/incentive/people', '/orders/:id/incentive/recalculate',
     ]);
     const lines = source.split('\n').filter((line) => /^app\.post\('\/orders\/:id/.test(line.trim()));
     expect(lines.length).toBeGreaterThan(0);

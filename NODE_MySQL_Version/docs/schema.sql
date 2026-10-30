@@ -4310,3 +4310,112 @@ ALTER TABLE ca_export_benefits
 ALTER TABLE order_lc_details
   ADD COLUMN lc_firc_reference VARCHAR(100) NULL,
   ADD COLUMN lc_firc_received_at DATE NULL;
+
+-- ================================================================
+-- SECTION CN — TEAM INCENTIVES AND ASSOCIATES
+-- (owner decision 2026-10-30, mockups approved)
+-- The team incentive program (settings, each person's incentive role,
+-- each order's incentive and the people on it, the payouts by incentive
+-- month) and the associate register (outside people who introduce new
+-- clients under a signed agreement). Both become the order's cost as a
+-- commission cost entry (incentive_kind) once the buyer has fully paid.
+-- docs/migrations/2026-10-30b-team-incentives.sql
+-- ================================================================
+CREATE TABLE associates (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name                VARCHAR(150) NOT NULL,
+  based_in            ENUM('india','abroad') NOT NULL DEFAULT 'india',
+  country             VARCHAR(80) NULL,
+  currency_code       CHAR(3) NOT NULL DEFAULT 'INR',
+  email               VARCHAR(190) NULL,
+  phone               VARCHAR(40) NULL,
+  tax_id              VARCHAR(50) NULL,
+  agreement_signed_on DATE NULL,
+  rate_1_5            DECIMAL(5,2) NOT NULL DEFAULT 0.70,
+  rate_6_10           DECIMAL(5,2) NOT NULL DEFAULT 1.00,
+  rate_11_20          DECIMAL(5,2) NOT NULL DEFAULT 1.50,
+  rate_21_40          DECIMAL(5,2) NOT NULL DEFAULT 1.75,
+  rate_41_plus        DECIMAL(5,2) NOT NULL DEFAULT 2.00,
+  status              ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  notes               VARCHAR(500) NULL,
+  created_by          BIGINT UNSIGNED NULL,
+  created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+ALTER TABLE clients
+  ADD COLUMN associate_id BIGINT UNSIGNED NULL,
+  ADD COLUMN associate_registered_on DATE NULL,
+  ADD CONSTRAINT fk_clients_associate FOREIGN KEY (associate_id) REFERENCES associates(id);
+ALTER TABLE order_cost_entries
+  ADD COLUMN incentive_kind ENUM('team','associate') NULL;
+CREATE TABLE incentive_settings (
+  setting_key   VARCHAR(60) NOT NULL PRIMARY KEY,
+  setting_value TEXT NULL,
+  updated_by    BIGINT UNSIGNED NULL,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE user_incentive_roles (
+  user_id BIGINT UNSIGNED NOT NULL,
+  role    ENUM('sales','export','marketing','logistics','accounts') NOT NULL,
+  PRIMARY KEY (user_id, role),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE order_incentives (
+  order_id                BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  reward_override_inr     DECIMAL(14,2) NOT NULL DEFAULT 0,
+  is_excluded             TINYINT(1) NOT NULL DEFAULT 0,
+  associate_mode          ENUM('auto','yes','no') NOT NULL DEFAULT 'auto',
+  people_customised       TINYINT(1) NOT NULL DEFAULT 0,
+  locked_at               TIMESTAMP NULL,
+  fully_paid_on           DATE NULL,
+  incentive_month         CHAR(7) NULL,
+  profit_basis_inr        DECIMAL(14,2) NULL,
+  team_total_inr          DECIMAL(14,2) NULL,
+  new_client_bonus_inr    DECIMAL(14,2) NULL,
+  associate_id            BIGINT UNSIGNED NULL,
+  associate_order_number  INT NULL,
+  associate_rate_pct      DECIMAL(5,2) NULL,
+  associate_amount_fc     DECIMAL(14,2) NULL,
+  associate_currency      CHAR(3) NULL,
+  associate_amount_inr    DECIMAL(14,2) NULL,
+  team_cost_entry_id      BIGINT UNSIGNED NULL,
+  associate_cost_entry_id BIGINT UNSIGNED NULL,
+  updated_by              BIGINT UNSIGNED NULL,
+  updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (associate_id) REFERENCES associates(id),
+  FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE order_incentive_people (
+  order_id BIGINT UNSIGNED NOT NULL,
+  role     ENUM('sales','export','marketing','logistics','accounts') NOT NULL,
+  user_id  BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (order_id, role, user_id),
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE incentive_payouts (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id        BIGINT UNSIGNED NOT NULL,
+  payee_kind      ENUM('staff','associate') NOT NULL,
+  user_id         BIGINT UNSIGNED NULL,
+  associate_id    BIGINT UNSIGNED NULL,
+  role            VARCHAR(20) NOT NULL,
+  amount_inr      DECIMAL(14,2) NOT NULL,
+  amount_fc       DECIMAL(14,2) NULL,
+  currency_code   CHAR(3) NULL,
+  incentive_month CHAR(7) NOT NULL,
+  status          ENUM('due','paid') NOT NULL DEFAULT 'due',
+  paid_on         DATE NULL,
+  paid_inr        DECIMAL(14,2) NULL,
+  tds_inr         DECIMAL(14,2) NULL,
+  paid_by         BIGINT UNSIGNED NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (associate_id) REFERENCES associates(id),
+  FOREIGN KEY (paid_by) REFERENCES users(id),
+  INDEX idx_incentive_payouts_month (incentive_month),
+  INDEX idx_incentive_payouts_user (user_id)
+) ENGINE=InnoDB;

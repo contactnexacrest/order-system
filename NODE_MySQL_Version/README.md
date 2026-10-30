@@ -46,9 +46,9 @@ app/                    the application itself — this is what you deploy
   package.json / package-lock.json
   .env.example            template — copy to .env and fill in real values
 docs/
-  schema.sql              the MySQL schema — 113 tables, 218 foreign keys
+  schema.sql              the MySQL schema — 119 tables, 231 foreign keys
                           as of 2026-10-29 (plus this stack's own
-                          `sessions` table = 114; see the file's own
+                          `sessions` table = 120; see the file's own
                           trailing changelog comments)
   seed.sql                seed data: roles/permissions, company settings,
                           lookup tables, one Admin user
@@ -115,7 +115,7 @@ storage/
    mysql -u nexacrest_app -p nexacrest < docs/schema.sql
    mysql -u nexacrest_app -p nexacrest < docs/seed.sql
    ```
-   This creates all 113 tables (114 once this stack's own `sessions` store
+   This creates all 119 tables (120 once this stack's own `sessions` store
    is added at first run) and seeds: the roles/permissions matrix, one
    Admin login, company settings (with `PLACEHOLDER` values you must
    replace — see below), lookup tables (incoterms, currencies, ports, T&C
@@ -832,3 +832,23 @@ are `src/jobs/zohoSync.js` (hourly) and `src/jobs/zohoCleanupTestRecords.js`
 `2026-10-30a` from `docs/migrations/` (run order in the repository's
 `docs/migrations/README.md`). Before switching Zoho on, set the go-live
 date in Admin → Company Settings (Zoho Books).
+
+## Follow-up (added 2026-10-30): team incentives and associates
+
+Owner decision 2026-10-30 (mockups approved). `incentiveService` /
+`incentiveRepository` / `associateRepository` / `incentiveController`, the
+views in `views/incentives/` and Step 12d (`views/orders/_incentive.njk`),
+migration `docs/migrations/2026-10-30b-team-incentives.sql` (schema section
+CN). An order's team reward (the amount set on the order, else the reward
+table for its profit after any associate commission, if it reaches the
+minimum and the program is on, plus the new client bonus on a client's
+first order) is split by role and fixed when the buyer has fully paid; the
+associate's agreement rate applies on the client's first 10 days. Both
+become commission cost entries (`order_cost_entries.incentive_kind`), paid
+in the incentive month (incentive cut-off day, default the 20th) and sent
+to Zoho Books as Commission Expense once paid. Permissions:
+`manage_incentives` (Admin, MD — not ED), `pay_incentives` (Admin, MD,
+Accounts Executive), `view_own_incentives`. Both stacks now stand at
+**119 tables** (plus `sessions`), **231 foreign keys**, **63 permissions** and **486 routes**
+(163 GET, 323 POST). Tests: `TeamIncentiveTest` / `teamIncentive.test.js`.
+SOP: chapter 20 (Incentives).

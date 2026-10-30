@@ -22,6 +22,15 @@ $canManagePayments = PermissionService::can((int) $currentUser['id'], $currentUs
 // bank actually received it) is split out of manage_payments (recording
 // what the client says they sent) so the same person can't do both.
 $canClearPayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'clear_payments');
+// Owner decision 2026-10-30: the team incentive box (Step 12d) — manage_incentives only.
+$canManageIncentives = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_incentives');
+if ($canManageIncentives) {
+    \App\Services\IncentiveService::lockIfDue((int) $order['id'], (int) $currentUser['id']);
+    $incentiveRow = \App\Repositories\IncentiveRepository::forOrder((int) $order['id']);
+    $incentiveCalc = \App\Services\IncentiveService::calculate((int) $order['id']);
+    $incentivePayouts = \App\Repositories\IncentiveRepository::payoutsForOrder((int) $order['id']);
+    $incentiveUsers = \App\Repositories\UserRepository::listActive();
+}
 // External QA report Q-ROLE-3: split out of manage_order_financials so
 // Accounts can confirm supplier payments without gaining the broader
 // financials permission's access to cost entries/export benefits/the
@@ -3329,10 +3338,14 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               <td><?= htmlspecialchars(\App\Repositories\OrderCostEntryRepository::PAID_FROM[$c['paid_from'] ?? ''] ?? '—') ?></td>
               <td><?= htmlspecialchars($c['recorded_by_name']) ?></td>
               <td>
+                <?php if (!empty($c['incentive_kind'])): ?>
+                <small class="muted">Set by Team Incentive</small>
+                <?php else: ?>
                 <form method="post" action="/orders/<?= (int) $order['id'] ?>/cost-entries/<?= (int) $c['id'] ?>/delete" onsubmit="return confirm(<?= htmlspecialchars(json_encode(!empty($c['zoho_expense_id']) ? 'Remove this cost entry? It is in Zoho Books too, and is removed there as well.' : 'Remove this cost entry?')) ?>);">
                   <?= Csrf::field() ?>
                   <button type="submit" class="btn-sm btn-danger">Remove</button>
                 </form>
+                <?php endif; ?>
               </td>
             </tr>
             <?php endforeach; ?>
@@ -3639,6 +3652,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <div><span class="k">Order Expenses (INR)</span><span class="v"><?= number_format($profitability['expenses_inr'], 2) ?></span></div>
             <div><span class="k">Expenses Booked in Zoho Books (INR)</span><span class="v"><?= number_format($profitability['zoho_expenses_inr'], 2) ?></span></div>
             <div><span class="k">Other Costs (INR)<?= $profitability['travel_is_provisional'] ? '' : ' — travel % replaced by actual travel' ?></span><span class="v"><?= number_format($profitability['other_costs_inr'], 2) ?></span></div>
+            <?php if ($profitability['team_incentive_inr'] > 0 || $profitability['associate_commission_inr'] > 0): ?>
+            <div><span class="k">of which Team Incentive (INR)</span><span class="v"><?= number_format($profitability['team_incentive_inr'], 2) ?></span></div>
+            <div><span class="k">of which Associate Commission (INR)</span><span class="v"><?= number_format($profitability['associate_commission_inr'], 2) ?></span></div>
+            <?php endif; ?>
             <div><span class="k">Total Order Cost (INR)</span><span class="v"><?= number_format($profitability['total_cost_inr'], 2) ?></span></div>
             <div><span class="k">Order Profit (INR)</span><span class="v"><?= number_format($profitability['profit_inr'], 2) ?></span></div>
             <div><span class="k">Order Margin %</span><span class="v"><?= $profitability['margin_pct'] !== null ? number_format($profitability['margin_pct'], 2) . '%' : '—' ?></span></div>
@@ -3680,6 +3697,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php endif; ?>
       </div>
     </details>
+    <?php if ($canManageIncentives): // Owner decision 2026-10-30: Step 12d, manage_incentives only. ?>
+      <div class="step-group-connector">and the team's incentive</div>
+      <?php require __DIR__ . '/_incentive.php'; ?>
+    <?php endif; ?>
   </details>
   <?php endif; ?>
 

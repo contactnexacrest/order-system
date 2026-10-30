@@ -127,11 +127,16 @@ async function computeForOrder(orderId) {
   const profitInr = revenueInr + exportBenefitsInr - totalCostInr;
   const marginPct = revenueInr > 0 ? round2(profitInr / revenueInr * 100) : null;
 
+  const incentiveEntries = await require('../repositories/incentiveRepository').costEntries(orderId);
   return {
     currency_code: currencyCode,
     fob_value_foreign: fobValue,
     revenue_inr: round2(revenueInr),
     zoho_expenses_inr: round2(zohoExpensesInr),
+    // Owner decision 2026-10-30: the team incentive and associate commission,
+    // already inside other_costs_inr (commission cost entries), shown apart.
+    team_incentive_inr: round2(Number((incentiveEntries.team || {}).amount_inr || 0)),
+    associate_commission_inr: round2(Number((incentiveEntries.associate || {}).amount_inr || 0)),
     revenue_is_estimated: revenueIsEstimated,
     export_benefits_inr: round2(exportBenefitsInr),
     export_benefits_is_estimated: exportBenefitsIsEstimated,

@@ -1,0 +1,110 @@
+{#
+  Port of _incentive.php. Step 12d · Team Incentive (owner decision
+  2026-10-30, mockups approved). Shown only to holders of
+  manage_incentives: the profit basis, the reward, the associate's
+  commission and who gets what.
+#}
+{% set inc = incentiveRow %}
+{% set locked = inc and inc.locked_at %}
+{% set sourceText = {
+  'override': 'the amount set on this order',
+  'table': 'your reward table',
+  'excluded': 'excluded — no reward on this order',
+  'off': 'the incentive program is switched off',
+  'before_start': 'fully paid before the program started',
+  'below_min': 'below the minimum profit — no reward'
+} %}
+<details class="step-card" id="financials-12d">
+  <summary><h2>Step 12d &middot; Team Incentive</h2>
+    <span class="fin-sub-summary">{% if locked %}&#8377;{{ inc.team_total_inr | money0 }} · {{ incentive.monthLabel(inc.incentive_month) }} incentive{% else %}&#8377;{{ incentiveCalc.team_total | money0 }} · pending{% endif %}</span></summary>
+  <p class="muted small">Only you and people with "Manage team incentives" see this box. The team sees only their own amounts, once the buyer has fully paid.</p>
+
+  {% if locked %}
+    <div class="kv-grid">
+      <div><span class="k">Buyer fully paid on</span><span class="v">{{ inc.fully_paid_on | shortDate }}</span></div>
+      <div><span class="k">Incentive month</span><span class="v">{{ incentive.monthLabel(inc.incentive_month) }}</span></div>
+      <div><span class="k">Profit used for the incentive</span><span class="v">{{ inc.profit_basis_inr | money }}</span></div>
+      <div><span class="k">Team incentive</span><span class="v">{{ inc.team_total_inr | money }}</span></div>
+      {% if inc.associate_id %}
+        <div><span class="k">Associate commission</span><span class="v">{{ inc.associate_currency }} {{ inc.associate_amount_fc | money }} (&#8377;{{ inc.associate_amount_inr | money }})</span></div>
+      {% endif %}
+    </div>
+    <table class="list" style="margin-top:10px">
+      <tr><th>Person</th><th>Role</th><th>Amount (&#8377;)</th><th>Status</th></tr>
+      {% for p in incentivePayouts %}
+        <tr>
+          <td>{{ p.user_name or p.associate_name or '—' }}</td>
+          <td>{{ 'Associate (agreement)' if p.payee_kind == 'associate' else (incentive.roles[p.role] or p.role) }}</td>
+          <td>{% if p.amount_fc !== null %}{{ p.currency_code }} {{ p.amount_fc | money }} · {% endif %}{{ p.amount_inr | money }}</td>
+          <td>{{ ('Paid ' + (p.paid_on | shortDate)) if p.status == 'paid' else 'Due' }}</td>
+        </tr>
+      {% endfor %}
+      {% if incentivePayouts.length == 0 %}<tr><td colspan="4" class="muted">No incentive on this order.</td></tr>{% endif %}
+    </table>
+    <form method="post" action="/orders/{{ order.id }}/incentive/recalculate" data-confirm="Work this order's incentive out again with the current settings and people? Only possible while nothing is paid yet." style="margin-top:8px">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm btn-secondary">Work it out again</button>
+      <span class="muted small">Fixed when the buyer fully paid. Use this to correct a mistake before anything is paid.</span>
+    </form>
+  {% else %}
+    {% set calc = incentiveCalc %}
+    <div class="kv-grid">
+      <div><span class="k">Order profit before incentives</span><span class="v">{{ calc.profit_before | money }}</span></div>
+      {% if calc.associate %}{% set a = calc.associate %}
+        <div><span class="k">&minus; Associate commission ({{ a.name }}, {{ a.rate | money }}%, client no. {{ a.order_number }})</span><span class="v">{{ a.amount_inr | money }}</span></div>
+      {% endif %}
+      <div><span class="k">Profit used for the incentive</span><span class="v">{{ calc.basis | money }}</span></div>
+      <div><span class="k">Team reward</span><span class="v">&#8377;{{ calc.reward | money0 }}{% if calc.new_client_bonus > 0 %} + &#8377;{{ calc.new_client_bonus | money0 }} new client bonus{% endif %}</span></div>
+    </div>
+    <p class="small">Reward from {{ sourceText[calc.source] or calc.source }}. Minimum profit: &#8377;{{ calc.min_profit | money0 }}.
+      {% if calc.pct_of_profit !== null and calc.team_total > 0 %}<span class="muted">Private check: &#8377;{{ calc.team_total | money0 }} is <strong>{{ calc.pct_of_profit.toFixed(1) }}%</strong> of this order's profit.</span>{% endif %}</p>
+
+    <form method="post" action="/orders/{{ order.id }}/incentive">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Reward for this order (&#8377;) <input type="number" name="reward_override_inr" min="0" step="1" value="{{ ((inc.reward_override_inr if inc else 0) | float | round) | int }}" required style="width:10em"> <small class="muted">0 = use the settings</small></label>
+      <label><input type="checkbox" name="is_excluded" value="1"{{ ' checked' if (inc and inc.is_excluded == 1) else '' }}> Exclude this order (no team reward)</label>
+      <label>Associate commission on this order
+        <select name="associate_mode">
+          {% for v, l in { 'auto': "Automatic (client's first 10 days)", 'yes': 'Yes', 'no': 'No' } %}
+            <option value="{{ v }}"{{ ' selected' if ((inc.associate_mode if inc else 'auto') or 'auto') == v else '' }}>{{ l }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit" class="btn-sm">Save</button>
+    </form>
+
+    <h3 style="font-size:.95em">Who gets what</h3>
+    <table class="list">
+      <tr><th>Role</th><th>People</th><th>Share</th><th>Amount (&#8377;)</th></tr>
+      {% for role, r in calc.roles %}
+        <tr>
+          <td>{{ r.label }}</td>
+          <td>{% if r.people.length == 0 %}<span class="muted">nobody — this share is not paid</span>{% else %}{{ r.people | join(', ', 'name') }}{% endif %}</td>
+          <td>{{ r.pct | pct2 }}%</td>
+          <td>{{ r.amount | money }}{% if r.people.length > 1 %} ({{ r.each | money }} each){% endif %}</td>
+        </tr>
+      {% endfor %}
+      <tr><td colspan="3"><strong>Total paid to the team</strong></td><td><strong>{{ calc.team_total | money }}</strong></td></tr>
+    </table>
+    {% if calc.unallocated > 0 %}<p class="small">&#8377;{{ calc.unallocated | money }} has nobody to go to and is not paid. Add people below or give staff their incentive roles in Team Incentives.</p>{% endif %}
+    <details style="margin-top:8px">
+      <summary class="small">Change who did each role on this order</summary>
+      <form method="post" action="/orders/{{ order.id }}/incentive/people">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <table class="list">
+          <tr><th>Person</th>{% for role, label in incentive.roles %}<th>{{ label }}</th>{% endfor %}</tr>
+          {% for u in incentiveUsers %}
+            <tr><td>{{ u.name }}</td>
+              {% for role, label in incentive.roles %}
+                <td><input type="checkbox" name="people[{{ role }}][]" value="{{ u.id }}"{{ ' checked' if (u.id in (calc.roles[role].people | pluck('id'))) else '' }} aria-label="{{ u.name }} — {{ label }}"></td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </table>
+        <label><input type="checkbox" name="reset" value="1"> Go back to the usual people (each person's incentive role)</label>
+        <button type="submit" class="btn-sm">Save people</button>
+      </form>
+    </details>
+    <p class="muted small">Pending: fixed and added to the order's costs when the buyer has fully paid, then paid in that incentive month.</p>
+  {% endif %}
+</details>

@@ -2821,10 +2821,14 @@
               <td>{{ costEntryPaidFrom[c.paid_from] or '—' }}</td>
               <td>{{ c.recorded_by_name }}</td>
               <td>
+                {% if c.incentive_kind %}
+                <small class="muted">Set by Team Incentive</small>
+                {% else %}
                 <form method="post" action="/orders/{{ order.id }}/cost-entries/{{ c.id }}/delete" onsubmit="return confirm({{ ('Remove this cost entry? It is in Zoho Books too, and is removed there as well.' if c.zoho_expense_id else 'Remove this cost entry?') | json }});">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                   <button type="submit" class="btn-sm btn-danger">Remove</button>
                 </form>
+                {% endif %}
               </td>
             </tr>
             {% endfor %}
@@ -3127,6 +3131,10 @@
             <div><span class="k">Order Expenses (INR)</span><span class="v">{{ profitability.expenses_inr | money }}</span></div>
             <div><span class="k">Expenses Booked in Zoho Books (INR)</span><span class="v">{{ profitability.zoho_expenses_inr | money }}</span></div>
             <div><span class="k">Other Costs (INR){{ '' if profitability.travel_is_provisional else ' — travel % replaced by actual travel' }}</span><span class="v">{{ profitability.other_costs_inr | money }}</span></div>
+            {% if profitability.team_incentive_inr > 0 or profitability.associate_commission_inr > 0 %}
+            <div><span class="k">of which Team Incentive (INR)</span><span class="v">{{ profitability.team_incentive_inr | money }}</span></div>
+            <div><span class="k">of which Associate Commission (INR)</span><span class="v">{{ profitability.associate_commission_inr | money }}</span></div>
+            {% endif %}
             <div><span class="k">Total Order Cost (INR)</span><span class="v">{{ profitability.total_cost_inr | money }}</span></div>
             <div><span class="k">Order Profit (INR)</span><span class="v">{{ profitability.profit_inr | money }}</span></div>
             <div><span class="k">Order Margin %</span><span class="v">{% if profitability.margin_pct != null %}{{ profitability.margin_pct | money }}%{% else %}—{% endif %}</span></div>
@@ -3168,6 +3176,10 @@
         {% endif %}
       </div>
     </details>
+    {% if canManageIncentives %}{# Owner decision 2026-10-30: Step 12d, manage_incentives only. #}
+      <div class="step-group-connector">and the team's incentive</div>
+      {% include "orders/_incentive.njk" %}
+    {% endif %}
   </details>
   {% endif %}
 

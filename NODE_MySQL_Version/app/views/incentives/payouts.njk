@@ -1,0 +1,55 @@
+<div class="card">
+  <h1>Incentive Payouts</h1>
+  <form method="get" action="/incentives/payouts">
+    <label>Incentive month
+      <select name="month" onchange="this.form.submit()">
+        {% for m in months %}
+          <option value="{{ m }}"{{ ' selected' if m == month else '' }}>{{ incentive.monthLabel(m) }} incentive — orders fully paid {{ incentive.cycleLabel(m, cutoff) }} · paid with the {{ incentive.monthName(m) }} salary</option>
+        {% endfor %}
+      </select></label>
+    <noscript><button type="submit" class="btn-sm">Show</button></noscript>
+  </form>
+  <p class="muted">Pay these together with the {{ incentive.monthName(month) }} salary on {{ incentive.payDay(month) }} (associates: against their invoice), then mark them paid. Each order's incentive then goes to Zoho Books as Commission Expense. Staff incentives go through payroll (salary TDS); the CA advises the TDS for associates.</p>
+
+  <table class="list">
+    <tr><th>Person</th><th>Order</th><th>Role</th><th>Amount</th><th>Status</th><th>Paid on · amount paid · TDS</th></tr>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.user_name or r.associate_name }}{% if r.payee_kind == 'associate' %} <small class="muted">(associate, {{ 'India' if r.based_in == 'india' else (r.country or 'abroad') }})</small>{% endif %}</td>
+        <td>{{ r.buyer_inquiry_ref or r.order_reference }}</td>
+        <td>{{ 'Associate (agreement)' if r.payee_kind == 'associate' else (incentive.roles[r.role] or r.role) }}</td>
+        <td>&#8377;{{ r.amount_inr | money }}{% if r.payee_kind == 'associate' and r.currency_code and r.currency_code != 'INR' %}<br><small class="muted">{{ r.currency_code }} {{ r.amount_fc | money }} (order currency)</small>{% endif %}</td>
+        <td>{% if r.status == 'paid' %}<span class="badge badge-success">Paid {{ r.paid_on | shortDate }}</span><br><small class="muted">&#8377;{{ r.paid_inr | money }}{% if r.tds_inr !== null %} · TDS &#8377;{{ r.tds_inr | money }}{% endif %}</small>{% else %}<span class="badge badge-warning">Due</span>{% endif %}</td>
+        <td>
+          {% if r.status == 'due' %}
+            <form method="post" action="/incentives/payouts/{{ r.id }}/paid">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="hidden" name="month" value="{{ month }}">
+              <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">
+                <input type="date" name="paid_on" required max="{{ today() }}" value="{{ today() }}" aria-label="Paid on" title="Paid on" style="width:10.5em">
+                <input type="number" name="paid_inr" required min="0.01" step="0.01" value="{{ r.amountPlain }}" aria-label="Amount paid (₹)" title="Amount paid (₹)" style="width:8.5em">
+                <input type="number" name="tds_inr" min="0" step="0.01" placeholder="TDS ₹" aria-label="TDS (₹)" title="TDS (₹), if any" style="width:7em" data-not-more-than="[name=paid_inr]" data-not-more-than-message="TDS cannot be more than the amount paid.">
+                <button type="submit" class="btn-sm">Mark paid</button>
+              </div>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    {% if rows.length == 0 %}<tr><td colspan="6" class="muted">No incentives for this month.</td></tr>{% endif %}
+  </table>
+
+  <p><strong>Total {{ incentive.monthLabel(month) }} incentive:</strong> staff &#8377;{{ staffTotal | money0 }} · associates &#8377;{{ associateInr | money0 }}{% for f in associateFc %} ({{ f.currency }} {{ f.amount | money }}){% endfor %}</p>
+  <div class="btn-row">
+    {% if dueIds.length %}
+      <form method="post" action="/incentives/payouts/paid-all" data-confirm="Mark every due payout of this month as paid, at the amounts shown?">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="month" value="{{ month }}">
+        {% for id in dueIds %}<input type="hidden" name="payout_ids[]" value="{{ id }}">{% endfor %}
+        <label class="small">Paid on <input type="date" name="paid_on" required max="{{ today() }}" value="{{ today() }}"></label>
+        <button type="submit" class="btn-sm">Mark all paid</button>
+      </form>
+    {% endif %}
+    <a class="btn-sm" href="/incentives/payouts?month={{ month | urlencode }}&amp;format=csv">Download list (CSV)</a>
+  </div>
+</div>

@@ -43,6 +43,7 @@ implementation detail.
 - [Editing, Duplicating & Reordering](./17-order-edit-duplication.md) — changing an order after it's created, cloning a product line or a whole order, and a client's self-service repeat order.
 - [Data Export / Migration](./18-data-export-migration.md) — downloading a structure snapshot and a full data export of the live database, to migrate every historical record into a fresh reinstall without loss.
 - [Complaints](./19-complaints.md) — a buyer flagging a process issue with no intent to cancel, a two-way conversation separate from Disputes.
+- [Incentives](./20-incentives.md) — the incentive cycle, My Incentives, and paying incentives (Accounts).
 
 ## The running examples
 

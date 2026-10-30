@@ -515,6 +515,10 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   (and designation) at any time, the same as any other document type.
 - **Field Protection** — which specific fields are locked from casual
   editing once set (e.g. the BL type field mentioned in Stage 7).
+- **Team Incentives** and **Associates** — management only ("Manage team
+  incentives": the owner and the MD). The incentive program's settings,
+  each person's incentive role, and the register of associates. See
+  [Incentives](./20-incentives.md) for what staff and Accounts see.
 - **Admin Overrides** — a log/interface for the various "override" actions
   scattered through this system (amendment reference, locked client data,
   etc.) — every one of them requires a logged reason, never a silent edit.

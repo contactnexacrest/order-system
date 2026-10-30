@@ -191,7 +191,7 @@ flowchart TB
     docxjs["docx (npm)"]
     phpword["PHPWord"]
   end
-  mysql[("MySQL 8 / MariaDB<br/>113 tables, shared schema")]
+  mysql[("MySQL 8 / MariaDB<br/>119 tables, shared schema")]
   storage[("Storage volume<br/>outside web root<br/>assets · generated docs")]
   smtp["SMTP<br/>Nodemailer / PHPMailer"]
   cron["Cron / node-cron<br/>LUT·RCMC·payment·dispute alerts<br/>deferred email dispatch<br/>Zoho Books sync (hourly)"]
@@ -358,7 +358,7 @@ sequenceDiagram
 
 <section id="e">
   <div class="sec-head"><span class="letter">E</span><h2>Database Schema</h2><span class="sub">Fig. E</span></div>
-  <p class="lede">One schema, 113 tables (Node adds one of its own — <code>sessions</code>, its DB-backed session store; PHP needs none), shared byte-for-byte in spirit between both stacks (<code>NODE_MySQL_Version/docs/schema.sql</code> and <code>PHP_MySQL_Version/docs/schema.sql</code> — table/column definitions identical, only comment prose differs per stack's own naming convention). 218 foreign keys. The file is organised as lettered sections in the order most features were built — the comments at the bottom of the file (<code>-- Section X … added YYYY-MM-DD</code>) are the changelog; the newest few additions (below the lettered-sections table) are dated inline instead, not yet folded into a letter.</p>
+  <p class="lede">One schema, 119 tables (Node adds one of its own — <code>sessions</code>, its DB-backed session store; PHP needs none), shared byte-for-byte in spirit between both stacks (<code>NODE_MySQL_Version/docs/schema.sql</code> and <code>PHP_MySQL_Version/docs/schema.sql</code> — table/column definitions identical, only comment prose differs per stack's own naming convention). 231 foreign keys. The file is organised as lettered sections in the order most features were built — the comments at the bottom of the file (<code>-- Section X … added YYYY-MM-DD</code>) are the changelog; the newest few additions (below the lettered-sections table) are dated inline instead, not yet folded into a letter.</p>
 
   <div class="sheet">
     <pre class="mermaid">
@@ -392,7 +392,7 @@ erDiagram
   DOCUMENT_TYPES ||--o{ DOCUMENTS : "of type"
     </pre>
   </div>
-  <p class="sheet-cap">FIG. E1 — CORE ENTITY RELATIONSHIPS (SIMPLIFIED — 23 OF 113 TABLES SHOWN)</p>
+  <p class="sheet-cap">FIG. E1 — CORE ENTITY RELATIONSHIPS (SIMPLIFIED — 23 OF 119 TABLES SHOWN)</p>
 
   <div class="tablewrap"><table>
     <caption>Schema sections, in build order</caption>
@@ -742,8 +742,8 @@ flowchart TB
     <tr><th>Object</th><th>Count / shape</th></tr>
     <tr><td>Order pipeline stages</td><td>9, linear with one conditional skip (Stage 6, FOB Incoterm)</td></tr>
     <tr><td>Generated document types</td><td>22 total — 9 customer-facing (QT/PI/OC/PL/CI/FDN/BUYERPO/ANNEXA/BLE), 2 procurement-only (SUPPO, COOPREP), 11 internal (AMD generated on demand + BLI + 4 cross-verification checklists + 2 SOP references + CAFIN + STAGEGATE + WALLREF)</td></tr>
-    <tr><td>Database tables</td><td>113 in both stacks (plus Node's own <code>sessions</code>), in lettered schema sections A–CM, plus a few dated-but-unlettered additions (see §E)</td></tr>
-    <tr><td>Routes</td><td>471 per stack, route-for-route identical (158 GET, 313 POST), every one covered by a test</td></tr>
+    <tr><td>Database tables</td><td>119 in both stacks (plus Node's own <code>sessions</code>), in lettered schema sections A–CM, plus a few dated-but-unlettered additions (see §E)</td></tr>
+    <tr><td>Routes</td><td>486 per stack, route-for-route identical (163 GET, 323 POST), every one covered by a test</td></tr>
     <tr><td>Permissions</td><td>60 in 7 categories, 8 roles (see §F)</td></tr>
     <tr><td>Auth surfaces</td><td>3, structurally separate — staff session, client-portal session, and unauthenticated public intake</td></tr>
     <tr><td>File formats generated</td><td>PDF (always) + DOCX (optional, internal-only)</td></tr>

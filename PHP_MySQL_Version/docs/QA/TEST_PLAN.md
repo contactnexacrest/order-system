@@ -19,14 +19,14 @@ through those dedicated suites rather than duplicated here.
 
 ## 1. Scope and application shape
 
-- **2 stacks**, PHP/MySQL and Node/MySQL, route-for-route identical: **471
-  routes each** — 158 GET, 313 POST (`public_html/index.php` /
+- **2 stacks**, PHP/MySQL and Node/MySQL, route-for-route identical: **486
+  routes each** — 163 GET, 323 POST (`public_html/index.php` /
   `src/server.js`; counts as of 29 Oct 2026).
-- **113 database tables** (`docs/schema.sql`), 24 of which (at the time
+- **119 database tables** (`docs/schema.sql`), 24 of which (at the time
   of the original inventory) hang directly off
   `orders.id` (the order-lifecycle-dependent tables — see
   `_inventory_raw.md` §3 for the full list).
-- **8 roles, 60 permissions** (`docs/seed.sql`), plus two mechanisms that
+- **8 roles, 63 permissions** (`docs/seed.sql`), plus two mechanisms that
   sit outside the role/permission matrix entirely and must be tested
   separately: per-user permission overrides (`user_permissions`) and the
   Super Admin tier (`users.is_super_admin`, `super_admin_delegations`),
@@ -52,15 +52,15 @@ through those dedicated suites rather than duplicated here.
 
 | Role | Permission scope |
 |---|---|
-| Admin, Managing Director, Executive Director | All 60 permissions (wildcard grant in seed.sql), including `approve_payment_terms` and `view_cafin` |
+| Admin, Managing Director, Executive Director | All permissions (wildcard grant in seed.sql), including `approve_payment_terms` and `view_cafin` — except that Executive Director does not hold `manage_incentives` (team incentives: owner and MD only, 2026-10-30) |
 | Export Executive (16) | manage_orders, manage_payments, manage_shipping, close_orders, generate_documents, download_pdf, view_reports, view_client_email_full, cross_verify_documents, override_buyer_acknowledgment, respond_to_disputes, respond_to_complaints, view/browse product catalog, view_product_pricing, view_archived_orders |
 | Accounts Executive (20) | view_cafin, manage_orders, manage_payments, clear_payments, manage_supplier_payments, download_pdf, view_reports, view_all_orders, view_client_email_full, cross_verify_documents, override_buyer_acknowledgment, view/browse product catalog, view_product_pricing, view_archived_orders, ca_module_view, ca_module_manage, inr_actual_view, inr_actual_edit, ca_fy_lock_override |
 | Logistics Executive (10) | manage_orders, manage_shipping, close_orders, generate_documents, download_pdf, cross_verify_documents, override_buyer_acknowledgment, view/browse product catalog, view_archived_orders |
 | Viewer / Auditor (6) | view_reports, view_audit_log, view_product_catalog, view_orders, view_clients, view_all_orders |
 | CA / Chartered Accountant (4) | ca_module_view, inr_actual_view, view_cafin, view_orders (read-only — no order-editing access; sees only orders assigned to them) |
 
-60 permissions span 7 categories: admin (11), reports (3), orders (17),
-documents (6), clients (3), catalog (11), ca (9). `_inventory_raw.md` §1
+63 permissions span 8 categories: admin (11), reports (3), orders (17),
+documents (6), clients (3), catalog (11), ca (9), incentives (3: `manage_incentives`, `pay_incentives` — also Accounts Executive, `view_own_incentives` — also Export, Accounts and Logistics Executive). `_inventory_raw.md` §1
 holds the original (pre-QA Round 5) grant list; `docs/seed.sql` is the
 source of truth.
 

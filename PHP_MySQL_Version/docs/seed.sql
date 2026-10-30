@@ -133,6 +133,39 @@ FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'CA / Chartered Accountant'
   AND p.permission_key IN ('ca_module_view','inr_actual_view','view_cafin','view_orders'); -- view_orders: owner decision 2026-10-28 (read-only, so the CA can open an order and its CAFIN box)
 
+-- Team incentives (owner decision 2026-10-30): you and the MD manage them,
+-- Accounts pays them, staff see their own. Executive Director is left out of
+-- manage_incentives on purpose (it is added after the all-permissions grant above).
+INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
+  ('manage_incentives', 'Manage team incentives', 'See and change the incentive settings, each order''s incentive and profit basis, the associate register and every payout. Owner decision 2026-10-30: you and the MD only.', 'incentives'),
+  ('pay_incentives', 'Pay incentives', 'See the incentive payouts list (person, order, amount) and record payments. No profit, no settings, cannot change amounts.', 'incentives'),
+  ('view_own_incentives', 'View own incentives', 'See your own incentive amounts once the buyer has fully paid.', 'incentives');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1
+FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'manage_incentives' AND r.name IN ('Admin', 'Managing Director');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1
+FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'pay_incentives' AND r.name IN ('Admin', 'Managing Director', 'Accounts Executive');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1
+FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'view_own_incentives'
+  AND r.name IN ('Admin', 'Managing Director', 'Executive Director', 'Export Executive', 'Accounts Executive', 'Logistics Executive');
+
+INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES
+  ('program_enabled', '0'),
+  ('program_start_date', ''),
+  ('min_profit_inr', '300000'),
+  ('reward_table', '[{"from":300000,"reward":40000},{"from":500000,"reward":60000}]'),
+  ('new_client_bonus_inr', '10000'),
+  ('role_split', '{"sales":40,"export":20,"marketing":15,"logistics":15,"accounts":10}'),
+  ('cutoff_day', '20');
+
 -- ================================================================
 -- USERS — one seeded account to get in the door.
 -- Email/password are PLACEHOLDERs — change both immediately.

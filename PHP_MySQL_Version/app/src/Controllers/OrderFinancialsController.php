@@ -856,6 +856,11 @@ final class OrderFinancialsController
             echo 'Cost entry not found for this order.';
             return;
         }
+        if (!empty($entry['incentive_kind'])) {
+            Flash::set('error', 'This is the order\'s team incentive or associate commission. It is managed in Step 12d (Team Incentive), not here.');
+            header("Location: /orders/{$orderId}#financials-12d");
+            return;
+        }
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
 

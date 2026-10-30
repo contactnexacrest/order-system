@@ -798,6 +798,11 @@ async function deleteCostEntry(req, res) {
     res.status(404).send('Cost entry not found for this order.');
     return;
   }
+  if (entry.incentive_kind) {
+    flash.set(req, 'error', 'This is the order\'s team incentive or associate commission. It is managed in Step 12d (Team Incentive), not here.');
+    res.redirect(`/orders/${orderId}#financials-12d`);
+    return;
+  }
   const user = req.user;
 
   if (!(await caFyLockGuard.allow(req, entry.incurred_at, 'order_cost_entries', entryId, 'delete'))) {

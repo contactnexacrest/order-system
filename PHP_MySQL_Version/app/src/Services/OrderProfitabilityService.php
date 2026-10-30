@@ -135,6 +135,10 @@ final class OrderProfitabilityService
             'fob_value_foreign'    => $fobValue,
             'revenue_inr'          => round($revenueInr, 2),
             'zoho_expenses_inr'    => round($zohoExpensesInr, 2),
+            // Owner decision 2026-10-30: the team incentive and associate commission,
+            // already inside other_costs_inr (commission cost entries), shown apart.
+            'team_incentive_inr'   => round((float) (\App\Repositories\IncentiveRepository::costEntries($orderId)['team']['amount_inr'] ?? 0), 2),
+            'associate_commission_inr' => round((float) (\App\Repositories\IncentiveRepository::costEntries($orderId)['associate']['amount_inr'] ?? 0), 2),
             'revenue_is_estimated' => $isEstimated,
             'export_benefits_inr'  => round($exportBenefitsInr, 2),
             'export_benefits_is_estimated' => $exportBenefitsIsEstimated,

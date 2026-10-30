@@ -1010,9 +1010,28 @@ async function show(req, res) {
   }
   const canManageOrderFinancialsForBills = !!req.permissions.manage_order_financials;
 
+  // Owner decision 2026-10-30: the team incentive box (Step 12d) — manage_incentives only.
+  const canManageIncentives = !!req.permissions.manage_incentives;
+  let incentiveView = {};
+  if (canManageIncentives) {
+    const incentiveService = require('../services/incentiveService');
+    const incentiveRepository = require('../repositories/incentiveRepository');
+    if (req.user) {
+      await incentiveService.lockIfDue(orderId, req.user.id);
+    }
+    incentiveView = {
+      incentiveRow: await incentiveRepository.forOrder(orderId),
+      incentiveCalc: await incentiveService.calculate(orderId),
+      incentivePayouts: await incentiveRepository.payoutsForOrder(orderId),
+      incentiveUsers: await userRepository.listActive(),
+    };
+  }
+
   res.renderView(
     'orders/show',
     {
+      canManageIncentives,
+      ...incentiveView,
       vendorBills,
       logisticsBanks,
       logisticsPaymentBlocked: await require('./vendorBillController').logisticsPaymentBlockedReason(order),

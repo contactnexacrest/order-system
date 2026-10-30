@@ -500,6 +500,15 @@
         return el.dataset.zeroIfMessage || 'This must be 0 here.';
       }
     }
+    // data-sum-group="<group>" data-sum-total="<n>": the fields of a group
+    // must add up to n (e.g. the team incentive role shares, 100%).
+    if (el.dataset.sumGroup && el.form && value !== '') {
+      var sumFields = el.form.querySelectorAll('[data-sum-group="' + el.dataset.sumGroup + '"]');
+      var sum = 0;
+      for (var si = 0; si < sumFields.length; si++) sum += parseFloat(sumFields[si].value) || 0;
+      var target = parseFloat(el.dataset.sumTotal);
+      if (Math.abs(sum - target) > 0.001) return 'These must add up to ' + target + ' (now ' + Math.round(sum * 100) / 100 + ').';
+    }
     var bankMessage = bankError(el, value);
     if (bankMessage) return bankMessage;
     if (/^bank_account_number(_confirm)?$/.test(name) && value !== '' && !/^[0-9]{6,20}$/.test(value.replace(/\s+/g, ''))) {

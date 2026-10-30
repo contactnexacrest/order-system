@@ -131,6 +131,7 @@ describe('Benefits at settlement — Step 13g (owner decision 2026-10-27)', () =
     expect(html).toContain('Step 13h &middot; Mark Fully Settled');
     expect(html.indexOf('id="step-13g-benefits"')).toBeLessThan(html.indexOf('id="step-despatch"'));
     expect(html).toContain('Skip — not claiming');
-    expect(html).not.toContain('Step 12d');
+    // The old Step 12d (Review Profit) is Step 12c now; Step 12d is the team incentive (2026-10-30).
+    expect(html).not.toContain('Step 12d &middot; Review Profit');
   });
 });

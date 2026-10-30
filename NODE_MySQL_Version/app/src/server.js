@@ -46,6 +46,7 @@ const galleryController = require('./controllers/galleryController');
 const gettingStartedController = require('./controllers/gettingStartedController');
 const caController = require('./controllers/caController');
 const orderFinancialsController = require('./controllers/orderFinancialsController');
+const incentiveController = require('./controllers/incentiveController');
 const orderExpenseController = require('./controllers/orderExpenseController');
 const vendorBillController = require('./controllers/vendorBillController');
 const assetController = require('./controllers/assetController');
@@ -151,6 +152,27 @@ njkEnv.addFilter('money', (value) => {
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 });
 // Owner decision 2026-10-29: how a settlement leg is named on the CA pages ('lc' → 'LC payment').
+// Owner decision 2026-10-30: team incentives — whole-rupee amounts (PHP number_format($v, 0)) and month/cycle labels.
+njkEnv.addFilter('money0', (value) => {
+  const num = parseFloat(value);
+  if (Number.isNaN(num)) return value;
+  return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+});
+// PHP's rtrim(rtrim(number_format($v, 2), '0'), '.') — a share like "40" or "15.5".
+njkEnv.addFilter('pct2', (value) => {
+  const num = parseFloat(value);
+  if (Number.isNaN(num)) return value;
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/0+$/, '').replace(/\.$/, '');
+});
+njkEnv.addFilter('pluck', (list, attr) => (list || []).map((item) => item && item[attr]));
+njkEnv.addGlobal('incentive', {
+  roles: require('./repositories/incentiveRepository').ROLES,
+  monthLabel: (m) => require('./services/incentiveService').monthLabel(m),
+  monthName: (m) => require('./services/incentiveService').monthName(m),
+  cycleLabel: (m, c) => require('./services/incentiveService').cycleLabel(m, c),
+  cycleSentence: (c) => require('./services/incentiveService').cycleSentence(c),
+  payDay: (m) => require('./services/incentiveService').payDay(m),
+});
 njkEnv.addFilter('legLabel', (leg) => require('./repositories/caRepository').legLabel(leg));
 // Mirrors PHP's number_format($v, 4) — used for CA exchange rates, which
 // are recorded and displayed to 4 decimal places (e.g. "88.5000"), not
@@ -769,6 +791,23 @@ app.post('/orders/:id/lc-received', requireAuth, requirePermission('manage_order
 app.post('/orders/:id/payment/lc/firc', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.recordLcFirc));
 app.post('/orders/:id/inspection-fee', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveInspectionFee));
 app.post('/orders/:id/travel-expenses', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveTravelExpenses));
+// Team incentives and associates (owner decision 2026-10-30).
+app.get('/incentives/settings', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.settings));
+app.post('/incentives/settings', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveSettings));
+app.get('/associates', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.associates));
+app.post('/associates', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveAssociate));
+app.get('/associates/:id/edit', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.associates));
+app.post('/associates/:id/update', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveAssociate));
+app.post('/associates/:id/clients', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.linkClient));
+app.post('/associates/:id/clients/:clientId/unlink', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.unlinkClient));
+// Owner decision 2026-10-30: the team incentive is fixed when the buyer has fully paid, which is often when the order is closed; it writes only the incentive's own rows (manage_incentives).
+app.post('/orders/:id/incentive', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveOrder));
+app.post('/orders/:id/incentive/people', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveOrderPeople));
+app.post('/orders/:id/incentive/recalculate', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.recalculate));
+app.get('/my-incentives', requireAuth, requirePermission('view_own_incentives'), asyncHandler(incentiveController.mine));
+app.get('/incentives/payouts', requireAuth, requirePermission('pay_incentives'), asyncHandler(incentiveController.payouts));
+app.post('/incentives/payouts/paid-all', requireAuth, requirePermission('pay_incentives'), verifyCsrf, asyncHandler(incentiveController.markPaid));
+app.post('/incentives/payouts/:payoutId/paid', requireAuth, requirePermission('pay_incentives'), verifyCsrf, asyncHandler(incentiveController.markPaid));
 app.post('/orders/:id/cost-entries', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addCostEntry));
 app.post('/orders/:id/cost-entries/:entryId/delete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.deleteCostEntry));
 app.get('/ca/bank-statement', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.bankStatement));

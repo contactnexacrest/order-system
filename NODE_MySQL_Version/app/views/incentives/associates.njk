@@ -1,0 +1,71 @@
+{% set a0 = editing or {} %}
+<div class="card">
+  <h1>Associates</h1>
+  <p class="muted">Outside people, in India or abroad, who introduce new clients under a signed agreement. They earn the agreement's rate on the product value of a client's first orders (the client's first 10 days count as one order), once the buyer has fully paid; nothing on repeat orders. Their commission is a cost of the order, deducted before the team incentive is worked out. Only people with "Manage team incentives" see this page.</p>
+
+  <table class="list">
+    <tr><th>Name</th><th>Based in</th><th>Paid in</th><th>Agreement signed</th><th>Rates (orders 1–5 / 6–10 / 11–20 / 21–40 / 41+)</th><th>Clients introduced</th><th>Status</th><th></th></tr>
+    {% for a in associates %}
+      <tr>
+        <td>{{ a.name }}</td>
+        <td>{% if a.based_in == 'india' %}India{% else %}Abroad{% if a.country %} — {{ a.country }}{% endif %}{% endif %}</td>
+        <td>{{ a.currency_code }}</td>
+        <td>{{ (a.agreement_signed_on | shortDate) if a.agreement_signed_on else '—' }}</td>
+        <td>{{ a.rateText }}</td>
+        <td>
+          {% for c in clientsByAssociate[a.id] %}
+            <div>{{ c.company_legal_name }} <small class="muted">since {{ c.associate_registered_on | shortDate }}</small>
+              <form method="post" action="/associates/{{ a.id }}/clients/{{ c.id }}/unlink" style="display:inline" data-confirm="Unlink this client from the associate?">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-secondary">Unlink</button>
+              </form></div>
+          {% endfor %}
+          <form method="post" action="/associates/{{ a.id }}/clients" style="margin-top:6px">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <select name="client_id" required aria-label="Client introduced by {{ a.name }}">
+              <option value="">Link a client…</option>
+              {% for c in unlinkedClients %}<option value="{{ c.id }}">{{ c.company_legal_name }} ({{ c.client_unique_number }})</option>{% endfor %}
+            </select>
+            <input type="date" name="registered_on" required max="{{ today() }}" value="{{ today() }}" aria-label="Lead registered on">
+            <button type="submit" class="btn-sm">Link</button>
+          </form>
+        </td>
+        <td>{% if a.status == 'active' %}<span class="badge badge-success">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}</td>
+        <td><a href="/associates/{{ a.id }}/edit" class="btn-sm">Edit</a></td>
+      </tr>
+    {% endfor %}
+    {% if associates.length == 0 %}<tr><td colspan="8" class="muted">No associates yet.</td></tr>{% endif %}
+  </table>
+</div>
+
+<div class="card" id="associate-form">
+  <h2>{{ ('Edit ' + a0.name) if editing else 'Add an associate' }}</h2>
+  <form method="post" action="{{ ('/associates/' + editing.id + '/update') if editing else '/associates' }}">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="field-grid">
+      <label>Name *<input type="text" name="name" required maxlength="150" value="{{ a0.name or '' }}"></label>
+      <label>Based in *<select name="based_in" required><option value="india"{{ ' selected' if (a0.based_in or 'india') == 'india' else '' }}>India</option><option value="abroad"{{ ' selected' if a0.based_in == 'abroad' else '' }}>Abroad</option></select></label>
+      <label>Country<input type="text" name="country" maxlength="80" value="{{ a0.country or '' }}"></label>
+      <label>Paid in (currency) *<select name="currency_code" required>
+        {% for cur in currencies %}{% set code = cur.code or cur.currency_code or '' %}
+          <option value="{{ code }}"{{ ' selected' if (a0.currency_code or 'INR') == code else '' }}>{{ code }}</option>
+        {% endfor %}
+      </select></label>
+      <label>Email<input type="email" name="email" maxlength="190" value="{{ a0.email or '' }}"></label>
+      <label>Phone<input type="tel" name="phone" maxlength="40" value="{{ a0.phone or '' }}"></label>
+      <label>PAN / tax ID<input type="text" name="tax_id" maxlength="50" value="{{ a0.tax_id or '' }}"></label>
+      <label>Agreement signed on<input type="date" name="agreement_signed_on" max="{{ today() }}" value="{{ a0.agreement_signed_on or '' }}"></label>
+    </div>
+    <fieldset><legend>Commission rates (% of product value, from the agreement)</legend>
+      <div class="field-grid">
+        {% for f in rateFields %}
+          <label>{{ f.label }} *<input type="number" name="{{ f.name }}" required min="0" max="20" step="0.01" value="{{ a0[f.name] if (a0[f.name] !== undefined and a0[f.name] !== null) else f.default }}"></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <div class="field-grid">
+      <label>Status<select name="status"><option value="active"{{ ' selected' if (a0.status or 'active') == 'active' else '' }}>Active</option><option value="inactive"{{ ' selected' if a0.status == 'inactive' else '' }}>Inactive</option></select></label>
+      <label>Notes<input type="text" name="notes" maxlength="500" value="{{ a0.notes or '' }}"></label>
+    </div>
+    <div class="btn-row"><button type="submit">{{ 'Save' if editing else 'Add associate' }}</button>{% if editing %} <a href="/associates">Cancel</a>{% endif %}</div>
+  </form>
+</div>

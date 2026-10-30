@@ -1,0 +1,64 @@
+{% set cutoffLabel = 'the 1st to the last day of this month' if settings.cutoff == 'last' else incentive.cycleSentence(settings.cutoff) %}
+<div class="card">
+  <h1>Team Incentives</h1>
+  <p class="muted">Only people with "Manage team incentives" can see this page. Staff never see the profit, the minimum or the reward table. Every change is recorded in the audit log; orders the buyer has already fully paid keep the figures they were fixed with.</p>
+
+  <form method="post" action="/incentives/settings">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <fieldset><legend>Program</legend>
+      <label class="setting-row"><span class="setting-label">Incentive program on<small class="muted">Off: no order gets a team reward. Associates are still paid under their agreements.{% if settings.start_date != '' %} Started {{ settings.start_date | shortDate }}: orders fully paid before then get no team reward.{% endif %}</small></span>
+        <input type="checkbox" name="program_enabled" value="1"{{ ' checked' if settings.enabled else '' }}></label>
+      <label class="setting-row"><span class="setting-label">Minimum order profit to qualify (&#8377;)<small class="muted">Checked on the order's profit after any associate commission.</small></span>
+        <input type="number" name="min_profit_inr" min="0" step="1" required value="{{ minProfitText }}"></label>
+    </fieldset>
+
+    <fieldset><legend>Incentive cycle</legend>
+      <label class="setting-row"><span class="setting-label">Incentive cut-off day<small class="muted">The last day of each incentive cycle: 1 to 28, or the last day of the month. A change applies from the next cycle.</small></span>
+        <select name="cutoff_day" required>
+          <option value="last"{{ ' selected' if settings.cutoff == 'last' else '' }}>Last day of the month (1st to 31st)</option>
+          {% for d in range(1, 29) %}<option value="{{ d }}"{{ ' selected' if settings.cutoff == (d | string) else '' }}>{{ d }}</option>{% endfor %}
+        </select></label>
+      <p class="alert alert-info">Incentive cycle (Incentive pay): <strong>{{ cutoffLabel }}</strong>. Orders the buyer fully pays in this cycle are this month's incentive, paid together with this month's salary (fixed pay, 1st to 31st) on the last day of the month.</p>
+    </fieldset>
+
+    <fieldset><legend>Reward table</legend>
+      <p class="muted small">The team reward for an order whose profit reaches each amount. Leave a row empty to drop it; one row is enough for one fixed amount. An amount set on an order replaces this.</p>
+      <table class="list"><tr><th>Order profit from (&#8377;)</th><th>Team reward (&#8377;)</th></tr>
+        {% for t in tableRows %}
+          <tr>
+            <td><input type="number" name="table_from[{{ loop.index0 }}]" min="1" step="1" value="{{ t.from }}" aria-label="Order profit from, row {{ loop.index }}"></td>
+            <td><input type="number" name="table_reward[{{ loop.index0 }}]" min="1" step="1" value="{{ t.reward }}" aria-label="Team reward, row {{ loop.index }}"></td>
+          </tr>
+        {% endfor %}
+      </table>
+      <label class="setting-row"><span class="setting-label">New client bonus (&#8377;)<small class="muted">Added on a client's first order (when it earns a reward); goes to Sales and Marketing. 0 = off.</small></span>
+        <input type="number" name="new_client_bonus_inr" min="0" step="1" required value="{{ bonusText }}"></label>
+    </fieldset>
+
+    <fieldset><legend>How the reward is split</legend>
+      <table class="list"><tr><th>Role</th><th>Share (%)</th></tr>
+        {% for role, label in incentive.roles %}
+          <tr><td>{{ label }}</td>
+            <td><input type="number" name="split[{{ role }}]" min="0" max="100" step="0.01" required value="{{ splitText[role] }}" data-sum-group="split" data-sum-total="100" aria-label="{{ label }} share"></td></tr>
+        {% endfor %}
+      </table>
+      <p class="muted small">Must add up to 100. Two people in the same role on an order share that role's amount equally.</p>
+    </fieldset>
+
+    <fieldset><legend>Each person's incentive role</legend>
+      <p class="muted small">Who usually does which role. On each order, the people assigned to it with that role get it (or everyone with the role, if none is assigned); it can be changed on the order.</p>
+      <table class="list">
+        <tr><th>Person</th>{% for role, label in incentive.roles %}<th>{{ label }}</th>{% endfor %}</tr>
+        {% for u in users %}
+          <tr><td>{{ u.name }} <small class="muted">{{ u.role_name or '' }}</small></td>
+            {% for role, label in incentive.roles %}
+              <td><input type="checkbox" name="user_roles[u{{ u.id }}][]" value="{{ role }}"{{ ' checked' if role in (userRoles[u.id] or []) else '' }} aria-label="{{ u.name }} — {{ label }}"></td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </table>
+    </fieldset>
+
+    <div class="btn-row"><button type="submit">Save</button> <a href="/associates">Associates</a> · <a href="/incentives/payouts">Incentive payouts</a></div>
+  </form>
+</div>

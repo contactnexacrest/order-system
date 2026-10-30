@@ -1,0 +1,23 @@
+<div class="card">
+  <h1>My Incentives</h1>
+  <div class="kv-grid">
+    <div><span class="k">Paid in {{ year }}</span><span class="v">&#8377;{{ paidThisYear | money0 }}</span></div>
+    {% for d in dueByMonth %}
+      <div><span class="k">Your {{ incentive.monthLabel(d.month) }} incentive (paid with the {{ incentive.monthName(d.month) }} salary)</span><span class="v">&#8377;{{ d.amount | money0 }}</span></div>
+    {% endfor %}
+  </div>
+  <table class="list" style="margin-top:12px">
+    <tr><th>Order</th><th>Client</th><th>Your role</th><th>Amount (&#8377;)</th><th>Status</th></tr>
+    {% for p in payouts %}
+      <tr>
+        <td>{{ p.buyer_inquiry_ref or p.order_reference }}</td>
+        <td>{{ p.company_legal_name }}</td>
+        <td>{{ incentive.roles[p.role] or p.role }}</td>
+        <td>{{ (p.paid_inr if p.status == 'paid' else p.amount_inr) | money0 }}</td>
+        <td>{% if p.status == 'paid' %}<span class="badge badge-success">{{ incentive.monthLabel(p.incentive_month) }} incentive — paid</span>{% else %}<span class="badge badge-warning">{{ incentive.monthLabel(p.incentive_month) }} incentive</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    {% if payouts.length == 0 %}<tr><td colspan="5" class="muted">Nothing yet. Your incentives appear here once the buyer of an order you worked on has fully paid.</td></tr>{% endif %}
+  </table>
+  <p class="muted small">An order appears here once the buyer has fully paid. Incentive cycle: {{ 'the 1st to the last day of the month' if cutoff == 'last' else incentive.cycleSentence(cutoff) }}. Your incentive for the cycle is paid together with your salary on the last day of the month.</p>
+</div>

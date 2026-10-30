@@ -63,7 +63,7 @@ correctly once the password is changed.
 
 ## What's in this folder
 
-- `docs/schema.sql` — full database schema (113 tables, 218 foreign keys as
+- `docs/schema.sql` — full database schema (119 tables, 231 foreign keys as
   of 2026-10-29 — see `docs/schema.sql`'s own trailing `-- SECTION X …
   added YYYY-MM-DD` comments for the running changelog; 52 tables/76 FKs
   at the time of this Phase D delivery specifically), validated against a
@@ -1950,3 +1950,23 @@ them goes to a fake Zoho; they never reach the real one.
 Docs updated in the same release: `docs/ARCHITECTURE.md`, the root
 `ARCHITECTURE.html`, `docs/QA/TEST_PLAN.md` (§9),
 `docs/migrations/README.md` and the SOP chapter ca-03 (Zoho Books Sync).
+
+## Follow-up (added 2026-10-30): team incentives and associates
+
+Owner decision 2026-10-30 (mockups approved). `IncentiveService` /
+`IncentiveRepository` / `AssociateRepository` / `IncentiveController`, the
+views in `views/incentives/` and Step 12d (`views/orders/_incentive.php`),
+migration `docs/migrations/2026-10-30b-team-incentives.sql` (schema section
+CN). An order's team reward (the amount set on the order, else the reward
+table for its profit after any associate commission, if it reaches the
+minimum and the program is on, plus the new client bonus on a client's
+first order) is split by role and fixed when the buyer has fully paid; the
+associate's agreement rate applies on the client's first 10 days. Both
+become commission cost entries (`order_cost_entries.incentive_kind`), paid
+in the incentive month (incentive cut-off day, default the 20th) and sent
+to Zoho Books as Commission Expense once paid. Permissions:
+`manage_incentives` (Admin, MD — not ED), `pay_incentives` (Admin, MD,
+Accounts Executive), `view_own_incentives`. Both stacks now stand at
+**119 tables**, **231 foreign keys**, **63 permissions** and **486 routes**
+(163 GET, 323 POST). Tests: `TeamIncentiveTest` / `teamIncentive.test.js`.
+SOP: chapter 20 (Incentives).

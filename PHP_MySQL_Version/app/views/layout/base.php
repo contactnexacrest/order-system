@@ -51,6 +51,10 @@ $canAudit = $can('view_audit_log');
 $canReports = $can('view_reports');
 $canOverrides = $can('edit_locked_data');
 $canFieldProtection = $can('manage_field_protection');
+// Owner decision 2026-10-30: team incentives and associates.
+$canManageIncentives = $can('manage_incentives');
+$canPayIncentives = $can('pay_incentives');
+$canOwnIncentives = $can('view_own_incentives');
 $canUsers = $can('manage_users');
 $canSampleData = $can('manage_sample_data');
 $canViewProducts = $can('view_product_catalog');
@@ -81,7 +85,7 @@ $canComplaints = $can('manage_complaints') || $can('respond_to_complaints');
 $canViewComplaintsList = $can('manage_complaints');
 
 $opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canComplaints || $canViewClients || $canViewOrders;
-$insightsGroupVisible = $canReports || $canAudit;
+$insightsGroupVisible = $canReports || $canAudit || $canPayIncentives || $canOwnIncentives;
 // 90-item backlog #34: $canManageHsCodes/$canManageComplianceTaskTypes/
 // $canManageDropdownOptions/$canManageEmailTemplates each gate their own
 // link inside this dropdown but were never added to the group's own
@@ -92,7 +96,7 @@ $insightsGroupVisible = $canReports || $canAudit;
 $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermissions
     || $canUsers || $canFieldProtection || $canOverrides || $canSampleData || $canDataExport || $canManageLogisticsPartners || $canManageSuppliers || $canManagePaymentPresets
     || $canManageHsCodes || $canManageComplianceTaskTypes || $canManageDropdownOptions || $canManageEmailTemplates
-    || $canManagePorts; // QA Round 5, R5-19: Ports / Port Routes live in this group too (Node already had it)
+    || $canManagePorts || $canManageIncentives; // QA Round 5, R5-19: Ports / Port Routes live in this group too (Node already had it)
 
 // Sidebar redesign (2026-09-23, "cover all" UI pass) — highlights the
 // current section so a fresher can see at a glance where they are, and
@@ -104,10 +108,10 @@ $isActive = static function (string $path) use ($currentPath): bool {
     return $path === '/' ? $currentPath === '/' : str_starts_with($currentPath, $path);
 };
 $opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes') || $isActive('/complaints');
-$insightsGroupActive = $isActive('/reports') || $isActive('/audit-log');
+$insightsGroupActive = $isActive('/reports') || $isActive('/audit-log') || $isActive('/incentives/payouts') || $isActive('/my-incentives');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates') || $isActive('/ui-templates')
-    || $isActive('/logistics-partners') || $isActive('/suppliers') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types') || $isActive('/ports');
+    || $isActive('/logistics-partners') || $isActive('/suppliers') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types') || $isActive('/ports') || $isActive('/incentives/settings') || $isActive('/associates');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -173,6 +177,8 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
         <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg></span>Insights</summary>
         <div class="nav-dropdown">
           <?php if ($canReports): ?><a href="/reports" class="<?= $isActive('/reports') ? 'active' : '' ?>">Reports</a><?php endif; ?>
+          <?php if ($canPayIncentives): ?><a href="/incentives/payouts" class="<?= $isActive('/incentives/payouts') ? 'active' : '' ?>">Incentive Payouts</a><?php endif; ?>
+          <?php if ($canOwnIncentives): ?><a href="/my-incentives" class="<?= $isActive('/my-incentives') ? 'active' : '' ?>">My Incentives</a><?php endif; ?>
           <?php if ($canAudit): ?><a href="/audit-log" class="<?= $isActive('/audit-log') ? 'active' : '' ?>">Audit Log</a><?php endif; ?>
         </div>
       </details>
@@ -198,6 +204,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canPermissions): ?><a href="/admin/permissions" class="<?= $isActive('/admin/permissions') ? 'active' : '' ?>">Permissions</a><?php endif; ?>
           <?php if ($canUsers): ?><a href="/users" class="<?= $isActive('/users') ? 'active' : '' ?>">Users</a><?php endif; ?>
           <?php if ($canFieldProtection): ?><a href="/admin/field-protection" class="<?= $isActive('/admin/field-protection') ? 'active' : '' ?>">Field Protection</a><?php endif; ?>
+          <?php if ($canManageIncentives): ?><a href="/incentives/settings" class="<?= $isActive('/incentives/settings') ? 'active' : '' ?>">Team Incentives</a><a href="/associates" class="<?= $isActive('/associates') ? 'active' : '' ?>">Associates</a><?php endif; ?>
           <?php if ($canOverrides): ?><a href="/admin/overrides" class="<?= $isActive('/admin/overrides') ? 'active' : '' ?>">Admin Overrides</a><?php endif; ?>
           <?php if ($canSampleData): ?><a href="/sample-data" class="<?= $isActive('/sample-data') ? 'active' : '' ?>">Sample Data</a><?php endif; ?>
           <?php if ($canDataExport): ?><a href="/admin/data-export" class="<?= $isActive('/admin/data-export') ? 'active' : '' ?>">Data Export / Migration</a><?php endif; ?>
