@@ -25,7 +25,7 @@ final class NavLinksMatchRoutePermissionsTest extends DbTestCase
         $_SESSION = [];
     }
 
-    public function testExportExecutiveDoesNotSeeTheDisputesListSidebarLink(): void
+    public function testExportExecutiveSeesTheDisputesListSidebarLink(): void
     {
         $_SESSION['_auth_user_id'] = $this->createTestUser('Export Executive');
 
@@ -33,7 +33,9 @@ final class NavLinksMatchRoutePermissionsTest extends DbTestCase
         (new OrderController())->index([]);
         $html = (string) ob_get_clean();
 
-        self::assertStringNotContainsString('href="/disputes"', $html, 'Export Executive has respond_to_disputes but not manage_disputes, and the list route needs manage_disputes');
+        // Owner decision 2026-10-30 (QA Round 6, Q-R6-3): respond_to_disputes
+        // now opens the list too, scoped to the orders the user may see.
+        self::assertStringContainsString('href="/disputes"', $html, 'Export Executive has respond_to_disputes, which now opens the Disputes list');
     }
 
     public function testAdminDoesSeeTheDisputesListSidebarLink(): void

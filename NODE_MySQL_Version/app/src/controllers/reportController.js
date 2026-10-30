@@ -9,6 +9,7 @@ const clientRepository = require('../repositories/clientRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const reportDefinitionRepository = require('../repositories/reportDefinitionRepository');
 const reportRepository = require('../repositories/reportRepository');
+const orderAccessService = require('../services/orderAccessService');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
 const { todayIst } = require('../helpers/dbDateTime');
@@ -52,7 +53,7 @@ function withoutCafinUnlessAllowed(req, documents) {
 
 async function client(req, res) {
   const clientId = parseInt(req.params.clientId, 10);
-  const data = await reportRepository.perClient(clientId);
+  const data = await reportRepository.perClient(clientId, orderAccessService.visibilitySql(req.user.id, req.permissions));
   if (!data.client) {
     res.status(404).send('Client not found.');
     return;
@@ -127,7 +128,7 @@ async function aggregate(req, res) {
   const incotermId = req.query.incoterm_id ? parseInt(req.query.incoterm_id, 10) : null;
   const country = str(req.query.country) || null;
 
-  const rows = await reportRepository.aggregate(dateFrom, dateTo, stageId, incotermId, country);
+  const rows = await reportRepository.aggregate(dateFrom, dateTo, stageId, incotermId, country, orderAccessService.visibilitySql(req.user.id, req.permissions));
 
   if (req.query.format === 'csv') {
     const csvRows = rows.map((r) => ({
@@ -252,7 +253,7 @@ async function disputes(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
-  const data = await reportRepository.disputesReport(dateFrom, dateTo);
+  const data = await reportRepository.disputesReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions));
 
   if (req.query.format === 'csv') {
     const rows = data.rows.map((r) => ({
@@ -287,7 +288,7 @@ async function amendments(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
-  const data = await reportRepository.amendmentsReport(dateFrom, dateTo);
+  const data = await reportRepository.amendmentsReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions));
 
   if (req.query.format === 'csv') {
     const rows = data.rows.map((r) => ({
@@ -402,7 +403,7 @@ async function payments(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
-  const data = await reportRepository.paymentsReport(dateFrom, dateTo);
+  const data = await reportRepository.paymentsReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions));
 
   if (req.query.format === 'csv') {
     const rows = data.rows.map((r) => ({
@@ -457,8 +458,11 @@ async function todaysPayments(req, res) {
   // payments.
   const canManageSupplierPayments = !!req.permissions.manage_supplier_payments;
 
-  const incoming = await orderPaymentStatusRepository.clearedOnDate(date);
-  const supplier = canManageSupplierPayments ? await orderSupplierPoRepository.paidOnDate(date) : [];
+  // QA Round 6, R6-N01: only the orders this user may open.
+  const incoming = await orderAccessService.visibleRows(await orderPaymentStatusRepository.clearedOnDate(date), req.user.id, req.permissions);
+  const supplier = canManageSupplierPayments
+    ? await orderAccessService.visibleRows(await orderSupplierPoRepository.paidOnDate(date), req.user.id, req.permissions)
+    : [];
 
   if (req.query.format === 'csv') {
     const rows = [];
@@ -646,7 +650,7 @@ async function freightCost(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
-  const data = await reportRepository.freightCostReport(dateFrom, dateTo);
+  const data = await reportRepository.freightCostReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions));
 
   if (req.query.format === 'csv') {
     const rows = data.rows.map((r) => ({
@@ -726,7 +730,7 @@ async function profitability(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
-  const data = await reportRepository.orderProfitabilityReport(dateFrom, dateTo);
+  const data = await reportRepository.orderProfitabilityReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions));
 
   if (req.query.format === 'csv') {
     const rows = data.rows.map((r) => ({

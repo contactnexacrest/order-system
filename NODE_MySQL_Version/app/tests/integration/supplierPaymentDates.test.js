@@ -207,7 +207,7 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
     await orderSupplierPoRepository.markAdvancePaid(supplierPoId, '2026-10-21', clearUserId, 20000.0);
 
     const res = fakeRes();
-    await reportController.todaysPayments({ query: { date: '2026-10-21' }, permissions: new Proxy({}, { get: () => true }) }, res);
+    await reportController.todaysPayments({ query: { date: '2026-10-21' }, user: { id: 1 }, permissions: new Proxy({}, { get: () => true }) }, res);
 
     expect(res.renderedData.supplierRows.some((r) => r.supplier_legal_name === 'Jest Test Supplier')).toBe(true);
     expect(res.renderedData.incomingRows.some((r) => Number(r.amount) === 1000)).toBe(true);
@@ -238,13 +238,13 @@ describe('Supplier payment dates (Phase 2 item 1)', () => {
     }
 
     const resViewer = fakeRes();
-    await reportController.todaysPayments({ query: { date: '2031-05-05' }, permissions: await loadRealPermissions('Viewer / Auditor') }, resViewer);
+    await reportController.todaysPayments({ query: { date: '2031-05-05' }, user: { id: adminId }, permissions: await loadRealPermissions('Viewer / Auditor') }, resViewer);
 
     const resExport = fakeRes();
-    await reportController.todaysPayments({ query: { date: '2031-05-05' }, permissions: await loadRealPermissions('Export Executive') }, resExport);
+    await reportController.todaysPayments({ query: { date: '2031-05-05' }, user: { id: adminId }, permissions: await loadRealPermissions('Export Executive') }, resExport);
 
     const resAccounts = fakeRes();
-    await reportController.todaysPayments({ query: { date: '2031-05-05' }, permissions: await loadRealPermissions('Accounts Executive') }, resAccounts);
+    await reportController.todaysPayments({ query: { date: '2031-05-05' }, user: { id: adminId }, permissions: await loadRealPermissions('Accounts Executive') }, resAccounts);
 
     expect(resViewer.renderedData.canManageSupplierPayments).toBe(false);
     expect(resViewer.renderedData.supplierRows).toEqual([]);

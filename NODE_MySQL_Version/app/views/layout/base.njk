@@ -18,11 +18,11 @@
 {% set canDisputes = permissions.manage_disputes or permissions.respond_to_disputes %}
 {# docs/schema.sql Section BX — a Complaint is not a Dispute; same visibility split. #}
 {% set canComplaints = permissions.manage_complaints or permissions.respond_to_complaints %}
-{% set canViewComplaintsList = permissions.manage_complaints %}
+{% set canViewComplaintsList = permissions.manage_complaints or permissions.respond_to_complaints %}
 {# External QA report U-18: /clients and /orders each also accept their own narrower view_clients/view_orders permission (server.js) — a Viewer/Auditor holds exactly these two and nothing else in this group, so without them here the whole Operations dropdown never rendered at all, even though both routes worked fine by direct URL. #}
 {% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders or canDisputes or canComplaints or permissions.view_clients or permissions.view_orders %}
 {# External QA report U-01: the main /disputes LIST route requires manage_disputes only (see server.js) — respond_to_disputes alone (e.g. Export Executive) never grants the cross-order list page. canDisputes above stays as the Ops group's own broader visibility check. #}
-{% set canViewDisputesList = permissions.manage_disputes %}
+{% set canViewDisputesList = permissions.manage_disputes or permissions.respond_to_disputes %}
 {% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log or permissions.pay_incentives or permissions.view_own_incentives %}
 {# 90-item backlog #34: manage_hs_codes/manage_compliance_task_types/
    manage_dropdown_options/manage_email_templates each gate their own link

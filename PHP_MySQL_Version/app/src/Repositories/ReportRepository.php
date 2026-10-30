@@ -41,16 +41,18 @@ final class ReportRepository
             return ['client' => null, 'orders' => [], 'documents' => [], 'payments' => [], 'products' => [], 'total_fob_value_by_currency' => [], 'total_cleared_by_currency' => []];
         }
 
+        // QA Round 6, R6-N01: only the orders this user may open.
+        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
         $orders = $pdo->prepare(
             "SELECT o.id, o.order_reference, o.status, o.created_at,
                     o.incoterm_code, o.currency_code,
                     sm.stage_name AS current_stage_name
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-             WHERE o.client_id = :client_id AND o.is_test_data = :is_test_data
+             WHERE o.client_id = :client_id AND o.is_test_data = :is_test_data{$visibleSql}
              ORDER BY o.created_at DESC, o.id DESC"
         );
-        $orders->execute(['client_id' => $clientId, 'is_test_data' => $isTestMode]);
+        $orders->execute(['client_id' => $clientId, 'is_test_data' => $isTestMode] + $visibleParams);
         $orders = $orders->fetchAll();
 
         $orderIds = array_map(static fn(array $o): int => (int) $o['id'], $orders);
@@ -203,6 +205,12 @@ final class ReportRepository
     ): array {
         $where = ['o.is_test_data = :is_test_data'];
         $params = ['is_test_data' => self::isTestModeFlag()];
+        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
+        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        if ($visibleSql !== '') {
+            $where[] = substr($visibleSql, 5);
+            $params += $visibleParams;
+        }
         if ($dateFrom) {
             $where[] = 'DATE(o.created_at) >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -347,6 +355,12 @@ final class ReportRepository
     {
         $where = ['o.is_test_data = :is_test_data'];
         $params = ['is_test_data' => self::isTestModeFlag()];
+        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
+        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        if ($visibleSql !== '') {
+            $where[] = substr($visibleSql, 5);
+            $params += $visibleParams;
+        }
         if ($dateFrom) {
             $where[] = 'DATE(o.created_at) >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -720,6 +734,12 @@ final class ReportRepository
     {
         $where = ['o.is_test_data = :is_test_data'];
         $params = ['is_test_data' => self::isTestModeFlag()];
+        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
+        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        if ($visibleSql !== '') {
+            $where[] = substr($visibleSql, 5);
+            $params += $visibleParams;
+        }
         if ($dateFrom) {
             $where[] = 'd.notice_date >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -777,6 +797,12 @@ final class ReportRepository
     {
         $where = ['o.is_test_data = :is_test_data'];
         $params = ['is_test_data' => self::isTestModeFlag()];
+        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
+        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        if ($visibleSql !== '') {
+            $where[] = substr($visibleSql, 5);
+            $params += $visibleParams;
+        }
         if ($dateFrom) {
             $where[] = 'DATE(a.created_at) >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -1161,6 +1187,12 @@ final class ReportRepository
         $isTestMode = self::isTestModeFlag();
         $where = ['o.is_test_data = :is_test_data', 'fr.id IS NOT NULL'];
         $params = ['is_test_data' => $isTestMode];
+        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
+        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        if ($visibleSql !== '') {
+            $where[] = substr($visibleSql, 5);
+            $params += $visibleParams;
+        }
         if ($dateFrom) {
             $where[] = 'DATE(o.created_at) >= :date_from';
             $params['date_from'] = $dateFrom;
@@ -1224,6 +1256,12 @@ final class ReportRepository
         $isTestMode = self::isTestModeFlag();
         $where = ['o.is_test_data = :is_test_data'];
         $params = ['is_test_data' => $isTestMode];
+        // QA Round 6, R6-N01 / Q-R6-4: only the orders this user may open.
+        [$visibleSql, $visibleParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        if ($visibleSql !== '') {
+            $where[] = substr($visibleSql, 5);
+            $params += $visibleParams;
+        }
         if ($dateFrom) {
             $where[] = 'DATE(o.created_at) >= :date_from';
             $params['date_from'] = $dateFrom;

@@ -70,7 +70,7 @@ $canDisputes = $can('manage_disputes') || $can('respond_to_disputes');
 // broader $canDisputes above stays as the Ops group's own
 // visibility check — that's just "is there a disputes-shaped doorway
 // into this group's worth of nav," not a doorway of its own.
-$canViewDisputesList = $can('manage_disputes');
+$canViewDisputesList = $can('manage_disputes') || $can('respond_to_disputes');
 // External QA report U-18: /clients and /orders each also accept their
 // own narrower view_clients/view_orders permission (see
 // PermissionCheck::requiresAny() on both routes) — a Viewer/Auditor holds
@@ -82,7 +82,7 @@ $canViewOrders = $can('view_orders');
 // docs/schema.sql Section BX — a Complaint is not a Dispute; same visibility
 // split as $canDisputes/$canViewDisputesList above.
 $canComplaints = $can('manage_complaints') || $can('respond_to_complaints');
-$canViewComplaintsList = $can('manage_complaints');
+$canViewComplaintsList = $can('manage_complaints') || $can('respond_to_complaints');
 
 $opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canComplaints || $canViewClients || $canViewOrders;
 $insightsGroupVisible = $canReports || $canAudit || $canPayIncentives || $canOwnIncentives;

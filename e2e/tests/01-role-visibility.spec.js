@@ -77,12 +77,10 @@ test.describe('Role-based navigation visibility', () => {
     await login(page, 'exportExecutive');
     await expect(navLink(page, '/orders')).toBeAttached();
     await expect(navLink(page, '/clients')).toBeAttached();
-    // External QA report U-01: the /disputes nav link is gated on
-    // manage_disputes only (the list route's own real gate) —
-    // respond_to_disputes alone (Export Executive's grant) lets them
-    // reply on an order they're already looking at, but never shows the
-    // cross-order list link.
-    await expect(navLink(page, '/disputes')).toHaveCount(0);
+    // Owner decision 2026-10-30 (QA Round 6, Q-R6-3): respond_to_disputes
+    // (Export Executive's grant) now opens the Disputes list too, scoped
+    // to the orders the user may see.
+    await expect(navLink(page, '/disputes')).toBeAttached();
     await expect(navLink(page, '/reports')).toBeAttached();
     await expect(page.getByRole('link', { name: 'CA / Accounting' })).toHaveCount(0);
     await expect(navLink(page, '/users')).toHaveCount(0);

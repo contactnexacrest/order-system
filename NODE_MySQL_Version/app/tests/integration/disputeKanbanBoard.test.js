@@ -42,7 +42,7 @@ describe('Dispute Kanban board (Task #40)', () => {
 
   async function render(userId) {
     const user = await userRepository.findById(userId);
-    const req = { query: {}, user, permissions: {} };
+    const req = { query: {}, user, permissions: { view_all_orders: true, view_archived_orders: true } };
     const res = fakeRes();
     await disputeController.index(req, res);
     return res;

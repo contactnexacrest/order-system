@@ -179,6 +179,26 @@ async function setLegExchangeRate(orderId, leg, rate, setBy) {
   );
 }
 
+/**
+ * QA Round 6, R6-N22: a remittance and its exchange rate are saved together
+ * or not at all.
+ */
+async function recordLegReceivedWithRate(orderId, leg, amount, receivedAt, rate, setBy) {
+  if (!EXCHANGE_RATE_LEGS.includes(leg)) {
+    throw new Error(`Unknown settlement leg: ${leg}`);
+  }
+  await db.transaction(async (c) => {
+    await c.execute(
+      `UPDATE order_payment_status SET ${leg}_amount = :amount, ${leg}_remittance_received_at = :received_at WHERE order_id = :order_id`,
+      { amount, received_at: receivedAt, order_id: orderId }
+    );
+    await c.execute(
+      `UPDATE order_payment_status SET ${leg}_exchange_rate = :rate, ${leg}_exchange_rate_set_at = NOW(), ${leg}_exchange_rate_set_by = :set_by WHERE order_id = :order_id`,
+      { rate, set_by: setBy, order_id: orderId }
+    );
+  });
+}
+
 async function setAdvanceFirc(orderId, reference, receivedAt) {
   await db.execute(
     'UPDATE order_payment_status SET advance_firc_reference = :ref, advance_firc_received_at = :received_at WHERE order_id = :order_id',
@@ -240,6 +260,7 @@ async function setLegZohoApplied(orderId, leg) {
 }
 
 module.exports = {
+  recordLegReceivedWithRate,
   initializeForOrder, find, balanceDue, recordAdvanceReceived, markAdvanceCleared, setBalanceAmount,
   recordFreightReceived, markFreightCleared, recordBalanceReceived, markBalanceCleared,
   setAdvanceInrActual, clearAdvanceInrActual, setBalanceInrActual, clearBalanceInrActual,

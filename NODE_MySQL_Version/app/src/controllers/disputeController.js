@@ -13,6 +13,7 @@ const userRepository = require('../repositories/userRepository');
 const fileUploadService = require('../services/fileUploadService');
 const uiTemplateService = require('../services/uiTemplateService');
 const workingDaysCalculator = require('../services/workingDaysCalculator');
+const orderAccessService = require('../services/orderAccessService');
 
 // Port of App\Controllers\DisputeController. Spec Section 16 — Dispute
 // Management.
@@ -34,7 +35,7 @@ async function index(req, res) {
   res.renderView(
     'disputes/index',
     {
-      disputes: await disputeRepository.all(status),
+      disputes: await orderAccessService.visibleRows(await disputeRepository.all(status), req.user.id, req.permissions),
       statusFilter: status,
       statusOptions: await lookupRepository.dropdownOptions('dispute_status'),
     },
@@ -49,7 +50,7 @@ async function index(req, res) {
  * longer appears in that list so nothing is dropped.
  */
 async function indexKanban(req, res) {
-  const all = await disputeRepository.all();
+  const all = await orderAccessService.visibleRows(await disputeRepository.all(), req.user.id, req.permissions);
   const statusOptions = await lookupRepository.dropdownOptions('dispute_status');
   const columns = {};
   for (const opt of statusOptions) {

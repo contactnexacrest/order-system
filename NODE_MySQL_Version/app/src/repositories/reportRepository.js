@@ -28,7 +28,7 @@ async function isTestModeFlag() {
  */
 
 /** @returns {Promise<object>} order history, payments, products, totals for one client */
-async function perClient(clientId) {
+async function perClient(clientId, visibility = { sql: '', params: {} }) {
   const isTestMode = await isTestModeFlag();
   const client = await db.queryOne('SELECT * FROM clients WHERE id = :id', { id: clientId });
   if (client && parseInt(client.is_test_data, 10) !== isTestMode) {
@@ -43,9 +43,9 @@ async function perClient(clientId) {
             sm.stage_name AS current_stage_name
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-     WHERE o.client_id = :client_id AND o.is_test_data = :is_test_data
+     WHERE o.client_id = :client_id AND o.is_test_data = :is_test_data${visibility.sql}
      ORDER BY o.created_at DESC, o.id DESC`,
-    { client_id: clientId, is_test_data: isTestMode }
+    { client_id: clientId, is_test_data: isTestMode, ...visibility.params }
   );
 
   const orderIds = orders.map((o) => o.id);
@@ -180,9 +180,13 @@ async function perOrder(orderId) {
  *
  * @returns {Promise<Array<object>>}
  */
-async function aggregate(dateFrom, dateTo, stageId, incotermId, country) {
+async function aggregate(dateFrom, dateTo, stageId, incotermId, country, visibility = { sql: '', params: {} }) {
   const where = ['o.is_test_data = :is_test_data'];
   const params = { is_test_data: await isTestModeFlag() };
+  if (visibility.sql) {
+    where.push(visibility.sql.replace(/^ AND /, ''));
+    Object.assign(params, visibility.params);
+  }
   if (dateFrom) {
     where.push('DATE(o.created_at) >= :date_from');
     params.date_from = dateFrom;
@@ -598,9 +602,13 @@ async function funnelActivity(dateFrom, dateTo) {
 // false "0 outstanding".
 
 /** @returns {Promise<{rows: Array<object>, by_currency: object}>} */
-async function paymentsReport(dateFrom, dateTo) {
+async function paymentsReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
   const where = ['o.is_test_data = :is_test_data'];
   const params = { is_test_data: await isTestModeFlag() };
+  if (visibility.sql) {
+    where.push(visibility.sql.replace(/^ AND /, ''));
+    Object.assign(params, visibility.params);
+  }
   if (dateFrom) {
     where.push('DATE(o.created_at) >= :date_from');
     params.date_from = dateFrom;
@@ -691,9 +699,13 @@ function round2(n) {
 // with the detail table.
 
 /** @returns {Promise<{rows: Array<object>, by_status: object, open_count: number, avg_resolution_days: ?number}>} */
-async function disputesReport(dateFrom, dateTo) {
+async function disputesReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
   const where = ['o.is_test_data = :is_test_data'];
   const params = { is_test_data: await isTestModeFlag() };
+  if (visibility.sql) {
+    where.push(visibility.sql.replace(/^ AND /, ''));
+    Object.assign(params, visibility.params);
+  }
   if (dateFrom) {
     where.push('d.notice_date >= :date_from');
     params.date_from = dateFrom;
@@ -745,9 +757,13 @@ async function disputesReport(dateFrom, dateTo) {
 // status/requested-by breakdown folded from the same rows.
 
 /** @returns {Promise<{rows: Array<object>, by_status: object, by_requested_by: object}>} */
-async function amendmentsReport(dateFrom, dateTo) {
+async function amendmentsReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
   const where = ['o.is_test_data = :is_test_data'];
   const params = { is_test_data: await isTestModeFlag() };
+  if (visibility.sql) {
+    where.push(visibility.sql.replace(/^ AND /, ''));
+    Object.assign(params, visibility.params);
+  }
   if (dateFrom) {
     where.push('DATE(a.created_at) >= :date_from');
     params.date_from = dateFrom;
@@ -1082,10 +1098,14 @@ async function ageingReport() {
 // ================================================================
 
 /** @returns {Promise<{rows: Array<object>, by_forwarder: object}>} */
-async function freightCostReport(dateFrom, dateTo) {
+async function freightCostReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
   const isTestMode = await isTestModeFlag();
   const where = ['o.is_test_data = :is_test_data', 'fr.id IS NOT NULL'];
   const params = { is_test_data: isTestMode };
+  if (visibility.sql) {
+    where.push(visibility.sql.replace(/^ AND /, ''));
+    Object.assign(params, visibility.params);
+  }
   if (dateFrom) {
     where.push('DATE(o.created_at) >= :date_from');
     params.date_from = dateFrom;
@@ -1450,10 +1470,14 @@ async function salesPerformanceReport(dateFrom, dateTo) {
  * (an export business's order volume), not meant for a dataset large
  * enough to need real aggregation.
  */
-async function orderProfitabilityReport(dateFrom, dateTo) {
+async function orderProfitabilityReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
   const isTestMode = await isTestModeFlag();
   const where = ['o.is_test_data = :is_test_data'];
   const params = { is_test_data: isTestMode };
+  if (visibility.sql) {
+    where.push(visibility.sql.replace(/^ AND /, ''));
+    Object.assign(params, visibility.params);
+  }
   if (dateFrom) {
     where.push('DATE(o.created_at) >= :date_from');
     params.date_from = dateFrom;

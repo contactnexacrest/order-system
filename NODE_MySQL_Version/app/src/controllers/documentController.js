@@ -11,6 +11,7 @@ const documentRepository = require('../repositories/documentRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
 const orderRepository = require('../repositories/orderRepository');
 const documentGenerationService = require('../services/documentGenerationService');
+const orderAccessService = require('../services/orderAccessService');
 
 // Port of App\Controllers\DocumentController.
 
@@ -174,7 +175,10 @@ async function download(req, res) {
   // view_cafin alone is enough for CAFIN (the CA holds it without
   // "Download PDF"); every other document needs download_pdf.
   const requiredKey = document.document_type_code === 'CAFIN' ? 'view_cafin' : 'download_pdf';
-  if (!req.permissions || !req.permissions[requiredKey]) {
+  // QA Round 6, Q-R6-2 (D-118): CAFIN also needs the order itself —
+  // whoever cannot open the order page cannot download its CAFIN.
+  if (!req.permissions || !req.permissions[requiredKey]
+    || (document.document_type_code === 'CAFIN' && !(await orderAccessService.orderLinkChecker(req.user.id, req.permissions))(document.order_id))) {
     res.status(403).send('You do not have permission to view this document.');
     return;
   }

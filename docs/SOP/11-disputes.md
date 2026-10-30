@@ -53,6 +53,14 @@ screen at all; what's shown on it (the Log Dispute form, Status/Attach
 Document controls) depends on which of the two permissions you actually
 have.
 
+Either permission also opens the **Disputes** list in the sidebar (owner
+decision 2026-10-30, QA Round 6 Q-R6-3). The list, like every dispute
+page, shows only disputes on orders you may open: orders assigned to you,
+or every order if you hold **View all orders** — archived orders only with
+**View archived orders**. A dispute on an order you may not open answers
+"This order is assigned to a different user", whatever the link
+(QA Round 6, R6-N08).
+
 ## The system does this automatically
 
 - **The response-due date is calculated automatically** the moment a

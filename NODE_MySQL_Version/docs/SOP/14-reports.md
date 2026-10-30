@@ -15,6 +15,16 @@ staff having to open every order individually.
 - Every summary figure is **computed from the same rows the detail table
   below it shows** — never a separate query that could quietly disagree
   with the detail. The Payments Report states this explicitly on screen.
+- **Reports show only the orders you may open** (owner decision
+  2026-10-30, QA Round 6 Q-R6-4 / R6-N01): orders assigned to you, or
+  every order if you hold **View all orders**; archived orders only with
+  **View archived orders**. This covers the Aggregate, Payments, Today's
+  Payments, Disputes, Amendments, Freight Cost and Order Profitability
+  reports, the Client report and a client's page. Admin, MD, ED,
+  Accounts, Viewer/Auditor and the CA see every order, as before.
+- A link to a page you can't open (an order not assigned to you, a page
+  your role doesn't have) is shown as plain text instead of a link that
+  would answer "not permitted" (QA Round 6, R6-N02).
 
 ## What staff do
 

@@ -41,7 +41,8 @@ async function download(req, res) {
       return;
     }
   }
-  if ((await fileStoreRepository.documentTypeCodeFor(fileId)) === 'CAFIN' && !permissions.view_cafin) {
+  if ((await fileStoreRepository.documentTypeCodeFor(fileId)) === 'CAFIN'
+    && (!permissions.view_cafin || !file.order_id || !(await orderAccessService.orderLinkChecker(req.user.id, permissions))(file.order_id))) {
     res.status(403).send('You do not have permission to view this document.');
     return;
   }

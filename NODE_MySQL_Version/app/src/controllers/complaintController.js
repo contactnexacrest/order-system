@@ -7,6 +7,7 @@ const orderComplaintReplyRepository = require('../repositories/orderComplaintRep
 const orderRepository = require('../repositories/orderRepository');
 const orderComplaintService = require('../services/orderComplaintService');
 const uiTemplateService = require('../services/uiTemplateService');
+const orderAccessService = require('../services/orderAccessService');
 
 // Port of App\Controllers\ComplaintController. docs/schema.sql Section
 // BX — Complaint / Process Issue management (distinct from Disputes).
@@ -24,7 +25,7 @@ async function index(req, res) {
   res.renderView(
     'complaints/index',
     {
-      complaints: await orderComplaintRepository.all(status),
+      complaints: await orderAccessService.visibleRows(await orderComplaintRepository.all(status), req.user.id, req.permissions),
       statusFilter: status,
     },
     'layout/base'
@@ -35,7 +36,7 @@ async function index(req, res) {
 async function indexKanban(req, res) {
   const columns = {};
   for (const status of STATUSES) {
-    columns[status] = await orderComplaintRepository.all(status);
+    columns[status] = await orderAccessService.visibleRows(await orderComplaintRepository.all(status), req.user.id, req.permissions);
   }
 
   res.renderView('complaints/index_kanban', { columns }, 'layout/base');

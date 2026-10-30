@@ -20,6 +20,7 @@ const testModeService = require('../services/testModeService');
 const superAdminService = require('../services/superAdminService');
 const clientPortalService = require('../services/clientPortalService');
 const fileUploadService = require('../services/fileUploadService');
+const orderAccessService = require('../services/orderAccessService');
 const env = require('../config/env');
 const { todayIst } = require('../helpers/dbDateTime');
 
@@ -201,7 +202,8 @@ async function show(req, res) {
     res.status(404).send('Client not found.');
     return;
   }
-  const orders = await orderRepository.forClient(client.id);
+  // QA Round 6, R6-N01: only the orders this user may open.
+  const orders = await orderAccessService.visibleRows(await orderRepository.forClient(client.id), req.user.id, req.permissions, 'id');
   // docs/schema.sql Section AV
   const impersonationGloballyEnabled = (await companySettingsRepository.get('client_impersonation_enabled')) === '1';
   const impersonationReasons = [];

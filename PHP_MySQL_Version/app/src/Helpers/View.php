@@ -30,6 +30,11 @@ final class View
             return;
         }
 
+        // QA Round 6, R6-N02: on staff pages, a link the user would get a
+        // 403 from is shown as plain text (the sidebar has its own checks).
+        if ($layout === 'layout/base') {
+            $content = PermittedLinks::filterHtml($content);
+        }
         $data['content'] = $content;
         echo self::capture($baseDir . $layout . '.php', $data);
     }

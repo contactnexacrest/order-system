@@ -274,7 +274,7 @@ describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
     await orderRepository.setCaInternalDocEnabled(orderId, true);
     const result = await documentGenerationService.generateCaInternalAnnexure(orderId, adminId);
 
-    const req = { params: { documentId: String(result.document_id) }, query: {}, permissions: { view_cafin: true } };
+    const req = { params: { documentId: String(result.document_id) }, query: {}, user: { id: 1 }, permissions: { view_cafin: true, view_orders: true, view_all_orders: true } };
     const res = fakeDownloadRes();
     const finished = new Promise((resolve) => res.on('finish', resolve));
     await documentController.download(req, res);

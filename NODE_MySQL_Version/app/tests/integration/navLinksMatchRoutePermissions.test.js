@@ -46,12 +46,14 @@ describe('Nav links match their own route permissions (External QA report U-01)'
     return { agent, userId: result.insertId };
   }
 
-  test('Export Executive does not see the Disputes list sidebar link', async () => {
+  // Owner decision 2026-10-30 (QA Round 6, Q-R6-3): respond_to_disputes
+  // now opens the list too, scoped to the orders the user may see.
+  test('Export Executive sees the Disputes list sidebar link', async () => {
     const { agent } = await loginAs('Export Executive');
 
     const res = await agent.get('/orders');
 
-    expect(res.text).not.toContain('href="/disputes"');
+    expect(res.text).toContain('href="/disputes"');
   });
 
   test('Admin does see the Disputes list sidebar link', async () => {

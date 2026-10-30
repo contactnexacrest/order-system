@@ -7,6 +7,8 @@ const request = require('supertest');
 const app = require('../../src/server');
 const db = require('../../src/config/db');
 const permittedLinks = require('../../src/helpers/permittedLinks');
+const orderAccessService = require('../../src/services/orderAccessService');
+const { createTestClient, createTestOrder } = require('../support/fixtures');
 
 function extractCsrf(html) {
   const m = html.match(/name="_csrf"\s+value="([^"]+)"/);
@@ -37,6 +39,7 @@ describe('Links only to pages the user may open (QA Round 5, R5-04 / R5-22)', ()
     const agent = request.agent(app);
     const csrf = extractCsrf((await agent.get('/login')).text);
     await agent.post('/login').type('form').send({ _csrf: csrf, email, password });
+    agent.userId = (await db.queryOne('SELECT id FROM users WHERE email = :email', { email })).id;
     return agent;
   }
 
@@ -81,5 +84,45 @@ describe('Links only to pages the user may open (QA Round 5, R5-04 / R5-22)', ()
     const agent = await loginAs('Admin');
     expect((await agent.get('/getting-started')).text).toContain('href="/settings"');
     expect((await agent.get('/')).text).toContain('href="/pi-intake-review"');
+  });
+
+  // QA Round 6, R6-N02: every page route under a rule needs exactly what
+  // the rule says, so a link hidden by the rule is one the route refuses.
+  it('every page route under a rule needs what the rule says', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'server.js'), 'utf8');
+    let checked = 0;
+    for (const line of source.split('\n')) {
+      const route = line.match(/^app\.get\('([^']+)',/);
+      if (!route) continue;
+      const one = line.match(/requirePermission\('([^']+)'\)/);
+      const any = line.match(/requirePermissionAny\(\[([^\]]+)\]\)/);
+      if (!one && !any) continue;
+      const samplePath = route[1].replace(/:[A-Za-z]+/g, '1');
+      const rule = permittedLinks.requiredFor(samplePath);
+      if (rule === null) continue;
+      const required = one ? [one[1]] : [...any[1].matchAll(/'([^']+)'/g)].map((k) => k[1]);
+      expect([route[1], [...rule].sort()]).toEqual([route[1], required.sort()]);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(70);
+  });
+
+  it('links that would answer 403 are plain text (QA Round 6, R6-N02)', async () => {
+    const exporter = await loginAs('Export Executive');
+    const mine = await createTestOrder(await createTestClient(), 'CIF', 'Standard — New Buyer', 'USD', null, null, exporter.userId);
+    const other = await createTestOrder(await createTestClient());
+    const perms = { manage_orders: true };
+    const canSee = await orderAccessService.orderVisibilityChecker(exporter.userId, perms);
+    const html = permittedLinks.filterHtml(`<a href="/orders/${mine}">A</a> <a href="/orders/${other}">B</a> <a href="/reports/order/${other}">C</a> <a href="/orders/${other}/disputes">D</a>`, perms, canSee);
+    expect(html).toContain(`href="/orders/${mine}"`);
+    expect(html).not.toContain(`href="/orders/${other}`);
+    expect(html).not.toContain(`href="/reports/order/${other}"`);
+
+    const agent = await loginAs('Viewer / Auditor');
+    const permission = await db.queryOne("SELECT id FROM permissions WHERE permission_key = 'manage_incentives'");
+    await db.execute('INSERT INTO user_permissions (user_id, permission_id, is_enabled) VALUES (:u, :p, 1)', { u: agent.userId, p: permission.id });
+    const settings = (await agent.get('/incentives/settings')).text;
+    expect(settings).toContain('Incentive payouts');
+    expect(settings).not.toContain('href="/incentives/payouts"');
   });
 });

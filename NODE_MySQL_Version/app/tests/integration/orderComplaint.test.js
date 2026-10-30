@@ -281,7 +281,7 @@ describe('Order Complaint / Process Issue (Section BX)', () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
     await orderComplaintRepository.create(orderId, clientId, 'Open one.');
-    const req = fakeReq({ user: { id: user.id }, query: { status: 'open' } });
+    const req = fakeReq({ user: { id: user.id }, query: { status: 'open' }, permissions: { view_all_orders: true, view_archived_orders: true } });
     const res = fakeRes();
 
     await complaintController.index(req, res);

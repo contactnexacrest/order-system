@@ -38,7 +38,7 @@ describe('Complaint Kanban board (Task #44)', () => {
 
   async function render(userId) {
     const user = await userRepository.findById(userId);
-    const req = { query: {}, user, permissions: {} };
+    const req = { query: {}, user, permissions: { view_all_orders: true, view_archived_orders: true } };
     const res = fakeRes();
     await complaintController.index(req, res);
     return res;

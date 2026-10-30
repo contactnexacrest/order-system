@@ -1731,6 +1731,13 @@ async function recordAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  const boundsError = fieldValidator.moneyAmount(amount, 'The advance amount') || fieldValidator.exchangeRate(rate);
+  if (boundsError) {
+    flash.set(req, 'error', boundsError);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
   // Owner report (2026-10-27, blocker): a mistyped advance flowed straight
   // into the Order Confirmation. An advance can never exceed the whole
   // order, and an amount that differs from the advance due must be
@@ -1752,8 +1759,8 @@ async function recordAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  await orderPaymentStatusRepository.recordAdvanceReceived(orderId, amount, receivedAt);
-  await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', rate, req.user ? req.user.id : null);
+  // QA Round 6, R6-N22: saved together or not at all.
+  await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'advance', amount, receivedAt, rate, req.user ? req.user.id : null);
   await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'advance_exchange_rate', null, String(rate));
   // External QA report L-23: advance payment recording was never audit-logged.
   await auditLogRepository.log(req.user ? req.user.id : null, 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', orderId, 'advance_amount', null, String(amount));
@@ -2594,8 +2601,15 @@ async function recordFreightPayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  await orderPaymentStatusRepository.recordFreightReceived(orderId, amount, receivedAt);
-  await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'freight', rate, req.user ? req.user.id : null);
+  const boundsError = fieldValidator.moneyAmount(amount, 'The freight amount') || fieldValidator.exchangeRate(rate);
+  if (boundsError) {
+    flash.set(req, 'error', boundsError);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  // QA Round 6, R6-N22: saved together or not at all.
+  await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'freight', amount, receivedAt, rate, req.user ? req.user.id : null);
   await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'freight_exchange_rate', null, String(rate));
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
@@ -3060,8 +3074,15 @@ async function recordBalancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  await orderPaymentStatusRepository.recordBalanceReceived(orderId, amount, receivedAt);
-  await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'balance', rate, req.user ? req.user.id : null);
+  const boundsError = fieldValidator.moneyAmount(amount, 'The balance amount') || fieldValidator.exchangeRate(rate);
+  if (boundsError) {
+    flash.set(req, 'error', boundsError);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  // QA Round 6, R6-N22: saved together or not at all.
+  await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'balance', amount, receivedAt, rate, req.user ? req.user.id : null);
   await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'balance_exchange_rate', null, String(rate));
   // External QA report L-23: balance payment recording was never audit-logged.
   await auditLogRepository.log(req.user ? req.user.id : null, 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', orderId, 'balance_amount', null, String(amount));
@@ -3265,6 +3286,12 @@ async function recordLegExchangeRate(req, res, leg) {
   const rate = parseFloat(req.body[`${leg}_exchange_rate`] || 0);
   if (!(rate > 0)) {
     flash.set(req, 'error', 'Enter the exchange rate for this leg.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const rateError = fieldValidator.exchangeRate(rate);
+  if (rateError) {
+    flash.set(req, 'error', rateError);
     res.redirect(`/orders/${orderId}`);
     return;
   }

@@ -214,7 +214,8 @@ final class ClientController
             echo 'Client not found.';
             return;
         }
-        $orders = OrderRepository::forClient((int) $client['id']);
+        // QA Round 6, R6-N01: only the orders this user may open.
+        $orders = \App\Services\OrderAccessService::visibleRows(OrderRepository::forClient((int) $client['id']), 'id');
         $additionalDocuments = FileStoreRepository::additionalDocumentsForClient((int) $client['id']);
         View::render('clients/show', [
             'client' => $client,

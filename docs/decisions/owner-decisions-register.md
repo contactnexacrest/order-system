@@ -366,6 +366,9 @@ Every change in this area follows R6 (before/after, confirmed twice). All curren
 | D-199 | **The Workflow Guide (HTML) and Workflow Specification (Word, one file with changes accepted) are kept in `docs/workflow/`.** The specification was renamed StoneCrest → NexaCrest and carries a section "Owner decisions recorded — 27 Oct 2026". Neither is published on claude.ai (R21). | 27 Oct; 30 Oct | | S2 G-1, G-2, P-15, P-16; S3; 9e02119 |
 | D-200 | **Continuity between sessions.** Consult the previous session's record before re-investigating, cross-check it against the current code and git, don't redo work, and summarise at each major stage. This register is now the single place to check. | 25 Oct | | S2 P-2 |
 | D-201 | **Work order on a QA round:** do the highest-priority fixes first and batch the rest. Each batch is pushed only after the owner says "push" (R3). | 28 Oct | | S2 §15 |
+| D-202 | **QA Round 6 handling (30 Oct):** five batches — access and High first, then input bounds, concurrency, smaller items, route coverage. Each batch: failing tests first, both stacks, full suites and e2e, review pack, push only on "push". Owner: "push and go with recommendationa nd plan". | 30 Oct | | R6 FIX_BRIEF; Batch 1 |
+| D-203 | **Export Executive keeps `respond_to_disputes` / `respond_to_complaints` (Q-R6-3).** Either permission opens the Disputes / Complaints list, showing only records on orders the user may see (D-118). Recommendation accepted 30 Oct. | 30 Oct | | R6-N09 |
+| D-204 | **Already decided, answered from this register (30 Oct):** Q-R6-2 → CAFIN download also needs access to the order (D-118); Q-R6-4 → reports and client pages show only orders the user may see (D-118); Q-R6-1 / Q-NEW-3 / Q-MAIL-3 → Admin/MD/ED may approve their own (D-117), non-admins refused; Q-R5-2 → insurance cleared on non-CIF orders when saved (D-049), no document change. | 30 Oct | | R6 owner questions |
 
 ---
 

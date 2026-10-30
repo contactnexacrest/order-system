@@ -1622,6 +1622,11 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The advance amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate)) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         // Owner report (2026-10-27, blocker): a mistyped advance flowed
         // straight into the Order Confirmation. An advance can never exceed
         // the whole order, and an amount that differs from the advance due
@@ -1640,11 +1645,15 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        OrderPaymentStatusRepository::recordAdvanceReceived($orderId, $amount, $receivedAt);
-        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', $rate, (int) AuthService::currentUserId());
-        AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'advance_exchange_rate', null, (string) $rate);
-        // External QA report L-23: advance payment recording was never audit-logged.
-        AuditLogRepository::log(AuthService::currentUserId(), 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'advance_amount', null, (string) $amount);
+        // QA Round 6, R6-N22: the amount, its rate and their audit rows are
+        // saved together or not at all.
+        \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): void {
+            OrderPaymentStatusRepository::recordAdvanceReceived($orderId, $amount, $receivedAt);
+            OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', $rate, (int) AuthService::currentUserId());
+            AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'advance_exchange_rate', null, (string) $rate);
+            // External QA report L-23: advance payment recording was never audit-logged.
+            AuditLogRepository::log(AuthService::currentUserId(), 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'advance_amount', null, (string) $amount);
+        });
 
         // docs/schema.sql Section AC — fallback lock trigger. The PI-details
         // form (client's own consent) is the primary trigger; if a client
@@ -2496,12 +2505,20 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        OrderPaymentStatusRepository::recordFreightReceived($orderId, $amount, $receivedAt);
-        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'freight', $rate, (int) AuthService::currentUserId());
-        AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'freight_exchange_rate', null, (string) $rate);
-        // External QA report N-08: this action never reached the audit
-        // log, so it never notified anyone either.
-        AuditLogRepository::log(AuthService::currentUserId(), 'FREIGHT_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'freight_amount', null, (string) $amount);
+        if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The freight amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate)) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        // QA Round 6, R6-N22: saved together or not at all.
+        \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): void {
+            OrderPaymentStatusRepository::recordFreightReceived($orderId, $amount, $receivedAt);
+            OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'freight', $rate, (int) AuthService::currentUserId());
+            AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'freight_exchange_rate', null, (string) $rate);
+            // External QA report N-08: this action never reached the audit
+            // log, so it never notified anyone either.
+            AuditLogRepository::log(AuthService::currentUserId(), 'FREIGHT_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'freight_amount', null, (string) $amount);
+        });
         Flash::set('success', $this->remittanceStatement($orderId, $amount, $rate) . ' ' . 'Freight remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
@@ -2960,11 +2977,19 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        OrderPaymentStatusRepository::recordBalanceReceived($orderId, $amount, $receivedAt);
-        OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'balance', $rate, (int) AuthService::currentUserId());
-        AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'balance_exchange_rate', null, (string) $rate);
-        // External QA report L-23: balance payment recording was never audit-logged.
-        AuditLogRepository::log(AuthService::currentUserId(), 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'balance_amount', null, (string) $amount);
+        if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The balance amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate)) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        // QA Round 6, R6-N22: saved together or not at all.
+        \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): void {
+            OrderPaymentStatusRepository::recordBalanceReceived($orderId, $amount, $receivedAt);
+            OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'balance', $rate, (int) AuthService::currentUserId());
+            AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'balance_exchange_rate', null, (string) $rate);
+            // External QA report L-23: balance payment recording was never audit-logged.
+            AuditLogRepository::log(AuthService::currentUserId(), 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'balance_amount', null, (string) $amount);
+        });
         Flash::set('success', $this->remittanceStatement($orderId, $amount, $rate) . ' ' . 'Balance remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
@@ -3197,6 +3222,11 @@ final class OrderController
         $rate = (float) ($_POST[$leg . '_exchange_rate'] ?? 0);
         if ($rate <= 0) {
             Flash::set('error', 'Enter the exchange rate for this leg.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if ($error = \App\Helpers\FieldValidator::exchangeRate($rate)) {
+            Flash::set('error', $error);
             header("Location: /orders/{$orderId}");
             return;
         }

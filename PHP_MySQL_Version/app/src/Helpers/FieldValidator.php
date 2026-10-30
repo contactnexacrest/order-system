@@ -15,6 +15,41 @@ namespace App\Helpers;
  */
 final class FieldValidator
 {
+    /** Largest exchange rate the database keeps (DECIMAL(10,4)). */
+    public const MAX_RATE = 999999.9999;
+    /** Largest money amount the database keeps (DECIMAL(14,2)). */
+    public const MAX_AMOUNT = 999999999999.99;
+
+    /**
+     * QA Round 6, R6-N22/N23: an exchange rate that survives being stored —
+     * at least 0.0001 once rounded to 4 decimals, at most MAX_RATE.
+     */
+    public static function exchangeRate(float $rate, string $label = 'The exchange rate'): ?string
+    {
+        if (!is_finite($rate) || round($rate, 4) <= 0) {
+            return "{$label} must be at least 0.0001 (₹ per 1 unit of the order currency).";
+        }
+        if ($rate > self::MAX_RATE) {
+            return "{$label} is too large: it can be at most 999999.9999.";
+        }
+        return null;
+    }
+
+    /**
+     * QA Round 6, R6-N14/N15/N19/N21: a money amount that survives being
+     * stored — at least 0.01 once rounded to 2 decimals, at most MAX_AMOUNT.
+     */
+    public static function moneyAmount(float $amount, string $label): ?string
+    {
+        if (!is_finite($amount) || round($amount, 2) <= 0) {
+            return "{$label} must be at least 0.01.";
+        }
+        if ($amount > self::MAX_AMOUNT) {
+            return "{$label} is too large: it can be at most 999999999999.99.";
+        }
+        return null;
+    }
+
     public static function wholeNumber(string $value, string $label, int $min = 0): ?string
     {
         if ($value === '') {

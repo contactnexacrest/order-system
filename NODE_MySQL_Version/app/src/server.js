@@ -15,6 +15,8 @@ const flash = require('./helpers/flash');
 const mask = require('./helpers/mask');
 const dates = require('./helpers/dates');
 const logger = require('./helpers/logger');
+const permittedLinks = require('./helpers/permittedLinks');
+const orderAccessService = require('./services/orderAccessService');
 
 // Process-level safety net — without these, an error thrown outside any
 // Express request handler (a stray async callback, a timer) used to just
@@ -409,12 +411,29 @@ app.use((req, res, next) => {
       query: req.query || {},
     };
     const context = Object.assign({}, common, data);
-    const content = njkEnv.render(`${viewPath}.njk`, context);
+    let content = njkEnv.render(`${viewPath}.njk`, context);
     if (layout === null) {
       res.send(content);
       return;
     }
-    res.send(njkEnv.render(`${layout}.njk`, Object.assign({}, context, { content })));
+    const sendPage = () => res.send(njkEnv.render(`${layout}.njk`, Object.assign({}, context, { content })));
+    // QA Round 6, R6-N02: on staff pages, a link the user would get a
+    // 403 from is shown as plain text (the sidebar has its own checks).
+    if (layout !== 'layout/base' || !req.user) {
+      sendPage();
+      return;
+    }
+    const perms = req.permissions || {};
+    const linksToOneOrder = /href="\/(?:orders|reports\/order)\/\d+/.test(content) && !(perms.view_all_orders && perms.view_archived_orders);
+    if (!linksToOneOrder) {
+      content = permittedLinks.filterHtml(content, perms);
+      sendPage();
+      return;
+    }
+    orderAccessService.orderVisibilityChecker(req.user.id, perms).then((canSeeOrder) => {
+      content = permittedLinks.filterHtml(content, perms, canSeeOrder);
+      sendPage();
+    }).catch(next);
   };
   next();
 });
@@ -996,7 +1015,7 @@ app.post('/amendments/:amendmentId/override-reference', requireAuth, requirePerm
 // — view/raise/status/evidence/enable are privileged-only by default;
 // respond_to_disputes is the separate, more broadly grantable permission
 // for posting a reply.
-app.get('/disputes', requireAuth, requirePermission('manage_disputes'), asyncHandler(disputeController.index));
+app.get('/disputes', requireAuth, requirePermissionAny(['manage_disputes', 'respond_to_disputes']), asyncHandler(disputeController.index));
 app.get('/orders/:id/disputes', requireAuth, requirePermissionAny(['manage_disputes', 'respond_to_disputes']), asyncHandler(disputeController.forOrder));
 app.post('/orders/:id/disputes', requireAuth, requirePermission('manage_disputes'), verifyCsrf, asyncHandler(disputeController.create));
 app.post('/disputes/:disputeId/status', requireAuth, requirePermission('manage_disputes'), verifyCsrf, asyncHandler(disputeController.updateStatus));
@@ -1007,7 +1026,7 @@ app.post('/disputes/:disputeId/replies', requireAuth, requirePermission('respond
 // separate feature from Disputes: always available on any order (never
 // gated by dispute_button_visible_to_client), and a two-way conversation
 // rather than a staff-only resolution log.
-app.get('/complaints', requireAuth, requirePermission('manage_complaints'), asyncHandler(complaintController.index));
+app.get('/complaints', requireAuth, requirePermissionAny(['manage_complaints', 'respond_to_complaints']), asyncHandler(complaintController.index));
 app.get('/orders/:id/complaints', requireAuth, requirePermissionAny(['manage_complaints', 'respond_to_complaints']), asyncHandler(complaintController.forOrder));
 app.post('/orders/:id/complaints', requireAuth, requirePermission('manage_complaints'), verifyCsrf, asyncHandler(complaintController.create));
 app.post('/complaints/:complaintId/status', requireAuth, requirePermission('manage_complaints'), verifyCsrf, asyncHandler(complaintController.updateStatus));

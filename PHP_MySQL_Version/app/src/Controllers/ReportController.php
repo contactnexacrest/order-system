@@ -296,8 +296,9 @@ final class ReportController
         $user = AuthService::currentUser();
         $canManageSupplierPayments = $user && PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'manage_supplier_payments');
 
-        $incoming = OrderPaymentStatusRepository::clearedOnDate($date);
-        $supplier = $canManageSupplierPayments ? OrderSupplierPoRepository::paidOnDate($date) : [];
+        // QA Round 6, R6-N01: only the orders this user may open.
+        $incoming = \App\Services\OrderAccessService::visibleRows(OrderPaymentStatusRepository::clearedOnDate($date));
+        $supplier = $canManageSupplierPayments ? \App\Services\OrderAccessService::visibleRows(OrderSupplierPoRepository::paidOnDate($date)) : [];
 
         if (($_GET['format'] ?? '') === 'csv') {
             $rows = [];

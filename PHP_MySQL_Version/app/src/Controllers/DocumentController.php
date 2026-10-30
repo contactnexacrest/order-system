@@ -12,6 +12,7 @@ use App\Repositories\DocumentRepository;
 use App\Repositories\FileStoreRepository;
 use App\Services\AuthService;
 use App\Services\DocumentGenerationService;
+use App\Services\OrderAccessService;
 use App\Services\PermissionService;
 use App\Services\StageGateBlockedException;
 
@@ -184,7 +185,10 @@ final class DocumentController
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $requiredKey = $document['document_type_code'] === 'CAFIN' ? 'view_cafin' : 'download_pdf';
-        if (!PermissionService::can((int) $user['id'], $roleId, $requiredKey)) {
+        // QA Round 6, Q-R6-2 (D-118): CAFIN also needs the order itself —
+        // whoever cannot open the order page cannot download its CAFIN.
+        if (!PermissionService::can((int) $user['id'], $roleId, $requiredKey)
+            || ($document['document_type_code'] === 'CAFIN' && !OrderAccessService::currentUserMayOpenOrderId((int) $document['order_id']))) {
             http_response_code(403);
             echo 'You do not have permission to view this document.';
             return;

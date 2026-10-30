@@ -15,6 +15,30 @@ final class Database
 {
     private static ?PDO $connection = null;
 
+    /**
+     * Runs $work in one database transaction: everything it writes is kept,
+     * or — when it throws — nothing is (QA Round 6, R6-N22). Inside an
+     * already open transaction it simply runs, and the outer one decides.
+     */
+    public static function transaction(callable $work): mixed
+    {
+        $pdo = self::connection();
+        if ($pdo->inTransaction()) {
+            return $work();
+        }
+        $pdo->beginTransaction();
+        try {
+            $result = $work();
+            $pdo->commit();
+            return $result;
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     public static function connection(): PDO
     {
         if (self::$connection !== null) {

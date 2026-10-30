@@ -52,7 +52,9 @@ final class FileStoreController
                 return;
             }
         }
-        if (FileStoreRepository::documentTypeCodeFor($fileId) === 'CAFIN' && !PermissionService::can((int) $user['id'], $roleId, 'view_cafin')) {
+        if (FileStoreRepository::documentTypeCodeFor($fileId) === 'CAFIN'
+            && (!PermissionService::can((int) $user['id'], $roleId, 'view_cafin')
+                || empty($file['order_id']) || !OrderAccessService::currentUserMayOpenOrderId((int) $file['order_id']))) {
             http_response_code(403);
             echo 'You do not have permission to view this document.';
             return;

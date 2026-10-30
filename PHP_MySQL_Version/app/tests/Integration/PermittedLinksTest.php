@@ -111,4 +111,49 @@ final class PermittedLinksTest extends DbTestCase
         $dashboard = $this->render(fn () => (new DashboardController())->index([]));
         self::assertStringContainsString('href="/ports"', $dashboard);
     }
+
+    /**
+     * QA Round 6, R6-N02: every page route under a rule needs exactly what
+     * the rule says, so a link hidden by the rule is one the route refuses.
+     */
+    public function testEveryPageRouteUnderARuleNeedsWhatTheRuleSays(): void
+    {
+        $checked = 0;
+        foreach (OrderPageActionsMatchPermissionsTest::routes() as $route) {
+            if ($route['method'] !== 'GET' || $route['permissions'] === null) {
+                continue;
+            }
+            $path = preg_replace('#\{[^}]+\}#', '1', $route['pattern']);
+            $rule = PermittedLinks::requiredFor($path);
+            if ($rule === null) {
+                continue;
+            }
+            self::assertEqualsCanonicalizing($route['permissions'], $rule, $route['pattern']);
+            $checked++;
+        }
+        self::assertGreaterThan(70, $checked);
+    }
+
+    /** QA Round 6, R6-N02: links to an order the user may not see, and to pages their permissions don't open, are plain text. */
+    public function testLinksThatWouldAnswer403ArePlainText(): void
+    {
+        $exporter = $this->createTestUser('Export Executive');
+        $client = $this->createTestClient();
+        $mine = $this->createTestOrder($client, 'CIF', 'Standard — New Buyer', 'USD', null, null, $exporter);
+        $other = $this->createTestOrder($this->createTestClient());
+        $this->actAs($exporter);
+        $html = PermittedLinks::filterHtml("<a href=\"/orders/{$mine}\">A</a> <a href=\"/orders/{$other}\">B</a> <a href=\"/reports/order/{$other}\">C</a> <a href=\"/orders/{$other}/disputes\">D</a>");
+        self::assertStringContainsString("href=\"/orders/{$mine}\"", $html, 'an order assigned to the user stays a link');
+        self::assertStringNotContainsString("href=\"/orders/{$other}", $html);
+        self::assertStringNotContainsString("href=\"/reports/order/{$other}\"", $html);
+
+        $userId = $this->createTestUser('Viewer / Auditor');
+        $pdo = Database::connection();
+        $permissionId = (int) $pdo->query("SELECT id FROM permissions WHERE permission_key = 'manage_incentives'")->fetchColumn();
+        $pdo->prepare('INSERT INTO user_permissions (user_id, permission_id, is_enabled) VALUES (:u, :p, 1)')->execute(['u' => $userId, 'p' => $permissionId]);
+        $this->actAs($userId);
+        $settings = $this->render(fn () => (new \App\Controllers\IncentiveController())->settings([]));
+        self::assertStringContainsString('Incentive payouts', $settings);
+        self::assertStringNotContainsString('href="/incentives/payouts"', $settings, 'paying incentives needs pay_incentives');
+    }
 }

@@ -175,7 +175,11 @@ structural guarantees:
    `view_cafin`, so a staff member without it can't fetch it just by
    knowing or guessing its document or file ID (QA Round 5, R5-21). The
    file link also refuses a removed file, and a file of an order the user
-   may not open. CAFIN never has a "send to buyer" screen (R5-23). It's
+   may not open. CAFIN also needs the order itself: whoever cannot open
+   the order's page (no **Manage orders** / **View orders**, or the order
+   is not assigned to them and they don't hold **View all orders**)
+   cannot download its CAFIN either (owner decision 2026-10-30, QA Round 6
+   Q-R6-2). CAFIN never has a "send to buyer" screen (R5-23). It's
    also deliberately left out of the "download everything for this order"
    dossier ZIP staff use for handovers/archiving, for the same reason —
    that ZIP only requires the broad "manage orders" permission.

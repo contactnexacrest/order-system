@@ -34,7 +34,7 @@ final class DisputeController
 
         $status = trim((string) ($_GET['status'] ?? '')) ?: null;
         View::render('disputes/index', [
-            'disputes'      => DisputeRepository::all($status),
+            'disputes'      => \App\Services\OrderAccessService::visibleRows(DisputeRepository::all($status)),
             'statusFilter'  => $status,
             'statusOptions' => LookupRepository::dropdownOptions('dispute_status'),
         ], 'layout/base');
@@ -48,7 +48,7 @@ final class DisputeController
      */
     private function indexKanban(): void
     {
-        $all = DisputeRepository::all();
+        $all = \App\Services\OrderAccessService::visibleRows(DisputeRepository::all());
         $statusOptions = LookupRepository::dropdownOptions('dispute_status');
         $columns = [];
         foreach ($statusOptions as $opt) {

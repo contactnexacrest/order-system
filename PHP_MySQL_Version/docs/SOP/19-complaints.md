@@ -47,6 +47,12 @@ Holding either permission is enough to open a given order's Complaints
 screen; what's shown on it (the Log Complaint form, Status control) depends
 on which of the two permissions you actually have.
 
+Either permission also opens the **Complaints** list in the sidebar (owner
+decision 2026-10-30, QA Round 6 Q-R6-3). The list, like every complaint
+page, shows only complaints on orders you may open: orders assigned to you,
+or every order if you hold **View all orders** — archived orders only with
+**View archived orders** (QA Round 6, R6-N08).
+
 ## The system does this automatically
 
 - **A complaint always starts at status "Open."** There's no automatic

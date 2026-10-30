@@ -666,7 +666,7 @@ $router->post('/amendments/{amendmentId}/signed-copy', [$amendments, 'uploadSign
 // here (docs/schema.sql Section AO) — view/raise/status/evidence/enable
 // are privileged-only by default; respond_to_disputes (below) is the
 // separate, more broadly grantable permission for posting a reply.
-$router->get('/disputes', [$disputes, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes')]);
+$router->get('/disputes', [$disputes, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_disputes', 'respond_to_disputes'])]);
 $router->get('/orders/{id}/disputes', [$disputes, 'forOrder'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_disputes', 'respond_to_disputes'])]);
 $router->post('/orders/{id}/disputes', [$disputes, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), CsrfCheck::verify()]);
 $router->post('/disputes/{disputeId}/status', [$disputes, 'updateStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), CsrfCheck::verify()]);
@@ -677,7 +677,7 @@ $router->post('/disputes/{disputeId}/replies', [$disputes, 'postReply'], [Sessio
 // separate feature from Disputes: always available on any order (never
 // gated by dispute_button_visible_to_client), and a two-way conversation
 // rather than a staff-only resolution log.
-$router->get('/complaints', [$complaints, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_complaints')]);
+$router->get('/complaints', [$complaints, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_complaints', 'respond_to_complaints'])]);
 $router->get('/orders/{id}/complaints', [$complaints, 'forOrder'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_complaints', 'respond_to_complaints'])]);
 $router->post('/orders/{id}/complaints', [$complaints, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_complaints'), CsrfCheck::verify()]);
 $router->post('/complaints/{complaintId}/status', [$complaints, 'updateStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_complaints'), CsrfCheck::verify()]);

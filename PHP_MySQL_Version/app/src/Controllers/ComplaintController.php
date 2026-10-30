@@ -29,7 +29,7 @@ final class ComplaintController
 
         $status = trim((string) ($_GET['status'] ?? '')) ?: null;
         \App\Helpers\View::render('complaints/index', [
-            'complaints'   => OrderComplaintRepository::all($status),
+            'complaints'   => \App\Services\OrderAccessService::visibleRows(OrderComplaintRepository::all($status)),
             'statusFilter' => $status,
         ], 'layout/base');
     }
@@ -39,7 +39,7 @@ final class ComplaintController
     {
         $columns = [];
         foreach (self::STATUSES as $status) {
-            $columns[$status] = OrderComplaintRepository::all($status);
+            $columns[$status] = \App\Services\OrderAccessService::visibleRows(OrderComplaintRepository::all($status));
         }
 
         \App\Helpers\View::render('complaints/index_kanban', [
