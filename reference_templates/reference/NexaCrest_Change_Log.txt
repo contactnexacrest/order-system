@@ -3188,3 +3188,36 @@ DOCUMENT: Quotation, Proforma Invoice (CFR orders) — QA Round 5, Q-R5-2
   NEW     : NIL — buyer arranges insurance (CFR).
   Note    : On CFR the buyer insures; the Debit Note covers freight only.
 
+
+================================================================================
+29 OCTOBER 2026 — REFERENCE NUMBERS (app-generated documents; reference .docx
+unchanged)
+================================================================================
+
+DOCUMENT: every app-generated document that carries an SC/ reference number
+          (QT, Annexure A, Buyer PO, PI, OC, Supplier PO, Debit Note, PL, BLI,
+          CI, Amendment, BL Endorsement, CAFIN) and the order / tracking
+          numbers
+  REPLACE #1
+  Section : Reference number format (company settings / document_types.ref_format)
+  OLD     : [SC/XX/YYYY/DDMMNNN]   e.g. SC/CI/2026/2910001
+  NEW     : [SC/XX/YY/DDMMNNN]     e.g. SC/CI/26/2910001
+  NOTE    : A GST invoice number may have at most 16 characters (Zoho Books /
+            GST e-invoice). Numbers already issued keep the 4-digit year; only
+            new numbers use the 2-digit year. Migration 2026-10-29c. Every
+            YYYY reference format earlier in this log now reads YY for new
+            numbers; nothing else on the documents changed.
+
+================================================================================
+29–30 OCTOBER 2026 — NO CHANGE TO BUYER-FACING DOCUMENTS
+================================================================================
+
+  - Debit Note: the goods' HS code is added to the Debit Note lines sent to
+    Zoho Books (zero-rated export). The Debit Note PDF / Word is unchanged.
+  - CAFIN (internal, never sent to the client): money received under an LC
+    and expenses booked in Zoho Books are counted (owner confirmed twice,
+    29 Oct); the team incentive and the associate commission appear as the
+    order's commission cost lines (C3) once fixed (owner confirmed twice,
+    30 Oct); CAFIN can also be exported as CSV for a financial year.
+  - Team incentives, the associate register, the buyer PO received date and
+    the stage document notice change no generated document.

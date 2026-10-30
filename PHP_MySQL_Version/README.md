@@ -1286,12 +1286,15 @@ the seeded matrix. Phase D adds two new permissions: `cross_verify_documents`
 (Admin/MD-only, via the existing wildcard) — review both against your real
 org chart before going live.
 
-**Current matrix (2026-10-28):** 8 roles — Admin, Managing Director and
-Executive Director hold all 60 permissions; Export Executive, Accounts
+**Current matrix (2026-10-30):** 8 roles, 63 permissions. Admin and
+Managing Director hold all 63; Executive Director holds 61 (every one except
+`manage_incentives` and `pay_incentives`). Export Executive, Accounts
 Executive, Logistics Executive, Viewer / Auditor and CA / Chartered
-Accountant hold the lists in `docs/QA/TEST_PLAN.md` §2. Added since:
-`view_cafin` (Admin, MD, ED, Accounts Executive, CA), `approve_payment_terms`
-(Admin, MD, ED), and `view_orders` for the CA (read-only).
+Accountant hold the lists in `docs/QA/TEST_PLAN.md` §2. Among the newer
+ones: `view_cafin` (Admin, MD, ED, Accounts Executive, CA),
+`approve_payment_terms` (Admin, MD, ED), `view_orders` and `view_all_orders`
+for the CA (read-only), `manage_incentives` (Admin, MD), `pay_incentives`
+(Admin, MD, Accounts Executive) and `view_own_incentives`.
 
 ## Document template fidelity verification pass (added 2026-09-21)
 
