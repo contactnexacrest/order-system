@@ -24,11 +24,13 @@
     <h2>Default Cost Components</h2>
     <p class="muted small">These are the catalog-wide fallbacks a computed-FOB supplier uses for any cost component it does not itself override.</p>
     <div class="kv-grid">
-      <div><span class="k">Factory Cost</span><span class="v"><?= $product['default_factory_cost'] === null ? '—' : number_format((float) $product['default_factory_cost'], 2) ?></span></div>
+      <?php // Owner decision D-214, phase 2: the factory cost is the buying side; the rest are logistics costs. ?>
+      <?php if ($sees['purchase']): ?><div><span class="k">Factory Cost</span><span class="v"><?= $product['default_factory_cost'] === null ? '—' : number_format((float) $product['default_factory_cost'], 2) ?></span></div><?php endif; ?>
+      <?php if ($sees['logistics']): ?>
       <div><span class="k">Transportation Cost</span><span class="v"><?= $product['default_transportation_cost'] === null ? '—' : number_format((float) $product['default_transportation_cost'], 2) ?></span></div>
       <div><span class="k">Packing Cost</span><span class="v"><?= $product['default_packing_cost'] === null ? '—' : number_format((float) $product['default_packing_cost'], 2) ?></span></div>
       <div><span class="k">Loading Cost</span><span class="v"><?= $product['default_loading_cost'] === null ? '—' : number_format((float) $product['default_loading_cost'], 2) ?></span></div>
-      <div><span class="k">CHA Cost</span><span class="v"><?= $product['default_cha_cost'] === null ? '—' : number_format((float) $product['default_cha_cost'], 2) ?></span></div>
+      <div><span class="k">CHA Cost</span><span class="v"><?= $product['default_cha_cost'] === null ? '—' : number_format((float) $product['default_cha_cost'], 2) ?></span></div><?php endif; ?>
     </div>
   </div>
   <?php endif; ?>

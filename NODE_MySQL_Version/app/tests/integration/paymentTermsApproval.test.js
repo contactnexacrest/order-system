@@ -47,7 +47,7 @@ describe('Payment terms approval before the Quotation (QA Round 5, R5-03)', () =
 
   it('refuses to generate the Quotation until the terms are approved', async () => {
     const orderId = await order('Established Buyer — Post-BL');
-    const req = { params: { id: String(orderId) }, body: { document_type: 'QT' }, user: { id: await createTestUser('Export Executive') }, permissions: { generate_documents: true }, session: {} };
+    const req = { params: { id: String(orderId) }, body: { document_type: 'QT' }, user: { id: await createTestUser('Export Executive') }, permissions: { generate_documents: true, view_selling_prices: true }, session: {} };
     await documentController.generate(req, fakeRes());
 
     expect(await documentRepository.findLatestForOrderAndTypeCode(orderId, 'QT')).toBeNull();

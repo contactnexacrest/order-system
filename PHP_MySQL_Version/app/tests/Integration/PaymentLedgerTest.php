@@ -26,10 +26,11 @@ use App\Tests\Support\DbTestCase;
  */
 final class PaymentLedgerTest extends DbTestCase
 {
+    /** Owner decision D-214, phase 2: a department that may not see buyer payments (Logistics) sees the status only. */
     public function testGeneralStaffSeeStatusOnlyNoAmounts(): void
     {
-        $userId = $this->createTestUser('Viewer / Auditor');
-        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB');
+        $userId = $this->createTestUser('Logistics Executive');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, $userId);
         OrderPaymentStatusRepository::initializeForOrder($orderId);
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 5000.0, '2026-06-01');
 
@@ -60,10 +61,11 @@ final class PaymentLedgerTest extends DbTestCase
         self::assertMatchesRegularExpression('/5,000\.00\s*USD/', $output);
     }
 
-    public function testCloseOrdersHolderSeesAmountsEvenWithoutManagePayments(): void
+    /** Owner decision D-214, phase 2: the auditors see every amount (read only), without "Manage payments". */
+    public function testAuditorSeesAmountsWithoutManagePayments(): void
     {
-        $userId = $this->createTestUser('Logistics Executive');
-        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, $userId);
+        $userId = $this->createTestUser('Viewer / Auditor');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB');
         OrderPaymentStatusRepository::initializeForOrder($orderId);
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, 7500.0, '2026-06-01');
 

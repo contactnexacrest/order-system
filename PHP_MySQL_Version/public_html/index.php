@@ -581,7 +581,7 @@ $router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayme
 $router->post('/orders/{id}/payment/lc', [$orders, 'recordLcDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/lc/confirm-usable', [$orders, 'confirmLcUsable'], [SessionAuth::required(), PermissionCheck::requires('clear_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment-terms/approve', [$orders, 'approvePaymentTerms'], [SessionAuth::required(), PermissionCheck::requires('approve_payment_terms'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_po'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 // docs/schema.sql Section AI — order progress chat.
@@ -605,8 +605,8 @@ $router->post('/orders/{id}/annexure/images/{imageId}/remove', [$annexure, 'remo
 // --- Phase C: Stages 4-9 ---
 $router->post('/orders/{id}/oc-acknowledgment', [$orders, 'recordOcAcknowledgment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
-$router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigned'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_po'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigned'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_po'), OrderLockGuard::check(), CsrfCheck::verify()]);
 // External QA report Q-ROLE-3: split out of manage_order_financials so
 // Accounts can confirm supplier payments without gaining the broader
 // financials permission's access to cost entries/export benefits/the
@@ -623,17 +623,17 @@ $router->post('/orders/{id}/vendor-bills/{billId}/delete', [$vendorBills, 'delet
 // Owner decisions (2026-10-27): the order's actual expenses with receipts (Step 12a).
 $router->post('/orders/{id}/expenses', [$orderExpenses, 'add'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/expenses/{expenseId}/delete', [$orderExpenses, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/supplier-po/documents', [$orders, 'uploadSupplierPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/supplier-po/supplier-link', [$orders, 'generateSupplierActionLink'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/supplier-po/ack-skip', [$orders, 'skipSupplierPoAck'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/documents', [$orders, 'uploadSupplierPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_po'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/supplier-link', [$orders, 'generateSupplierActionLink'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_po'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/supplier-po/ack-skip', [$orders, 'skipSupplierPoAck'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_po'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 // QA-5 RBAC-04: freight/packing/shipping/BL/closure are Logistics' duty,
 // split out of manage_orders so an Accounts-only user can no longer
 // record a BL or close an order (see docs/seed.sql's manage_shipping /
 // close_orders permissions).
 $router->post('/orders/{id}/freight-terms', [$orders, 'saveFreightTerms'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/freight', [$orders, 'recordFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/payment/freight/clear', [$orders, 'clearFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/freight', [$orders, 'recordFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/freight/clear', [$orders, 'clearFreightPayment'], [SessionAuth::required(), PermissionCheck::requires('clear_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/packing', [$orders, 'savePacking'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/shipping', [$orders, 'saveShipping'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -652,7 +652,7 @@ $router->post('/orders/{id}/bl-endorsed', [$orders, 'recordBlEndorsed'], [Sessio
 $router->post('/orders/{id}/bl-endorsement', [$orders, 'saveBlEndorsement'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/bl-endorsement/generate', [$orders, 'generateBlEndorsement'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/close', [$orders, 'closeOrder'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/mark-fully-settled', [$orders, 'markFullySettled'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/mark-fully-settled', [$orders, 'markFullySettled'], [SessionAuth::required(), PermissionCheck::requires('settle_orders'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/mark-lost', [$orders, 'markLost'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
 // External QA report M-09: formal cancellation workflow, distinct from mark-lost above.
 $router->post('/orders/{id}/cancellation/request', [$orders, 'requestCancellation'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
@@ -749,7 +749,7 @@ $router->get('/reports/amendments', [$reports, 'amendments'], [SessionAuth::requ
 $router->get('/reports/trends', [$reports, 'trends'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/staff', [$reports, 'staff'], [SessionAuth::required(), PermissionCheck::requires('view_staff_reports')]);
 $router->get('/reports/ageing', [$reports, 'ageing'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/freight-cost', [$reports, 'freightCost'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/freight-cost', [$reports, 'freightCost'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), PermissionCheck::requires('view_logistics_costs')]);
 $router->get('/reports/products', [$reports, 'products'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/suppliers', [$reports, 'suppliers'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/order-profitability', [$reports, 'profitability'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials')]);

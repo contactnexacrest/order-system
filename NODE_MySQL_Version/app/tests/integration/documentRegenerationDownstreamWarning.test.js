@@ -44,7 +44,7 @@ describe('Document regeneration downstream warning (90-item backlog Phase 6 Item
   }
 
   function fakeReq(user, body = {}, params = {}) {
-    return { session: {}, user, permissions: { edit_locked_data: !!user.isSuperAdmin }, body, params };
+    return { session: {}, user, permissions: { edit_locked_data: !!user.isSuperAdmin, view_selling_prices: true }, body, params };
   }
 
   it('no downstream risk when only the regenerated type exists', async () => {

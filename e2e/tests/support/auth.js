@@ -25,6 +25,7 @@ const ROLES = {
   logisticsExecutive: { email: 'ui-test-logistics-exec@nexacrest.test', name: 'UI Test Logistics Exec' },
   viewerAuditor: { email: 'ui-test-viewer@nexacrest.test', name: 'UI Test Viewer Auditor' },
   ca: { email: 'ui-test-ca@nexacrest.test', name: 'UI Test CA' },
+  procurementManager: { email: 'ui-test-procurement-mgr@nexacrest.test', name: 'UI Test Procurement Manager' },
 };
 
 async function login(page, role = 'admin') {

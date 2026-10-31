@@ -43,6 +43,22 @@ function canSeeDocument(permissions, typeCode) {
   return cls === null || can(permissions, cls);
 }
 
+/** Order costs and expense receipts: Finance and management only. */
+const FINANCIALS = 'financials';
+
+/** Whether these permissions may have this stored file, by the money it shows. */
+async function canSeeFile(permissions, fileId) {
+  const fileStoreRepository = require('../repositories/fileStoreRepository');
+  const cls = await fileStoreRepository.moneyClassFor(fileId);
+  if (cls === null) {
+    return true;
+  }
+  if (cls === FINANCIALS) {
+    return Boolean(permissions && permissions.manage_order_financials);
+  }
+  return can(permissions, cls);
+}
+
 /** { selling, buyer_payments, purchase, logistics } for views. */
 function flags(permissions) {
   const out = {};
@@ -53,6 +69,6 @@ function flags(permissions) {
 }
 
 module.exports = {
-  SELLING, BUYER_PAYMENTS, PURCHASE, LOGISTICS, PERMISSIONS, DOCUMENT_CLASSES,
-  documentClass, can, canSeeDocument, flags,
+  SELLING, BUYER_PAYMENTS, PURCHASE, LOGISTICS, FINANCIALS, PERMISSIONS, DOCUMENT_CLASSES,
+  documentClass, can, canSeeDocument, canSeeFile, flags,
 };

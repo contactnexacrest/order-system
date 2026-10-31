@@ -1,4 +1,4 @@
--- External QA report TI-10: the 6 ui-test-* role accounts tests/
+-- External QA report TI-10: the 7 ui-test-* role accounts tests/
 -- support/auth.js's ROLES map expects (every role except the two real
 -- seeded people, admin/executiveDirector, which already exist in
 -- docs/seed.sql) were created by hand, directly in each dev DB, with no
@@ -10,7 +10,7 @@
 -- seed.sql (see e2e/README.md "Prerequisites"):
 --   mysql -u nexacrest_app -p<password> <db_name> < e2e/seed-ui-test-users.sql
 --
--- All 6 share tests/support/auth.js's PASSWORD constant
+-- All 7 share tests/support/auth.js's PASSWORD constant
 -- ('PlaywrightTest#2026') — never a real password, dev-only test
 -- accounts. The two hashes below are of that same string; use whichever
 -- one matches the stack you're seeding (PHP's password_hash() produces
@@ -54,3 +54,9 @@ INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_
 SELECT 'UI Test CA', 'ui-test-ca@nexacrest.test', NULL, @pw, r.id, 1, 0, 0
 FROM roles r WHERE r.name = 'CA / Chartered Accountant'
   AND NOT EXISTS (SELECT 1 FROM users WHERE email = 'ui-test-ca@nexacrest.test');
+
+-- Owner decision D-214, phase 2: the Supplier PO belongs to Procurement.
+INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
+SELECT 'UI Test Procurement Manager', 'ui-test-procurement-mgr@nexacrest.test', NULL, @pw, r.id, 1, 0, 0
+FROM roles r WHERE r.name = 'Procurement Manager'
+  AND NOT EXISTS (SELECT 1 FROM users WHERE email = 'ui-test-procurement-mgr@nexacrest.test');

@@ -59,6 +59,23 @@ final class MoneyVisibility
         return $class === null || self::can($class);
     }
 
+    /** Order costs and expense receipts: Finance and management only. */
+    public const FINANCIALS = 'financials';
+
+    /** Whether the signed-in person may have this stored file, by the money it shows. */
+    public static function canSeeFile(int $fileId): bool
+    {
+        $class = \App\Repositories\FileStoreRepository::moneyClassFor($fileId);
+        if ($class === null) {
+            return true;
+        }
+        if ($class === self::FINANCIALS) {
+            $user = AuthService::currentUser();
+            return $user !== null && PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'manage_order_financials');
+        }
+        return self::can($class);
+    }
+
     /** @return array{selling:bool,buyer_payments:bool,purchase:bool,logistics:bool} for views */
     public static function flags(): array
     {

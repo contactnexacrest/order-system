@@ -21,6 +21,30 @@ use App\Tests\Support\DbTestCase;
  */
 final class RolePermissionWipeGuardTest extends DbTestCase
 {
+    /** @var list<array<string,mixed>> Export Executive's grants before the test, put back afterwards so later tests see the seeded role */
+    private array $savedGrants = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->savedGrants = Database::connection()
+            ->query("SELECT rp.role_id, rp.permission_id, rp.is_enabled FROM role_permissions rp JOIN roles r ON r.id = rp.role_id WHERE r.name = 'Export Executive'")
+            ->fetchAll();
+    }
+
+    protected function tearDown(): void
+    {
+        $pdo = Database::connection();
+        $pdo->exec("DELETE rp FROM role_permissions rp JOIN roles r ON r.id = rp.role_id WHERE r.name = 'Export Executive'");
+        $insert = $pdo->prepare('INSERT INTO role_permissions (role_id, permission_id, is_enabled) VALUES (:r, :p, :e)');
+        foreach ($this->savedGrants as $g) {
+            $insert->execute(['r' => $g['role_id'], 'p' => $g['permission_id'], 'e' => $g['is_enabled']]);
+        }
+        $_SESSION = [];
+        $_POST = [];
+        parent::tearDown();
+    }
+
     public function testSavingWithNoPermissionsSelectedIsRefusedAndChangesNothing(): void
     {
         $userId = $this->createTestUser('Admin');

@@ -8,7 +8,7 @@
   <div class="entity-card-sub">{{ o.company_legal_name }}</div>
   <div class="entity-card-footer">
     {% if o.is_overdue %}<span class="badge badge-lost">Overdue</span>{% else %}<span></span>{% endif %}
-    <span class="entity-card-amount">{{ o.currency_code }} {{ o.total_fob_value | money }}</span>
+    {% if sees.selling %}<span class="entity-card-amount">{{ o.currency_code }} {{ o.total_fob_value | money }}</span>{% endif %}
   </div>
 </a>
 {% endmacro %}

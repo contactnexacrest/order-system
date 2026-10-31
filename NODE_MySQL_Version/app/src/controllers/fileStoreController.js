@@ -1,5 +1,7 @@
 'use strict';
 
+const moneyVisibility = require('../services/moneyVisibility');
+
 const fs = require('fs');
 const associateRepository = require('../repositories/associateRepository');
 const fileStoreRepository = require('../repositories/fileStoreRepository');
@@ -43,6 +45,12 @@ async function download(req, res) {
   }
   if ((await fileStoreRepository.documentTypeCodeFor(fileId)) === 'CAFIN'
     && (!permissions.view_cafin || !file.order_id || !(await orderAccessService.orderLinkChecker(req.user.id, permissions))(file.order_id))) {
+    res.status(403).send('You do not have permission to view this document.');
+    return;
+  }
+  // Owner decision D-214, phase 2: a bill scan, signed PO, payment
+  // screenshot or sales document only for whoever may see that money.
+  if (!(await moneyVisibility.canSeeFile(permissions, fileId))) {
     res.status(403).send('You do not have permission to view this document.');
     return;
   }

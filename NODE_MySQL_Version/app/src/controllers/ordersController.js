@@ -1,5 +1,7 @@
 'use strict';
 
+const moneyVisibility = require('../services/moneyVisibility');
+
 const fs = require('fs');
 const editFingerprintHelper = require('../helpers/editFingerprint');
 const recordCheck = require('../helpers/recordCheck');
@@ -1469,7 +1471,13 @@ async function downloadDossier(req, res) {
     return;
   }
 
-  const files = await fileStoreRepository.forOrderExcludingInternalCaDocs(orderId);
+  // Owner decision D-214, phase 2: only the files whose money this person may see.
+  const files = [];
+  for (const f of await fileStoreRepository.forOrderExcludingInternalCaDocs(orderId)) {
+    if (await moneyVisibility.canSeeFile(req.permissions, f.id)) {
+      files.push(f);
+    }
+  }
   if (files.length === 0) {
     flash.set(req, 'error', 'No files are on record for this order yet.');
     res.redirect(`/orders/${orderId}`);

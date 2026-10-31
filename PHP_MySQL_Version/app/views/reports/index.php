@@ -61,7 +61,7 @@ $__uid = $__u ? (int) $__u['id'] : 0;
     <h2>Freight, Products &amp; Suppliers</h2>
     <p class="muted">Freight cost by forwarder, sales by product/HS code, and supplier signing/delivery performance.</p>
     <div class="btn-row">
-      <a class="btn-sm" href="/reports/freight-cost">Open Freight Cost Report</a>
+      <?php if ($sees['logistics']): ?><a class="btn-sm" href="/reports/freight-cost">Open Freight Cost Report</a><?php endif; ?>
       <a class="btn-sm" href="/reports/products">Open Product Sales Report</a>
       <a class="btn-sm" href="/reports/suppliers">Open Supplier Performance Report</a>
     </div>

@@ -15,6 +15,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-10-31b-payment-references.s
 mysql -u <user> -p <database> < docs/migrations/2026-10-31c-inspection-agency.sql
 mysql -u <user> -p <database> < docs/migrations/2026-10-31d-gst-refunds.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01a-departments.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-01b-money-separation.sql
 ```
 
 ## Rules every file follows
@@ -32,7 +33,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-01a-departments.sql
 
 Run each file below that the database has not had yet, in this order, then
 deploy the code for both stacks. As of 30 Oct 2026 the live site still
-needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30c, 30d, 31a, 31b, 31c, 31d and 11-01a**.
+needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30c, 30d, 31a, 31b, 31c, 31d, 11-01a and 11-01b**.
 
 | # | File | What it does |
 |---|---|---|
@@ -63,6 +64,8 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30
 | 25 | `2026-10-31d-gst-refunds.sql` | GST refunds under LUT (owner decision 2026-10-31, option A): the claims (RFD-01, per period) and the money credited to the bank (with its RFD-05 / UTR reference); each credit goes to Zoho Books as a journal. New tables only |
 
 | 26 | `2026-11-01a-departments.sql` | Organisation design D-214, phase 1: departments, their designations (Executive / Manager / Director, each its own role) and people's memberships; the new roles (Sales/Export Manager, Sales Director, Procurement Executive / Manager / Director, Logistics Manager / Director, Finance Manager / Director, System Administrator, Order Coordinator, Operations Manager) with their starting rights; existing staff become members of the department matching their role (Admin accounts are left as they are); the audit log records the department a change was made in; personal exceptions get an end date. New tables and two new columns |
+
+| 27 | `2026-11-01b-money-separation.sql` | D-214, phase 2: who sees which money — the permissions See selling prices, See buyer payments, See purchase prices, See logistics costs, Supplier PO and production, and Mark an order fully settled, granted by department (Sales: selling + buyer payments; Procurement: purchase + Supplier PO; Logistics: logistics costs; Accounts & Finance, MD/ED, auditors and CA: all money; settling: Accounts & Finance and management). New rows only |
 
 There is no `2026-10-28b` file; that letter was not used.
 

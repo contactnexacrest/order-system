@@ -70,7 +70,7 @@
         {% else %}
           <span class="badge badge-active">Active</span>
         {% endif %}
-        <span class="entity-card-amount">{{ o.currency_code }} {{ o.total_fob_value | money }}</span>
+        {% if sees.selling %}<span class="entity-card-amount">{{ o.currency_code }} {{ o.total_fob_value | money }}</span>{% endif %}
       </div>
     </a>
     {% endfor %}

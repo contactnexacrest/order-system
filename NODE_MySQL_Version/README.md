@@ -1070,3 +1070,23 @@ Zoho Books, built from the facts and including the bank reference.
   person acted as (`acting_as`), e.g. "Procurement Manager · Procurement", or
   "Preview: …".
 - **Tests:** `tests/integration/departments.test.js`; e2e `e2e/tests/10-departments.spec.js`. Node keeps the acting department per request in `src/helpers/requestContext.js` (AsyncLocalStorage), opened by `sessionAuth.required()`, so the audit log and permission loads see it without `req`.
+
+## Follow-up (added 2026-11-01): Money separation (owner decision D-214, phase 2)
+
+- **Migration:** `docs/migrations/2026-11-01b-money-separation.sql` —
+  `view_selling_prices`, `view_buyer_payments`, `view_purchase_prices`,
+  `view_logistics_costs`, `manage_supplier_po`, `settle_orders`, granted by
+  department.
+- **One rule:** `src/services/moneyVisibility.js` — document type → money class (QT, BUYERPO, PI, OC,
+  FDN, CI, AMD, COOPREP selling; CHECKLIST_2_FINANCE buyer payments; SUPPO
+  purchase; BLI logistics), stored file → money class (bill scans, signed
+  Supplier PO, payment screenshots, LC copy, buyer PO, signed amendment,
+  expense receipts = financials), and the flags every view gets as `sees`.
+- **Applied to:** document download (also checks the order, every type),
+  file-store download, the dossier ZIP, the order page, orders list and
+  kanban, catalogue costs, dashboard overdue amounts, the freight-cost report.
+- **Re-gated routes:** Supplier PO save / signed / documents / supplier link /
+  ack-skip and production status → `manage_supplier_po`; freight remittance →
+  `manage_payments`; freight cleared → `clear_payments`; mark fully settled →
+  `settle_orders`.
+- **Tests:** `tests/integration/moneySeparation.test.js` (role matrix, document and file downloads, order page).

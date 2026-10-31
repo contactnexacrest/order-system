@@ -10,6 +10,8 @@
 --   - freight clearing uses Clear payments (already Finance's), no new key.
 -- New rows only; safe to run twice (INSERT IGNORE on unique keys).
 
+SET NAMES utf8mb4;
+
 INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
   ('view_selling_prices', 'See selling prices', 'Unit prices, FOB and order values, and the sales documents that carry them (QT, PI, OC, CI, AMD, Debit Note). D-214: Sales, Finance, management, auditors, CA.', 'money'),
   ('view_buyer_payments', 'See buyer payments', 'What the buyer has paid and still owes: the payment snapshot, the remittances and their screenshots. D-214: Sales, Finance, management, auditors, CA.', 'money'),
@@ -50,9 +52,15 @@ SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
 WHERE p.permission_key = 'settle_orders'
   AND r.name IN ('Accounts Executive', 'Finance Manager', 'Finance Director');
 
--- Procurement works on the order (supplier PO, production) and downloads
--- its own documents, but only the orders assigned to it.
+-- Procurement works on the order (supplier PO, production), generates and
+-- downloads its own documents (the Supplier PO; a document carrying money it
+-- may not see is refused), and opens only the orders assigned to it.
 INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
 WHERE p.permission_key IN ('view_orders', 'download_pdf')
   AND r.name IN ('Procurement Executive');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'generate_documents'
+  AND r.name IN ('Procurement Executive', 'Procurement Manager', 'Procurement Director');

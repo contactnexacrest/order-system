@@ -80,7 +80,7 @@ $statusLabels = ['all' => 'All', 'active' => 'Active', 'overdue' => 'Overdue', '
         <?php else: ?>
           <span class="badge badge-active">Active</span>
         <?php endif; ?>
-        <span class="entity-card-amount"><?= htmlspecialchars($amount) ?></span>
+        <?php if ($sees['selling']): ?><span class="entity-card-amount"><?= htmlspecialchars($amount) ?></span><?php endif; ?>
       </div>
     </a>
     <?php endforeach; ?>

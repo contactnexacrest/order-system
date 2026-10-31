@@ -64,12 +64,16 @@ if ($canManageIncentives) {
 $canManageSupplierPayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_supplier_payments');
 $canManageShipping = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_shipping');
 $canCloseOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'close_orders');
+// Owner decision D-214, phase 2: the Supplier PO and production belong to Procurement; settling to Finance.
+$canManageSupplierPo = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_supplier_po');
+$canSettleOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'settle_orders');
 // Payment Ledger / Payment Snapshot (new): "only able to see the needed things" —
 // general staff see payment STATUS only (received/not received, dates), amounts
 // are restricted to manage_payments/close_orders (and Super Admin, already
 // covered transitively since PermissionService::can() bypasses for an
 // effective Super Admin on either check above).
-$canViewPaymentAmounts = $canManagePayments || $canCloseOrders;
+// Owner decision D-214, phase 2: amounts only for a department that may see buyer payments.
+$canViewPaymentAmounts = $sees['buyer_payments'];
 $canViewAuditLog = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'view_audit_log');
 // docs/schema.sql Section AO — split out of manage_orders so enabling the client-facing dispute button is privileged-only by default.
 $canManageDisputes = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_disputes');
@@ -105,7 +109,7 @@ $canOverrideOrderEdit = OrderEditGuard::canOverride((int) $currentUser['id'], $c
 // 90-item backlog Phase 6 Item 4 — the stricter lock check sits in front of the post-confirmation one.
 $isLockedOrder = (bool) $order['is_locked'];
 $canOverrideLockEdit = OrderEditGuard::canOverrideLock((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null);
-$canEditProducts = $canManageOrders && (!$isLockedOrder || $canOverrideLockEdit) && (!$isPostConfirmationOrder || $canOverrideOrderEdit);
+$canEditProducts = $canManageOrders && $sees['selling'] && (!$isLockedOrder || $canOverrideLockEdit) && (!$isPostConfirmationOrder || $canOverrideOrderEdit);
 
 // CA / Accounting module (Phase 1) — one small widget per settlement leg,
 // rendered inline in the Payment Status section rather than a separate
@@ -118,7 +122,14 @@ foreach ($activeUsers as $u) {
 // Owner request (2026-10-26): a remittance is recorded together with the
 // day's exchange rate, and once recorded the card reads it back as one
 // statement — "we received X at today's exchange rate of Y".
-$remittanceRecordedNote = function (string $leg, string $nextStep) use ($payment, $order): string {
+$remittanceRecordedNote = function (string $leg, string $nextStep) use ($payment, $order, $sees): string {
+    $clearedAt = $payment[$leg . '_cleared_at'] ?? null;
+    $after = $clearedAt ? 'Cleared on ' . date('d M Y', strtotime((string) $clearedAt)) . '.' : $nextStep;
+    // Owner decision D-214, phase 2: a department that may not see buyer payments sees only that it came in.
+    if (!$sees['buyer_payments']) {
+        $receivedAt = $payment[$leg . '_remittance_received_at'] ?? null;
+        return '<p class="remit-recorded"><strong>&#10003; Remittance recorded' . ($receivedAt ? ' on ' . htmlspecialchars(date('d M Y', strtotime((string) $receivedAt))) : '') . '.</strong> <span class="muted">' . htmlspecialchars($after) . '</span></p>';
+    }
     $amount = $payment[$leg . '_amount'] ?? null;
     $rate = $payment[$leg . '_exchange_rate'] ?? null;
     $receivedAt = $payment[$leg . '_remittance_received_at'] ?? null;
@@ -132,8 +143,6 @@ $remittanceRecordedNote = function (string $leg, string $nextStep) use ($payment
     if (!empty($payment[$leg . '_bank_reference'])) {
         $text .= ' Bank ref ' . htmlspecialchars((string) $payment[$leg . '_bank_reference']) . '.';
     }
-    $clearedAt = $payment[$leg . '_cleared_at'] ?? null;
-    $after = $clearedAt ? 'Cleared on ' . date('d M Y', strtotime((string) $clearedAt)) . '.' : $nextStep;
     return '<p class="remit-recorded"><strong>&#10003; ' . $text . '</strong> <span class="muted">' . htmlspecialchars($after) . '</span></p>';
 };
 
@@ -691,9 +700,16 @@ $vendorBillFields = static function (string $defaultKind = 'invoice', array $rep
 // Owner request (2026-10-26): the supplier's advance (Step 7e) and balance
 // (Step 10a — due before packing) are their own sub-steps; owner decisions
 // (2026-10-27): each is now the supplier's bill, then the payment against it.
-$renderSupplierPayment = static function (string $leg) use ($supplierPo, $supplierBank, $canManageSuppliers, $order, $canManageSupplierPayments, $vendorBills, $renderVendorBills, $vendorBillFields, $vendorBillPayTo): void {
+$renderSupplierPayment = static function (string $leg) use ($supplierPo, $supplierBank, $canManageSuppliers, $order, $canManageSupplierPayments, $vendorBills, $renderVendorBills, $vendorBillFields, $vendorBillPayTo, $sees): void {
     if (!$supplierPo) {
         echo '<p class="muted">Save the Supplier PO terms first (Step 7a).</p>';
+        return;
+    }
+    // Owner decision D-214, phase 2: without the buying side, only whether this supplier payment is done.
+    if (!$sees['purchase']) {
+        $paidOn = $supplierPo[$leg . '_paid_at'] ?? null;
+        echo '<p class="muted small">' . ($leg === 'advance' ? 'Supplier advance' : 'Supplier balance') . ': '
+            . ($paidOn ? 'paid on ' . htmlspecialchars(\App\Helpers\Dates::human((string) $paidOn)) : 'not paid yet') . '. Amounts and bills are with Procurement and Accounts.</p>';
         return;
     }
     $planned = $supplierPo[$leg . '_amount_inr'] ?? null;
@@ -1140,7 +1156,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       Cancelled<?php if ($__approvedCancellation && $__approvedCancellation['decided_at']): ?> on <?= htmlspecialchars($__approvedCancellation['decided_at']) ?> by <?= htmlspecialchars($__approvedCancellation['decided_by_name'] ?? 'unknown') ?><?php endif; ?>
       <?php if ($__approvedCancellation): ?> — reason: <?= htmlspecialchars($__approvedCancellation['reason']) ?><?php endif; ?>
       <?php if ($__approvedCancellation && $__approvedCancellation['refund_status'] !== 'not_applicable'): ?>
-        <br>Refund: <?= htmlspecialchars(str_replace('_', ' ', $__approvedCancellation['refund_status'])) ?><?php if ($__approvedCancellation['refund_amount'] !== null): ?> — <?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $__approvedCancellation['refund_amount'], 2) ?><?php endif; ?><?php if (!empty($__approvedCancellation['refund_reference'])): ?> · paid <?= htmlspecialchars(\App\Helpers\Dates::short((string) $__approvedCancellation['refund_paid_at'])) ?>, bank ref <?= htmlspecialchars((string) $__approvedCancellation['refund_reference']) ?><?php endif; ?>
+        <br>Refund: <?= htmlspecialchars(str_replace('_', ' ', $__approvedCancellation['refund_status'])) ?><?php if ($__approvedCancellation['refund_amount'] !== null && $sees['buyer_payments']): ?> — <?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $__approvedCancellation['refund_amount'], 2) ?><?php endif; ?><?php if (!empty($__approvedCancellation['refund_reference']) && $sees['buyer_payments']): ?> · paid <?= htmlspecialchars(\App\Helpers\Dates::short((string) $__approvedCancellation['refund_paid_at'])) ?>, bank ref <?= htmlspecialchars((string) $__approvedCancellation['refund_reference']) ?><?php endif; ?>
         <?php if ($__approvedCancellation['refund_status'] === 'pending' && $canCloseOrders): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/cancellation/<?= (int) $__approvedCancellation['id'] ?>/complete-refund" style="display:inline" onsubmit="return confirm('Mark this refund as completed? Record this only once the money has actually been sent back.');">
             <?= Csrf::field() ?>
@@ -1244,15 +1260,17 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <summary><h2>Products</h2></summary>
     <?php if (!$canEditProducts): ?>
       <table class="list">
-        <tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Amount</th></tr>
+        <tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><?php if ($sees['selling']): ?><th>Unit Price</th><th>Amount</th><?php endif; ?></tr>
         <?php foreach ($products as $i => $p): ?>
         <tr>
           <td><?= $i + 1 ?></td>
           <td><?= htmlspecialchars($p['description']) ?><?php if ($p['dimensions'] || $p['finish']): ?><br><span class="muted small"><?= htmlspecialchars($p['dimensions'] ?? '') ?> <?= htmlspecialchars($p['finish'] ?? '') ?></span><?php endif; ?></td>
           <td><?= $p['quantity_is_tbc'] ? 'To Be Confirmed' : htmlspecialchars((string) $p['quantity']) ?></td>
           <td><?= htmlspecialchars($p['unit'] ?? '') ?></td>
+          <?php if ($sees['selling']): ?>
           <td><?= $p['unit_price'] !== null ? number_format((float) $p['unit_price'], 2) : 'To Be Confirmed' ?></td>
           <td><?= $p['fob_value'] !== null ? number_format((float) $p['fob_value'], 2) : 'To Be Confirmed' ?></td>
+          <?php endif; ?>
         </tr>
         <?php endforeach; ?>
       </table>
@@ -1538,8 +1556,8 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <?php endif; ?>
         </td>
         <td>
-          <?php if ($d['pdf_file_id'] && $canDownloadPdf): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf">PDF</a><?php endif; ?>
-          <?php if ($d['docx_file_id'] && $canDownloadPdf): ?> · <a href="/documents/<?= (int) $d['id'] ?>/download?format=docx">DOCX (internal)</a><?php endif; ?>
+          <?php if ($d['pdf_file_id'] && $canDownloadPdf && \App\Services\MoneyVisibility::canSeeDocument((string) $d['document_type_code'])): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf">PDF</a><?php endif; ?>
+          <?php if ($d['docx_file_id'] && $canDownloadPdf && \App\Services\MoneyVisibility::canSeeDocument((string) $d['document_type_code'])): ?> · <a href="/documents/<?= (int) $d['id'] ?>/download?format=docx">DOCX (internal)</a><?php endif; ?>
         </td>
         <td>
           <?php if ($d['status'] === 'draft'): ?>
@@ -2402,7 +2420,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <div><span class="k">Supplier Type</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_type'] ?? '—') ?></span></div>
         <div><span class="k">Supplier PO Ref</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_po_reference']) ?></span></div>
         <div><span class="k">Material</span><span class="v"><?= htmlspecialchars($supplierPo['material_stone_type'] ?? '—') ?></span></div>
-        <div><span class="k">Total Payable (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['total_payable_inr'] ?? '—') ?></span></div>
+        <?php if ($sees['purchase']): ?><div><span class="k">Total Payable (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['total_payable_inr'] ?? '—') ?></span></div><?php endif; ?>
         <div><span class="k">Status</span><span class="v"><?= htmlspecialchars($supplierPo['status']) ?></span></div>
       </div>
       <p class="muted small">Terms already saved — see Step 7b to generate the document.</p>
@@ -2415,7 +2433,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <p class="small" style="color:var(--danger);font-weight:600;">No active suppliers yet. <?= $canManageSuppliers ? '<a href="/suppliers/create" target="_blank" rel="noopener">Add the first supplier</a>, then reload this page.' : 'Ask an Admin/MD/ED to add one in the Suppliers directory.' ?></p>
       <?php endif; ?>
 
-      <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
+      <?php if ($canManageSupplierPo): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po" id="supplier-po-form">
         <?= Csrf::field() ?>
         <div class="field-grid">
@@ -2613,7 +2631,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <div><span class="k">Supplier Type</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_type'] ?? '—') ?></span></div>
         <div><span class="k">Supplier PO Ref</span><span class="v"><?= htmlspecialchars($supplierPo['supplier_po_reference']) ?></span></div>
         <div><span class="k">Material</span><span class="v"><?= htmlspecialchars($supplierPo['material_stone_type'] ?? '—') ?></span></div>
-        <div><span class="k">Total Payable (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['total_payable_inr'] ?? '—') ?></span></div>
+        <?php if ($sees['purchase']): ?><div><span class="k">Total Payable (INR)</span><span class="v"><?= htmlspecialchars($supplierPo['total_payable_inr'] ?? '—') ?></span></div><?php endif; ?>
         <div><span class="k">Status</span><span class="v"><?= htmlspecialchars($supplierPo['status']) ?></span></div>
       </div>
       <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
@@ -2655,7 +2673,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <?php endforeach; ?>
         </table>
       <?php endif; ?>
-      <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
+      <?php if ($canManageSupplierPo): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/documents" enctype="multipart/form-data" style="margin-top:6px">
         <?= Csrf::field() ?>
         <input type="file" name="document" required>
@@ -2679,7 +2697,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           </div>
           <p class="muted small">Valid until <?= htmlspecialchars(Dates::human($supplierPo['supplier_action_token_expires_at'])) ?>.</p>
         <?php endif; ?>
-        <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
+        <?php if ($canManageSupplierPo): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/supplier-link" style="display:inline">
           <?= Csrf::field() ?>
           <button type="submit" class="btn-sm btn-secondary"><?= $supplierActionLinkValid ? 'Regenerate Supplier Link' : 'Generate Supplier Link' ?></button>
@@ -2688,7 +2706,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       </div>
       <?php if (!empty($supplierPo['ack_skipped_at'])): ?>
         <p class="small" style="margin-top:8px;">&#10003; Recorded that the supplier did not acknowledge — <?= htmlspecialchars((string) $supplierPo['ack_skip_reason']) ?> <span class="muted">(<?= htmlspecialchars((string) $supplierPo['ack_skipped_at']) ?>)</span></p>
-      <?php elseif (empty($supplierPoDocuments) && $supplierPo['status'] !== 'signed'): ?>
+      <?php elseif (empty($supplierPoDocuments) && $supplierPo['status'] !== 'signed' && $canManageSupplierPo): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/ack-skip" style="margin-top:8px;" data-confirm="Record that the supplier did not acknowledge this PO? Step 7d then opens without an acknowledgment on file.">
           <?= Csrf::field() ?>
           <label>Skip — supplier did not acknowledge <small class="muted">(reason required)</small>
@@ -2711,11 +2729,15 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php elseif ($supplierPo && $supplierPo['status'] !== 'signed' && $suppoDocGenerated && $supplierPoCopyRequired && empty($supplierPoDocuments) && empty($supplierPo['ack_skipped_at'])): ?>
       <p class="muted">Attach the supplier's signed acknowledgment in Step 7c first (or send them the Supplier Link, or record that they did not acknowledge) &mdash; this step completes Step 7 and needs it on file.</p>
     <?php elseif ($supplierPo && $supplierPo['status'] !== 'signed' && $suppoDocGenerated): ?>
+      <?php if ($canManageSupplierPo): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/signed">
         <?= Csrf::field() ?>
         <?= $stageGateNotice(5, "confirm the supplier signed the PO") ?>
         <?= $stepBadge('7d') ?><button type="submit"<?= $stageGateDisabled(5) ?> class="btn-sm btn-success">Confirm Supplier Signed &amp; Returned PO (unlocks Stage 6)</button>
       </form>
+      <?php else: ?>
+      <p class="muted small">Waiting for Procurement to confirm the supplier signed and returned the PO.</p>
+      <?php endif; ?>
     <?php elseif ($supplierPo && $supplierPo['status'] !== 'signed'): ?>
       <p class="muted small">Generate the Supplier PO document above before confirming the supplier's signature — they can't have signed and returned a document that was never sent.</p>
     <?php elseif ($supplierPo): ?>
@@ -2746,7 +2768,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     </div>
     <p class="muted small">Every update here is logged<?php if ($canViewAuditLog): ?> — <a href="/orders/<?= (int) $order['id'] ?>/audit-log">view update history</a><?php endif; ?>. Changing the estimated shipment date notifies the client (order update + portal); the production status is for the team.</p>
     <?php if ($stage4 && $stage4['status'] !== 'locked' && (!$isLockedOrder || $canOverrideLockEdit)): ?>
-      <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
+      <?php if ($canManageSupplierPo): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/production-status">
         <?= Csrf::field() ?>
         <label>Production Status<input type="text" name="production_status_text" placeholder="e.g. Cutting and finishing in progress — 30% complete"></label>
@@ -2875,8 +2897,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php endif; ?>
     <?php else: ?>
       <div class="kv-grid">
+        <?php if ($sees['logistics'] || $sees['selling']): ?>
         <div><span class="k">Confirmed Rate</span><span class="v"><?= $freight['confirmed_freight_rate'] !== null ? htmlspecialchars($freight['confirmed_freight_rate']) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?></span></div>
         <div><span class="k">Insurance</span><span class="v"><?= strtoupper((string) ($order['incoterm_code'] ?? '')) !== 'CIF' ? 'NIL — buyer arranges insurance' : ($freight['insurance_amount'] !== null ? htmlspecialchars($freight['insurance_amount']) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : 'NIL') ?></span></div>
+        <?php endif; ?>
         <div><span class="k">Forwarder</span><span class="v"><?= htmlspecialchars($freight['freight_forwarder_name'] ?? '—') ?></span></div>
         <div><span class="k">Forwarder Contact</span><span class="v"><?= htmlspecialchars($freight['freight_forwarder_contact'] ?? '—') ?></span></div>
       </div>
@@ -2914,6 +2938,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
     <?php elseif (!$freight): ?>
       <p class="muted">Save Freight Terms first (Step 9a).</p>
+    <?php elseif (!$freightCleared && (!$payment || $payment['freight_remittance_received_at'] === null) && !$canManagePayments): ?>
+      <p class="muted">Waiting for the buyer's freight remittance (recorded by Sales / Accounts).</p>
     <?php elseif (!$freightCleared && (!$payment || $payment['freight_remittance_received_at'] === null)): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight">
         <?= Csrf::field() ?>
@@ -2941,6 +2967,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <p class="muted">Save Freight Terms first (Step 9a).</p>
     <?php elseif ($freightCleared): ?>
       <p>Freight payment already cleared.</p>
+    <?php elseif ($payment && $payment['freight_remittance_received_at'] !== null && !$canClearPayments): ?>
+      <p class="muted">Waiting for Accounts to confirm the freight money has cleared.</p>
     <?php elseif ($payment && $payment['freight_remittance_received_at'] !== null): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight/clear" onsubmit="return confirm('Mark the freight payment cleared? This unlocks Stage 7 — confirm the funds have actually landed first.');">
         <?= Csrf::field() ?>
@@ -4078,7 +4106,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       </details>
       <?php endif; ?>
     <?php endif; ?>
-    <?php if (!$benefitSettlement['done'] && $order['status'] === 'shipped_docs_sent' && $canCloseOrders && $canEditLockedData): ?>
+    <?php if (!$benefitSettlement['done'] && $order['status'] === 'shipped_docs_sent' && $canSettleOrders && $canEditLockedData): ?>
       <details>
         <summary class="small">Override &amp; fully settle anyway (a benefit genuinely never arriving)</summary>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-fully-settled" onsubmit="return confirmFieldOverride(this, 'fully settling this order with a benefit claim still outstanding');" style="border:1px solid #D9822B; padding:10px; border-radius:4px;">
@@ -4102,7 +4130,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <p><strong>&#10003; Order fully settled and closed.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?></p>
     <?php elseif ($order['status'] === 'shipped_docs_sent'): ?>
       <p><strong>&#10003; Documents sent to buyer.</strong> Courier tracking: <?= htmlspecialchars($shipping['courier_tracking_number'] ?? '—') ?> — this order now shows as done to the client, but stays open internally for government export benefits (see Order Financials above).</p>
-      <?php if ($canCloseOrders): ?>
+      <?php if ($canSettleOrders): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/mark-fully-settled" onsubmit="return confirm('Mark this order fully settled and close it? This is the final, locked close.');">
         <?= Csrf::field() ?>
         <?= $stepBadge('13h') ?><button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
@@ -4338,7 +4366,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <div><span class="k">Buyer Inquiry Ref</span><span class="v"><?= htmlspecialchars($order['buyer_inquiry_ref']) ?></span></div>
           <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v"><?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_name'] ?? '—') ?></span></div>
           <div><span class="k">Quotation Date</span><span class="v"><?= htmlspecialchars($order['quotation_date'] ?? '—') ?></span></div>
-          <div><span class="k">FOB Value</span><span class="v"><?= htmlspecialchars($order['currency_code']) ?> <?= number_format((float) $fobTotal, 2) ?></span></div>
+          <?php if ($sees['selling']): ?><div><span class="k">FOB Value</span><span class="v"><?= htmlspecialchars($order['currency_code']) ?> <?= number_format((float) $fobTotal, 2) ?></span></div><?php endif; ?>
           <div><span class="k">Port of Discharge</span><span class="v"><?= htmlspecialchars($order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? 'To Be Confirmed') ?></span></div>
           <div><span class="k">Container Type</span><span class="v"><?= htmlspecialchars($order['container_type'] ?? '—') ?></span></div>
           <div><span class="k">Certificate of Origin Type</span><span class="v"><?= htmlspecialchars($order['coo_type'] ?? 'To Be Confirmed') ?></span></div>
@@ -4388,7 +4416,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <ul class="sidebar-doc-list">
             <?php foreach ($documents as $d): ?>
               <li>
-                <?php if ($d['pdf_file_id'] && $canDownloadPdf): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf"><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?></a><?php else: ?><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?><?php endif; ?>
+                <?php if ($d['pdf_file_id'] && $canDownloadPdf && \App\Services\MoneyVisibility::canSeeDocument((string) $d['document_type_code'])): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf"><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?></a><?php else: ?><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?><?php endif; ?>
                 <span class="muted small">Rev.<?= (int) $d['revision_number'] ?> &middot; <?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?></span>
               </li>
             <?php endforeach; ?>

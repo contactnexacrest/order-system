@@ -406,7 +406,12 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await expect(page.locator('.alert')).toContainText('unlocked');
     });
 
-    await test.step('Export Executive — Stage 5 Supplier PO: pick supplier, terms, generate, sign (manage_orders)', async () => {
+    await logout(page);
+
+    // Owner decision D-214, phase 2: the Supplier PO and production belong to Procurement.
+    await test.step('Procurement Manager — Stage 5 Supplier PO: pick supplier, terms, generate, sign (manage_supplier_po)', async () => {
+      await login(page, 'procurementManager');
+      await page.goto(`/orders/${orderId}`);
       await openStage(page, 5);
       const spoForm = page.locator('form#supplier-po-form');
       const supplierValue = await spoForm
@@ -420,7 +425,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await expect(page.locator('.alert')).toBeVisible();
 
       await generateDocument(page, orderId, 'SUPPO', 'generated');
-      await approveAsAdmin(page, orderId, 'SUPPO', 'exportExecutive');
+      await approveAsAdmin(page, orderId, 'SUPPO', 'procurementManager');
 
       await openStage(page, 5);
       const ackUploadForm = page.locator(`form[action="/orders/${orderId}/supplier-po/documents"]`);
@@ -448,7 +453,10 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
 
     await logout(page);
 
-    await test.step('Logistics Executive — Stage 6 freight terms/payment/clear (manage_shipping, not manage_payments)', async () => {
+    // Owner decision D-214, phase 2: Logistics sets the freight terms; the Debit
+    // Note carries the price charged to the buyer (Sales), the remittance is
+    // recorded by whoever records buyer payments, and Accounts clears it.
+    await test.step('Logistics Executive — Stage 6 freight terms (manage_shipping)', async () => {
       await login(page, 'logisticsExecutive');
       await page.goto(`/orders/${orderId}`);
       await openStage(page, 6);
@@ -458,9 +466,15 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await termsForm.locator('select[name="freight_forwarder_partner_id"]').selectOption({ label: `Role Workflow Forwarder ${UNIQUE} (Freight Forwarder)` });
       await termsForm.getByRole('button', { name: 'Save Freight Terms' }).click();
       await expect(page.locator('.alert')).toBeVisible();
+    });
 
+    await logout(page);
+
+    await test.step('Export Executive — Debit Note and freight remittance (generate_documents, manage_payments)', async () => {
+      await login(page, 'exportExecutive');
+      await page.goto(`/orders/${orderId}`);
       await generateDocument(page, orderId, 'FDN', 'generated');
-      await approveAsAdmin(page, orderId, 'FDN', 'logisticsExecutive');
+      await approveAsAdmin(page, orderId, 'FDN', 'exportExecutive');
 
       await openStage(page, 6);
       const recordForm = page.locator(`form[action="/orders/${orderId}/payment/freight"]`);
@@ -469,7 +483,13 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await recordForm.locator('input[name="freight_bank_reference"]').fill('E2E-UTR-FREIGHT-0001');
       await recordForm.getByRole('button', { name: 'Record Freight Remittance' }).click();
       await expect(page.locator('.alert')).toBeVisible();
+    });
 
+    await logout(page);
+
+    await test.step('Accounts Executive — freight cleared (clear_payments)', async () => {
+      await login(page, 'accountsExecutive');
+      await page.goto(`/orders/${orderId}`);
       await openStage(page, 6);
       const clearForm = page.locator(`form[action="/orders/${orderId}/payment/freight/clear"]`);
       // Wait for the reload, not just the click — under a full-suite load the
@@ -555,15 +575,16 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
 
     await logout(page);
 
-    await test.step('Logistics Executive — Stage 9 generate COOPREP (generate_documents)', async () => {
-      await login(page, 'logisticsExecutive');
+    // Owner decision D-214, phase 2: the COO preparation carries selling prices, so Sales generates it (like the CI).
+    await test.step('Export Executive — Stage 9 generate COOPREP (generate_documents, selling prices)', async () => {
+      await login(page, 'exportExecutive');
       await page.goto(`/orders/${orderId}`);
       await generateDocument(page, orderId, 'COOPREP', 'generated');
     });
 
     await logout(page);
 
-    await test.step('Admin — Stage 9 review + approve COOPREP (approve_documents, Logistics cannot do this part)', async () => {
+    await test.step('Admin — Stage 9 review + approve COOPREP (approve_documents, Sales cannot do this part)', async () => {
       await login(page, 'admin');
       await page.goto(`/orders/${orderId}`);
       await adminAssignSelfAndApprove(page, 'COOPREP');
@@ -601,8 +622,14 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       // 'shipped_docs_sent', not 'complete' directly, so the flash is
       // no longer "Order closed".
       await expect(page.locator('.alert')).toContainText('Documents sent to buyer');
+    });
 
-      // Phase 2 of closure, same role/permission (close_orders) as the close above.
+    await logout(page);
+
+    // Owner decision D-214, phase 2: phase 2 of closure (fully settled) is Finance's (settle_orders).
+    await test.step('Accounts Executive — mark the order fully settled (settle_orders)', async () => {
+      await login(page, 'accountsExecutive');
+      await page.goto(`/orders/${orderId}`);
       await openStage(page, 9);
       const settleForm = page.locator(`form[action="/orders/${orderId}/mark-fully-settled"]`);
       await settleForm.getByRole('button', { name: 'Mark Fully Settled' }).click();

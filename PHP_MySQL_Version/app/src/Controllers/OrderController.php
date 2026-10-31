@@ -1357,7 +1357,9 @@ final class OrderController
             return;
         }
 
-        $files = FileStoreRepository::forOrderExcludingInternalCaDocs($orderId);
+        // Owner decision D-214, phase 2: only the files whose money this person may see.
+        $files = array_values(array_filter(FileStoreRepository::forOrderExcludingInternalCaDocs($orderId),
+            static fn (array $f): bool => \App\Services\MoneyVisibility::canSeeFile((int) $f['id'])));
         if (empty($files)) {
             Flash::set('error', 'No files are on record for this order yet.');
             header("Location: /orders/{$orderId}");

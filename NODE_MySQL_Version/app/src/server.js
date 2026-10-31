@@ -426,6 +426,7 @@ app.use((req, res, next) => {
       myMemberships: req.myMemberships || [],
       previewDesignation: req.previewDesignation || null,
       sees: moneyVisibility.flags(req.permissions || {}),
+      canSeeDocument: (typeCode) => moneyVisibility.canSeeDocument(req.permissions || {}, typeCode),
       testModeEnabled: req.testModeEnabled || false,
       devServerEnabled: env.isDevServer(),
       isImpersonating: clientPortalService.isImpersonating(req),
@@ -942,7 +943,7 @@ app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('cl
 app.post('/orders/:id/payment/lc', requireAuth, requirePermission('manage_payments'), upload.single('lc_file'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordLcDetails));
 app.post('/orders/:id/payment/lc/confirm-usable', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.confirmLcUsable));
 app.post('/orders/:id/payment-terms/approve', requireAuth, requirePermission('approve_payment_terms'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.approvePaymentTerms));
-app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
+app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_supplier_po'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
 app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_disputes'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));
 
 // docs/schema.sql Section AI — order progress chat.
@@ -966,8 +967,8 @@ app.post('/orders/:id/annexure/images/:imageId/remove', requireAuth, requirePerm
 
 app.post('/orders/:id/oc-acknowledgment', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordOcAcknowledgment));
 
-app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
-app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.confirmSupplierSigned));
+app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_supplier_po'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
+app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manage_supplier_po'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.confirmSupplierSigned));
 // External QA report Q-ROLE-3: split out of manage_order_financials so
 // Accounts can confirm supplier payments without gaining the broader
 // financials permission's access to cost entries/export benefits/the
@@ -983,13 +984,13 @@ app.post('/orders/:id/vendor-bills/:billId/delete', requireAuth, requirePermissi
 // Owner decisions (2026-10-27): the order's actual expenses with receipts (Step 12a).
 app.post('/orders/:id/expenses', requireAuth, requirePermission('manage_order_financials'), uploadLarge.single('receipt'), checkOrderLock, verifyCsrf, asyncHandler(orderExpenseController.add));
 app.post('/orders/:id/expenses/:expenseId/delete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderExpenseController.remove));
-app.post('/orders/:id/supplier-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadSupplierPoDocument));
-app.post('/orders/:id/supplier-po/supplier-link', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generateSupplierActionLink));
-app.post('/orders/:id/supplier-po/ack-skip', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.skipSupplierPoAck));
+app.post('/orders/:id/supplier-po/documents', requireAuth, requirePermission('manage_supplier_po'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadSupplierPoDocument));
+app.post('/orders/:id/supplier-po/supplier-link', requireAuth, requirePermission('manage_supplier_po'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generateSupplierActionLink));
+app.post('/orders/:id/supplier-po/ack-skip', requireAuth, requirePermission('manage_supplier_po'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.skipSupplierPoAck));
 
 app.post('/orders/:id/freight-terms', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveFreightTerms));
-app.post('/orders/:id/payment/freight', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordFreightPayment));
-app.post('/orders/:id/payment/freight/clear', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearFreightPayment));
+app.post('/orders/:id/payment/freight', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordFreightPayment));
+app.post('/orders/:id/payment/freight/clear', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearFreightPayment));
 
 app.post('/orders/:id/packing', requireAuth, requirePermission('manage_shipping'), upload.single('buyer_approval'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.savePacking));
 app.post('/orders/:id/shipping', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveShipping));
@@ -1008,7 +1009,7 @@ app.post('/orders/:id/bl-endorsed', requireAuth, requirePermission('manage_shipp
 app.post('/orders/:id/bl-endorsement', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveBlEndorsement));
 app.post('/orders/:id/bl-endorsement/generate', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.generateBlEndorsement));
 app.post('/orders/:id/close', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.closeOrder));
-app.post('/orders/:id/mark-fully-settled', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.markFullySettled));
+app.post('/orders/:id/mark-fully-settled', requireAuth, requirePermission('settle_orders'), verifyCsrf, asyncHandler(ordersController.markFullySettled));
 app.post('/orders/:id/mark-lost', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.markLost));
 // External QA report M-09: formal cancellation workflow, distinct from mark-lost above.
 app.post('/orders/:id/cancellation/request', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.requestCancellation));
@@ -1129,7 +1130,7 @@ app.get('/reports/amendments', requireAuth, requirePermission('view_reports'), a
 app.get('/reports/trends', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.trends));
 app.get('/reports/staff', requireAuth, requirePermission('view_staff_reports'), asyncHandler(reportController.staff));
 app.get('/reports/ageing', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.ageing));
-app.get('/reports/freight-cost', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.freightCost));
+app.get('/reports/freight-cost', requireAuth, requirePermission('view_reports'), requirePermission('view_logistics_costs'), asyncHandler(reportController.freightCost));
 app.get('/reports/products', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.products));
 app.get('/reports/suppliers', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.suppliers));
 app.get('/reports/conversion', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.conversion));

@@ -66,9 +66,40 @@ permission** takes a reason and, now, an optional **Until** date. From the
 day after that date the exception no longer applies; the list shows it as
 "ended".
 
-## Who sees what (from phase 2)
+## Who sees which money
 
-The organisation design keeps money apart: Sales sees the selling side,
-Procurement the buying side, Logistics only CHA, transport and freight;
-Finance, the MD/ED and the auditors see everything. Those limits are set
-on each designation's role and are rolled out in the next phase.
+Each designation's role says which money its people may see. The default
+set-up (all editable in **Admin → Permissions**):
+
+| Money | Sales & Export | Procurement | Logistics | Accounts & Finance, MD/ED, auditors, CA |
+|---|---|---|---|---|
+| Selling prices — unit prices, FOB, order values; the QT, PI, OC, CI, amendment, Debit Note and COO preparation documents | ✅ | – | – | ✅ |
+| Buyer payments — amounts received and due, remittances, payment screenshots | ✅ | – | – | ✅ |
+| Purchase prices — Supplier PO values, supplier bills and their scans, the factory cost in the catalogue, the Supplier PO document | – | ✅ | – | ✅ |
+| Logistics costs — CHA, transport and packing costs in the catalogue, logistics bills and their scans, the BL Instruction, the freight-cost report | – | – | ✅ | ✅ |
+
+Where money is hidden, the page still shows the **status**: for example
+Logistics sees "Remittance recorded on 3 Jun" without the amount, and Sales
+sees "Supplier advance: paid on 12 Jun" without the bill.
+
+Downloads follow the same rule. A document, a bill scan or a payment
+screenshot downloads only for someone who may see the money it carries
+**and** who can open the order. The order dossier ZIP leaves out the files
+a person may not see.
+
+Who does which money step:
+
+- **Supplier PO and production** (Steps 7a–7d, production status) —
+  Procurement ("Supplier PO and production" permission). Someone in Sales
+  who also handles suppliers needs a Procurement membership.
+- **Freight remittance** (Step 9c) — whoever records buyer payments
+  (Sales / Accounts); **freight cleared** (Step 9d) — Accounts ("Clear
+  payments").
+- **Mark fully settled** (Step 13) — Accounts & Finance ("Mark an order
+  fully settled").
+
+The Commercial Invoice carries selling prices, so Logistics does not
+download it. Sales sends the CI and packing list to the CHA. If one
+logistics person must download it, Admin gives that person the "See
+selling prices" permission as a personal exception, with a reason and an
+end date.

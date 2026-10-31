@@ -59,6 +59,13 @@ final class FileStoreController
             echo 'You do not have permission to view this document.';
             return;
         }
+        // Owner decision D-214, phase 2: a bill scan, signed PO, payment
+        // screenshot or sales document only for whoever may see that money.
+        if (!\App\Services\MoneyVisibility::canSeeFile($fileId)) {
+            http_response_code(403);
+            echo 'You do not have permission to view this document.';
+            return;
+        }
         if (\App\Repositories\AssociateRepository::isAgreementFile($fileId) && !PermissionService::can((int) $user['id'], $roleId, 'manage_incentives')) {
             http_response_code(403);
             echo 'You do not have permission to view this document.';

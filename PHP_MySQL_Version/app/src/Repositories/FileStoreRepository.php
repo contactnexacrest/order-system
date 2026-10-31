@@ -106,6 +106,45 @@ final class FileStoreRepository
     }
 
     /**
+     * Owner decision D-214, phase 2: what money a stored file shows —
+     * a generated document by its type; a supplier or logistics bill scan;
+     * the signed Supplier PO; the buyer's PO, a signed amendment, the LC copy
+     * or a payment screenshot; an expense receipt ('financials'). Null when
+     * it shows none. MoneyVisibility::canSeeFile() decides who may have it.
+     */
+    public static function moneyClassFor(int $fileId): ?string
+    {
+        $code = self::documentTypeCodeFor($fileId);
+        if ($code === null) {
+            $stmt = Database::connection()->prepare(
+                'SELECT dt.code FROM document_revisions r JOIN documents d ON d.id = r.document_id JOIN document_types dt ON dt.id = d.document_type_id
+                  WHERE r.pdf_file_id = :pdf OR r.docx_file_id = :docx LIMIT 1'
+            );
+            $stmt->execute(['pdf' => $fileId, 'docx' => $fileId]);
+            $code = $stmt->fetchColumn() ?: null;
+        }
+        if ($code !== null) {
+            return \App\Services\MoneyVisibility::documentClass((string) $code);
+        }
+        $stmt = Database::connection()->prepare(
+            "SELECT CASE
+                WHEN EXISTS (SELECT 1 FROM order_vendor_bills WHERE bill_file_id = :f1 AND vendor_kind = 'logistics') THEN 'logistics'
+                WHEN EXISTS (SELECT 1 FROM order_vendor_bills WHERE bill_file_id = :f2) THEN 'purchase'
+                WHEN EXISTS (SELECT 1 FROM order_supplier_po_documents WHERE file_id = :f3) THEN 'purchase'
+                WHEN EXISTS (SELECT 1 FROM order_expenses WHERE receipt_file_id = :f4) THEN 'financials'
+                WHEN EXISTS (SELECT 1 FROM client_payment_reports WHERE screenshot_file_id = :f5) THEN 'buyer_payments'
+                WHEN EXISTS (SELECT 1 FROM order_lc_details WHERE lc_file_id = :f6) THEN 'buyer_payments'
+                WHEN EXISTS (SELECT 1 FROM file_store WHERE id = :f7 AND document_type_label = 'Client payment self-report screenshot') THEN 'buyer_payments'
+                WHEN EXISTS (SELECT 1 FROM order_buyer_po_documents WHERE file_id = :f8) THEN 'selling'
+                WHEN EXISTS (SELECT 1 FROM amendments WHERE signed_copy_file_id = :f9) THEN 'selling'
+                ELSE NULL END"
+        );
+        $stmt->execute(['f1' => $fileId, 'f2' => $fileId, 'f3' => $fileId, 'f4' => $fileId, 'f5' => $fileId, 'f6' => $fileId, 'f7' => $fileId, 'f8' => $fileId, 'f9' => $fileId]);
+        $class = $stmt->fetchColumn();
+        return $class === false || $class === null ? null : (string) $class;
+    }
+
+    /**
      * Every live file for one order, generated or received — order_id is
      * set on file_store directly for both origins (insertGenerated() and
      * insertReceived() above), so this is the one query the full order
