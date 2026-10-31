@@ -169,7 +169,9 @@ describe('Zoho Books Stage 3', () => {
 
     expect(await sync()).toEqual({ bills: 0, payments: 1, applied: 0, expenses: 0, failed: 0, skipped: 0 });
     expect(bills).toEqual({}); // a proforma is an advance request, not a bill
-    expect(vendorPayments['VP-1']).toEqual({ vendor_id: 'VN-1', amount: 50000, date: '2026-10-20', payment_mode: 'NEFT / RTGS', reference_number: 'TEST-UTR-ADV', paid_through_account_id: 'SBI-1' });
+    // The UTR stays the reference; the description says which payment it is (owner, 2026-10-31).
+    expect(vendorPayments['VP-1']).toEqual({ vendor_id: 'VN-1', amount: 50000, date: '2026-10-20', payment_mode: 'NEFT / RTGS', reference_number: 'TEST-UTR-ADV',
+      description: `Supplier advance payment for order NX-${o.order} · Supplier PO TEST-SPO-1 · against Proforma TEST-PI-77`, paid_through_account_id: 'SBI-1' });
     expect(contacts['VN-1'].payload).toEqual({ contact_name: 'TEST-Stage3 Granite Supplier', company_name: 'TEST-Stage3 Granite Supplier', contact_type: 'vendor', pan_no: 'ABCDE1234F' }); // not GST-registered: no GST fields
     expect((await messages(o.order, 'vendor_payment'))[0]).toContain('held unapplied until the tax invoice for proforma TEST-PI-77 is in Zoho Books');
 
@@ -185,6 +187,8 @@ describe('Zoho Books Stage 3', () => {
     await orderVendorBillRepository.addPayment(invoice, 'balance', '2026-10-28', 68000, 'NEFT / RTGS', 'TEST-UTR-BAL', userId);
     expect(await sync()).toEqual({ bills: 0, payments: 1, applied: 1, expenses: 0, failed: 0, skipped: 0 });
     expect(billBalance('BL-1')).toBe(0);
+    expect(vendorPayments['VP-2'].reference_number).toBe('TEST-UTR-BAL');
+    expect(vendorPayments['VP-2'].description).toBe(`Supplier balance payment for order NX-${o.order} · Supplier PO TEST-SPO-1 · against Tax invoice TEST-INV-77`);
     expect(requestsTo('POST', '/books/v3/contacts')).toHaveLength(1); // the vendor is created once and remembered
     expect((await db.queryOne('SELECT zoho_contact_id FROM suppliers WHERE id = :id', { id: o.supplier })).zoho_contact_id).toBe('VN-1');
 
@@ -204,6 +208,8 @@ describe('Zoho Books Stage 3', () => {
     expect(bills['BL-1'].payload.line_items[0].name).toBe('Ocean freight bill');
     expect(contacts['VN-1'].contact_name).toBe('TEST-Stage3 Forwarder');
     expect(billBalance('BL-1')).toBe(0);
+    expect([vendorPayments['VP-1'].reference_number, vendorPayments['VP-1'].description])
+      .toEqual(['TEST-UTR-FF', `Ocean freight — final payment for order NX-${o.order} · against Tax invoice TEST-FF-901`]);
   });
 
   it('order expenses go to Books and are not imported back', async () => {

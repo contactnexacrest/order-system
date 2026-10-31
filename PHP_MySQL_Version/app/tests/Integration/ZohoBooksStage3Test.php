@@ -201,7 +201,8 @@ final class ZohoBooksStage3Test extends DbTestCase
         self::assertSame(['bills' => 0, 'payments' => 1, 'applied' => 0, 'expenses' => 0, 'failed' => 0, 'skipped' => 0], $this->sync());
         self::assertSame([], $this->bills, 'a proforma is an advance request, not a bill');
         self::assertArrayNotHasKey('bills', $this->vendorPayments['VP-1'], 'held as an advance');
-        self::assertSame(['vendor_id' => 'VN-1', 'amount' => 50000.0, 'date' => '2026-10-20', 'payment_mode' => 'NEFT / RTGS', 'reference_number' => 'TEST-UTR-ADV', 'paid_through_account_id' => 'SBI-1'], $this->vendorPayments['VP-1']);
+        self::assertSame(['vendor_id' => 'VN-1', 'amount' => 50000.0, 'date' => '2026-10-20', 'payment_mode' => 'NEFT / RTGS', 'reference_number' => 'TEST-UTR-ADV',
+            'description' => "Supplier advance payment for order NX-{$o['order']} · Supplier PO TEST-SPO-1 · against Proforma TEST-PI-77", 'paid_through_account_id' => 'SBI-1'], $this->vendorPayments['VP-1'], 'the UTR stays the reference; the description says which payment it is (owner, 2026-10-31)');
         self::assertSame(['contact_name' => 'TEST-Stage3 Granite Supplier', 'company_name' => 'TEST-Stage3 Granite Supplier', 'contact_type' => 'vendor', 'pan_no' => 'ABCDE1234F'], $this->contacts['VN-1']['payload'], 'not GST-registered: no GST fields');
         self::assertStringContainsString('held unapplied until the tax invoice for proforma TEST-PI-77 is in Zoho Books', $this->messages($o['order'], 'vendor_payment')[0]);
 
@@ -217,6 +218,8 @@ final class ZohoBooksStage3Test extends DbTestCase
         OrderVendorBillRepository::addPayment($invoice, 'balance', '2026-10-28', 68000.0, 'NEFT / RTGS', 'TEST-UTR-BAL', $this->userId);
         self::assertSame(['bills' => 0, 'payments' => 1, 'applied' => 1, 'expenses' => 0, 'failed' => 0, 'skipped' => 0], $this->sync());
         self::assertSame(0.0, $this->billBalance('BL-1'));
+        self::assertSame('TEST-UTR-BAL', $this->vendorPayments['VP-2']['reference_number']);
+        self::assertSame("Supplier balance payment for order NX-{$o['order']} · Supplier PO TEST-SPO-1 · against Tax invoice TEST-INV-77", $this->vendorPayments['VP-2']['description']);
         self::assertCount(1, $this->requestsTo('POST', '/books/v3/contacts'), 'the vendor is created once and remembered');
         self::assertSame('VN-1', Database::connection()->query("SELECT zoho_contact_id FROM suppliers WHERE id = {$o['supplier']}")->fetchColumn());
 
@@ -237,6 +240,8 @@ final class ZohoBooksStage3Test extends DbTestCase
         self::assertSame('Ocean freight bill', $this->bills['BL-1']['payload']['line_items'][0]['name']);
         self::assertSame('TEST-Stage3 Forwarder', $this->contacts['VN-1']['contact_name']);
         self::assertSame(0.0, $this->billBalance('BL-1'));
+        self::assertSame(['TEST-UTR-FF', "Ocean freight — final payment for order NX-{$o['order']} · against Tax invoice TEST-FF-901"],
+            [$this->vendorPayments['VP-1']['reference_number'], $this->vendorPayments['VP-1']['description']]);
     }
 
     public function testOrderExpensesGoToBooksAndAreNotImportedBack(): void

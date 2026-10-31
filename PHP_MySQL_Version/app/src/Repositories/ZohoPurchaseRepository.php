@@ -31,7 +31,8 @@ final class ZohoPurchaseRepository
                COALESCE(s.supplier_legal_name, lp.partner_name) AS vendor_name,
                COALESCE(s.gstin, lp.gstin) AS vendor_gstin,
                COALESCE(s.pan, lp.pan) AS vendor_pan,
-               COALESCE(s.zoho_contact_id, lp.zoho_contact_id) AS vendor_zoho_contact_id
+               COALESCE(s.zoho_contact_id, lp.zoho_contact_id) AS vendor_zoho_contact_id,
+               po.supplier_po_reference
         FROM order_vendor_bills b
         JOIN orders o ON o.id = b.order_id
         JOIN clients c ON c.id = o.client_id

@@ -6,7 +6,7 @@ const lookupRepository = require('../repositories/lookupRepository');
 const zohoGuard = require('./zohoGuard');
 const { todayIst } = require('../helpers/dbDateTime');
 const { KIND_LABELS } = require('./zohoInvoiceData');
-const { LOGISTICS_SERVICES } = require('../repositories/orderVendorBillRepository');
+const { LOGISTICS_SERVICES, DOC_KINDS } = require('../repositories/orderVendorBillRepository');
 const { CATEGORIES: EXPENSE_CATEGORIES } = require('../repositories/orderExpenseRepository');
 const zohoPurchaseRepository = require('../repositories/zohoPurchaseRepository');
 
@@ -342,7 +342,7 @@ async function pushVendorPayment(payment, bill, targetBill) {
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
   const vendorId = await findOrCreateVendor(config, accessToken, bill);
-  const payload = vendorPaymentPayload(config, vendorId, payment);
+  const payload = vendorPaymentPayload(config, vendorId, payment, bill);
   let applied = 0;
   if (targetBill) {
     [payload.bills, applied] = await billApplication(config, accessToken, targetBill, vendorId, payload.amount);
@@ -368,7 +368,7 @@ async function restoreVendorPayment(payment, bill, zohoBillId) {
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
   const vendorId = await findOrCreateVendor(config, accessToken, bill);
-  const payload = vendorPaymentPayload(config, vendorId, payment);
+  const payload = vendorPaymentPayload(config, vendorId, payment, bill);
   if (zohoBillId !== null) {
     payload.bills = [{ bill_id: zohoBillId, amount_applied: payload.amount }];
   }
@@ -413,7 +413,7 @@ async function applyVendorPayment(payment, bill, targetBill) {
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
   const vendorId = await findOrCreateVendor(config, accessToken, bill);
-  const payload = vendorPaymentPayload(config, vendorId, payment);
+  const payload = vendorPaymentPayload(config, vendorId, payment, bill);
   let applied;
   [payload.bills, applied] = await billApplication(config, accessToken, targetBill, vendorId, payload.amount);
   if (applied <= 0) {
@@ -1088,15 +1088,34 @@ async function findBill(config, accessToken, billNumber, vendorId) {
   return rows.find((row) => String(row.bill_number || '') === billNumber && String(row.vendor_id ?? vendorId) === vendorId) || null;
 }
 
-function vendorPaymentPayload(config, vendorId, payment) {
+function vendorPaymentPayload(config, vendorId, payment, bill) {
   return {
     vendor_id: vendorId,
     amount: round(Number(payment.amount_inr), 2),
     date: String(payment.paid_at),
     payment_mode: String(payment.payment_mode),
     reference_number: String(payment.payment_ref),
+    description: vendorPaymentDescription(payment, bill),
     paid_through_account_id: config.depositAccountId,
   };
+}
+
+/**
+ * Owner decision 2026-10-31: the bank UTR stays the reference (bank
+ * reconciliation); the description says which payment it is, as the
+ * customer payments do — supplier advance / balance, or a logistics
+ * partner's advance / final payment — with the order and the bill.
+ */
+function vendorPaymentDescription(payment, bill) {
+  const order = String(bill.buyer_inquiry_ref || '');
+  const billLabel = `${DOC_KINDS[bill.doc_kind] || 'Bill'} ${bill.bill_no}`;
+  if (bill.vendor_kind === 'supplier') {
+    const leg = payment.leg === 'balance' ? 'balance' : 'advance';
+    return `Supplier ${leg} payment for order ${order}${bill.supplier_po_reference ? ` · Supplier PO ${bill.supplier_po_reference}` : ''} · against ${billLabel}`;
+  }
+  const service = LOGISTICS_SERVICES[bill.bill_for] || 'Logistics';
+  const kind = bill.payment_kind === 'advance' ? 'advance' : 'final';
+  return `${service} — ${kind} payment for order ${order} · against ${billLabel}`;
 }
 
 /** As much of amount as the bill still owes. @return {Promise<[Array, number]>} */

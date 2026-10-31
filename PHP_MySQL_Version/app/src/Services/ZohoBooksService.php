@@ -391,7 +391,7 @@ final class ZohoBooksService
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
         $vendorId = self::findOrCreateVendor($config, $accessToken, $bill);
-        $payload = self::vendorPaymentPayload($config, $vendorId, $payment);
+        $payload = self::vendorPaymentPayload($config, $vendorId, $payment, $bill);
         $applied = 0.0;
         if ($targetBill !== null) {
             [$payload['bills'], $applied] = self::billApplication($config, $accessToken, $targetBill, $vendorId, (float) $payload['amount']);
@@ -418,7 +418,7 @@ final class ZohoBooksService
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
         $vendorId = self::findOrCreateVendor($config, $accessToken, $bill);
-        $payload = self::vendorPaymentPayload($config, $vendorId, $payment);
+        $payload = self::vendorPaymentPayload($config, $vendorId, $payment, $bill);
         if ($zohoBillId !== null) {
             $payload['bills'] = [['bill_id' => $zohoBillId, 'amount_applied' => $payload['amount']]];
         }
@@ -465,7 +465,7 @@ final class ZohoBooksService
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
         $vendorId = self::findOrCreateVendor($config, $accessToken, $bill);
-        $payload = self::vendorPaymentPayload($config, $vendorId, $payment);
+        $payload = self::vendorPaymentPayload($config, $vendorId, $payment, $bill);
         [$payload['bills'], $applied] = self::billApplication($config, $accessToken, $targetBill, $vendorId, (float) $payload['amount']);
         if ($applied <= 0) {
             throw new \RuntimeException("Bill {$targetBill['bill_no']} in Zoho Books has nothing left to pay, so payment {$payment['payment_ref']} stays unapplied there — ask the CA how to book it.");
@@ -1247,7 +1247,7 @@ final class ZohoBooksService
     }
 
     /** @return array<string, mixed> */
-    private static function vendorPaymentPayload(array $config, string $vendorId, array $payment): array
+    private static function vendorPaymentPayload(array $config, string $vendorId, array $payment, array $bill): array
     {
         return [
             'vendor_id' => $vendorId,
@@ -1255,8 +1255,30 @@ final class ZohoBooksService
             'date' => (string) $payment['paid_at'],
             'payment_mode' => (string) $payment['payment_mode'],
             'reference_number' => (string) $payment['payment_ref'],
+            'description' => self::vendorPaymentDescription($payment, $bill),
             'paid_through_account_id' => $config['depositAccountId'],
         ];
+    }
+
+    /**
+     * Owner decision 2026-10-31: the bank UTR stays the reference (bank
+     * reconciliation); the description says which payment it is, as the
+     * customer payments do — supplier advance / balance, or a logistics
+     * partner's advance / final payment — with the order and the bill.
+     */
+    private static function vendorPaymentDescription(array $payment, array $bill): string
+    {
+        $order = (string) ($bill['buyer_inquiry_ref'] ?? '');
+        $billLabel = (\App\Repositories\OrderVendorBillRepository::DOC_KINDS[$bill['doc_kind'] ?? ''] ?? 'Bill') . ' ' . $bill['bill_no'];
+        if (($bill['vendor_kind'] ?? '') === 'supplier') {
+            $leg = ($payment['leg'] ?? '') === 'balance' ? 'balance' : 'advance';
+            return "Supplier {$leg} payment for order {$order}"
+                . (!empty($bill['supplier_po_reference']) ? " · Supplier PO {$bill['supplier_po_reference']}" : '')
+                . " · against {$billLabel}";
+        }
+        $service = \App\Repositories\OrderVendorBillRepository::LOGISTICS_SERVICES[$bill['bill_for'] ?? ''] ?? 'Logistics';
+        $kind = ($bill['payment_kind'] ?? '') === 'advance' ? 'advance' : 'final';
+        return "{$service} — {$kind} payment for order {$order} · against {$billLabel}";
     }
 
     /** @return array{0: list<array{bill_id: string, amount_applied: float}>, 1: float} as much of $amount as the bill still owes */
