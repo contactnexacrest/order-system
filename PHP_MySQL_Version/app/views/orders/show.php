@@ -3722,6 +3722,11 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <div><span class="k">Total Order Cost (INR)</span><span class="v"><?= number_format($profitability['total_cost_inr'], 2) ?></span></div>
             <div><span class="k">Order Profit (INR)</span><span class="v"><?= number_format($profitability['profit_inr'], 2) ?></span></div>
             <div><span class="k">Order Margin %</span><span class="v"><?= $profitability['margin_pct'] !== null ? number_format($profitability['margin_pct'], 2) . '%' : '—' ?></span></div>
+            <?php // Owner decision 2026-10-31 (option A): the GST on this order's purchases comes back through the period's LUT refund claim — information only, it stays in the cost. ?>
+            <?php if (!empty($orderPurchaseGst) && $orderPurchaseGst['total'] > 0): ?>
+            <div style="grid-column:1 / -1"><span class="k">For information — GST paid on this order's purchases (INR)</span><span class="v"><?= number_format($orderPurchaseGst['total'], 2) ?></span>
+              <small class="muted" style="display:block">Supplier &#8377;<?= number_format($orderPurchaseGst['supplier'], 2) ?> · logistics &#8377;<?= number_format($orderPurchaseGst['logistics'], 2) ?>. Refundable under LUT: claimed for the whole period in <a href="/ca/gst-refunds">CA → GST refunds (LUT)</a>, not per order, so it is not added to this order's profit. It stays in the cost above.</small></div>
+            <?php endif; ?>
           </div>
           <?php if ($profitability['revenue_is_estimated']): ?>
             <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>

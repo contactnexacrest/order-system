@@ -614,6 +614,21 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expect(await audits('CA_EXPORT_BENEFIT_RECEIVED', claim)).toBe(1);
   });
 
+  // Owner decision 2026-10-31 (option A): CA → GST refunds (LUT) — the page, a claim, a bank credit, removing a credit not yet in Zoho.
+  it('GST refunds under LUT', async () => {
+    const arn = `RT${Math.random().toString(16).slice(2, 12).toUpperCase()}`;
+    expectDone(await holder.call('POST', '/ca/gst-refunds', { period_from: '2026-10-01', period_to: '2026-12-31', claim_arn: arn, filed_on: todayIst(), amount_claimed: '206000' }), 'POST /ca/gst-refunds');
+    const claim = Number(await value('SELECT id FROM gst_refund_claims WHERE claim_arn = :arn', { arn }));
+    expect(await audits('GST_REFUND_CLAIM_RECORDED', claim)).toBe(1);
+    expectPage(await holder.call('GET', '/ca/gst-refunds'), arn, 'GET /ca/gst-refunds');
+
+    expectDone(await holder.call('POST', `/ca/gst-refunds/${claim}/credits`, { amount: '185400', credited_on: todayIst(), bank_reference: 'RFD05-RT-0001', part: 'provisional' }), 'POST /ca/gst-refunds/:id/credits');
+    const credit = Number(await value('SELECT id FROM gst_refund_credits WHERE claim_id = :c', { c: claim }));
+    expect(await audits('GST_REFUND_CREDITED', credit)).toBe(1);
+    expectDone(await holder.call('POST', `/ca/gst-refunds/credits/${credit}/delete`, {}), 'POST /ca/gst-refunds/credits/:creditId/delete');
+    expect(Number(await value('SELECT COUNT(*) AS n FROM gst_refund_credits WHERE claim_id = :c', { c: claim }))).toBe(0);
+  });
+
   it('incentive payouts paid', async () => {
     const order = await createTestOrder(await createTestClient());
     const month = todayIst().slice(0, 7);
@@ -696,6 +711,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     ['POST', '/associates/:id/clients'], ['POST', '/associates/:id/clients/:id/unlink'], ['POST', '/associates/:id/update', VALID_ASSOCIATE],
     ['POST', '/ca/bank-statement/:id/match-expense'], ['POST', '/ca/bank-statement/:id/unmatch'],
     ['POST', '/ca/expenses/:id/tds'], ['POST', '/ca/export-benefits/:id/mark-received'],
+    ['POST', '/ca/gst-refunds/:id/credits'], ['POST', '/ca/gst-refunds/credits/:id/delete'],
     ['GET', '/clients/:id/edit'], ['POST', '/clients/:id/override-unique-number'],
     ['POST', '/company-assets/:id/delete'],
     ['POST', '/compliance-task-types/:id/delete'], ['GET', '/compliance-task-types/:id/edit'], ['POST', '/compliance-task-types/:id/update'],
@@ -738,7 +754,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
       if (!notFound || r.status >= 500) wrong.push(`${method} ${pattern} → ${r.status} ${r.type || ''} ${r.flash || r.body.replace(/<[^>]+>/g, ' ').trim().slice(0, 80)}`);
     }
     expect(wrong).toEqual([]);
-    expect(ID_ROUTES.length).toBe(90);
+    expect(ID_ROUTES.length).toBe(92);
     expect(Number(await value('SELECT COUNT(*) AS n FROM audit_log WHERE entity_id = 999999999'))).toBe(auditBefore);
   }, 120000);
 });

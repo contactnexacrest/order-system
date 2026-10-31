@@ -170,6 +170,7 @@ async function reports(req, res) {
   }
 
   res.renderView('ca/reports', {
+    gstRefundsCredited: await require('../repositories/gstRefundRepository').creditedBetween(String(report.from), String(report.to)),
     canOpenOrder: await orderAccessService.orderLinkChecker(req.user && req.user.id, req.permissions),
     mode,
     period,
@@ -246,20 +247,21 @@ async function runZohoSync(req, res) {
   const user = req.user;
   const result = await caSyncService.runFullSync('manual', user.id);
   const { revenue, purchases, expenses, benefits } = result;
+  const gstRefunds = result.gst_refunds;
 
   const done = `${revenue.invoices} invoice(s) sent or updated, ${revenue.synced} payment(s) pushed, ${revenue.applied} payment(s) applied to invoices, `
-    + `${purchases.bills} bill(s), ${purchases.payments} vendor payment(s) (${purchases.applied} applied to bills) and ${purchases.expenses} order expense(s) / cost(s) sent, ${benefits.journals} export benefit journal(s) sent or updated, ${expenses.imported} expense(s) imported, ${expenses.updated} updated and ${expenses.removed} removed as in Zoho Books`;
-  const failed = revenue.failed + purchases.failed + expenses.failed + benefits.failed;
+    + `${purchases.bills} bill(s), ${purchases.payments} vendor payment(s) (${purchases.applied} applied to bills) and ${purchases.expenses} order expense(s) / cost(s) sent, ${benefits.journals} export benefit journal(s) sent or updated, ${gstRefunds.journals} GST refund journal(s) sent, ${expenses.imported} expense(s) imported, ${expenses.updated} updated and ${expenses.removed} removed as in Zoho Books`;
+  const failed = revenue.failed + purchases.failed + expenses.failed + benefits.failed + gstRefunds.failed;
   if (failed > 0) {
     flash.set(req, 'warning', `Sync finished: ${done}, ${failed} failed — see the log below for details.`);
-  } else if (revenue.synced > 0 || revenue.invoices > 0 || revenue.applied > 0 || purchases.bills + purchases.payments + purchases.applied + purchases.expenses > 0 || benefits.journals + benefits.removed > 0 || expenses.imported + expenses.updated + expenses.removed > 0) {
+  } else if (revenue.synced > 0 || revenue.invoices > 0 || revenue.applied > 0 || purchases.bills + purchases.payments + purchases.applied + purchases.expenses > 0 || benefits.journals + benefits.removed + gstRefunds.journals > 0 || expenses.imported + expenses.updated + expenses.removed > 0) {
     flash.set(req, 'success', `Sync finished: ${done}.`);
   } else {
     flash.set(req, 'success', "Sync ran — nothing was pending (or Zoho Books isn't configured yet). See the log below.");
   }
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
-  await auditLogRepository.log(user.id, 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, `revenue: ${revenue.invoices} invoices, ${revenue.synced} synced, ${revenue.applied} applied/${revenue.failed} failed, purchases: ${purchases.bills} bills, ${purchases.payments} payments, ${purchases.applied} applied, ${purchases.expenses} expenses/${purchases.failed} failed, benefits: ${benefits.journals} journals, ${benefits.removed} removed/${benefits.failed} failed, expenses: ${expenses.imported} imported, ${expenses.updated} updated, ${expenses.removed} removed/${expenses.failed} failed`);
+  await auditLogRepository.log(user.id, 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, `revenue: ${revenue.invoices} invoices, ${revenue.synced} synced, ${revenue.applied} applied/${revenue.failed} failed, purchases: ${purchases.bills} bills, ${purchases.payments} payments, ${purchases.applied} applied, ${purchases.expenses} expenses/${purchases.failed} failed, benefits: ${benefits.journals} journals, ${benefits.removed} removed/${benefits.failed} failed, GST refunds: ${gstRefunds.journals} journals/${gstRefunds.failed} failed, expenses: ${expenses.imported} imported, ${expenses.updated} updated, ${expenses.removed} removed/${expenses.failed} failed`);
   res.redirect('/ca/zoho-sync');
 }
 

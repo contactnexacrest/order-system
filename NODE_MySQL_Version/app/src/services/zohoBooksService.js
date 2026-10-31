@@ -567,6 +567,47 @@ async function pushBenefitJournal(benefit, journalId = null) {
   return String(id);
 }
 
+/**
+ * Owner decision 2026-10-31 (GST under LUT): the account the CA moves the
+ * claimed input credit into when a refund claim is filed (an asset, set up
+ * once in Zoho Books); a refund the bank credits is taken out of it.
+ */
+const GST_REFUND_ACCOUNT = 'GST Refund Receivable';
+
+/**
+ * Owner decision 2026-10-31 (GST under LUT, option A): a GST refund the bank
+ * credited, as a Books journal — the deposit account debited, GST Refund
+ * Receivable credited — with the description the app builds (rule D-212). A
+ * claim number starting TEST- marks test data: its notes then start TEST-
+ * too, so the test clean-up finds it. credit: a
+ * gstRefundRepository.creditsForZohoSync() row. Returns the journal_id.
+ * Port of ZohoBooksService::pushGstRefundJournal().
+ */
+async function pushGstRefundJournal(credit) {
+  const paymentDescription = require('./paymentDescription');
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const amount = round(Number(credit.amount), 2);
+  const description = paymentDescription.gstRefund(credit);
+  const test = String(credit.claim_arn).startsWith(zohoGuard.TEST_PREFIX);
+  const payload = {
+    journal_date: String(credit.credited_on).slice(0, 10),
+    reference_number: `GSTREF-${credit.claim_arn}-${credit.id}`,
+    notes: `${test ? `${zohoGuard.TEST_PREFIX} ` : ''}${description}`,
+    line_items: [
+      { account_id: config.depositAccountId, debit_or_credit: 'debit', amount, description },
+      { account_id: await accountId(config, accessToken, GST_REFUND_ACCOUNT), debit_or_credit: 'credit', amount, description: `GST refund under LUT, claim ${credit.claim_arn}` },
+    ],
+  };
+  const res = await request('POST', `https://${config.apiDomain}/books/v3/journals?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
+  const decoded = safeJson(res.body);
+  const id = decoded && decoded.journal && decoded.journal.journal_id;
+  if (!res.ok || id === undefined || id === null) {
+    throw new Error(`Zoho Books journal for the GST refund of claim ${credit.claim_arn} (₹${amount.toFixed(2)}) failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+  return String(id);
+}
+
 /** Clean-up before go-live: every Books journal whose notes start with TEST- (export benefits of TEST- orders). */
 async function listTestJournals() {
   const config = await loadConfig();
@@ -1245,7 +1286,7 @@ function safeJson(text) {
 }
 
 module.exports = {
-  BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS, COST_ACCOUNTS, BENEFIT_INCOME_ACCOUNT, BENEFIT_SCRIP_ACCOUNT,
+  BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS, COST_ACCOUNTS, BENEFIT_INCOME_ACCOUNT, BENEFIT_SCRIP_ACCOUNT, GST_REFUND_ACCOUNT, pushGstRefundJournal,
   isEnabled, syncStartDate, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense,
   pushCostEntry, pushBenefitJournal, listTestJournals, contactRecords, readRecord, totalsById, invoiceByNumber,
   restoreVendorPayment, restoreRevenuePayment,

@@ -1226,6 +1226,8 @@ async function show(req, res) {
       orderLcDetails: await orderLcDetailRepository.find(orderId),
       orderTravelExpenses: req.permissions.manage_order_financials ? await orderTravelExpenseRepository.find(orderId) : null,
       profitability: req.permissions.manage_order_financials ? await orderProfitabilityService.computeForOrder(orderId) : null,
+      // Owner decision 2026-10-31 (GST under LUT): shown for information only — the cost keeps its GST.
+      orderPurchaseGst: req.permissions.manage_order_financials ? await require('../repositories/gstRefundRepository').gstOnOrderBills(orderId) : null,
       exportBenefitSchemes: await lookupRepository.dropdownOptions('export_benefit_scheme'),
       duplicatedFromOrder,
       duplicatedIntoOrders,

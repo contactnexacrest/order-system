@@ -13,6 +13,7 @@ design, so the same files serve PHP and Node.
 mysql -u <user> -p <database> < docs/migrations/2026-10-31a-client-email-unique.sql
 mysql -u <user> -p <database> < docs/migrations/2026-10-31b-payment-references.sql
 mysql -u <user> -p <database> < docs/migrations/2026-10-31c-inspection-agency.sql
+mysql -u <user> -p <database> < docs/migrations/2026-10-31d-gst-refunds.sql
 ```
 
 ## Rules every file follows
@@ -30,7 +31,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-10-31c-inspection-agency.sq
 
 Run each file below that the database has not had yet, in this order, then
 deploy the code for both stacks. As of 30 Oct 2026 the live site still
-needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30c, 30d, 31a, 31b and 31c**.
+needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30c, 30d, 31a, 31b, 31c and 31d**.
 
 | # | File | What it does |
 |---|---|---|
@@ -58,6 +59,7 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30
 | 22 | `2026-10-31a-client-email-unique.sql` | One email per client, enforced by the database (unique index `uq_clients_email`). **First run `docs/checks/2026-10-28-duplicate-client-emails.sql`** and give any client sharing an email its own; until then this file adds nothing and prints which emails are shared. A blank email becomes "no email" |
 | 23 | `2026-10-31b-payment-references.sql` | Rule D-212: the bank / payment reference on buyer remittances (advance, balance, freight), the money paid under an LC, incentive and associate payouts (how paid + reference), export benefits received and cancellation refunds (date + bank ref). Columns only; records already saved keep their data |
 | 24 | `2026-10-31c-inspection-agency.sql` | Rule D-212, Batch 2: the inspection agency and its invoice no. on a pre-shipment inspection fee NexaCrest pays (the cost line is described from them). Columns only |
+| 25 | `2026-10-31d-gst-refunds.sql` | GST refunds under LUT (owner decision 2026-10-31, option A): the claims (RFD-01, per period) and the money credited to the bank (with its RFD-05 / UTR reference); each credit goes to Zoho Books as a journal. New tables only |
 
 There is no `2026-10-28b` file; that letter was not used.
 

@@ -1099,6 +1099,8 @@ final class OrderController
             'orderLcDetails' => OrderLcDetailRepository::find($orderId),
             'orderTravelExpenses' => $canManageOrderFinancials ? \App\Repositories\OrderTravelExpenseRepository::find($orderId) : null,
             'profitability' => $canManageOrderFinancials ? OrderProfitabilityService::computeForOrder($orderId) : null,
+            // Owner decision 2026-10-31 (GST under LUT): shown for information only — the cost keeps its GST.
+            'orderPurchaseGst' => $canManageOrderFinancials ? \App\Repositories\GstRefundRepository::gstOnOrderBills($orderId) : null,
             'exportBenefitSchemes' => LookupRepository::dropdownOptions('export_benefit_scheme'),
             'duplicatedFromOrder' => $duplicatedFromOrder,
             'duplicatedIntoOrders' => $duplicatedIntoOrders,

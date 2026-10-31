@@ -692,6 +692,22 @@ final class RouteBehaviourTest extends DbTestCase
         self::assertSame(1, $this->audits('CA_EXPORT_BENEFIT_RECEIVED', $claim));
     }
 
+    /** Owner decision 2026-10-31 (option A): CA → GST refunds (LUT) — the page, a claim, a bank credit, removing a credit not yet in Zoho. */
+    public function testGstRefundsLut(): void
+    {
+        $arn = 'RT' . strtoupper(bin2hex(random_bytes(5)));
+        $this->assertDone($this->call('POST', '/ca/gst-refunds', ['period_from' => '2026-10-01', 'period_to' => '2026-12-31', 'claim_arn' => $arn, 'filed_on' => date('Y-m-d'), 'amount_claimed' => '206000']), 'POST /ca/gst-refunds');
+        $claim = (int) $this->value("SELECT id FROM gst_refund_claims WHERE claim_arn = '{$arn}'");
+        self::assertSame(1, $this->audits('GST_REFUND_CLAIM_RECORDED', $claim));
+        $this->assertPage($this->call('GET', '/ca/gst-refunds'), $arn, 'GET /ca/gst-refunds');
+
+        $this->assertDone($this->call('POST', "/ca/gst-refunds/{$claim}/credits", ['amount' => '185400', 'credited_on' => date('Y-m-d'), 'bank_reference' => 'RFD05-RT-0001', 'part' => 'provisional']), 'POST /ca/gst-refunds/{id}/credits');
+        $credit = (int) $this->value("SELECT id FROM gst_refund_credits WHERE claim_id = {$claim}");
+        self::assertSame(1, $this->audits('GST_REFUND_CREDITED', $credit));
+        $this->assertDone($this->call('POST', "/ca/gst-refunds/credits/{$credit}/delete", []), 'POST /ca/gst-refunds/credits/{creditId}/delete');
+        self::assertSame(0, (int) $this->value("SELECT COUNT(*) FROM gst_refund_credits WHERE claim_id = {$claim}"));
+    }
+
     public function testIncentivePayoutsPaid(): void
     {
         $order = $this->createTestOrder($this->createTestClient());
@@ -909,6 +925,7 @@ final class RouteBehaviourTest extends DbTestCase
         ['POST', '/associates/{id}/clients'], ['POST', '/associates/{id}/clients/{id}/unlink'], ['POST', '/associates/{id}/update', self::VALID_ASSOCIATE],
         ['POST', '/ca/bank-statement/{id}/match-expense'], ['POST', '/ca/bank-statement/{id}/unmatch'],
         ['POST', '/ca/expenses/{id}/tds'], ['POST', '/ca/export-benefits/{id}/mark-received'],
+        ['POST', '/ca/gst-refunds/{id}/credits'], ['POST', '/ca/gst-refunds/credits/{id}/delete'],
         ['GET', '/clients/{id}/edit'], ['POST', '/clients/{id}/override-unique-number'],
         ['POST', '/company-assets/{id}/delete'],
         ['POST', '/compliance-task-types/{id}/delete'], ['GET', '/compliance-task-types/{id}/edit'], ['POST', '/compliance-task-types/{id}/update'],
@@ -963,7 +980,7 @@ final class RouteBehaviourTest extends DbTestCase
             }
         }
         self::assertSame([], $wrong);
-        self::assertSame(90, count(self::ID_ROUTES));
+        self::assertSame(92, count(self::ID_ROUTES));
         self::assertSame($auditBefore, (int) $this->value('SELECT COUNT(*) FROM audit_log'), 'no audit row for a record that does not exist');
     }
 }

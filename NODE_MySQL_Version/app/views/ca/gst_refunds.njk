@@ -1,0 +1,82 @@
+<div class="card page-wide">
+  <p class="muted small" style="margin-top:0;"><a href="/ca">&larr; CA / Accounting</a></p>
+  <h1>GST refunds (LUT)</h1>
+  <p class="muted">NexaCrest exports under LUT and sells nothing in India, so the GST paid on purchases comes back as a refund, claimed for a whole period (form RFD-01), not order by order. Each order's cost keeps its GST (it left the bank). Record each claim here, then what the bank actually credited. A credit goes to Zoho Books at the next sync (hourly, or Sync Now) as a journal: the bank account received, <em>GST Refund Receivable</em> reduced.</p>
+
+  <div class="kv-grid">
+    <div><span class="k">Claimed</span><span class="v">&#8377;{{ totals.claimed | money }}</span></div>
+    <div><span class="k">Credited to the bank</span><span class="v">&#8377;{{ totals.credited | money }}</span></div>
+    <div><span class="k">Refused</span><span class="v">&#8377;{{ totals.refused | money }}</span></div>
+    <div><span class="k">Still to come back</span><span class="v">&#8377;{{ totals.outstanding | money }}</span></div>
+  </div>
+
+  <div class="section">
+    <h2>Claims</h2>
+    {% if claims.length == 0 %}
+      <p class="muted">No claim recorded yet.</p>
+    {% else %}
+    <table class="list">
+      <tr><th>Period</th><th>RFD-01 claim no.</th><th>Filed</th><th>GST on bills in the period</th><th>Claimed</th><th>Credited</th><th>Refused</th><th>Status</th></tr>
+      {% for c in claims %}
+      <tr>
+        <td>{{ c.period_label }}</td>
+        <td>{{ c.claim_arn }}</td>
+        <td>{{ c.filed_on | shortDate }}</td>
+        <td>&#8377;{{ c.gst_on_bills | money }}</td>
+        <td>&#8377;{{ c.amount_claimed | money }}</td>
+        <td>&#8377;{{ c.amount_credited | money }}
+          {% for r in c.credit_rows %}
+            <br><small class="muted">{{ r.credited_on | shortDate }} · {{ parts[r.part] or r.part }} · &#8377;{{ r.amount | money }} · bank ref {{ r.bank_reference }} · {% if r.zoho_journal_id %}in Zoho Books (journal {{ r.zoho_journal_id }}){% else %}goes to Zoho Books at the next sync{% endif %}</small>
+            {% if not r.zoho_journal_id and permissions.inr_actual_edit %}
+              <form method="post" action="/ca/gst-refunds/credits/{{ r.id }}/delete" style="display:inline" data-confirm="Remove this refund credit? Record it again with the right figures."><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-link small">Remove</button></form>
+            {% endif %}
+          {% endfor %}
+        </td>
+        <td>{% if c.amount_refused > 0 %}&#8377;{{ c.amount_refused | money }}<br><small class="muted">{{ c.refused_note }}</small>{% else %}—{% endif %}</td>
+        <td>{% if c.outstanding > 0 %}<span class="badge badge-warning">{{ 'Balance pending' if c.amount_credited > 0 else 'Claimed' }}</span><br><small class="muted">&#8377;{{ c.outstanding | money }} to come</small>{% else %}<span class="badge badge-success">Closed</span>{% endif %}</td>
+      </tr>
+      {% if permissions.inr_actual_edit and c.outstanding > 0 %}
+      <tr>
+        <td colspan="8">
+          <details>
+            <summary class="small"><strong>Record money credited to the bank</strong> for claim {{ c.claim_arn }}</summary>
+            <form method="post" action="/ca/gst-refunds/{{ c.id }}/credits">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <div class="field-grid">
+                <label>Amount credited (&#8377;) *<input type="number" name="amount" required min="0.01" max="{{ c.outstanding_plain }}" step="0.01"></label>
+                <label>Credited on *<input type="date" name="credited_on" required min="{{ c.filed_on }}" max="{{ today() }}"></label>
+                <label>Bank reference (RFD-05 / UTR) *<input type="text" name="bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="as on the bank statement"></label>
+                <label>Part *
+                  <select name="part" required><option value="">Choose…</option>{% for k, v in parts %}<option value="{{ k }}">{{ v | capitalize }}</option>{% endfor %}</select>
+                </label>
+                <label>Amount refused, if any (&#8377;)<input type="number" name="amount_refused" min="0" step="0.01"><small class="muted">Refused GST is a real cost — the CA books it in Zoho Books by hand.</small></label>
+              </div>
+              <button type="submit" class="btn-sm">Record credit</button>
+            </form>
+          </details>
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </table>
+    <p class="muted small">Each credit goes to Zoho Books with a description built from its facts (rule D-212), e.g. <em>GST refund under LUT, Oct–Dec 2026, claim AA2701260012345 · provisional · ₹185,400.00 credited 12 Feb 2027 · bank ref RFD05-AA270226004411</em>.</p>
+    {% endif %}
+  </div>
+
+  {% if permissions.inr_actual_edit %}
+  <div class="section">
+    <h2>Record a claim</h2>
+    <form method="post" action="/ca/gst-refunds">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <div class="field-grid">
+        <label>Period from *<input type="date" name="period_from" required></label>
+        <label>Period to *<input type="date" name="period_to" required data-not-before="[name=period_from]" data-not-before-message="The period cannot end before it starts."></label>
+        <label>RFD-01 claim no. (ARN) *<input type="text" name="claim_arn" required minlength="6" maxlength="30" pattern="[A-Za-z0-9][A-Za-z0-9\-]*" placeholder="as on the GST portal"></label>
+        <label>Filed on *<input type="date" name="filed_on" required max="{{ today() }}"></label>
+        <label>Amount claimed (&#8377;) *<input type="number" name="amount_claimed" required min="0.01" step="0.01"></label>
+      </div>
+      <button type="submit" class="btn-sm">Save claim</button>
+    </form>
+  </div>
+  {% endif %}
+</div>

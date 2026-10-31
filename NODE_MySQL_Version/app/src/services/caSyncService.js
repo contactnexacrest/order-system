@@ -40,6 +40,7 @@ async function runFullSync(triggeredBy, triggeredByUserId) {
     purchases: await syncPurchases(triggeredBy, triggeredByUserId),
     expenses: await importPendingExpenses(triggeredBy, triggeredByUserId),
     benefits: await syncBenefits(triggeredBy, triggeredByUserId),
+    gst_refunds: await syncGstRefunds(triggeredBy, triggeredByUserId),
   };
   if (dailyCheck) {
     await zohoRestoreService.markScheduledCheckDone();
@@ -533,4 +534,42 @@ async function syncBenefits(triggeredBy, triggeredByUserId) {
   return result;
 }
 
-module.exports = { runFullSync, syncPendingRevenue, syncPurchases, importPendingExpenses, syncBenefits };
+/**
+ * Owner decision 2026-10-31 (GST under LUT, option A): every GST refund the
+ * bank credited goes to Books once, as a journal, at the next sync. Credits
+ * before the go-live date stay with the CA (opening position). Port of
+ * CaSyncService::syncGstRefunds().
+ */
+async function syncGstRefunds(triggeredBy, triggeredByUserId) {
+  const gstRefundRepository = require('../repositories/gstRefundRepository');
+  const result = { journals: 0, failed: 0, skipped: 0 };
+  if (!(await zohoBooksService.isEnabled())) {
+    await zohoSyncLogRepository.log('gst_refund', null, null, null, 'skipped', null, `${offReason()} — nothing synced.`, triggeredBy, triggeredByUserId);
+    result.skipped = 1;
+    return result;
+  }
+  const startDate = await zohoBooksService.syncStartDate();
+  if (startDate === null && zohoGuard.isProduction()) {
+    await zohoSyncLogRepository.log('gst_refund', null, null, null, 'error', null, NO_START_DATE, triggeredBy, triggeredByUserId);
+    result.failed = 1;
+    return result;
+  }
+  for (const credit of await gstRefundRepository.creditsForZohoSync(startDate)) {
+    try {
+      const journalId = await zohoBooksService.pushGstRefundJournal(credit);
+      await gstRefundRepository.setCreditZohoJournal(Number(credit.id), journalId);
+      await zohoSyncLogRepository.log('gst_refund', 'gst_refund_credit', Number(credit.id), 'journal', 'success', journalId, `Sent as Zoho Books journal: ${paymentDescription.gstRefund(credit)}.`, triggeredBy, triggeredByUserId);
+      result.journals += 1;
+    } catch (e) {
+      await zohoSyncLogRepository.log('gst_refund', 'gst_refund_credit', Number(credit.id), 'journal', 'error', null, e.message, triggeredBy, triggeredByUserId);
+      result.failed += 1;
+    }
+  }
+  if (result.journals + result.failed === 0) {
+    await zohoSyncLogRepository.log('gst_refund', null, null, null, 'skipped', null, 'Nothing pending — every GST refund credited is already in Zoho Books.', triggeredBy, triggeredByUserId);
+    result.skipped = 1;
+  }
+  return result;
+}
+
+module.exports = { runFullSync, syncPendingRevenue, syncPurchases, importPendingExpenses, syncBenefits, syncGstRefunds };

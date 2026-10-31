@@ -39,6 +39,7 @@ final class CaSyncService
             'purchases' => self::syncPurchases($triggeredBy, $triggeredByUserId),
             'expenses' => self::importPendingExpenses($triggeredBy, $triggeredByUserId),
             'benefits' => self::syncBenefits($triggeredBy, $triggeredByUserId),
+            'gst_refunds' => self::syncGstRefunds($triggeredBy, $triggeredByUserId),
         ];
         if ($dailyCheck) {
             ZohoRestoreService::markScheduledCheckDone();
@@ -98,6 +99,45 @@ final class CaSyncService
         }
         if ($result['journals'] + $result['removed'] + $result['failed'] === 0) {
             ZohoSyncLogRepository::log('export_benefit', null, null, null, 'skipped', null, 'Nothing pending — every received export benefit is already in Zoho Books.', $triggeredBy, $triggeredByUserId);
+            $result['skipped'] = 1;
+        }
+        return $result;
+    }
+
+    /**
+     * Owner decision 2026-10-31 (GST under LUT, option A): every GST refund
+     * the bank credited goes to Books once, as a journal, at the next sync.
+     * Credits before the go-live date stay with the CA (opening position).
+     *
+     * @return array{journals:int, failed:int, skipped:int}
+     */
+    public static function syncGstRefunds(string $triggeredBy, ?int $triggeredByUserId): array
+    {
+        $result = ['journals' => 0, 'failed' => 0, 'skipped' => 0];
+        if (!ZohoBooksService::isEnabled()) {
+            ZohoSyncLogRepository::log('gst_refund', null, null, null, 'skipped', null, self::offReason() . ' — nothing synced.', $triggeredBy, $triggeredByUserId);
+            $result['skipped'] = 1;
+            return $result;
+        }
+        $startDate = ZohoBooksService::syncStartDate();
+        if ($startDate === null && ZohoGuard::isProduction()) {
+            ZohoSyncLogRepository::log('gst_refund', null, null, null, 'error', null, self::NO_START_DATE, $triggeredBy, $triggeredByUserId);
+            $result['failed'] = 1;
+            return $result;
+        }
+        foreach (\App\Repositories\GstRefundRepository::creditsForZohoSync($startDate) as $credit) {
+            try {
+                $journalId = ZohoBooksService::pushGstRefundJournal($credit);
+                \App\Repositories\GstRefundRepository::setCreditZohoJournal((int) $credit['id'], $journalId);
+                ZohoSyncLogRepository::log('gst_refund', 'gst_refund_credit', (int) $credit['id'], 'journal', 'success', $journalId, 'Sent as Zoho Books journal: ' . PaymentDescription::gstRefund($credit) . '.', $triggeredBy, $triggeredByUserId);
+                $result['journals']++;
+            } catch (\Throwable $e) {
+                ZohoSyncLogRepository::log('gst_refund', 'gst_refund_credit', (int) $credit['id'], 'journal', 'error', null, $e->getMessage(), $triggeredBy, $triggeredByUserId);
+                $result['failed']++;
+            }
+        }
+        if ($result['journals'] + $result['failed'] === 0) {
+            ZohoSyncLogRepository::log('gst_refund', null, null, null, 'skipped', null, 'Nothing pending — every GST refund credited is already in Zoho Books.', $triggeredBy, $triggeredByUserId);
             $result['skipped'] = 1;
         }
         return $result;

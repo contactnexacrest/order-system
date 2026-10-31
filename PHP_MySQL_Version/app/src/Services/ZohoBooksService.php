@@ -631,6 +631,49 @@ final class ZohoBooksService
     }
 
     /**
+     * Owner decision 2026-10-31 (GST under LUT): the account the CA moves the
+     * claimed input credit into when a refund claim is filed (an asset, set
+     * up once in Zoho Books); a refund the bank credits is taken out of it.
+     */
+    public const GST_REFUND_ACCOUNT = 'GST Refund Receivable';
+
+    /**
+     * Owner decision 2026-10-31 (GST under LUT, option A): a GST refund the
+     * bank credited, as a Books journal — the deposit account debited, GST
+     * Refund Receivable credited — with the description the app builds
+     * (rule D-212). A claim number starting TEST- marks test data: its notes
+     * then start TEST- too, so the test clean-up finds it.
+     *
+     * @param array<string,mixed> $credit GstRefundRepository::creditsForZohoSync() row
+     * @throws \RuntimeException on any failure
+     * @return string the Zoho journal_id
+     */
+    public static function pushGstRefundJournal(array $credit): string
+    {
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $amount = round((float) $credit['amount'], 2);
+        $description = PaymentDescription::gstRefund($credit);
+        $test = str_starts_with((string) $credit['claim_arn'], ZohoGuard::TEST_PREFIX);
+        $payload = [
+            'journal_date' => (string) $credit['credited_on'],
+            'reference_number' => 'GSTREF-' . $credit['claim_arn'] . '-' . $credit['id'],
+            'notes' => ($test ? ZohoGuard::TEST_PREFIX . ' ' : '') . $description,
+            'line_items' => [
+                ['account_id' => $config['depositAccountId'], 'debit_or_credit' => 'debit', 'amount' => $amount, 'description' => $description],
+                ['account_id' => self::accountId($config, $accessToken, self::GST_REFUND_ACCOUNT), 'debit_or_credit' => 'credit', 'amount' => $amount, 'description' => 'GST refund under LUT, claim ' . $credit['claim_arn']],
+            ],
+        ];
+        $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/journals?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
+        $decoded = json_decode($response['body'], true);
+        $id = $decoded['journal']['journal_id'] ?? null;
+        if ($response['status'] < 200 || $response['status'] >= 300 || $id === null) {
+            throw new \RuntimeException('Zoho Books journal for the GST refund of claim ' . $credit['claim_arn'] . ' (₹' . number_format($amount, 2, '.', '') . ') failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return (string) $id;
+    }
+
+    /**
      * Clean-up before go-live: every Books journal whose notes start with
      * TEST- (export benefits of TEST- orders).
      *

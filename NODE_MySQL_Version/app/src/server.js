@@ -48,6 +48,7 @@ const sopController = require('./controllers/sopController');
 const galleryController = require('./controllers/galleryController');
 const gettingStartedController = require('./controllers/gettingStartedController');
 const caController = require('./controllers/caController');
+const gstRefundController = require('./controllers/gstRefundController');
 const orderFinancialsController = require('./controllers/orderFinancialsController');
 const incentiveController = require('./controllers/incentiveController');
 const orderExpenseController = require('./controllers/orderExpenseController');
@@ -471,7 +472,7 @@ const uploadMedia = multer({ storage: multer.memoryStorage(), limits: { fileSize
 const ID_PATTERN = /^[1-9][0-9]{0,14}$/;
 const ID_PARAMS = ['id', 'addressId', 'amendmentId', 'benefitId', 'billId', 'cancellationId', 'chargeId', 'clientId', 'complaintId',
   'disputeId', 'documentId', 'emailLogId', 'entryId', 'expenseId', 'fileId', 'imageId', 'orderId', 'payoutId', 'productId',
-  'reportId', 'requestId', 'reviewId', 'roundId', 'supplierId', 'userId'];
+  'creditId', 'reportId', 'requestId', 'reviewId', 'roundId', 'supplierId', 'userId'];
 app.param(ID_PARAMS, (req, res, next, value) => (ID_PATTERN.test(String(value)) ? next() : next('route')));
 
 // QA Round 6, R6-N04: for a signed-in staff member, a page or action of an
@@ -887,6 +888,11 @@ app.get('/ca/reconciliation', requireAuth, requirePermission('ca_module_view'), 
 app.get('/ca/export-benefits', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.exportBenefits));
 app.post('/ca/export-benefits', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.recordExportBenefit));
 app.post('/ca/export-benefits/:id/mark-received', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.markExportBenefitReceived));
+// Owner decision 2026-10-31 (option A): GST refunds under LUT — claims per period, bank credits, Zoho journals.
+app.get('/ca/gst-refunds', requireAuth, requirePermission('ca_module_view'), asyncHandler(gstRefundController.index));
+app.post('/ca/gst-refunds', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(gstRefundController.recordClaim));
+app.post('/ca/gst-refunds/:id/credits', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(gstRefundController.recordCredit));
+app.post('/ca/gst-refunds/credits/:creditId/delete', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(gstRefundController.deleteCredit));
 app.get('/ca/fy-locks', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.fyLocks));
 app.post('/ca/fy-locks/lock', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.lockFinancialYear));
 app.post('/ca/fy-locks/unlock', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.unlockFinancialYear));

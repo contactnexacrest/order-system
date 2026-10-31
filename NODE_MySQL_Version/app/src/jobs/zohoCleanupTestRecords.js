@@ -96,6 +96,11 @@ async function run(args) {
       const id = String(row.zoho_journal_id);
       if (!plan.journal.has(id)) plan.journal.set(id, `journal for export benefit #${row.id} ${row.scheme_name} INR ${row.received_amount} (created by this database)`);
     }
+    // Owner decision 2026-10-31: GST refunds under LUT, one journal per bank credit.
+    for (const row of await db.query('SELECT r.id, r.amount, r.zoho_journal_id, c.claim_arn FROM gst_refund_credits r JOIN gst_refund_claims c ON c.id = r.claim_id WHERE r.zoho_journal_id IS NOT NULL')) {
+      const id = String(row.zoho_journal_id);
+      if (!plan.journal.has(id)) plan.journal.set(id, `journal for the GST refund credit #${row.id} of claim ${row.claim_arn} INR ${row.amount} (created by this database)`);
+    }
     for (const record of await zohoPurchaseRepository.pushedRecords()) {
       if (!plan[record.kind].has(record.id)) plan[record.kind].set(record.id, record.label);
     }
@@ -147,6 +152,7 @@ async function run(args) {
           await orderLcDetailRepository.forgetZohoPayment(id);
         } else if (kind === 'journal') {
           await db.execute('UPDATE ca_export_benefits SET zoho_journal_id = NULL, zoho_synced_at = NULL, zoho_pushed_hash = NULL WHERE zoho_journal_id = :id', { id });
+          await db.execute('UPDATE gst_refund_credits SET zoho_journal_id = NULL, zoho_synced_at = NULL WHERE zoho_journal_id = :id', { id });
         }
       } catch (e) {
         failed += 1;

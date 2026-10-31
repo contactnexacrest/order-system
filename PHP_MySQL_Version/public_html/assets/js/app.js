@@ -494,6 +494,14 @@
         return el.dataset.notMoreThanMessage || 'This cannot be more than ' + cap.value + '.';
       }
     }
+    // data-not-before="<selector>": a date that cannot be earlier than another
+    // date field in the same form (e.g. a GST refund claim's period end).
+    if (el.dataset.notBefore && el.form && value !== '') {
+      var start = el.form.querySelector(el.dataset.notBefore);
+      if (start && start.value !== '' && value < start.value) {
+        return el.dataset.notBeforeMessage || 'This date cannot be before ' + start.value + '.';
+      }
+    }
     // data-max-decimals="n" / data-max-value="x": a number the database can
     // hold as entered (QA Round 6, R6-N14/N15/N21/N23) — 0.0001 for a
     // 2-decimal price was silently saved as 0.00, and a too-large value was

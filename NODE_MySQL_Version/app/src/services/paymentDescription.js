@@ -49,6 +49,31 @@ function travelExpenses(distanceKm, pct, currency, fobTotal, fxRate) {
     + `${currency} ${money(fobTotal)}${currency !== 'INR' ? ` at ₹${rate(fxRate)}` : ''}`;
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ymd = (d) => String(d).slice(0, 10).split('-').map(Number);
+
+/** 2026-10-01 … 2026-12-31 → "Oct–Dec 2026"; one month → "Oct 2026"; across years → "Dec 2026–Jan 2027". */
+function periodLabel(from, to) {
+  const [fy, fm] = ymd(from);
+  const [ty, tm] = ymd(to);
+  if (fy === ty && fm === tm) return `${MONTHS[fm - 1]} ${fy}`;
+  return fy === ty ? `${MONTHS[fm - 1]}–${MONTHS[tm - 1]} ${ty}` : `${MONTHS[fm - 1]} ${fy}–${MONTHS[tm - 1]} ${ty}`;
+}
+
+/**
+ * Owner decision 2026-10-31 (GST under LUT): a GST refund the bank
+ * credited — "GST refund under LUT, Oct–Dec 2026, claim AA27… · provisional
+ * · ₹185,400.00 credited 12 Feb 2027 · bank ref RFD05-…". credit: a
+ * gstRefundRepository credit row with its claim's period_from, period_to
+ * and claim_arn.
+ */
+function gstRefund(credit) {
+  const { PARTS } = require('../repositories/gstRefundRepository');
+  const [y, m, d] = ymd(credit.credited_on);
+  return `GST refund under LUT, ${periodLabel(credit.period_from, credit.period_to)}, claim ${credit.claim_arn}`
+    + ` · ${PARTS[credit.part] || credit.part} · ₹${money(credit.amount)} credited ${d} ${MONTHS[m - 1]} ${y} · bank ref ${credit.bank_reference}`;
+}
+
 /** What the payment settles: its invoice in Zoho, or, for an advance not yet applied, the Proforma Invoice it was asked for. */
 async function against(orderId, leg, invoiceNumber) {
   if (invoiceNumber !== null && invoiceNumber !== undefined && invoiceNumber !== '') {
@@ -102,4 +127,4 @@ async function buyerPayment(orderId, leg, invoiceNumber = null) {
   return parts.join(' · ');
 }
 
-module.exports = { buyerPayment, inspectionFee, lcLoanInterest, travelExpenses };
+module.exports = { buyerPayment, inspectionFee, lcLoanInterest, travelExpenses, periodLabel, gstRefund };

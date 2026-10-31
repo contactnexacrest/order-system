@@ -86,6 +86,33 @@ final class PaymentDescription
             . $currency . ' ' . number_format($fobTotal, 2) . ($currency !== 'INR' ? ' at ₹' . self::rate($rate) : '');
     }
 
+    /**
+     * Owner decision 2026-10-31 (GST under LUT): a GST refund the bank
+     * credited — "GST refund under LUT, Oct–Dec 2026, claim AA27… ·
+     * provisional · ₹185,400.00 credited 12 Feb 2027 · bank ref RFD05-…".
+     *
+     * @param array<string,mixed> $credit a GstRefundRepository credit row with its claim's period_from, period_to and claim_arn
+     */
+    public static function gstRefund(array $credit): string
+    {
+        return 'GST refund under LUT, ' . self::periodLabel((string) $credit['period_from'], (string) $credit['period_to'])
+            . ', claim ' . $credit['claim_arn']
+            . ' · ' . (\App\Repositories\GstRefundRepository::PARTS[$credit['part']] ?? (string) $credit['part'])
+            . ' · ₹' . number_format((float) $credit['amount'], 2) . ' credited ' . date('j M Y', strtotime((string) $credit['credited_on']))
+            . ' · bank ref ' . $credit['bank_reference'];
+    }
+
+    /** 2026-10-01 … 2026-12-31 → "Oct–Dec 2026"; one month → "Oct 2026"; across years → "Dec 2026–Jan 2027". */
+    public static function periodLabel(string $from, string $to): string
+    {
+        $f = strtotime($from);
+        $t = strtotime($to);
+        if (date('Y-m', $f) === date('Y-m', $t)) {
+            return date('M Y', $f);
+        }
+        return date('Y', $f) === date('Y', $t) ? date('M', $f) . '–' . date('M Y', $t) : date('M Y', $f) . '–' . date('M Y', $t);
+    }
+
     /** 5.0 → "5", 7.5 → "7.5". */
     private static function percent(float $value): string
     {

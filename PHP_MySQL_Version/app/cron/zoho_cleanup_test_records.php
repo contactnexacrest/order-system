@@ -94,6 +94,10 @@ if ($fromSyncLog) {
     foreach ($pdo->query('SELECT id, scheme_name, received_amount, zoho_journal_id FROM ca_export_benefits WHERE zoho_journal_id IS NOT NULL')->fetchAll() as $row) {
         $plan['journal'][(string) $row['zoho_journal_id']] ??= "journal for export benefit #{$row['id']} {$row['scheme_name']} INR {$row['received_amount']} (created by this database)";
     }
+    // Owner decision 2026-10-31: GST refunds under LUT, one journal per bank credit.
+    foreach ($pdo->query('SELECT r.id, r.amount, r.zoho_journal_id, c.claim_arn FROM gst_refund_credits r JOIN gst_refund_claims c ON c.id = r.claim_id WHERE r.zoho_journal_id IS NOT NULL')->fetchAll() as $row) {
+        $plan['journal'][(string) $row['zoho_journal_id']] ??= "journal for the GST refund credit #{$row['id']} of claim {$row['claim_arn']} INR {$row['amount']} (created by this database)";
+    }
     foreach (App\Repositories\ZohoPurchaseRepository::pushedRecords() as $record) {
         $plan[$record['kind']][$record['id']] ??= $record['label'];
     }
@@ -150,6 +154,7 @@ foreach ($plan as $kind => $items) {
                 App\Repositories\OrderLcDetailRepository::forgetZohoPayment((string) $id);
             } elseif ($kind === 'journal') {
                 $pdo->prepare('UPDATE ca_export_benefits SET zoho_journal_id = NULL, zoho_synced_at = NULL, zoho_pushed_hash = NULL WHERE zoho_journal_id = :id')->execute(['id' => $id]);
+                $pdo->prepare('UPDATE gst_refund_credits SET zoho_journal_id = NULL, zoho_synced_at = NULL WHERE zoho_journal_id = :id')->execute(['id' => $id]);
             }
         } catch (\Throwable $e) {
             $failed++;

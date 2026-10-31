@@ -401,7 +401,9 @@ Do these in order on the **live** server. Each step names who does it.
    Sold, Employee Reimbursements, Export Documentation Charges, Export
    Incentive Income, Export Incentive e-Scrips, Inspection Charges,
    Insurance Expense, Other Expenses, Packing Material, Postage,
-   Transportation Expense, Travel Expense. A missing one stops only the
+   Transportation Expense, Travel Expense, and **GST Refund Receivable**
+   (an asset: GST refunds under LUT are taken out of it — see
+   [CA-09](./ca-09-gst-refunds.md)). A missing one stops only the
    records that need it; the Sync Log names it.
 3. **CA:** turn on in Books every currency the buyers pay in (Settings →
    Currencies). Keep e-Invoicing and e-Way Bills **off**.

@@ -43,6 +43,8 @@
       <div><span class="k">Total INR Realized</span><span class="v">&#8377;{{ report.totalInrActual | money }}</span></div>
       <div><span class="k">Net Forex Gain/(Loss)</span><span class="v">&#8377;{{ (report.totalForexGainLoss | abs) | money }} {{ 'gain' if report.totalForexGainLoss >= 0 else 'loss' }}</span></div>
       <div><span class="k">Legs Missing INR Actual</span><span class="v">{{ report.legsMissingInr }}</span></div>
+      {# Owner decision 2026-10-31: GST refunds under LUT are company-level income, not any one order's. #}
+      <div><span class="k">GST Refunds Credited (LUT)</span><span class="v">&#8377;{{ gstRefundsCredited | money }} <a class="small" href="/ca/gst-refunds">details</a></span></div>
     </div>
 
     {% if report.byCurrency | length > 0 %}

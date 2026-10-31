@@ -112,7 +112,8 @@ shows every financial detail tied to it at a glance. Unlike Phase 1's
 read-only box, this one lets a claim be recorded and marked received, and
 a cost entered or removed, directly from the order page — see
 [Order Financials](./ca-08-order-financials.md) for the full chapter, and
-[Government Export Benefits](./ca-07-export-benefits.md) and
+[Government Export Benefits](./ca-07-export-benefits.md),
+[GST refunds under LUT](./ca-09-gst-refunds.md) and
 [Expenses](./ca-04-expenses.md#linking-an-expense-to-the-order-it-belongs-to)
 for the CA-module screens the same data also appears on.
 

@@ -3171,6 +3171,11 @@
             <div><span class="k">Total Order Cost (INR)</span><span class="v">{{ profitability.total_cost_inr | money }}</span></div>
             <div><span class="k">Order Profit (INR)</span><span class="v">{{ profitability.profit_inr | money }}</span></div>
             <div><span class="k">Order Margin %</span><span class="v">{% if profitability.margin_pct != null %}{{ profitability.margin_pct | money }}%{% else %}—{% endif %}</span></div>
+            {# Owner decision 2026-10-31 (option A): the GST on this order's purchases comes back through the period's LUT refund claim — information only, it stays in the cost. #}
+            {% if orderPurchaseGst and orderPurchaseGst.total > 0 %}
+            <div style="grid-column:1 / -1"><span class="k">For information — GST paid on this order's purchases (INR)</span><span class="v">{{ orderPurchaseGst.total | money }}</span>
+              <small class="muted" style="display:block">Supplier &#8377;{{ orderPurchaseGst.supplier | money }} · logistics &#8377;{{ orderPurchaseGst.logistics | money }}. Refundable under LUT: claimed for the whole period in <a href="/ca/gst-refunds">CA → GST refunds (LUT)</a>, not per order, so it is not added to this order's profit. It stays in the cost above.</small></div>
+            {% endif %}
           </div>
           {% if profitability.revenue_is_estimated %}
             <p class="muted small">Revenue is estimated using the order's assumed exchange rate — it becomes the exact figure once both the advance and balance legs clear with their INR actual recorded. See <a href="/reports/order-profitability">the Order Profitability report</a> for every order side by side.</p>

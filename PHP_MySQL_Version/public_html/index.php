@@ -528,6 +528,12 @@ $router->get('/ca/reconciliation', [$ca, 'reconciliation'], [SessionAuth::requir
 $router->get('/ca/export-benefits', [$ca, 'exportBenefits'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->post('/ca/export-benefits', [$ca, 'recordExportBenefit'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/export-benefits/{id}/mark-received', [$ca, 'markExportBenefitReceived'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+// Owner decision 2026-10-31 (option A): GST refunds under LUT — claims per period, bank credits, Zoho journals.
+$gstRefunds = new \App\Controllers\GstRefundController();
+$router->get('/ca/gst-refunds', [$gstRefunds, 'index'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
+$router->post('/ca/gst-refunds', [$gstRefunds, 'recordClaim'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+$router->post('/ca/gst-refunds/{id}/credits', [$gstRefunds, 'recordCredit'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
+$router->post('/ca/gst-refunds/credits/{creditId}/delete', [$gstRefunds, 'deleteCredit'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->get('/ca/fy-locks', [$ca, 'fyLocks'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
 $router->post('/ca/fy-locks/lock', [$ca, 'lockFinancialYear'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 $router->post('/ca/fy-locks/unlock', [$ca, 'unlockFinancialYear'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);

@@ -4448,3 +4448,35 @@ ALTER TABLE order_cancellations
 ALTER TABLE order_inspection_fees
   ADD COLUMN agency_name VARCHAR(150) NULL AFTER fee_amount,
   ADD COLUMN agency_invoice_no VARCHAR(60) NULL AFTER agency_name; -- D-212 Batch 2 (migration 2026-10-31c-inspection-agency.sql)
+
+-- Owner decision 2026-10-31: GST refunds under LUT, claimed per period (migration 2026-10-31d-gst-refunds.sql).
+CREATE TABLE gst_refund_claims (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  period_from     DATE NOT NULL,
+  period_to       DATE NOT NULL,
+  claim_arn       VARCHAR(30) NOT NULL,
+  filed_on        DATE NOT NULL,
+  amount_claimed  DECIMAL(14,2) NOT NULL,
+  amount_refused  DECIMAL(14,2) NOT NULL DEFAULT 0,
+  refused_note    VARCHAR(255) NULL,
+  recorded_by     BIGINT UNSIGNED NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_gst_refund_claims_arn (claim_arn),
+  FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE gst_refund_credits (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  claim_id        BIGINT UNSIGNED NOT NULL,
+  amount          DECIMAL(14,2) NOT NULL,
+  credited_on     DATE NOT NULL,
+  bank_reference  VARCHAR(100) NOT NULL,
+  part            ENUM('provisional','final') NOT NULL,
+  zoho_journal_id VARCHAR(40) NULL,
+  zoho_synced_at  DATETIME NULL,
+  recorded_by     BIGINT UNSIGNED NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (claim_id) REFERENCES gst_refund_claims(id),
+  FOREIGN KEY (recorded_by) REFERENCES users(id),
+  INDEX idx_gst_refund_credits_claim (claim_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

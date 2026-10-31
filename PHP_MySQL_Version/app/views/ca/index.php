@@ -23,6 +23,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caViewOrdersUser[
     <div class="btn-row">
       <a class="btn-sm" href="/ca/reports">Open Revenue Reports</a>
       <a class="btn-sm" href="/ca/export-benefits">Open Export Benefits</a>
+      <a class="btn-sm" href="/ca/gst-refunds">Open GST refunds (LUT)</a>
       <?php $__cu = \App\Services\AuthService::currentUser(); if ($__cu && \App\Services\PermissionService::can((int) $__cu['id'], $__cu['role_id'] !== null ? (int) $__cu['role_id'] : null, 'view_cafin')): ?>
         <a class="btn-sm" href="/ca/cafin-export">CAFIN export (CSV, all orders)</a>
       <?php endif; ?>

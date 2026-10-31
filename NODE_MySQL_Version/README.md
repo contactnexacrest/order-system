@@ -1022,3 +1022,23 @@ Zoho Books, built from the facts and including the bank reference.
 - An expense imported from Zoho without a description shows a red "No
   description in Zoho" badge (CA → Expenses, and the order's linked Zoho
   expenses).
+
+## Follow-up (added 2026-10-31): GST refunds under LUT (owner decision D-213, option A)
+
+- **Migration** `docs/migrations/2026-10-31d-gst-refunds.sql`: tables
+  `gst_refund_claims` (period, RFD-01 claim no., filed on, claimed, refused)
+  and `gst_refund_credits` (amount, credited on, RFD-05 / UTR reference,
+  provisional / final, Zoho journal).
+- **CA → GST refunds (LUT)** (`/ca/gst-refunds`; view `ca_module_view`,
+  record `inr_actual_edit`): record a claim, the money the bank credited,
+  any amount refused; remove a credit only while it is not in Zoho Books.
+- **Zoho Books:** `CaSyncService::syncGstRefunds()` / `caSyncService.syncGstRefunds()`
+  (part of every full sync) sends each credit once as a journal — the
+  deposit account debited, **GST Refund Receivable** credited (the CA adds
+  that account) — described by `PaymentDescription::gstRefund()`. Test
+  clean-up removes those journals too.
+- **The order's cost keeps its GST** (profit and incentive unchanged); Step
+  12c shows the GST on the order's tax invoices for information. The Revenue
+  Report shows the refunds credited in the period.
+- `app.js` gains `data-not-before` (a date not before another date field).
+- SOP chapter `ca-09-gst-refunds.md`.
