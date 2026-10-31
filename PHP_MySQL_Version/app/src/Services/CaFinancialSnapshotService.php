@@ -334,6 +334,12 @@ final class CaFinancialSnapshotService
             ['grand', 'ORDER PROFIT', null, self::money($profit['profit_inr'])],
             ['grand', 'MARGIN', null, $profit['margin_pct'] !== null ? number_format((float) $profit['margin_pct'], 2) . '%' : '—'],
         ];
+        // Owner decision 2026-10-31 (D-213, option A, CAFIN line confirmed twice): the GST on this
+        // order's purchases, for information — refundable under LUT for the period, not added to the profit.
+        $purchaseGst = \App\Repositories\GstRefundRepository::gstOnOrderBills($orderId);
+        if ($purchaseGst['total'] > 0) {
+            $pl[] = ['line', "For information: GST paid on this order's purchases ₹" . self::money($purchaseGst['total']) . ' (supplier ₹' . self::money($purchaseGst['supplier']) . ' · logistics ₹' . self::money($purchaseGst['logistics']) . ') is refundable under LUT', 'claimed for the period, not per order — not added to this profit', ''];
+        }
         $ledger = OrderLedgerService::forOrder($orderId, $currency, true)['totals'];
         $cash = [
             '₹' . self::money($ledger['buyer_inr']),

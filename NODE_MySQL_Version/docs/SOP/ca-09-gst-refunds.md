@@ -20,6 +20,8 @@ NexaCrest exports under **LUT** (Letter of Undertaking) and sells nothing in Ind
 
 The figure is the GST on the order's **tax invoices**. A proforma is left out, because its tax invoice replaces it.
 
+The order's **CAFIN** shows the same figure, for information only, as one line under MARGIN in section E (the owner confirmed this line twice on 31 Oct). None of the CAFIN figures change.
+
 ## CA → GST refunds (LUT)
 
 Anyone with the CA module can view the page. Recording on it needs the same permission as recording export benefits: Accounts Executive, Admin, MD or ED.

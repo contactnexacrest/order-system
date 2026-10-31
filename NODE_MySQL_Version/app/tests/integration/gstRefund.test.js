@@ -170,6 +170,11 @@ describe('GST refunds under LUT', () => {
     const html = (await admin.get(`/orders/${orderId}`)).text;
     expect(html).toContain(`For information — GST paid on this order's purchases (INR)</span><span class="v">57,600.00</span>`);
     expect(html).toContain('Supplier &#8377;54,000.00 · logistics &#8377;3,600.00. Refundable under LUT');
+
+    // CAFIN (owner confirmed the line twice): one information line under MARGIN; the figures do not change.
+    const { pl } = await require('../../src/services/caFinancialSnapshotService').build(orderId);
+    expect(pl[pl.length - 1]).toEqual(['line', "For information: GST paid on this order's purchases ₹57,600.00 (supplier ₹54,000.00 · logistics ₹3,600.00) is refundable under LUT", 'claimed for the period, not per order — not added to this profit', '']);
+    expect(pl[pl.length - 2][1]).toBe('MARGIN');
   });
 
   it('labels the period', () => {

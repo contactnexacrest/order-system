@@ -172,6 +172,11 @@ final class GstRefundTest extends DbTestCase
         $html = (string) ob_get_clean();
         self::assertStringContainsString("For information — GST paid on this order's purchases (INR)</span><span class=\"v\">57,600.00</span>", $html);
         self::assertStringContainsString('Supplier &#8377;54,000.00 · logistics &#8377;3,600.00. Refundable under LUT', $html);
+
+        // CAFIN (owner confirmed the line twice): one information line under MARGIN; the figures do not change.
+        $pl = \App\Services\CaFinancialSnapshotService::build($orderId)['pl'];
+        self::assertSame(['line', "For information: GST paid on this order's purchases ₹57,600.00 (supplier ₹54,000.00 · logistics ₹3,600.00) is refundable under LUT", 'claimed for the period, not per order — not added to this profit', ''], end($pl));
+        self::assertSame('MARGIN', $pl[count($pl) - 2][1]);
     }
 
     public function testThePeriodLabel(): void

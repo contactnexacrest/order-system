@@ -291,6 +291,12 @@ async function build(orderId) {
     ['grand', 'ORDER PROFIT', null, money(profit.profit_inr)],
     ['grand', 'MARGIN', null, profit.margin_pct !== null ? `${money(profit.margin_pct)}%` : '—'],
   ];
+  // Owner decision 2026-10-31 (D-213, option A, CAFIN line confirmed twice): the GST on this order's
+  // purchases, for information — refundable under LUT for the period, not added to the profit.
+  const purchaseGst = await require('../repositories/gstRefundRepository').gstOnOrderBills(orderId);
+  if (purchaseGst.total > 0) {
+    pl.push(['line', `For information: GST paid on this order's purchases ₹${money(purchaseGst.total)} (supplier ₹${money(purchaseGst.supplier)} · logistics ₹${money(purchaseGst.logistics)}) is refundable under LUT`, 'claimed for the period, not per order — not added to this profit', '']);
+  }
   const ledger = (await orderLedgerService.forOrder(orderId, currency, true)).totals;
   const cash = [
     `₹${money(ledger.buyer_inr)}`,

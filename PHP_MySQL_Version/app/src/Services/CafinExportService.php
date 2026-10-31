@@ -153,7 +153,7 @@ final class CafinExportService
                 $add('D. Government export benefits', $b['scheme'], 'ref ' . $b['reference'] . ' · claimed ' . $b['claimed'] . ' on ' . $b['claimed_date'], $b['received_date'], $amt, $cur, $cur === 'INR' ? $amt : '', $b['status']);
             }
             foreach ($s['pl'] as $line) {
-                $add('E. Profit', (string) $line[1], '', '', '', str_ends_with((string) $line[3], '%') ? '%' : 'INR', (string) $line[3], (string) ($line[2] ?? ''));
+                $add('E. Profit', (string) $line[1], '', '', '', (string) $line[3] === '' ? '' : (str_ends_with((string) $line[3], '%') ? '%' : 'INR'), (string) $line[3], (string) ($line[2] ?? ''));
             }
             foreach (['Received from buyer', 'Benefits received', 'Paid to supplier', 'Paid to logistics', 'Expenses', 'Net so far'] as $i => $label) {
                 $add('E. Cash position so far', $label, '', '', '', 'INR', (string) $s['cash'][$i]);

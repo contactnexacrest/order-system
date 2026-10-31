@@ -166,7 +166,7 @@ async function detailRows(ids) {
       add('D. Government export benefits', b.scheme, `ref ${b.reference} · claimed ${b.claimed} on ${b.claimed_date}`, b.received_date, amt, cur, cur === 'INR' ? amt : '', b.status);
     }
     for (const line of s.pl) {
-      add('E. Profit', line[1], '', '', '', String(line[3]).endsWith('%') ? '%' : 'INR', line[3], line[2] || '');
+      add('E. Profit', line[1], '', '', '', String(line[3]) === '' ? '' : (String(line[3]).endsWith('%') ? '%' : 'INR'), line[3], line[2] || '');
     }
     ['Received from buyer', 'Benefits received', 'Paid to supplier', 'Paid to logistics', 'Expenses', 'Net so far'].forEach((label, i) => {
       add('E. Cash position so far', label, '', '', '', 'INR', s.cash[i]);

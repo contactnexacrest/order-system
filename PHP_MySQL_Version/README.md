@@ -2157,5 +2157,8 @@ Zoho Books, built from the facts and including the bank reference.
 - **The order's cost keeps its GST** (profit and incentive unchanged); Step
   12c shows the GST on the order's tax invoices for information. The Revenue
   Report shows the refunds credited in the period.
+- CAFIN section E gains one information line under MARGIN with the same
+  GST figure (`CaFinancialSnapshotService` / `caFinancialSnapshotService.js`;
+  owner confirmed it twice). The CAFIN CSV export carries it with no amount.
 - `app.js` gains `data-not-before` (a date not before another date field).
 - SOP chapter `ca-09-gst-refunds.md`.
