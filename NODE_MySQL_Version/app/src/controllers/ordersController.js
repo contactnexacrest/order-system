@@ -1976,7 +1976,8 @@ async function clearAdvancePayment(req, res) {
 
   const fobTotal = await orderProductRepository.totalFobValue(orderId);
   const order = await orderRepository.find(orderId);
-  const balanceAmount = orderPaymentStatusRepository.balanceDue(fobTotal, order.advance_pct, existingPayment);
+  // D-215 (5a, owner confirmed twice): the balance leg leaves out the order's payment milestones.
+  const balanceAmount = orderPaymentStatusRepository.balanceDue(fobTotal, order.advance_pct, existingPayment, await require('../repositories/paymentMilestoneRepository').plannedTotal(orderId, fobTotal));
   const balanceDueDate =
     order.balance_trigger_option === 'A_BEFORE_SHIPMENT'
       ? null // due date is event-triggered (shipment readiness), not a fixed date, for this preset

@@ -1505,13 +1505,22 @@ final class DocxDocumentBuilder
         $freightStatus = $isFob ? 'NIL (FOB)' : (self::g($payment, 'freight_cleared_at') !== '—' ? 'PAID VIA FDN' : 'PENDING');
         $freightAmtCell = $isFob ? 'NIL — FOB' : ($currency . ' ' . self::g($payment, 'freight_amount', 'To Be Confirmed') . ' *');
         $freightRemark2 = $isFob ? 'FOB: buyer arranges — write NIL' : ('CFR/CIF: Against FDN No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed'));
-        $subtotalPaid = $currency . ' ' . $advanceAmt . (!$isFob && self::g($payment, 'freight_amount', null) !== '—' && self::g($payment, 'freight_amount', null) !== 'To Be Confirmed' ? ' + ' . self::g($payment, 'freight_amount') . ' (freight)' : '');
+        // Owner decision D-215 (5a, confirmed twice): payment milestones — their own rows, in the subtotal, the balance and the verification (as the PDF).
+        $milestones = $financial['milestones'] ?? [];
+        $milestoneRows = array_map(static fn (array $m): array => [
+            "\u{221A}  Milestone {$m['seq']} ({$m['pct']}% {$m['due_short']}) — " . ($m['received'] ? 'RECEIVED' : 'PENDING'),
+            $currency . ' ' . ($m['received'] ? $m['received_amount'] : $m['amount']) . ' *',
+            'Received: ' . ($m['received'] ? $m['received_on'] . ' · bank ref ' . $m['bank_reference'] : 'To Be Confirmed') . "\nDue: {$m['due_text']}",
+        ], $milestones);
+        $receivedParts = implode('', array_map(static fn (array $m): string => $m['received'] ? ' + ' . $m['received_amount'] : '', $milestones));
+        $subtotalPaid = $currency . ' ' . ($milestones !== [] ? self::g($financial, 'subtotal_paid_with_milestones') : $advanceAmt) . (!$isFob && self::g($payment, 'freight_amount', null) !== '—' && self::g($payment, 'freight_amount', null) !== 'To Be Confirmed' ? ' + ' . self::g($payment, 'freight_amount') . ' (freight)' : '');
         $sectionBRows = [
             ["\u{221A}  Advance — " . (self::g($payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'), $currency . ' ' . $advanceAmt . ' *', 'Received: ' . self::g($payment, 'advance_cleared_at', 'To Be Confirmed') . "\nAgainst: PI No. " . self::g($order, 'pi_ref', 'To Be Confirmed')],
+            ...$milestoneRows,
             ["\u{221A}  " . ($isCif || $isFob ? 'Freight & Insurance' : 'Freight') . " — {$freightStatus}", $freightAmtCell, $freightRemark2],
-            ['SUBTOTAL ALREADY PAID', $subtotalPaid, 'Advance' . (!$isFob ? ' + FDN (if applicable)' : '')],
-            ["\u{2192}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', "= FOB Value minus advance received\nPayable by T/T (Telegraphic Transfer). " . self::g($financial, 'balance_terms_text') . "\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
-            ['VERIFICATION', "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = " . self::g($financial, 'fob_value') . " \u{221A}", $isFob ? 'Freight & Insurance not applicable on an FOB order.' : ($isCif ? 'Freight & Insurance is' : 'Freight is') . ' paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.'],
+            ['SUBTOTAL ALREADY PAID', $subtotalPaid, 'Advance' . ($milestones !== [] ? ' + milestones' : '') . (!$isFob ? ' + FDN (if applicable)' : '')],
+            ["\u{2192}  BALANCE DUE NOW", $currency . ' ' . $balanceAmt . ' *', '= FOB Value minus advance' . ($milestones !== [] ? ' and milestones' : '') . " received\nPayable by T/T (Telegraphic Transfer). " . self::g($financial, 'balance_terms_text') . "\nPayment Reference: Quote CI No. " . self::g($meta, 'document_reference'), true],
+            ['VERIFICATION', ($milestones !== [] ? "Advance + Milestones + Balance = FOB Value\n{$advanceAmt}{$receivedParts} + {$balanceAmt} = " : "Advance + Balance = FOB Value\n{$advanceAmt} + {$balanceAmt} = ") . self::g($financial, 'fob_value') . " \u{221A}", $isFob ? 'Freight & Insurance not applicable on an FOB order.' : ($isCif ? 'Freight & Insurance is' : 'Freight is') . ' paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.'],
         ];
         self::threeColFinanceTable($section, 'SECTION B — PAYMENT SETTLEMENT', $sectionBRows, DocxComponents::NAVY_MID);
 

@@ -88,7 +88,15 @@ async function assemble(orderId, documentTypeCode = null) {
     due_text: String(m.due_text),
     amount_raw: round2(fobValue * parseFloat(m.pct) / 100),
     amount: formatMoney(round2(fobValue * parseFloat(m.pct) / 100)),
+    // The CI's milestone row names the step by its first words ("on shipment"), the full wording below it.
+    due_short: String(m.due_text).split(' — ')[0].trim(),
+    received: m.received_amount !== null,
+    received_amount_raw: m.received_amount !== null ? parseFloat(m.received_amount) : 0,
+    received_amount: m.received_amount !== null ? formatMoney(parseFloat(m.received_amount)) : null,
+    received_on: m.received_on !== null ? formatDate(String(m.received_on)) : null,
+    bank_reference: m.bank_reference,
   }));
+  const milestonesReceived = round2(milestones.reduce((sum, m) => sum + m.received_amount_raw, 0));
   const balanceAmount = round2(fobValue - advanceAmount - milestones.reduce((sum, m) => sum + m.amount_raw, 0));
 
   const isFob = String(order.incoterm_code).toUpperCase() === 'FOB';
@@ -267,6 +275,8 @@ async function assemble(orderId, documentTypeCode = null) {
       advance_amount: formatMoney(advanceAmount),
       advance_trigger_text: order.advance_trigger_text,
       milestones,
+      // D-215 (5a, owner confirmed twice): the CI's "subtotal already paid" with the milestones received.
+      subtotal_paid_with_milestones: formatMoney(round2((payment && payment.advance_amount !== null && payment.advance_amount !== undefined ? parseFloat(payment.advance_amount) : advanceAmount) + milestonesReceived)),
       balance_pct: trimTrailingZeros(balancePct.toFixed(2)),
       balance_amount: formatMoney(balanceAmount),
       balance_trigger_option: order.balance_trigger_option,
@@ -310,7 +320,7 @@ async function assemble(orderId, documentTypeCode = null) {
           // received (orderPaymentStatusRepository.balanceDue).
           balance_amount: payment.balance_remittance_received_at !== null && payment.balance_amount !== null
             ? formatMoney(payment.balance_amount)
-            : formatMoney(orderPaymentStatusRepository.balanceDue(fobValue, advancePct, payment)),
+            : formatMoney(orderPaymentStatusRepository.balanceDue(fobValue, advancePct, payment, milestonesReceived)),
           balance_remittance_received_at: formatDate(payment.balance_remittance_received_at),
           balance_cleared_at: formatDate(payment.balance_cleared_at),
           balance_due_date: formatDate(payment.balance_due_date),

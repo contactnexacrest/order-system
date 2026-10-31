@@ -115,6 +115,36 @@ describe('Payment milestones (D-215, 5a)', () => {
     expect(oc).toContain('<tr><td class="k">{{ m.pct }}% Payment Due ({{ order.currency_code }}) *</td><td class="v">{{ m.amount }}');
   });
 
+  // Owner confirmed twice (1 Nov 2026): the CI shows each milestone and asks only for what is left.
+  it('counts the milestones paid on the Commercial Invoice', async () => {
+    await schedule();
+    await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 1350, '2026-10-20');
+    const m = (await paymentMilestoneRepository.forOrder(orderId))[0];
+    const paymentActionService = require('../../src/services/paymentActionService');
+    let order = await orderRepository.find(orderId);
+    expect(await paymentActionService.amountDue(order, 'balance')).toBe(3150);
+    await paymentMilestoneRepository.recordReceived(Number(m.id), 2250, '2026-10-28', 84.1, 'UTR778899', null, userId);
+    order = await orderRepository.find(orderId);
+    expect(await paymentActionService.amountDue(order, 'balance')).toBe(900);
+    expect(orderPaymentStatusRepository.balanceDue(4500, 30, await orderPaymentStatusRepository.find(orderId), await paymentMilestoneRepository.plannedTotal(orderId, 4500))).toBe(900);
+
+    const ci = await documentDataAssembler.assemble(orderId, 'CI');
+    expect(ci.payment_status.balance_amount).toBe('900.00');
+    expect(ci.financial.subtotal_paid_with_milestones).toBe('3,600.00');
+
+    const result = await documentGenerationService.generate(orderId, 'CI', userId, null, true, true);
+    const text = renderedHtml.join('\n').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#8730;/g, '√').replace(/\s+/g, ' ');
+    expect(text).toContain('Milestone 2 (50% on shipment) — RECEIVED');
+    expect(text).toContain('USD 2,250.00');
+    expect(text).toContain('Received: 28 October 2026 · bank ref UTR778899');
+    expect(text).toContain('USD 3,600.00');
+    expect(text).toContain('Advance + milestones');
+    expect(text).toContain('USD 900.00');
+    expect(text).toContain('= FOB Value minus advance and milestones received');
+    expect(text).toContain('1,350.00 + 2,250.00 + 900.00 = 4,500.00');
+    expect(result.docx_file_id).toBeTruthy();
+  });
+
   it('prints an order without milestones as before', async () => {
     const pi = await documentDataAssembler.assemble(orderId, 'PI');
     expect(pi.financial.milestones).toEqual([]);

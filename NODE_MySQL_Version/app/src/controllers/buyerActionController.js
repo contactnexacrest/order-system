@@ -87,7 +87,7 @@ async function show(req, res) {
     products: await orderProductRepository.forOrder(order.id),
     totalFobValue,
     advanceReceived: paymentStatus && paymentStatus.advance_amount !== null ? parseFloat(paymentStatus.advance_amount) : null,
-    balanceDue: orderPaymentStatusRepository.balanceDue(totalFobValue, order.advance_pct, paymentStatus),
+    balanceDue: orderPaymentStatusRepository.balanceDue(totalFobValue, order.advance_pct, paymentStatus, await require('../repositories/paymentMilestoneRepository').receivedTotal(order.id)),
     ocAcknowledgment,
     buyerPoDocuments: await orderBuyerPoDocumentRepository.forOrder(order.id),
     advanceCleared: !!paymentStatus && paymentStatus.advance_cleared_at !== null,

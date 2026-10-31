@@ -91,9 +91,17 @@ final class DocumentDataAssembler
             'seq' => (int) $m['seq'],
             'pct' => rtrim(rtrim(number_format((float) $m['pct'], 2), '0'), '.'),
             'due_text' => (string) $m['due_text'],
+            // The CI's milestone row names the step by its first words ("on shipment"), the full wording below it.
+            'due_short' => trim(explode(' — ', (string) $m['due_text'])[0]),
             'amount_raw' => round($fobValue * (float) $m['pct'] / 100, 2),
             'amount' => self::formatMoney(round($fobValue * (float) $m['pct'] / 100, 2)),
+            'received' => $m['received_amount'] !== null,
+            'received_amount_raw' => $m['received_amount'] !== null ? (float) $m['received_amount'] : 0.0,
+            'received_amount' => $m['received_amount'] !== null ? self::formatMoney((float) $m['received_amount']) : null,
+            'received_on' => $m['received_on'] !== null ? self::formatDate((string) $m['received_on']) : null,
+            'bank_reference' => $m['bank_reference'],
         ], \App\Repositories\PaymentMilestoneRepository::forOrder($orderId));
+        $milestonesReceived = round(array_sum(array_column($milestones, 'received_amount_raw')), 2);
         $balanceAmount = round($fobValue - $advanceAmount - array_sum(array_column($milestones, 'amount_raw')), 2);
 
         $isFob = strtoupper($order['incoterm_code']) === 'FOB';
@@ -281,6 +289,8 @@ final class DocumentDataAssembler
                 'advance_amount'   => self::formatMoney($advanceAmount),
                 'advance_trigger_text' => $order['advance_trigger_text'],
                 'milestones'       => $milestones,
+                // D-215 (5a, owner confirmed twice): the CI's "subtotal already paid" with the milestones received.
+                'subtotal_paid_with_milestones' => self::formatMoney(round(($payment !== null && $payment['advance_amount'] !== null ? (float) $payment['advance_amount'] : $advanceAmount) + $milestonesReceived, 2)),
                 'balance_pct'      => rtrim(rtrim(number_format($balancePct, 2), '0'), '.'),
                 'balance_amount'   => self::formatMoney($balanceAmount),
                 'balance_trigger_option' => $order['balance_trigger_option'],
@@ -323,7 +333,7 @@ final class DocumentDataAssembler
                 // actually received (OrderPaymentStatusRepository::balanceDue).
                 'balance_amount'                  => $payment['balance_remittance_received_at'] !== null && $payment['balance_amount'] !== null
                     ? self::formatMoney($payment['balance_amount'])
-                    : self::formatMoney(OrderPaymentStatusRepository::balanceDue($fobValue, $advancePct, $payment)),
+                    : self::formatMoney(OrderPaymentStatusRepository::balanceDue($fobValue, $advancePct, $payment, $milestonesReceived)),
                 'balance_remittance_received_at'  => self::formatDate($payment['balance_remittance_received_at']),
                 'balance_cleared_at'              => self::formatDate($payment['balance_cleared_at']),
                 'balance_due_date'                => self::formatDate($payment['balance_due_date']),

@@ -70,7 +70,7 @@ async function amountDue(order, leg) {
       ? Math.round((parseFloat(freight.confirmed_freight_rate) + (String(order.incoterm_code || '').toUpperCase() === 'CIF' ? (parseFloat(freight.insurance_amount) || 0) : 0)) * 100) / 100
       : null;
   }
-  return orderPaymentStatusRepository.balanceDue(fob, order.advance_pct, await orderPaymentStatusRepository.find(order.id));
+  return orderPaymentStatusRepository.balanceDue(fob, order.advance_pct, await orderPaymentStatusRepository.find(order.id), await require('../repositories/paymentMilestoneRepository').receivedTotal(order.id));
 }
 
 /**

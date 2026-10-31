@@ -1610,24 +1610,35 @@ function renderCi(context) {
   const freightAmtCell = isFob ? 'NIL — FOB' : `${currency} ${g(payment, 'freight_amount', 'To Be Confirmed')} *`;
   const freightRemark2 = isFob ? 'FOB: buyer arranges — write NIL' : `CFR/CIF: Against FDN No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}`;
   const freightAmtVal = g(payment, 'freight_amount', null);
-  const subtotalPaid = `${currency} ${advanceAmt}${!isFob && freightAmtVal !== '—' && freightAmtVal !== 'To Be Confirmed' ? ` + ${g(payment, 'freight_amount')} (freight)` : ''}`;
+  // Owner decision D-215 (5a, confirmed twice): payment milestones — their own rows, in the subtotal, the balance and the verification (as the PDF).
+  const milestones = financial.milestones || [];
+  const milestoneRows = milestones.map((m) => [
+    `√  Milestone ${m.seq} (${m.pct}% ${m.due_short}) — ${m.received ? 'RECEIVED' : 'PENDING'}`,
+    `${currency} ${m.received ? m.received_amount : m.amount} *`,
+    `Received: ${m.received ? `${m.received_on} · bank ref ${m.bank_reference}` : 'To Be Confirmed'}\nDue: ${m.due_text}`,
+  ]);
+  const receivedParts = milestones.map((m) => (m.received ? ` + ${m.received_amount}` : '')).join('');
+  const subtotalPaid = `${currency} ${milestones.length ? g(financial, 'subtotal_paid_with_milestones') : advanceAmt}${!isFob && freightAmtVal !== '—' && freightAmtVal !== 'To Be Confirmed' ? ` + ${g(payment, 'freight_amount')} (freight)` : ''}`;
   const sectionBRows = [
     [
       `√  Advance — ${g(payment, 'advance_cleared_at') !== '—' ? 'RECEIVED' : 'PENDING'}`,
       `${currency} ${advanceAmt} *`,
       `Received: ${g(payment, 'advance_cleared_at', 'To Be Confirmed')}\nAgainst: PI No. ${g(order, 'pi_ref', 'To Be Confirmed')}`,
     ],
+    ...milestoneRows,
     [`√  ${isCif || isFob ? 'Freight & Insurance' : 'Freight'} — ${freightStatus}`, freightAmtCell, freightRemark2],
-    ['SUBTOTAL ALREADY PAID', subtotalPaid, `Advance${!isFob ? ' + FDN (if applicable)' : ''}`],
+    ['SUBTOTAL ALREADY PAID', subtotalPaid, `Advance${milestones.length ? ' + milestones' : ''}${!isFob ? ' + FDN (if applicable)' : ''}`],
     [
       '→  BALANCE DUE NOW',
       `${currency} ${balanceAmt} *`,
-      `= FOB Value minus advance received\nPayable by T/T (Telegraphic Transfer). ${g(financial, 'balance_terms_text')}\nPayment Reference: Quote CI No. ${g(meta, 'document_reference')}`,
+      `= FOB Value minus advance${milestones.length ? ' and milestones' : ''} received\nPayable by T/T (Telegraphic Transfer). ${g(financial, 'balance_terms_text')}\nPayment Reference: Quote CI No. ${g(meta, 'document_reference')}`,
       true,
     ],
     [
       'VERIFICATION',
-      `Advance + Balance = FOB Value\n${advanceAmt} + ${balanceAmt} = ${g(financial, 'fob_value')} √`,
+      milestones.length
+        ? `Advance + Milestones + Balance = FOB Value\n${advanceAmt}${receivedParts} + ${balanceAmt} = ${g(financial, 'fob_value')} √`
+        : `Advance + Balance = FOB Value\n${advanceAmt} + ${balanceAmt} = ${g(financial, 'fob_value')} √`,
       isFob
         ? 'Freight & Insurance not applicable on an FOB order.'
         : `${isCif ? 'Freight & Insurance is' : 'Freight is'} paid separately via FDN, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.`,

@@ -120,11 +120,44 @@ final class PaymentMilestoneTest extends DbTestCase
         self::assertStringContainsString('<tr><td class="k">{{ m.pct }}% Payment Due ({{ order.currency_code }}) *</td><td class="v">{{ m.amount }}', $oc);
     }
 
+    /** Owner confirmed twice (1 Nov 2026): the CI shows each milestone and asks only for what is left. */
+    public function testTheCommercialInvoiceCountsTheMilestonesPaid(): void
+    {
+        $this->schedule();
+        OrderPaymentStatusRepository::recordAdvanceReceived($this->orderId, 1350.0, '2026-10-20');
+        $m = PaymentMilestoneRepository::forOrder($this->orderId)[0];
+        $order = OrderRepository::find($this->orderId);
+        // Before the milestone is paid it stays in what is owed now.
+        self::assertSame(3150.0, \App\Services\PaymentActionService::amountDue($order, 'balance'));
+        PaymentMilestoneRepository::recordReceived((int) $m['id'], 2250.0, '2026-10-28', 84.1, 'UTR778899', null, $this->userId);
+        self::assertSame(900.0, \App\Services\PaymentActionService::amountDue($order, 'balance'), 'the pay-now link asks only for what is left');
+        self::assertSame(900.0, OrderPaymentStatusRepository::balanceDue(4500.0, 30.0, OrderPaymentStatusRepository::find($this->orderId), PaymentMilestoneRepository::plannedTotal($this->orderId, 4500.0)), 'the balance leg leaves out the milestones');
+
+        $ci = DocumentDataAssembler::assemble($this->orderId, 'CI');
+        self::assertSame('900.00', $ci['payment_status']['balance_amount']);
+        self::assertSame('3,600.00', $ci['financial']['subtotal_paid_with_milestones']);
+
+        $result = DocumentGenerationService::generate($this->orderId, 'CI', $this->userId, null, true, true);
+        $file = FileStoreRepository::find((int) $result['pdf_file_id']);
+        $text = preg_replace('/\s+/u', ' ', str_replace("\u{00A0}", ' ', (string) @shell_exec('pdftotext ' . escapeshellarg($file['server_path']) . ' - 2>/dev/null')));
+        self::assertStringContainsString('Milestone 2 (50% on shipment) — RECEIVED', $text);
+        self::assertStringContainsString('USD 2,250.00', $text);
+        self::assertStringContainsString('Received: 28 October 2026 · bank ref UTR778899', $text);
+        self::assertStringContainsString('USD 3,600.00', $text);
+        self::assertStringContainsString('Advance + milestones', $text);
+        self::assertStringContainsString('USD 900.00', $text);
+        self::assertStringContainsString('= FOB Value minus advance and milestones received', $text);
+        self::assertStringContainsString('1,350.00 + 2,250.00 + 900.00 = 4,500.00', $text);
+        self::assertNotEmpty($result['docx_file_id']);
+    }
+
     public function testAnOrderWithoutMilestonesPrintsAsBefore(): void
     {
         $pi = DocumentDataAssembler::assemble($this->orderId, 'PI');
         self::assertSame([], $pi['financial']['milestones']);
         self::assertSame('3,150.00', $pi['financial']['balance_amount']);
+        $ci = (string) file_get_contents(dirname(__DIR__, 2) . '/templates/CI/commercial_invoice.html.twig');
+        self::assertStringContainsString('{% else %}Advance + Balance = FOB Value<br>', $ci, 'orders without milestones keep today\'s verification line');
     }
 
     public function testEachMilestoneIsItsOwnPaymentAndComesBeforeTheBalance(): void

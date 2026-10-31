@@ -1839,7 +1839,8 @@ final class OrderController
 
         $fobTotal = OrderProductRepository::totalFobValue($orderId);
         $order = OrderRepository::find($orderId);
-        $balanceAmount = OrderPaymentStatusRepository::balanceDue($fobTotal, (float) $order['advance_pct'], $existingPayment);
+        // D-215 (5a, owner confirmed twice): the balance leg leaves out the order's payment milestones.
+        $balanceAmount = OrderPaymentStatusRepository::balanceDue($fobTotal, (float) $order['advance_pct'], $existingPayment, \App\Repositories\PaymentMilestoneRepository::plannedTotal($orderId, $fobTotal));
         $balanceDueDate = $order['balance_trigger_option'] === 'A_BEFORE_SHIPMENT'
             ? null // due date is event-triggered (shipment readiness), not a fixed date, for this preset
             : date('Y-m-d', strtotime('+' . (int) $order['balance_days'] . ' days'));

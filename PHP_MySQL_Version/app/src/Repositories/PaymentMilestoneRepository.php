@@ -41,6 +41,20 @@ final class PaymentMilestoneRepository
         return (float) $stmt->fetchColumn();
     }
 
+    /** D-215: the milestone money received so far (what the buyer no longer owes). */
+    public static function receivedTotal(int $orderId): float
+    {
+        $stmt = Database::connection()->prepare('SELECT COALESCE(SUM(received_amount), 0) FROM order_payment_milestones WHERE order_id = :o');
+        $stmt->execute(['o' => $orderId]);
+        return round((float) $stmt->fetchColumn(), 2);
+    }
+
+    /** D-215: the milestones' planned amounts (each its share of the FOB value) — what the balance leg leaves out. */
+    public static function plannedTotal(int $orderId, float $fobTotal): float
+    {
+        return round(array_sum(array_map(static fn (array $m): float => round($fobTotal * (float) $m['pct'] / 100, 2), self::forOrder($orderId))), 2);
+    }
+
     public static function anyMoneyRecorded(int $orderId): bool
     {
         $stmt = Database::connection()->prepare('SELECT COUNT(*) FROM order_payment_milestones WHERE order_id = :o AND received_amount IS NOT NULL');

@@ -369,10 +369,17 @@ Each milestone is its own payment:
   Commercial Invoice once the CI is in Books, held until then otherwise.
 - The **balance cannot be marked cleared** until every milestone is cleared.
 
+The **Commercial Invoice** shows one row per milestone (received or pending,
+with its date and bank reference), counts the milestones received in
+"Subtotal already paid", and asks only for what is left as "Balance due now"
+(FOB value minus the advance and the milestones received); its verification
+line reads "Advance + Milestones + Balance = FOB Value". The buyer's pay-now
+link and payment page ask for the same balance. Orders without milestones
+print exactly as before.
+
 Not changed by milestones: the Quotation (it prints advance and balance as
-before), the Commercial Invoice and the CA financial annexure (CAFIN), which
-still count advance and balance only — a change to those documents needs the
-owner's double confirmation first.
+before) and the CA financial annexure (CAFIN), which still counts advance and
+balance only — a change to those needs the owner's double confirmation first.
 
 ## What happens next
 

@@ -26,6 +26,18 @@ async function totalPct(orderId) {
   return parseFloat(row.total);
 }
 
+/** D-215: the milestone money received so far (what the buyer no longer owes). */
+async function receivedTotal(orderId) {
+  const row = await db.queryOne('SELECT COALESCE(SUM(received_amount), 0) AS total FROM order_payment_milestones WHERE order_id = :o', { o: orderId });
+  return Math.round(parseFloat(row.total) * 100) / 100;
+}
+
+/** D-215: the milestones' planned amounts (each its share of the FOB value) — what the balance leg leaves out. */
+async function plannedTotal(orderId, fobTotal) {
+  const total = (await forOrder(orderId)).reduce((sum, m) => sum + Math.round(Number(fobTotal) * parseFloat(m.pct)) / 100, 0);
+  return Math.round(total * 100) / 100;
+}
+
 async function anyMoneyRecorded(orderId) {
   const row = await db.queryOne('SELECT COUNT(*) AS n FROM order_payment_milestones WHERE order_id = :o AND received_amount IS NOT NULL', { o: orderId });
   return Number(row.n) > 0;
@@ -103,6 +115,6 @@ async function heldInZoho() {
 }
 
 module.exports = {
-  MAX_STEPS, forOrder, find, totalPct, anyMoneyRecorded, notCleared, replaceSchedule, recordReceived, markCleared,
+  MAX_STEPS, forOrder, find, totalPct, receivedTotal, plannedTotal, anyMoneyRecorded, notCleared, replaceSchedule, recordReceived, markCleared,
   setZohoReference, setZohoApplied, pendingZohoSync, heldInZoho,
 };

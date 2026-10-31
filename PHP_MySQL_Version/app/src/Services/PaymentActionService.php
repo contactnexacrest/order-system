@@ -78,7 +78,7 @@ final class PaymentActionService
                 ? round((float) $freight['confirmed_freight_rate'] + (strtoupper((string) ($order['incoterm_code'] ?? '')) === 'CIF' ? (float) ($freight['insurance_amount'] ?? 0) : 0.0), 2)
                 : null;
         }
-        return OrderPaymentStatusRepository::balanceDue($fob, (float) ($order['advance_pct'] ?? 0), OrderPaymentStatusRepository::find($orderId));
+        return OrderPaymentStatusRepository::balanceDue($fob, (float) ($order['advance_pct'] ?? 0), OrderPaymentStatusRepository::find($orderId), \App\Repositories\PaymentMilestoneRepository::receivedTotal($orderId));
     }
 
     /**

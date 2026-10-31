@@ -116,6 +116,14 @@
     <td class="v" style="text-align:right;">{{ order.currency_code }} {{ payment_status.advance_amount or financial.advance_amount }} <strong style="color:#C0392B;">*</strong></td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Received: {{ payment_status.advance_cleared_at or 'To Be Confirmed' }}<br>Against: PI No. {{ order.pi_ref or 'To Be Confirmed' }}</td>
   </tr>
+  {# Owner decision D-215 (5a, confirmed twice): one row per payment milestone — orders without milestones print as before. #}
+  {% for m in financial.milestones %}
+  <tr>
+    <td class="k">&#8730;&nbsp; Milestone {{ m.seq }} ({{ m.pct }}% {{ m.due_short }}) — {{ 'RECEIVED' if m.received else 'PENDING' }}</td>
+    <td class="v" style="text-align:right;">{{ order.currency_code }} {{ m.received_amount if m.received else m.amount }} <strong style="color:#C0392B;">*</strong></td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Received: {{ (m.received_on + ' · bank ref ' + m.bank_reference) if m.received else 'To Be Confirmed' }}<br>Due: {{ m.due_text }}</td>
+  </tr>
+  {% endfor %}
   <tr>
     <td class="k">&#8730;&nbsp; Freight{% if order.is_cif or order.is_fob %} &amp; Insurance{% endif %} — {% if order.is_fob %}NIL (FOB){% else %}{{ 'PAID VIA DEBIT NOTE' if payment_status.freight_cleared_at else 'PENDING' }}{% endif %}</td>
     <td class="v" style="text-align:right;">{% if order.is_fob %}NIL — FOB{% else %}{{ order.currency_code }} {{ payment_status.freight_amount or 'To Be Confirmed' }} <strong style="color:#C0392B;">*</strong>{% endif %}</td>
@@ -123,17 +131,17 @@
   </tr>
   <tr>
     <td class="k" style="font-weight:bold;">SUBTOTAL ALREADY PAID</td>
-    <td class="v" style="text-align:right; font-weight:bold;">{{ order.currency_code }} {{ payment_status.advance_amount or financial.advance_amount }}{% if not order.is_fob and payment_status.freight_amount %} + {{ payment_status.freight_amount }} (freight){% endif %}</td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Advance{% if not order.is_fob %} + Debit Note (if applicable){% endif %}</td>
+    <td class="v" style="text-align:right; font-weight:bold;">{{ order.currency_code }} {{ financial.subtotal_paid_with_milestones if (financial.milestones | length) else (payment_status.advance_amount or financial.advance_amount) }}{% if not order.is_fob and payment_status.freight_amount %} + {{ payment_status.freight_amount }} (freight){% endif %}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">Advance{% if financial.milestones | length %} + milestones{% endif %}{% if not order.is_fob %} + Debit Note (if applicable){% endif %}</td>
   </tr>
   <tr>
     <td class="k" style="background:#FFF3CD; font-weight:bold;">&#8594;&nbsp; BALANCE DUE NOW</td>
     <td class="v" style="background:#FFF3CD; text-align:right; font-weight:bold; color:#8A1F1F;">{{ order.currency_code }} {{ payment_status.balance_amount or financial.balance_amount }} <strong>*</strong></td>
-    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">= FOB Value minus advance received<br>Payable by T/T (Telegraphic Transfer). {{ financial.balance_terms_text }}<br>Payment Reference: Quote CI No. {{ meta.document_reference }}</td>
+    <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">= FOB Value minus advance{% if financial.milestones | length %} and milestones{% endif %} received<br>Payable by T/T (Telegraphic Transfer). {{ financial.balance_terms_text }}<br>Payment Reference: Quote CI No. {{ meta.document_reference }}</td>
   </tr>
   <tr>
     <td class="k">VERIFICATION</td>
-    <td class="v" style="text-align:right;">Advance + Balance = FOB Value<br>{{ payment_status.advance_amount or financial.advance_amount }} + {{ payment_status.balance_amount or financial.balance_amount }} = {{ financial.fob_value }} &#8730;</td>
+    <td class="v" style="text-align:right;">{% if financial.milestones | length %}Advance + Milestones + Balance = FOB Value<br>{{ payment_status.advance_amount or financial.advance_amount }}{% for m in financial.milestones %}{% if m.received %} + {{ m.received_amount }}{% endif %}{% endfor %} + {{ payment_status.balance_amount or financial.balance_amount }}{% else %}Advance + Balance = FOB Value<br>{{ payment_status.advance_amount or financial.advance_amount }} + {{ payment_status.balance_amount or financial.balance_amount }}{% endif %} = {{ financial.fob_value }} &#8730;</td>
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}Freight &amp; Insurance not applicable on an FOB order.{% else %}Freight{% if order.is_cif %} &amp; Insurance is{% else %} is{% endif %} paid separately via Debit Note, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.{% endif %}</td>
   </tr>
 </table>

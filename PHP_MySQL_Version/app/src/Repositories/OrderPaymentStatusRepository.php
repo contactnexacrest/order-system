@@ -21,12 +21,16 @@ final class OrderPaymentStatusRepository
      * received — never FOB × balance % on its own. Before any advance is
      * recorded it falls back to the advance due by the payment terms.
      */
-    public static function balanceDue(float $fobTotal, float $advancePct, ?array $payment): float
+    /**
+     * @param float $milestones D-215 (5a, owner confirmed twice): what the order's payment milestones take off the
+     *                          balance — the milestones received (what is owed now) or, for the planned balance, all of them
+     */
+    public static function balanceDue(float $fobTotal, float $advancePct, ?array $payment, float $milestones = 0.0): float
     {
         $advance = $payment !== null && $payment['advance_amount'] !== null
             ? (float) $payment['advance_amount']
             : round($fobTotal * $advancePct / 100, 2);
-        return max(0.0, round($fobTotal - $advance, 2));
+        return max(0.0, round($fobTotal - $advance - $milestones, 2));
     }
 
     public static function find(int $orderId): ?array

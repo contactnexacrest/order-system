@@ -95,7 +95,7 @@ final class BuyerActionController
             'products' => OrderProductRepository::forOrder($orderId),
             'totalFobValue' => $totalFobValue,
             'advanceReceived' => $paymentStatus !== null && $paymentStatus['advance_amount'] !== null ? (float) $paymentStatus['advance_amount'] : null,
-            'balanceDue' => OrderPaymentStatusRepository::balanceDue($totalFobValue, (float) ($order['advance_pct'] ?? 0), $paymentStatus),
+            'balanceDue' => OrderPaymentStatusRepository::balanceDue($totalFobValue, (float) ($order['advance_pct'] ?? 0), $paymentStatus, \App\Repositories\PaymentMilestoneRepository::receivedTotal($orderId)),
             'ocAcknowledgment' => $ocAcknowledgment,
             'buyerPoDocuments' => OrderBuyerPoDocumentRepository::forOrder($orderId),
             'advanceCleared' => $paymentStatus !== null && $paymentStatus['advance_cleared_at'] !== null,
