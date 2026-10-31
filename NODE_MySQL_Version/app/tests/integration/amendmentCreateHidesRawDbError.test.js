@@ -60,6 +60,7 @@ describe('Amendment create hides raw DB error text (External QA report R-02)', (
     expect(entry.type).toBe('error');
     expect(entry.message).not.toContain('SQLSTATE');
     expect(entry.message).not.toContain('Incorrect date value');
-    expect(entry.message).toBe('Something went wrong. Please try again.');
+    // QA Round 7, R7-N14: now caught by validation before the database, with a message saying what to fix.
+    expect(entry.message).toBe('Effective from: enter a valid date (YYYY-MM-DD).');
   });
 });

@@ -51,6 +51,7 @@ final class AmendmentCreateHidesRawDbErrorTest extends DbTestCase
         self::assertSame('error', $flash[0]['type']);
         self::assertStringNotContainsString('SQLSTATE', $flash[0]['message']);
         self::assertStringNotContainsString('Incorrect date value', $flash[0]['message']);
-        self::assertSame('Something went wrong. Please try again.', $flash[0]['message']);
+        // QA Round 7, R7-N14: now caught by validation before the database, with a message saying what to fix.
+        self::assertSame('Effective from: enter a valid date (YYYY-MM-DD).', $flash[0]['message']);
     }
 }
