@@ -11,7 +11,6 @@
     {% set n = 0 %}
     {% for leg, state in current.legs %}
       {% set n = n + 1 %}
-      {% if leg == current.leg %}{% set currentNum = n %}{% endif %}
       <li class="{{ state }}"><span class="dot">{% if state == 'done' %}&#10003;{% else %}{{ n }}{% endif %}</span>{{ legs[leg].label }}</li>
     {% endfor %}
   </ol>

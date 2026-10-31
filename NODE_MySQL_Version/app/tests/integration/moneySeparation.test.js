@@ -122,4 +122,46 @@ describe('Money separation (D-214 phase 2)', () => {
       expect([roleName, 'payment', /6,100\.00/.test(html)]).toEqual([roleName, 'payment', sees]);
     }
   });
+
+  // QA Round 7, R7-N02 — D-214: "Logistics sees the client name, Procurement only the
+  // order number", on the order page header, its summary and the order cards of both templates.
+  it('shows Procurement the order number but not the client name', async () => {
+    const orderRepository = require('../../src/repositories/orderRepository');
+    const userRepository = require('../../src/repositories/userRepository');
+    const uiTemplateRepository = require('../../src/repositories/uiTemplateRepository');
+    const escape = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    for (const [roleName, seesClient] of [['Procurement Executive', false], ['Procurement Manager', false], ['Procurement Director', false], ['Logistics Executive', true], ['Sales Executive', true]]) {
+      if (!(await roleRepository.findByName(roleName))) continue;
+      const { id, agent } = await signedInAs(roleName);
+      const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, id);
+      const order = await orderRepository.find(orderId);
+      const html = (await agent.get(`/orders/${orderId}`)).text;
+      expect([roleName, 'order number', html.includes(escape(order.order_reference))]).toEqual([roleName, 'order number', true]);
+      expect([roleName, 'client on order page', html.includes(escape(order.company_legal_name))]).toEqual([roleName, 'client on order page', seesClient]);
+      for (const template of [null, (await uiTemplateRepository.findByKey('kanban')).id]) {
+        await userRepository.updateUiTemplatePreference(id, template);
+        const list = (await agent.get('/orders?status=all')).text;
+        expect([roleName, template, list.includes(escape(order.company_legal_name))]).toEqual([roleName, template, seesClient]);
+      }
+    }
+  });
+
+  // QA Round 7, R7-N06: the order page links a received file only to someone who may
+  // download it; otherwise it shows as text, never a link that answers 403.
+  it('links on the order page only files the person may download', async () => {
+    const stageGateService = require('../../src/services/stageGateService');
+    for (const [roleName, seesSelling] of [['Logistics Executive', false], ['Viewer / Auditor', true]]) {
+      const { id, agent } = await signedInAs(roleName);
+      const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, id);
+      const buyerPoFile = await createTestFile(orderId, null);
+      await db.execute('INSERT INTO order_buyer_po_documents (order_id, file_id) VALUES (:o, :f)', { o: orderId, f: buyerPoFile });
+      await stageGateService.passAndUnlockNext(orderId, 1, null);
+      const html = (await agent.get(`/orders/${orderId}`)).text;
+      const linked = [...new Set([...html.matchAll(/href="\/file-store\/(\d+)\/download"/g)].map((m) => Number(m[1])))];
+      for (const fileId of linked) {
+        expect([roleName, fileId, (await agent.get(`/file-store/${fileId}/download`)).status]).not.toEqual([roleName, fileId, 403]);
+      }
+      expect([roleName, 'Buyer PO copy linked', linked.includes(Number(buyerPoFile))]).toEqual([roleName, 'Buyer PO copy linked', seesSelling]);
+    }
+  });
 });

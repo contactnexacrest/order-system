@@ -13,6 +13,10 @@ process.env.APP_ENV = 'local';
 process.env.DB_DATABASE = 'nexacrest_node_jest';
 process.env.PORT = '0'; // let the OS pick an ephemeral port if server.js's app.listen() runs at require-time
 process.env.RUN_JOBS_IN_PROCESS = 'false';
+// QA Round 7, R7-N05: every test file opens its own pools; small ones keep a
+// whole run well inside MySQL's default 151 connections.
+process.env.DB_POOL_SIZE = '4';
+process.env.SESSION_DB_POOL_SIZE = '2';
 process.env.SESSION_SECRET_KEY = process.env.SESSION_SECRET_KEY || 'jest-test-session-secret';
 
 // External QA report TI-05: the suite was never isolated from a

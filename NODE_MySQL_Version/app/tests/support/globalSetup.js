@@ -40,7 +40,20 @@ function runSql(database, sql) {
   });
 }
 
-module.exports = async function globalSetup() {
+/**
+ * QA Round 7, R7-N05: the integration tests share one disposable database
+ * and change real rows in it (Zoho settings, stage gates, the same order
+ * numbers), so two files at once give false failures. Refuse a parallel run
+ * with a clear message instead of a flaky red build.
+ */
+function assertOneWorker(globalConfig) {
+  if (globalConfig && Number(globalConfig.maxWorkers) > 1) {
+    throw new Error(`This suite shares one test database and must run one file at a time (maxWorkers is ${globalConfig.maxWorkers}). Run "npm test" or "npx jest --runInBand".`);
+  }
+}
+
+module.exports = async function globalSetup(globalConfig) {
+  assertOneWorker(globalConfig);
   // Fully disposable: rebuilt from scratch on every test run, never reused
   // across runs, and never the same database as nexacrest_node_test (the
   // interactively-used dev/demo DB with real sample data).
@@ -66,5 +79,6 @@ module.exports = async function globalSetup() {
 };
 
 module.exports.DB_NAME = DB_NAME;
+module.exports.assertOneWorker = assertOneWorker;
 module.exports.TEST_ADMIN_EMAIL = TEST_ADMIN_EMAIL;
 module.exports.TEST_ADMIN_PASSWORD = TEST_ADMIN_PASSWORD;

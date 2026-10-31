@@ -57,6 +57,8 @@ describe('Payment Action Link (owner request 2026-10-27)', () => {
     await issuePi(orderId, clientId);
     page = await request(app).get(`/payment-action/${token}`);
     expect(page.text).toContain('Advance Payment');
+    // QA Round 7, R7-N09: the current payment's heading carries its number, as on PHP.
+    expect(page.text).toMatch(/<span class="intake-step-num">1<\/span> Advance Payment/);
     expect(page.text).toContain('USD 3,000.00');
     expect(page.text).toContain(`/payment-action/${token}/document`);
     const download = await request(app).get(`/payment-action/${token}/document`);

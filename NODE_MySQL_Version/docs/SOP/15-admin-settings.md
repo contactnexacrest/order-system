@@ -581,6 +581,9 @@ manual:
   with **Lost** and **Cancelled** rolled up as compact count-chips
   linking to the existing filtered list rather than given full columns —
   they're dead ends, not pipeline stages worth a whole column of cards.
+  The board opens on **Active** orders, exactly as the Standard list does;
+  choose **Docs Sent**, **Complete** or **All** in the filter row to see
+  the others (QA Round 7, R7-N08).
 - **Disputes** ([Chapter 11](./11-disputes.md)) — one column per
   `dispute_status` dropdown option, in whatever order Admin has them
   configured in (Open / Under Review / Resolved / Escalated by default).

@@ -7,5 +7,5 @@
         <?php foreach ($statuses as $key => $label): ?><option value="<?= $key ?>" <?= $status === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option><?php endforeach; ?>
       </select>
     </label>
-    <a class="btn-sm btn-secondary" href="/procurement/suppliers">Supplier performance</a>
+    <?php if (\App\Services\PermissionService::can((int) \App\Services\AuthService::currentUserId(), \App\Services\AuthService::currentUser()['role_id'] !== null ? (int) \App\Services\AuthService::currentUser()['role_id'] : null, 'manage_purchasing')): // QA R7-N07: the page needs manage_purchasing ?><a class="btn-sm btn-secondary" href="/procurement/suppliers">Supplier performance</a><?php endif; ?>
   </form>

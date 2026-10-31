@@ -156,6 +156,20 @@ final class PaymentMilestoneController
             ?? FieldValidator::bankReference($bankRef)
             ?? (\DateTime::createFromFormat('!Y-m-d', $receivedOn) === false || $receivedOn > date('Y-m-d') ? 'Enter the date the money was received — today or earlier.' : null)
             ?? (mb_strlen($note) > 255 ? 'The note can be at most 255 characters.' : null);
+        if ($error === null) {
+            // QA Round 7, R7-N03: the advance leg's rules — never more than the whole order, and an
+            // amount that differs from the milestone due by more than 1% is confirmed on purpose.
+            $order = OrderRepository::find($orderId) ?? [];
+            $currency = (string) ($order['currency_code'] ?? '');
+            $fob = \App\Repositories\OrderProductRepository::totalFobValue($orderId);
+            $due = round($fob * (float) $m['pct'] / 100, 2);
+            if ($fob > 0 && $amount > $fob + 0.005) {
+                $error = sprintf('%s %s is more than the whole order value (%s %s). Check the amount the bank received.', $currency, number_format($amount, 2), $currency, number_format($fob, 2));
+            } elseif ($due > 0 && abs($amount - $due) > max(1.0, $due * 0.01) && empty($_POST['confirm_amount_differs'])) {
+                $error = sprintf('Milestone %d due on this order is %s %s (%s%% of %s %s). You entered %s %s — if that really is what the bank received, tick "The amount received differs from the milestone due" and save again.',
+                    (int) $m['seq'], $currency, number_format($due, 2), self::pct((float) $m['pct']), $currency, number_format($fob, 2), $currency, number_format($amount, 2));
+            }
+        }
         if ($error !== null) {
             Flash::set('error', $error);
             self::back($orderId);

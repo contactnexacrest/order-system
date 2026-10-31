@@ -60,12 +60,15 @@ ini_set('error_log', $errorLogPath);
 
 set_exception_handler(function (\Throwable $e) use ($errorLogPath): void {
     error_log('[UNCAUGHT EXCEPTION] ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-    http_response_code(500);
-    if (Env::isLocal()) {
-        echo '<pre>' . htmlspecialchars((string) $e) . '</pre>';
-    } else {
-        echo '<h1>500 — Something went wrong</h1><p>The error has been logged.</p>';
+    // QA Round 7, R7-N04: a briefly unreachable database answers 503 (try again), not 500.
+    $response = \App\Helpers\DbResilience::errorResponse($e, Env::isLocal());
+    if (!headers_sent()) {
+        http_response_code($response['status']);
+        foreach ($response['headers'] as $name => $value) {
+            header($name . ': ' . $value);
+        }
     }
+    echo $response['body'];
 });
 
 // Fatal errors (parse errors, out-of-memory, ...) never reach

@@ -74,10 +74,14 @@
       }
 
       var showError = function () {
+        // QA Round 7, R7-N10: the submit check's own message (.form-field-error,
+        // e.g. "Please fill out this field.") stays until the field is valid —
+        // this handler only manages its own length message.
+        if (field.parentElement.querySelector('.form-field-error') && fieldError(field)) return;
         var val = field.value.trim();
         var invalid = val.length > 0 && val.length < MIN_LENGTH;
         field.classList.toggle('field-invalid', invalid);
-        var existingError = field.parentElement.querySelector('.reason-error');
+        var existingError = field.parentElement.querySelector('.reason-error:not(.form-field-error)');
         if (invalid) {
           if (hint) hint.style.display = 'none';
           if (!existingError) {

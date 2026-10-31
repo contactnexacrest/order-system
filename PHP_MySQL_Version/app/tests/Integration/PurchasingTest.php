@@ -89,6 +89,54 @@ final class PurchasingTest extends DbTestCase
         return (int) Database::connection()->query("SELECT MAX(id) FROM purchase_requirements WHERE order_id = {$this->orderId}")->fetchColumn();
     }
 
+    /** A user who holds a designation's role directly, with no department membership (QA Round 7, R7-N01). */
+    private function roleOnly(string $designation, ?float $limit): int
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT dd.id, r.name FROM department_designations dd JOIN roles r ON r.id = dd.role_id WHERE dd.title = :t');
+        $stmt->execute(['t' => $designation]);
+        $d = $stmt->fetch();
+        $pdo->prepare('UPDATE department_designations SET approval_limit_inr = :l WHERE id = :id')->execute(['l' => $limit, 'id' => $d['id']]);
+        $userId = $this->createTestUser($d['name']);
+        $pdo->prepare('INSERT INTO order_assignees (order_id, user_id) VALUES (:o, :u)')->execute(['u' => $userId, 'o' => $this->orderId]);
+        $this->signIn($userId);
+        return $userId;
+    }
+
+    /**
+     * QA Round 7, R7-N01 (High): the approval limit applies whatever the
+     * department state — a user holding the Procurement Manager role without
+     * a membership (or without choosing a department this session) is held
+     * to that designation's limit; with no known limit below director level
+     * nothing self-approves (fail closed).
+     */
+    public function testTheApprovalLimitAppliesWithoutADepartmentMembership(): void
+    {
+        $id = $this->raise();
+        $this->roleOnly('Procurement Manager', 100000.0);
+        $this->post('addQuote', ['supplier_id' => $this->supplierA, 'unit_price_inr' => '1500', 'gst_percent' => '18', 'lead_time_days' => '14'], ['id' => $id]);
+        $quote = PurchasingRepository::quotes($id)[0];
+        self::assertStringContainsString('It is above your approval limit and waits for an approver.', $this->post('award', ['quote_id' => $quote['id']], ['id' => $id])['message']);
+        self::assertSame('awarded', PurchasingRepository::find($id)['status']);
+
+        $this->roleOnly('Procurement Manager', 100000.0);
+        self::assertSame('This award (₹212,400.00) is above your approval limit of ₹100,000.00 — a higher approver must approve it.', $this->post('approve', [], ['id' => $id])['message']);
+        self::assertSame('awarded', PurchasingRepository::find($id)['status']);
+
+        // No limit set for a manager-level designation: unknown, so no self-approval.
+        $id2 = $this->raise();
+        $this->roleOnly('Procurement Manager', null);
+        $this->post('addQuote', ['supplier_id' => $this->supplierA, 'unit_price_inr' => '10', 'gst_percent' => '0', 'lead_time_days' => '14'], ['id' => $id2]);
+        $q2 = PurchasingRepository::quotes($id2)[0];
+        self::assertStringContainsString('It is above your approval limit and waits for an approver.', $this->post('award', ['quote_id' => $q2['id']], ['id' => $id2])['message']);
+        $this->roleOnly('Procurement Manager', null);
+        self::assertStringStartsWith('This award (₹1,200.00) is above your approval limit of ₹0.00', $this->post('approve', [], ['id' => $id2])['message']);
+
+        // A director (no limit) still approves without a membership.
+        $this->roleOnly('Procurement Director', null);
+        self::assertStringStartsWith('Purchase PR-' . $id . ' approved', $this->post('approve', [], ['id' => $id])['message']);
+    }
+
     public function testSalesRaisesARequirementWithChecks(): void
     {
         $this->signIn($this->createTestUser('Export Executive'));
@@ -141,7 +189,7 @@ final class PurchasingTest extends DbTestCase
     public function testReceiptRecordsTheQualityCheckAndFeedsSupplierPerformance(): void
     {
         $id = $this->raise();
-        $this->member('Procurement Manager', null);
+        $this->member('Procurement Manager', 500000.0); // R7-N01: a manager with no limit set no longer self-approves
         $this->post('addQuote', ['supplier_id' => $this->supplierA, 'unit_price_inr' => '1500', 'gst_percent' => '18', 'lead_time_days' => '14'], ['id' => $id]);
         $this->post('award', ['quote_id' => PurchasingRepository::quotes($id)[0]['id']], ['id' => $id]);
         $body = ['received_quantity' => '118', 'received_on' => date('Y-m-d'), 'qc_result' => 'passed_with_remarks'];
@@ -149,6 +197,38 @@ final class PurchasingTest extends DbTestCase
         self::assertSame("Receipt recorded for PR-{$id}: quality check passed with remarks.", $this->post('receive', $body + ['qc_note' => '2 slabs chipped at edge'], ['id' => $id])['message']);
         $perf = array_values(array_filter(PurchasingRepository::supplierPerformance(), fn (array $s): bool => (int) $s['id'] === $this->supplierA))[0];
         self::assertSame([1, 1, 1, 1, 0], [(int) $perf['quotes_given'], (int) $perf['awards_won'], (int) $perf['received'], (int) $perf['on_time'], (int) $perf['qc_failed']]);
+    }
+
+    /**
+     * QA Round 7, R7-N12: a double submit or a second person acting on the
+     * same purchase changes nothing — a duplicate raise is refused, and an
+     * award, approval or receipt applies only from the state it expects.
+     */
+    public function testProcurementStepsApplyOnlyOnceUnderDoubleSubmit(): void
+    {
+        $id = $this->raise();
+        $body = ['description' => 'Black granite slabs 2cm', 'quantity' => '120', 'unit' => 'sqm', 'needed_by' => date('Y-m-d', strtotime('+20 days'))];
+        $again = $this->post('raise', $body, ['id' => $this->orderId]);
+        self::assertSame('warning', $again['type']);
+        self::assertSame("The same requirement is already open as PR-{$id} — nothing new raised.", $again['message']);
+        self::assertSame(1, (int) Database::connection()->query("SELECT COUNT(*) FROM purchase_requirements WHERE order_id = {$this->orderId}")->fetchColumn());
+
+        $userId = $this->member('Procurement Manager', 500000.0);
+        $this->post('addQuote', ['supplier_id' => $this->supplierA, 'unit_price_inr' => '1500', 'gst_percent' => '18', 'lead_time_days' => '14'], ['id' => $id]);
+        $quoteId = (int) PurchasingRepository::quotes($id)[0]['id'];
+        $this->post('award', ['quote_id' => $quoteId], ['id' => $id]);
+        self::assertSame('approved', PurchasingRepository::find($id)['status']);
+        // A stale second award or approval no longer applies.
+        self::assertFalse(PurchasingRepository::award($id, $quoteId, $userId, true));
+        self::assertFalse(PurchasingRepository::approve($id, $userId));
+        self::assertSame('approved', PurchasingRepository::find($id)['status']);
+
+        $receipt = ['received_quantity' => '118', 'received_on' => date('Y-m-d'), 'qc_result' => 'passed'];
+        self::assertSame('success', $this->post('receive', $receipt, ['id' => $id])['type']);
+        $second = $this->post('receive', $receipt, ['id' => $id]);
+        self::assertSame('error', $second['type']);
+        self::assertFalse(PurchasingRepository::receive($id, 118.0, date('Y-m-d'), 'passed', null, $userId));
+        self::assertSame(1, (int) Database::connection()->query("SELECT COUNT(*) FROM purchase_requirements WHERE id = {$id} AND status = 'received'")->fetchColumn());
     }
 
     public function testARequirementOnAnOrderThePersonCannotSeeIsNotFound(): void
@@ -161,5 +241,24 @@ final class PurchasingTest extends DbTestCase
         ob_end_clean();
         self::assertSame(404, http_response_code());
         http_response_code(200);
+    }
+
+    /** QA Round 7, R7-N07: the Supplier performance link shows only to whoever can open it (manage_purchasing). */
+    public function testTheSuppliersLinkShowsOnlyWithManagePurchasing(): void
+    {
+        $pdo = Database::connection();
+        $roleId = \App\Repositories\RoleRepository::create('Approver Only ' . bin2hex(random_bytes(3)), null);
+        foreach (['approve_purchases', 'view_orders'] as $key) {
+            $pdo->prepare('INSERT INTO role_permissions (role_id, permission_id, is_enabled) SELECT :r, id, 1 FROM permissions WHERE permission_key = :k')->execute(['r' => $roleId, 'k' => $key]);
+        }
+        $approver = $this->createTestUser('Admin');
+        $pdo->prepare('UPDATE users SET role_id = :r WHERE id = :u')->execute(['r' => $roleId, 'u' => $approver]);
+        foreach ([[$approver, false], [$this->createTestUser('Procurement Manager'), true]] as [$userId, $sees]) {
+            $this->signIn($userId);
+            ob_start();
+            (new PurchasingController())->queue([]);
+            $html = (string) ob_get_clean();
+            self::assertSame($sees, str_contains($html, 'href="/procurement/suppliers"'), $sees ? 'a buyer sees it' : 'an approver-only user does not');
+        }
     }
 }

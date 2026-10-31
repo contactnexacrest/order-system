@@ -364,6 +364,10 @@ Each milestone is its own payment:
   — …) received from <buyer> for order <ref> · USD 2,250.00 at ₹84.10 ·
   against Proforma Invoice <PI no.> · bank ref UTR778899". A note you add is
   appended, never a replacement.
+  The amount cannot exceed the whole order value. If it differs from the
+  milestone due by more than 1% (for example, bank charges deducted), the
+  form asks you to tick "The amount received differs from the milestone
+  due" before it saves.
 - **Mark it cleared** once your bank confirms. The next revenue sync sends it
   to Zoho Books as a customer payment with that description — applied to the
   Commercial Invoice once the CI is in Books, held until then otherwise.

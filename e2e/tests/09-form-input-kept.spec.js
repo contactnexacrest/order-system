@@ -155,4 +155,20 @@ test.describe('Form input is kept and checked before submit', () => {
     await expect(page).toHaveURL(new RegExp(`${orderHref}$`));
     await expect(form.locator('textarea[name="body"] + .form-field-error')).toHaveText('Write a message or attach a file before posting.');
   });
+
+  // QA Round 7, R7-N10: an empty required reason keeps its message (and red border)
+  // after the person clicks into the field and leaves it again without typing.
+  test('a required reason keeps its message after leaving the field empty', async ({ page }) => {
+    await page.goto('/settings');
+    const reason = page.locator('#settings-reason');
+    const form = page.locator('form:has(#settings-reason)');
+    await form.locator('button[type="submit"]').evaluate((button) => button.click());
+    await expect(page).toHaveURL(/\/settings$/);
+    const message = form.locator('#settings-reason + .form-field-error, #settings-reason ~ .form-field-error');
+    await expect(message.first()).toBeVisible();
+    await reason.focus();
+    await reason.blur();
+    await expect(message.first()).toBeVisible();
+    await expect(reason).toHaveClass(/field-invalid/);
+  });
 });

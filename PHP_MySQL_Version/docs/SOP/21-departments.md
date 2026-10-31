@@ -85,7 +85,13 @@ sees "Supplier advance: paid on 12 Jun" without the bill.
 Downloads follow the same rule. A document, a bill scan or a payment
 screenshot downloads only for someone who may see the money it carries
 **and** who can open the order. The order dossier ZIP leaves out the files
-a person may not see.
+a person may not see. The order page shows such a file as plain text
+("Screenshot received", the file's label) instead of a link that would be
+refused.
+
+**Procurement sees the order number, not the client.** Anyone working as
+a Procurement designation sees orders by their number only: the client's
+name is left off the order page, the orders list and the Kanban board.
 
 Who does which money step:
 

@@ -209,17 +209,16 @@ function withFilledSegments(o) {
  * aren't given full board columns of their own — they're dead ends,
  * not pipeline stages — so they're rolled up into a compact summary
  * instead, same as every other real Kanban board treats a "won/lost"
- * outcome. Deliberately unpaginated and unfiltered by status: the
- * whole point of a board is seeing the entire active pipeline at a
- * glance, which the existing card-grid list already offers filtered/
- * paginated for anyone who wants that instead.
+ * outcome. Same status filters as the list, opening on Active like it
+ * (QA Round 7, R7-N08). Not paged yet: paging the board waits for the
+ * owner's answer to Q-R7-2.
  */
 async function indexKanban(req, res, seesAllOrders) {
   const all = await orderRepository.allVisibleTo(req.user.id, seesAllOrders);
   // Owner hard rule 2026-11-01: the board has the same status filters (with counts) as the list.
-  // No filter = the open pipeline (active, docs sent, complete); Lost and Cancelled get columns when chosen.
-  const statusFilter = String(req.query.status || '').trim();
-  const visible = statusFilter === '' ? all.filter((o) => !['lost', 'cancelled'].includes(o.status)) : filterByStatus(all, statusFilter);
+  // QA Round 7, R7-N08: no filter = Active, exactly as the Standard list opens; Lost and Cancelled get columns when chosen.
+  const statusFilter = String(req.query.status || '').trim() || 'active';
+  const visible = filterByStatus(all, statusFilter);
 
   const columns = [];
   for (const st of await lookupRepository.stagesMaster()) {
@@ -1179,6 +1178,14 @@ async function show(req, res) {
       // Owner decision D-214, phase 3: what the order needs from Procurement.
       purchaseRequirements: await purchasingRepository.forOrder(orderId),
       lineTypes: orderProductRepository.LINE_TYPES,
+      // QA Round 7, R7-N06: which of this order's files the person may download (a link that would answer 403 shows as text).
+      fileAllowed: await (async () => {
+        const allowed = {};
+        for (const f of await require('../repositories/fileStoreRepository').forOrder(orderId)) {
+          allowed[f.id] = await moneyVisibility.canSeeFile(req.permissions, f.id);
+        }
+        return allowed;
+      })(),
       // Owner decision D-215 (5a): product categories for the order line forms.
       productCategories: await require('../repositories/productCategoryRepository').all(),
       // Owner decision D-215 (5a): the order's own payment schedule (advance, milestones, balance).

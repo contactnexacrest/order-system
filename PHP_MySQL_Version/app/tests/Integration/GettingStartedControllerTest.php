@@ -51,6 +51,17 @@ final class GettingStartedControllerTest extends DbTestCase
         self::assertStringNotContainsString('id="nav-toggle"', $html);
     }
 
+    /** QA Round 7, R7-N16: below 900 px the chapter bar sits above the text and the reference table scrolls in its own box (Playwright 06-responsive checks the result at 390/768 px). */
+    public function testThePhoneLayoutStacksTheChapterBarAndKeepsTablesInsideTheScreen(): void
+    {
+        $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');
+        ob_start();
+        (new GettingStartedController())->show([]);
+        $html = (string) ob_get_clean();
+        self::assertMatchesRegularExpression('/@media \(max-width: 880px\)\{\s*\/\*[^*]*R7-N16[^*]*\*\/\s*\.gs-shell\{flex-direction:column;\}/', $html);
+        self::assertStringContainsString('@media (max-width: 880px){ .gs-reftable{display:block; overflow-x:auto;}', $html);
+    }
+
     public function testShowGreetsTheSignedInUserByName(): void
     {
         $userId = $this->createTestUser('Admin');

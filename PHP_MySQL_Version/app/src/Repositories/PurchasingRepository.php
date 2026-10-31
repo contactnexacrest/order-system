@@ -66,6 +66,28 @@ final class PurchasingRepository
         return $stmt->fetch() ?: null;
     }
 
+    /**
+     * QA Round 7, R7-N12: an identical requirement still open for the same
+     * order (two tabs, a retried request, two people at once) is not raised
+     * twice — the order row is locked while checking. Returns the new id, or
+     * the open duplicate's id negated.
+     */
+    public static function createUnlessDuplicate(int $orderId, ?int $orderProductId, string $description, ?string $specification, float $quantity, ?string $unit, string $neededBy, int $raisedBy, ?string $note): int
+    {
+        return (int) Database::transaction(static function () use ($orderId, $orderProductId, $description, $specification, $quantity, $unit, $neededBy, $raisedBy, $note): int {
+            $pdo = Database::connection();
+            $pdo->prepare('SELECT id FROM orders WHERE id = :o FOR UPDATE')->execute(['o' => $orderId]);
+            $stmt = $pdo->prepare("SELECT id FROM purchase_requirements WHERE order_id = :o AND description = :d AND quantity = :q AND needed_by = :n
+                                     AND (order_product_id <=> :p) AND status IN ('open', 'quoted') LIMIT 1");
+            $stmt->execute(['o' => $orderId, 'd' => $description, 'q' => $quantity, 'n' => $neededBy, 'p' => $orderProductId]);
+            $existing = $stmt->fetchColumn();
+            if ($existing !== false) {
+                return -(int) $existing;
+            }
+            return self::create($orderId, $orderProductId, $description, $specification, $quantity, $unit, $neededBy, $raisedBy, $note);
+        });
+    }
+
     public static function create(int $orderId, ?int $orderProductId, string $description, ?string $specification, float $quantity, ?string $unit, string $neededBy, int $raisedBy, ?string $note): int
     {
         $pdo = Database::connection();
@@ -81,27 +103,36 @@ final class PurchasingRepository
         Database::connection()->prepare('UPDATE purchase_requirements SET status = :s WHERE id = :id')->execute(['s' => $status, 'id' => $id]);
     }
 
-    public static function award(int $id, int $quoteId, int $userId, bool $approvalNeeded): void
+    /** QA Round 7, R7-N12: only from open/quoted, in one statement; false when someone else got there first. */
+    public static function award(int $id, int $quoteId, int $userId, bool $approvalNeeded): bool
     {
-        Database::connection()->prepare(
+        $stmt = Database::connection()->prepare(
             "UPDATE purchase_requirements SET awarded_quote_id = :q, awarded_by = :u, awarded_at = NOW(), approval_needed = :n,
                     status = :s, approved_by = :ab, approved_at = IF(:n2 = 1, NULL, NOW())
-              WHERE id = :id"
-        )->execute(['q' => $quoteId, 'u' => $userId, 'n' => (int) $approvalNeeded, 'n2' => (int) $approvalNeeded,
+              WHERE id = :id AND status IN ('open', 'quoted')"
+        );
+        $stmt->execute(['q' => $quoteId, 'u' => $userId, 'n' => (int) $approvalNeeded, 'n2' => (int) $approvalNeeded,
             's' => $approvalNeeded ? 'awarded' : 'approved', 'ab' => $approvalNeeded ? null : $userId, 'id' => $id]);
+        return $stmt->rowCount() === 1;
     }
 
-    public static function approve(int $id, int $userId): void
+    /** QA Round 7, R7-N12: only from awarded, in one statement; false when someone else got there first. */
+    public static function approve(int $id, int $userId): bool
     {
-        Database::connection()->prepare("UPDATE purchase_requirements SET status = 'approved', approved_by = :u, approved_at = NOW() WHERE id = :id")
-            ->execute(['u' => $userId, 'id' => $id]);
+        $stmt = Database::connection()->prepare("UPDATE purchase_requirements SET status = 'approved', approved_by = :u, approved_at = NOW() WHERE id = :id AND status = 'awarded'");
+        $stmt->execute(['u' => $userId, 'id' => $id]);
+        return $stmt->rowCount() === 1;
     }
 
-    public static function receive(int $id, float $quantity, string $receivedOn, string $qcResult, ?string $qcNote, int $userId): void
+    /** QA Round 7, R7-N12: only from approved, in one statement; false when someone else got there first. */
+    public static function receive(int $id, float $quantity, string $receivedOn, string $qcResult, ?string $qcNote, int $userId): bool
     {
-        Database::connection()->prepare(
-            "UPDATE purchase_requirements SET status = 'received', received_quantity = :q, received_on = :d, qc_result = :r, qc_note = :n, received_by = :u WHERE id = :id"
-        )->execute(['q' => $quantity, 'd' => $receivedOn, 'r' => $qcResult, 'n' => $qcNote, 'u' => $userId, 'id' => $id]);
+        $stmt = Database::connection()->prepare(
+            "UPDATE purchase_requirements SET status = 'received', received_quantity = :q, received_on = :d, qc_result = :r, qc_note = :n, received_by = :u
+              WHERE id = :id AND status = 'approved'"
+        );
+        $stmt->execute(['q' => $quantity, 'd' => $receivedOn, 'r' => $qcResult, 'n' => $qcNote, 'u' => $userId, 'id' => $id]);
+        return $stmt->rowCount() === 1;
     }
 
     /** @return list<array<string,mixed>> a requirement's quotes, cheapest landed value first */

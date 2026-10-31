@@ -45,6 +45,29 @@ async function find(id) {
   return db.queryOne(`${SELECT} WHERE pr.id = :id`, { id });
 }
 
+/**
+ * QA Round 7, R7-N12: an identical requirement still open for the same order (two tabs, a
+ * retried request, two people at once) is not raised twice — the order row is locked while
+ * checking. Returns the new id, or the open duplicate's id negated.
+ */
+async function createUnlessDuplicate(orderId, orderProductId, description, specification, quantity, unit, neededBy, raisedBy, note) {
+  return db.transaction(async (tx) => {
+    await tx.query('SELECT id FROM orders WHERE id = :o FOR UPDATE', { o: orderId });
+    const existing = await tx.queryOne(
+      `SELECT id FROM purchase_requirements WHERE order_id = :o AND description = :d AND quantity = :q AND needed_by = :n
+         AND (order_product_id <=> :p) AND status IN ('open', 'quoted') LIMIT 1`,
+      { o: orderId, d: description, q: quantity, n: neededBy, p: orderProductId }
+    );
+    if (existing) return -Number(existing.id);
+    const result = await tx.execute(
+      `INSERT INTO purchase_requirements (order_id, order_product_id, description, specification, quantity, unit, needed_by, raised_by, note)
+       VALUES (:o, :p, :d, :s, :q, :u, :n, :r, :note)`,
+      { o: orderId, p: orderProductId, d: description, s: specification, q: quantity, u: unit, n: neededBy, r: raisedBy, note }
+    );
+    return result.insertId;
+  });
+}
+
 async function create(orderId, orderProductId, description, specification, quantity, unit, neededBy, raisedBy, note) {
   const result = await db.execute(
     `INSERT INTO purchase_requirements (order_id, order_product_id, description, specification, quantity, unit, needed_by, raised_by, note)
@@ -58,24 +81,30 @@ async function setStatus(id, status) {
   await db.execute('UPDATE purchase_requirements SET status = :s WHERE id = :id', { s: status, id });
 }
 
+/** QA Round 7, R7-N12: only from open/quoted, in one statement; false when someone else got there first. */
 async function award(id, quoteId, userId, approvalNeeded) {
-  await db.execute(
+  const result = await db.execute(
     `UPDATE purchase_requirements SET awarded_quote_id = :q, awarded_by = :u, awarded_at = NOW(), approval_needed = :n,
             status = :s, approved_by = :ab, approved_at = IF(:n2 = 1, NULL, NOW())
-      WHERE id = :id`,
+      WHERE id = :id AND status IN ('open', 'quoted')`,
     { q: quoteId, u: userId, n: approvalNeeded ? 1 : 0, n2: approvalNeeded ? 1 : 0, s: approvalNeeded ? 'awarded' : 'approved', ab: approvalNeeded ? null : userId, id }
   );
+  return result.affectedRows === 1;
 }
 
+/** QA Round 7, R7-N12: only from awarded, in one statement; false when someone else got there first. */
 async function approve(id, userId) {
-  await db.execute("UPDATE purchase_requirements SET status = 'approved', approved_by = :u, approved_at = NOW() WHERE id = :id", { u: userId, id });
+  const result = await db.execute("UPDATE purchase_requirements SET status = 'approved', approved_by = :u, approved_at = NOW() WHERE id = :id AND status = 'awarded'", { u: userId, id });
+  return result.affectedRows === 1;
 }
 
+/** QA Round 7, R7-N12: only from approved, in one statement; false when someone else got there first. */
 async function receive(id, quantity, receivedOn, qcResult, qcNote, userId) {
-  await db.execute(
-    "UPDATE purchase_requirements SET status = 'received', received_quantity = :q, received_on = :d, qc_result = :r, qc_note = :n, received_by = :u WHERE id = :id",
+  const result = await db.execute(
+    "UPDATE purchase_requirements SET status = 'received', received_quantity = :q, received_on = :d, qc_result = :r, qc_note = :n, received_by = :u WHERE id = :id AND status = 'approved'",
     { q: quantity, d: receivedOn, r: qcResult, n: qcNote, u: userId, id }
   );
+  return result.affectedRows === 1;
 }
 
 /** A requirement's quotes, cheapest landed value first. */
@@ -120,5 +149,6 @@ async function supplierPerformance() {
 
 module.exports = {
   board,
+  createUnlessDuplicate,
   STATUSES, forOrder, queue, find, create, setStatus, award, approve, receive, quotes, findQuote, addQuote, supplierPerformance,
 };

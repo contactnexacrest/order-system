@@ -79,8 +79,13 @@ async function raise(req, res) {
   const spec = specRaw || null;
   const unitRaw = scalarString(req.body.unit) || (product && product.unit) || null;
   const qty = Math.round(Number(quantity) * 1000) / 1000;
-  const id = await purchasingRepository.create(orderId, product ? productId : null, description, spec !== null ? [...spec].slice(0, 1000).join('') : null,
+  const id = await purchasingRepository.createUnlessDuplicate(orderId, product ? productId : null, description, spec !== null ? [...spec].slice(0, 1000).join('') : null,
     qty, unitRaw !== null ? [...String(unitRaw)].slice(0, 20).join('') : null, neededBy, req.user.id, String(req.body.note ?? '').trim() || null);
+  if (id < 0) {
+    flash.set(req, 'warning', `The same requirement is already open as PR-${-id} — nothing new raised.`);
+    res.redirect(back);
+    return;
+  }
   await auditLogRepository.log(req.user.id, 'PURCHASE_REQUIREMENT_RAISED', 'purchase_requirements', id, null, null,
     `${order.order_reference}: ${description} × ${trimQty(quantity)}${unitRaw ? ` ${unitRaw}` : ''} by ${neededBy}`);
   flash.set(req, 'success', `Purchase requirement PR-${id} raised for Procurement: ${description}, needed by ${neededBy}.`);
@@ -183,7 +188,11 @@ async function award(req, res) {
   }
   const value = purchasingService.awardValue(quote, r.quantity);
   const needsApproval = await purchasingService.needsApproval(req, req.user.id, value);
-  await purchasingRepository.award(r.id, quote.id, req.user.id, needsApproval);
+  if (!(await purchasingRepository.award(r.id, quote.id, req.user.id, needsApproval))) {
+    flash.set(req, 'error', 'This purchase has just been awarded by someone else — nothing changed.');
+    res.redirect(`/procurement/${r.id}`);
+    return;
+  }
   await auditLogRepository.log(req.user.id, 'PURCHASE_AWARDED', 'purchase_requirements', r.id, 'awarded_quote_id', r.awarded_quote_id !== null ? String(r.awarded_quote_id) : null,
     `${quote.supplier_legal_name} ₹${fmt(value)}${needsApproval ? ' (waiting for approval)' : ''}`);
   flash.set(req, 'success', `Awarded to ${quote.supplier_legal_name} for ₹${fmt(value)}. `
@@ -205,7 +214,11 @@ async function approve(req, res) {
     fail(req, res, refusal, back);
     return;
   }
-  await purchasingRepository.approve(r.id, req.user.id);
+  if (!(await purchasingRepository.approve(r.id, req.user.id))) {
+    flash.set(req, 'error', 'This purchase has just been approved by someone else — nothing changed.');
+    res.redirect(`/procurement/${r.id}`);
+    return;
+  }
   await auditLogRepository.log(req.user.id, 'PURCHASE_APPROVED', 'purchase_requirements', r.id, null, null, `${r.awarded_supplier_name} ₹${fmt(value)}`);
   flash.set(req, 'success', `Purchase PR-${r.id} approved: ${r.awarded_supplier_name}, ₹${fmt(value)}.`);
   res.redirect(back);
@@ -229,7 +242,11 @@ async function receive(req, res) {
     fail(req, res, error, back);
     return;
   }
-  await purchasingRepository.receive(r.id, Math.round(Number(qty) * 1000) / 1000, on, qc, note !== '' ? [...note].slice(0, 500).join('') : null, req.user.id);
+  if (!(await purchasingRepository.receive(r.id, Math.round(Number(qty) * 1000) / 1000, on, qc, note !== '' ? [...note].slice(0, 500).join('') : null, req.user.id))) {
+    flash.set(req, 'error', 'Receipt for this purchase has just been recorded by someone else — nothing changed.');
+    res.redirect(`/procurement/${r.id}`);
+    return;
+  }
   await auditLogRepository.log(req.user.id, 'PURCHASE_RECEIVED', 'purchase_requirements', r.id, 'qc_result', null, `${trimQty(qty)} received ${on}, QC ${QC_RESULTS[qc]}`);
   flash.set(req, 'success', `Receipt recorded for PR-${r.id}: quality check ${QC_RESULTS[qc].toLowerCase()}.`);
   res.redirect(back);

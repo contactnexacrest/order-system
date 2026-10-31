@@ -139,6 +139,23 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
     }
   });
 
+  // QA Round 7, R7-N08: with no filter chosen, the list and the board open on
+  // the same orders (Active) — the board used to add Docs Sent and Complete.
+  it('opens the Orders list and board on the same orders', async () => {
+    const active = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [userId]);
+    const complete = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [userId]);
+    const docsSent = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [userId]);
+    await db.execute("UPDATE orders SET status = 'complete' WHERE id = :id", { id: complete });
+    await db.execute("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id", { id: docsSent });
+    const mine = [`/orders/${active}`, `/orders/${complete}`, `/orders/${docsSent}`];
+    const list = parts((await agent.get('/orders?view=list')).text).records.filter((r) => mine.includes(r));
+    const boardHtml = (await agent.get('/orders')).text;
+    const board = parts(boardHtml).records.filter((r) => mine.includes(r));
+    expect(board).toEqual([`/orders/${active}`]);
+    expect(list).toEqual(board);
+    expect(boardHtml).toContain('class="filter-chip active" href="/orders?status=active">Active');
+  });
+
   it('offers a Standard user no switch to the board', async () => {
     await userRepository.updateUiTemplatePreference(userId, null);
     for (const [page, , boardUrl] of PAGES) {

@@ -744,6 +744,54 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     ['GET', '/users/:id/edit'], ['POST', '/users/:id/toggle-active'], ['POST', '/users/:id/unarchive'], ['POST', '/users/:id/update'],
   ];
 
+  // ---------------------------------------------------------------- QA Round 7: the six routes with no behaviour test
+
+  // QA Round 7 (TEST_STATISTICS): these six routes had no behaviour test in either suite.
+  it('Round 7 routes do what they say', async () => {
+    const departmentRepository = require('../../src/repositories/departmentRepository');
+    const orderProductRepository = require('../../src/repositories/orderProductRepository');
+    const orderPaymentStatusRepository = require('../../src/repositories/orderPaymentStatusRepository');
+    const purchasingRepository = require('../../src/repositories/purchasingRepository');
+
+    const code = `RT${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const dept = await departmentRepository.createDepartment(code, `Route Dept ${code}`, '#123456');
+    expectDone(await holder.call('POST', `/admin/departments/${dept}/update`, { name: `Route Dept ${code} B`, color: '#654321', is_active: '1' }),
+      'POST /admin/departments/:id/update', `Department "Route Dept ${code} B" saved.`);
+    expect(await db.queryOne('SELECT name, color FROM departments WHERE id = :id', { id: dept })).toEqual({ name: `Route Dept ${code} B`, color: '#654321' });
+    expect(await audits('DEPARTMENT_UPDATED', dept)).toBe(1);
+    expect((await holder.call('POST', `/admin/departments/${dept}/update`, { name: 'X', color: '#654321' })).type).toBe('error');
+
+    expectPage(await holder.call('GET', '/cockpit'), 'Management cockpit', 'GET /cockpit');
+
+    const order = await createTestOrder(await createTestClient(), 'FOB', 'Extended Terms — Before Shipment');
+    await orderProductRepository.add(order, 1, 'Black granite headstone', '60x30', 'Polished', '100', false, 'PCS', '45.00');
+    await orderPaymentStatusRepository.initializeForOrder(order);
+    const due = 'on shipment — within 3 Calendar Days of receiving the scanned Bill of Lading';
+    expectDone(await holder.call('POST', `/orders/${order}/payment-schedule`, { milestone_pct: ['50'], milestone_due: [due] }),
+      'POST /orders/:id/payment-schedule', 'Payment schedule saved: 30% advance · 50% ');
+    const milestone = Number(await value('SELECT id FROM order_payment_milestones WHERE order_id = :o AND seq = 2', { o: order }));
+    expect(milestone).toBeGreaterThan(0);
+    expect(String(await value('SELECT balance_pct FROM orders WHERE id = :o', { o: order }))).toBe('20.00');
+
+    await createTestDocument(order, 'PI', 'approved');
+    expectDone(await holder.call('POST', `/orders/${order}/payment/milestones/${milestone}`, { amount: '2250', exchange_rate: '84.1', bank_reference: 'UTR-RT7', received_on: todayIst() }),
+      'POST /orders/:id/payment/milestones/:milestoneId', 'bank ref UTR-RT7');
+    expect(String(await value('SELECT received_amount FROM order_payment_milestones WHERE id = :m', { m: milestone }))).toBe('2250.00');
+    expect(await audits('MILESTONE_PAYMENT_RECORDED', milestone)).toBe(1);
+
+    expectDone(await holder.call('POST', `/orders/${order}/payment/milestones/${milestone}/clear`, { cleared_on: todayIst() }),
+      'POST /orders/:id/payment/milestones/:milestoneId/clear', 'Milestone 2 cleared.');
+    expect(String(await value('SELECT cleared_on FROM order_payment_milestones WHERE id = :m', { m: milestone })).slice(0, 10)).toBe(todayIst());
+    expect(await audits('MILESTONE_PAYMENT_CLEARED', milestone)).toBe(1);
+    expect((await holder.call('POST', `/orders/${order}/payment/milestones/999999999/clear`, { cleared_on: todayIst() })).status).toBe(404);
+
+    const pr = await purchasingRepository.create(order, null, 'Route test blocks', null, 5, 'CBM', todayIst(), holder.userId, null);
+    expect((await holder.call('POST', `/procurement/${pr}/cancel`, { reason: 'no' })).type).toBe('error');
+    expectDone(await holder.call('POST', `/procurement/${pr}/cancel`, { reason: 'Buyer dropped this line from the order' }), 'POST /procurement/:id/cancel', `PR-${pr} cancelled.`);
+    expect(await value('SELECT status FROM purchase_requirements WHERE id = :id', { id: pr })).toBe('cancelled');
+    expect(await audits('PURCHASE_REQUIREMENT_CANCELLED', pr)).toBe(1);
+  });
+
   it('every route answers a missing id as not found and writes nothing', async () => {
     // Other test files run alongside this one, so the check is on audit rows for the missing id itself.
     const auditBefore = Number(await value('SELECT COUNT(*) AS n FROM audit_log WHERE entity_id = 999999999'));

@@ -38,6 +38,18 @@ working as:
   limit covers it. Nobody approves their own award (Admin, MD and ED
   excepted, as for other approvals).
 
+The limit applies whatever the department state: a person who holds a
+Procurement role without a department membership, or who has not chosen a
+department this session, is held to that designation's limit. Where no
+limit is set below Director level, the limit counts as ₹0, so the award
+waits for an approver (nobody self-approves on an unknown limit).
+
+Each step applies once. A second click, or a colleague acting on the same
+purchase at the same moment, changes nothing: raising the same requirement
+again shows "The same requirement is already open as PR-N — nothing new
+raised.", and a second award, approval or receipt says someone else has
+just done it.
+
 Starting limits (change them in **Admin → Departments → Edit**):
 
 | Designation | Approves up to |
@@ -45,6 +57,7 @@ Starting limits (change them in **Admin → Departments → Edit**):
 | Procurement Executive | ₹0 — every award goes to a manager |
 | Procurement Manager | ₹5,00,000 |
 | Procurement Director, MD/ED | no limit |
+| Procurement Manager with no limit set | ₹0 (waits for an approver) |
 
 ## 5. Receipt and quality check
 
@@ -56,7 +69,8 @@ check found unless it passed.
 
 **Procurement → Supplier performance** shows, for each supplier: quotes
 given, awards won, receipts, how many came by the needed-by date, and how
-many failed the quality check.
+many failed the quality check. The link shows only to people with **Manage
+purchasing**, the permission the page needs.
 
 ## 7. Cancelling
 

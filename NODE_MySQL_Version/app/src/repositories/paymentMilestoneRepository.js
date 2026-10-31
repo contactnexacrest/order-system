@@ -53,6 +53,8 @@ const r2 = (n) => Math.round(Number(n) * 100) / 100;
 /** Replaces the order's middle steps and sets its balance % to what is left (advance + steps + balance = 100). Saved together or not at all. */
 async function replaceSchedule(orderId, steps, advancePct) {
   await db.transaction(async (tx) => {
+    // QA Round 7, R7-N11: two saves at once used to deadlock (DELETE + INSERT); one at a time per order.
+    await tx.query('SELECT id FROM orders WHERE id = :o FOR UPDATE', { o: orderId });
     await tx.execute('DELETE FROM order_payment_milestones WHERE order_id = :o', { o: orderId });
     let total = 0;
     for (let i = 0; i < steps.length; i++) {

@@ -983,4 +983,53 @@ final class RouteBehaviourTest extends DbTestCase
         self::assertSame(92, count(self::ID_ROUTES));
         self::assertSame($auditBefore, (int) $this->value('SELECT COUNT(*) FROM audit_log'), 'no audit row for a record that does not exist');
     }
+
+    // ---------------------------------------------------------------- QA Round 7: the six routes with no behaviour test
+
+    /**
+     * QA Round 7 (TEST_STATISTICS): POST /admin/departments/{id}/update,
+     * GET /cockpit, POST /orders/{id}/payment-schedule,
+     * POST /orders/{id}/payment/milestones/{milestoneId}, its /clear, and
+     * POST /procurement/{id}/cancel had no behaviour test in either suite.
+     */
+    public function testRoundSevenRoutesDoWhatTheySay(): void
+    {
+        $code = 'RT' . strtoupper(bin2hex(random_bytes(3)));
+        $dept = \App\Repositories\DepartmentRepository::createDepartment($code, "Route Dept {$code}", '#123456');
+        $r = $this->call('POST', "/admin/departments/{$dept}/update", ['name' => "Route Dept {$code} B", 'color' => '#654321', 'is_active' => '1']);
+        $this->assertDone($r, 'POST /admin/departments/{id}/update', "Department \"Route Dept {$code} B\" saved.");
+        self::assertSame(["Route Dept {$code} B", '#654321'], array_values(Database::connection()->query("SELECT name, color FROM departments WHERE id = {$dept}")->fetch(\PDO::FETCH_NUM)));
+        self::assertSame(1, $this->audits('DEPARTMENT_UPDATED', $dept));
+        self::assertSame('error', $this->call('POST', "/admin/departments/{$dept}/update", ['name' => 'X', 'color' => '#654321'])['type']);
+
+        $this->assertPage($this->call('GET', '/cockpit'), 'Management cockpit', 'GET /cockpit');
+
+        $order = $this->createTestOrder($this->createTestClient(), 'FOB', 'Extended Terms — Before Shipment');
+        \App\Repositories\OrderProductRepository::add($order, 1, 'Black granite headstone', '60x30', 'Polished', '100', false, 'PCS', '45.00');
+        \App\Repositories\OrderPaymentStatusRepository::initializeForOrder($order);
+        $due = 'on shipment — within 3 Calendar Days of receiving the scanned Bill of Lading';
+        $r = $this->call('POST', "/orders/{$order}/payment-schedule", ['milestone_pct' => ['50'], 'milestone_due' => [$due]]);
+        $this->assertDone($r, 'POST /orders/{id}/payment-schedule', 'Payment schedule saved: 30% advance · 50% ');
+        $milestone = (int) $this->value("SELECT id FROM order_payment_milestones WHERE order_id = {$order} AND seq = 2");
+        self::assertGreaterThan(0, $milestone);
+        self::assertSame('20.00', (string) $this->value("SELECT balance_pct FROM orders WHERE id = {$order}"));
+
+        $this->createTestDocument($order, 'PI', 'approved');
+        $r = $this->call('POST', "/orders/{$order}/payment/milestones/{$milestone}", ['amount' => '2250', 'exchange_rate' => '84.1', 'bank_reference' => 'UTR-RT7', 'received_on' => date('Y-m-d')]);
+        $this->assertDone($r, 'POST /orders/{id}/payment/milestones/{milestoneId}', 'bank ref UTR-RT7');
+        self::assertSame('2250.00', (string) $this->value("SELECT received_amount FROM order_payment_milestones WHERE id = {$milestone}"));
+        self::assertSame(1, $this->audits('MILESTONE_PAYMENT_RECORDED', $milestone));
+
+        $r = $this->call('POST', "/orders/{$order}/payment/milestones/{$milestone}/clear", ['cleared_on' => date('Y-m-d')]);
+        $this->assertDone($r, 'POST /orders/{id}/payment/milestones/{milestoneId}/clear', 'Milestone 2 cleared.');
+        self::assertSame(date('Y-m-d'), substr((string) $this->value("SELECT cleared_on FROM order_payment_milestones WHERE id = {$milestone}"), 0, 10));
+        self::assertSame(1, $this->audits('MILESTONE_PAYMENT_CLEARED', $milestone));
+        self::assertSame(404, $this->call('POST', "/orders/{$order}/payment/milestones/999999999/clear", ['cleared_on' => date('Y-m-d')])['code']);
+
+        $pr = \App\Repositories\PurchasingRepository::create($order, null, 'Route test blocks', null, 5.0, 'CBM', date('Y-m-d', strtotime('+5 days')), $this->holder, null);
+        self::assertSame('error', $this->call('POST', "/procurement/{$pr}/cancel", ['reason' => 'no'])['type']);
+        $this->assertDone($this->call('POST', "/procurement/{$pr}/cancel", ['reason' => 'Buyer dropped this line from the order']), 'POST /procurement/{id}/cancel', "PR-{$pr} cancelled.");
+        self::assertSame('cancelled', $this->value("SELECT status FROM purchase_requirements WHERE id = {$pr}"));
+        self::assertSame(1, $this->audits('PURCHASE_REQUIREMENT_CANCELLED', $pr));
+    }
 }

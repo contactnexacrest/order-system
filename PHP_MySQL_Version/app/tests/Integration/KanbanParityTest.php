@@ -175,6 +175,31 @@ final class KanbanParityTest extends DbTestCase
         }
     }
 
+    /**
+     * QA Round 7, R7-N08: with no filter chosen, the list and the board open
+     * on the same orders (Active) — the board used to add Docs Sent and
+     * Complete orders.
+     */
+    public function testTheOrdersListAndBoardOpenOnTheSameOrders(): void
+    {
+        $active = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [$this->userId]);
+        $complete = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [$this->userId]);
+        $docsSent = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [$this->userId]);
+        $pdo = \App\Config\Database::connection();
+        $pdo->prepare("UPDATE orders SET status = 'complete' WHERE id = :id")->execute(['id' => $complete]);
+        $pdo->prepare("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id")->execute(['id' => $docsSent]);
+
+        $list = self::parts($this->render(new OrderController(), 'index', ['view' => 'list']));
+        $board = self::parts($this->render(new OrderController(), 'index', []));
+        self::assertContains("/orders/{$active}", $board['records']);
+        self::assertNotContains("/orders/{$complete}", $board['records']);
+        self::assertNotContains("/orders/{$docsSent}", $board['records']);
+        self::assertContains("/orders/{$active}", $list['records']);
+        self::assertSame(array_values(array_intersect($list['records'], ["/orders/{$active}", "/orders/{$complete}", "/orders/{$docsSent}"])),
+            array_values(array_intersect($board['records'], ["/orders/{$active}", "/orders/{$complete}", "/orders/{$docsSent}"])));
+        self::assertStringContainsString('class="filter-chip active" href="/orders?status=active">Active', $this->render(new OrderController(), 'index', []));
+    }
+
     public function testAStandardUserSeesNoSwitchToTheBoard(): void
     {
         UserRepository::updateUiTemplatePreference($this->userId, null);

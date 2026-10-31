@@ -86,8 +86,13 @@ final class PurchasingController
         }
         $spec = trim((string) ($_POST['specification'] ?? '')) ?: trim(implode(' · ', array_filter([(string) ($product['material'] ?? ''), (string) ($product['finish'] ?? ''), (string) ($product['dimensions'] ?? '')]))) ?: null;
         $unit = Input::scalarString($_POST['unit'] ?? '') ?: ($product['unit'] ?? null);
-        $id = PurchasingRepository::create($orderId, $product !== null ? $productId : null, $description, $spec !== null ? mb_substr($spec, 0, 1000) : null,
+        $id = PurchasingRepository::createUnlessDuplicate($orderId, $product !== null ? $productId : null, $description, $spec !== null ? mb_substr($spec, 0, 1000) : null,
             round((float) $quantity, 3), $unit !== null ? mb_substr((string) $unit, 0, 20) : null, $neededBy, (int) $user['id'], trim((string) ($_POST['note'] ?? '')) ?: null);
+        if ($id < 0) {
+            Flash::set('warning', 'The same requirement is already open as PR-' . (-$id) . ' — nothing new raised.');
+            header($back);
+            return;
+        }
         AuditLogRepository::log((int) $user['id'], 'PURCHASE_REQUIREMENT_RAISED', 'purchase_requirements', $id, null, null,
             "{$order['order_reference']}: {$description} × " . rtrim(rtrim(number_format((float) $quantity, 3, '.', ''), '0'), '.') . ($unit ? " {$unit}" : '') . " by {$neededBy}");
         Flash::set('success', "Purchase requirement PR-{$id} raised for Procurement: {$description}, needed by {$neededBy}.");
@@ -199,7 +204,11 @@ final class PurchasingController
         }
         $value = PurchasingService::awardValue($quote, (float) $r['quantity']);
         $needsApproval = PurchasingService::needsApproval((int) $user['id'], $value);
-        PurchasingRepository::award((int) $r['id'], (int) $quote['id'], (int) $user['id'], $needsApproval);
+        if (!PurchasingRepository::award((int) $r['id'], (int) $quote['id'], (int) $user['id'], $needsApproval)) {
+            Flash::set('error', 'This purchase has just been awarded by someone else — nothing changed.');
+            self::back((int) $r['id']);
+            return;
+        }
         AuditLogRepository::log((int) $user['id'], 'PURCHASE_AWARDED', 'purchase_requirements', (int) $r['id'], 'awarded_quote_id', $r['awarded_quote_id'] !== null ? (string) $r['awarded_quote_id'] : null,
             "{$quote['supplier_legal_name']} ₹" . number_format($value, 2) . ($needsApproval ? ' (waiting for approval)' : ''));
         Flash::set('success', "Awarded to {$quote['supplier_legal_name']} for ₹" . number_format($value, 2) . '. '
@@ -226,7 +235,11 @@ final class PurchasingController
             self::back((int) $r['id']);
             return;
         }
-        PurchasingRepository::approve((int) $r['id'], (int) $user['id']);
+        if (!PurchasingRepository::approve((int) $r['id'], (int) $user['id'])) {
+            Flash::set('error', 'This purchase has just been approved by someone else — nothing changed.');
+            self::back((int) $r['id']);
+            return;
+        }
         AuditLogRepository::log((int) $user['id'], 'PURCHASE_APPROVED', 'purchase_requirements', (int) $r['id'], null, null, "{$r['awarded_supplier_name']} ₹" . number_format($value, 2));
         Flash::set('success', "Purchase PR-{$r['id']} approved: {$r['awarded_supplier_name']}, ₹" . number_format($value, 2) . '.');
         self::back((int) $r['id']);
@@ -256,7 +269,11 @@ final class PurchasingController
             self::back((int) $r['id']);
             return;
         }
-        PurchasingRepository::receive((int) $r['id'], round((float) $qty, 3), $on, $qc, $note !== '' ? mb_substr($note, 0, 500) : null, (int) $user['id']);
+        if (!PurchasingRepository::receive((int) $r['id'], round((float) $qty, 3), $on, $qc, $note !== '' ? mb_substr($note, 0, 500) : null, (int) $user['id'])) {
+            Flash::set('error', 'Receipt for this purchase has just been recorded by someone else — nothing changed.');
+            self::back((int) $r['id']);
+            return;
+        }
         AuditLogRepository::log((int) $user['id'], 'PURCHASE_RECEIVED', 'purchase_requirements', (int) $r['id'], 'qc_result', null,
             rtrim(rtrim(number_format((float) $qty, 3, '.', ''), '0'), '.') . " received {$on}, QC " . self::QC_RESULTS[$qc]);
         Flash::set('success', "Receipt recorded for PR-{$r['id']}: quality check " . strtolower(self::QC_RESULTS[$qc]) . '.');

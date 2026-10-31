@@ -39,6 +39,9 @@ async function show(req, res) {
     legInfo: leg ? paymentActionService.LEGS[leg] : null,
     document: leg ? await paymentActionService.issuedDocument(order.id, leg) : null,
     amountDue: leg ? await paymentActionService.amountDue(order, leg) : null,
+    // QA Round 7, R7-N09: the current payment's number in the strip (as PHP: array_search + 1) —
+    // Nunjucks drops a variable first set inside a {% for %} when the loop ends.
+    currentNum: leg ? Object.keys(current.legs || {}).indexOf(leg) + 1 : null,
   }, 'layout/bare');
 }
 

@@ -60,6 +60,13 @@ final class AmendmentController
             ?? FieldValidator::decimal($raw('amended_advance_amount'), 'Amended advance amount')
             ?? FieldValidator::wholeNumber($raw('amended_balance_days'), 'Amended balance days', 1)
             ?? FieldValidator::decimal($raw('amended_balance_amount'), 'Amended balance amount');
+        // QA Round 7, R7-N14: an impossible date (2026-02-30, 31/10/2026, text) used to reach the database and show a generic error.
+        if ($numberError === null && $effectiveFrom !== null) {
+            $d = \DateTime::createFromFormat('!Y-m-d', $effectiveFrom);
+            if ($d === false || $d->format('Y-m-d') !== $effectiveFrom) {
+                $numberError = 'Effective from: enter a valid date (YYYY-MM-DD).';
+            }
+        }
         if ($numberError !== null) {
             Flash::set('error', $numberError);
             header("Location: /orders/{$orderId}/amendments");

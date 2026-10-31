@@ -129,11 +129,25 @@ async function record(req, res) {
   const bankRef = String(req.body.bank_reference ?? '').trim();
   const receivedOn = String(req.body.received_on ?? '').trim() || todayIst();
   const note = String(req.body.staff_note ?? '').trim();
-  const error = fieldValidator.moneyAmount(amount, `The milestone ${m.seq} amount`)
+  let error = fieldValidator.moneyAmount(amount, `The milestone ${m.seq} amount`)
     ?? fieldValidator.exchangeRate(rate)
     ?? fieldValidator.bankReference(bankRef)
     ?? (!isDate(receivedOn) || receivedOn > todayIst() ? 'Enter the date the money was received — today or earlier.' : null)
     ?? ([...note].length > 255 ? 'The note can be at most 255 characters.' : null);
+  if (error === null) {
+    // QA Round 7, R7-N03: the advance leg's rules — never more than the whole order, and an
+    // amount that differs from the milestone due by more than 1% is confirmed on purpose.
+    const order = (await orderRepository.find(orderId)) || {};
+    const currency = order.currency_code || '';
+    const fob = Number(await require('../repositories/orderProductRepository').totalFobValue(orderId));
+    const due = r2(fob * parseFloat(m.pct) / 100);
+    const money2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (fob > 0 && amount > fob + 0.005) {
+      error = `${currency} ${money2(amount)} is more than the whole order value (${currency} ${money2(fob)}). Check the amount the bank received.`;
+    } else if (due > 0 && Math.abs(amount - due) > Math.max(1, due * 0.01) && !req.body.confirm_amount_differs) {
+      error = `Milestone ${Number(m.seq)} due on this order is ${currency} ${money2(due)} (${pct(m.pct)}% of ${currency} ${money2(fob)}). You entered ${currency} ${money2(amount)} — if that really is what the bank received, tick "The amount received differs from the milestone due" and save again.`;
+    }
+  }
   if (error !== null) {
     flash.set(req, 'error', error);
     back(res, orderId);
@@ -200,6 +214,7 @@ async function scheduleView(orderId, order) {
     balanceStatus: legStatus('balance'),
     fixed: Boolean(payment.advance_cleared_at) || (await paymentMilestoneRepository.anyMoneyRecorded(orderId)),
     maxSteps: paymentMilestoneRepository.MAX_STEPS,
+    fobInput: fob > 0 ? Number(fob).toFixed(2) : '999999999999.99',
     editRows: Array.from({ length: paymentMilestoneRepository.MAX_STEPS }, (_, i) => rows[i] ? { seq: i + 2, pct: pct(rows[i].pct), due: rows[i].due_text } : { seq: i + 2, pct: '', due: '' }),
   };
 }

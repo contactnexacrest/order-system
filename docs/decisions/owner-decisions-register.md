@@ -734,6 +734,23 @@ Every finding ID found in the repository history and the session transcripts, so
 | Q-R6-4 | QA R6 question | Reports listing orders the user is not assigned to | Fixed | D-118 (D-204) | 854a866 |
 | Q-NEW-3 / Q-MAIL-3 | QA R6 question | Generator approving their own document; requester approving their own send | Kept as is | D-117 (Admin/MD/ED may; others refused) | — |
 | Q-R5-2 (re-raised) | QA R6 question | CFR order kept an insurance amount | Fixed | D-049: cleared on save for non-CIF, no document change (D-204) | 92512ba |
+| R7-N01 (High) | QA R7 | Approval limit bypassed by a Procurement role holder without a department membership | Fixed | D-214: limit from membership, else preview, else the role's designation; unknown limit below Director = ₹0 (fail closed) | R7 batch |
+| R7-N02 | QA R7 | Procurement roles saw the client name | Fixed | D-214 (Procurement sees the order number only): order page, list, board | R7 batch |
+| R7-N03 | QA R7 | Milestone receipt had no upper bound | Fixed | Not above the order value; a difference over 1% needs a tick | R7 batch |
+| R7-N04 (Node) | QA R7 | A transient DB error ("Too many connections") exited Node | Fixed | Session store errors no longer escape; transient DB errors answer 503 (PHP too) | R7 batch |
+| R7-N05 (Node tests) | QA R7 | Jest unreliable with 2 workers | Fixed | Parallel run refused with a clear message; pools capped in tests | R7 batch |
+| R7-N06 | QA R7 | Order page linked files that answered 403 | Fixed | Shown as plain text when not allowed | R7 batch |
+| R7-N07 | QA R7 | Suppliers link shown without manage_purchasing | Fixed | Link needs manage_purchasing | R7 batch |
+| R7-N08 | QA R7 | Kanban board opened on more orders than the Standard list | Fixed (filter) / Open (paging) | Board opens on Active like the list; paging waits for Q-R7-2 | R7 batch |
+| R7-N09 (Node) | QA R7 | Client payment page lost its step number | Fixed | Nunjucks loop scope | R7 batch |
+| R7-N10 | QA R7 | Reason field: leaving it empty removed the submit message | Fixed | app.js, both stacks | R7 batch |
+| R7-N11 | QA R7 | Two schedule saves at once deadlocked (500) | Fixed | Order row locked first | R7 batch |
+| R7-N12 | QA R7 | Procurement raise/award/approve/receive not atomic | Fixed | Duplicate raise refused; each step applies only from its expected state | R7 batch |
+| R7-N13 | QA R7 | System Administrator can export all data and self-grant money permissions | Open | Waits for Q-R8-1 | — |
+| R7-N14 | QA R7 | Amendment "Effective from" accepted impossible dates | Fixed | Real YYYY-MM-DD date required | R7 batch |
+| R7-N15 | QA R7 | GST refund period rules | Open | Confirm with the CA first | — |
+| R7-N16 | QA R7 | Getting Started page overflowed below 900 px | Fixed | Chapter bar above the text; wide table scrolls in its box | R7 batch |
+| Routes (R7) | QA R7 | 6 routes without a behaviour test | Fixed | RouteBehaviourTest / routeBehaviour.test.js | R7 batch |
 
 ---
 

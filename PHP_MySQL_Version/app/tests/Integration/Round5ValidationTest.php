@@ -180,6 +180,20 @@ final class Round5ValidationTest extends DbTestCase
         self::assertNotSame('not-an-email', ClientRepository::find($clientId)['email']);
     }
 
+    /** QA Round 7, R7-N14: an impossible "Effective from" date gets a field message, not a generic error. */
+    public function testAmendmentRefusesAnImpossibleEffectiveFromDate(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        foreach (['2026-02-30', '2026-13-01', '0000-00-00', '31/10/2026', 'next week'] as $date) {
+            $_POST = ['reason' => 'Buyer asked to change the advance split.', 'amended_advance_pct' => '30', 'effective_from' => $date];
+            $this->quietly(fn () => (new AmendmentController())->create(['id' => (string) $orderId]));
+            self::assertSame('Effective from: enter a valid date (YYYY-MM-DD).', $this->lastFlash()['message'], $date);
+        }
+        $count = Database::connection()->prepare('SELECT COUNT(*) FROM amendments WHERE order_id = :id');
+        $count->execute(['id' => $orderId]);
+        self::assertSame(0, (int) $count->fetchColumn());
+    }
+
     /** R5-28: text in the amended advance % is refused (it used to create the amendment). */
     public function testAmendmentRefusesTextInTheAdvancePct(): void
     {

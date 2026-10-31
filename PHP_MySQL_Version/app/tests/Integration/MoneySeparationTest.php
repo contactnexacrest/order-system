@@ -139,4 +139,60 @@ final class MoneySeparationTest extends DbTestCase
             self::assertSame($sees, (bool) preg_match('/6,100\.00/', $html), "{$role}: buyer payment amount");
         }
     }
+
+    /**
+     * QA Round 7, R7-N02 — D-214: "Logistics sees the client name, Procurement
+     * only the order number", on the order page header, its summary and the
+     * order cards of both templates.
+     */
+    public function testProcurementSeesTheOrderNumberButNotTheClientName(): void
+    {
+        foreach (['Procurement Executive' => false, 'Procurement Manager' => false, 'Procurement Director' => false, 'Logistics Executive' => true, 'Sales Executive' => true] as $role => $seesClient) {
+            if (\App\Repositories\RoleRepository::findByName($role) === null) {
+                continue;
+            }
+            $user = $this->createTestUser($role);
+            $clientId = $this->createTestClient();
+            $orderId = $this->createTestOrder($clientId, 'FOB', 'Standard — New Buyer', 'USD', null, null, $user);
+            $order = \App\Repositories\OrderRepository::find($orderId);
+            $name = htmlspecialchars((string) $order['company_legal_name']);
+            $this->signIn($user);
+            [, $html] = $this->call(new OrderController(), 'show', ['id' => (string) $orderId]);
+            self::assertStringContainsString(htmlspecialchars((string) $order['order_reference']), $html, "{$role}: the order number");
+            self::assertSame($seesClient, str_contains($html, $name), "{$role}: the client name on the order page");
+            foreach ([null, (int) \App\Repositories\UiTemplateRepository::findByKey('kanban')['id']] as $template) {
+                \App\Repositories\UserRepository::updateUiTemplatePreference($user, $template);
+                $this->signIn($user);
+                $_GET = ['status' => 'all'];
+                [, $list] = $this->call(new OrderController(), 'index', []);
+                $_GET = [];
+                self::assertSame($seesClient, str_contains($list, $name), "{$role}: the client name on the orders " . ($template === null ? 'list' : 'board'));
+            }
+        }
+    }
+
+    /**
+     * QA Round 7, R7-N06: the order page links a received file (Buyer PO copy,
+     * client payment screenshot, Supplier PO acknowledgment, …) only to
+     * someone who may download it; otherwise it shows as text, never a link
+     * that answers 403.
+     */
+    public function testTheOrderPageLinksOnlyFilesThePersonMayDownload(): void
+    {
+        $pdo = \App\Config\Database::connection();
+        foreach (['Logistics Executive' => false, 'Viewer / Auditor' => true] as $role => $seesSelling) {
+            $user = $this->createTestUser($role);
+            $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, $user);
+            $buyerPoFile = $this->createTestFile($orderId);
+            $pdo->prepare('INSERT INTO order_buyer_po_documents (order_id, file_id) VALUES (:o, :f)')->execute(['o' => $orderId, 'f' => $buyerPoFile]);
+            \App\Services\StageGateService::passAndUnlockNext($orderId, 1, null);
+            $this->signIn($user);
+            [, $html] = $this->call(new OrderController(), 'show', ['id' => (string) $orderId]);
+            preg_match_all('#href="/file-store/(\d+)/download"#', $html, $m);
+            foreach (array_unique($m[1]) as $fileId) {
+                self::assertTrue(\App\Services\MoneyVisibility::canSeeFile((int) $fileId), "{$role}: file {$fileId} is linked but would answer 403");
+            }
+            self::assertSame($seesSelling, in_array((string) $buyerPoFile, $m[1], true), "{$role}: the Buyer PO copy link");
+        }
+    }
 }

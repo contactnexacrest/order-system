@@ -20,7 +20,7 @@ $amount = trim(($o['currency_code'] ?? '') . ' ' . number_format((float) $o['tot
         <?php if (!empty($o['incoterm_code'])): ?><span class="tag tag-gold"><?= htmlspecialchars($o['incoterm_code']) ?></span><?php endif; ?>
         <?php if (!empty($seesAllOrders) && !empty($o['assignee_names'])): ?><span class="tag tag-navy"><?= htmlspecialchars($o['assignee_names']) ?></span><?php endif; ?>
       </div>
-      <div class="entity-card-sub"><?= htmlspecialchars((string) ($o['company_legal_name'] ?? '')) ?></div>
+      <?php if (!isset($sees['client']) || $sees['client']): // D-214: Procurement sees the order number only (QA R7-N02) ?><div class="entity-card-sub"><?= htmlspecialchars((string) ($o['company_legal_name'] ?? '')) ?></div><?php endif; ?>
       <div>
         <div class="mini-stage-track">
           <?php for ($i = 1; $i <= $stageTotal; $i++): ?>

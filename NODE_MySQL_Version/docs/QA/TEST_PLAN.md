@@ -229,6 +229,10 @@ Infrastructure (QA-2) is live on both stacks:
   repositories for pure service logic; `tests/integration/` uses
   Supertest against the real Express app plus a disposable database
   (`nexacrest_node_jest`), rebuilt the same way via `globalSetup.js`.
+  Run it one file at a time (`npm test`, or `npx jest --runInBand`):
+  the files share that database, so `globalSetup.js` refuses
+  `--maxWorkers` above 1 (QA Round 7, R7-N05). Each file's pools are
+  capped (DB_POOL_SIZE 4, SESSION_DB_POOL_SIZE 2 in `testEnv.js`).
   Prefer a real Supertest HTTP round-trip over calling a controller
   function directly whenever the thing under test is authorization or a
   state transition — those are exactly the bugs that only show up at the

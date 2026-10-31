@@ -76,13 +76,44 @@ final class MoneyVisibility
         return self::can($class);
     }
 
-    /** @return array{selling:bool,buyer_payments:bool,purchase:bool,logistics:bool} for views */
+    /** @return array{selling:bool,buyer_payments:bool,purchase:bool,logistics:bool,client:bool} for views */
     public static function flags(): array
     {
         $flags = [];
         foreach (array_keys(self::PERMISSIONS) as $class) {
             $flags[$class] = self::can($class);
         }
+        $flags['client'] = self::seesClient();
         return $flags;
+    }
+
+    /**
+     * Owner decision D-214 (D1–D12): "Logistics sees the client name,
+     * Procurement only the order number". False while the signed-in person
+     * works as a Procurement designation (QA Round 7, R7-N02).
+     */
+    public static function seesClient(): bool
+    {
+        $user = AuthService::currentUser();
+        if ($user === null || !empty($user['is_super_admin'])) {
+            return true;
+        }
+        $roleId = ActiveDepartmentService::effectiveRoleId((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null);
+        return $roleId === null || !self::isProcurementRole($roleId);
+    }
+
+    /** @var array<int,bool> */
+    private static array $procurementRoles = [];
+
+    public static function isProcurementRole(int $roleId): bool
+    {
+        if (!isset(self::$procurementRoles[$roleId])) {
+            $stmt = \App\Config\Database::connection()->prepare(
+                "SELECT COUNT(*) FROM department_designations dd JOIN departments d ON d.id = dd.department_id WHERE dd.role_id = :r AND d.code = 'PROC'"
+            );
+            $stmt->execute(['r' => $roleId]);
+            self::$procurementRoles[$roleId] = (int) $stmt->fetchColumn() > 0;
+        }
+        return self::$procurementRoles[$roleId];
     }
 }

@@ -148,7 +148,9 @@ final class OrderKanbanBoardTest extends DbTestCase
         Database::connection()->prepare("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id")
             ->execute(['id' => $orderId]);
 
+        $_GET['status'] = 'shipped_docs_sent'; // R7-N08: the board opens on Active, like the list
         $output = $this->render($userId);
+        unset($_GET['status']);
 
         $docsSentPos = strpos($output, 'Docs Sent — Awaiting Benefits');
         self::assertNotFalse($docsSentPos);
@@ -170,7 +172,9 @@ final class OrderKanbanBoardTest extends DbTestCase
         Database::connection()->prepare("UPDATE orders SET status = 'complete' WHERE id = :id")
             ->execute(['id' => $orderId]);
 
+        $_GET['status'] = 'complete'; // R7-N08: the board opens on Active, like the list
         $output = $this->render($userId);
+        unset($_GET['status']);
 
         $completePos = strpos($output, '<span class="kanban-column-title">Complete</span>');
         self::assertNotFalse($completePos);

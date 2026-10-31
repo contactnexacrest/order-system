@@ -12,7 +12,7 @@
         {% if o.incoterm_code %}<span class="tag tag-gold">{{ o.incoterm_code }}</span>{% endif %}
         {% if seesAllOrders and o.assignee_names %}<span class="tag tag-navy">{{ o.assignee_names }}</span>{% endif %}
       </div>
-      <div class="entity-card-sub">{{ o.company_legal_name }}</div>
+      {% if sees.client !== false %}<div class="entity-card-sub">{{ o.company_legal_name }}</div>{% endif %}{# D-214: Procurement sees the order number only (QA R7-N02) #}
       <div>
         <div class="mini-stage-track">
           {% for i in range(1, stageTotal + 1) %}

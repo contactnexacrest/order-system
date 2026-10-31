@@ -125,6 +125,8 @@ function required() {
     // permissionCheck middleware's plain-object lookups and every view
     // template's `permissions.xxx` access see the same real object.
     req.isSuperAdmin = await superAdminService.isEffective(user.id);
+    // D-214: Procurement sees the order number only, not the client name (QA Round 7, R7-N02).
+    req.seesClient = req.isSuperAdmin || !(await require('../services/moneyVisibility').isProcurementRole(acting.effectiveRoleId));
     // A preview shows exactly that designation, so no Super Admin bypass during it.
     if (req.isSuperAdmin && !acting.previewing) {
       for (const key of await permissionRepository.allKeys()) {

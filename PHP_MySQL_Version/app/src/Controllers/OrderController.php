@@ -168,19 +168,17 @@ final class OrderController
      * aren't given full board columns of their own — they're dead ends,
      * not pipeline stages — so they're rolled up into a compact summary
      * instead, same as every other real Kanban board treats a "won/lost"
-     * outcome. Deliberately unpaginated and unfiltered by status: the
-     * whole point of a board is seeing the entire active pipeline at a
-     * glance, which the existing card-grid list already offers filtered/
-     * paginated for anyone who wants that instead.
+     * outcome. Same status filters as the list, opening on Active like it
+     * (QA Round 7, R7-N08). Not paged yet: paging the board waits for the
+     * owner's answer to Q-R7-2.
      */
     private function indexKanban(int $actorId, bool $seesAllOrders): void
     {
         $all = OrderRepository::allVisibleTo($actorId, $seesAllOrders);
         // Owner hard rule 2026-11-01: the board has the same status filters (with counts) as the list.
-        // No filter = the open pipeline (active, docs sent, complete); Lost and Cancelled get columns when chosen.
-        $statusFilter = trim((string) ($_GET['status'] ?? ''));
-        $visible = $statusFilter === '' ? array_values(array_filter($all, static fn($o) => !in_array($o['status'], ['lost', 'cancelled'], true)))
-            : self::filterByStatus($all, $statusFilter);
+        // QA Round 7, R7-N08: no filter = Active, exactly as the Standard list opens; Lost and Cancelled get columns when chosen.
+        $statusFilter = trim((string) ($_GET['status'] ?? '')) ?: 'active';
+        $visible = self::filterByStatus($all, $statusFilter);
 
         $columns = [];
         foreach (LookupRepository::stagesMaster() as $st) {

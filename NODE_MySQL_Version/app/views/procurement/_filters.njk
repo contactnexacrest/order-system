@@ -7,5 +7,5 @@
         {% for key, label in statuses %}<option value="{{ key }}" {{ 'selected' if status == key else '' }}>{{ label }}</option>{% endfor %}
       </select>
     </label>
-    <a class="btn-sm btn-secondary" href="/procurement/suppliers">Supplier performance</a>
+    {% if permissions.manage_purchasing %}<a class="btn-sm btn-secondary" href="/procurement/suppliers">Supplier performance</a>{% endif %}{# QA R7-N07: the page needs manage_purchasing #}
   </form>

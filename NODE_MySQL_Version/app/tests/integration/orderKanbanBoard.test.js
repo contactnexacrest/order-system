@@ -49,13 +49,13 @@ describe('Order Kanban board (Task #37)', () => {
     return res;
   }
 
-  async function render(userId) {
+  async function render(userId, query = {}) {
     const user = await userRepository.findById(userId);
     // Order ownership / assignment visibility: this suite is about which
     // Kanban column an order lands in, not about who can see it, so the
     // viewer is given view_all_orders — the orthogonal oversight tier —
     // rather than threading assigned_to through every fixture order here.
-    const req = { query: {}, user, permissions: { view_all_orders: true } };
+    const req = { query, user, permissions: { view_all_orders: true } };
     const res = fakeRes();
     await ordersController.index(req, res);
     return res;
@@ -142,7 +142,7 @@ describe('Order Kanban board (Task #37)', () => {
     const orderId = await createTestOrder(await createTestClient());
     await db.execute("UPDATE orders SET status = 'shipped_docs_sent' WHERE id = :id", { id: orderId });
 
-    const res = await render(userId);
+    const res = await render(userId, { status: 'shipped_docs_sent' }); // R7-N08: the board opens on Active, like the list;
 
     expect(col(res, 'shipped_docs_sent').orders.some((o) => Number(o.id) === orderId)).toBe(true);
     for (let stage = 1; stage <= 9; stage++) {
@@ -156,7 +156,7 @@ describe('Order Kanban board (Task #37)', () => {
     const orderId = await createTestOrder(await createTestClient());
     await db.execute("UPDATE orders SET status = 'complete' WHERE id = :id", { id: orderId });
 
-    const res = await render(userId);
+    const res = await render(userId, { status: 'complete' }); // R7-N08: the board opens on Active, like the list;
 
     expect(col(res, 'complete').orders.some((o) => Number(o.id) === orderId)).toBe(true);
   });

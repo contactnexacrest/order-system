@@ -50,7 +50,10 @@ async function create(req, res) {
   const numberError = fieldValidator.decimal(raw('amended_advance_pct'), 'Amended advance %', 0, 100)
     || fieldValidator.decimal(raw('amended_advance_amount'), 'Amended advance amount')
     || fieldValidator.wholeNumber(raw('amended_balance_days'), 'Amended balance days', 1)
-    || fieldValidator.decimal(raw('amended_balance_amount'), 'Amended balance amount');
+    || fieldValidator.decimal(raw('amended_balance_amount'), 'Amended balance amount')
+    // QA Round 7, R7-N14: an impossible date (2026-02-30, 31/10/2026, text) used to reach the database and show a generic error.
+    || (effectiveFrom !== null && !(/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom) && !Number.isNaN(Date.parse(`${effectiveFrom}T00:00:00Z`)) && new Date(`${effectiveFrom}T00:00:00Z`).toISOString().slice(0, 10) === effectiveFrom)
+      ? 'Effective from: enter a valid date (YYYY-MM-DD).' : null);
   if (numberError) {
     flash.set(req, 'error', numberError);
     res.redirect(`/orders/${orderId}/amendments`);

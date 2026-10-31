@@ -603,7 +603,7 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
         ?>
         <?php if ($showPartner): ?><td><span class="badge <?= $__isAdvanceBill ? 'badge-advance' : 'badge-final' ?>"><?= $__isAdvanceBill ? 'Advance' : 'Final' ?></span></td><?php endif; ?>
         <td><span class="badge <?= $__isProforma ? 'badge-proforma' : 'badge-invoice' ?>"><?= $__isProforma ? 'Proforma' : 'Tax invoice' ?></span></td>
-        <td><?= htmlspecialchars((string) $b['bill_no']) ?> · <?= htmlspecialchars(\App\Helpers\Dates::short((string) $b['bill_date'])) ?><?php if (!empty($b['bill_file_id'])): ?> · <a href="/file-store/<?= (int) $b['bill_file_id'] ?>/download">bill</a><?php endif; ?>
+        <td><?= htmlspecialchars((string) $b['bill_no']) ?> · <?= htmlspecialchars(\App\Helpers\Dates::short((string) $b['bill_date'])) ?><?php if (!empty($b['bill_file_id'])): ?> · <?php if (\App\Services\MoneyVisibility::canSeeFile((int) $b['bill_file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $b['bill_file_id'] ?>/download">bill</a><?php else: ?>bill<?php endif; ?><?php endif; ?>
           <?php if ($__isProforma && $b['requested_amount_inr'] !== null): ?><br><small class="muted">Asks for &#8377;<?= $money($b['requested_amount_inr']) ?> now</small><?php endif; ?>
           <?php if ($b['replaces_bill_no'] !== null): ?><br><small class="muted">Replaces proforma <?= htmlspecialchars($b['replaces_bill_no']) ?></small><?php endif; ?>
           <?php if ($b['replaced_by'] !== null): ?><br><small class="muted">Replaced by tax invoice <?= htmlspecialchars($b['replaced_by']) ?></small><?php endif; ?>
@@ -1059,7 +1059,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <?php if ($order['status'] !== 'active'): ?><span class="badge badge-<?= htmlspecialchars($order['status']) ?>"><?= htmlspecialchars($order['status']) ?></span><?php endif; ?>
   </h1>
   <p class="muted">
-    <?= htmlspecialchars($order['company_legal_name']) ?> &nbsp;·&nbsp;
+    <?php if ($sees['client']): // D-214: Procurement sees the order number only (QA R7-N02) ?><?= htmlspecialchars($order['company_legal_name']) ?> &nbsp;·&nbsp;<?php endif; ?>
     Buyer Inquiry Ref: <?= htmlspecialchars($order['buyer_inquiry_ref']) ?> &nbsp;·&nbsp;
     <?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_city'] ?? $order['port_of_loading_name'] ?? '') ?>
     <?php if ($canViewReports): ?>&nbsp;·&nbsp; <a href="/reports/order/<?= (int) $order['id'] ?>">Full Report</a><?php endif; ?>
@@ -1546,7 +1546,9 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
             <td><?= htmlspecialchars($r['payment_date'] ?? '—') ?></td>
             <td><?= htmlspecialchars($r['payer_bank_details'] ?? '—') ?></td>
             <td>
-              <?php if (!empty($r['screenshot_file_id'])): ?>
+              <?php if (!empty($r['screenshot_file_id']) && !\App\Services\MoneyVisibility::canSeeFile((int) $r['screenshot_file_id'])): // QA R7-N06: no link that would answer 403 ?>
+                <span class="muted small">Screenshot received</span>
+              <?php elseif (!empty($r['screenshot_file_id'])): ?>
                 <?php $screenshotUrl = '/file-store/' . (int) $r['screenshot_file_id'] . '/download'; ?>
                 <?php if (str_starts_with((string) $r['screenshot_mime_type'], 'image/')): ?>
                   <a href="<?= $screenshotUrl ?>" target="_blank"><img src="<?= $screenshotUrl ?>" alt="Payment screenshot" class="asset-preview" style="max-height:60px;"></a>
@@ -1614,11 +1616,12 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/milestones/<?= (int) $__m['id'] ?>" class="inline-form milestone-record">
           <?= Csrf::field() ?>
           <strong>Milestone <?= (int) $__m['seq'] ?> received</strong>
-          <label>Amount received (<?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="amount" step="0.01" min="0.01" max="999999999999.99" required value="<?= number_format(round($__msFob * (float) $__m['pct'] / 100, 2), 2, '.', '') ?>"></label>
+          <label>Amount received (<?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="amount" step="0.01" min="0.01" max="<?= $__msFob > 0 ? number_format($__msFob, 2, '.', '') : '999999999999.99' ?>" required value="<?= number_format(round($__msFob * (float) $__m['pct'] / 100, 2), 2, '.', '') ?>"></label>
           <label>Exchange rate (₹ per 1 <?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="exchange_rate" step="0.0001" min="0.0001" max="999999.9999" required></label>
           <label>Bank reference (UTR / SWIFT) *<input type="text" name="bank_reference" minlength="4" maxlength="100" required></label>
           <label>Received on *<input type="date" name="received_on" required value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>"></label>
           <label>Note <small class="muted">(added to the description)</small><input type="text" name="staff_note" maxlength="255"></label>
+          <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the milestone due (e.g. bank charges deducted) — record it anyway</label>
           <button type="submit" class="btn-sm">Record Milestone <?= (int) $__m['seq'] ?> Remittance</button>
         </form>
         <?php elseif ($__m['received_amount'] !== null && $__m['cleared_on'] === null && $canClearPayments): ?>
@@ -2196,7 +2199,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <td><?= htmlspecialchars($bd['original_filename']) ?></td>
                 <td><?= htmlspecialchars($bd['uploaded_at']) ?></td>
                 <td><?= $bd['uploaded_by'] === null ? 'The buyer (self-uploaded)' : 'Staff' ?></td>
-                <td><a href="/file-store/<?= (int) $bd['file_id'] ?>/download">Download</a></td>
+                <td><?php if (\App\Services\MoneyVisibility::canSeeFile((int) $bd['file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $bd['file_id'] ?>/download">Download</a><?php else: ?>Download<?php endif; ?></td>
               </tr>
             <?php endforeach; ?>
           </table>
@@ -2847,7 +2850,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <tr>
               <td><?= htmlspecialchars($sd['original_filename']) ?></td>
               <td><?= htmlspecialchars($sd['uploaded_at']) ?></td>
-              <td><a href="/file-store/<?= (int) $sd['file_id'] ?>/download">Download</a></td>
+              <td><?php if (\App\Services\MoneyVisibility::canSeeFile((int) $sd['file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $sd['file_id'] ?>/download">Download</a><?php else: ?>Download<?php endif; ?></td>
             </tr>
           <?php endforeach; ?>
         </table>
@@ -3344,7 +3347,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <tr>
             <td><?= (int) $round['round_number'] ?></td>
             <td><?= htmlspecialchars((string) $round['uploaded_at']) ?></td>
-            <td><a href="/file-store/<?= (int) $round['draft_file_id'] ?>/download" target="_blank">View draft</a></td>
+            <td><?php if (\App\Services\MoneyVisibility::canSeeFile((int) $round['draft_file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $round['draft_file_id'] ?>/download" target="_blank">View draft</a><?php else: ?>View draft<?php endif; ?></td>
             <td>
               <?php if ($round['status'] === 'pending'): ?><span class="badge badge-inactive">Pending Review</span>
               <?php elseif ($round['status'] === 'approved'): ?><span class="badge badge-active">Approved</span>
@@ -3397,7 +3400,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php else: ?>
       <p>Bill of Lading recorded: <strong><?= htmlspecialchars((string) ($shipping['bl_number'] ?? '')) ?></strong> (<?= htmlspecialchars((string) ($shipping['bl_date'] ?? '')) ?>)</p>
       <?php if (!empty($shipping['bl_copy_file_id'])): ?>
-        <p class="muted small"><a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">Download scanned BL copy</a></p>
+        <p class="muted small"><?php if (\App\Services\MoneyVisibility::canSeeFile((int) $shipping['bl_copy_file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">Download scanned BL copy</a><?php else: ?>Download scanned BL copy<?php endif; ?></p>
       <?php else: ?>
         <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-copy" enctype="multipart/form-data">
@@ -3446,7 +3449,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php elseif (empty($shipping['bl_copy_file_id'])): ?>
         <p class="review-banner warn bl-copy-first">&#9888; <strong>Upload the scanned BL copy first</strong> — attach it in <a href="#step-10f-bl-issued">Step 10f</a> (Attach Scanned BL Copy), then generate the Commercial Invoice against it.</p>
       <?php else: ?>
-        <p class="muted small">Scanned BL copy is on file (<a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">download</a>) — generate the Commercial Invoice against it.</p>
+        <p class="muted small">Scanned BL copy is on file (<?php if (\App\Services\MoneyVisibility::canSeeFile((int) $shipping['bl_copy_file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">download</a><?php else: ?>download<?php endif; ?>) — generate the Commercial Invoice against it.</p>
       <?php endif; ?>
       <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
@@ -3646,7 +3649,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <td><?= htmlspecialchars((string) $e['details']) ?></td>
             <td style="text-align:right"><?= number_format((float) $e['amount_inr'], 2) ?></td>
             <td><?= htmlspecialchars(\App\Repositories\OrderExpenseRepository::PAID_BY[$e['paid_by']] ?? (string) $e['paid_by']) ?><?= $e['paid_by'] === 'staff' && !empty($e['staff_name']) ? ' — ' . htmlspecialchars((string) $e['staff_name']) : '' ?></td>
-            <td><?php if (!empty($e['receipt_file_id'])): ?><a href="/file-store/<?= (int) $e['receipt_file_id'] ?>/download">receipt</a><?php else: ?><span class="vendor-bill-due">No bill — <?= htmlspecialchars((string) $e['no_receipt_reason']) ?></span><?php endif; ?></td>
+            <td><?php if (!empty($e['receipt_file_id'])): ?><?php if (\App\Services\MoneyVisibility::canSeeFile((int) $e['receipt_file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $e['receipt_file_id'] ?>/download">receipt</a><?php else: ?>receipt<?php endif; ?><?php else: ?><span class="vendor-bill-due">No bill — <?= htmlspecialchars((string) $e['no_receipt_reason']) ?></span><?php endif; ?></td>
             <td>
               <form method="post" action="/orders/<?= (int) $order['id'] ?>/expenses/<?= (int) $e['id'] ?>/delete" data-confirm="<?= !empty($e['zoho_expense_id']) ? 'Remove this expense? It is in Zoho Books too, and is removed there as well.' : 'Remove this expense?' ?>">
                 <?= Csrf::field() ?>
@@ -3800,7 +3803,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <p class="muted small">Export process steps 5-1a/5-2a/5-3a: only relevant if the client opted for payment by LC. Recording an interest-paid amount below automatically keeps a matching "Bank Loan Interest" row in Other Order Costs below in sync — editing it there directly isn't needed.</p>
         <div class="kv-grid">
           <div><span class="k">LC Number</span><span class="v"><?= htmlspecialchars($lcDetails['lc_number'] ?? '—') ?></span></div>
-          <div><span class="k">LC Document</span><span class="v"><?php if (!empty($lcDetails['lc_file_id'])): ?><a href="/file-store/<?= (int) $lcDetails['lc_file_id'] ?>/download" target="_blank">View LC</a><?php else: ?>—<?php endif; ?></span></div>
+          <div><span class="k">LC Document</span><span class="v"><?php if (!empty($lcDetails['lc_file_id'])): ?><?php if (\App\Services\MoneyVisibility::canSeeFile((int) $lcDetails['lc_file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $lcDetails['lc_file_id'] ?>/download" target="_blank">View LC</a><?php else: ?>View LC<?php endif; ?><?php else: ?>—<?php endif; ?></span></div>
           <div><span class="k">Bank Loan Amount</span><span class="v"><?= $lcDetails['bank_loan_amount'] !== null ? number_format((float) $lcDetails['bank_loan_amount'], 2) : '—' ?></span></div>
           <div><span class="k">Interest Rate</span><span class="v"><?= $lcDetails['bank_loan_interest_rate'] !== null ? number_format((float) $lcDetails['bank_loan_interest_rate'], 3) . '%' : '—' ?></span></div>
           <div><span class="k">Interest Paid</span><span class="v"><?= $lcDetails['bank_loan_interest_paid'] !== null ? number_format((float) $lcDetails['bank_loan_interest_paid'], 2) : '—' ?></span></div>
@@ -4378,7 +4381,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <tr>
         <td><?= htmlspecialchars($ad['document_type_label'] ?? '') ?></td>
         <td class="muted small"><?= htmlspecialchars($ad['notes'] ?? '') ?></td>
-        <td><a href="/file-store/<?= (int) $ad['id'] ?>/download"><?= htmlspecialchars($ad['original_filename']) ?></a></td>
+        <td><?php if (\App\Services\MoneyVisibility::canSeeFile((int) $ad['id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $ad['id'] ?>/download"><?= htmlspecialchars($ad['original_filename']) ?></a><?php else: ?><?= htmlspecialchars($ad['original_filename']) ?><?php endif; ?></td>
         <td><?= htmlspecialchars((string) $ad['uploaded_at']) ?><?php if (!empty($ad['uploaded_by_name'])): ?> <span class="muted small">by <?= htmlspecialchars($ad['uploaded_by_name']) ?></span><?php endif; ?></td>
         <td>
           <?php if ($canManageOrders): ?>
@@ -4571,7 +4574,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <div><span class="k">Compliance Checklist</span><span class="v"><?= $complianceSummary['total'] === 0 ? 'No task types configured' : $complianceSummary['approved'] . ' of ' . $complianceSummary['total'] . ' resolved' ?> — <a href="#compliance-checklist">see checklist</a></span></div>
           <?php endif; ?>
           <div><span class="k">Documents Generated</span><span class="v"><?= count($documents) ?></span></div>
+          <?php if ($sees['client']): // D-214: Procurement sees the order number only (QA R7-N02) ?>
           <div><span class="k">Client</span><span class="v"><?php if ($canOpenClient): ?><a href="/clients/<?= (int) $order['client_id'] ?>"><?= htmlspecialchars($order['company_legal_name']) ?></a><?php else: ?><?= htmlspecialchars($order['company_legal_name']) ?><?php endif; ?></span></div>
+          <?php endif; ?>
           <div><span class="k">Buyer Inquiry Ref</span><span class="v"><?= htmlspecialchars($order['buyer_inquiry_ref']) ?></span></div>
           <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v"><?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_name'] ?? '—') ?></span></div>
           <div><span class="k">Quotation Date</span><span class="v"><?= htmlspecialchars($order['quotation_date'] ?? '—') ?></span></div>

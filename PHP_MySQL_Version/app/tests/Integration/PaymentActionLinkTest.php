@@ -58,6 +58,8 @@ final class PaymentActionLinkTest extends DbTestCase
         $this->createTestDocument($this->orderId, 'PI', 'approved', $this->createTestFile($this->orderId));
         $due = $this->page();
         self::assertStringContainsString('Advance Payment', $due);
+        // QA Round 7, R7-N09 (Node had it empty): the current payment's heading carries its number.
+        self::assertMatchesRegularExpression('#<span class="intake-step-num">1</span> Advance Payment#', $due);
         self::assertStringContainsString('USD 3,000.00', $due);
         self::assertStringContainsString('/payment-action/' . $this->token . '/document', $due);
         self::assertStringContainsString('name="screenshot"', $due);

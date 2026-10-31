@@ -369,7 +369,7 @@
       {% set isProforma = b.doc_kind == 'proforma' %}
       {% set hasPayments = b.payments.length or b.carried_payments.length %}
       <td><span class="badge {{ 'badge-proforma' if isProforma else 'badge-invoice' }}">{{ 'Proforma' if isProforma else 'Tax invoice' }}</span></td>
-      <td>{{ b.bill_no }} · {{ b.bill_date | shortDate }}{% if b.bill_file_id %} · <a href="/file-store/{{ b.bill_file_id }}/download">bill</a>{% endif %}
+      <td>{{ b.bill_no }} · {{ b.bill_date | shortDate }}{% if b.bill_file_id %} · {% if fileAllowed[b.bill_file_id] !== false %}<a href="/file-store/{{ b.bill_file_id }}/download">bill</a>{% else %}bill{% endif %}{# QA R7-N06 #}{% endif %}
         {% if isProforma and b.requested_amount_inr !== null %}<br><small class="muted">Asks for &#8377;{{ b.requested_amount_inr | money }} now</small>{% endif %}
         {% if b.replaces_bill_no !== null %}<br><small class="muted">Replaces proforma {{ b.replaces_bill_no }}</small>{% endif %}
         {% if b.replaced_by !== null %}<br><small class="muted">Replaced by tax invoice {{ b.replaced_by }}</small>{% endif %}
@@ -595,7 +595,7 @@
     {% if order.status != 'active' %}<span class="badge badge-{{ order.status }}">{{ order.status }}</span>{% endif %}
   </h1>
   <p class="muted">
-    {{ order.company_legal_name }} &nbsp;&middot;&nbsp;
+    {% if sees.client %}{{ order.company_legal_name }} &nbsp;&middot;&nbsp;{% endif %}{# D-214: Procurement sees the order number only (QA R7-N02) #}
     Buyer Inquiry Ref: {{ order.buyer_inquiry_ref }} &nbsp;&middot;&nbsp;
     {{ order.incoterm_code }} {{ order.port_of_loading_city or order.port_of_loading_name or '' }}
     {% if permissions.view_reports %}&nbsp;&middot;&nbsp; <a href="/reports/order/{{ order.id }}">Full Report</a>{% endif %}
@@ -1074,7 +1074,9 @@
             <td>{{ r.payment_date or '—' }}</td>
             <td>{{ r.payer_bank_details or '—' }}</td>
             <td>
-              {% if r.screenshot_file_id %}
+              {% if r.screenshot_file_id and fileAllowed[r.screenshot_file_id] === false %}{# QA R7-N06: no link that would answer 403 #}
+                <span class="muted small">Screenshot received</span>
+              {% elif r.screenshot_file_id %}
                 {% set screenshotUrl = '/file-store/' ~ r.screenshot_file_id ~ '/download' %}
                 {% if r.screenshot_mime_type and r.screenshot_mime_type.startsWith('image/') %}
                   <a href="{{ screenshotUrl }}" target="_blank"><img src="{{ screenshotUrl }}" alt="Payment screenshot" class="asset-preview" style="max-height:60px;"></a>
@@ -1131,11 +1133,12 @@
         <form method="post" action="/orders/{{ order.id }}/payment/milestones/{{ m.id }}" class="inline-form milestone-record">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <strong>Milestone {{ m.seq }} received</strong>
-          <label>Amount received ({{ order.currency_code }}) *<input type="number" name="amount" step="0.01" min="0.01" max="999999999999.99" required value="{{ m.amountInput }}"></label>
+          <label>Amount received ({{ order.currency_code }}) *<input type="number" name="amount" step="0.01" min="0.01" max="{{ ps.fobInput }}" required value="{{ m.amountInput }}"></label>
           <label>Exchange rate (₹ per 1 {{ order.currency_code }}) *<input type="number" name="exchange_rate" step="0.0001" min="0.0001" max="999999.9999" required></label>
           <label>Bank reference (UTR / SWIFT) *<input type="text" name="bank_reference" minlength="4" maxlength="100" required></label>
           <label>Received on *<input type="date" name="received_on" required value="{{ todayDate }}" max="{{ todayDate }}"></label>
           <label>Note <small class="muted">(added to the description)</small><input type="text" name="staff_note" maxlength="255"></label>
+          <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the milestone due (e.g. bank charges deducted) — record it anyway</label>
           <button type="submit" class="btn-sm">Record Milestone {{ m.seq }} Remittance</button>
         </form>
         {% elif m.received_amount !== null and not m.cleared_on and permissions.clear_payments %}
@@ -1663,7 +1666,7 @@
                 <td>{{ bd.original_filename }}</td>
                 <td>{{ bd.uploaded_at }}</td>
                 <td>{{ 'The buyer (self-uploaded)' if bd.uploaded_by === null else 'Staff' }}</td>
-                <td><a href="/file-store/{{ bd.file_id }}/download">Download</a></td>
+                <td>{% if fileAllowed[bd.file_id] !== false %}<a href="/file-store/{{ bd.file_id }}/download">Download</a>{% else %}Download{% endif %}{# QA R7-N06 #}</td>
               </tr>
             {% endfor %}
           </table>
@@ -2306,7 +2309,7 @@
               <tr>
                 <td>{{ sd.original_filename }}</td>
                 <td>{{ sd.uploaded_at }}</td>
-                <td><a href="/file-store/{{ sd.file_id }}/download">Download</a></td>
+                <td>{% if fileAllowed[sd.file_id] !== false %}<a href="/file-store/{{ sd.file_id }}/download">Download</a>{% else %}Download{% endif %}{# QA R7-N06 #}</td>
               </tr>
             {% endfor %}
           </table>
@@ -2795,7 +2798,7 @@
           <tr>
             <td>{{ round.round_number }}</td>
             <td>{{ round.uploaded_at }}</td>
-            <td><a href="/file-store/{{ round.draft_file_id }}/download" target="_blank">View draft</a></td>
+            <td>{% if fileAllowed[round.draft_file_id] !== false %}<a href="/file-store/{{ round.draft_file_id }}/download" target="_blank">View draft</a>{% else %}View draft{% endif %}{# QA R7-N06 #}</td>
             <td>
               {% if round.status == 'pending' %}<span class="badge badge-inactive">Pending Review</span>
               {% elif round.status == 'approved' %}<span class="badge badge-active">Approved</span>
@@ -2848,7 +2851,7 @@
       {% else %}
         <p>Bill of Lading recorded: <strong>{{ shipping.bl_number }}</strong> ({{ shipping.bl_date }})</p>
         {% if shipping.bl_copy_file_id %}
-          <p class="muted small"><a href="/file-store/{{ shipping.bl_copy_file_id }}/download">Download scanned BL copy</a></p>
+          <p class="muted small">{% if fileAllowed[shipping.bl_copy_file_id] !== false %}<a href="/file-store/{{ shipping.bl_copy_file_id }}/download">Download scanned BL copy</a>{% else %}Download scanned BL copy{% endif %}{# QA R7-N06 #}</p>
         {% else %}
           {% if permissions.manage_shipping %}{# QA Round 5, R5-20 #}
           <form method="post" action="/orders/{{ order.id }}/bl-copy" enctype="multipart/form-data">
@@ -2898,7 +2901,7 @@
       {% elif not (shipping and shipping.bl_copy_file_id) %}
         <p class="review-banner warn bl-copy-first">&#9888; <strong>Upload the scanned BL copy first</strong> — attach it in <a href="#step-10f-bl-issued">Step 10f</a> (Attach Scanned BL Copy), then generate the Commercial Invoice against it.</p>
       {% else %}
-        <p class="muted small">Scanned BL copy is on file (<a href="/file-store/{{ shipping.bl_copy_file_id }}/download">download</a>) — generate the Commercial Invoice against it.</p>
+        <p class="muted small">Scanned BL copy is on file ({% if fileAllowed[shipping.bl_copy_file_id] !== false %}<a href="/file-store/{{ shipping.bl_copy_file_id }}/download">download</a>{% else %}download{% endif %}{# QA R7-N06 #}) — generate the Commercial Invoice against it.</p>
       {% endif %}
       {% if permissions.generate_documents %}{# QA Round 5, R5-20 #}
       <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
@@ -3071,7 +3074,7 @@
             <td>{{ e.details }}</td>
             <td style="text-align:right">{{ e.amount_inr | money }}</td>
             <td>{{ expensePaidBy[e.paid_by] or e.paid_by }}{% if e.paid_by == 'staff' and e.staff_name %} — {{ e.staff_name }}{% endif %}</td>
-            <td>{% if e.receipt_file_id %}<a href="/file-store/{{ e.receipt_file_id }}/download">receipt</a>{% else %}<span class="vendor-bill-due">No bill — {{ e.no_receipt_reason }}</span>{% endif %}</td>
+            <td>{% if e.receipt_file_id %}{% if fileAllowed[e.receipt_file_id] !== false %}<a href="/file-store/{{ e.receipt_file_id }}/download">receipt</a>{% else %}receipt{% endif %}{# QA R7-N06 #}{% else %}<span class="vendor-bill-due">No bill — {{ e.no_receipt_reason }}</span>{% endif %}</td>
             <td>
               <form method="post" action="/orders/{{ order.id }}/expenses/{{ e.id }}/delete" data-confirm="{{ 'Remove this expense? It is in Zoho Books too, and is removed there as well.' if e.zoho_expense_id else 'Remove this expense?' }}">
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -3226,7 +3229,7 @@
         <p class="muted small">Export process steps 5-1a/5-2a/5-3a: only relevant if the client opted for payment by LC. Recording an interest-paid amount below automatically keeps a matching "Bank Loan Interest" row in Other Order Costs below in sync — editing it there directly isn't needed.</p>
         <div class="kv-grid">
           <div><span class="k">LC Number</span><span class="v">{{ lcDetails.lc_number or '—' }}</span></div>
-          <div><span class="k">LC Document</span><span class="v">{% if lcDetails.lc_file_id %}<a href="/file-store/{{ lcDetails.lc_file_id }}/download" target="_blank">View LC</a>{% else %}—{% endif %}</span></div>
+          <div><span class="k">LC Document</span><span class="v">{% if lcDetails.lc_file_id %}{% if fileAllowed[lcDetails.lc_file_id] !== false %}<a href="/file-store/{{ lcDetails.lc_file_id }}/download" target="_blank">View LC</a>{% else %}View LC{% endif %}{# QA R7-N06 #}{% else %}—{% endif %}</span></div>
           <div><span class="k">Bank Loan Amount</span><span class="v">{{ lcDetails.bank_loan_amount | money if lcDetails.bank_loan_amount != null else '—' }}</span></div>
           <div><span class="k">Interest Rate</span><span class="v">{{ (lcDetails.bank_loan_interest_rate + '%') if lcDetails.bank_loan_interest_rate != null else '—' }}</span></div>
           <div><span class="k">Interest Paid</span><span class="v">{{ lcDetails.bank_loan_interest_paid | money if lcDetails.bank_loan_interest_paid != null else '—' }}</span></div>
@@ -3794,7 +3797,7 @@
       <tr>
         <td>{{ ad.document_type_label }}</td>
         <td class="muted small">{{ ad.notes }}</td>
-        <td><a href="/file-store/{{ ad.id }}/download">{{ ad.original_filename }}</a></td>
+        <td>{% if fileAllowed[ad.id] !== false %}<a href="/file-store/{{ ad.id }}/download">{{ ad.original_filename }}</a>{% else %}{{ ad.original_filename }}{% endif %}{# QA R7-N06 #}</td>
         <td>{{ ad.uploaded_at }}{% if ad.uploaded_by_name %} <span class="muted small">by {{ ad.uploaded_by_name }}</span>{% endif %}</td>
         <td>
           {% if permissions.manage_orders %}
@@ -3994,7 +3997,7 @@
           <div><span class="k">Compliance Checklist</span><span class="v">{{ 'No task types configured' if complianceTotal == 0 else (complianceApproved ~ ' of ' ~ complianceTotal ~ ' resolved') }} — <a href="#compliance-checklist">see checklist</a></span></div>
           {% endif %}
           <div><span class="k">Documents Generated</span><span class="v">{{ documents.length }}</span></div>
-          <div><span class="k">Client</span><span class="v">{% if permissions.manage_orders or permissions.view_clients %}<a href="/clients/{{ order.client_id }}">{{ order.company_legal_name }}</a>{% else %}{{ order.company_legal_name }}{% endif %}</span></div>
+          {% if sees.client %}<div><span class="k">Client</span><span class="v">{% if permissions.manage_orders or permissions.view_clients %}<a href="/clients/{{ order.client_id }}">{{ order.company_legal_name }}</a>{% else %}{{ order.company_legal_name }}{% endif %}</span></div>{% endif %}
           <div><span class="k">Buyer Inquiry Ref</span><span class="v">{{ order.buyer_inquiry_ref }}</span></div>
           <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v">{{ order.incoterm_code }} {{ order.port_of_loading_name or '—' }}</span></div>
           <div><span class="k">Quotation Date</span><span class="v">{{ order.quotation_date or '—' }}</span></div>

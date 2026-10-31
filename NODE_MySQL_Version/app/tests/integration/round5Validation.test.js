@@ -168,6 +168,18 @@ describe('Round 5 validation (Batch 6)', () => {
     expect((await clientRepository.find(clientId)).email).not.toBe('not-an-email');
   });
 
+  // QA Round 7, R7-N14: an impossible "Effective from" date gets a field message, not a generic error.
+  it('Amendment refuses an impossible effective-from date', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    for (const date of ['2026-02-30', '2026-13-01', '0000-00-00', '31/10/2026', 'next week']) {
+      const req = fakeReq({ reason: 'Buyer asked to change the advance split.', amended_advance_pct: '30', effective_from: date }, { id: String(orderId) });
+      await amendmentController.create(req, fakeRes());
+      expect([date, lastFlash(req).message]).toEqual([date, 'Effective from: enter a valid date (YYYY-MM-DD).']);
+    }
+    const row = await db.queryOne('SELECT COUNT(*) AS n FROM amendments WHERE order_id = :id', { id: orderId });
+    expect(Number(row.n)).toBe(0);
+  });
+
   // R5-28: text in the amended advance % is refused (it used to create the amendment).
   it('Amendment refuses text in the advance %', async () => {
     const orderId = await createTestOrder(await createTestClient());

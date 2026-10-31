@@ -69,6 +69,22 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
     await assertNoHorizontalOverflow(page);
   });
 
+  // QA Round 7, R7-N16: the Getting Started page (its own layout) scrolled
+  // sideways on a phone — the chapter bar stood beside the text as a tall
+  // column. It now sits above the text and scrolls on its own.
+  test('Getting Started has no horizontal overflow and its chapter bar sits above the text', async ({ page }) => {
+    await login(page, 'admin');
+    await page.goto('/getting-started');
+    await assertNoHorizontalOverflow(page);
+    const nav = await page.locator('#gs-mobilenav').boundingBox();
+    const main = await page.locator('main.gs-main').boundingBox();
+    expect(nav.width).toBeGreaterThan(380);
+    expect(nav.height).toBeLessThan(80);
+    expect(main.y).toBeGreaterThanOrEqual(nav.y + nav.height - 1);
+    await page.locator('#gs-mobilenav a').last().click();
+    await assertNoHorizontalOverflow(page);
+  });
+
   test('orders list drops to a single-column card grid', async ({ page }) => {
     await login(page, 'admin');
     await page.goto('/orders');
@@ -294,6 +310,9 @@ test.describe('Tablet viewport (768x1024 — iPad Mini portrait, still below the
     await expect(page.locator('.sidebar-nav')).not.toBeVisible();
 
     await page.goto('/orders');
+    await assertNoHorizontalOverflow(page);
+
+    await page.goto('/getting-started'); // QA Round 7, R7-N16
     await assertNoHorizontalOverflow(page);
   });
 });

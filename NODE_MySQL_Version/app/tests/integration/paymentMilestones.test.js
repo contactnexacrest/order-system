@@ -94,6 +94,14 @@ describe('Payment milestones (D-215, 5a)', () => {
       .toBe('The payment schedule is fixed once the advance is cleared — change it with a payment terms amendment.');
   });
 
+  // QA Round 7, R7-N11: two schedule saves at once used to deadlock and show a 500 page.
+  it('saves two schedules at once without a deadlock', async () => {
+    const saves = Array.from({ length: 6 }, (_, i) => paymentMilestoneRepository.replaceSchedule(orderId, [{ pct: 10 + i, due_text: DUE }, { pct: 5, due_text: DUE }], 30));
+    await expect(Promise.all(saves)).resolves.toBeDefined();
+    const rows = await paymentMilestoneRepository.forOrder(orderId);
+    expect(rows.map((m) => Number(m.seq))).toEqual([2, 3]);
+  });
+
   it('shows each milestone on the PI and OC', async () => {
     await schedule();
     const pi = await documentDataAssembler.assemble(orderId, 'PI');
@@ -234,5 +242,21 @@ describe('Payment milestones (D-215, 5a)', () => {
     const order = await orderRepository.find(orderId);
     expect(mine[0].description).toBe(`Milestone 2 (50% ${DUE}) received from TEST-Milestone Buyer for order ${order.buyer_inquiry_ref} · USD 2,250.00 at ₹84.10 · bank ref UTR778899`);
     expect((await paymentMilestoneRepository.find(Number(m.id))).zoho_reference).toBe('PAY-1');
+  });
+
+  // QA Round 7, R7-N03: a milestone receipt follows the advance's rules — never more than the
+  // whole order, and an amount that differs from the milestone due by more than 1% must be confirmed.
+  it('bounds a milestone receipt like the advance', async () => {
+    await schedule();
+    const m = (await paymentMilestoneRepository.forOrder(orderId))[0];
+    await documentGenerationService.generate(orderId, 'PI', userId, null, false, true);
+    const body = { exchange_rate: '84.1', bank_reference: 'UTR778899', received_on: todayIst() };
+    expect(await call('record', { amount: '999999', ...body }, { milestoneId: String(m.id) }))
+      .toBe('USD 999,999.00 is more than the whole order value (USD 4,500.00). Check the amount the bank received.');
+    expect(await call('record', { amount: '2000', ...body }, { milestoneId: String(m.id) }))
+      .toBe('Milestone 2 due on this order is USD 2,250.00 (50% of USD 4,500.00). You entered USD 2,000.00 — if that really is what the bank received, tick "The amount received differs from the milestone due" and save again.');
+    expect((await paymentMilestoneRepository.find(Number(m.id))).received_amount).toBeNull();
+    expect(await call('record', { amount: '2000', confirm_amount_differs: '1', ...body }, { milestoneId: String(m.id) })).toMatch(/^Recorded: Milestone 2/);
+    expect((await paymentMilestoneRepository.find(Number(m.id))).received_amount).toBe('2000.00');
   });
 });

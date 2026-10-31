@@ -78,6 +78,8 @@ final class PaymentMilestoneRepository
     {
         Database::transaction(static function () use ($orderId, $steps, $advancePct): void {
             $pdo = Database::connection();
+            // QA Round 7, R7-N11: two saves at once used to deadlock (DELETE + INSERT); one at a time per order.
+            $pdo->prepare('SELECT id FROM orders WHERE id = :o FOR UPDATE')->execute(['o' => $orderId]);
             $pdo->prepare('DELETE FROM order_payment_milestones WHERE order_id = :o')->execute(['o' => $orderId]);
             $insert = $pdo->prepare('INSERT INTO order_payment_milestones (order_id, seq, pct, due_text) VALUES (:o, :seq, :pct, :due_text)');
             $total = 0.0;

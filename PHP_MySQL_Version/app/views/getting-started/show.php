@@ -48,9 +48,11 @@ body{font-size:15.5px; line-height:1.6;}
 
 .gs-mobile-nav{display:none;}
 @media (max-width: 880px){
+  /* QA Round 7, R7-N16: the chapter bar sits above the text (not beside it as a tall column) and scrolls on its own. */
+  .gs-shell{flex-direction:column;}
   .gs-rail{display:none;}
   .gs-mobile-nav{
-    display:flex; gap:6px; overflow-x:auto; position:sticky; top:0; z-index:20;
+    display:flex; align-items:center; gap:6px; overflow-x:auto; position:sticky; top:0; z-index:20; width:100%; max-width:100vw; min-width:0;
     background:var(--navy-strong); padding:10px 12px; -webkit-overflow-scrolling:touch;
   }
   .gs-mobile-nav a{flex:0 0 auto; color:#c7d1ea; text-decoration:none; font-size:12.5px; font-weight:600; padding:7px 11px; border-radius:99px; background:rgba(255,255,255,.07); white-space:nowrap;}
@@ -110,6 +112,7 @@ body{font-size:15.5px; line-height:1.6;}
 .gs-reftable td{padding:11px 12px; border-bottom:1px solid var(--line); vertical-align:top;}
 .gs-reftable tr:hover td{background:var(--navy-soft);}
 .gs-reftable .go{font-weight:600; color:var(--navy); white-space:nowrap;}
+@media (max-width: 880px){ .gs-reftable{display:block; overflow-x:auto;} .gs-reftable td{overflow-wrap:anywhere;} } /* R7-N16 */
 
 .gs-filterbar{display:flex; flex-wrap:wrap; gap:7px; margin:14px 0 2px;}
 .gs-fchip{font-size:12px; font-weight:600; padding:6px 12px; border-radius:99px; border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); cursor:pointer;}

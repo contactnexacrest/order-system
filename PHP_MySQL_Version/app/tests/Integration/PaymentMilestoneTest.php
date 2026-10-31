@@ -248,4 +248,24 @@ final class PaymentMilestoneTest extends DbTestCase
         self::assertSame('Milestone 2 (50% ' . self::DUE . ') received from TEST-Milestone Buyer for order ' . $order['buyer_inquiry_ref'] . ' · USD 2,250.00 at ₹84.10 · bank ref UTR778899', $mine[0]['description']);
         self::assertSame('PAY-1', PaymentMilestoneRepository::find((int) $m['id'])['zoho_reference']);
     }
+
+    /**
+     * QA Round 7, R7-N03: a milestone receipt follows the advance's rules —
+     * never more than the whole order, and an amount that differs from the
+     * milestone due by more than 1% must be confirmed on purpose.
+     */
+    public function testAMilestoneReceiptIsBoundedLikeTheAdvance(): void
+    {
+        $this->schedule();
+        $m = PaymentMilestoneRepository::forOrder($this->orderId)[0];
+        DocumentGenerationService::generate($this->orderId, 'PI', $this->userId, null, false, true);
+        $post = ['exchange_rate' => '84.1', 'bank_reference' => 'UTR778899', 'received_on' => date('Y-m-d')];
+        self::assertSame('USD 999,999.00 is more than the whole order value (USD 4,500.00). Check the amount the bank received.',
+            $this->call('record', ['amount' => '999999'] + $post, ['milestoneId' => (string) $m['id']]));
+        self::assertSame('Milestone 2 due on this order is USD 2,250.00 (50% of USD 4,500.00). You entered USD 2,000.00 — if that really is what the bank received, tick "The amount received differs from the milestone due" and save again.',
+            $this->call('record', ['amount' => '2000'] + $post, ['milestoneId' => (string) $m['id']]));
+        self::assertNull(PaymentMilestoneRepository::find((int) $m['id'])['received_amount']);
+        self::assertStringStartsWith('Recorded: Milestone 2', $this->call('record', ['amount' => '2000', 'confirm_amount_differs' => '1'] + $post, ['milestoneId' => (string) $m['id']]));
+        self::assertSame('2000.00', PaymentMilestoneRepository::find((int) $m['id'])['received_amount']);
+    }
 }

@@ -13,7 +13,7 @@ $canViewArchivedOrders = $currentUser && PermissionService::can((int) $currentUs
     </div>
     <div class="btn-row" style="margin-top:0;">
       <a class="btn btn-accent" href="/clients">Go to Clients to start a new order</a>
-      <a class="btn-sm btn-secondary" href="/orders?view=list&amp;status=<?= htmlspecialchars($statusFilter !== '' ? $statusFilter : 'all') ?>">Switch to list view</a>
+      <a class="btn-sm btn-secondary" href="/orders?view=list&amp;status=<?= htmlspecialchars($statusFilter) ?>">Switch to list view</a>
       <?php if ($canViewArchivedOrders): ?><a class="btn-sm btn-secondary" href="/orders/archived">View Archived Orders</a><?php endif; ?>
     </div>
   </div>

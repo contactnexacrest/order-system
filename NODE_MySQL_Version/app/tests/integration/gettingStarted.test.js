@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const gettingStartedController = require('../../src/controllers/gettingStartedController');
 
 /**
@@ -30,6 +32,14 @@ describe('Getting Started controller', () => {
 
     expect(res.renderedView).toBe('getting-started/show');
     expect(res.renderedLayout).toBeNull();
+  });
+
+  // QA Round 7, R7-N16: below 900 px the chapter bar sits above the text and the
+  // reference table scrolls in its own box (Playwright 06-responsive checks 390/768 px).
+  it('stacks the chapter bar and keeps tables inside the screen on a phone', () => {
+    const view = fs.readFileSync(path.join(__dirname, '..', '..', 'views', 'getting-started', 'show.njk'), 'utf8');
+    expect(view).toMatch(/@media \(max-width: 880px\)\{\s*\/\*[^*]*R7-N16[^*]*\*\/\s*\.gs-shell\{flex-direction:column;\}/);
+    expect(view).toContain('@media (max-width: 880px){ .gs-reftable{display:block; overflow-x:auto;}');
   });
 
   it('passes the signed-in user\'s name through to the view', async () => {

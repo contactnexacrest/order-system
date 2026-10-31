@@ -68,7 +68,22 @@ function flags(permissions) {
   return out;
 }
 
+/**
+ * Owner decision D-214 (D1–D12): "Logistics sees the client name, Procurement
+ * only the order number" — a role tied to a Procurement designation does not
+ * see the client name (QA Round 7, R7-N02). Port of MoneyVisibility::isProcurementRole().
+ */
+async function isProcurementRole(roleId) {
+  if (roleId === null || roleId === undefined) return false;
+  const db = require('../config/db');
+  const row = await db.queryOne(
+    "SELECT COUNT(*) AS n FROM department_designations dd JOIN departments d ON d.id = dd.department_id WHERE dd.role_id = :r AND d.code = 'PROC'",
+    { r: roleId }
+  );
+  return Number(row.n) > 0;
+}
+
 module.exports = {
   SELLING, BUYER_PAYMENTS, PURCHASE, LOGISTICS, FINANCIALS, PERMISSIONS, DOCUMENT_CLASSES,
-  documentClass, can, canSeeDocument, canSeeFile, flags,
+  documentClass, can, canSeeDocument, canSeeFile, flags, isProcurementRole,
 };

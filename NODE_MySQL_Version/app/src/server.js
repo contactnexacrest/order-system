@@ -6,7 +6,7 @@ const env = require('./config/env'); // loads .env as a side effect — must be 
 const express = require('express');
 const qs = require('qs');
 const session = require('express-session');
-const { ConnectSessionKnexStore } = require('connect-session-knex');
+const { isTransientDbError, UNAVAILABLE_MESSAGE, ResilientKnexStore } = require('./helpers/dbResilience');
 const knex = require('knex');
 const multer = require('multer');
 const nunjucks = require('nunjucks');
@@ -31,6 +31,12 @@ process.on('uncaughtException', (err) => {
 });
 process.on('unhandledRejection', (reason) => {
   logger.error('UNHANDLED REJECTION', reason instanceof Error ? reason : new Error(String(reason)));
+  // QA Round 7, R7-N04: a database that is briefly unreachable (too many
+  // connections, a restart) fails the requests it touches; the process
+  // keeps serving once the database is back.
+  if (isTransientDbError(reason)) {
+    return;
+  }
   process.exit(1);
 });
 const sessionAuth = require('./middleware/sessionAuth');
@@ -307,6 +313,10 @@ const sessionKnex = knex({
     user: env.get('DB_USERNAME'),
     password: env.get('DB_PASSWORD', ''),
   },
+  // QA Round 7, R7-N05: a small pool that lets idle connections go (knex's
+  // default keeps 2 open per process for good), so the session store never
+  // crowds the database's connection limit.
+  pool: { min: 0, max: env.getInt('SESSION_DB_POOL_SIZE', 5) },
 });
 
 app.set('trust proxy', 1);
@@ -374,7 +384,8 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.use(session({
-  store: new ConnectSessionKnexStore({ knex: sessionKnex, createTable: true, tableName: 'sessions', sidFieldName: 'sid' }),
+  store: new ResilientKnexStore({ knex: sessionKnex, createTable: true, tableName: 'sessions', sidFieldName: 'sid', onDbCleanupError: (err) => logger.error('SESSION CLEANUP FAILED', err) },
+    (err) => logger.error('SESSION STORE ERROR', err)),
   name: 'nexacrest_session',
   secret: env.sessionSecret(),
   resave: false,
@@ -433,7 +444,7 @@ app.use((req, res, next) => {
       actingMembership: req.actingMembership || null,
       myMemberships: req.myMemberships || [],
       previewDesignation: req.previewDesignation || null,
-      sees: moneyVisibility.flags(req.permissions || {}),
+      sees: { ...moneyVisibility.flags(req.permissions || {}), client: req.seesClient !== false },
       canSeeDocument: (typeCode) => moneyVisibility.canSeeDocument(req.permissions || {}, typeCode),
       testModeEnabled: req.testModeEnabled || false,
       devServerEnabled: env.isDevServer(),
@@ -1357,6 +1368,17 @@ function safeRedirectBack(req) {
 // --- Error handler (never leak stack traces outside APP_ENV=local, same rule as bootstrap.php's display_errors) ---
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   logger.error('UNHANDLED ERROR', err, { method: req.method, url: req.originalUrl, user: req.user ? req.user.id : null });
+  // QA Round 7, R7-N04: the database is briefly unreachable — this request
+  // fails with 503 (try again), the site stays up.
+  if (isTransientDbError(err)) {
+    res.set('Retry-After', '10');
+    if (req.xhr || String(req.get('Accept') || '').includes('application/json')) {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+    } else {
+      res.status(503).send(`<h1>503 — Please try again</h1><p>${UNAVAILABLE_MESSAGE}</p>`);
+    }
+    return;
+  }
   if (env.isLocal()) {
     res.status(500).send(`<pre>${escapeHtml(err.stack || String(err))}</pre>`);
   } else {
