@@ -89,7 +89,9 @@ $canViewOrders = $can('view_orders');
 $canComplaints = $can('manage_complaints') || $can('respond_to_complaints');
 $canViewComplaintsList = $can('manage_complaints') || $can('respond_to_complaints');
 
-$opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canComplaints || $canViewClients || $canViewOrders;
+// Owner decision D-214, phase 3: Procurement's queue.
+$canProcurement = $can('manage_purchasing') || $can('approve_purchases');
+$opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canComplaints || $canViewClients || $canViewOrders || $canProcurement;
 $insightsGroupVisible = $canReports || $canAudit || $canPayIncentives || $canOwnIncentives;
 // 90-item backlog #34: $canManageHsCodes/$canManageComplianceTaskTypes/
 // $canManageDropdownOptions/$canManageEmailTemplates each gate their own
@@ -112,7 +114,7 @@ $currentPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH
 $isActive = static function (string $path) use ($currentPath): bool {
     return $path === '/' ? $currentPath === '/' : str_starts_with($currentPath, $path);
 };
-$opsGroupActive = $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes') || $isActive('/complaints');
+$opsGroupActive = $isActive('/procurement') || $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes') || $isActive('/complaints');
 $insightsGroupActive = $isActive('/reports') || $isActive('/audit-log') || $isActive('/incentives/payouts') || $isActive('/my-incentives');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates') || $isActive('/ui-templates')
@@ -174,6 +176,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php endif; ?>
           <?php if ($canViewDisputesList): ?><a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a><?php endif; ?>
           <?php if ($canViewComplaintsList): ?><a href="/complaints" class="<?= $isActive('/complaints') ? 'active' : '' ?>">Complaints</a><?php endif; ?>
+          <?php if ($canProcurement): ?><a href="/procurement" class="<?= $isActive('/procurement') ? 'active' : '' ?>">Procurement</a><?php endif; ?>
         </div>
       </details>
     <?php endif; ?>

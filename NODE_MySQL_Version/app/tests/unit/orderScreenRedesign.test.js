@@ -176,7 +176,7 @@ describe('Order screen redesign (Point 2/4)', () => {
     // Steps 1, 2, 3, the LC card, 19, Amendments, 14, 16-18, Logistics Partner Bills (Step 12 is a step-group, 12a-12d).
     expect(counts.phaseCards).toBe(11);
     expect(counts.groups).toBe(10);
-    expect(counts.groupedCards).toBe(45);
+    expect(counts.groupedCards).toBe(46); // + Purchase Requirements (D-214 phase 3)
   });
 
   it('Not Applicable / Not Eligible fill their reason in, and "+ Add a cost" folds', () => {

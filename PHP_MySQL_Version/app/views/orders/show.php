@@ -2410,6 +2410,59 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
   <?php $renderComplianceCard('order', '7'); ?>
 
+  <?php
+  // Owner decision D-214, phase 3: what the order needs from Procurement — raised by Sales, no prices.
+  $__purchaseReqs = \App\Repositories\PurchasingRepository::forOrder((int) $order['id']);
+  $__canRaisePr = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'raise_purchase_requirements');
+  $__canOpenPr = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_purchasing')
+      || PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'approve_purchases');
+  ?>
+  <?php if ($__purchaseReqs !== [] || $__canRaisePr): ?>
+  <details class="step-card step-card-parallel" id="purchase-requirements"<?= $__purchaseReqs === [] ? '' : ' open' ?>>
+    <summary><h2>Purchase Requirements — for Procurement<?php if ($__purchaseReqs !== []): ?> <small class="muted">(<?= count($__purchaseReqs) ?>)</small><?php endif; ?></h2></summary>
+    <?php if ($__purchaseReqs !== []): ?>
+    <table class="list">
+      <tr><th>PR</th><th>What</th><th>Quantity</th><th>Needed by</th><th>Status</th><th>Supplier</th><th></th></tr>
+      <?php foreach ($__purchaseReqs as $__pr): ?>
+      <tr>
+        <td>PR-<?= (int) $__pr['id'] ?></td>
+        <td><?= htmlspecialchars((string) $__pr['description']) ?></td>
+        <td><?= htmlspecialchars(rtrim(rtrim((string) $__pr['quantity'], '0'), '.')) ?> <?= htmlspecialchars((string) ($__pr['unit'] ?? '')) ?></td>
+        <td><?= htmlspecialchars((string) $__pr['needed_by']) ?></td>
+        <td><?= htmlspecialchars(\App\Repositories\PurchasingRepository::STATUSES[$__pr['status']] ?? $__pr['status']) ?></td>
+        <td><?= htmlspecialchars((string) ($__pr['awarded_supplier_name'] ?? '—')) ?></td>
+        <td><?php if ($__canOpenPr): ?><a class="btn-sm" href="/procurement/<?= (int) $__pr['id'] ?>">Open</a><?php endif; ?></td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <?php endif; ?>
+    <?php if ($__canRaisePr && !$isLockedOrder): ?>
+    <h3>Ask Procurement for what this order needs</h3>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/purchase-requirements" class="field-grid">
+      <?= Csrf::field() ?>
+      <label>Product line
+        <select name="order_product_id">
+          <option value="">— describe it below —</option>
+          <?php foreach ($products as $__p): ?><option value="<?= (int) $__p['id'] ?>"><?= htmlspecialchars((string) $__p['description']) ?> (<?= $__p['quantity_is_tbc'] ? 'qty TBC' : htmlspecialchars((string) $__p['quantity']) . ' ' . htmlspecialchars((string) ($__p['unit'] ?? '')) ?>)</option><?php endforeach; ?>
+        </select>
+      </label>
+      <label>What is needed <small class="muted">(if not a product line)</small><input type="text" name="description" maxlength="500"></label>
+      <label>Quantity <small class="muted">(defaults to the product line's)</small><input type="number" name="quantity" step="0.001" min="0.001"></label>
+      <label>Unit <small class="muted">(defaults to the product line's)</small>
+        <select name="unit">
+          <option value="">—</option>
+          <?php foreach ($units as $o): ?><option value="<?= htmlspecialchars($o['option_value']) ?>"><?= htmlspecialchars($o['option_value']) ?></option><?php endforeach; ?>
+        </select>
+      </label>
+      <label>Needed by *<input type="date" name="needed_by" required min="<?= date('Y-m-d') ?>"></label>
+      <label>Specification<input type="text" name="specification" maxlength="1000"></label>
+      <label>Note for Procurement<input type="text" name="note" maxlength="500"></label>
+      <div class="btn-row"><button type="submit" class="btn-sm btn-accent">+ Raise purchase requirement</button></div>
+    </form>
+    <?php endif; ?>
+  </details>
+  <?php endif; ?>
+
   <details class="step-card" id="step-7a-supplier-po-terms"<?= $subCardOpen('7', '7a') ?>>
     <summary><?= $stepStatusIcon($subStepStatus('7', '7a')) ?><h2>Step 7a &middot; Save Supplier PO Terms</h2></summary>
     <?php if ($supplierPoLocked): ?>

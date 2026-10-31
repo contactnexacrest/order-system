@@ -1,0 +1,31 @@
+<div class="card page-wide">
+  <h1>Procurement</h1>
+  <p class="muted">Purchase requirements raised by Sales, earliest need first. Open one to record supplier quotes, compare, award, approve, and record receipt and the quality check.</p>
+  <form method="get" action="/procurement" class="btn-row">
+    <label>Status
+      <select name="status" onchange="this.form.submit()">
+        <option value="">All open</option>
+        {% for key, label in statuses %}<option value="{{ key }}" {{ 'selected' if status == key else '' }}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <a class="btn-sm btn-secondary" href="/procurement/suppliers">Supplier performance</a>
+  </form>
+  <div class="table-scroll">
+  <table class="list">
+    <tr><th>PR</th><th>Order</th><th>What</th><th>Quantity</th><th>Needed by</th><th>Quotes</th><th>Status</th><th></th></tr>
+    {% for r in rows %}{% set late = r.status not in ['received', 'cancelled'] and r.needed_by < today %}
+    <tr>
+      <td>PR-{{ r.id }}</td>
+      <td>{{ r.order_reference }}</td>
+      <td>{{ r.description }}</td>
+      <td>{{ r.quantity | qtyTrim }} {{ r.unit or '' }}</td>
+      <td>{{ r.needed_by }}{% if late %} <span class="badge badge-inactive">late</span>{% endif %}</td>
+      <td>{{ r.quote_count }}</td>
+      <td>{{ statuses[r.status] or r.status }}</td>
+      <td><a class="btn-sm" href="/procurement/{{ r.id }}">Open</a></td>
+    </tr>
+    {% endfor %}
+    {% if not rows.length %}<tr><td colspan="8" class="muted">Nothing here.</td></tr>{% endif %}
+  </table>
+  </div>
+</div>

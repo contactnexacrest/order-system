@@ -1,5 +1,7 @@
 'use strict';
 
+const purchasingRepository = require('../repositories/purchasingRepository');
+
 const moneyVisibility = require('../services/moneyVisibility');
 
 const fs = require('fs');
@@ -1093,6 +1095,10 @@ async function show(req, res) {
       canManageIncentives,
       ...incentiveView,
       vendorBills,
+      // Owner decision D-214, phase 3: what the order needs from Procurement.
+      purchaseRequirements: await purchasingRepository.forOrder(orderId),
+      purchaseStatuses: purchasingRepository.STATUSES,
+      todayDate: todayIst(),
       logisticsBanks,
       logisticsPaymentBlocked: await require('./vendorBillController').logisticsPaymentBlockedReason(order),
       orderExpenses: canManageOrderFinancialsForBills ? await orderExpenseRepository.forOrder(orderId) : [],

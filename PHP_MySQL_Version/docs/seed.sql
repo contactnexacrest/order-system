@@ -1847,3 +1847,33 @@ INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
 WHERE p.permission_key = 'generate_documents'
   AND r.name IN ('Procurement Executive', 'Procurement Manager', 'Procurement Director');
+
+-- ---------------------------------------------------------------
+-- Owner decision D-214, phase 3: Procurement permissions and starting approval limits
+-- (same rows as docs/migrations/2026-11-01c-procurement.sql).
+INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
+  ('raise_purchase_requirements', 'Raise purchase requirements', 'Ask Procurement for what an order needs (product, quantity, needed by) — no prices. D-214: Sales, management.', 'procurement'),
+  ('manage_purchasing', 'Work purchase requirements', 'Record supplier quotes, compare and award, follow production, record receipt and the quality check. D-214: Procurement.', 'procurement'),
+  ('approve_purchases', 'Approve purchases above a limit', 'Approve an award above the awarding designation''s approval limit (up to this designation''s own limit; no limit = any amount). D-214: Procurement Manager / Director, MD/ED.', 'procurement');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'raise_purchase_requirements'
+  AND r.name IN ('Admin', 'Managing Director', 'Executive Director', 'Export Executive', 'Sales/Export Manager', 'Sales Director');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'manage_purchasing'
+  AND r.name IN ('Admin', 'Managing Director', 'Executive Director', 'Procurement Executive', 'Procurement Manager', 'Procurement Director');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'approve_purchases'
+  AND r.name IN ('Admin', 'Managing Director', 'Executive Director', 'Procurement Manager', 'Procurement Director');
+
+-- Starting approval limits (Admin → Departments changes them): every award
+-- by a Procurement Executive is approved by a manager; a Procurement Manager
+-- approves up to ₹5,00,000; the Director has no limit. Only set where none is set yet.
+UPDATE department_designations dd JOIN departments d ON d.id = dd.department_id
+   SET dd.approval_limit_inr = CASE dd.title WHEN 'Procurement Executive' THEN 0 WHEN 'Procurement Manager' THEN 500000 END
+ WHERE d.code = 'PROC' AND dd.title IN ('Procurement Executive', 'Procurement Manager') AND dd.approval_limit_inr IS NULL;

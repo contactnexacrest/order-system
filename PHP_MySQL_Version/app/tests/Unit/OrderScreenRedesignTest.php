@@ -224,7 +224,7 @@ final class OrderScreenRedesignTest extends TestCase
         $this->assertSame(5, $phaseCount, 'Expected the five major sections: Order Booking, Procurement & Production, Shipment & Balance, Closure & Settlement, After-Sales & Records.');
         $this->assertSame(11, $phaseStepCardCount, 'Expected 11 standalone step-cards directly inside the sections (Steps 1, 2, 3, the LC card, 19, Amendments, 14, 16-18, Logistics Partner Bills — Order Communication is pinned above them; Step 12 is now a step-group).');
         $this->assertSame(10, $groupCount, 'Expected exactly 10 step-group boxes inside the sections (Step 4, 5, 6, 7, 8 (Production), 9-freight, 10-packing/BL, 11 (CI&Balance), 12 (Financials 12a-12d), 13 (Documents & Settlement)).');
-        $this->assertSame(45, $groupedStepCardCount, 'Expected exactly 45 step-cards nested inside a step-group box — every lettered sub-step card written in the page body.');
+        $this->assertSame(46, $groupedStepCardCount, 'Expected exactly 46 step-cards nested inside a step-group box — every lettered sub-step card written in the page body, plus the Purchase Requirements card (D-214 phase 3) in Step 7\'s group.');
     }
 
     public function testNotApplicableAndNotEligibleFillTheirReasonAndAddACostFolds(): void

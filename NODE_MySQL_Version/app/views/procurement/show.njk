@@ -1,0 +1,102 @@
+<div class="card page-wide">
+  <p class="muted small"><a href="/procurement">&larr; Procurement</a> · <a href="/orders/{{ r.order_id }}">Order {{ r.order_reference }}</a></p>
+  <h1>PR-{{ r.id }} · {{ r.description }}</h1>
+  <div class="kv-grid">
+    <div><span class="k">Quantity</span><span class="v">{{ qty }} {{ r.unit or '' }}</span></div>
+    <div><span class="k">Needed by</span><span class="v">{{ r.needed_by }}</span></div>
+    <div><span class="k">Status</span><span class="v">{{ statuses[r.status] or r.status }}</span></div>
+    {% if r.specification %}<div><span class="k">Specification</span><span class="v">{{ r.specification }}</span></div>{% endif %}
+    {% if r.note %}<div><span class="k">Note from Sales</span><span class="v">{{ r.note }}</span></div>{% endif %}
+    {% if r.awarded_supplier_name %}<div><span class="k">Awarded to</span><span class="v">{{ r.awarded_supplier_name }}{% if awardValue != null and sees.purchase %} — &#8377;{{ fmt(awardValue) }} incl. GST{% endif %}</span></div>{% endif %}
+    {% if r.status == 'received' %}<div><span class="k">Received</span><span class="v">{{ receivedQty }} on {{ r.received_on }} · QC {{ qcResults[r.qc_result] or '' }}{% if r.qc_note %} — {{ r.qc_note }}{% endif %}</span></div>{% endif %}
+  </div>
+</div>
+
+{% if sees.purchase %}
+<div class="card page-wide">
+  <h2>Supplier quotes (cheapest first, with GST)</h2>
+  <table class="list">
+    <tr><th>Supplier</th><th>Unit price</th><th>GST</th><th>Unit price with GST</th><th>Total for {{ qty }}</th><th>Lead time</th><th>Valid until</th><th>Ref</th><th></th></tr>
+    {% for q in quotes %}{% set isAwarded = q.id == r.awarded_quote_id %}
+    <tr{% if isAwarded %} style="background:var(--success-soft)"{% endif %}>
+      <td>{{ q.supplier_legal_name }}{% if loop.first %} <span class="badge badge-active">lowest</span>{% endif %}</td>
+      <td>&#8377;{{ fmt(q.unit_price_inr) }}</td>
+      <td>{{ q.gst_percent | float }}%</td>
+      <td>&#8377;{{ fmt(q.unit_price_with_gst_inr) }}</td>
+      <td>&#8377;{{ fmt(q.total) }}</td>
+      <td>{{ q.lead_time_days }} days</td>
+      <td>{{ q.valid_until or '—' }}</td>
+      <td>{{ q.quote_reference or '' }}</td>
+      <td>
+        {% if isAwarded %}<strong>Awarded</strong>
+        {% elif canWork and r.status in ['quoted', 'awarded'] %}
+          <form method="post" action="/procurement/{{ r.id }}/award" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="quote_id" value="{{ q.id }}"><button type="submit" class="btn-sm btn-success">Award</button></form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% if not quotes.length %}<tr><td colspan="9" class="muted">No quotes yet.</td></tr>{% endif %}
+  </table>
+  {% if myLimit != null %}<p class="muted small">Your approval limit as {{ actingLabel }}: &#8377;{{ fmt(myLimit) }}. An award above it waits for an approver.</p>{% endif %}
+
+  {% if canWork and r.status in ['open', 'quoted'] %}
+  <h3>Record a supplier quote</h3>
+  <form method="post" action="/procurement/{{ r.id }}/quotes" class="field-grid">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label>Supplier *
+      <select name="supplier_id" required>
+        <option value="">— choose —</option>
+        {% for s in suppliers %}<option value="{{ s.id }}">{{ s.supplier_legal_name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Unit price (&#8377;, before GST) *<input type="number" name="unit_price_inr" step="0.01" min="0.01" required></label>
+    <label>GST % *<input type="number" name="gst_percent" step="0.01" min="0" max="28" value="0" required></label>
+    <label>Lead time (days) *<input type="number" name="lead_time_days" step="1" min="0" max="365" required></label>
+    <label>Valid until<input type="date" name="valid_until" min="{{ today }}"></label>
+    <label>Supplier's quote ref<input type="text" name="quote_reference" maxlength="100"></label>
+    <label>Note<input type="text" name="note" maxlength="500"></label>
+    <div class="btn-row"><button type="submit" class="btn-sm btn-accent">+ Record quote</button></div>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if r.status == 'awarded' %}
+<div class="card page-wide">
+  <h2>Approval</h2>
+  {% if approvalRefusal == null %}
+    <form method="post" action="/procurement/{{ r.id }}/approve"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-success">Approve this purchase</button></form>
+  {% else %}
+    <p class="muted">{{ approvalRefusal }}</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if canWork and r.status == 'approved' %}
+<div class="card page-wide">
+  <h2>Receipt and quality check</h2>
+  <form method="post" action="/procurement/{{ r.id }}/receive" class="field-grid">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label>Quantity received *<input type="number" name="received_quantity" step="0.001" min="0.001" value="{{ qty }}" required></label>
+    <label>Received on *<input type="date" name="received_on" max="{{ today }}" value="{{ today }}" required></label>
+    <label>Quality check *
+      <select name="qc_result" required><option value="">— choose —</option>{% for k, l in qcResults %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select>
+    </label>
+    <label>What the check found <small class="muted">(needed unless passed)</small><input type="text" name="qc_note" maxlength="500"></label>
+    <div class="btn-row"><button type="submit" class="btn-sm btn-success">Record receipt</button></div>
+  </form>
+</div>
+{% endif %}
+
+{% if canWork and r.status not in ['received', 'cancelled'] %}
+<div class="card page-wide">
+  <details>
+    <summary>Cancel this requirement</summary>
+    <form method="post" action="/procurement/{{ r.id }}/cancel" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Reason *<input type="text" name="reason" required minlength="{{ minReasonLength }}" maxlength="500"></label>
+      <div class="btn-row"><button type="submit" class="btn-sm btn-danger">Cancel requirement</button></div>
+    </form>
+  </details>
+</div>
+{% endif %}

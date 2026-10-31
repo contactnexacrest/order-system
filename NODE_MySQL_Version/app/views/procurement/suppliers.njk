@@ -1,0 +1,19 @@
+<div class="card page-wide">
+  <p class="muted small"><a href="/procurement">&larr; Procurement</a></p>
+  <h1>Supplier performance</h1>
+  <p class="muted">From the purchase requirements: how often each supplier quoted and won, how many receipts came by the needed-by date, and how many failed the quality check.</p>
+  <table class="list">
+    <tr><th>Supplier</th><th>Quotes given</th><th>Awards won</th><th>Received</th><th>On time</th><th>Quality check failed</th></tr>
+    {% for s in rows %}
+    <tr>
+      <td>{{ s.supplier_legal_name }}</td>
+      <td>{{ s.quotes_given }}</td>
+      <td>{{ s.awards_won }}</td>
+      <td>{{ s.received }}</td>
+      <td>{% if s.received > 0 %}{{ s.on_time }} ({{ ((100 * s.on_time / s.received) | round) }}%){% else %}—{% endif %}</td>
+      <td>{{ s.qc_failed }}</td>
+    </tr>
+    {% endfor %}
+    {% if not rows.length %}<tr><td colspan="6" class="muted">No supplier quotes recorded yet.</td></tr>{% endif %}
+  </table>
+</div>

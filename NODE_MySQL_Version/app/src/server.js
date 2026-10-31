@@ -88,6 +88,7 @@ const superAdminController = require('./controllers/superAdminController');
 const permissionAdminController = require('./controllers/permissionAdminController');
 const departmentController = require('./controllers/departmentController');
 const departmentAdminController = require('./controllers/departmentAdminController');
+const purchasingController = require('./controllers/purchasingController');
 const moneyVisibility = require('./services/moneyVisibility');
 const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
@@ -160,6 +161,8 @@ njkEnv.addFilter('money', (value) => {
 });
 // Owner decision 2026-10-29: how a settlement leg is named on the CA pages ('lc' → 'LC payment').
 // Owner decision 2026-10-30: team incentives — whole-rupee amounts (PHP number_format($v, 0)) and month/cycle labels.
+// D-214 phase 3: a quantity without trailing zeros (120.000 -> 120, 12.500 -> 12.5).
+njkEnv.addFilter('qtyTrim', (value) => (value === null || value === undefined ? '' : String(value).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')));
 njkEnv.addFilter('money0', (value) => {
   const num = parseFloat(value);
   if (Number.isNaN(num)) return value;
@@ -757,6 +760,17 @@ app.post('/test-mode/enable', requireAuth, requireSuperAdmin, verifyCsrf, asyncH
 app.post('/test-mode/disable', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.disable));
 app.post('/test-mode/test-email', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.updateTestEmail));
 app.post('/test-mode/delete-test-data', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.deleteTestData));
+
+// Owner decision D-214, phase 3: Procurement — requirements raised by Sales, quotes, award, approval, receipt and quality check.
+app.post('/orders/:id/purchase-requirements', requireAuth, requirePermission('raise_purchase_requirements'), checkOrderLock, verifyCsrf, asyncHandler(purchasingController.raise));
+app.get('/procurement', requireAuth, requirePermissionAny(['manage_purchasing', 'approve_purchases']), asyncHandler(purchasingController.queue));
+app.get('/procurement/suppliers', requireAuth, requirePermission('manage_purchasing'), asyncHandler(purchasingController.suppliers));
+app.get('/procurement/:id', requireAuth, requirePermissionAny(['manage_purchasing', 'approve_purchases']), asyncHandler(purchasingController.show));
+app.post('/procurement/:id/quotes', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(purchasingController.addQuote));
+app.post('/procurement/:id/award', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(purchasingController.award));
+app.post('/procurement/:id/approve', requireAuth, requirePermission('approve_purchases'), verifyCsrf, asyncHandler(purchasingController.approve));
+app.post('/procurement/:id/receive', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(purchasingController.receive));
+app.post('/procurement/:id/cancel', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(purchasingController.cancel));
 
 // Owner decision D-214: "Log in as" a department, switching, Admin "Preview as", and Admin → Departments.
 app.get('/choose-department', requireAuth, asyncHandler(departmentController.chooseForm));

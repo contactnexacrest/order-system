@@ -1090,3 +1090,19 @@ Zoho Books, built from the facts and including the bank reference.
   `manage_payments`; freight cleared → `clear_payments`; mark fully settled →
   `settle_orders`.
 - **Tests:** `tests/integration/moneySeparation.test.js` (role matrix, document and file downloads, order page).
+
+## Follow-up (added 2026-11-01): Procurement (owner decision D-214, phase 3)
+
+- **Migration:** `docs/migrations/2026-11-01c-procurement.sql` — tables
+  `purchase_requirements`, `purchase_quotes`; permissions
+  `raise_purchase_requirements`, `manage_purchasing`, `approve_purchases`;
+  starting approval limits on the Procurement designations.
+- **Flow:** Sales raises a requirement on the order (`POST
+  /orders/{id}/purchase-requirements`, no prices); Procurement works it at
+  `/procurement` and `/procurement/{id}` (quotes, award, approve, receive
+  with quality check, cancel); `/procurement/suppliers` is the supplier
+  performance view. The award's value is checked against the approval limit
+  of the designation the person is working as (`src/services/purchasingService.js`); above it, an
+  approver with "Approve purchases" whose own limit covers it approves it
+  (never the awarder, unless the maker-checker rule allows).
+- **Tests:** `tests/integration/purchasing.test.js`.

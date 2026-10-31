@@ -88,7 +88,7 @@ async function designationTitleTaken(departmentId, title, exceptId = null) {
   return !!row;
 }
 
-const MEMBERSHIP_SELECT = `SELECT m.*, dd.title AS designation_title, dd.level, dd.role_id, dd.is_active AS designation_active,
+const MEMBERSHIP_SELECT = `SELECT m.*, dd.title AS designation_title, dd.level, dd.role_id, dd.is_active AS designation_active, dd.approval_limit_inr,
                                   d.id AS department_id, d.name AS department_name, d.color AS department_color, d.is_active AS department_active,
                                   d.sees_whole_company, r.name AS role_name
                              FROM user_department_memberships m

@@ -102,6 +102,7 @@ $superAdmin = new SuperAdminController();
 $permissionAdmin = new PermissionAdminController();
 $departments = new \App\Controllers\DepartmentController();
 $departmentAdmin = new \App\Controllers\DepartmentAdminController();
+$purchasing = new \App\Controllers\PurchasingController();
 $clients = new ClientController();
 $clientIntake = new ClientIntakeController();
 $clientIntakeReview = new ClientIntakeReviewController();
@@ -387,6 +388,17 @@ $router->post('/test-mode/enable', [$testMode, 'enable'], [SessionAuth::required
 $router->post('/test-mode/disable', [$testMode, 'disable'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 $router->post('/test-mode/test-email', [$testMode, 'updateTestEmail'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 $router->post('/test-mode/delete-test-data', [$testMode, 'deleteTestData'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
+
+// Owner decision D-214, phase 3: Procurement — requirements raised by Sales, quotes, award, approval, receipt and quality check.
+$router->post('/orders/{id}/purchase-requirements', [$purchasing, 'raise'], [SessionAuth::required(), PermissionCheck::requires('raise_purchase_requirements'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->get('/procurement', [$purchasing, 'queue'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_purchasing', 'approve_purchases'])]);
+$router->get('/procurement/suppliers', [$purchasing, 'suppliers'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing')]);
+$router->get('/procurement/{id}', [$purchasing, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_purchasing', 'approve_purchases'])]);
+$router->post('/procurement/{id}/quotes', [$purchasing, 'addQuote'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/procurement/{id}/award', [$purchasing, 'award'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/procurement/{id}/approve', [$purchasing, 'approve'], [SessionAuth::required(), PermissionCheck::requires('approve_purchases'), CsrfCheck::verify()]);
+$router->post('/procurement/{id}/receive', [$purchasing, 'receive'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/procurement/{id}/cancel', [$purchasing, 'cancel'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
 
 // Owner decision D-214: "Log in as" a department, switching, Admin "Preview as", and Admin → Departments.
 $router->get('/choose-department', [$departments, 'chooseForm'], [SessionAuth::required()]);
