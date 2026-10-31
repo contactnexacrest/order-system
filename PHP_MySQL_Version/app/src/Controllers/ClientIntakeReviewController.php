@@ -29,7 +29,7 @@ final class ClientIntakeReviewController
     public function index(array $params): void
     {
         $actor = AuthService::currentUser();
-        if (UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban') {
+        if (UiTemplateService::showsBoard($actor['ui_template_preference_id'] ?? null)) {
             $this->indexKanban();
             return;
         }

@@ -44,7 +44,7 @@ $renderKanbanCard = static function (array $o) use ($seesAllOrders, $sees): stri
     </div>
     <div class="btn-row" style="margin-top:0;">
       <a class="btn btn-accent" href="/clients">Go to Clients to start a new order</a>
-      <a class="btn-sm btn-secondary" href="/orders?status=all">Switch to list view</a>
+      <a class="btn-sm btn-secondary" href="/orders?view=list&amp;status=all">Switch to list view</a>
       <?php if ($canViewArchivedOrders): ?><a class="btn-sm btn-secondary" href="/orders/archived">View Archived Orders</a><?php endif; ?>
     </div>
   </div>

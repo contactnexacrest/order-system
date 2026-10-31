@@ -26,7 +26,7 @@ function todayYmd() {
 
 /** Global dispute log, filterable by status. */
 async function index(req, res) {
-  if ((await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban') {
+  if ((await uiTemplateService.showsBoard(req))) {
     await indexKanban(req, res);
     return;
   }

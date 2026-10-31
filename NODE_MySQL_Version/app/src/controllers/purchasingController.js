@@ -89,6 +89,16 @@ async function raise(req, res) {
 
 /** Procurement's queue: everything open, earliest need first (only orders this person can see). */
 async function queue(req, res) {
+  // The Kanban UI template shows Procurement as a board, one column per status.
+  if (await require('../services/uiTemplateService').showsBoard(req)) {
+    const board = await purchasingRepository.board();
+    const mayOpenBoard = await orderAccessService.orderLinkChecker(req.user.id, req.permissions);
+    const rows = board.rows.filter((r) => mayOpenBoard(r.order_id));
+    const columns = Object.entries(purchasingRepository.STATUSES).filter(([key]) => key !== 'cancelled')
+      .map(([key, label]) => ({ key, label, rows: rows.filter((r) => r.status === key) }));
+    res.renderView('procurement/queue_kanban', { columns, cancelled: board.cancelled, today: todayIst() }, 'layout/base');
+    return;
+  }
   const status = String(req.query.status || '');
   const rows = await purchasingRepository.queue(Object.prototype.hasOwnProperty.call(purchasingRepository.STATUSES, status) ? status : null);
   const mayOpen = await orderAccessService.orderLinkChecker(req.user.id, req.permissions);

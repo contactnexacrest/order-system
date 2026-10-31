@@ -1,0 +1,44 @@
+{# The Kanban UI template's Procurement board (D-214 phase 3): one column per requirement status. #}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>Procurement — Kanban Board</h1>
+      <p class="muted" style="margin:0;">Purchase requirements raised by Sales, earliest need first. Received shows the last 60 days.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      {% if cancelled > 0 %}<a class="tag" href="/procurement?view=list&amp;status=cancelled">Cancelled {{ cancelled }}</a>{% endif %}
+      <a class="btn-sm btn-secondary" href="/procurement/suppliers">Supplier performance</a>
+      <a class="btn-sm btn-secondary" href="/procurement?view=list">Switch to list view</a>
+    </div>
+  </div>
+
+  <div class="kanban-board">
+    {% for col in columns %}
+    <div class="kanban-column" data-status="{{ col.key }}">
+      <div class="kanban-column-header">
+        <span class="kanban-column-title">{{ col.label }}</span>
+        <span class="kanban-column-count">{{ col.rows | length }}</span>
+      </div>
+      {% if not col.rows | length %}
+        <p class="kanban-column-empty">Nothing here</p>
+      {% else %}
+        {% for r in col.rows %}
+        {% set late = r.status != 'received' and r.status != 'cancelled' and r.needed_by < today %}
+        <a class="entity-card kanban-card" href="/procurement/{{ r.id }}">
+          <div class="entity-card-header">
+            <span class="entity-card-title">PR-{{ r.id }} · {{ r.description }}</span>
+          </div>
+          <div class="entity-card-sub">{{ r.order_reference }} · {{ r.quantity | qtyTrim }} {{ r.unit or '' }}</div>
+          {% if r.awarded_supplier_name %}<div class="muted small">{{ r.awarded_supplier_name }}</div>{% endif %}
+          <div class="entity-card-footer">
+            <span class="muted small">Needed by {{ r.needed_by }}</span>
+            {% if late %}<span class="badge badge-inactive">late</span>{% endif %}
+            <span class="muted small">{{ r.quote_count }} quote{{ '' if r.quote_count == 1 else 's' }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>

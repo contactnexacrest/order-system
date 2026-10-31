@@ -1,0 +1,42 @@
+{# The Kanban UI template's My tasks board (D-214 phase 4): escalated, overdue, due today, coming up. #}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>My tasks — Kanban Board</h1>
+      <p class="muted" style="margin:0;">What {{ acting or 'your department' }} has to do next. A task appears when the step before it is done, and goes away when you do it.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <a class="btn-sm{{ ' btn-secondary' if mine else '' }}" href="/my-tasks">All of my department's tasks</a>
+      <a class="btn-sm{{ '' if mine else ' btn-secondary' }}" href="/my-tasks?show=mine">Only orders I own</a>
+      <a class="btn-sm btn-secondary" href="/my-tasks?view=list{{ '&amp;show=mine' | safe if mine else '' }}">Switch to list view</a>
+    </div>
+  </div>
+
+  <div class="kanban-board">
+    {% for col in columns %}
+    <div class="kanban-column" data-column="{{ col.key }}">
+      <div class="kanban-column-header">
+        <span class="kanban-column-title">{{ col.label }}</span>
+        <span class="kanban-column-count">{{ col.rows | length }}</span>
+      </div>
+      {% if not col.rows | length %}
+        <p class="kanban-column-empty">Nothing here</p>
+      {% else %}
+        {% for t in col.rows %}
+        <a class="entity-card kanban-card" href="{{ t.link }}">
+          <div class="entity-card-header">
+            <span class="entity-card-title">{{ t.title }}</span>
+          </div>
+          <div class="entity-card-sub"><span class="dept-tag" style="--dept-color:{{ t.department_color }}">{{ t.department_name }}</span> {{ t.order_reference }}</div>
+          {% if t.subject %}<div class="muted small">{{ t.subject | truncate(90, true, '…') }}</div>{% endif %}
+          <div class="entity-card-footer">
+            <span class="muted small">Due {{ t.due_on }}</span>
+            <span class="muted small">{{ t.owner_name if t.owner_name else 'no owner yet' }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>

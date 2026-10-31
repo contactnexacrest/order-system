@@ -34,6 +34,24 @@ async function myTasks(req, res) {
   }
   const m = await activeDepartmentService.current(req, req.user.id);
   const p = await activeDepartmentService.preview(req);
+  // The Kanban UI template shows the queue as a board: escalated, overdue, due today, coming up.
+  if (await require('../services/uiTemplateService').showsBoard(req)) {
+    const today = require('../helpers/dbDateTime').todayIst();
+    const columns = [
+      { key: 'escalated', label: 'Escalated', rows: [] }, { key: 'overdue', label: 'Overdue', rows: [] },
+      { key: 'today', label: 'Due today', rows: [] }, { key: 'upcoming', label: 'Coming up', rows: [] },
+    ];
+    for (const t of tasks) {
+      const key = Number(t.escalated) === 1 ? 'escalated' : (Number(t.overdue) === 1 ? 'overdue' : (String(t.due_on) === today ? 'today' : 'upcoming'));
+      columns.find((c) => c.key === key).rows.push(t);
+    }
+    res.renderView('coordination/my_tasks_kanban', {
+      columns,
+      mine,
+      acting: p ? `Preview: ${p.title} · ${p.department_name}` : (m ? activeDepartmentService.label(m) : null),
+    }, 'layout/base');
+    return;
+  }
   res.renderView('coordination/my_tasks', {
     tasks,
     mine,

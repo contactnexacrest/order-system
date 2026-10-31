@@ -125,7 +125,7 @@ function str(v, fallback = '') {
  */
 async function index(req, res) {
   const seesAllOrders = !!req.permissions.view_all_orders;
-  if ((await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban') {
+  if ((await uiTemplateService.showsBoard(req))) {
     await indexKanban(req, res, seesAllOrders);
     return;
   }

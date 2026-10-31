@@ -38,4 +38,14 @@ final class UiTemplateService
 
         return self::FALLBACK_TEMPLATE_KEY;
     }
+
+    /**
+     * Whether a list page shows its Kanban board: the person's template is
+     * Kanban and they did not ask for the list ("Switch to list view",
+     * ?view=list). Before this the switch link only reloaded the board.
+     */
+    public static function showsBoard(?int $userPreferenceId): bool
+    {
+        return self::resolve($userPreferenceId) === 'kanban' && (string) ($_GET['view'] ?? '') !== 'list';
+    }
 }

@@ -43,6 +43,21 @@ final class PurchasingRepository
         return $stmt->fetchAll();
     }
 
+    /**
+     * The Kanban board: every requirement still in play, plus those received
+     * in the last 60 days (older ones stay in the list view), earliest need
+     * first; cancelled ones are only counted.
+     *
+     * @return array{rows: list<array<string,mixed>>, cancelled: int}
+     */
+    public static function board(): array
+    {
+        $rows = Database::connection()->query(self::SELECT . " WHERE pr.status NOT IN ('received', 'cancelled')
+            OR (pr.status = 'received' AND pr.received_on >= CURDATE() - INTERVAL 60 DAY) ORDER BY pr.needed_by, pr.id")->fetchAll();
+        $cancelled = (int) Database::connection()->query("SELECT COUNT(*) FROM purchase_requirements WHERE status = 'cancelled'")->fetchColumn();
+        return ['rows' => $rows, 'cancelled' => $cancelled];
+    }
+
     /** @return array<string,mixed>|null */
     public static function find(int $id): ?array
     {

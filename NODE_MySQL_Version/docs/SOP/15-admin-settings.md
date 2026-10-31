@@ -570,7 +570,7 @@ automatically falls back to the company default, or to Standard if
 that's also inactive, the next time they load an affected page.
 
 **Where Kanban actually changes the screen** — the same switch, applied
-independently on each of these six list pages, each rendering columns
+independently on each of these eight list pages, each rendering columns
 that match the real states that list already tracks elsewhere in this
 manual:
 
@@ -592,6 +592,20 @@ manual:
   Review / Applied / Rejected.
 - **Complaints** ([Chapter 19](./19-complaints.md)) — Open / Acknowledged
   / Resolved.
+- **Procurement** ([Chapter 22](./22-procurement.md)) — Waiting for quotes /
+  Quotes in / Awarded — waiting for approval / Approved — with the supplier /
+  Received (the last 60 days), with **Cancelled** as a count-chip linking to
+  the list.
+- **My tasks** ([Chapter 23](./23-coordination.md)) — Escalated / Overdue /
+  Due today / Coming up, with the same "Only orders I own" switch.
+
+Every board has a **Switch to list view** button that shows that page's
+ordinary list (the board comes back the next time the page is opened from
+the menu). The money each department may see is the same on a board as in
+the list: for example the Orders board shows an order's value only to
+departments that see selling prices. The order page itself is the same in
+both templates, including the payment schedule, the Export Service Invoice
+and product categories.
 
 Every other screen in this manual — including the client portal, which
 stays the simple grouped list described in

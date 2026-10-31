@@ -33,4 +33,13 @@ async function resolve(userPreferenceId) {
   return FALLBACK_TEMPLATE_KEY;
 }
 
-module.exports = { resolve, FALLBACK_TEMPLATE_KEY };
+/**
+ * Whether a list page shows its Kanban board: the person's template is
+ * Kanban and they did not ask for the list ("Switch to list view",
+ * ?view=list). Port of UiTemplateService::showsBoard().
+ */
+async function showsBoard(req) {
+  return (await resolve(req.user.ui_template_preference_id || null)) === 'kanban' && String((req.query && req.query.view) || '') !== 'list';
+}
+
+module.exports = { resolve, showsBoard, FALLBACK_TEMPLATE_KEY };

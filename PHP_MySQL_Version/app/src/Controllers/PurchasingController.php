@@ -97,6 +97,17 @@ final class PurchasingController
     /** Procurement's queue: everything open, earliest need first (only orders this person can see). */
     public function queue(array $params): void
     {
+        // The Kanban UI template shows Procurement as a board, one column per status.
+        if (\App\Services\UiTemplateService::showsBoard(AuthService::currentUser()['ui_template_preference_id'] ?? null)) {
+            $board = PurchasingRepository::board();
+            $rows = array_values(array_filter($board['rows'], static fn (array $r): bool => OrderAccessService::currentUserMaySeeOrderId((int) $r['order_id'])));
+            $columns = [];
+            foreach (array_diff_key(PurchasingRepository::STATUSES, ['cancelled' => true]) as $key => $label) {
+                $columns[$key] = ['label' => $label, 'rows' => array_values(array_filter($rows, static fn (array $r): bool => $r['status'] === $key))];
+            }
+            View::render('procurement/queue_kanban', ['columns' => $columns, 'cancelled' => $board['cancelled']], 'layout/base');
+            return;
+        }
         $status = (string) ($_GET['status'] ?? '');
         $rows = PurchasingRepository::queue(array_key_exists($status, PurchasingRepository::STATUSES) ? $status : null);
         $rows = array_values(array_filter($rows, static fn (array $r): bool => OrderAccessService::currentUserMaySeeOrderId((int) $r['order_id'])));

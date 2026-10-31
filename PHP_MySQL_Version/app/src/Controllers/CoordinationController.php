@@ -48,6 +48,22 @@ final class CoordinationController
         if ($mine) {
             $tasks = array_values(array_filter($tasks, static fn (array $t): bool => (int) ($t['owner_id'] ?? 0) === $userId));
         }
+        // The Kanban UI template shows the queue as a board: escalated, overdue, due today, coming up.
+        if (\App\Services\UiTemplateService::showsBoard(AuthService::currentUser()['ui_template_preference_id'] ?? null)) {
+            $today = date('Y-m-d');
+            $columns = ['escalated' => ['label' => 'Escalated', 'rows' => []], 'overdue' => ['label' => 'Overdue', 'rows' => []],
+                'today' => ['label' => 'Due today', 'rows' => []], 'upcoming' => ['label' => 'Coming up', 'rows' => []]];
+            foreach ($tasks as $t) {
+                $key = (int) $t['escalated'] === 1 ? 'escalated' : ((int) $t['overdue'] === 1 ? 'overdue' : ((string) $t['due_on'] === $today ? 'today' : 'upcoming'));
+                $columns[$key]['rows'][] = $t;
+            }
+            View::render('coordination/my_tasks_kanban', [
+                'columns' => $columns,
+                'mine' => $mine,
+                'acting' => ActiveDepartmentService::actingLabel($userId),
+            ], 'layout/base');
+            return;
+        }
         View::render('coordination/my_tasks', [
             'tasks' => $tasks,
             'mine' => $mine,

@@ -91,7 +91,7 @@ final class OrderController
     {
         $actor = AuthService::currentUser();
         $seesAllOrders = PermissionService::can((int) $actor['id'], $actor['role_id'] !== null ? (int) $actor['role_id'] : null, 'view_all_orders');
-        if (\App\Services\UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban') {
+        if (\App\Services\UiTemplateService::showsBoard($actor['ui_template_preference_id'] ?? null)) {
             $this->indexKanban((int) $actor['id'], $seesAllOrders);
             return;
         }

@@ -29,6 +29,18 @@ async function queue(status = null) {
   return db.query(`${SELECT} WHERE ${where} ORDER BY pr.needed_by, pr.id`, status !== null ? { s: status } : {});
 }
 
+/**
+ * The Kanban board: every requirement still in play, plus those received in
+ * the last 60 days (older ones stay in the list view), earliest need first;
+ * cancelled ones are only counted.
+ */
+async function board() {
+  const rows = await db.query(`${SELECT} WHERE pr.status NOT IN ('received', 'cancelled')
+    OR (pr.status = 'received' AND pr.received_on >= CURDATE() - INTERVAL 60 DAY) ORDER BY pr.needed_by, pr.id`);
+  const c = await db.queryOne("SELECT COUNT(*) AS n FROM purchase_requirements WHERE status = 'cancelled'");
+  return { rows, cancelled: Number(c.n) };
+}
+
 async function find(id) {
   return db.queryOne(`${SELECT} WHERE pr.id = :id`, { id });
 }
@@ -107,5 +119,6 @@ async function supplierPerformance() {
 }
 
 module.exports = {
+  board,
   STATUSES, forOrder, queue, find, create, setStatus, award, approve, receive, quotes, findQuote, addQuote, supplierPerformance,
 };

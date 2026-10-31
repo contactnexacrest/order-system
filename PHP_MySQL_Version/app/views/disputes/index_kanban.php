@@ -31,7 +31,7 @@ $renderKanbanCard = static function (array $d): string {
       <p class="muted" style="margin:0;"><?= (int) $totalCount ?> total &middot; every dispute by its own status.</p>
     </div>
     <div class="btn-row" style="margin-top:0;">
-      <a class="btn-sm btn-secondary" href="/disputes?status=all">Switch to list view</a>
+      <a class="btn-sm btn-secondary" href="/disputes?view=list&amp;status=all">Switch to list view</a>
     </div>
   </div>
 
