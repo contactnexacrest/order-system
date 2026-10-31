@@ -107,6 +107,9 @@ final class OrderProductRepository
             (string) $source['hs_code']
         );
         self::setLineType($newId, (string) ($source['line_type'] ?? 'goods'), $source['sac_code'] ?? null);
+        // D-215 (5a): the copy keeps the line's product category and attribute values.
+        Database::connection()->prepare('UPDATE order_products SET category_id = :c, attribute_values = :v WHERE id = :id')
+            ->execute(['c' => $source['category_id'] ?? null, 'v' => $source['attribute_values'] ?? null, 'id' => $newId]);
         return $newId;
     }
 

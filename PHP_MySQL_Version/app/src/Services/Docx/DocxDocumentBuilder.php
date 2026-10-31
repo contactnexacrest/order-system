@@ -175,7 +175,12 @@ final class DocxDocumentBuilder
                     ['SAC Code: ', ['bold' => true, 'color' => DocxComponents::NAVY]],
                     [($p['sac_code'] ?? '') . '   ·   ', []],
                     ['Invoiced separately on our Export Service Invoice', []],
-                ] : ((!empty($p['dimensions']) || !empty($p['finish'])) ? [
+                ] : (!empty($p['attributes']) ? array_merge(
+                    // D-215 (5a): a line of another product category — its own attributes, then the HS code, as the PDF.
+                    [["{$n}. ", ['bold' => true, 'color' => $lineColor]]],
+                    array_merge(...array_map(static fn (array $a): array => [[$a['label'] . ': ', ['bold' => true, 'color' => DocxComponents::NAVY]], [$a['value'] . '   ·   ', []]], $p['attributes'])),
+                    [['HS Code: ', ['bold' => true, 'color' => DocxComponents::NAVY]], [($p['hs_code'] ?? '') . '   ·   ', []], ['Country of Origin: ', ['bold' => true, 'color' => DocxComponents::NAVY]], ['India', []]]
+                ) : ((!empty($p['dimensions']) || !empty($p['finish'])) ? [
                     ["{$n}. ", ['bold' => true, 'color' => $lineColor]],
                     ['Dimensions: ', ['bold' => true, 'color' => DocxComponents::NAVY]],
                     [($p['dimensions'] ?: 'To Be Confirmed') . '   ·   ', []],
@@ -185,7 +190,7 @@ final class DocxDocumentBuilder
                     [($p['hs_code'] ?? '') . '   ·   ', []],
                     ['Country of Origin: ', ['bold' => true, 'color' => DocxComponents::NAVY]],
                     ['India', []],
-                ] : null),
+                ] : null)),
             ];
         }
         return $rows;

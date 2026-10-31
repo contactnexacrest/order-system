@@ -252,6 +252,8 @@ async function assemble(orderId, documentTypeCode = null) {
       unit_price: p.unit_price !== null ? formatMoney(p.unit_price) : 'To Be Confirmed',
       amount: p.fob_value !== null ? formatMoney(p.fob_value) : 'To Be Confirmed',
       line_type: p.line_type || 'goods',
+      // D-215 (5a): a line of another product category prints its own attributes (stone lines: none, as today).
+      attributes: require('../repositories/productCategoryRepository').documentAttributes(p),
       sac_code: p.sac_code || null,
     })),
     financial: {

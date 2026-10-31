@@ -758,6 +758,39 @@ final class OrderController
         return ['goods', $hsCode, null, null];
     }
 
+    /**
+     * Owner decision D-215 (5a): the line's product category and, for a
+     * category other than Natural Stone, its attribute values. A service
+     * has no category; Natural Stone (or none chosen) keeps Dimensions and
+     * Finish as today.
+     *
+     * @return array{0: ?int, 1: ?array<string,string>, 2: ?string} category id, values, error
+     */
+    private static function categoryInput(string $lineType, ?int $currentCategoryId = null): array
+    {
+        $categoryId = (int) ($_POST['category_id'] ?? 0);
+        if ($lineType === 'service' || $categoryId === 0) {
+            return [null, null, null];
+        }
+        $category = \App\Repositories\ProductCategoryRepository::find($categoryId);
+        if ($category === null || ((int) $category['is_active'] !== 1 && $categoryId !== $currentCategoryId)) {
+            return [null, null, 'Choose the product category from the list.'];
+        }
+        if ((int) $category['is_system'] === 1) {
+            return [null, null, null];
+        }
+        $raw = (array) ($_POST['attr_' . $categoryId] ?? []);
+        $values = [];
+        foreach ($category['attributes'] as $i => $label) {
+            $value = trim((string) ($raw[$i] ?? ''));
+            if (mb_strlen($value) > 100) {
+                return [null, null, "{$label}: at most 100 characters."];
+            }
+            $values[$label] = $value;
+        }
+        return [$categoryId, $values, null];
+    }
+
     public function addProduct(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -774,8 +807,9 @@ final class OrderController
             return;
         }
         [$lineType, $hsCode, $sacCode, $lineTypeError] = self::lineTypeInput();
-        if ($lineTypeError !== null) {
-            Flash::set('error', $lineTypeError);
+        [$categoryId, $attributeValues, $categoryError] = self::categoryInput($lineType);
+        if (($lineTypeError ?? $categoryError) !== null) {
+            Flash::set('error', $lineTypeError ?? $categoryError);
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -809,6 +843,7 @@ final class OrderController
             $hsCode
         );
         OrderProductRepository::setLineType($newLineId, $lineType, $sacCode);
+        \App\Repositories\ProductCategoryRepository::setLineCategory($newLineId, $categoryId, $attributeValues);
         Flash::set('success', 'Product line added.');
         header("Location: /orders/{$orderId}");
     }
@@ -831,8 +866,9 @@ final class OrderController
             return;
         }
         [$lineType, $hsCode, $sacCode, $lineTypeError] = self::lineTypeInput();
-        if ($lineTypeError !== null) {
-            Flash::set('error', $lineTypeError);
+        [$categoryId, $attributeValues, $categoryError] = self::categoryInput($lineType, isset($product['category_id']) ? (int) $product['category_id'] : null);
+        if (($lineTypeError ?? $categoryError) !== null) {
+            Flash::set('error', $lineTypeError ?? $categoryError);
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -865,6 +901,7 @@ final class OrderController
             $hsCode
         );
         OrderProductRepository::setLineType($productId, $lineType, $sacCode);
+        \App\Repositories\ProductCategoryRepository::setLineCategory($productId, $categoryId, $attributeValues);
         Flash::set('success', 'Product line updated.');
         header("Location: /orders/{$orderId}");
     }

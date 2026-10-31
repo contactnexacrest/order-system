@@ -92,6 +92,8 @@ async function duplicate(id, targetOrderId = null) {
     source.hs_code
   );
   await setLineType(newId, source.line_type || 'goods', source.sac_code || null);
+  // D-215 (5a): the copy keeps the line's product category and attribute values.
+  await db.execute('UPDATE order_products SET category_id = :c, attribute_values = :v WHERE id = :id', { c: source.category_id || null, v: source.attribute_values || null, id: newId });
   return newId;
 }
 

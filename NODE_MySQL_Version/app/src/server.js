@@ -91,6 +91,7 @@ const departmentAdminController = require('./controllers/departmentAdminControll
 const purchasingController = require('./controllers/purchasingController');
 const coordinationController = require('./controllers/coordinationController');
 const paymentMilestoneController = require('./controllers/paymentMilestoneController');
+const productCategoryController = require('./controllers/productCategoryController');
 const moneyVisibility = require('./services/moneyVisibility');
 const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
@@ -134,6 +135,8 @@ const njkEnv = nunjucks.configure(viewsDir, {
 njkEnv.addFilter('maskEmail', mask.maskEmail);
 njkEnv.addFilter('maskPhone', mask.maskPhone);
 njkEnv.addFilter('humanDate', dates.human);
+// D-215 (5a): an order line's stored attribute values (JSON) as an object for the line forms.
+njkEnv.addFilter('fromJson', (v) => { try { return v ? JSON.parse(v) : {}; } catch (e) { return {}; } });
 njkEnv.addFilter('shortDate', dates.short);
 // Nunjucks 3's selectattr/rejectattr only test truthiness — these filter a
 // list of objects by an attribute's exact value instead.
@@ -1062,6 +1065,10 @@ app.post('/orders/:id/override-status-lock', requireAuth, requirePermission('edi
 app.get('/products', requireAuth, requirePermission('view_product_catalog'), asyncHandler(productsController.index));
 app.get('/products/create', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.create));
 app.post('/products/create', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.store));
+// Owner decision D-215 (5a): product categories and their attributes (before /products/:id, which would match first).
+app.get('/products/categories', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productCategoryController.index));
+app.post('/products/categories', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productCategoryController.store));
+app.post('/products/categories/:id', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productCategoryController.update));
 app.get('/products/:id', requireAuth, requirePermission('view_product_catalog'), asyncHandler(productsController.show));
 app.get('/products/:id/edit', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.edit));
 app.post('/products/:id/update', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.update));

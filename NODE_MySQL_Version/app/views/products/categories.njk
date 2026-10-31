@@ -1,0 +1,41 @@
+{# Owner decision D-215 (5a): product categories and the attributes their order lines carry. #}
+<div class="card page-wide">
+  <h1>Product categories</h1>
+  <p class="muted">Each category names the attributes an order line of that category carries — they print on the Quotation, Proforma Invoice and Commercial Invoice in the line's detail row, in this order, followed by the HS code. Natural Stone is today's products: its Dimensions and Finish stay exactly as they are.</p>
+  <table class="list">
+    <tr><th>Category</th><th>Attributes</th><th>Status</th></tr>
+    {% for c in categories %}
+    <tr>
+      <td>{{ c.name }}{% if c.is_system == 1 %} <small class="muted">(today's products)</small>{% endif %}</td>
+      <td>{{ c.attributes | join(' · ') }}</td>
+      <td>{{ 'Active' if c.is_active == 1 else 'Inactive' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  {% for c in categories %}{% if c.is_system != 1 %}
+  <details class="category-edit">
+    <summary>Edit {{ c.name }}</summary>
+    <form method="post" action="/products/categories/{{ c.id }}">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Name *<input type="text" name="name" required minlength="2" maxlength="80" value="{{ c.name }}"></label>
+      {% for i in range(0, maxAttributes) %}
+      <label>Attribute {{ i + 1 }}{{ ' *' if i == 0 else '' }}<input type="text" name="attributes[]" maxlength="60" {{ 'required' if i == 0 else '' }} value="{{ c.attributes[i] or '' }}"></label>
+      {% endfor %}
+      <label class="checkbox-row"><input type="checkbox" name="is_active" value="1" {{ 'checked' if c.is_active == 1 else '' }}> Active (offered on new order lines)</label>
+      <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save {{ c.name }}</button></div>
+    </form>
+  </details>
+  {% endif %}{% endfor %}
+
+  <h2>Add a category</h2>
+  <form method="post" action="/products/categories">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label>Name *<input type="text" name="name" required minlength="2" maxlength="80" placeholder="e.g. Ceramic Tiles"></label>
+    {% set hints = ['e.g. Size', 'e.g. Grade', 'e.g. Colour', '', '', ''] %}
+    {% for i in range(0, maxAttributes) %}
+    <label>Attribute {{ i + 1 }}{{ ' *' if i == 0 else '' }}<input type="text" name="attributes[]" maxlength="60" {{ 'required' if i == 0 else '' }} placeholder="{{ hints[i] }}"></label>
+    {% endfor %}
+    <div class="btn-row"><button type="submit" class="btn-sm btn-success">Add Category</button></div>
+  </form>
+</div>

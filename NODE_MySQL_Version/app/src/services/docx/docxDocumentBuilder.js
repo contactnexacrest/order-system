@@ -116,6 +116,16 @@ function buildProductRows(products) {
           [`${p.sac_code || ''}   ·   `, {}],
           ['Invoiced separately on our Export Service Invoice', {}],
         ]
+      : (p.attributes && p.attributes.length)
+        ? [
+            // D-215 (5a): a line of another product category — its own attributes, then the HS code, as the PDF.
+            [`${n}. `, { bold: true, color: lineColor }],
+            ...p.attributes.flatMap((a) => [[`${a.label}: `, { bold: true, color: C.NAVY }], [`${a.value}   ·   `, {}]]),
+            ['HS Code: ', { bold: true, color: C.NAVY }],
+            [`${p.hs_code || ''}   ·   `, {}],
+            ['Country of Origin: ', { bold: true, color: C.NAVY }],
+            ['India', {}],
+          ]
       : p.dimensions || p.finish
         ? [
             [`${n}. `, { bold: true, color: lineColor }],

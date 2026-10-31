@@ -105,6 +105,7 @@ $departmentAdmin = new \App\Controllers\DepartmentAdminController();
 $purchasing = new \App\Controllers\PurchasingController();
 $coordination = new \App\Controllers\CoordinationController();
 $milestones = new \App\Controllers\PaymentMilestoneController();
+$productCategories = new \App\Controllers\ProductCategoryController();
 $clients = new ClientController();
 $clientIntake = new ClientIntakeController();
 $clientIntakeReview = new ClientIntakeReviewController();
@@ -847,6 +848,10 @@ $router->post('/sample-data/clear', [$sampleData, 'clear'], [SessionAuth::requir
 $router->get('/products', [$products, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_product_catalog')]);
 $router->get('/products/create', [$products, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
 $router->post('/products/create', [$products, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+// Owner decision D-215 (5a): product categories and their attributes (before /products/{id}, which would match first).
+$router->get('/products/categories', [$productCategories, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
+$router->post('/products/categories', [$productCategories, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/categories/{id}', [$productCategories, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->get('/products/{id}', [$products, 'show'], [SessionAuth::required(), PermissionCheck::requires('view_product_catalog')]);
 $router->get('/products/{id}/edit', [$products, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
 $router->post('/products/{id}/update', [$products, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);

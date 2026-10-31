@@ -265,6 +265,8 @@ final class DocumentDataAssembler
                     'unit_price'     => $p['unit_price'] !== null ? self::formatMoney($p['unit_price']) : 'To Be Confirmed',
                     'amount'         => $p['fob_value'] !== null ? self::formatMoney($p['fob_value']) : 'To Be Confirmed',
                     'line_type'      => $p['line_type'] ?? 'goods',
+                    // D-215 (5a): a line of another product category prints its own attributes (stone lines: none, as today).
+                    'attributes'     => \App\Repositories\ProductCategoryRepository::documentAttributes($p),
                     'sac_code'       => $p['sac_code'] ?? null,
                 ];
             }, $products),

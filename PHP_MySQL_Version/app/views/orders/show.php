@@ -109,6 +109,7 @@ $canOverrideOrderEdit = OrderEditGuard::canOverride((int) $currentUser['id'], $c
 // 90-item backlog Phase 6 Item 4 — the stricter lock check sits in front of the post-confirmation one.
 $isLockedOrder = (bool) $order['is_locked'];
 $canOverrideLockEdit = OrderEditGuard::canOverrideLock((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null);
+$__productCategories = \App\Repositories\ProductCategoryRepository::all();
 $canEditProducts = $canManageOrders && $sees['selling'] && (!$isLockedOrder || $canOverrideLockEdit) && (!$isPostConfirmationOrder || $canOverrideOrderEdit);
 
 // CA / Accounting module (Phase 1) — one small widget per settlement leg,
@@ -1320,6 +1321,18 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
               </label>
               <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code."></label>
               <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="<?= htmlspecialchars((string) ($p['sac_code'] ?? '')) ?>" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
+              <?php $__catLine = $p; ?>
+              <?php // Owner decision D-215 (5a): the line's product category; another category's own attributes. ?>
+              <label>Category
+                <select name="category_id">
+                  <?php foreach ($__productCategories as $__c): ?><option value="<?= (int) $__c['is_system'] === 1 ? '' : (int) $__c['id'] ?>" <?= (int) $__c['is_system'] !== 1 && (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $__c['name']) ?></option><?php endforeach; ?>
+                </select>
+              </label>
+              <?php foreach ($__productCategories as $__c): if ((int) $__c['is_system'] === 1) { continue; } $__vals = (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? (json_decode((string) ($__catLine['attribute_values'] ?? ''), true) ?: []) : []; ?>
+              <fieldset class="category-attributes" data-show-when="category_id=<?= (int) $__c['id'] ?>"><legend><?= htmlspecialchars((string) $__c['name']) ?></legend>
+                <?php foreach ($__c['attributes'] as $__label): ?><label><?= htmlspecialchars($__label) ?><input type="text" name="attr_<?= (int) $__c['id'] ?>[]" maxlength="100" value="<?= htmlspecialchars((string) ($__vals[$__label] ?? '')) ?>"></label><?php endforeach; ?>
+              </fieldset>
+              <?php endforeach; ?>
             </div>
             <?php if ($__productReasonRequired): ?>
               <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing?"></textarea></label>
@@ -1372,6 +1385,18 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
             </label>
             <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code."></label>
             <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
+            <?php $__catLine = []; ?>
+            <?php // Owner decision D-215 (5a): the line's product category; another category's own attributes. ?>
+            <label>Category
+              <select name="category_id">
+                <?php foreach ($__productCategories as $__c): ?><option value="<?= (int) $__c['is_system'] === 1 ? '' : (int) $__c['id'] ?>" <?= (int) $__c['is_system'] !== 1 && (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $__c['name']) ?></option><?php endforeach; ?>
+              </select>
+            </label>
+            <?php foreach ($__productCategories as $__c): if ((int) $__c['is_system'] === 1) { continue; } $__vals = (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? (json_decode((string) ($__catLine['attribute_values'] ?? ''), true) ?: []) : []; ?>
+            <fieldset class="category-attributes" data-show-when="category_id=<?= (int) $__c['id'] ?>"><legend><?= htmlspecialchars((string) $__c['name']) ?></legend>
+              <?php foreach ($__c['attributes'] as $__label): ?><label><?= htmlspecialchars($__label) ?><input type="text" name="attr_<?= (int) $__c['id'] ?>[]" maxlength="100" value="<?= htmlspecialchars((string) ($__vals[$__label] ?? '')) ?>"></label><?php endforeach; ?>
+            </fieldset>
+            <?php endforeach; ?>
           </div>
           <?php if ($__productReasonRequired): ?>
             <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added?"></textarea></label>

@@ -735,6 +735,31 @@ async function updateDetails(req, res) {
  * from the master list (as before); a service needs its SAC code (6 digits
  * starting 99) and no HS code; a charge needs neither.
  */
+/**
+ * Owner decision D-215 (5a): the line's product category and, for a
+ * category other than Natural Stone, its attribute values. A service has no
+ * category; Natural Stone (or none chosen) keeps Dimensions and Finish.
+ */
+async function categoryInput(body, lineType, currentCategoryId = null) {
+  const productCategoryRepository = require('../repositories/productCategoryRepository');
+  const categoryId = parseInt(body.category_id, 10) || 0;
+  if (lineType === 'service' || categoryId === 0) return { categoryId: null, values: null, error: null };
+  const category = await productCategoryRepository.find(categoryId);
+  if (!category || (Number(category.is_active) !== 1 && categoryId !== currentCategoryId)) {
+    return { categoryId: null, values: null, error: 'Choose the product category from the list.' };
+  }
+  if (Number(category.is_system) === 1) return { categoryId: null, values: null, error: null };
+  const raw = [].concat(body[`attr_${categoryId}`] || []);
+  const values = {};
+  for (let i = 0; i < category.attributes.length; i++) {
+    const label = category.attributes[i];
+    const value = String(raw[i] ?? '').trim();
+    if ([...value].length > 100) return { categoryId: null, values: null, error: `${label}: at most 100 characters.` };
+    values[label] = value;
+  }
+  return { categoryId, values, error: null };
+}
+
 async function lineTypeInput(body) {
   const lineType = String(body.line_type ?? 'goods');
   if (!Object.prototype.hasOwnProperty.call(orderProductRepository.LINE_TYPES, lineType)) {
@@ -773,8 +798,9 @@ async function addProduct(req, res) {
     return;
   }
   const { lineType, hsCode, sacCode, error: lineTypeError } = await lineTypeInput(body);
-  if (lineTypeError !== null) {
-    flash.set(req, 'error', lineTypeError);
+  const { categoryId, values: attributeValues, error: categoryError } = await categoryInput(body, lineType);
+  if ((lineTypeError ?? categoryError) !== null) {
+    flash.set(req, 'error', lineTypeError ?? categoryError);
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -806,6 +832,7 @@ async function addProduct(req, res) {
     hsCode
   );
   await orderProductRepository.setLineType(newLineId, lineType, sacCode);
+  await require('../repositories/productCategoryRepository').setLineCategory(newLineId, categoryId, attributeValues);
   flash.set(req, 'success', 'Product line added.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -827,8 +854,9 @@ async function updateProduct(req, res) {
     return;
   }
   const { lineType, hsCode, sacCode, error: lineTypeError } = await lineTypeInput(body);
-  if (lineTypeError !== null) {
-    flash.set(req, 'error', lineTypeError);
+  const { categoryId, values: attributeValues, error: categoryError } = await categoryInput(body, lineType, product.category_id ? Number(product.category_id) : null);
+  if ((lineTypeError ?? categoryError) !== null) {
+    flash.set(req, 'error', lineTypeError ?? categoryError);
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -859,6 +887,7 @@ async function updateProduct(req, res) {
     hsCode
   );
   await orderProductRepository.setLineType(productId, lineType, sacCode);
+  await require('../repositories/productCategoryRepository').setLineCategory(productId, categoryId, attributeValues);
   flash.set(req, 'success', 'Product line updated.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1144,6 +1173,8 @@ async function show(req, res) {
       // Owner decision D-214, phase 3: what the order needs from Procurement.
       purchaseRequirements: await purchasingRepository.forOrder(orderId),
       lineTypes: orderProductRepository.LINE_TYPES,
+      // Owner decision D-215 (5a): product categories for the order line forms.
+      productCategories: await require('../repositories/productCategoryRepository').all(),
       // Owner decision D-215 (5a): the order's own payment schedule (advance, milestones, balance).
       paymentSchedule: await require('./paymentMilestoneController').scheduleView(orderId, order),
       // Owner decision D-214, phase 4: one owner per department; a department's manager picks theirs.

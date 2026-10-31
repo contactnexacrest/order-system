@@ -784,6 +784,8 @@ CREATE TABLE order_products (
   fob_value     DECIMAL(14,2) NULL,
   hs_code       VARCHAR(20) NOT NULL DEFAULT '6802.93',
   sac_code      VARCHAR(10) NULL,
+  category_id   BIGINT UNSIGNED NULL,
+  attribute_values TEXT NULL,
   is_active     TINYINT(1) NOT NULL DEFAULT 1,
   FOREIGN KEY (order_id) REFERENCES orders(id),
   FOREIGN KEY (product_id) REFERENCES products(id)
@@ -4627,4 +4629,25 @@ CREATE TABLE order_payment_milestones (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_opm_order_seq (order_id, seq),
   CONSTRAINT fk_opm_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Owner decision D-215 (5a): product categories and their attributes (docs/migrations/2026-11-01h-product-categories.sql).
+CREATE TABLE product_categories (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(80) NOT NULL,
+  is_system TINYINT(1) NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_by BIGINT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_product_categories_name (name)
+) ENGINE=InnoDB;
+
+CREATE TABLE product_category_attributes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  category_id BIGINT UNSIGNED NOT NULL,
+  label VARCHAR(60) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uq_pca_category_label (category_id, label),
+  CONSTRAINT fk_pca_category FOREIGN KEY (category_id) REFERENCES product_categories(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;

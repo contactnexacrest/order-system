@@ -1930,3 +1930,13 @@ WHERE NOT EXISTS (SELECT 1 FROM document_types WHERE code = 'ESI');
 INSERT INTO docx_generation_settings (document_type_id, is_enabled)
 SELECT t.id, 1 FROM document_types t
 WHERE t.code = 'ESI' AND NOT EXISTS (SELECT 1 FROM docx_generation_settings s WHERE s.document_type_id = t.id);
+
+-- Owner decision D-215 (5a): Natural Stone, today's products, with Dimensions and Finish (same rows as docs/migrations/2026-11-01h-product-categories.sql).
+INSERT INTO product_categories (name, is_system, is_active, sort_order)
+SELECT 'Natural Stone', 1, 1, 0 WHERE NOT EXISTS (SELECT 1 FROM product_categories WHERE is_system = 1);
+
+INSERT INTO product_category_attributes (category_id, label, sort_order)
+SELECT c.id, a.label, a.sort_order FROM product_categories c
+JOIN (SELECT 'Dimensions' AS label, 1 AS sort_order UNION ALL SELECT 'Finish', 2) a
+WHERE c.is_system = 1
+  AND NOT EXISTS (SELECT 1 FROM product_category_attributes x WHERE x.category_id = c.id AND x.label = a.label);

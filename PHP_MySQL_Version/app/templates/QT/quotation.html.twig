@@ -49,6 +49,16 @@
       <span class="spec-sep">&nbsp;&middot;&nbsp;</span>Invoiced separately on our Export Service Invoice
     </td>
   </tr>
+  {% elseif p.attributes %}
+  {# Owner decision D-215 (5a, confirmed twice): a line of another product category prints its own attributes in the same place. #}
+  <tr class="spec">
+    <td></td>
+    <td colspan="5">
+      <span class="line-no" style="color:{{ lineColor }};">{{ loop.index }}.</span>
+      {% for a in p.attributes %}<span class="spec-label">{{ a.label }}:</span> {{ a.value }}<span class="spec-sep">&nbsp;&middot;&nbsp;</span>{% endfor %}<span class="spec-label">HS Code:</span> {{ p.hs_code }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">Country of Origin:</span> India
+    </td>
+  </tr>
   {% elseif p.dimensions or p.finish %}
   <tr class="spec">
     <td></td>

@@ -848,6 +848,19 @@
               </label>
               <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="{{ p.hs_code }}" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code."></label>
               <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="{{ p.sac_code or '' }}" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
+              {% set catLine = p %}
+              {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
+              <label>Category
+                <select name="category_id">
+                  {% for c in productCategories %}<option value="{{ '' if c.is_system == 1 else c.id }}" {{ 'selected' if (c.is_system != 1 and catLine.category_id == c.id) else '' }}>{{ c.name }}</option>{% endfor %}
+                </select>
+              </label>
+              {% for c in productCategories %}{% if c.is_system != 1 %}
+              {% set vals = (catLine.attribute_values | fromJson) if catLine.category_id == c.id else {} %}
+              <fieldset class="category-attributes" data-show-when="category_id={{ c.id }}"><legend>{{ c.name }}</legend>
+                {% for label in c.attributes %}<label>{{ label }}<input type="text" name="attr_{{ c.id }}[]" maxlength="100" value="{{ vals[label] or '' }}"></label>{% endfor %}
+              </fieldset>
+              {% endif %}{% endfor %}
             </div>
             {% if productReasonRequired %}
               <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing?"></textarea></label>
@@ -900,6 +913,19 @@
             </label>
             <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code."></label>
             <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
+            {% set catLine = {} %}
+            {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
+            <label>Category
+              <select name="category_id">
+                {% for c in productCategories %}<option value="{{ '' if c.is_system == 1 else c.id }}" {{ 'selected' if (c.is_system != 1 and catLine.category_id == c.id) else '' }}>{{ c.name }}</option>{% endfor %}
+              </select>
+            </label>
+            {% for c in productCategories %}{% if c.is_system != 1 %}
+            {% set vals = (catLine.attribute_values | fromJson) if catLine.category_id == c.id else {} %}
+            <fieldset class="category-attributes" data-show-when="category_id={{ c.id }}"><legend>{{ c.name }}</legend>
+              {% for label in c.attributes %}<label>{{ label }}<input type="text" name="attr_{{ c.id }}[]" maxlength="100" value="{{ vals[label] or '' }}"></label>{% endfor %}
+            </fieldset>
+            {% endif %}{% endfor %}
           </div>
           {% if productReasonRequired %}
             <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added?"></textarea></label>
