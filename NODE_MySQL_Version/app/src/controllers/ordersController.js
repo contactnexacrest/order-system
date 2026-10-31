@@ -1761,7 +1761,8 @@ async function recordAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const boundsError = fieldValidator.moneyAmount(amount, 'The advance amount') || fieldValidator.exchangeRate(rate);
+  const bankRef = str(req.body.advance_bank_reference);
+  const boundsError = fieldValidator.moneyAmount(amount, 'The advance amount') || fieldValidator.exchangeRate(rate) || fieldValidator.bankReference(bankRef);
   if (boundsError) {
     flash.set(req, 'error', boundsError);
     res.redirect(`/orders/${orderId}`);
@@ -1791,7 +1792,7 @@ async function recordAdvancePayment(req, res) {
   }
   // QA Round 6, R6-N22: saved together or not at all.
   // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'advance', amount, receivedAt, rate, req.user ? req.user.id : null))) {
+  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'advance', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef))) {
     flash.set(req, 'warning', 'Advance remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -2655,7 +2656,8 @@ async function recordFreightPayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const boundsError = fieldValidator.moneyAmount(amount, 'The freight amount') || fieldValidator.exchangeRate(rate);
+  const bankRef = str(req.body.freight_bank_reference);
+  const boundsError = fieldValidator.moneyAmount(amount, 'The freight amount') || fieldValidator.exchangeRate(rate) || fieldValidator.bankReference(bankRef);
   if (boundsError) {
     flash.set(req, 'error', boundsError);
     res.redirect(`/orders/${orderId}`);
@@ -2664,7 +2666,7 @@ async function recordFreightPayment(req, res) {
 
   // QA Round 6, R6-N22: saved together or not at all.
   // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'freight', amount, receivedAt, rate, req.user ? req.user.id : null))) {
+  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'freight', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef))) {
     flash.set(req, 'warning', 'Freight remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -3133,7 +3135,8 @@ async function recordBalancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const boundsError = fieldValidator.moneyAmount(amount, 'The balance amount') || fieldValidator.exchangeRate(rate);
+  const bankRef = str(req.body.balance_bank_reference);
+  const boundsError = fieldValidator.moneyAmount(amount, 'The balance amount') || fieldValidator.exchangeRate(rate) || fieldValidator.bankReference(bankRef);
   if (boundsError) {
     flash.set(req, 'error', boundsError);
     res.redirect(`/orders/${orderId}`);
@@ -3142,7 +3145,7 @@ async function recordBalancePayment(req, res) {
 
   // QA Round 6, R6-N22: saved together or not at all.
   // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'balance', amount, receivedAt, rate, req.user ? req.user.id : null))) {
+  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'balance', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef))) {
     flash.set(req, 'warning', 'Balance remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -4116,9 +4119,27 @@ async function completeCancellationRefund(req, res) {
     return;
   }
   const refundNotes = str(req.body.refund_notes) || null;
+  // Owner rule D-212: the refund says when it left the bank and with which reference.
+  const refundPaidAt = str(req.body.refund_paid_at);
+  const refundReference = str(req.body.refund_reference);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(refundPaidAt);
+  const day = m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : null;
+  const realDay = day && day.getUTCFullYear() === Number(m[1]) && day.getUTCMonth() + 1 === Number(m[2]) && day.getUTCDate() === Number(m[3]);
+  if (!realDay || refundPaidAt > todayIst()) {
+    flash.set(req, 'error', 'Enter the date the refund was paid (today or earlier).');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const refError = fieldValidator.bankReference(refundReference, 'The bank reference of the refund');
+  if (refError) {
+    flash.set(req, 'error', refError);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
 
-  await orderCancellationRepository.completeRefund(cancellationId, user.id, refundNotes);
-  await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_REFUND_COMPLETED', 'order_cancellations', cancellationId, 'refund_status', 'pending', 'completed', refundNotes);
+  await orderCancellationRepository.completeRefund(cancellationId, user.id, refundNotes, refundPaidAt, refundReference);
+  await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_REFUND_COMPLETED', 'order_cancellations', cancellationId, 'refund_status', 'pending', 'completed',
+    `Paid ${refundPaidAt}, bank ref ${refundReference}${refundNotes !== null ? ` — ${refundNotes}` : ''}`);
   flash.set(req, 'success', 'Refund marked as completed.');
   res.redirect(`/orders/${orderId}`);
 }

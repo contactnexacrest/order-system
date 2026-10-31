@@ -63,6 +63,7 @@ test.describe('CA / Accounting module — Accounts Executive writes, CA confirme
     const markReceivedForm = row.locator('form[action$="/mark-received"]');
     await markReceivedForm.locator('input[name="received_amount"]').fill('15000.00');
     await markReceivedForm.locator('input[name="received_at"]').fill(claimedAt);
+    await markReceivedForm.locator('input[name="received_reference"]').fill('E2E-ESCRIP-0001');
     await markReceivedForm.getByRole('button', { name: 'Mark Received' }).click();
     await expect(page.locator('.alert-success')).toBeVisible();
 

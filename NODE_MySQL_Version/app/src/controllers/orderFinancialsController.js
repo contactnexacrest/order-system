@@ -3,6 +3,7 @@
 const flash = require('../helpers/flash');
 const orderStorage = require('../helpers/orderStorage');
 const reasonValidator = require('../helpers/reasonValidator');
+const fieldValidator = require('../helpers/fieldValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
@@ -105,12 +106,20 @@ async function markExportBenefitReceived(req, res) {
     return;
   }
 
+  const receivedReference = String(req.body.received_reference || '').trim();
+  const refError = fieldValidator.bankReference(receivedReference, 'How it was credited (bank UTR / e-scrip no.)');
+  if (refError) {
+    flash.set(req, 'error', refError);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
   if (!(await caFyLockGuard.allow(req, receivedAt, 'ca_export_benefits', benefitId, 'mark_received'))) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
 
-  await caExportBenefitRepository.markReceived(benefitId, parseFloat(receivedAmount), receivedAt);
+  await caExportBenefitRepository.markReceived(benefitId, parseFloat(receivedAmount), receivedAt, receivedReference);
   await auditLogRepository.log(user.id, 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', benefitId, null, null, receivedAmount);
   flash.set(req, 'success', 'Marked as received.');
   res.redirect(`/orders/${orderId}#step-13g-benefits`);
@@ -175,7 +184,15 @@ async function correctExportBenefit(req, res) {
     res.redirect(back);
     return;
   }
+  const receivedReference = String(req.body.received_reference || '').trim() || String(benefit.received_reference || '');
+  const refError = received !== '' ? fieldValidator.bankReference(receivedReference, 'How it was credited (bank UTR / e-scrip no.)') : null;
+  if (refError) {
+    flash.set(req, 'error', `${refError} Nothing was changed.`);
+    res.redirect(back);
+    return;
+  }
   await caExportBenefitRepository.correct(benefit.id, String(req.body.reference_number || '').trim() || null, parseFloat(claimed), claimedAt, received !== '' ? parseFloat(received) : null, received !== '' ? receivedAt : null);
+  await caExportBenefitRepository.setReceivedReference(benefit.id, received !== '' ? receivedReference : null);
   const after = await caExportBenefitRepository.find(benefit.id);
   await auditLogRepository.log(req.user.id, 'CA_EXPORT_BENEFIT_CORRECTED', 'ca_export_benefits', benefit.id, benefit.scheme_name, describeBenefit(benefit), describeBenefit(after), String(req.body.reason).trim());
   flash.set(req, 'success', `${benefit.scheme_name} claim corrected.`);
@@ -381,7 +398,13 @@ async function addCostEntry(req, res) {
     return;
   }
 
-  const description = String(req.body.description || '').trim() || null;
+  // Owner rule D-212: every cost says who was paid and for what.
+  const description = String(req.body.description || '').trim();
+  if ([...description].length < 10 || [...description].length > 255) {
+    flash.set(req, 'error', 'Describe the cost: who was paid and for what (their invoice / receipt no.), 10 to 255 characters.');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
   // Owner decision 2026-10-29: what the cost was paid from (it goes to Zoho Books from there).
   const paidFrom = String(req.body.paid_from || '');
   if (!Object.prototype.hasOwnProperty.call(orderCostEntryRepository.PAID_FROM, paidFrom)) {
@@ -747,11 +770,17 @@ async function recordLcReceived(req, res) {
     back('error', 'Enter the bank charges deducted (₹), or 0.');
     return;
   }
+  const bankRef = String(req.body.lc_bank_reference || '').trim();
+  const refError = fieldValidator.bankReference(bankRef, 'The bank reference of the credit');
+  if (refError) {
+    back('error', refError);
+    return;
+  }
   if (!(await caFyLockGuard.allow(req, receivedAt, 'order_lc_details', orderId, 'record'))) {
     res.redirect(`/orders/${orderId}#lc-received`);
     return;
   }
-  await orderLcDetailRepository.recordReceived(orderId, receivedAt, Number(amount), Number(inr), Number(charges), req.user.id);
+  await orderLcDetailRepository.recordReceived(orderId, receivedAt, Number(amount), Number(inr), Number(charges), req.user.id, bankRef);
   await auditLogRepository.log(req.user.id, 'ORDER_LC_PAYMENT_RECEIVED', 'order_lc_details', orderId, 'lc_received_amount', lc.lc_received_amount, amount, `${currency} ${amount} on ${receivedAt}: ₹${inr} credited, ₹${charges} bank charges`);
   back('success', `LC payment recorded: ${currency} ${amount}, ₹${inr} credited.`);
 }
@@ -943,6 +972,7 @@ async function saveExportBenefits(req, res) {
     const benefitId = parseInt(row.benefit_id, 10) || 0;
     const receivedAmount = text(row.received_amount);
     const receivedAt = text(row.received_at);
+    const receivedReference = text(row.received_reference);
     if (benefitId === 0) {
       const claimedAmount = text(row.claimed_amount);
       if (claimedAmount === '') continue;
@@ -952,7 +982,7 @@ async function saveExportBenefits(req, res) {
         fail(`${scheme}: enter the claimed amount and the date it was claimed.`);
         return;
       }
-      claims.push({ scheme, reference: text(row.reference_number) || null, claimedAmount: parseFloat(claimedAmount), claimedAt, receivedAmount, receivedAt });
+      claims.push({ scheme, reference: text(row.reference_number) || null, claimedAmount: parseFloat(claimedAmount), claimedAt, receivedAmount, receivedAt, receivedReference });
       continue;
     }
     const benefit = await caExportBenefitRepository.find(benefitId);
@@ -961,12 +991,18 @@ async function saveExportBenefits(req, res) {
       return;
     }
     if (receivedAmount !== '' && benefit.received_amount === null) {
-      receipts.push({ benefitId, receivedAmount, receivedAt });
+      receipts.push({ benefitId, receivedAmount, receivedAt, receivedReference, scheme: String(benefit.scheme_name) });
     }
   }
-  for (const [amount, at, label] of [...claims.map((c) => [c.receivedAmount, c.receivedAt, c.scheme]), ...receipts.map((r) => [r.receivedAmount, r.receivedAt, 'A claim'])]) {
+  for (const [amount, at, label, ref] of [...claims.map((c) => [c.receivedAmount, c.receivedAt, c.scheme, c.receivedReference]), ...receipts.map((r) => [r.receivedAmount, r.receivedAt, r.scheme, r.receivedReference])]) {
     if (amount !== '' && (!isAmount(amount, true) || !isDate(at))) {
       fail(`${label}: enter the received amount and the date it was received.`);
+      return;
+    }
+    // Owner rule D-212: money received says how it was credited.
+    const refError = amount !== '' ? fieldValidator.bankReference(ref, 'How it was credited (bank UTR / e-scrip no.)') : null;
+    if (refError) {
+      fail(`${label}: ${refError}`);
       return;
     }
   }
@@ -998,11 +1034,11 @@ async function saveExportBenefits(req, res) {
     const id = await caExportBenefitRepository.record(orderId, c.scheme, c.reference, c.claimedAmount, c.claimedAt, 'INR', null, req.user.id);
     await auditLogRepository.log(req.user.id, 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', id, null, null, c.scheme);
     if (c.receivedAmount !== '') {
-      receipts.push({ benefitId: id, receivedAmount: c.receivedAmount, receivedAt: c.receivedAt });
+      receipts.push({ benefitId: id, receivedAmount: c.receivedAmount, receivedAt: c.receivedAt, receivedReference: c.receivedReference, scheme: c.scheme });
     }
   }
   for (const r of receipts) {
-    await caExportBenefitRepository.markReceived(r.benefitId, parseFloat(r.receivedAmount), r.receivedAt);
+    await caExportBenefitRepository.markReceived(r.benefitId, parseFloat(r.receivedAmount), r.receivedAt, r.receivedReference);
     await auditLogRepository.log(req.user.id, 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', r.benefitId, null, null, r.receivedAmount);
   }
   flash.set(req, 'success', `Benefits saved — ${claims.length} claim(s) recorded, ${receipts.length} receipt(s) recorded.`);

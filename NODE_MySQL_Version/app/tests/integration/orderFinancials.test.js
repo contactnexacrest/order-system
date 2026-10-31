@@ -306,7 +306,7 @@ describe('Order Financials (Section AP)', () => {
 
     const req = fakeReq({
       params: { id: String(orderId) },
-      body: { category: 'cha_charges', amount_inr: '1234.56', incurred_at: '2026-06-01', description: 'Test CHA', paid_from: 'company_card' },
+      body: { category: 'cha_charges', amount_inr: '1234.56', incurred_at: '2026-06-01', description: 'Test CHA — Shree Clearing, bill SC/101', paid_from: 'company_card' },
       user: { id: userId },
     });
     await orderFinancialsController.addCostEntry(req, fakeRes());
@@ -367,7 +367,7 @@ describe('Order Financials (Section AP)', () => {
 
     const receiveReq = fakeReq({
       params: { id: String(orderId), benefitId: String(benefitId) },
-      body: { received_amount: '9000', received_at: '2026-07-01' },
+      body: { received_amount: '9000', received_at: '2026-07-01', received_reference: 'UTR-TEST-0002' },
       user: { id: userId },
     });
     await orderFinancialsController.markExportBenefitReceived(receiveReq, fakeRes());

@@ -48,6 +48,14 @@ async function setBalanceAmount(orderId, balanceAmount, balanceDueDate) {
   );
 }
 
+/** Owner rule D-212: the bank reference of a buyer remittance (advance / balance / freight). */
+async function setLegBankReference(orderId, leg, reference) {
+  if (!EXCHANGE_RATE_LEGS.includes(leg)) {
+    throw new Error(`Unknown payment leg: ${leg}`);
+  }
+  await db.execute(`UPDATE order_payment_status SET ${leg}_bank_reference = :ref WHERE order_id = :order_id`, { ref: String(reference).trim(), order_id: orderId });
+}
+
 async function recordFreightReceived(orderId, amount, receivedAt) {
   await db.execute(
     'UPDATE order_payment_status SET freight_amount = :amount, freight_remittance_received_at = :received_at WHERE order_id = :order_id',
@@ -181,9 +189,9 @@ async function setLegExchangeRate(orderId, leg, rate, setBy) {
 
 /**
  * QA Round 6, R6-N22: a remittance and its exchange rate are saved together
- * or not at all.
+ * or not at all. Owner rule D-212: with the bank reference it came with.
  */
-async function recordLegReceivedWithRate(orderId, leg, amount, receivedAt, rate, setBy) {
+async function recordLegReceivedWithRate(orderId, leg, amount, receivedAt, rate, setBy, bankReference = null) {
   if (!EXCHANGE_RATE_LEGS.includes(leg)) {
     throw new Error(`Unknown settlement leg: ${leg}`);
   }
@@ -207,6 +215,9 @@ async function recordLegReceivedWithRate(orderId, leg, amount, receivedAt, rate,
       `UPDATE order_payment_status SET ${leg}_amount = :amount, ${leg}_remittance_received_at = :received_at WHERE order_id = :order_id`,
       { amount, received_at: receivedAt, order_id: orderId }
     );
+    if (bankReference !== null) {
+      await c.execute(`UPDATE order_payment_status SET ${leg}_bank_reference = :ref WHERE order_id = :order_id`, { ref: String(bankReference).trim(), order_id: orderId });
+    }
     await c.execute(
       `UPDATE order_payment_status SET ${leg}_exchange_rate = :rate, ${leg}_exchange_rate_set_at = NOW(), ${leg}_exchange_rate_set_by = :set_by WHERE order_id = :order_id`,
       { rate, set_by: setBy, order_id: orderId }
@@ -281,6 +292,6 @@ module.exports = {
   recordFreightReceived, markFreightCleared, recordBalanceReceived, markBalanceCleared,
   setAdvanceInrActual, clearAdvanceInrActual, setBalanceInrActual, clearBalanceInrActual,
   setFreightInrActual, clearFreightInrActual, clearedSettlements, clearedOnDate,
-  setLegExchangeRate, setAdvanceFirc, setBalanceFirc, setFreightFirc,
+  setLegExchangeRate, setLegBankReference, setAdvanceFirc, setBalanceFirc, setFreightFirc,
   setAdvanceZohoSync, setBalanceZohoSync, setFreightZohoSync, setLegZohoApplied,
 };

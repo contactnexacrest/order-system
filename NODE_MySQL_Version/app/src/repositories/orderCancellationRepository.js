@@ -60,10 +60,11 @@ async function reject(id, decidedBy, decisionNotes) {
 }
 
 /** Recording that the refund money has actually moved — a separate, lower-bar step from the approval decision itself, since the bank transfer happens outside this system on its own timeline. */
-async function completeRefund(id, recordedBy, refundNotes) {
+async function completeRefund(id, recordedBy, refundNotes, refundPaidAt = null, refundReference = null) {
   await db.execute(
-    "UPDATE order_cancellations SET refund_status = 'completed', refund_notes = :refund_notes, refund_recorded_by = :recorded_by, refund_recorded_at = NOW() WHERE id = :id",
-    { refund_notes: refundNotes, recorded_by: recordedBy, id }
+    `UPDATE order_cancellations SET refund_status = 'completed', refund_notes = :refund_notes, refund_paid_at = :paid_at, refund_reference = :ref,
+            refund_recorded_by = :recorded_by, refund_recorded_at = NOW() WHERE id = :id`,
+    { refund_notes: refundNotes, paid_at: refundPaidAt, ref: refundReference, recorded_by: recordedBy, id }
   );
 }
 

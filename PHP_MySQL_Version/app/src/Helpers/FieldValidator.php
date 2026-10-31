@@ -39,6 +39,26 @@ final class FieldValidator
      * QA Round 6, R6-N14/N15/N19/N21: a money amount that survives being
      * stored — at least 0.01 once rounded to 2 decimals, at most MAX_AMOUNT.
      */
+    /**
+     * Owner rule D-212 (2026-10-31): money that moved through a bank carries
+     * its bank reference (UTR / SWIFT / FIRC / e-scrip / cheque no.), so the
+     * record can be matched to the bank statement years later.
+     */
+    public static function bankReference(string $value, string $label = 'The bank reference'): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return "{$label} is required (UTR / SWIFT / bank reference as on the bank's advice).";
+        }
+        if (mb_strlen($value) < 4 || mb_strlen($value) > 100) {
+            return "{$label} must be 4 to 100 characters.";
+        }
+        if (preg_match('/^[\p{L}\p{N}][\p{L}\p{N} .\/_#:()-]*$/u', $value) !== 1) {
+            return "{$label} may contain letters, digits, spaces and . / - _ # : ( ) only.";
+        }
+        return null;
+    }
+
     public static function moneyAmount(float $amount, string $label): ?string
     {
         if (!is_finite($amount) || round($amount, 2) <= 0) {

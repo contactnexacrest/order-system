@@ -1,5 +1,6 @@
 'use strict';
 
+const { todayIst } = require('../../src/helpers/dbDateTime');
 const db = require('../../src/config/db');
 const orderRepository = require('../../src/repositories/orderRepository');
 const orderCancellationRepository = require('../../src/repositories/orderCancellationRepository');
@@ -215,7 +216,7 @@ describe('Order cancellation workflow (External QA report M-09)', () => {
     await orderCancellationRepository.approve(cancellationId, approver, null, 2000.0, 'pending');
 
     await ordersController.completeCancellationRefund(
-      fakeReq(orderId, approver, { refund_notes: 'Wire transfer TXN123 sent back to buyer.' }, { cancellationId: String(cancellationId) }),
+      fakeReq(orderId, approver, { refund_notes: 'Wire transfer TXN123 sent back to buyer.', refund_paid_at: todayIst(), refund_reference: 'TXN123' }, { cancellationId: String(cancellationId) }),
       fakeRes()
     );
 

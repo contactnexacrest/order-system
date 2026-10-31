@@ -90,7 +90,7 @@ describe('QA Round 6 — simultaneous and repeated saves', () => {
     const orderId = await createTestOrder(await createTestClient());
     // Every real order has its payment-status row from creation.
     await db.execute('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)', { o: orderId });
-    const fields = { advance_amount: '1020', advance_exchange_rate: '83.25', advance_received_at: todayIst() };
+    const fields = { advance_amount: '1020', advance_exchange_rate: '83.25', advance_bank_reference: 'UTR-TEST-0001', advance_received_at: todayIst() };
     const page = `/orders/${orderId}`;
     expect((await flashAfter(await post(`/orders/${orderId}/payment/advance`, fields, page))).type).toBe('success');
     expect((await flashAfter(await post(`/orders/${orderId}/payment/advance`, fields, page))).message).toContain('already recorded with these details');
@@ -108,7 +108,7 @@ describe('QA Round 6 — simultaneous and repeated saves', () => {
       { o: orderId, u: adminId, m: month }
     );
     for (const click of [1, 2]) {
-      await post(`/incentives/payouts/${payoutId}/paid`, { month, paid_on: todayIst(), paid_inr: '5000', click }, `/incentives/payouts?month=${month}`);
+      await post(`/incentives/payouts/${payoutId}/paid`, { month, paid_on: todayIst(), paid_inr: '5000', click, paid_via: 'salary', paid_reference: 'Payroll TEST' }, `/incentives/payouts?month=${month}`);
     }
     expect(await auditCount('INCENTIVE_PAID', payoutId)).toBe(1);
 

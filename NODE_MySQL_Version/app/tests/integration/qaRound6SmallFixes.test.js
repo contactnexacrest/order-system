@@ -95,7 +95,7 @@ describe('QA Round 6 — smaller fixes', () => {
   it('"Mark all paid" with nothing selected is a warning (R6-N11)', async () => {
     const admin = await staff('Admin');
     const month = todayIst().slice(0, 7);
-    const res = await post(admin, '/incentives/payouts/paid-all', { month, paid_on: todayIst() }, `/incentives/payouts?month=${month}`);
+    const res = await post(admin, '/incentives/payouts/paid-all', { month, paid_on: todayIst(), paid_via: 'salary', paid_reference: 'Payroll TEST' }, `/incentives/payouts?month=${month}`);
     const flash = await flashAfter(admin, res);
     expect(flash.type).toBe('warning');
     expect(flash.message).toContain('Nothing was recorded');

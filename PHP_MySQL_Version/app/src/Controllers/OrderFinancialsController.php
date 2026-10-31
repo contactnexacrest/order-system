@@ -107,12 +107,19 @@ final class OrderFinancialsController
             return;
         }
 
+        $receivedReference = trim((string) ($_POST['received_reference'] ?? ''));
+        if ($error = \App\Helpers\FieldValidator::bankReference($receivedReference, 'How it was credited (bank UTR / e-scrip no.)')) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
         if (!CaFyLockGuard::allow($receivedAt, (int) $user['id'], $roleId, 'ca_export_benefits', $benefitId, 'mark_received')) {
             header("Location: /orders/{$orderId}");
             return;
         }
 
-        CaExportBenefitRepository::markReceived($benefitId, (float) $receivedAmount, $receivedAt);
+        CaExportBenefitRepository::markReceived($benefitId, (float) $receivedAmount, $receivedAt, $receivedReference);
         AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', $benefitId, null, null, $receivedAmount);
         Flash::set('success', 'Marked as received.');
         header("Location: /orders/{$orderId}#step-13g-benefits");
@@ -181,8 +188,15 @@ final class OrderFinancialsController
             return;
         }
 
+        $receivedReference = trim((string) ($_POST['received_reference'] ?? '')) ?: (string) ($benefit['received_reference'] ?? '');
+        if ($received !== '' && ($error = \App\Helpers\FieldValidator::bankReference($receivedReference, 'How it was credited (bank UTR / e-scrip no.)'))) {
+            Flash::set('error', $error . ' Nothing was changed.');
+            header($back);
+            return;
+        }
         $reference = trim((string) ($_POST['reference_number'] ?? '')) ?: null;
         CaExportBenefitRepository::correct((int) $benefit['id'], $reference, (float) $claimed, $claimedAt, $received !== '' ? (float) $received : null, $received !== '' ? $receivedAt : null);
+        CaExportBenefitRepository::setReceivedReference((int) $benefit['id'], $received !== '' ? $receivedReference : null);
         $describe = static fn(array $b): string => sprintf(
             'claimed %s on %s (ref %s), received %s',
             number_format((float) $b['claimed_amount'], 2, '.', ''),
@@ -414,7 +428,13 @@ final class OrderFinancialsController
             return;
         }
 
-        $description = trim((string) ($_POST['description'] ?? '')) ?: null;
+        // Owner rule D-212: every cost says who was paid and for what.
+        $description = trim((string) ($_POST['description'] ?? ''));
+        if (mb_strlen($description) < 10 || mb_strlen($description) > 255) {
+            Flash::set('error', 'Describe the cost: who was paid and for what (their invoice / receipt no.), 10 to 255 characters.');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
         // Owner decision 2026-10-29: what the cost was paid from (it goes to Zoho Books from there).
         $paidFrom = (string) ($_POST['paid_from'] ?? '');
         if (!array_key_exists($paidFrom, OrderCostEntryRepository::PAID_FROM)) {
@@ -599,13 +619,18 @@ final class OrderFinancialsController
             $back('error', 'Enter the bank charges deducted (₹), or 0.');
             return;
         }
+        $bankRef = trim((string) ($_POST['lc_bank_reference'] ?? ''));
+        if ($error = \App\Helpers\FieldValidator::bankReference($bankRef, 'The bank reference of the credit')) {
+            $back('error', $error);
+            return;
+        }
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         if (!CaFyLockGuard::allow($receivedAt, (int) $user['id'], $roleId, 'order_lc_details', $orderId, 'record')) {
             header("Location: /orders/{$orderId}#lc-received");
             return;
         }
-        OrderLcDetailRepository::recordReceived($orderId, $receivedAt, (float) $amount, (float) $inr, (float) $charges, (int) $user['id']);
+        OrderLcDetailRepository::recordReceived($orderId, $receivedAt, (float) $amount, (float) $inr, (float) $charges, (int) $user['id'], $bankRef);
         AuditLogRepository::log((int) $user['id'], 'ORDER_LC_PAYMENT_RECEIVED', 'order_lc_details', $orderId, 'lc_received_amount', $lc['lc_received_amount'], $amount, "{$currency} {$amount} on {$receivedAt}: ₹{$inr} credited, ₹{$charges} bank charges");
         $back('success', "LC payment recorded: {$currency} {$amount}, ₹{$inr} credited.");
     }
@@ -1014,6 +1039,7 @@ final class OrderFinancialsController
             $benefitId = (int) ($row['benefit_id'] ?? 0);
             $receivedAmount = trim((string) ($row['received_amount'] ?? ''));
             $receivedAt = trim((string) ($row['received_at'] ?? ''));
+            $receivedReference = trim((string) ($row['received_reference'] ?? ''));
             if ($benefitId === 0) {
                 $claimedAmount = trim((string) ($row['claimed_amount'] ?? ''));
                 if ($claimedAmount === '') {
@@ -1025,7 +1051,7 @@ final class OrderFinancialsController
                     $fail("{$scheme}: enter the claimed amount and the date it was claimed.");
                     return;
                 }
-                $claims[] = [$scheme, trim((string) ($row['reference_number'] ?? '')) ?: null, (float) $claimedAmount, $claimedAt, $receivedAmount, $receivedAt];
+                $claims[] = [$scheme, trim((string) ($row['reference_number'] ?? '')) ?: null, (float) $claimedAmount, $claimedAt, $receivedAmount, $receivedAt, $receivedReference];
                 continue;
             }
             $benefit = CaExportBenefitRepository::find($benefitId);
@@ -1034,12 +1060,17 @@ final class OrderFinancialsController
                 return;
             }
             if ($receivedAmount !== '' && $benefit['received_amount'] === null) {
-                $receipts[] = [$benefitId, $receivedAmount, $receivedAt];
+                $receipts[] = [$benefitId, $receivedAmount, $receivedAt, $receivedReference, (string) $benefit['scheme_name']];
             }
         }
-        foreach ([...array_map(static fn($c) => [$c[4], $c[5], $c[0]], $claims), ...array_map(static fn($r) => [$r[1], $r[2], 'A claim'], $receipts)] as [$amount, $at, $label]) {
+        foreach ([...array_map(static fn($c) => [$c[4], $c[5], $c[0], $c[6]], $claims), ...array_map(static fn($r) => [$r[1], $r[2], $r[4], $r[3]], $receipts)] as [$amount, $at, $label, $ref]) {
             if ($amount !== '' && (!$isAmount($amount, true) || !$isDate($at))) {
                 $fail("{$label}: enter the received amount and the date it was received.");
+                return;
+            }
+            // Owner rule D-212: money received says how it was credited.
+            if ($amount !== '' && ($error = \App\Helpers\FieldValidator::bankReference($ref, 'How it was credited (bank UTR / e-scrip no.)'))) {
+                $fail("{$label}: {$error}");
                 return;
             }
         }
@@ -1067,15 +1098,15 @@ final class OrderFinancialsController
             }
         }
 
-        foreach ($claims as [$scheme, $reference, $claimedAmount, $claimedAt, $receivedAmount, $receivedAt]) {
+        foreach ($claims as [$scheme, $reference, $claimedAmount, $claimedAt, $receivedAmount, $receivedAt, $receivedReference]) {
             $id = CaExportBenefitRepository::record($orderId, $scheme, $reference, $claimedAmount, $claimedAt, 'INR', null, (int) $user['id']);
             AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', $id, null, null, $scheme);
             if ($receivedAmount !== '') {
-                $receipts[] = [$id, $receivedAmount, $receivedAt];
+                $receipts[] = [$id, $receivedAmount, $receivedAt, $receivedReference, $scheme];
             }
         }
-        foreach ($receipts as [$benefitId, $receivedAmount, $receivedAt]) {
-            CaExportBenefitRepository::markReceived($benefitId, (float) $receivedAmount, $receivedAt);
+        foreach ($receipts as [$benefitId, $receivedAmount, $receivedAt, $receivedReference]) {
+            CaExportBenefitRepository::markReceived($benefitId, (float) $receivedAmount, $receivedAt, $receivedReference);
             AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', $benefitId, null, null, $receivedAmount);
         }
         Flash::set('success', 'Benefits saved — ' . count($claims) . ' claim(s) recorded, ' . count($receipts) . ' receipt(s) recorded.');

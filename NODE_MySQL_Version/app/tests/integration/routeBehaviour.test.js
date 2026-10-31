@@ -609,7 +609,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expect(Number(await value('SELECT tds_amount FROM ca_expenses WHERE id = :id', { id: expense }))).toBe(18);
 
     const claim = await insert('ca_export_benefits', { scheme_name: 'RoDTEP', claimed_amount: 5000, claimed_at: todayIst(), recorded_by: holder.userId });
-    expectDone(await holder.call('POST', `/ca/export-benefits/${claim}/mark-received`, { received_amount: '4900', received_at: todayIst() }), 'POST /ca/export-benefits/:id/mark-received');
+    expectDone(await holder.call('POST', `/ca/export-benefits/${claim}/mark-received`, { received_amount: '4900', received_at: todayIst(), received_reference: 'ESCRIP-0002' }), 'POST /ca/export-benefits/:id/mark-received');
     expect(Number(await value('SELECT received_amount FROM ca_export_benefits WHERE id = :id', { id: claim }))).toBe(4900);
     expect(await audits('CA_EXPORT_BENEFIT_RECEIVED', claim)).toBe(1);
   });
@@ -620,12 +620,12 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     const payout = () => insert('incentive_payouts', { order_id: order, payee_kind: 'staff', user_id: holder.userId, role: 'sales', amount_inr: 5000, incentive_month: month, status: 'due' });
 
     const one = await payout();
-    expectDone(await holder.call('POST', `/incentives/payouts/${one}/paid`, { month, paid_on: todayIst(), paid_inr: '5000', tds_inr: '500' }), 'POST /incentives/payouts/:payoutId/paid');
+    expectDone(await holder.call('POST', `/incentives/payouts/${one}/paid`, { month, paid_on: todayIst(), paid_inr: '5000', tds_inr: '500', paid_via: 'salary', paid_reference: 'Payroll TEST' }), 'POST /incentives/payouts/:payoutId/paid');
     expect(await value('SELECT status FROM incentive_payouts WHERE id = :id', { id: one })).toBe('paid');
     expect(Number(await value('SELECT tds_inr FROM incentive_payouts WHERE id = :id', { id: one }))).toBe(500);
 
     const [a, b] = [await payout(), await payout()];
-    expectDone(await holder.call('POST', '/incentives/payouts/paid-all', { month, paid_on: todayIst(), 'payout_ids[]': [String(a), String(b)] }), 'POST /incentives/payouts/paid-all', '2 payments recorded');
+    expectDone(await holder.call('POST', '/incentives/payouts/paid-all', { month, paid_on: todayIst(), 'payout_ids[]': [String(a), String(b)], paid_via: 'salary', paid_reference: 'Payroll TEST' }), 'POST /incentives/payouts/paid-all', '2 payments recorded');
     expect(Number(await value("SELECT COUNT(*) AS n FROM incentive_payouts WHERE id IN (:a, :b) AND status = 'paid'", { a, b }))).toBe(2);
   });
 

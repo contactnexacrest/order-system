@@ -104,14 +104,15 @@ final class OrderLcDetailRepository
      * charges deducted. It goes to Zoho Books as a customer payment applied
      * to the CI (CaSyncService), so it can be corrected only until then.
      */
-    public static function recordReceived(int $orderId, string $receivedAt, float $amount, float $inrCredited, float $bankChargesInr, int $userId): void
+    public static function recordReceived(int $orderId, string $receivedAt, float $amount, float $inrCredited, float $bankChargesInr, int $userId, ?string $bankReference = null): void
     {
         Database::connection()->prepare(
             'UPDATE order_lc_details
                 SET lc_received_at = :received_at, lc_received_amount = :amount, lc_inr_credited = :inr,
-                    lc_bank_charges_inr = :charges, lc_received_by = :user_id
+                    lc_bank_charges_inr = :charges, lc_received_by = :user_id, lc_bank_reference = :ref
               WHERE order_id = :order_id AND lc_zoho_synced_at IS NULL'
-        )->execute(['received_at' => $receivedAt, 'amount' => round($amount, 2), 'inr' => round($inrCredited, 2), 'charges' => round($bankChargesInr, 2), 'user_id' => $userId, 'order_id' => $orderId]);
+        )->execute(['received_at' => $receivedAt, 'amount' => round($amount, 2), 'inr' => round($inrCredited, 2), 'charges' => round($bankChargesInr, 2), 'user_id' => $userId,
+            'ref' => $bankReference !== null && trim($bankReference) !== '' ? trim($bankReference) : null, 'order_id' => $orderId]);
     }
 
     /**

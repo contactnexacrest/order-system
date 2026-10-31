@@ -238,7 +238,7 @@ final class OrderCancellationWorkflowTest extends DbTestCase
 
         OrderCancellationRepository::approve($cancellationId, $approver, null, 2000.00, 'pending');
 
-        $_POST = ['refund_notes' => 'Wire transfer TXN123 sent back to buyer.'];
+        $_POST = ['refund_notes' => 'Wire transfer TXN123 sent back to buyer.', 'refund_paid_at' => date('Y-m-d'), 'refund_reference' => 'TXN123'];
         ob_start();
         (new OrderController())->completeCancellationRefund(['id' => (string) $orderId, 'cancellationId' => (string) $cancellationId]);
         ob_end_clean();

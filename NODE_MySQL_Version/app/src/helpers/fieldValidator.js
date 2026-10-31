@@ -102,6 +102,20 @@ function moneyAmount(amount, label) {
 }
 
 /**
+ * Owner rule D-212: the bank / payment reference a money record's
+ * description is built from — required, 4 to 100 characters, letters,
+ * digits, spaces and . / - _ # : ( ). Port of FieldValidator::bankReference().
+ */
+function bankReference(value, label = 'The bank reference') {
+  const v = String(value ?? '').trim();
+  if (v === '') return `${label} is required (UTR / SWIFT / bank reference as on the bank's advice).`;
+  const len = [...v].length;
+  if (len < 4 || len > 100) return `${label} must be 4 to 100 characters.`;
+  if (!/^[\p{L}\p{N}][\p{L}\p{N} ./_#:()-]*$/u.test(v)) return `${label} may contain letters, digits, spaces and . / - _ # : ( ) only.`;
+  return null;
+}
+
+/**
  * QA Round 6, R6-N19/N20/N21: a payment the buyer reports (portal or
  * e-mailed link) — the amount, if given, above 0 and storable; the date, if
  * given, a real day that is not in the future. Port of
@@ -124,4 +138,4 @@ function reportedPayment(amount, date) {
   return null;
 }
 
-module.exports = { MAX_RATE, MAX_AMOUNT, wholeNumber, decimal, email, orderNumbers, exchangeRate, moneyAmount, reportedPayment };
+module.exports = { MAX_RATE, MAX_AMOUNT, wholeNumber, decimal, email, orderNumbers, exchangeRate, moneyAmount, reportedPayment, bankReference };

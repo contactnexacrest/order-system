@@ -163,10 +163,10 @@ async function findPayout(id) {
 }
 
 /** @returns {Promise<boolean>} whether this call marked it paid (false: it already was — QA Round 6, R6-N17) */
-async function markPayoutPaid(id, paidOn, paidInr, tdsInr, userId) {
+async function markPayoutPaid(id, paidOn, paidInr, tdsInr, userId, paidVia = null, paidReference = null) {
   const result = await db.execute(
-    "UPDATE incentive_payouts SET status = 'paid', paid_on = :d, paid_inr = :p, tds_inr = :t, paid_by = :u WHERE id = :id AND status = 'due'",
-    { d: paidOn, p: paidInr, t: tdsInr, u: userId, id }
+    "UPDATE incentive_payouts SET status = 'paid', paid_on = :d, paid_inr = :p, tds_inr = :t, paid_by = :u, paid_via = :via, paid_reference = :ref WHERE id = :id AND status = 'due'",
+    { d: paidOn, p: paidInr, t: tdsInr, u: userId, via: paidVia, ref: paidReference !== null ? String(paidReference).trim() : null, id }
   );
   return result.affectedRows === 1;
 }
@@ -194,12 +194,18 @@ async function addCostEntry(orderId, kind, description, amountInr, incurredAt, u
 }
 
 /** All of the kind paid: the cost entry takes the amounts actually paid and goes to Zoho Books (paid from the company account). */
-async function settleCostEntry(entryId, amountInr, paidOn) {
+async function settleCostEntry(entryId, amountInr, paidOn, paidNote = null) {
+  // Owner rule D-212: the cost line (and so the Zoho expense) says how and with what reference it was paid.
   await db.execute(
-    "UPDATE order_cost_entries SET amount_inr = :a, incurred_at = :d, paid_from = 'company_account' WHERE id = :id",
-    { a: amountInr, d: paidOn, id: entryId }
+    `UPDATE order_cost_entries SET amount_inr = :a, incurred_at = :d, paid_from = 'company_account',
+            description = CASE WHEN :note IS NULL OR LOCATE(' · paid ', COALESCE(description, '')) > 0 THEN description ELSE CONCAT(COALESCE(description, ''), ' · paid ', :note2) END
+      WHERE id = :id`,
+    { a: amountInr, d: paidOn, note: paidNote, note2: paidNote, id: entryId }
   );
 }
+
+/** Owner rule D-212: how a payout was paid. */
+const PAID_VIA = { salary: 'with the salary (payroll)', bank_transfer: 'by bank transfer', cheque: 'by cheque' };
 
 /** Order ids whose buyer may have fully paid and whose incentive is not fixed yet. */
 async function unlockedOrderIdsWithPayments() {
@@ -215,6 +221,7 @@ async function unlockedOrderIdsWithPayments() {
 
 module.exports = {
   ROLES,
+  PAID_VIA,
   settings,
   setSetting,
   userRoles,

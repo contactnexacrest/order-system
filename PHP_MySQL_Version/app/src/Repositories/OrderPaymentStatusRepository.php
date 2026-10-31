@@ -63,6 +63,16 @@ final class OrderPaymentStatusRepository
         )->execute(['amount' => $balanceAmount, 'due_date' => $balanceDueDate, 'order_id' => $orderId]);
     }
 
+    /** Owner rule D-212: the bank reference of a buyer remittance (advance / balance / freight). */
+    public static function setLegBankReference(int $orderId, string $leg, string $reference): void
+    {
+        if (!in_array($leg, ['advance', 'balance', 'freight'], true)) {
+            throw new \InvalidArgumentException("Unknown payment leg: {$leg}");
+        }
+        Database::connection()->prepare("UPDATE order_payment_status SET {$leg}_bank_reference = :ref WHERE order_id = :order_id")
+            ->execute(['ref' => trim($reference), 'order_id' => $orderId]);
+    }
+
     /** CFR/CIF only — Stage 6 (Freight Debit Note). Skipped entirely for FOB orders. */
     public static function recordFreightReceived(int $orderId, float $amount, string $receivedAt): void
     {

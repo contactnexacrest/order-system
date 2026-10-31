@@ -135,7 +135,7 @@ final class OrderPageT3Test extends DbTestCase
     public function testARecordedRemittanceReadsBackWithItsExchangeRate(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD');
-        $_POST = ['advance_amount' => '1800', 'advance_received_at' => '2026-10-26', 'advance_exchange_rate' => '83.25'];
+        $_POST = ['advance_amount' => '1800', 'advance_received_at' => '2026-10-26', 'advance_exchange_rate' => '83.25', 'advance_bank_reference' => 'UTR-TEST-0001'];
         \App\Services\StageGateService::passAndUnlockNext($orderId, 1, $this->userId);
         \App\Services\StageGateService::passAndUnlockNext($orderId, 2, $this->userId);
         OrderPaymentStatusRepository::initializeForOrder($orderId);
@@ -145,6 +145,6 @@ final class OrderPageT3Test extends DbTestCase
         (new OrderController())->show(['id' => (string) $orderId]);
         $html = (string) ob_get_clean();
 
-        self::assertStringContainsString('Received USD 1,800.00 on 26 Oct 2026 at today\'s exchange rate of &#8377;83.2500 (= &#8377;149,850.00).', $html);
+        self::assertStringContainsString('Received USD 1,800.00 on 26 Oct 2026 at today\'s exchange rate of &#8377;83.2500 (= &#8377;149,850.00). Bank ref UTR-TEST-0001.', $html);
     }
 }

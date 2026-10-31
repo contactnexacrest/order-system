@@ -442,13 +442,13 @@ final class IncentiveService
      * payout was already paid, e.g. by a second click a moment earlier
      * (QA Round 6, R6-N17), so the caller logs it once.
      */
-    public static function markPaid(int $payoutId, string $paidOn, float $paidInr, ?float $tdsInr, int $userId): bool
+    public static function markPaid(int $payoutId, string $paidOn, float $paidInr, ?float $tdsInr, int $userId, ?string $paidVia = null, ?string $paidReference = null): bool
     {
         $payout = IncentiveRepository::findPayout($payoutId);
         if ($payout === null || $payout['status'] !== 'due') {
             return false;
         }
-        if (!IncentiveRepository::markPayoutPaid($payoutId, $paidOn, $paidInr, $tdsInr, $userId)) {
+        if (!IncentiveRepository::markPayoutPaid($payoutId, $paidOn, $paidInr, $tdsInr, $userId, $paidVia, $paidReference)) {
             return false;
         }
         $kind = $payout['payee_kind'] === 'staff' ? 'team' : 'associate';
@@ -461,8 +461,28 @@ final class IncentiveService
         $entry = IncentiveRepository::costEntries((int) $payout['order_id'])[$kind] ?? null;
         if ($entry !== null) {
             IncentiveRepository::settleCostEntry((int) $entry['id'], round(array_sum(array_map(static fn (array $p): float => (float) $p['paid_inr'], $rows)), 2),
-                max(array_map(static fn (array $p): string => (string) $p['paid_on'], $rows)));
+                max(array_map(static fn (array $p): string => (string) $p['paid_on'], $rows)), self::paidNote($rows));
         }
         return true;
+    }
+
+    /**
+     * Owner rule D-212: how the payouts of one order and kind were paid, for
+     * its cost line — "with the salary (payroll), ref Nov-2026 payroll" —
+     * each distinct way and reference once; null when none was recorded.
+     *
+     * @param array<int, array<string,mixed>> $rows
+     */
+    private static function paidNote(array $rows): ?string
+    {
+        $parts = [];
+        foreach ($rows as $p) {
+            if (empty($p['paid_via']) && empty($p['paid_reference'])) {
+                continue;
+            }
+            $part = trim((IncentiveRepository::PAID_VIA[$p['paid_via'] ?? ''] ?? '') . (!empty($p['paid_reference']) ? ', ref ' . $p['paid_reference'] : ''), ' ,');
+            $parts[$part] = true;
+        }
+        return $parts === [] ? null : implode('; ', array_keys($parts));
     }
 }

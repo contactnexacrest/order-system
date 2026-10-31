@@ -221,10 +221,13 @@ describe('Zoho Books: order costs, LC receipt, export benefits and the App vs Zo
 
   it('holds the LC payment, then applies it to the CI with the bank charges', async () => {
     const orderId = await createOrder();
-    await orderLcDetailRepository.recordReceived(orderId, '2026-11-05', 1275, 107100, 750, userId);
+    await orderLcDetailRepository.recordReceived(orderId, '2026-11-05', 1275, 107100, 750, userId, 'HDFC-LC-0915-778');
 
     const first = await caSyncService.syncPendingRevenue('manual', null);
     expect([first.synced, first.applied]).toEqual([1, 0]); // no CI in Books yet: held
+    // owner rule D-212
+    expect(payments['PAY-1'].description.startsWith(`LC money received from TEST-Stage4 Buyer for order NX-${orderId} · `)).toBe(true);
+    expect(payments['PAY-1'].description.endsWith('USD 1,275.00, ₹107,100.00 credited after ₹750.00 bank charges · bank ref HDFC-LC-0915-778')).toBe(true);
     const payment = payments['PAY-1'];
     expect(payment.amount).toBe(1275);
     expect(payment.exchange_rate).toBe(84.588235); // (credited 107,100 + charges 750) / 1,275
@@ -236,12 +239,14 @@ describe('Zoho Books: order costs, LC receipt, export benefits and the App vs Zo
     expect([second.invoices, second.applied]).toEqual([1, 1]);
     expect(payments['PAY-1'].invoices).toEqual([{ invoice_id: 'INV-1', amount_applied: 1275 }]);
     expect(payments['PAY-1'].bank_charges).toBe(8.87); // re-sent whole, with the charges
+    // once applied, it names the CI
+    expect(payments['PAY-1'].description.endsWith(` · against Commercial Invoice ${invoices['INV-1'].invoice_number} · bank ref HDFC-LC-0915-778`)).toBe(true);
     expect((await orderLcDetailRepository.find(orderId)).lc_zoho_applied_at).not.toBeNull();
   });
 
   it('records the LC payment only on an LC order once usable, and not once it is in Books', async () => {
     const orderId = await createOrder();
-    const post = { lc_received_at: '2026-10-27', lc_received_amount: '1275', lc_inr_credited: '107100', lc_bank_charges_inr: '750' };
+    const post = { lc_received_at: '2026-10-27', lc_received_amount: '1275', lc_inr_credited: '107100', lc_bank_charges_inr: '750', lc_bank_reference: 'HDFC-LC-0915-778' };
     const run = async (body) => {
       const req = fakeReq({ id: String(orderId) }, body);
       await orderFinancialsController.recordLcReceived(req, fakeRes());
@@ -251,8 +256,11 @@ describe('Zoho Books: order costs, LC receipt, export benefits and the App vs Zo
 
     expect((await run({ ...post, lc_inr_credited: '' })).message).toBe('Enter the rupees credited to the bank account.');
     expect((await run({ ...post, lc_received_at: '2099-01-01' })).message).toBe('Enter the date the bank paid (not in the future).');
+    expect((await run({ ...post, lc_bank_reference: '' })).message).toContain('bank reference of the credit is required'); // owner rule D-212
+    expect((await orderLcDetailRepository.find(orderId)).lc_received_at).toBeNull(); // nothing recorded without it
     expect(await run(post)).toEqual({ type: 'success', message: 'LC payment recorded: USD 1275, ₹107100 credited.' });
     expect(String((await orderLcDetailRepository.find(orderId)).lc_bank_charges_inr)).toBe('750.00');
+    expect((await orderLcDetailRepository.find(orderId)).lc_bank_reference).toBe('HDFC-LC-0915-778');
 
     await caSyncService.syncPendingRevenue('manual', null);
     expect((await run(post)).message).toBe('This LC payment is already in Zoho Books, so it cannot be changed here. Ask the CA to correct it there.');
@@ -267,9 +275,9 @@ describe('Zoho Books: order costs, LC receipt, export benefits and the App vs Zo
     const rodtep = await caExportBenefitRepository.record(orderId, 'RODTEP', 'SB-1', 9000, '2026-10-28', 'INR', null, userId);
     const other = await caExportBenefitRepository.record(orderId, 'Other', null, 500, '2026-10-28', 'INR', null, userId);
     await caExportBenefitRepository.record(orderId, 'RoSCTL', null, 700, '2026-10-28', 'INR', null, userId); // claimed, not received: not booked
-    await caExportBenefitRepository.markReceived(drawback, 17850, '2026-11-20');
-    await caExportBenefitRepository.markReceived(rodtep, 9000, '2026-11-25');
-    await caExportBenefitRepository.markReceived(other, 500, '2026-11-25');
+    await caExportBenefitRepository.markReceived(drawback, 17850, '2026-11-20', 'SBIN226311000555');
+    await caExportBenefitRepository.markReceived(rodtep, 9000, '2026-11-25', '2610000123456');
+    await caExportBenefitRepository.markReceived(other, 500, '2026-11-25', 'SBIN226311000777');
 
     const result = await caSyncService.syncBenefits('manual', null);
 
@@ -278,7 +286,8 @@ describe('Zoho Books: order costs, LC receipt, export benefits and the App vs Zo
       { account_id: 'SBI-1', debit_or_credit: 'debit', amount: 17850, description: 'Duty Drawback paid into the bank' },
       { account_id: 'AC-INCOME', debit_or_credit: 'credit', amount: 17850, description: 'Duty Drawback received' },
     ]);
-    expect([journals['JN-1'].journal_date, journals['JN-1'].reference_number, journals['JN-1'].notes]).toEqual(['2026-11-20', `NX-${orderId}-BEN-${drawback}`, `TEST-Stage4 Buyer / NX-${orderId}: Duty Drawback received (claim SB-1)`]);
+    expect([journals['JN-1'].journal_date, journals['JN-1'].reference_number, journals['JN-1'].notes]).toEqual(['2026-11-20', `NX-${orderId}-BEN-${drawback}`, `TEST-Stage4 Buyer / NX-${orderId}: Duty Drawback received (claim SB-1) · ₹17,850.00 · bank ref SBIN226311000555`]); // owner rule D-212: how it was credited
+    expect(journals['JN-2'].notes).toBe(`TEST-Stage4 Buyer / NX-${orderId}: RODTEP received (claim SB-1) · ₹9,000.00 · e-scrip 2610000123456`);
     expect(journals['JN-2'].line_items[0].account_id).toBe('AC-SCRIP'); // RoDTEP: credited as e-scrips
     expect(await lastMessage(orderId, 'export_benefit')).toContain('only Duty Drawback, RoDTEP and RoSCTL go to Zoho Books automatically');
 

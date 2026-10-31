@@ -14,6 +14,7 @@ const orderRepository = require('../repositories/orderRepository');
 const userRepository = require('../repositories/userRepository');
 const incentiveService = require('../services/incentiveService');
 const fileUploadService = require('../services/fileUploadService');
+const fieldValidator = require('../helpers/fieldValidator');
 
 /**
  * Port of IncentiveController.php. Team incentive program and associates
@@ -439,6 +440,7 @@ async function payouts(req, res) {
     r.earliestPaidOn = incentiveService.earliestPaidOn(String(r.incentive_month));
   }
   res.renderView('incentives/payouts', {
+    paidVia: incentiveRepository.PAID_VIA,
     staffTotal,
     associateInr,
     associateFc: Object.entries(fc).map(([currency, amount]) => ({ currency, amount })),
@@ -459,6 +461,20 @@ async function markPaid(req, res) {
   const paidOn = String(body.paid_on || '');
   if (!DATE_RE.test(paidOn) || paidOn > todayIso()) {
     flash.set(req, 'error', 'Enter the date it was paid (today or earlier).');
+    res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+    return;
+  }
+  // Owner rule D-212: how it was paid, with its reference (payroll month, UTR or cheque no.).
+  const paidVia = String(body.paid_via || '');
+  const paidReference = String(body.paid_reference || '').trim();
+  if (!Object.prototype.hasOwnProperty.call(incentiveRepository.PAID_VIA, paidVia)) {
+    flash.set(req, 'error', 'Choose how it was paid (with the salary, bank transfer or cheque).');
+    res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+    return;
+  }
+  const refError = fieldValidator.bankReference(paidReference, 'The payment reference');
+  if (refError) {
+    flash.set(req, 'error', refError);
     res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
     return;
   }
@@ -488,7 +504,7 @@ async function markPaid(req, res) {
       return;
     }
     // QA Round 6, R6-N17: a second click records and logs nothing more.
-    if (!(await incentiveService.markPaid(id, paidOn, paidInr, tds, req.user.id))) {
+    if (!(await incentiveService.markPaid(id, paidOn, paidInr, tds, req.user.id, paidVia, paidReference))) {
       continue;
     }
     await auditLogRepository.log(req.user.id, 'INCENTIVE_PAID', 'incentive_payouts', id, 'status', 'due', 'paid');

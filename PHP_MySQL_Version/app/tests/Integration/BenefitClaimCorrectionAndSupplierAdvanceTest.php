@@ -51,7 +51,7 @@ final class BenefitClaimCorrectionAndSupplierAdvanceTest extends DbTestCase
         CaExportBenefitRepository::markReceived($id, 5000, '2026-10-27');
         $params = ['id' => (string) $orderId, 'benefitId' => (string) $id];
 
-        $_POST = ['claimed_amount' => '5000', 'claimed_at' => '2026-10-27', 'received_amount' => '5000', 'received_at' => '2026-10-27', 'reason' => ''];
+        $_POST = ['claimed_amount' => '5000', 'claimed_at' => '2026-10-27', 'received_amount' => '5000', 'received_at' => '2026-10-27', 'received_reference' => 'ESCRIP-0001', 'reason' => ''];
         (new OrderFinancialsController())->correctExportBenefit($params);
         self::assertSame('error', $this->lastFlash()['type']);
         self::assertEqualsWithDelta(50000, (float) CaExportBenefitRepository::find($id)['claimed_amount'], 0.001);

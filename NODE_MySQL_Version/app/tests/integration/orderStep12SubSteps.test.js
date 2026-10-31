@@ -85,7 +85,7 @@ describe('Step 12 sub-steps (12a–12d)', () => {
     await resolveSchemes(orderId, 'RODTEP');
     const waitingId = await caExportBenefitRepository.record(orderId, 'Duty Drawback', 'SB-1', 9800, '2026-10-01', 'INR', null, adminId);
     const body = { benefits: {
-      0: { benefit_id: String(waitingId), received_amount: '9800', received_at: '2026-10-20' },
+      0: { benefit_id: String(waitingId), received_amount: '9800', received_at: '2026-10-20', received_reference: 'UTR-TEST-0003' },
       1: { scheme_name: 'RODTEP', reference_number: 'SB-2', claimed_amount: '18450', claimed_at: '2026-10-05', received_amount: '', received_at: '2026-10-26' },
     } };
 

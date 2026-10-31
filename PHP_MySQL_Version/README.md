@@ -2090,3 +2090,33 @@ name ends in `_INTERNAL`. The CSV helper now leaves a plain negative number
   and saving an associate reported success for a record that does not exist.
   Node: `routeBehaviour.test.js` (its `/sample-data` checks live in
   `sampleDataLoadClear.test.js`, since Jest runs files side by side).
+
+## Follow-up (added 2026-10-31): rule D-212, Batch 1 — every money record says what it is
+
+Owner hard rule (CLAUDE.md, register D-212): every payment, bill, cost,
+payout, refund and benefit carries a correct description, in the app and in
+Zoho Books, built from the facts and including the bank reference.
+
+- **Migration** `docs/migrations/2026-10-31b-payment-references.sql`
+  (columns only): `order_payment_status.{advance,balance,freight}_bank_reference`,
+  `order_lc_details.lc_bank_reference`, `incentive_payouts.paid_via` /
+  `paid_reference`, `ca_export_benefits.received_reference`,
+  `order_cancellations.refund_paid_at` / `refund_reference`.
+- **Forms that now refuse to save without the reference:** the advance,
+  freight and balance remittances; LC money received; incentive payouts
+  (Paid via + reference, also on "Mark all paid"); export benefit received
+  (order page 13g, its correction, CA → Export Benefits); a cancellation
+  refund (date paid + bank reference). A staff-added cost needs a
+  description of 10 to 255 characters. One check, `bankReference()` in the
+  field validator (4–100 characters: letters, digits, spaces, `. / - _ # : ( )`).
+- **The description builder** (`PaymentDescription` / `paymentDescription.js`)
+  writes the Zoho customer payment's description: "Advance received from
+  <buyer> for order <ref> · USD 1,600.00 at ₹84.10 · against Commercial
+  Invoice <no.> · bank ref <ref>" (LC: the LC number, the amount, the rupees
+  credited after bank charges). The benefit journal's notes add the amount
+  and the UTR / e-scrip no.; a paid incentive's Commission cost line (and so
+  its Zoho expense) ends "· paid with the salary (payroll), ref …".
+- Records saved before keep their data; the new fields apply from the next
+  record. Documents (PDF / DOCX) and CAFIN are unchanged.
+- Tests: `PaymentDescriptionRuleTest` / `paymentDescriptionRule.test.js`,
+  and the Zoho Books stage 2 and 4 tests check the exact wording.

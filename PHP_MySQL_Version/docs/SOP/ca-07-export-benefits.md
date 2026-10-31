@@ -53,7 +53,10 @@ the amount claimed, the currency, and the claim date.
 ## Marking a claim received
 
 Once the government pays out, find the claim in the list and enter the
-**received amount** and **received date**. This is intentionally a
+**received amount**, **received date** and how it was **credited** —
+the bank UTR for Duty Drawback, the e-scrip number for RoDTEP / RoSCTL
+(required, rule D-212; it is added to the Zoho Books journal's notes).
+This is intentionally a
 separate field from the claimed amount, since DGFT/Customs frequently
 pays a different (usually lower) figure after their own review — the
 system keeps both on record rather than assuming they always match.

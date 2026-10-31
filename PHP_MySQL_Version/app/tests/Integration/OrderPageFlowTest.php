@@ -75,7 +75,7 @@ final class OrderPageFlowTest extends DbTestCase
         self::assertStringContainsString("today's exchange rate", $this->lastFlash());
         self::assertNull(OrderPaymentStatusRepository::find($orderId)['advance_amount'], 'nothing is recorded without the rate');
 
-        $_POST = ['advance_amount' => '1800', 'advance_received_at' => '2026-10-26', 'advance_exchange_rate' => '83.25'];
+        $_POST = ['advance_amount' => '1800', 'advance_received_at' => '2026-10-26', 'advance_exchange_rate' => '83.25', 'advance_bank_reference' => 'UTR-TEST-0001'];
         (new OrderController())->recordAdvancePayment(['id' => (string) $orderId]);
         $payment = OrderPaymentStatusRepository::find($orderId);
         self::assertEquals(1800, (float) $payment['advance_amount']);

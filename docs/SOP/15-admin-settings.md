@@ -178,7 +178,10 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   order**, and every one also appears in the in-app notification bell:
 
   - a document was assigned to you to review, or a send waits on your
-    approval; an amendment or cancellation waits on your decision;
+    approval; an amendment or cancellation waits on your decision
+    (once an approved cancellation's refund has been sent, **Mark Refund
+    Completed** on the order asks for the date it was paid and its bank
+    reference — rule D-212);
   - the buyer acknowledged the OC, uploaded their signed PO, or reported
     a payment — sent to that order's own assignees (or, while nobody is
     assigned, to everyone who manages orders);

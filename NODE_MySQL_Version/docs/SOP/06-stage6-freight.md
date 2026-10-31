@@ -88,7 +88,8 @@ Recording and clearing the payment itself follows the exact same
 two-step pattern as the advance payment in Stage 3:
 
 1. **Record Freight Remittance** (9c) — the amount, the date and the **@
-   Exchange Rate** (₹ per 1 unit of the order currency) once the buyer's
+   Exchange Rate** (₹ per 1 unit of the order currency) and the **Bank
+   reference** (SWIFT / UTR; rule D-212) once the buyer's
    payment notification comes in, exactly as for the advance. Does not
    pass the gate yet:
 

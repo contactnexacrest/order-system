@@ -56,11 +56,18 @@ async function forOrder(orderId) {
   return db.query('SELECT * FROM ca_export_benefits WHERE order_id = :order_id ORDER BY claimed_at DESC, id DESC', { order_id: orderId });
 }
 
-async function markReceived(id, receivedAmount, receivedAt) {
+const refOrNull = (v) => (v !== null && v !== undefined && String(v).trim() !== '' ? String(v).trim() : null);
+
+async function markReceived(id, receivedAmount, receivedAt, receivedReference = null) {
   await db.execute(
-    'UPDATE ca_export_benefits SET received_amount = :amount, received_at = :received_at WHERE id = :id',
-    { amount: receivedAmount, received_at: receivedAt, id }
+    'UPDATE ca_export_benefits SET received_amount = :amount, received_at = :received_at, received_reference = COALESCE(:ref, received_reference) WHERE id = :id',
+    { amount: receivedAmount, received_at: receivedAt, ref: refOrNull(receivedReference), id }
   );
+}
+
+/** Owner rule D-212: how the money or e-scrip of a claim was credited (bank UTR / e-scrip no.). */
+async function setReceivedReference(id, reference) {
+  await db.execute('UPDATE ca_export_benefits SET received_reference = :ref WHERE id = :id', { ref: refOrNull(reference), id });
 }
 
 /**
@@ -124,4 +131,4 @@ async function remove(id) {
   await db.execute('DELETE FROM ca_export_benefits WHERE id = :id', { id });
 }
 
-module.exports = { correct, remove, record, find, all, forOrder, markReceived, forZohoSync, setZohoJournal, totalClaimed, totalReceived, availableFinancialYears };
+module.exports = { correct, remove, record, find, all, forOrder, markReceived, setReceivedReference, forZohoSync, setZohoJournal, totalClaimed, totalReceived, availableFinancialYears };

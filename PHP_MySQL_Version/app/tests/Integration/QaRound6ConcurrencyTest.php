@@ -95,7 +95,7 @@ final class QaRound6ConcurrencyTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
         // Every real order has its payment-status row from creation.
         Database::connection()->prepare('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)')->execute(['o' => $orderId]);
-        $_POST = ['advance_amount' => '1020', 'advance_exchange_rate' => '83.25', 'advance_received_at' => date('Y-m-d')];
+        $_POST = ['advance_amount' => '1020', 'advance_exchange_rate' => '83.25', 'advance_bank_reference' => 'UTR-TEST-0001', 'advance_received_at' => date('Y-m-d')];
         (new OrderController())->recordAdvancePayment(['id' => (string) $orderId]);
         self::assertSame('success', $this->flash()['type']);
         (new OrderController())->recordAdvancePayment(['id' => (string) $orderId]);
@@ -118,7 +118,7 @@ final class QaRound6ConcurrencyTest extends DbTestCase
         )->execute(['o' => $orderId, 'u' => $this->admin, 'm' => $month]);
         $payoutId = (int) Database::connection()->lastInsertId();
         foreach ([1, 2] as $click) {
-            $_POST = ['month' => $month, 'paid_on' => date('Y-m-d'), 'paid_inr' => '5000'];
+            $_POST = ['month' => $month, 'paid_on' => date('Y-m-d'), 'paid_inr' => '5000', 'paid_via' => 'salary', 'paid_reference' => 'Payroll TEST'];
             (new IncentiveController())->markPaid(['payoutId' => (string) $payoutId]);
         }
         self::assertSame(1, $this->auditCount('INCENTIVE_PAID', $payoutId));

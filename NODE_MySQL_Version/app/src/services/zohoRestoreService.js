@@ -12,6 +12,7 @@ const zohoPurchaseRepository = require('../repositories/zohoPurchaseRepository')
 const zohoSyncLogRepository = require('../repositories/zohoSyncLogRepository');
 const zohoBooksService = require('./zohoBooksService');
 const zohoGuard = require('./zohoGuard');
+const paymentDescription = require('./paymentDescription');
 const { KIND_LABELS } = require('./zohoInvoiceData');
 
 /**
@@ -176,7 +177,8 @@ async function revenue(startDate, triggeredBy, userId) {
       } else if (Math.abs(Number(row.amount) - p.amount) > 0.01) {
         if (await locked(p.date, 'revenue_payment', p.order_id, p.leg, p.id, `${what} was changed in Zoho Books`, triggeredBy, userId)) continue;
         const invoice = p.applied ? await orderZohoInvoiceRepository.find(p.order_id, p.leg === 'freight' ? 'dn' : 'ci') : null;
-        await zohoBooksService.restoreRevenuePayment(p.id, ...p.args, invoice ? String(invoice.zoho_invoice_id) : null, p.charges);
+        await zohoBooksService.restoreRevenuePayment(p.id, ...p.args, invoice ? String(invoice.zoho_invoice_id) : null, p.charges,
+          await paymentDescription.buyerPayment(Number(p.order_id), String(p.leg), invoice ? String(invoice.zoho_invoice_number) : null));
         await zohoSyncLogRepository.log('revenue_payment', 'order', p.order_id, p.leg, 'success', p.id, `${RESTORED}${what} put back to ${fmt(p.amount)} (Books had ${fmt(row.amount)}).`, triggeredBy, userId);
         out.restored += 1;
       }

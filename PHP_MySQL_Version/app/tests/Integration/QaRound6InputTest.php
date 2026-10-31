@@ -164,17 +164,17 @@ final class QaRound6InputTest extends DbTestCase
         $id = $this->payout(5000, $month);
         $status = static fn (): string => (string) Database::connection()->query("SELECT status FROM incentive_payouts WHERE id = {$id}")->fetchColumn();
 
-        $_POST = ['month' => $month, 'paid_on' => date('Y-m-d'), 'paid_inr' => '5000000'];
+        $_POST = ['month' => $month, 'paid_on' => date('Y-m-d'), 'paid_inr' => '5000000', 'paid_via' => 'salary', 'paid_reference' => 'Payroll TEST'];
         (new IncentiveController())->markPaid(['payoutId' => (string) $id]);
         self::assertStringContainsString('cannot be more than the payout', (string) $this->flash()['message']);
         self::assertSame('due', $status());
 
-        $_POST = ['month' => $month, 'paid_on' => '1900-01-01', 'paid_inr' => '5000'];
+        $_POST = ['month' => $month, 'paid_on' => '1900-01-01', 'paid_inr' => '5000', 'paid_via' => 'salary', 'paid_reference' => 'Payroll TEST'];
         (new IncentiveController())->markPaid(['payoutId' => (string) $id]);
         self::assertStringContainsString('cannot be before', (string) $this->flash()['message']);
         self::assertSame('due', $status());
 
-        $_POST = ['month' => $month, 'paid_on' => date('Y-m-d'), 'paid_inr' => '5000'];
+        $_POST = ['month' => $month, 'paid_on' => date('Y-m-d'), 'paid_inr' => '5000', 'paid_via' => 'salary', 'paid_reference' => 'Payroll TEST'];
         (new IncentiveController())->markPaid(['payoutId' => (string) $id]);
         self::assertSame('success', $this->flash()['type']);
         self::assertSame('paid', $status());

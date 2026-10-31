@@ -566,12 +566,19 @@ final class CaController
             return;
         }
 
+        $receivedReference = trim((string) ($_POST['received_reference'] ?? ''));
+        if ($error = \App\Helpers\FieldValidator::bankReference($receivedReference, 'How it was credited (bank UTR / e-scrip no.)')) {
+            Flash::set('error', $error);
+            header('Location: /ca/export-benefits');
+            return;
+        }
+
         if (!CaFyLockGuard::allow($receivedAt, (int) $user['id'], $roleId, 'ca_export_benefits', $id, 'mark_received')) {
             header('Location: /ca/export-benefits');
             return;
         }
 
-        CaExportBenefitRepository::markReceived($id, (float) $receivedAmount, $receivedAt);
+        CaExportBenefitRepository::markReceived($id, (float) $receivedAmount, $receivedAt, $receivedReference);
         AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', $id, 'received_amount', null, $receivedAmount);
         Flash::set('success', 'Marked as received.');
         header('Location: /ca/export-benefits');

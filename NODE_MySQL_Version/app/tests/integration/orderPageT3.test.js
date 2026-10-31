@@ -123,9 +123,10 @@ describe('Order page t3 requests (2026-10-26)', () => {
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     await orderPaymentStatusRepository.recordAdvanceReceived(orderId, 1800.0, '2026-10-26');
     await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'advance', 83.25, adminId);
+    await orderPaymentStatusRepository.setLegBankReference(orderId, 'advance', 'UTR-TEST-0001');
 
     const { text } = await agent.get(`/orders/${orderId}`);
 
-    expect(text).toContain("Received USD 1,800.00 on 26 Oct 2026 at today's exchange rate of &#8377;83.2500 (= &#8377;149,850.00).");
+    expect(text).toContain("Received USD 1,800.00 on 26 Oct 2026 at today's exchange rate of &#8377;83.2500 (= &#8377;149,850.00). Bank ref UTR-TEST-0001.");
   });
 });

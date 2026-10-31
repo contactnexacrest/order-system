@@ -118,15 +118,15 @@ describe('QA Round 6 — bad input is refused with a message, never a server err
     const status = async () => (await db.queryOne('SELECT status FROM incentive_payouts WHERE id = :id', { id })).status;
     const page = `/incentives/payouts?month=${month}`;
 
-    let res = await post(admin, `/incentives/payouts/${id}/paid`, { month, paid_on: todayIst(), paid_inr: '5000000' }, page);
+    let res = await post(admin, `/incentives/payouts/${id}/paid`, { month, paid_on: todayIst(), paid_inr: '5000000', paid_via: 'salary', paid_reference: 'Payroll TEST' }, page);
     expect((await flashAfter(admin, res)).message).toContain('cannot be more than the payout');
     expect(await status()).toBe('due');
 
-    res = await post(admin, `/incentives/payouts/${id}/paid`, { month, paid_on: '1900-01-01', paid_inr: '5000' }, page);
+    res = await post(admin, `/incentives/payouts/${id}/paid`, { month, paid_on: '1900-01-01', paid_inr: '5000', paid_via: 'salary', paid_reference: 'Payroll TEST' }, page);
     expect((await flashAfter(admin, res)).message).toContain('cannot be before');
     expect(await status()).toBe('due');
 
-    res = await post(admin, `/incentives/payouts/${id}/paid`, { month, paid_on: todayIst(), paid_inr: '5000' }, page);
+    res = await post(admin, `/incentives/payouts/${id}/paid`, { month, paid_on: todayIst(), paid_inr: '5000', paid_via: 'salary', paid_reference: 'Payroll TEST' }, page);
     expect((await flashAfter(admin, res)).type).toBe('success');
     expect(await status()).toBe('paid');
   });

@@ -14,6 +14,7 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const financialYear = require('../helpers/financialYear');
 const flash = require('../helpers/flash');
 const recordCheck = require('../helpers/recordCheck');
+const fieldValidator = require('../helpers/fieldValidator');
 const zohoSyncLogRepository = require('../repositories/zohoSyncLogRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const zohoBooksService = require('../services/zohoBooksService');
@@ -536,12 +537,20 @@ async function markExportBenefitReceived(req, res) {
     return;
   }
 
+  const receivedReference = String(req.body.received_reference || '').trim();
+  const refError = fieldValidator.bankReference(receivedReference, 'How it was credited (bank UTR / e-scrip no.)');
+  if (refError) {
+    flash.set(req, 'error', refError);
+    res.redirect('/ca/export-benefits');
+    return;
+  }
+
   if (!(await caFyLockGuard.allow(req, receivedAt, 'ca_export_benefits', id, 'mark_received'))) {
     res.redirect('/ca/export-benefits');
     return;
   }
 
-  await caExportBenefitRepository.markReceived(id, parseFloat(receivedAmount), receivedAt);
+  await caExportBenefitRepository.markReceived(id, parseFloat(receivedAmount), receivedAt, receivedReference);
   await auditLogRepository.log(user.id, 'CA_EXPORT_BENEFIT_RECEIVED', 'ca_export_benefits', id, 'received_amount', null, receivedAmount);
   flash.set(req, 'success', 'Marked as received.');
   res.redirect('/ca/export-benefits');

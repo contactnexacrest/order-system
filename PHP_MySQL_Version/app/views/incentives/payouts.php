@@ -53,6 +53,8 @@ $__payDay = date('j M', strtotime(date('Y-m-t', strtotime($month . '-01'))));
                 <input type="date" name="paid_on" required min="<?= \App\Services\IncentiveService::earliestPaidOn((string) $r['incentive_month']) ?>" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>" aria-label="Paid on" title="Paid on" style="width:10.5em">
                 <input type="number" name="paid_inr" required min="0.01" max="<?= number_format((float) $r['amount_inr'], 2, '.', '') ?>" step="0.01" value="<?= number_format((float) $r['amount_inr'], 2, '.', '') ?>" aria-label="Amount paid (₹)" title="Amount paid (₹)" style="width:8.5em">
                 <input type="number" name="tds_inr" min="0" step="0.01" placeholder="TDS ₹" aria-label="TDS (₹)" title="TDS (₹), if any" style="width:7em" data-not-more-than="[name=paid_inr]" data-not-more-than-message="TDS cannot be more than the amount paid.">
+                <select name="paid_via" required aria-label="Paid via" title="Paid via"><option value="">Paid via…</option><?php foreach (IncentiveRepository::PAID_VIA as $__k => $__v): ?><option value="<?= $__k ?>"><?= htmlspecialchars(ucfirst($__v)) ?></option><?php endforeach; ?></select>
+                <input type="text" name="paid_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="Payroll Nov-2026 / UTR / cheque no." aria-label="Payment reference" title="Payment reference: payroll month, UTR or cheque no. (rule D-212)" style="width:13em">
                 <button type="submit" class="btn-sm">Mark paid</button>
               </div>
             </form>
@@ -71,6 +73,8 @@ $__payDay = date('j M', strtotime(date('Y-m-t', strtotime($month . '-01'))));
         <input type="hidden" name="month" value="<?= htmlspecialchars($month) ?>">
         <?php foreach ($__dueIds as $id): ?><input type="hidden" name="payout_ids[]" value="<?= $id ?>"><?php endforeach; ?>
         <label class="small">Paid on <input type="date" name="paid_on" required min="<?= \App\Services\IncentiveService::earliestPaidOn($month) ?>" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
+        <label class="small">Paid via <select name="paid_via" required aria-label="Paid via" title="Paid via"><option value="">Paid via…</option><?php foreach (IncentiveRepository::PAID_VIA as $__k => $__v): ?><option value="<?= $__k ?>"><?= htmlspecialchars(ucfirst($__v)) ?></option><?php endforeach; ?></select></label>
+        <label class="small">Payment reference <input type="text" name="paid_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="Payroll Nov-2026 / UTR / cheque no." title="Payment reference: payroll month, UTR or cheque no. (rule D-212)" style="width:13em"></label>
         <button type="submit" class="btn-sm">Mark all paid</button>
       </form>
     <?php endif; ?>

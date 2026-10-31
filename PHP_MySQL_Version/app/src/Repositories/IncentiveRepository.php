@@ -189,12 +189,12 @@ final class IncentiveRepository
     }
 
     /** @return bool whether this call marked it paid (false: it already was — QA Round 6, R6-N17) */
-    public static function markPayoutPaid(int $id, string $paidOn, float $paidInr, ?float $tdsInr, int $userId): bool
+    public static function markPayoutPaid(int $id, string $paidOn, float $paidInr, ?float $tdsInr, int $userId, ?string $paidVia = null, ?string $paidReference = null): bool
     {
         $stmt = Database::connection()->prepare(
-            "UPDATE incentive_payouts SET status = 'paid', paid_on = :d, paid_inr = :p, tds_inr = :t, paid_by = :u WHERE id = :id AND status = 'due'"
+            "UPDATE incentive_payouts SET status = 'paid', paid_on = :d, paid_inr = :p, tds_inr = :t, paid_by = :u, paid_via = :via, paid_reference = :ref WHERE id = :id AND status = 'due'"
         );
-        $stmt->execute(['d' => $paidOn, 'p' => $paidInr, 't' => $tdsInr, 'u' => $userId, 'id' => $id]);
+        $stmt->execute(['d' => $paidOn, 'p' => $paidInr, 't' => $tdsInr, 'u' => $userId, 'via' => $paidVia, 'ref' => $paidReference !== null ? trim($paidReference) : null, 'id' => $id]);
         return $stmt->rowCount() === 1;
     }
 
@@ -226,12 +226,18 @@ final class IncentiveRepository
     }
 
     /** All of the kind paid: the cost entry takes the amounts actually paid and goes to Zoho Books (paid from the company account). */
-    public static function settleCostEntry(int $entryId, float $amountInr, string $paidOn): void
+    public static function settleCostEntry(int $entryId, float $amountInr, string $paidOn, ?string $paidNote = null): void
     {
+        // Owner rule D-212: the cost line (and so the Zoho expense) says how and with what reference it was paid.
         Database::connection()->prepare(
-            "UPDATE order_cost_entries SET amount_inr = :a, incurred_at = :d, paid_from = 'company_account' WHERE id = :id"
-        )->execute(['a' => $amountInr, 'd' => $paidOn, 'id' => $entryId]);
+            "UPDATE order_cost_entries SET amount_inr = :a, incurred_at = :d, paid_from = 'company_account',
+                    description = CASE WHEN :note IS NULL OR LOCATE(' · paid ', COALESCE(description, '')) > 0 THEN description ELSE CONCAT(COALESCE(description, ''), ' · paid ', :note2) END
+              WHERE id = :id"
+        )->execute(['a' => $amountInr, 'd' => $paidOn, 'note' => $paidNote, 'note2' => $paidNote, 'id' => $entryId]);
     }
+
+    /** Owner rule D-212: how a payout was paid. */
+    public const PAID_VIA = ['salary' => 'with the salary (payroll)', 'bank_transfer' => 'by bank transfer', 'cheque' => 'by cheque'];
 
     /** Order ids whose buyer may have fully paid and whose incentive is not fixed yet. */
     public static function unlockedOrderIdsWithPayments(): array

@@ -66,7 +66,7 @@ describe('Order page flow (owner requests 2026-10-26)', () => {
     expect(lastFlash(req)).toContain("today's exchange rate");
     expect((await orderPaymentStatusRepository.find(orderId)).advance_amount).toBeNull();
 
-    req = fakeReq({ id: String(orderId) }, { advance_amount: '1800', advance_received_at: '2026-10-26', advance_exchange_rate: '83.25' });
+    req = fakeReq({ id: String(orderId) }, { advance_amount: '1800', advance_received_at: '2026-10-26', advance_exchange_rate: '83.25', advance_bank_reference: 'UTR-TEST-0001' });
     await ordersController.recordAdvancePayment(req, fakeRes());
     const payment = await orderPaymentStatusRepository.find(orderId);
     expect(Number(payment.advance_amount)).toBe(1800);

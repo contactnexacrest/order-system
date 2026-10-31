@@ -181,8 +181,14 @@ with money that's actually landed:
    currency) it was received at, once the buyer's T/T notification comes in. The rate is
    required and is recorded together with the remittance; the form reads
    back "Received USD 1,800.00 at today's exchange rate of ₹83.2500
-   (= ₹149,850.00)" as you type. The freight and balance remittances work
-   the same way. This does **not** pass the gate yet:
+   (= ₹149,850.00)" as you type. The **Bank reference** (SWIFT / UTR /
+   the reference on the bank's credit advice) is required too (rule D-212,
+   2026-10-31): the payment's description — here and in Zoho Books — is
+   built from it, so the payment can always be matched to the bank
+   statement ("Advance received from <buyer> for order <ref> · USD 1,600.00
+   at ₹84.10 · against Proforma Invoice <no.> · bank ref <ref>"). The freight
+   and balance remittances work the same way. This does **not** pass the
+   gate yet:
 
    ![Payment Status after recording, before clearing](./images/s3_payment_status_recorded.png)
 

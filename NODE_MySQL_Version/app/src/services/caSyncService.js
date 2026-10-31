@@ -14,6 +14,7 @@ const zohoBooksService = require('../services/zohoBooksService');
 const zohoGuard = require('../services/zohoGuard');
 const zohoInvoiceData = require('../services/zohoInvoiceData');
 const zohoRestoreService = require('../services/zohoRestoreService');
+const paymentDescription = require('../services/paymentDescription');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const caFyLockRepository = require('../repositories/caFyLockRepository');
 const financialYear = require('../helpers/financialYear');
@@ -124,7 +125,9 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
         leg.inr_actual,
         String(leg.cleared_at).slice(0, 10),
         referenceNumber,
-        target ? target.zoho_invoice_number : null
+        target ? target.zoho_invoice_number : null,
+        0,
+        await paymentDescription.buyerPayment(Number(leg.order_id), String(leg.leg), target ? target.zoho_invoice_number : null)
       );
       const zohoReference = result.payment_id;
       await markSynced(leg.order_id, leg.leg, zohoReference);
@@ -155,7 +158,9 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
         leg.inr_actual,
         String(leg.cleared_at).slice(0, 10),
         `${leg.buyer_inquiry_ref}-${leg.leg}`,
-        target.zoho_invoice_number
+        target.zoho_invoice_number,
+        0,
+        await paymentDescription.buyerPayment(Number(leg.order_id), String(leg.leg), target.zoho_invoice_number)
       );
       await orderPaymentStatusRepository.setLegZohoApplied(leg.order_id, leg.leg);
       await zohoSyncLogRepository.log('payment_apply', 'order_payment_status', leg.order_id, leg.leg, 'success', String(leg.zoho_reference), `Applied ${amount.toFixed(2)} of payment ${leg.zoho_reference} to ${zohoInvoiceData.KIND_LABELS[LEG_INVOICE[leg.leg]]} ${target.zoho_invoice_number}.`, triggeredBy, triggeredByUserId);
@@ -179,13 +184,13 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
     const args = [Number(lc.client_id), String(lc.company_legal_name), String(lc.currency_code || 'INR'), Number(lc.lc_received_amount), Number(lc.lc_inr_credited), String(lc.lc_received_at), reference];
     try {
       if (lc.lc_zoho_synced_at === null) {
-        const result = await zohoBooksService.pushRevenuePayment(...args, target ? target.zoho_invoice_number : null, Number(lc.lc_bank_charges_inr));
+        const result = await zohoBooksService.pushRevenuePayment(...args, target ? target.zoho_invoice_number : null, Number(lc.lc_bank_charges_inr), await paymentDescription.buyerPayment(orderId, 'lc', target ? target.zoho_invoice_number : null));
         await orderLcDetailRepository.setZohoSynced(orderId, result.payment_id, result.applied > 0);
         applied += result.applied > 0 ? 1 : 0;
         await zohoSyncLogRepository.log('revenue_payment', 'order_lc_details', orderId, 'lc', 'success', result.payment_id, `${zohoRestoreService.note(`lc:${orderId}`)}Pushed LC payment as Zoho Books customer payment ${result.payment_id}${appliedNote('lc', target, result.applied)}`, triggeredBy, triggeredByUserId);
         synced += 1;
       } else if (target) {
-        const amount = await zohoBooksService.applyPaymentToInvoice(String(lc.lc_zoho_payment_id), ...args, target.zoho_invoice_number, Number(lc.lc_bank_charges_inr));
+        const amount = await zohoBooksService.applyPaymentToInvoice(String(lc.lc_zoho_payment_id), ...args, target.zoho_invoice_number, Number(lc.lc_bank_charges_inr), await paymentDescription.buyerPayment(orderId, 'lc', target.zoho_invoice_number));
         await orderLcDetailRepository.setZohoApplied(orderId);
         await zohoSyncLogRepository.log('payment_apply', 'order_lc_details', orderId, 'lc', 'success', String(lc.lc_zoho_payment_id), `Applied ${amount.toFixed(2)} of LC payment ${lc.lc_zoho_payment_id} to Commercial Invoice ${target.zoho_invoice_number}.`, triggeredBy, triggeredByUserId);
         applied += 1;

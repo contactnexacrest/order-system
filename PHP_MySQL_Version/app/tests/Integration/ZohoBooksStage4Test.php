@@ -263,10 +263,12 @@ final class ZohoBooksStage4Test extends DbTestCase
     public function testTheLcPaymentIsHeldThenAppliedToTheCiWithTheBankCharges(): void
     {
         $orderId = $this->createOrder();
-        OrderLcDetailRepository::recordReceived($orderId, '2026-11-05', 1275.0, 107100.0, 750.0, $this->userId);
+        OrderLcDetailRepository::recordReceived($orderId, '2026-11-05', 1275.0, 107100.0, 750.0, $this->userId, 'HDFC-LC-0915-778');
 
         $first = CaSyncService::syncPendingRevenue('manual', null);
         self::assertSame([1, 0], [$first['synced'], $first['applied']], 'no CI in Books yet: held');
+        self::assertStringStartsWith("LC money received from TEST-Stage4 Buyer for order NX-{$orderId} · ", $this->payments['PAY-1']['description'], 'owner rule D-212');
+        self::assertStringEndsWith('USD 1,275.00, ₹107,100.00 credited after ₹750.00 bank charges · bank ref HDFC-LC-0915-778', $this->payments['PAY-1']['description']);
         $payment = $this->payments['PAY-1'];
         self::assertSame(1275.0, $payment['amount']);
         self::assertSame(84.588235, $payment['exchange_rate'], '(credited 107,100 + charges 750) / 1,275');
@@ -278,13 +280,14 @@ final class ZohoBooksStage4Test extends DbTestCase
         self::assertSame([1, 1], [$second['invoices'], $second['applied']]);
         self::assertSame([['invoice_id' => 'INV-1', 'amount_applied' => 1275.0]], $this->payments['PAY-1']['invoices']);
         self::assertSame(8.87, $this->payments['PAY-1']['bank_charges'], 're-sent whole, with the charges');
+        self::assertStringEndsWith(' · against Commercial Invoice ' . $this->invoices['INV-1']['invoice_number'] . ' · bank ref HDFC-LC-0915-778', $this->payments['PAY-1']['description'], 'once applied, it names the CI');
         self::assertNotNull(OrderLcDetailRepository::find($orderId)['lc_zoho_applied_at']);
     }
 
     public function testTheLcPaymentIsRecordedOnlyOnAnLcOrderOnceUsableAndNotChangedOnceInBooks(): void
     {
         $orderId = $this->createOrder();
-        $post = ['lc_received_at' => '2026-10-27', 'lc_received_amount' => '1275', 'lc_inr_credited' => '107100', 'lc_bank_charges_inr' => '750'];
+        $post = ['lc_received_at' => '2026-10-27', 'lc_received_amount' => '1275', 'lc_inr_credited' => '107100', 'lc_bank_charges_inr' => '750', 'lc_bank_reference' => 'HDFC-LC-0915-778'];
         $run = function (array $body) use ($orderId): array {
             $_POST = $body;
             ob_start();
@@ -296,8 +299,11 @@ final class ZohoBooksStage4Test extends DbTestCase
 
         self::assertSame('Enter the rupees credited to the bank account.', $run(['lc_inr_credited' => ''] + $post)['message']);
         self::assertSame('Enter the date the bank paid (not in the future).', $run(['lc_received_at' => '2099-01-01'] + $post)['message']);
+        self::assertStringContainsString('bank reference of the credit is required', $run(['lc_bank_reference' => ''] + $post)['message'], 'owner rule D-212');
+        self::assertNull(OrderLcDetailRepository::find($orderId)['lc_received_at'], 'nothing recorded without it');
         self::assertSame(['type' => 'success', 'message' => 'LC payment recorded: USD 1275, ₹107100 credited.'], $run($post));
         self::assertSame('750.00', (string) OrderLcDetailRepository::find($orderId)['lc_bank_charges_inr']);
+        self::assertSame('HDFC-LC-0915-778', OrderLcDetailRepository::find($orderId)['lc_bank_reference']);
 
         CaSyncService::syncPendingRevenue('manual', null);
         self::assertSame('This LC payment is already in Zoho Books, so it cannot be changed here. Ask the CA to correct it there.', $run($post)['message']);
@@ -313,9 +319,9 @@ final class ZohoBooksStage4Test extends DbTestCase
         $rodtep = CaExportBenefitRepository::record($orderId, 'RODTEP', 'SB-1', 9000.0, '2026-10-28', 'INR', null, $this->userId);
         $other = CaExportBenefitRepository::record($orderId, 'Other', null, 500.0, '2026-10-28', 'INR', null, $this->userId);
         CaExportBenefitRepository::record($orderId, 'RoSCTL', null, 700.0, '2026-10-28', 'INR', null, $this->userId); // claimed, not received: not booked
-        CaExportBenefitRepository::markReceived($drawback, 17850.0, '2026-11-20');
-        CaExportBenefitRepository::markReceived($rodtep, 9000.0, '2026-11-25');
-        CaExportBenefitRepository::markReceived($other, 500.0, '2026-11-25');
+        CaExportBenefitRepository::markReceived($drawback, 17850.0, '2026-11-20', 'SBIN226311000555');
+        CaExportBenefitRepository::markReceived($rodtep, 9000.0, '2026-11-25', '2610000123456');
+        CaExportBenefitRepository::markReceived($other, 500.0, '2026-11-25', 'SBIN226311000777');
 
         $result = CaSyncService::syncBenefits('manual', null);
 
@@ -324,7 +330,8 @@ final class ZohoBooksStage4Test extends DbTestCase
             ['account_id' => 'SBI-1', 'debit_or_credit' => 'debit', 'amount' => 17850.0, 'description' => 'Duty Drawback paid into the bank'],
             ['account_id' => 'AC-INCOME', 'debit_or_credit' => 'credit', 'amount' => 17850.0, 'description' => 'Duty Drawback received'],
         ], $this->journals['JN-1']['line_items']);
-        self::assertSame(['2026-11-20', "NX-{$orderId}-BEN-{$drawback}", "TEST-Stage4 Buyer / NX-{$orderId}: Duty Drawback received (claim SB-1)"], [$this->journals['JN-1']['journal_date'], $this->journals['JN-1']['reference_number'], $this->journals['JN-1']['notes']]);
+        self::assertSame(['2026-11-20', "NX-{$orderId}-BEN-{$drawback}", "TEST-Stage4 Buyer / NX-{$orderId}: Duty Drawback received (claim SB-1) · ₹17,850.00 · bank ref SBIN226311000555"], [$this->journals['JN-1']['journal_date'], $this->journals['JN-1']['reference_number'], $this->journals['JN-1']['notes']], 'owner rule D-212: how it was credited');
+        self::assertSame("TEST-Stage4 Buyer / NX-{$orderId}: RODTEP received (claim SB-1) · ₹9,000.00 · e-scrip 2610000123456", $this->journals['JN-2']['notes']);
         self::assertSame('AC-SCRIP', $this->journals['JN-2']['line_items'][0]['account_id'], 'RoDTEP: credited as e-scrips');
         self::assertStringContainsString('only Duty Drawback, RoDTEP and RoSCTL go to Zoho Books automatically', $this->lastMessage($orderId, 'export_benefit'));
 

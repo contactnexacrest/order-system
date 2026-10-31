@@ -182,7 +182,9 @@ final class CaSyncService
                     (float) $leg['inr_actual'],
                     substr((string) $leg['cleared_at'], 0, 10),
                     $referenceNumber,
-                    $target['zoho_invoice_number'] ?? null
+                    $target['zoho_invoice_number'] ?? null,
+                    0.0,
+                    PaymentDescription::buyerPayment((int) $leg['order_id'], (string) $leg['leg'], $target['zoho_invoice_number'] ?? null)
                 );
                 $zohoReference = $result['payment_id'];
                 self::markSynced((int) $leg['order_id'], $leg['leg'], $zohoReference);
@@ -213,7 +215,9 @@ final class CaSyncService
                     (float) $leg['inr_actual'],
                     substr((string) $leg['cleared_at'], 0, 10),
                     $leg['buyer_inquiry_ref'] . '-' . $leg['leg'],
-                    $target['zoho_invoice_number']
+                    $target['zoho_invoice_number'],
+                    0.0,
+                    PaymentDescription::buyerPayment((int) $leg['order_id'], (string) $leg['leg'], $target['zoho_invoice_number'])
                 );
                 OrderPaymentStatusRepository::setLegZohoApplied((int) $leg['order_id'], $leg['leg']);
                 ZohoSyncLogRepository::log('payment_apply', 'order_payment_status', (int) $leg['order_id'], $leg['leg'], 'success', (string) $leg['zoho_reference'], "Applied " . number_format($amount, 2, '.', '') . " of payment {$leg['zoho_reference']} to " . ZohoInvoiceData::KIND_LABELS[self::LEG_INVOICE[$leg['leg']]] . " {$target['zoho_invoice_number']}.", $triggeredBy, $triggeredByUserId);
@@ -237,13 +241,13 @@ final class CaSyncService
             $args = [(int) $lc['client_id'], (string) $lc['company_legal_name'], (string) ($lc['currency_code'] ?? 'INR'), (float) $lc['lc_received_amount'], (float) $lc['lc_inr_credited'], (string) $lc['lc_received_at'], $reference];
             try {
                 if ($lc['lc_zoho_synced_at'] === null) {
-                    $result = ZohoBooksService::pushRevenuePayment(...[...$args, $target['zoho_invoice_number'] ?? null, (float) $lc['lc_bank_charges_inr']]);
+                    $result = ZohoBooksService::pushRevenuePayment(...[...$args, $target['zoho_invoice_number'] ?? null, (float) $lc['lc_bank_charges_inr'], PaymentDescription::buyerPayment($orderId, 'lc', $target['zoho_invoice_number'] ?? null)]);
                     OrderLcDetailRepository::setZohoSynced($orderId, $result['payment_id'], $result['applied'] > 0);
                     $applied += $result['applied'] > 0 ? 1 : 0;
                     ZohoSyncLogRepository::log('revenue_payment', 'order_lc_details', $orderId, 'lc', 'success', $result['payment_id'], ZohoRestoreService::note("lc:{$orderId}") . "Pushed LC payment as Zoho Books customer payment {$result['payment_id']}" . self::appliedNote('lc', $target, $result['applied']), $triggeredBy, $triggeredByUserId);
                     $synced++;
                 } elseif ($target !== null) {
-                    $amount = ZohoBooksService::applyPaymentToInvoice((string) $lc['lc_zoho_payment_id'], ...[...$args, $target['zoho_invoice_number'], (float) $lc['lc_bank_charges_inr']]);
+                    $amount = ZohoBooksService::applyPaymentToInvoice((string) $lc['lc_zoho_payment_id'], ...[...$args, $target['zoho_invoice_number'], (float) $lc['lc_bank_charges_inr'], PaymentDescription::buyerPayment($orderId, 'lc', $target['zoho_invoice_number'])]);
                     OrderLcDetailRepository::setZohoApplied($orderId);
                     ZohoSyncLogRepository::log('payment_apply', 'order_lc_details', $orderId, 'lc', 'success', (string) $lc['lc_zoho_payment_id'], 'Applied ' . number_format($amount, 2, '.', '') . " of LC payment {$lc['lc_zoho_payment_id']} to Commercial Invoice {$target['zoho_invoice_number']}.", $triggeredBy, $triggeredByUserId);
                     $applied++;

@@ -91,14 +91,15 @@ async function confirmUsable(orderId, confirmedBy) {
  * charges deducted. It goes to Zoho Books as a customer payment applied to
  * the CI (caSyncService), so it can be corrected only until then.
  */
-async function recordReceived(orderId, receivedAt, amount, inrCredited, bankChargesInr, userId) {
+async function recordReceived(orderId, receivedAt, amount, inrCredited, bankChargesInr, userId, bankReference = null) {
   const r2 = (v) => Math.round(Number(v) * 100) / 100;
   await db.execute(
     `UPDATE order_lc_details
         SET lc_received_at = :received_at, lc_received_amount = :amount, lc_inr_credited = :inr,
-            lc_bank_charges_inr = :charges, lc_received_by = :user_id
+            lc_bank_charges_inr = :charges, lc_received_by = :user_id, lc_bank_reference = :ref
       WHERE order_id = :order_id AND lc_zoho_synced_at IS NULL`,
-    { received_at: receivedAt, amount: r2(amount), inr: r2(inrCredited), charges: r2(bankChargesInr), user_id: userId, order_id: orderId }
+    { received_at: receivedAt, amount: r2(amount), inr: r2(inrCredited), charges: r2(bankChargesInr), user_id: userId,
+      ref: bankReference !== null && String(bankReference).trim() !== '' ? String(bankReference).trim() : null, order_id: orderId }
   );
 }
 

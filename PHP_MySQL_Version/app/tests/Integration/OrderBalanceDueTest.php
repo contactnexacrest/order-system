@@ -37,7 +37,7 @@ final class OrderBalanceDueTest extends DbTestCase
 
     private function recordAdvance(array $post): array
     {
-        $_POST = $post + ['advance_received_at' => '2026-10-27', 'advance_exchange_rate' => '83.5'];
+        $_POST = $post + ['advance_received_at' => '2026-10-27', 'advance_exchange_rate' => '83.5', 'advance_bank_reference' => 'UTR-TEST-0001'];
         ob_start();
         (new OrderController())->recordAdvancePayment(['id' => (string) $this->orderId]);
         ob_end_clean();

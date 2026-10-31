@@ -43,7 +43,7 @@ describe('Benefit claim corrections and the supplier advance (owner requests 202
     const id = await caExportBenefitRepository.record(orderId, 'RODTEP', '443432432', 50000, '2026-10-27', 'INR', null, userId);
     await caExportBenefitRepository.markReceived(id, 5000, '2026-10-27');
     const params = { id: String(orderId), benefitId: String(id) };
-    const body = { claimed_amount: '5000', claimed_at: '2026-10-27', received_amount: '5000', received_at: '2026-10-27', reason: '' };
+    const body = { claimed_amount: '5000', claimed_at: '2026-10-27', received_amount: '5000', received_at: '2026-10-27', received_reference: 'ESCRIP-0001', reason: '' };
 
     expect((await call(orderFinancialsController.correctExportBenefit, params, body)).type).toBe('error');
     expect(Number((await caExportBenefitRepository.find(id)).claimed_amount)).toBe(50000);

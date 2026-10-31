@@ -166,8 +166,12 @@ describe('Zoho Books Stage 2', () => {
 
   it('holds the advance until the CI, then applies it to it', async () => {
     const orderId = await createCifOrder();
+    await db.execute("UPDATE order_payment_status SET advance_bank_reference = 'HDFCN26304123456' WHERE order_id = :id", { id: orderId });
 
     expect(await sync()).toEqual({ synced: 1, failed: 0, skipped: 0, invoices: 0, applied: 0 });
+    // Owner rule D-212: the payment says what it is, for which order, what it settles and its bank reference.
+    expect(payments['PAY-1'].description).toBe(`Advance received from TEST-Stage2 Buyer for order NX-${orderId} · USD 300.00 at ₹84.10 · bank ref HDFCN26304123456`);
+    expect(payments['PAY-1'].reference_number).toBe(`NX-${orderId}-advance`); // the reference is unchanged
     expect(payments['PAY-1']).not.toHaveProperty('invoices'); // no CI yet: the advance is held unapplied
     expect((await logRows(orderId)).pop().message).toContain('held unapplied until the Commercial Invoice is in Zoho Books');
 
@@ -190,6 +194,8 @@ describe('Zoho Books Stage 2', () => {
     });
     expect(requestsTo('POST', '/books/v3/invoices')[0].url).toContain('ignore_auto_number_generation=true');
     expect(payments['PAY-1'].invoices).toEqual([{ invoice_id: 'INV-1', amount_applied: 300 }]);
+    // once applied, it says which invoice it settles
+    expect(payments['PAY-1'].description).toBe(`Advance received from TEST-Stage2 Buyer for order NX-${orderId} · USD 300.00 at ₹84.10 · against Commercial Invoice TEST-SC/CI/2026/2810001 · bank ref HDFCN26304123456`);
     expect(payments['PAY-1'].amount).toBe(300);
     expect(payments['PAY-1'].exchange_rate).toBe(84.1);
     expect(invoiceBalance('INV-1')).toBe(975);
@@ -218,6 +224,9 @@ describe('Zoho Books Stage 2', () => {
     expect(debitNote.payload.date).toBe('2026-10-27');
     expect(invoiceBalance(debitNote.invoice_id)).toBe(0);
     expect(invoiceBalance(invoiceNamed('TEST-SC/CI/2026/2810002').invoice_id)).toBe(0); // advance 300 + balance 975 = the CI
+    const descriptions = Object.fromEntries(Object.values(payments).map((p) => [p.reference_number, p.description]));
+    expect(descriptions[`NX-${orderId}-freight`]).toBe(`Freight received from TEST-Stage2 Buyer for order NX-${orderId} · USD 215.00 at ₹84.30 · against Debit Note TEST-SC/DN/2026/2710001`);
+    expect(descriptions[`NX-${orderId}-balance`]).toBe(`Balance received from TEST-Stage2 Buyer for order NX-${orderId} · USD 975.00 at ₹84.50 · against Commercial Invoice TEST-SC/CI/2026/2810002`);
   });
 
   it('a revised CI updates the same Books invoice', async () => {

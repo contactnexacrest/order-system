@@ -202,8 +202,12 @@ final class ZohoBooksStage2Test extends DbTestCase
     public function testTheAdvanceIsHeldUntilTheCiAndThenAppliedToIt(): void
     {
         $orderId = $this->createCifOrder();
+        Database::connection()->exec("UPDATE order_payment_status SET advance_bank_reference = 'HDFCN26304123456' WHERE order_id = {$orderId}");
 
         $first = $this->sync();
+        // Owner rule D-212: the payment says what it is, for which order, what it settles and its bank reference.
+        self::assertSame("Advance received from TEST-Stage2 Buyer for order NX-{$orderId} · USD 300.00 at ₹84.10 · bank ref HDFCN26304123456", $this->payments['PAY-1']['description']);
+        self::assertSame("NX-{$orderId}-advance", $this->payments['PAY-1']['reference_number'], 'the reference is unchanged');
         self::assertSame(['synced' => 1, 'failed' => 0, 'skipped' => 0, 'invoices' => 0, 'applied' => 0], $first);
         self::assertArrayNotHasKey('invoices', $this->payments['PAY-1'], 'no CI yet: the advance is held unapplied');
         $rows = $this->logRows($orderId);
@@ -222,6 +226,7 @@ final class ZohoBooksStage2Test extends DbTestCase
         ], 'exchange_rate' => 84.4], $invoice['payload']);
         self::assertStringContainsString('ignore_auto_number_generation=true', $this->requestsTo('POST', '/books/v3/invoices')[0]['url']);
         self::assertSame([['invoice_id' => 'INV-1', 'amount_applied' => 300.0]], $this->payments['PAY-1']['invoices']);
+        self::assertSame("Advance received from TEST-Stage2 Buyer for order NX-{$orderId} · USD 300.00 at ₹84.10 · against Commercial Invoice TEST-SC/CI/2026/2810001 · bank ref HDFCN26304123456", $this->payments['PAY-1']['description'], 'once applied, it says which invoice it settles');
         self::assertSame(300.0, $this->payments['PAY-1']['amount']);
         self::assertSame(84.1, $this->payments['PAY-1']['exchange_rate']);
         self::assertSame(975.0, $this->invoiceBalance('INV-1'));
@@ -253,6 +258,9 @@ final class ZohoBooksStage2Test extends DbTestCase
         self::assertSame(0.0, $this->invoiceBalance($debitNote['invoice_id']));
         $ci = array_values(array_filter($this->invoices, static fn (array $i): bool => $i['invoice_number'] === 'TEST-SC/CI/2026/2810002'))[0];
         self::assertSame(0.0, $this->invoiceBalance($ci['invoice_id']), 'advance 300 + balance 975 = the CI');
+        $descriptions = array_column($this->payments, 'description', 'reference_number');
+        self::assertSame("Freight received from TEST-Stage2 Buyer for order NX-{$orderId} · USD 215.00 at ₹84.30 · against Debit Note TEST-SC/DN/2026/2710001", $descriptions["NX-{$orderId}-freight"]);
+        self::assertSame("Balance received from TEST-Stage2 Buyer for order NX-{$orderId} · USD 975.00 at ₹84.50 · against Commercial Invoice TEST-SC/CI/2026/2810002", $descriptions["NX-{$orderId}-balance"]);
     }
 
     public function testARevisedCiUpdatesTheSameBooksInvoice(): void

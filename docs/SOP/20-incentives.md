@@ -64,7 +64,11 @@ associates (outside people who introduced a client; see below).
    (salary TDS). Pay an associate against their invoice; the CA advises the
    TDS.
 3. Record each payment: the date, the amount actually paid and any TDS,
-   then **Mark paid**. The amount paid cannot be more than the payout, and
+   **Paid via** (with the salary / bank transfer / cheque) and the
+   **Payment reference** (payroll month, UTR or cheque no.), then **Mark
+   paid** (rule D-212, 2026-10-31: both are required; once every payout of
+   the order is paid, its Commission cost line — and so the Zoho Books
+   expense — ends "· paid with the salary (payroll), ref Payroll Nov-2026"). The amount paid cannot be more than the payout, and
    the date cannot be in the future or before the 1st of the month before
    the payout's incentive month (QA Round 6, R6-N10). When nothing due was selected, nothing is recorded and a warning says so (R6-N11). **Mark all paid** records every due line of the
    month at the amounts shown. **Download list (CSV)** gives the list for

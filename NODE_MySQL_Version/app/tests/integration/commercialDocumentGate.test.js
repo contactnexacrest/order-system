@@ -171,7 +171,7 @@ describe('Commercial document gate — SUPPO/CI must exist before confirming (90
     await unlockThroughStage8(orderId);
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     await createTestDocument(orderId, 'CI');
-    const req = fakeReq({ id: String(orderId) }, { balance_amount: '1000', balance_received_at: '2026-05-01', balance_exchange_rate: '84' });
+    const req = fakeReq({ id: String(orderId) }, { balance_amount: '1000', balance_received_at: '2026-05-01', balance_exchange_rate: '84', balance_bank_reference: 'UTR-TEST-0001' });
 
     await ordersController.recordBalancePayment(req, fakeRes());
 

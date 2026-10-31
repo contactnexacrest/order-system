@@ -486,12 +486,12 @@ async function unlock(orderId, userId) {
  * when the payout was already paid, e.g. by a second click a moment earlier
  * (QA Round 6, R6-N17), so the caller logs it once.
  */
-async function markPaid(payoutId, paidOn, paidInr, tdsInr, userId) {
+async function markPaid(payoutId, paidOn, paidInr, tdsInr, userId, paidVia = null, paidReference = null) {
   const payout = await incentiveRepository.findPayout(payoutId);
   if (!payout || payout.status !== 'due') {
     return false;
   }
-  if (!(await incentiveRepository.markPayoutPaid(payoutId, paidOn, paidInr, tdsInr, userId))) {
+  if (!(await incentiveRepository.markPayoutPaid(payoutId, paidOn, paidInr, tdsInr, userId, paidVia, paidReference))) {
     return false;
   }
   const kind = payout.payee_kind === 'staff' ? 'team' : 'associate';
@@ -502,9 +502,25 @@ async function markPaid(payoutId, paidOn, paidInr, tdsInr, userId) {
   const entry = (await incentiveRepository.costEntries(Number(payout.order_id)))[kind];
   if (entry) {
     await incentiveRepository.settleCostEntry(Number(entry.id), round2(rows.reduce((sum, p) => sum + Number(p.paid_inr), 0)),
-      rows.map((p) => String(p.paid_on).slice(0, 10)).sort().pop());
+      rows.map((p) => String(p.paid_on).slice(0, 10)).sort().pop(), paidNote(rows));
   }
   return true;
+}
+
+/**
+ * Owner rule D-212: how the payouts of one order and kind were paid, for
+ * its cost line — "with the salary (payroll), ref Nov-2026 payroll" — each
+ * distinct way and reference once; null when none was recorded. Port of
+ * IncentiveService::paidNote().
+ */
+function paidNote(rows) {
+  const parts = new Set();
+  for (const p of rows) {
+    if (!p.paid_via && !p.paid_reference) continue;
+    const part = `${incentiveRepository.PAID_VIA[p.paid_via || ''] || ''}${p.paid_reference ? `, ref ${p.paid_reference}` : ''}`.replace(/^[ ,]+|[ ,]+$/g, '');
+    parts.add(part);
+  }
+  return parts.size ? [...parts].join('; ') : null;
 }
 
 module.exports = {

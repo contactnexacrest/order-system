@@ -84,11 +84,18 @@ final class CaExportBenefitRepository
         return $stmt->fetchAll();
     }
 
-    public static function markReceived(int $id, float $receivedAmount, string $receivedAt): void
+    public static function markReceived(int $id, float $receivedAmount, string $receivedAt, ?string $receivedReference = null): void
     {
         Database::connection()->prepare(
-            'UPDATE ca_export_benefits SET received_amount = :amount, received_at = :received_at WHERE id = :id'
-        )->execute(['amount' => $receivedAmount, 'received_at' => $receivedAt, 'id' => $id]);
+            'UPDATE ca_export_benefits SET received_amount = :amount, received_at = :received_at, received_reference = COALESCE(:ref, received_reference) WHERE id = :id'
+        )->execute(['amount' => $receivedAmount, 'received_at' => $receivedAt, 'ref' => $receivedReference !== null && trim($receivedReference) !== '' ? trim($receivedReference) : null, 'id' => $id]);
+    }
+
+    /** Owner rule D-212: how the money or e-scrip of a claim was credited (bank UTR / e-scrip no.). */
+    public static function setReceivedReference(int $id, ?string $reference): void
+    {
+        Database::connection()->prepare('UPDATE ca_export_benefits SET received_reference = :ref WHERE id = :id')
+            ->execute(['ref' => $reference !== null && trim($reference) !== '' ? trim($reference) : null, 'id' => $id]);
     }
 
     /** Owner request (2026-10-27): fix a wrongly typed claim — every field at once; a null received amount clears the receipt. */

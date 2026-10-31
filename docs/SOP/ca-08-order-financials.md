@@ -119,7 +119,8 @@ RODTEP/export-benefit claim linked to this order (see
 [Government Export Benefits](./ca-07-export-benefits.md)) is a row of one
 table, with an empty row for each eligible scheme not claimed yet — type
 the claim (reference, amount, date) and, when it arrives, the **received
-amount and date** on the same row, then **Save Benefits**. It opens for
+amount and date** and how it was **credited** (bank UTR / e-scrip no. —
+required with a received amount, rule D-212) on the same row, then **Save Benefits**. It opens for
 claims once the documents are sent and the balance remittance is
 received. **Record another claim** (under the table) covers a second
 claim on the same scheme or a scheme not listed. An eligible scheme the
@@ -219,7 +220,9 @@ updates itself.
 on an LC order once the LC is confirmed usable: when the bank pays under
 the LC, record the **date the bank paid**, the **amount** in the order
 currency, the **rupees credited** (from the bank's credit advice) and the
-**bank charges deducted**. It goes to Zoho Books as the buyer's payment
+**bank charges deducted**, and the **bank reference of the credit** (UTR /
+bank ref. / FIRC no.; required, rule D-212 — it goes into the payment's
+description). It goes to Zoho Books as the buyer's payment
 against the Commercial Invoice (see
 [CA-03](./ca-03-zoho-sync.md)); until then it can be corrected here, after
 that only in Books.
@@ -276,7 +279,9 @@ else in the system:
 
 Each entry records a category, amount (INR), date, what it was **paid
 from** (company account or company card — owner decision 2026-10-29),
-and an optional free-text description, and can be removed with a
+and a **description** — required since rule D-212 (2026-10-31): who was
+paid and for what, with their invoice / receipt no., 10 to 255
+characters — and can be removed with a
 **Remove** button (a
 correction, not a routine action — same reasoning as INR-actual delete
 being its own permission elsewhere in this module). The three

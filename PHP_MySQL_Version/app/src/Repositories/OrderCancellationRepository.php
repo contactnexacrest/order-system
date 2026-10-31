@@ -85,10 +85,11 @@ final class OrderCancellationRepository
     }
 
     /** Recording that the refund money has actually moved — a separate, lower-bar step from the approval decision itself, since the bank transfer happens outside this system on its own timeline. */
-    public static function completeRefund(int $id, int $recordedBy, ?string $refundNotes): void
+    public static function completeRefund(int $id, int $recordedBy, ?string $refundNotes, ?string $refundPaidAt = null, ?string $refundReference = null): void
     {
         Database::connection()->prepare(
-            "UPDATE order_cancellations SET refund_status = 'completed', refund_notes = :refund_notes, refund_recorded_by = :recorded_by, refund_recorded_at = NOW() WHERE id = :id"
-        )->execute(['refund_notes' => $refundNotes, 'recorded_by' => $recordedBy, 'id' => $id]);
+            "UPDATE order_cancellations SET refund_status = 'completed', refund_notes = :refund_notes, refund_paid_at = :paid_at, refund_reference = :ref,
+                    refund_recorded_by = :recorded_by, refund_recorded_at = NOW() WHERE id = :id"
+        )->execute(['refund_notes' => $refundNotes, 'paid_at' => $refundPaidAt, 'ref' => $refundReference, 'recorded_by' => $recordedBy, 'id' => $id]);
     }
 }

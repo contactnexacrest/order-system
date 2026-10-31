@@ -4425,3 +4425,21 @@ CREATE TABLE incentive_payouts (
   INDEX idx_incentive_payouts_month (incentive_month),
   INDEX idx_incentive_payouts_user (user_id)
 ) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+-- Owner rule D-212 (2026-10-31): every money record has a correct description.
+-- The bank / payment references the app builds each description from
+-- (migration docs/migrations/2026-10-31b-payment-references.sql).
+-- ---------------------------------------------------------------------------
+ALTER TABLE order_payment_status
+  ADD COLUMN advance_bank_reference VARCHAR(100) NULL AFTER advance_firc_received_at,
+  ADD COLUMN balance_bank_reference VARCHAR(100) NULL AFTER balance_firc_received_at,
+  ADD COLUMN freight_bank_reference VARCHAR(100) NULL AFTER freight_firc_received_at;
+ALTER TABLE order_lc_details ADD COLUMN lc_bank_reference VARCHAR(100) NULL AFTER lc_firc_reference;
+ALTER TABLE incentive_payouts
+  ADD COLUMN paid_via VARCHAR(20) NULL AFTER tds_inr,
+  ADD COLUMN paid_reference VARCHAR(100) NULL AFTER paid_via;
+ALTER TABLE ca_export_benefits ADD COLUMN received_reference VARCHAR(100) NULL AFTER received_at;
+ALTER TABLE order_cancellations
+  ADD COLUMN refund_paid_at DATE NULL AFTER refund_notes,
+  ADD COLUMN refund_reference VARCHAR(100) NULL AFTER refund_paid_at;

@@ -394,6 +394,19 @@ final class IncentiveController
             header('Location: /incentives/payouts?month=' . rawurlencode($month));
             return;
         }
+        // Owner rule D-212: how it was paid, with its reference (payroll month, UTR or cheque no.).
+        $paidVia = (string) ($_POST['paid_via'] ?? '');
+        $paidReference = trim((string) ($_POST['paid_reference'] ?? ''));
+        if (!array_key_exists($paidVia, IncentiveRepository::PAID_VIA)) {
+            Flash::set('error', 'Choose how it was paid (with the salary, bank transfer or cheque).');
+            header('Location: /incentives/payouts?month=' . rawurlencode($month));
+            return;
+        }
+        if ($error = \App\Helpers\FieldValidator::bankReference($paidReference, 'The payment reference')) {
+            Flash::set('error', $error);
+            header('Location: /incentives/payouts?month=' . rawurlencode($month));
+            return;
+        }
         $count = 0;
         foreach ($ids as $id) {
             $payout = IncentiveRepository::findPayout($id);
@@ -420,7 +433,7 @@ final class IncentiveController
                 return;
             }
             // QA Round 6, R6-N17: a second click records and logs nothing more.
-            if (!IncentiveService::markPaid($id, $paidOn, $paidInr, $tds, (int) $user['id'])) {
+            if (!IncentiveService::markPaid($id, $paidOn, $paidInr, $tds, (int) $user['id'], $paidVia, $paidReference)) {
                 continue;
             }
             AuditLogRepository::log((int) $user['id'], 'INCENTIVE_PAID', 'incentive_payouts', $id, 'status', 'due', 'paid');

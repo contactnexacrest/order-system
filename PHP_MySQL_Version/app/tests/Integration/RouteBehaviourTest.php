@@ -687,7 +687,7 @@ final class RouteBehaviourTest extends DbTestCase
         self::assertSame(18.0, (float) $this->value("SELECT tds_amount FROM ca_expenses WHERE id = {$expense}"));
 
         $claim = $this->insert('ca_export_benefits', ['scheme_name' => 'RoDTEP', 'claimed_amount' => 5000, 'claimed_at' => date('Y-m-d'), 'recorded_by' => $this->holder]);
-        $this->assertDone($this->call('POST', "/ca/export-benefits/{$claim}/mark-received", ['received_amount' => '4900', 'received_at' => date('Y-m-d')]), 'POST /ca/export-benefits/{id}/mark-received');
+        $this->assertDone($this->call('POST', "/ca/export-benefits/{$claim}/mark-received", ['received_amount' => '4900', 'received_at' => date('Y-m-d'), 'received_reference' => 'ESCRIP-0002']), 'POST /ca/export-benefits/{id}/mark-received');
         self::assertSame(4900.0, (float) $this->value("SELECT received_amount FROM ca_export_benefits WHERE id = {$claim}"));
         self::assertSame(1, $this->audits('CA_EXPORT_BENEFIT_RECEIVED', $claim));
     }
@@ -699,12 +699,12 @@ final class RouteBehaviourTest extends DbTestCase
         $payout = fn (): int => $this->insert('incentive_payouts', ['order_id' => $order, 'payee_kind' => 'staff', 'user_id' => $this->holder, 'role' => 'sales', 'amount_inr' => 5000, 'incentive_month' => $month, 'status' => 'due']);
 
         $one = $payout();
-        $this->assertDone($this->call('POST', "/incentives/payouts/{$one}/paid", ['month' => $month, 'paid_on' => date('Y-m-d'), 'paid_inr' => '5000', 'tds_inr' => '500']), 'POST /incentives/payouts/{id}/paid');
+        $this->assertDone($this->call('POST', "/incentives/payouts/{$one}/paid", ['month' => $month, 'paid_on' => date('Y-m-d'), 'paid_inr' => '5000', 'tds_inr' => '500', 'paid_via' => 'salary', 'paid_reference' => 'Payroll TEST']), 'POST /incentives/payouts/{id}/paid');
         self::assertSame('paid', $this->value("SELECT status FROM incentive_payouts WHERE id = {$one}"));
         self::assertSame(500.0, (float) $this->value("SELECT tds_inr FROM incentive_payouts WHERE id = {$one}"));
 
         [$a, $b] = [$payout(), $payout()];
-        $r = $this->call('POST', '/incentives/payouts/paid-all', ['month' => $month, 'paid_on' => date('Y-m-d'), 'payout_ids' => [(string) $a, (string) $b]]);
+        $r = $this->call('POST', '/incentives/payouts/paid-all', ['month' => $month, 'paid_on' => date('Y-m-d'), 'payout_ids' => [(string) $a, (string) $b], 'paid_via' => 'salary', 'paid_reference' => 'Payroll TEST']);
         $this->assertDone($r, 'POST /incentives/payouts/paid-all', '2 payments recorded');
         self::assertSame(2, (int) $this->value("SELECT COUNT(*) FROM incentive_payouts WHERE id IN ({$a}, {$b}) AND status = 'paid'"));
     }

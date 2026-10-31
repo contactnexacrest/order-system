@@ -88,14 +88,15 @@ final class ZohoBooksService
         string $date,
         string $referenceNumber,
         ?string $invoiceNumber = null,
-        float $bankChargesInr = 0.0
+        float $bankChargesInr = 0.0,
+        string $description = ''
     ): array {
         ZohoGuard::assertCustomerAllowed($companyLegalName);
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
 
         $contactId = self::findOrCreateContact($config, $accessToken, $clientId, $companyLegalName, $currencyCode);
-        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber, $bankChargesInr);
+        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber, $bankChargesInr, $description);
         $applied = 0.0;
         if ($invoiceNumber !== null) {
             [$payload['invoices'], $applied] = self::invoiceApplication($config, $accessToken, $invoiceNumber, $contactId, (float) $payload['amount']);
@@ -136,14 +137,15 @@ final class ZohoBooksService
         string $date,
         string $referenceNumber,
         string $invoiceNumber,
-        float $bankChargesInr = 0.0
+        float $bankChargesInr = 0.0,
+        string $description = ''
     ): float {
         ZohoGuard::assertCustomerAllowed($companyLegalName);
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
 
         $contactId = self::findOrCreateContact($config, $accessToken, $clientId, $companyLegalName, $currencyCode);
-        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber, $bankChargesInr);
+        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber, $bankChargesInr, $description);
         [$payload['invoices'], $applied] = self::invoiceApplication($config, $accessToken, $invoiceNumber, $contactId, (float) $payload['amount']);
         if ($applied <= 0) {
             throw new \RuntimeException("Invoice {$invoiceNumber} in Zoho Books has nothing left to pay, so payment {$referenceNumber} stays unapplied there — ask the CA how to book it.");
@@ -435,13 +437,13 @@ final class ZohoBooksService
      *
      * @throws \RuntimeException on any failure
      */
-    public static function restoreRevenuePayment(string $paymentId, int $clientId, string $companyLegalName, string $currencyCode, ?float $foreignAmount, float $amountInr, string $date, string $referenceNumber, ?string $zohoInvoiceId, float $bankChargesInr = 0.0): void
+    public static function restoreRevenuePayment(string $paymentId, int $clientId, string $companyLegalName, string $currencyCode, ?float $foreignAmount, float $amountInr, string $date, string $referenceNumber, ?string $zohoInvoiceId, float $bankChargesInr = 0.0, string $description = ''): void
     {
         ZohoGuard::assertCustomerAllowed($companyLegalName);
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
         $contactId = self::findOrCreateContact($config, $accessToken, $clientId, $companyLegalName, $currencyCode);
-        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber, $bankChargesInr);
+        $payload = self::paymentPayload($config, $contactId, $currencyCode, $foreignAmount, $amountInr, $date, $referenceNumber, $bankChargesInr, $description);
         if ($zohoInvoiceId !== null) {
             $payload['invoices'] = [['invoice_id' => $zohoInvoiceId, 'amount_applied' => $payload['amount']]];
         }
@@ -597,7 +599,8 @@ final class ZohoBooksService
         $payload = [
             'journal_date' => (string) $benefit['received_at'],
             'reference_number' => ($orderRef !== '' ? "{$orderRef}-" : '') . 'BEN-' . $benefit['id'],
-            'notes' => trim(($benefit['buyer_name'] ?? '') . ($orderRef !== '' ? " / {$orderRef}" : '') . ": {$scheme} received" . (!empty($benefit['reference_number']) ? " (claim {$benefit['reference_number']})" : ''), ' :'),
+            'notes' => trim(($benefit['buyer_name'] ?? '') . ($orderRef !== '' ? " / {$orderRef}" : '') . ": {$scheme} received" . (!empty($benefit['reference_number']) ? " (claim {$benefit['reference_number']})" : '')
+                . ' · ₹' . number_format($amount, 2) . (!empty($benefit['received_reference']) ? ($kind === 'bank' ? ' · bank ref ' : ' · e-scrip ') . $benefit['received_reference'] : ''), ' :'),
             'line_items' => [
                 ['account_id' => $kind === 'bank' ? $config['depositAccountId'] : self::accountId($config, $accessToken, self::BENEFIT_SCRIP_ACCOUNT), 'debit_or_credit' => 'debit', 'amount' => $amount, 'description' => $kind === 'bank' ? "{$scheme} paid into the bank" : "{$scheme} e-scrip credited"],
                 ['account_id' => self::accountId($config, $accessToken, self::BENEFIT_INCOME_ACCOUNT), 'debit_or_credit' => 'credit', 'amount' => $amount, 'description' => "{$scheme} received"],
@@ -1021,7 +1024,7 @@ final class ZohoBooksService
      * and Books books the charges as bank charges — in the payment's own
      * currency.
      */
-    private static function paymentPayload(array $config, string $contactId, string $currencyCode, ?float $foreignAmount, float $amountInr, string $date, string $referenceNumber, float $bankChargesInr = 0.0): array
+    private static function paymentPayload(array $config, string $contactId, string $currencyCode, ?float $foreignAmount, float $amountInr, string $date, string $referenceNumber, float $bankChargesInr = 0.0, string $description = ''): array
     {
         $payload = [
             'customer_id'      => $contactId,
@@ -1029,6 +1032,8 @@ final class ZohoBooksService
             'amount'           => round($amountInr + $bankChargesInr, 2),
             'date'             => $date,
             'reference_number' => $referenceNumber,
+            // Owner rule D-212: what the payment is, for which order, what it settles, its bank reference.
+            'description'      => $description,
             'account_id'       => $config['depositAccountId'],
         ];
         if ($bankChargesInr > 0) {

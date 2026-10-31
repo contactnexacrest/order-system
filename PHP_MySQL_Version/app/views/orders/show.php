@@ -128,6 +128,10 @@ $remittanceRecordedNote = function (string $leg, string $nextStep) use ($payment
     $text .= $rate !== null
         ? ' at today\'s exchange rate of &#8377;' . number_format((float) $rate, 4) . ' (= &#8377;' . number_format((float) $amount * (float) $rate, 2) . ').'
         : ' — exchange rate not recorded yet (record it below).';
+    // Owner rule D-212: the bank reference it was recorded with.
+    if (!empty($payment[$leg . '_bank_reference'])) {
+        $text .= ' Bank ref ' . htmlspecialchars((string) $payment[$leg . '_bank_reference']) . '.';
+    }
     $clearedAt = $payment[$leg . '_cleared_at'] ?? null;
     $after = $clearedAt ? 'Cleared on ' . date('d M Y', strtotime((string) $clearedAt)) . '.' : $nextStep;
     return '<p class="remit-recorded"><strong>&#10003; ' . $text . '</strong> <span class="muted">' . htmlspecialchars($after) . '</span></p>';
@@ -1136,11 +1140,13 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       Cancelled<?php if ($__approvedCancellation && $__approvedCancellation['decided_at']): ?> on <?= htmlspecialchars($__approvedCancellation['decided_at']) ?> by <?= htmlspecialchars($__approvedCancellation['decided_by_name'] ?? 'unknown') ?><?php endif; ?>
       <?php if ($__approvedCancellation): ?> — reason: <?= htmlspecialchars($__approvedCancellation['reason']) ?><?php endif; ?>
       <?php if ($__approvedCancellation && $__approvedCancellation['refund_status'] !== 'not_applicable'): ?>
-        <br>Refund: <?= htmlspecialchars(str_replace('_', ' ', $__approvedCancellation['refund_status'])) ?><?php if ($__approvedCancellation['refund_amount'] !== null): ?> — <?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $__approvedCancellation['refund_amount'], 2) ?><?php endif; ?>
+        <br>Refund: <?= htmlspecialchars(str_replace('_', ' ', $__approvedCancellation['refund_status'])) ?><?php if ($__approvedCancellation['refund_amount'] !== null): ?> — <?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $__approvedCancellation['refund_amount'], 2) ?><?php endif; ?><?php if (!empty($__approvedCancellation['refund_reference'])): ?> · paid <?= htmlspecialchars(\App\Helpers\Dates::short((string) $__approvedCancellation['refund_paid_at'])) ?>, bank ref <?= htmlspecialchars((string) $__approvedCancellation['refund_reference']) ?><?php endif; ?>
         <?php if ($__approvedCancellation['refund_status'] === 'pending' && $canCloseOrders): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/cancellation/<?= (int) $__approvedCancellation['id'] ?>/complete-refund" style="display:inline" onsubmit="return confirm('Mark this refund as completed? Record this only once the money has actually been sent back.');">
             <?= Csrf::field() ?>
-            <input type="text" name="refund_notes" placeholder="Refund reference / notes (optional)" style="width:260px">
+            <label class="small">Refund paid on *<input type="date" name="refund_paid_at" required max="<?= date('Y-m-d') ?>"></label>
+            <label class="small">Bank reference of the refund * <input type="text" name="refund_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="SWIFT / UTR" style="width:200px" title="Rule D-212: lets anyone match this refund to the bank statement later"></label>
+            <input type="text" name="refund_notes" placeholder="Note (optional)" style="width:200px">
             <button type="submit" class="btn-sm btn-secondary">Mark Refund Completed</button>
           </form>
         <?php endif; ?>
@@ -2238,6 +2244,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the advance due (e.g. bank charges deducted) — record it anyway</label>
           <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="advance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
           <?= $stepBadge('5d') ?><button type="submit" class="btn-sm">Record Advance Remittance</button>
         </form>
@@ -2913,6 +2920,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label>Freight Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="freight_amount" required data-remit-amount></label>
         <label>Received On<input type="date" name="freight_received_at" value="<?= date('Y-m-d') ?>"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="freight_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
         <?= $stepBadge('9c') ?><button type="submit" class="btn-sm">Record Freight Remittance</button>
       </form>
@@ -3283,6 +3291,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label>Balance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="balance_amount" required data-remit-amount value="<?= htmlspecialchars((string) ($payment['balance_amount'] ?? '')) ?>"></label>
         <label>Received On<input type="date" name="balance_received_at" value="<?= date('Y-m-d') ?>"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="balance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
         <?= $stepBadge('11c') ?><button type="submit" class="btn-sm">Record Balance Remittance</button>
       </form>
@@ -3505,7 +3514,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             </label>
             <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
             <label>Date<input type="date" name="incurred_at" value="<?= date('Y-m-d') ?>"></label>
-            <label>Description<input type="text" name="description"></label>
+            <label>Description * <small class="muted">(who was paid and for what — their invoice / receipt no.)</small><input type="text" name="description" required minlength="10" maxlength="255" placeholder="e.g. Agent commission — Ravi Traders, their invoice RT/45 dated 20 Oct"></label>
             <?php // Owner decision 2026-10-29: real paid costs go to Zoho Books as expenses, paid from here. ?>
             <label>Paid from *
               <select name="paid_from" required>
@@ -3633,6 +3642,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label>Amount paid under the LC (<?= htmlspecialchars($__cur) ?>) *<input type="number" name="lc_received_amount" required min="0.01" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_received_amount'] ?? '')) ?>"></label>
         <label>Rupees credited (&#8377;) *<input type="number" name="lc_inr_credited" required min="0.01" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_inr_credited'] ?? '')) ?>"><small class="muted">As on the bank's credit advice.</small></label>
         <label>Bank charges deducted (&#8377;)<input type="number" name="lc_bank_charges_inr" min="0" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_bank_charges_inr'] ?? '0')) ?>"></label>
+        <label style="grid-column:1 / -1">Bank reference of the credit * <small class="muted">(UTR / bank ref. / FIRC no. on the bank's advice)</small><input type="text" name="lc_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_bank_reference'] ?? '')) ?>" placeholder="e.g. 0915-2026-778"><small class="muted">Rule D-212: it goes into this payment's description here and in Zoho Books.</small></label>
         <div><button type="submit" class="btn-sm"><?= !empty($orderLcDetails['lc_received_at']) ? 'Update LC Payment' : 'Record LC Payment' ?></button></div>
       </form>
       <?php endif; ?>
@@ -3943,6 +3953,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <td class="fin-claim-cell">
               <input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][received_amount]" placeholder="Amount received" aria-label="<?= htmlspecialchars($b['scheme_name']) ?> received amount">
               <input type="date" name="benefits[<?= $__row ?>][received_at]" value="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($b['scheme_name']) ?> received on">
+              <input type="text" name="benefits[<?= $__row ?>][received_reference]" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" data-required-if="benefits[<?= $__row ?>][received_amount]" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." placeholder="Credited by: UTR / e-scrip no." aria-label="<?= htmlspecialchars($b['scheme_name']) ?> credited by (bank UTR / e-scrip no.)">
             </td>
             <?php endif; ?>
           </tr>
@@ -3959,6 +3970,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <td class="fin-claim-cell">
               <input type="number" step="0.01" min="0" name="benefits[<?= $__row ?>][received_amount]" placeholder="If already received" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> received amount"<?= $__benefitsDisabled ?>>
               <input type="date" name="benefits[<?= $__row ?>][received_at]" value="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> received on"<?= $__benefitsDisabled ?>>
+              <input type="text" name="benefits[<?= $__row ?>][received_reference]" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" data-required-if="benefits[<?= $__row ?>][received_amount]" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." placeholder="Credited by: UTR / e-scrip no." aria-label="<?= htmlspecialchars($sch['scheme_name']) ?> credited by (bank UTR / e-scrip no.)"<?= $__benefitsDisabled ?>>
             </td>
           </tr>
           <?php $__row++; endforeach; ?>
@@ -3980,6 +3992,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               <label>Claim Ref.<input type="text" name="reference_number" value="<?= htmlspecialchars((string) ($b['reference_number'] ?? '')) ?>"></label>
               <label>Received (&#8377;) <small class="muted">(empty = not received yet)</small><input type="number" step="0.01" min="0" name="received_amount" value="<?= htmlspecialchars((string) ($b['received_amount'] ?? '')) ?>"></label>
               <label>Received On<input type="date" name="received_at" value="<?= htmlspecialchars((string) ($b['received_at'] ?? date('Y-m-d'))) ?>"></label>
+              <label>Credited by <small class="muted">(bank UTR / e-scrip no.; needed with a received amount)</small><input type="text" name="received_reference" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" data-required-if="received_amount" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." value="<?= htmlspecialchars((string) ($b['received_reference'] ?? '')) ?>"></label>
               <label class="full">Reason for the correction *<input type="text" name="reason" required minlength="10" placeholder="e.g. Typed 50,000 instead of 5,000"></label>
               <div><button type="submit" class="btn-sm">Save Correction</button></div>
             </form>

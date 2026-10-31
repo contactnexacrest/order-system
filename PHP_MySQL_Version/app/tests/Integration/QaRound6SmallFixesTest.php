@@ -110,7 +110,7 @@ final class QaRound6SmallFixesTest extends DbTestCase
     /** R6-N11: "Mark all paid" with nothing selected is a warning, not a green "0 payments recorded". */
     public function testMarkAllPaidWithNothingSelectedIsAWarning(): void
     {
-        $_POST = ['month' => date('Y-m'), 'paid_on' => date('Y-m-d')];
+        $_POST = ['month' => date('Y-m'), 'paid_on' => date('Y-m-d'), 'paid_via' => 'salary', 'paid_reference' => 'Payroll TEST'];
         (new IncentiveController())->markPaid([]);
         $flash = $this->flash();
         self::assertSame('warning', $flash['type']);

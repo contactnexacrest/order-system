@@ -88,7 +88,7 @@ final class OrderStep12SubStepsTest extends DbTestCase
         $waitingId = CaExportBenefitRepository::record($orderId, 'Duty Drawback', 'SB-1', 9800, '2026-10-01', 'INR', null, $this->userId);
 
         $_POST = ['benefits' => [
-            ['benefit_id' => (string) $waitingId, 'received_amount' => '9800', 'received_at' => '2026-10-20'],
+            ['benefit_id' => (string) $waitingId, 'received_amount' => '9800', 'received_at' => '2026-10-20', 'received_reference' => 'UTR-TEST-0003'],
             ['scheme_name' => 'RODTEP', 'reference_number' => 'SB-2', 'claimed_amount' => '18450', 'claimed_at' => '2026-10-05', 'received_amount' => '', 'received_at' => '2026-10-26'],
         ]];
         (new OrderFinancialsController())->saveExportBenefits(['id' => (string) $orderId]);

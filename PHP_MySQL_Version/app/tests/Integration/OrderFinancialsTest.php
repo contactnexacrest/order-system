@@ -317,7 +317,7 @@ final class OrderFinancialsTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
 
         $_SESSION['_auth_user_id'] = $userId;
-        $_POST = ['category' => 'cha_charges', 'amount_inr' => '1234.56', 'incurred_at' => '2026-06-01', 'description' => 'Test CHA', 'paid_from' => 'company_card'];
+        $_POST = ['category' => 'cha_charges', 'amount_inr' => '1234.56', 'incurred_at' => '2026-06-01', 'description' => 'Test CHA — Shree Clearing, bill SC/101', 'paid_from' => 'company_card'];
         $controller = new OrderFinancialsController();
         ob_start();
         $controller->addCostEntry(['id' => (string) $orderId]);
@@ -385,7 +385,7 @@ final class OrderFinancialsTest extends DbTestCase
         $benefitId = (int) $benefits[0]['id'];
         self::assertNull($benefits[0]['received_amount']);
 
-        $_POST = ['received_amount' => '9000', 'received_at' => '2026-07-01'];
+        $_POST = ['received_amount' => '9000', 'received_at' => '2026-07-01', 'received_reference' => 'UTR-TEST-0002'];
         ob_start();
         $controller->markExportBenefitReceived(['id' => (string) $orderId, 'benefitId' => (string) $benefitId]);
         ob_get_clean();

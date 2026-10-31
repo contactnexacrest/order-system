@@ -54,7 +54,7 @@ describe('Balance due after the actual advance (owner report 2026-10-27)', () =>
   }
 
   async function recordAdvance(orderId, userId, body) {
-    const req = { user: { id: userId }, params: { id: String(orderId) }, session: {}, body: { advance_received_at: '2026-10-27', advance_exchange_rate: '83.5', ...body } };
+    const req = { user: { id: userId }, params: { id: String(orderId) }, session: {}, body: { advance_received_at: '2026-10-27', advance_exchange_rate: '83.5', advance_bank_reference: 'UTR-TEST-0001', ...body } };
     await ordersController.recordAdvancePayment(req, { redirect: () => {} });
     const messages = flash.pull(req);
     return messages[messages.length - 1] || { type: '', message: '' };

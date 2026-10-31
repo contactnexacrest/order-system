@@ -80,13 +80,13 @@ async function isEnabled() {
  * @throws on any missing config, HTTP failure, or unexpected response
  * @return {Promise<{payment_id: string, applied: number}>} the Zoho-side customerpayment_id and the amount applied to the invoice
  */
-async function pushRevenuePayment(clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, invoiceNumber = null, bankChargesInr = 0) {
+async function pushRevenuePayment(clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, invoiceNumber = null, bankChargesInr = 0, description = '') {
   zohoGuard.assertCustomerAllowed(companyLegalName);
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
 
   const contactId = await findOrCreateContact(config, accessToken, clientId, companyLegalName, currencyCode);
-  const payload = paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr);
+  const payload = paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr, description);
   let applied = 0;
   if (invoiceNumber !== null && invoiceNumber !== undefined) {
     [payload.invoices, applied] = await invoiceApplication(config, accessToken, invoiceNumber, contactId, payload.amount);
@@ -110,13 +110,13 @@ async function pushRevenuePayment(clientId, companyLegalName, currencyCode, fore
  * @throws on any failure
  * @return {Promise<number>} the amount applied (in the order's currency)
  */
-async function applyPaymentToInvoice(paymentId, clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, invoiceNumber, bankChargesInr = 0) {
+async function applyPaymentToInvoice(paymentId, clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, invoiceNumber, bankChargesInr = 0, description = '') {
   zohoGuard.assertCustomerAllowed(companyLegalName);
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
 
   const contactId = await findOrCreateContact(config, accessToken, clientId, companyLegalName, currencyCode);
-  const payload = paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr);
+  const payload = paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr, description);
   let applied;
   [payload.invoices, applied] = await invoiceApplication(config, accessToken, invoiceNumber, contactId, payload.amount);
   if (applied <= 0) {
@@ -385,12 +385,12 @@ async function restoreVendorPayment(payment, bill, zohoBillId) {
  *
  * @throws on any failure
  */
-async function restoreRevenuePayment(paymentId, clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, zohoInvoiceId, bankChargesInr = 0) {
+async function restoreRevenuePayment(paymentId, clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, zohoInvoiceId, bankChargesInr = 0, description = '') {
   zohoGuard.assertCustomerAllowed(companyLegalName);
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
   const contactId = await findOrCreateContact(config, accessToken, clientId, companyLegalName, currencyCode);
-  const payload = paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr);
+  const payload = paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr, description);
   if (zohoInvoiceId !== null) {
     payload.invoices = [{ invoice_id: zohoInvoiceId, amount_applied: payload.amount }];
   }
@@ -532,7 +532,8 @@ async function pushBenefitJournal(benefit, journalId = null) {
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
   const amount = round(Number(benefit.received_amount), 2);
   const orderRef = String(benefit.buyer_inquiry_ref || '');
-  const notes = (`${benefit.buyer_name || ''}${orderRef !== '' ? ` / ${orderRef}` : ''}: ${scheme} received${benefit.reference_number ? ` (claim ${benefit.reference_number})` : ''}`).replace(/^[ :]+|[ :]+$/g, '');
+  const notes = (`${benefit.buyer_name || ''}${orderRef !== '' ? ` / ${orderRef}` : ''}: ${scheme} received${benefit.reference_number ? ` (claim ${benefit.reference_number})` : ''}`
+    + ` · ₹${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${benefit.received_reference ? `${kind === 'bank' ? ' · bank ref ' : ' · e-scrip '}${benefit.received_reference}` : ''}`).replace(/^[ :]+|[ :]+$/g, '');
   const payload = {
     journal_date: String(benefit.received_at),
     reference_number: `${orderRef !== '' ? `${orderRef}-` : ''}BEN-${benefit.id}`,
@@ -905,7 +906,7 @@ async function findOrCreateContact(config, accessToken, clientId, companyLegalNa
  * then covers both, at (credited + charges) / foreign amount, and Books
  * books the charges as bank charges — in the payment's own currency.
  */
-function paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr = 0) {
+function paymentPayload(config, contactId, currencyCode, foreignAmount, amountInr, date, referenceNumber, bankChargesInr = 0, description = '') {
   const charges = Number(bankChargesInr) || 0;
   const payload = {
     customer_id: contactId,
@@ -913,6 +914,8 @@ function paymentPayload(config, contactId, currencyCode, foreignAmount, amountIn
     amount: round(amountInr + charges, 2),
     date,
     reference_number: referenceNumber,
+    // Owner rule D-212: what the payment is, for which order, what it settles, its bank reference.
+    description,
     account_id: config.depositAccountId,
   };
   if (charges > 0) {

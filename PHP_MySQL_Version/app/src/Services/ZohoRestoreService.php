@@ -179,7 +179,8 @@ final class ZohoRestoreService
                     }
                     $kind = $p['leg'] === 'freight' ? 'dn' : 'ci';
                     $invoice = $p['applied'] ? OrderZohoInvoiceRepository::find($p['order_id'], $kind) : null;
-                    ZohoBooksService::restoreRevenuePayment($p['id'], ...[...$p['args'], $invoice !== null ? (string) $invoice['zoho_invoice_id'] : null, $p['charges']]);
+                    ZohoBooksService::restoreRevenuePayment($p['id'], ...[...$p['args'], $invoice !== null ? (string) $invoice['zoho_invoice_id'] : null, $p['charges'],
+                        PaymentDescription::buyerPayment((int) $p['order_id'], (string) $p['leg'], $invoice !== null ? (string) $invoice['zoho_invoice_number'] : null)]);
                     ZohoSyncLogRepository::log('revenue_payment', 'order', $p['order_id'], $p['leg'], 'success', $p['id'], self::RESTORED . "{$what} put back to " . number_format($p['amount'], 2, '.', '') . ' (Books had ' . number_format((float) $row['amount'], 2, '.', '') . ').', $triggeredBy, $userId);
                     $out['restored']++;
                 }

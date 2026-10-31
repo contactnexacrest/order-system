@@ -1648,7 +1648,8 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The advance amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate)) {
+        $bankRef = trim((string) ($_POST['advance_bank_reference'] ?? ''));
+        if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The advance amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate) ?? \App\Helpers\FieldValidator::bankReference($bankRef)) {
             Flash::set('error', $error);
             header("Location: /orders/{$orderId}");
             return;
@@ -1673,12 +1674,13 @@ final class OrderController
         }
         // QA Round 6, R6-N22: the amount, its rate and their audit rows are
         // saved together or not at all.
-        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): bool {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             if (OrderPaymentStatusRepository::legAlreadyRecorded($orderId, 'advance', $amount, $receivedAt, $rate)) {
                 return false;
             }
             OrderPaymentStatusRepository::recordAdvanceReceived($orderId, $amount, $receivedAt);
+            OrderPaymentStatusRepository::setLegBankReference($orderId, 'advance', $bankRef);
             OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', $rate, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'advance_exchange_rate', null, (string) $rate);
             // External QA report L-23: advance payment recording was never audit-logged.
@@ -2555,18 +2557,20 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The freight amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate)) {
+        $bankRef = trim((string) ($_POST['freight_bank_reference'] ?? ''));
+        if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The freight amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate) ?? \App\Helpers\FieldValidator::bankReference($bankRef)) {
             Flash::set('error', $error);
             header("Location: /orders/{$orderId}");
             return;
         }
         // QA Round 6, R6-N22: saved together or not at all.
-        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): bool {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             if (OrderPaymentStatusRepository::legAlreadyRecorded($orderId, 'freight', $amount, $receivedAt, $rate)) {
                 return false;
             }
             OrderPaymentStatusRepository::recordFreightReceived($orderId, $amount, $receivedAt);
+            OrderPaymentStatusRepository::setLegBankReference($orderId, 'freight', $bankRef);
             OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'freight', $rate, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'freight_exchange_rate', null, (string) $rate);
             // External QA report N-08: this action never reached the audit
@@ -3037,18 +3041,20 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The balance amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate)) {
+        $bankRef = trim((string) ($_POST['balance_bank_reference'] ?? ''));
+        if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The balance amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate) ?? \App\Helpers\FieldValidator::bankReference($bankRef)) {
             Flash::set('error', $error);
             header("Location: /orders/{$orderId}");
             return;
         }
         // QA Round 6, R6-N22: saved together or not at all.
-        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate): bool {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             if (OrderPaymentStatusRepository::legAlreadyRecorded($orderId, 'balance', $amount, $receivedAt, $rate)) {
                 return false;
             }
             OrderPaymentStatusRepository::recordBalanceReceived($orderId, $amount, $receivedAt);
+            OrderPaymentStatusRepository::setLegBankReference($orderId, 'balance', $bankRef);
             OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'balance', $rate, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'balance_exchange_rate', null, (string) $rate);
             // External QA report L-23: balance payment recording was never audit-logged.
@@ -4023,9 +4029,23 @@ final class OrderController
             return;
         }
         $refundNotes = trim((string) ($_POST['refund_notes'] ?? '')) ?: null;
+        // Owner rule D-212: the refund says when it left the bank and with which reference.
+        $refundPaidAt = trim((string) ($_POST['refund_paid_at'] ?? ''));
+        $refundReference = trim((string) ($_POST['refund_reference'] ?? ''));
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $refundPaidAt, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || $refundPaidAt > date('Y-m-d')) {
+            Flash::set('error', 'Enter the date the refund was paid (today or earlier).');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if ($error = \App\Helpers\FieldValidator::bankReference($refundReference, 'The bank reference of the refund')) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
 
-        OrderCancellationRepository::completeRefund($cancellationId, (int) $user['id'], $refundNotes);
-        AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_REFUND_COMPLETED', 'order_cancellations', $cancellationId, 'refund_status', 'pending', 'completed', $refundNotes);
+        OrderCancellationRepository::completeRefund($cancellationId, (int) $user['id'], $refundNotes, $refundPaidAt, $refundReference);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_REFUND_COMPLETED', 'order_cancellations', $cancellationId, 'refund_status', 'pending', 'completed',
+            "Paid {$refundPaidAt}, bank ref {$refundReference}" . ($refundNotes !== null ? " — {$refundNotes}" : ''));
         Flash::set('success', 'Refund marked as completed.');
         header("Location: /orders/{$orderId}");
     }
