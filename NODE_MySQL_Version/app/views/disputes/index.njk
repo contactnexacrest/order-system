@@ -1,37 +1,19 @@
-{% macro statusBadgeClass(status) %}{% if status == 'Resolved' %}badge-active{% elif status == 'Escalated' %}badge-lost{% else %}badge-protected{% endif %}{% endmacro %}
 <div class="card page-wide">
   <div class="page-header-row">
     <div>
       <h1>Dispute Log (All Orders)</h1>
       <p class="muted" style="margin:0;">{{ disputes.length }} shown.</p>
     </div>
+    {% if kanbanUser %}<div class="btn-row" style="margin-top:0;"><a class="btn-sm btn-secondary" href="/disputes">Switch to board view</a></div>{% endif %}
   </div>
 
-  <div class="filter-chip-row">
-    <a class="filter-chip{{ ' active' if not statusFilter else '' }}" href="/disputes">All</a>
-    {% for opt in statusOptions %}
-      <a class="filter-chip{{ ' active' if statusFilter == opt.option_value else '' }}" href="/disputes?status={{ opt.option_value | urlencode }}">{{ opt.option_value }}</a>
-    {% endfor %}
-  </div>
+  {% set listOfBoard = kanbanUser %}{% include "disputes/_filters.njk" %}
 
   {% if not disputes or disputes.length == 0 %}
     <p class="muted">No disputes recorded.</p>
   {% else %}
   <div class="card-grid">
-    {% for d in disputes %}
-    <a class="entity-card" href="/orders/{{ d.order_id }}/disputes">
-      <div class="entity-card-header">
-        <span class="entity-card-title">{{ d.order_reference }}</span>
-        <span class="badge {{ statusBadgeClass(d.status) }}">{{ d.status }}</span>
-      </div>
-      <div class="entity-card-sub">{{ d.company_legal_name }}</div>
-      <div class="muted small">{{ d.description | truncate(110, true, '…') }}</div>
-      <div class="entity-card-footer">
-        <span class="muted small">Notice: {{ d.notice_date }}</span>
-        <span class="muted small">Response due: {{ d.response_due_date or '—' }}</span>
-      </div>
-    </a>
-    {% endfor %}
+    {% for d in disputes %}{% set kanbanCard = false %}{% include "disputes/_card.njk" %}{% endfor %}
   </div>
   {% endif %}
 </div>

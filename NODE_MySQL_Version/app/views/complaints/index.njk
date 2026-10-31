@@ -1,37 +1,19 @@
-{% macro statusBadgeClass(status) %}{% if status == 'resolved' %}badge-active{% elif status == 'acknowledged' %}badge-protected{% else %}badge-lost{% endif %}{% endmacro %}
-{% macro statusLabel(status) %}{% if status == 'acknowledged' %}Acknowledged{% elif status == 'resolved' %}Resolved{% else %}Open{% endif %}{% endmacro %}
 <div class="card page-wide">
   <div class="page-header-row">
     <div>
       <h1>Complaints (All Orders)</h1>
       <p class="muted" style="margin:0;">A process issue or flaw the client flagged for us to fix next time — not a Dispute. {{ complaints.length }} shown.</p>
     </div>
+    {% if kanbanUser %}<div class="btn-row" style="margin-top:0;"><a class="btn-sm btn-secondary" href="/complaints">Switch to board view</a></div>{% endif %}
   </div>
 
-  <div class="filter-chip-row">
-    <a class="filter-chip{{ ' active' if not statusFilter else '' }}" href="/complaints">All</a>
-    {% for s in ['open', 'acknowledged', 'resolved'] %}
-      <a class="filter-chip{{ ' active' if statusFilter == s else '' }}" href="/complaints?status={{ s | urlencode }}">{{ statusLabel(s) }}</a>
-    {% endfor %}
-  </div>
+  {% set listOfBoard = kanbanUser %}{% include "complaints/_filters.njk" %}
 
   {% if not complaints or complaints.length == 0 %}
     <p class="muted">No complaints recorded.</p>
   {% else %}
   <div class="card-grid">
-    {% for c in complaints %}
-    <a class="entity-card" href="/orders/{{ c.order_id }}/complaints">
-      <div class="entity-card-header">
-        <span class="entity-card-title">{{ c.order_reference }}</span>
-        <span class="badge {{ statusBadgeClass(c.status) }}">{{ statusLabel(c.status) }}</span>
-      </div>
-      <div class="entity-card-sub">{{ c.company_legal_name }}</div>
-      <div class="muted small">{{ c.description | truncate(110, true, '…') }}</div>
-      <div class="entity-card-footer">
-        <span class="muted small">Raised: {{ c.created_at }}</span>
-      </div>
-    </a>
-    {% endfor %}
+    {% for c in complaints %}{% set kanbanCard = false %}{% include "complaints/_card.njk" %}{% endfor %}
   </div>
   {% endif %}
 </div>

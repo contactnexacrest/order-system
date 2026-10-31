@@ -55,6 +55,8 @@ async function myTasks(req, res) {
   res.renderView('coordination/my_tasks', {
     tasks,
     mine,
+    // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+    kanbanUser: (await require('../services/uiTemplateService').resolve(req.user.ui_template_preference_id || null)) === 'kanban',
     acting: p ? `Preview: ${p.title} · ${p.department_name}` : (m ? activeDepartmentService.label(m) : null),
   }, 'layout/base');
 }

@@ -34,6 +34,9 @@ describe('Order Kanban board (Task #37)', () => {
     return result.insertId;
   }
 
+  // The board's columns, by key (stage1..stage9, shipped_docs_sent, complete, lost, cancelled).
+  const col = (res, key) => res.locals.columns.find((c) => c.key === key) || { orders: [] };
+
   async function kanbanTemplateId() {
     return (await uiTemplateRepository.findByKey('kanban')).id;
   }
@@ -113,10 +116,10 @@ describe('Order Kanban board (Task #37)', () => {
 
     const res = await render(userId);
 
-    const stage1Orders = res.locals.columns[1].orders;
+    const stage1Orders = col(res, `stage${1}`).orders;
     expect(stage1Orders.some((o) => Number(o.id) === orderId)).toBe(true);
     for (let stage = 2; stage <= 9; stage++) {
-      expect(res.locals.columns[stage].orders.some((o) => Number(o.id) === orderId)).toBe(false);
+      expect(col(res, `stage${stage}`).orders.some((o) => Number(o.id) === orderId)).toBe(false);
     }
   });
 
@@ -130,7 +133,7 @@ describe('Order Kanban board (Task #37)', () => {
 
     const res = await render(userId);
 
-    expect(res.locals.columns[4].orders.some((o) => Number(o.id) === orderId)).toBe(true);
+    expect(col(res, `stage${4}`).orders.some((o) => Number(o.id) === orderId)).toBe(true);
   });
 
   it('shipped_docs_sent orders appear in their own column, not a stage column', async () => {
@@ -141,9 +144,9 @@ describe('Order Kanban board (Task #37)', () => {
 
     const res = await render(userId);
 
-    expect(res.locals.shippedDocsSent.some((o) => Number(o.id) === orderId)).toBe(true);
+    expect(col(res, 'shipped_docs_sent').orders.some((o) => Number(o.id) === orderId)).toBe(true);
     for (let stage = 1; stage <= 9; stage++) {
-      expect(res.locals.columns[stage].orders.some((o) => Number(o.id) === orderId)).toBe(false);
+      expect(col(res, `stage${stage}`).orders.some((o) => Number(o.id) === orderId)).toBe(false);
     }
   });
 
@@ -155,7 +158,7 @@ describe('Order Kanban board (Task #37)', () => {
 
     const res = await render(userId);
 
-    expect(res.locals.complete.some((o) => Number(o.id) === orderId)).toBe(true);
+    expect(col(res, 'complete').orders.some((o) => Number(o.id) === orderId)).toBe(true);
   });
 
   it('lost and cancelled orders are summarized as counts, not full columns', async () => {
@@ -168,14 +171,14 @@ describe('Order Kanban board (Task #37)', () => {
 
     const res = await render(userId);
 
-    expect(res.locals.lostCount).toBeGreaterThanOrEqual(1);
-    expect(res.locals.cancelledCount).toBeGreaterThanOrEqual(1);
+    expect(res.locals.counts.lost).toBeGreaterThanOrEqual(1);
+    expect(res.locals.counts.cancelled).toBeGreaterThanOrEqual(1);
     for (let stage = 1; stage <= 9; stage++) {
-      expect(res.locals.columns[stage].orders.some((o) => Number(o.id) === lostOrderId)).toBe(false);
-      expect(res.locals.columns[stage].orders.some((o) => Number(o.id) === cancelledOrderId)).toBe(false);
+      expect(col(res, `stage${stage}`).orders.some((o) => Number(o.id) === lostOrderId)).toBe(false);
+      expect(col(res, `stage${stage}`).orders.some((o) => Number(o.id) === cancelledOrderId)).toBe(false);
     }
-    expect(res.locals.shippedDocsSent.some((o) => Number(o.id) === lostOrderId)).toBe(false);
-    expect(res.locals.complete.some((o) => Number(o.id) === cancelledOrderId)).toBe(false);
+    expect(col(res, 'shipped_docs_sent').orders.some((o) => Number(o.id) === lostOrderId)).toBe(false);
+    expect(col(res, 'complete').orders.some((o) => Number(o.id) === cancelledOrderId)).toBe(false);
   });
 
   it('every stage column exists even when empty', async () => {
@@ -185,8 +188,8 @@ describe('Order Kanban board (Task #37)', () => {
     const res = await render(userId);
 
     for (let stage = 1; stage <= 9; stage++) {
-      expect(res.locals.columns[stage]).toBeDefined();
-      expect(Array.isArray(res.locals.columns[stage].orders)).toBe(true);
+      expect(res.locals.columns.some((c) => c.key === `stage${stage}`)).toBe(true);
+      expect(Array.isArray(col(res, `stage${stage}`).orders)).toBe(true);
     }
   });
 });

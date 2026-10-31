@@ -1,15 +1,8 @@
 <div class="card page-wide">
   <h1>Procurement</h1>
   <p class="muted">Purchase requirements raised by Sales, earliest need first. Open one to record supplier quotes, compare, award, approve, and record receipt and the quality check.</p>
-  <form method="get" action="/procurement" class="btn-row">
-    <label>Status
-      <select name="status" onchange="this.form.submit()">
-        <option value="">All open</option>
-        <?php foreach ($statuses as $key => $label): ?><option value="<?= $key ?>" <?= $status === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option><?php endforeach; ?>
-      </select>
-    </label>
-    <a class="btn-sm btn-secondary" href="/procurement/suppliers">Supplier performance</a>
-  </form>
+  <?php if (!empty($kanbanUser)): ?><div class="btn-row"><a class="btn-sm btn-secondary" href="/procurement">Switch to board view</a></div><?php endif; ?>
+  <?php $listOfBoard = !empty($kanbanUser); include __DIR__ . '/_filters.php'; ?>
   <div class="table-scroll">
   <table class="list">
     <tr><th>PR</th><th>Order</th><th>What</th><th>Quantity</th><th>Needed by</th><th>Quotes</th><th>Status</th><th></th></tr>

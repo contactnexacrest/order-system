@@ -27,6 +27,8 @@ async function index(req, res) {
     {
       complaints: await orderAccessService.visibleRows(await orderComplaintRepository.all(status), req.user.id, req.permissions),
       statusFilter: status,
+      // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+      kanbanUser: (await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban',
     },
     'layout/base'
   );
@@ -34,12 +36,16 @@ async function index(req, res) {
 
 /** The Kanban UI template's Complaints board: Open / Acknowledged / Resolved columns. */
 async function indexKanban(req, res) {
+  // Owner hard rule 2026-11-01: the same status filter as the list — a chosen status shows its column only.
+  const filter = String(req.query.status || '').trim() || null;
   const columns = {};
   for (const status of STATUSES) {
-    columns[status] = await orderAccessService.visibleRows(await orderComplaintRepository.all(status), req.user.id, req.permissions);
+    if (filter === null || filter === status) {
+      columns[status] = await orderAccessService.visibleRows(await orderComplaintRepository.all(status), req.user.id, req.permissions);
+    }
   }
 
-  res.renderView('complaints/index_kanban', { columns }, 'layout/base');
+  res.renderView('complaints/index_kanban', { columns, statusFilter: filter, shownCount: Object.values(columns).reduce((n, list) => n + list.length, 0) }, 'layout/base');
 }
 
 async function forOrder(req, res) {

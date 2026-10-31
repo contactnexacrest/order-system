@@ -67,6 +67,8 @@ final class CoordinationController
         View::render('coordination/my_tasks', [
             'tasks' => $tasks,
             'mine' => $mine,
+            // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+            'kanbanUser' => \App\Services\UiTemplateService::resolve(AuthService::currentUser()['ui_template_preference_id'] ?? null) === 'kanban',
             'acting' => ActiveDepartmentService::actingLabel($userId),
         ], 'layout/base');
     }

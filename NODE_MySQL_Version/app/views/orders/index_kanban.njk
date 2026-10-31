@@ -1,74 +1,32 @@
-{% macro kanbanCard(o, seesAllOrders) %}
-<a class="entity-card kanban-card{{ ' entity-card-overdue' if o.is_overdue }}" href="/orders/{{ o.id }}?from=kanban">
-  <div class="entity-card-header">
-    <span class="entity-card-title">{{ o.order_reference }}</span>
-    {% if o.incoterm_code %}<span class="tag tag-gold">{{ o.incoterm_code }}</span>{% endif %}
-    {% if seesAllOrders and o.assignee_names %}<span class="tag tag-navy">{{ o.assignee_names }}</span>{% endif %}
-  </div>
-  <div class="entity-card-sub">{{ o.company_legal_name }}</div>
-  <div class="entity-card-footer">
-    {% if o.is_overdue %}<span class="badge badge-lost">Overdue</span>{% else %}<span></span>{% endif %}
-    {% if sees.selling %}<span class="entity-card-amount">{{ o.currency_code }} {{ o.total_fob_value | money }}</span>{% endif %}
-  </div>
-</a>
-{% endmacro %}
+{# Owner hard rule 2026-11-01: the same filters and the same cards as the Standard list (orders/_filters.njk, orders/_card.njk). #}
 <div class="card page-wide">
   <div class="page-header-row">
     <div>
       <h1>Orders — Kanban Board</h1>
-      <p class="muted" style="margin:0;">{{ totalActive }} active &middot; every order where it actually sits in the pipeline.</p>
+      <p class="muted" style="margin:0;">{{ counts.all }} total &middot; {{ totalActive }} active &middot; every order where it actually sits in the pipeline.</p>
     </div>
     <div class="btn-row" style="margin-top:0;">
       <a class="btn btn-accent" href="/clients">Go to Clients to start a new order</a>
-      <a class="btn-sm btn-secondary" href="/orders?view=list&amp;status=all">Switch to list view</a>
+      <a class="btn-sm btn-secondary" href="/orders?view=list&amp;status={{ statusFilter or 'all' }}">Switch to list view</a>
       {% if permissions.view_archived_orders %}<a class="btn-sm btn-secondary" href="/orders/archived">View Archived Orders</a>{% endif %}
     </div>
   </div>
 
-  <div class="kanban-summary-row">
-    <a class="kanban-summary-chip" href="/orders?status=shipped_docs_sent">Docs Sent ({{ shippedDocsSent.length }})</a>
-    <a class="kanban-summary-chip" href="/orders?status=complete">Complete ({{ complete.length }})</a>
-    <a class="kanban-summary-chip" href="/orders?status=lost">Lost ({{ lostCount }})</a>
-    <a class="kanban-summary-chip" href="/orders?status=cancelled">Cancelled ({{ cancelledCount }})</a>
-  </div>
+  {% set listOfBoard = false %}{% include "orders/_filters.njk" %}
 
   <div class="kanban-board">
-    {% for stageNumber, col in columns %}
-      <div class="kanban-column">
+    {% for col in columns %}
+      <div class="kanban-column" data-column="{{ col.key }}">
         <div class="kanban-column-header">
-          <span class="kanban-column-title">Stage {{ stageNumber }} &middot; {{ col.name }}</span>
+          <span class="kanban-column-title">{% if col.stage %}Stage {{ col.stage }} &middot; {% endif %}{{ col.title }}</span>
           <span class="kanban-column-count">{{ col.orders.length }}</span>
         </div>
-        {% if col.orders.length == 0 %}
+        {% if not col.orders.length %}
           <p class="kanban-column-empty">No orders here</p>
         {% else %}
-          {% for o in col.orders %}{{ kanbanCard(o, seesAllOrders) }}{% endfor %}
+          {% for o in col.orders %}{% set kanbanCard = true %}{% include "orders/_card.njk" %}{% endfor %}
         {% endif %}
       </div>
     {% endfor %}
-
-    <div class="kanban-column">
-      <div class="kanban-column-header">
-        <span class="kanban-column-title">Docs Sent — Awaiting Benefits</span>
-        <span class="kanban-column-count">{{ shippedDocsSent.length }}</span>
-      </div>
-      {% if shippedDocsSent.length == 0 %}
-        <p class="kanban-column-empty">No orders here</p>
-      {% else %}
-        {% for o in shippedDocsSent %}{{ kanbanCard(o, seesAllOrders) }}{% endfor %}
-      {% endif %}
-    </div>
-
-    <div class="kanban-column">
-      <div class="kanban-column-header">
-        <span class="kanban-column-title">Complete</span>
-        <span class="kanban-column-count">{{ complete.length }}</span>
-      </div>
-      {% if complete.length == 0 %}
-        <p class="kanban-column-empty">No orders here</p>
-      {% else %}
-        {% for o in complete %}{{ kanbanCard(o, seesAllOrders) }}{% endfor %}
-      {% endif %}
-    </div>
   </div>
 </div>

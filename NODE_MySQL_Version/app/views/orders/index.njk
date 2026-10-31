@@ -1,4 +1,3 @@
-{% set statusLabels = [['all', 'All'], ['active', 'Active'], ['overdue', 'Overdue'], ['shipped_docs_sent', 'Docs Sent'], ['complete', 'Complete'], ['lost', 'Lost'], ['cancelled', 'Cancelled']] %}
 <div class="card page-wide">
   <div class="page-header-row">
     <div>
@@ -7,79 +6,24 @@
     </div>
     <div class="btn-row" style="margin-top:0;">
       <a class="btn btn-accent" href="/clients">Go to Clients to start a new order</a>
+      {% if kanbanUser %}<a class="btn-sm btn-secondary" href="/orders">Switch to board view</a>{% endif %}
       {% if permissions.view_archived_orders %}<a class="btn-sm btn-secondary" href="/orders/archived">View Archived Orders</a>{% endif %}
     </div>
   </div>
 
-  <div class="filter-chip-row">
-    {% for key, label in statusLabels %}
-      <a class="filter-chip{{ ' active' if statusFilter == key else '' }}" href="/orders?status={{ key }}">{{ label }} ({{ counts[key] }})</a>
-    {% endfor %}
-  </div>
+  {% set listOfBoard = kanbanUser %}{% include "orders/_filters.njk" %}
 
   {% if not orders or orders.length == 0 %}
     <p class="muted">No orders match this filter.</p>
   {% else %}
   <div class="card-grid">
-    {% for o in orders %}
-      {% set stageTotal = 9 %}
-      {% set stageNumber = o.current_stage_number or 0 %}
-      {% set isLost = o.status == 'lost' %}
-      {% set isShippedDocsSent = o.status == 'shipped_docs_sent' %}
-      {% set isComplete = o.status == 'complete' %}
-      {% set isCancelled = o.status == 'cancelled' %}
-      {% set filledSegments = o.filled_segments %}
-    <a class="entity-card{{ ' entity-card-overdue' if o.is_overdue else '' }}" href="/orders/{{ o.id }}">
-      <div class="entity-card-header">
-        <span class="entity-card-title">{{ o.order_reference }}</span>
-        {% if o.incoterm_code %}<span class="tag tag-gold">{{ o.incoterm_code }}</span>{% endif %}
-        {% if seesAllOrders and o.assignee_names %}<span class="tag tag-navy">{{ o.assignee_names }}</span>{% endif %}
-      </div>
-      <div class="entity-card-sub">{{ o.company_legal_name }}</div>
-      <div>
-        <div class="mini-stage-track">
-          {% for i in range(1, stageTotal + 1) %}
-            <div class="mini-stage-seg{{ ' filled' if i <= filledSegments else '' }}{{ ' lost' if ((isLost or isCancelled) and i <= filledSegments) else '' }}"></div>
-          {% endfor %}
-        </div>
-        <div class="mini-stage-label">
-          {% if isCancelled %}
-            Cancelled
-          {% elif isLost %}
-            {{ (o.lost_reason | truncate(46)) if o.lost_reason else 'Marked lost' }}
-          {% elif isComplete %}
-            Stage 9 of 9 &middot; Closed
-          {% elif isShippedDocsSent %}
-            Stage 9 of 9 &middot; Docs Sent &mdash; Awaiting Benefits
-          {% else %}
-            Stage {{ stageNumber or 1 }} of {{ stageTotal }} &middot; {{ o.current_stage_name or 'Quotation' }}
-          {% endif %}
-        </div>
-      </div>
-      <div class="entity-card-footer">
-        {% if o.is_overdue %}
-          <span class="badge badge-lost">Overdue</span>
-        {% elif isCancelled %}
-          <span class="badge badge-lost">Cancelled</span>
-        {% elif isLost %}
-          <span class="badge badge-lost">Lost</span>
-        {% elif isComplete %}
-          <span class="badge badge-complete">Complete</span>
-        {% elif isShippedDocsSent %}
-          <span class="badge badge-complete">Docs Sent</span>
-        {% else %}
-          <span class="badge badge-active">Active</span>
-        {% endif %}
-        {% if sees.selling %}<span class="entity-card-amount">{{ o.currency_code }} {{ o.total_fob_value | money }}</span>{% endif %}
-      </div>
-    </a>
-    {% endfor %}
+    {% for o in orders %}{% set kanbanCard = false %}{% include "orders/_card.njk" %}{% endfor %}
   </div>
   {% if totalPages > 1 %}
   <div class="btn-row" style="justify-content:center; margin-top:16px;">
-    {% if page > 1 %}<a class="btn-sm btn-secondary" href="/orders?status={{ statusFilter }}&amp;page={{ page - 1 }}">&larr; Previous</a>{% endif %}
+    {% if page > 1 %}<a class="btn-sm btn-secondary" href="/orders?status={{ statusFilter }}&amp;page={{ page - 1 }}{{ '&amp;view=list' | safe if kanbanUser else '' }}">&larr; Previous</a>{% endif %}
     <span class="muted small">Page {{ page }} of {{ totalPages }} ({{ totalFiltered }} orders)</span>
-    {% if page < totalPages %}<a class="btn-sm btn-secondary" href="/orders?status={{ statusFilter }}&amp;page={{ page + 1 }}">Next &rarr;</a>{% endif %}
+    {% if page < totalPages %}<a class="btn-sm btn-secondary" href="/orders?status={{ statusFilter }}&amp;page={{ page + 1 }}{{ '&amp;view=list' | safe if kanbanUser else '' }}">Next &rarr;</a>{% endif %}
   </div>
   {% endif %}
   {% endif %}

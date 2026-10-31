@@ -105,31 +105,8 @@ final class OrderController
         // deliberate click on "All" is remembered for that pageview
         // exactly like every other tab.
         $statusFilter = trim((string) ($_GET['status'] ?? '')) ?: 'active';
-
-        $counts = [
-            'all' => count($all),
-            'active' => 0,
-            'overdue' => 0,
-            'shipped_docs_sent' => 0,
-            'complete' => 0,
-            'lost' => 0,
-            'cancelled' => 0,
-        ];
-        foreach ($all as $o) {
-            if (!empty($o['is_overdue'])) {
-                $counts['overdue']++;
-            }
-            if (isset($counts[$o['status']])) {
-                $counts[$o['status']]++;
-            }
-        }
-
-        $filtered = match ($statusFilter) {
-            'all' => $all,
-            'overdue' => array_values(array_filter($all, static fn($o) => !empty($o['is_overdue']))),
-            'active', 'shipped_docs_sent', 'complete', 'lost', 'cancelled' => array_values(array_filter($all, static fn($o) => $o['status'] === $statusFilter)),
-            default => array_values(array_filter($all, static fn($o) => $o['status'] === 'active')),
-        };
+        $counts = self::statusCounts($all);
+        $filtered = self::filterByStatus($all, $statusFilter);
 
         // External QA report U-02: with ~200 orders this page was 17,600px
         // tall on desktop (52,000px on a phone) — one unpaginated
@@ -152,7 +129,35 @@ final class OrderController
             'totalPages' => $totalPages,
             'totalFiltered' => $totalFiltered,
             'seesAllOrders' => $seesAllOrders,
+            // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+            'kanbanUser' => \App\Services\UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban',
         ], 'layout/base');
+    }
+
+    /** @param list<array<string,mixed>> $all @return array<string,int> the count per status filter (Standard list and Kanban board alike) */
+    private static function statusCounts(array $all): array
+    {
+        $counts = ['all' => count($all), 'active' => 0, 'overdue' => 0, 'shipped_docs_sent' => 0, 'complete' => 0, 'lost' => 0, 'cancelled' => 0];
+        foreach ($all as $o) {
+            if (!empty($o['is_overdue'])) {
+                $counts['overdue']++;
+            }
+            if (isset($counts[$o['status']])) {
+                $counts[$o['status']]++;
+            }
+        }
+        return $counts;
+    }
+
+    /** @param list<array<string,mixed>> $all @return list<array<string,mixed>> the orders a status filter keeps */
+    private static function filterByStatus(array $all, string $statusFilter): array
+    {
+        return match ($statusFilter) {
+            'all' => $all,
+            'overdue' => array_values(array_filter($all, static fn($o) => !empty($o['is_overdue']))),
+            'active', 'shipped_docs_sent', 'complete', 'lost', 'cancelled' => array_values(array_filter($all, static fn($o) => $o['status'] === $statusFilter)),
+            default => array_values(array_filter($all, static fn($o) => $o['status'] === 'active')),
+        };
     }
 
     /**
@@ -171,40 +176,33 @@ final class OrderController
     private function indexKanban(int $actorId, bool $seesAllOrders): void
     {
         $all = OrderRepository::allVisibleTo($actorId, $seesAllOrders);
-        $stages = LookupRepository::stagesMaster();
+        // Owner hard rule 2026-11-01: the board has the same status filters (with counts) as the list.
+        // No filter = the open pipeline (active, docs sent, complete); Lost and Cancelled get columns when chosen.
+        $statusFilter = trim((string) ($_GET['status'] ?? ''));
+        $visible = $statusFilter === '' ? array_values(array_filter($all, static fn($o) => !in_array($o['status'], ['lost', 'cancelled'], true)))
+            : self::filterByStatus($all, $statusFilter);
 
         $columns = [];
-        foreach ($stages as $s) {
-            $columns[(int) $s['stage_number']] = ['name' => $s['stage_name'], 'orders' => []];
+        foreach (LookupRepository::stagesMaster() as $st) {
+            $columns['stage' . (int) $st['stage_number']] = ['stage' => (int) $st['stage_number'], 'title' => (string) $st['stage_name'], 'orders' => []];
         }
-        $shippedDocsSent = [];
-        $complete = [];
-        $lostCount = 0;
-        $cancelledCount = 0;
-
-        foreach ($all as $o) {
-            if ($o['status'] === 'active') {
-                $stageNum = (int) ($o['current_stage_number'] ?? 1) ?: 1;
-                if (isset($columns[$stageNum])) {
-                    $columns[$stageNum]['orders'][] = $o;
-                }
-            } elseif ($o['status'] === 'shipped_docs_sent') {
-                $shippedDocsSent[] = $o;
-            } elseif ($o['status'] === 'complete') {
-                $complete[] = $o;
-            } elseif ($o['status'] === 'lost') {
-                $lostCount++;
-            } elseif ($o['status'] === 'cancelled') {
-                $cancelledCount++;
+        $columns['shipped_docs_sent'] = ['title' => 'Docs Sent — Awaiting Benefits', 'orders' => []];
+        $columns['complete'] = ['title' => 'Complete', 'orders' => []];
+        if (in_array($statusFilter, ['all', 'lost', 'cancelled', 'overdue'], true)) {
+            $columns['lost'] = ['title' => 'Lost', 'orders' => []];
+            $columns['cancelled'] = ['title' => 'Cancelled', 'orders' => []];
+        }
+        foreach ($visible as $o) {
+            $key = $o['status'] === 'active' ? 'stage' . ((int) ($o['current_stage_number'] ?? 1) ?: 1) : (string) $o['status'];
+            if (isset($columns[$key])) {
+                $columns[$key]['orders'][] = $o;
             }
         }
 
         View::render('orders/index_kanban', [
             'columns' => $columns,
-            'shippedDocsSent' => $shippedDocsSent,
-            'complete' => $complete,
-            'lostCount' => $lostCount,
-            'cancelledCount' => $cancelledCount,
+            'counts' => self::statusCounts($all),
+            'statusFilter' => $statusFilter,
             'totalActive' => count(array_filter($all, static fn($o) => $o['status'] === 'active')),
             'seesAllOrders' => $seesAllOrders,
         ], 'layout/base');

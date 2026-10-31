@@ -99,19 +99,27 @@ final class PurchasingController
     {
         // The Kanban UI template shows Procurement as a board, one column per status.
         if (\App\Services\UiTemplateService::showsBoard(AuthService::currentUser()['ui_template_preference_id'] ?? null)) {
+            // Owner hard rule 2026-11-01: the same status filter as the list — a chosen status shows its column only (all of it).
+            $status = (string) ($_GET['status'] ?? '');
+            $status = array_key_exists($status, PurchasingRepository::STATUSES) ? $status : '';
             $board = PurchasingRepository::board();
-            $rows = array_values(array_filter($board['rows'], static fn (array $r): bool => OrderAccessService::currentUserMaySeeOrderId((int) $r['order_id'])));
+            $source = $status === '' ? $board['rows'] : PurchasingRepository::queue($status);
+            $rows = array_values(array_filter($source, static fn (array $r): bool => OrderAccessService::currentUserMaySeeOrderId((int) $r['order_id'])));
             $columns = [];
-            foreach (array_diff_key(PurchasingRepository::STATUSES, ['cancelled' => true]) as $key => $label) {
-                $columns[$key] = ['label' => $label, 'rows' => array_values(array_filter($rows, static fn (array $r): bool => $r['status'] === $key))];
+            foreach (PurchasingRepository::STATUSES as $key => $label) {
+                if ($status === '' ? $key !== 'cancelled' : $key === $status) {
+                    $columns[$key] = ['label' => $label, 'rows' => array_values(array_filter($rows, static fn (array $r): bool => $r['status'] === $key))];
+                }
             }
-            View::render('procurement/queue_kanban', ['columns' => $columns, 'cancelled' => $board['cancelled']], 'layout/base');
+            View::render('procurement/queue_kanban', ['columns' => $columns, 'cancelled' => $board['cancelled'], 'statuses' => PurchasingRepository::STATUSES, 'status' => $status], 'layout/base');
             return;
         }
         $status = (string) ($_GET['status'] ?? '');
         $rows = PurchasingRepository::queue(array_key_exists($status, PurchasingRepository::STATUSES) ? $status : null);
         $rows = array_values(array_filter($rows, static fn (array $r): bool => OrderAccessService::currentUserMaySeeOrderId((int) $r['order_id'])));
-        View::render('procurement/queue', ['rows' => $rows, 'statuses' => PurchasingRepository::STATUSES, 'status' => $status], 'layout/base');
+        View::render('procurement/queue', ['rows' => $rows, 'statuses' => PurchasingRepository::STATUSES, 'status' => $status,
+            // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+            'kanbanUser' => \App\Services\UiTemplateService::resolve(AuthService::currentUser()['ui_template_preference_id'] ?? null) === 'kanban'], 'layout/base');
     }
 
     public function show(array $params): void

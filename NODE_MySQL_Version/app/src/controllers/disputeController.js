@@ -38,6 +38,8 @@ async function index(req, res) {
       disputes: await orderAccessService.visibleRows(await disputeRepository.all(status), req.user.id, req.permissions),
       statusFilter: status,
       statusOptions: await lookupRepository.dropdownOptions('dispute_status'),
+      // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+      kanbanUser: (await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban',
     },
     'layout/base'
   );
@@ -50,11 +52,15 @@ async function index(req, res) {
  * longer appears in that list so nothing is dropped.
  */
 async function indexKanban(req, res) {
-  const all = await orderAccessService.visibleRows(await disputeRepository.all(), req.user.id, req.permissions);
+  // Owner hard rule 2026-11-01: the same status filter as the list — a chosen status shows its column only.
+  const status = String(req.query.status || '').trim() || null;
+  const all = await orderAccessService.visibleRows(await disputeRepository.all(status), req.user.id, req.permissions);
   const statusOptions = await lookupRepository.dropdownOptions('dispute_status');
   const columns = {};
   for (const opt of statusOptions) {
-    columns[opt.option_value] = { disputes: [] };
+    if (status === null || opt.option_value === status) {
+      columns[opt.option_value] = { disputes: [] };
+    }
   }
   for (const d of all) {
     if (!columns[d.status]) {
@@ -63,7 +69,7 @@ async function indexKanban(req, res) {
     columns[d.status].disputes.push(d);
   }
 
-  res.renderView('disputes/index_kanban', { columns, totalCount: all.length }, 'layout/base');
+  res.renderView('disputes/index_kanban', { columns, totalCount: all.length, statusFilter: status, statusOptions }, 'layout/base');
 }
 
 async function forOrder(req, res) {

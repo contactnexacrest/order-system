@@ -1,0 +1,7 @@
+{# The status filter row, shared by the Standard list and the Kanban board (owner hard rule 2026-11-01). Expects counts, statusFilter, listOfBoard. #}
+{% set statusLabels = [['all', 'All'], ['active', 'Active'], ['overdue', 'Overdue'], ['shipped_docs_sent', 'Docs Sent'], ['complete', 'Complete'], ['lost', 'Lost'], ['cancelled', 'Cancelled']] %}
+  <div class="filter-chip-row">
+    {% for key, label in statusLabels %}
+      <a class="filter-chip{{ ' active' if statusFilter == key else '' }}" href="/orders?status={{ key }}{{ '&amp;view=list' | safe if listOfBoard else '' }}">{{ label }} ({{ counts[key] }})</a>
+    {% endfor %}
+  </div>

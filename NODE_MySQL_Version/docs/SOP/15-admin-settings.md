@@ -599,9 +599,26 @@ manual:
 - **My tasks** ([Chapter 23](./23-coordination.md)) — Escalated / Overdue /
   Due today / Coming up, with the same "Only orders I own" switch.
 
-Every board has a **Switch to list view** button that shows that page's
-ordinary list (the board comes back the next time the page is opened from
-the menu). The money each department may see is the same on a board as in
+**Both templates do exactly the same (owner rule, 1 Nov 2026).** Anyone can
+use either template, so a board offers everything its list offers, and the
+other way round:
+
+- the **same cards**: every field, badge, stage bar and amount the list
+  shows (Orders, Disputes and Complaints use the very same card in both);
+- the **same filters**: the status chips with their counts (Orders, Disputes,
+  Complaints) or the Status choice (Procurement) — on a board, choosing a
+  status shows that status only (Orders: Lost and Cancelled get their own
+  columns when chosen);
+- the **same actions**: Accept / Reject / Resend Link on Quotation Intake,
+  Accept & Apply / Reject on PI Intake, Review on Reorder Requests, Open on
+  My tasks — right on the card;
+- the **same links**: the source order, the new order or client, each record.
+
+Every board has a **Switch to list view** button, and a Kanban user on the
+list has **Switch to board view** to go back (filters stay as chosen). A test
+on each stack (`KanbanParityTest` / `kanbanParity.test.js`) compares both
+views of all eight pages with real data and fails if either one lacks a link,
+action or filter the other has. The money each department may see is the same on a board as in
 the list: for example the Orders board shows an order's value only to
 departments that see selling prices. The order page itself is the same in
 both templates, including the payment schedule, the Export Service Invoice

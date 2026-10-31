@@ -37,6 +37,8 @@ final class DisputeController
             'disputes'      => \App\Services\OrderAccessService::visibleRows(DisputeRepository::all($status)),
             'statusFilter'  => $status,
             'statusOptions' => LookupRepository::dropdownOptions('dispute_status'),
+            // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+            'kanbanUser'    => UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban',
         ], 'layout/base');
     }
 
@@ -48,11 +50,15 @@ final class DisputeController
      */
     private function indexKanban(): void
     {
-        $all = \App\Services\OrderAccessService::visibleRows(DisputeRepository::all());
+        // Owner hard rule 2026-11-01: the same status filter as the list — a chosen status shows its column only.
+        $status = trim((string) ($_GET['status'] ?? '')) ?: null;
+        $all = \App\Services\OrderAccessService::visibleRows(DisputeRepository::all($status));
         $statusOptions = LookupRepository::dropdownOptions('dispute_status');
         $columns = [];
         foreach ($statusOptions as $opt) {
-            $columns[$opt['option_value']] = ['disputes' => []];
+            if ($status === null || $opt['option_value'] === $status) {
+                $columns[$opt['option_value']] = ['disputes' => []];
+            }
         }
         foreach ($all as $d) {
             if (!isset($columns[$d['status']])) {
@@ -62,8 +68,10 @@ final class DisputeController
         }
 
         View::render('disputes/index_kanban', [
-            'columns'    => $columns,
-            'totalCount' => count($all),
+            'columns'       => $columns,
+            'totalCount'    => count($all),
+            'statusFilter'  => $status,
+            'statusOptions' => $statusOptions,
         ], 'layout/base');
     }
 

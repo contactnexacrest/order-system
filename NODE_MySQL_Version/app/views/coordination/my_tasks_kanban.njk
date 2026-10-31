@@ -3,7 +3,7 @@
   <div class="page-header-row">
     <div>
       <h1>My tasks — Kanban Board</h1>
-      <p class="muted" style="margin:0;">What {{ acting or 'your department' }} has to do next. A task appears when the step before it is done, and goes away when you do it.</p>
+      <p class="muted" style="margin:0;">What {{ acting or 'your department' }} has to do next, earliest due first. A task appears here when the step before it is done, and goes away when you do it. Overdue tasks are red; after a few more days they are escalated to management.</p>
     </div>
     <div class="btn-row" style="margin-top:0;">
       <a class="btn-sm{{ ' btn-secondary' if mine else '' }}" href="/my-tasks">All of my department's tasks</a>
@@ -28,11 +28,12 @@
             <span class="entity-card-title">{{ t.title }}</span>
           </div>
           <div class="entity-card-sub"><span class="dept-tag" style="--dept-color:{{ t.department_color }}">{{ t.department_name }}</span> {{ t.order_reference }}</div>
-          {% if t.subject %}<div class="muted small">{{ t.subject | truncate(90, true, '…') }}</div>{% endif %}
+          {% if t.subject %}<div class="muted small">{{ t.subject }}</div>{% endif %}
           <div class="entity-card-footer">
-            <span class="muted small">Due {{ t.due_on }}</span>
+            <span class="muted small">Due {{ t.due_on }}{% if t.escalated == 1 %} <span class="badge badge-inactive">escalated</span>{% elif t.overdue == 1 %} <span class="badge badge-warning">overdue</span>{% endif %}</span>
             <span class="muted small">{{ t.owner_name if t.owner_name else 'no owner yet' }}</span>
           </div>
+          <span class="btn-sm">Open</span>
         </a>
         {% endfor %}
       {% endif %}

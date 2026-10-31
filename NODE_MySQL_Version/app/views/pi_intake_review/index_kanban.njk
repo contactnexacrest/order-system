@@ -1,25 +1,42 @@
-{% macro kanbanCard(s) %}
-<a class="entity-card kanban-card" href="/orders/{{ s.order_id }}">
+{# Owner hard rule 2026-11-01: every field and action of the Standard list's row (pi_intake_review/index.njk) — Accept & Apply, Reject with a reason. #}
+{% macro kanbanCard(s, csrfToken) %}
+<div class="entity-card kanban-card">
   <div class="entity-card-header">
-    <span class="entity-card-title">{{ s.order_reference }}</span>
+    <span class="entity-card-title"><a href="/orders/{{ s.order_id }}">{{ s.order_reference }}</a></span>
+    {% if s.status and s.status != 'pending_review' %}<span class="badge {{ 'badge-active' if s.status == 'applied' else 'badge-lost' }}">{{ s.status | capitalize }}</span>{% endif %}
   </div>
-  <div class="entity-card-sub">{{ s.company_legal_name or s.client_company_legal_name }}</div>
-  <div class="entity-card-footer">
-    {% if s.status == 'applied' %}
-      <span class="muted small">Applied</span>
-    {% elif s.status == 'rejected' %}
-      <span class="muted small">{{ (s.rejection_reason or '') | truncate(40, true, '…') }}</span>
-    {% else %}
-      <span class="muted small">Submitted {{ s.submitted_at }}</span>
-    {% endif %}
-  </div>
-</a>
+  <div class="entity-card-sub">{{ s.company_legal_name or s.client_company_legal_name or '' }}</div>
+  {% if not s.status or s.status == 'pending_review' %}
+    <div class="muted small">{{ s.contact_person }} · {{ s.email }}</div>
+    <div class="muted small">Consignee: {{ s.consignee_name }} · Notify: {{ s.notify_party or '—' }}</div>
+    <div class="muted small">Incoterm: {{ s.incoterm_confirmed }} · Port: {{ s.port_of_discharge_text }}</div>
+    <div class="muted small">{{ s.quotation_acceptance_reference }}</div>
+    <div class="muted small">{{ s.payment_terms_confirmation }}</div>
+    {% if s.changes_from_quotation %}<div class="muted small">Changes: {{ s.changes_from_quotation }}</div>{% endif %}
+    {% if s.buyer_po_ref %}<div class="muted small">Buyer PO: {{ s.buyer_po_ref }}</div>{% endif %}
+    <div class="muted small">Submitted {{ s.submitted_at }}</div>
+    <div class="kanban-card-actions">
+      <form method="post" action="/pi-intake-review/{{ s.id }}/accept" onsubmit="return confirm('Accept and apply these details to the client and order?');">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <button type="submit" class="btn-sm btn-success">Accept &amp; Apply</button>
+      </form>
+      <form method="post" action="/pi-intake-review/{{ s.id }}/reject" onsubmit="return confirm('Reject this PI-stage submission?');">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="text" name="reason" placeholder="Reason (required)" required aria-label="Reason for rejecting">
+        <button type="submit" class="btn-sm btn-danger">Reject</button>
+      </form>
+    </div>
+  {% else %}
+    <div class="muted small">Resolved by {{ s.reviewed_by_name or '—' }} · {{ s.reviewed_at }}</div>
+    {% if s.status == 'rejected' %}<div class="entity-card-footer"><span class="muted small">{{ s.rejection_reason or '' }}</span></div>{% endif %}
+  {% endif %}
+</div>
 {% endmacro %}
 <div class="card page-wide">
   <div class="page-header-row">
     <div>
       <h1>PI Intake Review — Kanban Board</h1>
-      <p class="muted" style="margin:0;">Submissions from the per-order PI-stage form.</p>
+      <p class="muted" style="margin:0;">Submissions from the per-order PI-stage form (<code>/pi-details/&lt;token&gt;</code>). Accepting overwrites the client's identity fields with what the client confirmed and sets the order's Buyer PO ref if provided; everything else stays on the submission for you to read before generating the PI.</p>
     </div>
     <div class="btn-row" style="margin-top:0;">
       <a class="btn-sm btn-secondary" href="/pi-intake-review?view=list">Switch to list view</a>
@@ -35,7 +52,7 @@
       {% if pending.length == 0 %}
         <p class="kanban-column-empty">Nothing pending</p>
       {% else %}
-        {% for s in pending %}{{ kanbanCard(s) }}{% endfor %}
+        {% for s in pending %}{{ kanbanCard(s, csrfToken) }}{% endfor %}
       {% endif %}
     </div>
 
@@ -47,7 +64,7 @@
       {% if applied.length == 0 %}
         <p class="kanban-column-empty">Nothing here</p>
       {% else %}
-        {% for s in applied %}{{ kanbanCard(s) }}{% endfor %}
+        {% for s in applied %}{{ kanbanCard(s, csrfToken) }}{% endfor %}
       {% endif %}
     </div>
 
@@ -59,7 +76,7 @@
       {% if rejected.length == 0 %}
         <p class="kanban-column-empty">Nothing here</p>
       {% else %}
-        {% for s in rejected %}{{ kanbanCard(s) }}{% endfor %}
+        {% for s in rejected %}{{ kanbanCard(s, csrfToken) }}{% endfor %}
       {% endif %}
     </div>
   </div>

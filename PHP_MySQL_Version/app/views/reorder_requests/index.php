@@ -1,6 +1,7 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card page-wide">
   <h1>Reorder Requests</h1>
+  <?php if (!empty($kanbanUser)): ?><div class="btn-row"><a class="btn-sm btn-secondary" href="/reorder-requests">Switch to board view</a></div><?php endif; ?>
   <p class="muted">Repeat-order requests submitted by clients from an order already on file. Approving reviews and confirms each product line (HS code, unit price) before it becomes a real order — nothing here becomes live automatically.</p>
 
   <div class="section">

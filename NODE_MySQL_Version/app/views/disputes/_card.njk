@@ -1,0 +1,13 @@
+{# One dispute card, shared by the Standard list and the Kanban board (owner hard rule 2026-11-01: both templates show exactly the same). Expects d, kanbanCard. #}
+    <a class="entity-card{{ ' kanban-card' if kanbanCard else '' }}" href="/orders/{{ d.order_id }}/disputes">
+      <div class="entity-card-header">
+        <span class="entity-card-title">{{ d.order_reference }}</span>
+        <span class="badge {% if d.status == 'Resolved' %}badge-active{% elif d.status == 'Escalated' %}badge-lost{% else %}badge-protected{% endif %}">{{ d.status }}</span>
+      </div>
+      <div class="entity-card-sub">{{ d.company_legal_name or '' }}</div>
+      <div class="muted small">{{ d.description | truncate(110, true, '…') }}</div>
+      <div class="entity-card-footer">
+        <span class="muted small">Notice: {{ d.notice_date }}</span>
+        <span class="muted small">Response due: {{ d.response_due_date or '—' }}</span>
+      </div>
+    </a>

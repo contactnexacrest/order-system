@@ -841,3 +841,8 @@ fieldset.radio-row label{display:flex;gap:6px;align-items:flex-start;font-weight
 .dept-badge .dept-switch > summary::before,.dept-badge .dept-switch > summary::after{content:none;}
 .dept-end{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0;}
 .dept-end input[type=date]{width:auto;margin:0;}
+
+/* Owner hard rule 2026-11-01: a Kanban card carries the same actions as its Standard list row. */
+.kanban-card-actions{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.kanban-card-actions form{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0;}
+.kanban-card-actions input[type="text"]{flex:1 1 140px;min-width:0;}

@@ -37,6 +37,8 @@ final class ClientIntakeReviewController
         View::render('client_intake_review/index', [
             'pending' => ClientIntakeRepository::pending(),
             'resolved' => ClientIntakeRepository::recentResolved(),
+            // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+            'kanbanUser' => UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban',
         ], 'layout/base');
     }
 

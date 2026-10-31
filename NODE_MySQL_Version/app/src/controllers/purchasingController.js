@@ -91,18 +91,25 @@ async function raise(req, res) {
 async function queue(req, res) {
   // The Kanban UI template shows Procurement as a board, one column per status.
   if (await require('../services/uiTemplateService').showsBoard(req)) {
+    // Owner hard rule 2026-11-01: the same status filter as the list — a chosen status shows its column only (all of it).
+    const chosen = String(req.query.status || '');
+    const boardStatus = Object.prototype.hasOwnProperty.call(purchasingRepository.STATUSES, chosen) ? chosen : '';
     const board = await purchasingRepository.board();
     const mayOpenBoard = await orderAccessService.orderLinkChecker(req.user.id, req.permissions);
-    const rows = board.rows.filter((r) => mayOpenBoard(r.order_id));
-    const columns = Object.entries(purchasingRepository.STATUSES).filter(([key]) => key !== 'cancelled')
+    const rows = (boardStatus === '' ? board.rows : await purchasingRepository.queue(boardStatus)).filter((r) => mayOpenBoard(r.order_id));
+    const columns = Object.entries(purchasingRepository.STATUSES).filter(([key]) => (boardStatus === '' ? key !== 'cancelled' : key === boardStatus))
       .map(([key, label]) => ({ key, label, rows: rows.filter((r) => r.status === key) }));
-    res.renderView('procurement/queue_kanban', { columns, cancelled: board.cancelled, today: todayIst() }, 'layout/base');
+    res.renderView('procurement/queue_kanban', { columns, cancelled: board.cancelled, today: todayIst(), statuses: purchasingRepository.STATUSES, status: boardStatus }, 'layout/base');
     return;
   }
   const status = String(req.query.status || '');
   const rows = await purchasingRepository.queue(Object.prototype.hasOwnProperty.call(purchasingRepository.STATUSES, status) ? status : null);
   const mayOpen = await orderAccessService.orderLinkChecker(req.user.id, req.permissions);
-  res.renderView('procurement/queue', { rows: rows.filter((r) => mayOpen(r.order_id)), statuses: purchasingRepository.STATUSES, status, today: todayIst() }, 'layout/base');
+  res.renderView('procurement/queue', {
+    rows: rows.filter((r) => mayOpen(r.order_id)), statuses: purchasingRepository.STATUSES, status, today: todayIst(),
+    // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+    kanbanUser: (await require('../services/uiTemplateService').resolve(req.user.ui_template_preference_id || null)) === 'kanban',
+  }, 'layout/base');
 }
 
 async function show(req, res) {

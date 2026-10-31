@@ -1,0 +1,11 @@
+{# The status filter, shared by the Standard list and the Kanban board (owner hard rule 2026-11-01). Expects statuses, status, listOfBoard. #}
+  <form method="get" action="/procurement" class="btn-row">
+    {% if listOfBoard %}<input type="hidden" name="view" value="list">{% endif %}
+    <label>Status
+      <select name="status" onchange="this.form.submit()">
+        <option value="">All open</option>
+        {% for key, label in statuses %}<option value="{{ key }}" {{ 'selected' if status == key else '' }}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <a class="btn-sm btn-secondary" href="/procurement/suppliers">Supplier performance</a>
+  </form>

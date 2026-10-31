@@ -40,7 +40,8 @@ async function index(req, res) {
     piIntakeRepository.pendingReview(),
     piIntakeRepository.recentResolved(),
   ]);
-  res.renderView('pi_intake_review/index', { pending, resolved }, 'layout/base');
+  // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+  res.renderView('pi_intake_review/index', { pending, resolved, kanbanUser: (await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban' }, 'layout/base');
 }
 
 /** The Kanban UI template's PI Intake Review board: Pending Review / Applied / Rejected columns. */

@@ -2,8 +2,9 @@
   <h1>My tasks</h1>
   <p class="muted">What <?= $acting ? htmlspecialchars($acting) : 'your department' ?> has to do next, earliest due first. A task appears here when the step before it is done, and goes away when you do it. Overdue tasks are red; after a few more days they are escalated to management.</p>
   <div class="btn-row">
-    <a class="btn-sm<?= $mine ? ' btn-secondary' : '' ?>" href="/my-tasks">All of my department's tasks</a>
-    <a class="btn-sm<?= $mine ? '' : ' btn-secondary' ?>" href="/my-tasks?show=mine">Only orders I own</a>
+    <a class="btn-sm<?= $mine ? ' btn-secondary' : '' ?>" href="/my-tasks<?= !empty($kanbanUser) ? '?view=list' : '' ?>">All of my department's tasks</a>
+    <a class="btn-sm<?= $mine ? '' : ' btn-secondary' ?>" href="/my-tasks?show=mine<?= !empty($kanbanUser) ? '&amp;view=list' : '' ?>">Only orders I own</a>
+    <?php if (!empty($kanbanUser)): ?><a class="btn-sm btn-secondary" href="/my-tasks<?= $mine ? '?show=mine' : '' ?>">Switch to board view</a><?php endif; ?>
   </div>
   <div class="table-scroll">
   <table class="list">

@@ -1,0 +1,7 @@
+{# The status filter row, shared by the Standard list and the Kanban board (owner hard rule 2026-11-01). Expects statusFilter, listOfBoard. #}
+  <div class="filter-chip-row">
+    <a class="filter-chip{{ ' active' if not statusFilter else '' }}" href="/complaints{{ '?view=list' if listOfBoard else '' }}">All</a>
+    {% for s, l in [['open', 'Open'], ['acknowledged', 'Acknowledged'], ['resolved', 'Resolved']] %}
+      <a class="filter-chip{{ ' active' if statusFilter == s else '' }}" href="/complaints?{{ 'view=list&amp;' | safe if listOfBoard else '' }}status={{ s }}">{{ l }}</a>
+    {% endfor %}
+  </div>

@@ -1,6 +1,7 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card page-wide">
   <h1>Quotation Intake Review</h1>
+  <?php if (!empty($kanbanUser)): ?><div class="btn-row"><a class="btn-sm btn-secondary" href="/client-intake">Switch to board view</a></div><?php endif; ?>
   <p class="muted">Submissions from the public quotation-details form (<code>/quotation-details</code>). Nothing here becomes a real client or order until you accept it — accepting creates the client record and takes you to it, ready for you to create the order and generate the Quotation yourself.</p>
 
   <div class="section">

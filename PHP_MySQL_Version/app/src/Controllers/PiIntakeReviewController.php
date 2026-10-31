@@ -47,6 +47,8 @@ final class PiIntakeReviewController
         View::render('pi_intake_review/index', [
             'pending' => PiIntakeRepository::pendingReview(),
             'resolved' => PiIntakeRepository::recentResolved(),
+            // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+            'kanbanUser' => UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban',
         ], 'layout/base');
     }
 

@@ -31,19 +31,26 @@ final class ComplaintController
         \App\Helpers\View::render('complaints/index', [
             'complaints'   => \App\Services\OrderAccessService::visibleRows(OrderComplaintRepository::all($status)),
             'statusFilter' => $status,
+            // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+            'kanbanUser'   => UiTemplateService::resolve($actor['ui_template_preference_id'] ?? null) === 'kanban',
         ], 'layout/base');
     }
 
     /** The Kanban UI template's Complaints board: Open / Acknowledged / Resolved columns. */
     private function indexKanban(): void
     {
+        // Owner hard rule 2026-11-01: the same status filter as the list — a chosen status shows its column only.
+        $filter = trim((string) ($_GET['status'] ?? '')) ?: null;
         $columns = [];
         foreach (self::STATUSES as $status) {
-            $columns[$status] = \App\Services\OrderAccessService::visibleRows(OrderComplaintRepository::all($status));
+            if ($filter === null || $filter === $status) {
+                $columns[$status] = \App\Services\OrderAccessService::visibleRows(OrderComplaintRepository::all($status));
+            }
         }
 
         \App\Helpers\View::render('complaints/index_kanban', [
             'columns' => $columns,
+            'statusFilter' => $filter,
         ], 'layout/base');
     }
 

@@ -139,20 +139,8 @@ async function index(req, res) {
   // is remembered for that pageview exactly like every other tab.
   const statusFilter = String(req.query.status || '').trim() || 'active';
 
-  const counts = { all: all.length, active: 0, overdue: 0, shipped_docs_sent: 0, complete: 0, lost: 0, cancelled: 0 };
-  for (const o of all) {
-    if (o.is_overdue) counts.overdue++;
-    if (Object.prototype.hasOwnProperty.call(counts, o.status)) counts[o.status]++;
-  }
-
-  let filtered = all;
-  if (statusFilter === 'overdue') {
-    filtered = all.filter((o) => !!o.is_overdue);
-  } else if (['active', 'shipped_docs_sent', 'complete', 'lost', 'cancelled'].includes(statusFilter)) {
-    filtered = all.filter((o) => o.status === statusFilter);
-  } else if (statusFilter !== 'all') {
-    filtered = all.filter((o) => o.status === 'active');
-  }
+  const counts = statusCounts(all);
+  const filtered = filterByStatus(all, statusFilter);
 
   // External QA report U-02: with ~200 orders this page was 17,600px tall
   // on desktop (52,000px on a phone) — one unpaginated card-grid of every
@@ -169,11 +157,7 @@ async function index(req, res) {
 
   // Precomputed here (not in the template) since Nunjucks has no min/max
   // filter — how many of the 9 mini-stage-track segments render filled.
-  const stageTotal = 9;
-  const orders = pageSlice.map((o) => ({
-    ...o,
-    filled_segments: (o.status === 'complete' || o.status === 'shipped_docs_sent') ? stageTotal : ((o.status === 'lost' || o.status === 'cancelled') ? Math.max(o.current_stage_number || 0, 1) : (o.current_stage_number || 0)),
-  }));
+  const orders = pageSlice.map(withFilledSegments);
 
   res.renderView('orders/index', {
     orders,
@@ -183,7 +167,38 @@ async function index(req, res) {
     totalPages,
     totalFiltered,
     seesAllOrders,
+    // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+    kanbanUser: (await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban',
   }, 'layout/base');
+}
+
+/** The count per status filter (Standard list and Kanban board alike). */
+function statusCounts(all) {
+  const counts = { all: all.length, active: 0, overdue: 0, shipped_docs_sent: 0, complete: 0, lost: 0, cancelled: 0 };
+  for (const o of all) {
+    if (o.is_overdue) counts.overdue++;
+    if (Object.prototype.hasOwnProperty.call(counts, o.status)) counts[o.status]++;
+  }
+  return counts;
+}
+
+/** The orders a status filter keeps. */
+function filterByStatus(all, statusFilter) {
+  if (statusFilter === 'all') return all;
+  if (statusFilter === 'overdue') return all.filter((o) => !!o.is_overdue);
+  if (['active', 'shipped_docs_sent', 'complete', 'lost', 'cancelled'].includes(statusFilter)) return all.filter((o) => o.status === statusFilter);
+  return all.filter((o) => o.status === 'active');
+}
+
+// Precomputed here (not in the template) since Nunjucks has no min/max
+// filter — how many of the 9 mini-stage-track segments render filled
+// (lost/cancelled: the first one, as PHP).
+function withFilledSegments(o) {
+  const stageTotal = 9;
+  return {
+    ...o,
+    filled_segments: (o.status === 'complete' || o.status === 'shipped_docs_sent') ? stageTotal : ((o.status === 'lost' || o.status === 'cancelled') ? 1 : (o.current_stage_number || 0)),
+  };
 }
 
 /**
@@ -201,40 +216,31 @@ async function index(req, res) {
  */
 async function indexKanban(req, res, seesAllOrders) {
   const all = await orderRepository.allVisibleTo(req.user.id, seesAllOrders);
-  const stages = await lookupRepository.stagesMaster();
+  // Owner hard rule 2026-11-01: the board has the same status filters (with counts) as the list.
+  // No filter = the open pipeline (active, docs sent, complete); Lost and Cancelled get columns when chosen.
+  const statusFilter = String(req.query.status || '').trim();
+  const visible = statusFilter === '' ? all.filter((o) => !['lost', 'cancelled'].includes(o.status)) : filterByStatus(all, statusFilter);
 
-  const columns = {};
-  for (const s of stages) {
-    columns[s.stage_number] = { name: s.stage_name, orders: [] };
+  const columns = [];
+  for (const st of await lookupRepository.stagesMaster()) {
+    columns.push({ key: `stage${st.stage_number}`, stage: Number(st.stage_number), title: st.stage_name, orders: [] });
   }
-  const shippedDocsSent = [];
-  const complete = [];
-  let lostCount = 0;
-  let cancelledCount = 0;
-
-  for (const o of all) {
-    if (o.status === 'active') {
-      const stageNum = (o.current_stage_number || 1) || 1;
-      if (columns[stageNum]) {
-        columns[stageNum].orders.push(o);
-      }
-    } else if (o.status === 'shipped_docs_sent') {
-      shippedDocsSent.push(o);
-    } else if (o.status === 'complete') {
-      complete.push(o);
-    } else if (o.status === 'lost') {
-      lostCount++;
-    } else if (o.status === 'cancelled') {
-      cancelledCount++;
-    }
+  columns.push({ key: 'shipped_docs_sent', stage: null, title: 'Docs Sent — Awaiting Benefits', orders: [] });
+  columns.push({ key: 'complete', stage: null, title: 'Complete', orders: [] });
+  if (['all', 'lost', 'cancelled', 'overdue'].includes(statusFilter)) {
+    columns.push({ key: 'lost', stage: null, title: 'Lost', orders: [] });
+    columns.push({ key: 'cancelled', stage: null, title: 'Cancelled', orders: [] });
+  }
+  for (const o of visible) {
+    const key = o.status === 'active' ? `stage${(o.current_stage_number || 1) || 1}` : String(o.status);
+    const col = columns.find((c) => c.key === key);
+    if (col) col.orders.push(withFilledSegments(o));
   }
 
   res.renderView('orders/index_kanban', {
     columns,
-    shippedDocsSent,
-    complete,
-    lostCount,
-    cancelledCount,
+    counts: statusCounts(all),
+    statusFilter,
     totalActive: all.filter((o) => o.status === 'active').length,
     seesAllOrders,
   }, 'layout/base');

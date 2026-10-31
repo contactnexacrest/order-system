@@ -1,6 +1,7 @@
 <?php use App\Helpers\Csrf; ?>
 <div class="card page-wide">
   <h1>PI Intake Review</h1>
+  <?php if (!empty($kanbanUser)): ?><div class="btn-row"><a class="btn-sm btn-secondary" href="/pi-intake-review">Switch to board view</a></div><?php endif; ?>
   <p class="muted">Submissions from the per-order PI-stage form (<code>/pi-details/&lt;token&gt;</code>), generated per-order from the order screen. Accepting overwrites the client's identity fields (consignee, notify party, VAT/EORI, phone, confirmed contact/billing) with what the client confirmed here — this is the "must match official documents" checkpoint — and sets the order's Buyer PO ref if provided. Everything else (payment-terms confirmation, quotation acceptance reference, confirmed Incoterm/port/COO, changes, special requirements) stays on the submission for you to read before generating the PI.</p>
 
   <div class="section">

@@ -1,0 +1,12 @@
+{# One complaint card, shared by the Standard list and the Kanban board (owner hard rule 2026-11-01: both templates show exactly the same). Expects c, kanbanCard. #}
+    <a class="entity-card{{ ' kanban-card' if kanbanCard else '' }}" href="/orders/{{ c.order_id }}/complaints">
+      <div class="entity-card-header">
+        <span class="entity-card-title">{{ c.order_reference }}</span>
+        <span class="badge {% if c.status == 'resolved' %}badge-active{% elif c.status == 'acknowledged' %}badge-protected{% else %}badge-lost{% endif %}">{% if c.status == 'acknowledged' %}Acknowledged{% elif c.status == 'resolved' %}Resolved{% else %}Open{% endif %}</span>
+      </div>
+      <div class="entity-card-sub">{{ c.company_legal_name or '' }}</div>
+      <div class="muted small">{{ c.description | truncate(110, true, '…') }}</div>
+      <div class="entity-card-footer">
+        <span class="muted small">Raised: {{ c.created_at }}</span>
+      </div>
+    </a>

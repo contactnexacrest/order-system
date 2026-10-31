@@ -29,6 +29,8 @@ async function index(req, res) {
   res.renderView('client_intake_review/index', {
     pending: await clientIntakeRepository.pending(),
     resolved: await clientIntakeRepository.recentResolved(),
+    // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
+    kanbanUser: (await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban',
   }, 'layout/base');
 }
 

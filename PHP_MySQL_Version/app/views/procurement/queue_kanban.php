@@ -7,6 +7,7 @@ $renderKanbanCard = static function (array $r): string {
     <a class="entity-card kanban-card" href="/procurement/<?= (int) $r['id'] ?>">
       <div class="entity-card-header">
         <span class="entity-card-title">PR-<?= (int) $r['id'] ?> · <?= htmlspecialchars((string) $r['description']) ?></span>
+        <span class="badge badge-protected"><?= htmlspecialchars(\App\Repositories\PurchasingRepository::STATUSES[$r['status']] ?? (string) $r['status']) ?></span>
       </div>
       <div class="entity-card-sub"><?= htmlspecialchars((string) $r['order_reference']) ?> · <?= htmlspecialchars(rtrim(rtrim((string) $r['quantity'], '0'), '.')) ?> <?= htmlspecialchars((string) ($r['unit'] ?? '')) ?></div>
       <?php if (!empty($r['awarded_supplier_name'])): ?><div class="muted small"><?= htmlspecialchars((string) $r['awarded_supplier_name']) ?></div><?php endif; ?>
@@ -24,14 +25,15 @@ $renderKanbanCard = static function (array $r): string {
   <div class="page-header-row">
     <div>
       <h1>Procurement — Kanban Board</h1>
-      <p class="muted" style="margin:0;">Purchase requirements raised by Sales, earliest need first. Received shows the last 60 days.</p>
+      <p class="muted" style="margin:0;">Purchase requirements raised by Sales, earliest need first. Open one to record supplier quotes, compare, award, approve, and record receipt and the quality check. Received shows the last 60 days unless chosen in Status.</p>
     </div>
     <div class="btn-row" style="margin-top:0;">
       <?php if ($cancelled > 0): ?><a class="tag" href="/procurement?view=list&amp;status=cancelled">Cancelled <?= (int) $cancelled ?></a><?php endif; ?>
-      <a class="btn-sm btn-secondary" href="/procurement/suppliers">Supplier performance</a>
-      <a class="btn-sm btn-secondary" href="/procurement?view=list">Switch to list view</a>
+      <a class="btn-sm btn-secondary" href="/procurement?view=list<?= $status !== '' ? '&amp;status=' . htmlspecialchars($status) : '' ?>">Switch to list view</a>
     </div>
   </div>
+
+  <?php $listOfBoard = false; include __DIR__ . '/_filters.php'; ?>
 
   <div class="kanban-board">
     <?php foreach ($columns as $key => $col): ?>
