@@ -46,6 +46,7 @@ implementation detail.
 - [Incentives](./20-incentives.md) — the incentive cycle, My Incentives, and paying incentives (Accounts).
 - [Departments & Log in as](./21-departments.md) — departments and their designations, choosing and switching department, Admin's Preview as, a person's memberships, personal exceptions with an end date.
 - [Procurement](./22-procurement.md) — purchase requirements from Sales, supplier quotes and comparison, award and approval limits, receipt and quality check, supplier performance.
+- [My tasks, owners & cockpit](./23-coordination.md) — each department's task list built from the orders, one owner per department per order, due and escalation days, the management cockpit, the optional Order Coordinator.
 
 ## The running examples
 

@@ -89,6 +89,7 @@ const permissionAdminController = require('./controllers/permissionAdminControll
 const departmentController = require('./controllers/departmentController');
 const departmentAdminController = require('./controllers/departmentAdminController');
 const purchasingController = require('./controllers/purchasingController');
+const coordinationController = require('./controllers/coordinationController');
 const moneyVisibility = require('./services/moneyVisibility');
 const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
@@ -760,6 +761,13 @@ app.post('/test-mode/enable', requireAuth, requireSuperAdmin, verifyCsrf, asyncH
 app.post('/test-mode/disable', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.disable));
 app.post('/test-mode/test-email', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.updateTestEmail));
 app.post('/test-mode/delete-test-data', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.deleteTestData));
+
+// Owner decision D-214, phase 4: the system coordinates — My tasks, owners per department, the cockpit, task due days.
+app.get('/my-tasks', requireAuth, requirePermissionAny(['manage_orders', 'view_orders']), asyncHandler(coordinationController.myTasks));
+app.get('/cockpit', requireAuth, requirePermission('view_cockpit'), asyncHandler(coordinationController.cockpit));
+app.get('/admin/task-types', requireAuth, requirePermission('manage_task_types'), asyncHandler(coordinationController.taskTypes));
+app.post('/admin/task-types', requireAuth, requirePermission('manage_task_types'), verifyCsrf, asyncHandler(coordinationController.updateTaskTypes));
+app.post('/orders/:id/department-owners', requireAuth, requirePermission('assign_department_owner'), checkOrderLock, verifyCsrf, asyncHandler(coordinationController.setOwner));
 
 // Owner decision D-214, phase 3: Procurement — requirements raised by Sales, quotes, award, approval, receipt and quality check.
 app.post('/orders/:id/purchase-requirements', requireAuth, requirePermission('raise_purchase_requirements'), checkOrderLock, verifyCsrf, asyncHandler(purchasingController.raise));

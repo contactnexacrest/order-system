@@ -92,7 +92,9 @@ $canViewComplaintsList = $can('manage_complaints') || $can('respond_to_complaint
 // Owner decision D-214, phase 3: Procurement's queue.
 $canProcurement = $can('manage_purchasing') || $can('approve_purchases');
 $opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canComplaints || $canViewClients || $canViewOrders || $canProcurement;
-$insightsGroupVisible = $canReports || $canAudit || $canPayIncentives || $canOwnIncentives;
+// Owner decision D-214, phase 4: the management cockpit.
+$canCockpit = $can('view_cockpit');
+$insightsGroupVisible = $canReports || $canAudit || $canPayIncentives || $canOwnIncentives || $canCockpit;
 // 90-item backlog #34: $canManageHsCodes/$canManageComplianceTaskTypes/
 // $canManageDropdownOptions/$canManageEmailTemplates each gate their own
 // link inside this dropdown but were never added to the group's own
@@ -115,7 +117,7 @@ $isActive = static function (string $path) use ($currentPath): bool {
     return $path === '/' ? $currentPath === '/' : str_starts_with($currentPath, $path);
 };
 $opsGroupActive = $isActive('/procurement') || $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes') || $isActive('/complaints');
-$insightsGroupActive = $isActive('/reports') || $isActive('/audit-log') || $isActive('/incentives/payouts') || $isActive('/my-incentives');
+$insightsGroupActive = $isActive('/cockpit') || $isActive('/reports') || $isActive('/audit-log') || $isActive('/incentives/payouts') || $isActive('/my-incentives');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates') || $isActive('/ui-templates')
     || $isActive('/logistics-partners') || $isActive('/suppliers') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types') || $isActive('/ports') || $isActive('/incentives/settings') || $isActive('/associates');
@@ -157,6 +159,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
       <a href="/sop" target="_blank" rel="noopener"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>SOP / Operations Guide</a>
       <a href="/gallery" class="<?= $isActive('/gallery') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg></span>Gallery</a>
       <a href="/reviews" class="<?= $isActive('/reviews') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>My Reviews<?= $myReviewsPendingCount > 0 ? ' <span class="nav-badge">' . (int) $myReviewsPendingCount . '</span>' : '' ?></a>
+      <?php if ($can('manage_orders') || $can('view_orders')): ?><a href="/my-tasks" class="<?= $isActive('/my-tasks') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>My Tasks</a><?php endif; ?>
       <?php if ($canApproveEmail): ?><a href="/email-approvals" class="<?= $isActive('/email-approvals') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-10 6L2 7"></path></svg></span>Email Approvals<?= $emailApprovalsPendingCount > 0 ? ' <span class="nav-badge">' . (int) $emailApprovalsPendingCount . '</span>' : '' ?></a><?php endif; ?>
       <?php if ($canCaModule): ?><a href="/ca" class="<?= $isActive('/ca') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>CA / Accounting</a><?php endif; ?>
       <?php if ($canViewProducts): ?><a href="/products" class="<?= $isActive('/products') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></span>Products</a><?php endif; ?>
@@ -187,6 +190,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canReports): ?><a href="/reports" class="<?= $isActive('/reports') ? 'active' : '' ?>">Reports</a><?php endif; ?>
           <?php if ($canPayIncentives): ?><a href="/incentives/payouts" class="<?= $isActive('/incentives/payouts') ? 'active' : '' ?>">Incentive Payouts</a><?php endif; ?>
           <?php if ($canOwnIncentives): ?><a href="/my-incentives" class="<?= $isActive('/my-incentives') ? 'active' : '' ?>">My Incentives</a><?php endif; ?>
+          <?php if ($canCockpit): ?><a href="/cockpit" class="<?= $isActive('/cockpit') ? 'active' : '' ?>">Management Cockpit</a><?php endif; ?>
           <?php if ($canAudit): ?><a href="/audit-log" class="<?= $isActive('/audit-log') ? 'active' : '' ?>">Audit Log</a><?php endif; ?>
         </div>
       </details>
@@ -210,6 +214,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canAssets): ?><a href="/company-assets" class="<?= $isActive('/company-assets') ? 'active' : '' ?>">Assets</a><?php endif; ?>
           <?php if ($canSignatories): ?><a href="/signatories" class="<?= $isActive('/signatories') ? 'active' : '' ?>">Signatories</a><?php endif; ?>
           <?php if ($canPermissions): ?><a href="/admin/departments" class="<?= $isActive('/admin/departments') ? 'active' : '' ?>">Departments</a><?php endif; ?>
+          <?php if ($can('manage_task_types')): ?><a href="/admin/task-types" class="<?= $isActive('/admin/task-types') ? 'active' : '' ?>">Task Due Days</a><?php endif; ?>
           <?php if ($canPermissions): ?><a href="/admin/permissions" class="<?= $isActive('/admin/permissions') ? 'active' : '' ?>">Permissions</a><?php endif; ?>
           <?php if ($canUsers): ?><a href="/users" class="<?= $isActive('/users') ? 'active' : '' ?>">Users</a><?php endif; ?>
           <?php if ($canFieldProtection): ?><a href="/admin/field-protection" class="<?= $isActive('/admin/field-protection') ? 'active' : '' ?>">Field Protection</a><?php endif; ?>

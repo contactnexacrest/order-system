@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS purchase_requirements (
   KEY idx_pr_order (order_id),
   KEY idx_pr_status (status),
   CONSTRAINT fk_pr_order FOREIGN KEY (order_id) REFERENCES orders(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS purchase_quotes (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS purchase_quotes (
   KEY idx_pq_supplier (supplier_id),
   CONSTRAINT fk_pq_requirement FOREIGN KEY (requirement_id) REFERENCES purchase_requirements(id),
   CONSTRAINT fk_pq_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB;
 
 INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
   ('raise_purchase_requirements', 'Raise purchase requirements', 'Ask Procurement for what an order needs (product, quantity, needed by) — no prices. D-214: Sales, management.', 'procurement'),

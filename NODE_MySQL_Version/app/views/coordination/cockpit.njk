@@ -1,0 +1,54 @@
+<div class="card page-wide">
+  <h1>Management cockpit</h1>
+  <p class="muted">Open work per department from every order's state — counts and status only, no amounts.</p>
+  <table class="list">
+    <tr><th>Department</th><th>Open tasks</th><th>Overdue</th><th>Escalated</th><th>Orders without an owner</th></tr>
+    {% for name, c in byDepartment %}
+    <tr>
+      <td><span class="dept-tag" style="--dept-color:{{ c.color }}">{{ name }}</span></td>
+      <td>{{ c.open }}</td>
+      <td>{% if c.overdue > 0 %}<strong style="color:var(--danger)">{{ c.overdue }}</strong>{% else %}0{% endif %}</td>
+      <td>{{ c.escalated }}</td>
+      <td>{{ c.unowned }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="muted">No open work.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card page-wide">
+  <h2>Orders by status</h2>
+  <div class="kv-grid">
+    {% for status, n in ordersByStatus %}<div><span class="k">{{ status | replace('_', ' ') | title }}</span><span class="v">{{ n }}</span></div>{% endfor %}
+  </div>
+</div>
+
+<div class="card page-wide">
+  <h2>Escalated — needs management</h2>
+  <table class="list">
+    <tr><th>Due</th><th>Department</th><th>Task</th><th>Order</th><th>Detail</th><th>Owner</th></tr>
+    {% for t in escalated %}
+    <tr>
+      <td>{{ t.due_on }}</td>
+      <td>{{ t.department_name }}</td>
+      <td>{{ t.title }}</td>
+      <td><a href="{{ t.link }}">{{ t.order_reference }}</a></td>
+      <td>{{ t.subject }}</td>
+      <td>{{ t.owner_name if t.owner_name != null else '—' }}</td>
+    </tr>
+    {% endfor %}
+    {% if not escalated.length %}<tr><td colspan="6" class="muted">Nothing escalated.</td></tr>{% endif %}
+  </table>
+</div>
+
+<div class="card page-wide">
+  <h2>Supplier delays</h2>
+  <table class="list">
+    <tr><th>Needed by</th><th>Order</th><th>Purchase</th></tr>
+    {% for t in supplierDelays %}
+    <tr><td>{{ t.since }}</td><td>{{ t.order_reference }}</td><td><a href="{{ t.link }}">{{ t.subject }}</a></td></tr>
+    {% endfor %}
+    {% if not supplierDelays.length %}<tr><td colspan="3" class="muted">No supplier is late.</td></tr>{% endif %}
+  </table>
+</div>

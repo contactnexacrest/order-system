@@ -1,0 +1,24 @@
+<div class="card page-wide">
+  <h1>My tasks</h1>
+  <p class="muted">What {{ acting if acting else 'your department' }} has to do next, earliest due first. A task appears here when the step before it is done, and goes away when you do it. Overdue tasks are red; after a few more days they are escalated to management.</p>
+  <div class="btn-row">
+    <a class="btn-sm{{ ' btn-secondary' if mine else '' }}" href="/my-tasks">All of my department's tasks</a>
+    <a class="btn-sm{{ '' if mine else ' btn-secondary' }}" href="/my-tasks?show=mine">Only orders I own</a>
+  </div>
+  <div class="table-scroll">
+  <table class="list">
+    <tr><th>Due</th><th>Task</th><th>Order</th><th>Detail</th><th>Owner</th><th></th></tr>
+    {% for t in tasks %}
+    <tr{% if t.overdue == 1 %} style="background:var(--danger-soft)"{% endif %}>
+      <td>{{ t.due_on }}{% if t.escalated == 1 %} <span class="badge badge-inactive">escalated</span>{% elif t.overdue == 1 %} <span class="badge badge-warning">overdue</span>{% endif %}</td>
+      <td><span class="dept-tag" style="--dept-color:{{ t.department_color }}">{{ t.department_name }}</span> {{ t.title }}</td>
+      <td>{{ t.order_reference }}</td>
+      <td>{{ t.subject }}</td>
+      <td>{% if t.owner_name != null %}{{ t.owner_name }}{% else %}<span class="muted">no owner yet</span>{% endif %}</td>
+      <td><a class="btn-sm" href="{{ t.link }}">Open</a></td>
+    </tr>
+    {% endfor %}
+    {% if not tasks.length %}<tr><td colspan="6" class="muted">Nothing to do right now.</td></tr>{% endif %}
+  </table>
+  </div>
+</div>

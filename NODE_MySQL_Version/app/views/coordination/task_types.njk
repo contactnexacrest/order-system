@@ -1,0 +1,19 @@
+<div class="card page-wide">
+  <h1>Task due days</h1>
+  <p class="muted">Each kind of department task is due this many days after the step before it was done; after the escalation days more, it is shown to management as escalated.</p>
+  <form method="post" action="/admin/task-types">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <table class="list">
+      <tr><th>Department</th><th>Task</th><th>Due after (days)</th><th>Escalate after a further (days)</th></tr>
+      {% for t in types %}
+      <tr>
+        <td>{{ t.department_name or t.department_code }}</td>
+        <td>{{ t.title }}</td>
+        <td><input type="number" name="standard_days[{{ t.task_key }}]" value="{{ t.standard_days }}" min="0" max="90" step="1" required aria-label="Due after days"></td>
+        <td><input type="number" name="escalate_after_days[{{ t.task_key }}]" value="{{ t.escalate_after_days }}" min="0" max="90" step="1" required aria-label="Escalate after days"></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save</button></div>
+  </form>
+</div>

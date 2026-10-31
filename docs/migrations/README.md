@@ -17,6 +17,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-10-31d-gst-refunds.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01a-departments.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01b-money-separation.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01c-procurement.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-01d-coordination.sql
 ```
 
 ## Rules every file follows
@@ -34,7 +35,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-01c-procurement.sql
 
 Run each file below that the database has not had yet, in this order, then
 deploy the code for both stacks. As of 30 Oct 2026 the live site still
-needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30c, 30d, 31a, 31b, 31c, 31d, 11-01a, 11-01b and 11-01c**.
+needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30c, 30d, 31a, 31b, 31c, 31d, 11-01a, 11-01b, 11-01c and 11-01d**.
 
 | # | File | What it does |
 |---|---|---|
@@ -68,6 +69,7 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30
 
 | 27 | `2026-11-01b-money-separation.sql` | D-214, phase 2: who sees which money — the permissions See selling prices, See buyer payments, See purchase prices, See logistics costs, Supplier PO and production, and Mark an order fully settled, granted by department (Sales: selling + buyer payments; Procurement: purchase + Supplier PO; Logistics: logistics costs; Accounts & Finance, MD/ED, auditors and CA: all money; settling: Accounts & Finance and management). New rows only |
 | 28 | `2026-11-01c-procurement.sql` | D-214, phase 3: Procurement — purchase requirements (raised by Sales, no prices) and supplier quotes; the permissions Raise purchase requirements (Sales, management), Work purchase requirements (Procurement, management) and Approve purchases (Procurement Manager / Director, management); starting approval limits Procurement Executive ₹0 and Procurement Manager ₹5,00,000 (only where none is set). New tables and rows only |
+| 29 | `2026-11-01d-coordination.sql` | D-214, phase 4: one owner per department per order; the kinds of department task with their due and escalation days (editable in Admin → Task Due Days); the permissions Assign department owners (managers, directors, MD/ED, Admin, Order Coordinator), Management cockpit (directors, MD/ED, Admin, Order Coordinator) and Task due days (Admin, MD/ED); the Order Coordinator sees every order (no money). Also brings the tables added on 1 Nov to the database's own collation where they differ. New tables and rows only |
 
 There is no `2026-10-28b` file; that letter was not used.
 

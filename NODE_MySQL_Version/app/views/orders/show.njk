@@ -3846,6 +3846,29 @@
 
     </div>
     <aside class="order-detail-sidebar" id="order-detail-sidebar">
+      {# Owner decision D-214, phase 4: one owner per department; a department's manager picks theirs. #}
+      {% if departmentOwners.length %}
+      <div class="sidebar-panel" id="department-owners">
+        <h3>Owners</h3>
+        <div class="kv-grid">
+          {% for o in departmentOwners %}
+          <div><span class="k">{{ o.name }}</span><span class="v">{% if o.owner_name != null %}{{ o.owner_name }}{% else %}<span class="muted">no owner yet</span>{% endif %}
+            {% if o.mayAssign and o.candidates.length %}
+              <form method="post" action="/orders/{{ order.id }}/department-owners" class="dept-end">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="department_id" value="{{ o.department_id }}">
+                <select name="user_id" required aria-label="Owner for {{ o.name }}">
+                  <option value="">— choose —</option>
+                  {% for c in o.candidates %}<option value="{{ c.id }}" {{ 'selected' if c.id == o.user_id else '' }}>{{ c.name }} ({{ c.designation_title }})</option>{% endfor %}
+                </select>
+                <button type="submit" class="btn-sm">Set</button>
+              </form>
+            {% endif %}
+          </span></div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
       <div class="sidebar-panel sidebar-glance">
         <h3>At a Glance</h3>
         <div class="kv-grid">

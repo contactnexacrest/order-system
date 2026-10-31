@@ -4494,7 +4494,7 @@ CREATE TABLE departments (
   created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_departments_code (code),
   UNIQUE KEY uq_departments_name (name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB;
 
 CREATE TABLE department_designations (
   id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -4509,7 +4509,7 @@ CREATE TABLE department_designations (
   UNIQUE KEY uq_designation_title (department_id, title),
   FOREIGN KEY (department_id) REFERENCES departments(id),
   FOREIGN KEY (role_id) REFERENCES roles(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB;
 
 CREATE TABLE user_department_memberships (
   id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -4526,7 +4526,7 @@ CREATE TABLE user_department_memberships (
   FOREIGN KEY (created_by) REFERENCES users(id),
   FOREIGN KEY (ended_by) REFERENCES users(id),
   INDEX idx_memberships_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB;
 
 ALTER TABLE audit_log ADD COLUMN acting_as VARCHAR(160) NULL AFTER user_id;
 
@@ -4561,7 +4561,7 @@ CREATE TABLE purchase_requirements (
   KEY idx_pr_order (order_id),
   KEY idx_pr_status (status),
   CONSTRAINT fk_pr_order FOREIGN KEY (order_id) REFERENCES orders(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB;
 
 CREATE TABLE purchase_quotes (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -4579,4 +4579,29 @@ CREATE TABLE purchase_quotes (
   KEY idx_pq_supplier (supplier_id),
   CONSTRAINT fk_pq_requirement FOREIGN KEY (requirement_id) REFERENCES purchase_requirements(id),
   CONSTRAINT fk_pq_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB;
+
+-- Owner decision D-214 (2026-10-31), phase 4: coordination — one owner per department per order, and the
+-- standard / escalation days of each kind of department task (docs/migrations/2026-11-01d-coordination.sql).
+CREATE TABLE order_department_owners (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id BIGINT UNSIGNED NOT NULL,
+  department_id BIGINT UNSIGNED NOT NULL,
+  user_id BIGINT UNSIGNED NOT NULL,
+  assigned_by BIGINT UNSIGNED NOT NULL,
+  assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_order_department_owner (order_id, department_id),
+  KEY idx_odo_user (user_id),
+  CONSTRAINT fk_odo_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_odo_department FOREIGN KEY (department_id) REFERENCES departments(id),
+  CONSTRAINT fk_odo_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE department_task_types (
+  task_key VARCHAR(50) PRIMARY KEY,
+  department_code VARCHAR(20) NOT NULL,
+  title VARCHAR(150) NOT NULL,
+  standard_days INT NOT NULL,
+  escalate_after_days INT NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB;

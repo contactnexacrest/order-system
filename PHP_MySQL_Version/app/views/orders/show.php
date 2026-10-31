@@ -4405,6 +4405,36 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     </div>
 
     <aside class="order-detail-sidebar" id="order-detail-sidebar">
+      <?php
+      // Owner decision D-214, phase 4: one owner per department; a department's manager picks theirs.
+      $__owners = \App\Repositories\DepartmentTaskRepository::ownersForOrder((int) $order['id']);
+      $__canAssignOwner = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'assign_department_owner');
+      $__ownScope = \App\Repositories\DepartmentTaskRepository::scopeFor(\App\Services\ActiveDepartmentService::current((int) $currentUser['id']));
+      ?>
+      <?php if ($__owners !== []): ?>
+      <div class="sidebar-panel" id="department-owners">
+        <h3>Owners</h3>
+        <div class="kv-grid">
+          <?php foreach ($__owners as $__o): $__mayAssign = $__canAssignOwner && ($__ownScope === null || in_array((string) $__o['code'], $__ownScope, true)); ?>
+          <div><span class="k"><?= htmlspecialchars((string) $__o['name']) ?></span><span class="v"><?= $__o['owner_name'] !== null ? htmlspecialchars((string) $__o['owner_name']) : '<span class="muted">no owner yet</span>' ?>
+            <?php if ($__mayAssign): $__cands = \App\Repositories\DepartmentTaskRepository::candidates((int) $__o['department_id']); ?>
+              <?php if ($__cands !== []): ?>
+              <form method="post" action="/orders/<?= (int) $order['id'] ?>/department-owners" class="dept-end">
+                <?= Csrf::field() ?>
+                <input type="hidden" name="department_id" value="<?= (int) $__o['department_id'] ?>">
+                <select name="user_id" required aria-label="Owner for <?= htmlspecialchars((string) $__o['name']) ?>">
+                  <option value="">— choose —</option>
+                  <?php foreach ($__cands as $__c): ?><option value="<?= (int) $__c['id'] ?>" <?= (int) $__c['id'] === (int) ($__o['user_id'] ?? 0) ? 'selected' : '' ?>><?= htmlspecialchars($__c['name'] . ' (' . $__c['designation_title'] . ')') ?></option><?php endforeach; ?>
+                </select>
+                <button type="submit" class="btn-sm">Set</button>
+              </form>
+              <?php endif; ?>
+            <?php endif; ?>
+          </span></div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+      <?php endif; ?>
       <div class="sidebar-panel sidebar-glance">
         <h3>At a Glance</h3>
         <div class="kv-grid">

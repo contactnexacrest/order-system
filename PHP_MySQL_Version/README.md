@@ -2223,3 +2223,19 @@ Zoho Books, built from the facts and including the bank reference.
   approver with "Approve purchases" whose own limit covers it approves it
   (never the awarder, unless the maker-checker rule allows).
 - **Tests:** `tests/Integration/PurchasingTest.php`.
+
+## Follow-up (added 2026-11-01): My tasks, owners and cockpit (owner decision D-214, phase 4)
+
+- **Migration:** `docs/migrations/2026-11-01d-coordination.sql` — tables
+  `order_department_owners`, `department_task_types`; permissions
+  `assign_department_owner`, `view_cockpit`, `manage_task_types`; aligns the
+  1 Nov tables to the database collation.
+- **Tasks:** `App\Repositories\DepartmentTaskRepository` derives each department's open work from order state
+  in one query (advance cleared without a requirement, requirements to quote
+  / approve / chase, received goods without freight, remittances to clear,
+  unpaid bills, documents to send), with due and escalation dates from
+  `department_task_types`. A department with task kinds of its own sees its
+  own; management, the Order Desk and Audit see all.
+- **Screens:** `/my-tasks`, `/cockpit`, `/admin/task-types`, and the Owners
+  panel on the order page (`POST /orders/{id}/department-owners`).
+- **Tests:** `tests/Integration/CoordinationTest.php`.

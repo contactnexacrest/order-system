@@ -1,5 +1,9 @@
 'use strict';
 
+const activeDepartmentService = require('../services/activeDepartmentService');
+
+const departmentTaskRepository = require('../repositories/departmentTaskRepository');
+
 const purchasingRepository = require('../repositories/purchasingRepository');
 
 const moneyVisibility = require('../services/moneyVisibility');
@@ -872,6 +876,18 @@ async function duplicateProduct(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/** The order's owner per department, with whom this person may choose from (a manager for their own department; MD/ED, Admin for all). */
+async function departmentOwnersFor(req, orderId) {
+  const owners = await departmentTaskRepository.ownersForOrder(orderId);
+  const userId = req.user ? req.user.id : null;
+  const scope = userId !== null && req.session ? await departmentTaskRepository.scopeFor(await activeDepartmentService.current(req, userId)) : null;
+  for (const o of owners) {
+    o.mayAssign = userId !== null && !!(req.permissions && req.permissions.assign_department_owner) && (scope === null || scope.includes(String(o.code)));
+    o.candidates = o.mayAssign ? await departmentTaskRepository.candidates(Number(o.department_id)) : [];
+  }
+  return owners;
+}
+
 async function show(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -1097,6 +1113,8 @@ async function show(req, res) {
       vendorBills,
       // Owner decision D-214, phase 3: what the order needs from Procurement.
       purchaseRequirements: await purchasingRepository.forOrder(orderId),
+      // Owner decision D-214, phase 4: one owner per department; a department's manager picks theirs.
+      departmentOwners: await departmentOwnersFor(req, orderId),
       purchaseStatuses: purchasingRepository.STATUSES,
       todayDate: todayIst(),
       logisticsBanks,

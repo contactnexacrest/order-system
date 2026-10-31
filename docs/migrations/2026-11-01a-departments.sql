@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS departments (
   created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_departments_code (code),
   UNIQUE KEY uq_departments_name (name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS department_designations (
   id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS department_designations (
   UNIQUE KEY uq_designation_title (department_id, title),
   FOREIGN KEY (department_id) REFERENCES departments(id),
   FOREIGN KEY (role_id) REFERENCES roles(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS user_department_memberships (
   id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS user_department_memberships (
   FOREIGN KEY (created_by) REFERENCES users(id),
   FOREIGN KEY (ended_by) REFERENCES users(id),
   INDEX idx_memberships_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB;
 
 SET @nx_sql := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'audit_log' AND COLUMN_NAME = 'acting_as') = 0, 'ALTER TABLE audit_log ADD COLUMN acting_as VARCHAR(160) NULL AFTER user_id', 'DO 0');
 PREPARE nx_stmt FROM @nx_sql; EXECUTE nx_stmt; DEALLOCATE PREPARE nx_stmt;

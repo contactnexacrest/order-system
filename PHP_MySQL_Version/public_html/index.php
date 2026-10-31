@@ -103,6 +103,7 @@ $permissionAdmin = new PermissionAdminController();
 $departments = new \App\Controllers\DepartmentController();
 $departmentAdmin = new \App\Controllers\DepartmentAdminController();
 $purchasing = new \App\Controllers\PurchasingController();
+$coordination = new \App\Controllers\CoordinationController();
 $clients = new ClientController();
 $clientIntake = new ClientIntakeController();
 $clientIntakeReview = new ClientIntakeReviewController();
@@ -388,6 +389,13 @@ $router->post('/test-mode/enable', [$testMode, 'enable'], [SessionAuth::required
 $router->post('/test-mode/disable', [$testMode, 'disable'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 $router->post('/test-mode/test-email', [$testMode, 'updateTestEmail'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 $router->post('/test-mode/delete-test-data', [$testMode, 'deleteTestData'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
+
+// Owner decision D-214, phase 4: the system coordinates — My tasks, owners per department, the cockpit, task due days.
+$router->get('/my-tasks', [$coordination, 'myTasks'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'view_orders'])]);
+$router->get('/cockpit', [$coordination, 'cockpit'], [SessionAuth::required(), PermissionCheck::requires('view_cockpit')]);
+$router->get('/admin/task-types', [$coordination, 'taskTypes'], [SessionAuth::required(), PermissionCheck::requires('manage_task_types')]);
+$router->post('/admin/task-types', [$coordination, 'updateTaskTypes'], [SessionAuth::required(), PermissionCheck::requires('manage_task_types'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/department-owners', [$coordination, 'setOwner'], [SessionAuth::required(), PermissionCheck::requires('assign_department_owner'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 // Owner decision D-214, phase 3: Procurement — requirements raised by Sales, quotes, award, approval, receipt and quality check.
 $router->post('/orders/{id}/purchase-requirements', [$purchasing, 'raise'], [SessionAuth::required(), PermissionCheck::requires('raise_purchase_requirements'), OrderLockGuard::check(), CsrfCheck::verify()]);

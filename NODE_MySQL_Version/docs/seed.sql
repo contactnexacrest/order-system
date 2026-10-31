@@ -1878,3 +1878,44 @@ WHERE p.permission_key = 'approve_purchases'
 UPDATE department_designations dd JOIN departments d ON d.id = dd.department_id
    SET dd.approval_limit_inr = CASE dd.title WHEN 'Procurement Executive' THEN 0 WHEN 'Procurement Manager' THEN 500000 END
  WHERE d.code = 'PROC' AND dd.title IN ('Procurement Executive', 'Procurement Manager') AND dd.approval_limit_inr IS NULL;
+
+-- ---------------------------------------------------------------
+-- Owner decision D-214, phase 4: task types, coordination permissions
+-- (same rows as docs/migrations/2026-11-01d-coordination.sql).
+INSERT IGNORE INTO department_task_types (task_key, department_code, title, standard_days, escalate_after_days, sort_order) VALUES
+  ('raise_purchase_requirement', 'SALES', 'Raise the purchase requirement (advance cleared)', 1, 2, 10),
+  ('quote_and_award', 'PROC', 'Get supplier quotes and award', 3, 3, 20),
+  ('approve_purchase', 'PROC', 'Approve the award (above the awarder''s limit)', 1, 2, 30),
+  ('chase_supplier', 'PROC', 'Chase the supplier — goods due', 0, 3, 40),
+  ('book_freight', 'LOG', 'Book freight and CHA (goods received)', 2, 3, 50),
+  ('clear_buyer_payment', 'FIN', 'Clear the buyer''s payment (remittance received)', 1, 2, 60),
+  ('pay_supplier_bill', 'FIN', 'Pay the supplier / logistics bill', 3, 4, 70),
+  ('send_documents', 'LOG', 'Send the documents to the buyer (balance cleared)', 2, 3, 80);
+
+INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
+  ('assign_department_owner', 'Assign department owners', 'Choose who in a department owns an order for that department (a manager for their own department; MD/ED and Admin for any). D-214 phase 4.', 'orders'),
+  ('view_cockpit', 'Management cockpit', 'Open, overdue and escalated work per department, orders by stage, supplier delays and overdue buyer payments — counts and status only. D-214 phase 4.', 'reports'),
+  ('manage_task_types', 'Task due days', 'Set the standard and escalation days of each kind of department task. D-214 phase 4.', 'admin');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'assign_department_owner'
+  AND r.name IN ('Admin', 'Managing Director', 'Executive Director', 'Sales/Export Manager', 'Sales Director', 'Procurement Manager', 'Procurement Director',
+                 'Logistics Manager', 'Logistics Director', 'Finance Manager', 'Finance Director', 'Order Coordinator', 'Operations Manager');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'view_cockpit'
+  AND r.name IN ('Admin', 'Managing Director', 'Executive Director', 'Sales Director', 'Procurement Director', 'Logistics Director', 'Finance Director',
+                 'Order Coordinator', 'Operations Manager');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'manage_task_types'
+  AND r.name IN ('Admin', 'Managing Director', 'Executive Director');
+
+-- The Order Coordinator follows every order's status and tasks — no money.
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key IN ('view_orders', 'view_all_orders')
+  AND r.name IN ('Order Coordinator', 'Operations Manager');
