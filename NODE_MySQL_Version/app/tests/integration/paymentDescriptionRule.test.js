@@ -153,4 +153,26 @@ describe('Rule D-212 — money records need the reference their description is b
     expect(await db.queryOne("SELECT refund_status, DATE_FORMAT(refund_paid_at, '%Y-%m-%d') AS paid_at, refund_reference FROM order_cancellations WHERE id = :id", { id: cancellation }))
       .toEqual({ refund_status: 'completed', paid_at: todayIst(), refund_reference: 'HDFCO26311000777' });
   });
+
+  // Batch 2 (A13): an expense typed in Zoho Books without a description is flagged, so the CA fixes it there.
+  it('flags a Zoho expense without a description', async () => {
+    const tag = Math.random().toString(16).slice(2, 8);
+    await db.execute(
+      `INSERT INTO ca_expenses (zoho_expense_id, category, description, vendor_name, amount, currency_code, expense_date)
+       VALUES (:a, 'Courier', '', 'Blue Dart', 850, 'INR', CURDATE()), (:b, 'Courier', :desc, 'DHL', 2100, 'INR', CURDATE())`,
+      { a: `TEST-ZX-${tag}-1`, b: `TEST-ZX-${tag}-2`, desc: `Courier of BL copies to the buyer ${tag}` }
+    );
+    const html = (await admin.get('/ca/expenses')).text;
+    expect(html).toContain('>No description in Zoho</span>');
+    expect(html).toContain(`Courier of BL copies to the buyer ${tag}`);
+  });
+
+  // Batch 2: the descriptions built for the inspection fee, the LC loan interest and the travel cost.
+  it('builds the cost descriptions', () => {
+    expect(paymentDescription.inspectionFee(' SGS India Pvt Ltd ', 'SGS/MUM/26/0457')).toBe('Pre-shipment inspection fee — SGS India Pvt Ltd, invoice SGS/MUM/26/0457');
+    expect(paymentDescription.lcLoanInterest('LC-778', 250000, 9.5)).toBe('Bank loan interest (LC order) · LC LC-778 · loan ₹250,000.00 at 9.5%');
+    expect(paymentDescription.lcLoanInterest(null, null, null)).toBe('Bank loan interest (LC order)');
+    expect(paymentDescription.travelExpenses(175, 5, 'USD', 8000, 84.1)).toBe('Travel expenses (factory visits) — 175 km to the factory, 5% of the order value USD 8,000.00 at ₹84.10');
+    expect(paymentDescription.travelExpenses(null, 7.5, 'INR', 500000, 1)).toBe('Travel expenses (factory visits) — 7.5% of the order value INR 500,000.00');
+  });
 });

@@ -32,7 +32,11 @@ Every expense recorded in Zoho Books is imported: its category (Zoho
 Books' own expense/account name — this system doesn't maintain a separate
 category list, so whatever chart-of-accounts category is used in Zoho
 Books is exactly what shows up here), description, vendor name, amount,
-currency, and date.
+currency, and date. An expense typed in Zoho Books **without a
+description** shows a red **No description in Zoho** badge here and on
+the order it is linked to (rule D-212): add the description in Zoho Books
+(Purchases → Expenses) and run the sync — the app cannot fill it in for
+Zoho.
 
 Each Zoho expense is only ever imported once — the system remembers which
 Zoho expense IDs it has already pulled, so running a sync repeatedly never

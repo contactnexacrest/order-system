@@ -186,13 +186,14 @@ final class OrderLcDetailTest extends DbTestCase
         self::assertCount(1, $entries);
         self::assertSame('bank_loan_interest', $entries[0]['category']);
         self::assertSame('1200.00', $entries[0]['amount_inr']);
+        self::assertSame('Bank loan interest (LC order) · LC LC-1', $entries[0]['description'], 'owner rule D-212: names the LC');
         $firstEntryId = (int) $entries[0]['id'];
 
         $saved = OrderLcDetailRepository::find($orderId);
         self::assertSame($firstEntryId, (int) $saved['interest_cost_entry_id']);
 
         // Re-save with a higher interest-paid amount.
-        $_POST = ['lc_number' => 'LC-1', 'bank_loan_interest_paid' => '1500'];
+        $_POST = ['lc_number' => 'LC-1', 'bank_loan_amount' => '250000', 'bank_loan_interest_rate' => '9.5', 'bank_loan_interest_paid' => '1500'];
         ob_start();
         (new OrderFinancialsController())->saveLcDetails(['id' => (string) $orderId]);
         ob_end_clean();
@@ -201,6 +202,7 @@ final class OrderLcDetailTest extends DbTestCase
         self::assertCount(1, $entriesAfter, 'must update the existing cost entry, never create a second one');
         self::assertSame($firstEntryId, (int) $entriesAfter[0]['id']);
         self::assertSame('1500.00', $entriesAfter[0]['amount_inr']);
+        self::assertSame('Bank loan interest (LC order) · LC LC-1 · loan ₹250,000.00 at 9.5%', $entriesAfter[0]['description'], 'and the loan it was charged on');
     }
 
     public function testClearingInterestPaidBackOutRemovesTheCostEntry(): void

@@ -261,6 +261,19 @@ final class ZohoBooksService
             $status = 'sent';
         }
 
+        // Owner rule D-212: what the invoice is, as an internal comment in
+        // Books (comments never print on Zoho's own invoice PDF, and our
+        // own documents are unchanged). Added once, when Books first gets
+        // the invoice; a failure here does not undo the invoice.
+        if ($existing === null && !empty($invoice['summary'])) {
+            try {
+                self::request('POST', "https://{$config['apiDomain']}/books/v3/invoices/" . rawurlencode((string) $saved['invoice_id']) . '/comments?organization_id=' . rawurlencode($config['organizationId']),
+                    ['description' => (string) $invoice['summary'], 'show_comment_to_clients' => false], self::authHeaders($accessToken));
+            } catch (\Throwable) {
+                // the invoice itself is in Books; the comment is a courtesy
+            }
+        }
+
         return ['zoho_invoice_id' => (string) $saved['invoice_id'], 'zoho_invoice_number' => (string) $saved['invoice_number'], 'status' => $status, 'created' => $existing === null];
     }
 
@@ -352,7 +365,8 @@ final class ZohoBooksService
             'line_items' => [[
                 'account_id' => self::accountId($config, $accessToken, self::BILL_ACCOUNTS[$forKey] ?? self::BILL_ACCOUNTS['other']),
                 'name' => $what,
-                'description' => "{$what} for order {$bill['buyer_inquiry_ref']}: taxable " . number_format((float) $bill['taxable_inr'], 2, '.', '') . ' + GST ' . number_format((float) $bill['gst_inr'], 2, '.', '') . (!empty($bill['note']) ? ". {$bill['note']}" : ''),
+                // Owner rule D-212: a supplier bill also names the Supplier PO it is billed against.
+                'description' => "{$what} for order {$bill['buyer_inquiry_ref']}" . ($bill['vendor_kind'] === 'supplier' && !empty($bill['supplier_po_reference']) ? " (Supplier PO {$bill['supplier_po_reference']})" : '') . ": taxable " . number_format((float) $bill['taxable_inr'], 2, '.', '') . ' + GST ' . number_format((float) $bill['gst_inr'], 2, '.', '') . (!empty($bill['note']) ? ". {$bill['note']}" : ''),
                 'rate' => $line['rate'],
                 'quantity' => 1,
             ] + ($line['tax_id'] !== null ? ['tax_id' => $line['tax_id']] : [])

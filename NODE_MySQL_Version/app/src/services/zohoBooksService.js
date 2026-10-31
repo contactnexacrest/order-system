@@ -213,6 +213,19 @@ async function pushInvoice(invoice) {
     status = 'sent';
   }
 
+  // Owner rule D-212: what the invoice is, as an internal comment in Books
+  // (comments never print on Zoho's own invoice PDF, and our own documents
+  // are unchanged). Added once, when Books first gets the invoice; a
+  // failure here does not undo the invoice.
+  if (!existing && invoice.summary) {
+    try {
+      await request('POST', `https://${config.apiDomain}/books/v3/invoices/${encodeURIComponent(String(saved.invoice_id))}/comments?organization_id=${encodeURIComponent(config.organizationId)}`,
+        { description: String(invoice.summary), show_comment_to_clients: false }, authHeaders(accessToken));
+    } catch (e) {
+      // the invoice itself is in Books; the comment is a courtesy
+    }
+  }
+
   return { zoho_invoice_id: String(saved.invoice_id), zoho_invoice_number: String(saved.invoice_number), status, created: !existing };
 }
 
@@ -301,7 +314,8 @@ async function pushBill(bill, zohoBillId = null) {
     line_items: [{
       account_id: await accountId(config, accessToken, BILL_ACCOUNTS[forKey] || BILL_ACCOUNTS.other),
       name: what,
-      description: `${what} for order ${bill.buyer_inquiry_ref}: taxable ${money(bill.taxable_inr)} + GST ${money(bill.gst_inr)}${bill.note ? `. ${bill.note}` : ''}`,
+      // Owner rule D-212: a supplier bill also names the Supplier PO it is billed against.
+      description: `${what} for order ${bill.buyer_inquiry_ref}${bill.vendor_kind === 'supplier' && bill.supplier_po_reference ? ` (Supplier PO ${bill.supplier_po_reference})` : ''}: taxable ${money(bill.taxable_inr)} + GST ${money(bill.gst_inr)}${bill.note ? `. ${bill.note}` : ''}`,
       rate: line.rate,
       quantity: 1,
       ...(line.tax_id !== null ? { tax_id: line.tax_id } : {}),

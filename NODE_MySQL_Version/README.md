@@ -1003,3 +1003,22 @@ Zoho Books, built from the facts and including the bank reference.
   record. Documents (PDF / DOCX) and CAFIN are unchanged.
 - Tests: `PaymentDescriptionRuleTest` / `paymentDescriptionRule.test.js`,
   and the Zoho Books stage 2 and 4 tests check the exact wording.
+
+## Follow-up (added 2026-10-31): rule D-212, Batch 2 — the remaining descriptions
+
+- **Migration** `docs/migrations/2026-10-31c-inspection-agency.sql`:
+  `order_inspection_fees.agency_name` / `agency_invoice_no`. A fee NexaCrest
+  pays needs both; its cost line reads "Pre-shipment inspection fee — <agency>,
+  invoice <no.>".
+- The automatic cost lines are described from their facts: "Bank loan interest
+  (LC order) · LC <no.> · loan ₹<amount> at <rate>%" and "Travel expenses
+  (factory visits) — <km> km to the factory, <pct>% of the order value <CUR>
+  <FOB> at ₹<rate>" (`PaymentDescription` / `paymentDescription.js`).
+- Zoho Books: a supplier bill's line names its Supplier PO; a CI / Debit Note
+  gets one internal comment when Books first gets it ("Commercial Invoice for
+  order <ref> · <Incoterm> · buyer PO <no.> · <buyer>", from
+  `ZohoInvoiceData::summary()` / `zohoInvoiceData.summary()`; not part of the
+  invoice fingerprint, so invoices already in Books are not re-sent).
+- An expense imported from Zoho without a description shows a red "No
+  description in Zoho" badge (CA → Expenses, and the order's linked Zoho
+  expenses).

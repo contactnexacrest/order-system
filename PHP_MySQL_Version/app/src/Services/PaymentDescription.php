@@ -60,6 +60,38 @@ final class PaymentDescription
         return implode(' · ', $parts);
     }
 
+    /** Batch 2: the pre-shipment inspection fee, naming the agency and its invoice. */
+    public static function inspectionFee(string $agency, string $invoiceNo): string
+    {
+        return 'Pre-shipment inspection fee — ' . trim($agency) . ', invoice ' . trim($invoiceNo);
+    }
+
+    /** Batch 2: the interest on the bank loan taken against the LC, with the LC and the loan it was charged on. */
+    public static function lcLoanInterest(?string $lcNumber, ?float $loanAmount, ?float $interestRate): string
+    {
+        $parts = ['Bank loan interest (LC order)'];
+        if ($lcNumber !== null && trim($lcNumber) !== '') {
+            $parts[] = 'LC ' . trim($lcNumber);
+        }
+        if ($loanAmount !== null && $loanAmount > 0) {
+            $parts[] = 'loan ₹' . number_format($loanAmount, 2) . ($interestRate !== null && $interestRate > 0 ? ' at ' . self::percent($interestRate) . '%' : '');
+        }
+        return implode(' · ', $parts);
+    }
+
+    /** Batch 2: the provisional travel cost, with how it was worked out. */
+    public static function travelExpenses(?float $distanceKm, float $pct, string $currency, float $fobTotal, float $rate): string
+    {
+        return 'Travel expenses (factory visits) — ' . ($distanceKm !== null ? self::percent($distanceKm) . ' km to the factory, ' : '') . self::percent($pct) . '% of the order value '
+            . $currency . ' ' . number_format($fobTotal, 2) . ($currency !== 'INR' ? ' at ₹' . self::rate($rate) : '');
+    }
+
+    /** 5.0 → "5", 7.5 → "7.5". */
+    private static function percent(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+    }
+
     /** What the payment settles: its invoice in Zoho, or, for an advance not yet applied, the Proforma Invoice it was asked for. */
     private static function against(int $orderId, string $leg, ?string $invoiceNumber): ?string
     {

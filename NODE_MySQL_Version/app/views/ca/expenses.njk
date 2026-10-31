@@ -17,7 +17,7 @@
           <td>{{ e.expense_date }}</td>
           <td>{{ e.category }}</td>
           <td>{{ e.vendor_name or '—' }}</td>
-          <td class="muted small">{{ e.description or '' }}</td>
+          <td class="muted small">{% if not (e.description or '') | trim %}<span class="badge badge-danger" title="Rule D-212: every expense says what it was for. Add the description in Zoho Books (Purchases → Expenses), then run the Zoho sync.">No description in Zoho</span>{% else %}{{ e.description }}{% endif %}</td>
           <td>{{ e.amount | money }} {{ e.currency_code }}</td>
           <td>
             {% if e.order_id != null %}

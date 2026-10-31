@@ -4443,3 +4443,6 @@ ALTER TABLE ca_export_benefits ADD COLUMN received_reference VARCHAR(100) NULL A
 ALTER TABLE order_cancellations
   ADD COLUMN refund_paid_at DATE NULL AFTER refund_notes,
   ADD COLUMN refund_reference VARCHAR(100) NULL AFTER refund_paid_at;
+ALTER TABLE order_inspection_fees
+  ADD COLUMN agency_name VARCHAR(150) NULL AFTER fee_amount,
+  ADD COLUMN agency_invoice_no VARCHAR(60) NULL AFTER agency_name; -- D-212 Batch 2 (migration 2026-10-31c-inspection-agency.sql)

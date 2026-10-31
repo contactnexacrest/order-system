@@ -52,7 +52,12 @@ the buyer:
 
 - **Same number and date as our document.** The Books invoice carries the
   document's own reference (for example `SC/CI/26/2810001`) and the date
-  printed on it. Books does not give it a number of its own.
+  printed on it. Books does not give it a number of its own. When Books
+  first gets it, the invoice also gets an internal **comment** saying what
+  it is — "Commercial Invoice for order NX-12 · CIF · buyer PO PO-778 ·
+  <buyer>" (rule D-212). Comments never print on Zoho's own invoice PDF,
+  and our documents are unchanged. A supplier bill's line also names the
+  Supplier PO it is billed against.
 - **The CI lists the products only** — one line per product, with its
   quantity, unit, unit price and HS code, so its total is the FOB value.
   On CFR / CIF orders, ocean freight (and insurance on CIF) are billed on

@@ -21,6 +21,34 @@ function rate(value) {
   return text.includes('.') && text.split('.')[1].length >= 2 ? text : Number(value).toFixed(2);
 }
 
+/** 5.0 → "5", 7.5 → "7.5". */
+function percent(value) {
+  return Number(value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+/** Batch 2: the pre-shipment inspection fee, naming the agency and its invoice. */
+function inspectionFee(agency, invoiceNo) {
+  return `Pre-shipment inspection fee — ${String(agency).trim()}, invoice ${String(invoiceNo).trim()}`;
+}
+
+/** Batch 2: the interest on the bank loan taken against the LC, with the LC and the loan it was charged on. */
+function lcLoanInterest(lcNumber, loanAmount, interestRate) {
+  const parts = ['Bank loan interest (LC order)'];
+  if (lcNumber !== null && lcNumber !== undefined && String(lcNumber).trim() !== '') {
+    parts.push(`LC ${String(lcNumber).trim()}`);
+  }
+  if (loanAmount !== null && loanAmount !== undefined && Number(loanAmount) > 0) {
+    parts.push(`loan ₹${money(loanAmount)}${interestRate !== null && interestRate !== undefined && Number(interestRate) > 0 ? ` at ${percent(interestRate)}%` : ''}`);
+  }
+  return parts.join(' · ');
+}
+
+/** Batch 2: the provisional travel cost, with how it was worked out. */
+function travelExpenses(distanceKm, pct, currency, fobTotal, fxRate) {
+  return `Travel expenses (factory visits) — ${distanceKm !== null && distanceKm !== undefined ? `${percent(distanceKm)} km to the factory, ` : ''}${percent(pct)}% of the order value `
+    + `${currency} ${money(fobTotal)}${currency !== 'INR' ? ` at ₹${rate(fxRate)}` : ''}`;
+}
+
 /** What the payment settles: its invoice in Zoho, or, for an advance not yet applied, the Proforma Invoice it was asked for. */
 async function against(orderId, leg, invoiceNumber) {
   if (invoiceNumber !== null && invoiceNumber !== undefined && invoiceNumber !== '') {
@@ -74,4 +102,4 @@ async function buyerPayment(orderId, leg, invoiceNumber = null) {
   return parts.join(' · ');
 }
 
-module.exports = { buyerPayment };
+module.exports = { buyerPayment, inspectionFee, lcLoanInterest, travelExpenses };

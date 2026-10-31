@@ -2928,12 +2928,13 @@
           <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
         {% else %}
           <table class="list">
-            <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
+            <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Description</th><th>Amount</th></tr>
             {% for e in linkedCaExpenses %}
             <tr>
               <td>{{ e.expense_date }}</td>
               <td>{{ e.category }}{% if e.reason %}<br><small class="muted">{{ e.reason }}</small>{% endif %}</td>
               <td>{{ e.vendor_name or '—' }}</td>
+              <td class="small">{% if not (e.description or '') | trim %}<span class="badge badge-danger" title="Rule D-212: every expense says what it was for. Add the description in Zoho Books (Purchases → Expenses), then run the Zoho sync.">No description in Zoho</span>{% else %}{{ e.description }}{% endif %}</td>
               <td>{{ e.amount | money }} {{ e.currency_code }}</td>
             </tr>
             {% endfor %}
@@ -3004,6 +3005,7 @@
         <div class="kv-grid">
           <div><span class="k">Fee Payer</span><span class="v">{{ (('NexaCrest' if orderInspectionFee.fee_payer == 'nexacrest' else 'Client')) if orderInspectionFee else 'Not yet recorded' }}</span></div>
           <div><span class="k">Fee Amount</span><span class="v">{{ orderInspectionFee.fee_amount | money if orderInspectionFee and orderInspectionFee.fee_amount != null else '—' }}</span></div>
+          {% if orderInspectionFee and orderInspectionFee.agency_name %}<div><span class="k">Agency</span><span class="v">{{ orderInspectionFee.agency_name }}, invoice {{ orderInspectionFee.agency_invoice_no }}</span></div>{% endif %}
         </div>
         <details>
           <summary>{{ 'Edit inspection fee' if orderInspectionFee else 'Record inspection fee' }}</summary>
@@ -3024,6 +3026,9 @@
                 {% for key, label in costEntryPaidFrom %}<option value="{{ key }}"{{ ' selected' if feePaidFrom == key }}>{{ label }}</option>{% endfor %}
               </select>
             </label>
+            {# Owner rule D-212: the cost line is described from the agency and its invoice. #}
+            <label data-show-when="fee_payer=nexacrest">Inspection agency *<input type="text" name="agency_name" required minlength="2" maxlength="150" value="{{ orderInspectionFee.agency_name if orderInspectionFee and orderInspectionFee.agency_name else '' }}" placeholder="e.g. SGS India Pvt Ltd"></label>
+            <label data-show-when="fee_payer=nexacrest">Agency's invoice no. *<input type="text" name="agency_invoice_no" required maxlength="60" value="{{ orderInspectionFee.agency_invoice_no if orderInspectionFee and orderInspectionFee.agency_invoice_no else '' }}" placeholder="e.g. SGS/MUM/26/0457"></label>
             <button type="submit" class="btn-sm">Save</button>
           </form>
         </details>

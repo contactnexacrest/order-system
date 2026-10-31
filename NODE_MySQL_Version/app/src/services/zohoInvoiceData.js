@@ -81,15 +81,31 @@ async function build(orderId, kind, documentId) {
     date,
     due_date: dueDate,
     reference_number: String(order.buyer_inquiry_ref),
+    summary: summary(kind, order),
     exchange_rate: rate,
     total: round2(total),
     lines,
   };
 }
 
+/**
+ * Owner rule D-212: "Commercial Invoice for order NX-12 · CIF · buyer PO
+ * PO-778 · Acme GmbH" — kept as an internal comment on the Books invoice.
+ * Port of ZohoInvoiceData::summary().
+ */
+function summary(kind, order) {
+  const parts = [`${kind === 'dn' ? 'Freight Debit Note' : 'Commercial Invoice'} for order ${order.buyer_inquiry_ref || ''}`];
+  if (order.incoterm_code) parts.push(String(order.incoterm_code));
+  if (order.buyers_po_ref) parts.push(`buyer PO ${order.buyers_po_ref}`);
+  parts.push(String(order.company_legal_name || ''));
+  return parts.filter((p) => p !== '').join(' · ');
+}
+
 /** A fingerprint of everything sent (not which revision it came from): when it changes, the Books invoice is updated. */
 function fingerprint(invoice) {
-  const { document_id: _documentId, revision: _revision, ...rest } = invoice;
+  // The summary is a comment added once, not part of the invoice (so
+  // invoices already in Books are not re-sent because of it).
+  const { document_id: _documentId, revision: _revision, summary: _summary, ...rest } = invoice;
   return crypto.createHash('sha256').update(JSON.stringify(rest)).digest('hex');
 }
 
@@ -146,4 +162,4 @@ async function debitNoteLines(orderId, order, label) {
   return lines;
 }
 
-module.exports = { KIND_LABELS, build, fingerprint };
+module.exports = { KIND_LABELS, build, fingerprint, summary };

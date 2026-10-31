@@ -133,6 +133,8 @@ final class OrderTravelExpenseTest extends DbTestCase
         self::assertCount(1, $entries);
         self::assertSame('travel_expenses', $entries[0]['category']);
         self::assertSame('160000.00', $entries[0]['amount_inr']);
+        // Owner rule D-212: the line says how the provisional amount was worked out.
+        self::assertSame('Travel expenses (factory visits) — 10% of the order value USD 20,000.00 at ₹80.00', $entries[0]['description']);
     }
 
     public function testResavingUpdatesTheSameCostEntryRatherThanCreatingASecondOne(): void

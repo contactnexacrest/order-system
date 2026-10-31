@@ -172,10 +172,33 @@ describe('Shipment date + pre-shipment inspection (Section BT)', () => {
     expect(await orderCostEntryRepository.forOrder(orderId)).toEqual([]);
   });
 
+  // Owner rule D-212 (Batch 2): the fee names the agency and its invoice, and the cost line is described from them.
+  it('a NexaCrest-paid fee names the agency and its invoice', async () => {
+    const userId = await createTestUser();
+    const orderId = await createTestOrder(await createTestClient());
+    const post = { fee_payer: 'nexacrest', fee_amount: '2500', paid_from: 'company_account' };
+    const save = async (body) => {
+      const req = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body });
+      await orderFinancialsController.saveInspectionFee(req, fakeRes());
+      return flash.pull(req)[0].message;
+    };
+
+    expect(await save({ ...post, agency_invoice_no: 'SGS/MUM/26/0457' })).toBe('Enter the inspection agency that was paid (2 to 150 characters).');
+    expect(await save({ ...post, agency_name: 'SGS India Pvt Ltd' })).toBe("Enter the inspection agency's invoice no. (up to 60 characters).");
+    expect(await orderCostEntryRepository.forOrder(orderId)).toEqual([]); // nothing saved without them
+
+    await save({ ...post, agency_name: 'SGS India Pvt Ltd', agency_invoice_no: 'SGS/MUM/26/0457' });
+    expect((await orderCostEntryRepository.forOrder(orderId))[0].description).toBe('Pre-shipment inspection fee — SGS India Pvt Ltd, invoice SGS/MUM/26/0457');
+    const fee = await orderInspectionFeeRepository.find(orderId);
+    expect([fee.agency_name, fee.agency_invoice_no]).toEqual(['SGS India Pvt Ltd', 'SGS/MUM/26/0457']);
+
+    expect(await save({ fee_payer: 'client' })).toContain('saved'); // the client pays: nothing to name
+  });
+
   it('nexacrest payer with an amount creates a matching cost entry', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
-    const req = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500', paid_from: 'company_account' } });
+    const req = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500', paid_from: 'company_account', agency_name: 'SGS India Pvt Ltd', agency_invoice_no: 'SGS/MUM/26/0457' } });
 
     await orderFinancialsController.saveInspectionFee(req, fakeRes());
 
@@ -193,7 +216,7 @@ describe('Shipment date + pre-shipment inspection (Section BT)', () => {
   it('client payer never creates a cost entry and removes an existing one', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
-    const req1 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500', paid_from: 'company_account' } });
+    const req1 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500', paid_from: 'company_account', agency_name: 'SGS India Pvt Ltd', agency_invoice_no: 'SGS/MUM/26/0457' } });
     await orderFinancialsController.saveInspectionFee(req1, fakeRes());
     expect((await orderCostEntryRepository.forOrder(orderId)).length).toBe(1);
 
@@ -207,11 +230,11 @@ describe('Shipment date + pre-shipment inspection (Section BT)', () => {
   it('re-saving nexacrest with a different amount updates the same cost entry', async () => {
     const userId = await createTestUser();
     const orderId = await createTestOrder(await createTestClient());
-    const req1 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500', paid_from: 'company_account' } });
+    const req1 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '2500', paid_from: 'company_account', agency_name: 'SGS India Pvt Ltd', agency_invoice_no: 'SGS/MUM/26/0457' } });
     await orderFinancialsController.saveInspectionFee(req1, fakeRes());
     const firstEntryId = Number((await orderCostEntryRepository.forOrder(orderId))[0].id);
 
-    const req2 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '3000', paid_from: 'company_account' } });
+    const req2 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { fee_payer: 'nexacrest', fee_amount: '3000', paid_from: 'company_account', agency_name: 'SGS India Pvt Ltd', agency_invoice_no: 'SGS/MUM/26/0457' } });
     await orderFinancialsController.saveInspectionFee(req2, fakeRes());
 
     const entries = await orderCostEntryRepository.forOrder(orderId);

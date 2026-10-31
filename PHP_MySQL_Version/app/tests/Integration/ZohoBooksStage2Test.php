@@ -29,6 +29,8 @@ final class ZohoBooksStage2Test extends DbTestCase
     private array $invoices = [];
     /** @var array<string, array<string, mixed>> payments by id */
     private array $payments = [];
+    /** @var array<string, list<array<string,mixed>>> internal comments per invoice id */
+    private array $comments = [];
     private bool $gstRegistered = false;
     /** Answer an invoice create/update with HTTP 500 although it went through (seen in the test organisation). */
     private bool $invoiceWrites500 = false;
@@ -106,6 +108,10 @@ final class ZohoBooksStage2Test extends DbTestCase
             $id = 'INV-' . (count($this->invoices) + 1);
             $this->invoices[$id] = $this->storedInvoice($id, $payload, 'draft');
             return $this->invoiceWrites500 ? ['status' => 500, 'body' => '{"code":0,"message":"The invoice has been created.","invoice":{"invoice_id":"' . $id] : $json(['code' => 0, 'invoice' => $this->invoices[$id]], 201);
+        }
+        if (preg_match('#^/books/v3/invoices/([^/]+)/comments$#', $path, $m) === 1 && $method === 'POST') {
+            $this->comments[$m[1]][] = $payload;
+            return $json(['code' => 0, 'message' => 'Comments added.'], 201);
         }
         if (preg_match('#^/books/v3/invoices/([^/]+)/status/sent$#', $path, $m) === 1) {
             $this->invoices[$m[1]]['status'] = 'sent';
@@ -203,6 +209,7 @@ final class ZohoBooksStage2Test extends DbTestCase
     {
         $orderId = $this->createCifOrder();
         Database::connection()->exec("UPDATE order_payment_status SET advance_bank_reference = 'HDFCN26304123456' WHERE order_id = {$orderId}");
+        Database::connection()->exec("UPDATE orders SET buyers_po_ref = 'PO-778' WHERE id = {$orderId}");
 
         $first = $this->sync();
         // Owner rule D-212: the payment says what it is, for which order, what it settles and its bank reference.
@@ -226,6 +233,8 @@ final class ZohoBooksStage2Test extends DbTestCase
         ], 'exchange_rate' => 84.4], $invoice['payload']);
         self::assertStringContainsString('ignore_auto_number_generation=true', $this->requestsTo('POST', '/books/v3/invoices')[0]['url']);
         self::assertSame([['invoice_id' => 'INV-1', 'amount_applied' => 300.0]], $this->payments['PAY-1']['invoices']);
+        // Owner rule D-212 (Batch 2): what the invoice is, as an internal comment (never on Zoho's printed invoice).
+        self::assertSame([['description' => "Commercial Invoice for order NX-{$orderId} · CIF · buyer PO PO-778 · TEST-Stage2 Buyer", 'show_comment_to_clients' => false]], $this->comments['INV-1']);
         self::assertSame("Advance received from TEST-Stage2 Buyer for order NX-{$orderId} · USD 300.00 at ₹84.10 · against Commercial Invoice TEST-SC/CI/2026/2810001 · bank ref HDFCN26304123456", $this->payments['PAY-1']['description'], 'once applied, it says which invoice it settles');
         self::assertSame(300.0, $this->payments['PAY-1']['amount']);
         self::assertSame(84.1, $this->payments['PAY-1']['exchange_rate']);
@@ -277,6 +286,7 @@ final class ZohoBooksStage2Test extends DbTestCase
         self::assertCount(1, $this->invoices, 'no second invoice');
         self::assertSame(1375.0, $this->invoices['INV-1']['total']);
         self::assertCount(1, $this->requestsTo('PUT', '/books/v3/invoices/INV-1'));
+        self::assertCount(1, $this->comments['INV-1'], 'the comment is added once, not again on a revision');
         self::assertSame('Revised in the order system: Commercial Invoice TEST-SC/CI/2026/2810003 revision 1 approved.', $this->invoices['INV-1']['payload']['reason'], 'Books needs a reason to change a sent invoice');
         $rows = $this->logRows($orderId);
         self::assertStringStartsWith('Updated Commercial Invoice TEST-SC/CI/2026/2810003', end($rows)['message']);

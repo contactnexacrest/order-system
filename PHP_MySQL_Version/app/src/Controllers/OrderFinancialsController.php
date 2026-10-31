@@ -526,14 +526,16 @@ final class OrderFinancialsController
         // or a duplicate row for the same loan.
         $interestCostEntryId = $existing['interest_cost_entry_id'] ?? null;
         $staleCostEntryIdToDelete = null;
+        // Owner rule D-212: the interest line names the LC and the loan it was charged on.
+        $interestDescription = \App\Services\PaymentDescription::lcLoanInterest($lcNumber, $bankLoanAmount, $interestRate);
         if ($interestPaid !== null && $interestPaid > 0) {
             if ($interestCostEntryId) {
-                OrderCostEntryRepository::updateAmount($interestCostEntryId, $interestPaid, 'Bank loan interest (LC order)');
+                OrderCostEntryRepository::updateAmount($interestCostEntryId, $interestPaid, $interestDescription);
             } else {
                 $interestCostEntryId = OrderCostEntryRepository::create(
                     $orderId,
                     'bank_loan_interest',
-                    'Bank loan interest (LC order)',
+                    $interestDescription,
                     $interestPaid,
                     date('Y-m-d'),
                     (int) $user['id']
@@ -712,17 +714,32 @@ final class OrderFinancialsController
             header("Location: /orders/{$orderId}#order-financials");
             return;
         }
+        // Owner rule D-212: a fee NexaCrest pays names the inspection agency and its invoice.
+        $agency = trim((string) ($_POST['agency_name'] ?? ''));
+        $agencyInvoice = trim((string) ($_POST['agency_invoice_no'] ?? ''));
+        $companyPays = $feePayer === 'nexacrest' && $feeAmount !== null && $feeAmount > 0;
+        if ($companyPays && (mb_strlen($agency) < 2 || mb_strlen($agency) > 150)) {
+            Flash::set('error', 'Enter the inspection agency that was paid (2 to 150 characters).');
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
+        if ($companyPays && (mb_strlen($agencyInvoice) < 1 || mb_strlen($agencyInvoice) > 60)) {
+            Flash::set('error', "Enter the inspection agency's invoice no. (up to 60 characters).");
+            header("Location: /orders/{$orderId}#order-financials");
+            return;
+        }
 
         $costEntryId = $existing['cost_entry_id'] ?? null;
         $staleCostEntryIdToDelete = null;
         if ($feePayer === 'nexacrest' && $feeAmount !== null && $feeAmount > 0) {
+            $feeDescription = \App\Services\PaymentDescription::inspectionFee($agency, $agencyInvoice);
             if ($costEntryId) {
-                OrderCostEntryRepository::updateAmount($costEntryId, $feeAmount, 'Pre-shipment inspection fee');
+                OrderCostEntryRepository::updateAmount($costEntryId, $feeAmount, $feeDescription);
             } else {
                 $costEntryId = OrderCostEntryRepository::create(
                     $orderId,
                     'inspection_fee',
-                    'Pre-shipment inspection fee',
+                    $feeDescription,
                     $feeAmount,
                     date('Y-m-d'),
                     (int) $user['id']
@@ -747,6 +764,8 @@ final class OrderFinancialsController
         OrderInspectionFeeRepository::upsert($orderId, [
             'fee_payer' => $feePayer,
             'fee_amount' => $feeAmount,
+            'agency_name' => $companyPays ? $agency : null,
+            'agency_invoice_no' => $companyPays ? $agencyInvoice : null,
             'cost_entry_id' => $costEntryId,
             'recorded_by' => (int) $user['id'],
         ]);
@@ -826,14 +845,16 @@ final class OrderFinancialsController
         }
         $expenseAmount = round($expensePct / 100 * $fobTotal * $rate, 2);
 
+        // Owner rule D-212: the cost line says how the provisional amount was worked out.
+        $travelDescription = \App\Services\PaymentDescription::travelExpenses($factoryDistanceKm, $expensePct, (string) $currencyCode, (float) $fobTotal, $rate);
         $costEntryId = $existing['cost_entry_id'] ?? null;
         if ($costEntryId) {
-            OrderCostEntryRepository::updateAmount($costEntryId, $expenseAmount, 'Travel expenses (factory visits)');
+            OrderCostEntryRepository::updateAmount($costEntryId, $expenseAmount, $travelDescription);
         } else {
             $costEntryId = OrderCostEntryRepository::create(
                 $orderId,
                 'travel_expenses',
-                'Travel expenses (factory visits)',
+                $travelDescription,
                 $expenseAmount,
                 date('Y-m-d'),
                 (int) $user['id']

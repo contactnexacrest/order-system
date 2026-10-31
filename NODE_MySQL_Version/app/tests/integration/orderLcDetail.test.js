@@ -176,18 +176,20 @@ describe('Order LC details + bank loan interest (Section BR)', () => {
     expect(entries.length).toBe(1);
     expect(entries[0].category).toBe('bank_loan_interest');
     expect(Number(entries[0].amount_inr)).toBe(1200);
+    expect(entries[0].description).toBe('Bank loan interest (LC order) · LC LC-1'); // owner rule D-212: names the LC
     const firstEntryId = Number(entries[0].id);
 
     const saved = await orderLcDetailRepository.find(orderId);
     expect(Number(saved.interest_cost_entry_id)).toBe(firstEntryId);
 
-    const req2 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { lc_number: 'LC-1', bank_loan_interest_paid: '1500' } });
+    const req2 = fakeReq({ user: { id: userId }, params: { id: String(orderId) }, body: { lc_number: 'LC-1', bank_loan_amount: '250000', bank_loan_interest_rate: '9.5', bank_loan_interest_paid: '1500' } });
     await orderFinancialsController.saveLcDetails(req2, fakeRes());
 
     entries = await orderCostEntryRepository.forOrder(orderId);
     expect(entries.length).toBe(1);
     expect(Number(entries[0].id)).toBe(firstEntryId);
     expect(Number(entries[0].amount_inr)).toBe(1500);
+    expect(entries[0].description).toBe('Bank loan interest (LC order) · LC LC-1 · loan ₹250,000.00 at 9.5%'); // and the loan it was charged on
   });
 
   it('clearing interest paid back out removes the cost entry', async () => {

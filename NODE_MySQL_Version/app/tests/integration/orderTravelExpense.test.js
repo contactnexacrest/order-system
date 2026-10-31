@@ -132,6 +132,8 @@ describe('Travel expense recording (Section BW)', () => {
     expect(entries.length).toBe(1);
     expect(entries[0].category).toBe('travel_expenses');
     expect(Number(entries[0].amount_inr)).toBe(160000);
+    // Owner rule D-212: the line says how the provisional amount was worked out.
+    expect(entries[0].description).toBe('Travel expenses (factory visits) — 10% of the order value USD 20,000.00 at ₹80.00');
   });
 
   it('resaving updates the same cost entry rather than creating a second one', async () => {

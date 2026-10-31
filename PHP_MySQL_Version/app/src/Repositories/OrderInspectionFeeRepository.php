@@ -23,22 +23,26 @@ final class OrderInspectionFeeRepository
     }
 
     /**
-     * @param array{fee_payer:string, fee_amount:?float, cost_entry_id:?int, recorded_by:?int} $fields
+     * @param array{fee_payer:string, fee_amount:?float, agency_name?:?string, agency_invoice_no?:?string, cost_entry_id:?int, recorded_by:?int} $fields
      */
     public static function upsert(int $orderId, array $fields): void
     {
         Database::connection()->prepare(
-            'INSERT INTO order_inspection_fees (order_id, fee_payer, fee_amount, cost_entry_id, recorded_by)
-             VALUES (:order_id, :fee_payer, :fee_amount, :cost_entry_id, :recorded_by)
+            'INSERT INTO order_inspection_fees (order_id, fee_payer, fee_amount, agency_name, agency_invoice_no, cost_entry_id, recorded_by)
+             VALUES (:order_id, :fee_payer, :fee_amount, :agency_name, :agency_invoice_no, :cost_entry_id, :recorded_by)
              ON DUPLICATE KEY UPDATE
                 fee_payer = VALUES(fee_payer),
                 fee_amount = VALUES(fee_amount),
+                agency_name = VALUES(agency_name),
+                agency_invoice_no = VALUES(agency_invoice_no),
                 cost_entry_id = VALUES(cost_entry_id),
                 recorded_by = VALUES(recorded_by)'
         )->execute([
             'order_id' => $orderId,
             'fee_payer' => $fields['fee_payer'],
             'fee_amount' => $fields['fee_amount'],
+            'agency_name' => $fields['agency_name'] ?? null,
+            'agency_invoice_no' => $fields['agency_invoice_no'] ?? null,
             'cost_entry_id' => $fields['cost_entry_id'],
             'recorded_by' => $fields['recorded_by'],
         ]);

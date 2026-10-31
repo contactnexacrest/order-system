@@ -3480,12 +3480,13 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <p class="muted">Nothing linked to this order yet — link an expense from <a href="/ca/expenses">the Expenses register</a> if one belongs here.</p>
         <?php else: ?>
           <table class="list">
-            <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th></tr>
+            <tr><th>Date</th><th>Category</th><th>Vendor</th><th>Description</th><th>Amount</th></tr>
             <?php foreach ($linkedCaExpenses as $e): ?>
             <tr>
               <td><?= htmlspecialchars((string) $e['expense_date']) ?></td>
               <td><?= htmlspecialchars($e['category']) ?><?php if (!empty($e['reason'])): ?><br><small class="muted"><?= htmlspecialchars((string) $e['reason']) ?></small><?php endif; ?></td>
               <td><?= htmlspecialchars((string) ($e['vendor_name'] ?? '—')) ?></td>
+              <td class="small"><?php if (trim((string) ($e['description'] ?? '')) === ''): ?><span class="badge badge-danger" title="Rule D-212: every expense says what it was for. Add the description in Zoho Books (Purchases → Expenses), then run the Zoho sync.">No description in Zoho</span><?php else: ?><?= htmlspecialchars((string) $e['description']) ?><?php endif; ?></td>
               <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
             </tr>
             <?php endforeach; ?>
@@ -3556,6 +3557,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <div class="kv-grid">
           <div><span class="k">Fee Payer</span><span class="v"><?= $orderInspectionFee ? htmlspecialchars($orderInspectionFee['fee_payer'] === 'nexacrest' ? 'NexaCrest' : 'Client') : 'Not yet recorded' ?></span></div>
           <div><span class="k">Fee Amount</span><span class="v"><?= $orderInspectionFee && $orderInspectionFee['fee_amount'] !== null ? number_format((float) $orderInspectionFee['fee_amount'], 2) : '—' ?></span></div>
+          <?php if (!empty($orderInspectionFee['agency_name'])): ?><div><span class="k">Agency</span><span class="v"><?= htmlspecialchars((string) $orderInspectionFee['agency_name']) ?>, invoice <?= htmlspecialchars((string) $orderInspectionFee['agency_invoice_no']) ?></span></div><?php endif; ?>
         </div>
         <details>
           <summary><?= $orderInspectionFee ? 'Edit inspection fee' : 'Record inspection fee' ?></summary>
@@ -3575,6 +3577,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__feePaidFrom === $__key ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
+            <?php // Owner rule D-212: the cost line is described from the agency and its invoice. ?>
+            <label data-show-when="fee_payer=nexacrest">Inspection agency *<input type="text" name="agency_name" required minlength="2" maxlength="150" value="<?= htmlspecialchars((string) ($orderInspectionFee['agency_name'] ?? '')) ?>" placeholder="e.g. SGS India Pvt Ltd"></label>
+            <label data-show-when="fee_payer=nexacrest">Agency's invoice no. *<input type="text" name="agency_invoice_no" required maxlength="60" value="<?= htmlspecialchars((string) ($orderInspectionFee['agency_invoice_no'] ?? '')) ?>" placeholder="e.g. SGS/MUM/26/0457"></label>
             <button type="submit" class="btn-sm">Save</button>
           </form>
         </details>

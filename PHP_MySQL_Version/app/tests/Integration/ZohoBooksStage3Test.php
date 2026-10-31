@@ -212,6 +212,7 @@ final class ZohoBooksStage3Test extends DbTestCase
         self::assertSame('TEST-INV-77', $bill['bill_number']);
         self::assertSame(118000.0, $bill['total']);
         self::assertSame('AC-COGS', $bill['payload']['line_items'][0]['account_id']);
+        self::assertStringStartsWith("Supplier advance bill for order NX-{$o['order']} (Supplier PO TEST-SPO-1): taxable 100000.00 + GST 18000.00", $bill['payload']['line_items'][0]['description'], 'owner rule D-212: the bill names its Supplier PO');
         self::assertSame("NX-{$o['order']}", $bill['payload']['reference_number']);
         self::assertSame([['bill_id' => 'BL-1', 'amount_applied' => 50000.0]], $this->vendorPayments['VP-1']['bills']);
 

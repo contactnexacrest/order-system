@@ -160,12 +160,39 @@ final class OrderShipmentInspectionTest extends DbTestCase
         self::assertSame([], OrderCostEntryRepository::forOrder($orderId));
     }
 
+    /** Owner rule D-212 (Batch 2): the fee names the agency and its invoice, and the cost line is described from them. */
+    public function testNexacrestPaidFeeNamesTheAgencyAndItsInvoice(): void
+    {
+        $userId = $this->createTestUser('Admin');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $_SESSION['_auth_user_id'] = $userId;
+        $post = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500', 'paid_from' => 'company_account'];
+        $save = static function (array $body) use ($orderId): string {
+            $_POST = $body;
+            ob_start();
+            (new OrderFinancialsController())->saveInspectionFee(['id' => (string) $orderId]);
+            ob_end_clean();
+            return (string) Flash::pull()[0]['message'];
+        };
+
+        self::assertSame('Enter the inspection agency that was paid (2 to 150 characters).', $save($post + ['agency_invoice_no' => 'SGS/MUM/26/0457']));
+        self::assertSame("Enter the inspection agency's invoice no. (up to 60 characters).", $save($post + ['agency_name' => 'SGS India Pvt Ltd']));
+        self::assertSame([], OrderCostEntryRepository::forOrder($orderId), 'nothing saved without them');
+
+        $save($post + ['agency_name' => 'SGS India Pvt Ltd', 'agency_invoice_no' => 'SGS/MUM/26/0457']);
+        self::assertSame('Pre-shipment inspection fee — SGS India Pvt Ltd, invoice SGS/MUM/26/0457', OrderCostEntryRepository::forOrder($orderId)[0]['description']);
+        self::assertSame(['SGS India Pvt Ltd', 'SGS/MUM/26/0457'], [OrderInspectionFeeRepository::find($orderId)['agency_name'], OrderInspectionFeeRepository::find($orderId)['agency_invoice_no']]);
+
+        // the client pays: nothing to name
+        self::assertStringContainsString('saved', $save(['fee_payer' => 'client']));
+    }
+
     public function testNexacrestPayerWithAnAmountCreatesAMatchingCostEntry(): void
     {
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $_SESSION['_auth_user_id'] = $userId;
-        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500', 'paid_from' => 'company_account'];
+        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500', 'paid_from' => 'company_account', 'agency_name' => 'SGS India Pvt Ltd', 'agency_invoice_no' => 'SGS/MUM/26/0457'];
 
         ob_start();
         (new OrderFinancialsController())->saveInspectionFee(['id' => (string) $orderId]);
@@ -187,7 +214,7 @@ final class OrderShipmentInspectionTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $_SESSION['_auth_user_id'] = $userId;
-        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500', 'paid_from' => 'company_account'];
+        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500', 'paid_from' => 'company_account', 'agency_name' => 'SGS India Pvt Ltd', 'agency_invoice_no' => 'SGS/MUM/26/0457'];
         ob_start();
         (new OrderFinancialsController())->saveInspectionFee(['id' => (string) $orderId]);
         ob_end_clean();
@@ -207,13 +234,13 @@ final class OrderShipmentInspectionTest extends DbTestCase
         $userId = $this->createTestUser('Admin');
         $orderId = $this->createTestOrder($this->createTestClient());
         $_SESSION['_auth_user_id'] = $userId;
-        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500', 'paid_from' => 'company_account'];
+        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '2500', 'paid_from' => 'company_account', 'agency_name' => 'SGS India Pvt Ltd', 'agency_invoice_no' => 'SGS/MUM/26/0457'];
         ob_start();
         (new OrderFinancialsController())->saveInspectionFee(['id' => (string) $orderId]);
         ob_end_clean();
         $firstEntryId = (int) OrderCostEntryRepository::forOrder($orderId)[0]['id'];
 
-        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '3000', 'paid_from' => 'company_account'];
+        $_POST = ['fee_payer' => 'nexacrest', 'fee_amount' => '3000', 'paid_from' => 'company_account', 'agency_name' => 'SGS India Pvt Ltd', 'agency_invoice_no' => 'SGS/MUM/26/0457'];
         ob_start();
         (new OrderFinancialsController())->saveInspectionFee(['id' => (string) $orderId]);
         ob_end_clean();

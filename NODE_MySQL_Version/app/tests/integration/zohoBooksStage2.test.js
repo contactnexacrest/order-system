@@ -20,6 +20,7 @@ describe('Zoho Books Stage 2', () => {
   let contacts;
   let invoices;
   let payments;
+  let comments; // internal comments per invoice id
   let gstRegistered;
   let invoiceWrites500;
   // Make the invoice list miss an invoice just created, once (the list lags behind a create, seen in the test organisation).
@@ -68,6 +69,10 @@ describe('Zoho Books Stage 2', () => {
       const id = `INV-${Object.keys(invoices).length + 1}`;
       invoices[id] = storedInvoice(id, payload, 'draft');
       return invoiceWrites500 ? { status: 500, body: `{"code":0,"message":"The invoice has been created.","invoice":{"invoice_id":"${id}` } : json({ code: 0, invoice: invoices[id] }, 201);
+    }
+    if ((m = p.match(/^\/books\/v3\/invoices\/([^/]+)\/comments$/)) && method === 'POST') {
+      (comments[m[1]] = comments[m[1]] || []).push(payload);
+      return json({ code: 0, message: 'Comments added.' }, 201);
     }
     if ((m = p.match(/^\/books\/v3\/invoices\/([^/]+)\/status\/sent$/))) {
       invoices[m[1]].status = 'sent';
@@ -130,6 +135,7 @@ describe('Zoho Books Stage 2', () => {
     contacts = {};
     invoices = {};
     payments = {};
+    comments = {};
     gstRegistered = false;
     invoiceWrites500 = false;
     invoiceListLags = false;
@@ -167,6 +173,7 @@ describe('Zoho Books Stage 2', () => {
   it('holds the advance until the CI, then applies it to it', async () => {
     const orderId = await createCifOrder();
     await db.execute("UPDATE order_payment_status SET advance_bank_reference = 'HDFCN26304123456' WHERE order_id = :id", { id: orderId });
+    await db.execute("UPDATE orders SET buyers_po_ref = 'PO-778' WHERE id = :id", { id: orderId });
 
     expect(await sync()).toEqual({ synced: 1, failed: 0, skipped: 0, invoices: 0, applied: 0 });
     // Owner rule D-212: the payment says what it is, for which order, what it settles and its bank reference.
@@ -194,6 +201,8 @@ describe('Zoho Books Stage 2', () => {
     });
     expect(requestsTo('POST', '/books/v3/invoices')[0].url).toContain('ignore_auto_number_generation=true');
     expect(payments['PAY-1'].invoices).toEqual([{ invoice_id: 'INV-1', amount_applied: 300 }]);
+    // Owner rule D-212 (Batch 2): what the invoice is, as an internal comment (never on Zoho's printed invoice).
+    expect(comments['INV-1']).toEqual([{ description: `Commercial Invoice for order NX-${orderId} · CIF · buyer PO PO-778 · TEST-Stage2 Buyer`, show_comment_to_clients: false }]);
     // once applied, it says which invoice it settles
     expect(payments['PAY-1'].description).toBe(`Advance received from TEST-Stage2 Buyer for order NX-${orderId} · USD 300.00 at ₹84.10 · against Commercial Invoice TEST-SC/CI/2026/2810001 · bank ref HDFCN26304123456`);
     expect(payments['PAY-1'].amount).toBe(300);
@@ -240,6 +249,7 @@ describe('Zoho Books Stage 2', () => {
     expect(Object.keys(invoices)).toHaveLength(1); // no second invoice
     expect(invoices['INV-1'].total).toBe(1375);
     expect(requestsTo('PUT', '/books/v3/invoices/INV-1')).toHaveLength(1);
+    expect(comments['INV-1']).toHaveLength(1); // the comment is added once, not again on a revision
     expect(invoices['INV-1'].payload.reason).toBe('Revised in the order system: Commercial Invoice TEST-SC/CI/2026/2810003 revision 1 approved.'); // Books needs a reason to change a sent invoice
     expect((await logRows(orderId)).pop().message).toMatch(/^Updated Commercial Invoice TEST-SC\/CI\/2026\/2810003/);
   });

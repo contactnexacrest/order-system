@@ -298,7 +298,15 @@ transport, port charges, bank charges, bank-loan interest and the travel
 % are not sent — the table says why under each. CHA, transport and port
 charges belong on logistics partner bills instead. The pre-shipment
 inspection fee's own form asks what it was paid from when NexaCrest
-pays. See [CA-03](./ca-03-zoho-sync.md).
+pays, and — rule D-212, 2026-10-31 — the **inspection agency** and its
+**invoice no.** (both required): the cost line then reads "Pre-shipment
+inspection fee — SGS India Pvt Ltd, invoice SGS/MUM/26/0457". The
+automatic lines are described from their facts too: the LC interest line
+names the LC and the loan ("Bank loan interest (LC order) · LC LC-778 ·
+loan ₹250,000.00 at 9.5%"), and the travel line says how the provisional
+amount was worked out ("Travel expenses (factory visits) — 175 km to the
+factory, 5% of the order value USD 8,000.00 at ₹84.10"). See
+[CA-03](./ca-03-zoho-sync.md).
 
 **Supplier cost, ocean freight, and insurance are never entered here** —
 see "What feeds the Profitability Sheet" below for where those come

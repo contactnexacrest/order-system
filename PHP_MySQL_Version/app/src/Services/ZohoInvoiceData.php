@@ -90,16 +90,36 @@ final class ZohoInvoiceData
             'date' => $date,
             'due_date' => $dueDate,
             'reference_number' => (string) $order['buyer_inquiry_ref'],
+            'summary' => self::summary($kind, $order),
             'exchange_rate' => $rate,
             'total' => round($total, 2),
             'lines' => $lines,
         ];
     }
 
+    /**
+     * Owner rule D-212: "Commercial Invoice for order NX-12 · CIF · buyer PO
+     * PO-778 · Acme GmbH" — kept as an internal comment on the Books invoice.
+     */
+    public static function summary(string $kind, array $order): string
+    {
+        $parts = [($kind === 'dn' ? 'Freight Debit Note' : 'Commercial Invoice') . ' for order ' . ($order['buyer_inquiry_ref'] ?? '')];
+        if (!empty($order['incoterm_code'])) {
+            $parts[] = (string) $order['incoterm_code'];
+        }
+        if (!empty($order['buyers_po_ref'])) {
+            $parts[] = 'buyer PO ' . $order['buyers_po_ref'];
+        }
+        $parts[] = (string) ($order['company_legal_name'] ?? '');
+        return implode(' · ', array_filter($parts, static fn (string $p): bool => $p !== ''));
+    }
+
     /** A fingerprint of everything sent (not which revision it came from): when it changes, the Books invoice is updated. */
     public static function fingerprint(array $invoice): string
     {
-        unset($invoice['document_id'], $invoice['revision']);
+        // The summary is a comment added once, not part of the invoice (so
+        // invoices already in Books are not re-sent because of it).
+        unset($invoice['document_id'], $invoice['revision'], $invoice['summary']);
         return hash('sha256', (string) json_encode($invoice));
     }
 

@@ -157,4 +157,26 @@ final class PaymentDescriptionRuleTest extends DbTestCase
         self::assertSame('success', $complete(['refund_paid_at' => date('Y-m-d'), 'refund_reference' => 'HDFCO26311000777'])['type']);
         self::assertSame(['completed', date('Y-m-d'), 'HDFCO26311000777'], array_values($pdo->query("SELECT refund_status, refund_paid_at, refund_reference FROM order_cancellations WHERE id = {$cancellation}")->fetch(\PDO::FETCH_ASSOC)));
     }
+
+    /** Batch 2 (A13): an expense typed in Zoho Books without a description is flagged, so the CA fixes it there. */
+    public function testAZohoExpenseWithoutADescriptionIsFlagged(): void
+    {
+        $pdo = Database::connection();
+        $pdo->exec("INSERT INTO ca_expenses (zoho_expense_id, category, description, vendor_name, amount, currency_code, expense_date) VALUES ('TEST-ZX-1', 'Courier', '', 'Blue Dart', 850, 'INR', CURDATE()), ('TEST-ZX-2', 'Courier', 'Courier of BL copies to the buyer', 'DHL', 2100, 'INR', CURDATE())");
+        ob_start();
+        (new CaController())->expenses([]);
+        $html = (string) ob_get_clean();
+        self::assertSame(1, substr_count($html, '>No description in Zoho</span>'));
+        self::assertStringContainsString('Courier of BL copies to the buyer', $html);
+    }
+
+    /** Batch 2: the descriptions built for the inspection fee, the LC loan interest and the travel cost. */
+    public function testTheBuiltCostDescriptions(): void
+    {
+        self::assertSame('Pre-shipment inspection fee — SGS India Pvt Ltd, invoice SGS/MUM/26/0457', \App\Services\PaymentDescription::inspectionFee(' SGS India Pvt Ltd ', 'SGS/MUM/26/0457'));
+        self::assertSame('Bank loan interest (LC order) · LC LC-778 · loan ₹250,000.00 at 9.5%', \App\Services\PaymentDescription::lcLoanInterest('LC-778', 250000.0, 9.5));
+        self::assertSame('Bank loan interest (LC order)', \App\Services\PaymentDescription::lcLoanInterest(null, null, null));
+        self::assertSame('Travel expenses (factory visits) — 175 km to the factory, 5% of the order value USD 8,000.00 at ₹84.10', \App\Services\PaymentDescription::travelExpenses(175.0, 5.0, 'USD', 8000.0, 84.1));
+        self::assertSame('Travel expenses (factory visits) — 7.5% of the order value INR 500,000.00', \App\Services\PaymentDescription::travelExpenses(null, 7.5, 'INR', 500000.0, 1.0));
+    }
 }

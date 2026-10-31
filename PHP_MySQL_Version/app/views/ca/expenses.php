@@ -31,7 +31,7 @@ $canManageCa = \App\Services\PermissionService::can((int) $__caExpensesUser['id'
           <td><?= htmlspecialchars((string) $e['expense_date']) ?></td>
           <td><?= htmlspecialchars($e['category']) ?></td>
           <td><?= htmlspecialchars((string) ($e['vendor_name'] ?? '—')) ?></td>
-          <td class="muted small"><?= htmlspecialchars((string) ($e['description'] ?? '')) ?></td>
+          <td class="muted small"><?php if (trim((string) ($e['description'] ?? '')) === ''): ?><span class="badge badge-danger" title="Rule D-212: every expense says what it was for. Add the description in Zoho Books (Purchases → Expenses), then run the Zoho sync.">No description in Zoho</span><?php else: ?><?= htmlspecialchars((string) $e['description']) ?><?php endif; ?></td>
           <td><?= number_format((float) $e['amount'], 2) ?> <?= htmlspecialchars($e['currency_code']) ?></td>
           <td>
             <?php if ($e['order_id'] !== null): ?>

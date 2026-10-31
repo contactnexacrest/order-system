@@ -4,6 +4,7 @@ const flash = require('../helpers/flash');
 const orderStorage = require('../helpers/orderStorage');
 const reasonValidator = require('../helpers/reasonValidator');
 const fieldValidator = require('../helpers/fieldValidator');
+const paymentDescription = require('../services/paymentDescription');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const orderCostEntryRepository = require('../repositories/orderCostEntryRepository');
@@ -499,14 +500,16 @@ async function saveLcDetails(req, res) {
   // duplicate row for the same loan.
   let interestCostEntryId = existing ? existing.interest_cost_entry_id : null;
   let staleCostEntryIdToDelete = null;
+  // Owner rule D-212: the interest line names the LC and the loan it was charged on.
+  const interestDescription = paymentDescription.lcLoanInterest(lcNumber, bankLoanAmount, interestRate);
   if (interestPaid !== null && interestPaid > 0) {
     if (interestCostEntryId) {
-      await orderCostEntryRepository.updateAmount(interestCostEntryId, interestPaid, 'Bank loan interest (LC order)');
+      await orderCostEntryRepository.updateAmount(interestCostEntryId, interestPaid, interestDescription);
     } else {
       interestCostEntryId = await orderCostEntryRepository.create(
         orderId,
         'bank_loan_interest',
-        'Bank loan interest (LC order)',
+        interestDescription,
         interestPaid,
         todayIst(),
         user.id
@@ -580,14 +583,29 @@ async function saveInspectionFee(req, res) {
     res.redirect(`/orders/${orderId}#order-financials`);
     return;
   }
+  // Owner rule D-212: a fee NexaCrest pays names the inspection agency and its invoice.
+  const agency = String(req.body.agency_name || '').trim();
+  const agencyInvoice = String(req.body.agency_invoice_no || '').trim();
+  const companyPays = feePayer === 'nexacrest' && feeAmount !== null && feeAmount > 0;
+  if (companyPays && ([...agency].length < 2 || [...agency].length > 150)) {
+    flash.set(req, 'error', 'Enter the inspection agency that was paid (2 to 150 characters).');
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
+  if (companyPays && ([...agencyInvoice].length < 1 || [...agencyInvoice].length > 60)) {
+    flash.set(req, 'error', "Enter the inspection agency's invoice no. (up to 60 characters).");
+    res.redirect(`/orders/${orderId}#order-financials`);
+    return;
+  }
 
   let costEntryId = existing ? existing.cost_entry_id : null;
   let staleCostEntryIdToDelete = null;
   if (feePayer === 'nexacrest' && feeAmount !== null && feeAmount > 0) {
+    const feeDescription = paymentDescription.inspectionFee(agency, agencyInvoice);
     if (costEntryId) {
-      await orderCostEntryRepository.updateAmount(costEntryId, feeAmount, 'Pre-shipment inspection fee');
+      await orderCostEntryRepository.updateAmount(costEntryId, feeAmount, feeDescription);
     } else {
-      costEntryId = await orderCostEntryRepository.create(orderId, 'inspection_fee', 'Pre-shipment inspection fee', feeAmount, todayIst(), user.id);
+      costEntryId = await orderCostEntryRepository.create(orderId, 'inspection_fee', feeDescription, feeAmount, todayIst(), user.id);
     }
     await orderCostEntryRepository.setPaidFrom(costEntryId, paidFrom);
   } else if (costEntryId) {
@@ -605,7 +623,9 @@ async function saveInspectionFee(req, res) {
     costEntryId = null;
   }
 
-  await orderInspectionFeeRepository.upsert(orderId, { fee_payer: feePayer, fee_amount: feeAmount, cost_entry_id: costEntryId, recorded_by: user.id });
+  await orderInspectionFeeRepository.upsert(orderId, {
+    fee_payer: feePayer, fee_amount: feeAmount, agency_name: companyPays ? agency : null, agency_invoice_no: companyPays ? agencyInvoice : null, cost_entry_id: costEntryId, recorded_by: user.id,
+  });
   if (staleCostEntryIdToDelete !== null) {
     await orderCostEntryRepository.remove(staleCostEntryIdToDelete);
   }
@@ -681,11 +701,13 @@ async function saveTravelExpenses(req, res) {
   }
   const expenseAmount = Math.round((expensePct / 100) * fobTotal * rate * 100) / 100;
 
+  // Owner rule D-212: the cost line says how the provisional amount was worked out.
+  const travelDescription = paymentDescription.travelExpenses(factoryDistanceKm, expensePct, String(currencyCode), Number(fobTotal), rate);
   let costEntryId = existing ? existing.cost_entry_id : null;
   if (costEntryId) {
-    await orderCostEntryRepository.updateAmount(costEntryId, expenseAmount, 'Travel expenses (factory visits)');
+    await orderCostEntryRepository.updateAmount(costEntryId, expenseAmount, travelDescription);
   } else {
-    costEntryId = await orderCostEntryRepository.create(orderId, 'travel_expenses', 'Travel expenses (factory visits)', expenseAmount, todayIst(), user.id);
+    costEntryId = await orderCostEntryRepository.create(orderId, 'travel_expenses', travelDescription, expenseAmount, todayIst(), user.id);
   }
 
   await orderTravelExpenseRepository.upsert(orderId, {

@@ -181,6 +181,8 @@ describe('Zoho Books Stage 3', () => {
     expect(bill.bill_number).toBe('TEST-INV-77');
     expect(bill.total).toBe(118000);
     expect(bill.payload.line_items[0].account_id).toBe('AC-COGS');
+    // owner rule D-212: the bill names its Supplier PO
+    expect(bill.payload.line_items[0].description.startsWith(`Supplier advance bill for order NX-${o.order} (Supplier PO TEST-SPO-1): taxable 100000.00 + GST 18000.00`)).toBe(true);
     expect(bill.payload.reference_number).toBe(`NX-${o.order}`);
     expect(vendorPayments['VP-1'].bills).toEqual([{ bill_id: 'BL-1', amount_applied: 50000 }]);
 

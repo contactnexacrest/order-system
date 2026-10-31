@@ -16,17 +16,21 @@ async function find(orderId) {
 
 async function upsert(orderId, fields) {
   await db.execute(
-    `INSERT INTO order_inspection_fees (order_id, fee_payer, fee_amount, cost_entry_id, recorded_by)
-     VALUES (:order_id, :fee_payer, :fee_amount, :cost_entry_id, :recorded_by)
+    `INSERT INTO order_inspection_fees (order_id, fee_payer, fee_amount, agency_name, agency_invoice_no, cost_entry_id, recorded_by)
+     VALUES (:order_id, :fee_payer, :fee_amount, :agency_name, :agency_invoice_no, :cost_entry_id, :recorded_by)
      ON DUPLICATE KEY UPDATE
         fee_payer = VALUES(fee_payer),
         fee_amount = VALUES(fee_amount),
+        agency_name = VALUES(agency_name),
+        agency_invoice_no = VALUES(agency_invoice_no),
         cost_entry_id = VALUES(cost_entry_id),
         recorded_by = VALUES(recorded_by)`,
     {
       order_id: orderId,
       fee_payer: fields.fee_payer,
       fee_amount: fields.fee_amount,
+      agency_name: fields.agency_name ?? null,
+      agency_invoice_no: fields.agency_invoice_no ?? null,
       cost_entry_id: fields.cost_entry_id,
       recorded_by: fields.recorded_by,
     }
