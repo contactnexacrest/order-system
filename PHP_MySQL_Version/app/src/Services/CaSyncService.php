@@ -268,6 +268,57 @@ final class CaSyncService
             }
         }
 
+        // Owner decision D-215 (5a): each payment milestone between the
+        // advance and the balance — a customer payment once cleared, applied
+        // to the CI when the CI is in Books, else held unapplied (like the
+        // advance) and applied on a later run.
+        foreach (\App\Repositories\PaymentMilestoneRepository::pendingZohoSync() as $m) {
+            if ($startDate !== null && (string) $m['cleared_on'] < $startDate) {
+                continue; // before the go-live date: the CA books it as the opening position
+            }
+            $orderId = (int) $m['order_id'];
+            $target = OrderZohoInvoiceRepository::find($orderId, 'ci');
+            try {
+                $result = ZohoBooksService::pushRevenuePayment(
+                    (int) $m['client_id'], (string) $m['company_legal_name'], (string) ($m['currency_code'] ?? 'INR'),
+                    (float) $m['received_amount'], round((float) $m['received_amount'] * (float) $m['exchange_rate'], 2),
+                    (string) $m['cleared_on'], $m['buyer_inquiry_ref'] . '-m' . $m['seq'],
+                    $target['zoho_invoice_number'] ?? null, 0.0,
+                    PaymentDescription::milestonePayment($m, $target['zoho_invoice_number'] ?? null)
+                );
+                \App\Repositories\PaymentMilestoneRepository::setZohoReference((int) $m['id'], $result['payment_id']);
+                if ($result['applied'] > 0) {
+                    \App\Repositories\PaymentMilestoneRepository::setZohoApplied((int) $m['id']);
+                    $applied++;
+                }
+                ZohoSyncLogRepository::log('revenue_payment', 'order_payment_milestones', (int) $m['id'], 'milestone', 'success', $result['payment_id'], "Pushed payment milestone {$m['seq']} as Zoho Books customer payment {$result['payment_id']}" . self::appliedNote('balance', $target, $result['applied']), $triggeredBy, $triggeredByUserId);
+                $synced++;
+            } catch (\Throwable $e) {
+                ZohoSyncLogRepository::log('revenue_payment', 'order_payment_milestones', (int) $m['id'], 'milestone', 'error', null, $e->getMessage(), $triggeredBy, $triggeredByUserId);
+                $failed++;
+            }
+        }
+        foreach (\App\Repositories\PaymentMilestoneRepository::heldInZoho() as $m) {
+            $target = OrderZohoInvoiceRepository::find((int) $m['order_id'], 'ci');
+            if ($target === null) {
+                continue; // still waiting for the CI — nothing to do yet
+            }
+            try {
+                $amount = ZohoBooksService::applyPaymentToInvoice(
+                    (string) $m['zoho_reference'], (int) $m['client_id'], (string) $m['company_legal_name'], (string) ($m['currency_code'] ?? 'INR'),
+                    (float) $m['received_amount'], round((float) $m['received_amount'] * (float) $m['exchange_rate'], 2),
+                    (string) $m['cleared_on'], $m['buyer_inquiry_ref'] . '-m' . $m['seq'], $target['zoho_invoice_number'], 0.0,
+                    PaymentDescription::milestonePayment($m, $target['zoho_invoice_number'])
+                );
+                \App\Repositories\PaymentMilestoneRepository::setZohoApplied((int) $m['id']);
+                ZohoSyncLogRepository::log('payment_apply', 'order_payment_milestones', (int) $m['id'], 'milestone', 'success', (string) $m['zoho_reference'], 'Applied ' . number_format($amount, 2, '.', '') . " of milestone payment {$m['zoho_reference']} to Commercial Invoice {$target['zoho_invoice_number']}.", $triggeredBy, $triggeredByUserId);
+                $applied++;
+            } catch (\Throwable $e) {
+                ZohoSyncLogRepository::log('payment_apply', 'order_payment_milestones', (int) $m['id'], 'milestone', 'error', (string) $m['zoho_reference'], $e->getMessage(), $triggeredBy, $triggeredByUserId);
+                $failed++;
+            }
+        }
+
         // Owner decision 2026-10-29: the money the bank paid under an LC — a
         // customer payment applied to the CI (held until the CI is in Books,
         // like the advance), with the bank charges the bank kept.

@@ -335,6 +335,45 @@ to see the needed things."
   on the Buyer Action Link disappears once the advance is marked cleared —
   there's nothing left to report by then.
 
+## Payment milestones — the order's own schedule (D-215)
+
+Most orders are paid as advance + balance. When a buyer agrees to pay in
+more steps (for example 30% advance, 50% on shipment, 20% on delivery),
+give the order its own schedule **before the advance is cleared**:
+
+1. On the order page, open **Payment Overview** and scroll to **Payment
+   schedule**.
+2. Open **Change the schedule** and fill one row per step between the
+   advance and the balance: its **%** of the FOB value and **when it is due**
+   (e.g. "on shipment — within 3 Calendar Days of receiving the scanned
+   Bill of Lading"). Up to 4 milestones. The balance becomes what is left;
+   the advance, milestones and balance always add up to 100%.
+3. Click **Save Payment Schedule**, then **regenerate the Proforma Invoice**.
+   Its Payment Terms section then shows one bullet per milestone with its
+   amount; the Order Confirmation shows one "Payment Due" row per milestone.
+
+Leave every row empty to go back to plain advance and balance. The schedule
+is fixed once the advance is cleared or any milestone money is recorded;
+after that, change it with a payment terms amendment.
+
+Each milestone is its own payment:
+
+- **Record the remittance** (Accounts): amount received, the day's exchange
+  rate, the bank reference (UTR / SWIFT — required) and the date. The app
+  writes its description from the facts, e.g. "Milestone 2 (50% on shipment
+  — …) received from <buyer> for order <ref> · USD 2,250.00 at ₹84.10 ·
+  against Proforma Invoice <PI no.> · bank ref UTR778899". A note you add is
+  appended, never a replacement.
+- **Mark it cleared** once your bank confirms. The next revenue sync sends it
+  to Zoho Books as a customer payment with that description — applied to the
+  Commercial Invoice once the CI is in Books, held until then otherwise.
+- The **balance cannot be marked cleared** until every milestone is cleared.
+
+Not changed by milestones: the Quotation (it prints advance and balance as
+before), the Commercial Invoice and the CA financial annexure (CAFIN), which
+still count advance and balance only — a change to those documents needs the
+owner's double confirmation first.
+
 ## What happens next
 
 The moment staff mark the advance payment cleared (or confirm the LC

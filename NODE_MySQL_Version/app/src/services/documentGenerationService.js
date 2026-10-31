@@ -1322,6 +1322,7 @@ function templateFileFor(code) {
     PL: 'PL/packing_list.njk',
     BLI: 'BLI/bl_instruction.njk',
     CI: 'CI/commercial_invoice.njk',
+    ESI: 'ESI/export_service_invoice.njk',
     COOPREP: 'COOPREP/coo_prep.njk',
     AMD: 'AMD/payment_terms_amendment.njk',
   };
@@ -1355,6 +1356,7 @@ function titleFor(code) {
     PL: 'PACKING LIST',
     BLI: 'BILL OF LADING INSTRUCTION SHEET',
     CI: 'COMMERCIAL INVOICE',
+    ESI: 'EXPORT SERVICE INVOICE',
     COOPREP: 'COO PREPARATION SHEET',
     AMD: 'PAYMENT TERMS AMENDMENT AGREEMENT',
   };
@@ -1374,6 +1376,7 @@ function section1TitleFor(code) {
     SUPPO: 'BUYER (NexaCrest International Private Limited)',
     FDN: 'FROM (SELLER / EXPORTER)',
     CI: 'EXPORTER / SELLER',
+    ESI: 'EXPORTER / SELLER',
     BLI: 'SHIPPER / EXPORTER (APPEARS ON BL EXACTLY AS WRITTEN)',
     AMD: 'PARTIES TO THIS AMENDMENT',
     PL: 'EXPORTER',

@@ -172,6 +172,58 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
     }
   }
 
+  // Owner decision D-215 (5a): each payment milestone between the advance
+  // and the balance — a customer payment once cleared, applied to the CI
+  // when the CI is in Books, else held unapplied (like the advance) and
+  // applied on a later run.
+  const paymentMilestoneRepository = require('../repositories/paymentMilestoneRepository');
+  for (const m of await paymentMilestoneRepository.pendingZohoSync()) {
+    if (startDate !== null && String(m.cleared_on) < startDate) {
+      continue; // before the go-live date: the CA books it as the opening position
+    }
+    const orderId = Number(m.order_id);
+    const target = await orderZohoInvoiceRepository.find(orderId, 'ci');
+    try {
+      const result = await zohoBooksService.pushRevenuePayment(
+        Number(m.client_id), String(m.company_legal_name), String(m.currency_code || 'INR'),
+        Number(m.received_amount), Math.round(Number(m.received_amount) * Number(m.exchange_rate) * 100) / 100,
+        String(m.cleared_on), `${m.buyer_inquiry_ref}-m${m.seq}`,
+        target ? target.zoho_invoice_number : null, 0,
+        await paymentDescription.milestonePayment(m, target ? target.zoho_invoice_number : null)
+      );
+      await paymentMilestoneRepository.setZohoReference(Number(m.id), result.payment_id);
+      if (result.applied > 0) {
+        await paymentMilestoneRepository.setZohoApplied(Number(m.id));
+        applied++;
+      }
+      await zohoSyncLogRepository.log('revenue_payment', 'order_payment_milestones', Number(m.id), 'milestone', 'success', result.payment_id, `Pushed payment milestone ${m.seq} as Zoho Books customer payment ${result.payment_id}${appliedNote('balance', target, result.applied)}`, triggeredBy, triggeredByUserId);
+      synced++;
+    } catch (e) {
+      await zohoSyncLogRepository.log('revenue_payment', 'order_payment_milestones', Number(m.id), 'milestone', 'error', null, e.message, triggeredBy, triggeredByUserId);
+      failed++;
+    }
+  }
+  for (const m of await paymentMilestoneRepository.heldInZoho()) {
+    const target = await orderZohoInvoiceRepository.find(Number(m.order_id), 'ci');
+    if (!target) {
+      continue; // still waiting for the CI — nothing to do yet
+    }
+    try {
+      const amount = await zohoBooksService.applyPaymentToInvoice(
+        String(m.zoho_reference), Number(m.client_id), String(m.company_legal_name), String(m.currency_code || 'INR'),
+        Number(m.received_amount), Math.round(Number(m.received_amount) * Number(m.exchange_rate) * 100) / 100,
+        String(m.cleared_on), `${m.buyer_inquiry_ref}-m${m.seq}`, target.zoho_invoice_number, 0,
+        await paymentDescription.milestonePayment(m, target.zoho_invoice_number)
+      );
+      await paymentMilestoneRepository.setZohoApplied(Number(m.id));
+      await zohoSyncLogRepository.log('payment_apply', 'order_payment_milestones', Number(m.id), 'milestone', 'success', String(m.zoho_reference), `Applied ${Number(amount).toFixed(2)} of milestone payment ${m.zoho_reference} to Commercial Invoice ${target.zoho_invoice_number}.`, triggeredBy, triggeredByUserId);
+      applied++;
+    } catch (e) {
+      await zohoSyncLogRepository.log('payment_apply', 'order_payment_milestones', Number(m.id), 'milestone', 'error', String(m.zoho_reference), e.message, triggeredBy, triggeredByUserId);
+      failed++;
+    }
+  }
+
   // Owner decision 2026-10-29: the money the bank paid under an LC — a
   // customer payment applied to the CI (held until the CI is in Books, like
   // the advance), with the bank charges the bank kept.

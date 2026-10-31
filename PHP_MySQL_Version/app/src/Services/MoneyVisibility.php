@@ -30,7 +30,7 @@ final class MoneyVisibility
     /** Document type code => the money it carries (types not listed carry none). */
     public const DOCUMENT_CLASSES = [
         'QT' => self::SELLING, 'BUYERPO' => self::SELLING, 'PI' => self::SELLING, 'OC' => self::SELLING,
-        'FDN' => self::SELLING, 'CI' => self::SELLING, 'AMD' => self::SELLING, 'COOPREP' => self::SELLING,
+        'FDN' => self::SELLING, 'CI' => self::SELLING, 'AMD' => self::SELLING, 'COOPREP' => self::SELLING, 'ESI' => self::SELLING,
         'CHECKLIST_2_FINANCE' => self::BUYER_PAYMENTS,
         'SUPPO' => self::PURCHASE,
         'BLI' => self::LOGISTICS,

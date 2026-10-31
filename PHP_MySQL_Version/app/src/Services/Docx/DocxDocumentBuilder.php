@@ -51,6 +51,7 @@ final class DocxDocumentBuilder
             'PL' => self::renderPl($phpWord, $context),
             'BLI' => self::renderBli($phpWord, $context),
             'CI' => self::renderCi($phpWord, $context),
+            'ESI' => self::renderEsi($phpWord, $context),
             'COOPREP' => self::renderCooprep($phpWord, $context),
             default => throw new \RuntimeException("No DOCX render method for document type {$documentTypeCode}"),
         };
@@ -89,6 +90,7 @@ final class DocxDocumentBuilder
             'PL' => 'PACKING LIST',
             'BLI' => 'BILL OF LADING INSTRUCTION SHEET',
             'CI' => 'COMMERCIAL INVOICE',
+            'ESI' => 'EXPORT SERVICE INVOICE',
             'COOPREP' => 'COO PREPARATION SHEET',
             default => $code,
         };
@@ -205,14 +207,25 @@ final class DocxDocumentBuilder
         ));
     }
 
-    private static function paymentTermsBlock(Section $section, array $context, bool $noAdvanceWording = false): void
+    private static function paymentTermsBlock(Section $section, array $context, bool $noAdvanceWording = false, bool $withMilestones = false): void
     {
         $financial = $context['financial'] ?? [];
         $order = $context['order'] ?? [];
         $currency = self::g($order, 'currency_code', '');
+        // Owner decision D-215 (5a, confirmed twice): the PI prints one bullet per milestone between the advance and the balance — same as the PDF.
+        $milestoneLines = static function () use ($section, $financial, $currency, $withMilestones): void {
+            if (!$withMilestones) {
+                return;
+            }
+            foreach ($financial['milestones'] ?? [] as $m) {
+                DocxComponents::addRichParagraph($section, [['• ', []], [$m['pct'] . '% Payment on FOB Value ' . $m['due_text'] . '. ', []], self::starRun()]);
+                DocxComponents::addRichParagraph($section, [['   ' . $m['pct'] . '% Amount:  ' . $currency . ' ' . $m['amount'], []], self::starRun()]);
+            }
+        };
         if ($noAdvanceWording && empty($financial['has_advance'])) {
             // Owner decision (2026-10-28): a QT / PI with no advance (e.g.
             // Letter of Credit) has no "0% Advance" lines — same as the PDF.
+            $milestoneLines();
             DocxComponents::addRichParagraph($section, [
                 ['• ', []], [self::g($financial, 'balance_pct', '') . '% Payment on FOB Value' . (($financial['payment_method'] ?? null) === 'LC' ? ' by Letter of Credit' : '') . ' — ' . self::g($financial, 'balance_terms_text', '') . ' ', []], self::starRun(),
             ]);
@@ -232,6 +245,7 @@ final class DocxDocumentBuilder
         // order's own balance terms — the same sentence as the PDF (Calendar
         // Days, and the preset's own wording when it has one).
         $balanceText = self::g($financial, 'balance_terms_text', '');
+        $milestoneLines();
         DocxComponents::addRichParagraph($section, [
             ['• ', []], [self::g($financial, 'balance_pct', '') . '% balance T/T on FOB Value ' . $balanceText . ' ', []], self::starRun(),
         ]);
@@ -469,7 +483,7 @@ final class DocxDocumentBuilder
         ]);
 
         DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
-        self::paymentTermsBlock($section, $context, true);
+        self::paymentTermsBlock($section, $context, true, true);
         if (!empty($financial['has_advance'])) {
             DocxComponents::addPlainParagraph($section, '• ' . self::g($financial, 'cleared_funds_text', ''));
         }
@@ -578,7 +592,11 @@ final class DocxDocumentBuilder
             ['label' => self::g($financial, 'advance_pct') . '% Advance Due (' . $currency . ') *', 'value' => self::g($financial, 'advance_amount')],
             ['label' => 'Advance Received (' . $currency . ') *', 'value' => self::g($payment, 'advance_amount', 'To Be Confirmed')],
             ['label' => 'Advance T/T Received On *', 'value' => self::g($payment, 'advance_remittance_received_at', 'To Be Confirmed')],
-        ] : [], [
+        ] : [], array_map(
+            // Owner decision D-215 (5a, confirmed twice): one row per milestone between the advance and the balance.
+            static fn (array $m): array => ['label' => $m['pct'] . '% Payment Due (' . $currency . ') *', 'value' => $m['amount'] . '  —  ' . $m['due_text']],
+            $financial['milestones'] ?? []
+        ), [
             // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no advance rows.
             ['label' => ($hasAdvance ? 'Balance Due' : ((($financial['payment_method'] ?? null) === 'LC') ? 'Payable by Letter of Credit' : 'Payment Due')) . ' (' . $currency . ') *', 'value' => (self::g($payment, 'balance_amount') !== '—' ? self::g($payment, 'balance_amount') : self::g($financial, 'balance_amount')) . '  —  ' . self::g($financial, 'balance_terms_text')],
             ['label' => 'Currency', 'value' => $currency],
@@ -1521,6 +1539,75 @@ final class DocxDocumentBuilder
         DocxComponents::addTermsSection($section, $context, (int) ($context['terms_section_number'] ?? 9), (string) ($context['terms_section_title'] ?? 'TERMS & CONDITIONS'));
         DocxComponents::addClientAgreementFooter($section, $context);
         self::addAnnexureAppendixIfAny($section, $context);
+        DocxComponents::addSignatureBlock($section, $context);
+    }
+
+    // ==================================================================
+    // ESI — Export Service Invoice (owner decision D-215, confirmed twice):
+    // the order's service lines, invoiced on their own so the Commercial
+    // Invoice stays goods-only for customs.
+    // ==================================================================
+    private static function renderEsi(PhpWord $phpWord, array $context): void
+    {
+        $section = DocxComponents::addSection($phpWord);
+        DocxComponents::addWatermark($section, $context['watermark'] ?? []);
+        $order = $context['order'] ?? [];
+        $meta = $context['meta'] ?? [];
+        $buyer = $context['buyer'] ?? [];
+        $financial = $context['financial'] ?? [];
+        $company = $context['company'] ?? [];
+        $products = $context['products'] ?? [];
+        $currency = self::g($order, 'currency_code', '');
+
+        DocxComponents::addHeader($section, $context, self::titleFor('ESI'), null);
+        DocxComponents::addMandatoryNote($section);
+        DocxComponents::addMetaBar($section, [
+            ['label' => 'INVOICE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
+            ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
+            ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
+        ]);
+        DocxComponents::addColorBox($section, DocxComponents::GREEN_BG, DocxComponents::GREEN_BORDER, function (AbstractContainer $cell) use ($company) {
+            $run = $cell->addTextRun();
+            $run->addText('GST DECLARATION: ', ['bold' => true, 'color' => DocxComponents::GREEN_BORDER, 'size' => 9.5]);
+            $run->addText('Supply meant for export under Letter of Undertaking (LUT) without payment of Integrated Tax (IGST). ', ['color' => DocxComponents::GREEN_VALUE, 'size' => 9.5]);
+            $run->addText('LUT Order No.: ' . self::g($company, 'lut_number'), ['bold' => true, 'color' => DocxComponents::GREEN_BORDER, 'size' => 9.5]);
+            $run->addText('   ·   Valid for ' . self::g($company, 'lut_valid_fy') . '   ·   GSTIN: ' . self::g($company, 'gstin'), ['color' => DocxComponents::GREEN_VALUE, 'size' => 9.5]);
+        });
+
+        self::addDefaultSection1($section, $context, 'EXPORTER / SELLER');
+
+        DocxComponents::addSectionTitle($section, '2. BUYER DETAILS');
+        DocxComponents::addKvTable($section, [
+            ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
+            ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
+            ['label' => 'Country *', 'value' => self::g($buyer, 'country_of_destination', 'To Be Confirmed')],
+        ]);
+
+        DocxComponents::addSectionTitle($section, '3. SERVICES');
+        $rows = [];
+        foreach ($products as $i => $p) {
+            $rows[] = [
+                'cells' => [(string) ($i + 1), $p['description'] ?? '', $p['sac_code'] ?? '', $p['quantity'] ?? '', $p['unit'] ?? '', $p['unit_price'] ?? '', $p['amount'] ?? ''],
+                'lineColor' => ($i % 2 === 0) ? '1D6FA8' : '2D7D56',
+                'align' => [null, null, null, 'right', null, 'right', 'right'],
+                'specText' => null,
+            ];
+        }
+        DocxComponents::addProductsTable($section, ['#', 'Service *', 'SAC *', 'Qty *', 'Unit *', "Rate ({$currency}) *", "Amount ({$currency}) *"], [6, 32, 12, 10, 10, 15, 15], $rows);
+        DocxComponents::addKvTable($section, [['label' => "TOTAL ({$currency}) *", 'value' => self::g($financial, 'service_value')]]);
+
+        DocxComponents::addSectionTitle($section, '4. BANK DETAILS');
+        $bank = array_values(array_filter(
+            self::bankDetailsRows($context, 'Please quote ESI No. ' . self::g($meta, 'document_reference', '') . ' in your wire transfer remarks.', ''),
+            static fn (array $r): bool => ($r['label'] ?? '') !== 'RBI Purpose Code'
+        ));
+        $bank[] = ['label' => 'Bank Charges', 'value' => self::g($financial, 'bank_charges_text', '')];
+        DocxComponents::addKvTable($section, $bank);
+
+        DocxComponents::addSectionTitle($section, '5. DECLARATION');
+        DocxComponents::addPlainParagraph($section, 'We hereby declare that the services described in this invoice were supplied by us and that the particulars given are true and correct.', ['italic' => true, 'color' => DocxComponents::MUTED]);
+        DocxComponents::addPlainParagraph($section, 'This invoice is issued under Letter of Undertaking (LUT Order No. ' . self::g($company, 'lut_number') . ') for export of services without payment of IGST under the provisions of the IGST Act, 2017.', ['italic' => true, 'color' => DocxComponents::MUTED]);
         DocxComponents::addSignatureBlock($section, $context);
     }
 

@@ -52,6 +52,10 @@
   <tr><td class="k">Advance T/T Received On *</td><td class="v">{{ payment_status.advance_remittance_received_at or 'To Be Confirmed' }}</td></tr>
   {% endif %}
   {# Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no advance rows; the amount is the full payment. #}
+  {# Owner decision D-215 (5a, confirmed twice): an order's own schedule — one row per milestone between the advance and the balance. #}
+  {% for m in financial.milestones %}
+  <tr><td class="k">{{ m.pct }}% Payment Due ({{ order.currency_code }}) *</td><td class="v">{{ m.amount }} <span style="font-size:8.5pt; color:#5B6573;">&nbsp;—&nbsp;{{ m.due_text }}</span></td></tr>
+  {% endfor %}
   <tr><td class="k">{% if financial.has_advance %}Balance Due{% elseif financial.payment_method == 'LC' %}Payable by Letter of Credit{% else %}Payment Due{% endif %} ({{ order.currency_code }}) *</td><td class="v">{{ payment_status.balance_amount or financial.balance_amount }} <span style="font-size:8.5pt; color:#5B6573;">&nbsp;—&nbsp;{{ financial.balance_terms_text }}</span></td></tr>
   <tr><td class="k">Currency</td><td class="v" style="font-weight:bold;">{{ order.currency_code }}</td></tr>
   {% if not order.is_fob %}

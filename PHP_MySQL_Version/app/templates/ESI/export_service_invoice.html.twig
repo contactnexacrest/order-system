@@ -1,0 +1,65 @@
+{% extends "_layout.html.twig" %}
+{# Owner decision D-215 (confirmed twice, 1 Nov 2026): the order's service lines are invoiced on their own Export Service Invoice, so the Commercial Invoice stays goods-only for customs. #}
+
+{# Services carry no Incoterm, so no 'FOB CHENNAI' under the title (the DOCX passes none either). #}
+{% block header_incoterm %}{% endblock %}
+
+{% block meta_table %}
+<table class="meta">
+  <tr>
+    <td><span class="label">INVOICE NO. *</span><span class="value">{{ meta.document_reference }} {{ meta.client_revision_label }}</span></td>
+    <td><span class="label">DATE *</span><span class="value">{{ meta.generated_date }}</span></td>
+    <td><span class="label">PI REFERENCE *</span><span class="value">{{ order.pi_ref ?: '—' }}</span></td>
+    <td><span class="label">BUYER INQUIRY REF *</span><span class="value">{{ order.buyer_inquiry_ref }}</span></td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block banner %}
+<div class="banner banner-green"><span class="label">GST DECLARATION:</span> <span class="value">Supply meant for export under Letter of Undertaking (LUT) without payment of Integrated Tax (IGST).</span> <span class="label">LUT Order No.: {{ company.lut_number }}</span> <span class="value">&nbsp;·&nbsp; Valid for {{ company.lut_valid_fy }} &nbsp;·&nbsp; GSTIN: {{ company.gstin }}</span></div>
+{% endblock %}
+
+{% block body %}
+
+{% include '_buyer_details.html.twig' with {'section_number': 2} %}
+
+<div class="section-title">3. SERVICES</div>
+<table class="products">
+  <tr><th>#</th><th>Service *</th><th>SAC *</th><th>Qty *</th><th>Unit *</th><th>Rate ({{ order.currency_code }}) *</th><th>Amount ({{ order.currency_code }}) *</th></tr>
+  {% for p in products %}
+  {% set lineColor = loop.index is odd ? '#1D6FA8' : '#2D7D56' %}
+  <tr>
+    <td class="line-no" style="color:{{ lineColor }};">{{ loop.index }}</td>
+    <td>{{ p.description }}</td>
+    <td>{{ p.sac_code }}</td>
+    <td class="num">{{ p.quantity }}</td>
+    <td>{{ p.unit }}</td>
+    <td class="num">{{ p.unit_price }}</td>
+    <td class="num">{{ p.amount }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<table class="totals">
+  <tr class="highlight"><td class="k" style="text-align:right;">TOTAL ({{ order.currency_code }}) *</td><td class="v" style="text-align:right;">{{ financial.service_value }}</td></tr>
+</table>
+
+<div class="section-title">4. BANK DETAILS</div>
+<table class="kv">
+  <tr><td class="k">Account Holder</td><td class="v">{{ company.legal_name|upper }}</td></tr>
+  <tr><td class="k">Bank</td><td class="v">{{ company.bank_name }}</td></tr>
+  <tr><td class="k">Branch</td><td class="v">{{ company.bank_branch }}</td></tr>
+  <tr><td class="k">Account No.</td><td class="v">{{ company.bank_account_no }}</td></tr>
+  <tr><td class="k">IFSC</td><td class="v">{{ company.ifsc }}</td></tr>
+  <tr><td class="k">SWIFT / BIC</td><td class="v">{{ company.swift_bic }}</td></tr>
+  <tr><td class="k">Bank Address</td><td class="v">{{ company.bank_address }}</td></tr>
+  <tr><td class="k">Payment Reference</td><td class="v" style="color:#185FA5;">Please quote ESI No. {{ meta.document_reference }} in your wire transfer remarks.</td></tr>
+  <tr><td class="k">Bank Charges</td><td class="v" style="color:#185FA5;">{{ financial.bank_charges_text }}</td></tr>
+</table>
+
+<div class="section-title">5. DECLARATION</div>
+<div class="numbered-block" style="font-style:italic; color:#5B6573;">
+  <p style="margin:0 0 4pt;">We hereby declare that the services described in this invoice were supplied by us and that the particulars given are true and correct.</p>
+  <p style="margin:0;">This invoice is issued under Letter of Undertaking (LUT Order No. {{ company.lut_number }}) for export of services without payment of IGST under the provisions of the IGST Act, 2017.</p>
+</div>
+
+{% endblock %}

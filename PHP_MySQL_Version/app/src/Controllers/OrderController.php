@@ -3148,6 +3148,12 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision D-215 (5a): every milestone between the advance and the balance is cleared first.
+        if ($open = \App\Repositories\PaymentMilestoneRepository::notCleared($orderId)) {
+            Flash::set('error', 'Clear payment milestone ' . $open[0]['seq'] . ' (' . rtrim(rtrim(number_format((float) $open[0]['pct'], 2, '.', ''), '0'), '.') . '% ' . $open[0]['due_text'] . ') before the balance.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $clearedAt = trim((string) ($_POST['balance_cleared_at'] ?? '')) ?: date('Y-m-d');
         OrderPaymentStatusRepository::markBalanceCleared($orderId, $clearedAt, (int) $user['id']);
         // External QA report L-23: balance payment clearing was never audit-logged.

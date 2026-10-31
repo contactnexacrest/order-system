@@ -72,6 +72,10 @@ final class DocumentDataAssembler
         if ($documentTypeCode !== null && !in_array(strtoupper($documentTypeCode), self::ALL_LINE_DOCUMENTS, true)) {
             $products = array_values(array_filter($products, static fn (array $p): bool => ($p['line_type'] ?? 'goods') !== 'service'));
         }
+        // The Export Service Invoice carries the service lines only.
+        if (strtoupper((string) $documentTypeCode) === 'ESI') {
+            $products = array_values(array_filter($products, static fn (array $p): bool => ($p['line_type'] ?? 'goods') === 'service'));
+        }
         $serviceValue = OrderProductRepository::totalServiceValue($orderId);
         $payment = OrderPaymentStatusRepository::find($orderId);
 
@@ -82,7 +86,15 @@ final class DocumentDataAssembler
         $advancePct = (float) $order['advance_pct'];
         $balancePct = (float) $order['balance_pct'];
         $advanceAmount = round($fobValue * $advancePct / 100, 2);
-        $balanceAmount = round($fobValue - $advanceAmount, 2);
+        // D-215 (5a): an order's own schedule — the steps between the advance and the balance, each its share of the FOB value.
+        $milestones = array_map(static fn (array $m): array => [
+            'seq' => (int) $m['seq'],
+            'pct' => rtrim(rtrim(number_format((float) $m['pct'], 2), '0'), '.'),
+            'due_text' => (string) $m['due_text'],
+            'amount_raw' => round($fobValue * (float) $m['pct'] / 100, 2),
+            'amount' => self::formatMoney(round($fobValue * (float) $m['pct'] / 100, 2)),
+        ], \App\Repositories\PaymentMilestoneRepository::forOrder($orderId));
+        $balanceAmount = round($fobValue - $advanceAmount - array_sum(array_column($milestones, 'amount_raw')), 2);
 
         $isFob = strtoupper($order['incoterm_code']) === 'FOB';
         // QA Round 5, Q-R5-2: under Incoterms 2020 only CIF puts insurance
@@ -266,6 +278,7 @@ final class DocumentDataAssembler
                 'advance_pct'      => rtrim(rtrim(number_format($advancePct, 2), '0'), '.'),
                 'advance_amount'   => self::formatMoney($advanceAmount),
                 'advance_trigger_text' => $order['advance_trigger_text'],
+                'milestones'       => $milestones,
                 'balance_pct'      => rtrim(rtrim(number_format($balancePct, 2), '0'), '.'),
                 'balance_amount'   => self::formatMoney($balanceAmount),
                 'balance_trigger_option' => $order['balance_trigger_option'],

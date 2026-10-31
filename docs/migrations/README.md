@@ -19,6 +19,8 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-01b-money-separation.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01c-procurement.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01d-coordination.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01e-line-types.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-01f-export-service-invoice.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-01g-payment-milestones.sql
 ```
 
 ## Rules every file follows
@@ -72,6 +74,8 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30
 | 28 | `2026-11-01c-procurement.sql` | D-214, phase 3: Procurement — purchase requirements (raised by Sales, no prices) and supplier quotes; the permissions Raise purchase requirements (Sales, management), Work purchase requirements (Procurement, management) and Approve purchases (Procurement Manager / Director, management); starting approval limits Procurement Executive ₹0 and Procurement Manager ₹5,00,000 (only where none is set). New tables and rows only |
 | 29 | `2026-11-01d-coordination.sql` | D-214, phase 4: one owner per department per order; the kinds of department task with their due and escalation days (editable in Admin → Task Due Days); the permissions Assign department owners (managers, directors, MD/ED, Admin, Order Coordinator), Management cockpit (directors, MD/ED, Admin, Order Coordinator) and Task due days (Admin, MD/ED); the Order Coordinator sees every order (no money). Also brings the tables added on 1 Nov to the database's own collation where they differ. New tables and rows only |
 | 30 | `2026-11-01e-line-types.sql` | D-215 (5a): each order line is Goods, Service or Charge (`order_products.line_type`, every existing line goods) and a service's SAC code (`sac_code`). Columns only |
+| 31 | `2026-11-01f-export-service-invoice.sql` | D-215 (5a): the Export Service Invoice document type (`ESI`, customer-facing, reference `SC/ESI/{YY}/{DDMM}{NNN}`) with DOCX turned on. New rows only |
+| 32 | `2026-11-01g-payment-milestones.sql` | D-215 (5a): an order's own payment schedule — the milestones between the advance and the balance (`order_payment_milestones`), each with its remittance, bank reference, clearing and Zoho Books payment. New table only |
 
 There is no `2026-10-28b` file; that letter was not used.
 

@@ -104,6 +104,7 @@ $departments = new \App\Controllers\DepartmentController();
 $departmentAdmin = new \App\Controllers\DepartmentAdminController();
 $purchasing = new \App\Controllers\PurchasingController();
 $coordination = new \App\Controllers\CoordinationController();
+$milestones = new \App\Controllers\PaymentMilestoneController();
 $clients = new ClientController();
 $clientIntake = new ClientIntakeController();
 $clientIntakeReview = new ClientIntakeReviewController();
@@ -666,6 +667,10 @@ $router->post('/orders/{id}/scanned-bl-sent', [$orders, 'recordScannedBlSent'], 
 
 $router->post('/orders/{id}/payment/balance', [$orders, 'recordBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/balance/clear', [$orders, 'clearBalancePayment'], [SessionAuth::required(), PermissionCheck::requires('clear_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// Owner decision D-215 (5a): the order's own payment schedule, and each milestone between the advance and the balance as its own payment.
+$router->post('/orders/{id}/payment-schedule', [$milestones, 'saveSchedule'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/milestones/{milestoneId}', [$milestones, 'record'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/payment/milestones/{milestoneId}/clear', [$milestones, 'clear'], [SessionAuth::required(), PermissionCheck::requires('clear_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/bl-originals-received', [$orders, 'recordBlOriginalsReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/bl-endorsed', [$orders, 'recordBlEndorsed'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);

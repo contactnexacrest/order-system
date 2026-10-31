@@ -127,4 +127,34 @@ async function buyerPayment(orderId, leg, invoiceNumber = null) {
   return parts.join(' · ');
 }
 
-module.exports = { buyerPayment, inspectionFee, lcLoanInterest, travelExpenses, periodLabel, gstRefund };
+/**
+ * D-215 (5a): a payment milestone between the advance and the balance —
+ * which step, its share and when it is due, the buyer and order, the
+ * amount and rate, what it settles (the Commercial Invoice in Zoho, or
+ * else the Proforma Invoice it was asked for) and the bank reference.
+ */
+async function milestonePayment(milestone, invoiceNumber = null) {
+  const orderId = Number(milestone.order_id);
+  const order = (await orderRepository.find(orderId)) || {};
+  const currency = order.currency_code || '';
+  const parts = [`Milestone ${Number(milestone.seq)} (${percent(milestone.pct)}% ${milestone.due_text}) received from `
+    + `${order.company_legal_name || 'the buyer'} for order ${order.buyer_inquiry_ref || order.order_reference || `#${orderId}`}`];
+  if (milestone.received_amount !== null && milestone.received_amount !== undefined) {
+    parts.push(`${currency} ${money(milestone.received_amount)}${milestone.exchange_rate !== null && milestone.exchange_rate !== undefined ? ` at ₹${rate(milestone.exchange_rate)}` : ''}`);
+  }
+  if (invoiceNumber !== null && invoiceNumber !== undefined && invoiceNumber !== '') {
+    parts.push(`against Commercial Invoice ${invoiceNumber}`);
+  } else {
+    const pi = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'PI');
+    if (pi && pi.document_reference) {
+      parts.push(`against Proforma Invoice ${pi.document_reference}`);
+    }
+  }
+  if (milestone.bank_reference) {
+    parts.push(`bank ref ${milestone.bank_reference}`);
+  }
+  const text = parts.join(' · ');
+  return milestone.staff_note ? `${text} · note: ${milestone.staff_note}` : text;
+}
+
+module.exports = { buyerPayment, milestonePayment, inspectionFee, lcLoanInterest, travelExpenses, periodLabel, gstRefund };

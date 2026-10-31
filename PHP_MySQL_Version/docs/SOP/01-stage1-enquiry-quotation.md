@@ -436,3 +436,38 @@ Each product line has a **Line type**:
 The Commercial Invoice, Packing List, COO preparation, Supplier PO and BL
 Instruction list goods and charges only. An order with goods only prints
 exactly as before.
+
+### Product categories and their attributes (D-215)
+
+**Products → Categories** (for whoever manages the product catalogue) lists
+the product categories and the attributes each one's order lines carry.
+**Natural Stone** is today's products: its attributes are Dimensions and
+Finish, and it cannot be changed — stone lines and every document print
+exactly as before.
+
+To sell something else (e.g. ceramic tiles), add a category with up to 6
+attributes (e.g. Size, Grade, Colour). On the order page, a product line's
+**Category** then offers it; choosing it shows that category's attribute
+fields. The Quotation, Proforma Invoice and Commercial Invoice (PDF and Word)
+print the line's detail row as "Size: … · Grade: … · Colour: … · HS Code: … ·
+Country of Origin: India", in the category's order; an attribute left empty
+prints "To Be Confirmed". A category can be made inactive: new lines no longer
+offer it, existing lines keep it.
+
+### Export Service Invoice (D-215)
+
+When an order has at least one service line, the **Products** card on the
+order page shows **Generate Export Service Invoice** (for staff who generate
+documents and see selling prices). The Export Service Invoice (reference
+`SC/ESI/YY/DDMMNNN`) lists the service lines only — service, SAC code,
+quantity, unit, rate and amount — with their total, our bank details
+("Please quote ESI No. … in your wire transfer remarks") and the LUT
+declaration for export of services without IGST. There is no Incoterm on it.
+It goes through Document Review & Approval like every other customer
+document, and can be made as PDF and DOCX.
+
+The buyer pays the services against the Export Service Invoice, as their own
+amount. The advance and balance stay a percentage of the goods FOB value, as
+before. An order without service lines cannot have an Export Service
+Invoice; the app says "This order has no service lines — the Export Service
+Invoice is only for services."

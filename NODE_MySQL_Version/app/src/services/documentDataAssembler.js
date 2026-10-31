@@ -67,6 +67,10 @@ async function assemble(orderId, documentTypeCode = null) {
   if (documentTypeCode !== null && !ALL_LINE_DOCUMENTS.includes(String(documentTypeCode).toUpperCase())) {
     products = products.filter((p) => (p.line_type || 'goods') !== 'service');
   }
+  // The Export Service Invoice carries the service lines only.
+  if (String(documentTypeCode || '').toUpperCase() === 'ESI') {
+    products = products.filter((p) => (p.line_type || 'goods') === 'service');
+  }
   const serviceValue = await orderProductRepository.totalServiceValue(orderId);
   const payment = await orderPaymentStatusRepository.find(orderId);
 
@@ -77,7 +81,15 @@ async function assemble(orderId, documentTypeCode = null) {
   const advancePct = parseFloat(order.advance_pct);
   const balancePct = parseFloat(order.balance_pct);
   const advanceAmount = round2(fobValue * advancePct / 100);
-  const balanceAmount = round2(fobValue - advanceAmount);
+  // D-215 (5a): an order's own schedule — the steps between the advance and the balance, each its share of the FOB value.
+  const milestones = (await require('../repositories/paymentMilestoneRepository').forOrder(orderId)).map((m) => ({
+    seq: Number(m.seq),
+    pct: trimTrailingZeros(parseFloat(m.pct).toFixed(2)),
+    due_text: String(m.due_text),
+    amount_raw: round2(fobValue * parseFloat(m.pct) / 100),
+    amount: formatMoney(round2(fobValue * parseFloat(m.pct) / 100)),
+  }));
+  const balanceAmount = round2(fobValue - advanceAmount - milestones.reduce((sum, m) => sum + m.amount_raw, 0));
 
   const isFob = String(order.incoterm_code).toUpperCase() === 'FOB';
   // QA Round 5, Q-R5-2: under Incoterms 2020 only CIF puts insurance
@@ -252,6 +264,7 @@ async function assemble(orderId, documentTypeCode = null) {
       advance_pct: trimTrailingZeros(advancePct.toFixed(2)),
       advance_amount: formatMoney(advanceAmount),
       advance_trigger_text: order.advance_trigger_text,
+      milestones,
       balance_pct: trimTrailingZeros(balancePct.toFixed(2)),
       balance_amount: formatMoney(balanceAmount),
       balance_trigger_option: order.balance_trigger_option,

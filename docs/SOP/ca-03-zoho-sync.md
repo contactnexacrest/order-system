@@ -364,7 +364,7 @@ created in Zoho Books.
   system's Audit Log, exactly as this module was scoped to keep it.
 
 Each Sync Now (and the scheduled job once a day) first checks what was already sent (see *Who owns what* above),
-then sends approved CIs and Debit Notes, then payments (and LC payments),
+then sends approved CIs and Debit Notes, then payments (cleared payment milestones too — D-215 — with reference `<buyer ref>-m<step>`, and LC payments),
 then applies any held payment whose invoice is now in Books; then bills,
 vendor payments, order expenses and order costs; then the expense import
 (new, changed and deleted expenses); then received export benefits as

@@ -1919,3 +1919,14 @@ INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
 SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
 WHERE p.permission_key IN ('view_orders', 'view_all_orders')
   AND r.name IN ('Order Coordinator', 'Operations Manager');
+
+-- ---------------------------------------------------------------
+-- Owner decision D-215: the Export Service Invoice (same row as docs/migrations/2026-11-01f-export-service-invoice.sql).
+INSERT INTO document_types (code, name, category, ref_format, never_shown_to_buyer, revision_enabled, min_reviewers_default, is_active)
+SELECT 'ESI', 'Export Service Invoice', 'customer_facing', 'SC/ESI/{YY}/{DDMM}{NNN}', 0, 1, 1, 1
+WHERE NOT EXISTS (SELECT 1 FROM document_types WHERE code = 'ESI');
+
+-- DOCX for the Export Service Invoice, like the other customer-facing documents.
+INSERT INTO docx_generation_settings (document_type_id, is_enabled)
+SELECT t.id, 1 FROM document_types t
+WHERE t.code = 'ESI' AND NOT EXISTS (SELECT 1 FROM docx_generation_settings s WHERE s.document_type_id = t.id);

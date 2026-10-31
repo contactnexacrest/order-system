@@ -126,10 +126,20 @@
   {% if financial.has_advance %}
   <p>&#8226; {{ financial.advance_pct }}% Advance Payment on FOB Value against this document. <span class="mand-star">*</span></p>
   <p class="sub-line">&nbsp;&nbsp;{{ financial.advance_pct }}% Advance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.advance_amount }} <span class="mand-star">*</span></p>
+  {# Owner decision D-215 (5a, confirmed twice): an order's own schedule — one bullet per milestone between the advance and the balance. #}
+  {% for m in financial.milestones %}
+  <p>&#8226; {{ m.pct }}% Payment on FOB Value {{ m.due_text }}. <span class="mand-star">*</span></p>
+  <p class="sub-line">&nbsp;&nbsp;{{ m.pct }}% Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ m.amount }} <span class="mand-star">*</span></p>
+  {% endfor %}
   <p>&#8226; {{ financial.balance_pct }}% Balance Payment on FOB Value {{ financial.balance_terms_text }} <span class="mand-star">*</span></p>
   <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Balance Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.balance_amount }} <span class="mand-star">*</span></p>
   {% else %}
   {# Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no "0% Advance" lines. #}
+  {# Owner decision D-215 (5a, confirmed twice): an order's own schedule — one bullet per milestone between the advance and the balance. #}
+  {% for m in financial.milestones %}
+  <p>&#8226; {{ m.pct }}% Payment on FOB Value {{ m.due_text }}. <span class="mand-star">*</span></p>
+  <p class="sub-line">&nbsp;&nbsp;{{ m.pct }}% Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ m.amount }} <span class="mand-star">*</span></p>
+  {% endfor %}
   <p>&#8226; {{ financial.balance_pct }}% Payment on FOB Value{% if financial.payment_method == 'LC' %} by Letter of Credit{% endif %} — {{ financial.balance_terms_text }} <span class="mand-star">*</span></p>
   <p class="sub-line">&nbsp;&nbsp;{{ financial.balance_pct }}% Amount:&nbsp;&nbsp;{{ order.currency_code }} {{ financial.balance_amount }} <span class="mand-star">*</span></p>
   {% endif %}

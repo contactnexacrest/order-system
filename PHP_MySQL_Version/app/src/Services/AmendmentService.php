@@ -213,7 +213,8 @@ final class AmendmentService
         // percentages must still sum to 100, so derive balance_pct from
         // whichever side actually changed rather than leaving the old
         // value in place alongside a new advance_pct.
-        $balancePct = $advancePct !== null ? round(100 - $advancePct, 2) : (float) $order['balance_pct'];
+        // D-215 (5a): an order with its own schedule keeps its milestones — the balance is what is left after them.
+        $balancePct = $advancePct !== null ? round(100 - $advancePct - \App\Repositories\PaymentMilestoneRepository::totalPct((int) $amendment['order_id']), 2) : (float) $order['balance_pct'];
         $finalAdvancePct = $advancePct ?? (float) $order['advance_pct'];
 
         // Structured balance-trigger fields drive what PI/CI templates

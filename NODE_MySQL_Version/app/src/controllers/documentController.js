@@ -1,5 +1,7 @@
 'use strict';
 
+const orderProductRepository = require('../repositories/orderProductRepository');
+
 const moneyVisibility = require('../services/moneyVisibility');
 
 const fs = require('fs');
@@ -18,7 +20,7 @@ const orderAccessService = require('../services/orderAccessService');
 
 // Port of App\Controllers\DocumentController.
 
-const ALLOWED_TYPES = ['QT', 'ANNEXA', 'PI', 'OC', 'BUYERPO', 'SUPPO', 'FDN', 'PL', 'BLI', 'CI', 'COOPREP'];
+const ALLOWED_TYPES = ['QT', 'ANNEXA', 'PI', 'OC', 'BUYERPO', 'SUPPO', 'FDN', 'PL', 'BLI', 'CI', 'COOPREP', 'ESI'];
 
 /**
  * The invoice date staff picked: null for today (left blank or today), the
@@ -77,6 +79,12 @@ async function generate(req, res) {
 
   if (!ALLOWED_TYPES.includes(type)) {
     flash.set(req, 'error', `Unknown or unsupported document type: ${type}`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // Owner decision D-215: the Export Service Invoice is for an order's service lines — none, nothing to invoice.
+  if (type === 'ESI' && (await orderProductRepository.totalServiceValue(orderId)) <= 0) {
+    flash.set(req, 'error', 'This order has no service lines — the Export Service Invoice is only for services.');
     res.redirect(`/orders/${orderId}`);
     return;
   }

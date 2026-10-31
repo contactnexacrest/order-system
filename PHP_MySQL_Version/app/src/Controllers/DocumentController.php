@@ -18,7 +18,7 @@ use App\Services\StageGateBlockedException;
 
 final class DocumentController
 {
-    private const ALLOWED_TYPES = ['QT', 'ANNEXA', 'PI', 'OC', 'BUYERPO', 'SUPPO', 'FDN', 'PL', 'BLI', 'CI', 'COOPREP'];
+    private const ALLOWED_TYPES = ['QT', 'ANNEXA', 'PI', 'OC', 'BUYERPO', 'SUPPO', 'FDN', 'PL', 'BLI', 'CI', 'COOPREP', 'ESI'];
 
     /**
      * The invoice date staff picked: null for today (left blank or today),
@@ -51,6 +51,12 @@ final class DocumentController
 
         if (!in_array($type, self::ALLOWED_TYPES, true)) {
             Flash::set('error', "Unknown or unsupported document type: {$type}");
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        // Owner decision D-215: the Export Service Invoice is for an order's service lines — none, nothing to invoice.
+        if ($type === 'ESI' && \App\Repositories\OrderProductRepository::totalServiceValue($orderId) <= 0) {
+            Flash::set('error', 'This order has no service lines — the Export Service Invoice is only for services.');
             header("Location: /orders/{$orderId}");
             return;
         }

@@ -913,6 +913,19 @@
         {% endfor %}
       </datalist>
     {% endif %}
+    {# Owner decision D-215 (5a-2): service lines are invoiced on their own Export Service Invoice. #}
+    {% if serviceLineCount and permissions.generate_documents and sees.selling %}
+      <div class="esi-generate">
+        <p class="muted small">This order has {{ serviceLineCount }} service line{{ '' if serviceLineCount == 1 else 's' }}. Services are invoiced on their own Export Service Invoice (under LUT, SAC codes) and paid against it — the Commercial Invoice stays goods-only.</p>
+        <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="document_type" value="ESI">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          <button type="submit" class="{{ 'btn-sm btn-doc-regenerate' if docGenerated(documents, 'ESI') else 'btn-sm btn-doc-new' }}" data-loading-text="Generating…">Generate Export Service Invoice</button>{{ docAlreadyNote(documents, 'ESI') }}
+        </form>
+      </div>
+    {% endif %}
   </details>
 
   <details class="step-card step-card-reference" id="payment-overview">
@@ -1062,6 +1075,70 @@
       {% endif %}
       </div>
     </div>
+    {# Owner decision D-215 (5a): the order's own payment schedule — advance, the milestones in between (each its own payment: remittance with bank ref, cleared, Zoho), balance. #}
+    {% if sees.selling %}
+    {% set ps = paymentSchedule %}
+    <div class="payment-schedule" id="payment-schedule">
+      <h3>Payment schedule</h3>
+      <p class="muted small">The advance is the first step and the balance the last. Steps in between (milestones) are paid and tracked on their own: record the remittance with its bank reference, clear it once the bank confirms, and the revenue sync sends it to Zoho Books.</p>
+      <table class="data-table">
+        <tr><th>Step</th><th>Share of FOB</th><th>When</th><th>Amount ({{ order.currency_code }})</th><th>Status</th></tr>
+        <tr><td>1 · Advance</td><td>{{ ps.advancePct }}%</td><td>{{ ps.advanceText }}</td><td>{{ ps.advanceAmount | money }}</td><td>{{ ps.advanceStatus }}</td></tr>
+        {% for m in ps.rows %}
+        <tr class="milestone-row">
+          <td>{{ m.seq }} · Milestone</td>
+          <td>{{ m.pctText }}%</td>
+          <td>{{ m.due_text }}</td>
+          <td>{{ m.amount | money }}</td>
+          <td>
+            {% if m.received_amount === null %}Due
+            {% else %}Received {{ m.received_amount | money }} on {{ m.received_on | humanDate }} · bank ref {{ m.bank_reference }}{{ (' · Cleared ' + (m.cleared_on | humanDate)) if m.cleared_on else ' — not yet cleared' }}{{ ' · In Zoho Books' if m.zoho_reference else '' }}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        <tr><td>{{ ps.balanceStep }} · Balance</td><td>{{ ps.balancePct }}%</td><td>{{ ps.balanceText }}</td><td>{{ ps.balanceAmount | money }}</td><td>{{ ps.balanceStatus }}</td></tr>
+      </table>
+
+      {% for m in ps.rows %}
+        {% if m.received_amount === null and permissions.manage_payments %}
+        <form method="post" action="/orders/{{ order.id }}/payment/milestones/{{ m.id }}" class="inline-form milestone-record">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <strong>Milestone {{ m.seq }} received</strong>
+          <label>Amount received ({{ order.currency_code }}) *<input type="number" name="amount" step="0.01" min="0.01" max="999999999999.99" required value="{{ m.amountInput }}"></label>
+          <label>Exchange rate (₹ per 1 {{ order.currency_code }}) *<input type="number" name="exchange_rate" step="0.0001" min="0.0001" max="999999.9999" required></label>
+          <label>Bank reference (UTR / SWIFT) *<input type="text" name="bank_reference" minlength="4" maxlength="100" required></label>
+          <label>Received on *<input type="date" name="received_on" required value="{{ todayDate }}" max="{{ todayDate }}"></label>
+          <label>Note <small class="muted">(added to the description)</small><input type="text" name="staff_note" maxlength="255"></label>
+          <button type="submit" class="btn-sm">Record Milestone {{ m.seq }} Remittance</button>
+        </form>
+        {% elif m.received_amount !== null and not m.cleared_on and permissions.clear_payments %}
+        <form method="post" action="/orders/{{ order.id }}/payment/milestones/{{ m.id }}/clear" class="inline-form milestone-clear">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Milestone {{ m.seq }} cleared on *<input type="date" name="cleared_on" required value="{{ todayDate }}" min="{{ m.received_on }}" max="{{ todayDate }}"></label>
+          <button type="submit" class="btn-sm">Mark Milestone {{ m.seq }} Cleared</button>
+        </form>
+        {% endif %}
+      {% endfor %}
+
+      {% if permissions.manage_orders and not ps.fixed and not isLockedOrder %}
+      <details class="milestone-edit">
+        <summary>Change the schedule (milestones between the advance and the balance)</summary>
+        <form method="post" action="/orders/{{ order.id }}/payment-schedule">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <p class="muted small">Up to {{ ps.maxSteps }} milestones. Each is a share of the FOB value and says when it is due, e.g. "on shipment — within 3 Calendar Days of receiving the scanned Bill of Lading". The balance is what is left after the advance ({{ ps.advancePct }}%) and the milestones. Leave every row empty for plain advance and balance.</p>
+          {% for r in ps.editRows %}
+          <div class="milestone-edit-row">
+            <label>Milestone {{ r.seq }} %<input type="number" name="milestone_pct[]" step="0.01" min="0.01" max="99" value="{{ r.pct }}"></label>
+            <label>When it is due<input type="text" name="milestone_due[]" minlength="5" maxlength="200" value="{{ r.due }}"></label>
+          </div>
+          {% endfor %}
+          <button type="submit" class="btn-sm">Save Payment Schedule</button>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+    {% endif %}
   </details>
 
   {% set pendingDocActions = docPendingActions(documents, mailSendingEnabled) %}

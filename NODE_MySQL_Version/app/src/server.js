@@ -90,6 +90,7 @@ const departmentController = require('./controllers/departmentController');
 const departmentAdminController = require('./controllers/departmentAdminController');
 const purchasingController = require('./controllers/purchasingController');
 const coordinationController = require('./controllers/coordinationController');
+const paymentMilestoneController = require('./controllers/paymentMilestoneController');
 const moneyVisibility = require('./services/moneyVisibility');
 const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
@@ -1025,6 +1026,10 @@ app.post('/orders/:id/scanned-bl-sent', requireAuth, requirePermission('manage_s
 
 app.post('/orders/:id/payment/balance', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBalancePayment));
 app.post('/orders/:id/payment/balance/clear', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.clearBalancePayment));
+// Owner decision D-215 (5a): the order's own payment schedule, and each milestone between the advance and the balance as its own payment.
+app.post('/orders/:id/payment-schedule', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(paymentMilestoneController.saveSchedule));
+app.post('/orders/:id/payment/milestones/:milestoneId', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(paymentMilestoneController.record));
+app.post('/orders/:id/payment/milestones/:milestoneId/clear', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(paymentMilestoneController.clear));
 
 app.post('/orders/:id/bl-originals-received', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBlOriginalsReceived));
 app.post('/orders/:id/bl-endorsed', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBlEndorsed));

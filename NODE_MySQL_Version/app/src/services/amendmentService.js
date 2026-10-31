@@ -213,7 +213,9 @@ async function attachSignedCopyAndActivate(amendmentId, signedCopyFileId, userId
   // still sum to 100, so derive balance_pct from whichever side actually
   // changed rather than leaving the old value in place alongside a new
   // advance_pct.
-  const balancePct = advancePct !== null ? Math.round((100 - advancePct) * 100) / 100 : parseFloat(order.balance_pct);
+  // D-215 (5a): an order with its own schedule keeps its milestones — the balance is what is left after them.
+  const milestonePct = await require('../repositories/paymentMilestoneRepository').totalPct(Number(amendment.order_id));
+  const balancePct = advancePct !== null ? Math.round((100 - advancePct - milestonePct) * 100) / 100 : parseFloat(order.balance_pct);
   const finalAdvancePct = advancePct !== null ? advancePct : parseFloat(order.advance_pct);
 
   // Structured balance-trigger fields drive what PI/CI templates actually

@@ -1144,6 +1144,8 @@ async function show(req, res) {
       // Owner decision D-214, phase 3: what the order needs from Procurement.
       purchaseRequirements: await purchasingRepository.forOrder(orderId),
       lineTypes: orderProductRepository.LINE_TYPES,
+      // Owner decision D-215 (5a): the order's own payment schedule (advance, milestones, balance).
+      paymentSchedule: await require('./paymentMilestoneController').scheduleView(orderId, order),
       // Owner decision D-214, phase 4: one owner per department; a department's manager picks theirs.
       departmentOwners: await departmentOwnersFor(req, orderId),
       purchaseStatuses: purchasingRepository.STATUSES,
@@ -1170,6 +1172,8 @@ async function show(req, res) {
       buyerPoCopyRequired: (await companySettingsRepository.get('wet_signature_required_buyer_po')) === '1',
       supplierPoCopyRequired: (await companySettingsRepository.get('wet_signature_required_supplier_po')) === '1',
       products: await orderProductRepository.forOrder(orderId),
+      // Owner decision D-215 (5a-2): the Export Service Invoice is offered when the order has service lines.
+      serviceLineCount: (await orderProductRepository.forOrder(orderId)).filter((p) => (p.line_type || 'goods') === 'service').length,
       hsCodes: await hsCodeRepository.active(),
       isPostConfirmationOrder: orderEditGuard.isPostConfirmation(order.current_stage_number),
       canOverrideOrderEdit: orderEditGuard.canOverride(req),
@@ -3259,6 +3263,14 @@ async function clearBalancePayment(req, res) {
   // own gate on that field).
   if (existingPayment.balance_remittance_received_at === null) {
     flash.set(req, 'error', 'Record the balance remittance before marking it cleared.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // Owner decision D-215 (5a): every milestone between the advance and the balance is cleared first.
+  const openMilestones = await require('../repositories/paymentMilestoneRepository').notCleared(orderId);
+  if (openMilestones.length > 0) {
+    const m = openMilestones[0];
+    flash.set(req, 'error', `Clear payment milestone ${m.seq} (${Number(m.pct).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}% ${m.due_text}) before the balance.`);
     res.redirect(`/orders/${orderId}`);
     return;
   }

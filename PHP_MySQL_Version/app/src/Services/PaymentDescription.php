@@ -60,6 +60,38 @@ final class PaymentDescription
         return implode(' · ', $parts);
     }
 
+    /**
+     * D-215 (5a): a payment milestone between the advance and the balance —
+     * which step, its share and when it is due, the buyer and order, the
+     * amount and rate, what it settles (the Commercial Invoice in Zoho, or
+     * else the Proforma Invoice it was asked for) and the bank reference.
+     */
+    public static function milestonePayment(array $milestone, ?string $invoiceNumber = null): string
+    {
+        $orderId = (int) $milestone['order_id'];
+        $order = OrderRepository::find($orderId) ?? [];
+        $currency = (string) ($order['currency_code'] ?? '');
+        $parts = ['Milestone ' . (int) $milestone['seq'] . ' (' . self::percent((float) $milestone['pct']) . '% ' . $milestone['due_text'] . ') received from '
+            . ($order['company_legal_name'] ?? 'the buyer') . ' for order ' . ($order['buyer_inquiry_ref'] ?? $order['order_reference'] ?? "#{$orderId}")];
+        if (($milestone['received_amount'] ?? null) !== null) {
+            $parts[] = "{$currency} " . number_format((float) $milestone['received_amount'], 2)
+                . (($milestone['exchange_rate'] ?? null) !== null ? ' at ₹' . self::rate((float) $milestone['exchange_rate']) : '');
+        }
+        if ($invoiceNumber !== null && $invoiceNumber !== '') {
+            $parts[] = "against Commercial Invoice {$invoiceNumber}";
+        } else {
+            $pi = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'PI');
+            if ($pi !== null && !empty($pi['document_reference'])) {
+                $parts[] = 'against Proforma Invoice ' . $pi['document_reference'];
+            }
+        }
+        if (!empty($milestone['bank_reference'])) {
+            $parts[] = 'bank ref ' . $milestone['bank_reference'];
+        }
+        $text = implode(' · ', $parts);
+        return !empty($milestone['staff_note']) ? $text . ' · note: ' . $milestone['staff_note'] : $text;
+    }
+
     /** Batch 2: the pre-shipment inspection fee, naming the agency and its invoice. */
     public static function inspectionFee(string $agency, string $invoiceNo): string
     {

@@ -49,6 +49,7 @@ function titleFor(code) {
     PL: 'PACKING LIST',
     BLI: 'BILL OF LADING INSTRUCTION SHEET',
     CI: 'COMMERCIAL INVOICE',
+    ESI: 'EXPORT SERVICE INVOICE',
     COOPREP: 'COO PREPARATION SHEET',
   };
   return map[code] || code;
@@ -150,14 +151,23 @@ function weightTable(order) {
   return out;
 }
 
-function paymentTermsBlock(context, noAdvanceWording = false) {
+function paymentTermsBlock(context, noAdvanceWording = false, withMilestones = false) {
   const financial = context.financial || {};
   const order = context.order || {};
   const currency = g(order, 'currency_code', '');
   const out = [];
+  // Owner decision D-215 (5a, confirmed twice): the PI prints one bullet per milestone between the advance and the balance — same as the PDF.
+  const milestoneLines = () => {
+    if (!withMilestones) return;
+    for (const m of financial.milestones || []) {
+      out.push(C.rich([['• ', {}], [`${m.pct}% Payment on FOB Value ${m.due_text}. `, {}], starRun()]));
+      out.push(C.rich([[`   ${m.pct}% Amount:  ${currency} ${m.amount}`, {}], starRun()]));
+    }
+  };
   if (noAdvanceWording && !financial.has_advance) {
     // Owner decision (2026-10-28): a QT / PI with no advance (e.g. Letter of
     // Credit) has no "0% Advance" lines — same as the PDF.
+    milestoneLines();
     out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% Payment on FOB Value${financial.payment_method === 'LC' ? ' by Letter of Credit' : ''} — ${g(financial, 'balance_terms_text', '')} `, {}], starRun()]));
     out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}], starRun()]));
     return out.concat(freightAndCurrencyLines(order, currency));
@@ -168,6 +178,7 @@ function paymentTermsBlock(context, noAdvanceWording = false) {
   // order's own balance terms — the same sentence as the PDF (Calendar
   // Days, and the preset's own wording when it has one).
   const balanceText = g(financial, 'balance_terms_text', '');
+  milestoneLines();
   out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% balance T/T on FOB Value ${balanceText} `, {}], starRun()]));
   out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Balance Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}], starRun()]));
   return out.concat(freightAndCurrencyLines(order, currency));
@@ -438,7 +449,7 @@ function renderPi(context) {
   );
 
   children.push(...C.sectionTitle('5. PAYMENT TERMS'));
-  children.push(...paymentTermsBlock(context, true));
+  children.push(...paymentTermsBlock(context, true, true));
   if (financial.has_advance) children.push(C.plain(`• ${g(financial, 'cleared_funds_text', '')}`));
 
   children.push(...C.sectionTitle('6. PRODUCTION & ESTIMATED SHIPMENT'));
@@ -568,6 +579,8 @@ function renderOc(context) {
       { label: `Advance Received (${currency}) *`, value: g(payment, 'advance_amount', 'To Be Confirmed') },
       { label: 'Advance T/T Received On *', value: g(payment, 'advance_remittance_received_at', 'To Be Confirmed') },
     ] : []),
+    // Owner decision D-215 (5a, confirmed twice): one row per milestone between the advance and the balance.
+    ...(financial.milestones || []).map((m) => ({ label: `${m.pct}% Payment Due (${currency}) *`, value: `${m.amount}  —  ${m.due_text}` })),
     // Owner decision (2026-10-28): no advance (e.g. Letter of Credit) — no advance rows.
     { label: `${financial.has_advance ? 'Balance Due' : (financial.payment_method === 'LC' ? 'Payable by Letter of Credit' : 'Payment Due')} (${currency}) *`, value: `${g(payment, 'balance_amount') !== '—' ? g(payment, 'balance_amount') : g(financial, 'balance_amount')}  —  ${g(financial, 'balance_terms_text')}` },
     { label: 'Currency', value: currency },
@@ -1657,6 +1670,79 @@ function renderCi(context) {
 }
 
 // ==================================================================
+// ESI — Export Service Invoice (owner decision D-215, confirmed twice):
+// the order's service lines, invoiced on their own so the Commercial
+// Invoice stays goods-only for customs.
+// ==================================================================
+function renderEsi(context) {
+  const order = context.order || {};
+  const meta = context.meta || {};
+  const buyer = context.buyer || {};
+  const financial = context.financial || {};
+  const company = context.company || {};
+  const products = context.products || [];
+  const currency = g(order, 'currency_code', '');
+  const children = [];
+
+  children.push(...C.header(context, titleFor('ESI'), null));
+  children.push(C.mandatoryNote());
+  children.push(
+    ...C.metaBar([
+      { label: 'INVOICE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'DATE *', value: g(meta, 'generated_date', '') },
+      { label: 'PI REFERENCE *', value: g(order, 'pi_ref', '—') },
+      { label: 'BUYER INQUIRY REF *', value: g(order, 'buyer_inquiry_ref', '') },
+    ])
+  );
+  children.push(
+    ...C.colorBox(C.GREEN_BG, C.GREEN_BORDER, [
+      C.rich([
+        ['GST DECLARATION: ', { bold: true, color: C.GREEN_BORDER, size: 19 }],
+        ['Supply meant for export under Letter of Undertaking (LUT) without payment of Integrated Tax (IGST). ', { color: C.GREEN_VALUE, size: 19 }],
+        [`LUT Order No.: ${g(company, 'lut_number')}`, { bold: true, color: C.GREEN_BORDER, size: 19 }],
+        [`   ·   Valid for ${g(company, 'lut_valid_fy')}   ·   GSTIN: ${g(company, 'gstin')}`, { color: C.GREEN_VALUE, size: 19 }],
+      ]),
+    ])
+  );
+
+  children.push(...defaultSection1(context, 'EXPORTER / SELLER'));
+
+  children.push(...C.sectionTitle('2. BUYER DETAILS'));
+  children.push(
+    ...C.kvTable([
+      { label: 'Company Legal Name *', value: g(buyer, 'company_legal_name') },
+      { label: 'Billing Address *', value: g(buyer, 'billing_address') },
+      { label: 'Country *', value: g(buyer, 'country_of_destination', 'To Be Confirmed') },
+    ])
+  );
+
+  children.push(...C.sectionTitle('3. SERVICES'));
+  const rows = products.map((p, i) => ({
+    cells: [String(i + 1), p.description || '', p.sac_code || '', p.quantity ?? '', p.unit || '', p.unit_price ?? '', p.amount ?? ''],
+    lineColor: i % 2 === 0 ? '1D6FA8' : '2D7D56',
+    align: [null, null, null, 'right', null, 'right', 'right'],
+    specText: null,
+  }));
+  children.push(...C.productsTable(['#', 'Service *', 'SAC *', 'Qty *', 'Unit *', `Rate (${currency}) *`, `Amount (${currency}) *`], [6, 32, 12, 10, 10, 15, 15], rows));
+  children.push(...C.kvTable([{ label: `TOTAL (${currency}) *`, value: g(financial, 'service_value') }]));
+
+  children.push(...C.sectionTitle('4. BANK DETAILS'));
+  children.push(
+    ...C.kvTable(
+      bankDetailsRows(context, `Please quote ESI No. ${g(meta, 'document_reference', '')} in your wire transfer remarks.`, null)
+        .filter((r) => r.label !== 'RBI Purpose Code')
+        .concat([{ label: 'Bank Charges', value: g(financial, 'bank_charges_text', '') }])
+    )
+  );
+
+  children.push(...C.sectionTitle('5. DECLARATION'));
+  children.push(C.plain('We hereby declare that the services described in this invoice were supplied by us and that the particulars given are true and correct.', { italics: true, color: C.MUTED }));
+  children.push(C.plain(`This invoice is issued under Letter of Undertaking (LUT Order No. ${g(company, 'lut_number')}) for export of services without payment of IGST under the provisions of the IGST Act, 2017.`, { italics: true, color: C.MUTED }));
+  children.push(...C.signatureBlock(context));
+  return children;
+}
+
+// ==================================================================
 // COOPREP — Certificate of Origin Preparation Sheet (internal only)
 // ==================================================================
 function renderCooprep(context) {
@@ -1802,6 +1888,7 @@ const RENDERERS = {
   PL: renderPl,
   BLI: renderBli,
   CI: renderCi,
+  ESI: renderEsi,
   COOPREP: renderCooprep,
 };
 

@@ -1385,6 +1385,20 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <?php endforeach; ?>
       </datalist>
     <?php endif; ?>
+    <?php // Owner decision D-215 (5a-2): service lines are invoiced on their own Export Service Invoice. ?>
+    <?php $__serviceLines = array_filter($products, static fn (array $p): bool => ($p['line_type'] ?? 'goods') === 'service'); ?>
+    <?php if ($__serviceLines && $canGenerateDocuments && $sees['selling']): ?>
+      <div class="esi-generate">
+        <p class="muted small">This order has <?= count($__serviceLines) ?> service line<?= count($__serviceLines) === 1 ? '' : 's' ?>. Services are invoiced on their own Export Service Invoice (under LUT, SAC codes) and paid against it — the Commercial Invoice stays goods-only.</p>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="document_type" value="ESI">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_pdf" value="1" checked disabled> PDF</label><input type="hidden" name="generate_pdf" value="1">
+          <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> DOCX</label>
+          <button type="submit" class="btn-sm <?= isset($latestDocByCode['ESI']) ? 'btn-doc-regenerate' : 'btn-doc-new' ?>" data-loading-text="Generating…">Generate Export Service Invoice</button><?= $__docAlreadyNote('ESI') ?>
+        </form>
+      </div>
+    <?php endif; ?>
   </details>
 
   <details class="step-card step-card-reference" id="payment-overview">
@@ -1534,6 +1548,81 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?php endif; ?>
       </div>
     </div>
+
+    <?php // Owner decision D-215 (5a): the order's own payment schedule — advance, the milestones in between (each its own payment: remittance with bank ref, cleared, Zoho), balance. ?>
+    <?php if ($sees['selling']): ?>
+    <?php
+      $__ms = \App\Repositories\PaymentMilestoneRepository::forOrder((int) $order['id']);
+      $__msFob = \App\Repositories\OrderProductRepository::totalFobValue((int) $order['id']);
+      $__msAdvPct = (float) $order['advance_pct'];
+      $__msTotalPct = array_sum(array_map(static fn (array $m): float => (float) $m['pct'], $__ms));
+      $__msFixed = !empty($payment['advance_cleared_at']) || \App\Repositories\PaymentMilestoneRepository::anyMoneyRecorded((int) $order['id']);
+      $__msPct = static fn (float $v): string => rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+      $__msLegStatus = static fn (string $leg): string => !empty($payment[$leg . '_cleared_at']) ? 'Cleared' : (!empty($payment[$leg . '_remittance_received_at']) ? 'Received — not yet cleared' : 'Due');
+      $__msAdvAmount = round($__msFob * $__msAdvPct / 100, 2);
+      $__msMidAmount = array_sum(array_map(static fn (array $m): float => round($__msFob * (float) $m['pct'] / 100, 2), $__ms));
+    ?>
+    <div class="payment-schedule" id="payment-schedule">
+      <h3>Payment schedule</h3>
+      <p class="muted small">The advance is the first step and the balance the last. Steps in between (milestones) are paid and tracked on their own: record the remittance with its bank reference, clear it once the bank confirms, and the revenue sync sends it to Zoho Books.</p>
+      <table class="data-table">
+        <tr><th>Step</th><th>Share of FOB</th><th>When</th><th>Amount (<?= htmlspecialchars((string) $order['currency_code']) ?>)</th><th>Status</th></tr>
+        <tr><td>1 · Advance</td><td><?= $__msPct($__msAdvPct) ?>%</td><td><?= htmlspecialchars((string) ($order['advance_trigger_text'] ?? '')) ?></td><td><?= number_format($__msAdvAmount, 2) ?></td><td><?= $__msLegStatus('advance') ?></td></tr>
+        <?php foreach ($__ms as $__m): ?>
+        <tr class="milestone-row">
+          <td><?= (int) $__m['seq'] ?> · Milestone</td>
+          <td><?= $__msPct((float) $__m['pct']) ?>%</td>
+          <td><?= htmlspecialchars((string) $__m['due_text']) ?></td>
+          <td><?= number_format(round($__msFob * (float) $__m['pct'] / 100, 2), 2) ?></td>
+          <td>
+            <?php if ($__m['received_amount'] === null): ?>Due
+            <?php else: ?>Received <?= number_format((float) $__m['received_amount'], 2) ?> on <?= htmlspecialchars(Dates::human((string) $__m['received_on'])) ?> · bank ref <?= htmlspecialchars((string) $__m['bank_reference']) ?><?= $__m['cleared_on'] !== null ? ' · Cleared ' . htmlspecialchars(Dates::human((string) $__m['cleared_on'])) : ' — not yet cleared' ?><?= $__m['zoho_reference'] !== null ? ' · In Zoho Books' : '' ?>
+            <?php endif; ?>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+        <tr><td><?= count($__ms) + 2 ?> · Balance</td><td><?= $__msPct(100 - $__msAdvPct - $__msTotalPct) ?>%</td><td><?= htmlspecialchars(\App\Services\DocumentDataAssembler::balanceTriggerSentence($order['balance_trigger_option'] ?? null, isset($order['balance_days']) ? (int) $order['balance_days'] : null, $order['balance_trigger_wording'] ?? null)) ?></td><td><?= number_format(round($__msFob - $__msAdvAmount - $__msMidAmount, 2), 2) ?></td><td><?= $__msLegStatus('balance') ?></td></tr>
+      </table>
+
+      <?php foreach ($__ms as $__m): ?>
+        <?php if ($__m['received_amount'] === null && $canManagePayments): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/milestones/<?= (int) $__m['id'] ?>" class="inline-form milestone-record">
+          <?= Csrf::field() ?>
+          <strong>Milestone <?= (int) $__m['seq'] ?> received</strong>
+          <label>Amount received (<?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="amount" step="0.01" min="0.01" max="999999999999.99" required value="<?= number_format(round($__msFob * (float) $__m['pct'] / 100, 2), 2, '.', '') ?>"></label>
+          <label>Exchange rate (₹ per 1 <?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="exchange_rate" step="0.0001" min="0.0001" max="999999.9999" required></label>
+          <label>Bank reference (UTR / SWIFT) *<input type="text" name="bank_reference" minlength="4" maxlength="100" required></label>
+          <label>Received on *<input type="date" name="received_on" required value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>"></label>
+          <label>Note <small class="muted">(added to the description)</small><input type="text" name="staff_note" maxlength="255"></label>
+          <button type="submit" class="btn-sm">Record Milestone <?= (int) $__m['seq'] ?> Remittance</button>
+        </form>
+        <?php elseif ($__m['received_amount'] !== null && $__m['cleared_on'] === null && $canClearPayments): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/milestones/<?= (int) $__m['id'] ?>/clear" class="inline-form milestone-clear">
+          <?= Csrf::field() ?>
+          <label>Milestone <?= (int) $__m['seq'] ?> cleared on *<input type="date" name="cleared_on" required value="<?= date('Y-m-d') ?>" min="<?= htmlspecialchars((string) $__m['received_on']) ?>" max="<?= date('Y-m-d') ?>"></label>
+          <button type="submit" class="btn-sm">Mark Milestone <?= (int) $__m['seq'] ?> Cleared</button>
+        </form>
+        <?php endif; ?>
+      <?php endforeach; ?>
+
+      <?php if ($canManageOrders && !$__msFixed && !$isLockedOrder): ?>
+      <details class="milestone-edit">
+        <summary>Change the schedule (milestones between the advance and the balance)</summary>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment-schedule">
+          <?= Csrf::field() ?>
+          <p class="muted small">Up to <?= \App\Repositories\PaymentMilestoneRepository::MAX_STEPS ?> milestones. Each is a share of the FOB value and says when it is due, e.g. "on shipment — within 3 Calendar Days of receiving the scanned Bill of Lading". The balance is what is left after the advance (<?= $__msPct($__msAdvPct) ?>%) and the milestones. Leave every row empty for plain advance and balance.</p>
+          <?php for ($__i = 0; $__i < \App\Repositories\PaymentMilestoneRepository::MAX_STEPS; $__i++): $__row = $__ms[$__i] ?? null; ?>
+          <div class="milestone-edit-row">
+            <label>Milestone <?= $__i + 2 ?> %<input type="number" name="milestone_pct[]" step="0.01" min="0.01" max="99" value="<?= $__row !== null ? $__msPct((float) $__row['pct']) : '' ?>"></label>
+            <label>When it is due<input type="text" name="milestone_due[]" minlength="5" maxlength="200" value="<?= htmlspecialchars((string) ($__row['due_text'] ?? '')) ?>"></label>
+          </div>
+          <?php endfor; ?>
+          <button type="submit" class="btn-sm">Save Payment Schedule</button>
+        </form>
+      </details>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
   </details>
 
   <?php // Owner decision (2026-10-26): opens by itself only when a document is waiting on someone; otherwise a slim bar with the count. ?>

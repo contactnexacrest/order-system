@@ -4607,3 +4607,26 @@ CREATE TABLE department_task_types (
   escalate_after_days INT NOT NULL,
   sort_order INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB;
+
+-- Owner decision D-215 (5a): the steps of an order's own payment schedule between the advance and the balance (docs/migrations/2026-11-01g-payment-milestones.sql).
+CREATE TABLE order_payment_milestones (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id BIGINT UNSIGNED NOT NULL,
+  seq TINYINT UNSIGNED NOT NULL,
+  pct DECIMAL(5,2) NOT NULL,
+  due_text VARCHAR(200) NOT NULL,
+  received_amount DECIMAL(14,2) NULL,
+  received_on DATE NULL,
+  exchange_rate DECIMAL(12,4) NULL,
+  bank_reference VARCHAR(100) NULL,
+  staff_note VARCHAR(255) NULL,
+  recorded_by BIGINT UNSIGNED NULL,
+  recorded_at DATETIME NULL,
+  cleared_on DATE NULL,
+  cleared_by BIGINT UNSIGNED NULL,
+  zoho_reference VARCHAR(64) NULL,
+  zoho_applied_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_opm_order_seq (order_id, seq),
+  CONSTRAINT fk_opm_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
