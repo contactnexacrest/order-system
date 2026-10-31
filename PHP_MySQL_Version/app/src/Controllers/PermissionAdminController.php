@@ -62,8 +62,16 @@ final class PermissionAdminController
             return;
         }
 
-        $id = PermissionRepository::grantOverride($userId, $permissionId, (int) $user['id'], $reason);
-        AuditLogRepository::log((int) $user['id'], 'USER_PERMISSION_GRANTED', 'user_permissions', $id, 'permission_id', null, (string) $permissionId, $reason);
+        // Owner decision D-214: a personal exception may carry an end date ("Until"); from the day after, it no longer applies.
+        $expiresAt = trim((string) ($_POST['expires_at'] ?? '')) ?: null;
+        if ($expiresAt !== null && (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $expiresAt, $m) !== 1 || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || $expiresAt < date('Y-m-d'))) {
+            Flash::set('error', 'The "Until" date must be today or later (or leave it empty for no end date).');
+            header('Location: /admin/permissions');
+            return;
+        }
+
+        $id = PermissionRepository::grantOverride($userId, $permissionId, (int) $user['id'], $reason, $expiresAt);
+        AuditLogRepository::log((int) $user['id'], 'USER_PERMISSION_GRANTED', 'user_permissions', $id, 'permission_id', null, (string) $permissionId . ($expiresAt !== null ? " until {$expiresAt}" : ''), $reason);
         Flash::set('success', 'Extra permission granted.');
         header('Location: /admin/permissions');
     }

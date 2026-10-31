@@ -26,6 +26,8 @@ them.
 
 ### Roles & Permissions
 
+> **Departments come first (D-214).** Most access is now given by adding a person to a department on their user page — see [Departments & Log in as](./21-departments.md). Edit a role's permissions only when a designation's rights themselves change. **Admin → Departments** lists every department and the role behind each designation.
+
 Sidebar: **Admin → Permissions**. Create, edit, or delete roles; edit which permissions a role has; or grant
 one specific person an extra permission beyond what their role normally
 gives them (with a mandatory, logged reason):

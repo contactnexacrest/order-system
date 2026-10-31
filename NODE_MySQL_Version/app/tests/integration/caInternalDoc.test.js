@@ -336,7 +336,8 @@ describe('CA internal-only financial annexure (Point 2 follow-up)', () => {
       `SELECT r.name FROM role_permissions rp JOIN roles r ON r.id = rp.role_id JOIN permissions p ON p.id = rp.permission_id
        WHERE p.permission_key = 'view_cafin' AND rp.is_enabled = 1 ORDER BY r.name`
     );
-    expect(rows.map((r) => r.name).sort()).toEqual(['Accounts Executive', 'Admin', 'CA / Chartered Accountant', 'Executive Director', 'Managing Director'].sort());
+    // D-214: Finance Manager and Finance Director start from Accounts Executive's rights (staff only; never the client).
+    expect(rows.map((r) => r.name).sort()).toEqual(['Accounts Executive', 'Admin', 'CA / Chartered Accountant', 'Executive Director', 'Finance Director', 'Finance Manager', 'Managing Director'].sort());
   });
 
   // QA Round 5, R5-21: /file-store/:id/download applies the same gates.

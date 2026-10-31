@@ -98,7 +98,7 @@
   <div class="section">
     <h2>Extra Permissions Granted to Individuals</h2>
     <table class="list">
-      <tr><th>User</th><th>Permission</th><th>Reason</th><th>Granted By</th><th>When</th><th>Action</th></tr>
+      <tr><th>User</th><th>Permission</th><th>Reason</th><th>Granted By</th><th>When</th><th>Until</th><th>Action</th></tr>
       <?php foreach ($overrides as $o): ?>
       <tr>
         <td><?= htmlspecialchars($o['user_name']) ?></td>
@@ -106,6 +106,7 @@
         <td><?= htmlspecialchars($o['reason'] ?? '') ?></td>
         <td><?= htmlspecialchars($o['granted_by_name'] ?? '—') ?></td>
         <td><?= htmlspecialchars((string) $o['granted_at']) ?></td>
+        <td><?php if ($o['expires_at'] === null): ?>—<?php else: ?><?= htmlspecialchars((string) $o['expires_at']) ?><?= $o['expires_at'] < date('Y-m-d') ? ' <span class="badge badge-inactive">ended</span>' : '' ?><?php endif; ?></td>
         <td>
           <form method="post" action="/admin/permissions/<?= (int) $o['id'] ?>/remove" style="display:inline" onsubmit="return confirm('Remove this extra permission?');">
             <?= Csrf::field() ?>
@@ -115,7 +116,7 @@
       </tr>
       <?php endforeach; ?>
       <?php if (empty($overrides)): ?>
-        <tr><td colspan="6" class="muted">No individual extra permissions granted.</td></tr>
+        <tr><td colspan="7" class="muted">No individual extra permissions granted.</td></tr>
       <?php endif; ?>
     </table>
 
@@ -133,6 +134,7 @@
         <?php endforeach; ?>
       </select>
       <input type="text" name="reason" placeholder="Reason (min <?= $minReasonLength ?> chars)" required minlength="<?= $minReasonLength ?>" style="width:280px">
+      <label class="inline small">Until <input type="date" name="expires_at" min="<?= date('Y-m-d') ?>" aria-label="Until (optional end date)"></label>
       <button type="submit" class="btn-sm btn-success">Grant</button>
     </form>
   </div>

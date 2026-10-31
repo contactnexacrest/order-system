@@ -16,7 +16,7 @@ use App\Tests\Support\DbTestCase;
 
 /**
  * QA Round 5, R5-14 (second half): RouteMatrixTest covers every route that
- * needs a permission. The 88 routes below need none — they are guarded by
+ * needs a permission. The 92 routes below need none — they are guarded by
  * sign-in (staff or client), by Super Admin, by a CSRF token, or are
  * public token links — and the QA "Missing Test Cases" sheet listed 30 of
  * them as tested on one stack only, or not at all. This drives every one
@@ -53,6 +53,7 @@ final class UngatedRoutesTest extends DbTestCase
         'GET /client/orders/{}/comment-attachments/{}/download client',
         'GET /client/orders/{}/payment-reports/{}/screenshot client',
         'GET /client/orders/{}/reorder client',
+        'GET /choose-department staff',
         'GET /client/set-password/{} public',
         'GET /company-assets/preview staff',
         'GET /force-password-change staff',
@@ -89,6 +90,7 @@ final class UngatedRoutesTest extends DbTestCase
         'POST /buyer-action/{}/acknowledge-oc public +csrf',
         'POST /buyer-action/{}/buyer-po public +csrf',
         'POST /buyer-action/{}/report-payment public +csrf',
+        'POST /choose-department staff +csrf',
         'POST /client/account/password client +csrf',
         'POST /client/end-impersonation public +csrf',
         'POST /client/forgot-password public +csrf',
@@ -111,6 +113,7 @@ final class UngatedRoutesTest extends DbTestCase
         'POST /logout public +csrf',
         'POST /payment-action/{}/report public +csrf',
         'POST /pi-details/{} public +csrf',
+        'POST /preview/exit staff +csrf',
         'POST /quotation-details/edit/{} public +csrf',
         'POST /quotation-details/submit public +csrf',
         'POST /reset-password/{} public +csrf',
@@ -120,6 +123,7 @@ final class UngatedRoutesTest extends DbTestCase
         'POST /super-admin/delegations/{}/revoke super-admin +csrf',
         'POST /super-admin/set-permanent super-admin +csrf',
         'POST /supplier-action/{}/acknowledgment public +csrf',
+        'POST /switch-department staff +csrf',
         'POST /test-mode/delete-test-data super-admin +csrf',
         'POST /test-mode/disable super-admin +csrf',
         'POST /test-mode/enable super-admin +csrf',
@@ -368,7 +372,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(33, $checked);
+        self::assertSame(37, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -457,7 +461,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(44, $checked);
+        self::assertSame(47, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -496,7 +500,7 @@ final class UngatedRoutesTest extends DbTestCase
             $this->signInFor($route['guard']);
             try {
                 [$code, $body] = $this->dispatch('GET', $route['pattern']);
-                $redirectsOnPurpose = in_array($route['pattern'], ['/2fa', '/gallery/file', '/company-assets/preview'], true);
+                $redirectsOnPurpose = in_array($route['pattern'], ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department'], true);
                 if ($code >= 500 || ($code !== 200 && !$redirectsOnPurpose) || ($code === 200 && trim($body) === '')) {
                     $failed[] = self::label($route) . " → {$code}";
                 }
@@ -506,7 +510,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(21, $checked);
+        self::assertSame(22, $checked);
         self::assertSame([], $failed);
     }
 

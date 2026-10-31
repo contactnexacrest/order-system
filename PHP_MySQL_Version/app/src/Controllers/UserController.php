@@ -93,6 +93,10 @@ final class UserController
         View::render('users/edit', [
             'target' => $target,
             'roles' => LookupRepository::roles(),
+            // Owner decision D-214: the person's departments, and the designations they can be added to.
+            'memberships' => \App\Repositories\DepartmentRepository::membershipsForUser($userId),
+            'designations' => array_values(array_filter(\App\Repositories\DepartmentRepository::designations(),
+                static fn (array $d): bool => (int) $d['is_active'] === 1 && (int) $d['department_active'] === 1)),
         ], 'layout/base');
     }
 

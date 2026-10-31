@@ -105,6 +105,7 @@
           {% if permissions.manage_company_settings %}<a href="/watermarks" class="{{ 'active' if (currentPath | startswith('/watermarks')) else '' }}">Watermarks</a>{% endif %}
           {% if permissions.manage_assets %}<a href="/company-assets" class="{{ 'active' if (currentPath | startswith('/company-assets')) else '' }}">Assets</a>{% endif %}
           {% if permissions.manage_signatories %}<a href="/signatories" class="{{ 'active' if (currentPath | startswith('/signatories')) else '' }}">Signatories</a>{% endif %}
+          {% if permissions.manage_permissions %}<a href="/admin/departments" class="{{ 'active' if (currentPath | startswith('/admin/departments')) else '' }}">Departments</a>{% endif %}
           {% if permissions.manage_permissions %}<a href="/admin/permissions" class="{{ 'active' if (currentPath | startswith('/admin/permissions')) else '' }}">Permissions</a>{% endif %}
           {% if permissions.manage_users %}<a href="/users" class="{{ 'active' if (currentPath | startswith('/users')) else '' }}">Users</a>{% endif %}
           {% if permissions.manage_field_protection %}<a href="/admin/field-protection" class="{{ 'active' if (currentPath | startswith('/admin/field-protection')) else '' }}">Field Protection</a>{% endif %}
@@ -126,6 +127,28 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
         Notifications{% if unreadCount > 0 %} <span class="nav-badge">{{ unreadCount }}</span>{% endif %}
       </a>
+      {% if actingMembership %}
+        <div class="dept-badge" style="--dept-color:{{ actingMembership.department_color }}" data-testid="dept-badge">
+          <span class="dept-badge-label">Logged in as</span>
+          <strong>{{ actingMembership.designation_title }}</strong>
+          {{ actingMembership.department_name }}
+          {% if myMemberships.length > 1 %}
+            <details class="dept-switch">
+              <summary>Switch department &#9662;</summary>
+              <div class="dept-switch-list">
+                {% for m in myMemberships %}
+                  {% if m.id == actingMembership.id %}
+                    <div class="current">&#9679; {{ m.designation_title }} — {{ m.department_name }}</div>
+                  {% else %}
+                    <form method="post" action="/switch-department"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="membership_id" value="{{ m.id }}"><button type="submit">&#9675; {{ m.designation_title }} — {{ m.department_name }}</button></form>
+                  {% endif %}
+                {% endfor %}
+                <div class="hint">Switching reloads the app with that department's menus, tasks and data.</div>
+              </div>
+            </details>
+          {% endif %}
+        </div>
+      {% endif %}
       <a href="/account" class="sidebar-user-card">
         <span class="sidebar-user-avatar">{{ currentUser.name[0] | upper }}</span>
         <span class="sidebar-user-name">{{ currentUser.name }}</span>
@@ -135,6 +158,12 @@
   </div>
 </header>
 <div class="app-main">
+  {% if previewDesignation %}
+    <div class="preview-banner" data-testid="preview-banner">
+      <span>Previewing the app as {{ previewDesignation.title }} · {{ previewDesignation.department_name }} — you see only what this designation sees (your own extra rights are off).</span>
+      <form method="post" action="/preview/exit"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">Exit preview</button></form>
+    </div>
+  {% endif %}
   {% if testModeEnabled %}
     <div class="test-mode-banner">TEST MODE ACTIVE — client access suspended, all outbound business mail is redirected, admin panel settings are locked. Any order/client/document created now is test data.</div>
   {% endif %}

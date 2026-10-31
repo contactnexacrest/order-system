@@ -1,5 +1,8 @@
 'use strict';
 
+const departmentRepository = require('../repositories/departmentRepository');
+const { todayIst } = require('../helpers/dbDateTime');
+
 const crypto = require('crypto');
 
 const flash = require('../helpers/flash');
@@ -82,7 +85,11 @@ async function editForm(req, res) {
     return;
   }
   const roles = await lookupRepository.roles();
-  res.renderView('users/edit', { target, roles }, 'layout/base');
+  // Owner decision D-214: the person's departments, and the designations they can be added to.
+  const memberships = await departmentRepository.membershipsForUser(userId);
+  const designations = (await departmentRepository.designations())
+    .filter((d) => Number(d.is_active) === 1 && Number(d.department_active) === 1);
+  res.renderView('users/edit', { target, roles, memberships, designations, today: todayIst() }, 'layout/base');
 }
 
 async function update(req, res) {

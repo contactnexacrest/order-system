@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const env = require('../config/env');
 const flash = require('../helpers/flash');
+const activeDepartmentService = require('../services/activeDepartmentService');
 const authService = require('../services/authService');
 const twoFactorService = require('../services/twoFactorService');
 const userRepository = require('../repositories/userRepository');
@@ -37,7 +38,7 @@ async function login(req, res) {
 
   switch (result.status) {
     case 'ok':
-      res.redirect(result.force_password_change ? '/force-password-change' : '/');
+      res.redirect(await afterLogin(req, result.force_password_change));
       return;
     case 'requires_2fa':
       req.session._2fa_dev_code = result.dev_code || '';
@@ -57,6 +58,12 @@ async function login(req, res) {
   }
 }
 
+/** Owner decision D-214: after sign-in, a person in several departments chooses one ("Log in as"). */
+async function afterLogin(req, forcePasswordChange) {
+  const next = await activeDepartmentService.afterLogin(req, authService.currentUserId(req));
+  return forcePasswordChange ? '/force-password-change' : (next ?? '/');
+}
+
 async function show2fa(req, res) {
   if (!twoFactorService.pendingUserId(req)) {
     res.redirect('/login');
@@ -71,7 +78,7 @@ async function verify2fa(req, res) {
 
   if (result.status === 'ok') {
     delete req.session._2fa_dev_code;
-    res.redirect(result.force_password_change ? '/force-password-change' : '/');
+    res.redirect(await afterLogin(req, result.force_password_change));
     return;
   }
 

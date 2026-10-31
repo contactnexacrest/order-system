@@ -29,11 +29,13 @@ final class AuditLogRepository
         }
         Database::connection()->prepare(
             'INSERT INTO audit_log
-                (user_id, action_type, entity_type, entity_id, field_name, old_value, new_value, reason, ip_address)
+                (user_id, acting_as, action_type, entity_type, entity_id, field_name, old_value, new_value, reason, ip_address)
              VALUES
-                (:user_id, :action_type, :entity_type, :entity_id, :field_name, :old_value, :new_value, :reason, :ip)'
+                (:user_id, :acting_as, :action_type, :entity_type, :entity_id, :field_name, :old_value, :new_value, :reason, :ip)'
         )->execute([
             'user_id'     => $userId,
+            // Owner decision D-214: the department and designation the person acted as.
+            'acting_as'   => $userId !== null ? \App\Services\ActiveDepartmentService::actingLabel($userId) : null,
             'action_type' => $actionType,
             'entity_type' => $entityType,
             'entity_id'   => $entityId,

@@ -86,6 +86,8 @@ const sampleDataController = require('./controllers/sampleDataController');
 const signatoryController = require('./controllers/signatoryController');
 const superAdminController = require('./controllers/superAdminController');
 const permissionAdminController = require('./controllers/permissionAdminController');
+const departmentController = require('./controllers/departmentController');
+const departmentAdminController = require('./controllers/departmentAdminController');
 const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
@@ -418,6 +420,10 @@ app.use((req, res, next) => {
       myReviewsPendingCount: req.myReviewsPendingCount || 0,
       emailApprovalsPendingCount: req.emailApprovalsPendingCount || 0,
       settingsExpiryWarningCount: req.settingsExpiryWarningCount || 0,
+      // Owner decision D-214: the department this person works as, the others they can switch to, and a preview.
+      actingMembership: req.actingMembership || null,
+      myMemberships: req.myMemberships || [],
+      previewDesignation: req.previewDesignation || null,
       testModeEnabled: req.testModeEnabled || false,
       devServerEnabled: env.isDevServer(),
       isImpersonating: clientPortalService.isImpersonating(req),
@@ -470,7 +476,7 @@ const uploadMedia = multer({ storage: multer.memoryStorage(), limits: { fileSize
 // 20-digit id skip the route (404) instead of reaching a query. Port of
 // Router::ID_PATTERN.
 const ID_PATTERN = /^[1-9][0-9]{0,14}$/;
-const ID_PARAMS = ['id', 'addressId', 'amendmentId', 'benefitId', 'billId', 'cancellationId', 'chargeId', 'clientId', 'complaintId',
+const ID_PARAMS = ['id', 'membershipId', 'addressId', 'amendmentId', 'benefitId', 'billId', 'cancellationId', 'chargeId', 'clientId', 'complaintId',
   'disputeId', 'documentId', 'emailLogId', 'entryId', 'expenseId', 'fileId', 'imageId', 'orderId', 'payoutId', 'productId',
   'creditId', 'reportId', 'requestId', 'reviewId', 'roundId', 'supplierId', 'userId'];
 app.param(ID_PARAMS, (req, res, next, value) => (ID_PATTERN.test(String(value)) ? next() : next('route')));
@@ -748,6 +754,20 @@ app.post('/test-mode/enable', requireAuth, requireSuperAdmin, verifyCsrf, asyncH
 app.post('/test-mode/disable', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.disable));
 app.post('/test-mode/test-email', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.updateTestEmail));
 app.post('/test-mode/delete-test-data', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(testModeController.deleteTestData));
+
+// Owner decision D-214: "Log in as" a department, switching, Admin "Preview as", and Admin → Departments.
+app.get('/choose-department', requireAuth, asyncHandler(departmentController.chooseForm));
+app.post('/choose-department', requireAuth, verifyCsrf, asyncHandler(departmentController.choose));
+app.post('/switch-department', requireAuth, verifyCsrf, asyncHandler(departmentController.switchDepartment));
+app.post('/admin/preview-as', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentController.previewStart));
+app.post('/preview/exit', requireAuth, verifyCsrf, asyncHandler(departmentController.previewEnd));
+app.get('/admin/departments', requireAuth, requirePermission('manage_permissions'), asyncHandler(departmentAdminController.index));
+app.post('/admin/departments', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.createDepartment));
+app.post('/admin/departments/:id/update', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.updateDepartment));
+app.post('/admin/designations', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.createDesignation));
+app.post('/admin/designations/:id/update', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.updateDesignation));
+app.post('/users/:id/memberships', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(departmentAdminController.addMembership));
+app.post('/users/:id/memberships/:membershipId/end', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(departmentAdminController.endMembership));
 
 app.get('/admin/permissions', requireAuth, requirePermission('manage_permissions'), asyncHandler(permissionAdminController.index));
 app.post('/admin/permissions/grant', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(permissionAdminController.grantOverride));

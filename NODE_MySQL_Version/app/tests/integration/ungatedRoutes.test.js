@@ -28,6 +28,7 @@ const EXPECTED = [
   'GET /client/orders/{}/comment-attachments/{}/download client',
   'GET /client/orders/{}/payment-reports/{}/screenshot client',
   'GET /client/orders/{}/reorder client',
+  'GET /choose-department staff',
   'GET /client/set-password/{} public',
   'GET /company-assets/preview staff',
   'GET /force-password-change staff',
@@ -64,6 +65,7 @@ const EXPECTED = [
   'POST /buyer-action/{}/acknowledge-oc public +csrf',
   'POST /buyer-action/{}/buyer-po public +csrf',
   'POST /buyer-action/{}/report-payment public +csrf',
+  'POST /choose-department staff +csrf',
   'POST /client/account/password client +csrf',
   'POST /client/end-impersonation public +csrf',
   'POST /client/forgot-password public +csrf',
@@ -86,6 +88,7 @@ const EXPECTED = [
   'POST /logout public +csrf',
   'POST /payment-action/{}/report public +csrf',
   'POST /pi-details/{} public +csrf',
+  'POST /preview/exit staff +csrf',
   'POST /quotation-details/edit/{} public +csrf',
   'POST /quotation-details/submit public +csrf',
   'POST /reset-password/{} public +csrf',
@@ -95,6 +98,7 @@ const EXPECTED = [
   'POST /super-admin/delegations/{}/revoke super-admin +csrf',
   'POST /super-admin/set-permanent super-admin +csrf',
   'POST /supplier-action/{}/acknowledgment public +csrf',
+  'POST /switch-department staff +csrf',
   'POST /test-mode/delete-test-data super-admin +csrf',
   'POST /test-mode/disable super-admin +csrf',
   'POST /test-mode/enable super-admin +csrf',
@@ -142,7 +146,7 @@ function send(agent, method, url, body = {}) {
 
 /**
  * Port of UngatedRoutesTest.php. QA Round 5, R5-14 (second half):
- * routeMatrix.test.js covers every route that needs a permission. The 88
+ * routeMatrix.test.js covers every route that needs a permission. The 92
  * routes above need none — they are guarded by sign-in (staff or client),
  * by Super Admin, by a CSRF token, or are public token links — and the QA
  * "Missing Test Cases" sheet listed 30 of them as tested on one stack
@@ -247,7 +251,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status !== 302 || res.headers.location !== '/login') wrong.push(`${label(route)} → ${res.status} ${res.headers.location}`);
       checked++;
     }
-    expect(checked).toBe(33);
+    expect(checked).toBe(37);
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -312,7 +316,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(44);
+    expect(checked).toBe(47);
     expect(wrong).toEqual([]);
   }, 120000);
 
@@ -335,13 +339,13 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
     for (const route of routes().filter((r) => r.method === 'GET' && !r.pattern.includes(':'))) {
       const agent = await agentFor(route.guard);
       const res = await agent.get(route.pattern);
-      const redirectsOnPurpose = ['/2fa', '/gallery/file', '/company-assets/preview'].includes(route.pattern);
+      const redirectsOnPurpose = ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department'].includes(route.pattern);
       if (res.status >= 500 || (res.status !== 200 && !redirectsOnPurpose) || (res.status === 200 && (res.text || res.body || '').length === 0)) {
         failed.push(`${label(route)} → ${res.status}`);
       }
       checked++;
     }
-    expect(checked).toBe(21);
+    expect(checked).toBe(22);
     expect(failed).toEqual([]);
   }, 120000);
 

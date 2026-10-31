@@ -730,12 +730,12 @@ details.vendor-bill-add{margin-top:10px;}
 /* Owner request (2026-10-27): the small ▸ "expand" toggles (native
    <details> other than the page's own step/section/nav cards) were easy
    to miss — show each one as a clear navy button with a ▸/▾ marker. */
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay) > summary{display:inline-flex;align-items:center;gap:7px;cursor:pointer;list-style:none;color:var(--navy) !important;font-weight:600;font-size:0.88rem;line-height:1.3;background:var(--navy-soft);border:1px solid #c5d3ee;border-radius:8px;padding:6px 12px;margin:6px 0;}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay) > summary::-webkit-details-marker{display:none;}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay) > summary::before{content:"\25B8";font-size:1em;}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay)[open] > summary::before{content:"\25BE";}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay) > summary:hover{background:#dce6f8;border-color:var(--navy);}
-details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay) > summary *{color:inherit;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch) > summary{display:inline-flex;align-items:center;gap:7px;cursor:pointer;list-style:none;color:var(--navy) !important;font-weight:600;font-size:0.88rem;line-height:1.3;background:var(--navy-soft);border:1px solid #c5d3ee;border-radius:8px;padding:6px 12px;margin:6px 0;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch) > summary::-webkit-details-marker{display:none;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch) > summary::before{content:"\25B8";font-size:1em;}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch)[open] > summary::before{content:"\25BE";}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch) > summary:hover{background:#dce6f8;border-color:var(--navy);}
+details:not(.step-card):not(.step-group):not(.phase-group):not(.nav-group):not(.settings-section):not(.collapsible-section):not(.vendor-bill-pay):not(.dept-switch) > summary *{color:inherit;}
 
 /* Owner request (2026-10-27): "At a Glance" sits across the top of the
    order page instead of in a 280px side column, so the step sections and
@@ -787,3 +787,37 @@ fieldset.radio-row label{display:flex;gap:6px;align-items:flex-start;font-weight
 @media (max-width:480px){
   input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:16px !important;}
 }
+
+/* Owner decision D-214 (2026-10-31): the department a person is working as
+   ("Log in as"), shown in its own colour in the menu, with the switch list;
+   Admin's "Preview as" banner; the Log in as page and department tags. */
+.dept-badge{background:var(--dept-color,#3a4140);border-radius:10px;padding:8px 12px;color:#fff;font-size:12px;line-height:1.35;}
+.dept-badge-label{display:block;opacity:0.8;font-size:11px;}
+.dept-badge strong{display:block;font-size:13px;}
+.dept-switch summary{cursor:pointer;text-decoration:underline;margin-top:4px;list-style:none;}
+.dept-switch summary::-webkit-details-marker{display:none;}
+.dept-switch-list{background:var(--surface);color:var(--ink);border-radius:8px;padding:6px;margin-top:6px;display:flex;flex-direction:column;gap:4px;}
+.dept-switch-list form{margin:0;}
+.dept-switch-list button{width:100%;text-align:left;background:none;border:0;border-radius:6px;padding:6px 8px;font:inherit;font-size:12.5px;color:var(--ink);cursor:pointer;}
+.dept-switch-list button:hover{background:var(--bg);}
+.dept-switch-list .current{background:var(--success-soft);font-weight:700;border-radius:6px;padding:6px 8px;}
+.dept-switch-list .hint{color:var(--ink-soft);font-size:11.5px;padding:2px 8px;}
+.preview-banner{background:var(--gold-soft);color:var(--gold-strong);border-bottom:2px solid var(--gold);padding:10px 1.5rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-weight:600;}
+.preview-banner form{margin:0 0 0 auto;}
+.dept-tag{display:inline-block;background:var(--dept-color,#3a4140);color:#fff;font-size:0.75rem;font-weight:600;padding:0.15rem 0.6rem;border-radius:999px;white-space:nowrap;}
+.dept-tag.off{opacity:0.5;}
+.dept-choice{display:flex;flex-direction:column;gap:10px;margin:1rem 0;}
+.dept-choice label{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;background:var(--surface);}
+.dept-choice label:has(input:checked){border-color:var(--success);background:var(--success-soft);}
+.dept-choice .dot{width:12px;height:12px;border-radius:50%;background:var(--dept-color,#3a4140);flex:0 0 auto;margin-top:5px;}
+.dept-choice small{display:block;color:var(--ink-soft);}
+.dept-ladder td{vertical-align:top;}
+.dept-ladder .desig{margin-bottom:8px;}
+.dept-ladder .desig small{display:block;color:var(--ink-soft);}
+.dept-ladder .desig form{margin:2px 0 0;}
+.dept-ladder .desig .btn-link{font-size:12px;font-weight:500;min-height:0;text-align:left;}
+.dept-edit > summary{cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px;}
+.dept-badge .dept-switch > summary{background:none;border:0;color:#fff;padding:0;font-weight:600;font-size:12px;}
+.dept-badge .dept-switch > summary::before,.dept-badge .dept-switch > summary::after{content:none;}
+.dept-end{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0;}
+.dept-end input[type=date]{width:auto;margin:0;}

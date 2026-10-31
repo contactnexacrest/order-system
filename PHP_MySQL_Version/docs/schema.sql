@@ -4480,3 +4480,55 @@ CREATE TABLE gst_refund_credits (
   FOREIGN KEY (recorded_by) REFERENCES users(id),
   INDEX idx_gst_refund_credits_claim (claim_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Owner decision D-214 (2026-10-31), phase 1: departments, designations, memberships
+-- (migration docs/migrations/2026-11-01a-departments.sql).
+CREATE TABLE departments (
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code                VARCHAR(20) NOT NULL,
+  name                VARCHAR(100) NOT NULL,
+  color               CHAR(7) NOT NULL DEFAULT '#3a4140',
+  sees_whole_company  TINYINT(1) NOT NULL DEFAULT 0,
+  sort_order          INT NOT NULL DEFAULT 0,
+  is_active           TINYINT(1) NOT NULL DEFAULT 1,
+  created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_departments_code (code),
+  UNIQUE KEY uq_departments_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE department_designations (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  department_id   BIGINT UNSIGNED NOT NULL,
+  title           VARCHAR(100) NOT NULL,
+  level           ENUM('executive','manager','director','other') NOT NULL DEFAULT 'executive',
+  role_id         BIGINT UNSIGNED NOT NULL,
+  approval_limit_inr DECIMAL(14,2) NULL,
+  sort_order      INT NOT NULL DEFAULT 0,
+  is_active       TINYINT(1) NOT NULL DEFAULT 1,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_designation_title (department_id, title),
+  FOREIGN KEY (department_id) REFERENCES departments(id),
+  FOREIGN KEY (role_id) REFERENCES roles(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE user_department_memberships (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id         BIGINT UNSIGNED NOT NULL,
+  designation_id  BIGINT UNSIGNED NOT NULL,
+  starts_on       DATE NOT NULL,
+  ends_on         DATE NULL,
+  is_default      TINYINT(1) NOT NULL DEFAULT 0,
+  created_by      BIGINT UNSIGNED NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ended_by        BIGINT UNSIGNED NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (designation_id) REFERENCES department_designations(id),
+  FOREIGN KEY (created_by) REFERENCES users(id),
+  FOREIGN KEY (ended_by) REFERENCES users(id),
+  INDEX idx_memberships_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE audit_log ADD COLUMN acting_as VARCHAR(160) NULL AFTER user_id;
+
+ALTER TABLE user_permissions ADD COLUMN expires_at DATE NULL AFTER reason;
+

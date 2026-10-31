@@ -42,7 +42,7 @@ final class AuthController
 
         switch ($result['status']) {
             case 'ok':
-                header('Location: ' . ($result['force_password_change'] ? '/force-password-change' : '/'));
+                header('Location: ' . self::afterLogin((bool) $result['force_password_change']));
                 return;
 
             case 'requires_2fa':
@@ -67,6 +67,13 @@ final class AuthController
         }
     }
 
+    /** Owner decision D-214: after sign-in, a person in several departments chooses one ("Log in as"). */
+    private static function afterLogin(bool $forcePasswordChange): string
+    {
+        $next = \App\Services\ActiveDepartmentService::afterLogin((int) AuthService::currentUserId());
+        return $forcePasswordChange ? '/force-password-change' : ($next ?? '/');
+    }
+
     public function show2fa(array $params): void
     {
         if (!\App\Services\TwoFactorService::pendingUserId()) {
@@ -85,7 +92,7 @@ final class AuthController
 
         if ($result['status'] === 'ok') {
             unset($_SESSION['_2fa_dev_code']);
-            header('Location: ' . ($result['force_password_change'] ? '/force-password-change' : '/'));
+            header('Location: ' . self::afterLogin((bool) $result['force_password_change']));
             return;
         }
 

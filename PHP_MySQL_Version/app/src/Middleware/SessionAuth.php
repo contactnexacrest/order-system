@@ -100,6 +100,16 @@ final class SessionAuth
                 }
             }
 
+            // Owner decision D-214: a person in several departments works as
+            // one of them; until they choose, only the choice page (and logout) opens.
+            if (!$mustChange && \App\Services\ActiveDepartmentService::needsChoice((int) $userId)) {
+                $requestPath = rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+                if (!in_array($requestPath, ['/choose-department', '/logout'], true)) {
+                    header('Location: /choose-department');
+                    return false;
+                }
+            }
+
             // QA Round 5, R5-24: the archived-order and assignment rules
             // apply to every page and action of an order, not just its
             // main page — checked once here for every staff route.

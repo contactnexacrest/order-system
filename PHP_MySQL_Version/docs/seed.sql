@@ -1697,3 +1697,87 @@ SET FOREIGN_KEY_CHECKS = 1;
 --   UPDATE user_signature_assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/absolute/path/to/storage');
 --   UPDATE reference_library_documents SET file_path = REPLACE(file_path, '__STORAGE_BASE_PATH__', '/absolute/path/to/storage');
 -- ================================================================
+
+-- Owner decision D-214, phase 1: departments, their designation ladders, the new roles and the
+-- memberships of the seeded people (migration docs/migrations/2026-11-01a-departments.sql).
+-- Departments
+INSERT IGNORE INTO departments (code, name, color, sees_whole_company, sort_order, is_active) VALUES
+  ('MGMT',  'Company Management',  '#3a4140', 1, 10, 1),
+  ('SALES', 'Sales & Export',      '#2f6fb3', 0, 20, 1),
+  ('PROC',  'Procurement',         '#a3591b', 0, 30, 1),
+  ('LOG',   'Logistics',           '#6b4fa8', 0, 40, 1),
+  ('FIN',   'Accounts & Finance',  '#2c7a4b', 1, 50, 1),
+  ('AUDIT', 'Audit & Compliance',  '#6a736f', 1, 60, 1),
+  ('ADMIN', 'Administration',      '#6a736f', 0, 70, 1),
+  ('OPS',   'Order Desk',          '#9aa39f', 0, 80, 0);
+
+-- New roles (one per new designation). Existing roles are reused for the designations that match them.
+INSERT IGNORE INTO roles (name, description, is_system_role) VALUES
+  ('Sales/Export Manager',  'Sales & Export department — Manager', 0),
+  ('Sales Director',        'Sales & Export department — Director', 0),
+  ('Procurement Executive', 'Procurement department — Executive', 0),
+  ('Procurement Manager',   'Procurement department — Manager', 0),
+  ('Procurement Director',  'Procurement department — Director', 0),
+  ('Logistics Manager',     'Logistics department — Manager', 0),
+  ('Logistics Director',    'Logistics department — Director', 0),
+  ('Finance Manager',       'Accounts & Finance department — Manager', 0),
+  ('Finance Director',      'Accounts & Finance department — Director', 0),
+  ('System Administrator',  'Administration — users, settings and templates; no business money', 0),
+  ('Order Coordinator',     'Order Desk — status of every order, no prices', 0),
+  ('Operations Manager',    'Order Desk — Manager', 0);
+
+-- Managers start from their Executive's permissions; Directors from their Manager's.
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT n.id, rp.permission_id, rp.is_enabled FROM role_permissions rp JOIN roles o ON o.id = rp.role_id JOIN roles n
+ WHERE (o.name = 'Export Executive' AND n.name IN ('Sales/Export Manager', 'Sales Director'))
+    OR (o.name = 'Logistics Executive' AND n.name IN ('Logistics Manager', 'Logistics Director'))
+    OR (o.name = 'Accounts Executive' AND n.name IN ('Finance Manager', 'Finance Director'));
+
+-- Additional permissions per new role (keys that do not exist are simply skipped).
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r JOIN permissions p ON (
+     (r.name IN ('Sales/Export Manager', 'Sales Director') AND p.permission_key IN ('approve_documents', 'approve_payment_terms', 'view_all_orders', 'assign_order_owner', 'manage_disputes', 'manage_complaints'))
+  OR (r.name = 'Sales Director' AND p.permission_key IN ('approve_email_send', 'view_staff_reports'))
+  OR (r.name IN ('Procurement Executive', 'Procurement Manager', 'Procurement Director') AND p.permission_key IN ('view_orders', 'view_product_catalog', 'browse_product_catalog', 'download_pdf', 'view_own_incentives'))
+  OR (r.name IN ('Procurement Manager', 'Procurement Director') AND p.permission_key IN ('manage_suppliers', 'view_all_orders', 'assign_order_owner'))
+  OR (r.name IN ('Logistics Manager', 'Logistics Director') AND p.permission_key IN ('view_all_orders', 'assign_order_owner', 'manage_logistics_partners'))
+  OR (r.name IN ('Finance Manager', 'Finance Director') AND p.permission_key IN ('manage_order_financials', 'inr_actual_delete', 'view_cafin', 'ca_internal_doc_manage', 'pay_incentives', 'view_all_orders', 'assign_order_owner'))
+  OR (r.name = 'Finance Director' AND p.permission_key IN ('view_reports', 'view_staff_reports', 'ca_fy_lock_override', 'approve_payment_terms'))
+  OR (r.name = 'System Administrator' AND p.permission_key IN ('manage_users', 'manage_permissions', 'manage_company_settings', 'manage_assets', 'delete_assets', 'manage_email_templates', 'manage_dropdown_options', 'manage_ports', 'manage_hs_codes', 'manage_payment_presets', 'manage_compliance_task_types', 'manage_signatories', 'view_audit_log', 'manage_field_protection', 'data_export_run', 'manage_sample_data', 'manage_report_definitions'))
+  OR (r.name IN ('Order Coordinator', 'Operations Manager') AND p.permission_key IN ('view_orders', 'view_all_orders'))
+  OR (r.name = 'Operations Manager' AND p.permission_key IN ('assign_order_owner'))
+);
+
+-- Designations: each department's ladder, each tied to its own role.
+INSERT IGNORE INTO department_designations (department_id, title, level, role_id, sort_order)
+SELECT d.id, x.title, x.level, r.id, x.sort_order FROM (
+  SELECT 'MGMT' AS dept, 'Managing Director' AS title, 'director' AS level, 'Managing Director' AS role, 1 AS sort_order
+  UNION ALL SELECT 'MGMT', 'Executive Director', 'director', 'Executive Director', 2
+  UNION ALL SELECT 'SALES', 'Sales/Export Executive', 'executive', 'Export Executive', 1
+  UNION ALL SELECT 'SALES', 'Sales/Export Manager', 'manager', 'Sales/Export Manager', 2
+  UNION ALL SELECT 'SALES', 'Sales Director', 'director', 'Sales Director', 3
+  UNION ALL SELECT 'PROC', 'Procurement Executive', 'executive', 'Procurement Executive', 1
+  UNION ALL SELECT 'PROC', 'Procurement Manager', 'manager', 'Procurement Manager', 2
+  UNION ALL SELECT 'PROC', 'Procurement Director', 'director', 'Procurement Director', 3
+  UNION ALL SELECT 'LOG', 'Logistics Executive', 'executive', 'Logistics Executive', 1
+  UNION ALL SELECT 'LOG', 'Logistics Manager', 'manager', 'Logistics Manager', 2
+  UNION ALL SELECT 'LOG', 'Logistics Director', 'director', 'Logistics Director', 3
+  UNION ALL SELECT 'FIN', 'Accounts Executive', 'executive', 'Accounts Executive', 1
+  UNION ALL SELECT 'FIN', 'Finance Manager', 'manager', 'Finance Manager', 2
+  UNION ALL SELECT 'FIN', 'Finance Director', 'director', 'Finance Director', 3
+  UNION ALL SELECT 'AUDIT', 'Internal Auditor', 'other', 'Viewer / Auditor', 1
+  UNION ALL SELECT 'AUDIT', 'External CA', 'other', 'CA / Chartered Accountant', 2
+  UNION ALL SELECT 'ADMIN', 'System Administrator', 'other', 'System Administrator', 1
+  UNION ALL SELECT 'OPS', 'Order Coordinator', 'executive', 'Order Coordinator', 1
+  UNION ALL SELECT 'OPS', 'Operations Manager', 'manager', 'Operations Manager', 2
+) x JOIN departments d ON d.code = x.dept JOIN roles r ON r.name = x.role;
+
+-- Existing people: one membership matching the role they hold today (not for Admin-role accounts).
+INSERT INTO user_department_memberships (user_id, designation_id, starts_on, is_default)
+SELECT u.id, dd.id, CURDATE(), 1
+  FROM users u
+  JOIN roles r ON r.id = u.role_id
+  JOIN department_designations dd ON dd.role_id = r.id
+  JOIN departments d ON d.id = dd.department_id
+ WHERE r.name IN ('Managing Director', 'Executive Director', 'Export Executive', 'Accounts Executive', 'Logistics Executive', 'Viewer / Auditor', 'CA / Chartered Accountant')
+   AND NOT EXISTS (SELECT 1 FROM user_department_memberships m WHERE m.user_id = u.id);

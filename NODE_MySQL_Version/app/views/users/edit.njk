@@ -28,3 +28,44 @@
     </div>
   </form>
 </div>
+<div class="card page-wide" id="departments">
+  <h2>Departments</h2>
+  <p class="muted small">{{ target.name }} chooses one of these at "Log in as". Add or end a membership here — that is the only day-to-day change. With no department, the role above applies.</p>
+  <table class="list">
+    <tr><th>Department</th><th>Designation (role)</th><th>From</th><th>Until</th><th></th></tr>
+    {% for m in memberships %}{% set ended = m.ends_on and m.ends_on < today %}
+    <tr{{ ' class="muted"' | safe if ended else '' }}>
+      <td><span class="dept-tag{{ ' off' if ended else '' }}" style="--dept-color:{{ m.department_color }}">{{ m.department_name }}</span></td>
+      <td>{{ m.designation_title }} <span class="muted small">({{ m.role_name }})</span>{% if m.is_default == 1 %} <span class="badge badge-active">starts here</span>{% endif %}</td>
+      <td>{{ m.starts_on }}</td>
+      <td>{{ m.ends_on if m.ends_on else '—' }}</td>
+      <td>
+        {% if not ended %}
+        <form method="post" action="/users/{{ target.id }}/memberships/{{ m.id }}/end" class="dept-end" onsubmit="return confirm('End this membership on the date given?');">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="starts_on" value="{{ m.starts_on }}">
+          <input type="date" name="ends_on" value="{{ today }}" required aria-label="Last day" data-not-before="[name=starts_on]" data-not-before-message="The last day cannot be before the membership started.">
+          <button type="submit" class="btn-sm btn-danger">End</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% if not memberships.length %}<tr><td colspan="5" class="muted">No department yet — this person works with their role above.</td></tr>{% endif %}
+  </table>
+  <form method="post" action="/users/{{ target.id }}/memberships" class="field-grid" style="margin-top:12px">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label>Department and designation *
+      <select name="designation_id" required>
+        <option value="">— choose —</option>
+        {% for d in designations %}{% if loop.first or designations[loop.index0 - 1].department_name != d.department_name %}<optgroup label="{{ d.department_name }}">{% endif %}
+          <option value="{{ d.id }}">{{ d.title }}</option>
+        {% if loop.last or designations[loop.index0 + 1].department_name != d.department_name %}</optgroup>{% endif %}{% endfor %}
+      </select>
+    </label>
+    <label>From *
+      <input type="date" name="starts_on" value="{{ today }}" required>
+    </label>
+    <div class="btn-row"><button type="submit" class="btn-sm btn-accent">+ Add membership</button></div>
+  </form>
+</div>

@@ -1,0 +1,21 @@
+<div class="card">
+  <h1>Log in as</h1>
+  <p class="muted small">{{ user.name }}, you work in more than one department. Choose one for this session — you can switch at any time from the menu.</p>
+  <form method="post" action="/choose-department">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="dept-choice">
+      {% for m in memberships %}
+        <label style="--dept-color:{{ m.department_color }}">
+          <input type="radio" name="membership_id" value="{{ m.id }}" required {{ 'checked' if m.id == selectedId else '' }}>
+          <span class="dot" aria-hidden="true"></span>
+          <span><strong>{{ m.designation_title }}</strong><small>{{ m.department_name }}</small></span>
+        </label>
+      {% endfor %}
+    </div>
+    <label class="inline"><input type="checkbox" name="remember" value="1" checked> Start here next time</label>
+    <div class="btn-row">
+      <button type="submit" class="btn-success">Continue</button>
+    </div>
+  </form>
+  <form method="post" action="/logout"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-link">Log out</button></form>
+</div>

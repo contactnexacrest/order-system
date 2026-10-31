@@ -44,6 +44,7 @@ implementation detail.
 - [Data Export / Migration](./18-data-export-migration.md) — downloading a structure snapshot and a full data export of the live database, to migrate every historical record into a fresh reinstall without loss.
 - [Complaints](./19-complaints.md) — a buyer flagging a process issue with no intent to cancel, a two-way conversation separate from Disputes.
 - [Incentives](./20-incentives.md) — the incentive cycle, My Incentives, and paying incentives (Accounts).
+- [Departments & Log in as](./21-departments.md) — departments and their designations, choosing and switching department, Admin's Preview as, a person's memberships, personal exceptions with an end date.
 
 ## The running examples
 

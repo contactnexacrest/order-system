@@ -14,6 +14,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-10-31a-client-email-unique.
 mysql -u <user> -p <database> < docs/migrations/2026-10-31b-payment-references.sql
 mysql -u <user> -p <database> < docs/migrations/2026-10-31c-inspection-agency.sql
 mysql -u <user> -p <database> < docs/migrations/2026-10-31d-gst-refunds.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-01a-departments.sql
 ```
 
 ## Rules every file follows
@@ -31,7 +32,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-10-31d-gst-refunds.sql
 
 Run each file below that the database has not had yet, in this order, then
 deploy the code for both stacks. As of 30 Oct 2026 the live site still
-needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30c, 30d, 31a, 31b, 31c and 31d**.
+needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30c, 30d, 31a, 31b, 31c, 31d and 11-01a**.
 
 | # | File | What it does |
 |---|---|---|
@@ -60,6 +61,8 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30
 | 23 | `2026-10-31b-payment-references.sql` | Rule D-212: the bank / payment reference on buyer remittances (advance, balance, freight), the money paid under an LC, incentive and associate payouts (how paid + reference), export benefits received and cancellation refunds (date + bank ref). Columns only; records already saved keep their data |
 | 24 | `2026-10-31c-inspection-agency.sql` | Rule D-212, Batch 2: the inspection agency and its invoice no. on a pre-shipment inspection fee NexaCrest pays (the cost line is described from them). Columns only |
 | 25 | `2026-10-31d-gst-refunds.sql` | GST refunds under LUT (owner decision 2026-10-31, option A): the claims (RFD-01, per period) and the money credited to the bank (with its RFD-05 / UTR reference); each credit goes to Zoho Books as a journal. New tables only |
+
+| 26 | `2026-11-01a-departments.sql` | Organisation design D-214, phase 1: departments, their designations (Executive / Manager / Director, each its own role) and people's memberships; the new roles (Sales/Export Manager, Sales Director, Procurement Executive / Manager / Director, Logistics Manager / Director, Finance Manager / Director, System Administrator, Order Coordinator, Operations Manager) with their starting rights; existing staff become members of the department matching their role (Admin accounts are left as they are); the audit log records the department a change was made in; personal exceptions get an end date. New tables and two new columns |
 
 There is no `2026-10-28b` file; that letter was not used.
 

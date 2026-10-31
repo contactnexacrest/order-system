@@ -1,0 +1,104 @@
+{% set columns = [['executive', 'Executive'], ['manager', 'Manager'], ['director', 'Director'], ['other', 'Other']] %}
+<div class="card page-wide">
+  <h1>Departments &amp; designations</h1>
+  <p class="muted">Each department has its own ladder. Each designation is its own role (its permissions and money view). To give someone access, add them to a department on their user page — no permission editing needed.</p>
+
+  <div class="table-scroll">
+  <table class="list dept-ladder">
+    <tr><th>Department</th>{% for c in columns %}<th>{{ c[1] }}</th>{% endfor %}</tr>
+    {% for dept in departments %}{% set list = byDepartment[dept.id] or [] %}
+    <tr>
+      <td><span class="dept-tag{{ '' if dept.is_active == 1 else ' off' }}" style="--dept-color:{{ dept.color }}">{{ dept.name }}{{ '' if dept.is_active == 1 else ' (off)' }}</span>
+        {% if dept.sees_whole_company == 1 %}<br><small class="muted">sees the whole company</small>{% endif %}</td>
+      {% for c in columns %}
+      <td>
+        {% for d in list %}{% if d.level == c[0] %}
+          <div class="desig">
+            <strong>{{ d.title }}</strong>{% if d.is_active != 1 %} <span class="badge badge-inactive">off</span>{% endif %}
+            <small>{{ d.member_count }} {{ 'person' if d.member_count == 1 else 'people' }} · role: <a href="/admin/roles/{{ d.role_id }}/permissions">{{ d.role_name }}</a>{% if d.approval_limit_inr !== null %} · approves up to ₹{{ d.approval_limit_inr | money0 }}{% endif %}</small>
+            <form method="post" action="/admin/preview-as" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="designation_id" value="{{ d.id }}"><button type="submit" class="btn-link" title="See the app exactly as a {{ d.title }} sees it">Preview the app as this</button></form>
+          </div>
+        {% endif %}{% endfor %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+
+  <div class="section">
+    <h2>Add a designation</h2>
+    <form method="post" action="/admin/designations" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Department *
+        <select name="department_id" required>
+          <option value="">— choose —</option>
+          {% for dept in departments %}<option value="{{ dept.id }}">{{ dept.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Designation *
+        <input type="text" name="title" required minlength="2" maxlength="100" placeholder="e.g., Quality Manager">
+      </label>
+      <label>Level *
+        <select name="level" required>
+          {% for key, label in levels %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Role (its permissions) *
+        <select name="role_id" required>
+          <option value="new">A new role with the same name (set its permissions next)</option>
+          {% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <div class="btn-row"><button type="submit" class="btn-sm btn-accent">+ Add designation</button></div>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Add a department</h2>
+    <form method="post" action="/admin/departments" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Name *
+        <input type="text" name="name" required minlength="2" maxlength="100" placeholder="e.g., Quality Control">
+      </label>
+      <label>Short code *
+        <input type="text" name="code" required pattern="[A-Za-z][A-Za-z0-9_]{1,19}" maxlength="20" placeholder="e.g., QUALITY" title="2 to 20 letters, digits or _, starting with a letter">
+      </label>
+      <label>Colour *
+        <input type="color" name="color" value="#3a4140" required>
+      </label>
+      <div class="btn-row"><button type="submit" class="btn-sm btn-accent">+ Add department</button></div>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Edit</h2>
+    {% for dept in departments %}{% set list = byDepartment[dept.id] or [] %}
+    <details class="card-nested dept-edit" id="department-{{ dept.id }}">
+      <summary><span class="dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:{{ dept.color }}"></span>{{ dept.name }} <span class="muted small">{{ dept.code }} · {{ list.length }} designation{{ '' if list.length == 1 else 's' }}</span></summary>
+      <form method="post" action="/admin/departments/{{ dept.id }}/update" class="field-grid">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Name *<input type="text" name="name" value="{{ dept.name }}" required minlength="2" maxlength="100"></label>
+        <label>Colour *<input type="color" name="color" value="{{ dept.color }}" required></label>
+        <label class="inline"><input type="checkbox" name="is_active" value="1" {{ 'checked' if dept.is_active == 1 else '' }}> Active (people can log in as it)</label>
+        <label class="inline"><input type="checkbox" name="sees_whole_company" value="1" {{ 'checked' if dept.sees_whole_company == 1 else '' }}> Sees the whole company</label>
+        <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save department</button></div>
+      </form>
+      {% if list.length %}
+      <table class="list">
+        <tr><th>Designation</th><th>Level</th><th>Approval limit (₹)</th><th>Active</th><th></th></tr>
+        {% for d in list %}{% set formId = 'designation-' + d.id %}
+        <tr>
+          <td><input form="{{ formId }}" type="text" name="title" value="{{ d.title }}" required minlength="2" maxlength="100"></td>
+          <td><select form="{{ formId }}" name="level" required>{% for key, label in levels %}<option value="{{ key }}" {{ 'selected' if d.level == key else '' }}>{{ label }}</option>{% endfor %}</select></td>
+          <td><input form="{{ formId }}" type="number" name="approval_limit_inr" min="0" step="0.01" value="{{ d.approval_limit_inr if d.approval_limit_inr !== null else '' }}" placeholder="none"></td>
+          <td><input form="{{ formId }}" type="checkbox" name="is_active" value="1" {{ 'checked' if d.is_active == 1 else '' }} aria-label="Active"></td>
+          <td><form id="{{ formId }}" method="post" action="/admin/designations/{{ d.id }}/update"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-success">Save</button></form></td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+    </details>
+    {% endfor %}
+  </div>
+</div>

@@ -100,6 +100,8 @@ $assets = new AssetController();
 $signatories = new SignatoryController();
 $superAdmin = new SuperAdminController();
 $permissionAdmin = new PermissionAdminController();
+$departments = new \App\Controllers\DepartmentController();
+$departmentAdmin = new \App\Controllers\DepartmentAdminController();
 $clients = new ClientController();
 $clientIntake = new ClientIntakeController();
 $clientIntakeReview = new ClientIntakeReviewController();
@@ -385,6 +387,20 @@ $router->post('/test-mode/enable', [$testMode, 'enable'], [SessionAuth::required
 $router->post('/test-mode/disable', [$testMode, 'disable'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 $router->post('/test-mode/test-email', [$testMode, 'updateTestEmail'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 $router->post('/test-mode/delete-test-data', [$testMode, 'deleteTestData'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
+
+// Owner decision D-214: "Log in as" a department, switching, Admin "Preview as", and Admin → Departments.
+$router->get('/choose-department', [$departments, 'chooseForm'], [SessionAuth::required()]);
+$router->post('/choose-department', [$departments, 'choose'], [SessionAuth::required(), CsrfCheck::verify()]);
+$router->post('/switch-department', [$departments, 'switch'], [SessionAuth::required(), CsrfCheck::verify()]);
+$router->post('/admin/preview-as', [$departments, 'previewStart'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->post('/preview/exit', [$departments, 'previewEnd'], [SessionAuth::required(), CsrfCheck::verify()]);
+$router->get('/admin/departments', [$departmentAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
+$router->post('/admin/departments', [$departmentAdmin, 'createDepartment'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->post('/admin/departments/{id}/update', [$departmentAdmin, 'updateDepartment'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->post('/admin/designations', [$departmentAdmin, 'createDesignation'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->post('/admin/designations/{id}/update', [$departmentAdmin, 'updateDesignation'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->post('/users/{id}/memberships', [$departmentAdmin, 'addMembership'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
+$router->post('/users/{id}/memberships/{membershipId}/end', [$departmentAdmin, 'endMembership'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 
 $router->get('/admin/permissions', [$permissionAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
 $router->post('/admin/permissions/grant', [$permissionAdmin, 'grantOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);

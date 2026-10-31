@@ -2,6 +2,7 @@
 
 const db = require('../config/db');
 const superAdminService = require('../services/superAdminService');
+const departmentRepository = require('./departmentRepository');
 
 // Port of App\Repositories\PermissionRepository.
 
@@ -10,7 +11,7 @@ const superAdminService = require('../services/superAdminService');
  * per-user overrides in user_permissions taking final precedence.
  * @returns {Promise<Object<string,boolean>>}
  */
-async function effectivePermissions(userId, roleId) {
+async function effectivePermissions(userId, roleId, roleOnly = false) {
   const effective = {};
 
   if (roleId !== null && roleId !== undefined) {
@@ -26,11 +27,16 @@ async function effectivePermissions(userId, roleId) {
     }
   }
 
+  if (roleOnly) {
+    // A preview shows the designation exactly, without this person's own exceptions.
+    return effective;
+  }
+  // Owner decision D-214: a personal exception can carry an end date; past it, it no longer applies.
   const overrides = await db.query(
     `SELECT p.permission_key, up.is_enabled
      FROM user_permissions up
      JOIN permissions p ON p.id = up.permission_id
-     WHERE up.user_id = :user_id`,
+     WHERE up.user_id = :user_id AND (up.expires_at IS NULL OR up.expires_at >= CURDATE())`,
     { user_id: userId }
   );
   for (const row of overrides) {
@@ -61,9 +67,17 @@ async function usersWithPermission(permissionKey) {
       matched.push(u.id);
       continue;
     }
-    const effective = await effectivePermissions(u.id, u.role_id);
-    if (effective[permissionKey]) {
-      matched.push(u.id);
+    // Owner decision D-214: a person in departments holds what any of
+    // their current memberships' roles holds; with none, their own role.
+    let roleIds = await departmentRepository.activeRoleIdsForUser(u.id);
+    if (roleIds.length === 0) {
+      roleIds = [u.role_id];
+    }
+    for (const roleId of roleIds) {
+      if ((await effectivePermissions(u.id, roleId))[permissionKey]) {
+        matched.push(u.id);
+        break;
+      }
     }
   }
   return matched;
@@ -113,7 +127,7 @@ async function roleMatrix() {
 async function activeGrantOverrides() {
   return db.query(
     `SELECT up.id, up.user_id, u.name AS user_name, p.permission_key, p.name AS permission_name,
-            up.granted_by, g.name AS granted_by_name, up.granted_at, up.reason
+            up.granted_by, g.name AS granted_by_name, up.granted_at, up.reason, up.expires_at
      FROM user_permissions up
      JOIN users u ON u.id = up.user_id
      JOIN permissions p ON p.id = up.permission_id
@@ -123,12 +137,12 @@ async function activeGrantOverrides() {
   );
 }
 
-async function grantOverride(userId, permissionId, grantedBy, reason) {
+async function grantOverride(userId, permissionId, grantedBy, reason, expiresAt = null) {
   const result = await db.execute(
-    `INSERT INTO user_permissions (user_id, permission_id, is_enabled, granted_by, reason)
-     VALUES (:user_id, :permission_id, 1, :granted_by, :reason)
-     ON DUPLICATE KEY UPDATE is_enabled = 1, granted_by = VALUES(granted_by), reason = VALUES(reason), granted_at = CURRENT_TIMESTAMP`,
-    { user_id: userId, permission_id: permissionId, granted_by: grantedBy, reason }
+    `INSERT INTO user_permissions (user_id, permission_id, is_enabled, granted_by, reason, expires_at)
+     VALUES (:user_id, :permission_id, 1, :granted_by, :reason, :expires_at)
+     ON DUPLICATE KEY UPDATE is_enabled = 1, granted_by = VALUES(granted_by), reason = VALUES(reason), expires_at = VALUES(expires_at), granted_at = CURRENT_TIMESTAMP`,
+    { user_id: userId, permission_id: permissionId, granted_by: grantedBy, reason, expires_at: expiresAt }
   );
   if (result.insertId > 0) {
     return result.insertId;

@@ -1,5 +1,7 @@
 'use strict';
 
+const { todayIst } = require('../helpers/dbDateTime');
+
 const flash = require('../helpers/flash');
 const recordCheck = require('../helpers/recordCheck');
 const { scalarString } = require('../helpers/input');
@@ -34,8 +36,16 @@ async function index(req, res) {
     permissionRepository.activeGrantOverrides(),
   ]);
   res.renderView('permission_admin/index', {
-    roleMatrix, allPermissions, allUsers, roles, overrides, minReasonLength: MIN_REASON_LENGTH,
+    roleMatrix, allPermissions, allUsers, roles, overrides, minReasonLength: MIN_REASON_LENGTH, today: todayIst(),
   }, 'layout/base');
+}
+
+/** 'YYYY-MM-DD' that is a real calendar date. */
+function isRealDate(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
 }
 
 async function grantOverride(req, res) {
@@ -55,8 +65,16 @@ async function grantOverride(req, res) {
     return;
   }
 
-  const id = await permissionRepository.grantOverride(userId, permissionId, user.id, reason);
-  await auditLogRepository.log(user.id, 'USER_PERMISSION_GRANTED', 'user_permissions', id, 'permission_id', null, String(permissionId), reason);
+  // Owner decision D-214: a personal exception may carry an end date ("Until"); from the day after, it no longer applies.
+  const expiresAt = String((req.body && req.body.expires_at) || '').trim() || null;
+  if (expiresAt !== null && (!isRealDate(expiresAt) || expiresAt < todayIst())) {
+    flash.set(req, 'error', 'The "Until" date must be today or later (or leave it empty for no end date).');
+    res.redirect('/admin/permissions');
+    return;
+  }
+
+  const id = await permissionRepository.grantOverride(userId, permissionId, user.id, reason, expiresAt);
+  await auditLogRepository.log(user.id, 'USER_PERMISSION_GRANTED', 'user_permissions', id, 'permission_id', null, String(permissionId) + (expiresAt !== null ? ` until ${expiresAt}` : ''), reason);
   flash.set(req, 'success', 'Extra permission granted.');
   res.redirect('/admin/permissions');
 }

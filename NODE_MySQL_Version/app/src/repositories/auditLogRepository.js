@@ -2,6 +2,7 @@
 
 const db = require('../config/db');
 const testModeService = require('../services/testModeService');
+const requestContext = require('../helpers/requestContext');
 
 // Port of App\Repositories\AuditLogRepository. Read-only viewer by design —
 // no function here ever updates or deletes a row.
@@ -15,13 +16,16 @@ async function log(userId, actionType, entityType = null, entityId = null, field
   if (await testModeService.isTestEntity(entityType, entityId)) {
     return;
   }
+  // Owner decision D-214: which department (designation) the person acted as.
+  const ctx = requestContext.get();
+  const actingAs = ctx && userId !== null && Number(ctx.userId) === Number(userId) ? (ctx.actingAs || null) : null;
   await db.execute(
     `INSERT INTO audit_log
-        (user_id, action_type, entity_type, entity_id, field_name, old_value, new_value, reason, ip_address)
+        (user_id, acting_as, action_type, entity_type, entity_id, field_name, old_value, new_value, reason, ip_address)
      VALUES
-        (:user_id, :action_type, :entity_type, :entity_id, :field_name, :old_value, :new_value, :reason, :ip)`,
+        (:user_id, :acting_as, :action_type, :entity_type, :entity_id, :field_name, :old_value, :new_value, :reason, :ip)`,
     {
-      user_id: userId, action_type: actionType, entity_type: entityType, entity_id: entityId,
+      user_id: userId, acting_as: actingAs, action_type: actionType, entity_type: entityType, entity_id: entityId,
       field_name: fieldName, old_value: oldValue, new_value: newValue, reason, ip: ipAddress,
     }
   );

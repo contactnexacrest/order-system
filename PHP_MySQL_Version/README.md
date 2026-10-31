@@ -2162,3 +2162,28 @@ Zoho Books, built from the facts and including the bank reference.
   owner confirmed it twice). The CAFIN CSV export carries it with no amount.
 - `app.js` gains `data-not-before` (a date not before another date field).
 - SOP chapter `ca-09-gst-refunds.md`.
+
+## Follow-up (added 2026-11-01): Departments, "Log in as" and Preview as (owner decision D-214, phase 1)
+
+- **Migration:** `docs/migrations/2026-11-01a-departments.sql` (new tables
+  `departments`, `department_designations`, `user_department_memberships`;
+  columns `audit_log.acting_as`, `user_permissions.expires_at`; the new roles
+  and their starting rights; existing staff become members of the department
+  matching their role, Admin accounts excepted).
+- **How a person's role is chosen:** the previewed designation's role, else
+  the role of the department membership they logged in as, else their own
+  `users.role_id`. Every permission check goes through this, so no call site
+  changed. A preview turns off the Super Admin bypass and personal exceptions.
+- **Screens:** `/choose-department` (Log in as; until chosen, every other
+  staff page redirects there), the "Logged in as" badge with Switch
+  department in the menu (`POST /switch-department`), `/admin/departments`
+  (`manage_permissions`: departments, designations, Preview the app as —
+  `POST /admin/preview-as`, `POST /preview/exit`), and the Departments
+  section on the user page (`POST /users/{id}/memberships`,
+  `.../memberships/{membershipId}/end`, `manage_users`; founder accounts
+  refused). Admin → Permissions: an optional **Until** date on an extra
+  permission.
+- **Audit:** every row written while signed in carries the department the
+  person acted as (`acting_as`), e.g. "Procurement Manager · Procurement", or
+  "Preview: …".
+- **Tests:** `tests/Integration/DepartmentsTest.php`; e2e `e2e/tests/10-departments.spec.js`.

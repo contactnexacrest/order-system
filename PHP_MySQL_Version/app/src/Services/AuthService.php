@@ -149,7 +149,14 @@ final class AuthService
     public static function currentUser(): ?array
     {
         $id = self::currentUserId();
-        return $id ? UserRepository::findById($id) : null;
+        $user = $id ? UserRepository::findById($id) : null;
+        if ($user !== null) {
+            // Owner decision D-214: role_id is the role of the department this
+            // session works as (own_role_id keeps the person's own role).
+            $user['own_role_id'] = $user['role_id'];
+            $user['role_id'] = ActiveDepartmentService::effectiveRoleId((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null);
+        }
+        return $user;
     }
 
     public static function logout(): void

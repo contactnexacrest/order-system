@@ -4,6 +4,7 @@ const authService = require('../services/authService');
 const { parseDbDateTime } = require('../helpers/dbDateTime');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const userRepository = require('../repositories/userRepository');
+const departmentRepository = require('../repositories/departmentRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const permissionService = require('../services/permissionService');
 const permissionRepository = require('../repositories/permissionRepository');
@@ -24,6 +25,8 @@ const dashboardRepository = require('../repositories/dashboardRepository');
 // so route guards and view templates both read the same resolved object.
 
 const orderAccessService = require('../services/orderAccessService');
+const activeDepartmentService = require('../services/activeDepartmentService');
+const requestContext = require('../helpers/requestContext');
 
 const LAST_ACTIVITY_KEY = '_last_activity_ts';
 
@@ -94,8 +97,26 @@ function required() {
       }
     }
 
+    // Owner decision D-214: a person in several departments works as one
+    // of them; until they choose, only the choice page (and logout) opens.
+    if (!mustChange && await activeDepartmentService.needsChoice(req, user.id)) {
+      const requestPath = req.path.replace(/\/+$/, '');
+      if (!['/choose-department', '/logout'].includes(requestPath)) {
+        res.redirect('/choose-department');
+        return;
+      }
+    }
+    // The role every check uses: the previewed designation's, else the
+    // active membership's, else the person's own (kept as own_role_id).
+    const acting = await activeDepartmentService.resolve(req, user.id, user.role_id !== null ? user.role_id : null);
+    user.own_role_id = user.role_id;
+    user.role_id = acting.effectiveRoleId;
+    req.actingMembership = acting.membership;
+    req.previewDesignation = acting.preview;
+    req.myMemberships = acting.membership !== null ? await departmentRepository.activeMembershipsForUser(user.id) : [];
+
     req.user = user;
-    req.permissions = await permissionService.load(user.id, user.role_id !== null ? user.role_id : null);
+    req.permissions = await permissionService.load(user.id, acting.effectiveRoleId, acting.previewing);
 
     // A Super Admin (permanent flag or an active delegation) is
     // unrestricted everywhere: every permission key resolves true, with
@@ -104,7 +125,8 @@ function required() {
     // permissionCheck middleware's plain-object lookups and every view
     // template's `permissions.xxx` access see the same real object.
     req.isSuperAdmin = await superAdminService.isEffective(user.id);
-    if (req.isSuperAdmin) {
+    // A preview shows exactly that designation, so no Super Admin bypass during it.
+    if (req.isSuperAdmin && !acting.previewing) {
       for (const key of await permissionRepository.allKeys()) {
         req.permissions[key] = true;
       }
@@ -158,7 +180,9 @@ function required() {
       return;
     }
 
-    next();
+    requestContext.run({
+      userId: user.id, effectiveRoleId: acting.effectiveRoleId, previewing: acting.previewing, actingAs: acting.actingAs,
+    }, next);
   };
 }
 

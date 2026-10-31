@@ -11,6 +11,11 @@ $can = static fn(string $perm): bool => $current && PermissionService::can((int)
 // (see .nav-group in app.css) so it's readable at all, on desktop or
 // mobile. A group's <details> only renders once at least one of its links
 // is actually visible to this user's permissions.
+// Owner decision D-214: the department this person is working as, the others
+// they can switch to, and Admin's "Preview as" banner.
+$actingMembership = $current ? \App\Services\ActiveDepartmentService::current((int) $current['id']) : null;
+$myMemberships = $actingMembership ? \App\Repositories\DepartmentRepository::activeMembershipsForUser((int) $current['id']) : [];
+$previewDesignation = $current ? \App\Services\ActiveDepartmentService::preview() : null;
 $canOrders = $can('manage_orders');
 // Standing-request badges — a live COUNT on every page load (not cached),
 // so the sidebar always reflects reality: a submission appearing the
@@ -201,6 +206,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canSettings): ?><a href="/watermarks" class="<?= $isActive('/watermarks') ? 'active' : '' ?>">Watermarks</a><?php endif; ?>
           <?php if ($canAssets): ?><a href="/company-assets" class="<?= $isActive('/company-assets') ? 'active' : '' ?>">Assets</a><?php endif; ?>
           <?php if ($canSignatories): ?><a href="/signatories" class="<?= $isActive('/signatories') ? 'active' : '' ?>">Signatories</a><?php endif; ?>
+          <?php if ($canPermissions): ?><a href="/admin/departments" class="<?= $isActive('/admin/departments') ? 'active' : '' ?>">Departments</a><?php endif; ?>
           <?php if ($canPermissions): ?><a href="/admin/permissions" class="<?= $isActive('/admin/permissions') ? 'active' : '' ?>">Permissions</a><?php endif; ?>
           <?php if ($canUsers): ?><a href="/users" class="<?= $isActive('/users') ? 'active' : '' ?>">Users</a><?php endif; ?>
           <?php if ($canFieldProtection): ?><a href="/admin/field-protection" class="<?= $isActive('/admin/field-protection') ? 'active' : '' ?>">Field Protection</a><?php endif; ?>
@@ -222,6 +228,28 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
         Notifications<?= $unreadCount > 0 ? ' <span class="nav-badge">' . (int) $unreadCount . '</span>' : '' ?>
       </a>
+      <?php if ($actingMembership): ?>
+        <div class="dept-badge" style="--dept-color:<?= htmlspecialchars((string) $actingMembership['department_color']) ?>" data-testid="dept-badge">
+          <span class="dept-badge-label">Logged in as</span>
+          <strong><?= htmlspecialchars((string) $actingMembership['designation_title']) ?></strong>
+          <?= htmlspecialchars((string) $actingMembership['department_name']) ?>
+          <?php if (count($myMemberships) > 1): ?>
+            <details class="dept-switch">
+              <summary>Switch department &#9662;</summary>
+              <div class="dept-switch-list">
+                <?php foreach ($myMemberships as $m): ?>
+                  <?php if ((int) $m['id'] === (int) $actingMembership['id']): ?>
+                    <div class="current">&#9679; <?= htmlspecialchars($m['designation_title'] . ' — ' . $m['department_name']) ?></div>
+                  <?php else: ?>
+                    <form method="post" action="/switch-department"><?= \App\Helpers\Csrf::field() ?><input type="hidden" name="membership_id" value="<?= (int) $m['id'] ?>"><button type="submit">&#9675; <?= htmlspecialchars($m['designation_title'] . ' — ' . $m['department_name']) ?></button></form>
+                  <?php endif; ?>
+                <?php endforeach; ?>
+                <div class="hint">Switching reloads the app with that department's menus, tasks and data.</div>
+              </div>
+            </details>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
       <a href="/account" class="sidebar-user-card">
         <span class="sidebar-user-avatar"><?= htmlspecialchars(mb_strtoupper(mb_substr($current['name'], 0, 1))) ?></span>
         <span class="sidebar-user-name"><?= htmlspecialchars($current['name']) ?></span>
@@ -231,6 +259,12 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
   </div>
 </header>
 <div class="app-main">
+  <?php if ($previewDesignation): ?>
+    <div class="preview-banner" data-testid="preview-banner">
+      <span>Previewing the app as <?= htmlspecialchars($previewDesignation['title'] . ' · ' . $previewDesignation['department_name']) ?> — you see only what this designation sees (your own extra rights are off).</span>
+      <form method="post" action="/preview/exit"><?= \App\Helpers\Csrf::field() ?><button type="submit" class="btn-sm">Exit preview</button></form>
+    </div>
+  <?php endif; ?>
   <?php if ($testModeEnabled): ?>
     <div class="test-mode-banner">TEST MODE ACTIVE — client access suspended, all outbound business mail is redirected, admin panel settings are locked. Any order/client/document created now is test data.</div>
   <?php endif; ?>

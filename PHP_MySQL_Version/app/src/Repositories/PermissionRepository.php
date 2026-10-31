@@ -17,7 +17,7 @@ final class PermissionRepository
      *
      * @return array<string, bool>  permission_key => effective boolean
      */
-    public static function effectivePermissions(int $userId, ?int $roleId): array
+    public static function effectivePermissions(int $userId, ?int $roleId, bool $roleOnly = false): array
     {
         $pdo = Database::connection();
         $effective = [];
@@ -35,11 +35,16 @@ final class PermissionRepository
             }
         }
 
+        if ($roleOnly) {
+            // A preview shows the designation exactly, without this person's own exceptions.
+            return $effective;
+        }
+        // Owner decision D-214: a personal exception can carry an end date; past it, it no longer applies.
         $stmt = $pdo->prepare(
             'SELECT p.permission_key, up.is_enabled
              FROM user_permissions up
              JOIN permissions p ON p.id = up.permission_id
-             WHERE up.user_id = :user_id'
+             WHERE up.user_id = :user_id AND (up.expires_at IS NULL OR up.expires_at >= CURDATE())'
         );
         $stmt->execute(['user_id' => $userId]);
         foreach ($stmt->fetchAll() as $row) {
@@ -75,10 +80,17 @@ final class PermissionRepository
                 $matched[] = $userId;
                 continue;
             }
-            $roleId = $u['role_id'] !== null ? (int) $u['role_id'] : null;
-            $effective = self::effectivePermissions($userId, $roleId);
-            if (!empty($effective[$permissionKey])) {
-                $matched[] = $userId;
+            // Owner decision D-214: a person in departments holds what any of
+            // their current memberships' roles holds; with none, their own role.
+            $roleIds = DepartmentRepository::activeRoleIdsForUser($userId);
+            if ($roleIds === []) {
+                $roleIds = [$u['role_id'] !== null ? (int) $u['role_id'] : null];
+            }
+            foreach ($roleIds as $roleId) {
+                if (!empty(self::effectivePermissions($userId, $roleId)[$permissionKey])) {
+                    $matched[] = $userId;
+                    break;
+                }
             }
         }
         return $matched;
@@ -133,7 +145,7 @@ final class PermissionRepository
     {
         return Database::connection()->query(
             "SELECT up.id, up.user_id, u.name AS user_name, p.permission_key, p.name AS permission_name,
-                    up.granted_by, g.name AS granted_by_name, up.granted_at, up.reason
+                    up.granted_by, g.name AS granted_by_name, up.granted_at, up.reason, up.expires_at
              FROM user_permissions up
              JOIN users u ON u.id = up.user_id
              JOIN permissions p ON p.id = up.permission_id
@@ -143,15 +155,15 @@ final class PermissionRepository
         )->fetchAll();
     }
 
-    public static function grantOverride(int $userId, int $permissionId, int $grantedBy, string $reason): int
+    public static function grantOverride(int $userId, int $permissionId, int $grantedBy, string $reason, ?string $expiresAt = null): int
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
-            'INSERT INTO user_permissions (user_id, permission_id, is_enabled, granted_by, reason)
-             VALUES (:user_id, :permission_id, 1, :granted_by, :reason)
-             ON DUPLICATE KEY UPDATE is_enabled = 1, granted_by = VALUES(granted_by), reason = VALUES(reason), granted_at = CURRENT_TIMESTAMP'
+            'INSERT INTO user_permissions (user_id, permission_id, is_enabled, granted_by, reason, expires_at)
+             VALUES (:user_id, :permission_id, 1, :granted_by, :reason, :expires_at)
+             ON DUPLICATE KEY UPDATE is_enabled = 1, granted_by = VALUES(granted_by), reason = VALUES(reason), expires_at = VALUES(expires_at), granted_at = CURRENT_TIMESTAMP'
         );
-        $stmt->execute(['user_id' => $userId, 'permission_id' => $permissionId, 'granted_by' => $grantedBy, 'reason' => $reason]);
+        $stmt->execute(['user_id' => $userId, 'permission_id' => $permissionId, 'granted_by' => $grantedBy, 'reason' => $reason, 'expires_at' => $expiresAt]);
         $insertId = (int) $pdo->lastInsertId();
         if ($insertId > 0) {
             return $insertId;
