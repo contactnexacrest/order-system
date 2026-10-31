@@ -162,11 +162,12 @@ final class PaymentDescriptionRuleTest extends DbTestCase
     public function testAZohoExpenseWithoutADescriptionIsFlagged(): void
     {
         $pdo = Database::connection();
-        $pdo->exec("INSERT INTO ca_expenses (zoho_expense_id, category, description, vendor_name, amount, currency_code, expense_date) VALUES ('TEST-ZX-1', 'Courier', '', 'Blue Dart', 850, 'INR', CURDATE()), ('TEST-ZX-2', 'Courier', 'Courier of BL copies to the buyer', 'DHL', 2100, 'INR', CURDATE())");
+        $pdo->exec("INSERT INTO ca_expenses (zoho_expense_id, category, description, vendor_name, amount, currency_code, expense_date) VALUES ('TEST-ZX-1', 'Courier', '', 'Blue Dart D212', 850, 'INR', CURDATE()), ('TEST-ZX-2', 'Courier', 'Courier of BL copies to the buyer', 'DHL', 2100, 'INR', CURDATE())");
         ob_start();
         (new CaController())->expenses([]);
         $html = (string) ob_get_clean();
-        self::assertSame(1, substr_count($html, '>No description in Zoho</span>'));
+        self::assertMatchesRegularExpression('#Blue Dart D212</td>\s*<td[^>]*><span class="badge badge-danger"[^>]*>No description in Zoho</span>#', $html);
+        self::assertDoesNotMatchRegularExpression('#DHL</td>\s*<td[^>]*><span class="badge badge-danger"#', $html, 'an expense with a description is not flagged');
         self::assertStringContainsString('Courier of BL copies to the buyer', $html);
     }
 

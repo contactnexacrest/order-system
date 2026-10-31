@@ -159,11 +159,12 @@ describe('Rule D-212 — money records need the reference their description is b
     const tag = Math.random().toString(16).slice(2, 8);
     await db.execute(
       `INSERT INTO ca_expenses (zoho_expense_id, category, description, vendor_name, amount, currency_code, expense_date)
-       VALUES (:a, 'Courier', '', 'Blue Dart', 850, 'INR', CURDATE()), (:b, 'Courier', :desc, 'DHL', 2100, 'INR', CURDATE())`,
+       VALUES (:a, 'Courier', '', 'Blue Dart D212', 850, 'INR', CURDATE()), (:b, 'Courier', :desc, 'DHL', 2100, 'INR', CURDATE())`,
       { a: `TEST-ZX-${tag}-1`, b: `TEST-ZX-${tag}-2`, desc: `Courier of BL copies to the buyer ${tag}` }
     );
     const html = (await admin.get('/ca/expenses')).text;
-    expect(html).toContain('>No description in Zoho</span>');
+    expect(html).toMatch(/Blue Dart D212<\/td>\s*<td[^>]*><span class="badge badge-danger"[^>]*>No description in Zoho<\/span>/);
+    expect(html).not.toMatch(/DHL<\/td>\s*<td[^>]*><span class="badge badge-danger"/); // an expense with a description is not flagged
     expect(html).toContain(`Courier of BL copies to the buyer ${tag}`);
   });
 
