@@ -43,7 +43,18 @@
     <td class="num">{{ p.unit_price }}</td>
     <td class="num">{{ p.amount }}</td>
   </tr>
-  {% if p.dimensions or p.finish %}
+  {% if p.line_type == 'service' %}
+  {# Owner decision D-215: a service line shows its SAC code and is invoiced separately. #}
+  <tr class="spec">
+    <td></td>
+    <td colspan="5">
+      <span class="line-no" style="color:{{ lineColor }};">{{ loop.index }}.</span>
+      <span class="spec-label">Service</span>
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">SAC Code:</span> {{ p.sac_code }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span>Invoiced separately on our Export Service Invoice
+    </td>
+  </tr>
+  {% elseif p.dimensions or p.finish %}
   <tr class="spec">
     <td></td>
     <td colspan="5">
@@ -62,7 +73,7 @@
   {% for p in products %}
   <tr><td class="k" style="text-align:right;">{{ p.description }} ({{ p.quantity }} {{ p.unit }} &times; {{ p.unit_price }})</td><td class="v" style="text-align:right; font-style:italic; color:#5B6573;">{{ order.currency_code }} {{ p.amount }}</td></tr>
   {% endfor %}
-  <tr class="highlight"><td class="k" style="text-align:right;">TOTAL PI VALUE ({{ order.currency_code }}) *</td><td class="v" style="text-align:right;">{{ financial.fob_value }}</td></tr>
+  <tr class="highlight"><td class="k" style="text-align:right;">TOTAL PI VALUE ({{ order.currency_code }}) *</td><td class="v" style="text-align:right;">{{ financial.has_services ? financial.total_with_services : financial.fob_value }}</td></tr>
 </table>
 <p><strong style="color:#17233A;">Remark:</strong> <em style="color:#5B6573;">Loading quantity subject to final packing confirmation.</em></p>
 

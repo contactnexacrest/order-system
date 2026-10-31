@@ -79,7 +79,7 @@ async function duplicate(id, targetOrderId = null) {
     throw new Error(`Cannot duplicate order_products row ${id} — not found.`);
   }
   const orderId = targetOrderId ?? source.order_id;
-  return add(
+  const newId = await add(
     orderId,
     await nextLineNo(orderId),
     source.description,
@@ -91,10 +91,26 @@ async function duplicate(id, targetOrderId = null) {
     source.unit_price !== null ? String(source.unit_price) : null,
     source.hs_code
   );
+  await setLineType(newId, source.line_type || 'goods', source.sac_code || null);
+  return newId;
 }
 
+/** Owner decision D-215: a line is goods, a service (SAC code, its own Export Service Invoice) or a charge. */
+const LINE_TYPES = { goods: 'Goods', service: 'Service', charge: 'Charge' };
+
+async function setLineType(id, lineType, sacCode) {
+  await db.execute('UPDATE order_products SET line_type = :t, sac_code = :s WHERE id = :id', { t: lineType, s: lineType === 'service' ? sacCode : null, id });
+}
+
+/** The service lines' total — invoiced on the Export Service Invoice, never part of the goods FOB value. */
+async function totalServiceValue(orderId) {
+  const row = await db.queryOne("SELECT COALESCE(SUM(fob_value), 0) AS total FROM order_products WHERE order_id = :order_id AND is_active = 1 AND line_type = 'service'", { order_id: orderId });
+  return parseFloat(row.total);
+}
+
+/** The goods FOB value (goods and charges; D-215: service lines are invoiced separately). */
 async function totalFobValue(orderId) {
-  const row = await db.queryOne('SELECT COALESCE(SUM(fob_value), 0) AS total FROM order_products WHERE order_id = :order_id AND is_active = 1', { order_id: orderId });
+  const row = await db.queryOne("SELECT COALESCE(SUM(fob_value), 0) AS total FROM order_products WHERE order_id = :order_id AND is_active = 1 AND line_type <> 'service'", { order_id: orderId });
   return parseFloat(row.total);
 }
 
@@ -130,4 +146,4 @@ async function orderedQuantitySummary(orderId) {
   return { total, unit: [...units][0], comparable: true };
 }
 
-module.exports = { forOrder, add, find, nextLineNo, update, softDelete, duplicate, totalFobValue, orderedQuantitySummary };
+module.exports = { LINE_TYPES, forOrder, add, find, nextLineNo, update, softDelete, duplicate, setLineType, totalServiceValue, totalFobValue, orderedQuantitySummary };

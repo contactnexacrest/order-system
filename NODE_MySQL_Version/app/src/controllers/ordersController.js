@@ -730,6 +730,34 @@ async function updateDetails(req, res) {
  * orderEditGuard exactly like updateDetails() above once the order has
  * reached Order Confirmation.
  */
+/**
+ * Owner decision D-215: the line's type and its code. Goods need an HS code
+ * from the master list (as before); a service needs its SAC code (6 digits
+ * starting 99) and no HS code; a charge needs neither.
+ */
+async function lineTypeInput(body) {
+  const lineType = String(body.line_type ?? 'goods');
+  if (!Object.prototype.hasOwnProperty.call(orderProductRepository.LINE_TYPES, lineType)) {
+    return { lineType: 'goods', hsCode: '', sacCode: null, error: 'Choose whether the line is goods, a service or a charge.' };
+  }
+  const hsCode = String(body.hs_code ?? '').trim();
+  const sacCode = String(body.sac_code ?? '').trim();
+  if (lineType === 'service') {
+    return /^99\d{4}$/.test(sacCode)
+      ? { lineType, hsCode: '', sacCode, error: null }
+      : { lineType, hsCode: '', sacCode: null, error: 'A service line needs its SAC code: 6 digits starting 99 (e.g. 998719).' };
+  }
+  if (lineType === 'charge') {
+    return hsCode !== '' && !(await hsCodeRepository.isActiveCode(hsCode))
+      ? { lineType, hsCode: '', sacCode: null, error: `HS code "${hsCode}" is not on the HS Code master list — leave it empty for a charge, or add it there first.` }
+      : { lineType, hsCode, sacCode: null, error: null };
+  }
+  if (hsCode === '' || !(await hsCodeRepository.isActiveCode(hsCode))) {
+    return { lineType, hsCode, sacCode: null, error: `HS code "${hsCode}" is not on the HS Code master list — add it there first (HS Codes, under Admin).` };
+  }
+  return { lineType, hsCode, sacCode: null, error: null };
+}
+
 async function addProduct(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -739,14 +767,14 @@ async function addProduct(req, res) {
   }
   const body = req.body;
   const description = str(body.description);
-  const hsCode = str(body.hs_code);
   if (description === '') {
     flash.set(req, 'error', 'Description is required.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (hsCode === '' || !(await hsCodeRepository.isActiveCode(hsCode))) {
-    flash.set(req, 'error', `HS code "${hsCode}" is not on the HS Code master list — add it there first (HS Codes, under Admin).`);
+  const { lineType, hsCode, sacCode, error: lineTypeError } = await lineTypeInput(body);
+  if (lineTypeError !== null) {
+    flash.set(req, 'error', lineTypeError);
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -765,7 +793,7 @@ async function addProduct(req, res) {
     return;
   }
 
-  await orderProductRepository.add(
+  const newLineId = await orderProductRepository.add(
     orderId,
     await orderProductRepository.nextLineNo(orderId),
     description,
@@ -777,6 +805,7 @@ async function addProduct(req, res) {
     str(body.unit_price) || null,
     hsCode
   );
+  await orderProductRepository.setLineType(newLineId, lineType, sacCode);
   flash.set(req, 'success', 'Product line added.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -792,14 +821,14 @@ async function updateProduct(req, res) {
   }
   const body = req.body;
   const description = str(body.description);
-  const hsCode = str(body.hs_code);
   if (description === '') {
     flash.set(req, 'error', 'Description is required.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (hsCode === '' || !(await hsCodeRepository.isActiveCode(hsCode))) {
-    flash.set(req, 'error', `HS code "${hsCode}" is not on the HS Code master list — add it there first (HS Codes, under Admin).`);
+  const { lineType, hsCode, sacCode, error: lineTypeError } = await lineTypeInput(body);
+  if (lineTypeError !== null) {
+    flash.set(req, 'error', lineTypeError);
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -829,6 +858,7 @@ async function updateProduct(req, res) {
     str(body.unit_price) || null,
     hsCode
   );
+  await orderProductRepository.setLineType(productId, lineType, sacCode);
   flash.set(req, 'success', 'Product line updated.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1113,6 +1143,7 @@ async function show(req, res) {
       vendorBills,
       // Owner decision D-214, phase 3: what the order needs from Procurement.
       purchaseRequirements: await purchasingRepository.forOrder(orderId),
+      lineTypes: orderProductRepository.LINE_TYPES,
       // Owner decision D-214, phase 4: one owner per department; a department's manager picks theirs.
       departmentOwners: await departmentOwnersFor(req, orderId),
       purchaseStatuses: purchasingRepository.STATUSES,

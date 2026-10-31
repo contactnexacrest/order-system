@@ -728,6 +728,36 @@ final class OrderController
      * OrderEditGuard exactly like updateDetails() above once the order
      * has reached Order Confirmation.
      */
+    /**
+     * Owner decision D-215: the line's type and its code. Goods need an HS
+     * code from the master list (as before); a service needs its SAC code
+     * (6 digits starting 99) and no HS code; a charge needs neither.
+     * @return array{0:string,1:string,2:?string,3:?string} type, HS code, SAC code, error
+     */
+    private static function lineTypeInput(): array
+    {
+        $type = (string) ($_POST['line_type'] ?? 'goods');
+        if (!array_key_exists($type, OrderProductRepository::LINE_TYPES)) {
+            return ['goods', '', null, 'Choose whether the line is goods, a service or a charge.'];
+        }
+        $hsCode = trim((string) ($_POST['hs_code'] ?? ''));
+        $sacCode = trim((string) ($_POST['sac_code'] ?? ''));
+        if ($type === 'service') {
+            return preg_match('/^99\d{4}$/', $sacCode) === 1
+                ? ['service', '', $sacCode, null]
+                : ['service', '', null, 'A service line needs its SAC code: 6 digits starting 99 (e.g. 998719).'];
+        }
+        if ($type === 'charge') {
+            return $hsCode !== '' && !HsCodeRepository::isActiveCode($hsCode)
+                ? ['charge', '', null, "HS code \"{$hsCode}\" is not on the HS Code master list — leave it empty for a charge, or add it there first."]
+                : ['charge', $hsCode, null, null];
+        }
+        if ($hsCode === '' || !HsCodeRepository::isActiveCode($hsCode)) {
+            return ['goods', $hsCode, null, "HS code \"{$hsCode}\" is not on the HS Code master list — add it there first (HS Codes, under Admin)."];
+        }
+        return ['goods', $hsCode, null, null];
+    }
+
     public function addProduct(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -738,14 +768,14 @@ final class OrderController
             return;
         }
         $description = trim((string) ($_POST['description'] ?? ''));
-        $hsCode = trim((string) ($_POST['hs_code'] ?? ''));
         if ($description === '') {
             Flash::set('error', 'Description is required.');
             header("Location: /orders/{$orderId}");
             return;
         }
-        if ($hsCode === '' || !HsCodeRepository::isActiveCode($hsCode)) {
-            Flash::set('error', "HS code \"{$hsCode}\" is not on the HS Code master list — add it there first (HS Codes, under Admin).");
+        [$lineType, $hsCode, $sacCode, $lineTypeError] = self::lineTypeInput();
+        if ($lineTypeError !== null) {
+            Flash::set('error', $lineTypeError);
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -766,7 +796,7 @@ final class OrderController
             return;
         }
 
-        OrderProductRepository::add(
+        $newLineId = OrderProductRepository::add(
             $orderId,
             OrderProductRepository::nextLineNo($orderId),
             $description,
@@ -778,6 +808,7 @@ final class OrderController
             trim((string) ($_POST['unit_price'] ?? '')) ?: null,
             $hsCode
         );
+        OrderProductRepository::setLineType($newLineId, $lineType, $sacCode);
         Flash::set('success', 'Product line added.');
         header("Location: /orders/{$orderId}");
     }
@@ -794,14 +825,14 @@ final class OrderController
             return;
         }
         $description = trim((string) ($_POST['description'] ?? ''));
-        $hsCode = trim((string) ($_POST['hs_code'] ?? ''));
         if ($description === '') {
             Flash::set('error', 'Description is required.');
             header("Location: /orders/{$orderId}");
             return;
         }
-        if ($hsCode === '' || !HsCodeRepository::isActiveCode($hsCode)) {
-            Flash::set('error', "HS code \"{$hsCode}\" is not on the HS Code master list — add it there first (HS Codes, under Admin).");
+        [$lineType, $hsCode, $sacCode, $lineTypeError] = self::lineTypeInput();
+        if ($lineTypeError !== null) {
+            Flash::set('error', $lineTypeError);
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -833,6 +864,7 @@ final class OrderController
             trim((string) ($_POST['unit_price'] ?? '')) ?: null,
             $hsCode
         );
+        OrderProductRepository::setLineType($productId, $lineType, $sacCode);
         Flash::set('success', 'Product line updated.');
         header("Location: /orders/{$orderId}");
     }

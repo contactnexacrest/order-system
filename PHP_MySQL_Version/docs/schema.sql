@@ -770,6 +770,7 @@ CREATE TABLE order_products (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id      BIGINT UNSIGNED NOT NULL,
   line_no       INT NOT NULL,
+  line_type     ENUM('goods','service','charge') NOT NULL DEFAULT 'goods', -- D-215: a service line has a SAC code and its own Export Service Invoice
   product_id    BIGINT UNSIGNED NULL,
   description   VARCHAR(500) NOT NULL,
   material      VARCHAR(150) NULL,
@@ -781,6 +782,7 @@ CREATE TABLE order_products (
   unit_price    DECIMAL(14,2) NULL,
   fob_value     DECIMAL(14,2) NULL,
   hs_code       VARCHAR(20) NOT NULL DEFAULT '6802.93',
+  sac_code      VARCHAR(10) NULL,
   is_active     TINYINT(1) NOT NULL DEFAULT 1,
   FOREIGN KEY (order_id) REFERENCES orders(id),
   FOREIGN KEY (product_id) REFERENCES products(id)

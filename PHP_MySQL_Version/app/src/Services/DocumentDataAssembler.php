@@ -56,13 +56,23 @@ final class DocumentDataAssembler
     /** Owner decision (2026-10-28): printed under the PI's payment terms. */
     public const CLEARED_FUNDS_SENTENCE = 'The order is confirmed, and production starts, only once the advance is received in our account as cleared funds.';
 
+    /** D-215: documents that list service lines too (the rest are goods-only). */
+    private const ALL_LINE_DOCUMENTS = ['QT', 'PI', 'OC', 'BUYERPO', 'AMD', 'ESI'];
+
     public static function assemble(int $orderId, ?string $documentTypeCode = null): array
     {
         $order = OrderRepository::find($orderId);
         if (!$order) {
             throw new \RuntimeException("Order {$orderId} not found");
         }
+        // Owner decision D-215: the selling documents list every line; the goods
+        // documents (CI, Packing List, COO, Supplier PO, BL…) goods and charges only —
+        // a service line is invoiced on its own Export Service Invoice.
         $products = OrderProductRepository::forOrder($orderId);
+        if ($documentTypeCode !== null && !in_array(strtoupper($documentTypeCode), self::ALL_LINE_DOCUMENTS, true)) {
+            $products = array_values(array_filter($products, static fn (array $p): bool => ($p['line_type'] ?? 'goods') !== 'service'));
+        }
+        $serviceValue = OrderProductRepository::totalServiceValue($orderId);
         $payment = OrderPaymentStatusRepository::find($orderId);
 
         $company = self::companyBlock();
@@ -242,11 +252,17 @@ final class DocumentDataAssembler
                     'unit'           => $p['unit'],
                     'unit_price'     => $p['unit_price'] !== null ? self::formatMoney($p['unit_price']) : 'To Be Confirmed',
                     'amount'         => $p['fob_value'] !== null ? self::formatMoney($p['fob_value']) : 'To Be Confirmed',
+                    'line_type'      => $p['line_type'] ?? 'goods',
+                    'sac_code'       => $p['sac_code'] ?? null,
                 ];
             }, $products),
             'financial' => [
                 'fob_value'        => self::formatMoney($fobValue),
                 'fob_value_raw'    => $fobValue,
+                // D-215: service lines, invoiced on the Export Service Invoice (not part of the FOB value).
+                'has_services'        => $serviceValue > 0,
+                'service_value'       => self::formatMoney($serviceValue),
+                'total_with_services' => self::formatMoney($fobValue + $serviceValue),
                 'advance_pct'      => rtrim(rtrim(number_format($advancePct, 2), '0'), '.'),
                 'advance_amount'   => self::formatMoney($advanceAmount),
                 'advance_trigger_text' => $order['advance_trigger_text'],

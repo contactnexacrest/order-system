@@ -165,7 +165,15 @@ final class DocxDocumentBuilder
                 'cells' => [(string) $n, $p['description'] ?? '', $p['quantity'] ?? '', $p['unit'] ?? '', $p['unit_price'] ?? '', $p['amount'] ?? ''],
                 'lineColor' => $lineColor,
                 'align' => [null, null, 'right', null, 'right', 'right'],
-                'specText' => (!empty($p['dimensions']) || !empty($p['finish'])) ? [
+                // Owner decision D-215: a service line shows its SAC code and is invoiced separately.
+                'specText' => ($p['line_type'] ?? 'goods') === 'service' ? [
+                    ["{$n}. ", ['bold' => true, 'color' => $lineColor]],
+                    ['Service', ['bold' => true, 'color' => DocxComponents::NAVY]],
+                    ['   ·   ', []],
+                    ['SAC Code: ', ['bold' => true, 'color' => DocxComponents::NAVY]],
+                    [($p['sac_code'] ?? '') . '   ·   ', []],
+                    ['Invoiced separately on our Export Service Invoice', []],
+                ] : ((!empty($p['dimensions']) || !empty($p['finish'])) ? [
                     ["{$n}. ", ['bold' => true, 'color' => $lineColor]],
                     ['Dimensions: ', ['bold' => true, 'color' => DocxComponents::NAVY]],
                     [($p['dimensions'] ?: 'To Be Confirmed') . '   ·   ', []],
@@ -175,7 +183,7 @@ final class DocxDocumentBuilder
                     [($p['hs_code'] ?? '') . '   ·   ', []],
                     ['Country of Origin: ', ['bold' => true, 'color' => DocxComponents::NAVY]],
                     ['India', []],
-                ] : null,
+                ] : null),
             ];
         }
         return $rows;
@@ -409,7 +417,7 @@ final class DocxDocumentBuilder
         foreach ($products as $p) {
             $piTotalsRows[] = ['label' => ($p['description'] ?? '') . ' (' . ($p['quantity'] ?? '') . ' ' . ($p['unit'] ?? '') . ' × ' . ($p['unit_price'] ?? '') . ')', 'value' => $currency . ' ' . ($p['amount'] ?? '')];
         }
-        $piTotalsRows[] = ['label' => "TOTAL PI VALUE ({$currency}) *", 'value' => self::g($financial, 'fob_value'), 'highlight' => true];
+        $piTotalsRows[] = ['label' => "TOTAL PI VALUE ({$currency}) *", 'value' => !empty($financial['has_services']) ? self::g($financial, 'total_with_services') : self::g($financial, 'fob_value'), 'highlight' => true];
         DocxComponents::addTotalsTable($section, $piTotalsRows, 65);
         DocxComponents::addRichParagraph($section, [
             ['Remark: ', ['bold' => true, 'color' => DocxComponents::NAVY]],

@@ -417,3 +417,22 @@ to Buyer screen — a warning and a second confirmation, not a block.
 Stage 2 (Buyer Purchase Order) is unlocked the moment the Quotation is
 approved (email sending off) or sent (email sending on). See
 [Chapter 2](./02-stage2-buyer-po.md).
+
+## Order lines: goods, services and charges (D-215)
+
+Each product line has a **Line type**:
+
+- **Goods** — as always: description, dimensions, finish, quantity, unit,
+  price and an HS code from the master list.
+- **Service** — work NexaCrest does, for example installation supervision.
+  It needs its **SAC code** (6 digits starting 99, e.g. 998719) instead of
+  an HS code. On the Quotation, Proforma and Order Confirmation it shows
+  "Service · SAC Code … · Invoiced separately on our Export Service
+  Invoice". It is not part of the goods FOB value, so the advance, balance
+  and Commercial Invoice are for the goods only; the service is invoiced on
+  its own Export Service Invoice.
+- **Charge** — a single amount such as a testing fee; no HS code needed.
+
+The Commercial Invoice, Packing List, COO preparation, Supplier PO and BL
+Instruction list goods and charges only. An order with goods only prints
+exactly as before.

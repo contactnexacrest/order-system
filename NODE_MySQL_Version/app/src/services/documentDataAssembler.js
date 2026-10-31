@@ -52,12 +52,22 @@ const BANK_CHARGES_SENTENCE = 'All bank charges outside India are for the Buyer\
 // Owner decision (2026-10-28): printed under the PI's payment terms.
 const CLEARED_FUNDS_SENTENCE = 'The order is confirmed, and production starts, only once the advance is received in our account as cleared funds.';
 
+/** D-215: documents that list service lines too (the rest are goods-only). */
+const ALL_LINE_DOCUMENTS = ['QT', 'PI', 'OC', 'BUYERPO', 'AMD', 'ESI'];
+
 async function assemble(orderId, documentTypeCode = null) {
   const order = await orderRepository.find(orderId);
   if (!order) {
     throw new Error(`Order ${orderId} not found`);
   }
-  const products = await orderProductRepository.forOrder(orderId);
+  // Owner decision D-215: the selling documents list every line; the goods
+  // documents (CI, Packing List, COO, Supplier PO, BL…) goods and charges only —
+  // a service line is invoiced on its own Export Service Invoice.
+  let products = await orderProductRepository.forOrder(orderId);
+  if (documentTypeCode !== null && !ALL_LINE_DOCUMENTS.includes(String(documentTypeCode).toUpperCase())) {
+    products = products.filter((p) => (p.line_type || 'goods') !== 'service');
+  }
+  const serviceValue = await orderProductRepository.totalServiceValue(orderId);
   const payment = await orderPaymentStatusRepository.find(orderId);
 
   const company = await companyBlock();
@@ -229,10 +239,16 @@ async function assemble(orderId, documentTypeCode = null) {
       unit: p.unit,
       unit_price: p.unit_price !== null ? formatMoney(p.unit_price) : 'To Be Confirmed',
       amount: p.fob_value !== null ? formatMoney(p.fob_value) : 'To Be Confirmed',
+      line_type: p.line_type || 'goods',
+      sac_code: p.sac_code || null,
     })),
     financial: {
       fob_value: formatMoney(fobValue),
       fob_value_raw: fobValue,
+      // D-215: service lines, invoiced on the Export Service Invoice (not part of the FOB value).
+      has_services: serviceValue > 0,
+      service_value: formatMoney(serviceValue),
+      total_with_services: formatMoney(fobValue + serviceValue),
       advance_pct: trimTrailingZeros(advancePct.toFixed(2)),
       advance_amount: formatMoney(advanceAmount),
       advance_trigger_text: order.advance_trigger_text,

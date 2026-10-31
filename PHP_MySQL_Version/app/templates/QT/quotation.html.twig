@@ -38,7 +38,18 @@
     <td class="num">{{ p.unit_price }}</td>
     <td class="num">{{ p.amount }}</td>
   </tr>
-  {% if p.dimensions or p.finish %}
+  {% if p.line_type == 'service' %}
+  {# Owner decision D-215: a service line shows its SAC code and is invoiced separately. #}
+  <tr class="spec">
+    <td></td>
+    <td colspan="5">
+      <span class="line-no" style="color:{{ lineColor }};">{{ loop.index }}.</span>
+      <span class="spec-label">Service</span>
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span><span class="spec-label">SAC Code:</span> {{ p.sac_code }}
+      <span class="spec-sep">&nbsp;&middot;&nbsp;</span>Invoiced separately on our Export Service Invoice
+    </td>
+  </tr>
+  {% elseif p.dimensions or p.finish %}
   <tr class="spec">
     <td></td>
     <td colspan="5">

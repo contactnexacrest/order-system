@@ -105,8 +105,17 @@ function buildProductRows(products) {
   return (products || []).map((p, i) => {
     const lineColor = i % 2 === 0 ? '1D6FA8' : '2D7D56';
     const n = i + 1;
-    const specText =
-      p.dimensions || p.finish
+    // Owner decision D-215: a service line shows its SAC code and is invoiced separately.
+    const specText = (p.line_type || 'goods') === 'service'
+      ? [
+          [`${n}. `, { bold: true, color: lineColor }],
+          ['Service', { bold: true, color: C.NAVY }],
+          ['   ·   ', {}],
+          ['SAC Code: ', { bold: true, color: C.NAVY }],
+          [`${p.sac_code || ''}   ·   `, {}],
+          ['Invoiced separately on our Export Service Invoice', {}],
+        ]
+      : p.dimensions || p.finish
         ? [
             [`${n}. `, { bold: true, color: lineColor }],
             ['Dimensions: ', { bold: true, color: C.NAVY }],
@@ -358,7 +367,7 @@ function renderPi(context) {
   children.push(...C.productsTable(productTableHeaders(currency), [6, 34, 10, 10, 20, 20], buildProductRows(products)));
 
   const piTotalsRows = products.map((p) => ({ label: `${p.description || ''} (${p.quantity ?? ''} ${p.unit || ''} × ${p.unit_price ?? ''})`, value: `${currency} ${p.amount ?? ''}` }));
-  piTotalsRows.push({ label: `TOTAL PI VALUE (${currency}) *`, value: g(financial, 'fob_value'), highlight: true });
+  piTotalsRows.push({ label: `TOTAL PI VALUE (${currency}) *`, value: financial && financial.has_services ? g(financial, 'total_with_services') : g(financial, 'fob_value'), highlight: true });
   children.push(...C.totalsTable(piTotalsRows, 65));
   children.push(
     C.rich([
@@ -1819,4 +1828,4 @@ async function render(documentTypeCode, context) {
   return require('docx').Packer.toBuffer(doc);
 }
 
-module.exports = { render };
+module.exports = { render, buildProductRows };

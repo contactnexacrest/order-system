@@ -494,6 +494,14 @@
         return el.dataset.notMoreThanMessage || 'This cannot be more than ' + cap.value + '.';
       }
     }
+    // data-required-when="<field>=<value>": required only while another
+    // field of the same form has that value (D-215: an HS code for a goods
+    // line, a SAC code for a service line).
+    if (el.dataset.requiredWhen && el.form && value === '') {
+      var cond = el.dataset.requiredWhen.split('=');
+      var other = el.form.elements.namedItem(cond[0]);
+      if (other && other.value === cond[1]) return el.dataset.requiredWhenMessage || 'This field is required.';
+    }
     // data-not-before="<selector>": a date that cannot be earlier than another
     // date field in the same form (e.g. a GST refund claim's period end).
     if (el.dataset.notBefore && el.form && value !== '') {

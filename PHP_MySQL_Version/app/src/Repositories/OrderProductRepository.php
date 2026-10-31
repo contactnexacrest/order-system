@@ -94,7 +94,7 @@ final class OrderProductRepository
             throw new \RuntimeException("Cannot duplicate order_products row {$id} — not found.");
         }
         $orderId = $targetOrderId ?? (int) $source['order_id'];
-        return self::add(
+        $newId = self::add(
             $orderId,
             self::nextLineNo($orderId),
             (string) $source['description'],
@@ -106,6 +106,8 @@ final class OrderProductRepository
             $source['unit_price'] !== null ? (string) $source['unit_price'] : null,
             (string) $source['hs_code']
         );
+        self::setLineType($newId, (string) ($source['line_type'] ?? 'goods'), $source['sac_code'] ?? null);
+        return $newId;
     }
 
     public static function add(
@@ -147,10 +149,30 @@ final class OrderProductRepository
         return (int) $pdo->lastInsertId();
     }
 
+    /** Owner decision D-215: a line is goods, a service (SAC code, its own Export Service Invoice) or a charge. */
+    public const LINE_TYPES = ['goods' => 'Goods', 'service' => 'Service', 'charge' => 'Charge'];
+
+    public static function setLineType(int $id, string $lineType, ?string $sacCode): void
+    {
+        Database::connection()->prepare('UPDATE order_products SET line_type = :t, sac_code = :s WHERE id = :id')
+            ->execute(['t' => $lineType, 's' => $lineType === 'service' ? $sacCode : null, 'id' => $id]);
+    }
+
+    /** The service lines' total — invoiced on the Export Service Invoice, never part of the goods FOB value. */
+    public static function totalServiceValue(int $orderId): float
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT COALESCE(SUM(fob_value), 0) AS total FROM order_products WHERE order_id = :order_id AND is_active = 1 AND line_type = 'service'"
+        );
+        $stmt->execute(['order_id' => $orderId]);
+        return (float) $stmt->fetch()['total'];
+    }
+
+    /** The goods FOB value (goods and charges; D-215: service lines are invoiced separately). */
     public static function totalFobValue(int $orderId): float
     {
         $stmt = Database::connection()->prepare(
-            'SELECT COALESCE(SUM(fob_value), 0) AS total FROM order_products WHERE order_id = :order_id AND is_active = 1'
+            "SELECT COALESCE(SUM(fob_value), 0) AS total FROM order_products WHERE order_id = :order_id AND is_active = 1 AND line_type <> 'service'"
         );
         $stmt->execute(['order_id' => $orderId]);
         return (float) $stmt->fetch()['total'];

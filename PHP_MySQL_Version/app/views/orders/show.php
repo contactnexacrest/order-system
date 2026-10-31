@@ -1313,7 +1313,13 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                 </select>
               </label>
               <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>"></label>
-              <label>HS Code<input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" required></label>
+              <label>Line type
+                <select name="line_type">
+                  <?php foreach (\App\Repositories\OrderProductRepository::LINE_TYPES as $__lt => $__ltLabel): ?><option value="<?= $__lt ?>" <?= ($p['line_type'] ?? 'goods') === $__lt ? 'selected' : '' ?>><?= $__ltLabel ?></option><?php endforeach; ?>
+                </select>
+              </label>
+              <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code."></label>
+              <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="<?= htmlspecialchars((string) ($p['sac_code'] ?? '')) ?>" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
             </div>
             <?php if ($__productReasonRequired): ?>
               <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is this line changing?"></textarea></label>
@@ -1359,7 +1365,13 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
               </select>
             </label>
             <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99"></label>
-            <label>HS Code<input type="text" name="hs_code" list="hs_code_list_edit" required></label>
+            <label>Line type
+              <select name="line_type">
+                <?php foreach (\App\Repositories\OrderProductRepository::LINE_TYPES as $__lt => $__ltLabel): ?><option value="<?= $__lt ?>"><?= $__ltLabel ?></option><?php endforeach; ?>
+              </select>
+            </label>
+            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code."></label>
+            <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
           </div>
           <?php if ($__productReasonRequired): ?>
             <label>Reason *<textarea name="reason" rows="2" required minlength="10" placeholder="Why is a new line being added?"></textarea></label>
