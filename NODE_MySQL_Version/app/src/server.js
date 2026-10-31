@@ -88,6 +88,7 @@ const superAdminController = require('./controllers/superAdminController');
 const permissionAdminController = require('./controllers/permissionAdminController');
 const departmentController = require('./controllers/departmentController');
 const departmentAdminController = require('./controllers/departmentAdminController');
+const moneyVisibility = require('./services/moneyVisibility');
 const productsController = require('./controllers/productsController');
 const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
@@ -424,6 +425,7 @@ app.use((req, res, next) => {
       actingMembership: req.actingMembership || null,
       myMemberships: req.myMemberships || [],
       previewDesignation: req.previewDesignation || null,
+      sees: moneyVisibility.flags(req.permissions || {}),
       testModeEnabled: req.testModeEnabled || false,
       devServerEnabled: env.isDevServer(),
       isImpersonating: clientPortalService.isImpersonating(req),

@@ -44,6 +44,10 @@ final class View
         if (!is_file($file)) {
             throw new \RuntimeException("View not found: {$file}");
         }
+        // Owner decision D-214: every view knows which money the signed-in person may see ($sees['selling'], ...).
+        if (!array_key_exists('sees', $data)) {
+            $data['sees'] = \App\Services\MoneyVisibility::flags();
+        }
         extract($data, EXTR_SKIP);
         ob_start();
         include $file;
