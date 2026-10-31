@@ -15,7 +15,7 @@ process.env.PORT = '0'; // let the OS pick an ephemeral port if server.js's app.
 process.env.RUN_JOBS_IN_PROCESS = 'false';
 // QA Round 7, R7-N05: every test file opens its own pools; small ones keep a
 // whole run well inside MySQL's default 151 connections.
-process.env.DB_POOL_SIZE = '4';
+process.env.DB_POOL_SIZE = '10'; // as live: order creation holds a connection inside its transaction and takes a second
 process.env.SESSION_DB_POOL_SIZE = '2';
 process.env.SESSION_SECRET_KEY = process.env.SESSION_SECRET_KEY || 'jest-test-session-secret';
 

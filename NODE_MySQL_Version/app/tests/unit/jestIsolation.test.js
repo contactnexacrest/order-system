@@ -20,7 +20,7 @@ describe('Jest run isolation (R7-N05)', () => {
   });
 
   it('keeps each test file to a small database pool', () => {
-    expect(db.pool.pool.config.connectionLimit).toBe(4);
+    expect(db.pool.pool.config.connectionLimit).toBe(10);
     expect(process.env.SESSION_DB_POOL_SIZE).toBe('2');
   });
 });
