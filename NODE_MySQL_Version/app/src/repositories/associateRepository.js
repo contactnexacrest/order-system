@@ -80,9 +80,14 @@ async function rateWithSource(associate, orderNumber, ladder = null) {
     return { rate: 0, source: 'none' };
   }
   const column = columnFor(orderNumber);
-  const personal = associate[column];
-  if (personal !== null && personal !== undefined && personal !== '' && Number(personal) > 0) {
-    return { rate: Number(personal), source: 'personal' };
+  // Owner decision 1 Nov 2026 (D-221): an empty (or 0) rung carries on the last personal rate set below it;
+  // rungs below the first personal rate use the standard ladder.
+  const columns = TIERS.map(([, col]) => col);
+  for (let i = columns.indexOf(column); i >= 0; i -= 1) {
+    const personal = associate[columns[i]];
+    if (personal !== null && personal !== undefined && personal !== '' && Number(personal) > 0) {
+      return { rate: Number(personal), source: 'personal' };
+    }
   }
   const global = ladder || await globalLadder();
   return { rate: Number(global[column] ?? 0), source: 'global' };

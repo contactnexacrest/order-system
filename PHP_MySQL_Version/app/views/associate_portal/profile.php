@@ -26,10 +26,10 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
     <form method="post" action="/associate/profile">
       <?= Csrf::field() ?>
       <div class="field-grid">
-        <label>Phone<input type="tel" name="phone" maxlength="40" value="<?= htmlspecialchars((string) ($me['phone'] ?? '')) ?>"></label>
-        <?php if ($__india): ?><label>PAN<input type="text" name="pan" maxlength="10" pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]" title="As on the card, e.g. ABCDE1234F" value="<?= htmlspecialchars((string) ($me['pan'] ?? '')) ?>"></label><?php endif; ?>
-        <label>GSTIN (if registered)<input type="text" name="gstin" maxlength="15" pattern="[0-9]{2}[A-Za-z0-9]{13}" value="<?= htmlspecialchars((string) ($me['gstin'] ?? '')) ?>"></label>
-        <label style="grid-column:1/-1">Address<textarea name="address" maxlength="1000" rows="2"><?= htmlspecialchars((string) ($me['address'] ?? '')) ?></textarea></label>
+        <label>Phone<input type="tel" name="phone" maxlength="40" value="<?= htmlspecialchars((string) ($me['phone'] ?? '')) ?>" placeholder="e.g. +91 98765 43210"></label>
+        <?php if ($__india): ?><label>PAN<input type="text" name="pan" maxlength="10" pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]" title="As on the card, e.g. ABCDE1234F" value="<?= htmlspecialchars((string) ($me['pan'] ?? '')) ?>" placeholder="e.g. ABCDE1234F"></label><?php endif; ?>
+        <label>GSTIN (if registered)<input type="text" name="gstin" maxlength="15" pattern="[0-9]{2}[A-Za-z0-9]{13}" value="<?= htmlspecialchars((string) ($me['gstin'] ?? '')) ?>" placeholder="e.g. 29ABCDE1234F1Z5"></label>
+        <label style="grid-column:1/-1">Address<textarea name="address" maxlength="1000" rows="2" placeholder="e.g. 12 MG Road, Bengaluru 560001"><?= htmlspecialchars((string) ($me['address'] ?? '')) ?></textarea></label>
       </div>
       <button type="submit" class="btn-sm">Save</button>
     </form>

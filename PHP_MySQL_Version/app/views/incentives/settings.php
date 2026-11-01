@@ -21,7 +21,7 @@ $__cutoffLabel = $settings['cutoff'] === 'last'
       <label class="setting-row"><span class="setting-label">Incentive program on<small class="muted">Off: no order gets a team reward. Associates are still paid under their agreements.<?= $settings['start_date'] !== '' ? ' Started ' . htmlspecialchars(\App\Helpers\Dates::short($settings['start_date'])) . ': orders fully paid before then get no team reward.' : '' ?></small></span>
         <input type="checkbox" name="program_enabled" value="1"<?= $settings['enabled'] ? ' checked' : '' ?>></label>
       <label class="setting-row"><span class="setting-label">Minimum order profit to qualify (&#8377;)<small class="muted">Checked on the order's profit after any associate commission.</small></span>
-        <input type="number" name="min_profit_inr" min="0" step="1" required value="<?= (int) round($settings['min_profit']) ?>"></label>
+        <input type="number" name="min_profit_inr" min="0" step="1" required value="<?= (int) round($settings['min_profit']) ?>" placeholder="e.g. 300000"></label>
     </fieldset>
 
     <fieldset><legend>Incentive cycle</legend>
@@ -38,20 +38,20 @@ $__cutoffLabel = $settings['cutoff'] === 'last'
       <table class="list"><tr><th>Order profit from (&#8377;)</th><th>Team reward (&#8377;)</th></tr>
         <?php foreach ($__table as $i => $t): ?>
           <tr>
-            <td><input type="number" data-unique-among="table_from[" data-unique-among-message="Another row already starts at this profit." name="table_from[<?= $i ?>]" min="1" step="1" value="<?= $t['from'] === '' ? '' : (int) round((float) $t['from']) ?>" aria-label="Order profit from, row <?= $i + 1 ?>"></td>
-            <td><input type="number" name="table_reward[<?= $i ?>]" min="1" step="1" value="<?= $t['reward'] === '' ? '' : (int) round((float) $t['reward']) ?>" aria-label="Team reward, row <?= $i + 1 ?>"></td>
+            <td><input type="number" data-unique-among="table_from[" data-unique-among-message="Another row already starts at this profit." name="table_from[<?= $i ?>]" min="1" step="1" value="<?= $t['from'] === '' ? '' : (int) round((float) $t['from']) ?>" aria-label="Order profit from, row <?= $i + 1 ?>" placeholder="e.g. 300000"></td>
+            <td><input type="number" name="table_reward[<?= $i ?>]" min="1" step="1" value="<?= $t['reward'] === '' ? '' : (int) round((float) $t['reward']) ?>" aria-label="Team reward, row <?= $i + 1 ?>" placeholder="e.g. 40000"></td>
           </tr>
         <?php endforeach; ?>
       </table>
       <label class="setting-row"><span class="setting-label">New client bonus (&#8377;)<small class="muted">Added on a client's first order (when it earns a reward); goes to Sales and Marketing. 0 = off.</small></span>
-        <input type="number" name="new_client_bonus_inr" min="0" step="1" required value="<?= (int) round($settings['bonus']) ?>"></label>
+        <input type="number" name="new_client_bonus_inr" min="0" step="1" required value="<?= (int) round($settings['bonus']) ?>" placeholder="e.g. 10000"></label>
     </fieldset>
 
     <fieldset><legend>How the reward is split</legend>
       <table class="list"><tr><th>Role</th><th>Share (%)</th></tr>
         <?php foreach (IncentiveRepository::ROLES as $role => $label): ?>
           <tr><td><?= htmlspecialchars($label) ?></td>
-            <td><input type="number" name="split[<?= $role ?>]" min="0" max="100" step="0.01" required value="<?= rtrim(rtrim(number_format($settings['split'][$role], 2, '.', ''), '0'), '.') ?>" data-sum-group="split" data-sum-total="100" aria-label="<?= htmlspecialchars($label) ?> share"></td></tr>
+            <td><input type="number" name="split[<?= $role ?>]" min="0" max="100" step="0.01" required value="<?= rtrim(rtrim(number_format($settings['split'][$role], 2, '.', ''), '0'), '.') ?>" data-sum-group="split" data-sum-total="100" aria-label="<?= htmlspecialchars($label) ?> share" placeholder="e.g. 40"></td></tr>
         <?php endforeach; ?>
       </table>
       <p class="muted small">Must add up to 100. Two people in the same role on an order share that role's amount equally.</p>

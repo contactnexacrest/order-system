@@ -5,8 +5,8 @@
   <form method="get" action="/audit-log">
     <div class="kv-grid">
       <label>Entity Type<input type="text" name="entity_type" value="<?= htmlspecialchars($filters['entity_type'] ?? '') ?>" placeholder="e.g. orders, documents, amendments"></label>
-      <label>Entity ID<input type="number" name="entity_id" value="<?= htmlspecialchars((string) ($filters['entity_id'] ?? '')) ?>"></label>
-      <label>User ID<input type="number" name="user_id" value="<?= htmlspecialchars((string) ($filters['user_id'] ?? '')) ?>"></label>
+      <label>Entity ID<input type="number" name="entity_id" value="<?= htmlspecialchars((string) ($filters['entity_id'] ?? '')) ?>" placeholder="e.g. 1024"></label>
+      <label>User ID<input type="number" name="user_id" value="<?= htmlspecialchars((string) ($filters['user_id'] ?? '')) ?>" placeholder="e.g. 12"></label>
       <label>Action Type
         <select name="action_type">
           <option value="">All</option>

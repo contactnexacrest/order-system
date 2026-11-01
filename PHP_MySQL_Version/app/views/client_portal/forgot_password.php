@@ -5,7 +5,7 @@
   <form method="post" action="/client/forgot-password">
     <?= Csrf::field() ?>
     <label>Email
-      <input type="email" name="email" required autofocus>
+      <input type="email" name="email" required autofocus placeholder="e.g. name@company.com">
     </label>
     <button type="submit">Send reset link</button>
   </form>

@@ -133,7 +133,7 @@
             <option value="freight">Freight Payment</option>
           </select>
         </label>
-        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required></label>
+        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
         <label>Amount Paid<input type="number" name="amount" min="0.01" max="999999999999.99" step="0.01" placeholder="e.g. 12500.00"></label>
         <label>Date Paid<input type="date" name="payment_date" max="{{ today() }}"></label>
         <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
@@ -178,7 +178,7 @@
     <p class="muted">If you want to cancel this order and not proceed with us, let us know here — our team will respond within the timeframe set out in your order terms.</p>
     <form method="post" action="/client/orders/{{ order.id }}/disputes">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>Describe the issue *<textarea name="description" rows="4" required></textarea></label>
+      <label>Describe the issue *<textarea name="description" rows="4" required placeholder="Describe the issue"></textarea></label>
       <button type="submit">Raise a Dispute</button>
     </form>
   </div>
@@ -226,7 +226,7 @@
             {% endfor %}
           </select>
         </label>
-        <label>Your feedback / testimonial<textarea name="comments" rows="5">{% if orderFeedback %}{{ orderFeedback.comments or '' }}{% else %}{{ testimonialSuggestion or '' }}{% endif %}</textarea></label>
+        <label>Your feedback / testimonial<textarea name="comments" rows="5" placeholder="Type your comments">{% if orderFeedback %}{{ orderFeedback.comments or '' }}{% else %}{{ testimonialSuggestion or '' }}{% endif %}</textarea></label>
         <p class="muted small">{% if orderFeedback %}This is the feedback you left — if you want to modify it, please update it above.{% else %}We have written a suggestion from your order to get you started — if you want to modify the feedback/testimonial, please update it above.{% endif %}</p>
         <button type="submit">{{ 'Update Feedback' if orderFeedback else 'Submit Feedback' }}</button>
       </form>

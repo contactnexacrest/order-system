@@ -192,15 +192,23 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
 
   // ---------------------------------------------------------------- rates (AS-17)
 
-  it('the personal rate, else the standard ladder, and no commission', async () => {
-    const a = await associate({ rate_1_5: '1.25', rate_6_10: '0' });
-    expect(await associateRepository.rateWithSource(a, 1)).toEqual({ rate: 1.25, source: 'personal' });
-    expect(await associateRepository.rateWithSource(a, 6)).toEqual({ rate: 1.0, source: 'global' }); // 0 means the standard rate
-    expect(await associateRepository.rateWithSource(a, 11)).toEqual({ rate: 1.5, source: 'global' }); // empty means the standard rate
+  // Owner decision 1 Nov 2026 (D-221): an empty rung carries on the last personal rate below it, else the standard ladder.
+  it('the personal rate carries upward, else the standard ladder, and no commission', async () => {
+    const ladder = async (a) => Promise.all([1, 6, 11, 21, 41].map((n) => associateRepository.rateWithSource(a, n)));
+    const p = (rate) => ({ rate, source: 'personal' });
+    const g = (rate) => ({ rate, source: 'global' });
+    expect(await ladder(await associate({ rate_1_5: '1.25', rate_6_10: '1.50' }))).toEqual([p(1.25), p(1.5), p(1.5), p(1.5), p(1.5)]); // 11 onward carries 6-10
+    expect(await ladder(await associate({ rate_6_10: '1.50' }))).toEqual([g(0.7), p(1.5), p(1.5), p(1.5), p(1.5)]); // 1-5 standard, 11 onward carries 6-10
+    expect(await ladder(await associate({ rate_1_5: '1.00', rate_21_40: '2.50' }))).toEqual([p(1), p(1), p(1), p(2.5), p(2.5)]); // 6-20 carry 1-5, 41+ carries 21-40
+    expect(await ladder(await associate({}))).toEqual([g(0.7), g(1), g(1.5), g(1.75), g(2)]); // nothing set: the standard ladder
+    const zero = await associate({ rate_1_5: '1.25', rate_6_10: '0' });
+    expect(await associateRepository.rateWithSource(zero, 6)).toEqual(p(1.25)); // 0 counts as empty: carries 1-5
+
+    const std = await associate({});
     await incentiveRepository.setSetting('associate_rate_11_20', '1.60', admin);
-    expect((await associateRepository.rateWithSource(a, 15)).rate).toBe(1.6); // the standard ladder is set in Admin
-    await associateRepository.setFields(Number(a.id), { no_commission: 1 });
-    expect(await associateRepository.rateWithSource(await associateRepository.find(Number(a.id)), 1)).toEqual({ rate: 0, source: 'none' });
+    expect((await associateRepository.rateWithSource(std, 15)).rate).toBe(1.6); // the standard ladder is set in Admin
+    await associateRepository.setFields(Number(zero.id), { no_commission: 1 });
+    expect(await associateRepository.rateWithSource(await associateRepository.find(Number(zero.id)), 1)).toEqual({ rate: 0, source: 'none' });
   });
 
   it('the rate is fixed on the order when it is created and earned only when the buyer has paid everything', async () => {

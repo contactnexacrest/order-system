@@ -233,6 +233,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
     <?php endif; ?>
     <?php if ($isEffectiveSuperAdmin): ?>
       <a href="/super-admin" class="<?= $isActive('/super-admin') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg></span>Super Admin</a>
+      <a href="/admin/self-approval" class="<?= $isActive('/admin/self-approval') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>Self-approval rules</a>
       <a href="/test-mode" class="<?= $isActive('/test-mode') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 20a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L15 8V2"></path><path d="M8.5 14h7"></path></svg></span>Test Mode<?= $testModeEnabled ? ' <span class="nav-live-dot" aria-hidden="true"></span>' : '' ?></a>
     <?php endif; ?>
   </nav>

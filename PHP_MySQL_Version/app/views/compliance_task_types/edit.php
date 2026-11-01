@@ -4,7 +4,7 @@
   <h1>Edit Compliance Task Type</h1>
   <form method="post" action="/compliance-task-types/<?= (int) $taskType['id'] ?>/update">
     <?= Csrf::field() ?>
-    <label>Task Name * <input type="text" name="name" value="<?= htmlspecialchars($taskType['name']) ?>" required></label>
+    <label>Task Name * <input type="text" name="name" value="<?= htmlspecialchars($taskType['name']) ?>" required placeholder="e.g. Pre-Shipment Inspection"></label>
     <label>When is it done? *
       <select name="phase" required>
         <?php foreach (\App\Repositories\ComplianceTaskTypeRepository::PHASES as $key => $label): ?>

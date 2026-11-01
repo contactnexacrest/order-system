@@ -18,9 +18,9 @@
     <summary>Edit {{ c.name }}</summary>
     <form method="post" action="/products/categories/{{ c.id }}">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>Name *<input type="text" name="name" required minlength="2" maxlength="80" value="{{ c.name }}"></label>
+      <label>Name *<input type="text" name="name" required minlength="2" maxlength="80" value="{{ c.name }}" placeholder="e.g. Granite slabs"></label>
       {% for i in range(0, maxAttributes) %}
-      <label>Attribute {{ i + 1 }}{{ ' *' if i == 0 else '' }}<input type="text" name="attributes[]" maxlength="60" {{ 'required' if i == 0 else '' }} value="{{ c.attributes[i] or '' }}"></label>
+      <label>Attribute {{ i + 1 }}{{ ' *' if i == 0 else '' }}<input type="text" name="attributes[]" maxlength="60" {{ 'required' if i == 0 else '' }} value="{{ c.attributes[i] or '' }}" placeholder="e.g. Finish"></label>
       {% endfor %}
       <label class="checkbox-row"><input type="checkbox" name="is_active" value="1" {{ 'checked' if c.is_active == 1 else '' }}> Active (offered on new order lines)</label>
       <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save {{ c.name }}</button></div>

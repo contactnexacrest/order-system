@@ -48,9 +48,14 @@ the same links, filters and actions, and switch to each other.
    (their portal login — one associate per e-mail), phone, PAN / GSTIN or
    foreign tax ID, address, relationship manager, agreement dates and the
    signed agreement (PDF, with its signing date).
-2. **Commission.** Leave each rung **empty** (or 0) to use the **standard
-   rate**; enter a rate only for an agreed personal rate. Tick **No
-   commission** for an associate who introduces without commission.
+2. **Commission.** Enter a rate only for an agreed personal rate. A rung
+   left **empty** (or 0) carries on the **last personal rate set below it**;
+   rungs below the first personal rate use the **standard rate** (owner
+   decision D-221). Example: 1–5 = 1.25 % and 6–10 = 1.5 % gives 1.5 % from
+   the 11th client on; only 6–10 = 1.5 % gives the standard 0.7 % for
+   clients 1–5 and 1.5 % from the 6th; nothing filled in gives the standard
+   ladder. Tick **No commission** for an associate who introduces without
+   commission.
 3. The associate starts as **Invited**. Upload their KYC (PAN card, ID,
    address proof, GST certificate; abroad: passport / company registration,
    tax residency certificate, Form 10F, no-PE declaration) under

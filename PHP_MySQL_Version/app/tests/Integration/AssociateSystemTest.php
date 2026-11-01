@@ -164,16 +164,25 @@ final class AssociateSystemTest extends DbTestCase
 
     // ---------------------------------------------------------------- rates (AS-17)
 
-    public function testThePersonalRateElseTheStandardLadderAndNoCommission(): void
+    /** Owner decision 1 Nov 2026 (D-221): an empty rung carries on the last personal rate below it, else the standard ladder. */
+    public function testThePersonalRateCarriesUpwardElseTheStandardLadderAndNoCommission(): void
     {
-        $a = $this->associate(['rate_1_5' => '1.25', 'rate_6_10' => '0']);
-        self::assertSame(['rate' => 1.25, 'source' => 'personal'], AssociateRepository::rateWithSource($a, 1));
-        self::assertSame(['rate' => 1.0, 'source' => 'global'], AssociateRepository::rateWithSource($a, 6), '0 means the standard rate');
-        self::assertSame(['rate' => 1.5, 'source' => 'global'], AssociateRepository::rateWithSource($a, 11), 'empty means the standard rate');
+        $ladder = static fn (array $a): array => array_map(static fn (int $n): array => AssociateRepository::rateWithSource($a, $n), [1, 6, 11, 21, 41]);
+        $p = static fn (float $r): array => ['rate' => $r, 'source' => 'personal'];
+        $g = static fn (float $r): array => ['rate' => $r, 'source' => 'global'];
+
+        self::assertSame([$p(1.25), $p(1.5), $p(1.5), $p(1.5), $p(1.5)], $ladder($this->associate(['rate_1_5' => '1.25', 'rate_6_10' => '1.50'])), '1-5 and 6-10 set: 11 onward carries 6-10');
+        self::assertSame([$g(0.7), $p(1.5), $p(1.5), $p(1.5), $p(1.5)], $ladder($this->associate(['rate_6_10' => '1.50'])), 'only 6-10 set: 1-5 standard, 11 onward carries 6-10');
+        self::assertSame([$p(1.0), $p(1.0), $p(1.0), $p(2.5), $p(2.5)], $ladder($this->associate(['rate_1_5' => '1.00', 'rate_21_40' => '2.50'])), '1-5 and 21-40 set: 6-20 carry 1-5, 41+ carries 21-40');
+        self::assertSame([$g(0.7), $g(1.0), $g(1.5), $g(1.75), $g(2.0)], $ladder($this->associate([])), 'nothing set: the standard ladder');
+        $zero = $this->associate(['rate_1_5' => '1.25', 'rate_6_10' => '0']);
+        self::assertSame($p(1.25), AssociateRepository::rateWithSource($zero, 6), '0 counts as empty: carries 1-5');
+
+        $std = $this->associate([]);
         IncentiveRepository::setSetting('associate_rate_11_20', '1.60', $this->admin);
-        self::assertSame(1.6, AssociateRepository::rateWithSource($a, 15)['rate'], 'the standard ladder is set in Admin');
-        AssociateRepository::setFields((int) $a['id'], ['no_commission' => 1]);
-        self::assertSame(['rate' => 0.0, 'source' => 'none'], AssociateRepository::rateWithSource(AssociateRepository::find((int) $a['id']), 1));
+        self::assertSame(1.6, AssociateRepository::rateWithSource($std, 15)['rate'], 'the standard ladder is set in Admin');
+        AssociateRepository::setFields((int) $zero['id'], ['no_commission' => 1]);
+        self::assertSame(['rate' => 0.0, 'source' => 'none'], AssociateRepository::rateWithSource(AssociateRepository::find((int) $zero['id']), 1));
     }
 
     public function testTheRateIsFixedOnTheOrderWhenItIsCreatedAndEarnedOnlyWhenTheBuyerHasPaidEverything(): void

@@ -61,7 +61,7 @@
 
     <form method="post" action="/orders/{{ order.id }}/incentive">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>Reward for this order (&#8377;) <input type="number" name="reward_override_inr" min="0" step="1" value="{{ ((inc.reward_override_inr if inc else 0) | float | round) | int }}" required style="width:10em"> <small class="muted">0 = use the settings</small></label>
+      <label>Reward for this order (&#8377;) <input type="number" name="reward_override_inr" min="0" step="1" value="{{ ((inc.reward_override_inr if inc else 0) | float | round) | int }}" required style="width:10em" placeholder="e.g. 50000"> <small class="muted">0 = use the settings</small></label>
       <label><input type="checkbox" name="is_excluded" value="1"{{ ' checked' if (inc and inc.is_excluded == 1) else '' }}> Exclude this order (no team reward)</label>
       <label>Associate commission on this order
         <select name="associate_mode">

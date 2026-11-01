@@ -83,6 +83,9 @@ const EXPECTED = [
   'GET /sop-assets/{} staff',
   'GET /sop/{} staff',
   'GET /super-admin super-admin',
+  // Owner decision 1 Nov 2026 (D-221): Admin → Self-approval rules, Super Admins only.
+  'GET /admin/self-approval super-admin',
+  'POST /admin/self-approval super-admin +csrf',
   'GET /supplier-action/{} public',
   'GET /supplier-action/{}/po-document public',
   'GET /test-mode super-admin',
@@ -302,7 +305,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status !== 302 || res.headers.location !== '/login') wrong.push(`${label(route)} → ${res.status} ${res.headers.location}`);
       checked++;
     }
-    expect(checked).toBe(37);
+    expect(checked).toBe(39);
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -369,7 +372,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status !== 403) wrong.push(`${label(route)} → ${res.status}`);
       checked++;
     }
-    expect(checked).toBe(9);
+    expect(checked).toBe(11);
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -390,7 +393,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(60);
+    expect(checked).toBe(61);
     expect(wrong).toEqual([]);
   }, 120000);
 
@@ -419,7 +422,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(33);
+    expect(checked).toBe(34);
     expect(failed).toEqual([]);
   }, 120000);
 

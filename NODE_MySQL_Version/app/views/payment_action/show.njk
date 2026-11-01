@@ -29,8 +29,8 @@
     <form method="post" action="/payment-action/{{ token }}/report" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <div class="field-grid">
-        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required></label>
-        <label>Amount Paid ({{ currency }}) *<input type="number" step="0.01" min="0.01" name="amount" required value="{{ amountDue.toFixed(2) if amountDue != null else '' }}"></label>
+        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
+        <label>Amount Paid ({{ currency }}) *<input type="number" step="0.01" min="0.01" name="amount" required value="{{ amountDue.toFixed(2) if amountDue != null else '' }}" placeholder="e.g. 1500.00"></label>
         <label>Date Paid *<input type="date" name="payment_date" required value="{{ today() }}"></label>
         <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
         <label class="full">Payment Screenshot / Bank Remittance Advice *<input type="file" name="screenshot" accept=".pdf,.jpg,.jpeg,.png" required></label>

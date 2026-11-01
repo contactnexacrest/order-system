@@ -2014,3 +2014,9 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'approve_short_payment'
  WHERE r.name IN ('Managing Director', 'Executive Director', 'Admin', 'Finance Director')
    AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+
+-- Owner decision 1 Nov 2026 (D-221): self-approval defaults — Managing Director and Executive Director on all three rules.
+INSERT INTO self_approval_rules (rule_key, role_id)
+SELECT k.rule_key, r.id FROM (SELECT 'payment_terms' AS rule_key UNION ALL SELECT 'document_review' UNION ALL SELECT 'email_send') k
+JOIN roles r ON r.name IN ('Managing Director', 'Executive Director')
+WHERE NOT EXISTS (SELECT 1 FROM self_approval_rules x WHERE x.rule_key = k.rule_key);

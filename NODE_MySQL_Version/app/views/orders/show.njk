@@ -20,7 +20,7 @@
 </table><p>{% if ps5.expected != null %}Due: <strong>{{ order.currency_code or '' }} {{ ps5.expected | money }}</strong> &middot; received so far: <strong>{{ order.currency_code or '' }} {{ ps5.received | money }}</strong> &middot; {% if ps5.owed > 0.01 %}<strong class="text-warning">still owed: {{ order.currency_code or '' }} {{ ps5.owed | money }}</strong>{% elif ps5.owed < -0.01 %}paid {{ order.currency_code or '' }} {{ (0 - ps5.owed) | money }} more than due{% else %}received in full{% endif %}{% else %}Received so far: <strong>{{ order.currency_code or '' }} {{ ps5.received | money }}</strong>{% endif %}</p>
 {% if ps5.shortfall %}<p class="notice notice-warning">Cleared short by {{ order.currency_code or '' }} {{ ps5.shortfall.shortfall_amount | money }} on {{ ps5.shortfall.approved_on | shortDate }}: approved by {{ ps5.shortfall.approved_by_name or '—' }} — {{ 'carried into the balance' if ps5.shortfall.treatment == 'carried_to_balance' else 'written off' }}. Reason: {{ ps5.shortfall.reason }}</p>{% endif %}
 </div>{% endif %}{% endmacro %}
-{% macro shortReasonField(key) %}{% set ps5 = partPayments[key] if (partPayments and sees.buyer_payments) else null %}{% if ps5 and ps5.owed != null and ps5.owed > 0.01 %}{% if not canApproveShort %}<p class="notice notice-warning small">{{ order.currency_code or '' }} {{ ps5.owed | money }} is still owed — record the rest when it arrives. Only a manager with "Approve short payment" can clear it short.</p>{% else %}<label>Reason for clearing it short * <small class="muted">({{ order.currency_code or '' }} {{ ps5.owed | money }} still owed — recorded and shown on the order)</small><textarea name="short_reason" required minlength="10" maxlength="500" rows="2"></textarea></label>{% endif %}{% endif %}{% endmacro %}
+{% macro shortReasonField(key) %}{% set ps5 = partPayments[key] if (partPayments and sees.buyer_payments) else null %}{% if ps5 and ps5.owed != null and ps5.owed > 0.01 %}{% if not canApproveShort %}<p class="notice notice-warning small">{{ order.currency_code or '' }} {{ ps5.owed | money }} is still owed — record the rest when it arrives. Only a manager with "Approve short payment" can clear it short.</p>{% else %}<label>Reason for clearing it short * <small class="muted">({{ order.currency_code or '' }} {{ ps5.owed | money }} still owed — recorded and shown on the order)</small><textarea name="short_reason" required minlength="10" maxlength="500" rows="2" placeholder="At least 10 characters — say why"></textarea></label>{% endif %}{% endif %}{% endmacro %}
 {% macro remittanceRecordedNote(leg, nextStep) %}
   {% set amount = payment[leg ~ '_amount'] %}
   {% set rate = payment[leg ~ '_exchange_rate'] %}
@@ -105,7 +105,7 @@
           {% endif %}
           <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/inr-actual">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>INR Amount Actually Credited *<input type="text" name="{{ leg }}_inr_actual" required></label>
+            <label>INR Amount Actually Credited *<input type="text" name="{{ leg }}_inr_actual" required placeholder="e.g. 150000.00"></label>
             <button type="submit" class="btn-sm">{{ 'Override & Record' if lockMessage != null else 'Record INR Actual' }}</button>
           </form>
         {% else %}
@@ -124,7 +124,7 @@
             {% endif %}
             <form method="post" action="/orders/{{ order.id }}/payment/{{ leg }}/firc">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <label>FIRC/eBRC Reference *<input type="text" name="{{ leg }}_firc_reference" required></label>
+              <label>FIRC/eBRC Reference *<input type="text" name="{{ leg }}_firc_reference" required placeholder="e.g. FIRC/HDFC/2026/0412"></label>
               <label>Received On<input type="date" name="{{ leg }}_firc_received_at"></label>
               <button type="submit" class="btn-sm">{{ 'Override & Record' if lockMessage != null else 'Record FIRC/eBRC' }}</button>
             </form>
@@ -407,7 +407,7 @@
             <form method="post" action="/orders/{{ order.id }}/vendor-bills/{{ b.id }}/pay" class="field-grid">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               {% if leg !== null %}<input type="hidden" name="leg" value="{{ leg }}">{% endif %}
-              <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" max="{{ b.remaining.toFixed(2) }}" name="paid_amount_inr" value="{{ b.remaining.toFixed(2) }}" required></label>
+              <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" max="{{ b.remaining.toFixed(2) }}" name="paid_amount_inr" value="{{ b.remaining.toFixed(2) }}" required placeholder="e.g. 25000.00"></label>
               <label>Paid on *<input type="date" name="paid_at" value="{{ today() }}" max="{{ today() }}" required></label>
               <label>Mode *
                 <select name="payment_mode" required>
@@ -447,7 +447,7 @@
     </fieldset>
     <label>Bill / invoice no. *<input type="text" name="bill_no" required maxlength="100" placeholder="e.g. INV-120"></label>
     <label>Bill date *<input type="date" name="bill_date" required max="{{ today() }}"></label>
-    <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base></label>
+    <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base placeholder="e.g. 10000.00"></label>
     <label>GST rate (%) *
       <select name="gst_rate_pct" required data-gst-rate data-zero-if="gst_charge=reverse" data-zero-if-message="Under reverse charge the transporter charges no GST — pick 0%. We pay the 5% to the government ourselves.">
         {% for o in gstRates %}
@@ -457,7 +457,7 @@
     </label>
     <label>GST (&#8377;) <small class="muted">(auto: Taxable &times; GST rate)</small><input type="text" readonly tabindex="-1" data-gst-amount value="0.00"></label>
     <label>Bill total (&#8377;) <small class="muted">(auto: Taxable + GST)</small><input type="text" readonly tabindex="-1" data-gst-total value="0.00"></label>
-    <label data-show-when="doc_kind=proforma">Amount asked now (&#8377;) <small class="muted">(leave blank when the proforma asks for the whole bill{{ (' — ' + askedHint) if askedHint !== null else '' }})</small><input type="number" step="0.01" min="0.01" name="requested_amount_inr" data-not-more-than="[data-gst-total]" data-not-more-than-message="The amount asked now cannot be more than the bill total."></label>
+    <label data-show-when="doc_kind=proforma">Amount asked now (&#8377;) <small class="muted">(leave blank when the proforma asks for the whole bill{{ (' — ' + askedHint) if askedHint !== null else '' }})</small><input type="number" step="0.01" min="0.01" name="requested_amount_inr" data-not-more-than="[data-gst-total]" data-not-more-than-message="The amount asked now cannot be more than the bill total." placeholder="e.g. 25000.00"></label>
     {% if replaceable.length %}
     <label class="full" data-show-when="doc_kind=invoice">Advance already paid on a proforma from this vendor
       <select name="replaces_bill_id">
@@ -833,8 +833,8 @@
           <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <div class="kv-grid">
-              <label>Description *<input type="text" name="description" value="{{ p.description }}" required></label>
-              <label>Dimensions<input type="text" name="dimensions" value="{{ p.dimensions or '' }}"></label>
+              <label>Description *<input type="text" name="description" value="{{ p.description }}" required placeholder="e.g. Granite slabs, polished"></label>
+              <label>Dimensions<input type="text" name="dimensions" value="{{ p.dimensions or '' }}" placeholder="e.g. 240 x 120 x 2 cm"></label>
               <label>Finish
                 <select name="finish">
                   <option value="">—</option>
@@ -843,7 +843,7 @@
                   {% endfor %}
                 </select>
               </label>
-              <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="{{ p.quantity or '' }}"></label>
+              <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="{{ p.quantity or '' }}" placeholder="e.g. 100"></label>
               <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
               <label>Unit
                 <select name="unit">
@@ -852,13 +852,13 @@
                   {% endfor %}
                 </select>
               </label>
-              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ p.unit_price or '' }}"></label>
+              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ p.unit_price or '' }}" placeholder="e.g. 45.00"></label>
               <label>Line type
                 <select name="line_type">
                   {% for lt, ltLabel in lineTypes %}<option value="{{ lt }}" {{ 'selected' if (p.line_type or 'goods') == lt else '' }}>{{ ltLabel }}</option>{% endfor %}
                 </select>
               </label>
-              <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="{{ p.hs_code }}" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code."></label>
+              <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="{{ p.hs_code }}" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
               <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="{{ p.sac_code or '' }}" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
               {% set catLine = p %}
               {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
@@ -870,7 +870,7 @@
               {% for c in productCategories %}{% if c.is_system != 1 %}
               {% set vals = (catLine.attribute_values | fromJson) if catLine.category_id == c.id else {} %}
               <fieldset class="category-attributes" data-show-when="category_id={{ c.id }}"><legend>{{ c.name }}</legend>
-                {% for label in c.attributes %}<label>{{ label }}<input type="text" name="attr_{{ c.id }}[]" maxlength="100" value="{{ vals[label] or '' }}"></label>{% endfor %}
+                {% for label in c.attributes %}<label>{{ label }}<input type="text" name="attr_{{ c.id }}[]" maxlength="100" value="{{ vals[label] or '' }}" placeholder="e.g. Black Galaxy"></label>{% endfor %}
               </fieldset>
               {% endif %}{% endfor %}
             </div>
@@ -898,8 +898,8 @@
         <form method="post" action="/orders/{{ order.id }}/products">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <div class="kv-grid">
-            <label>Description *<input type="text" name="description" required></label>
-            <label>Dimensions<input type="text" name="dimensions"></label>
+            <label>Description *<input type="text" name="description" required placeholder="e.g. Granite slabs, polished"></label>
+            <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 240 x 120 x 2 cm"></label>
             <label>Finish
               <select name="finish">
                 <option value="">—</option>
@@ -908,7 +908,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999"></label>
+            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" placeholder="e.g. 100"></label>
             <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
             <label>Unit
               <select name="unit">
@@ -917,13 +917,13 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99"></label>
+            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 45.00"></label>
             <label>Line type
               <select name="line_type">
                 {% for lt, ltLabel in lineTypes %}<option value="{{ lt }}">{{ ltLabel }}</option>{% endfor %}
               </select>
             </label>
-            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code."></label>
+            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
             <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
             {% set catLine = {} %}
             {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
@@ -935,7 +935,7 @@
             {% for c in productCategories %}{% if c.is_system != 1 %}
             {% set vals = (catLine.attribute_values | fromJson) if catLine.category_id == c.id else {} %}
             <fieldset class="category-attributes" data-show-when="category_id={{ c.id }}"><legend>{{ c.name }}</legend>
-              {% for label in c.attributes %}<label>{{ label }}<input type="text" name="attr_{{ c.id }}[]" maxlength="100" value="{{ vals[label] or '' }}"></label>{% endfor %}
+              {% for label in c.attributes %}<label>{{ label }}<input type="text" name="attr_{{ c.id }}[]" maxlength="100" value="{{ vals[label] or '' }}" placeholder="e.g. Black Galaxy"></label>{% endfor %}
             </fieldset>
             {% endif %}{% endfor %}
           </div>
@@ -1146,11 +1146,11 @@
         <form method="post" action="/orders/{{ order.id }}/payment/milestones/{{ m.id }}" class="inline-form milestone-record">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <strong>Milestone {{ m.seq }} received</strong>
-          <label>Amount received ({{ order.currency_code }}) *<input type="number" name="amount" step="0.01" min="0.01" max="{{ ps.fobInput }}" required value="{{ m.amountInput }}"></label>
-          <label>Exchange rate (₹ per 1 {{ order.currency_code }}) *<input type="number" name="exchange_rate" step="0.0001" min="0.0001" max="999999.9999" required></label>
-          <label>Bank reference (UTR / SWIFT) *<input type="text" name="bank_reference" minlength="4" maxlength="100" required></label>
+          <label>Amount received ({{ order.currency_code }}) *<input type="number" name="amount" step="0.01" min="0.01" max="{{ ps.fobInput }}" required value="{{ m.amountInput }}" placeholder="e.g. 1500.00"></label>
+          <label>Exchange rate (₹ per 1 {{ order.currency_code }}) *<input type="number" name="exchange_rate" step="0.0001" min="0.0001" max="999999.9999" required placeholder="e.g. 83.25"></label>
+          <label>Bank reference (UTR / SWIFT) *<input type="text" name="bank_reference" minlength="4" maxlength="100" required placeholder="e.g. HDFCN26304123456"></label>
           <label>Received on *<input type="date" name="received_on" required value="{{ todayDate }}" max="{{ todayDate }}"></label>
-          <label>Note <small class="muted">(added to the description)</small><input type="text" name="staff_note" maxlength="255"></label>
+          <label>Note <small class="muted">(added to the description)</small><input type="text" name="staff_note" maxlength="255" placeholder="Optional note"></label>
           <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the milestone due (e.g. bank charges deducted) — record it anyway</label>
           <button type="submit" class="btn-sm">Record Milestone {{ m.seq }} Remittance</button>
         </form>
@@ -1172,8 +1172,8 @@
           <p class="muted small">Up to {{ ps.maxSteps }} milestones. Each is a share of the FOB value and says when it is due, e.g. "on shipment — within 3 Calendar Days of receiving the scanned Bill of Lading". The balance is what is left after the advance ({{ ps.advancePct }}%) and the milestones. Leave every row empty for plain advance and balance.</p>
           {% for r in ps.editRows %}
           <div class="milestone-edit-row">
-            <label>Milestone {{ r.seq }} %<input type="number" name="milestone_pct[]" step="0.01" min="0.01" max="99" value="{{ r.pct }}"></label>
-            <label>When it is due<input type="text" name="milestone_due[]" minlength="5" maxlength="200" value="{{ r.due }}"></label>
+            <label>Milestone {{ r.seq }} %<input type="number" name="milestone_pct[]" step="0.01" min="0.01" max="99" value="{{ r.pct }}" placeholder="e.g. 20"></label>
+            <label>When it is due<input type="text" name="milestone_due[]" minlength="5" maxlength="200" value="{{ r.due }}" placeholder="e.g. on inspection"></label>
           </div>
           {% endfor %}
           <button type="submit" class="btn-sm">Save Payment Schedule</button>
@@ -1326,7 +1326,7 @@
                   <tr><th>Reviewer</th><th>Status</th><th>Comments</th><th>Reviewed</th></tr>
                   {% for r in reviews %}
                     <tr>
-                      <td>{{ r.reviewer_name }}</td>
+                      <td>{{ r.reviewer_name }}{% if d.generated_by and (d.generated_by | int) == (r.reviewer_id | int) %} <span class="badge badge-pending" title="Owner decision D-221: allowed by Admin → Self-approval rules">self-review</span>{% endif %}</td>
                       <td>{{ r.status }}</td>
                       <td>{{ r.comments or '' }}</td>
                       <td>{{ r.reviewed_at or '—' }}</td>
@@ -1709,7 +1709,7 @@
             <form method="post" action="/orders/{{ order.id }}/buyer-po/received-date" class="field-grid">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <label>Date the buyer's PO was received *<input type="date" name="buyer_po_received_on" required min="{{ (order.created_at | string) | truncate(10, true, '') }}" max="{{ today() }}" value="{{ order.buyer_po_received_on or '' }}"></label>
-              <label>Reason for the change *<input type="text" name="reason" required minlength="10" maxlength="500"></label>
+              <label>Reason for the change *<input type="text" name="reason" required minlength="10" maxlength="500" placeholder="At least 10 characters — say why"></label>
               <button type="submit" class="btn-sm">Save date</button>
             </form>
           </details>
@@ -1721,7 +1721,7 @@
       {% else %}
         <form method="post" action="/orders/{{ order.id }}/buyer-po">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
+          <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required placeholder="e.g. PO-2026-0412"></label>
           <label>Date the buyer's PO was received *<input type="date" name="buyer_po_received_on" required min="{{ (order.created_at | string) | truncate(10, true, '') }}" max="{{ today() }}" value="{{ today() }}"></label>
           <p class="muted small">The day it arrived by email or post, not the date printed on it. For an associate's client, this is Day 1 of the agreement's 10 days.</p>
           {{ stageGateNotice(2, "confirm the buyer's PO received") | safe }}
@@ -1818,10 +1818,10 @@
         {% else %}
         <form method="post" action="/orders/{{ order.id }}/payment/lc" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Issuing Bank<input type="text" name="lc_bank_name"></label>
-          <label>LC Number<input type="text" name="lc_number"></label>
-          <label>LC Amount * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="lc_amount" required></label>
-          <label>LC Charges <small class="muted">(billed to the client, in {{ order.currency_code or '' }})</small><input type="text" name="lc_charges_amount"></label>
+          <label>Issuing Bank<input type="text" name="lc_bank_name" placeholder="e.g. ABN AMRO Bank"></label>
+          <label>LC Number<input type="text" name="lc_number" placeholder="e.g. LC/ABN/2026/0451"></label>
+          <label>LC Amount * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="lc_amount" required placeholder="e.g. 45000.00"></label>
+          <label>LC Charges <small class="muted">(billed to the client, in {{ order.currency_code or '' }})</small><input type="text" name="lc_charges_amount" placeholder="e.g. 2500.00"></label>
           <label>LC Document (optional)<input type="file" name="lc_file"></label>
           {{ stepBadge('5d') | safe }}<button type="submit" class="btn-sm">Record LC Details</button>
         </form>
@@ -1869,7 +1869,7 @@
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           {% set advanceDue = ((fobTotal | float) * (order.advance_pct | float) / 100) | round(2) %}
           <p class="advance-due-note">Advance due on this order: <strong>{{ order.currency_code or '' }} {{ advanceDue | money }}</strong> ({{ (order.advance_pct | float) }}% of the order value {{ order.currency_code or '' }} {{ (fobTotal or 0) | money }}). Enter what the bank actually received.</p>
-          <label>Advance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="advance_amount" required data-remit-amount value="{{ advanceDue.toFixed(2) if advanceDue > 0 else '' }}"></label>
+          <label>Advance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="advance_amount" required data-remit-amount value="{{ advanceDue.toFixed(2) if advanceDue > 0 else '' }}" placeholder="e.g. 1800.00"></label>
           <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the advance due (e.g. bank charges deducted) — record it anyway</label>
           <label>Received On<input type="date" name="advance_received_at"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
@@ -1960,7 +1960,7 @@
         <form method="post" action="/orders/{{ order.id }}/lc-amendments" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Amendment date *<input type="date" name="amended_on" required max="{{ today() }}" value="{{ today() }}"></label>
-          <label>Amendment number / reference *<input type="text" name="reference" required maxlength="100"></label>
+          <label>Amendment number / reference *<input type="text" name="reference" required maxlength="100" placeholder="e.g. REF-2026-001"></label>
           <label>What changed *<input type="text" name="change_text" required minlength="5" maxlength="500" placeholder="e.g. Last shipment date extended to 30 Nov"></label>
           <label>Copy of the amendment (optional)<input type="file" name="amendment_file" accept=".pdf,.jpg,.jpeg,.png"></label>
           <button type="submit" class="btn-sm">Record amendment</button>
@@ -2031,7 +2031,7 @@
         {% if permissions.manage_orders %}{# QA Round 5, R5-20 #}
         <form method="post" action="/orders/{{ order.id }}/oc-acknowledgment">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
+          <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required placeholder="e.g. Acknowledged by phone with the buyer"></textarea></label>
           {{ stageGateNotice(4, "record the buyer's acknowledgement") | safe }}
           {{ stepBadge('6c') | safe }}<button type="submit"{{ stageGateDisabled(4) | safe }} class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Step 7)</button>
         </form>
@@ -2051,7 +2051,7 @@
         {% if permissions.manage_orders %}{# QA Round 5, R5-20 #}
         <form method="post" action="/orders/{{ order.id }}/oc-acknowledgment">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Describe how the buyer confirmed (quote their reply, or note the call/meeting) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
+          <label>Describe how the buyer confirmed (quote their reply, or note the call/meeting) *<textarea name="acknowledged_note" rows="3" required placeholder="e.g. Acknowledged by phone with the buyer"></textarea></label>
           {{ stageGateNotice(4, "record the buyer's acknowledgement") | safe }}
           {{ stepBadge('6c') | safe }}<button type="submit"{{ stageGateDisabled(4) | safe }} class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Step 7)</button>
         </form>
@@ -2111,8 +2111,8 @@
           {% for p in products %}<option value="{{ p.id }}">{{ p.description }} ({{ 'qty TBC' if p.quantity_is_tbc else (p.quantity ~ ' ' ~ (p.unit or '')) }})</option>{% endfor %}
         </select>
       </label>
-      <label>What is needed <small class="muted">(if not a product line)</small><input type="text" name="description" maxlength="500"></label>
-      <label>Quantity <small class="muted">(defaults to the product line's)</small><input type="number" name="quantity" step="0.001" min="0.001"></label>
+      <label>What is needed <small class="muted">(if not a product line)</small><input type="text" name="description" maxlength="500" placeholder="e.g. Granite slabs, polished"></label>
+      <label>Quantity <small class="muted">(defaults to the product line's)</small><input type="number" name="quantity" step="0.001" min="0.001" placeholder="e.g. 100"></label>
       <label>Unit <small class="muted">(defaults to the product line's)</small>
         <select name="unit">
           <option value="">—</option>
@@ -2120,8 +2120,8 @@
         </select>
       </label>
       <label>Needed by *<input type="date" name="needed_by" required min="{{ todayDate }}"></label>
-      <label>Specification<input type="text" name="specification" maxlength="1000"></label>
-      <label>Note for Procurement<input type="text" name="note" maxlength="500"></label>
+      <label>Specification<input type="text" name="specification" maxlength="1000" placeholder="e.g. 2 cm, polished"></label>
+      <label>Note for Procurement<input type="text" name="note" maxlength="500" placeholder="Optional note"></label>
       <div class="btn-row"><button type="submit" class="btn-sm btn-accent">+ Raise purchase requirement</button></div>
     </form>
     {% endif %}
@@ -2168,7 +2168,7 @@
             <small class="muted">This supplier has more than one type — pick the one that applies to this order. It prints on the Supplier PO.</small>
           </label>
           <label>Material / Stone Type<input type="text" name="material_stone_type" placeholder="e.g., Black Granite"></label>
-          <label>Grade<input type="text" name="grade" value="Grade A"></label>
+          <label>Grade<input type="text" name="grade" value="Grade A" placeholder="e.g. Grade A"></label>
           <label>Surface Finish
             <select name="surface_finish">
               <option value="">—</option>
@@ -2206,11 +2206,11 @@
               {% endfor %}
             </select>
           </label>
-          <label>GST Amount (INR) <small class="muted">(auto: Basic Value &times; GST Rate)</small><input type="text" name="gst_amount_inr" data-spo-calc="gst_amount_inr"></label>
-          <label>Total Payable (INR) <small class="muted">(auto: Basic Value + GST Amount)</small><input type="text" name="total_payable_inr" data-spo-calc="total_payable_inr"></label>
+          <label>GST Amount (INR) <small class="muted">(auto: Basic Value &times; GST Rate)</small><input type="text" name="gst_amount_inr" data-spo-calc="gst_amount_inr" placeholder="e.g. 1800.00"></label>
+          <label>Total Payable (INR) <small class="muted">(auto: Basic Value + GST Amount)</small><input type="text" name="total_payable_inr" data-spo-calc="total_payable_inr" placeholder="e.g. 11800.00"></label>
           <label>Advance (%)<input type="text" name="advance_pct" data-spo-calc="advance_pct" placeholder="e.g., 30"></label>
-          <label>Advance Amount (INR) <small class="muted">(auto: Total Payable &times; Advance %)</small><input type="text" name="advance_amount_inr" data-spo-calc="advance_amount_inr"></label>
-          <label>Balance Amount (INR) <small class="muted">(auto: Total Payable &minus; Advance Amount)</small><input type="text" name="balance_amount_inr" data-spo-calc="balance_amount_inr"></label>
+          <label>Advance Amount (INR) <small class="muted">(auto: Total Payable &times; Advance %)</small><input type="text" name="advance_amount_inr" data-spo-calc="advance_amount_inr" placeholder="e.g. 150000.00"></label>
+          <label>Balance Amount (INR) <small class="muted">(auto: Total Payable &minus; Advance Amount)</small><input type="text" name="balance_amount_inr" data-spo-calc="balance_amount_inr" placeholder="e.g. 250000.00"></label>
           <label>Delivery Location
             <select id="spo-delivery-location-select">
               <option value="">— Select —</option>
@@ -2510,9 +2510,9 @@
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Result *<select name="inspection_result" required><option value="">Choose…</option><option value="passed">Passed</option><option value="failed">Failed</option></select></label>
           <label>Inspected on *<input type="date" name="inspected_on" required max="{{ today() }}" value="{{ today() }}"></label>
-          <label>Agency *<input type="text" name="agency_name" required minlength="2" maxlength="150" value="{{ (inspection.agency_name if inspection else (orderInspectionFee.agency_name if orderInspectionFee else '')) or '' }}"></label>
+          <label>Agency *<input type="text" name="agency_name" required minlength="2" maxlength="150" value="{{ (inspection.agency_name if inspection else (orderInspectionFee.agency_name if orderInspectionFee else '')) or '' }}" placeholder="e.g. SGS India"></label>
           <label>Report (PDF or image) *<input type="file" name="inspection_report" required accept=".pdf,.jpg,.jpeg,.png"></label>
-          <label style="grid-column:1/-1">Note <small class="muted">(required when failed: what failed)</small><textarea name="inspection_note" rows="2" maxlength="500" data-required-if="inspection_result=failed" data-required-if-message="Say what failed (at least 10 characters)." minlength="10"></textarea></label>
+          <label style="grid-column:1/-1">Note <small class="muted">(required when failed: what failed)</small><textarea name="inspection_note" rows="2" maxlength="500" data-required-if="inspection_result=failed" data-required-if-message="Say what failed (at least 10 characters)." minlength="10" placeholder="e.g. Thickness out of tolerance on 3 slabs"></textarea></label>
           <div><button type="submit" class="btn-sm">Record Inspection Result</button></div>
         </form>
         {% endif %}
@@ -2613,9 +2613,9 @@
       {% if permissions.manage_shipping %}{# QA Round 5, R5-20 #}
       <form method="post" action="/orders/{{ order.id }}/freight-terms">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Confirmed Freight Rate<input type="text" name="confirmed_freight_rate"></label>
+        <label>Confirmed Freight Rate<input type="text" name="confirmed_freight_rate" placeholder="e.g. 950.00"></label>
         {% if (order.incoterm_code or '') | upper == 'CIF' %}{# Q-R5-2: only a CIF seller insures #}
-        <label>Insurance Amount (CIF only)<input type="text" name="insurance_amount"></label>
+        <label>Insurance Amount (CIF only)<input type="text" name="insurance_amount" placeholder="e.g. 120.00"></label>
         {% endif %}
         {# Owner request (2026-10-27): the forwarder comes from the Logistics Partners directory, like the supplier in 7a. #}
         <label>Freight Forwarder (Logistics Partner) *
@@ -2680,7 +2680,7 @@
       {% if payment and payment.freight_remittance_received_at != null %}{{ remittanceRecordedNote('freight', 'Next: Step 9d — mark it cleared once the bank confirms, or record another receipt below if the buyer paid in parts.') }}{% endif %}
       <form method="post" action="/orders/{{ order.id }}/payment/freight">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Freight Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="freight_amount" required data-remit-amount></label>
+        <label>Freight Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="freight_amount" required data-remit-amount placeholder="e.g. 950.00"></label>
         <label>Received On<input type="date" name="freight_received_at"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="freight_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
@@ -2754,7 +2754,7 @@
       <form method="post" action="/orders/{{ order.id }}/packing" enctype="multipart/form-data">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <div class="kv-grid">
-          <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="{{ packing.actual_quantity_packed or '' }}"></label>
+          <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="{{ packing.actual_quantity_packed or '' }}" placeholder="e.g. 98"></label>
           <label>Actual Quantity Unit
             {% set packingUnit = packing.actual_quantity_unit or (orderedQuantitySummary.comparable and orderedQuantitySummary.unit) or '' %}
             <select name="actual_quantity_unit">
@@ -2764,10 +2764,10 @@
               {% endfor %}
             </select>
           </label>
-          <label>Crate Count<input type="text" name="crate_count" value="{{ packing.crate_count or '' }}"></label>
-          <label>Total Net Weight (kg)<input type="text" name="total_net_weight_kg" value="{{ packing.total_net_weight_kg or '' }}"></label>
-          <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="{{ packing.total_gross_weight_kg or '' }}"></label>
-          <label>Total CBM (m&sup3;)<input type="text" name="total_cbm" value="{{ packing.total_cbm or '' }}"></label>
+          <label>Crate Count<input type="text" name="crate_count" value="{{ packing.crate_count or '' }}" placeholder="e.g. 12"></label>
+          <label>Total Net Weight (kg)<input type="text" name="total_net_weight_kg" value="{{ packing.total_net_weight_kg or '' }}" placeholder="e.g. 23500"></label>
+          <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="{{ packing.total_gross_weight_kg or '' }}" placeholder="e.g. 24000"></label>
+          <label>Total CBM (m&sup3;)<input type="text" name="total_cbm" value="{{ packing.total_cbm or '' }}" placeholder="e.g. 28.5"></label>
           <label>Packing Date<input type="date" name="packing_date" value="{{ packing.packing_date or '' }}"></label>
           <label>Shortfall % {% if orderedQuantitySummary.comparable %}(auto-computed — this field is ignored when the ordered quantity is comparable){% endif %}<input type="text" name="shortfall_pct" value="{{ packing.shortfall_pct or '' }}" {% if orderedQuantitySummary.comparable %}readonly{% endif %}></label>
           <label>Buyer's Written Approval of Shortfall <small class="muted">(required only if the shortfall exceeds tolerance)</small><input type="file" name="buyer_approval" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg"></label>
@@ -2779,8 +2779,8 @@
           {% set existingCrates = crates if crates and crates.length > 0 else [{}, {}, {}] %}
           {% for c in existingCrates %}
           <tr>
-            <td><input type="text" name="crate_no[]" value="{{ c.crate_no or '' }}" style="width:70px;"></td>
-            <td><input type="text" name="crate_marks_numbers[]" value="{{ c.marks_numbers or '' }}" style="width:130px;"></td>
+            <td><input type="text" name="crate_no[]" value="{{ c.crate_no or '' }}" style="width:70px;" placeholder="e.g. 1"></td>
+            <td><input type="text" name="crate_marks_numbers[]" value="{{ c.marks_numbers or '' }}" style="width:130px;" placeholder="e.g. NX/01-12"></td>
             <td>{% set crateProduct = c.product_description or '' %}{% set crateKnown = (products | whereEq('description', crateProduct) | length) > 0 %}
               <select name="crate_product_description[]" data-crate-product style="width:160px;">
                 <option value="" data-hs="">— Product —</option>
@@ -2789,11 +2789,11 @@
                 {% endfor %}
                 {% if crateProduct and not crateKnown %}<option value="{{ crateProduct }}" data-hs="{{ c.hs_code or '' }}" selected>{{ crateProduct }} (earlier entry)</option>{% endif %}
               </select></td>
-            <td><input type="text" name="crate_dimensions[]" value="{{ c.dimensions_lwh_cm or '' }}" style="width:80px;"></td>
-            <td><input type="text" name="crate_pcs[]" value="{{ c.pcs or '' }}" style="width:50px;"></td>
-            <td><input type="text" name="crate_net_weight_kg[]" value="{{ c.net_weight_kg or '' }}" style="width:70px;"></td>
-            <td><input type="text" name="crate_gross_weight_kg[]" value="{{ c.gross_weight_kg or '' }}" style="width:70px;"></td>
-            <td><input type="text" name="crate_cbm[]" value="{{ c.cbm or '' }}" style="width:60px;"></td>
+            <td><input type="text" name="crate_dimensions[]" value="{{ c.dimensions_lwh_cm or '' }}" style="width:80px;" placeholder="e.g. 120 x 80 x 90 cm"></td>
+            <td><input type="text" name="crate_pcs[]" value="{{ c.pcs or '' }}" style="width:50px;" placeholder="e.g. 20"></td>
+            <td><input type="text" name="crate_net_weight_kg[]" value="{{ c.net_weight_kg or '' }}" style="width:70px;" placeholder="e.g. 800"></td>
+            <td><input type="text" name="crate_gross_weight_kg[]" value="{{ c.gross_weight_kg or '' }}" style="width:70px;" placeholder="e.g. 850"></td>
+            <td><input type="text" name="crate_cbm[]" value="{{ c.cbm or '' }}" style="width:60px;" placeholder="e.g. 1.25"></td>
             <td><input type="text" value="{{ c.hs_code or '' }}" data-crate-hs readonly tabindex="-1" title="Taken from the product's HS code" style="width:70px;"></td>
           </tr>
           {% endfor %}
@@ -2836,9 +2836,9 @@
       <form method="post" action="/orders/{{ order.id }}/shipping">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <div class="kv-grid">
-          <label>Shipping Line<input type="text" name="shipping_line" value="{{ shipping.shipping_line or '' }}"></label>
-          <label>Vessel Name<input type="text" name="vessel_name" value="{{ shipping.vessel_name or '' }}"></label>
-          <label>Voyage Number<input type="text" name="voyage_number" value="{{ shipping.voyage_number or '' }}"></label>
+          <label>Shipping Line<input type="text" name="shipping_line" value="{{ shipping.shipping_line or '' }}" placeholder="e.g. Maersk"></label>
+          <label>Vessel Name<input type="text" name="vessel_name" value="{{ shipping.vessel_name or '' }}" placeholder="e.g. MSC Gulsun"></label>
+          <label>Voyage Number<input type="text" name="voyage_number" value="{{ shipping.voyage_number or '' }}" placeholder="e.g. 645W"></label>
           <label>ETD <small class="muted">(Estimated Time of Departure)</small><input type="date" name="etd" value="{{ shipping.etd or '' }}"></label>
           <label>ETA <small class="muted">(Estimated Time of Arrival)</small><input type="date" name="eta" value="{{ shipping.eta or '' }}"></label>
           <label>Container Type
@@ -2850,9 +2850,9 @@
               {% endfor %}
             </select>
           </label>
-          <label>Number of Containers<input type="number" name="container_count" min="1" step="1" value="{{ shipping.container_count or '' }}"></label>
-          <label>Container No.<input type="text" name="container_no" value="{{ shipping.container_no or '' }}"></label>
-          <label>Seal No.<input type="text" name="seal_no" value="{{ shipping.seal_no or '' }}"></label>
+          <label>Number of Containers<input type="number" name="container_count" min="1" step="1" value="{{ shipping.container_count or '' }}" placeholder="e.g. 1"></label>
+          <label>Container No.<input type="text" name="container_no" value="{{ shipping.container_no or '' }}" placeholder="e.g. MSKU1234567"></label>
+          <label>Seal No.<input type="text" name="seal_no" value="{{ shipping.seal_no or '' }}" placeholder="e.g. SL123456"></label>
         </div>
         {{ stepBadge('10d') | safe }}<button type="submit" class="btn-sm">Save Shipping Details</button>
       </form>
@@ -2922,7 +2922,7 @@
                         <option value="revision_requested">Request Revision</option>
                       </select>
                     </label>
-                    <label>Notes <small class="muted">(required if requesting a revision)</small><input type="text" name="notes"></label>
+                    <label>Notes <small class="muted">(required if requesting a revision)</small><input type="text" name="notes" placeholder="Optional notes"></label>
                     <button type="submit" class="btn-sm">Submit Review</button>
                   </form>
                 </details>
@@ -2952,7 +2952,7 @@
         {% if permissions.manage_shipping %}{# QA Round 5, R5-20 #}
         <form method="post" action="/orders/{{ order.id }}/bl-issued" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>BL Number *<input type="text" name="bl_number" required></label>
+          <label>BL Number *<input type="text" name="bl_number" required placeholder="e.g. MAEU123456789"></label>
           <label>BL Date<input type="date" name="bl_date"></label>
           <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip"></label>
           {% if shipmentGateBlockers.length and canOverrideShipmentGates %}
@@ -2992,9 +2992,9 @@
       {% if permissions.manage_shipping %}
       <form method="post" action="/orders/{{ order.id }}/shipping-bill" class="field-grid">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Shipping Bill No. *<input type="text" name="shipping_bill_no" required maxlength="30" value="{{ shipping.shipping_bill_no if shipping and shipping.shipping_bill_no else '' }}"></label>
+        <label>Shipping Bill No. *<input type="text" name="shipping_bill_no" required maxlength="30" value="{{ shipping.shipping_bill_no if shipping and shipping.shipping_bill_no else '' }}" placeholder="e.g. 1234567"></label>
         <label>Shipping Bill Date *<input type="date" name="shipping_bill_date" required max="{{ today() }}" value="{{ shipping.shipping_bill_date if shipping and shipping.shipping_bill_date else '' }}"></label>
-        <label>Customs Exchange Rate (&#8377; for 1 {{ order.currency_code }}) *<input type="number" name="customs_exchange_rate" required min="0.0001" max="100000" step="0.0001" value="{{ shipping.customs_exchange_rate if shipping and shipping.customs_exchange_rate else '' }}"><small class="muted">As printed on the shipping bill. An invoice already in Zoho Books keeps the rate it was sent at.</small></label>
+        <label>Customs Exchange Rate (&#8377; for 1 {{ order.currency_code }}) *<input type="number" name="customs_exchange_rate" required min="0.0001" max="100000" step="0.0001" value="{{ shipping.customs_exchange_rate if shipping and shipping.customs_exchange_rate else '' }}" placeholder="e.g. 83.25"><small class="muted">As printed on the shipping bill. An invoice already in Zoho Books keeps the rate it was sent at.</small></label>
         <div><button type="submit" class="btn-sm">{{ 'Update Shipping Bill' if shipping and shipping.shipping_bill_no else 'Save Shipping Bill' }}</button></div>
       </form>
       {% endif %}
@@ -3074,7 +3074,7 @@
       {% else %}
       <form method="post" action="/orders/{{ order.id }}/payment/balance">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Balance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="balance_amount" required data-remit-amount value="{% if payment and payment.balance_remittance_received_at != null %}{% if partPayments.balance.owed != null and partPayments.balance.owed > 0 %}{{ partPayments.balance.owed.toFixed(2) }}{% endif %}{% else %}{{ payment.balance_amount or '' }}{% endif %}"></label>
+        <label>Balance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="balance_amount" required data-remit-amount value="{% if payment and payment.balance_remittance_received_at != null %}{% if partPayments.balance.owed != null and partPayments.balance.owed > 0 %}{{ partPayments.balance.owed.toFixed(2) }}{% endif %}{% else %}{{ payment.balance_amount or '' }}{% endif %}" placeholder="e.g. 2700.00"></label>
         <label>Received On<input type="date" name="balance_received_at"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="balance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
@@ -3236,7 +3236,7 @@
                 {% for key, catLabel in expenseCategories %}<option value="{{ key }}">{{ catLabel }}</option>{% endfor %}
               </select>
             </label>
-            <label>Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="amount_inr" required></label>
+            <label>Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="amount_inr" required placeholder="e.g. 25000.00"></label>
             <label>Paid by *
               <select name="paid_by" required>
                 {% for key, byLabel in expensePaidBy %}<option value="{{ key }}">{{ byLabel }}</option>{% endfor %}
@@ -3289,7 +3289,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
+            <label>Amount (INR) *<input type="text" name="amount_inr" required placeholder="e.g. 25000.00"></label>
             <label>Date<input type="date" name="incurred_at" value="{{ today() }}"></label>
             <label>Description * <small class="muted">(who was paid and for what — their invoice / receipt no.)</small><input type="text" name="description" required minlength="10" maxlength="255" placeholder="e.g. Agent commission — Ravi Traders, their invoice RT/45 dated 20 Oct"></label>
             {# Owner decision 2026-10-29: real paid costs go to Zoho Books as expenses, paid from here. #}
@@ -3313,7 +3313,7 @@
         </div>
           <form method="post" action="/orders/{{ order.id }}/travel-expenses">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="number" min="0" step="any" name="factory_distance_km" value="{{ orderTravelExpenses.factory_distance_km if orderTravelExpenses and orderTravelExpenses.factory_distance_km != null else '' }}"></label>
+            <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="number" min="0" step="any" name="factory_distance_km" value="{{ orderTravelExpenses.factory_distance_km if orderTravelExpenses and orderTravelExpenses.factory_distance_km != null else '' }}" placeholder="e.g. 120"></label>
             <label>Travel Expense % of FOB Value *
               <select name="expense_pct" required>
                 {% for pct in ['5', '7', '10', '15'] %}
@@ -3322,7 +3322,7 @@
                 <option value="other" {{ 'selected' if savedPct and savedPct not in ['5', '7', '10', '15'] }}>Other — specify</option>
               </select>
             </label>
-            <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="number" min="0" step="any" name="expense_pct_other" value="{{ savedPct if savedPct and savedPct not in ['5', '7', '10', '15'] else '' }}"></label>
+            <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="number" min="0" step="any" name="expense_pct_other" value="{{ savedPct if savedPct and savedPct not in ['5', '7', '10', '15'] else '' }}" placeholder="e.g. 5"></label>
             <button type="submit" class="btn-sm">Save</button>
           </form>
         </div>
@@ -3345,7 +3345,7 @@
                 <option value="client" {{ 'selected' if orderInspectionFee and orderInspectionFee.fee_payer == 'client' }}>Client</option>
               </select>
             </label>
-            <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" value="{{ orderInspectionFee.fee_amount if orderInspectionFee and orderInspectionFee.fee_amount != null else '' }}"></label>
+            <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" value="{{ orderInspectionFee.fee_amount if orderInspectionFee and orderInspectionFee.fee_amount != null else '' }}" placeholder="e.g. 12000.00"></label>
             {# Owner decision 2026-10-29: the fee goes to Zoho Books as an expense, paid from here. #}
             {% set feeEntry = (orderCostEntries | whereEq('id', orderInspectionFee.cost_entry_id) | first) if orderInspectionFee and orderInspectionFee.cost_entry_id else null %}
             {% set feePaidFrom = feeEntry.paid_from if feeEntry else null %}
@@ -3379,11 +3379,11 @@
           <summary>{{ 'Edit LC / bank loan details' if orderLcDetails else 'Record LC / bank loan details for this order' }}</summary>
           <form method="post" action="/orders/{{ order.id }}/lc-details" enctype="multipart/form-data">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>LC Number<input type="text" name="lc_number" value="{{ lcDetails.lc_number or '' }}"></label>
+            <label>LC Number<input type="text" name="lc_number" value="{{ lcDetails.lc_number or '' }}" placeholder="e.g. LC/ABN/2026/0451"></label>
             <label>Final LC Document<input type="file" name="lc_file" accept=".pdf,.jpg,.jpeg,.png"></label>
-            <label>Bank Loan Amount<input type="text" name="bank_loan_amount" value="{{ lcDetails.bank_loan_amount if lcDetails.bank_loan_amount != null else '' }}"></label>
-            <label>Interest Rate (%)<input type="text" name="bank_loan_interest_rate" value="{{ lcDetails.bank_loan_interest_rate if lcDetails.bank_loan_interest_rate != null else '' }}"></label>
-            <label>Total Interest Paid<input type="text" name="bank_loan_interest_paid" value="{{ lcDetails.bank_loan_interest_paid if lcDetails.bank_loan_interest_paid != null else '' }}"></label>
+            <label>Bank Loan Amount<input type="text" name="bank_loan_amount" value="{{ lcDetails.bank_loan_amount if lcDetails.bank_loan_amount != null else '' }}" placeholder="e.g. 500000.00"></label>
+            <label>Interest Rate (%)<input type="text" name="bank_loan_interest_rate" value="{{ lcDetails.bank_loan_interest_rate if lcDetails.bank_loan_interest_rate != null else '' }}" placeholder="e.g. 9.50"></label>
+            <label>Total Interest Paid<input type="text" name="bank_loan_interest_paid" value="{{ lcDetails.bank_loan_interest_paid if lcDetails.bank_loan_interest_paid != null else '' }}" placeholder="e.g. 4500.00"></label>
             <button type="submit" class="btn-sm">Save LC / Loan Details</button>
           </form>
         </details>
@@ -3407,7 +3407,7 @@
         {% elif canEditInrActual %}
           <form method="post" action="/orders/{{ order.id }}/payment/lc/firc" class="field-grid">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>FIRC/eBRC reference *<input type="text" name="lc_firc_reference" required maxlength="100"></label>
+            <label>FIRC/eBRC reference *<input type="text" name="lc_firc_reference" required maxlength="100" placeholder="e.g. FIRC/HDFC/2026/0412"></label>
             <label>FIRC/eBRC date<input type="date" name="lc_firc_received_at" max="{{ today() }}" value="{{ today() }}"></label>
             <div><button type="submit" class="btn-sm">Record FIRC/eBRC</button></div>
           </form>
@@ -3421,9 +3421,9 @@
       <form method="post" action="/orders/{{ order.id }}/lc-received" class="field-grid">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Date the bank paid *<input type="date" name="lc_received_at" required max="{{ today() }}" value="{{ orderLcDetails.lc_received_at or '' }}"></label>
-        <label>Amount paid under the LC ({{ lcCur }}) *<input type="number" name="lc_received_amount" required min="0.01" step="0.01" value="{{ orderLcDetails.lc_received_amount if orderLcDetails.lc_received_amount != null else '' }}"></label>
-        <label>Rupees credited (&#8377;) *<input type="number" name="lc_inr_credited" required min="0.01" step="0.01" value="{{ orderLcDetails.lc_inr_credited if orderLcDetails.lc_inr_credited != null else '' }}"><small class="muted">As on the bank's credit advice.</small></label>
-        <label>Bank charges deducted (&#8377;)<input type="number" name="lc_bank_charges_inr" min="0" step="0.01" value="{{ orderLcDetails.lc_bank_charges_inr if orderLcDetails.lc_bank_charges_inr != null else '0' }}"></label>
+        <label>Amount paid under the LC ({{ lcCur }}) *<input type="number" name="lc_received_amount" required min="0.01" step="0.01" value="{{ orderLcDetails.lc_received_amount if orderLcDetails.lc_received_amount != null else '' }}" placeholder="e.g. 45000.00"></label>
+        <label>Rupees credited (&#8377;) *<input type="number" name="lc_inr_credited" required min="0.01" step="0.01" value="{{ orderLcDetails.lc_inr_credited if orderLcDetails.lc_inr_credited != null else '' }}" placeholder="e.g. 3700000.00"><small class="muted">As on the bank's credit advice.</small></label>
+        <label>Bank charges deducted (&#8377;)<input type="number" name="lc_bank_charges_inr" min="0" step="0.01" value="{{ orderLcDetails.lc_bank_charges_inr if orderLcDetails.lc_bank_charges_inr != null else '0' }}" placeholder="e.g. 2500.00"></label>
         <label style="grid-column:1 / -1">Bank reference of the credit * <small class="muted">(UTR / bank ref. / FIRC no. on the bank's advice)</small><input type="text" name="lc_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" value="{{ orderLcDetails.lc_bank_reference or '' }}" placeholder="e.g. 0915-2026-778"><small class="muted">Rule D-212: it goes into this payment's description here and in Zoho Books.</small></label>
         <div><button type="submit" class="btn-sm">{{ 'Update LC Payment' if orderLcDetails.lc_received_at else 'Record LC Payment' }}</button></div>
       </form>
@@ -3584,7 +3584,7 @@
     {% elif not shipping or not shipping.bl_originals_received_at %}
       <form method="post" action="/orders/{{ order.id }}/bl-originals-received">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3"></label>
+        <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3" placeholder="e.g. 3"></label>
         {{ stepBadge('13b') | safe }}<button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
       </form>
     {% else %}
@@ -3602,10 +3602,10 @@
       <p class="muted small">Save these details, then generate the printable endorsement — it states who to endorse the BL to ("Pay to the order of"), the BL/vessel/voyage, both ports, the latest PI/CI references, and the authorised signatory, exactly as it should be written or stamped on the reverse of each original BL.</p>
       <form method="post" action="/orders/{{ order.id }}/bl-endorsement">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>BL Number<input type="text" name="bl_number" value="{{ blEndorsement.bl_number or shipping.bl_number or '' }}"></label>
+        <label>BL Number<input type="text" name="bl_number" value="{{ blEndorsement.bl_number or shipping.bl_number or '' }}" placeholder="e.g. MAEU123456789"></label>
         <label>Vessel / Voyage<input type="text" name="vessel_voyage" placeholder="e.g. MSC MAYA / 012W" value="{{ blEndorsement.vessel_voyage or ((shipping.vessel_name or '') + ' / ' + (shipping.voyage_number or '')) | trim }}"></label>
-        <label>Port of Loading<input type="text" name="port_of_loading" value="{{ blEndorsement.port_of_loading or order.port_of_loading_name or 'Chennai, India' }}"></label>
-        <label>Port of Discharge<input type="text" name="port_of_discharge" value="{{ blEndorsement.port_of_discharge or order.port_of_discharge_name or order.port_of_discharge_text or '' }}"></label>
+        <label>Port of Loading<input type="text" name="port_of_loading" value="{{ blEndorsement.port_of_loading or order.port_of_loading_name or 'Chennai, India' }}" placeholder="e.g. Chennai"></label>
+        <label>Port of Discharge<input type="text" name="port_of_discharge" value="{{ blEndorsement.port_of_discharge or order.port_of_discharge_name or order.port_of_discharge_text or '' }}" placeholder="e.g. Rotterdam, Netherlands"></label>
         <label>Date of Endorsement<input type="date" name="date_of_endorsement" value="{{ blEndorsement.date_of_endorsement or today() }}"></label>
         {{ stepBadge('13c') | safe }}<button type="submit" class="btn-sm">Save BL Endorsement Details</button>
       </form>
@@ -3672,9 +3672,9 @@
       <form method="post" action="/orders/{{ order.id }}/close" onsubmit="return confirmFieldOverride(this, 'closing this order without both required documents approved');" style="border:1px solid #D9822B; padding:10px; border-radius:4px;">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="hidden" name="override_gate" value="1">
-        <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
+        <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required placeholder="e.g. DHL 1234567890"></label>
         <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
-          <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+          <textarea class="override-reason" name="override_reason" rows="2" required minlength="10" placeholder="At least 10 characters — say why"></textarea>
         </label>
         {{ stepBadge('13f') | safe }}<button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
       </form>
@@ -3682,7 +3682,7 @@
     {% else %}
       <form method="post" action="/orders/{{ order.id }}/close">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
+        <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required placeholder="e.g. DHL 1234567890"></label>
         {{ stepBadge('13f') | safe }}<button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
     {% endif %}
@@ -3768,12 +3768,12 @@
             <strong>{{ b.scheme_name }}</strong> <span class="muted small">— claimed &#8377;{{ b.claimed_amount | money }} on {{ b.claimed_at }}{% if b.received_amount != null %}, received &#8377;{{ b.received_amount | money }}{% endif %}</span>
             <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/correct" class="field-grid">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <label>Claimed (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required value="{{ b.claimed_amount }}"></label>
+              <label>Claimed (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required value="{{ b.claimed_amount }}" placeholder="e.g. 25000.00"></label>
               <label>Claimed On *<input type="date" name="claimed_at" required value="{{ b.claimed_at }}"></label>
-              <label>Claim Ref.<input type="text" name="reference_number" value="{{ b.reference_number or '' }}"></label>
-              <label>Received (&#8377;) <small class="muted">(empty = not received yet)</small><input type="number" step="0.01" min="0" name="received_amount" value="{{ b.received_amount if b.received_amount != null else '' }}"></label>
+              <label>Claim Ref.<input type="text" name="reference_number" value="{{ b.reference_number or '' }}" placeholder="e.g. REF-2026-001"></label>
+              <label>Received (&#8377;) <small class="muted">(empty = not received yet)</small><input type="number" step="0.01" min="0" name="received_amount" value="{{ b.received_amount if b.received_amount != null else '' }}" placeholder="e.g. 1500.00"></label>
               <label>Received On<input type="date" name="received_at" value="{{ b.received_at or today() }}"></label>
-              <label>Credited by <small class="muted">(bank UTR / e-scrip no.; needed with a received amount)</small><input type="text" name="received_reference" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" data-required-if="received_amount" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." value="{{ b.received_reference or '' }}"></label>
+              <label>Credited by <small class="muted">(bank UTR / e-scrip no.; needed with a received amount)</small><input type="text" name="received_reference" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" data-required-if="received_amount" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." value="{{ b.received_reference or '' }}" placeholder="e.g. HDFCN26304123456"></label>
               <label class="full">Reason for the correction *<input type="text" name="reason" required minlength="10" placeholder="e.g. Typed 50,000 instead of 5,000"></label>
               <div><button type="submit" class="btn-sm">Save Correction</button></div>
             </form>
@@ -3798,11 +3798,11 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
-            <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
+            <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number" placeholder="e.g. REF-2026-001"></label>
+            <label>Claimed Amount *<input type="text" name="claimed_amount" required placeholder="e.g. 25000.00"></label>
             <label>Claimed On *<input type="date" name="claimed_at" value="{{ today() }}" required></label>
-            <label>Currency<input type="text" name="currency_code" value="INR"></label>
-            <label>Notes<input type="text" name="notes"></label>
+            <label>Currency<input type="text" name="currency_code" value="INR" placeholder="e.g. USD"></label>
+            <label>Notes<input type="text" name="notes" placeholder="Optional notes"></label>
             <button type="submit" class="btn-sm">Record Claim</button>
           </form>
       </details>
@@ -3853,7 +3853,7 @@
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="override_gate" value="1">
           <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
-            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10" placeholder="At least 10 characters — say why"></textarea>
           </label>
           <button type="submit" class="btn-sm btn-danger">Override &amp; Mark Fully Settled</button>
         </form>
@@ -3889,7 +3889,7 @@
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="override_gate" value="1">
           <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
-            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10" placeholder="At least 10 characters — say why"></textarea>
           </label>
           <button type="submit" class="btn-sm btn-danger">Override &amp; Mark Fully Settled</button>
         </form>
@@ -3999,7 +3999,7 @@
             </select>
           </label>
           <label>Feedback / testimonial
-            <textarea name="comments" rows="4">{{ testimonialSuggestion or '' }}</textarea>
+            <textarea name="comments" rows="4" placeholder="Type your comments">{{ testimonialSuggestion or '' }}</textarea>
           </label>
           <p class="muted small">A suggested testimonial written from this order's details — change it to what the client actually told you before recording it.</p>
           <button type="submit" class="btn-sm">Record Feedback</button>
@@ -4062,7 +4062,7 @@
         </select>
       </label>
       <label><input type="checkbox" name="is_locked" value="1" style="display:inline-block;width:auto;" {{ 'checked' if order.is_locked else '' }}> Locked (normally set automatically once status = complete)</label>
-      <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" required></textarea></label>
+      <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" required placeholder="At least 10 characters — say why"></textarea></label>
       <button type="submit" class="btn-sm btn-danger">Override Status/Lock</button>
     </form>
   </details>
@@ -4095,7 +4095,7 @@
       </label>
       <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> Also generate DOCX</label>
       <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
-        <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+        <textarea class="override-reason" name="override_reason" rows="2" required minlength="10" placeholder="At least 10 characters — say why"></textarea>
       </label>
       <button type="submit" class="btn-sm btn-danger" data-loading-text="Generating…">Force-Generate</button>
     </form>

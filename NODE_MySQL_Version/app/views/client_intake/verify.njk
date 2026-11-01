@@ -4,7 +4,7 @@
   <p>We e-mailed a 6-digit code to <b>{{ s.email }}</b>. Enter it below to confirm your quotation request for <b>{{ s.company_legal_name }}</b>.</p>
   <form method="post" action="/quotation-details/verify">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-    <label>Code from the e-mail *<input type="text" name="code" required inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code"></label>
+    <label>Code from the e-mail *<input type="text" name="code" required inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code"></label>
     <button type="submit">Confirm</button>
   </form>
   <p class="muted small">The code is valid for 30 minutes. If it has expired, submit this page and we will send a new one.</p>

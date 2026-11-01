@@ -44,13 +44,13 @@
             <form method="post" action="/ca/gst-refunds/<?= (int) $c['id'] ?>/credits">
               <?= \App\Helpers\Csrf::field() ?>
               <div class="field-grid">
-                <label>Amount credited (&#8377;) *<input type="number" name="amount" required min="0.01" max="<?= number_format($c['outstanding'], 2, '.', '') ?>" step="0.01"></label>
+                <label>Amount credited (&#8377;) *<input type="number" name="amount" required min="0.01" max="<?= number_format($c['outstanding'], 2, '.', '') ?>" step="0.01" placeholder="e.g. 1500.00"></label>
                 <label>Credited on *<input type="date" name="credited_on" required min="<?= htmlspecialchars((string) $c['filed_on']) ?>" max="<?= date('Y-m-d') ?>"></label>
                 <label>Bank reference (RFD-05 / UTR) *<input type="text" name="bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="as on the bank statement"></label>
                 <label>Part *
                   <select name="part" required><option value="">Choose…</option><?php foreach ($parts as $__k => $__v): ?><option value="<?= $__k ?>"><?= htmlspecialchars(ucfirst($__v)) ?></option><?php endforeach; ?></select>
                 </label>
-                <label>Amount refused, if any (&#8377;)<input type="number" name="amount_refused" min="0" step="0.01"><small class="muted">Refused GST is a real cost — the CA books it in Zoho Books by hand.</small></label>
+                <label>Amount refused, if any (&#8377;)<input type="number" name="amount_refused" min="0" step="0.01" placeholder="e.g. 0.00"><small class="muted">Refused GST is a real cost — the CA books it in Zoho Books by hand.</small></label>
               </div>
               <button type="submit" class="btn-sm">Record credit</button>
             </form>
@@ -74,7 +74,7 @@
         <label>Period to *<input type="date" name="period_to" required data-not-before="[name=period_from]" data-not-before-message="The period cannot end before it starts."></label>
         <label>RFD-01 claim no. (ARN) *<input type="text" name="claim_arn" required minlength="6" maxlength="30" pattern="[A-Za-z0-9][A-Za-z0-9\-]*" placeholder="as on the GST portal"></label>
         <label>Filed on *<input type="date" name="filed_on" required max="<?= date('Y-m-d') ?>"></label>
-        <label>Amount claimed (&#8377;) *<input type="number" name="amount_claimed" required min="0.01" step="0.01"></label>
+        <label>Amount claimed (&#8377;) *<input type="number" name="amount_claimed" required min="0.01" step="0.01" placeholder="e.g. 25000.00"></label>
       </div>
       <button type="submit" class="btn-sm">Save claim</button>
     </form>

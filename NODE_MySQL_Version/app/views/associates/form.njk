@@ -8,37 +8,37 @@
   <form method="post" action="{{ ('/associates/' ~ editing.id ~ '/update') if editing else '/associates' }}" enctype="multipart/form-data">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <div class="field-grid">
-      <label>Name *<input type="text" name="name" required maxlength="150" value="{{ a0.name }}"></label>
+      <label>Name *<input type="text" name="name" required maxlength="150" value="{{ a0.name }}" placeholder="e.g. Rajesh Kumar"></label>
       <label>Based in *<select name="based_in" required><option value="india"{{ ' selected' if (a0.based_in or 'india') == 'india' else '' }}>India</option><option value="abroad"{{ ' selected' if a0.based_in == 'abroad' else '' }}>Abroad</option></select></label>
-      <label>Country<input type="text" name="country" maxlength="80" value="{{ a0.country }}"></label>
+      <label>Country<input type="text" name="country" maxlength="80" value="{{ a0.country }}" placeholder="e.g. Netherlands"></label>
       <label>Paid in (currency) *<select name="currency_code" required>
         {% for cur in currencies %}{% set __code = cur.code or cur.currency_code or '' %}
           <option value="{{ __code }}"{{ ' selected' if (a0.currency_code or 'INR') == __code else '' }}>{{ __code }}</option>
         {% endfor %}
       </select></label>
-      <label>E-mail (portal login)<input type="email" name="email" maxlength="190" value="{{ a0.email }}"></label>
-      <label>Phone<input type="tel" name="phone" maxlength="40" value="{{ a0.phone }}"></label>
-      <label>PAN (India)<input type="text" name="pan" maxlength="10" pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]" title="As on the PAN card, e.g. ABCDE1234F" value="{{ a0.pan }}"></label>
-      <label>GSTIN<input type="text" name="gstin" maxlength="15" pattern="[0-9]{2}[A-Za-z0-9]{13}" title="15 characters" value="{{ a0.gstin }}"></label>
-      <label>Tax ID (abroad)<input type="text" name="tax_id" maxlength="50" value="{{ a0.tax_id }}"></label>
+      <label>E-mail (portal login)<input type="email" name="email" maxlength="190" value="{{ a0.email }}" placeholder="e.g. name@company.com"></label>
+      <label>Phone<input type="tel" name="phone" maxlength="40" value="{{ a0.phone }}" placeholder="e.g. +91 98765 43210"></label>
+      <label>PAN (India)<input type="text" name="pan" maxlength="10" pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]" title="As on the PAN card, e.g. ABCDE1234F" value="{{ a0.pan }}" placeholder="e.g. ABCDE1234F"></label>
+      <label>GSTIN<input type="text" name="gstin" maxlength="15" pattern="[0-9]{2}[A-Za-z0-9]{13}" title="15 characters" value="{{ a0.gstin }}" placeholder="e.g. 29ABCDE1234F1Z5"></label>
+      <label>Tax ID (abroad)<input type="text" name="tax_id" maxlength="50" value="{{ a0.tax_id }}" placeholder="e.g. NL123456789B01"></label>
       <label>Relationship manager<select name="relationship_manager_id"><option value="">— none —</option>
         {% for u in users %}<option value="{{ u.id }}"{{ ' selected' if a0.relationship_manager_id == u.id else '' }}>{{ u.name }}</option>{% endfor %}
       </select></label>
-      <label style="grid-column:1/-1">Address<textarea name="address" maxlength="1000" rows="2">{{ a0.address }}</textarea></label>
+      <label style="grid-column:1/-1">Address<textarea name="address" maxlength="1000" rows="2" placeholder="e.g. 12 MG Road, Bengaluru 560001">{{ a0.address }}</textarea></label>
       <label>Agreement signed on<input type="date" name="agreement_signed_on" max="{{ today() }}" value="{{ a0.agreement_signed_on }}"{% if a0.agreement_file_id %} required{% else %} data-required-if="agreement_file" data-required-if-message="Enter the date the agreement was signed."{% endif %}></label>
       <label>Agreement ends on<input type="date" name="agreement_ends_on" value="{{ a0.agreement_ends_on }}"></label>
       <label>Signed agreement (PDF){% if a0.agreement_file_id %} &middot; <a href="/associates/{{ a0.id }}/agreement">copy on file</a>, choose a file only to replace it{% endif %}<input type="file" name="agreement_file" accept=".pdf,application/pdf"{% if not a0.agreement_file_id %} data-required-if="agreement_signed_on" data-required-if-message="Attach the signed agreement (PDF) with its signing date."{% endif %}></label>
     </div>
     <fieldset><legend>Commission (% of the product FOB value of the client's first orders, paid once the buyer has paid in full)</legend>
-      <p class="muted small">Leave a rung empty (or 0) to use the standard rate set in <a href="/associates/ladder">Standard rates</a>. A personal rate applies to orders created after it is saved; each order keeps the rate fixed on it when it was created.</p>
+      <p class="muted small">Leave a rung empty (or 0) to carry on the last personal rate set below it; rungs below the first personal rate use the standard rate set in <a href="/associates/ladder">Standard rates</a>. A personal rate applies to orders created after it is saved; each order keeps the rate fixed on it when it was created.</p>
       <div class="field-grid">
         {% for pair in __rateLabels %}{% set f = pair[0] %}
-          <label>{{ pair[1] }} <small class="muted">(standard {{ ladder[f] | pct2 }}%)</small><input type="number" name="{{ f }}" min="0" max="20" step="0.01" placeholder="standard" value="{{ a0[f] if (a0[f] !== null and a0[f] !== undefined and (a0[f] | float) > 0) else '' }}"></label>
+          <label>{{ pair[1] }} <small class="muted">(standard {{ ladder[f] | pct2 }}%)</small><input type="number" name="{{ f }}" min="0" max="20" step="0.01" placeholder="e.g. 1.25" value="{{ a0[f] if (a0[f] !== null and a0[f] !== undefined and (a0[f] | float) > 0) else '' }}"></label>
         {% endfor %}
       </div>
       <label class="checkbox"><input type="checkbox" name="no_commission" value="1"{{ ' checked' if a0.no_commission == 1 else '' }}> No commission for this associate (introductions only)</label>
     </fieldset>
-    <label>Notes<input type="text" name="notes" maxlength="500" value="{{ a0.notes }}"></label>
+    <label>Notes<input type="text" name="notes" maxlength="500" value="{{ a0.notes }}" placeholder="Optional notes"></label>
     <div class="btn-row"><button type="submit">{{ 'Save' if editing else 'Add associate' }}</button> <a href="{{ ('/associates/' ~ editing.id) if editing else '/associates' }}">Cancel</a></div>
   </form>
 </div>

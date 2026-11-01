@@ -27,7 +27,7 @@
               <input type="hidden" name="month" value="{{ month }}">
               <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">
                 <input type="date" name="paid_on" required min="{{ r.earliestPaidOn }}" max="{{ today() }}" value="{{ today() }}" aria-label="Paid on" title="Paid on" style="width:10.5em">
-                <input type="number" name="paid_inr" required min="0.01" max="{{ r.amountPlain }}" step="0.01" value="{{ r.amountPlain }}" aria-label="Amount paid (₹)" title="Amount paid (₹)" style="width:8.5em">
+                <input type="number" name="paid_inr" required min="0.01" max="{{ r.amountPlain }}" step="0.01" value="{{ r.amountPlain }}" aria-label="Amount paid (₹)" title="Amount paid (₹)" style="width:8.5em" placeholder="e.g. 25000.00">
                 <input type="number" name="tds_inr" min="0" step="0.01" placeholder="TDS ₹" aria-label="TDS (₹)" title="TDS (₹), if any" style="width:7em" data-not-more-than="[name=paid_inr]" data-not-more-than-message="TDS cannot be more than the amount paid.">
                 <select name="paid_via" required aria-label="Paid via" title="Paid via"><option value="">Paid via…</option>{% for k, v in paidVia %}<option value="{{ k }}">{{ v | capitalize }}</option>{% endfor %}</select>
                 <input type="text" name="paid_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="Payroll Nov-2026 / UTR / cheque no." aria-label="Payment reference" title="Payment reference: payroll month, UTR or cheque no. (rule D-212)" style="width:13em">

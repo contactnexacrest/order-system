@@ -8,7 +8,7 @@
   <?php if ($messages === []): ?><p class="muted">No messages yet.</p><?php endif; ?>
   <form method="post" action="/associate/messages">
     <?= Csrf::field() ?>
-    <label>Your message<textarea name="body" required maxlength="4000" rows="4"></textarea></label>
+    <label>Your message<textarea name="body" required maxlength="4000" rows="4" placeholder="Type your message"></textarea></label>
     <button type="submit" class="btn-sm">Send</button>
   </form>
 </div>

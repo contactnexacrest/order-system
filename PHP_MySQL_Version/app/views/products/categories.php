@@ -19,9 +19,9 @@
     <summary>Edit <?= htmlspecialchars((string) $c['name']) ?></summary>
     <form method="post" action="/products/categories/<?= (int) $c['id'] ?>">
       <?= Csrf::field() ?>
-      <label>Name *<input type="text" name="name" required minlength="2" maxlength="80" value="<?= htmlspecialchars((string) $c['name']) ?>"></label>
+      <label>Name *<input type="text" name="name" required minlength="2" maxlength="80" value="<?= htmlspecialchars((string) $c['name']) ?>" placeholder="e.g. Granite slabs"></label>
       <?php for ($i = 0; $i < $maxAttributes; $i++): ?>
-      <label>Attribute <?= $i + 1 ?><?= $i === 0 ? ' *' : '' ?><input type="text" name="attributes[]" maxlength="60" <?= $i === 0 ? 'required' : '' ?> value="<?= htmlspecialchars((string) ($c['attributes'][$i] ?? '')) ?>"></label>
+      <label>Attribute <?= $i + 1 ?><?= $i === 0 ? ' *' : '' ?><input type="text" name="attributes[]" maxlength="60" <?= $i === 0 ? 'required' : '' ?> value="<?= htmlspecialchars((string) ($c['attributes'][$i] ?? '')) ?>" placeholder="e.g. Finish"></label>
       <?php endfor; ?>
       <label class="checkbox-row"><input type="checkbox" name="is_active" value="1" <?= (int) $c['is_active'] === 1 ? 'checked' : '' ?>> Active (offered on new order lines)</label>
       <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save <?= htmlspecialchars((string) $c['name']) ?></button></div>

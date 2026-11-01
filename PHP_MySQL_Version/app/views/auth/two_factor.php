@@ -8,7 +8,7 @@
   <form method="post" action="/2fa">
     <?= Csrf::field() ?>
     <label>Code
-      <input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autofocus>
+      <input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autofocus placeholder="6-digit code">
     </label>
     <button type="submit">Verify</button>
   </form>

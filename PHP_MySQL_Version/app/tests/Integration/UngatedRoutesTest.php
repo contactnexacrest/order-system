@@ -78,6 +78,9 @@ final class UngatedRoutesTest extends DbTestCase
         'GET /sop-assets/{} staff',
         'GET /sop/{} staff',
         'GET /super-admin super-admin',
+        // Owner decision 1 Nov 2026 (D-221): Admin → Self-approval rules, Super Admins only.
+        'GET /admin/self-approval super-admin',
+        'POST /admin/self-approval super-admin +csrf',
         'GET /supplier-action/{} public',
         'GET /supplier-action/{}/po-document public',
         'GET /test-mode super-admin',
@@ -416,7 +419,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(37, $checked);
+        self::assertSame(39, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -502,7 +505,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(9, $checked);
+        self::assertSame(11, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -529,7 +532,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(60, $checked);
+        self::assertSame(61, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -579,7 +582,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(33, $checked);
+        self::assertSame(34, $checked);
         self::assertSame([], $failed);
     }
 

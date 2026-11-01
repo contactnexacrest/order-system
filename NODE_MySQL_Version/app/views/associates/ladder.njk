@@ -8,14 +8,14 @@
     <fieldset><legend>Standard rate (% of product FOB value) by the associate's Nth client</legend>
       <div class="field-grid">
         {% for pair in __rateLabels %}
-          <label>{{ pair[1] }} *<input type="number" name="{{ pair[0] }}" required min="0" max="20" step="0.01" value="{{ (ladder[pair[0]] | float).toFixed(2) }}"></label>
+          <label>{{ pair[1] }} *<input type="number" name="{{ pair[0] }}" required min="0" max="20" step="0.01" value="{{ (ladder[pair[0]] | float).toFixed(2) }}" placeholder="e.g. 0.70"></label>
         {% endfor %}
       </div>
     </fieldset>
     <div class="field-grid">
-      <label>TDS on commission, India (section 194H) % *<input type="number" name="associate_tds_pct" required min="0" max="30" step="0.01" value="{{ (tds | float).toFixed(2) }}"></label>
-      <label>Client protection (months from acceptance) *<input type="number" name="associate_protection_months" required min="1" max="60" step="1" value="{{ protection | int }}"></label>
-      <label>Wait before a new bank account is used (days) *<input type="number" name="associate_bank_wait_days" required min="0" max="60" step="1" value="{{ wait | int }}"></label>
+      <label>TDS on commission, India (section 194H) % *<input type="number" name="associate_tds_pct" required min="0" max="30" step="0.01" value="{{ (tds | float).toFixed(2) }}" placeholder="e.g. 2.00"></label>
+      <label>Client protection (months from acceptance) *<input type="number" name="associate_protection_months" required min="1" max="60" step="1" value="{{ protection | int }}" placeholder="e.g. 12"></label>
+      <label>Wait before a new bank account is used (days) *<input type="number" name="associate_bank_wait_days" required min="0" max="60" step="1" value="{{ wait | int }}" placeholder="e.g. 7"></label>
     </div>
     <div class="btn-row"><button type="submit">Save</button> <a href="/associates">Back to associates</a></div>
   </form>

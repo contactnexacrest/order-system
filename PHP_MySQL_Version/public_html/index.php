@@ -22,6 +22,7 @@ use App\Controllers\VendorBillController;
 use App\Controllers\ClientController;
 use App\Controllers\DataExportController;
 use App\Controllers\AssociateAdminController;
+use App\Controllers\SelfApprovalController;
 use App\Controllers\AssociatePortalController;
 use App\Controllers\ClientIntakeController;
 use App\Controllers\ClientIntakeReviewController;
@@ -151,6 +152,7 @@ $ca = new CaController();
 $orderFinancials = new OrderFinancialsController();
 $incentives = new IncentiveController();
 $associateAdmin = new AssociateAdminController();
+$selfApproval = new SelfApprovalController();
 $associatePortal = new AssociatePortalController();
 $orderExpenses = new OrderExpenseController();
 $vendorBills = new VendorBillController();
@@ -388,6 +390,9 @@ $router->post('/signatories/global-default', [$signatories, 'setGlobalDefault'],
 $router->post('/signatories/document-types/{id}', [$signatories, 'setDocumentTypeDefault'], [SessionAuth::required(), PermissionCheck::requires('manage_signatories'), CsrfCheck::verify()]);
 
 $router->get('/super-admin', [$superAdmin, 'index'], [SessionAuth::required(), SuperAdminOnly::required()]);
+// Owner decision 1 Nov 2026 (D-221): which roles may approve their own work (payment terms, document review, e-mail send).
+$router->get('/admin/self-approval', [$selfApproval, 'index'], [SessionAuth::required(), SuperAdminOnly::required()]);
+$router->post('/admin/self-approval', [$selfApproval, 'save'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 $router->post('/super-admin/delegations', [$superAdmin, 'grantDelegation'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 $router->post('/super-admin/delegations/{id}/revoke', [$superAdmin, 'revokeDelegation'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);
 $router->post('/super-admin/set-permanent', [$superAdmin, 'setPermanent'], [SessionAuth::required(), SuperAdminOnly::required(), CsrfCheck::verify()]);

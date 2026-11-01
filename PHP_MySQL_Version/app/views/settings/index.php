@@ -152,7 +152,7 @@
       </details>
     <?php endforeach; ?>
     <label>Reason for this change * <small class="muted">(mandatory — recorded in the audit log against every field you change below)</small>
-      <textarea name="reason" id="settings-reason" rows="2" required></textarea>
+      <textarea name="reason" id="settings-reason" rows="2" required placeholder="At least 10 characters — say why"></textarea>
     </label>
     <button type="submit">Save changes</button>
   </form>

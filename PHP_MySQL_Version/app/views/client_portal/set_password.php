@@ -5,10 +5,10 @@
   <form method="post" action="/client/set-password/<?= htmlspecialchars($token) ?>">
     <?= Csrf::field() ?>
     <label>New Password
-      <input type="password" name="new_password" required autofocus>
+      <input type="password" name="new_password" required autofocus placeholder="At least 10 characters">
     </label>
     <label>Confirm Password
-      <input type="password" name="confirm_password" required>
+      <input type="password" name="confirm_password" required placeholder="Type the new password again">
     </label>
     <button type="submit">Set Password</button>
   </form>

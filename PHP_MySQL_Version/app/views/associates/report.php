@@ -1,7 +1,7 @@
 <?php $__m = static fn ($v): string => number_format((float) $v, 2); ?>
 <div class="card page-wide">
   <h1>Associates report — FY <?= htmlspecialchars($year) ?>–<?= substr((string) ((int) $year + 1), 2) ?></h1>
-  <form method="get" action="/reports/associates" class="inline-form"><label>Financial year from April <input type="number" name="fy" min="2020" max="2100" required value="<?= htmlspecialchars($year) ?>"></label><button type="submit" class="btn-sm">Show</button></form>
+  <form method="get" action="/reports/associates" class="inline-form"><label>Financial year from April <input type="number" name="fy" min="2020" max="2100" required value="<?= htmlspecialchars($year) ?>" placeholder="e.g. 2026"></label><button type="submit" class="btn-sm">Show</button></form>
 
   <div class="section"><h2>Performance <a class="btn-sm btn-secondary" href="/reports/associates?fy=<?= urlencode($year) ?>&amp;format=performance">CSV</a></h2>
     <table class="list"><tr><th>Associate</th><th>Status</th><th>Clients</th><th>Orders in year</th><th>FOB value of orders</th><th>Paid INR</th><th>TDS INR</th><th>Waiting INR</th></tr>

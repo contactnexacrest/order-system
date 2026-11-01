@@ -215,14 +215,18 @@ final class EmailDispatchService
         if (!$row || $row['status'] !== 'pending_approval') {
             throw new \RuntimeException('This send is not awaiting approval.');
         }
-        // QA-5 maker-checker (EML-03); owner decision 1 Nov 2026 (A-3,
-        // Q-MAIL-3): whoever requested this send never approves it — no
-        // exception, whatever their role.
-        if ($row['requested_by'] !== null && (int) $row['requested_by'] === $approverUserId) {
+        // QA-5 maker-checker (EML-03); owner decisions 1 Nov 2026 (A-3, then
+        // D-221): whoever requested this send approves it only when one of
+        // their roles is ticked in Admin → Self-approval rules.
+        $self = $row['requested_by'] !== null && (int) $row['requested_by'] === $approverUserId;
+        if ($self && !SelfApprovalRules::allowed('email_send', $approverUserId)) {
             throw new \RuntimeException('You requested this send — a different person must approve it.');
         }
         EmailLogRepository::approve($emailLogId, $approverUserId);
         AuditLogRepository::log($approverUserId, 'EMAIL_SEND_APPROVED', 'email_log', $emailLogId);
+        if ($self) {
+            AuditLogRepository::log($approverUserId, 'EMAIL_SEND_SELF_APPROVED', 'email_log', $emailLogId, null, null, 'approved by the person who requested it', 'Allowed by Admin → Self-approval rules.');
+        }
     }
 
     public static function rejectSend(int $emailLogId, int $approverUserId, string $reason): void

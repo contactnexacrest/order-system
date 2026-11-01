@@ -39,7 +39,7 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     associatePath = new URL(page.url()).pathname;
     await expect(page.locator('h1')).toContainText('Invited');
     await expect(page.locator('#profile')).toContainText('clients 1–5: 1.25% (personal)');
-    await expect(page.locator('#profile')).toContainText('clients 6–10: 1% (standard)');
+    await expect(page.locator('#profile')).toContainText('clients 6–10: 1.25% (personal)');
 
     verifyAssociateBank(ASSOCIATE_EMAIL);
     await page.locator('#profile select[name="status"]').selectOption('active');

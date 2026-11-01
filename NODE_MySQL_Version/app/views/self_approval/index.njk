@@ -1,0 +1,19 @@
+{# Owner decision 1 Nov 2026 (D-221). Expects: rules (key → label), current (key → role ids), roles, csrfToken. #}
+<div class="card">
+  <h1>Self-approval rules</h1>
+  <p class="muted">Normally a second person approves what someone else created. Tick the roles that may approve their <b>own</b> work for each rule. A person qualifies when any of their roles (their main role, the department they are logged in as, or a department membership) is ticked. Every self-approval is written to the audit log; leave a rule empty so that nobody self-approves. Only Super Admins can change this page; every change is logged.</p>
+  <form method="post" action="/admin/self-approval">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    {% for key, label in rules %}
+      <fieldset id="rule-{{ key }}">
+        <legend>{{ label }}</legend>
+        <div class="field-grid">
+          {% for r in roles %}
+            <label class="checkbox"><input type="checkbox" name="{{ key }}[]" value="{{ r.id }}"{% if (r.id | int) in current[key] %} checked{% endif %}> {{ r.name }}</label>
+          {% endfor %}
+        </div>
+      </fieldset>
+    {% endfor %}
+    <div class="btn-row"><button type="submit">Save rules</button></div>
+  </form>
+</div>

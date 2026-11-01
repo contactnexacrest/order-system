@@ -73,7 +73,7 @@ $shortReasonField = static function (string $leg, ?array $milestone = null) use 
     if (!$canApproveShort) {
         return '<p class="notice notice-warning small">' . $__owed . ' is still owed — record the rest when it arrives. Only a manager with "Approve short payment" can clear it short.</p>';
     }
-    return '<label>Reason for clearing it short * <small class="muted">(' . $__owed . ' still owed — recorded and shown on the order)</small><textarea name="short_reason" required minlength="10" maxlength="500" rows="2"></textarea></label>';
+    return '<label>Reason for clearing it short * <small class="muted">(' . $__owed . ' still owed — recorded and shown on the order)</small><textarea name="short_reason" required minlength="10" maxlength="500" rows="2" placeholder="At least 10 characters — say why"></textarea></label>';
 };
 // Owner decision 2026-10-30: each stage's gating button says, before the
 // click, which of the stage's documents still need generating, approving or
@@ -299,7 +299,7 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
           <?php endif; ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/inr-actual">
             <?= Csrf::field() ?>
-            <label>INR Amount Actually Credited *<input type="text" name="<?= $leg ?>_inr_actual" required></label>
+            <label>INR Amount Actually Credited *<input type="text" name="<?= $leg ?>_inr_actual" required placeholder="e.g. 150000.00"></label>
             <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Record' : 'Record INR Actual' ?></button>
           </form>
         <?php else: ?>
@@ -318,7 +318,7 @@ $renderInrActualWidget = function (string $leg, string $label) use ($payment, $o
             <?php endif; ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/<?= $leg ?>/firc">
               <?= Csrf::field() ?>
-              <label>FIRC/eBRC Reference *<input type="text" name="<?= $leg ?>_firc_reference" required></label>
+              <label>FIRC/eBRC Reference *<input type="text" name="<?= $leg ?>_firc_reference" required placeholder="e.g. FIRC/HDFC/2026/0412"></label>
               <label>Received On<input type="date" name="<?= $leg ?>_firc_received_at" value="<?= date('Y-m-d') ?>"></label>
               <button type="submit" class="btn-sm"><?= $lockMessage !== null ? 'Override &amp; Record' : 'Record FIRC/eBRC' ?></button>
             </form>
@@ -686,7 +686,7 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
               <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/<?= (int) $b['id'] ?>/pay" class="field-grid">
                 <?= \App\Helpers\Csrf::field() ?>
                 <?php if ($leg !== null): ?><input type="hidden" name="leg" value="<?= htmlspecialchars($leg) ?>"><?php endif; ?>
-                <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" max="<?= htmlspecialchars(number_format($b['remaining'], 2, '.', '')) ?>" name="paid_amount_inr" value="<?= htmlspecialchars(number_format($b['remaining'], 2, '.', '')) ?>" required></label>
+                <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" max="<?= htmlspecialchars(number_format($b['remaining'], 2, '.', '')) ?>" name="paid_amount_inr" value="<?= htmlspecialchars(number_format($b['remaining'], 2, '.', '')) ?>" required placeholder="e.g. 25000.00"></label>
                 <label>Paid on *<input type="date" name="paid_at" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required></label>
                 <label>Mode *
                   <select name="payment_mode" required>
@@ -727,7 +727,7 @@ $vendorBillFields = static function (string $defaultKind = 'invoice', array $rep
     </fieldset>
     <label>Bill / invoice no. *<input type="text" name="bill_no" required maxlength="100" placeholder="e.g. INV-120"></label>
     <label>Bill date *<input type="date" name="bill_date" required max="<?= date('Y-m-d') ?>"></label>
-    <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base></label>
+    <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base placeholder="e.g. 10000.00"></label>
     <label>GST rate (%) *
       <select name="gst_rate_pct" required data-gst-rate data-zero-if="gst_charge=reverse" data-zero-if-message="Under reverse charge the transporter charges no GST — pick 0%. We pay the 5% to the government ourselves.">
         <?php foreach ($gstRates as $o): ?>
@@ -737,7 +737,7 @@ $vendorBillFields = static function (string $defaultKind = 'invoice', array $rep
     </label>
     <label>GST (&#8377;) <small class="muted">(auto: Taxable &times; GST rate)</small><input type="text" readonly tabindex="-1" data-gst-amount value="0.00"></label>
     <label>Bill total (&#8377;) <small class="muted">(auto: Taxable + GST)</small><input type="text" readonly tabindex="-1" data-gst-total value="0.00"></label>
-    <label data-show-when="doc_kind=proforma">Amount asked now (&#8377;) <small class="muted">(leave blank when the proforma asks for the whole bill<?= $askedHint !== null ? ' — ' . htmlspecialchars($askedHint) : '' ?>)</small><input type="number" step="0.01" min="0.01" name="requested_amount_inr" data-not-more-than="[data-gst-total]" data-not-more-than-message="The amount asked now cannot be more than the bill total."></label>
+    <label data-show-when="doc_kind=proforma">Amount asked now (&#8377;) <small class="muted">(leave blank when the proforma asks for the whole bill<?= $askedHint !== null ? ' — ' . htmlspecialchars($askedHint) : '' ?>)</small><input type="number" step="0.01" min="0.01" name="requested_amount_inr" data-not-more-than="[data-gst-total]" data-not-more-than-message="The amount asked now cannot be more than the bill total." placeholder="e.g. 25000.00"></label>
     <?php if ($replaceable !== []): ?>
     <label class="full" data-show-when="doc_kind=invoice">Advance already paid on a proforma from this vendor
       <select name="replaces_bill_id">
@@ -1356,8 +1356,8 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>">
             <?= Csrf::field() ?>
             <div class="kv-grid">
-              <label>Description *<input type="text" name="description" value="<?= htmlspecialchars($p['description']) ?>" required></label>
-              <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>"></label>
+              <label>Description *<input type="text" name="description" value="<?= htmlspecialchars($p['description']) ?>" required placeholder="e.g. Granite slabs, polished"></label>
+              <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>" placeholder="e.g. 240 x 120 x 2 cm"></label>
               <label>Finish
                 <select name="finish">
                   <?php $__finishVal = (string) ($p['finish'] ?? ''); ?>
@@ -1367,7 +1367,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                   <?php endforeach; ?>
                 </select>
               </label>
-              <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>"></label>
+              <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>" placeholder="e.g. 100"></label>
               <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" <?= $p['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
               <label>Unit
                 <select name="unit">
@@ -1377,13 +1377,13 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                   <?php endforeach; ?>
                 </select>
               </label>
-              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>"></label>
+              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>" placeholder="e.g. 45.00"></label>
               <label>Line type
                 <select name="line_type">
                   <?php foreach (\App\Repositories\OrderProductRepository::LINE_TYPES as $__lt => $__ltLabel): ?><option value="<?= $__lt ?>" <?= ($p['line_type'] ?? 'goods') === $__lt ? 'selected' : '' ?>><?= $__ltLabel ?></option><?php endforeach; ?>
                 </select>
               </label>
-              <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code."></label>
+              <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" value="<?= htmlspecialchars($p['hs_code']) ?>" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
               <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" value="<?= htmlspecialchars((string) ($p['sac_code'] ?? '')) ?>" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
               <?php $__catLine = $p; ?>
               <?php // Owner decision D-215 (5a): the line's product category; another category's own attributes. ?>
@@ -1394,7 +1394,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
               </label>
               <?php foreach ($__productCategories as $__c): if ((int) $__c['is_system'] === 1) { continue; } $__vals = (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? (json_decode((string) ($__catLine['attribute_values'] ?? ''), true) ?: []) : []; ?>
               <fieldset class="category-attributes" data-show-when="category_id=<?= (int) $__c['id'] ?>"><legend><?= htmlspecialchars((string) $__c['name']) ?></legend>
-                <?php foreach ($__c['attributes'] as $__label): ?><label><?= htmlspecialchars($__label) ?><input type="text" name="attr_<?= (int) $__c['id'] ?>[]" maxlength="100" value="<?= htmlspecialchars((string) ($__vals[$__label] ?? '')) ?>"></label><?php endforeach; ?>
+                <?php foreach ($__c['attributes'] as $__label): ?><label><?= htmlspecialchars($__label) ?><input type="text" name="attr_<?= (int) $__c['id'] ?>[]" maxlength="100" value="<?= htmlspecialchars((string) ($__vals[$__label] ?? '')) ?>" placeholder="e.g. Black Galaxy"></label><?php endforeach; ?>
               </fieldset>
               <?php endforeach; ?>
             </div>
@@ -1422,8 +1422,8 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/products">
           <?= Csrf::field() ?>
           <div class="kv-grid">
-            <label>Description *<input type="text" name="description" required></label>
-            <label>Dimensions<input type="text" name="dimensions"></label>
+            <label>Description *<input type="text" name="description" required placeholder="e.g. Granite slabs, polished"></label>
+            <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 240 x 120 x 2 cm"></label>
             <label>Finish
               <select name="finish">
                 <option value="">—</option>
@@ -1432,7 +1432,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                 <?php endforeach; ?>
               </select>
             </label>
-            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999"></label>
+            <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" placeholder="e.g. 100"></label>
             <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
             <label>Unit
               <select name="unit">
@@ -1441,13 +1441,13 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                 <?php endforeach; ?>
               </select>
             </label>
-            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99"></label>
+            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 45.00"></label>
             <label>Line type
               <select name="line_type">
                 <?php foreach (\App\Repositories\OrderProductRepository::LINE_TYPES as $__lt => $__ltLabel): ?><option value="<?= $__lt ?>"><?= $__ltLabel ?></option><?php endforeach; ?>
               </select>
             </label>
-            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code."></label>
+            <label>HS Code <small class="muted">(goods)</small><input type="text" name="hs_code" list="hs_code_list_edit" data-required-when="line_type=goods" data-required-when-message="Goods need an HS code." placeholder="e.g. 68022310"></label>
             <label>SAC Code <small class="muted">(services)</small><input type="text" name="sac_code" pattern="99[0-9]{4}" maxlength="6" placeholder="e.g. 998719" title="6 digits starting 99" data-required-when="line_type=service" data-required-when-message="A service needs its SAC code."></label>
             <?php $__catLine = []; ?>
             <?php // Owner decision D-215 (5a): the line's product category; another category's own attributes. ?>
@@ -1458,7 +1458,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
             </label>
             <?php foreach ($__productCategories as $__c): if ((int) $__c['is_system'] === 1) { continue; } $__vals = (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? (json_decode((string) ($__catLine['attribute_values'] ?? ''), true) ?: []) : []; ?>
             <fieldset class="category-attributes" data-show-when="category_id=<?= (int) $__c['id'] ?>"><legend><?= htmlspecialchars((string) $__c['name']) ?></legend>
-              <?php foreach ($__c['attributes'] as $__label): ?><label><?= htmlspecialchars($__label) ?><input type="text" name="attr_<?= (int) $__c['id'] ?>[]" maxlength="100" value="<?= htmlspecialchars((string) ($__vals[$__label] ?? '')) ?>"></label><?php endforeach; ?>
+              <?php foreach ($__c['attributes'] as $__label): ?><label><?= htmlspecialchars($__label) ?><input type="text" name="attr_<?= (int) $__c['id'] ?>[]" maxlength="100" value="<?= htmlspecialchars((string) ($__vals[$__label] ?? '')) ?>" placeholder="e.g. Black Galaxy"></label><?php endforeach; ?>
             </fieldset>
             <?php endforeach; ?>
           </div>
@@ -1681,11 +1681,11 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/milestones/<?= (int) $__m['id'] ?>" class="inline-form milestone-record">
           <?= Csrf::field() ?>
           <strong>Milestone <?= (int) $__m['seq'] ?> received</strong>
-          <label>Amount received (<?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="amount" step="0.01" min="0.01" max="<?= $__msFob > 0 ? number_format($__msFob, 2, '.', '') : '999999999999.99' ?>" required value="<?= number_format(round($__msFob * (float) $__m['pct'] / 100, 2), 2, '.', '') ?>"></label>
-          <label>Exchange rate (₹ per 1 <?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="exchange_rate" step="0.0001" min="0.0001" max="999999.9999" required></label>
-          <label>Bank reference (UTR / SWIFT) *<input type="text" name="bank_reference" minlength="4" maxlength="100" required></label>
+          <label>Amount received (<?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="amount" step="0.01" min="0.01" max="<?= $__msFob > 0 ? number_format($__msFob, 2, '.', '') : '999999999999.99' ?>" required value="<?= number_format(round($__msFob * (float) $__m['pct'] / 100, 2), 2, '.', '') ?>" placeholder="e.g. 1500.00"></label>
+          <label>Exchange rate (₹ per 1 <?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="exchange_rate" step="0.0001" min="0.0001" max="999999.9999" required placeholder="e.g. 83.25"></label>
+          <label>Bank reference (UTR / SWIFT) *<input type="text" name="bank_reference" minlength="4" maxlength="100" required placeholder="e.g. HDFCN26304123456"></label>
           <label>Received on *<input type="date" name="received_on" required value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>"></label>
-          <label>Note <small class="muted">(added to the description)</small><input type="text" name="staff_note" maxlength="255"></label>
+          <label>Note <small class="muted">(added to the description)</small><input type="text" name="staff_note" maxlength="255" placeholder="Optional note"></label>
           <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the milestone due (e.g. bank charges deducted) — record it anyway</label>
           <button type="submit" class="btn-sm">Record Milestone <?= (int) $__m['seq'] ?> Remittance</button>
         </form>
@@ -1707,8 +1707,8 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <p class="muted small">Up to <?= \App\Repositories\PaymentMilestoneRepository::MAX_STEPS ?> milestones. Each is a share of the FOB value and says when it is due, e.g. "on shipment — within 3 Calendar Days of receiving the scanned Bill of Lading". The balance is what is left after the advance (<?= $__msPct($__msAdvPct) ?>%) and the milestones. Leave every row empty for plain advance and balance.</p>
           <?php for ($__i = 0; $__i < \App\Repositories\PaymentMilestoneRepository::MAX_STEPS; $__i++): $__row = $__ms[$__i] ?? null; ?>
           <div class="milestone-edit-row">
-            <label>Milestone <?= $__i + 2 ?> %<input type="number" name="milestone_pct[]" step="0.01" min="0.01" max="99" value="<?= $__row !== null ? $__msPct((float) $__row['pct']) : '' ?>"></label>
-            <label>When it is due<input type="text" name="milestone_due[]" minlength="5" maxlength="200" value="<?= htmlspecialchars((string) ($__row['due_text'] ?? '')) ?>"></label>
+            <label>Milestone <?= $__i + 2 ?> %<input type="number" name="milestone_pct[]" step="0.01" min="0.01" max="99" value="<?= $__row !== null ? $__msPct((float) $__row['pct']) : '' ?>" placeholder="e.g. 20"></label>
+            <label>When it is due<input type="text" name="milestone_due[]" minlength="5" maxlength="200" value="<?= htmlspecialchars((string) ($__row['due_text'] ?? '')) ?>" placeholder="e.g. on inspection"></label>
           </div>
           <?php endfor; ?>
           <button type="submit" class="btn-sm">Save Payment Schedule</button>
@@ -1886,7 +1886,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                   <tr><th>Reviewer</th><th>Status</th><th>Comments</th><th>Reviewed</th></tr>
                   <?php foreach ($reviews as $r): ?>
                     <tr>
-                      <td><?= htmlspecialchars($r['reviewer_name']) ?></td>
+                      <td><?= htmlspecialchars($r['reviewer_name']) ?><?php if (($d['generated_by'] ?? null) !== null && (int) $d['generated_by'] === (int) $r['reviewer_id']): ?> <span class="badge badge-pending" title="Owner decision D-221: allowed by Admin → Self-approval rules">self-review</span><?php endif; ?></td>
                       <td><?= htmlspecialchars($r['status']) ?></td>
                       <td><?= htmlspecialchars($r['comments'] ?? '') ?></td>
                       <td><?= htmlspecialchars($r['reviewed_at'] ?? '—') ?></td>
@@ -2294,7 +2294,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/received-date" class="field-grid">
               <?= Csrf::field() ?>
               <label>Date the buyer's PO was received *<input type="date" name="buyer_po_received_on" required min="<?= htmlspecialchars(substr((string) $order['created_at'], 0, 10)) ?>" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars((string) ($order['buyer_po_received_on'] ?? '')) ?>"></label>
-              <label>Reason for the change *<input type="text" name="reason" required minlength="10" maxlength="500"></label>
+              <label>Reason for the change *<input type="text" name="reason" required minlength="10" maxlength="500" placeholder="At least 10 characters — say why"></label>
               <button type="submit" class="btn-sm">Save date</button>
             </form>
           </details>
@@ -2306,7 +2306,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php else: ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po">
           <?= Csrf::field() ?>
-          <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required></label>
+          <label>Buyer's PO / Reference Number *<input type="text" name="buyers_po_ref" required placeholder="e.g. PO-2026-0412"></label>
           <label>Date the buyer's PO was received *<input type="date" name="buyer_po_received_on" required min="<?= htmlspecialchars(substr((string) $order['created_at'], 0, 10)) ?>" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
           <p class="muted small">The day it arrived by email or post, not the date printed on it. For an associate's client, this is Day 1 of the agreement's 10 days.</p>
           <?= $stageGateNotice(2, "confirm the buyer's PO received") ?>
@@ -2404,10 +2404,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php else: ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/lc" enctype="multipart/form-data">
           <?= Csrf::field() ?>
-          <label>Issuing Bank<input type="text" name="lc_bank_name"></label>
-          <label>LC Number<input type="text" name="lc_number"></label>
-          <label>LC Amount * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="lc_amount" required></label>
-          <label>LC Charges <small class="muted">(billed to the client, in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="lc_charges_amount"></label>
+          <label>Issuing Bank<input type="text" name="lc_bank_name" placeholder="e.g. ABN AMRO Bank"></label>
+          <label>LC Number<input type="text" name="lc_number" placeholder="e.g. LC/ABN/2026/0451"></label>
+          <label>LC Amount * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="lc_amount" required placeholder="e.g. 45000.00"></label>
+          <label>LC Charges <small class="muted">(billed to the client, in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="lc_charges_amount" placeholder="e.g. 2500.00"></label>
           <label>LC Document (optional)<input type="file" name="lc_file"></label>
           <?= $stepBadge('5d') ?><button type="submit" class="btn-sm">Record LC Details</button>
         </form>
@@ -2455,7 +2455,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <?= Csrf::field() ?>
           <?php $advanceDue = round((float) $fobTotal * (float) ($order['advance_pct'] ?? 0) / 100, 2); ?>
           <p class="advance-due-note">Advance due on this order: <strong><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format($advanceDue, 2) ?></strong> (<?= htmlspecialchars(rtrim(rtrim(number_format((float) ($order['advance_pct'] ?? 0), 2), '0'), '.')) ?>% of the order value <?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $fobTotal, 2) ?>). Enter what the bank actually received.</p>
-          <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required data-remit-amount value="<?= $advanceDue > 0 ? number_format($advanceDue, 2, '.', '') : '' ?>"></label>
+          <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required data-remit-amount value="<?= $advanceDue > 0 ? number_format($advanceDue, 2, '.', '') : '' ?>" placeholder="e.g. 1800.00"></label>
           <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the advance due (e.g. bank charges deducted) — record it anyway</label>
           <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
@@ -2546,7 +2546,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/lc-amendments" enctype="multipart/form-data">
           <?= Csrf::field() ?>
           <label>Amendment date *<input type="date" name="amended_on" required max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
-          <label>Amendment number / reference *<input type="text" name="reference" required maxlength="100"></label>
+          <label>Amendment number / reference *<input type="text" name="reference" required maxlength="100" placeholder="e.g. REF-2026-001"></label>
           <label>What changed *<input type="text" name="change_text" required minlength="5" maxlength="500" placeholder="e.g. Last shipment date extended to 30 Nov"></label>
           <label>Copy of the amendment (optional)<input type="file" name="amendment_file" accept=".pdf,.jpg,.jpeg,.png"></label>
           <button type="submit" class="btn-sm">Record amendment</button>
@@ -2619,7 +2619,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-acknowledgment">
           <?= Csrf::field() ?>
-          <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
+          <label>Buyer replied by email? Record the evidence here (quote the reply) *<textarea name="acknowledged_note" rows="3" required placeholder="e.g. Acknowledged by phone with the buyer"></textarea></label>
           <?= $stageGateNotice(4, "record the buyer's acknowledgement") ?>
           <?= $stepBadge('6c') ?><button type="submit"<?= $stageGateDisabled(4) ?> class="btn-sm btn-success">Record Buyer's Email Acknowledgement (unlocks Step 7)</button>
         </form>
@@ -2639,7 +2639,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-acknowledgment">
           <?= Csrf::field() ?>
-          <label>Describe how the buyer confirmed (quote their reply, or note the call/meeting) *<textarea name="acknowledged_note" rows="3" required></textarea></label>
+          <label>Describe how the buyer confirmed (quote their reply, or note the call/meeting) *<textarea name="acknowledged_note" rows="3" required placeholder="e.g. Acknowledged by phone with the buyer"></textarea></label>
           <?= $stageGateNotice(4, "record the buyer's acknowledgement") ?>
           <?= $stepBadge('6c') ?><button type="submit"<?= $stageGateDisabled(4) ?> class="btn-sm btn-success">Record Buyer's Acknowledgement (unlocks Step 7)</button>
         </form>
@@ -2702,8 +2702,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <?php foreach ($products as $__p): ?><option value="<?= (int) $__p['id'] ?>"><?= htmlspecialchars((string) $__p['description']) ?> (<?= $__p['quantity_is_tbc'] ? 'qty TBC' : htmlspecialchars((string) $__p['quantity']) . ' ' . htmlspecialchars((string) ($__p['unit'] ?? '')) ?>)</option><?php endforeach; ?>
         </select>
       </label>
-      <label>What is needed <small class="muted">(if not a product line)</small><input type="text" name="description" maxlength="500"></label>
-      <label>Quantity <small class="muted">(defaults to the product line's)</small><input type="number" name="quantity" step="0.001" min="0.001"></label>
+      <label>What is needed <small class="muted">(if not a product line)</small><input type="text" name="description" maxlength="500" placeholder="e.g. Granite slabs, polished"></label>
+      <label>Quantity <small class="muted">(defaults to the product line's)</small><input type="number" name="quantity" step="0.001" min="0.001" placeholder="e.g. 100"></label>
       <label>Unit <small class="muted">(defaults to the product line's)</small>
         <select name="unit">
           <option value="">—</option>
@@ -2711,8 +2711,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </select>
       </label>
       <label>Needed by *<input type="date" name="needed_by" required min="<?= date('Y-m-d') ?>"></label>
-      <label>Specification<input type="text" name="specification" maxlength="1000"></label>
-      <label>Note for Procurement<input type="text" name="note" maxlength="500"></label>
+      <label>Specification<input type="text" name="specification" maxlength="1000" placeholder="e.g. 2 cm, polished"></label>
+      <label>Note for Procurement<input type="text" name="note" maxlength="500" placeholder="Optional note"></label>
       <div class="btn-row"><button type="submit" class="btn-sm btn-accent">+ Raise purchase requirement</button></div>
     </form>
     <?php endif; ?>
@@ -2760,7 +2760,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <small class="muted">This supplier has more than one type — pick the one that applies to this order. It prints on the Supplier PO.</small>
         </label>
         <label>Material / Stone Type<input type="text" name="material_stone_type" placeholder="e.g., Black Granite"></label>
-        <label>Grade<input type="text" name="grade" value="Grade A"></label>
+        <label>Grade<input type="text" name="grade" value="Grade A" placeholder="e.g. Grade A"></label>
         <label>Surface Finish
           <select name="surface_finish">
             <option value="">—</option>
@@ -2798,11 +2798,11 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?php endforeach; ?>
           </select>
         </label>
-        <label>GST Amount (INR) <small class="muted">(auto: Basic Value &times; GST Rate)</small><input type="text" name="gst_amount_inr" data-spo-calc="gst_amount_inr"></label>
-        <label>Total Payable (INR) <small class="muted">(auto: Basic Value + GST Amount)</small><input type="text" name="total_payable_inr" data-spo-calc="total_payable_inr"></label>
+        <label>GST Amount (INR) <small class="muted">(auto: Basic Value &times; GST Rate)</small><input type="text" name="gst_amount_inr" data-spo-calc="gst_amount_inr" placeholder="e.g. 1800.00"></label>
+        <label>Total Payable (INR) <small class="muted">(auto: Basic Value + GST Amount)</small><input type="text" name="total_payable_inr" data-spo-calc="total_payable_inr" placeholder="e.g. 11800.00"></label>
         <label>Advance (%)<input type="text" name="advance_pct" data-spo-calc="advance_pct" placeholder="e.g., 30"></label>
-        <label>Advance Amount (INR) <small class="muted">(auto: Total Payable &times; Advance %)</small><input type="text" name="advance_amount_inr" data-spo-calc="advance_amount_inr"></label>
-        <label>Balance Amount (INR) <small class="muted">(auto: Total Payable &minus; Advance Amount)</small><input type="text" name="balance_amount_inr" data-spo-calc="balance_amount_inr"></label>
+        <label>Advance Amount (INR) <small class="muted">(auto: Total Payable &times; Advance %)</small><input type="text" name="advance_amount_inr" data-spo-calc="advance_amount_inr" placeholder="e.g. 150000.00"></label>
+        <label>Balance Amount (INR) <small class="muted">(auto: Total Payable &minus; Advance Amount)</small><input type="text" name="balance_amount_inr" data-spo-calc="balance_amount_inr" placeholder="e.g. 250000.00"></label>
         <label>Delivery Location
           <select id="spo-delivery-location-select">
             <option value="">— Select —</option>
@@ -3110,9 +3110,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <?= Csrf::field() ?>
           <label>Result *<select name="inspection_result" required><option value="">Choose…</option><option value="passed">Passed</option><option value="failed">Failed</option></select></label>
           <label>Inspected on *<input type="date" name="inspected_on" required max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
-          <label>Agency *<input type="text" name="agency_name" required minlength="2" maxlength="150" value="<?= htmlspecialchars((string) ($inspection['agency_name'] ?? ($orderInspectionFee['agency_name'] ?? ''))) ?>"></label>
+          <label>Agency *<input type="text" name="agency_name" required minlength="2" maxlength="150" value="<?= htmlspecialchars((string) ($inspection['agency_name'] ?? ($orderInspectionFee['agency_name'] ?? ''))) ?>" placeholder="e.g. SGS India"></label>
           <label>Report (PDF or image) *<input type="file" name="inspection_report" required accept=".pdf,.jpg,.jpeg,.png"></label>
-          <label style="grid-column:1/-1">Note <small class="muted">(required when failed: what failed)</small><textarea name="inspection_note" rows="2" maxlength="500" data-required-if="inspection_result=failed" data-required-if-message="Say what failed (at least 10 characters)." minlength="10"></textarea></label>
+          <label style="grid-column:1/-1">Note <small class="muted">(required when failed: what failed)</small><textarea name="inspection_note" rows="2" maxlength="500" data-required-if="inspection_result=failed" data-required-if-message="Say what failed (at least 10 characters)." minlength="10" placeholder="e.g. Thickness out of tolerance on 3 slabs"></textarea></label>
           <div><button type="submit" class="btn-sm">Record Inspection Result</button></div>
         </form>
         <?php endif; ?>
@@ -3212,9 +3212,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/freight-terms">
         <?= Csrf::field() ?>
-        <label>Confirmed Freight Rate<input type="text" name="confirmed_freight_rate"></label>
+        <label>Confirmed Freight Rate<input type="text" name="confirmed_freight_rate" placeholder="e.g. 950.00"></label>
         <?php if (strtoupper((string) ($order['incoterm_code'] ?? '')) === 'CIF'): // Q-R5-2: only a CIF seller insures ?>
-        <label>Insurance Amount (CIF only)<input type="text" name="insurance_amount"></label>
+        <label>Insurance Amount (CIF only)<input type="text" name="insurance_amount" placeholder="e.g. 120.00"></label>
         <?php endif; ?>
         <?php // Owner request (2026-10-27): the forwarder comes from the Logistics Partners directory, like the supplier in 7a. ?>
         <label>Freight Forwarder (Logistics Partner) *
@@ -3279,7 +3279,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php if ($payment && $payment['freight_remittance_received_at'] !== null): ?><?= $remittanceRecordedNote('freight', 'Next: Step 9d — mark it cleared once the bank confirms, or record another receipt below if the buyer paid in parts.') ?><?php endif; ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight">
         <?= Csrf::field() ?>
-        <label>Freight Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="freight_amount" required data-remit-amount></label>
+        <label>Freight Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="freight_amount" required data-remit-amount placeholder="e.g. 950.00"></label>
         <label>Received On<input type="date" name="freight_received_at" value="<?= date('Y-m-d') ?>"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="freight_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
@@ -3357,7 +3357,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/packing" enctype="multipart/form-data">
         <?= Csrf::field() ?>
         <div class="kv-grid">
-          <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="<?= htmlspecialchars((string) ($packing['actual_quantity_packed'] ?? '')) ?>"></label>
+          <label>Actual Quantity Packed<input type="text" name="actual_quantity_packed" value="<?= htmlspecialchars((string) ($packing['actual_quantity_packed'] ?? '')) ?>" placeholder="e.g. 98"></label>
           <label>Actual Quantity Unit
             <?php $__packingUnit = $packing['actual_quantity_unit'] ?? ($orderedSummary['comparable'] ? $orderedSummary['unit'] : ''); ?>
             <select name="actual_quantity_unit">
@@ -3367,10 +3367,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               <?php endforeach; ?>
             </select>
           </label>
-          <label>Crate Count<input type="text" name="crate_count" value="<?= htmlspecialchars((string) ($packing['crate_count'] ?? '')) ?>"></label>
-          <label>Total Net Weight (kg)<input type="text" name="total_net_weight_kg" value="<?= htmlspecialchars((string) ($packing['total_net_weight_kg'] ?? '')) ?>"></label>
-          <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="<?= htmlspecialchars((string) ($packing['total_gross_weight_kg'] ?? '')) ?>"></label>
-          <label>Total CBM (m&sup3;)<input type="text" name="total_cbm" value="<?= htmlspecialchars((string) ($packing['total_cbm'] ?? '')) ?>"></label>
+          <label>Crate Count<input type="text" name="crate_count" value="<?= htmlspecialchars((string) ($packing['crate_count'] ?? '')) ?>" placeholder="e.g. 12"></label>
+          <label>Total Net Weight (kg)<input type="text" name="total_net_weight_kg" value="<?= htmlspecialchars((string) ($packing['total_net_weight_kg'] ?? '')) ?>" placeholder="e.g. 23500"></label>
+          <label>Total Gross Weight (kg)<input type="text" name="total_gross_weight_kg" value="<?= htmlspecialchars((string) ($packing['total_gross_weight_kg'] ?? '')) ?>" placeholder="e.g. 24000"></label>
+          <label>Total CBM (m&sup3;)<input type="text" name="total_cbm" value="<?= htmlspecialchars((string) ($packing['total_cbm'] ?? '')) ?>" placeholder="e.g. 28.5"></label>
           <label>Packing Date<input type="date" name="packing_date" value="<?= htmlspecialchars((string) ($packing['packing_date'] ?? '')) ?>"></label>
           <label>Shortfall % <?= $orderedSummary['comparable'] ? '(auto-computed — this field is ignored when the ordered quantity is comparable)' : '' ?><input type="text" name="shortfall_pct" value="<?= htmlspecialchars((string) ($packing['shortfall_pct'] ?? '')) ?>" <?= $orderedSummary['comparable'] ? 'readonly' : '' ?>></label>
           <label>Buyer's Written Approval of Shortfall <small class="muted">(required only if the shortfall exceeds tolerance)</small><input type="file" name="buyer_approval" accept=".pdf,.jpg,.jpeg,.png,.eml,.msg"></label>
@@ -3381,8 +3381,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <tr><th>Crate No.</th><th>Marks &amp; Numbers</th><th>Product</th><th>L×W×H (cm)</th><th>Pcs</th><th>Net (kg)</th><th>Gross (kg)</th><th>CBM</th><th>HS Code</th></tr>
           <?php $existingCrates = $crates ?: [[], [], []]; foreach ($existingCrates as $c): ?>
           <tr>
-            <td><input type="text" name="crate_no[]" value="<?= htmlspecialchars($c['crate_no'] ?? '') ?>" style="width:70px;"></td>
-            <td><input type="text" name="crate_marks_numbers[]" value="<?= htmlspecialchars($c['marks_numbers'] ?? '') ?>" style="width:130px;"></td>
+            <td><input type="text" name="crate_no[]" value="<?= htmlspecialchars($c['crate_no'] ?? '') ?>" style="width:70px;" placeholder="e.g. 1"></td>
+            <td><input type="text" name="crate_marks_numbers[]" value="<?= htmlspecialchars($c['marks_numbers'] ?? '') ?>" style="width:130px;" placeholder="e.g. NX/01-12"></td>
             <td><?php $__crateProduct = (string) ($c['product_description'] ?? ''); $__crateKnown = in_array($__crateProduct, array_map(static fn(array $p): string => (string) $p['description'], $products), true); ?>
               <select name="crate_product_description[]" data-crate-product style="width:160px;">
                 <option value="" data-hs="">— Product —</option>
@@ -3391,11 +3391,11 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <?php endforeach; ?>
                 <?php if ($__crateProduct !== '' && !$__crateKnown): ?><option value="<?= htmlspecialchars($__crateProduct) ?>" data-hs="<?= htmlspecialchars((string) ($c['hs_code'] ?? '')) ?>" selected><?= htmlspecialchars($__crateProduct) ?> (earlier entry)</option><?php endif; ?>
               </select></td>
-            <td><input type="text" name="crate_dimensions[]" value="<?= htmlspecialchars($c['dimensions_lwh_cm'] ?? '') ?>" style="width:80px;"></td>
-            <td><input type="text" name="crate_pcs[]" value="<?= htmlspecialchars((string) ($c['pcs'] ?? '')) ?>" style="width:50px;"></td>
-            <td><input type="text" name="crate_net_weight_kg[]" value="<?= htmlspecialchars((string) ($c['net_weight_kg'] ?? '')) ?>" style="width:70px;"></td>
-            <td><input type="text" name="crate_gross_weight_kg[]" value="<?= htmlspecialchars((string) ($c['gross_weight_kg'] ?? '')) ?>" style="width:70px;"></td>
-            <td><input type="text" name="crate_cbm[]" value="<?= htmlspecialchars((string) ($c['cbm'] ?? '')) ?>" style="width:60px;"></td>
+            <td><input type="text" name="crate_dimensions[]" value="<?= htmlspecialchars($c['dimensions_lwh_cm'] ?? '') ?>" style="width:80px;" placeholder="e.g. 120 x 80 x 90 cm"></td>
+            <td><input type="text" name="crate_pcs[]" value="<?= htmlspecialchars((string) ($c['pcs'] ?? '')) ?>" style="width:50px;" placeholder="e.g. 20"></td>
+            <td><input type="text" name="crate_net_weight_kg[]" value="<?= htmlspecialchars((string) ($c['net_weight_kg'] ?? '')) ?>" style="width:70px;" placeholder="e.g. 800"></td>
+            <td><input type="text" name="crate_gross_weight_kg[]" value="<?= htmlspecialchars((string) ($c['gross_weight_kg'] ?? '')) ?>" style="width:70px;" placeholder="e.g. 850"></td>
+            <td><input type="text" name="crate_cbm[]" value="<?= htmlspecialchars((string) ($c['cbm'] ?? '')) ?>" style="width:60px;" placeholder="e.g. 1.25"></td>
             <td><input type="text" value="<?= htmlspecialchars($c['hs_code'] ?? '') ?>" data-crate-hs readonly tabindex="-1" title="Taken from the product's HS code" style="width:70px;"></td>
           </tr>
           <?php endforeach; ?>
@@ -3438,9 +3438,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/shipping">
         <?= Csrf::field() ?>
         <div class="kv-grid">
-          <label>Shipping Line<input type="text" name="shipping_line" value="<?= htmlspecialchars($shipping['shipping_line'] ?? '') ?>"></label>
-          <label>Vessel Name<input type="text" name="vessel_name" value="<?= htmlspecialchars($shipping['vessel_name'] ?? '') ?>"></label>
-          <label>Voyage Number<input type="text" name="voyage_number" value="<?= htmlspecialchars($shipping['voyage_number'] ?? '') ?>"></label>
+          <label>Shipping Line<input type="text" name="shipping_line" value="<?= htmlspecialchars($shipping['shipping_line'] ?? '') ?>" placeholder="e.g. Maersk"></label>
+          <label>Vessel Name<input type="text" name="vessel_name" value="<?= htmlspecialchars($shipping['vessel_name'] ?? '') ?>" placeholder="e.g. MSC Gulsun"></label>
+          <label>Voyage Number<input type="text" name="voyage_number" value="<?= htmlspecialchars($shipping['voyage_number'] ?? '') ?>" placeholder="e.g. 645W"></label>
           <label>ETD <small class="muted">(Estimated Time of Departure)</small><input type="date" name="etd" value="<?= htmlspecialchars($shipping['etd'] ?? '') ?>"></label>
           <label>ETA <small class="muted">(Estimated Time of Arrival)</small><input type="date" name="eta" value="<?= htmlspecialchars($shipping['eta'] ?? '') ?>"></label>
           <label>Container Type
@@ -3452,9 +3452,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               <?php endforeach; ?>
             </select>
           </label>
-          <label>Number of Containers<input type="number" name="container_count" min="1" step="1" value="<?= htmlspecialchars((string) ($shipping['container_count'] ?? '')) ?>"></label>
-          <label>Container No.<input type="text" name="container_no" value="<?= htmlspecialchars($shipping['container_no'] ?? '') ?>"></label>
-          <label>Seal No.<input type="text" name="seal_no" value="<?= htmlspecialchars($shipping['seal_no'] ?? '') ?>"></label>
+          <label>Number of Containers<input type="number" name="container_count" min="1" step="1" value="<?= htmlspecialchars((string) ($shipping['container_count'] ?? '')) ?>" placeholder="e.g. 1"></label>
+          <label>Container No.<input type="text" name="container_no" value="<?= htmlspecialchars($shipping['container_no'] ?? '') ?>" placeholder="e.g. MSKU1234567"></label>
+          <label>Seal No.<input type="text" name="seal_no" value="<?= htmlspecialchars($shipping['seal_no'] ?? '') ?>" placeholder="e.g. SL123456"></label>
         </div>
         <?= $stepBadge('10d') ?><button type="submit" class="btn-sm">Save Shipping Details</button>
       </form>
@@ -3523,7 +3523,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                         <option value="revision_requested">Request Revision</option>
                       </select>
                     </label>
-                    <label>Notes <small class="muted">(required if requesting a revision)</small><input type="text" name="notes"></label>
+                    <label>Notes <small class="muted">(required if requesting a revision)</small><input type="text" name="notes" placeholder="Optional notes"></label>
                     <button type="submit" class="btn-sm">Submit Review</button>
                   </form>
                 </details>
@@ -3553,7 +3553,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-issued" enctype="multipart/form-data">
         <?= Csrf::field() ?>
-        <label>BL Number *<input type="text" name="bl_number" required></label>
+        <label>BL Number *<input type="text" name="bl_number" required placeholder="e.g. MAEU123456789"></label>
         <label>BL Date<input type="date" name="bl_date" value="<?= date('Y-m-d') ?>"></label>
         <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip"></label>
         <?php if ($shipmentGateBlockers !== [] && $canOverrideShipmentGates): ?>
@@ -3592,9 +3592,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php if ($canManageShipping): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/shipping-bill" class="field-grid">
         <?= Csrf::field() ?>
-        <label>Shipping Bill No. *<input type="text" name="shipping_bill_no" required maxlength="30" value="<?= htmlspecialchars((string) ($shipping['shipping_bill_no'] ?? '')) ?>"></label>
+        <label>Shipping Bill No. *<input type="text" name="shipping_bill_no" required maxlength="30" value="<?= htmlspecialchars((string) ($shipping['shipping_bill_no'] ?? '')) ?>" placeholder="e.g. 1234567"></label>
         <label>Shipping Bill Date *<input type="date" name="shipping_bill_date" required max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars((string) ($shipping['shipping_bill_date'] ?? '')) ?>"></label>
-        <label>Customs Exchange Rate (&#8377; for 1 <?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="customs_exchange_rate" required min="0.0001" max="100000" step="0.0001" value="<?= htmlspecialchars((string) ($shipping['customs_exchange_rate'] ?? '')) ?>"><small class="muted">As printed on the shipping bill. An invoice already in Zoho Books keeps the rate it was sent at.</small></label>
+        <label>Customs Exchange Rate (&#8377; for 1 <?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="customs_exchange_rate" required min="0.0001" max="100000" step="0.0001" value="<?= htmlspecialchars((string) ($shipping['customs_exchange_rate'] ?? '')) ?>" placeholder="e.g. 83.25"><small class="muted">As printed on the shipping bill. An invoice already in Zoho Books keeps the rate it was sent at.</small></label>
         <div><button type="submit" class="btn-sm"><?= !empty($shipping['shipping_bill_no']) ? 'Update Shipping Bill' : 'Save Shipping Bill' ?></button></div>
       </form>
       <?php endif; ?>
@@ -3675,7 +3675,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance">
         <?= Csrf::field() ?>
         <?php $__balOwed = \App\Services\PartPaymentService::summary((int) $order['id'], 'balance')['owed']; ?>
-        <label>Balance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="balance_amount" required data-remit-amount value="<?= htmlspecialchars($payment && $payment['balance_remittance_received_at'] !== null ? ($__balOwed !== null && $__balOwed > 0 ? number_format($__balOwed, 2, '.', '') : '') : (string) ($payment['balance_amount'] ?? '')) ?>"></label>
+        <label>Balance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="balance_amount" required data-remit-amount value="<?= htmlspecialchars($payment && $payment['balance_remittance_received_at'] !== null ? ($__balOwed !== null && $__balOwed > 0 ? number_format($__balOwed, 2, '.', '') : '') : (string) ($payment['balance_amount'] ?? '')) ?>" placeholder="e.g. 2700.00"></label>
         <label>Received On<input type="date" name="balance_received_at" value="<?= date('Y-m-d') ?>"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="balance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
@@ -3864,7 +3864,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <?php foreach (\App\Repositories\OrderExpenseRepository::CATEGORIES as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
-            <label>Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="amount_inr" required></label>
+            <label>Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="amount_inr" required placeholder="e.g. 25000.00"></label>
             <label>Paid by *
               <select name="paid_by" required>
                 <?php foreach (\App\Repositories\OrderExpenseRepository::PAID_BY as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
@@ -3917,7 +3917,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <?php endforeach; ?>
               </select>
             </label>
-            <label>Amount (INR) *<input type="text" name="amount_inr" required></label>
+            <label>Amount (INR) *<input type="text" name="amount_inr" required placeholder="e.g. 25000.00"></label>
             <label>Date<input type="date" name="incurred_at" value="<?= date('Y-m-d') ?>"></label>
             <label>Description * <small class="muted">(who was paid and for what — their invoice / receipt no.)</small><input type="text" name="description" required minlength="10" maxlength="255" placeholder="e.g. Agent commission — Ravi Traders, their invoice RT/45 dated 20 Oct"></label>
             <?php // Owner decision 2026-10-29: real paid costs go to Zoho Books as expenses, paid from here. ?>
@@ -3940,7 +3940,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </div>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/travel-expenses">
             <?= Csrf::field() ?>
-            <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="number" min="0" step="any" name="factory_distance_km" value="<?= htmlspecialchars($orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? (string) $orderTravelExpenses['factory_distance_km'] : '') ?>"></label>
+            <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="number" min="0" step="any" name="factory_distance_km" value="<?= htmlspecialchars($orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? (string) $orderTravelExpenses['factory_distance_km'] : '') ?>" placeholder="e.g. 120"></label>
             <label>Travel Expense % of FOB Value *
               <select name="expense_pct" required>
                 <?php $savedPct = $orderTravelExpenses ? (string) (float) $orderTravelExpenses['expense_pct'] : ''; ?>
@@ -3950,7 +3950,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <option value="other" <?= !in_array($savedPct, ['5', '7', '10', '15'], true) && $savedPct !== '' ? 'selected' : '' ?>>Other — specify</option>
               </select>
             </label>
-            <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="number" min="0" step="any" name="expense_pct_other" value="<?= !in_array($savedPct, ['5', '7', '10', '15', ''], true) ? htmlspecialchars($savedPct) : '' ?>"></label>
+            <label>Custom % <small class="muted">(only used when "Other" is selected above)</small><input type="number" min="0" step="any" name="expense_pct_other" value="<?= !in_array($savedPct, ['5', '7', '10', '15', ''], true) ? htmlspecialchars($savedPct) : '' ?>" placeholder="e.g. 5"></label>
             <button type="submit" class="btn-sm">Save</button>
           </form>
         </div>
@@ -3973,7 +3973,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <option value="client" <?= ($orderInspectionFee['fee_payer'] ?? '') === 'client' ? 'selected' : '' ?>>Client</option>
               </select>
             </label>
-            <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" value="<?= htmlspecialchars($orderInspectionFee && $orderInspectionFee['fee_amount'] !== null ? (string) $orderInspectionFee['fee_amount'] : '') ?>"></label>
+            <label>Fee Amount (INR) <small class="muted">(only recorded as an expense when NexaCrest pays)</small><input type="text" name="fee_amount" value="<?= htmlspecialchars($orderInspectionFee && $orderInspectionFee['fee_amount'] !== null ? (string) $orderInspectionFee['fee_amount'] : '') ?>" placeholder="e.g. 12000.00"></label>
             <?php // Owner decision 2026-10-29: the fee goes to Zoho Books as an expense, paid from here. ?>
             <?php $__feePaidFrom = null; foreach ($orderCostEntries as $__c) { if ($orderInspectionFee && (int) $__c['id'] === (int) ($orderInspectionFee['cost_entry_id'] ?? 0)) { $__feePaidFrom = $__c['paid_from']; } } ?>
             <label data-show-when="fee_payer=nexacrest">Paid from *
@@ -4006,11 +4006,11 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <summary><?= $orderLcDetails ? 'Edit LC / bank loan details' : 'Record LC / bank loan details for this order' ?></summary>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/lc-details" enctype="multipart/form-data">
             <?= Csrf::field() ?>
-            <label>LC Number<input type="text" name="lc_number" value="<?= htmlspecialchars($lcDetails['lc_number'] ?? '') ?>"></label>
+            <label>LC Number<input type="text" name="lc_number" value="<?= htmlspecialchars($lcDetails['lc_number'] ?? '') ?>" placeholder="e.g. LC/ABN/2026/0451"></label>
             <label>Final LC Document<input type="file" name="lc_file" accept=".pdf,.jpg,.jpeg,.png"></label>
-            <label>Bank Loan Amount<input type="text" name="bank_loan_amount" value="<?= htmlspecialchars($lcDetails['bank_loan_amount'] !== null ? (string) $lcDetails['bank_loan_amount'] : '') ?>"></label>
-            <label>Interest Rate (%)<input type="text" name="bank_loan_interest_rate" value="<?= htmlspecialchars($lcDetails['bank_loan_interest_rate'] !== null ? (string) $lcDetails['bank_loan_interest_rate'] : '') ?>"></label>
-            <label>Total Interest Paid<input type="text" name="bank_loan_interest_paid" value="<?= htmlspecialchars($lcDetails['bank_loan_interest_paid'] !== null ? (string) $lcDetails['bank_loan_interest_paid'] : '') ?>"></label>
+            <label>Bank Loan Amount<input type="text" name="bank_loan_amount" value="<?= htmlspecialchars($lcDetails['bank_loan_amount'] !== null ? (string) $lcDetails['bank_loan_amount'] : '') ?>" placeholder="e.g. 500000.00"></label>
+            <label>Interest Rate (%)<input type="text" name="bank_loan_interest_rate" value="<?= htmlspecialchars($lcDetails['bank_loan_interest_rate'] !== null ? (string) $lcDetails['bank_loan_interest_rate'] : '') ?>" placeholder="e.g. 9.50"></label>
+            <label>Total Interest Paid<input type="text" name="bank_loan_interest_paid" value="<?= htmlspecialchars($lcDetails['bank_loan_interest_paid'] !== null ? (string) $lcDetails['bank_loan_interest_paid'] : '') ?>" placeholder="e.g. 4500.00"></label>
             <button type="submit" class="btn-sm">Save LC / Loan Details</button>
           </form>
         </details>
@@ -4034,7 +4034,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php elseif (!empty($canEditInrActual)): ?>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/lc/firc" class="field-grid">
             <?= Csrf::field() ?>
-            <label>FIRC/eBRC reference *<input type="text" name="lc_firc_reference" required maxlength="100"></label>
+            <label>FIRC/eBRC reference *<input type="text" name="lc_firc_reference" required maxlength="100" placeholder="e.g. FIRC/HDFC/2026/0412"></label>
             <label>FIRC/eBRC date<input type="date" name="lc_firc_received_at" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
             <div><button type="submit" class="btn-sm">Record FIRC/eBRC</button></div>
           </form>
@@ -4048,9 +4048,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/lc-received" class="field-grid">
         <?= Csrf::field() ?>
         <label>Date the bank paid *<input type="date" name="lc_received_at" required max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_received_at'] ?? '')) ?>"></label>
-        <label>Amount paid under the LC (<?= htmlspecialchars($__cur) ?>) *<input type="number" name="lc_received_amount" required min="0.01" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_received_amount'] ?? '')) ?>"></label>
-        <label>Rupees credited (&#8377;) *<input type="number" name="lc_inr_credited" required min="0.01" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_inr_credited'] ?? '')) ?>"><small class="muted">As on the bank's credit advice.</small></label>
-        <label>Bank charges deducted (&#8377;)<input type="number" name="lc_bank_charges_inr" min="0" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_bank_charges_inr'] ?? '0')) ?>"></label>
+        <label>Amount paid under the LC (<?= htmlspecialchars($__cur) ?>) *<input type="number" name="lc_received_amount" required min="0.01" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_received_amount'] ?? '')) ?>" placeholder="e.g. 45000.00"></label>
+        <label>Rupees credited (&#8377;) *<input type="number" name="lc_inr_credited" required min="0.01" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_inr_credited'] ?? '')) ?>" placeholder="e.g. 3700000.00"><small class="muted">As on the bank's credit advice.</small></label>
+        <label>Bank charges deducted (&#8377;)<input type="number" name="lc_bank_charges_inr" min="0" step="0.01" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_bank_charges_inr'] ?? '0')) ?>" placeholder="e.g. 2500.00"></label>
         <label style="grid-column:1 / -1">Bank reference of the credit * <small class="muted">(UTR / bank ref. / FIRC no. on the bank's advice)</small><input type="text" name="lc_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" value="<?= htmlspecialchars((string) ($orderLcDetails['lc_bank_reference'] ?? '')) ?>" placeholder="e.g. 0915-2026-778"><small class="muted">Rule D-212: it goes into this payment's description here and in Zoho Books.</small></label>
         <div><button type="submit" class="btn-sm"><?= !empty($orderLcDetails['lc_received_at']) ? 'Update LC Payment' : 'Record LC Payment' ?></button></div>
       </form>
@@ -4222,7 +4222,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php elseif (!$shipping || !$shipping['bl_originals_received_at']): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-originals-received">
         <?= Csrf::field() ?>
-        <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3"></label>
+        <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3" placeholder="e.g. 3"></label>
         <?= $stepBadge('13b') ?><button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
       </form>
     <?php else: ?>
@@ -4240,10 +4240,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <p class="muted small">Save these details, then generate the printable endorsement — it states who to endorse the BL to ("Pay to the order of"), the BL/vessel/voyage, both ports, the latest PI/CI references, and the authorised signatory, exactly as it should be written or stamped on the reverse of each original BL.</p>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-endorsement">
         <?= Csrf::field() ?>
-        <label>BL Number<input type="text" name="bl_number" value="<?= htmlspecialchars($blEndorsement['bl_number'] ?? $shipping['bl_number'] ?? '') ?>"></label>
+        <label>BL Number<input type="text" name="bl_number" value="<?= htmlspecialchars($blEndorsement['bl_number'] ?? $shipping['bl_number'] ?? '') ?>" placeholder="e.g. MAEU123456789"></label>
         <label>Vessel / Voyage<input type="text" name="vessel_voyage" placeholder="e.g. MSC MAYA / 012W" value="<?= htmlspecialchars($blEndorsement['vessel_voyage'] ?? (trim(($shipping['vessel_name'] ?? '') . ' / ' . ($shipping['voyage_number'] ?? '')) !== '/' ? trim(($shipping['vessel_name'] ?? '') . ' / ' . ($shipping['voyage_number'] ?? '')) : '')) ?>"></label>
-        <label>Port of Loading<input type="text" name="port_of_loading" value="<?= htmlspecialchars($blEndorsement['port_of_loading'] ?? $order['port_of_loading_name'] ?? 'Chennai, India') ?>"></label>
-        <label>Port of Discharge<input type="text" name="port_of_discharge" value="<?= htmlspecialchars($blEndorsement['port_of_discharge'] ?? $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? '') ?>"></label>
+        <label>Port of Loading<input type="text" name="port_of_loading" value="<?= htmlspecialchars($blEndorsement['port_of_loading'] ?? $order['port_of_loading_name'] ?? 'Chennai, India') ?>" placeholder="e.g. Chennai"></label>
+        <label>Port of Discharge<input type="text" name="port_of_discharge" value="<?= htmlspecialchars($blEndorsement['port_of_discharge'] ?? $order['port_of_discharge_name'] ?? $order['port_of_discharge_text'] ?? '') ?>" placeholder="e.g. Rotterdam, Netherlands"></label>
         <label>Date of Endorsement<input type="date" name="date_of_endorsement" value="<?= htmlspecialchars($blEndorsement['date_of_endorsement'] ?? date('Y-m-d')) ?>"></label>
         <?= $stepBadge('13c') ?><button type="submit" class="btn-sm">Save BL Endorsement Details</button>
       </form>
@@ -4310,9 +4310,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/close" onsubmit="return confirmFieldOverride(this, 'closing this order without both required documents approved');" style="border:1px solid #D9822B; padding:10px; border-radius:4px;">
         <?= Csrf::field() ?>
         <input type="hidden" name="override_gate" value="1">
-        <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
+        <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required placeholder="e.g. DHL 1234567890"></label>
         <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
-          <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+          <textarea class="override-reason" name="override_reason" rows="2" required minlength="10" placeholder="At least 10 characters — say why"></textarea>
         </label>
         <?= $stepBadge('13f') ?><button type="submit" class="btn-sm btn-danger">Override &amp; Close Order</button>
       </form>
@@ -4320,7 +4320,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php else: ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/close">
         <?= Csrf::field() ?>
-        <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required></label>
+        <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required placeholder="e.g. DHL 1234567890"></label>
         <?= $stepBadge('13f') ?><button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
     <?php endif; ?>
@@ -4401,12 +4401,12 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <strong><?= htmlspecialchars($b['scheme_name']) ?></strong> <span class="muted small">— claimed &#8377;<?= number_format((float) $b['claimed_amount'], 2) ?> on <?= htmlspecialchars((string) $b['claimed_at']) ?><?= $b['received_amount'] !== null ? ', received &#8377;' . number_format((float) $b['received_amount'], 2) : '' ?></span>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits/<?= (int) $b['id'] ?>/correct" class="field-grid">
               <?= Csrf::field() ?>
-              <label>Claimed (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required value="<?= htmlspecialchars((string) $b['claimed_amount']) ?>"></label>
+              <label>Claimed (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required value="<?= htmlspecialchars((string) $b['claimed_amount']) ?>" placeholder="e.g. 25000.00"></label>
               <label>Claimed On *<input type="date" name="claimed_at" required value="<?= htmlspecialchars((string) $b['claimed_at']) ?>"></label>
-              <label>Claim Ref.<input type="text" name="reference_number" value="<?= htmlspecialchars((string) ($b['reference_number'] ?? '')) ?>"></label>
-              <label>Received (&#8377;) <small class="muted">(empty = not received yet)</small><input type="number" step="0.01" min="0" name="received_amount" value="<?= htmlspecialchars((string) ($b['received_amount'] ?? '')) ?>"></label>
+              <label>Claim Ref.<input type="text" name="reference_number" value="<?= htmlspecialchars((string) ($b['reference_number'] ?? '')) ?>" placeholder="e.g. REF-2026-001"></label>
+              <label>Received (&#8377;) <small class="muted">(empty = not received yet)</small><input type="number" step="0.01" min="0" name="received_amount" value="<?= htmlspecialchars((string) ($b['received_amount'] ?? '')) ?>" placeholder="e.g. 1500.00"></label>
               <label>Received On<input type="date" name="received_at" value="<?= htmlspecialchars((string) ($b['received_at'] ?? date('Y-m-d'))) ?>"></label>
-              <label>Credited by <small class="muted">(bank UTR / e-scrip no.; needed with a received amount)</small><input type="text" name="received_reference" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" data-required-if="received_amount" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." value="<?= htmlspecialchars((string) ($b['received_reference'] ?? '')) ?>"></label>
+              <label>Credited by <small class="muted">(bank UTR / e-scrip no.; needed with a received amount)</small><input type="text" name="received_reference" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" data-required-if="received_amount" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." value="<?= htmlspecialchars((string) ($b['received_reference'] ?? '')) ?>" placeholder="e.g. HDFCN26304123456"></label>
               <label class="full">Reason for the correction *<input type="text" name="reason" required minlength="10" placeholder="e.g. Typed 50,000 instead of 5,000"></label>
               <div><button type="submit" class="btn-sm">Save Correction</button></div>
             </form>
@@ -4431,11 +4431,11 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <?php endforeach; ?>
               </select>
             </label>
-            <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number"></label>
-            <label>Claimed Amount *<input type="text" name="claimed_amount" required></label>
+            <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number" placeholder="e.g. REF-2026-001"></label>
+            <label>Claimed Amount *<input type="text" name="claimed_amount" required placeholder="e.g. 25000.00"></label>
             <label>Claimed On *<input type="date" name="claimed_at" value="<?= date('Y-m-d') ?>" required></label>
-            <label>Currency<input type="text" name="currency_code" value="INR"></label>
-            <label>Notes<input type="text" name="notes"></label>
+            <label>Currency<input type="text" name="currency_code" value="INR" placeholder="e.g. USD"></label>
+            <label>Notes<input type="text" name="notes" placeholder="Optional notes"></label>
             <button type="submit" class="btn-sm">Record Claim</button>
           </form>
       </details>
@@ -4489,7 +4489,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <?= Csrf::field() ?>
           <input type="hidden" name="override_gate" value="1">
           <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
-            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10" placeholder="At least 10 characters — say why"></textarea>
           </label>
           <button type="submit" class="btn-sm btn-danger">Override &amp; Mark Fully Settled</button>
         </form>
@@ -4528,7 +4528,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <?= Csrf::field() ?>
           <input type="hidden" name="override_gate" value="1">
           <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
-            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+            <textarea class="override-reason" name="override_reason" rows="2" required minlength="10" placeholder="At least 10 characters — say why"></textarea>
           </label>
           <button type="submit" class="btn-sm btn-danger">Override &amp; Mark Fully Settled</button>
         </form>
@@ -4621,7 +4621,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             </select>
           </label>
           <label>Feedback / testimonial
-            <textarea name="comments" rows="4"><?= htmlspecialchars($testimonialSuggestion ?? '') ?></textarea>
+            <textarea name="comments" rows="4" placeholder="Type your comments"><?= htmlspecialchars($testimonialSuggestion ?? '') ?></textarea>
           </label>
           <p class="muted small">A suggested testimonial written from this order's details — change it to what the client actually told you before recording it.</p>
           <button type="submit" class="btn-sm">Record Feedback</button>
@@ -4684,7 +4684,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </select>
       </label>
       <label><input type="checkbox" name="is_locked" value="1" style="display:inline-block;width:auto;" <?= $order['is_locked'] ? 'checked' : '' ?>> Locked (normally set automatically once status = complete)</label>
-      <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" required></textarea></label>
+      <label>Reason for this change * <textarea class="override-reason" name="reason" rows="2" required placeholder="At least 10 characters — say why"></textarea></label>
       <button type="submit" class="btn-sm btn-danger">Override Status/Lock</button>
     </form>
   </details>
@@ -4717,7 +4717,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       </label>
       <label class="checkbox-row" style="display:inline-block; margin:0 6pt 0 0; font-weight:normal;"><input type="checkbox" name="generate_docx" value="1"> Also generate DOCX</label>
       <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
-        <textarea class="override-reason" name="override_reason" rows="2" required minlength="10"></textarea>
+        <textarea class="override-reason" name="override_reason" rows="2" required minlength="10" placeholder="At least 10 characters — say why"></textarea>
       </label>
       <button type="submit" class="btn-sm btn-danger" data-loading-text="Generating…">Force-Generate</button>
     </form>

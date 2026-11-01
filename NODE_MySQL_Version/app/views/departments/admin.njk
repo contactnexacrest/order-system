@@ -78,7 +78,7 @@
       <summary><span class="dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:{{ dept.color }}"></span>{{ dept.name }} <span class="muted small">{{ dept.code }} · {{ list.length }} designation{{ '' if list.length == 1 else 's' }}</span></summary>
       <form method="post" action="/admin/departments/{{ dept.id }}/update" class="field-grid">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Name *<input type="text" name="name" value="{{ dept.name }}" required minlength="2" maxlength="100"></label>
+        <label>Name *<input type="text" name="name" value="{{ dept.name }}" required minlength="2" maxlength="100" placeholder="e.g. Logistics"></label>
         <label>Colour *<input type="color" name="color" value="{{ dept.color }}" required></label>
         <label class="inline"><input type="checkbox" name="is_active" value="1" {{ 'checked' if dept.is_active == 1 else '' }}> Active (people can log in as it)</label>
         <label class="inline"><input type="checkbox" name="sees_whole_company" value="1" {{ 'checked' if dept.sees_whole_company == 1 else '' }}> Sees the whole company</label>
@@ -89,7 +89,7 @@
         <tr><th>Designation</th><th>Level</th><th>Approval limit (₹)</th><th>Active</th><th></th></tr>
         {% for d in list %}{% set formId = 'designation-' + d.id %}
         <tr>
-          <td><input form="{{ formId }}" type="text" name="title" value="{{ d.title }}" required minlength="2" maxlength="100"></td>
+          <td><input form="{{ formId }}" type="text" name="title" value="{{ d.title }}" required minlength="2" maxlength="100" placeholder="e.g. Logistics Executive"></td>
           <td><select form="{{ formId }}" name="level" required>{% for key, label in levels %}<option value="{{ key }}" {{ 'selected' if d.level == key else '' }}>{{ label }}</option>{% endfor %}</select></td>
           <td><input form="{{ formId }}" type="number" name="approval_limit_inr" min="0" step="0.01" value="{{ d.approval_limit_inr if d.approval_limit_inr !== null else '' }}" placeholder="none"></td>
           <td><input form="{{ formId }}" type="checkbox" name="is_active" value="1" {{ 'checked' if d.is_active == 1 else '' }} aria-label="Active"></td>

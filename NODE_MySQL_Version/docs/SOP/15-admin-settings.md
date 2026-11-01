@@ -92,6 +92,31 @@ order.
 - System Administrator manages users, settings and lists, but has no
   full data export.
 
+### Self-approval rules (owner decision D-221, 1 Nov 2026)
+
+Normally a second person approves what someone else created. **Self-approval
+rules** (left menu, Super Admins only) sets, for each rule, the roles whose
+holders may approve their **own** work:
+
+| Rule | Default | Refused with |
+|---|---|---|
+| Approve the payment terms of an order they created | Managing Director, Executive Director | "You created this order, so its payment terms must be approved by someone else." |
+| Review (approve) a document they generated | Managing Director, Executive Director | "This document's own generator cannot be assigned as its reviewer — a different person must review it." |
+| Approve an e-mail send they requested | Managing Director, Executive Director | "You requested this send — a different person must approve it." |
+
+1. Tick or untick the roles under each rule, then **Save rules**. The page
+   says "Self-approval rules saved. They apply from the next approval."
+2. A person qualifies when any of their roles (main role, the department
+   they are logged in as, or a department membership) is ticked. Leave a
+   rule empty so that nobody self-approves.
+3. Every self-approval is written to the audit log (PAYMENT_TERMS_SELF_APPROVED,
+   DOCUMENT_SELF_REVIEWED, EMAIL_SEND_SELF_APPROVED); a self-review shows a
+   **self-review** badge in the document's review list. Every change to the
+   rules is logged as SELF_APPROVAL_RULE_CHANGED with the roles before and
+   after.
+4. A self-review that was assigned while allowed is refused at approval if
+   the rule has since been withdrawn.
+
 ### Permissions added 1 Nov 2026
 
 | Permission | Who has it | What it allows |

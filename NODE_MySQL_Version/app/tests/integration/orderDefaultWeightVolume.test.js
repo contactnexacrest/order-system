@@ -85,14 +85,17 @@ describe('Order default weight/volume values (90-item backlog "default weight/vo
     expect(text).toContain('name="estimated_total_cbm" value="8.2"');
     expect(text).toContain('name="estimated_gross_weight_kg" value="27000"');
     expect(text).toMatch(/name="estimated_net_weight_kg" value="25500(\.0+)?"/);
-    expect(text).not.toMatch(/name="estimated_(total_cbm|gross_weight_kg|net_weight_kg)" value="[^"]*" placeholder=/);
+    // Owner rule 2026-11-01 (D-220): every input also has a placeholder — a hint shown only when the field is cleared; the default stays the value.
+    expect(text).not.toMatch(/name="estimated_(total_cbm|gross_weight_kg|net_weight_kg)" value=""/);
   });
 
-  it('has no example placeholders on these fields of the create form', async () => {
+  it('the create form carries the defaults as values (the placeholder only shows when a field is cleared)', async () => {
     const agent = await loggedInAgent();
 
     const { text } = await agent.get('/orders/create');
 
-    expect(text).not.toMatch(/name="estimated_(total_cbm|gross_weight_kg|net_weight_kg)" value="[^"]*" placeholder=/);
+    expect(text).toContain('name="estimated_total_cbm" value="8.2"');
+    expect(text).toContain('name="estimated_gross_weight_kg" value="27000"');
+    expect(text).toContain('name="estimated_net_weight_kg" value="26000"');
   });
 });

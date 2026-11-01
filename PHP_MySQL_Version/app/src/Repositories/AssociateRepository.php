@@ -92,10 +92,10 @@ final class AssociateRepository
     }
 
     /**
-     * The rate (%) for the associate's Nth client — owner decision 1 Nov 2026
-     * (AS-17): the associate's personal rate for that rung when it is set
-     * (above 0), else the global ladder; none at all when the associate is
-     * marked "no commission".
+     * The rate (%) for the associate's Nth client — owner decisions 1 Nov 2026
+     * (AS-17, D-221): the associate's personal rate for that rung when it is
+     * set (above 0), else the last personal rate set on a lower rung, else the
+     * global ladder; none at all when the associate is marked "no commission".
      */
     public static function rateFor(array $associate, int $orderNumber): float
     {
@@ -115,9 +115,14 @@ final class AssociateRepository
                 break;
             }
         }
-        $personal = $associate[$column] ?? null;
-        if ($personal !== null && $personal !== '' && (float) $personal > 0) {
-            return ['rate' => (float) $personal, 'source' => 'personal'];
+        // Owner decision 1 Nov 2026 (D-221): an empty (or 0) rung carries on the last personal rate set below it;
+        // rungs below the first personal rate use the standard ladder.
+        $columns = array_values(self::TIERS);
+        for ($i = array_search($column, $columns, true); $i >= 0; $i--) {
+            $personal = $associate[$columns[$i]] ?? null;
+            if ($personal !== null && $personal !== '' && (float) $personal > 0) {
+                return ['rate' => (float) $personal, 'source' => 'personal'];
+            }
         }
         return ['rate' => (float) (self::globalLadder()[$column] ?? 0), 'source' => 'global'];
     }

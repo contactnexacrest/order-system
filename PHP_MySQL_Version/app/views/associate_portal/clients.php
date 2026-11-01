@@ -21,8 +21,8 @@ $__codeChosen = false;
         <h3>A link for one buyer</h3>
         <form method="post" action="/associate/invitations">
           <?= Csrf::field() ?>
-          <label>Company name *<input type="text" name="company_name" required minlength="2" maxlength="255"></label>
-          <label>Country *<input type="text" name="country" required maxlength="100"></label>
+          <label>Company name *<input type="text" name="company_name" required minlength="2" maxlength="255" placeholder="e.g. Rotterdam Stone Trading BV"></label>
+          <label>Country *<input type="text" name="country" required maxlength="100" placeholder="e.g. Netherlands"></label>
           <button type="submit" class="btn-sm">Create link</button>
         </form>
       </div>

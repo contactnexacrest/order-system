@@ -69,7 +69,7 @@ $__sourceText = [
 
     <form method="post" action="/orders/<?= $__oid ?>/incentive">
       <?= Csrf::field() ?>
-      <label>Reward for this order (&#8377;) <input type="number" name="reward_override_inr" min="0" step="1" value="<?= (int) round((float) ($__inc['reward_override_inr'] ?? 0)) ?>" required style="width:10em"> <small class="muted">0 = use the settings</small></label>
+      <label>Reward for this order (&#8377;) <input type="number" name="reward_override_inr" min="0" step="1" value="<?= (int) round((float) ($__inc['reward_override_inr'] ?? 0)) ?>" required style="width:10em" placeholder="e.g. 50000"> <small class="muted">0 = use the settings</small></label>
       <label><input type="checkbox" name="is_excluded" value="1"<?= !empty($__inc['is_excluded']) ? ' checked' : '' ?>> Exclude this order (no team reward)</label>
       <label>Associate commission on this order
         <select name="associate_mode">

@@ -95,24 +95,24 @@
                 <div class="card-nested">
                   <form method="post" action="/products/suppliers/<?= (int) $s['id'] ?>/update">
                     <?= Csrf::field() ?>
-                    <label>Supplier Name *<input type="text" name="supplier_name" value="<?= View::e($s['supplier_name']) ?>" required></label>
-                    <label>Location<input type="text" name="location" value="<?= View::e($s['location'] ?? '') ?>"></label>
-                    <label>Contact Person<input type="text" name="contact_person" value="<?= View::e($s['contact_person'] ?? '') ?>"></label>
-                    <label>Contact Phone<input type="text" name="contact_phone" value="<?= View::e($s['contact_phone'] ?? '') ?>"></label>
-                    <label>Contact Email<input type="text" name="contact_email" value="<?= View::e($s['contact_email'] ?? '') ?>"></label>
+                    <label>Supplier Name *<input type="text" name="supplier_name" value="<?= View::e($s['supplier_name']) ?>" required placeholder="e.g. Sri Balaji Granites"></label>
+                    <label>Location<input type="text" name="location" value="<?= View::e($s['location'] ?? '') ?>" placeholder="e.g. Krishnagiri, Tamil Nadu"></label>
+                    <label>Contact Person<input type="text" name="contact_person" value="<?= View::e($s['contact_person'] ?? '') ?>" placeholder="e.g. Rajesh Kumar"></label>
+                    <label>Contact Phone<input type="text" name="contact_phone" value="<?= View::e($s['contact_phone'] ?? '') ?>" placeholder="e.g. +91 98765 43210"></label>
+                    <label>Contact Email<input type="text" name="contact_email" value="<?= View::e($s['contact_email'] ?? '') ?>" placeholder="e.g. name@company.com"></label>
                     <label>FOB Source
                       <select name="fob_source">
                         <option value="direct" <?= $s['fob_source'] === 'direct' ? 'selected' : '' ?>>Direct</option>
                         <option value="computed" <?= $s['fob_source'] === 'computed' ? 'selected' : '' ?>>Computed</option>
                       </select>
                     </label>
-                    <label>FOB Value (direct only)<input type="number" step="0.01" name="fob_value" value="<?= View::e($s['fob_value'] !== null ? (string) $s['fob_value'] : '') ?>"></label>
-                    <label>Factory Cost override<input type="number" step="0.01" name="factory_cost" value="<?= View::e($s['factory_cost'] !== null ? (string) $s['factory_cost'] : '') ?>"></label>
-                    <label>Transportation Cost override<input type="number" step="0.01" name="transportation_cost" value="<?= View::e($s['transportation_cost'] !== null ? (string) $s['transportation_cost'] : '') ?>"></label>
-                    <label>Packing Cost override<input type="number" step="0.01" name="packing_cost" value="<?= View::e($s['packing_cost'] !== null ? (string) $s['packing_cost'] : '') ?>"></label>
-                    <label>Loading Cost override<input type="number" step="0.01" name="loading_cost" value="<?= View::e($s['loading_cost'] !== null ? (string) $s['loading_cost'] : '') ?>"></label>
-                    <label>CHA Cost override<input type="number" step="0.01" name="cha_cost" value="<?= View::e($s['cha_cost'] !== null ? (string) $s['cha_cost'] : '') ?>"></label>
-                    <label>Notes<textarea name="notes" rows="2"><?= View::e($s['notes'] ?? '') ?></textarea></label>
+                    <label>FOB Value (direct only)<input type="number" step="0.01" name="fob_value" value="<?= View::e($s['fob_value'] !== null ? (string) $s['fob_value'] : '') ?>" placeholder="e.g. 4500.00"></label>
+                    <label>Factory Cost override<input type="number" step="0.01" name="factory_cost" value="<?= View::e($s['factory_cost'] !== null ? (string) $s['factory_cost'] : '') ?>" placeholder="e.g. 350000"></label>
+                    <label>Transportation Cost override<input type="number" step="0.01" name="transportation_cost" value="<?= View::e($s['transportation_cost'] !== null ? (string) $s['transportation_cost'] : '') ?>" placeholder="e.g. 9000"></label>
+                    <label>Packing Cost override<input type="number" step="0.01" name="packing_cost" value="<?= View::e($s['packing_cost'] !== null ? (string) $s['packing_cost'] : '') ?>" placeholder="e.g. 12000"></label>
+                    <label>Loading Cost override<input type="number" step="0.01" name="loading_cost" value="<?= View::e($s['loading_cost'] !== null ? (string) $s['loading_cost'] : '') ?>" placeholder="e.g. 8000"></label>
+                    <label>CHA Cost override<input type="number" step="0.01" name="cha_cost" value="<?= View::e($s['cha_cost'] !== null ? (string) $s['cha_cost'] : '') ?>" placeholder="e.g. 15000"></label>
+                    <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes"><?= View::e($s['notes'] ?? '') ?></textarea></label>
                     <label><input type="checkbox" name="is_primary" value="1" <?= $s['is_primary'] ? 'checked' : '' ?>> Primary supplier</label>
                     <button type="submit" class="btn-sm">Save</button>
                   </form>
@@ -134,24 +134,24 @@
         <div class="card-nested">
           <form method="post" action="/products/<?= (int) $product['id'] ?>/suppliers/add">
             <?= Csrf::field() ?>
-            <label>Supplier Name *<input type="text" name="supplier_name" required></label>
-            <label>Location<input type="text" name="location"></label>
-            <label>Contact Person<input type="text" name="contact_person"></label>
-            <label>Contact Phone<input type="text" name="contact_phone"></label>
-            <label>Contact Email<input type="text" name="contact_email"></label>
+            <label>Supplier Name *<input type="text" name="supplier_name" required placeholder="e.g. Sri Balaji Granites"></label>
+            <label>Location<input type="text" name="location" placeholder="e.g. Krishnagiri, Tamil Nadu"></label>
+            <label>Contact Person<input type="text" name="contact_person" placeholder="e.g. Rajesh Kumar"></label>
+            <label>Contact Phone<input type="text" name="contact_phone" placeholder="e.g. +91 98765 43210"></label>
+            <label>Contact Email<input type="text" name="contact_email" placeholder="e.g. name@company.com"></label>
             <label>FOB Source
               <select name="fob_source">
                 <option value="direct">Direct</option>
                 <option value="computed">Computed</option>
               </select>
             </label>
-            <label>FOB Value (direct only)<input type="number" step="0.01" name="fob_value"></label>
-            <label>Factory Cost override<input type="number" step="0.01" name="factory_cost"></label>
-            <label>Transportation Cost override<input type="number" step="0.01" name="transportation_cost"></label>
-            <label>Packing Cost override<input type="number" step="0.01" name="packing_cost"></label>
-            <label>Loading Cost override<input type="number" step="0.01" name="loading_cost"></label>
-            <label>CHA Cost override<input type="number" step="0.01" name="cha_cost"></label>
-            <label>Notes<textarea name="notes" rows="2"></textarea></label>
+            <label>FOB Value (direct only)<input type="number" step="0.01" name="fob_value" placeholder="e.g. 4500.00"></label>
+            <label>Factory Cost override<input type="number" step="0.01" name="factory_cost" placeholder="e.g. 350000"></label>
+            <label>Transportation Cost override<input type="number" step="0.01" name="transportation_cost" placeholder="e.g. 9000"></label>
+            <label>Packing Cost override<input type="number" step="0.01" name="packing_cost" placeholder="e.g. 12000"></label>
+            <label>Loading Cost override<input type="number" step="0.01" name="loading_cost" placeholder="e.g. 8000"></label>
+            <label>CHA Cost override<input type="number" step="0.01" name="cha_cost" placeholder="e.g. 15000"></label>
+            <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes"></textarea></label>
             <label><input type="checkbox" name="is_primary" value="1"> Primary supplier</label>
             <button type="submit" class="btn-sm btn-accent">Add Supplier</button>
           </form>

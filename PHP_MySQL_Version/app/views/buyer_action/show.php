@@ -83,7 +83,7 @@ if ($task === 'waiting' && empty($advanceCleared) && ($order['payment_method'] ?
     <form method="post" action="/buyer-action/<?= htmlspecialchars($token) ?>/report-payment" enctype="multipart/form-data">
       <?= Csrf::field() ?>
       <div class="field-grid">
-        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required></label>
+        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
         <label>Amount Paid<input type="number" name="amount" min="0.01" max="999999999999.99" step="0.01" placeholder="e.g. 12500.00"></label>
         <label>Date Paid<input type="date" name="payment_date" max="<?= date('Y-m-d') ?>"></label>
         <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>

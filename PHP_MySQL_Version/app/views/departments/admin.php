@@ -79,7 +79,7 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
       <summary><span class="dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:<?= htmlspecialchars((string) $dept['color']) ?>"></span><?= htmlspecialchars((string) $dept['name']) ?> <span class="muted small"><?= htmlspecialchars((string) $dept['code']) ?> · <?= count($list) ?> designation<?= count($list) === 1 ? '' : 's' ?></span></summary>
       <form method="post" action="/admin/departments/<?= (int) $dept['id'] ?>/update" class="field-grid">
         <?= Csrf::field() ?>
-        <label>Name *<input type="text" name="name" value="<?= htmlspecialchars((string) $dept['name']) ?>" required minlength="2" maxlength="100"></label>
+        <label>Name *<input type="text" name="name" value="<?= htmlspecialchars((string) $dept['name']) ?>" required minlength="2" maxlength="100" placeholder="e.g. Logistics"></label>
         <label>Colour *<input type="color" name="color" value="<?= htmlspecialchars((string) $dept['color']) ?>" required></label>
         <label class="inline"><input type="checkbox" name="is_active" value="1" <?= (int) $dept['is_active'] === 1 ? 'checked' : '' ?>> Active (people can log in as it)</label>
         <label class="inline"><input type="checkbox" name="sees_whole_company" value="1" <?= (int) $dept['sees_whole_company'] === 1 ? 'checked' : '' ?>> Sees the whole company</label>
@@ -90,7 +90,7 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
         <tr><th>Designation</th><th>Level</th><th>Approval limit (₹)</th><th>Active</th><th></th></tr>
         <?php foreach ($list as $d): $formId = 'designation-' . (int) $d['id']; ?>
         <tr>
-          <td><input form="<?= $formId ?>" type="text" name="title" value="<?= htmlspecialchars((string) $d['title']) ?>" required minlength="2" maxlength="100"></td>
+          <td><input form="<?= $formId ?>" type="text" name="title" value="<?= htmlspecialchars((string) $d['title']) ?>" required minlength="2" maxlength="100" placeholder="e.g. Logistics Executive"></td>
           <td><select form="<?= $formId ?>" name="level" required><?php foreach ($levels as $key => $label): ?><option value="<?= $key ?>" <?= $d['level'] === $key ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?></select></td>
           <td><input form="<?= $formId ?>" type="number" name="approval_limit_inr" min="0" step="0.01" value="<?= $d['approval_limit_inr'] !== null ? htmlspecialchars((string) $d['approval_limit_inr']) : '' ?>" placeholder="none"></td>
           <td><input form="<?= $formId ?>" type="checkbox" name="is_active" value="1" <?= (int) $d['is_active'] === 1 ? 'checked' : '' ?> aria-label="Active"></td>

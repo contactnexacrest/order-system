@@ -14,7 +14,7 @@
           <form method="post" action="/holidays/{{ h.id }}/update" style="display:flex;gap:8px;align-items:center">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <input type="date" name="holiday_date" aria-label="Date" value="{{ h.holiday_date }}" required>
-            <input type="text" name="description" value="{{ h.description }}" required style="width:240px">
+            <input type="text" name="description" value="{{ h.description }}" required style="width:240px" placeholder="e.g. Diwali">
             <button type="submit" class="btn-sm">Save</button>
             <button type="submit" formaction="/holidays/{{ h.id }}/delete" formnovalidate class="btn-sm btn-danger" onclick="return confirm('Remove this holiday?');">Remove</button>
           </form>

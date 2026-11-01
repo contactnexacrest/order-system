@@ -47,7 +47,7 @@ $__sourceLabel = ['link' => 'own invitation link', 'code' => 'personal code', 's
       <label>Change status <select name="status" required><option value="">Choose…</option>
         <?php foreach (AssociateRepository::STATUSES as $k => $l): if ($k === 'inactive' || $k === $a['status']) { continue; } ?><option value="<?= $k ?>"><?= htmlspecialchars($l) ?></option><?php endforeach; ?>
       </select></label>
-      <label>Reason <input type="text" name="reason" required minlength="10" maxlength="300"></label>
+      <label>Reason <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="At least 10 characters — say why"></label>
       <button type="submit" class="btn-sm">Change status</button>
     </form>
   </div>
@@ -219,7 +219,7 @@ $__sourceLabel = ['link' => 'own invitation link', 'code' => 'personal code', 's
     <?php endforeach; ?>
     <form method="post" action="/associates/<?= $id ?>/messages">
       <?= Csrf::field() ?>
-      <textarea name="body" required maxlength="4000" rows="3" aria-label="Reply"></textarea>
+      <textarea name="body" required maxlength="4000" rows="3" aria-label="Reply" placeholder="Type your message"></textarea>
       <button type="submit" class="btn-sm">Send</button>
     </form>
   </div>

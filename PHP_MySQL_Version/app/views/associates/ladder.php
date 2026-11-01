@@ -7,14 +7,14 @@
     <fieldset><legend>Standard rate (% of product FOB value) by the associate's Nth client</legend>
       <div class="field-grid">
         <?php foreach (['rate_1_5' => 'Clients 1–5', 'rate_6_10' => 'Clients 6–10', 'rate_11_20' => 'Clients 11–20', 'rate_21_40' => 'Clients 21–40', 'rate_41_plus' => 'Client 41 onward'] as $f => $label): ?>
-          <label><?= $label ?> *<input type="number" name="<?= $f ?>" required min="0" max="20" step="0.01" value="<?= htmlspecialchars(number_format((float) $ladder[$f], 2, '.', '')) ?>"></label>
+          <label><?= $label ?> *<input type="number" name="<?= $f ?>" required min="0" max="20" step="0.01" value="<?= htmlspecialchars(number_format((float) $ladder[$f], 2, '.', '')) ?>" placeholder="e.g. 0.70"></label>
         <?php endforeach; ?>
       </div>
     </fieldset>
     <div class="field-grid">
-      <label>TDS on commission, India (section 194H) % *<input type="number" name="associate_tds_pct" required min="0" max="30" step="0.01" value="<?= htmlspecialchars(number_format($tds, 2, '.', '')) ?>"></label>
-      <label>Client protection (months from acceptance) *<input type="number" name="associate_protection_months" required min="1" max="60" step="1" value="<?= (int) $protection ?>"></label>
-      <label>Wait before a new bank account is used (days) *<input type="number" name="associate_bank_wait_days" required min="0" max="60" step="1" value="<?= (int) $wait ?>"></label>
+      <label>TDS on commission, India (section 194H) % *<input type="number" name="associate_tds_pct" required min="0" max="30" step="0.01" value="<?= htmlspecialchars(number_format($tds, 2, '.', '')) ?>" placeholder="e.g. 2.00"></label>
+      <label>Client protection (months from acceptance) *<input type="number" name="associate_protection_months" required min="1" max="60" step="1" value="<?= (int) $protection ?>" placeholder="e.g. 12"></label>
+      <label>Wait before a new bank account is used (days) *<input type="number" name="associate_bank_wait_days" required min="0" max="60" step="1" value="<?= (int) $wait ?>" placeholder="e.g. 7"></label>
     </div>
     <div class="btn-row"><button type="submit">Save</button> <a href="/associates">Back to associates</a></div>
   </form>

@@ -17,17 +17,17 @@ $bv = static fn(string $k): string => htmlspecialchars((string) ($bank[$k] ?? ''
     <fieldset class="intake-step">
       <legend><span class="intake-step-num">1</span> Company Details</legend>
       <div class="field-grid">
-        <label class="full">Address<input type="text" name="address" value="<?= $v('address') ?>"></label>
-        <label>City<input type="text" name="city" value="<?= $v('city') ?>"></label>
-        <label>State<input type="text" name="state" value="<?= $v('state') ?>"></label>
-        <label>Phone<input type="text" name="phone" value="<?= $v('phone') ?>"></label>
-        <label>WhatsApp Number<input type="text" name="whatsapp_number" value="<?= $v('whatsapp_number') ?>"></label>
-        <label>Email<input type="email" name="email" value="<?= $v('email') ?>"></label>
-        <label>Contact Person — Name<input type="text" name="<?= htmlspecialchars($meta['contact']) ?>" value="<?= $v($meta['contact']) ?>"></label>
-        <label>Contact Person — Phone<input type="text" name="contact_person_phone" value="<?= $v('contact_person_phone') ?>"></label>
-        <label>Contact Person — WhatsApp<input type="text" name="contact_person_whatsapp" value="<?= $v('contact_person_whatsapp') ?>"></label>
-        <label>GSTIN<input type="text" name="gstin" value="<?= $v('gstin') ?>"></label>
-        <label>PAN<input type="text" name="pan" value="<?= $v('pan') ?>"></label>
+        <label class="full">Address<input type="text" name="address" value="<?= $v('address') ?>" placeholder="e.g. 12 MG Road, Bengaluru 560001"></label>
+        <label>City<input type="text" name="city" value="<?= $v('city') ?>" placeholder="e.g. Chennai"></label>
+        <label>State<input type="text" name="state" value="<?= $v('state') ?>" placeholder="e.g. Tamil Nadu"></label>
+        <label>Phone<input type="text" name="phone" value="<?= $v('phone') ?>" placeholder="e.g. +91 98765 43210"></label>
+        <label>WhatsApp Number<input type="text" name="whatsapp_number" value="<?= $v('whatsapp_number') ?>" placeholder="e.g. +91 98765 43210"></label>
+        <label>Email<input type="email" name="email" value="<?= $v('email') ?>" placeholder="e.g. name@company.com"></label>
+        <label>Contact Person — Name<input type="text" name="<?= htmlspecialchars($meta['contact']) ?>" value="<?= $v($meta['contact']) ?>" placeholder="e.g. Rajesh Kumar"></label>
+        <label>Contact Person — Phone<input type="text" name="contact_person_phone" value="<?= $v('contact_person_phone') ?>" placeholder="e.g. +91 98765 43210"></label>
+        <label>Contact Person — WhatsApp<input type="text" name="contact_person_whatsapp" value="<?= $v('contact_person_whatsapp') ?>" placeholder="e.g. +91 98765 43210"></label>
+        <label>GSTIN<input type="text" name="gstin" value="<?= $v('gstin') ?>" placeholder="e.g. 29ABCDE1234F1Z5"></label>
+        <label>PAN<input type="text" name="pan" value="<?= $v('pan') ?>" placeholder="e.g. ABCDE1234F"></label>
       </div>
     </fieldset>
 
@@ -38,11 +38,11 @@ $bv = static fn(string $k): string => htmlspecialchars((string) ($bank[$k] ?? ''
       <?php endif; ?>
       <div class="field-grid">
         <label>Account Holder Name *<input type="text" name="bank_account_name" required value="<?= $bv('bank_account_name') ?>" placeholder="As printed on your cheque"></label>
-        <label>Bank Name *<input type="text" name="bank_name" required value="<?= $bv('bank_name') ?>"></label>
-        <label>Branch<input type="text" name="bank_branch" value="<?= $bv('bank_branch') ?>"></label>
+        <label>Bank Name *<input type="text" name="bank_name" required value="<?= $bv('bank_name') ?>" placeholder="e.g. HDFC Bank"></label>
+        <label>Branch<input type="text" name="bank_branch" value="<?= $bv('bank_branch') ?>" placeholder="e.g. Fort, Mumbai"></label>
         <label>IFSC Code *<input type="text" name="bank_ifsc" required value="<?= $bv('bank_ifsc') ?>" maxlength="11" placeholder="e.g., SBIN0001234" style="text-transform:uppercase"></label>
-        <label>Account Number<?= $bank['has_bank'] ? '' : ' *' ?><input type="text" name="bank_account_number" data-bank-on-file="<?= $bank['has_bank'] ? '1' : '0' ?>" inputmode="numeric" autocomplete="off"<?= $bank['has_bank'] ? '' : ' required' ?>></label>
-        <label>Re-enter Account Number<?= $bank['has_bank'] ? '' : ' *' ?><input type="text" name="bank_account_number_confirm" inputmode="numeric" autocomplete="off"<?= $bank['has_bank'] ? '' : ' required' ?>></label>
+        <label>Account Number<?= $bank['has_bank'] ? '' : ' *' ?><input type="text" name="bank_account_number" data-bank-on-file="<?= $bank['has_bank'] ? '1' : '0' ?>" inputmode="numeric" autocomplete="off"<?= $bank['has_bank'] ? '' : ' required' ?> placeholder="e.g. 50100234567890"></label>
+        <label>Re-enter Account Number<?= $bank['has_bank'] ? '' : ' *' ?><input type="text" name="bank_account_number_confirm" inputmode="numeric" autocomplete="off"<?= $bank['has_bank'] ? '' : ' required' ?> placeholder="Type the account number again"></label>
         <label>Account Type
           <select name="bank_account_type">
             <option value="">—</option>
@@ -51,7 +51,7 @@ $bv = static fn(string $k): string => htmlspecialchars((string) ($bank[$k] ?? ''
             <?php endforeach; ?>
           </select>
         </label>
-        <label>UPI ID <small class="muted">(optional)</small><input type="text" name="bank_upi_id" value="<?= $bv('bank_upi_id') ?>"></label>
+        <label>UPI ID <small class="muted">(optional)</small><input type="text" name="bank_upi_id" value="<?= $bv('bank_upi_id') ?>" placeholder="e.g. company@hdfcbank"></label>
       </div>
       <p class="muted small">Our accounts team verifies the account before the first payment and may ask for a cancelled cheque or a bank letter.</p>
     </fieldset>

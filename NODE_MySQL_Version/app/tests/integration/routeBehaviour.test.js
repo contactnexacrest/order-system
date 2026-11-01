@@ -438,6 +438,21 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expect(await audits('ASSOCIATE_CLIENT_UNLINKED', client)).toBe(1);
   });
 
+  // Owner decision 1 Nov 2026 (D-221): Admin → Self-approval rules, through the real app (the holder is a Super Admin).
+  it('self-approval rules page', async () => {
+    const selfApprovalRules = require('../../src/services/selfApprovalRules');
+    expectPage(await holder.call('GET', '/admin/self-approval'), 'Self-approval rules', 'GET /admin/self-approval');
+    const before = await selfApprovalRules.roleIds('email_send');
+    const md = String(await value("SELECT id FROM roles WHERE name = 'Managing Director'"));
+    try {
+      const body = { 'payment_terms[]': (await selfApprovalRules.roleIds('payment_terms')).map(String), 'document_review[]': (await selfApprovalRules.roleIds('document_review')).map(String), 'email_send[]': [md] };
+      expectDone(await holder.call('POST', '/admin/self-approval', body), 'POST /admin/self-approval', 'Self-approval rules saved.');
+      expect(await selfApprovalRules.roleIds('email_send')).toEqual([Number(md)]);
+    } finally {
+      await selfApprovalRules.set('email_send', before);
+    }
+  });
+
   it('associate staff routes', async () => {
     const associateBankRepository = require('../../src/repositories/associateBankRepository');
     const associateDocumentRepository = require('../../src/repositories/associateDocumentRepository');

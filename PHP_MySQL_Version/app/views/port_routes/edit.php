@@ -20,10 +20,10 @@
         </select>
       </label>
       <label>Sailing Days Min *
-        <input type="number" min="0" name="sailing_days_min" required value="<?= (int) $route['sailing_days_min'] ?>">
+        <input type="number" min="0" name="sailing_days_min" required value="<?= (int) $route['sailing_days_min'] ?>" placeholder="e.g. 22">
       </label>
       <label>Sailing Days Max *
-        <input type="number" min="0" name="sailing_days_max" required value="<?= (int) $route['sailing_days_max'] ?>">
+        <input type="number" min="0" name="sailing_days_max" required value="<?= (int) $route['sailing_days_max'] ?>" placeholder="e.g. 30">
       </label>
       <label class="full">Notes (optional)
         <input type="text" name="notes" value="<?= htmlspecialchars((string) ($route['notes'] ?? '')) ?>" placeholder="e.g. Direct service, no transshipment">

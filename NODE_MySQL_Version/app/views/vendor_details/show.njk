@@ -9,17 +9,17 @@
     <fieldset class="intake-step">
       <legend><span class="intake-step-num">1</span> Company Details</legend>
       <div class="field-grid">
-        <label class="full">Address<input type="text" name="address" value="{{ vendor.address or '' }}"></label>
-        <label>City<input type="text" name="city" value="{{ vendor.city or '' }}"></label>
-        <label>State<input type="text" name="state" value="{{ vendor.state or '' }}"></label>
-        <label>Phone<input type="text" name="phone" value="{{ vendor.phone or '' }}"></label>
-        <label>WhatsApp Number<input type="text" name="whatsapp_number" value="{{ vendor.whatsapp_number or '' }}"></label>
-        <label>Email<input type="email" name="email" value="{{ vendor.email or '' }}"></label>
-        <label>Contact Person — Name<input type="text" name="{{ meta.contact }}" value="{{ vendor[meta.contact] or '' }}"></label>
-        <label>Contact Person — Phone<input type="text" name="contact_person_phone" value="{{ vendor.contact_person_phone or '' }}"></label>
-        <label>Contact Person — WhatsApp<input type="text" name="contact_person_whatsapp" value="{{ vendor.contact_person_whatsapp or '' }}"></label>
-        <label>GSTIN<input type="text" name="gstin" value="{{ vendor.gstin or '' }}"></label>
-        <label>PAN<input type="text" name="pan" value="{{ vendor.pan or '' }}"></label>
+        <label class="full">Address<input type="text" name="address" value="{{ vendor.address or '' }}" placeholder="e.g. 12 MG Road, Bengaluru 560001"></label>
+        <label>City<input type="text" name="city" value="{{ vendor.city or '' }}" placeholder="e.g. Chennai"></label>
+        <label>State<input type="text" name="state" value="{{ vendor.state or '' }}" placeholder="e.g. Tamil Nadu"></label>
+        <label>Phone<input type="text" name="phone" value="{{ vendor.phone or '' }}" placeholder="e.g. +91 98765 43210"></label>
+        <label>WhatsApp Number<input type="text" name="whatsapp_number" value="{{ vendor.whatsapp_number or '' }}" placeholder="e.g. +91 98765 43210"></label>
+        <label>Email<input type="email" name="email" value="{{ vendor.email or '' }}" placeholder="e.g. name@company.com"></label>
+        <label>Contact Person — Name<input type="text" name="{{ meta.contact }}" value="{{ vendor[meta.contact] or '' }}" placeholder="e.g. Rajesh Kumar"></label>
+        <label>Contact Person — Phone<input type="text" name="contact_person_phone" value="{{ vendor.contact_person_phone or '' }}" placeholder="e.g. +91 98765 43210"></label>
+        <label>Contact Person — WhatsApp<input type="text" name="contact_person_whatsapp" value="{{ vendor.contact_person_whatsapp or '' }}" placeholder="e.g. +91 98765 43210"></label>
+        <label>GSTIN<input type="text" name="gstin" value="{{ vendor.gstin or '' }}" placeholder="e.g. 29ABCDE1234F1Z5"></label>
+        <label>PAN<input type="text" name="pan" value="{{ vendor.pan or '' }}" placeholder="e.g. ABCDE1234F"></label>
       </div>
     </fieldset>
 
@@ -30,11 +30,11 @@
       {% endif %}
       <div class="field-grid">
         <label>Account Holder Name *<input type="text" name="bank_account_name" required value="{{ bank.bank_account_name or '' }}" placeholder="As printed on your cheque"></label>
-        <label>Bank Name *<input type="text" name="bank_name" required value="{{ bank.bank_name or '' }}"></label>
-        <label>Branch<input type="text" name="bank_branch" value="{{ bank.bank_branch or '' }}"></label>
+        <label>Bank Name *<input type="text" name="bank_name" required value="{{ bank.bank_name or '' }}" placeholder="e.g. HDFC Bank"></label>
+        <label>Branch<input type="text" name="bank_branch" value="{{ bank.bank_branch or '' }}" placeholder="e.g. Fort, Mumbai"></label>
         <label>IFSC Code *<input type="text" name="bank_ifsc" required value="{{ bank.bank_ifsc or '' }}" maxlength="11" placeholder="e.g., SBIN0001234" style="text-transform:uppercase"></label>
-        <label>Account Number{{ '' if bank.has_bank else ' *' }}<input type="text" name="bank_account_number" data-bank-on-file="{{ '1' if bank.has_bank else '0' }}" inputmode="numeric" autocomplete="off"{{ '' if bank.has_bank else ' required' }}></label>
-        <label>Re-enter Account Number{{ '' if bank.has_bank else ' *' }}<input type="text" name="bank_account_number_confirm" inputmode="numeric" autocomplete="off"{{ '' if bank.has_bank else ' required' }}></label>
+        <label>Account Number{{ '' if bank.has_bank else ' *' }}<input type="text" name="bank_account_number" data-bank-on-file="{{ '1' if bank.has_bank else '0' }}" inputmode="numeric" autocomplete="off"{{ '' if bank.has_bank else ' required' }} placeholder="e.g. 50100234567890"></label>
+        <label>Re-enter Account Number{{ '' if bank.has_bank else ' *' }}<input type="text" name="bank_account_number_confirm" inputmode="numeric" autocomplete="off"{{ '' if bank.has_bank else ' required' }} placeholder="Type the account number again"></label>
         <label>Account Type
           <select name="bank_account_type">
             <option value="">—</option>
@@ -43,7 +43,7 @@
             {% endfor %}
           </select>
         </label>
-        <label>UPI ID <small class="muted">(optional)</small><input type="text" name="bank_upi_id" value="{{ bank.bank_upi_id or '' }}"></label>
+        <label>UPI ID <small class="muted">(optional)</small><input type="text" name="bank_upi_id" value="{{ bank.bank_upi_id or '' }}" placeholder="e.g. company@hdfcbank"></label>
       </div>
       <p class="muted small">Our accounts team verifies the account before the first payment and may ask for a cancelled cheque or a bank letter.</p>
     </fieldset>

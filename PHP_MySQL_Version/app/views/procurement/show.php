@@ -52,12 +52,12 @@ $inr = static fn ($v): string => '&#8377;' . number_format((float) $v, 2); ?>
         <?php foreach ($suppliers as $s): ?><option value="<?= (int) $s['id'] ?>"><?= htmlspecialchars((string) $s['supplier_legal_name']) ?></option><?php endforeach; ?>
       </select>
     </label>
-    <label>Unit price (&#8377;, before GST) *<input type="number" name="unit_price_inr" step="0.01" min="0.01" required></label>
-    <label>GST % *<input type="number" name="gst_percent" step="0.01" min="0" max="28" value="0" required></label>
-    <label>Lead time (days) *<input type="number" name="lead_time_days" step="1" min="0" max="365" required></label>
+    <label>Unit price (&#8377;, before GST) *<input type="number" name="unit_price_inr" step="0.01" min="0.01" required placeholder="e.g. 3500.00"></label>
+    <label>GST % *<input type="number" name="gst_percent" step="0.01" min="0" max="28" value="0" required placeholder="e.g. 18"></label>
+    <label>Lead time (days) *<input type="number" name="lead_time_days" step="1" min="0" max="365" required placeholder="e.g. 21"></label>
     <label>Valid until<input type="date" name="valid_until" min="<?= date('Y-m-d') ?>"></label>
-    <label>Supplier's quote ref<input type="text" name="quote_reference" maxlength="100"></label>
-    <label>Note<input type="text" name="note" maxlength="500"></label>
+    <label>Supplier's quote ref<input type="text" name="quote_reference" maxlength="100" placeholder="e.g. Q-2026-118"></label>
+    <label>Note<input type="text" name="note" maxlength="500" placeholder="Optional note"></label>
     <div class="btn-row"><button type="submit" class="btn-sm btn-accent">+ Record quote</button></div>
   </form>
   <?php endif; ?>
@@ -80,12 +80,12 @@ $inr = static fn ($v): string => '&#8377;' . number_format((float) $v, 2); ?>
   <h2>Receipt and quality check</h2>
   <form method="post" action="/procurement/<?= (int) $r['id'] ?>/receive" class="field-grid">
     <?= Csrf::field() ?>
-    <label>Quantity received *<input type="number" name="received_quantity" step="0.001" min="0.001" value="<?= htmlspecialchars($qty) ?>" required></label>
+    <label>Quantity received *<input type="number" name="received_quantity" step="0.001" min="0.001" value="<?= htmlspecialchars($qty) ?>" required placeholder="e.g. 100"></label>
     <label>Received on *<input type="date" name="received_on" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>" required></label>
     <label>Quality check *
       <select name="qc_result" required><option value="">— choose —</option><?php foreach ($qcResults as $k => $l): ?><option value="<?= $k ?>"><?= $l ?></option><?php endforeach; ?></select>
     </label>
-    <label>What the check found <small class="muted">(needed unless passed)</small><input type="text" name="qc_note" maxlength="500"></label>
+    <label>What the check found <small class="muted">(needed unless passed)</small><input type="text" name="qc_note" maxlength="500" placeholder="e.g. 2 slabs chipped, replaced"></label>
     <div class="btn-row"><button type="submit" class="btn-sm btn-success">Record receipt</button></div>
   </form>
 </div>
@@ -97,7 +97,7 @@ $inr = static fn ($v): string => '&#8377;' . number_format((float) $v, 2); ?>
     <summary>Cancel this requirement</summary>
     <form method="post" action="/procurement/<?= (int) $r['id'] ?>/cancel" class="field-grid">
       <?= Csrf::field() ?>
-      <label>Reason *<input type="text" name="reason" required minlength="<?= \App\Helpers\ReasonValidator::MIN_LENGTH ?>" maxlength="500"></label>
+      <label>Reason *<input type="text" name="reason" required minlength="<?= \App\Helpers\ReasonValidator::MIN_LENGTH ?>" maxlength="500" placeholder="At least 10 characters — say why"></label>
       <div class="btn-row"><button type="submit" class="btn-sm btn-danger">Cancel requirement</button></div>
     </form>
   </details>

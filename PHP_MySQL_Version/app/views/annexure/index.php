@@ -144,7 +144,7 @@ $annexureConfirmAttr = static function (string $extraMessage = '') use ($annexaW
       </div>
       <input type="file" id="annexure-terms-image-input" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;">
       <div id="annexure-terms-surface" class="wysiwyg-surface" contenteditable="true"><?= $terms['content_html'] ?? '' ?></div>
-      <textarea name="content_html" id="annexure-terms-hidden" style="display:none;"></textarea>
+      <textarea name="content_html" id="annexure-terms-hidden" style="display:none;" placeholder="Type the text"></textarea>
       <button type="submit" class="btn-sm" style="margin-top:0.75rem;">Save Additional Terms</button>
     </form>
   </div>

@@ -78,15 +78,19 @@ final class OrderDefaultWeightVolumeTest extends DbTestCase
         self::assertStringContainsString('name="estimated_total_cbm" value="8.2"', $html);
         self::assertStringContainsString('name="estimated_gross_weight_kg" value="27000"', $html);
         self::assertMatchesRegularExpression('/name="estimated_net_weight_kg" value="25500(\.0+)?"/', $html, 'a saved value always wins over the default');
-        self::assertDoesNotMatchRegularExpression('/name="estimated_(total_cbm|gross_weight_kg|net_weight_kg)" value="[^"]*" placeholder=/', $html);
+        // Owner rule 2026-11-01 (D-220): every input also has a placeholder — a hint shown only when the field is cleared; the default stays the value.
+        self::assertDoesNotMatchRegularExpression('/name="estimated_(total_cbm|gross_weight_kg|net_weight_kg)" value=""/', $html);
     }
 
-    public function testCreateFormHasNoExamplePlaceholdersOnTheseFields(): void
+    public function testCreateFormCarriesTheDefaultsAsValues(): void
     {
         ob_start();
         (new OrderController())->create([]);
         $html = (string) ob_get_clean();
 
-        self::assertDoesNotMatchRegularExpression('/name="estimated_(total_cbm|gross_weight_kg|net_weight_kg)" value="[^"]*" placeholder=/', $html);
+        // The configured defaults are the values; the placeholder (owner rule 2026-11-01, D-220) only shows when a field is cleared.
+        self::assertStringContainsString('name="estimated_total_cbm" value="8.2"', $html);
+        self::assertStringContainsString('name="estimated_gross_weight_kg" value="27000"', $html);
+        self::assertStringContainsString('name="estimated_net_weight_kg" value="26000"', $html);
     }
 }

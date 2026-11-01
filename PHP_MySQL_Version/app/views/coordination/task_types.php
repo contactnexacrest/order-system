@@ -10,8 +10,8 @@
       <tr>
         <td><?= htmlspecialchars((string) ($t['department_name'] ?? $t['department_code'])) ?></td>
         <td><?= htmlspecialchars((string) $t['title']) ?></td>
-        <td><input type="number" name="standard_days[<?= htmlspecialchars((string) $t['task_key']) ?>]" value="<?= (int) $t['standard_days'] ?>" min="0" max="90" step="1" required aria-label="Due after days"></td>
-        <td><input type="number" name="escalate_after_days[<?= htmlspecialchars((string) $t['task_key']) ?>]" value="<?= (int) $t['escalate_after_days'] ?>" min="0" max="90" step="1" required aria-label="Escalate after days"></td>
+        <td><input type="number" name="standard_days[<?= htmlspecialchars((string) $t['task_key']) ?>]" value="<?= (int) $t['standard_days'] ?>" min="0" max="90" step="1" required aria-label="Due after days" placeholder="e.g. 3"></td>
+        <td><input type="number" name="escalate_after_days[<?= htmlspecialchars((string) $t['task_key']) ?>]" value="<?= (int) $t['escalate_after_days'] ?>" min="0" max="90" step="1" required aria-label="Escalate after days" placeholder="e.g. 3"></td>
       </tr>
       <?php endforeach; ?>
     </table>

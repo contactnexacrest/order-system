@@ -142,7 +142,7 @@
             <option value="freight">Freight Payment</option>
           </select>
         </label>
-        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required></label>
+        <label>Transaction ID / UTR *<input type="text" name="transaction_ref" required placeholder="e.g. HDFCN26304123456"></label>
         <label>Amount Paid<input type="number" name="amount" min="0.01" max="999999999999.99" step="0.01" placeholder="e.g. 12500.00"></label>
         <label>Date Paid<input type="date" name="payment_date" max="<?= date('Y-m-d') ?>"></label>
         <label>Your Bank / Payer Details<input type="text" name="payer_bank_details" placeholder="e.g. Sent from HSBC UK, account ending 4321"></label>
@@ -187,7 +187,7 @@
     <p class="muted">If you want to cancel this order and not proceed with us, let us know here — our team will respond within the timeframe set out in your order terms.</p>
     <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/disputes">
       <?= Csrf::field() ?>
-      <label>Describe the issue *<textarea name="description" rows="4" required></textarea></label>
+      <label>Describe the issue *<textarea name="description" rows="4" required placeholder="Describe the issue"></textarea></label>
       <button type="submit">Raise a Dispute</button>
     </form>
   </div>
@@ -235,7 +235,7 @@
             <?php endfor; ?>
           </select>
         </label>
-        <label>Your feedback / testimonial<textarea name="comments" rows="5"><?= htmlspecialchars(!empty($orderFeedback) ? (string) ($orderFeedback['comments'] ?? '') : ($testimonialSuggestion ?? '')) ?></textarea></label>
+        <label>Your feedback / testimonial<textarea name="comments" rows="5" placeholder="Type your comments"><?= htmlspecialchars(!empty($orderFeedback) ? (string) ($orderFeedback['comments'] ?? '') : ($testimonialSuggestion ?? '')) ?></textarea></label>
         <p class="muted small"><?= !empty($orderFeedback) ? 'This is the feedback you left — if you want to modify it, please update it above.' : 'We have written a suggestion from your order to get you started — if you want to modify the feedback/testimonial, please update it above.' ?></p>
         <button type="submit"><?= !empty($orderFeedback) ? 'Update Feedback' : 'Submit Feedback' ?></button>
       </form>

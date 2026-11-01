@@ -275,19 +275,18 @@ async function approveSend(emailLogId, approverUserId) {
   if (!row || row.status !== 'pending_approval') {
     throw new Error('This send is not awaiting approval.');
   }
-  // QA-5 maker-checker (EML-03): whoever requested this send must not also
-  // be the one who approves it, unless they're a Super Admin or hold
-  // manage_permissions (owner decision).
-  if (
-    row.requested_by !== null
-    && row.requested_by !== undefined
-    && Number(row.requested_by) === Number(approverUserId)
-  ) {
-    // Owner decision 1 Nov 2026 (A-3, Q-MAIL-3): no exception, whatever the role.
+  // QA-5 maker-checker (EML-03); owner decisions 1 Nov 2026 (A-3, then
+  // D-221): whoever requested this send approves it only when one of their
+  // roles is ticked in Admin → Self-approval rules.
+  const self = row.requested_by !== null && row.requested_by !== undefined && Number(row.requested_by) === Number(approverUserId);
+  if (self && !(await require('./selfApprovalRules').allowed('email_send', approverUserId))) {
     throw new Error('You requested this send — a different person must approve it.');
   }
   await emailLogRepository.approve(emailLogId, approverUserId);
   await auditLogRepository.log(approverUserId, 'EMAIL_SEND_APPROVED', 'email_log', emailLogId);
+  if (self) {
+    await auditLogRepository.log(approverUserId, 'EMAIL_SEND_SELF_APPROVED', 'email_log', emailLogId, null, null, 'approved by the person who requested it', 'Allowed by Admin → Self-approval rules.');
+  }
 }
 
 async function rejectSend(emailLogId, approverUserId, reason) {

@@ -63,10 +63,10 @@ final class ReviewWorkflowService
                 // forever.
                 throw new \RuntimeException("{$reviewer['name']} is not an active user and cannot be assigned as a reviewer.");
             }
-            if ($generatedBy !== null && $reviewerId === $generatedBy) {
-                // QA-5 maker-checker (REV-05); owner decision 1 Nov 2026 (A-2,
-                // Q-NEW-3): the document's own generator never reviews it —
-                // no exception, whatever their role.
+            if ($generatedBy !== null && $reviewerId === $generatedBy && !SelfApprovalRules::allowed('document_review', $reviewerId)) {
+                // QA-5 maker-checker (REV-05); owner decisions 1 Nov 2026 (A-2,
+                // then D-221): the document's own generator reviews it only
+                // when one of their roles is ticked in Admin → Self-approval rules.
                 throw new \RuntimeException("This document's own generator cannot be assigned as its reviewer — a different person must review it.");
             }
             $toAssign[] = $reviewerId;
@@ -128,8 +128,16 @@ final class ReviewWorkflowService
             }
         }
 
+        // Owner decision D-221: a self-review is allowed only while the rule allows it, and is logged as such.
+        $selfReview = $document && $document['generated_by'] !== null && (int) $document['generated_by'] === $reviewerUserId;
+        if ($selfReview && !SelfApprovalRules::allowed('document_review', $reviewerUserId)) {
+            throw new \RuntimeException("This document's own generator cannot be assigned as its reviewer — a different person must review it.");
+        }
         DocumentReviewRepository::approve($documentReviewId, $comments);
         AuditLogRepository::log($reviewerUserId, 'DOCUMENT_REVIEW_APPROVED', 'documents', (int) $review['document_id'], null, null, null, $comments);
+        if ($selfReview) {
+            AuditLogRepository::log($reviewerUserId, 'DOCUMENT_SELF_REVIEWED', 'documents', (int) $review['document_id'], null, null, 'approved by its own generator', 'Allowed by Admin → Self-approval rules.');
+        }
 
         self::finalizeIfFullyApproved((int) $review['document_id']);
     }

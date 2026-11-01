@@ -5,10 +5,10 @@
   <form method="post" action="/client/login">
     <?= Csrf::field() ?>
     <label>Email
-      <input type="email" name="email" required autofocus>
+      <input type="email" name="email" required autofocus placeholder="e.g. name@company.com">
     </label>
     <label>Password
-      <input type="password" name="password" required>
+      <input type="password" name="password" required placeholder="Your password">
     </label>
     <button type="submit">Sign in</button>
   </form>

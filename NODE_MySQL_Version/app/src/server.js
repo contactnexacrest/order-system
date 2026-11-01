@@ -771,6 +771,9 @@ app.post('/signatories/document-types/:id', requireAuth, requirePermission('mana
 
 const requireSuperAdmin = asyncHandler(superAdminOnly.required());
 app.get('/super-admin', requireAuth, requireSuperAdmin, asyncHandler(superAdminController.index));
+// Owner decision 1 Nov 2026 (D-221): which roles may approve their own work (payment terms, document review, e-mail send).
+app.get('/admin/self-approval', requireAuth, requireSuperAdmin, asyncHandler(require('./controllers/selfApprovalController').index));
+app.post('/admin/self-approval', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(require('./controllers/selfApprovalController').save));
 app.post('/super-admin/delegations', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(superAdminController.grantDelegation));
 app.post('/super-admin/delegations/:id/revoke', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(superAdminController.revokeDelegation));
 app.post('/super-admin/set-permanent', requireAuth, requireSuperAdmin, verifyCsrf, asyncHandler(superAdminController.setPermanent));

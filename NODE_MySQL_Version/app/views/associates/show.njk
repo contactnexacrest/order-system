@@ -43,7 +43,7 @@
       <label>Change status <select name="status" required><option value="">Choose…</option>
         {% for k, l in statuses %}{% if k != 'inactive' and k != a.status %}<option value="{{ k }}">{{ l }}</option>{% endif %}{% endfor %}
       </select></label>
-      <label>Reason <input type="text" name="reason" required minlength="10" maxlength="300"></label>
+      <label>Reason <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="At least 10 characters — say why"></label>
       <button type="submit" class="btn-sm">Change status</button>
     </form>
   </div>
@@ -215,7 +215,7 @@
     {% endfor %}
     <form method="post" action="/associates/{{ id }}/messages">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <textarea name="body" required maxlength="4000" rows="3" aria-label="Reply"></textarea>
+      <textarea name="body" required maxlength="4000" rows="3" aria-label="Reply" placeholder="Type your message"></textarea>
       <button type="submit" class="btn-sm">Send</button>
     </form>
   </div>

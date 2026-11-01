@@ -4964,3 +4964,12 @@ CREATE TABLE IF NOT EXISTS order_payment_shortfalls (
   KEY idx_payment_shortfalls_leg (order_id, leg, milestone_id),
   CONSTRAINT fk_payment_shortfalls_order FOREIGN KEY (order_id) REFERENCES orders(id)
 ) ENGINE=InnoDB;
+
+-- Owner decision 1 Nov 2026 (D-221): self-approval rules (docs/migrations/2026-11-02f-self-approval-rules.sql).
+CREATE TABLE IF NOT EXISTS self_approval_rules (
+  rule_key VARCHAR(40) NOT NULL,
+  role_id BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (rule_key, role_id),
+  CONSTRAINT fk_self_approval_rules_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+

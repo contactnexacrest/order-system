@@ -502,6 +502,21 @@ final class RouteBehaviourTest extends DbTestCase
         self::assertSame(1, $this->audits('ASSOCIATE_CLIENT_UNLINKED', $client));
     }
 
+    /** Owner decision 1 Nov 2026 (D-221): Admin → Self-approval rules, through the real router (the holder is a Super Admin). */
+    public function testSelfApprovalRulesPage(): void
+    {
+        $this->assertPage($this->call('GET', '/admin/self-approval'), 'Self-approval rules', 'GET /admin/self-approval');
+        $before = \App\Services\SelfApprovalRules::roleIds('email_send');
+        $md = (string) $this->value("SELECT id FROM roles WHERE name = 'Managing Director'");
+        try {
+            $r = $this->call('POST', '/admin/self-approval', ['payment_terms' => \App\Services\SelfApprovalRules::roleIds('payment_terms'), 'document_review' => \App\Services\SelfApprovalRules::roleIds('document_review'), 'email_send' => [$md]]);
+            $this->assertDone($r, 'POST /admin/self-approval', 'Self-approval rules saved.');
+            self::assertSame([(int) $md], \App\Services\SelfApprovalRules::roleIds('email_send'));
+        } finally {
+            \App\Services\SelfApprovalRules::set('email_send', $before);
+        }
+    }
+
     /** Owner decision 1 Nov 2026: the associate system's staff routes, through the real router. */
     public function testAssociateStaffRoutes(): void
     {
