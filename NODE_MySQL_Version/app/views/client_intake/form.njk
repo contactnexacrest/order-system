@@ -26,12 +26,9 @@
   {% if introError %}<div class="alert alert-warning">{{ introError }}</div>{% endif %}
   <form method="post" action="/quotation-details/submit">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    {# Owner decision 1 Nov 2026 (AS-5, revised): the associate's invitation link or code travels only as a hidden field — nothing for the buyer to tick or type. #}
     {% if introducer %}
-      <div class="alert alert-info">
-        {% if introducer.inv %}<input type="hidden" name="associate_inv" value="{{ introducer.inv }}">{% else %}<input type="hidden" name="associate_code" value="{{ introducer.code }}">{% endif %}
-        <label class="checkbox"><input type="checkbox" name="introduction_confirmed" value="1"> <b>{{ introducer.name }}</b> introduced us to NexaCrest — correct</label>
-        <small class="muted">We will also e-mail you a code to confirm your request. Please fill in your own company's details below.</small>
-      </div>
+      {% if introducer.inv %}<input type="hidden" name="associate_inv" value="{{ introducer.inv }}">{% else %}<input type="hidden" name="associate_code" value="{{ introducer.code }}">{% endif %}
     {% endif %}
 
     <fieldset class="intake-step">
@@ -151,11 +148,6 @@
         <label>Company website
           <input type="text" name="website" maxlength="255" placeholder="e.g., www.example.com">
         </label>
-        {% if not introducer %}
-        <label>Associate code <small class="muted">(only if a NexaCrest associate introduced you)</small>
-          <input type="text" name="associate_code" maxlength="30" pattern="[Nn][Xx][Aa]-[A-Za-z0-9]{3,12}-[A-Za-z0-9]{2}" title="As the associate gave it, e.g. NXA-RAJESH-7K" placeholder="e.g., NXA-RAJESH-7K">
-        </label>
-        {% endif %}
         <label class="full">Your Own Reference Number
           <input type="text" name="buyer_own_reference" placeholder="Your internal reference number, if any — write NIL if none">
         </label>

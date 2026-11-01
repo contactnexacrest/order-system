@@ -78,10 +78,11 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await expect(page.locator('body')).toContainText('Link created');
   });
 
-  test('the buyer registers through the link, verifies the e-mail and confirms the introduction', async ({ page }) => {
+  test('the buyer registers through the link and verifies the e-mail; the link is detected automatically', async ({ page }) => {
     await page.goto(new URL(inviteLink).pathname);
-    await expect(page.locator('form')).toContainText(`${ASSOCIATE_NAME} introduced us to NexaCrest — correct`);
-    await page.locator('input[name="introduction_confirmed"]').check();
+    // The link travels as a hidden field: nothing to tick or type.
+    await expect(page.locator('input[type="hidden"][name="associate_inv"]')).toHaveCount(1);
+    await expect(page.locator('input[name="introduction_confirmed"], input[name="associate_code"]')).toHaveCount(0);
     await page.locator('input[name="company_legal_name"]').fill(BUYER);
     await page.locator('input[name="billing_address_line1"]').fill('1 Harbour Road');
     await page.locator('input[name="billing_city"]').fill('Rotterdam');
@@ -95,7 +96,6 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await expect(page.locator('h1')).toContainText('Confirm your request');
     const code = (await page.locator('.alert-info').innerText()).match(/(\d{6})/)[1];
     await page.getByLabel('Code from the e-mail *').fill(code);
-    await page.locator('input[name="introduced"][value="yes"]').check();
     await page.getByRole('button', { name: 'Confirm' }).click();
     await expect(page.locator('h1')).toContainText('Thank you');
   });
@@ -104,7 +104,7 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await login(page, 'admin');
     await page.goto('/client-intake?view=list');
     const row = page.locator('tr', { hasText: BUYER });
-    await expect(row).toContainText(`Associate: ${ASSOCIATE_NAME} — confirmed by the buyer`);
+    await expect(row).toContainText(`Associate: ${ASSOCIATE_NAME} — buyer’s e-mail verified`);
     await row.getByRole('button', { name: /Accept/ }).click();
     await expect(page.locator('.alert-success')).toContainText(`Linked to associate ${ASSOCIATE_NAME} — protected until`);
     await expect(page.locator('.associate-line')).toContainText(`Associate client — introduced by ${ASSOCIATE_NAME}`);

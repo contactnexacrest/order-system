@@ -92,31 +92,33 @@ details. Two ways, in any mix:
   days and for one registration. The associate can cancel it.
 - **Personal code**: every associate has one code, e.g. `NXA-RAJESH-7K`,
   for all their buyers; the link `…/quotation-details?code=NXA-RAJESH-7K`
-  fills it in, or the buyer types it in "Associate code". The last letter is
+  carries it. The last letter is
   a check letter: a mistyped code is refused, never given to someone else.
-  0/O and 1/I count as the same, case does not matter. A code belongs to one
+  0/O and 1/I count as the same, case does not matter (the buyer never
+  types it: it comes with the link). A code belongs to one
   associate for ever; when a new code is set, the old one no longer brings
   new clients (clients already registered stay theirs).
 
 Then:
 
-1. The buyer fills in the form. With a link or code the form shows
-   "**<associate> introduced us to NexaCrest — correct**".
-2. The buyer is e-mailed a **6-digit code** (valid 30 minutes) and on the
-   next page enters it and answers "Did <associate> introduce you?" Yes / No.
+1. The buyer fills in the form. The associate's link or code is picked up
+   automatically and carried as a **hidden field**: the buyer sees no
+   checkbox, no associate name and no code box (owner decision 1 Nov 2026).
+   A buyer who opens the plain form without a link or code is not linked to
+   any associate.
+2. The buyer is e-mailed a **6-digit code** (valid 30 minutes) and enters it
+   on the next page to confirm the request.
 3. The associate sees the invitation move: Link created → Opened →
    Registered → Accepted — your client / Not accepted / Expired.
 4. On **Quotation Intake** (list or board) staff see "Associate: <name> —
-   confirmed by the buyer" and any warnings: the buyer used the associate's
+   buyer’s e-mail verified" and any warnings: the buyer used the associate's
    own e-mail or phone, a free-mail address, an e-mail domain not matching
    the website, the same company as another associate's client, or the
    e-mail not yet verified.
-5. **Accept** creates the client and, when the buyer confirmed, links it to
-   the associate: the **protection** starts (12 months) and the associate is
-   told, with a printable **registration certificate** in the portal.
+5. **Accept** creates the client and links it to the associate: the
+   **protection** starts (12 months) and the associate is told, with a
+   printable **registration certificate** in the portal.
    - Not verified yet: Accept is refused until the buyer has entered the code.
-   - The buyer answered "No": the client is created but **not linked**; the
-     associate is told.
    - **First completed registration wins**: if another associate's
      registration of the same company was completed (code entered) earlier
      and is still pending, decide that one first.

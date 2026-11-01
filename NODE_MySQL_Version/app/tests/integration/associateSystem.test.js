@@ -372,11 +372,14 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     const a = await associate();
     const inv = await associateInvitationRepository.createLink(Number(a.id), 'Link Buyer BV', 'Netherlands');
     const form = (await request(app).get(`/quotation-details?inv=${inv.token}`)).text;
-    expect(form).toContain(`<b>${a.name}</b> introduced us to NexaCrest — correct`);
+    // Owner decision 1 Nov 2026 (revised): the link travels as a hidden field — nothing for the buyer to tick or type.
+    expect(form).toContain(`<input type="hidden" name="associate_inv" value="${inv.token}">`);
+    expect(form).not.toContain('introduction_confirmed');
+    expect(form).not.toContain(a.name); // the associate is not named on the buyer's form
     expect((await associateInvitationRepository.find(inv.id)).status).toBe('opened');
 
     const company = `Link Buyer BV ${tag}`;
-    const [id, code] = await submit(intakePost(company, { associate_inv: inv.token, introduction_confirmed: '1' }));
+    const [id, code] = await submit(intakePost(company, { associate_inv: inv.token }));
     expect(code).not.toBeNull();
     expect((await accept(id)).message).toContain('has not yet verified their e-mail'); // not verified: cannot be accepted yet
 
@@ -420,16 +423,20 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect(flash().message).toBe('That associate code is no longer active — leave it empty, or ask the associate.');
   });
 
-  it('a buyer who does not confirm is not linked', async () => {
+  it('the quotation form has no associate checkbox or code field', async () => {
+    const plain = (await request(app).get('/quotation-details')).text;
+    for (const never of ['associate_code', 'associate_inv', 'introduction_confirmed', 'Associate code']) {
+      expect(plain).not.toContain(never);
+    }
     const a = await associate();
-    const company = `Unconfirmed Buyer ${tag}`;
+    const withCode = (await request(app).get(`/quotation-details?code=${encodeURIComponent(a.personal_code)}`)).text;
+    expect(withCode).toContain(`<input type="hidden" name="associate_code" value="${a.personal_code}">`);
+    expect(withCode).not.toContain('type="checkbox" name="introduction_confirmed"');
+    const company = `Hidden Code Buyer ${tag}`;
     const [id, code] = await submit(intakePost(company, { associate_code: String(a.personal_code) }));
-    await verify(id, String(code), 'no');
-    expect((await associateIntakeService.reviewInfo(await associateIntakeService.submission(id))).flags)
-      .toContain('The buyer did not confirm that this associate introduced them — accepting does not link them.');
-    expect((await accept(id)).message).toContain('Not linked to the associate: the buyer did not confirm the introduction.');
-    expect(await value('SELECT associate_id FROM clients WHERE company_legal_name = :n', { n: company })).toBeNull();
-    expect(await associateEventRepository.hasEvent(Number(a.id), 'client_not_accepted', null, null)).toBe(true);
+    expect(Number((await associateIntakeService.submission(id)).introduction_confirmed)).toBe(1); // the link or code is enough
+    await verify(id, String(code), '');
+    expect((await accept(id)).message).toContain(`Linked to associate ${a.name}`);
   });
 
   it('two associates claim one buyer: the first completed registration wins', async () => {

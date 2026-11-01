@@ -91,7 +91,7 @@ async function submit(req, res) {
   const id = await clientIntakeRepository.create(data, req.ip || null);
   const link = await issueCorrectionLink(id, data.email);
   if (intro.associate) {
-    const code = await associateIntakeService.attach(id, intro.associate, intro.invitation, data.company_legal_name, data.country_of_destination, data.email, !!body.introduction_confirmed, website || null);
+    const code = await associateIntakeService.attach(id, intro.associate, intro.invitation, data.company_legal_name, data.country_of_destination, data.email, true, website || null);
     req.session[associateIntakeService.SESSION_KEY] = id;
     await auditLogRepository.log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', id, 'associate_id', null, String(intro.associate.id), `Submitted by ${data.company_legal_name} via the public quotation-details form, introduced by associate ${intro.associate.name}.`);
     if (associatePortalService.showCodeOnScreen()) {
@@ -140,18 +140,12 @@ async function verify(req, res) {
     res.renderView('client_intake/link_expired', {}, 'layout/bare');
     return;
   }
-  const answer = String((req.body || {}).introduced || '');
-  if (!['yes', 'no'].includes(answer)) {
-    flash.set(req, 'error', `Tell us whether ${s.associate_name} introduced you.`);
-    res.redirect('/quotation-details/verify');
-    return;
-  }
   if (await rateLimiter.tooManyRequests('quotation_intake_verify', String(id), 10, 30)) {
     flash.set(req, 'error', 'Too many attempts. Please wait and try again.');
     res.redirect('/quotation-details/verify');
     return;
   }
-  let error = await associateIntakeService.verify(id, String((req.body || {}).code || ''), answer === 'yes');
+  let error = await associateIntakeService.verify(id, String((req.body || {}).code || ''), true);
   if (error !== null) {
     if (error.includes('expired')) {
       const code = await associateIntakeService.sendEmailCode(id, String(s.email));

@@ -5,10 +5,6 @@
   <form method="post" action="/quotation-details/verify">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <label>Code from the e-mail *<input type="text" name="code" required inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code"></label>
-    <fieldset><legend>Did <b>{{ s.associate_name }}</b> introduce you to NexaCrest? *</legend>
-      <label class="checkbox"><input type="radio" name="introduced" value="yes" required{{ ' checked' if s.introduction_confirmed == 1 else '' }}> Yes</label>
-      <label class="checkbox"><input type="radio" name="introduced" value="no"> No</label>
-    </fieldset>
     <button type="submit">Confirm</button>
   </form>
   <p class="muted small">The code is valid for 30 minutes. If it has expired, submit this page and we will send a new one.</p>

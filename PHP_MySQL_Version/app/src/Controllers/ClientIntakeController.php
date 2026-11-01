@@ -85,7 +85,7 @@ final class ClientIntakeController
         $id = ClientIntakeRepository::create($data, $_SERVER['REMOTE_ADDR'] ?? null);
         $link = self::issueCorrectionLink($id, $data['email']);
         if ($intro['associate'] !== null) {
-            $code = \App\Services\AssociateIntakeService::attach($id, $intro['associate'], $intro['invitation'], $data['company_legal_name'], $data['country_of_destination'], $data['email'], !empty($_POST['introduction_confirmed']), $website ?: null);
+            $code = \App\Services\AssociateIntakeService::attach($id, $intro['associate'], $intro['invitation'], $data['company_legal_name'], $data['country_of_destination'], $data['email'], true, $website ?: null);
             $_SESSION[\App\Services\AssociateIntakeService::SESSION_KEY] = $id;
             \App\Repositories\AuditLogRepository::log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', $id, 'associate_id', null, (string) $intro['associate']['id'], "Submitted by {$data['company_legal_name']} via the public quotation-details form, introduced by associate {$intro['associate']['name']}.");
             if (\App\Services\AssociatePortalService::showCodeOnScreen()) {
@@ -137,18 +137,12 @@ final class ClientIntakeController
             View::render('client_intake/link_expired', [], 'layout/bare');
             return;
         }
-        $answer = (string) ($_POST['introduced'] ?? '');
-        if (!in_array($answer, ['yes', 'no'], true)) {
-            Flash::set('error', 'Tell us whether ' . $s['associate_name'] . ' introduced you.');
-            header('Location: /quotation-details/verify');
-            return;
-        }
         if (RateLimiter::tooManyRequests('quotation_intake_verify', (string) $id, 10, 30)) {
             Flash::set('error', 'Too many attempts. Please wait and try again.');
             header('Location: /quotation-details/verify');
             return;
         }
-        $error = \App\Services\AssociateIntakeService::verify($id, (string) ($_POST['code'] ?? ''), $answer === 'yes');
+        $error = \App\Services\AssociateIntakeService::verify($id, (string) ($_POST['code'] ?? ''), true);
         if ($error !== null) {
             if (str_contains($error, 'expired')) {
                 $code = \App\Services\AssociateIntakeService::sendEmailCode($id, (string) $s['email']);

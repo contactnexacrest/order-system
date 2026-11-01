@@ -369,11 +369,14 @@ final class AssociateSystemTest extends DbTestCase
         $inv = AssociateInvitationRepository::createLink((int) $a['id'], 'Link Buyer BV', 'Netherlands');
         $_GET = ['inv' => $inv['token']];
         $form = $this->render(fn () => (new ClientIntakeController())->show([]));
-        self::assertStringContainsString('<b>' . htmlspecialchars((string) $a['name']) . '</b> introduced us to NexaCrest — correct', $form);
+        // Owner decision 1 Nov 2026 (revised): the link travels as a hidden field — nothing for the buyer to tick or type.
+        self::assertStringContainsString('<input type="hidden" name="associate_inv" value="' . $inv['token'] . '">', $form);
+        self::assertStringNotContainsString('introduction_confirmed', $form);
+        self::assertStringNotContainsString(htmlspecialchars((string) $a['name']), $form, 'the associate is not named on the buyer\'s form');
         self::assertSame('opened', AssociateInvitationRepository::find($inv['id'])['status']);
 
         $company = 'Link Buyer BV ' . $this->tag;
-        [$id, $code] = $this->submit($this->intakePost($company, ['associate_inv' => $inv['token'], 'introduction_confirmed' => '1']));
+        [$id, $code] = $this->submit($this->intakePost($company, ['associate_inv' => $inv['token']]));
         self::assertNotNull($code);
         self::assertStringContainsString('has not yet verified their e-mail', $this->accept($id)['message'], 'not verified: cannot be accepted yet');
 
@@ -420,16 +423,24 @@ final class AssociateSystemTest extends DbTestCase
         self::assertSame('That associate code is no longer active — leave it empty, or ask the associate.', $this->flash()['message']);
     }
 
-    public function testABuyerWhoDoesNotConfirmIsNotLinked(): void
+    public function testTheQuotationFormHasNoAssociateCheckboxOrCodeField(): void
     {
+        $_GET = [];
+        $plain = $this->render(fn () => (new ClientIntakeController())->show([]));
+        foreach (['associate_code', 'associate_inv', 'introduction_confirmed', 'Associate code'] as $never) {
+            self::assertStringNotContainsString($never, $plain, "the plain form has no {$never}");
+        }
         $a = $this->associate();
-        $company = 'Unconfirmed Buyer ' . $this->tag;
+        $_GET = ['code' => (string) $a['personal_code']];
+        $withCode = $this->render(fn () => (new ClientIntakeController())->show([]));
+        self::assertStringContainsString('<input type="hidden" name="associate_code" value="' . $a['personal_code'] . '">', $withCode);
+        self::assertStringNotContainsString('type="checkbox" name="introduction_confirmed"', $withCode);
+        $_GET = [];
+        $company = 'Hidden Code Buyer ' . $this->tag;
         [$id, $code] = $this->submit($this->intakePost($company, ['associate_code' => (string) $a['personal_code']]));
-        $this->verify($id, (string) $code, 'no');
-        self::assertContains('The buyer did not confirm that this associate introduced them — accepting does not link them.', AssociateIntakeService::reviewInfo(AssociateIntakeService::submission($id))['flags']);
-        self::assertStringContainsString('Not linked to the associate: the buyer did not confirm the introduction.', $this->accept($id)['message']);
-        self::assertNull(Database::connection()->query('SELECT associate_id FROM clients WHERE company_legal_name = ' . Database::connection()->quote($company))->fetchColumn() ?: null);
-        self::assertTrue(AssociateEventRepository::hasEvent((int) $a['id'], 'client_not_accepted', null, null));
+        self::assertSame(1, (int) AssociateIntakeService::submission($id)['introduction_confirmed'], 'the link or code is enough — no question to the buyer');
+        $this->verify($id, (string) $code, '');
+        self::assertStringContainsString("Linked to associate {$a['name']}", $this->accept($id)['message']);
     }
 
     public function testTwoAssociatesClaimOneBuyerTheFirstCompletedRegistrationWins(): void
