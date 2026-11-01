@@ -158,4 +158,44 @@ async function setFirc(orderId, reference, receivedAt) {
     { ref: reference, received_at: receivedAt, order_id: orderId });
 }
 
-module.exports = { find, upsert, recordLegDetails, confirmUsable, recordReceived, receiptsForZohoSync, setZohoSynced, setZohoApplied, forgetZohoPayment, receivedForRegister, setFirc };
+/** Gap list G-4 (owner, 1 Nov 2026): the LC's issue, expiry, last shipment and document presentation dates. */
+async function saveDates(orderId, issue, expiry, lastShipment, presentation, userId) {
+  await db.execute(
+    `INSERT INTO order_lc_details (order_id, lc_issue_date, lc_expiry_date, lc_last_shipment_date, lc_presentation_deadline, recorded_by)
+     VALUES (:o, :i, :e, :l, :p, :u)
+     ON DUPLICATE KEY UPDATE lc_issue_date = VALUES(lc_issue_date), lc_expiry_date = VALUES(lc_expiry_date),
+        lc_last_shipment_date = VALUES(lc_last_shipment_date), lc_presentation_deadline = VALUES(lc_presentation_deadline)`,
+    { o: orderId, i: issue, e: expiry, l: lastShipment, p: presentation, u: userId }
+  );
+}
+
+function ymd(v) {
+  if (!v) return null;
+  if (v instanceof Date) {
+    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
+  }
+  return String(v).slice(0, 10);
+}
+
+/**
+ * The LC dates within 7 days or already past (while the bank has not paid
+ * under the LC), for the order page's warning.
+ */
+function dateWarnings(lc, today) {
+  if (!lc || lc.lc_received_at) {
+    return [];
+  }
+  const t = today || require('../helpers/dbDateTime').todayIst();
+  const out = [];
+  for (const [col, label] of [['lc_last_shipment_date', 'Last shipment date'], ['lc_presentation_deadline', 'Deadline to present documents'], ['lc_expiry_date', 'LC expiry']]) {
+    const d = ymd(lc[col]);
+    if (!d) continue;
+    const days = Math.round((Date.parse(`${d}T00:00:00Z`) - Date.parse(`${t}T00:00:00Z`)) / 86400000);
+    if (days <= 7) {
+      out.push({ label, date: d, days });
+    }
+  }
+  return out;
+}
+
+module.exports = { find, upsert, recordLegDetails, confirmUsable, recordReceived, receiptsForZohoSync, setZohoSynced, setZohoApplied, forgetZohoPayment, receivedForRegister, setFirc, saveDates, dateWarnings, ymd };

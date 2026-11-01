@@ -633,6 +633,9 @@ $router->post('/orders/{id}/payment/advance/clear', [$orders, 'clearAdvancePayme
 // vs. confirming-usable is the same record/clear duty split either way.
 $router->post('/orders/{id}/payment/lc', [$orders, 'recordLcDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/lc/confirm-usable', [$orders, 'confirmLcUsable'], [SessionAuth::required(), PermissionCheck::requires('clear_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// Gap list G-4 (owner, 1 Nov 2026): the LC's dates and its amendments.
+$router->post('/orders/{id}/lc-dates', [$orders, 'saveLcDates'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/lc-amendments', [$orders, 'addLcAmendment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment-terms/approve', [$orders, 'approvePaymentTerms'], [SessionAuth::required(), PermissionCheck::requires('approve_payment_terms'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_po'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -657,6 +660,8 @@ $router->post('/orders/{id}/annexure/images/{imageId}/remove', [$annexure, 'remo
 
 // --- Phase C: Stages 4-9 ---
 $router->post('/orders/{id}/oc-acknowledgment', [$orders, 'recordOcAcknowledgment'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// Gap list G-6 (owner, 1 Nov 2026): with e-mail off, the buyer's 48 hours start when the OC is marked as sent.
+$router->post('/orders/{id}/oc-sent-to-buyer', [$orders, 'markOcSentToBuyer'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
 $router->post('/orders/{id}/supplier-po', [$orders, 'saveSupplierPo'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_po'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/supplier-po/signed', [$orders, 'confirmSupplierSigned'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_po'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -693,6 +698,8 @@ $router->post('/orders/{id}/shipping', [$orders, 'saveShipping'], [SessionAuth::
 $router->post('/orders/{id}/draft-bl', [$orders, 'uploadDraftBl'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/draft-bl/{roundId}/review', [$orders, 'reviewDraftBl'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/bl-issued', [$orders, 'recordBlIssued'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// Gap list G-3 (owner, 1 Nov 2026): the pre-shipment inspection's result and report.
+$router->post('/orders/{id}/inspection-result', [$orders, 'recordInspectionResult'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/bl-copy', [$orders, 'attachBlCopy'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/shipping-bill', [$orders, 'recordShippingBill'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/scanned-bl-sent', [$orders, 'recordScannedBlSent'], [SessionAuth::required(), PermissionCheck::requires('manage_shipping'), OrderLockGuard::check(), CsrfCheck::verify()]);

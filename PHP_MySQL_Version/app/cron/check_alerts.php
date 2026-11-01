@@ -50,6 +50,32 @@ function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $r
     return $count;
 }
 
+/**
+ * Gap list G-4 (owner, 1 Nov 2026): a reminder that goes out once per
+ * person, order and date (not once a day) — sent again only if the date
+ * itself changes (e.g. after an LC amendment).
+ */
+function notifyOnce(array $userIds, string $type, string $message, int $relatedOrderId): int
+{
+    $count = 0;
+    $seen = Database::connection()->prepare('SELECT 1 FROM notifications WHERE user_id = :u AND type = :t AND related_order_id = :o AND message = :m LIMIT 1');
+    foreach (array_unique($userIds) as $userId) {
+        $seen->execute(['u' => $userId, 't' => $type, 'o' => $relatedOrderId, 'm' => $message]);
+        if ($seen->fetchColumn() !== false) {
+            continue;
+        }
+        NotificationRepository::create($userId, null, $type, $relatedOrderId, $message);
+        $count++;
+    }
+    return $count;
+}
+
+/** @return list<int> the order's assignees */
+function orderAssignees(int $orderId): array
+{
+    return array_map(static fn (array $a): int => (int) $a['user_id'], \App\Repositories\OrderAssigneeRepository::forOrder($orderId));
+}
+
 function run(): int
 {
     $pdo = Database::connection();
@@ -118,6 +144,53 @@ function run(): int
         $dueDate = (new DateTimeImmutable(substr((string) $row['generated_at'], 0, 10)))->modify("+{$fdnOverdueDays} days")->format('Y-m-d');
         if ($dueDate < $today->format('Y-m-d')) {
             $created += notifyMdAndAdmin($mdAndAdminIds, 'fdn_overdue', "Freight payment overdue on order {$row['order_reference']} — FDN issued {$row['generated_at']}, still not cleared.", (int) $row['order_id']);
+        }
+    }
+
+    // --- Balance payment overdue (gap list G-2, owner 1 Nov 2026) ---
+    // Same daily pattern as the freight alert above, to Admin/MD and the
+    // order's assignees, from the day after the balance due date.
+    $stmt = $pdo->query(
+        "SELECT o.id AS order_id, o.order_reference, ps.balance_due_date
+         FROM order_payment_status ps
+         JOIN orders o ON o.id = ps.order_id
+         WHERE ps.balance_due_date IS NOT NULL
+           AND ps.balance_due_date < CURDATE()
+           AND ps.balance_cleared_at IS NULL
+           AND o.is_locked = 0
+           AND o.status NOT IN ('cancelled', 'lost')"
+    );
+    foreach ($stmt->fetchAll() as $row) {
+        $created += notifyMdAndAdmin(array_values(array_unique(array_merge($mdAndAdminIds, orderAssignees((int) $row['order_id'])))), 'balance_overdue',
+            "Balance payment overdue on order {$row['order_reference']} — was due {$row['balance_due_date']}, still not cleared.", (int) $row['order_id']);
+    }
+
+    // --- Letter of Credit dates (gap list G-4, owner 1 Nov 2026) ---
+    // Once each, 7 days before the LC's last shipment date, deadline to
+    // present documents and expiry, to Admin/MD and the order's assignees,
+    // while the bank has not yet paid under the LC.
+    $stmt = $pdo->query(
+        "SELECT o.id AS order_id, o.order_reference, lc.lc_number, lc.lc_last_shipment_date, lc.lc_presentation_deadline, lc.lc_expiry_date
+         FROM order_lc_details lc
+         JOIN orders o ON o.id = lc.order_id
+         WHERE o.payment_method = 'LC'
+           AND o.is_locked = 0
+           AND o.status NOT IN ('cancelled', 'lost')
+           AND lc.lc_received_at IS NULL"
+    );
+    $lcDates = ['lc_last_shipment_date' => ['lc_last_shipment_soon', 'last shipment date'], 'lc_presentation_deadline' => ['lc_presentation_soon', 'deadline to present the documents'], 'lc_expiry_date' => ['lc_expiry_soon', 'expiry date']];
+    foreach ($stmt->fetchAll() as $row) {
+        foreach ($lcDates as $col => [$type, $label]) {
+            if (empty($row[$col])) {
+                continue;
+            }
+            $daysLeft = (int) $today->diff(new DateTimeImmutable((string) $row[$col]))->format('%r%a');
+            if ($daysLeft < 0 || $daysLeft > 7) {
+                continue;
+            }
+            $lc = !empty($row['lc_number']) ? "LC {$row['lc_number']}" : 'the LC';
+            $created += notifyOnce(array_merge($mdAndAdminIds, orderAssignees((int) $row['order_id'])), $type,
+                "Order {$row['order_reference']}: {$lc} — {$label} is {$row[$col]} ({$daysLeft} day(s) away).", (int) $row['order_id']);
         }
     }
 

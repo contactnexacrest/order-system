@@ -21,13 +21,28 @@ On the order page this is **Step 11 · Commercial Invoice & Balance**
 **11b** Mark Scanned BL Copy Sent to Buyer, **11c** Record Balance
 Remittance, **11d** Mark Balance Cleared. It bundles two independent
 things — sending the buyer proof of shipment, and collecting final
-payment:
+payment.
+
+**Balance before shipment (gap list G-1, owner 1 Nov 2026).** On a
+"before shipment" order ("Standard — New Buyer", "Extended Terms — Before
+Shipment"; not LC), 11c and 11d open from Step 9 (freight) on, before the
+Commercial Invoice: the buyer pays against the PI. **Mark Balance Cleared
+(before shipment)** clears it without passing Stage 8, and the Bill of
+Lading (Step 10f) can then be recorded. Once the CI is approved, **Complete
+Step 11 (unlocks Stage 9)** in 11d passes the stage. Post-BL orders work as
+below:
 
 ![Stage 8 section — before anything actioned](./images/s8_before.png)
 
 **Mark Scanned BL Copy Sent to Buyer** (11b) is a simple confirmation that the
 buyer has been sent a copy of the Bill of Lading now that it's been
-issued — purely a record-keeping checkbox, it doesn't affect the gate.
+issued — it doesn't affect the gate. On an order whose balance is due
+against the BL, and on every Letter of Credit order, it also **starts the
+balance due date** (gap list G-2, owner 1 Nov 2026): the date becomes that
+day plus the order's balance days, and the message says "Balance payment due
+on …". From the day after that date, until the balance is cleared, a daily
+**"Balance payment overdue"** reminder goes to Admin/MD and the order's
+assignees, and the order shows as overdue on the dashboard and order list.
 
 **Upload the scanned BL copy first.** On a CFR/CIF order the CI is made
 against the BL, so Step 11a shows a reminder until the scanned BL copy is
@@ -137,3 +152,12 @@ stage:
 
 See [Chapter 9](./09-stage9-despatch-closure.md) for Document Despatch &
 Closure — the final stage.
+
+## Paid in parts or short (gap list G-5, 1 Nov 2026)
+
+If the buyer pays in more than one wire, record each one at Step 11c
+(**Record Another … Receipt**); the card shows each receipt and **Due ·
+received so far · still owed**. A payment cannot be cleared while money is
+still owed, except by a manager with **Approve short payment**, who writes
+the reason; the shortfall is then recorded as written off and shown on the
+order. See chapter 03, "Paid in parts", for the details.

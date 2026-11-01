@@ -154,6 +154,8 @@ async function record(req, res) {
     return;
   }
   await paymentMilestoneRepository.recordReceived(Number(m.id), amount, receivedOn, rate, bankRef, note, req.user.id);
+  // Gap list G-5: the receipt is kept in the order's receipt history too.
+  await require('../services/partPaymentService').addMilestoneReceipt(m, amount, receivedOn, rate, bankRef, note, req.user.id);
   const description = await paymentDescription.milestonePayment((await paymentMilestoneRepository.find(Number(m.id))) || m);
   await auditLogRepository.log(req.user.id, 'MILESTONE_PAYMENT_RECORDED', 'order_payment_milestones', Number(m.id), 'received_amount', null, description);
   flash.set(req, 'success', `Recorded: ${description}. Mark it cleared once your bank confirms receipt.`);
@@ -183,9 +185,18 @@ async function clear(req, res) {
     back(res, orderId);
     return;
   }
+  // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
+  const partPaymentService = require('../services/partPaymentService');
+  const partCheck = await partPaymentService.clearCheck(orderId, 'milestone', m, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason);
+  if (partCheck.error) {
+    flash.set(req, 'error', partCheck.error);
+    back(res, orderId);
+    return;
+  }
   await paymentMilestoneRepository.markCleared(Number(m.id), clearedOn, req.user.id);
   await auditLogRepository.log(req.user.id, 'MILESTONE_PAYMENT_CLEARED', 'order_payment_milestones', Number(m.id), 'cleared_on', null, clearedOn);
-  flash.set(req, 'success', `Milestone ${m.seq} cleared. It goes to Zoho Books with the next revenue sync.`);
+  const shortNote = partCheck.short ? ` ${await partPaymentService.recordShortfall(orderId, 'milestone', m, partCheck.short, req.user)}` : '';
+  flash.set(req, 'success', `Milestone ${m.seq} cleared. It goes to Zoho Books with the next revenue sync.${shortNote}`);
   back(res, orderId);
 }
 

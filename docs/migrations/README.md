@@ -24,6 +24,9 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-01g-payment-milestones.s
 mysql -u <user> -p <database> < docs/migrations/2026-11-01h-product-categories.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01i-owner-decisions.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-02a-associate-system.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-02b-gap-shipment-gates.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-02c-gap-due-dates-lc.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-02d-gap-part-payments.sql
 ```
 
 ## Rules every file follows
@@ -82,6 +85,9 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30
 | 33 | `2026-11-01h-product-categories.sql` | D-215 (5a): product categories and their attributes (`product_categories`, `product_category_attributes`; Natural Stone = today's products, Dimensions and Finish) and the order line's category and attribute values (`order_products.category_id`, `attribute_values`, every existing line Natural Stone). New tables and columns only |
 | 34 | `2026-11-01i-owner-decisions.sql` | Owner decisions of 1 Nov 2026: System Administrator loses `data_export_run` (A-8); Procurement Executive gets `manage_suppliers` (C-8); `payment_presets.allow_zero_advance`, on for the Letter of Credit presets (C-4); `daily_digest_log` for the once-a-day digest (C-7); an existing order with no assignee gets its creator (C-7). Safe to run twice |
 | 35 | `2026-11-02a-associate-system.sql` | Associate system (owner decision 1 Nov 2026, AS-1 … AS-17): associates get status Invited/Active/Suspended/Ended, personal rates that may be empty (empty = the standard ladder), a no-commission switch, portal login fields, a personal code; new tables `associate_tokens`, `associate_bank_accounts`, `associate_documents`, `associate_invitations`, `associate_events`, `associate_messages`, `associate_codes`; intake submissions carry the associate, the buyer's e-mail verification and confirmation; clients carry the 12-month lock; orders carry the rate fixed at creation; payouts can be held or clawed back; the standard ladder, TDS %, protection months and bank waiting days in `incentive_settings`; permissions `manage_associates`, `view_associates`, `manage_associate_bank`; upload context `associate_document`. Safe to run twice |
+| 36 | `2026-11-02b-gap-shipment-gates.sql` | Gap list G-1 / G-3 (owner, 1 Nov 2026): `order_inspections` (Passed / Failed, date, agency, report) and `order_shipment_gate_overrides` (a manager's written release of the Bill of Lading step); upload context `inspection_report`; permission `override_shipment_gates` for MD, ED and Admin. Safe to run twice |
+| 37 | `2026-11-02c-gap-due-dates-lc.sql` | Gap list answers 1 Nov 2026 (D-218), part B. G-2: a balance due against the BL, and every LC order's balance, has no due date until the scanned BL is sent; existing open balances are corrected (no date while the scanned BL is not sent, else that day + the order's balance days). G-4: `order_lc_details` gets `lc_issue_date`, `lc_expiry_date`, `lc_last_shipment_date`, `lc_presentation_deadline`; new table `order_lc_amendments`; upload context `order_lc_amendment`. Safe to run twice |
+| 38 | `2026-11-02d-gap-part-payments.sql` | Gap list answers 1 Nov 2026 (D-218), part C (G-5): new table `order_payment_receipts` (every remittance of the advance, freight, balance and each milestone kept separately; the leg's existing columns keep the total) and `order_payment_shortfalls` (a leg cleared while money was still owed, with the manager's reason); permission `approve_short_payment` (MD, ED, Admin, Finance Director); existing remittances back-filled as one receipt each. Safe to run twice |
 
 There is no `2026-10-28b` file; that letter was not used.
 

@@ -15,11 +15,17 @@ collect the advance payment before production or procurement begins.
   usable), a client login is created behind the scenes —
   the buyer never had to ask for one and staff never had to create one by
   hand. See "What happens next" below.
-- The Balance Due date shown in Payment Status reads **"event-triggered"**
-  rather than a fixed date — the balance isn't due on a calendar date, it's
-  due when a later event (typically BL issuance, per the order's own
-  payment terms) happens. The system doesn't try to guess that date ahead
-  of time.
+- The Balance Due date shown in Payment Status has no fixed date yet when
+  the advance is cleared (gap list G-2, owner 1 Nov 2026):
+  - **Balance before shipment** (e.g. *Standard — New Buyer*): it reads
+    **"event-triggered"** — the balance is due when the goods are ready to
+    ship, not on a calendar date.
+  - **Balance against the BL** (e.g. *Established Buyer — Post-BL*) and
+    every **Letter of Credit** order: it reads **"set when the scanned BL
+    is sent to the buyer (Step 11b)"**. The day staff mark the scanned BL
+    sent, the due date becomes that day plus the order's balance days
+    (7 on the standard presets). Only then can it show as overdue — on
+    the dashboard, the order list and as a daily reminder.
 
 ## What staff do
 
@@ -190,6 +196,28 @@ with money that's actually landed:
    and balance remittances work the same way. This does **not** pass the
    gate yet:
 
+   **Paid in parts (gap list G-5, 1 Nov 2026).** If the buyer pays the
+   advance (or the freight, the balance or a milestone) in more than one
+   wire, record each wire as it arrives — the card then shows **Record
+   Another Advance Receipt**. Each receipt is kept with its date, amount,
+   rate, bank reference and who recorded it; the card lists them with
+   **Due · received so far · still owed** (or "paid … more than due").
+   The payment's totals (amount, latest date, the amount-weighted rate and
+   the bank references, e.g. "bank ref UTR0001, UTR0002") are what the
+   documents, Zoho Books and the reports use. Once a payment is cleared,
+   no more receipts can be added to it.
+
+   **Clearing while money is still owed** is refused ("Advance received so
+   far: USD 1,500.00 of USD 1,800.00 due — USD 300.00 is still owed. …").
+   Only a manager with **Approve short payment** (MD, ED, Admin, Finance
+   Director) can clear it short, writing the reason (10–500 characters).
+   The shortfall is recorded and shown on the order with the reason and
+   who approved it: on the advance it is **carried into the balance** (the
+   balance is always the order value less the advance actually received);
+   on the freight, the balance or a milestone it is **written off**.
+   A middle milestone keeps one receipt (its line prints on the PI/OC);
+   a short one is cleared the same way.
+
    ![Payment Status after recording, before clearing](./images/s3_payment_status_recorded.png)
 
 2. **Mark Advance Cleared (unlocks Stage 4)** (5e) — staff confirm only once
@@ -217,6 +245,24 @@ On a Letter of Credit order there is no advance to record. Instead:
    creates the client's portal login. **This is the action that passes
    Stage 3's gate** on an LC order. Like 5e on a cash order, it is refused
    until the PI is approved (email off) or sent (email on).
+
+**LC dates and amendments** (gap list G-4, owner 1 Nov 2026). On an LC
+order, the **Letter of Credit & Bank Loan** card under Step 5 holds:
+
+- **LC issued on**, **Last shipment date**, **Deadline to present
+  documents** and **LC expiry** — open **Record or change the LC dates**
+  (Accounts/Export, "Manage payments"). The last shipment date and the
+  presentation deadline cannot be after the expiry, and none of the three
+  can be on or before the issue date. The bank can refuse to pay if one is
+  missed, so each date is reminded **once, 7 days before**, to Admin/MD
+  and the order's assignees (daily alerts job). While a date is within 7
+  days or past, and the bank has not yet paid under the LC, the card opens
+  by itself and shows **LC date within 7 days** / **LC date passed**.
+- **LC amendments** — **Record an LC amendment**: the date (today or
+  earlier), the amendment number or reference, what changed, and
+  optionally a copy (PDF or image). Every amendment stays listed, oldest
+  first. If an amendment changes a date, update the LC dates as well.
+- Loan interest stays one total, in Order Financials (below).
 
 The **Payment Action Link** box is not shown on an LC order's 5d. When the
 bank later pays under the LC, that money is recorded in **Step 12a → LC

@@ -22,6 +22,59 @@ $canManagePayments = PermissionService::can((int) $currentUser['id'], $currentUs
 // bank actually received it) is split out of manage_payments (recording
 // what the client says they sent) so the same person can't do both.
 $canClearPayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'clear_payments');
+// Gap list G-5 (owner, 1 Nov 2026): part payments — each receipt, what is still owed, and a manager's reason to clear short.
+$canApproveShort = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'approve_short_payment');
+$renderReceipts = static function (string $leg, ?array $milestone = null) use ($order, $sees): void {
+    // Owner decision D-214, phase 2: a department that may not see buyer payments sees no amounts here.
+    if (empty($sees['buyer_payments'])) {
+        return;
+    }
+    $__s = \App\Services\PartPaymentService::summary((int) $order['id'], $leg, $milestone);
+    if ($__s['receipts'] === [] && $__s['shortfall'] === null) {
+        return;
+    }
+    $__cur = (string) ($order['currency_code'] ?? '');
+    echo '<div class="part-payments small" data-part-payments="' . htmlspecialchars($leg) . '"><table class="list compact"><tr><th>Received on</th><th>Amount</th><th>Rate</th><th>Bank reference</th><th>Recorded by</th></tr>';
+    foreach ($__s['receipts'] as $__r) {
+        echo '<tr><td>' . htmlspecialchars(Dates::short((string) $__r['received_on'])) . '</td><td>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['amount'])) . '</td><td>'
+            . ($__r['exchange_rate'] !== null ? '&#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['exchange_rate'], 4), '0'), '.')) : '—') . '</td><td>' . htmlspecialchars((string) ($__r['bank_reference'] ?? '—')) . '</td><td>'
+            . htmlspecialchars((string) ($__r['recorded_by_name'] ?? '—')) . '</td></tr>';
+    }
+    echo '</table><p>';
+    if ($__s['expected'] !== null) {
+        echo 'Due: <strong>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, $__s['expected'])) . '</strong> &middot; received so far: <strong>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, $__s['received'])) . '</strong> &middot; ';
+        if ($__s['owed'] > \App\Services\PartPaymentService::TOLERANCE) {
+            echo '<strong class="text-warning">still owed: ' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, $__s['owed'])) . '</strong>';
+        } elseif ($__s['owed'] < -\App\Services\PartPaymentService::TOLERANCE) {
+            echo 'paid ' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, -$__s['owed'])) . ' more than due';
+        } else {
+            echo 'received in full';
+        }
+    } else {
+        echo 'Received so far: <strong>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, $__s['received'])) . '</strong>';
+    }
+    echo '</p>';
+    if ($__s['shortfall'] !== null) {
+        $__sf = $__s['shortfall'];
+        echo '<p class="notice notice-warning">Cleared short by ' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__sf['shortfall_amount'])) . ' on ' . htmlspecialchars(Dates::short(substr((string) $__sf['approved_at'], 0, 10)))
+            . ': approved by ' . htmlspecialchars((string) ($__sf['approved_by_name'] ?? '—')) . ' — ' . ($__sf['treatment'] === 'carried_to_balance' ? 'carried into the balance' : 'written off') . '. Reason: ' . htmlspecialchars((string) $__sf['reason']) . '</p>';
+    }
+    echo '</div>';
+};
+$shortReasonField = static function (string $leg, ?array $milestone = null) use ($order, $canApproveShort, $sees): string {
+    if (empty($sees['buyer_payments'])) {
+        return '';
+    }
+    $__s = \App\Services\PartPaymentService::summary((int) $order['id'], $leg, $milestone);
+    if ($__s['owed'] === null || $__s['owed'] <= \App\Services\PartPaymentService::TOLERANCE) {
+        return '';
+    }
+    $__owed = htmlspecialchars(\App\Services\PartPaymentService::money((string) ($order['currency_code'] ?? ''), $__s['owed']));
+    if (!$canApproveShort) {
+        return '<p class="notice notice-warning small">' . $__owed . ' is still owed — record the rest when it arrives. Only a manager with "Approve short payment" can clear it short.</p>';
+    }
+    return '<label>Reason for clearing it short * <small class="muted">(' . $__owed . ' still owed — recorded and shown on the order)</small><textarea name="short_reason" required minlength="10" maxlength="500" rows="2"></textarea></label>';
+};
 // Owner decision 2026-10-30: each stage's gating button says, before the
 // click, which of the stage's documents still need generating, approving or
 // sending (the rule stageDocumentBlockedBy() enforces), and stays disabled
@@ -321,6 +374,8 @@ $isFob = strtoupper((string) $order['incoterm_code']) === 'FOB';
 $freightCleared = $stage6 && $stage6['status'] === 'gate_passed';
 $blIssued = $stage7 && $stage7['status'] === 'gate_passed';
 $balanceCleared = $stage8 && $stage8['status'] === 'gate_passed';
+// Gap list G-1: a "before shipment" balance can be cleared before Stage 8 is passed.
+$balanceMoneyCleared = $balanceCleared || !empty($payment['balance_cleared_at']);
 $orderClosed = $order['status'] === 'complete';
 
 // Payment Snapshot + Payment Ledger data, computed here (rather than down
@@ -892,9 +947,17 @@ foreach ($subStepDone as $__step => $__subs) {
 // done/current/locked for one sub-step card: a done or locked step
 // overrides every sub-step; inside the current step, done sub-steps show
 // done, the first unfinished one is current, and the rest wait their turn.
-$subStepStatus = static function (string $step, string $sub) use ($stepStates, $subStepDone, $currentSubStep, $honestSubSteps): string {
+$__balanceEarly = !empty($balanceOpenEarly);
+$subStepStatus = static function (string $step, string $sub) use ($stepStates, $subStepDone, $currentSubStep, $honestSubSteps, $__balanceEarly): string {
     $parent = $stepStates[$step];
     $done = $subStepDone[$step][$sub] ?? null;
+    // Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is recorded (11c) and cleared (11d) before Step 11 is reached.
+    if ($__balanceEarly && $step === '11' && ($sub === '11c' || $sub === '11d') && $parent !== 'done') {
+        if ($done) {
+            return 'done';
+        }
+        return $sub === '11c' || !empty($subStepDone['11']['11c']) ? 'current' : 'locked';
+    }
     if (isset($honestSubSteps[$sub]) && $parent === 'done' && $done !== null) {
         return $done ? 'done' : 'current';
     }
@@ -982,7 +1045,7 @@ $phaseSummary = static function (string $key, string $badges = '') use ($phases,
 // Phytosanitary, Pre-Shipment Inspection...) at the start of Step 10. Both
 // run alongside the other cards and never lock them. Each row saves on its
 // own without reloading the page.
-$renderComplianceCard = static function (string $phase, string $step) use ($complianceTasks, $order, $canCloseOrders, $canManageComplianceTaskTypes, $stepStates, $currentUserStep, $stepStatusIcon): void {
+$renderComplianceCard = static function (string $phase, string $step) use ($complianceTasks, $order, $canCloseOrders, $canManageComplianceTaskTypes, $stepStates, $currentUserStep, $stepStatusIcon, $inspection): void {
     if (!$canCloseOrders) {
         return;
     }
@@ -1008,6 +1071,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <tr data-compliance-row>
           <td><?= htmlspecialchars($ct['task_type_name']) ?>
             <input type="hidden" name="tasks[<?= (int) $__i ?>][task_type_id]" value="<?= (int) $ct['task_type_id'] ?>">
+            <?php if ($ct['task_type_name'] === \App\Services\ShipmentGateService::INSPECTION_TASK && $inspection): // Gap list G-3 ?><br><span class="badge <?= $inspection['result'] === 'passed' ? 'badge-active' : 'badge-lost' ?>"><?= $inspection['result'] === 'passed' ? 'Passed' : 'Failed' ?></span> <small class="muted"><?= htmlspecialchars(\App\Helpers\Dates::short((string) $inspection['inspected_on'])) ?> · <?= htmlspecialchars((string) $inspection['agency_name']) ?></small><?php endif; ?>
             <?php if ($ct['resolved_at']): ?><br><span class="muted small"><?= htmlspecialchars($ct['resolved_at']) ?><?php if ($ct['resolved_by_name']): ?> by <?= htmlspecialchars($ct['resolved_by_name']) ?><?php endif; ?></span><?php endif; ?>
           </td>
           <td>
@@ -1509,7 +1573,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <div><span class="k">Advance T/T Received</span><span class="v"><?= htmlspecialchars($payment['advance_remittance_received_at'] ?? '—') ?></span></div>
         <div><span class="k">Advance Cleared</span><span class="v"><?= htmlspecialchars($payment['advance_cleared_at'] ?? '—') ?></span></div>
         <div><span class="k">Balance Amount</span><span class="v"><?php if (!$canViewPaymentAmounts): ?>Only shown to Accounts/Logistics/Export staff<?php else: ?><?= $payment['balance_amount'] !== null ? number_format((float) $payment['balance_amount'], 2) . ' ' . htmlspecialchars($order['currency_code'] ?? '') : '—' ?><?php endif; ?></span></div>
-        <div><span class="k">Balance Due</span><span class="v"><?= htmlspecialchars($payment['balance_due_date'] ?? 'event-triggered') ?></span></div>
+        <div><span class="k">Balance Due</span><span class="v"><?= htmlspecialchars($payment['balance_due_date'] ?? (\App\Services\BalanceDueService::dueAfterBl($order) ? 'set when the scanned BL is sent to the buyer (Step 11b)' : 'event-triggered')) ?></span></div>
         <div><span class="k">Balance T/T Received</span><span class="v"><?= htmlspecialchars($payment['balance_remittance_received_at'] ?? '—') ?></span></div>
         <div><span class="k">Balance Cleared</span><span class="v"><?= htmlspecialchars($payment['balance_cleared_at'] ?? '—') ?></span></div>
         <?php if ($payment['freight_amount'] !== null || $payment['freight_remittance_received_at'] !== null): ?>
@@ -1612,6 +1676,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       </table>
 
       <?php foreach ($__ms as $__m): ?>
+        <?php $renderReceipts('milestone', $__m); ?>
         <?php if ($__m['received_amount'] === null && $canManagePayments): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/milestones/<?= (int) $__m['id'] ?>" class="inline-form milestone-record">
           <?= Csrf::field() ?>
@@ -1628,6 +1693,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/milestones/<?= (int) $__m['id'] ?>/clear" class="inline-form milestone-clear">
           <?= Csrf::field() ?>
           <label>Milestone <?= (int) $__m['seq'] ?> cleared on *<input type="date" name="cleared_on" required value="<?= date('Y-m-d') ?>" min="<?= htmlspecialchars((string) $__m['received_on']) ?>" max="<?= date('Y-m-d') ?>"></label>
+          <?= $shortReasonField('milestone', $__m) ?>
           <button type="submit" class="btn-sm">Mark Milestone <?= (int) $__m['seq'] ?> Cleared</button>
         </form>
         <?php endif; ?>
@@ -2379,7 +2445,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <details class="step-card" id="step-5d-payment-record"<?= $subCardOpen('5', '5d') ?>>
       <summary><?= $stepStatusIcon($subStepStatus('5', '5d')) ?><h2>Step 5d &middot; Record Advance Remittance</h2></summary>
       <?php if (!$advanceCleared) { $renderPaymentActionLink('advance', 'step-5d-payment-record'); } ?>
-      <?php if ($stage3 && $stage3['status'] !== 'locked' && !$advanceCleared && (!$payment || $payment['advance_remittance_received_at'] === null)): ?>
+      <?php $renderReceipts('advance'); ?>
+      <?php if ($stage3 && $stage3['status'] !== 'locked' && !$advanceCleared): ?>
+        <?php if ($payment && $payment['advance_remittance_received_at'] !== null): ?><?= $remittanceRecordedNote('advance', 'Next: Step 5e — mark it cleared once the bank confirms, or record another receipt below if the buyer paid in parts.') ?><?php endif; ?>
         <?php if (!$canManagePayments): ?>
           <p class="muted">Only Accounts/Export can record this payment.</p>
         <?php else: ?>
@@ -2393,7 +2461,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="advance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
-          <?= $stepBadge('5d') ?><button type="submit" class="btn-sm">Record Advance Remittance</button>
+          <?= $stepBadge('5d') ?><button type="submit" class="btn-sm"><?= $payment && $payment['advance_remittance_received_at'] !== null ? 'Record Another Advance Receipt' : 'Record Advance Remittance' ?></button>
         </form>
         <?php endif; ?>
       <?php elseif (!$stage3 || $stage3['status'] === 'locked'): ?>
@@ -2417,6 +2485,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
           <?= Csrf::field() ?>
           <label>Cleared On<input type="date" name="advance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
+          <?= $shortReasonField('advance') ?>
           <?= $stageGateNotice(3, "mark the advance cleared") ?>
           <?= $stepBadge('5e') ?><button type="submit"<?= $stageGateDisabled(3) ?> class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
         </form>
@@ -2433,8 +2502,58 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
   </details>
 
   <?php if ($isLcPayment): ?>
-  <details class="step-card step-card-reference" id="step-5-lc-bank-loan">
-    <summary><h2>Letter of Credit &amp; Bank Loan <small class="muted">(steps 5-1a/5-2a/5-3a &mdash; financing cost, not the LC leg above)</small></h2></summary>
+  <?php $__lcWarnings = \App\Repositories\OrderLcDetailRepository::dateWarnings($orderLcDetails); ?>
+  <details class="step-card step-card-reference" id="step-5-lc-bank-loan"<?= $__lcWarnings !== [] ? ' open' : '' ?>>
+    <summary><h2>Letter of Credit &amp; Bank Loan <small class="muted">(steps 5-1a/5-2a/5-3a &mdash; financing cost, not the LC leg above)</small><?php if ($__lcWarnings !== []): ?> <span class="badge badge-lost">LC date <?= min(array_column($__lcWarnings, 'days')) < 0 ? 'passed' : 'within 7 days' ?></span><?php endif; ?></h2></summary>
+    <?php // Gap list G-4 (owner, 1 Nov 2026): the LC's dates (reminded 7 days before) and its amendments. ?>
+    <?php $__lc = $orderLcDetails ?? []; $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short((string) $v) : '—'; ?>
+    <div class="lc-dates" id="lc-dates">
+      <?php foreach ($__lcWarnings as $__w): ?>
+        <div class="alert alert-warning"><?= htmlspecialchars($__w['label']) ?>: <?= htmlspecialchars($__d($__w['date'])) ?> — <?= $__w['days'] < 0 ? 'passed ' . abs($__w['days']) . ' day(s) ago' : ($__w['days'] === 0 ? 'today' : 'in ' . $__w['days'] . ' day(s)') ?></div>
+      <?php endforeach; ?>
+      <div class="kv-grid">
+        <div><span class="k">LC issued on</span><span class="v"><?= htmlspecialchars($__d($__lc['lc_issue_date'] ?? null)) ?></span></div>
+        <div><span class="k">Last shipment date</span><span class="v"><?= htmlspecialchars($__d($__lc['lc_last_shipment_date'] ?? null)) ?></span></div>
+        <div><span class="k">Deadline to present documents</span><span class="v"><?= htmlspecialchars($__d($__lc['lc_presentation_deadline'] ?? null)) ?></span></div>
+        <div><span class="k">LC expiry</span><span class="v"><?= htmlspecialchars($__d($__lc['lc_expiry_date'] ?? null)) ?></span></div>
+      </div>
+      <?php if ($canManagePayments): ?>
+      <details>
+        <summary>Record or change the LC dates</summary>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/lc-dates">
+          <?= Csrf::field() ?>
+          <label>LC issued on<input type="date" name="lc_issue_date" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars((string) ($__lc['lc_issue_date'] ?? '')) ?>"></label>
+          <label>Last shipment date<input type="date" name="lc_last_shipment_date" value="<?= htmlspecialchars((string) ($__lc['lc_last_shipment_date'] ?? '')) ?>"></label>
+          <label>Deadline to present documents<input type="date" name="lc_presentation_deadline" value="<?= htmlspecialchars((string) ($__lc['lc_presentation_deadline'] ?? '')) ?>"></label>
+          <label>LC expiry<input type="date" name="lc_expiry_date" value="<?= htmlspecialchars((string) ($__lc['lc_expiry_date'] ?? '')) ?>"></label>
+          <button type="submit" class="btn-sm">Save LC dates</button>
+        </form>
+      </details>
+      <?php endif; ?>
+      <h3 style="font-size:0.95em;">LC amendments</h3>
+      <table class="list">
+        <tr><th>Date</th><th>Amendment</th><th>What changed</th><th>Copy</th><th>Recorded by</th></tr>
+        <?php foreach ($orderLcAmendments ?? [] as $__am): ?>
+          <tr><td><?= htmlspecialchars($__d($__am['amended_on'])) ?></td><td><?= htmlspecialchars((string) $__am['reference']) ?></td><td><?= htmlspecialchars((string) $__am['change_text']) ?></td>
+            <td><?php if (!empty($__am['file_id'])): ?><?php if (\App\Services\MoneyVisibility::canSeeFile((int) $__am['file_id'])): ?><a href="/file-store/<?= (int) $__am['file_id'] ?>/download" target="_blank">View</a><?php else: ?>View<?php endif; ?><?php else: ?>—<?php endif; ?></td>
+            <td><?= htmlspecialchars((string) ($__am['recorded_by_name'] ?? '')) ?></td></tr>
+        <?php endforeach; ?>
+        <?php if (empty($orderLcAmendments)): ?><tr><td colspan="5" class="muted">No amendments recorded.</td></tr><?php endif; ?>
+      </table>
+      <?php if ($canManagePayments): ?>
+      <details>
+        <summary>Record an LC amendment</summary>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/lc-amendments" enctype="multipart/form-data">
+          <?= Csrf::field() ?>
+          <label>Amendment date *<input type="date" name="amended_on" required max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
+          <label>Amendment number / reference *<input type="text" name="reference" required maxlength="100"></label>
+          <label>What changed *<input type="text" name="change_text" required minlength="5" maxlength="500" placeholder="e.g. Last shipment date extended to 30 Nov"></label>
+          <label>Copy of the amendment (optional)<input type="file" name="amendment_file" accept=".pdf,.jpg,.jpeg,.png"></label>
+          <button type="submit" class="btn-sm">Record amendment</button>
+        </form>
+      </details>
+      <?php endif; ?>
+    </div>
     <p class="muted small">If the client financed their LC (Step 5d/5e above) with a bank loan, record that loan's amount/interest here — separate from the LC leg itself, since this is about the cost of financing it, not confirming it usable.</p>
     <?php if ($canManageOrderFinancials): ?>
     <p class="muted small">Recorded in full under <a href="#order-financials">Order Financials</a> (Step 12) alongside this order's other costs — the Bank Loan Interest you record there is automatically kept in sync as an order expense.</p>
@@ -2495,7 +2614,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php elseif ($stage4 && $stage4['status'] !== 'locked'): ?>
       <?php if ($ocAcknowledgment && $ocAcknowledgment['acknowledged_at'] === null): ?>
         <div class="review-banner info">
-          ℹ <span>Order Confirmation emailed to the buyer on <?= htmlspecialchars(Dates::human($ocAcknowledgment['sent_at'])) ?>. Awaiting their acknowledgement — the client can confirm it directly in their portal, or reply to the email (record that below). If there's no response by <?= htmlspecialchars(Dates::human($ocAcknowledgment['due_at'])) ?>, it auto-confirms and Step 7 (Supplier PO) unlocks on its own.</span>
+          ℹ <span>Order Confirmation <?= $mailSendingEnabled ? 'emailed' : 'sent' ?> to the buyer on <?= htmlspecialchars(Dates::human($ocAcknowledgment['sent_at'])) ?>. Awaiting their acknowledgement — the client can confirm it directly in their portal, or reply to the email (record that below). If there's no response by <?= htmlspecialchars(Dates::human($ocAcknowledgment['due_at'])) ?>, it auto-confirms and Step 7 (Supplier PO) unlocks on its own.</span>
         </div>
         <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-acknowledgment">
@@ -2506,6 +2625,14 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </form>
         <?php endif; ?>
       <?php elseif ($ocDocGenerated): ?>
+        <?php if (!$mailSendingEnabled && $canManageOrders): // Gap list G-6 (owner, 1 Nov 2026): the 48 hours start when staff send the OC themselves ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/oc-sent-to-buyer" style="margin-bottom:10px;">
+          <?= Csrf::field() ?>
+          <p class="muted small">E-mail sending is off: send the approved Order Confirmation to the buyer yourself, then mark it sent here. The buyer's 48 hours start now — if they do not respond, it auto-confirms and Step 7 unlocks.</p>
+          <?= $stageGateNotice(4, "mark the Order Confirmation sent") ?>
+          <button type="submit"<?= $stageGateDisabled(4) ?> class="btn-sm">Mark Order Confirmation Sent to Buyer</button>
+        </form>
+        <?php endif; ?>
         <div class="review-banner info">
           ℹ <span>Order Confirmation has been generated but hasn't gone out by email yet (still awaiting send/approval, or mail sending isn't configured). If the buyer has confirmed by phone, in person, or any channel other than the portal/email, record it below once the Order Confirmation is approved (and sent to the buyer, when email is on); Step 7 (Supplier PO) then unlocks.</span>
         </div>
@@ -2966,6 +3093,31 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php endif; ?>
     <?php endif; ?>
 
+    <?php // Gap list G-3 (owner, 1 Nov 2026): the inspection result — the Bill of Lading waits for a Passed one. ?>
+    <?php if ($inspectionApplies): ?>
+      <div id="step-8a-inspection" class="section">
+        <h3 style="font-size:0.95em; margin-top:14px;">Pre-Shipment Inspection — result</h3>
+        <?php if ($inspection): ?>
+          <p><span class="badge <?= $inspection['result'] === 'passed' ? 'badge-active' : 'badge-lost' ?>"><?= $inspection['result'] === 'passed' ? 'Passed' : 'Failed' ?></span>
+            on <?= htmlspecialchars(Dates::short((string) $inspection['inspected_on'])) ?> by <?= htmlspecialchars((string) $inspection['agency_name']) ?>
+            <?php if (\App\Services\MoneyVisibility::canSeeFile((int) $inspection['report_file_id'])): ?> · <a href="/file-store/<?= (int) $inspection['report_file_id'] ?>/download">Report</a><?php endif; ?>
+            <?php if (!empty($inspection['note'])): ?><br><small class="muted"><?= htmlspecialchars((string) $inspection['note']) ?></small><?php endif; ?></p>
+        <?php else: ?>
+          <p class="muted small">Not recorded yet. The Bill of Lading (Step 10f) waits for a Passed inspection; mark the inspection not applicable on the compliance checklist if this order has none.</p>
+        <?php endif; ?>
+        <?php if ($canManageShipping && $order['status'] === 'active' && ($inspection['result'] ?? null) !== 'passed'): ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/inspection-result" enctype="multipart/form-data" class="field-grid">
+          <?= Csrf::field() ?>
+          <label>Result *<select name="inspection_result" required><option value="">Choose…</option><option value="passed">Passed</option><option value="failed">Failed</option></select></label>
+          <label>Inspected on *<input type="date" name="inspected_on" required max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
+          <label>Agency *<input type="text" name="agency_name" required minlength="2" maxlength="150" value="<?= htmlspecialchars((string) ($inspection['agency_name'] ?? ($orderInspectionFee['agency_name'] ?? ''))) ?>"></label>
+          <label>Report (PDF or image) *<input type="file" name="inspection_report" required accept=".pdf,.jpg,.jpeg,.png"></label>
+          <label style="grid-column:1/-1">Note <small class="muted">(required when failed: what failed)</small><textarea name="inspection_note" rows="2" maxlength="500" data-required-if="inspection_result=failed" data-required-if-message="Say what failed (at least 10 characters)." minlength="10"></textarea></label>
+          <div><button type="submit" class="btn-sm">Record Inspection Result</button></div>
+        </form>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
     <?php if ($pendingInspectionTask && $canManageOrderFinancials): ?>
       <h3 style="font-size:0.95em; margin-top:14px;">3rd-Party Pre-Shipment Inspection (step 8a)</h3>
       <p class="muted small">This order has a Pre-Shipment Inspection on its Compliance Checklist (not marked not-applicable) — staff get reminded starting 7 days before the estimated shipment date above.</p>
@@ -3115,6 +3267,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
   <details class="step-card" id="step-9c-freight-remittance"<?= $subCardOpen('9', '9c') ?>>
     <summary><?= $stepStatusIcon($subStepStatus('9', '9c')) ?><h2>Step 9c &middot; Record Freight Remittance</h2></summary>
+    <?php $renderReceipts('freight'); ?>
     <?php if (!$freightCleared) { $renderPaymentActionLink('freight', 'step-9c-freight-remittance'); } ?>
     <?php if ($freightLocked): ?>
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
@@ -3122,7 +3275,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <p class="muted">Save Freight Terms first (Step 9a).</p>
     <?php elseif (!$freightCleared && (!$payment || $payment['freight_remittance_received_at'] === null) && !$canManagePayments): ?>
       <p class="muted">Waiting for the buyer's freight remittance (recorded by Sales / Accounts).</p>
-    <?php elseif (!$freightCleared && (!$payment || $payment['freight_remittance_received_at'] === null)): ?>
+    <?php elseif (!$freightCleared && $canManagePayments): ?>
+      <?php if ($payment && $payment['freight_remittance_received_at'] !== null): ?><?= $remittanceRecordedNote('freight', 'Next: Step 9d — mark it cleared once the bank confirms, or record another receipt below if the buyer paid in parts.') ?><?php endif; ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight">
         <?= Csrf::field() ?>
         <label>Freight Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="freight_amount" required data-remit-amount></label>
@@ -3130,8 +3284,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="freight_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
-        <?= $stepBadge('9c') ?><button type="submit" class="btn-sm">Record Freight Remittance</button>
+        <?= $stepBadge('9c') ?><button type="submit" class="btn-sm"><?= $payment && $payment['freight_remittance_received_at'] !== null ? 'Record Another Freight Receipt' : 'Record Freight Remittance' ?></button>
       </form>
+      <?php if ($payment && $payment['freight_remittance_received_at'] !== null) { $renderInrActualWidget('freight', 'Freight Payment'); $renderExchangeRateWidget('freight', 'Freight Payment'); } ?>
     <?php else: ?>
       <?= $remittanceRecordedNote('freight', 'Next: Step 9d — mark it cleared once the bank confirms.') ?>
       <?php $renderInrActualWidget('freight', 'Freight Payment'); ?>
@@ -3155,6 +3310,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight/clear" onsubmit="return confirm('Mark the freight payment cleared? This unlocks Stage 7 — confirm the funds have actually landed first.');">
         <?= Csrf::field() ?>
         <label>Cleared On<input type="date" name="freight_cleared_at" value="<?= date('Y-m-d') ?>"></label>
+        <?= $shortReasonField('freight') ?>
         <?= $stageGateNotice(6, "mark the freight cleared") ?>
         <?= $stepBadge('9d') ?><button type="submit"<?= $stageGateDisabled(6) ?> class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
       </form>
@@ -3387,18 +3543,31 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php endif; ?>
       <?php endif; ?>
 
+      <?php // Gap list G-1 / G-3 (owner, 1 Nov 2026): what the Bill of Lading waits for. ?>
+      <?php if ($shipmentGateBlockers !== []): ?>
+        <div class="notice notice-warning shipment-gate-blockers">
+          <?php foreach ($shipmentGateBlockers as $__gateMsg): ?><p style="margin:0 0 4px;"><?= htmlspecialchars($__gateMsg) ?></p><?php endforeach; ?>
+          <p class="muted small" style="margin:0;"><?= $canOverrideShipmentGates ? 'You can release the step with a written reason below; it is recorded on the order.' : 'A manager (Override shipment gates) can release the step with a written reason.' ?></p>
+        </div>
+      <?php endif; ?>
       <?php if ($canManageShipping): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-issued" enctype="multipart/form-data">
         <?= Csrf::field() ?>
         <label>BL Number *<input type="text" name="bl_number" required></label>
         <label>BL Date<input type="date" name="bl_date" value="<?= date('Y-m-d') ?>"></label>
         <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip"></label>
+        <?php if ($shipmentGateBlockers !== [] && $canOverrideShipmentGates): ?>
+          <label>Reason for releasing the Bill of Lading step *<textarea name="gate_override_reason" rows="2" required minlength="10" maxlength="500" placeholder="Why may the goods ship before this is done?"></textarea></label>
+        <?php endif; ?>
         <?= $stageGateNotice(7, "confirm the BL issued") ?>
-        <?= $stepBadge('10f') ?><button type="submit"<?= $stageGateDisabled(7) ?> class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
+        <?= $stepBadge('10f') ?><button type="submit"<?= $stageGateDisabled(7) ?><?= $shipmentGateBlockers !== [] && !$canOverrideShipmentGates ? ' disabled' : '' ?> class="btn-sm btn-success"><?= $shipmentGateBlockers !== [] && $canOverrideShipmentGates ? 'Release &amp; Confirm BL Issued (unlocks Stage 8)' : 'Confirm BL Issued (unlocks Stage 8)' ?></button>
       </form>
       <?php endif; ?>
     <?php else: ?>
       <p>Bill of Lading recorded: <strong><?= htmlspecialchars((string) ($shipping['bl_number'] ?? '')) ?></strong> (<?= htmlspecialchars((string) ($shipping['bl_date'] ?? '')) ?>)</p>
+      <?php foreach ($shipmentGateOverrides as $__ov): ?>
+        <p class="notice notice-warning small">Bill of Lading step released by <?= htmlspecialchars((string) $__ov['user_name']) ?> on <?= htmlspecialchars(Dates::human((string) $__ov['created_at'])) ?> before <?= htmlspecialchars(\App\Services\ShipmentGateService::gatesLabel((string) $__ov['gates'])) ?> was done. Reason: <?= htmlspecialchars((string) $__ov['reason']) ?></p>
+      <?php endforeach; ?>
       <?php if (!empty($shipping['bl_copy_file_id'])): ?>
         <p class="muted small"><?php if (\App\Services\MoneyVisibility::canSeeFile((int) $shipping['bl_copy_file_id'])): // QA R7-N06: no link that would answer 403 ?><a href="/file-store/<?= (int) $shipping['bl_copy_file_id'] ?>/download">Download scanned BL copy</a><?php else: ?>Download scanned BL copy<?php endif; ?></p>
       <?php else: ?>
@@ -3487,29 +3656,38 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
   <details class="step-card" id="step-balance-record"<?= $subCardOpen('11', '11c') ?>>
     <summary><?= $stepStatusIcon($subStepStatus('11', '11c')) ?><h2>Step 11c &middot; Record Balance Remittance</h2></summary>
-    <?php if (!$balanceCleared) { $renderPaymentActionLink('balance', 'step-balance-record'); } ?>
-    <?php if ($ciBalanceLocked): ?>
-      <p class="muted">Confirm BL issuance first to unlock this gate.</p>
-    <?php elseif (!$balanceCleared && (!$payment || $payment['balance_remittance_received_at'] === null)): ?>
-      <?php if (!$ciDocGenerated): ?>
+    <?php if (!$balanceMoneyCleared) { $renderPaymentActionLink('balance', 'step-balance-record'); } ?>
+    <?php // Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is recorded and cleared before the Bill of Lading. ?>
+    <?php $__balanceLocked = $ciBalanceLocked && !$balanceOpenEarly; ?>
+    <?php if ($preShipmentBalance && !$balanceMoneyCleared): ?>
+      <p class="notice notice-info small">This order's balance is due <strong>before shipment</strong>: record and clear it here (against the PI) before the Bill of Lading is recorded in Step 10f.</p>
+    <?php endif; ?>
+    <?php if ($__balanceLocked): ?>
+      <p class="muted"><?= $preShipmentBalance ? 'Reach Step 9 (freight) first to record this order\'s balance.' : 'Confirm BL issuance first to unlock this gate.' ?></p>
+    <?php elseif (!$balanceMoneyCleared): ?>
+      <?php $renderReceipts('balance'); ?>
+      <?php if ($payment && $payment['balance_remittance_received_at'] !== null): ?><?= $remittanceRecordedNote('balance', 'Next: mark it cleared once the bank confirms, or record another receipt below if the buyer paid in parts.') ?><?php endif; ?>
+      <?php if (!$ciDocGenerated && !$balanceOpenEarly): ?>
         <p class="muted small">Generate the Commercial Invoice first — the buyer can't be remitting against an invoice they were never sent.</p>
       <?php elseif (!$canManagePayments): ?>
         <p class="muted">Only Accounts/Export can record this payment.</p>
       <?php else: ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance">
         <?= Csrf::field() ?>
-        <label>Balance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="balance_amount" required data-remit-amount value="<?= htmlspecialchars((string) ($payment['balance_amount'] ?? '')) ?>"></label>
+        <?php $__balOwed = \App\Services\PartPaymentService::summary((int) $order['id'], 'balance')['owed']; ?>
+        <label>Balance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="balance_amount" required data-remit-amount value="<?= htmlspecialchars($payment && $payment['balance_remittance_received_at'] !== null ? ($__balOwed !== null && $__balOwed > 0 ? number_format($__balOwed, 2, '.', '') : '') : (string) ($payment['balance_amount'] ?? '')) ?>"></label>
         <label>Received On<input type="date" name="balance_received_at" value="<?= date('Y-m-d') ?>"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="balance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
-        <?= $stepBadge('11c') ?><button type="submit" class="btn-sm">Record Balance Remittance</button>
+        <?= $stepBadge('11c') ?><button type="submit" class="btn-sm"><?= $payment && $payment['balance_remittance_received_at'] !== null ? 'Record Another Balance Receipt' : 'Record Balance Remittance' ?></button>
       </form>
       <?php endif; ?>
     <?php else: ?>
+      <?php $renderReceipts('balance'); ?>
       <?= $remittanceRecordedNote('balance', 'Next: mark it cleared once the bank confirms.') ?>
     <?php endif; ?>
-    <?php if (!$ciBalanceLocked): ?>
+    <?php if (!$__balanceLocked): ?>
       <?php $renderInrActualWidget('balance', 'Balance Payment'); ?>
       <?php $renderExchangeRateWidget('balance', 'Balance Payment'); ?>
     <?php endif; ?>
@@ -3519,17 +3697,33 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
   <details class="step-card" id="step-balance-clear"<?= $subCardOpen('11', '11d') ?>>
     <summary><?= $stepStatusIcon($subStepStatus('11', '11d')) ?><h2>Step 11d &middot; Mark Balance Cleared</h2></summary>
-    <?php if ($ciBalanceLocked): ?>
-      <p class="muted">Confirm BL issuance first to unlock this gate.</p>
-    <?php elseif ($balanceCleared): ?>
-      <p>Balance payment cleared.</p>
+    <?php if ($__balanceLocked): ?>
+      <p class="muted"><?= $preShipmentBalance ? 'Reach Step 9 (freight) first to record this order\'s balance.' : 'Confirm BL issuance first to unlock this gate.' ?></p>
+    <?php elseif ($balanceMoneyCleared): ?>
+      <p>Balance payment cleared<?= $payment && $payment['balance_cleared_at'] ? ' on ' . htmlspecialchars(Dates::short(substr((string) $payment['balance_cleared_at'], 0, 10))) : '' ?>.</p>
+      <?php if (!$ciBalanceLocked && $stage8 && $stage8['status'] === 'in_progress' && $canClearPayments): ?>
+        <?php // Gap list G-1: cleared before shipment — Step 11 completes once the Commercial Invoice is approved. ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance/clear">
+          <?= Csrf::field() ?>
+          <?= $stageGateNotice(8, "complete Step 11") ?>
+          <?= $stepBadge('11d') ?><button type="submit"<?= $stageGateDisabled(8) ?> class="btn-sm btn-success">Complete Step 11 (unlocks Stage 9)</button>
+        </form>
+      <?php endif; ?>
     <?php elseif ($payment && $payment['balance_remittance_received_at'] !== null): ?>
       <?php if (!$canClearPayments): ?>
         <p class="muted">Balance remittance recorded — awaiting Accounts to confirm it cleared.</p>
+      <?php elseif ($ciBalanceLocked): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared before shipment? Confirm the funds have actually landed first.');">
+        <?= Csrf::field() ?>
+        <label>Cleared On<input type="date" name="balance_cleared_at" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>"></label>
+        <?= $shortReasonField('balance') ?>
+        <?= $stepBadge('11d') ?><button type="submit" class="btn-sm btn-success">Mark Balance Cleared (before shipment)</button>
+      </form>
       <?php else: ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
         <?= Csrf::field() ?>
         <label>Cleared On<input type="date" name="balance_cleared_at" value="<?= date('Y-m-d') ?>"></label>
+        <?= $shortReasonField('balance') ?>
         <?= $stageGateNotice(8, "mark the balance cleared") ?>
         <?= $stepBadge('11d') ?><button type="submit"<?= $stageGateDisabled(8) ?> class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
       </form>

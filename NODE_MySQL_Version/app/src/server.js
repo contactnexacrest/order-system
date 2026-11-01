@@ -1007,6 +1007,9 @@ app.post('/orders/:id/payment/advance/clear', requireAuth, requirePermission('cl
 // clear_payments split as the cash-advance leg above, since recording
 // vs. confirming-usable is the same record/clear duty split either way.
 app.post('/orders/:id/payment/lc', requireAuth, requirePermission('manage_payments'), upload.single('lc_file'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordLcDetails));
+// Gap list G-4 (owner, 1 Nov 2026): the LC's dates and its amendments.
+app.post('/orders/:id/lc-dates', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveLcDates));
+app.post('/orders/:id/lc-amendments', requireAuth, requirePermission('manage_payments'), upload.single('amendment_file'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.addLcAmendment));
 app.post('/orders/:id/payment/lc/confirm-usable', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.confirmLcUsable));
 app.post('/orders/:id/payment-terms/approve', requireAuth, requirePermission('approve_payment_terms'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.approvePaymentTerms));
 app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_supplier_po'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
@@ -1032,6 +1035,8 @@ app.post('/orders/:id/annexure/products/:productId/images', requireAuth, require
 app.post('/orders/:id/annexure/images/:imageId/remove', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(annexureController.removeImage));
 
 app.post('/orders/:id/oc-acknowledgment', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordOcAcknowledgment));
+// Gap list G-6 (owner, 1 Nov 2026): with e-mail off, the buyer's 48 hours start when the OC is marked as sent.
+app.post('/orders/:id/oc-sent-to-buyer', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markOcSentToBuyer));
 
 app.post('/orders/:id/supplier-po', requireAuth, requirePermission('manage_supplier_po'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveSupplierPo));
 app.post('/orders/:id/supplier-po/signed', requireAuth, requirePermission('manage_supplier_po'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.confirmSupplierSigned));
@@ -1063,6 +1068,8 @@ app.post('/orders/:id/shipping', requireAuth, requirePermission('manage_shipping
 app.post('/orders/:id/draft-bl', requireAuth, requirePermission('manage_shipping'), upload.single('draft_bl'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadDraftBl));
 app.post('/orders/:id/draft-bl/:roundId/review', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.reviewDraftBl));
 app.post('/orders/:id/bl-issued', requireAuth, requirePermission('manage_shipping'), upload.single('bl_copy'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBlIssued));
+// Gap list G-3 (owner, 1 Nov 2026): the pre-shipment inspection's result and report.
+app.post('/orders/:id/inspection-result', requireAuth, requirePermission('manage_shipping'), upload.single('inspection_report'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordInspectionResult));
 app.post('/orders/:id/bl-copy', requireAuth, requirePermission('manage_shipping'), upload.single('bl_copy'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.attachBlCopy));
 app.post('/orders/:id/shipping-bill', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordShippingBill));
 app.post('/orders/:id/scanned-bl-sent', requireAuth, requirePermission('manage_shipping'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordScannedBlSent));

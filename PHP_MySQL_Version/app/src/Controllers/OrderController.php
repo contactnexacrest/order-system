@@ -1143,6 +1143,14 @@ final class OrderController
             'exportBenefitEligibility' => $exportBenefitSchemesForOrder,
             'benefitSettlement' => \App\Services\BenefitSettlementService::state($orderId),
             'pendingInspectionTask' => $pendingInspectionTask,
+            // Gap list G-1 / G-3 (owner, 1 Nov 2026): what the Bill of Lading waits for, and who may release it.
+            'shipmentGateBlockers' => \App\Services\ShipmentGateService::blockers($orderId),
+            'shipmentGateOverrides' => \App\Services\ShipmentGateService::overrides($orderId),
+            'canOverrideShipmentGates' => PermissionService::can((int) $actor['id'], $actor['role_id'] !== null ? (int) $actor['role_id'] : null, 'override_shipment_gates'),
+            'inspection' => \App\Services\ShipmentGateService::inspection($orderId),
+            'inspectionApplies' => \App\Services\ShipmentGateService::inspectionApplies($orderId),
+            'preShipmentBalance' => \App\Services\ShipmentGateService::isPreShipmentBalance($order),
+            'balanceOpenEarly' => \App\Services\ShipmentGateService::balanceOpenEarly($orderId),
             'orderInspectionFee' => $canManageOrderFinancials ? OrderInspectionFeeRepository::find($orderId) : null,
             'openDisputeCount' => count(array_filter(DisputeRepository::forOrder($orderId), static fn(array $d): bool => $d['status'] !== 'Resolved')),
             'openComplaintCount' => count(array_filter(\App\Repositories\OrderComplaintRepository::forOrder($orderId), static fn(array $c): bool => $c['status'] !== 'resolved')),
@@ -1173,6 +1181,8 @@ final class OrderController
             // Financials — display of the financials-specific fields below
             // stays gated by $canManageOrderFinancials in the view itself.
             'orderLcDetails' => OrderLcDetailRepository::find($orderId),
+            // Gap list G-4 (owner, 1 Nov 2026): the LC's amendments.
+            'orderLcAmendments' => \App\Repositories\OrderLcAmendmentRepository::forOrder($orderId),
             'orderTravelExpenses' => $canManageOrderFinancials ? \App\Repositories\OrderTravelExpenseRepository::find($orderId) : null,
             'profitability' => $canManageOrderFinancials ? OrderProfitabilityService::computeForOrder($orderId) : null,
             // Owner decision 2026-10-31 (GST under LUT): shown for information only — the cost keeps its GST.
@@ -1715,6 +1725,11 @@ final class OrderController
         $orderId = (int) $params['id'];
         $amount = (float) ($_POST['advance_amount'] ?? 0);
         $receivedAt = trim((string) ($_POST['advance_received_at'] ?? '')) ?: date('Y-m-d');
+        if ((OrderPaymentStatusRepository::find($orderId) ?? [])['advance_cleared_at'] ?? null) {
+            Flash::set('error', \App\Services\PartPaymentService::clearedMessage('advance'));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         if ($amount <= 0) {
             Flash::set('error', 'Enter the advance amount actually received.');
             header("Location: /orders/{$orderId}");
@@ -1742,12 +1757,14 @@ final class OrderController
         $fobTotal = OrderProductRepository::totalFobValue($orderId);
         $advanceDue = round($fobTotal * (float) ($orderForAdvance['advance_pct'] ?? 0) / 100, 2);
         $currency = (string) ($orderForAdvance['currency_code'] ?? '');
-        if ($fobTotal > 0 && $amount > $fobTotal + 0.005) {
+        $advanceSoFar = \App\Services\PartPaymentService::receivedTotal($orderId, 'advance');
+        if ($fobTotal > 0 && $advanceSoFar + $amount > $fobTotal + 0.005) {
             Flash::set('error', sprintf('%s %s is more than the whole order value (%s %s). Check the amount the bank received.', $currency, number_format($amount, 2), $currency, number_format($fobTotal, 2)));
             header("Location: /orders/{$orderId}");
             return;
         }
-        if ($advanceDue > 0 && abs($amount - $advanceDue) > max(1.0, $advanceDue * 0.01) && empty($_POST['confirm_amount_differs'])) {
+        // Gap list G-5: a further receipt of a part-paid advance needs no confirming tick.
+        if ($advanceSoFar <= 0 && $advanceDue > 0 && abs($amount - $advanceDue) > max(1.0, $advanceDue * 0.01) && empty($_POST['confirm_amount_differs'])) {
             Flash::set('error', sprintf('The advance due on this order is %s %s (%s%% of %s %s). You entered %s %s — if that really is what the bank received, tick "The amount received differs from the advance due" and save again.', $currency, number_format($advanceDue, 2), rtrim(rtrim(number_format((float) $orderForAdvance['advance_pct'], 2), '0'), '.'), $currency, number_format($fobTotal, 2), $currency, number_format($amount, 2)));
             header("Location: /orders/{$orderId}");
             return;
@@ -1756,12 +1773,11 @@ final class OrderController
         // saved together or not at all.
         $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-            if (OrderPaymentStatusRepository::legAlreadyRecorded($orderId, 'advance', $amount, $receivedAt, $rate)) {
+            // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
+            if (\App\Services\PartPaymentService::receiptExists($orderId, 'advance', null, $amount, $receivedAt, $rate)) {
                 return false;
             }
-            OrderPaymentStatusRepository::recordAdvanceReceived($orderId, $amount, $receivedAt);
-            OrderPaymentStatusRepository::setLegBankReference($orderId, 'advance', $bankRef);
-            OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'advance', $rate, (int) AuthService::currentUserId());
+            \App\Services\PartPaymentService::addLegReceipt($orderId, 'advance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'advance_exchange_rate', null, (string) $rate);
             // External QA report L-23: advance payment recording was never audit-logged.
             AuditLogRepository::log(AuthService::currentUserId(), 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'advance_amount', null, (string) $amount);
@@ -1842,17 +1858,25 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
+        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'advance', null, $user, (string) ($_POST['short_reason'] ?? ''));
+        if (isset($partCheck['error'])) {
+            Flash::set('error', $partCheck['error']);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $clearedAt = trim((string) ($_POST['advance_cleared_at'] ?? '')) ?: date('Y-m-d');
 
         $fobTotal = OrderProductRepository::totalFobValue($orderId);
         $order = OrderRepository::find($orderId);
         // D-215 (5a, owner confirmed twice): the balance leg leaves out the order's payment milestones.
         $balanceAmount = OrderPaymentStatusRepository::balanceDue($fobTotal, (float) $order['advance_pct'], $existingPayment, \App\Repositories\PaymentMilestoneRepository::plannedTotal($orderId, $fobTotal));
-        $balanceDueDate = $order['balance_trigger_option'] === 'A_BEFORE_SHIPMENT'
-            ? null // due date is event-triggered (shipment readiness), not a fixed date, for this preset
-            : date('Y-m-d', strtotime('+' . (int) $order['balance_days'] . ' days'));
+        // Gap list G-2 (owner, 1 Nov 2026): before shipment, the balance is due on shipment readiness (no fixed date);
+        // against the BL, it gets its due date only when the scanned BL is sent to the buyer (recordScannedBlSent()).
+        $balanceDueDate = null;
 
         OrderPaymentStatusRepository::markAdvanceCleared($orderId, $clearedAt, (int) $user['id']);
+        $shortNote = $partCheck['short'] !== null ? ' ' . \App\Services\PartPaymentService::recordShortfall($orderId, 'advance', null, $partCheck['short'], $user) : '';
         OrderPaymentStatusRepository::setBalanceAmount($orderId, $balanceAmount, $balanceDueDate);
         // External QA report L-23: advance payment clearing was never audit-logged.
         AuditLogRepository::log((int) $user['id'], 'ADVANCE_PAYMENT_CLEARED', 'order_payment_status', $orderId, 'advance_cleared_at', null, $clearedAt);
@@ -1863,7 +1887,7 @@ final class OrderController
         // a login from an earlier order.
         $provisionStatus = \App\Services\ClientPortalService::provisionIfNeeded((int) $order['client_id'], $orderId);
 
-        $baseMessage = 'Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.';
+        $baseMessage = 'Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.' . $shortNote;
         if ($provisionStatus === 'provisioned') {
             Flash::set('success', $baseMessage . ' The client has been emailed their portal login.');
         } elseif ($provisionStatus === 'no_email_on_file') {
@@ -1943,6 +1967,105 @@ final class OrderController
     }
 
     /**
+     * Gap list G-4 (owner, 1 Nov 2026): the Letter of Credit's dates — issue,
+     * expiry, last shipment and the deadline to present the documents. The
+     * bank can refuse to pay if one is missed, so each is reminded 7 days
+     * before (cron/check_alerts.php).
+     */
+    public function saveLcDates(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $back = "/orders/{$orderId}#step-5-lc-bank-loan";
+        if (($order['payment_method'] ?? '') !== 'LC') {
+            Flash::set('error', 'This order is not paid by Letter of Credit.');
+            header("Location: {$back}");
+            return;
+        }
+        $dates = [];
+        foreach (['lc_issue_date', 'lc_expiry_date', 'lc_last_shipment_date', 'lc_presentation_deadline'] as $f) {
+            $v = trim((string) ($_POST[$f] ?? ''));
+            if ($v !== '' && (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]))) {
+                Flash::set('error', 'Enter each LC date as a date, or leave it empty.');
+                header("Location: {$back}");
+                return;
+            }
+            $dates[$f] = $v !== '' ? $v : null;
+        }
+        $error = match (true) {
+            $dates['lc_issue_date'] !== null && $dates['lc_issue_date'] > date('Y-m-d') => 'The LC issue date cannot be in the future.',
+            $dates['lc_expiry_date'] !== null && $dates['lc_last_shipment_date'] !== null && $dates['lc_last_shipment_date'] > $dates['lc_expiry_date'] => 'The last shipment date cannot be after the LC expiry date.',
+            $dates['lc_expiry_date'] !== null && $dates['lc_presentation_deadline'] !== null && $dates['lc_presentation_deadline'] > $dates['lc_expiry_date'] => 'The deadline to present documents cannot be after the LC expiry date.',
+            $dates['lc_issue_date'] !== null && array_filter([$dates['lc_expiry_date'], $dates['lc_last_shipment_date'], $dates['lc_presentation_deadline']], static fn ($d): bool => $d !== null && $d <= $dates['lc_issue_date']) !== []
+                => 'The expiry, last shipment and presentation dates must be after the LC issue date (' . \App\Helpers\Dates::short($dates['lc_issue_date']) . ').',
+            default => null,
+        };
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header("Location: {$back}");
+            return;
+        }
+        $before = OrderLcDetailRepository::find($orderId);
+        $userId = (int) AuthService::currentUserId();
+        OrderLcDetailRepository::saveDates($orderId, $dates['lc_issue_date'], $dates['lc_expiry_date'], $dates['lc_last_shipment_date'], $dates['lc_presentation_deadline'], $userId);
+        foreach ($dates as $f => $v) {
+            if (($before[$f] ?? null) !== $v) {
+                AuditLogRepository::log($userId, 'LC_DATE_SAVED', 'order_lc_details', $orderId, $f, $before[$f] ?? null, $v);
+            }
+        }
+        Flash::set('success', 'LC dates saved. Reminders go out 7 days before the last shipment date, the deadline to present documents and the expiry.');
+        header("Location: {$back}");
+    }
+
+    /** Gap list G-4 (owner, 1 Nov 2026): an amendment to the order's Letter of Credit, with an optional copy. */
+    public function addLcAmendment(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = OrderRepository::find($orderId);
+        if (!$order) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $back = "/orders/{$orderId}#step-5-lc-bank-loan";
+        $date = trim((string) ($_POST['amended_on'] ?? ''));
+        $reference = trim((string) ($_POST['reference'] ?? ''));
+        $change = trim((string) ($_POST['change_text'] ?? ''));
+        $error = match (true) {
+            ($order['payment_method'] ?? '') !== 'LC' => 'This order is not paid by Letter of Credit.',
+            !preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || $date > date('Y-m-d') => 'Enter the date of the amendment (today or earlier).',
+            $reference === '' || mb_strlen($reference) > 100 => 'Enter the amendment number or reference (up to 100 characters).',
+            mb_strlen($change) < 5 || mb_strlen($change) > 500 => 'Say what the amendment changed (5 to 500 characters).',
+            default => null,
+        };
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header("Location: {$back}");
+            return;
+        }
+        $userId = (int) AuthService::currentUserId();
+        $fileId = null;
+        if (!empty($_FILES['amendment_file']['name'])) {
+            try {
+                $fileId = FileUploadService::handleUpload('amendment_file', 'order_lc_amendment', \App\Helpers\OrderStorage::folder($order, 'lc'), null, $orderId, $userId, null, null, 'LC amendment ' . $reference);
+            } catch (\Throwable $e) {
+                Flash::set('error', 'The amendment was not saved — the copy could not be uploaded: ' . Flash::describeException($e, 'upload failed — check the server error log.'));
+                header("Location: {$back}");
+                return;
+            }
+        }
+        $id = \App\Repositories\OrderLcAmendmentRepository::add($orderId, $date, $reference, $change, $fileId, $userId);
+        AuditLogRepository::log($userId, 'LC_AMENDMENT_RECORDED', 'order_lc_amendments', $id, 'reference', null, $reference, $change);
+        Flash::set('success', "LC amendment {$reference} recorded. If it changed a date, update the LC dates too.");
+        header("Location: {$back}");
+    }
+
+    /**
      * Step 5 LC leg's equivalent of clearAdvancePayment() — the real
      * Stage 2->3 gate when this order's payment_method is LC. Mirrors
      * clearAdvancePayment() exactly (same stage check, same balance
@@ -1975,9 +2098,8 @@ final class OrderController
         $fobTotal = OrderProductRepository::totalFobValue($orderId);
         $order = OrderRepository::find($orderId);
         $balanceAmount = round($fobTotal * ((float) $order['balance_pct']) / 100, 2);
-        $balanceDueDate = $order['balance_trigger_option'] === 'A_BEFORE_SHIPMENT'
-            ? null
-            : date('Y-m-d', strtotime('+' . (int) $order['balance_days'] . ' days'));
+        // Gap list G-2 (owner, 1 Nov 2026): an LC balance gets its due date when the scanned BL is sent to the buyer.
+        $balanceDueDate = null;
 
         OrderLcDetailRepository::confirmUsable($orderId, (int) $user['id']);
         OrderPaymentStatusRepository::setBalanceAmount($orderId, $balanceAmount, $balanceDueDate);
@@ -2109,6 +2231,47 @@ final class OrderController
      * mandatory note (the reply itself, quoted, is normal practice here) is
      * this feature's substitute for that missing evidence.
      */
+    /**
+     * Gap list G-6 (owner, 1 Nov 2026): with e-mail sending off, staff send
+     * the Order Confirmation themselves — the buyer's 48 hours start when
+     * staff mark it as sent, not when it is approved.
+     */
+    public function markOcSentToBuyer(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        if (!StageGateService::isUnlocked($orderId, 4)) {
+            Flash::set('error', 'Stage 4 has not been unlocked for this order yet — complete Stage 3 first.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if (\App\Services\EmailDispatchService::mailSendingEnabled()) {
+            Flash::set('error', 'E-mail sending is on: the buyer\'s 48 hours start when the Order Confirmation is e-mailed.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if ($blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 4)) {
+            Flash::set('error', DocumentGenerationService::stageDocumentBlockedMessage($blockedBy));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $oc = DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'OC');
+        $ack = OrderOcAcknowledgmentRepository::find($orderId);
+        if ($oc === null) {
+            Flash::set('error', 'Generate the Order Confirmation for this order first.');
+        } elseif ($ack !== null && $ack['acknowledged_at'] !== null) {
+            Flash::set('error', 'This order\'s Order Confirmation has already been acknowledged.');
+        } elseif ($ack !== null && (int) $ack['document_id'] === (int) $oc['id']) {
+            Flash::set('error', 'This Order Confirmation is already marked as sent to the buyer.');
+        } else {
+            \App\Services\EmailDispatchService::startOcAcknowledgmentClock(DocumentRepository::find((int) $oc['id']) ?? $oc);
+            $ack = OrderOcAcknowledgmentRepository::find($orderId);
+            AuditLogRepository::log((int) $user['id'], 'OC_MARKED_SENT_TO_BUYER', 'orders', $orderId, 'oc_sent_at', null, (string) $ack['sent_at']);
+            Flash::set('success', 'Order Confirmation marked as sent to the buyer. If the buyer does not respond by ' . \App\Helpers\Dates::human((string) $ack['due_at']) . ', it auto-confirms and Step 7 (Supplier PO) unlocks.');
+        }
+        header("Location: /orders/{$orderId}");
+    }
+
     public function recordOcAcknowledgment(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -2630,6 +2793,11 @@ final class OrderController
         }
         $amount = (float) ($_POST['freight_amount'] ?? 0);
         $receivedAt = trim((string) ($_POST['freight_received_at'] ?? '')) ?: date('Y-m-d');
+        if ((OrderPaymentStatusRepository::find($orderId) ?? [])['freight_cleared_at'] ?? null) {
+            Flash::set('error', \App\Services\PartPaymentService::clearedMessage('freight'));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         if ($amount <= 0) {
             Flash::set('error', 'Enter the freight & insurance amount actually received.');
             header("Location: /orders/{$orderId}");
@@ -2652,12 +2820,11 @@ final class OrderController
         // QA Round 6, R6-N22: saved together or not at all.
         $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-            if (OrderPaymentStatusRepository::legAlreadyRecorded($orderId, 'freight', $amount, $receivedAt, $rate)) {
+            // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
+            if (\App\Services\PartPaymentService::receiptExists($orderId, 'freight', null, $amount, $receivedAt, $rate)) {
                 return false;
             }
-            OrderPaymentStatusRepository::recordFreightReceived($orderId, $amount, $receivedAt);
-            OrderPaymentStatusRepository::setLegBankReference($orderId, 'freight', $bankRef);
-            OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'freight', $rate, (int) AuthService::currentUserId());
+            \App\Services\PartPaymentService::addLegReceipt($orderId, 'freight', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'freight_exchange_rate', null, (string) $rate);
             // External QA report N-08: this action never reached the audit
             // log, so it never notified anyone either.
@@ -2690,10 +2857,18 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
+        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'freight', null, $user, (string) ($_POST['short_reason'] ?? ''));
+        if (isset($partCheck['error'])) {
+            Flash::set('error', $partCheck['error']);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $clearedAt = trim((string) ($_POST['freight_cleared_at'] ?? '')) ?: date('Y-m-d');
         OrderPaymentStatusRepository::markFreightCleared($orderId, $clearedAt, (int) $user['id']);
+        $shortNote = $partCheck['short'] !== null ? ' ' . \App\Services\PartPaymentService::recordShortfall($orderId, 'freight', null, $partCheck['short'], $user) : '';
         StageGateService::passAndUnlockNext($orderId, 6, (int) $user['id']);
-        Flash::set('success', 'Freight payment cleared. Stage 7 (Packing & BL Instruction) unlocked.');
+        Flash::set('success', 'Freight payment cleared. Stage 7 (Packing & BL Instruction) unlocked.' . $shortNote);
         header("Location: /orders/{$orderId}");
     }
 
@@ -2978,6 +3153,33 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Gap list G-1 / G-3 (owner, 1 Nov 2026): a "before shipment" balance and a pre-shipment
+        // inspection come first; a manager can release the step with a written reason.
+        $gateRelease = null;
+        if ($blockers = \App\Services\ShipmentGateService::blockers($orderId)) {
+            $reason = trim((string) ($_POST['gate_override_reason'] ?? ''));
+            $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+            if ($reason === '') {
+                Flash::set('error', implode(' ', $blockers) . (PermissionService::can((int) $user['id'], $roleId, 'override_shipment_gates') ? ' Or release the step with a written reason.' : ' A manager can release the step with a written reason.'));
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            if (!PermissionService::can((int) $user['id'], $roleId, 'override_shipment_gates')) {
+                Flash::set('error', 'Only a manager with "Override shipment gates" can release the Bill of Lading step.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            if (mb_strlen($reason) < 10 || mb_strlen($reason) > 500) {
+                Flash::set('error', 'Give the reason for releasing the Bill of Lading step (10 to 500 characters).');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            $gateRelease = [array_keys($blockers), $reason];
+        }
+        if ($gateRelease !== null) {
+            \App\Services\ShipmentGateService::recordOverride($orderId, $gateRelease[0], $gateRelease[1], (int) $user['id']);
+            AuditLogRepository::log((int) $user['id'], 'SHIPMENT_GATE_OVERRIDDEN', 'orders', $orderId, 'gates', null, implode(',', $gateRelease[0]), $gateRelease[1]);
+        }
         OrderShippingRepository::recordBl($orderId, $blNumber, $blDate);
         // External QA report L-23: BL issuance was never audit-logged.
         AuditLogRepository::log((int) $user['id'], 'BL_ISSUED', 'orders', $orderId, 'bl_number', null, $blNumber);
@@ -3007,6 +3209,62 @@ final class OrderController
         StageGateService::passAndUnlockNext($orderId, 7, (int) $user['id']);
         Flash::set('success', "Bill of Lading recorded ({$blNumber}). Stage 8 (Commercial Invoice) unlocked.");
         header("Location: /orders/{$orderId}");
+    }
+
+    /**
+     * Gap list G-3 (owner, 1 Nov 2026): the third-party pre-shipment
+     * inspection's result — Passed or Failed, with its date, agency and
+     * report. A Passed inspection resolves the checklist line and lets the
+     * Bill of Lading be recorded; a Failed one tells the managers.
+     */
+    public function recordInspectionResult(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $order = OrderRepository::find($orderId);
+        if ($order === null || $order['status'] !== 'active') {
+            Flash::set('error', 'The inspection can be recorded only on an active order.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if (!\App\Services\ShipmentGateService::inspectionApplies($orderId)) {
+            Flash::set('error', 'This order has no pre-shipment inspection on its compliance checklist (it is marked not applicable).');
+            header("Location: /orders/{$orderId}#step-8a-inspection");
+            return;
+        }
+        $result = (string) ($_POST['inspection_result'] ?? '');
+        $date = trim((string) ($_POST['inspected_on'] ?? ''));
+        $agency = trim((string) ($_POST['agency_name'] ?? ''));
+        $note = trim((string) ($_POST['inspection_note'] ?? ''));
+        $error = match (true) {
+            !in_array($result, ['passed', 'failed'], true) => 'Choose whether the inspection passed or failed.',
+            !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || strtotime($date) === false || $date > date('Y-m-d') => 'Enter the date of the inspection (today or earlier).',
+            mb_strlen($agency) < 2 || mb_strlen($agency) > 150 => 'Enter the inspection agency (2 to 150 characters).',
+            $result === 'failed' && mb_strlen($note) < 10 => 'Say what failed (at least 10 characters).',
+            $note !== '' && mb_strlen($note) < 10 => 'Write the note in at least 10 characters, or leave it empty.',
+            mb_strlen($note) > 500 => 'The note is too long (up to 500 characters).',
+            empty($_FILES['inspection_report']['name']) => 'Attach the inspection report (PDF or image).',
+            default => null,
+        };
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}#step-8a-inspection");
+            return;
+        }
+        try {
+            $fileId = FileUploadService::handleUpload('inspection_report', 'inspection_report', \App\Helpers\OrderStorage::forReceived($order, 'packing_bl'), null, $orderId, (int) $user['id'], null, $agency, 'Pre-shipment inspection report');
+        } catch (\Throwable $e) {
+            Flash::setErrorFromException($e);
+            header("Location: /orders/{$orderId}#step-8a-inspection");
+            return;
+        }
+        \App\Services\ShipmentGateService::saveInspection($order, $result, $date, $agency, $fileId, $note !== '' ? $note : null, (int) $user['id']);
+        if ($result === 'failed') {
+            Flash::set('warning', 'Inspection recorded as FAILED. The managers were notified; the Bill of Lading waits for a Passed inspection.');
+        } else {
+            Flash::set('success', 'Inspection recorded as Passed.');
+        }
+        header("Location: /orders/{$orderId}#step-8a-inspection");
     }
 
     /** Lets staff attach the scanned BL copy later, when it wasn't available yet at bl-issued time. */
@@ -3089,31 +3347,41 @@ final class OrderController
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
         AuditLogRepository::log(AuthService::currentUserId(), 'ORDER_SCANNED_BL_SENT', 'order_shipping', $orderId, null, null, null);
-        Flash::set('success', 'Scanned BL copy marked as sent to buyer.');
+        // Gap list G-2 (owner, 1 Nov 2026): a balance due against the BL (or an LC) is due the order's balance days from today.
+        $dueDate = \App\Services\BalanceDueService::startFromScannedBl($orderId, date('Y-m-d'));
+        Flash::set('success', 'Scanned BL copy marked as sent to buyer.' . ($dueDate !== null ? ' Balance payment due on ' . \App\Helpers\Dates::short($dueDate) . '.' : ''));
         header("Location: /orders/{$orderId}");
     }
 
     public function recordBalancePayment(array $params): void
     {
         $orderId = (int) $params['id'];
+        // Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is recorded from the
+        // freight stage on, against the PI — no Commercial Invoice needed yet.
+        $early = \App\Services\ShipmentGateService::balanceOpenEarly($orderId);
         // 90-item backlog #53: this action had no stage gate at all (unlike
         // clearBalancePayment just below, which does check Stage 8) and no
         // check that the Commercial Invoice was ever actually generated —
         // the buyer can't be remitting against an invoice they were never
         // sent. Same "generated" bar as confirmSupplierSigned's SUPPO check
         // and recordOcAcknowledgment's OC check above.
-        if (!StageGateService::isUnlocked($orderId, 8)) {
+        if (!$early && !StageGateService::isUnlocked($orderId, 8)) {
             Flash::set('error', 'Stage 8 has not been unlocked for this order yet.');
             header("Location: /orders/{$orderId}");
             return;
         }
-        if (!DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CI')) {
+        if (!$early && !DocumentRepository::findLatestForOrderAndTypeCode($orderId, 'CI')) {
             Flash::set('error', 'Generate the Commercial Invoice for this order before recording the balance remittance.');
             header("Location: /orders/{$orderId}");
             return;
         }
         $amount = (float) ($_POST['balance_amount'] ?? 0);
         $receivedAt = trim((string) ($_POST['balance_received_at'] ?? '')) ?: date('Y-m-d');
+        if ((OrderPaymentStatusRepository::find($orderId) ?? [])['balance_cleared_at'] ?? null) {
+            Flash::set('error', \App\Services\PartPaymentService::clearedMessage('balance'));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         if ($amount <= 0) {
             Flash::set('error', 'Enter the balance amount actually received.');
             header("Location: /orders/{$orderId}");
@@ -3136,12 +3404,11 @@ final class OrderController
         // QA Round 6, R6-N22: saved together or not at all.
         $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-            if (OrderPaymentStatusRepository::legAlreadyRecorded($orderId, 'balance', $amount, $receivedAt, $rate)) {
+            // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
+            if (\App\Services\PartPaymentService::receiptExists($orderId, 'balance', null, $amount, $receivedAt, $rate)) {
                 return false;
             }
-            OrderPaymentStatusRepository::recordBalanceReceived($orderId, $amount, $receivedAt);
-            OrderPaymentStatusRepository::setLegBankReference($orderId, 'balance', $bankRef);
-            OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'balance', $rate, (int) AuthService::currentUserId());
+            \App\Services\PartPaymentService::addLegReceipt($orderId, 'balance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'balance_exchange_rate', null, (string) $rate);
             // External QA report L-23: balance payment recording was never audit-logged.
             AuditLogRepository::log(AuthService::currentUserId(), 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'balance_amount', null, (string) $amount);
@@ -3161,15 +3428,31 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
-        if (!StageGateService::isUnlocked($orderId, 8)) {
+        $stage8 = StageGateService::isUnlocked($orderId, 8);
+        // Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is cleared before the
+        // Bill of Lading; Stage 8 is passed later, once its Commercial Invoice is approved/sent.
+        $early = !$stage8 && \App\Services\ShipmentGateService::balanceOpenEarly($orderId);
+        if (!$stage8 && !$early) {
             Flash::set('error', 'Stage 8 has not been unlocked for this order yet — complete Stage 7 first.');
             header("Location: /orders/{$orderId}");
             return;
         }
         // Owner decision (2026-10-25): this stage completes only once its
         // document is approved (email off) / sent (email on).
-        if ($blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 8)) {
+        if ($stage8 && $blockedBy = DocumentGenerationService::stageDocumentBlockedBy($orderId, 8)) {
             Flash::set('error', DocumentGenerationService::stageDocumentBlockedMessage($blockedBy));
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $alreadyCleared = OrderPaymentStatusRepository::find($orderId)['balance_cleared_at'] ?? null;
+        if ($alreadyCleared !== null) {
+            if ($early) {
+                Flash::set('error', 'The balance is already cleared.');
+            } else {
+                StageGateService::passAndUnlockNext($orderId, 8, (int) $user['id']);
+                AuditLogRepository::log((int) $user['id'], 'STAGE_8_COMPLETED_BALANCE_CLEARED_EARLIER', 'orders', $orderId, 'balance_cleared_at', null, substr((string) $alreadyCleared, 0, 10));
+                Flash::set('success', 'Step 11 complete — the balance was cleared before shipment on ' . \App\Helpers\Dates::short(substr((string) $alreadyCleared, 0, 10)) . '. Stage 9 (Document Despatch & Closure) unlocked.');
+            }
             header("Location: /orders/{$orderId}");
             return;
         }
@@ -3204,12 +3487,25 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
+        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'balance', null, $user, (string) ($_POST['short_reason'] ?? ''));
+        if (isset($partCheck['error'])) {
+            Flash::set('error', $partCheck['error']);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $clearedAt = trim((string) ($_POST['balance_cleared_at'] ?? '')) ?: date('Y-m-d');
         OrderPaymentStatusRepository::markBalanceCleared($orderId, $clearedAt, (int) $user['id']);
+        $shortNote = $partCheck['short'] !== null ? ' ' . \App\Services\PartPaymentService::recordShortfall($orderId, 'balance', null, $partCheck['short'], $user) : '';
         // External QA report L-23: balance payment clearing was never audit-logged.
         AuditLogRepository::log((int) $user['id'], 'BALANCE_PAYMENT_CLEARED', 'order_payment_status', $orderId, 'balance_cleared_at', null, $clearedAt);
+        if ($early) {
+            Flash::set('success', 'Balance payment cleared before shipment. The Bill of Lading (Step 10f) can now be recorded; Step 11 completes once the Commercial Invoice is approved.' . $shortNote);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         StageGateService::passAndUnlockNext($orderId, 8, (int) $user['id']);
-        Flash::set('success', 'Balance payment cleared. Stage 9 (Document Despatch & Closure) unlocked.');
+        Flash::set('success', 'Balance payment cleared. Stage 9 (Document Despatch & Closure) unlocked.' . $shortNote);
         header("Location: /orders/{$orderId}");
     }
 

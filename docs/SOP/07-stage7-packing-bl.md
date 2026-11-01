@@ -109,6 +109,22 @@ which runs alongside and never locks anything. Then:
    confirm with just the number and attach the copy afterward (**Attach
    Scanned BL Copy**, same step) once it arrives.
 
+   **What the BL waits for (gap list G-1 / G-3, owner 1 Nov 2026).** The
+   step also refuses, and says so above the form, while:
+   - the order's balance is due **before shipment** (presets "Standard —
+     New Buyer" and "Extended Terms — Before Shipment") and is not yet
+     recorded and cleared — record and clear it in Steps 11c/11d, which
+     open for these orders from Step 9 on, against the PI;
+   - the order has a **Pre-Shipment Inspection** (its Compliance Checklist
+     line is not marked not applicable) that is not recorded as
+     **Passed** in Step 8a.
+
+   A manager with **Override shipment gates** (MD, ED, Admin) sees a
+   **Reason** box and can release the step with a written reason (at
+   least 10 characters); the release is kept in the audit log and shown
+   under the recorded BL ("Bill of Lading step released by … Reason: …").
+   Post-BL and Letter of Credit orders do not wait for the balance.
+
    ![Confirm BL Issued form](./images/s7_bl_confirm_before.png)
 
 Once confirmed:

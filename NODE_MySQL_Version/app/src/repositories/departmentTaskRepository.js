@@ -54,7 +54,9 @@ const OPEN_WORK = `
         UNION ALL
         SELECT o.id, 'send_documents', 'Balance cleared — documents to the buyer', DATE(ps.balance_cleared_at), CONCAT('/orders/', o.id)
           FROM orders o JOIN order_payment_status ps ON ps.order_id = o.id
-         WHERE o.status = 'active' AND ps.balance_cleared_at IS NOT NULL`;
+         WHERE o.status = 'active' AND ps.balance_cleared_at IS NOT NULL
+           -- Gap list G-1: a balance cleared before shipment waits for the Bill of Lading
+           AND EXISTS (SELECT 1 FROM order_shipping sh WHERE sh.order_id = o.id AND sh.bl_number IS NOT NULL)`;
 
 /**
  * @param {string[]|null} departmentCodes only these departments' tasks (null = every department)

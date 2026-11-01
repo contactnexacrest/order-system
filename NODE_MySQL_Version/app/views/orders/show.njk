@@ -13,6 +13,14 @@
 {# Owner request (2026-10-26): a remittance is recorded together with the
    day's exchange rate, and once recorded the card reads it back as one
    statement — "we received X at today's exchange rate of Y". #}
+{# Gap list G-5 (owner, 1 Nov 2026): part payments — each receipt, what is still owed, and a manager's reason to clear short. #}
+{% macro renderReceipts(key) %}{% set ps5 = partPayments[key] if (partPayments and sees.buyer_payments) else null %}{% if ps5 and (ps5.receipts.length or ps5.shortfall) %}
+<div class="part-payments small" data-part-payments="{{ key }}"><table class="list compact"><tr><th>Received on</th><th>Amount</th><th>Rate</th><th>Bank reference</th><th>Recorded by</th></tr>
+{% for r in ps5.receipts %}<tr><td>{{ r.received_on | shortDate }}</td><td>{{ order.currency_code or '' }} {{ r.amount | money }}</td><td>{% if r.exchange_rate != null %}&#8377;{{ r.exchange_rate | rate4 }}{% else %}—{% endif %}</td><td>{{ r.bank_reference or '—' }}</td><td>{{ r.recorded_by_name or '—' }}</td></tr>{% endfor %}
+</table><p>{% if ps5.expected != null %}Due: <strong>{{ order.currency_code or '' }} {{ ps5.expected | money }}</strong> &middot; received so far: <strong>{{ order.currency_code or '' }} {{ ps5.received | money }}</strong> &middot; {% if ps5.owed > 0.01 %}<strong class="text-warning">still owed: {{ order.currency_code or '' }} {{ ps5.owed | money }}</strong>{% elif ps5.owed < -0.01 %}paid {{ order.currency_code or '' }} {{ (0 - ps5.owed) | money }} more than due{% else %}received in full{% endif %}{% else %}Received so far: <strong>{{ order.currency_code or '' }} {{ ps5.received | money }}</strong>{% endif %}</p>
+{% if ps5.shortfall %}<p class="notice notice-warning">Cleared short by {{ order.currency_code or '' }} {{ ps5.shortfall.shortfall_amount | money }} on {{ ps5.shortfall.approved_on | shortDate }}: approved by {{ ps5.shortfall.approved_by_name or '—' }} — {{ 'carried into the balance' if ps5.shortfall.treatment == 'carried_to_balance' else 'written off' }}. Reason: {{ ps5.shortfall.reason }}</p>{% endif %}
+</div>{% endif %}{% endmacro %}
+{% macro shortReasonField(key) %}{% set ps5 = partPayments[key] if (partPayments and sees.buyer_payments) else null %}{% if ps5 and ps5.owed != null and ps5.owed > 0.01 %}{% if not canApproveShort %}<p class="notice notice-warning small">{{ order.currency_code or '' }} {{ ps5.owed | money }} is still owed — record the rest when it arrives. Only a manager with "Approve short payment" can clear it short.</p>{% else %}<label>Reason for clearing it short * <small class="muted">({{ order.currency_code or '' }} {{ ps5.owed | money }} still owed — recorded and shown on the order)</small><textarea name="short_reason" required minlength="10" maxlength="500" rows="2"></textarea></label>{% endif %}{% endif %}{% endmacro %}
 {% macro remittanceRecordedNote(leg, nextStep) %}
   {% set amount = payment[leg ~ '_amount'] %}
   {% set rate = payment[leg ~ '_exchange_rate'] %}
@@ -155,6 +163,8 @@
 {% set freightCleared = stage6 and stage6.status == 'gate_passed' %}
 {% set blIssued = stage7 and stage7.status == 'gate_passed' %}
 {% set balanceCleared = stage8 and stage8.status == 'gate_passed' %}
+{# Gap list G-1: a "before shipment" balance can be cleared before Stage 8 is passed. #}
+{% set balanceMoneyCleared = balanceCleared or (payment and payment.balance_cleared_at) %}
 {% set orderClosed = order.status == 'complete' %}
 
 {# Payment Snapshot + Payment Ledger data, computed here (rather than down
@@ -532,6 +542,7 @@
         <tr data-compliance-row>
           <td>{{ ct.task_type_name }}
             <input type="hidden" name="tasks[{{ i }}][task_type_id]" value="{{ ct.task_type_id }}">
+            {% if ct.task_type_name == 'Pre-Shipment Inspection' and inspection %}{# Gap list G-3 #}<br><span class="badge {{ 'badge-active' if inspection.result == 'passed' else 'badge-lost' }}">{{ 'Passed' if inspection.result == 'passed' else 'Failed' }}</span> <small class="muted">{{ inspection.inspected_on | shortDate }} · {{ inspection.agency_name }}</small>{% endif %}
             {% if ct.resolved_at %}<br><span class="muted small">{{ ct.resolved_at }}{% if ct.resolved_by_name %} by {{ ct.resolved_by_name }}{% endif %}</span>{% endif %}
           </td>
           <td>
@@ -575,7 +586,8 @@
   orderClosed: orderClosed,
   supplierAdvancePending: (supplierPo and (supplierPo.advance_amount_inr | float) > 0 and not supplierPo.advance_paid_at),
   productionUpdated: ((order.production_status_text and (order.production_status_text | trim) != 'Not yet commenced') or order.est_shipment_date_text or order.est_shipment_date),
-  freightSkipped: (stage6 and stage6.status == 'skipped')
+  freightSkipped: (stage6 and stage6.status == 'skipped'),
+  balanceOpenEarly: balanceOpenEarly
 }) %}
 {% set stepStates = flow.stepStates %}
 {% set currentUserStep = flow.currentUserStep %}
@@ -1037,7 +1049,7 @@
         <div><span class="k">Advance T/T Received</span><span class="v">{{ payment.advance_remittance_received_at or '—' }}</span></div>
         <div><span class="k">Advance Cleared</span><span class="v">{{ payment.advance_cleared_at or '—' }}</span></div>
         <div><span class="k">Balance Amount</span><span class="v">{% if not canViewPaymentAmounts %}Only shown to Accounts/Logistics/Export staff{% else %}{{ (payment.balance_amount | money) ~ ' ' ~ (order.currency_code or '') if payment.balance_amount != null else '—' }}{% endif %}</span></div>
-        <div><span class="k">Balance Due</span><span class="v">{{ payment.balance_due_date or 'event-triggered' }}</span></div>
+        <div><span class="k">Balance Due</span><span class="v">{{ payment.balance_due_date or ('set when the scanned BL is sent to the buyer (Step 11b)' if balanceDueAfterBl else 'event-triggered') }}</span></div>
         <div><span class="k">Balance T/T Received</span><span class="v">{{ payment.balance_remittance_received_at or '—' }}</span></div>
         <div><span class="k">Balance Cleared</span><span class="v">{{ payment.balance_cleared_at or '—' }}</span></div>
         {% if payment.freight_amount != null or payment.freight_remittance_received_at %}
@@ -1129,6 +1141,7 @@
       </table>
 
       {% for m in ps.rows %}
+        {{ renderReceipts('milestone:' ~ m.id) }}
         {% if m.received_amount === null and permissions.manage_payments %}
         <form method="post" action="/orders/{{ order.id }}/payment/milestones/{{ m.id }}" class="inline-form milestone-record">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -1145,6 +1158,7 @@
         <form method="post" action="/orders/{{ order.id }}/payment/milestones/{{ m.id }}/clear" class="inline-form milestone-clear">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Milestone {{ m.seq }} cleared on *<input type="date" name="cleared_on" required value="{{ todayDate }}" min="{{ m.received_on }}" max="{{ todayDate }}"></label>
+          {{ shortReasonField('milestone:' ~ m.id) }}
           <button type="submit" class="btn-sm">Mark Milestone {{ m.seq }} Cleared</button>
         </form>
         {% endif %}
@@ -1845,7 +1859,9 @@
     <details class="step-card" id="step-5d-payment-record"{{ flow.subCardOpen('s5', '5d') }}>
       <summary>{{ stepStatusIcon(flow.subStepStatus('s5', '5d')) }}<h2>Step 5d &middot; Record Advance Remittance</h2></summary>
       {% if not advanceCleared %}{{ paymentActionLinkWidget('Proforma Invoice', 'step-5d-payment-record') }}{% endif %}
-      {% if stage3 and stage3.status != 'locked' and not advanceCleared and (not payment or payment.advance_remittance_received_at == null) %}
+      {{ renderReceipts('advance') }}
+      {% if stage3 and stage3.status != 'locked' and not advanceCleared %}
+        {% if payment and payment.advance_remittance_received_at != null %}{{ remittanceRecordedNote('advance', 'Next: Step 5e — mark it cleared once the bank confirms, or record another receipt below if the buyer paid in parts.') }}{% endif %}
         {% if not permissions.manage_payments %}
           <p class="muted">Only Accounts/Export can record this payment.</p>
         {% else %}
@@ -1859,7 +1875,7 @@
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="advance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="{{ order.currency_code or '' }}"></p>
-          {{ stepBadge('5d') | safe }}<button type="submit" class="btn-sm">Record Advance Remittance</button>
+          {{ stepBadge('5d') | safe }}<button type="submit" class="btn-sm">{{ 'Record Another Advance Receipt' if (payment and payment.advance_remittance_received_at != null) else 'Record Advance Remittance' }}</button>
         </form>
         {% endif %}
       {% elif not stage3 or stage3.status == 'locked' %}
@@ -1883,6 +1899,7 @@
         <form method="post" action="/orders/{{ order.id }}/payment/advance/clear" onsubmit="return confirm('Mark the advance payment cleared? This unlocks Stage 4 and auto-provisions the client portal login — confirm the funds have actually landed first.');">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>Cleared On<input type="date" name="advance_cleared_at"></label>
+          {{ shortReasonField('advance') }}
           {{ stageGateNotice(3, "mark the advance cleared") | safe }}
           {{ stepBadge('5e') | safe }}<button type="submit"{{ stageGateDisabled(3) | safe }} class="btn-sm btn-success">Mark Advance Cleared (unlocks Stage 4)</button>
         </form>
@@ -1899,8 +1916,58 @@
   </details>
 
   {% if isLcPayment %}
-  <details class="step-card step-card-reference" id="step-5-lc-bank-loan">
-    <summary><h2>Letter of Credit &amp; Bank Loan <small class="muted">(steps 5-1a/5-2a/5-3a &mdash; financing cost, not the LC leg above)</small></h2></summary>
+  {% set __minWarn = 999 %}{% for __w in lcWarnings %}{% if __w.days < __minWarn %}{% set __minWarn = __w.days %}{% endif %}{% endfor %}
+  <details class="step-card step-card-reference" id="step-5-lc-bank-loan"{{ ' open' if lcWarnings.length else '' }}>
+    <summary><h2>Letter of Credit &amp; Bank Loan <small class="muted">(steps 5-1a/5-2a/5-3a &mdash; financing cost, not the LC leg above)</small>{% if lcWarnings.length %} <span class="badge badge-lost">LC date {{ 'passed' if __minWarn < 0 else 'within 7 days' }}</span>{% endif %}</h2></summary>
+    {# Gap list G-4 (owner, 1 Nov 2026): the LC's dates (reminded 7 days before) and its amendments. #}
+    {% set __lc = orderLcDetails or {} %}
+    <div class="lc-dates" id="lc-dates">
+      {% for __w in lcWarnings %}
+        <div class="alert alert-warning">{{ __w.label }}: {{ __w.date | shortDate }} — {% if __w.days < 0 %}passed {{ -__w.days }} day(s) ago{% elif __w.days == 0 %}today{% else %}in {{ __w.days }} day(s){% endif %}</div>
+      {% endfor %}
+      <div class="kv-grid">
+        <div><span class="k">LC issued on</span><span class="v">{{ (__lc.lc_issue_date | shortDate) if __lc.lc_issue_date else '—' }}</span></div>
+        <div><span class="k">Last shipment date</span><span class="v">{{ (__lc.lc_last_shipment_date | shortDate) if __lc.lc_last_shipment_date else '—' }}</span></div>
+        <div><span class="k">Deadline to present documents</span><span class="v">{{ (__lc.lc_presentation_deadline | shortDate) if __lc.lc_presentation_deadline else '—' }}</span></div>
+        <div><span class="k">LC expiry</span><span class="v">{{ (__lc.lc_expiry_date | shortDate) if __lc.lc_expiry_date else '—' }}</span></div>
+      </div>
+      {% if permissions.manage_payments %}
+      <details>
+        <summary>Record or change the LC dates</summary>
+        <form method="post" action="/orders/{{ order.id }}/lc-dates">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>LC issued on<input type="date" name="lc_issue_date" max="{{ today() }}" value="{{ __lc.lc_issue_date or '' }}"></label>
+          <label>Last shipment date<input type="date" name="lc_last_shipment_date" value="{{ __lc.lc_last_shipment_date or '' }}"></label>
+          <label>Deadline to present documents<input type="date" name="lc_presentation_deadline" value="{{ __lc.lc_presentation_deadline or '' }}"></label>
+          <label>LC expiry<input type="date" name="lc_expiry_date" value="{{ __lc.lc_expiry_date or '' }}"></label>
+          <button type="submit" class="btn-sm">Save LC dates</button>
+        </form>
+      </details>
+      {% endif %}
+      <h3 style="font-size:0.95em;">LC amendments</h3>
+      <table class="list">
+        <tr><th>Date</th><th>Amendment</th><th>What changed</th><th>Copy</th><th>Recorded by</th></tr>
+        {% for __am in orderLcAmendments %}
+          <tr><td>{{ __am.amended_on | shortDate }}</td><td>{{ __am.reference }}</td><td>{{ __am.change_text }}</td>
+            <td>{% if __am.file_id %}{% if fileAllowed[__am.file_id] !== false %}<a href="/file-store/{{ __am.file_id }}/download" target="_blank">View</a>{% else %}View{% endif %}{% else %}—{% endif %}</td>
+            <td>{{ __am.recorded_by_name or '' }}</td></tr>
+        {% endfor %}
+        {% if not orderLcAmendments.length %}<tr><td colspan="5" class="muted">No amendments recorded.</td></tr>{% endif %}
+      </table>
+      {% if permissions.manage_payments %}
+      <details>
+        <summary>Record an LC amendment</summary>
+        <form method="post" action="/orders/{{ order.id }}/lc-amendments" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Amendment date *<input type="date" name="amended_on" required max="{{ today() }}" value="{{ today() }}"></label>
+          <label>Amendment number / reference *<input type="text" name="reference" required maxlength="100"></label>
+          <label>What changed *<input type="text" name="change_text" required minlength="5" maxlength="500" placeholder="e.g. Last shipment date extended to 30 Nov"></label>
+          <label>Copy of the amendment (optional)<input type="file" name="amendment_file" accept=".pdf,.jpg,.jpeg,.png"></label>
+          <button type="submit" class="btn-sm">Record amendment</button>
+        </form>
+      </details>
+      {% endif %}
+    </div>
     <p class="muted small">If the client financed their LC (Step 5d/5e above) with a bank loan, record that loan's amount/interest here — separate from the LC leg itself, since this is about the cost of financing it, not confirming it usable.</p>
     {% if canManageOrderFinancials %}
     <p class="muted small">Recorded in full under <a href="#order-financials">Order Financials</a> (Step 12) alongside this order's other costs — the Bank Loan Interest you record there is automatically kept in sync as an order expense.</p>
@@ -1959,7 +2026,7 @@
     {% elif stage4 and stage4.status != 'locked' %}
       {% if ocAcknowledgment and ocAcknowledgment.acknowledged_at == null %}
         <div class="review-banner info">
-          ℹ <span>Order Confirmation emailed to the buyer on {{ ocAcknowledgment.sent_at | humanDate }}. Awaiting their acknowledgement — the client can confirm it directly in their portal, or reply to the email (record that below). If there's no response by {{ ocAcknowledgment.due_at | humanDate }}, it auto-confirms and Step 7 (Supplier PO) unlocks on its own.</span>
+          ℹ <span>Order Confirmation {{ 'emailed' if mailSendingEnabled else 'sent' }} to the buyer on {{ ocAcknowledgment.sent_at | humanDate }}. Awaiting their acknowledgement — the client can confirm it directly in their portal, or reply to the email (record that below). If there's no response by {{ ocAcknowledgment.due_at | humanDate }}, it auto-confirms and Step 7 (Supplier PO) unlocks on its own.</span>
         </div>
         {% if permissions.manage_orders %}{# QA Round 5, R5-20 #}
         <form method="post" action="/orders/{{ order.id }}/oc-acknowledgment">
@@ -1970,6 +2037,14 @@
         </form>
         {% endif %}
       {% elif ocDocGenerated %}
+        {% if not mailSendingEnabled and permissions.manage_orders %}{# Gap list G-6 (owner, 1 Nov 2026): the 48 hours start when staff send the OC themselves #}
+        <form method="post" action="/orders/{{ order.id }}/oc-sent-to-buyer" style="margin-bottom:10px;">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <p class="muted small">E-mail sending is off: send the approved Order Confirmation to the buyer yourself, then mark it sent here. The buyer's 48 hours start now — if they do not respond, it auto-confirms and Step 7 unlocks.</p>
+          {{ stageGateNotice(4, "mark the Order Confirmation sent") | safe }}
+          <button type="submit"{{ stageGateDisabled(4) | safe }} class="btn-sm">Mark Order Confirmation Sent to Buyer</button>
+        </form>
+        {% endif %}
         <div class="review-banner info">
           ℹ <span>Order Confirmation has been generated but hasn't gone out by email yet (still awaiting send/approval, or mail sending isn't configured). If the buyer has confirmed by phone, in person, or any channel other than the portal/email, record it below once the Order Confirmation is approved (and sent to the buyer, when email is on); Step 7 (Supplier PO) then unlocks.</span>
         </div>
@@ -2418,6 +2493,31 @@
       {% endif %}
     {% endif %}
 
+    {# Gap list G-3 (owner, 1 Nov 2026): the inspection result — the Bill of Lading waits for a Passed one. #}
+    {% if inspectionApplies %}
+      <div id="step-8a-inspection" class="section">
+        <h3 style="font-size:0.95em; margin-top:14px;">Pre-Shipment Inspection — result</h3>
+        {% if inspection %}
+          <p><span class="badge {{ 'badge-active' if inspection.result == 'passed' else 'badge-lost' }}">{{ 'Passed' if inspection.result == 'passed' else 'Failed' }}</span>
+            on {{ inspection.inspected_on | shortDate }} by {{ inspection.agency_name }}
+            {% if fileAllowed[inspection.report_file_id] !== false %} · <a href="/file-store/{{ inspection.report_file_id }}/download">Report</a>{% endif %}
+            {% if inspection.note %}<br><small class="muted">{{ inspection.note }}</small>{% endif %}</p>
+        {% else %}
+          <p class="muted small">Not recorded yet. The Bill of Lading (Step 10f) waits for a Passed inspection; mark the inspection not applicable on the compliance checklist if this order has none.</p>
+        {% endif %}
+        {% if permissions.manage_shipping and order.status == 'active' and (not inspection or inspection.result != 'passed') %}
+        <form method="post" action="/orders/{{ order.id }}/inspection-result" enctype="multipart/form-data" class="field-grid">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Result *<select name="inspection_result" required><option value="">Choose…</option><option value="passed">Passed</option><option value="failed">Failed</option></select></label>
+          <label>Inspected on *<input type="date" name="inspected_on" required max="{{ today() }}" value="{{ today() }}"></label>
+          <label>Agency *<input type="text" name="agency_name" required minlength="2" maxlength="150" value="{{ (inspection.agency_name if inspection else (orderInspectionFee.agency_name if orderInspectionFee else '')) or '' }}"></label>
+          <label>Report (PDF or image) *<input type="file" name="inspection_report" required accept=".pdf,.jpg,.jpeg,.png"></label>
+          <label style="grid-column:1/-1">Note <small class="muted">(required when failed: what failed)</small><textarea name="inspection_note" rows="2" maxlength="500" data-required-if="inspection_result=failed" data-required-if-message="Say what failed (at least 10 characters)." minlength="10"></textarea></label>
+          <div><button type="submit" class="btn-sm">Record Inspection Result</button></div>
+        </form>
+        {% endif %}
+      </div>
+    {% endif %}
     {% if pendingInspectionTask and canManageOrderFinancials %}
       <h3 style="font-size:0.95em; margin-top:14px;">3rd-Party Pre-Shipment Inspection (step 8a)</h3>
       <p class="muted small">This order has a Pre-Shipment Inspection on its Compliance Checklist (not marked not-applicable) — staff get reminded starting 7 days before the estimated shipment date above.</p>
@@ -2568,6 +2668,7 @@
 
   <details class="step-card" id="step-9c-freight-remittance"{{ flow.subCardOpen('s9', '9c') }}>
     <summary>{{ stepStatusIcon(flow.subStepStatus('s9', '9c')) }}<h2>Step 9c &middot; Record Freight Remittance</h2></summary>
+    {{ renderReceipts('freight') }}
     {% if not freightCleared %}{{ paymentActionLinkWidget('Debit Note', 'step-9c-freight-remittance') }}{% endif %}
     {% if freightLocked %}
       <p class="muted">Confirm the Supplier PO is signed first to unlock this gate.</p>
@@ -2575,7 +2676,8 @@
       <p class="muted">Save Freight Terms first (Step 9a).</p>
     {% elif not freightCleared and (not payment or payment.freight_remittance_received_at == null) and not permissions.manage_payments %}
       <p class="muted">Waiting for the buyer's freight remittance (recorded by Sales / Accounts).</p>
-    {% elif not freightCleared and (not payment or payment.freight_remittance_received_at == null) %}
+    {% elif not freightCleared and permissions.manage_payments %}
+      {% if payment and payment.freight_remittance_received_at != null %}{{ remittanceRecordedNote('freight', 'Next: Step 9d — mark it cleared once the bank confirms, or record another receipt below if the buyer paid in parts.') }}{% endif %}
       <form method="post" action="/orders/{{ order.id }}/payment/freight">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Freight Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="freight_amount" required data-remit-amount></label>
@@ -2583,8 +2685,9 @@
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="freight_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="{{ order.currency_code or '' }}"></p>
-        {{ stepBadge('9c') | safe }}<button type="submit" class="btn-sm">Record Freight Remittance</button>
+        {{ stepBadge('9c') | safe }}<button type="submit" class="btn-sm">{{ 'Record Another Freight Receipt' if (payment and payment.freight_remittance_received_at != null) else 'Record Freight Remittance' }}</button>
       </form>
+      {% if payment and payment.freight_remittance_received_at != null %}{{ inrActualWidget('freight', 'Freight Payment') }}{{ exchangeRateWidget('freight', 'Freight Payment') }}{% endif %}
     {% else %}
       {{ remittanceRecordedNote('freight', 'Next: Step 9d — mark it cleared once the bank confirms.') }}
       {{ inrActualWidget('freight', 'Freight Payment') }}
@@ -2608,6 +2711,7 @@
       <form method="post" action="/orders/{{ order.id }}/payment/freight/clear" onsubmit="return confirm('Mark the freight payment cleared? This unlocks Stage 7 — confirm the funds have actually landed first.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Cleared On<input type="date" name="freight_cleared_at"></label>
+        {{ shortReasonField('freight') }}
         {{ stageGateNotice(6, "mark the freight cleared") | safe }}
         {{ stepBadge('9d') | safe }}<button type="submit"{{ stageGateDisabled(6) | safe }} class="btn-sm btn-success">Mark Freight Cleared (unlocks Stage 7)</button>
       </form>
@@ -2838,18 +2942,31 @@
         {% endif %}
       {% endif %}
 
+        {# Gap list G-1 / G-3 (owner, 1 Nov 2026): what the Bill of Lading waits for. #}
+        {% if shipmentGateBlockers.length %}
+          <div class="notice notice-warning shipment-gate-blockers">
+            {% for gateMsg in shipmentGateBlockers %}<p style="margin:0 0 4px;">{{ gateMsg }}</p>{% endfor %}
+            <p class="muted small" style="margin:0;">{{ 'You can release the step with a written reason below; it is recorded on the order.' if canOverrideShipmentGates else 'A manager (Override shipment gates) can release the step with a written reason.' }}</p>
+          </div>
+        {% endif %}
         {% if permissions.manage_shipping %}{# QA Round 5, R5-20 #}
         <form method="post" action="/orders/{{ order.id }}/bl-issued" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <label>BL Number *<input type="text" name="bl_number" required></label>
           <label>BL Date<input type="date" name="bl_date"></label>
           <label>Scanned BL Copy <small class="muted">(optional — can be attached later)</small><input type="file" name="bl_copy" accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.rtf,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tif,.tiff,.heic,.eml,.msg,.zip"></label>
+          {% if shipmentGateBlockers.length and canOverrideShipmentGates %}
+            <label>Reason for releasing the Bill of Lading step *<textarea name="gate_override_reason" rows="2" required minlength="10" maxlength="500" placeholder="Why may the goods ship before this is done?"></textarea></label>
+          {% endif %}
           {{ stageGateNotice(7, "confirm the BL issued") | safe }}
-          {{ stepBadge('10f') | safe }}<button type="submit"{{ stageGateDisabled(7) | safe }} class="btn-sm btn-success">Confirm BL Issued (unlocks Stage 8)</button>
+          {{ stepBadge('10f') | safe }}<button type="submit"{{ stageGateDisabled(7) | safe }}{{ ' disabled' if (shipmentGateBlockers.length and not canOverrideShipmentGates) else '' }} class="btn-sm btn-success">{% if shipmentGateBlockers.length and canOverrideShipmentGates %}Release &amp; Confirm BL Issued (unlocks Stage 8){% else %}Confirm BL Issued (unlocks Stage 8){% endif %}</button>
         </form>
         {% endif %}
       {% else %}
         <p>Bill of Lading recorded: <strong>{{ shipping.bl_number }}</strong> ({{ shipping.bl_date }})</p>
+        {% for ov in shipmentGateOverrides %}
+          <p class="notice notice-warning small">Bill of Lading step released by {{ ov.user_name }} on {{ ov.created_at | humanDate }} before {{ ov.gates_label }} was done. Reason: {{ ov.reason }}</p>
+        {% endfor %}
         {% if shipping.bl_copy_file_id %}
           <p class="muted small">{% if fileAllowed[shipping.bl_copy_file_id] !== false %}<a href="/file-store/{{ shipping.bl_copy_file_id }}/download">Download scanned BL copy</a>{% else %}Download scanned BL copy{% endif %}{# QA R7-N06 #}</p>
         {% else %}
@@ -2939,29 +3056,37 @@
 
   <details class="step-card" id="step-balance-record"{{ flow.subCardOpen('s11', '11c') }}>
     <summary>{{ stepStatusIcon(flow.subStepStatus('s11', '11c')) }}<h2>Step 11c &middot; Record Balance Remittance</h2></summary>
-    {% if not balanceCleared %}{{ paymentActionLinkWidget('Commercial Invoice', 'step-balance-record') }}{% endif %}
-    {% if ciBalanceLocked %}
-      <p class="muted">Confirm BL issuance first to unlock this gate.</p>
-    {% elif not balanceCleared and (not payment or payment.balance_remittance_received_at == null) %}
-      {% if not ciDocGenerated %}
+    {% if not balanceMoneyCleared %}{{ paymentActionLinkWidget('Commercial Invoice', 'step-balance-record') }}{% endif %}
+    {# Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is recorded and cleared before the Bill of Lading. #}
+    {% set balanceLocked = ciBalanceLocked and not balanceOpenEarly %}
+    {% if preShipmentBalance and not balanceMoneyCleared %}
+      <p class="notice notice-info small">This order's balance is due <strong>before shipment</strong>: record and clear it here (against the PI) before the Bill of Lading is recorded in Step 10f.</p>
+    {% endif %}
+    {% if balanceLocked %}
+      <p class="muted">{{ 'Reach Step 9 (freight) first to record this order\'s balance.' if preShipmentBalance else 'Confirm BL issuance first to unlock this gate.' }}</p>
+    {% elif not balanceMoneyCleared %}
+      {{ renderReceipts('balance') }}
+      {% if payment and payment.balance_remittance_received_at != null %}{{ remittanceRecordedNote('balance', 'Next: mark it cleared once the bank confirms, or record another receipt below if the buyer paid in parts.') }}{% endif %}
+      {% if not ciDocGenerated and not balanceOpenEarly %}
         <p class="muted small">Generate the Commercial Invoice first — the buyer can't be remitting against an invoice they were never sent.</p>
       {% elif not permissions.manage_payments %}
         <p class="muted">Only Accounts/Export can record this payment.</p>
       {% else %}
       <form method="post" action="/orders/{{ order.id }}/payment/balance">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>Balance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="balance_amount" required data-remit-amount value="{{ payment.balance_amount or '' }}"></label>
+        <label>Balance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="balance_amount" required data-remit-amount value="{% if payment and payment.balance_remittance_received_at != null %}{% if partPayments.balance.owed != null and partPayments.balance.owed > 0 %}{{ partPayments.balance.owed.toFixed(2) }}{% endif %}{% else %}{{ payment.balance_amount or '' }}{% endif %}"></label>
         <label>Received On<input type="date" name="balance_received_at"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="balance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="{{ order.currency_code or '' }}"></p>
-        {{ stepBadge('11c') | safe }}<button type="submit" class="btn-sm">Record Balance Remittance</button>
+        {{ stepBadge('11c') | safe }}<button type="submit" class="btn-sm">{{ 'Record Another Balance Receipt' if (payment and payment.balance_remittance_received_at != null) else 'Record Balance Remittance' }}</button>
       </form>
       {% endif %}
     {% else %}
+      {{ renderReceipts('balance') }}
       {{ remittanceRecordedNote('balance', 'Next: mark it cleared once the bank confirms.') }}
     {% endif %}
-    {% if not ciBalanceLocked %}
+    {% if not balanceLocked %}
       {{ inrActualWidget('balance', 'Balance Payment') }}
       {{ exchangeRateWidget('balance', 'Balance Payment') }}
     {% endif %}
@@ -2971,17 +3096,33 @@
 
   <details class="step-card" id="step-balance-clear"{{ flow.subCardOpen('s11', '11d') }}>
     <summary>{{ stepStatusIcon(flow.subStepStatus('s11', '11d')) }}<h2>Step 11d &middot; Mark Balance Cleared</h2></summary>
-    {% if ciBalanceLocked %}
-      <p class="muted">Confirm BL issuance first to unlock this gate.</p>
-    {% elif balanceCleared %}
-      <p>Balance payment cleared.</p>
+    {% if balanceLocked %}
+      <p class="muted">{{ 'Reach Step 9 (freight) first to record this order\'s balance.' if preShipmentBalance else 'Confirm BL issuance first to unlock this gate.' }}</p>
+    {% elif balanceMoneyCleared %}
+      <p>Balance payment cleared{% if payment and payment.balance_cleared_at %} on {{ payment.balance_cleared_at | shortDate }}{% endif %}.</p>
+      {% if not ciBalanceLocked and stage8 and stage8.status == 'in_progress' and permissions.clear_payments %}
+        {# Gap list G-1: cleared before shipment — Step 11 completes once the Commercial Invoice is approved. #}
+        <form method="post" action="/orders/{{ order.id }}/payment/balance/clear">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          {{ stageGateNotice(8, "complete Step 11") | safe }}
+          {{ stepBadge('11d') | safe }}<button type="submit"{{ stageGateDisabled(8) | safe }} class="btn-sm btn-success">Complete Step 11 (unlocks Stage 9)</button>
+        </form>
+      {% endif %}
     {% elif payment and payment.balance_remittance_received_at != null %}
       {% if not permissions.clear_payments %}
         <p class="muted">Balance remittance recorded — awaiting Accounts to confirm it cleared.</p>
+      {% elif ciBalanceLocked %}
+      <form method="post" action="/orders/{{ order.id }}/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared before shipment? Confirm the funds have actually landed first.');">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Cleared On<input type="date" name="balance_cleared_at" value="{{ today() }}" max="{{ today() }}"></label>
+        {{ shortReasonField('balance') }}
+        {{ stepBadge('11d') | safe }}<button type="submit" class="btn-sm btn-success">Mark Balance Cleared (before shipment)</button>
+      </form>
       {% else %}
       <form method="post" action="/orders/{{ order.id }}/payment/balance/clear" onsubmit="return confirm('Mark the balance payment cleared? This unlocks Stage 9 (final closure) — confirm the funds have actually landed first, and that the BL hasn\'t been released early if this is a post-BL preset.');">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Cleared On<input type="date" name="balance_cleared_at"></label>
+        {{ shortReasonField('balance') }}
         {{ stageGateNotice(8, "mark the balance cleared") | safe }}
         {{ stepBadge('11d') | safe }}<button type="submit"{{ stageGateDisabled(8) | safe }} class="btn-sm btn-success">Mark Balance Cleared (unlocks Stage 9)</button>
       </form>

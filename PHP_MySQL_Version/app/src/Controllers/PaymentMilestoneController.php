@@ -177,6 +177,8 @@ final class PaymentMilestoneController
         }
         $userId = (int) AuthService::currentUserId();
         PaymentMilestoneRepository::recordReceived((int) $m['id'], $amount, $receivedOn, $rate, $bankRef, $note, $userId);
+        // Gap list G-5: the receipt is kept in the order's receipt history too.
+        \App\Services\PartPaymentService::addMilestoneReceipt($m, $amount, $receivedOn, $rate, $bankRef, $note, $userId);
         $description = PaymentDescription::milestonePayment(PaymentMilestoneRepository::find((int) $m['id']) ?? $m);
         AuditLogRepository::log($userId, 'MILESTONE_PAYMENT_RECORDED', 'order_payment_milestones', (int) $m['id'], 'received_amount', null, $description);
         Flash::set('success', "Recorded: {$description}. Mark it cleared once your bank confirms receipt.");
@@ -209,9 +211,18 @@ final class PaymentMilestoneController
             return;
         }
         $userId = (int) AuthService::currentUserId();
+        // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
+        $user = AuthService::currentUser() ?? [];
+        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'milestone', $m, $user, (string) ($_POST['short_reason'] ?? ''));
+        if (isset($partCheck['error'])) {
+            Flash::set('error', $partCheck['error']);
+            self::back($orderId);
+            return;
+        }
         PaymentMilestoneRepository::markCleared((int) $m['id'], $clearedOn, $userId);
         AuditLogRepository::log($userId, 'MILESTONE_PAYMENT_CLEARED', 'order_payment_milestones', (int) $m['id'], 'cleared_on', null, $clearedOn);
-        Flash::set('success', "Milestone {$m['seq']} cleared. It goes to Zoho Books with the next revenue sync.");
+        $shortNote = $partCheck['short'] !== null ? ' ' . \App\Services\PartPaymentService::recordShortfall($orderId, 'milestone', $m, $partCheck['short'], $user) : '';
+        Flash::set('success', "Milestone {$m['seq']} cleared. It goes to Zoho Books with the next revenue sync." . $shortNote);
         self::back($orderId);
     }
 }

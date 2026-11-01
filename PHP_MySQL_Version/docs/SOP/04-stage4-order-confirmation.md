@@ -12,8 +12,11 @@ even if the buyer never responds at all.
 
 - The acknowledgment clock starts the moment the OC is actually **emailed**
   to the buyer (not when it's generated). While email sending is turned
-  off in Company Settings, an approved OC counts as sent, so the clock
-  starts when it is **approved** — see
+  off in Company Settings, an approved OC counts as sent, but the clock
+  starts only when staff send it to the buyer themselves and press **Mark
+  Order Confirmation Sent to Buyer** in Step 6c (gap list G-6, owner
+  1 Nov 2026: the buyer's 48 hours never start before the buyer has the
+  OC) — see
   [Document Review & Approval](./13-document-review-approval.md) for the
   full draft → review → approved → sent path every document goes through
   first. The window defaults to 48 hours and is admin-configurable

@@ -470,7 +470,8 @@ async function markSentIfMailDisabled(documentId) {
     return;
   }
   await documentRepository.markSent(documentId);
-  await startOcAcknowledgmentClock(document);
+  // Gap list G-6 (owner, 1 Nov 2026): with e-mail off, the buyer's 48 hours start when staff
+  // mark the Order Confirmation as sent to the buyer (ordersController.markOcSentToBuyer), not now.
   await auditLogRepository.log(
     null, 'DOCUMENT_MARKED_SENT_MAIL_DISABLED', 'documents', documentId, 'status', 'approved', 'sent',
     'mail_sending_enabled is off — counted as sent on approval; staff send the PDF outside the app.'
@@ -514,4 +515,4 @@ async function dispatchGeneric(emailLogRow) {
   return sent;
 }
 
-module.exports = { buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride, mailSendingEnabled, markSentIfMailDisabled };
+module.exports = { buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride, mailSendingEnabled, markSentIfMailDisabled, startOcAcknowledgmentClock };

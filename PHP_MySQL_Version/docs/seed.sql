@@ -1985,3 +1985,31 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
 SELECT 'associate_document', 'pdf,jpg,jpeg,png', 10485760, 'An associate''s own documents (KYC, tax papers, commission invoices, bank proof, 15CA/CB, TDS certificates) — internal; seen by the associate and by manage_associates / manage_associate_bank only.'
 WHERE NOT EXISTS (SELECT 1 FROM file_upload_contexts WHERE context_key = 'associate_document');
 
+
+-- Gap list answers 1 Nov 2026 (D-218, G-4): upload context for LC amendment copies (2026-11-02c)
+INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description)
+SELECT 'order_lc_amendment', 'pdf,jpg,jpeg,png', 10485760, 'A copy of an amendment to the order''s Letter of Credit (order_lc_amendments.file_id).'
+WHERE NOT EXISTS (SELECT 1 FROM file_upload_contexts WHERE context_key = 'order_lc_amendment');
+
+-- Gap list G-1 / G-3 (owner, 1 Nov 2026): inspection report upload context, override_shipment_gates (docs/migrations/2026-11-02b-gap-shipment-gates.sql).
+INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description)
+SELECT 'inspection_report', 'pdf,jpg,jpeg,png', 10485760, 'The third-party pre-shipment inspection report (order_inspections.report_file_id) — gap list G-3.'
+WHERE NOT EXISTS (SELECT 1 FROM file_upload_contexts WHERE context_key = 'inspection_report');
+
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT 'override_shipment_gates', 'Override shipment gates', 'Override shipment gates — release the BL step with a written reason when the pre-shipment balance or the inspection is not cleared', 'orders'
+WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'override_shipment_gates');
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'override_shipment_gates'
+ WHERE r.name IN ('Managing Director', 'Executive Director', 'Admin')
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+
+-- Gap list G-5: the manager's permission to clear a buyer payment that is less than due.
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT 'approve_short_payment', 'Approve short payment', 'Approve a short payment — clear a buyer payment that is less than due, with a written reason', 'orders'
+WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'approve_short_payment');
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'approve_short_payment'
+ WHERE r.name IN ('Managing Director', 'Executive Director', 'Admin', 'Finance Director')
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);

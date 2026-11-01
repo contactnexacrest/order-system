@@ -290,3 +290,13 @@ Checklist](./09-stage9-despatch-closure.md#compliance-checklist) in
 Stage 9 for that task, and
 [Order Financials](./ca-08-order-financials.md#5-travel-expenses--factory-visits)
 for recording the travel cost of these factory visits.
+
+**The inspection result (gap list G-3, owner 1 Nov 2026).** In Step 8a,
+**Pre-Shipment Inspection — result** records **Passed** or **Failed**, the
+date, the agency (filled from the inspection fee, if recorded) and the
+inspection report (PDF or image; required), with a note (required when it
+failed: what failed). Passed marks the checklist line approved; Failed
+reopens it and notifies the MD, ED and Admin. The Bill of Lading (Step 10f)
+waits for a Passed inspection unless the checklist line is marked not
+applicable or a manager releases the step with a reason. Who records it:
+staff with "Manage shipping".

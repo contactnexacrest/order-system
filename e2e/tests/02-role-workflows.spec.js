@@ -488,10 +488,23 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
 
     await logout(page);
 
-    await test.step('Accounts Executive — Step 10a supplier balance paid before packing (manage_supplier_payments)', async () => {
+    await test.step('Accounts Executive — Step 10a supplier balance paid before packing, and the buyer’s balance before shipment (manage_supplier_payments, manage_payments)', async () => {
       await login(page, 'accountsExecutive');
       await page.goto(`/orders/${orderId}`);
       await addAndPayBill(page, 7, '#step-10a-supplier-balance-paid', {}, 'SUP-TI-201', '45000');
+      await page.goto(`/orders/${orderId}`);
+
+      // Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is recorded and cleared
+      // before the Bill of Lading — against the PI, no Commercial Invoice yet.
+      await page.goto(`/orders/${orderId}?open=balance-record#step-balance-record`);
+      const earlyRecord = page.locator(`form[action="/orders/${orderId}/payment/balance"]`);
+      await earlyRecord.locator('input[name="balance_exchange_rate"]').fill('91');
+      await earlyRecord.locator('input[name="balance_bank_reference"]').fill('E2E-UTR-BALANCE-0001');
+      await Promise.all([page.waitForEvent('load'), earlyRecord.getByRole('button', { name: 'Record Balance Remittance' }).click()]);
+      await expect(page.locator('.alert')).toBeVisible();
+      await page.goto(`/orders/${orderId}?open=balance-clear#step-balance-clear`);
+      await Promise.all([page.waitForEvent('load'), page.locator(`form[action="/orders/${orderId}/payment/balance/clear"]`).getByRole('button', { name: 'Mark Balance Cleared (before shipment)' }).click()]);
+      await expect(page.locator('.alert')).toContainText('Balance payment cleared before shipment');
     });
 
     await logout(page);
@@ -524,6 +537,8 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
 
       await generateDocument(page, orderId, 'BLI', 'generated');
       await approveAsAdmin(page, orderId, 'BLI', 'logisticsExecutive');
+      // Gap list G-3: this order has no pre-shipment inspection — the checklist says so before the BL (close_orders).
+      await resolveComplianceChecklistIfNeeded(page, orderId);
 
       await openStage(page, 7);
       const blForm = page.locator(`form[action="/orders/${orderId}/bl-issued"]`);
@@ -545,19 +560,13 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
 
     await logout(page);
 
-    await test.step('Accounts Executive — Stage 8 balance payment record + clear (manage_payments)', async () => {
+    await test.step('Accounts Executive — Stage 8 complete Step 11: the balance was cleared before shipment (manage_payments)', async () => {
       await login(page, 'accountsExecutive');
       await page.goto(`/orders/${orderId}`);
-      await openStage(page, 8);
-      const recordForm = page.locator(`form[action="/orders/${orderId}/payment/balance"]`);
-      await recordForm.locator('input[name="balance_exchange_rate"]').fill('91');
-      await recordForm.locator('input[name="balance_bank_reference"]').fill('E2E-UTR-BALANCE-0001');
-      await recordForm.getByRole('button', { name: 'Record Balance Remittance' }).click();
-      await expect(page.locator('.alert')).toBeVisible();
-
-      await openStage(page, 8);
-      const clearForm = page.locator(`form[action="/orders/${orderId}/payment/balance/clear"]`);
-      await clearForm.getByRole('button', { name: 'Mark Balance Cleared' }).click();
+      // Gap list G-1: the balance was cleared before shipment — Step 11 completes now the CI is approved.
+      await page.goto(`/orders/${orderId}?open=balance-clear#step-balance-clear`);
+      const completeForm = page.locator(`form[action="/orders/${orderId}/payment/balance/clear"]`);
+      await Promise.all([page.waitForEvent('load'), completeForm.getByRole('button', { name: 'Complete Step 11 (unlocks Stage 9)' }).click()]);
       await expect(page.locator('.alert')).toContainText('unlocked');
     });
 

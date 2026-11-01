@@ -236,6 +236,12 @@ final class AuditLogCoverageTest extends DbTestCase
         }
         $this->createTestDocument($orderId, 'PL', 'approved');
         $this->createTestDocument($orderId, 'BLI', 'approved');
+        // Gap list G-3: this order has no pre-shipment inspection.
+        foreach (\App\Repositories\OrderComplianceTaskRepository::forOrder($orderId) as $t) {
+            if ($t['task_type_name'] === 'Pre-Shipment Inspection') {
+                \App\Repositories\OrderComplianceTaskRepository::setStatus($orderId, (int) $t['task_type_id'], 'skipped', 'Not applicable — test.', $userId);
+            }
+        }
 
         $_POST = ['bl_number' => 'L23MSCU0001', 'bl_date' => '2026-06-15'];
         ob_start();

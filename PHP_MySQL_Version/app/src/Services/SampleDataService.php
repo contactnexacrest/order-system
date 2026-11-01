@@ -508,9 +508,7 @@ final class SampleDataService
         $order = OrderRepository::find($orderId);
         $advanceAmount = round($fobTotal * ((float) $order['advance_pct']) / 100, 2);
         $balanceAmount = round($fobTotal * ((float) $order['balance_pct']) / 100, 2);
-        $balanceDueDate = $order['balance_trigger_option'] === 'A_BEFORE_SHIPMENT'
-            ? null
-            : date('Y-m-d', strtotime('+' . (int) $order['balance_days'] . ' days'));
+        $balanceDueDate = null; // Gap list G-2: set when the scanned BL is sent (BalanceDueService)
 
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, $advanceAmount, date('Y-m-d'));
         OrderPaymentStatusRepository::markAdvanceCleared($orderId, date('Y-m-d'), $userId);
@@ -647,9 +645,7 @@ final class SampleDataService
         $order = OrderRepository::find($orderId);
         $advanceAmount = round($fobTotal * ((float) $order['advance_pct']) / 100, 2);
         $balanceAmount = round($fobTotal * ((float) $order['balance_pct']) / 100, 2);
-        $balanceDueDate = $order['balance_trigger_option'] === 'A_BEFORE_SHIPMENT'
-            ? null
-            : date('Y-m-d', strtotime('+' . (int) $order['balance_days'] . ' days'));
+        $balanceDueDate = null; // Gap list G-2: set when the scanned BL is sent (BalanceDueService)
         OrderPaymentStatusRepository::recordAdvanceReceived($orderId, $advanceAmount, date('Y-m-d'));
         OrderPaymentStatusRepository::markAdvanceCleared($orderId, date('Y-m-d'), $userId);
         OrderPaymentStatusRepository::setBalanceAmount($orderId, $balanceAmount, $balanceDueDate);
@@ -934,6 +930,7 @@ final class SampleDataService
         OrderShippingRepository::recordBlOriginalsReceived($orderId, 3);
         OrderShippingRepository::recordBlEndorsed($orderId, $userId);
         OrderShippingRepository::recordScannedBlSent($orderId);
+        \App\Services\BalanceDueService::startFromScannedBl($orderId, date('Y-m-d'));
         OrderShippingRepository::recordCourierSent($orderId, 'SAMPLE-COURIER-TRACK-0001');
         StageGateService::passAndUnlockNext($orderId, 9, $userId);
         OrderRepository::markComplete($orderId);

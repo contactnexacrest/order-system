@@ -51,6 +51,30 @@ async function notifyMdAndAdmin(userIds, type, message, relatedOrderId = null) {
   return count;
 }
 
+/**
+ * Gap list G-4 (owner, 1 Nov 2026): a reminder that goes out once per
+ * person, order and date (not once a day) — sent again only if the date
+ * itself changes (e.g. after an LC amendment).
+ */
+async function notifyOnce(userIds, type, message, relatedOrderId) {
+  let count = 0;
+  for (const userId of [...new Set(userIds)]) {
+    const seen = await db.queryOne('SELECT 1 AS x FROM notifications WHERE user_id = :u AND type = :t AND related_order_id = :o AND message = :m LIMIT 1',
+      { u: userId, t: type, o: relatedOrderId, m: message });
+    if (seen) {
+      continue;
+    }
+    await notificationRepository.create(userId, null, type, relatedOrderId, message);
+    count++;
+  }
+  return count;
+}
+
+/** The order's assignees. */
+async function orderAssignees(orderId) {
+  return (await require('../repositories/orderAssigneeRepository').forOrder(orderId)).map((a) => Number(a.user_id));
+}
+
 async function run() {
   // 90-item backlog "timezone": todayIst(), not new Date().toISOString()
   // (always UTC) — this "today" drives every escalation threshold and
@@ -125,6 +149,55 @@ async function run() {
     const dueDate = due.toISOString().slice(0, 10);
     if (dueDate < todayStr) {
       created += await notifyMdAndAdmin(mdAndAdminIds, 'fdn_overdue', `Freight payment overdue on order ${row.order_reference} — FDN issued ${row.generated_at}, still not cleared.`, row.order_id);
+    }
+  }
+
+  // --- Balance payment overdue (gap list G-2, owner 1 Nov 2026) ---
+  // Same daily pattern as the freight alert above, to Admin/MD and the
+  // order's assignees, from the day after the balance due date.
+  const overdueBalances = await db.query(
+    `SELECT o.id AS order_id, o.order_reference, ps.balance_due_date
+     FROM order_payment_status ps
+     JOIN orders o ON o.id = ps.order_id
+     WHERE ps.balance_due_date IS NOT NULL
+       AND ps.balance_due_date < CURDATE()
+       AND ps.balance_cleared_at IS NULL
+       AND o.is_locked = 0
+       AND o.status NOT IN ('cancelled', 'lost')`
+  );
+  for (const row of overdueBalances) {
+    const targets = [...new Set([...mdAndAdminIds.map(Number), ...(await orderAssignees(row.order_id))])];
+    created += await notifyMdAndAdmin(targets, 'balance_overdue',
+      `Balance payment overdue on order ${row.order_reference} — was due ${String(row.balance_due_date).slice(0, 10)}, still not cleared.`, row.order_id);
+  }
+
+  // --- Letter of Credit dates (gap list G-4, owner 1 Nov 2026) ---
+  // Once each, 7 days before the LC's last shipment date, deadline to
+  // present documents and expiry, to Admin/MD and the order's assignees,
+  // while the bank has not yet paid under the LC.
+  const lcRows = await db.query(
+    `SELECT o.id AS order_id, o.order_reference, lc.lc_number, lc.lc_last_shipment_date, lc.lc_presentation_deadline, lc.lc_expiry_date
+     FROM order_lc_details lc
+     JOIN orders o ON o.id = lc.order_id
+     WHERE o.payment_method = 'LC'
+       AND o.is_locked = 0
+       AND o.status NOT IN ('cancelled', 'lost')
+       AND lc.lc_received_at IS NULL`
+  );
+  const lcDates = [['lc_last_shipment_date', 'lc_last_shipment_soon', 'last shipment date'], ['lc_presentation_deadline', 'lc_presentation_soon', 'deadline to present the documents'], ['lc_expiry_date', 'lc_expiry_soon', 'expiry date']];
+  for (const row of lcRows) {
+    for (const [col, type, label] of lcDates) {
+      if (!row[col]) {
+        continue;
+      }
+      const date = String(row[col]).slice(0, 10);
+      const daysLeft = daysUntil(date, today);
+      if (daysLeft < 0 || daysLeft > 7) {
+        continue;
+      }
+      const lc = row.lc_number ? `LC ${row.lc_number}` : 'the LC';
+      created += await notifyOnce([...mdAndAdminIds.map(Number), ...(await orderAssignees(row.order_id))], type,
+        `Order ${row.order_reference}: ${lc} — ${label} is ${date} (${daysLeft} day(s) away).`, row.order_id);
     }
   }
 

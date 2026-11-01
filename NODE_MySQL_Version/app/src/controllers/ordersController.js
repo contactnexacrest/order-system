@@ -97,6 +97,7 @@ const clientPortalService = require('../services/clientPortalService');
 const fileUploadService = require('../services/fileUploadService');
 const testModeService = require('../services/testModeService');
 const wetSignatureGuardService = require('../services/wetSignatureGuardService');
+const partPaymentService = require('../services/partPaymentService');
 const { todayIst } = require('../helpers/dbDateTime');
 const dates = require('../helpers/dates');
 
@@ -1204,6 +1205,9 @@ async function show(req, res) {
       productCategories: await require('../repositories/productCategoryRepository').all(),
       // Owner decision D-215 (5a): the order's own payment schedule (advance, milestones, balance).
       paymentSchedule: await require('./paymentMilestoneController').scheduleView(orderId, order),
+      // Gap list G-5 (owner, 1 Nov 2026): each leg's receipts, what is still owed, and an approved shortfall.
+      partPayments: await partPaymentService.pageData(orderId, await require('../repositories/paymentMilestoneRepository').forOrder(orderId)),
+      canApproveShort: !!(req.permissions && req.permissions.approve_short_payment),
       // Owner decision D-214, phase 4: one owner per department; a department's manager picks theirs.
       departmentOwners: await departmentOwnersFor(req, orderId),
       purchaseStatuses: purchasingRepository.STATUSES,
@@ -1283,6 +1287,20 @@ async function show(req, res) {
       complianceNaReason: orderComplianceTaskRepository.NOT_APPLICABLE_REASON,
       schemeNotEligibleReason: orderExportBenefitSchemeRepository.NOT_ELIGIBLE_REASON,
       pendingInspectionTask,
+      // Gap list G-1 / G-3 (owner, 1 Nov 2026): what the Bill of Lading waits for, and who may release it.
+      ...(await (async () => {
+        const sg = require('../services/shipmentGateService');
+        const blockers = await sg.blockers(orderId);
+        return {
+          shipmentGateBlockers: Object.values(blockers),
+          shipmentGateOverrides: (await sg.overrides(orderId)).map((o) => ({ ...o, gates_label: sg.gatesLabel(o.gates) })),
+          canOverrideShipmentGates: !!req.permissions.override_shipment_gates,
+          inspection: await sg.inspection(orderId),
+          inspectionApplies: await sg.inspectionApplies(orderId),
+          preShipmentBalance: sg.isPreShipmentBalance(order),
+          balanceOpenEarly: await sg.balanceOpenEarly(orderId),
+        };
+      })()),
       exportBenefitEligibility: exportBenefitSchemesForOrder,
       benefitSettlement: await benefitSettlementService.state(orderId),
       exportBenefitEligibilityStatuses: orderExportBenefitSchemeRepository.STATUSES,
@@ -1343,6 +1361,10 @@ async function show(req, res) {
       // above — Step 5d/5e (LC payment leg) needs this for anyone viewing
       // the order page, not just Order Financials staff.
       orderLcDetails: await orderLcDetailRepository.find(orderId),
+      // Gap list G-4 (owner, 1 Nov 2026): the LC's amendments, the date warnings; G-2: after-BL balance wording.
+      orderLcAmendments: await require('../repositories/orderLcAmendmentRepository').forOrder(orderId),
+      lcWarnings: orderLcDetailRepository.dateWarnings(await orderLcDetailRepository.find(orderId)),
+      balanceDueAfterBl: require('../services/balanceDueService').dueAfterBl(order),
       orderTravelExpenses: req.permissions.manage_order_financials ? await orderTravelExpenseRepository.find(orderId) : null,
       profitability: req.permissions.manage_order_financials ? await orderProfitabilityService.computeForOrder(orderId) : null,
       // Owner decision 2026-10-31 (GST under LUT): shown for information only — the cost keeps its GST.
@@ -1875,6 +1897,11 @@ async function recordAdvancePayment(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const amount = parseFloat(req.body.advance_amount || 0);
   const receivedAt = str(req.body.advance_received_at) || todayYmd();
+  if (((await orderPaymentStatusRepository.find(orderId)) || {}).advance_cleared_at) {
+    flash.set(req, 'error', partPaymentService.clearedMessage('advance'));
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   if (!(amount > 0)) {
     flash.set(req, 'error', 'Enter the advance amount actually received.');
     res.redirect(`/orders/${orderId}`);
@@ -1906,12 +1933,14 @@ async function recordAdvancePayment(req, res) {
   const advanceDue = Math.round(fobTotal * advancePctNum) / 100;
   const currency = (orderForAdvance && orderForAdvance.currency_code) || '';
   const money = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (fobTotal > 0 && amount > fobTotal + 0.005) {
+  const advanceSoFar = await partPaymentService.receivedTotal(orderId, 'advance');
+  if (fobTotal > 0 && advanceSoFar + amount > fobTotal + 0.005) {
     flash.set(req, 'error', `${currency} ${money(amount)} is more than the whole order value (${currency} ${money(fobTotal)}). Check the amount the bank received.`);
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (advanceDue > 0 && Math.abs(amount - advanceDue) > Math.max(1, advanceDue * 0.01) && !req.body.confirm_amount_differs) {
+  // Gap list G-5: a further receipt of a part-paid advance needs no confirming tick.
+  if (advanceSoFar <= 0 && advanceDue > 0 && Math.abs(amount - advanceDue) > Math.max(1, advanceDue * 0.01) && !req.body.confirm_amount_differs) {
     const pctLabel = advancePctNum.toFixed(2).replace(/\.?0+$/, '');
     flash.set(req, 'error', `The advance due on this order is ${currency} ${money(advanceDue)} (${pctLabel}% of ${currency} ${money(fobTotal)}). You entered ${currency} ${money(amount)} — if that really is what the bank received, tick "The amount received differs from the advance due" and save again.`);
     res.redirect(`/orders/${orderId}`);
@@ -1999,18 +2028,25 @@ async function clearAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
+  const partCheck = await partPaymentService.clearCheck(orderId, 'advance', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason);
+  if (partCheck.error) {
+    flash.set(req, 'error', partCheck.error);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const clearedAt = str(req.body.advance_cleared_at) || todayYmd();
 
   const fobTotal = await orderProductRepository.totalFobValue(orderId);
   const order = await orderRepository.find(orderId);
   // D-215 (5a, owner confirmed twice): the balance leg leaves out the order's payment milestones.
   const balanceAmount = orderPaymentStatusRepository.balanceDue(fobTotal, order.advance_pct, existingPayment, await require('../repositories/paymentMilestoneRepository').plannedTotal(orderId, fobTotal));
-  const balanceDueDate =
-    order.balance_trigger_option === 'A_BEFORE_SHIPMENT'
-      ? null // due date is event-triggered (shipment readiness), not a fixed date, for this preset
-      : addDaysYmd(todayYmd(), parseInt(order.balance_days, 10));
+  // Gap list G-2 (owner, 1 Nov 2026): before shipment, the balance is due on shipment readiness (no fixed date);
+  // against the BL, it gets its due date only when the scanned BL is sent to the buyer (recordScannedBlSent()).
+  const balanceDueDate = null;
 
   await orderPaymentStatusRepository.markAdvanceCleared(orderId, clearedAt, user.id);
+  const shortNote = partCheck.short ? ` ${await partPaymentService.recordShortfall(orderId, 'advance', null, partCheck.short, user)}` : '';
   await orderPaymentStatusRepository.setBalanceAmount(orderId, balanceAmount, balanceDueDate);
   // External QA report L-23: advance payment clearing was never audit-logged.
   await auditLogRepository.log(user.id, 'ADVANCE_PAYMENT_CLEARED', 'order_payment_status', orderId, 'advance_cleared_at', null, clearedAt);
@@ -2021,7 +2057,7 @@ async function clearAdvancePayment(req, res) {
   // login from an earlier order.
   const provisionStatus = await clientPortalService.provisionIfNeeded(order.client_id, orderId);
 
-  const baseMessage = 'Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.';
+  const baseMessage = `Advance payment cleared. Stage 4 unlocked — you can now generate the Order Confirmation.${shortNote}`;
   if (provisionStatus === 'provisioned') {
     flash.set(req, 'success', `${baseMessage} The client has been emailed their portal login.`);
   } else if (provisionStatus === 'no_email_on_file') {
@@ -2100,6 +2136,114 @@ async function recordLcDetails(req, res) {
 }
 
 /**
+ * Gap list G-4 (owner, 1 Nov 2026): the Letter of Credit's dates — issue,
+ * expiry, last shipment and the deadline to present the documents. The bank
+ * can refuse to pay if one is missed, so each is reminded 7 days before
+ * (jobs/checkAlerts.js).
+ */
+async function saveLcDates(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const back = `/orders/${orderId}#step-5-lc-bank-loan`;
+  if (order.payment_method !== 'LC') {
+    flash.set(req, 'error', 'This order is not paid by Letter of Credit.');
+    res.redirect(back);
+    return;
+  }
+  const isDate = (v) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+    if (!m) return false;
+    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
+  };
+  const fields = ['lc_issue_date', 'lc_expiry_date', 'lc_last_shipment_date', 'lc_presentation_deadline'];
+  const dts = {};
+  for (const f of fields) {
+    const v = str(req.body[f]);
+    if (v !== '' && !isDate(v)) {
+      flash.set(req, 'error', 'Enter each LC date as a date, or leave it empty.');
+      res.redirect(back);
+      return;
+    }
+    dts[f] = v !== '' ? v : null;
+  }
+  let error = null;
+  if (dts.lc_issue_date !== null && dts.lc_issue_date > todayYmd()) {
+    error = 'The LC issue date cannot be in the future.';
+  } else if (dts.lc_expiry_date !== null && dts.lc_last_shipment_date !== null && dts.lc_last_shipment_date > dts.lc_expiry_date) {
+    error = 'The last shipment date cannot be after the LC expiry date.';
+  } else if (dts.lc_expiry_date !== null && dts.lc_presentation_deadline !== null && dts.lc_presentation_deadline > dts.lc_expiry_date) {
+    error = 'The deadline to present documents cannot be after the LC expiry date.';
+  } else if (dts.lc_issue_date !== null && [dts.lc_expiry_date, dts.lc_last_shipment_date, dts.lc_presentation_deadline].some((d) => d !== null && d <= dts.lc_issue_date)) {
+    error = `The expiry, last shipment and presentation dates must be after the LC issue date (${dates.short(dts.lc_issue_date)}).`;
+  }
+  if (error !== null) {
+    flash.set(req, 'error', error);
+    res.redirect(back);
+    return;
+  }
+  const before = (await orderLcDetailRepository.find(orderId)) || {};
+  await orderLcDetailRepository.saveDates(orderId, dts.lc_issue_date, dts.lc_expiry_date, dts.lc_last_shipment_date, dts.lc_presentation_deadline, req.user.id);
+  for (const f of fields) {
+    const old = before[f] ? String(before[f]).slice(0, 10) : null;
+    if (old !== dts[f]) {
+      await auditLogRepository.log(req.user.id, 'LC_DATE_SAVED', 'order_lc_details', orderId, f, old, dts[f]);
+    }
+  }
+  flash.set(req, 'success', 'LC dates saved. Reminders go out 7 days before the last shipment date, the deadline to present documents and the expiry.');
+  res.redirect(back);
+}
+
+/** Gap list G-4 (owner, 1 Nov 2026): an amendment to the order's Letter of Credit, with an optional copy. */
+async function addLcAmendment(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const back = `/orders/${orderId}#step-5-lc-bank-loan`;
+  const date = str(req.body.amended_on);
+  const reference = str(req.body.reference);
+  const change = str(req.body.change_text);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const validDate = m && (() => { const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])); return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3]; })();
+  let error = null;
+  if (order.payment_method !== 'LC') {
+    error = 'This order is not paid by Letter of Credit.';
+  } else if (!validDate || date > todayYmd()) {
+    error = 'Enter the date of the amendment (today or earlier).';
+  } else if (reference === '' || [...reference].length > 100) {
+    error = 'Enter the amendment number or reference (up to 100 characters).';
+  } else if ([...change].length < 5 || [...change].length > 500) {
+    error = 'Say what the amendment changed (5 to 500 characters).';
+  }
+  if (error !== null) {
+    flash.set(req, 'error', error);
+    res.redirect(back);
+    return;
+  }
+  let fileId = null;
+  if (req.file && req.file.buffer) {
+    try {
+      fileId = await fileUploadService.handleUpload(req, 'amendment_file', 'order_lc_amendment', orderStorage.folder(order, 'lc'), null, orderId, req.user.id, null, null, `LC amendment ${reference}`);
+    } catch (e) {
+      flash.set(req, 'error', `The amendment was not saved — the copy could not be uploaded: ${flash.describeException(e, 'upload failed — check the server error log.')}`);
+      res.redirect(back);
+      return;
+    }
+  }
+  const id = await require('../repositories/orderLcAmendmentRepository').add(orderId, date, reference, change, fileId, req.user.id);
+  await auditLogRepository.log(req.user.id, 'LC_AMENDMENT_RECORDED', 'order_lc_amendments', id, 'reference', null, reference, change);
+  flash.set(req, 'success', `LC amendment ${reference} recorded. If it changed a date, update the LC dates too.`);
+  res.redirect(back);
+}
+
+/**
  * Step 5 LC leg's equivalent of clearAdvancePayment() — the real Stage
  * 2->3 gate when this order's payment_method is LC. Mirrors
  * clearAdvancePayment() exactly (same stage check, same balance
@@ -2132,10 +2276,8 @@ async function confirmLcUsable(req, res) {
   const fobTotal = await orderProductRepository.totalFobValue(orderId);
   const order = await orderRepository.find(orderId);
   const balanceAmount = Math.round(fobTotal * (parseFloat(order.balance_pct) / 100) * 100) / 100;
-  const balanceDueDate =
-    order.balance_trigger_option === 'A_BEFORE_SHIPMENT'
-      ? null
-      : addDaysYmd(todayYmd(), parseInt(order.balance_days, 10));
+  // Gap list G-2 (owner, 1 Nov 2026): an LC balance gets its due date when the scanned BL is sent to the buyer.
+  const balanceDueDate = null;
 
   await orderLcDetailRepository.confirmUsable(orderId, user.id);
   await orderPaymentStatusRepository.setBalanceAmount(orderId, balanceAmount, balanceDueDate);
@@ -2219,6 +2361,48 @@ async function updateProductionStatus(req, res) {
  * mandatory note (the reply itself, quoted, is normal practice here) is
  * this feature's substitute for that missing evidence.
  */
+/**
+ * Gap list G-6 (owner, 1 Nov 2026): with e-mail sending off, staff send the
+ * Order Confirmation themselves — the buyer's 48 hours start when staff mark
+ * it as sent, not when it is approved.
+ */
+async function markOcSentToBuyer(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  if (!(await stageGateService.isUnlocked(orderId, 4))) {
+    flash.set(req, 'error', 'Stage 4 has not been unlocked for this order yet — complete Stage 3 first.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const emailDispatchService = require('../services/emailDispatchService');
+  if (await emailDispatchService.mailSendingEnabled()) {
+    flash.set(req, 'error', 'E-mail sending is on: the buyer\'s 48 hours start when the Order Confirmation is e-mailed.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const stageDocsBlockedBy = await documentGenerationService.stageDocumentBlockedBy(orderId, 4);
+  if (stageDocsBlockedBy.length) {
+    flash.set(req, 'error', await documentGenerationService.stageDocumentBlockedMessage(stageDocsBlockedBy));
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const oc = await documentRepository.findLatestForOrderAndTypeCode(orderId, 'OC');
+  let ack = await orderOcAcknowledgmentRepository.find(orderId);
+  if (!oc) {
+    flash.set(req, 'error', 'Generate the Order Confirmation for this order first.');
+  } else if (ack && ack.acknowledged_at !== null) {
+    flash.set(req, 'error', 'This order\'s Order Confirmation has already been acknowledged.');
+  } else if (ack && Number(ack.document_id) === Number(oc.id)) {
+    flash.set(req, 'error', 'This Order Confirmation is already marked as sent to the buyer.');
+  } else {
+    await emailDispatchService.startOcAcknowledgmentClock((await documentRepository.find(oc.id)) || oc);
+    ack = await orderOcAcknowledgmentRepository.find(orderId);
+    await auditLogRepository.log(user.id, 'OC_MARKED_SENT_TO_BUYER', 'orders', orderId, 'oc_sent_at', null, String(ack.sent_at));
+    flash.set(req, 'success', `Order Confirmation marked as sent to the buyer. If the buyer does not respond by ${dates.human(String(ack.due_at))}, it auto-confirms and Step 7 (Supplier PO) unlocks.`);
+  }
+  res.redirect(`/orders/${orderId}`);
+}
+
 async function recordOcAcknowledgment(req, res) {
   const orderId = parseInt(req.params.id, 10);
   if (!(await stageGateService.isUnlocked(orderId, 4))) {
@@ -2776,6 +2960,11 @@ async function recordFreightPayment(req, res) {
   }
   const amount = parseFloat(req.body.freight_amount || 0);
   const receivedAt = str(req.body.freight_received_at) || todayYmd();
+  if (((await orderPaymentStatusRepository.find(orderId)) || {}).freight_cleared_at) {
+    flash.set(req, 'error', partPaymentService.clearedMessage('freight'));
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   if (!(amount > 0)) {
     flash.set(req, 'error', 'Enter the freight & insurance amount actually received.');
     res.redirect(`/orders/${orderId}`);
@@ -2829,10 +3018,18 @@ async function clearFreightPayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
+  const partCheck = await partPaymentService.clearCheck(orderId, 'freight', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason);
+  if (partCheck.error) {
+    flash.set(req, 'error', partCheck.error);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const clearedAt = str(req.body.freight_cleared_at) || todayYmd();
   await orderPaymentStatusRepository.markFreightCleared(orderId, clearedAt, user.id);
+  const shortNote = partCheck.short ? ` ${await partPaymentService.recordShortfall(orderId, 'freight', null, partCheck.short, user)}` : '';
   await stageGateService.passAndUnlockNext(orderId, 6, user.id);
-  flash.set(req, 'success', 'Freight payment cleared. Stage 7 (Packing & BL Instruction) unlocked.');
+  flash.set(req, 'success', `Freight payment cleared. Stage 7 (Packing & BL Instruction) unlocked.${shortNote}`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -3120,6 +3317,35 @@ async function recordBlIssued(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Gap list G-1 / G-3 (owner, 1 Nov 2026): a "before shipment" balance and a pre-shipment
+  // inspection come first; a manager can release the step with a written reason.
+  const shipmentGateService = require('../services/shipmentGateService');
+  const gateBlockers = await shipmentGateService.blockers(orderId);
+  let gateRelease = null;
+  if (Object.keys(gateBlockers).length) {
+    const reason = str(req.body.gate_override_reason);
+    const canOverride = !!(req.permissions && req.permissions.override_shipment_gates);
+    if (reason === '') {
+      flash.set(req, 'error', Object.values(gateBlockers).join(' ') + (canOverride ? ' Or release the step with a written reason.' : ' A manager can release the step with a written reason.'));
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    if (!canOverride) {
+      flash.set(req, 'error', 'Only a manager with "Override shipment gates" can release the Bill of Lading step.');
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    if ([...reason].length < 10 || [...reason].length > 500) {
+      flash.set(req, 'error', 'Give the reason for releasing the Bill of Lading step (10 to 500 characters).');
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    gateRelease = [Object.keys(gateBlockers), reason];
+  }
+  if (gateRelease) {
+    await shipmentGateService.recordOverride(orderId, gateRelease[0], gateRelease[1], user.id);
+    await auditLogRepository.log(user.id, 'SHIPMENT_GATE_OVERRIDDEN', 'orders', orderId, 'gates', null, gateRelease[0].join(','), gateRelease[1]);
+  }
   await orderShippingRepository.recordBl(orderId, blNumber, blDate);
   // External QA report L-23: BL issuance was never audit-logged.
   await auditLogRepository.log(user.id, 'BL_ISSUED', 'orders', orderId, 'bl_number', null, blNumber);
@@ -3150,6 +3376,61 @@ async function recordBlIssued(req, res) {
   await stageGateService.passAndUnlockNext(orderId, 7, user.id);
   flash.set(req, 'success', `Bill of Lading recorded (${blNumber}). Stage 8 (Commercial Invoice) unlocked.`);
   res.redirect(`/orders/${orderId}`);
+}
+
+/**
+ * Gap list G-3 (owner, 1 Nov 2026): the third-party pre-shipment
+ * inspection's result — Passed or Failed, with its date, agency and report.
+ */
+async function recordInspectionResult(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const user = req.user;
+  const shipmentGateService = require('../services/shipmentGateService');
+  const order = await orderRepository.find(orderId);
+  const back = `/orders/${orderId}#step-8a-inspection`;
+  if (!order || order.status !== 'active') {
+    flash.set(req, 'error', 'The inspection can be recorded only on an active order.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (!(await shipmentGateService.inspectionApplies(orderId))) {
+    flash.set(req, 'error', 'This order has no pre-shipment inspection on its compliance checklist (it is marked not applicable).');
+    res.redirect(back);
+    return;
+  }
+  const result = String(req.body.inspection_result || '');
+  const date = str(req.body.inspected_on);
+  const agency = str(req.body.agency_name);
+  const note = str(req.body.inspection_note);
+  const len = (v) => [...v].length;
+  let error = null;
+  if (!['passed', 'failed'].includes(result)) error = 'Choose whether the inspection passed or failed.';
+  else if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || date > todayYmd()) error = 'Enter the date of the inspection (today or earlier).';
+  else if (len(agency) < 2 || len(agency) > 150) error = 'Enter the inspection agency (2 to 150 characters).';
+  else if (result === 'failed' && len(note) < 10) error = 'Say what failed (at least 10 characters).';
+  else if (note !== '' && len(note) < 10) error = 'Write the note in at least 10 characters, or leave it empty.';
+  else if (len(note) > 500) error = 'The note is too long (up to 500 characters).';
+  else if (!req.file) error = 'Attach the inspection report (PDF or image).';
+  if (error) {
+    flash.set(req, 'error', error);
+    res.redirect(back);
+    return;
+  }
+  let fileId;
+  try {
+    fileId = await fileUploadService.handleUpload(req, 'inspection_report', 'inspection_report', orderStorage.forReceived(order, 'packing_bl'), null, orderId, user.id, null, agency, 'Pre-shipment inspection report');
+  } catch (e) {
+    flash.setErrorFromException(req, e);
+    res.redirect(back);
+    return;
+  }
+  await shipmentGateService.saveInspection(order, result, date, agency, fileId, note !== '' ? note : null, user.id);
+  if (result === 'failed') {
+    flash.set(req, 'warning', 'Inspection recorded as FAILED. The managers were notified; the Bill of Lading waits for a Passed inspection.');
+  } else {
+    flash.set(req, 'success', 'Inspection recorded as Passed.');
+  }
+  res.redirect(back);
 }
 
 /** Lets staff attach the scanned BL copy later, when it wasn't available yet at bl-issued time. */
@@ -3232,29 +3513,39 @@ async function recordScannedBlSent(req, res) {
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
   await auditLogRepository.log(req.user.id, 'ORDER_SCANNED_BL_SENT', 'order_shipping', orderId, null, null, null);
-  flash.set(req, 'success', 'Scanned BL copy marked as sent to buyer.');
+  // Gap list G-2 (owner, 1 Nov 2026): a balance due against the BL (or an LC) is due the order's balance days from today.
+  const dueDate = await require('../services/balanceDueService').startFromScannedBl(orderId, todayYmd());
+  flash.set(req, 'success', 'Scanned BL copy marked as sent to buyer.' + (dueDate !== null ? ` Balance payment due on ${dates.short(dueDate)}.` : ''));
   res.redirect(`/orders/${orderId}`);
 }
 
 async function recordBalancePayment(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  // Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is recorded from the
+  // freight stage on, against the PI — no Commercial Invoice needed yet.
+  const early = await require('../services/shipmentGateService').balanceOpenEarly(orderId);
   // 90-item backlog #53: this action had no stage gate at all (unlike
   // clearBalancePayment just below, which does check Stage 8) and no
   // check that the Commercial Invoice was ever actually generated — the
   // buyer can't be remitting against an invoice they were never sent.
   // Same "generated" bar as confirmSupplierSigned's SUPPO check above.
-  if (!(await stageGateService.isUnlocked(orderId, 8))) {
+  if (!early && !(await stageGateService.isUnlocked(orderId, 8))) {
     flash.set(req, 'error', 'Stage 8 has not been unlocked for this order yet.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (!(await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CI'))) {
+  if (!early && !(await documentRepository.findLatestForOrderAndTypeCode(orderId, 'CI'))) {
     flash.set(req, 'error', 'Generate the Commercial Invoice for this order before recording the balance remittance.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
   const amount = parseFloat(req.body.balance_amount || 0);
   const receivedAt = str(req.body.balance_received_at) || todayYmd();
+  if (((await orderPaymentStatusRepository.find(orderId)) || {}).balance_cleared_at) {
+    flash.set(req, 'error', partPaymentService.clearedMessage('balance'));
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   if (!(amount > 0)) {
     flash.set(req, 'error', 'Enter the balance amount actually received.');
     res.redirect(`/orders/${orderId}`);
@@ -3294,16 +3585,33 @@ async function recordBalancePayment(req, res) {
 async function clearBalancePayment(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
-  if (!(await stageGateService.isUnlocked(orderId, 8))) {
+  const stage8 = await stageGateService.isUnlocked(orderId, 8);
+  // Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is cleared before the
+  // Bill of Lading; Stage 8 is passed later, once its Commercial Invoice is approved/sent.
+  const early = !stage8 && (await require('../services/shipmentGateService').balanceOpenEarly(orderId));
+  if (!stage8 && !early) {
     flash.set(req, 'error', 'Stage 8 has not been unlocked for this order yet — complete Stage 7 first.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
   // Owner decision (2026-10-25): this stage completes only once its
   // document is approved (email off) / sent (email on).
-  const stageDocsBlockedBy = await documentGenerationService.stageDocumentBlockedBy(orderId, 8);
+  const stageDocsBlockedBy = stage8 ? await documentGenerationService.stageDocumentBlockedBy(orderId, 8) : [];
   if (stageDocsBlockedBy.length) {
     flash.set(req, 'error', await documentGenerationService.stageDocumentBlockedMessage(stageDocsBlockedBy));
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const alreadyCleared = ((await orderPaymentStatusRepository.find(orderId)) || {}).balance_cleared_at || null;
+  if (alreadyCleared !== null) {
+    if (early) {
+      flash.set(req, 'error', 'The balance is already cleared.');
+    } else {
+      const clearedYmd = String(alreadyCleared).slice(0, 10);
+      await stageGateService.passAndUnlockNext(orderId, 8, user.id);
+      await auditLogRepository.log(user.id, 'STAGE_8_COMPLETED_BALANCE_CLEARED_EARLIER', 'orders', orderId, 'balance_cleared_at', null, clearedYmd);
+      flash.set(req, 'success', `Step 11 complete — the balance was cleared before shipment on ${dates.short(clearedYmd)}. Stage 9 (Document Despatch & Closure) unlocked.`);
+    }
     res.redirect(`/orders/${orderId}`);
     return;
   }
@@ -3338,12 +3646,25 @@ async function clearBalancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
+  const partCheck = await partPaymentService.clearCheck(orderId, 'balance', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason);
+  if (partCheck.error) {
+    flash.set(req, 'error', partCheck.error);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const clearedAt = str(req.body.balance_cleared_at) || todayYmd();
   await orderPaymentStatusRepository.markBalanceCleared(orderId, clearedAt, user.id);
+  const shortNote = partCheck.short ? ` ${await partPaymentService.recordShortfall(orderId, 'balance', null, partCheck.short, user)}` : '';
   // External QA report L-23: balance payment clearing was never audit-logged.
   await auditLogRepository.log(user.id, 'BALANCE_PAYMENT_CLEARED', 'order_payment_status', orderId, 'balance_cleared_at', null, clearedAt);
+  if (early) {
+    flash.set(req, 'success', `Balance payment cleared before shipment. The Bill of Lading (Step 10f) can now be recorded; Step 11 completes once the Commercial Invoice is approved.${shortNote}`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await stageGateService.passAndUnlockNext(orderId, 8, user.id);
-  flash.set(req, 'success', 'Balance payment cleared. Stage 9 (Document Despatch & Closure) unlocked.');
+  flash.set(req, 'success', `Balance payment cleared. Stage 9 (Document Despatch & Closure) unlocked.${shortNote}`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -4286,10 +4607,12 @@ async function completeCancellationRefund(req, res) {
 }
 
 module.exports = {
+  markOcSentToBuyer,
+  recordInspectionResult,
   index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, addAssignee, removeAssignee, downloadDossier, generatePiFormLink, generateBuyerActionLink, generatePaymentActionLink,
   editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
   recordBuyerPo, correctBuyerPoReceivedDate, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
-  recordLcDetails, confirmLcUsable, updateProductionStatus,
+  recordLcDetails, confirmLcUsable, saveLcDates, addLcAmendment, updateProductionStatus,
   recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, skipPiForm, confirmSupplierSigned, uploadSupplierPoDocument, generateSupplierActionLink, skipSupplierPoAck, markSupplierAdvancePaid, markSupplierBalancePaid,
   saveFreightTerms, recordFreightPayment, clearFreightPayment,
   savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordShippingBill, recordScannedBlSent,

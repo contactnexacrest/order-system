@@ -152,7 +152,8 @@ describe('Commercial document gate — SUPPO/CI must exist before confirming (90
   });
 
   it('recordBalancePayment refuses without a generated CI document', async () => {
-    const orderId = await createTestOrder(await createTestClient());
+    // Gap list G-1: a "before shipment" balance is paid against the PI; a post-BL one needs the CI.
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Established Buyer — Post-BL');
     await unlockThroughStage8(orderId);
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     const req = fakeReq({ id: String(orderId) }, { balance_amount: '1000' });

@@ -476,9 +476,7 @@ async function advanceSampleOrderToStage5(orderId, userId) {
   const order = await orderRepository.find(orderId);
   const advanceAmount = Math.round(fobTotal * parseFloat(order.advance_pct) / 100 * 100) / 100;
   const balanceAmount = Math.round(fobTotal * parseFloat(order.balance_pct) / 100 * 100) / 100;
-  const balanceDueDate = order.balance_trigger_option === 'A_BEFORE_SHIPMENT'
-    ? null
-    : formatDate(addDays(new Date(), parseInt(order.balance_days, 10)));
+  const balanceDueDate = null; // Gap list G-2: set when the scanned BL is sent (balanceDueService)
 
   await orderPaymentStatusRepository.recordAdvanceReceived(orderId, advanceAmount, formatDate(new Date()));
   await orderPaymentStatusRepository.markAdvanceCleared(orderId, formatDate(new Date()), userId);
@@ -611,9 +609,7 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
   order = await orderRepository.find(orderId);
   const advanceAmount = Math.round(fobTotal * parseFloat(order.advance_pct) / 100 * 100) / 100;
   const balanceAmount = Math.round(fobTotal * parseFloat(order.balance_pct) / 100 * 100) / 100;
-  const balanceDueDate = order.balance_trigger_option === 'A_BEFORE_SHIPMENT'
-    ? null
-    : formatDate(addDays(new Date(), parseInt(order.balance_days, 10)));
+  const balanceDueDate = null; // Gap list G-2: set when the scanned BL is sent (balanceDueService)
   await orderPaymentStatusRepository.recordAdvanceReceived(orderId, advanceAmount, formatDate(new Date()));
   await orderPaymentStatusRepository.markAdvanceCleared(orderId, formatDate(new Date()), userId);
   await orderPaymentStatusRepository.setBalanceAmount(orderId, balanceAmount, balanceDueDate);
@@ -889,6 +885,7 @@ async function advanceSampleOrderToStage9(orderId, supplierId, userId) {
   await orderShippingRepository.recordBlOriginalsReceived(orderId, 3);
   await orderShippingRepository.recordBlEndorsed(orderId, userId);
   await orderShippingRepository.recordScannedBlSent(orderId);
+  await require('./balanceDueService').startFromScannedBl(orderId, formatDate(new Date()));
   await orderShippingRepository.recordCourierSent(orderId, 'SAMPLE-COURIER-TRACK-0001');
   await stageGateService.passAndUnlockNext(orderId, 9, userId);
   await orderRepository.markComplete(orderId);

@@ -179,4 +179,39 @@ final class OrderLcDetailRepository
         Database::connection()->prepare('UPDATE order_lc_details SET lc_firc_reference = :ref, lc_firc_received_at = :received_at WHERE order_id = :order_id')
             ->execute(['ref' => $reference, 'received_at' => $receivedAt, 'order_id' => $orderId]);
     }
+
+    /** Gap list G-4 (owner, 1 Nov 2026): the LC's issue, expiry, last shipment and document presentation dates. */
+    public static function saveDates(int $orderId, ?string $issue, ?string $expiry, ?string $lastShipment, ?string $presentation, int $userId): void
+    {
+        Database::connection()->prepare(
+            'INSERT INTO order_lc_details (order_id, lc_issue_date, lc_expiry_date, lc_last_shipment_date, lc_presentation_deadline, recorded_by)
+             VALUES (:o, :i, :e, :l, :p, :u)
+             ON DUPLICATE KEY UPDATE lc_issue_date = VALUES(lc_issue_date), lc_expiry_date = VALUES(lc_expiry_date),
+                lc_last_shipment_date = VALUES(lc_last_shipment_date), lc_presentation_deadline = VALUES(lc_presentation_deadline)'
+        )->execute(['o' => $orderId, 'i' => $issue, 'e' => $expiry, 'l' => $lastShipment, 'p' => $presentation, 'u' => $userId]);
+    }
+
+    /**
+     * The LC dates within 7 days or already past (while the bank has not paid
+     * under the LC), for the order page's warning.
+     * @return list<array{label:string, date:string, days:int}>
+     */
+    public static function dateWarnings(?array $lc, ?string $today = null): array
+    {
+        if ($lc === null || !empty($lc['lc_received_at'])) {
+            return [];
+        }
+        $today ??= date('Y-m-d');
+        $out = [];
+        foreach (['lc_last_shipment_date' => 'Last shipment date', 'lc_presentation_deadline' => 'Deadline to present documents', 'lc_expiry_date' => 'LC expiry'] as $col => $label) {
+            if (empty($lc[$col])) {
+                continue;
+            }
+            $days = (int) round((strtotime((string) $lc[$col]) - strtotime($today)) / 86400);
+            if ($days <= 7) {
+                $out[] = ['label' => $label, 'date' => (string) $lc[$col], 'days' => $days];
+            }
+        }
+        return $out;
+    }
 }

@@ -152,6 +152,11 @@ function computeStepFlow(rawStepStates, rawSubStepDone, procurement = null) {
     subStepStatus(step, sub) {
       const parent = stepStates[step];
       const done = subStepDone[step] ? subStepDone[step][sub] : undefined;
+      // Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is recorded (11c) and cleared (11d) before Step 11 is reached.
+      if (procurement && procurement.balanceOpenEarly && step === 's11' && (sub === '11c' || sub === '11d') && parent !== 'done') {
+        if (done) return 'done';
+        return sub === '11c' || (subStepDone.s11 && subStepDone.s11['11c']) ? 'current' : 'locked';
+      }
       if (HONEST_SUB_STEPS.has(sub) && parent === 'done' && done !== null && done !== undefined) {
         return done ? 'done' : 'current';
       }

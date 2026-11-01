@@ -377,7 +377,7 @@ final class EmailDispatchService
         return $sent;
     }
 
-    private static function startOcAcknowledgmentClock(array $document): void
+    public static function startOcAcknowledgmentClock(array $document): void
     {
         if ($document['document_type_code'] === 'OC' && $document['order_id'] !== null) {
             $now = new \DateTimeImmutable();
@@ -417,7 +417,8 @@ final class EmailDispatchService
             return;
         }
         DocumentRepository::markSent($documentId);
-        self::startOcAcknowledgmentClock($document);
+        // Gap list G-6 (owner, 1 Nov 2026): with e-mail off, the buyer's 48 hours start when staff
+        // mark the Order Confirmation as sent to the buyer (OrderController::markOcSentToBuyer), not now.
         AuditLogRepository::log(
             null, 'DOCUMENT_MARKED_SENT_MAIL_DISABLED', 'documents', $documentId, 'status', 'approved', 'sent',
             'mail_sending_enabled is off — counted as sent on approval; staff send the PDF outside the app.'

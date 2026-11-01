@@ -89,7 +89,7 @@ final class EmailOffAutoSentTest extends DbTestCase
         self::assertSame('approved', DocumentRepository::find($documentId)['status'], 'a Supplier PO is never sent to the buyer');
     }
 
-    public function testOrderConfirmationMarkedSentStartsTheAcknowledgmentClock(): void
+    public function testOrderConfirmationMarkedSentOnApprovalDoesNotStartTheClockYet(): void
     {
         CompanySettingsRepository::set('mail_sending_enabled', '0', null);
         $orderId = $this->createTestOrder($this->createTestClient());
@@ -98,9 +98,9 @@ final class EmailOffAutoSentTest extends DbTestCase
         EmailDispatchService::markSentIfMailDisabled($documentId);
 
         self::assertSame('sent', DocumentRepository::find($documentId)['status']);
-        $ack = OrderOcAcknowledgmentRepository::find($orderId);
-        self::assertNotNull($ack, 'the 48-hour acknowledgment clock must start exactly as a real OC send would');
-        self::assertSame($documentId, (int) $ack['document_id']);
+        // Gap list G-6 (owner, 1 Nov 2026): with e-mail off, the 48 hours start when staff mark
+        // the Order Confirmation sent to the buyer (GapShipmentGatesTest), not on approval.
+        self::assertNull(OrderOcAcknowledgmentRepository::find($orderId), 'approval alone does not start the 48-hour clock');
     }
 
     public function testSendFallsBackToTheLiveClientEmailWhenTheOrderSnapshotHasNone(): void

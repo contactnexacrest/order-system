@@ -120,7 +120,7 @@ describe('Email sending off: approved documents count as sent', () => {
     expect((await documentRepository.find(documentId)).status).toBe('approved');
   });
 
-  it('starts the OC acknowledgment clock when an Order Confirmation is marked sent', async () => {
+  it('does not start the OC acknowledgment clock yet when an Order Confirmation is marked sent on approval', async () => {
     await companySettingsRepository.set('mail_sending_enabled', '0');
     const orderId = await createTestOrder(await createTestClient());
     const documentId = await createTestDocument(orderId, 'OC', 'approved');
@@ -128,9 +128,9 @@ describe('Email sending off: approved documents count as sent', () => {
     await emailDispatchService.markSentIfMailDisabled(documentId);
 
     expect((await documentRepository.find(documentId)).status).toBe('sent');
-    const ack = await orderOcAcknowledgmentRepository.find(orderId);
-    expect(ack).not.toBeNull();
-    expect(Number(ack.document_id)).toBe(documentId);
+    // Gap list G-6 (owner, 1 Nov 2026): with e-mail off, the 48 hours start when staff mark
+    // the Order Confirmation sent to the buyer (gapShipmentGates.test.js), not on approval.
+    expect(await orderOcAcknowledgmentRepository.find(orderId)).toBeNull();
   });
 
   it('falls back to the live client email when the order snapshot has none', async () => {

@@ -4875,3 +4875,90 @@ CREATE TABLE IF NOT EXISTS associate_codes (
 ) ENGINE=InnoDB;
 INSERT INTO associate_codes (code, associate_id)
 SELECT a.personal_code, a.id FROM associates a WHERE a.personal_code IS NOT NULL AND NOT EXISTS (SELECT 1 FROM associate_codes c WHERE c.code = a.personal_code);
+
+-- Gap list answers 1 Nov 2026 (D-218, G-4): LC dates and LC amendments — docs/migrations/2026-11-02c-gap-due-dates-lc.sql
+-- ---------------------------------------------------------------- G-4: LC dates
+SET @c := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'order_lc_details' AND COLUMN_NAME = 'lc_expiry_date');
+SET @s := IF(@c = 0, 'ALTER TABLE order_lc_details
+  ADD COLUMN lc_issue_date DATE NULL,
+  ADD COLUMN lc_expiry_date DATE NULL,
+  ADD COLUMN lc_last_shipment_date DATE NULL,
+  ADD COLUMN lc_presentation_deadline DATE NULL', 'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ---------------------------------------------------------------- G-4: LC amendments
+CREATE TABLE IF NOT EXISTS order_lc_amendments (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id BIGINT UNSIGNED NOT NULL,
+  amended_on DATE NOT NULL,
+  reference VARCHAR(100) NOT NULL,
+  change_text VARCHAR(500) NOT NULL,
+  file_id BIGINT UNSIGNED NULL,
+  recorded_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_order_lc_amendments_order (order_id, amended_on),
+  CONSTRAINT fk_order_lc_amendments_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_order_lc_amendments_file FOREIGN KEY (file_id) REFERENCES file_store(id),
+  CONSTRAINT fk_order_lc_amendments_user FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+
+-- Gap list G-1 / G-3 (owner, 1 Nov 2026): inspection result, shipment gate overrides — docs/migrations/2026-11-02b-gap-shipment-gates.sql
+CREATE TABLE IF NOT EXISTS order_inspections (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id        BIGINT UNSIGNED NOT NULL UNIQUE,
+  result          ENUM('passed','failed') NOT NULL,
+  inspected_on    DATE NOT NULL,
+  agency_name     VARCHAR(150) NOT NULL,
+  report_file_id  BIGINT UNSIGNED NOT NULL,
+  note            VARCHAR(500) NULL,
+  recorded_by     BIGINT UNSIGNED NULL,
+  recorded_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_order_inspections_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_order_inspections_file FOREIGN KEY (report_file_id) REFERENCES file_store(id),
+  CONSTRAINT fk_order_inspections_user FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS order_shipment_gate_overrides (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id    BIGINT UNSIGNED NOT NULL,
+  gates       VARCHAR(60) NOT NULL,          -- 'balance', 'inspection' or 'balance,inspection'
+  reason      VARCHAR(500) NOT NULL,
+  user_id     BIGINT UNSIGNED NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_shipment_gate_overrides_order (order_id),
+  CONSTRAINT fk_shipment_gate_overrides_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_shipment_gate_overrides_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Gap list G-5 (1 Nov 2026): buyer payment receipts and approved shortfalls (docs/migrations/2026-11-02d-gap-part-payments.sql).
+CREATE TABLE IF NOT EXISTS order_payment_receipts (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id BIGINT UNSIGNED NOT NULL,
+  leg ENUM('advance','freight','balance','milestone') NOT NULL,
+  milestone_id BIGINT UNSIGNED NULL,
+  amount DECIMAL(14,2) NOT NULL,
+  received_on DATE NOT NULL,
+  exchange_rate DECIMAL(12,4) NULL,
+  bank_reference VARCHAR(100) NULL,
+  staff_note VARCHAR(255) NULL,
+  recorded_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_payment_receipts_leg (order_id, leg, milestone_id),
+  CONSTRAINT fk_payment_receipts_order FOREIGN KEY (order_id) REFERENCES orders(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS order_payment_shortfalls (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id BIGINT UNSIGNED NOT NULL,
+  leg ENUM('advance','freight','balance','milestone') NOT NULL,
+  milestone_id BIGINT UNSIGNED NULL,
+  expected_amount DECIMAL(14,2) NOT NULL,
+  received_amount DECIMAL(14,2) NOT NULL,
+  shortfall_amount DECIMAL(14,2) NOT NULL,
+  treatment ENUM('written_off','carried_to_balance') NOT NULL,
+  reason VARCHAR(500) NOT NULL,
+  approved_by BIGINT UNSIGNED NOT NULL,
+  approved_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_payment_shortfalls_leg (order_id, leg, milestone_id),
+  CONSTRAINT fk_payment_shortfalls_order FOREIGN KEY (order_id) REFERENCES orders(id)
+) ENGINE=InnoDB;

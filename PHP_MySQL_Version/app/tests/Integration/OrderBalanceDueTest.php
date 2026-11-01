@@ -61,7 +61,8 @@ final class OrderBalanceDueTest extends DbTestCase
         self::assertNull(OrderPaymentStatusRepository::find($this->orderId)['advance_amount']);
 
         self::assertSame('success', $this->recordAdvance(['advance_amount' => '2985'])['type'], 'within 1% (bank charges) needs no confirmation');
-        self::assertSame('success', $this->recordAdvance(['advance_amount' => '3500', 'confirm_amount_differs' => '1'])['type']);
+        // Gap list G-5 (1 Nov 2026): a further remittance is a second receipt and adds to the advance (no tick needed).
+        self::assertSame('success', $this->recordAdvance(['advance_amount' => '515', 'advance_received_at' => '2026-10-28'])['type']);
         self::assertEqualsWithDelta(3500, (float) OrderPaymentStatusRepository::find($this->orderId)['advance_amount'], 0.001);
     }
 

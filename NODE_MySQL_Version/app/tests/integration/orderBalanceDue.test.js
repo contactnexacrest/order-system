@@ -74,7 +74,8 @@ describe('Balance due after the actual advance (owner report 2026-10-27)', () =>
     expect(refused.type).toBe('error');
     expect(refused.message).toContain('The advance due on this order is USD 3,000.00 (40% of USD 7,500.00)');
     expect((await recordAdvance(orderId, userId, { advance_amount: '2985' })).type).toBe('success');
-    expect((await recordAdvance(orderId, userId, { advance_amount: '3500', confirm_amount_differs: '1' })).type).toBe('success');
+    // Gap list G-5 (1 Nov 2026): a further remittance is a second receipt and adds to the advance (no tick needed).
+    expect((await recordAdvance(orderId, userId, { advance_amount: '515', advance_received_at: '2026-10-28' })).type).toBe('success');
     expect(parseFloat((await orderPaymentStatusRepository.find(orderId)).advance_amount)).toBeCloseTo(3500);
   });
 

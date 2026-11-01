@@ -135,7 +135,8 @@ final class CommercialDocumentGateTest extends DbTestCase
 
     public function testRecordBalancePaymentRefusesWithoutAGeneratedCiDocument(): void
     {
-        $orderId = $this->createTestOrder($this->createTestClient());
+        // Gap list G-1: a "before shipment" balance is paid against the PI; a post-BL one needs the CI.
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Established Buyer — Post-BL');
         $this->unlockThroughStage8($orderId);
         OrderPaymentStatusRepository::initializeForOrder($orderId);
         $_POST = ['balance_amount' => '1000'];

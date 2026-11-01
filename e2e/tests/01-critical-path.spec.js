@@ -526,6 +526,22 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await generateDocument(page, orderId, 'BLI', 'generated');
     await assignSelfAndApprove(page, 'BLI');
 
+    // Gap list G-3: this order has no pre-shipment inspection — the checklist says so before the BL.
+    await page.goto(`/orders/${orderId}`);
+    await resolveComplianceChecklistIfNeeded(page, orderId);
+
+    // Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is recorded and cleared
+    // before the Bill of Lading — against the PI, no Commercial Invoice yet.
+    await page.goto(`/orders/${orderId}?open=balance-record#step-balance-record`);
+    const earlyRecord = page.locator(`form[action="/orders/${orderId}/payment/balance"]`);
+    await earlyRecord.locator('input[name="balance_exchange_rate"]').fill('91');
+    await earlyRecord.locator('input[name="balance_bank_reference"]').fill('E2E-UTR-BALANCE-0001');
+    await Promise.all([page.waitForEvent('load'), earlyRecord.getByRole('button', { name: 'Record Balance Remittance' }).click()]);
+    await expect(page.locator('.alert')).toBeVisible();
+    await page.goto(`/orders/${orderId}?open=balance-clear#step-balance-clear`);
+    await Promise.all([page.waitForEvent('load'), page.locator(`form[action="/orders/${orderId}/payment/balance/clear"]`).getByRole('button', { name: 'Mark Balance Cleared (before shipment)' }).click()]);
+    await expect(page.locator('.alert')).toContainText('Balance payment cleared before shipment');
+
     await openStage(page, 7);
     const blForm = page.locator(`form[action="/orders/${orderId}/bl-issued"]`);
     await blForm.locator('input[name="bl_number"]').fill(`SMOKE-BL-${UNIQUE}`);
@@ -533,7 +549,7 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await expect(page.locator('.alert')).toContainText('unlocked');
   });
 
-  await test.step('Stage 8 — Commercial Invoice & Balance Payment: generate CI, record, clear', async () => {
+  await test.step('Stage 8 — Commercial Invoice: generate CI, complete Step 11 (balance cleared before shipment)', async () => {
     await generateDocument(page, orderId, 'CI', 'generated', { docx: true });
     await assignSelfAndApprove(page, 'CI');
 
@@ -551,16 +567,10 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     // 11b: the scanned BL copy goes to the buyer before the balance comes in.
     await submitStepForm(page, 8, `/orders/${orderId}/scanned-bl-sent`, {}, /Mark Scanned BL Copy Sent/);
 
-    await openStage(page, 8);
-    const recordForm = page.locator(`form[action="/orders/${orderId}/payment/balance"]`);
-    await recordForm.locator('input[name="balance_exchange_rate"]').fill('91');
-    await recordForm.locator('input[name="balance_bank_reference"]').fill('E2E-UTR-BALANCE-0001');
-    await recordForm.getByRole('button', { name: 'Record Balance Remittance' }).click();
-    await expect(page.locator('.alert')).toBeVisible();
-
-    await openStage(page, 8);
-    const clearForm = page.locator(`form[action="/orders/${orderId}/payment/balance/clear"]`);
-    await clearForm.getByRole('button', { name: 'Mark Balance Cleared' }).click();
+    // Gap list G-1: the balance was cleared before shipment — Step 11 completes now the CI is approved.
+    await page.goto(`/orders/${orderId}?open=balance-clear#step-balance-clear`);
+    const completeForm = page.locator(`form[action="/orders/${orderId}/payment/balance/clear"]`);
+    await Promise.all([page.waitForEvent('load'), completeForm.getByRole('button', { name: 'Complete Step 11 (unlocks Stage 9)' }).click()]);
     await expect(page.locator('.alert')).toContainText('unlocked');
   });
 

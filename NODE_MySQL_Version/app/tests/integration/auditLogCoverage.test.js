@@ -221,6 +221,13 @@ describe('Audit log coverage (External QA report L-23)', () => {
     }
     await createTestDocument(orderId, 'PL', 'sent');
     await createTestDocument(orderId, 'BLI', 'sent');
+    // Gap list G-3: this order has no pre-shipment inspection.
+    const orderComplianceTaskRepository = require('../../src/repositories/orderComplianceTaskRepository');
+    for (const t of await orderComplianceTaskRepository.forOrder(orderId)) {
+      if (t.task_type_name === 'Pre-Shipment Inspection') {
+        await orderComplianceTaskRepository.setStatus(orderId, Number(t.task_type_id), 'skipped', 'Not applicable — test.', userId);
+      }
+    }
 
     await ordersController.recordBlIssued(
       fakeReq({ id: userId }, { bl_number: 'L23MSCU0001', bl_date: '2026-06-15' }, { id: String(orderId) }),

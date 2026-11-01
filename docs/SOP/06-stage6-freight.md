@@ -175,3 +175,12 @@ Clearing the freight payment passes Stage 6's gate and unlocks Stage 7:
 This is the same place the FOB path from Chapter 5 also arrives at — from
 here on, FOB and CFR/CIF orders follow an identical process. See
 [Chapter 7](./07-stage7-packing-bl.md) for Packing & BL Instruction.
+
+## Paid in parts or short (gap list G-5, 1 Nov 2026)
+
+If the buyer pays in more than one wire, record each one at Step 9c
+(**Record Another … Receipt**); the card shows each receipt and **Due ·
+received so far · still owed**. A payment cannot be cleared while money is
+still owed, except by a manager with **Approve short payment**, who writes
+the reason; the shortfall is then recorded as written off and shown on the
+order. See chapter 03, "Paid in parts", for the details.
