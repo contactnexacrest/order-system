@@ -274,7 +274,12 @@ describe('Order multi-assignee visibility', () => {
     const orderId = await createTestOrder(clientId, 'FOB', 'Standard — New Buyer', 'USD', null, null, soleAssignee.userId);
     const admin = await createLoginableUser('Admin');
 
-    await orderAssignmentService.removeAssignee(orderId, soleAssignee.userId, admin.userId);
+    // Owner decision 1 Nov 2026 (C-7a): the last assignee cannot be removed. An older order
+    // left with none (before that rule) is still visible only to oversight roles.
+    await expect(orderAssignmentService.removeAssignee(orderId, soleAssignee.userId, admin.userId))
+      .rejects.toThrow('An order always keeps at least one assignee — add the person taking over first, then remove this one.');
+    expect(await orderAssigneeRepository.forOrder(orderId)).toHaveLength(1);
+    await db.execute('DELETE FROM order_assignees WHERE order_id = :o', { o: orderId }); // an older order with none
     expect(await orderAssigneeRepository.forOrder(orderId)).toHaveLength(0);
 
     const removedAgent = await loginAsUser(soleAssignee.email, soleAssignee.password);

@@ -249,6 +249,11 @@ final class OrderMultiAssigneeTest extends DbTestCase
 
     // --- 9. Zero-assignee state ----------------------------------------------
 
+    /**
+     * Owner decision 1 Nov 2026 (C-7a): the last assignee cannot be removed. An older
+     * order left with none (before that rule; the migration gives each its creator)
+     * is still visible only to oversight roles.
+     */
     public function testRemovingEveryAssigneeLeavesTheOrderVisibleOnlyToOversightRoles(): void
     {
         $clientId = $this->createTestClient();
@@ -256,8 +261,14 @@ final class OrderMultiAssigneeTest extends DbTestCase
         $orderId = $this->createTestOrder($clientId, 'FOB', 'Standard — New Buyer', 'USD', null, null, $soleAssigneeId);
         $adminId = $this->createTestUser('Admin');
 
-        OrderAssignmentService::removeAssignee($orderId, $soleAssigneeId, $adminId);
-        self::assertCount(0, OrderAssigneeRepository::forOrder($orderId));
+        try {
+            OrderAssignmentService::removeAssignee($orderId, $soleAssigneeId, $adminId);
+            self::fail('the sole assignee was removed');
+        } catch (\RuntimeException $e) {
+            self::assertSame('An order always keeps at least one assignee — add the person taking over first, then remove this one.', $e->getMessage());
+        }
+        self::assertCount(1, OrderAssigneeRepository::forOrder($orderId));
+        \App\Config\Database::connection()->exec("DELETE FROM order_assignees WHERE order_id = {$orderId}"); // an older order with none
 
         $this->render($orderId, $soleAssigneeId);
         self::assertSame(403, http_response_code(), 'the removed sole assignee must now be blocked');
