@@ -196,6 +196,17 @@ final class OrderController
                 $columns[$key]['orders'][] = $o;
             }
         }
+        // Owner decision 1 Nov 2026 (A-5, Q-R7-2): each column pages like the list — the latest 25 cards,
+        // then "Show more" adds 25 at a time (?more_<column>=50, 75, …). The count shows the whole column.
+        foreach ($columns as $key => $col) {
+            $shown = max(self::ORDERS_PER_PAGE, (int) ($_GET['more_' . $key] ?? 0));
+            $shown = (int) (ceil($shown / self::ORDERS_PER_PAGE) * self::ORDERS_PER_PAGE);
+            $columns[$key]['total'] = count($col['orders']);
+            $columns[$key]['orders'] = array_slice($col['orders'], 0, $shown);
+            $columns[$key]['moreUrl'] = $columns[$key]['total'] > $shown
+                ? '/orders?' . http_build_query(array_filter(['status' => $statusFilter] + array_filter($_GET, static fn ($k): bool => is_string($k) && str_starts_with($k, 'more_'), ARRAY_FILTER_USE_KEY)) + ['more_' . $key => $shown + self::ORDERS_PER_PAGE]) . '#col-' . $key
+                : null;
+        }
 
         View::render('orders/index_kanban', [
             'columns' => $columns,

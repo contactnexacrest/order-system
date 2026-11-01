@@ -37,3 +37,9 @@ CREATE TABLE IF NOT EXISTS daily_digest_log (
   UNIQUE KEY uq_daily_digest_user_date (user_id, digest_date),
   CONSTRAINT fk_daily_digest_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- C-7 (O-7): every order has an assignee — an existing order with none gets its creator.
+INSERT INTO order_assignees (order_id, user_id, assigned_by)
+SELECT o.id, o.created_by, o.created_by FROM orders o
+ JOIN users u ON u.id = o.created_by
+ WHERE NOT EXISTS (SELECT 1 FROM order_assignees a WHERE a.order_id = o.id);

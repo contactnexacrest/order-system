@@ -59,6 +59,11 @@ final class OrderAssignmentService
             throw new \RuntimeException("Order {$orderId} not found");
         }
 
+        // Owner decision 1 Nov 2026 (C-7a, O-7): an order always keeps at least one assignee.
+        $assignees = array_map(static fn (array $a): int => (int) $a['user_id'], OrderAssigneeRepository::forOrder($orderId));
+        if ($assignees === [$userId]) {
+            throw new \RuntimeException('An order always keeps at least one assignee — add the person taking over first, then remove this one.');
+        }
         OrderAssigneeRepository::remove($orderId, $userId);
 
         AuditLogRepository::log(

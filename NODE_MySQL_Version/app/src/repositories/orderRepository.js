@@ -186,6 +186,11 @@ async function createWithNextSequence(clientId, buildFields, createdBy, executor
   const sequenceNo = await referenceNumberService.nextOrderSequenceForClient(clientId);
   const fields = { ...buildFields(sequenceNo), client_id: clientId, sequence_no: sequenceNo };
   const orderId = await insertOrderRow(executor, fields, createdBy);
+  // Owner decision 1 Nov 2026 (C-7a, O-7): every order has an assignee — whoever creates it, until someone else is added.
+  // Same connection as the insert (it may be inside a transaction holding the order row).
+  if (Number(createdBy) > 0) {
+    await executor.execute('INSERT IGNORE INTO order_assignees (order_id, user_id, assigned_by) VALUES (:o, :u, :u)', { o: orderId, u: createdBy });
+  }
   return { orderId, sequenceNo, orderReference: fields.order_reference };
 }
 

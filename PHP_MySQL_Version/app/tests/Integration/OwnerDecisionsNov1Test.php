@@ -249,4 +249,23 @@ final class OwnerDecisionsNov1Test extends DbTestCase
         self::assertSame(['old_value' => '(secret, ends in WXYZ)', 'new_value' => '(secret, ends in ABCD)'], $audit);
         self::assertStringNotContainsString('brand-new-secret', $this->call($md, 'GET', '/audit-log?entity_type=company_settings')['body']);
     }
+
+    /** C-7a (O-7): every order has an assignee — its creator — and always keeps at least one. */
+    public function testEveryOrderKeepsAnAssignee(): void
+    {
+        $creator = $this->createTestUser('Export Executive');
+        $orderId = \App\Services\OrderDuplicationService::duplicate($this->createTestOrder($this->createTestClient()), $creator);
+        self::assertSame([$creator], array_map(static fn (array $a): int => (int) $a['user_id'], \App\Repositories\OrderAssigneeRepository::forOrder($orderId)));
+
+        $md = $this->createTestUser('Managing Director');
+        try {
+            \App\Services\OrderAssignmentService::removeAssignee($orderId, $creator, $md);
+            self::fail('the last assignee was removed');
+        } catch (\RuntimeException $e) {
+            self::assertSame('An order always keeps at least one assignee — add the person taking over first, then remove this one.', $e->getMessage());
+        }
+        \App\Services\OrderAssignmentService::addAssignee($orderId, $md, $md);
+        \App\Services\OrderAssignmentService::removeAssignee($orderId, $creator, $md);
+        self::assertSame([$md], array_map(static fn (array $a): int => (int) $a['user_id'], \App\Repositories\OrderAssigneeRepository::forOrder($orderId)));
+    }
 }

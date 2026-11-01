@@ -235,6 +235,19 @@ async function indexKanban(req, res, seesAllOrders) {
     const col = columns.find((c) => c.key === key);
     if (col) col.orders.push(withFilledSegments(o));
   }
+  // Owner decision 1 Nov 2026 (A-5, Q-R7-2): each column pages like the list — the latest 25 cards,
+  // then "Show more" adds 25 at a time (?more_<column>=50, 75, …). The count shows the whole column.
+  const PER_COLUMN = 25;
+  const moreParams = Object.fromEntries(Object.entries(req.query || {}).filter(([k]) => k.startsWith('more_')));
+  for (const col of columns) {
+    let shown = Math.max(PER_COLUMN, parseInt(req.query[`more_${col.key}`], 10) || 0);
+    shown = Math.ceil(shown / PER_COLUMN) * PER_COLUMN;
+    col.total = col.orders.length;
+    col.orders = col.orders.slice(0, shown);
+    col.moreUrl = col.total > shown
+      ? `/orders?${new URLSearchParams({ status: statusFilter, ...moreParams, [`more_${col.key}`]: String(shown + PER_COLUMN) }).toString()}#col-${col.key}`
+      : null;
+  }
 
   res.renderView('orders/index_kanban', {
     columns,

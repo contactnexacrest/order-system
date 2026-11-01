@@ -156,6 +156,35 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
     expect(boardHtml).toContain('class="filter-chip active" href="/orders?status=active">Active');
   });
 
+  // Owner decision 1 Nov 2026 (A-5, Q-R7-2): the board pages like the list — 25 per column, then "Show more".
+  it('pages the Orders board like the list', async () => {
+    // A Kanban user who sees only their own orders (an Admin sees every order in the test database).
+    const role = await db.queryOne("SELECT id FROM roles WHERE name = 'Export Executive'");
+    const email = `jest-parity-x-${crypto.randomBytes(4).toString('hex')}@nexacrest.test`;
+    userId = (await db.execute(
+      `INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
+       VALUES ('Jest Parity Exec', :email, NULL, :hash, :role_id, 1, 0, 0)`,
+      { email, hash: await bcrypt.hash(PASSWORD, 4), role_id: role.id }
+    )).insertId;
+    await userRepository.updateUiTemplatePreference(userId, (await uiTemplateRepository.findByKey('kanban')).id);
+    agent = request.agent(app);
+    const loginCsrf = (await agent.get('/login')).text.match(/name="_csrf"\s+value="([^"]+)"/)[1];
+    await agent.post('/login').type('form').send({ _csrf: loginCsrf, email, password: PASSWORD });
+    const ids = [];
+    for (let i = 0; i < 27; i++) {
+      ids.push(await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [userId]));
+    }
+    const mine = ids.map((id) => `/orders/${id}`);
+    expect(parts((await agent.get('/orders?view=list')).text).records.filter((r) => mine.includes(r))).toHaveLength(25);
+    const html = (await agent.get('/orders')).text;
+    const board = parts(html).records.filter((r) => mine.includes(r));
+    expect(board).toHaveLength(25);
+    expect(html).toContain('<span class="kanban-column-count">27</span>');
+    expect(html).toContain('href="/orders?status=active&amp;more_stage1=50#col-stage1">Show more (2 more)</a>');
+    expect(board).not.toContain(`/orders/${ids[0]}`);
+    expect(parts((await agent.get('/orders?status=active&more_stage1=50')).text).records.filter((r) => mine.includes(r))).toHaveLength(27);
+  });
+
   it('offers a Standard user no switch to the board', async () => {
     await userRepository.updateUiTemplatePreference(userId, null);
     for (const [page, , boardUrl] of PAGES) {

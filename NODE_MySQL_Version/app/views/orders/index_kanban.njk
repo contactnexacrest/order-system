@@ -16,15 +16,16 @@
 
   <div class="kanban-board">
     {% for col in columns %}
-      <div class="kanban-column" data-column="{{ col.key }}">
+      <div class="kanban-column" id="col-{{ col.key }}" data-column="{{ col.key }}">
         <div class="kanban-column-header">
           <span class="kanban-column-title">{% if col.stage %}Stage {{ col.stage }} &middot; {% endif %}{{ col.title }}</span>
-          <span class="kanban-column-count">{{ col.orders.length }}</span>
+          <span class="kanban-column-count">{{ col.total if col.total is defined else col.orders.length }}</span>
         </div>
         {% if not col.orders.length %}
           <p class="kanban-column-empty">No orders here</p>
         {% else %}
           {% for o in col.orders %}{% set kanbanCard = true %}{% include "orders/_card.njk" %}{% endfor %}
+          {% if col.moreUrl %}<a class="btn-sm btn-secondary kanban-show-more" href="{{ col.moreUrl }}">Show more ({{ col.total - col.orders.length }} more)</a>{% endif %}
         {% endif %}
       </div>
     {% endfor %}

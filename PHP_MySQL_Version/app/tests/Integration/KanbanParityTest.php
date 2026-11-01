@@ -200,6 +200,33 @@ final class KanbanParityTest extends DbTestCase
         self::assertStringContainsString('class="filter-chip active" href="/orders?status=active">Active', $this->render(new OrderController(), 'index', []));
     }
 
+    /**
+     * Owner decision 1 Nov 2026 (A-5, Q-R7-2): the board pages like the
+     * list — 25 per column (the list shows 25 per page), then "Show more".
+     */
+    public function testTheOrdersBoardPagesLikeTheList(): void
+    {
+        // A Kanban user who sees only their own orders (an Admin sees every order in the test database).
+        $this->userId = $this->createTestUser('Export Executive');
+        UserRepository::updateUiTemplatePreference($this->userId, (int) UiTemplateRepository::findByKey('kanban')['id']);
+        $ids = [];
+        for ($i = 0; $i < 27; $i++) {
+            $ids[] = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [$this->userId]);
+        }
+        $list = self::parts($this->render(new OrderController(), 'index', ['view' => 'list']));
+        self::assertCount(25, array_intersect($list['records'], array_map(static fn (int $id): string => "/orders/{$id}", $ids)), 'the list shows 25 per page');
+
+        $html = $this->render(new OrderController(), 'index', []);
+        $board = self::parts($html);
+        self::assertCount(25, array_intersect($board['records'], array_map(static fn (int $id): string => "/orders/{$id}", $ids)), 'the board shows 25 per column');
+        self::assertStringContainsString('<span class="kanban-column-count">27</span>', $html);
+        self::assertStringContainsString('href="/orders?status=active&amp;more_stage1=50#col-stage1">Show more (2 more)</a>', $html);
+        self::assertNotContains('/orders/' . $ids[0], $board['records'], 'the oldest is behind "Show more"');
+
+        $more = self::parts($this->render(new OrderController(), 'index', ['status' => 'active', 'more_stage1' => '50']));
+        self::assertCount(27, array_intersect($more['records'], array_map(static fn (int $id): string => "/orders/{$id}", $ids)));
+    }
+
     public function testAStandardUserSeesNoSwitchToTheBoard(): void
     {
         UserRepository::updateUiTemplatePreference($this->userId, null);

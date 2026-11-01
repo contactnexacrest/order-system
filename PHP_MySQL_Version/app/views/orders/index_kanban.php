@@ -22,15 +22,18 @@ $canViewArchivedOrders = $currentUser && PermissionService::can((int) $currentUs
 
   <div class="kanban-board">
     <?php foreach ($columns as $key => $col): ?>
-      <div class="kanban-column" data-column="<?= htmlspecialchars((string) $key) ?>">
+      <div class="kanban-column" id="col-<?= htmlspecialchars((string) $key) ?>" data-column="<?= htmlspecialchars((string) $key) ?>">
         <div class="kanban-column-header">
           <span class="kanban-column-title"><?= isset($col['stage']) ? 'Stage ' . (int) $col['stage'] . ' &middot; ' : '' ?><?= htmlspecialchars($col['title']) ?></span>
-          <span class="kanban-column-count"><?= count($col['orders']) ?></span>
+          <span class="kanban-column-count"><?= (int) ($col['total'] ?? count($col['orders'])) ?></span>
         </div>
         <?php if (empty($col['orders'])): ?>
           <p class="kanban-column-empty">No orders here</p>
         <?php else: ?>
           <?php foreach ($col['orders'] as $o): $cardHref = '/orders/' . (int) $o['id'] . '?from=kanban'; $kanbanCard = true; include __DIR__ . '/_card.php'; endforeach; ?>
+          <?php if (!empty($col['moreUrl'])): ?>
+            <a class="btn-sm btn-secondary kanban-show-more" href="<?= htmlspecialchars($col['moreUrl']) ?>">Show more (<?= (int) $col['total'] - count($col['orders']) ?> more)</a>
+          <?php endif; ?>
         <?php endif; ?>
       </div>
     <?php endforeach; ?>

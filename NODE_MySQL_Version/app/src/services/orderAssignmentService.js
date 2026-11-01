@@ -43,6 +43,11 @@ async function removeAssignee(orderId, userId, actingUserId) {
     throw new Error(`Order ${orderId} not found`);
   }
 
+  // Owner decision 1 Nov 2026 (C-7a, O-7): an order always keeps at least one assignee.
+  const assignees = (await orderAssigneeRepository.forOrder(orderId)).map((a) => Number(a.user_id));
+  if (assignees.length === 1 && assignees[0] === Number(userId)) {
+    throw new Error('An order always keeps at least one assignee — add the person taking over first, then remove this one.');
+  }
   await orderAssigneeRepository.remove(orderId, userId);
 
   await auditLogRepository.log(actingUserId, 'ORDER_ASSIGNEE_REMOVED', 'orders', orderId, 'assignee', String(userId), null);

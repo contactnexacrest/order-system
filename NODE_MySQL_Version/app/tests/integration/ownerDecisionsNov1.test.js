@@ -169,4 +169,21 @@ describe('Owner decisions of 1 Nov 2026', () => {
     expect(audit).toEqual({ old_value: '(secret, ends in WXYZ)', new_value: '(secret, ends in ABCD)' });
     expect((await md.get('/audit-log?entity_type=company_settings')).text).not.toContain('brand-new-secret');
   });
+
+  it('C-7a: every order has an assignee and always keeps at least one', async () => {
+    const orderDuplicationService = require('../../src/services/orderDuplicationService');
+    const orderAssignmentService = require('../../src/services/orderAssignmentService');
+    const orderAssigneeRepository = require('../../src/repositories/orderAssigneeRepository');
+    const creator = await staff('Export Executive');
+    const orderId = await orderDuplicationService.duplicate(await createTestOrder(await createTestClient()), creator.userId);
+    const ids = async () => (await orderAssigneeRepository.forOrder(orderId)).map((a) => Number(a.user_id));
+    expect(await ids()).toEqual([creator.userId]);
+
+    const md = await staff('Managing Director');
+    await expect(orderAssignmentService.removeAssignee(orderId, creator.userId, md.userId))
+      .rejects.toThrow('An order always keeps at least one assignee — add the person taking over first, then remove this one.');
+    await orderAssignmentService.addAssignee(orderId, md.userId, md.userId);
+    await orderAssignmentService.removeAssignee(orderId, creator.userId, md.userId);
+    expect(await ids()).toEqual([md.userId]);
+  });
 });

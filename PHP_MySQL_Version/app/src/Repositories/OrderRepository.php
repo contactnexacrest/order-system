@@ -197,6 +197,10 @@ final class OrderRepository
         $sequenceNo = ReferenceNumberService::nextOrderSequenceForClient($clientId);
         $fields = $buildFields($sequenceNo) + ['client_id' => $clientId, 'sequence_no' => $sequenceNo];
         $orderId = self::insertRow($fields, $createdBy);
+        // Owner decision 1 Nov 2026 (C-7a, O-7): every order has an assignee — whoever creates it, until someone else is added.
+        if ($createdBy > 0) {
+            OrderAssigneeRepository::add($orderId, $createdBy, $createdBy);
+        }
         return ['orderId' => $orderId, 'sequenceNo' => $sequenceNo, 'orderReference' => $fields['order_reference']];
     }
 
