@@ -138,17 +138,17 @@ describe('Maker-checker guard (QA-5)', () => {
     await expect(reviewWorkflowService.assignReviewers(documentId, [generator], 1)).rejects.toThrow('own generator cannot be assigned');
   });
 
-  it('a Super Admin generator can review their own document', async () => {
+  // Owner decision 1 Nov 2026 (A-2, Q-NEW-3): no exception — not even a Super Admin or an Admin reviews their own document.
+  it('lets nobody review their own document, not even a Super Admin or an Admin', async () => {
     const orderId = await createTestOrder(await createTestClient());
-    const generator = await createTestUser('Export Executive');
-    await makeSuperAdmin(generator);
-    const documentId = await createTestDocumentGeneratedBy(orderId, generator);
-
-    await reviewWorkflowService.assignReviewers(documentId, [generator], 1);
-
-    const reviews = await documentReviewRepository.forDocument(documentId);
-    expect(reviews).toHaveLength(1);
-    expect(Number(reviews[0].reviewer_id)).toBe(generator);
+    for (const superAdmin of [true, false]) {
+      const generator = await createTestUser('Admin');
+      if (superAdmin) await makeSuperAdmin(generator);
+      const documentId = await createTestDocumentGeneratedBy(orderId, generator);
+      await expect(reviewWorkflowService.assignReviewers(documentId, [generator], 1))
+        .rejects.toThrow("This document's own generator cannot be assigned as its reviewer — a different person must review it.");
+      expect(await documentReviewRepository.forDocument(documentId)).toHaveLength(0);
+    }
   });
 
   // ---------------------------------------------------------------
@@ -220,10 +220,11 @@ describe('Maker-checker guard (QA-5)', () => {
     const requester = await createTestUser('Export Executive');
     const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', null, requester);
 
-    await expect(emailDispatchService.approveSend(emailLogId, requester)).rejects.toThrow('a different privileged user must approve');
+    await expect(emailDispatchService.approveSend(emailLogId, requester)).rejects.toThrow('You requested this send — a different person must approve it.');
   });
 
-  it('a Super Admin can approve their own email send', async () => {
+  // Owner decision 1 Nov 2026 (A-3, Q-MAIL-3): no exception — not even a Super Admin approves their own send.
+  it('lets not even a Super Admin approve their own email send', async () => {
     const clientId = await createTestClient();
     const orderId = await createTestOrder(clientId);
     await db.execute('UPDATE clients SET email = :e WHERE id = :id', { e: BUYER_EMAIL, id: clientId });
@@ -233,8 +234,11 @@ describe('Maker-checker guard (QA-5)', () => {
     await makeSuperAdmin(requester);
     const emailLogId = await emailLogRepository.create(orderId, documentId, 'send_qt', BUYER_EMAIL, 'Subject', 'Body', null, requester);
 
-    await emailDispatchService.approveSend(emailLogId, requester);
+    await expect(emailDispatchService.approveSend(emailLogId, requester)).rejects.toThrow('You requested this send — a different person must approve it.');
+    expect((await emailLogRepository.find(emailLogId)).status).toBe('pending_approval');
 
+    // Someone else approves it.
+    await emailDispatchService.approveSend(emailLogId, await createTestUser('Admin'));
     expect((await emailLogRepository.find(emailLogId)).status).toBe('approved');
   });
 

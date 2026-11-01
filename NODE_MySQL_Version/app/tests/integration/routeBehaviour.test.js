@@ -617,7 +617,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
   // Owner decision 2026-10-31 (option A): CA → GST refunds (LUT) — the page, a claim, a bank credit, removing a credit not yet in Zoho.
   it('GST refunds under LUT', async () => {
     const arn = `RT${Math.random().toString(16).slice(2, 12).toUpperCase()}`;
-    expectDone(await holder.call('POST', '/ca/gst-refunds', { period_from: '2026-10-01', period_to: '2026-12-31', claim_arn: arn, filed_on: todayIst(), amount_claimed: '206000' }), 'POST /ca/gst-refunds');
+    expectDone(await holder.call('POST', '/ca/gst-refunds', { period_from: '2026-04-01', period_to: '2026-06-30', claim_arn: arn, filed_on: todayIst(), amount_claimed: '206000' }), 'POST /ca/gst-refunds');
     const claim = Number(await value('SELECT id FROM gst_refund_claims WHERE claim_arn = :arn', { arn }));
     expect(await audits('GST_REFUND_CLAIM_RECORDED', claim)).toBe(1);
     expectPage(await holder.call('GET', '/ca/gst-refunds'), arn, 'GET /ca/gst-refunds');

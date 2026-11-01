@@ -62,6 +62,14 @@ final class UserController
             return;
         }
 
+        // Owner decision 1 Nov 2026 (A-8): a new user cannot get a role carrying a permission the creator does not hold.
+        $missing = \App\Services\GrantGuard::firstNotHeld(AuthService::currentUser(), \App\Services\GrantGuard::roleKeys($roleId));
+        if ($missing !== null) {
+            Flash::set('error', \App\Services\GrantGuard::notHeldMessage($missing) . ' The user was not created.');
+            header('Location: /users');
+            return;
+        }
+
         $tempPassword = self::generateTempPassword();
         $userId = UserRepository::create($name, $email, $phone, $roleId, password_hash($tempPassword, PASSWORD_DEFAULT));
 
@@ -138,6 +146,21 @@ final class UserController
         }
 
         $actor = AuthService::currentUser();
+        // Owner decision 1 Nov 2026 (A-8): nobody changes their own role, and nobody gives a role
+        // carrying a permission they do not hold themselves.
+        if ((string) ($target['role_id'] ?? '') !== (string) ($roleId ?? '')) {
+            if ($userId === (int) $actor['id'] && !\App\Services\GrantGuard::isSuperAdmin($actor)) {
+                Flash::set('error', 'You cannot change your own role. Ask another administrator.');
+                header("Location: /users/{$userId}/edit");
+                return;
+            }
+            $missing = \App\Services\GrantGuard::firstNotHeld($actor, \App\Services\GrantGuard::roleKeys($roleId));
+            if ($missing !== null) {
+                Flash::set('error', \App\Services\GrantGuard::notHeldMessage($missing) . ' The role was not changed.');
+                header("Location: /users/{$userId}/edit");
+                return;
+            }
+        }
         $changes = array_filter([
             ['name', $target['name'], $name],
             ['email', $target['email'], $email],

@@ -2337,10 +2337,11 @@ async function approvePaymentTerms(req, res) {
     res.redirect(`/orders/${orderId}#step-1-quotation-prepare`);
     return;
   }
-  // Owner decision D-117 (QA Round 6, Q-R6-1): Admin, MD and ED may approve
-  // the terms of an order they created; anyone else needs a second person.
-  if (Number(order.created_by || 0) === Number(req.user.id) && !(await makerCheckerGuard.selfApprovalAllowed(req.user.id))) {
-    flash.set(req, 'error', 'You created this order, so its payment terms must be approved by someone else (MD, ED or Admin).');
+  // Owner decision 1 Nov 2026 (A-1, Q-R6-1; replaces D-117): a second person approves the
+  // terms of an order; only the MD or ED may approve their own, and that is noted in the audit log.
+  const ownOrder = Number(order.created_by || 0) === Number(req.user.id);
+  if (ownOrder && !(await makerCheckerGuard.paymentTermsSelfApprovalAllowed(req.user.id))) {
+    flash.set(req, 'error', 'You created this order, so its payment terms must be approved by someone else.');
     res.redirect(`/orders/${orderId}#step-1-quotation-prepare`);
     return;
   }
@@ -2348,6 +2349,10 @@ async function approvePaymentTerms(req, res) {
     || !(await paymentTermsApprovalService.approve(orderId, req.user.id))) {
     flash.set(req, 'warning', 'These payment terms do not need approval, or are already approved.');
   } else {
+    if (ownOrder) {
+      await auditLogRepository.log(req.user.id, 'PAYMENT_TERMS_SELF_APPROVED', 'orders', orderId, 'payment_terms', null, "approved by the order's own creator",
+        'Self-approval by MD/ED (owner decision 1 Nov 2026, A-1)');
+    }
     flash.set(req, 'success', 'Payment terms approved — the Quotation can now be generated.');
   }
   res.redirect(`/orders/${orderId}#step-1-quotation-prepare`);

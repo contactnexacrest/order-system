@@ -2056,10 +2056,11 @@ final class OrderController
             header("Location: /orders/{$orderId}#step-1-quotation-prepare");
             return;
         }
-        // Owner decision D-117 (QA Round 6, Q-R6-1): Admin, MD and ED may approve
-        // the terms of an order they created; anyone else needs a second person.
-        if ((int) ($order['created_by'] ?? 0) === (int) $user['id'] && !MakerCheckerGuard::selfApprovalAllowed((int) $user['id'])) {
-            Flash::set('error', 'You created this order, so its payment terms must be approved by someone else (MD, ED or Admin).');
+        // Owner decision 1 Nov 2026 (A-1, Q-R6-1; replaces D-117): a second person approves the
+        // terms of an order; only the MD or ED may approve their own, and that is noted in the audit log.
+        $ownOrder = (int) ($order['created_by'] ?? 0) === (int) $user['id'];
+        if ($ownOrder && !MakerCheckerGuard::paymentTermsSelfApprovalAllowed((int) $user['id'])) {
+            Flash::set('error', 'You created this order, so its payment terms must be approved by someone else.');
             header("Location: /orders/{$orderId}#step-1-quotation-prepare");
             return;
         }
@@ -2067,6 +2068,10 @@ final class OrderController
             || !\App\Services\PaymentTermsApprovalService::approve($orderId, (int) $user['id'])) {
             Flash::set('warning', 'These payment terms do not need approval, or are already approved.');
         } else {
+            if ($ownOrder) {
+                AuditLogRepository::log((int) $user['id'], 'PAYMENT_TERMS_SELF_APPROVED', 'orders', $orderId, 'payment_terms', null, 'approved by the order\'s own creator',
+                    'Self-approval by MD/ED (owner decision 1 Nov 2026, A-1)');
+            }
             Flash::set('success', 'Payment terms approved — the Quotation can now be generated.');
         }
         header("Location: /orders/{$orderId}#step-1-quotation-prepare");

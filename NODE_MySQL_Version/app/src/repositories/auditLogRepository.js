@@ -51,7 +51,10 @@ async function search({ entityType = null, entityId = null, userId = null, actio
   if (where.length) sql += ' WHERE ' + where.join(' AND ');
   sql += ` ORDER BY al.created_at DESC LIMIT ${parseInt(limit, 10)} OFFSET ${parseInt(offset, 10)}`;
 
-  return db.query(sql, params);
+  // Owner decision 1 Nov 2026 (C-14): a Zoho secret edited before secrets were masked may sit in an older row; never shown again.
+  const secretSetting = require('../helpers/secretSetting');
+  return (await db.query(sql, params)).map((r) => (r.entity_type === 'company_settings' && secretSetting.isSecret(r.field_name)
+    ? { ...r, old_value: secretSetting.forAudit(r.old_value), new_value: secretSetting.forAudit(r.new_value) } : r));
 }
 
 async function distinctActionTypes() {

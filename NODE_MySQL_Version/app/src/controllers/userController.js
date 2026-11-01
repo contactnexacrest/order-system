@@ -11,6 +11,7 @@ const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const userRepository = require('../repositories/userRepository');
+const grantGuard = require('../services/grantGuard');
 
 /**
  * Port of App\Controllers\UserController — admin user-management screen.
@@ -53,6 +54,14 @@ async function create(req, res) {
 
   if (await userRepository.findByEmail(email)) {
     flash.set(req, 'error', `A user with the email ${email} already exists.`);
+    res.redirect('/users');
+    return;
+  }
+
+  // Owner decision 1 Nov 2026 (A-8): a new user cannot get a role carrying a permission the creator does not hold.
+  const missingForNew = grantGuard.firstNotHeld(req, await grantGuard.roleKeys(roleId));
+  if (missingForNew !== null) {
+    flash.set(req, 'error', `${await grantGuard.notHeldMessage(missingForNew)} The user was not created.`);
     res.redirect('/users');
     return;
   }
@@ -129,6 +138,21 @@ async function update(req, res) {
   }
 
   const actor = req.user;
+  // Owner decision 1 Nov 2026 (A-8): nobody changes their own role, and nobody gives a role
+  // carrying a permission they do not hold themselves.
+  if (String(target.role_id ?? '') !== String(roleId ?? '')) {
+    if (Number(userId) === Number(actor.id) && !req.isSuperAdmin) {
+      flash.set(req, 'error', 'You cannot change your own role. Ask another administrator.');
+      res.redirect(`/users/${userId}/edit`);
+      return;
+    }
+    const missing = grantGuard.firstNotHeld(req, await grantGuard.roleKeys(roleId));
+    if (missing !== null) {
+      flash.set(req, 'error', `${await grantGuard.notHeldMessage(missing)} The role was not changed.`);
+      res.redirect(`/users/${userId}/edit`);
+      return;
+    }
+  }
   const changes = [
     ['name', target.name, name],
     ['email', target.email, email],

@@ -35,4 +35,26 @@ async function selfApprovalAllowedStrict(userId) {
   return superAdminService.isEffective(userId);
 }
 
-module.exports = { selfApprovalAllowed, selfApprovalAllowedStrict };
+// Owner decision 1 Nov 2026 (A-1, Q-R6-1): the payment terms of an order
+// are approved by a second person; only the Managing Director or the
+// Executive Director may approve the terms of an order they created
+// themselves (written to the audit log as a self-approval).
+async function paymentTermsSelfApprovalAllowed(userId) {
+  if (await superAdminService.isEffective(userId)) {
+    return true;
+  }
+  const user = await userRepository.findById(userId);
+  if (!user) {
+    return false;
+  }
+  const roleIds = new Set((await require('../repositories/departmentRepository').activeRoleIdsForUser(userId)).map(Number));
+  if (user.role_id !== null && user.role_id !== undefined) roleIds.add(Number(user.role_id));
+  const roleRepository = require('../repositories/roleRepository');
+  for (const id of roleIds) {
+    const role = await roleRepository.find(id);
+    if (role && ['Managing Director', 'Executive Director'].includes(role.name)) return true;
+  }
+  return false;
+}
+
+module.exports = { selfApprovalAllowed, selfApprovalAllowedStrict, paymentTermsSelfApprovalAllowed };

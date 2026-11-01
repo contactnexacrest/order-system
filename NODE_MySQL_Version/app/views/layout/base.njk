@@ -25,7 +25,10 @@
 {% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders or canDisputes or canComplaints or permissions.view_clients or permissions.view_orders or canProcurement %}
 {# External QA report U-01: the main /disputes LIST route requires manage_disputes only (see server.js) — respond_to_disputes alone (e.g. Export Executive) never grants the cross-order list page. canDisputes above stays as the Ops group's own broader visibility check. #}
 {% set canViewDisputesList = permissions.manage_disputes or permissions.respond_to_disputes %}
-{% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log or permissions.pay_incentives or permissions.view_own_incentives or permissions.view_cockpit %}
+{# Owner decision 1 Nov 2026 (A-7 / A-9): Logistics and Procurement open their own report without the Reports page. #}
+{% set canFreightReport = (not permissions.view_reports) and permissions.view_logistics_costs %}
+{% set canSupplierReport = (not permissions.view_reports) and permissions.view_purchase_prices %}
+{% set insightsGroupVisible = permissions.view_reports or permissions.view_audit_log or permissions.pay_incentives or permissions.view_own_incentives or permissions.view_cockpit or canFreightReport or canSupplierReport %}
 {# 90-item backlog #34: manage_hs_codes/manage_compliance_task_types/
    manage_dropdown_options/manage_email_templates each gate their own link
    inside this dropdown but were never added to the group's own visibility
@@ -85,6 +88,8 @@
         <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg></span>Insights</summary>
         <div class="nav-dropdown">
           {% if permissions.view_reports %}<a href="/reports" class="{{ 'active' if (currentPath | startswith('/reports')) else '' }}">Reports</a>{% endif %}
+          {% if canFreightReport %}<a href="/reports/freight-cost" class="{{ 'active' if (currentPath | startswith('/reports/freight-cost')) else '' }}">Freight Cost Report</a>{% endif %}
+          {% if canSupplierReport %}<a href="/reports/suppliers" class="{{ 'active' if (currentPath | startswith('/reports/suppliers')) else '' }}">Supplier Report</a>{% endif %}
           {% if permissions.pay_incentives %}<a href="/incentives/payouts" class="{{ 'active' if (currentPath | startswith('/incentives/payouts')) else '' }}">Incentive Payouts</a>{% endif %}
           {% if permissions.view_own_incentives %}<a href="/my-incentives" class="{{ 'active' if (currentPath | startswith('/my-incentives')) else '' }}">My Incentives</a>{% endif %}
           {% if permissions.view_cockpit %}<a href="/cockpit" class="{{ 'active' if (currentPath | startswith('/cockpit')) else '' }}">Management Cockpit</a>{% endif %}

@@ -30,6 +30,29 @@ final class MakerCheckerGuard
     }
 
     /**
+     * Owner decision 1 Nov 2026 (A-1, Q-R6-1): the payment terms of an order
+     * are approved by a second person; only the Managing Director or the
+     * Executive Director may approve the terms of an order they created
+     * themselves (the approval is then written to the audit log as a
+     * self-approval). Admin and System Administrator no longer self-approve.
+     */
+    public static function paymentTermsSelfApprovalAllowed(int $userId): bool
+    {
+        if (SuperAdminService::isEffective($userId)) {
+            return true;
+        }
+        $user = UserRepository::findById($userId);
+        if (!$user) {
+            return false;
+        }
+        $names = array_map(
+            static fn (int $roleId): string => (string) (\App\Repositories\RoleRepository::find($roleId)['name'] ?? ''),
+            GrantGuard::ownRoleIds($user)
+        );
+        return array_intersect($names, ['Managing Director', 'Executive Director']) !== [];
+    }
+
+    /**
      * External QA report N-04: order cancellations approve/reject through
      * this stricter variant instead of selfApprovalAllowed(), because the
      * default roles that can approve a cancellation (Admin, MD, ED) all

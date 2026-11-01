@@ -215,14 +215,11 @@ final class EmailDispatchService
         if (!$row || $row['status'] !== 'pending_approval') {
             throw new \RuntimeException('This send is not awaiting approval.');
         }
-        // QA-5 maker-checker (EML-03): whoever requested this send must not
-        // also be the one who approves it, unless they're a Super Admin or
-        // hold manage_permissions (owner decision).
-        if ($row['requested_by'] !== null
-            && (int) $row['requested_by'] === $approverUserId
-            && !MakerCheckerGuard::selfApprovalAllowed($approverUserId)
-        ) {
-            throw new \RuntimeException('You requested this send — a different privileged user must approve it.');
+        // QA-5 maker-checker (EML-03); owner decision 1 Nov 2026 (A-3,
+        // Q-MAIL-3): whoever requested this send never approves it — no
+        // exception, whatever their role.
+        if ($row['requested_by'] !== null && (int) $row['requested_by'] === $approverUserId) {
+            throw new \RuntimeException('You requested this send — a different person must approve it.');
         }
         EmailLogRepository::approve($emailLogId, $approverUserId);
         AuditLogRepository::log($approverUserId, 'EMAIL_SEND_APPROVED', 'email_log', $emailLogId);

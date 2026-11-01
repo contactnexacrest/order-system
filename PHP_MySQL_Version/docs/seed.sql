@@ -1939,3 +1939,16 @@ SELECT c.id, a.label, a.sort_order FROM product_categories c
 JOIN (SELECT 'Dimensions' AS label, 1 AS sort_order UNION ALL SELECT 'Finish', 2) a
 WHERE c.is_system = 1
   AND NOT EXISTS (SELECT 1 FROM product_category_attributes x WHERE x.category_id = c.id AND x.label = a.label);
+
+-- Owner decisions of 1 Nov 2026 (same as docs/migrations/2026-11-01i-owner-decisions.sql):
+-- A-8 System Administrator has no full data export; C-8 Procurement Executive manages suppliers;
+-- C-4 only the Letter of Credit preset may run without an advance.
+DELETE rp FROM role_permissions rp
+  JOIN roles r ON r.id = rp.role_id
+  JOIN permissions p ON p.id = rp.permission_id
+ WHERE r.name = 'System Administrator' AND p.permission_key = 'data_export_run';
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'manage_suppliers'
+ WHERE r.name = 'Procurement Executive'
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+UPDATE payment_presets SET allow_zero_advance = 1 WHERE payment_method = 'LC';

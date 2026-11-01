@@ -70,6 +70,24 @@ final class PermissionAdminController
             return;
         }
 
+        // Owner decision 1 Nov 2026 (A-8): no personal exception for yourself, and none you do not hold.
+        $permission = PermissionRepository::find($permissionId);
+        if ($permission === null) {
+            Flash::set('error', 'Pick a user and a permission.');
+            header('Location: /admin/permissions');
+            return;
+        }
+        if ($userId === (int) $user['id'] && !\App\Services\GrantGuard::isSuperAdmin($user)) {
+            Flash::set('error', 'You cannot give yourself an extra permission. Ask another administrator.');
+            header('Location: /admin/permissions');
+            return;
+        }
+        if (\App\Services\GrantGuard::firstNotHeld($user, [(string) $permission['permission_key']]) !== null) {
+            Flash::set('error', \App\Services\GrantGuard::notHeldMessage((string) $permission['permission_key']));
+            header('Location: /admin/permissions');
+            return;
+        }
+
         $id = PermissionRepository::grantOverride($userId, $permissionId, (int) $user['id'], $reason, $expiresAt);
         AuditLogRepository::log((int) $user['id'], 'USER_PERMISSION_GRANTED', 'user_permissions', $id, 'permission_id', null, (string) $permissionId . ($expiresAt !== null ? " until {$expiresAt}" : ''), $reason);
         Flash::set('success', 'Extra permission granted.');
@@ -245,8 +263,24 @@ final class PermissionAdminController
             sort($keys);
             return implode(', ', $keys);
         };
-        $beforeKeys = $keysFor(PermissionRepository::enabledForRole($roleId));
+        $beforeIds = PermissionRepository::enabledForRole($roleId);
+        $beforeKeys = $keysFor($beforeIds);
         $afterKeys = $keysFor($permissionIds);
+
+        // Owner decision 1 Nov 2026 (A-8): nobody edits the permissions of a role they work under,
+        // and nobody adds a permission they do not hold themselves (removing one is always allowed).
+        if (in_array($roleId, \App\Services\GrantGuard::ownRoleIds($user), true) && !\App\Services\GrantGuard::isSuperAdmin($user)) {
+            Flash::set('error', "You cannot change the permissions of \"{$role['name']}\": it is a role you work under. Ask another administrator.");
+            header("Location: /admin/roles/{$roleId}/permissions");
+            return;
+        }
+        $added = array_values(array_intersect_key($permissionKeysById, array_flip(array_diff($permissionIds, $beforeIds))));
+        $missing = \App\Services\GrantGuard::firstNotHeld($user, $added);
+        if ($missing !== null) {
+            Flash::set('error', \App\Services\GrantGuard::notHeldMessage($missing) . ' Nothing was changed.');
+            header("Location: /admin/roles/{$roleId}/permissions");
+            return;
+        }
 
         PermissionRepository::setForRole($roleId, $permissionIds);
         AuditLogRepository::log((int) $user['id'], 'ROLE_PERMISSIONS_UPDATED', 'roles', $roleId, 'permissions', $beforeKeys, $afterKeys);

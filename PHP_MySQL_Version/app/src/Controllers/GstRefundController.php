@@ -54,9 +54,12 @@ final class GstRefundController
         $amount = trim((string) ($_POST['amount_claimed'] ?? ''));
         $error = match (true) {
             !self::isDate($from) || !self::isDate($to) || $to < $from => 'Enter the period the claim covers (from and to; "to" not before "from").',
+            // Owner decision 1 Nov 2026 (B-1, QA R7-N15): RFD-01 covers one financial year (April–March) at most,
+            // and is filed only after the period has ended.
+            self::financialYear($from) !== self::financialYear($to) => 'The claim period must stay within one financial year (April to March) — the GST portal does not accept a period across two years. Record one claim per year.',
             preg_match('/^[A-Z0-9][A-Z0-9-]{5,29}$/', $arn) !== 1 => 'Enter the RFD-01 claim no. (ARN) as on the GST portal: 6 to 30 letters and digits.',
             GstRefundRepository::arnTaken($arn) => "Claim {$arn} is already recorded.",
-            !self::isDate($filedOn) || $filedOn > date('Y-m-d') || $filedOn < $from => 'Enter the date the claim was filed (not in the future, not before the period starts).',
+            !self::isDate($filedOn) || $filedOn > date('Y-m-d') || $filedOn <= $to => 'Enter the date the claim was filed (after the period ends, and not in the future).',
             default => FieldValidator::moneyAmount(is_numeric($amount) ? (float) $amount : NAN, 'The amount claimed'),
         };
         if ($error !== null) {
@@ -146,6 +149,13 @@ final class GstRefundController
         AuditLogRepository::log((int) $user['id'], 'GST_REFUND_CREDIT_REMOVED', 'gst_refund_credits', (int) $credit['id'], 'amount', number_format((float) $credit['amount'], 2, '.', ''), null, PaymentDescription::gstRefund($credit));
         Flash::set('success', 'Refund credit removed. Record it again with the right figures.');
         header(self::BACK);
+    }
+
+    /** The financial year (April–March) a Y-m-d date falls in, as its starting year. */
+    private static function financialYear(string $date): int
+    {
+        $year = (int) substr($date, 0, 4);
+        return (int) substr($date, 5, 2) >= 4 ? $year : $year - 1;
     }
 
     private static function isDate(string $value): bool

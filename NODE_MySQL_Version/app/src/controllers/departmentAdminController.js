@@ -5,6 +5,7 @@ const { scalarString } = require('../helpers/input');
 const { todayIst } = require('../helpers/dbDateTime');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const departmentRepository = require('../repositories/departmentRepository');
+const grantGuard = require('../services/grantGuard');
 const roleRepository = require('../repositories/roleRepository');
 const userRepository = require('../repositories/userRepository');
 
@@ -172,6 +173,12 @@ async function addMembership(req, res) {
   if (!designation || Number(designation.is_active) !== 1) error = 'Choose the department and designation.';
   else if (!isRealDate(startsOn)) error = 'Enter the date the membership starts.';
   else if (await departmentRepository.hasOpenMembership(Number(target.id), Number(designation.id))) error = `${target.name} is already ${designation.title} in ${designation.department_name}.`;
+  // Owner decision 1 Nov 2026 (A-8): no membership for yourself, and none whose role carries a permission you do not hold.
+  else if (Number(target.id) === Number(user.id) && !req.isSuperAdmin) error = 'You cannot give yourself a department membership. Ask another administrator.';
+  else {
+    const missing = grantGuard.firstNotHeld(req, await grantGuard.roleKeys(designation.role_id));
+    if (missing !== null) error = await grantGuard.notHeldMessage(missing);
+  }
   if (error !== null) {
     fail(req, res, error, back);
     return;

@@ -171,6 +171,9 @@ final class DepartmentAdminController
             $designation === null || (int) $designation['is_active'] !== 1 => 'Choose the department and designation.',
             preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $startsOn, $m) !== 1 || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) => 'Enter the date the membership starts.',
             DepartmentRepository::hasOpenMembership((int) $target['id'], (int) $designation['id']) => "{$target['name']} is already {$designation['title']} in {$designation['department_name']}.",
+            // Owner decision 1 Nov 2026 (A-8): no membership for yourself, and none whose role carries a permission you do not hold.
+            (int) $target['id'] === (int) $user['id'] && !\App\Services\GrantGuard::isSuperAdmin($user) => 'You cannot give yourself a department membership. Ask another administrator.',
+            ($missing = \App\Services\GrantGuard::firstNotHeld($user, \App\Services\GrantGuard::roleKeys((int) $designation['role_id']))) !== null => \App\Services\GrantGuard::notHeldMessage($missing),
             default => null,
         };
         if ($error !== null) {

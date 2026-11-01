@@ -99,6 +99,14 @@
                 {{ 'disabled' if row.is_protected or lockedToSuperAdmin }}
                 onchange="this.previousElementSibling.value = this.checked ? '1' : '0';"
               >
+            {% elif row.is_secret %}
+              {# Owner decision 1 Nov 2026 (C-14): a secret is never sent to the browser. #}
+              <input type="password" autocomplete="new-password" name="settings[{{ row.setting_key }}]"
+                data-key="{{ row.setting_key }}" value=""
+                placeholder="{{ row.secret_hint }} — type a new value to replace it"
+                data-sensitive="{{ '1' if row.is_sensitive else '0' }}" data-protected="{{ '1' if row.is_protected else '0' }}"
+                {{ 'disabled' if row.is_protected or lockedToSuperAdmin }}>
+              <small class="muted">{{ row.secret_hint }}. Leave empty to keep it.</small>
             {% elif (row.setting_value or '') | length > 100 %}
               <textarea
                 name="settings[{{ row.setting_key }}]"

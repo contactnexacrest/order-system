@@ -21,7 +21,6 @@ const signatoryRepository = require('../repositories/signatoryRepository');
 const userRepository = require('../repositories/userRepository');
 const mailSenderService = require('./mailSenderService');
 const documentDataAssembler = require('./documentDataAssembler');
-const makerCheckerGuard = require('./makerCheckerGuard');
 const stageGateService = require('./stageGateService');
 const fs = require('fs');
 
@@ -283,9 +282,9 @@ async function approveSend(emailLogId, approverUserId) {
     row.requested_by !== null
     && row.requested_by !== undefined
     && Number(row.requested_by) === Number(approverUserId)
-    && !(await makerCheckerGuard.selfApprovalAllowed(approverUserId))
   ) {
-    throw new Error('You requested this send — a different privileged user must approve it.');
+    // Owner decision 1 Nov 2026 (A-3, Q-MAIL-3): no exception, whatever the role.
+    throw new Error('You requested this send — a different person must approve it.');
   }
   await emailLogRepository.approve(emailLogId, approverUserId);
   await auditLogRepository.log(approverUserId, 'EMAIL_SEND_APPROVED', 'email_log', emailLogId);

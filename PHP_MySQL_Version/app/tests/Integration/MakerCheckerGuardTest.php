@@ -104,18 +104,24 @@ final class MakerCheckerGuardTest extends DbTestCase
         ReviewWorkflowService::assignReviewers($documentId, [$generator], 1);
     }
 
-    public function testSuperAdminGeneratorCanReviewTheirOwnDocument(): void
+    /** Owner decision 1 Nov 2026 (A-2, Q-NEW-3): no exception — not even a Super Admin or an Admin reviews their own document. */
+    public function testNobodyReviewsTheirOwnDocumentNotEvenASuperAdminOrAdmin(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
-        $generator = $this->createTestUser('Export Executive');
-        $this->makeSuperAdmin($generator);
-        $documentId = $this->createTestDocumentGeneratedBy($orderId, $generator);
-
-        ReviewWorkflowService::assignReviewers($documentId, [$generator], 1);
-
-        $reviews = DocumentReviewRepository::forDocument($documentId);
-        self::assertCount(1, $reviews);
-        self::assertSame($generator, (int) $reviews[0]['reviewer_id']);
+        foreach (['super admin' => true, 'admin' => false] as $who => $super) {
+            $generator = $this->createTestUser('Admin');
+            if ($super) {
+                $this->makeSuperAdmin($generator);
+            }
+            $documentId = $this->createTestDocumentGeneratedBy($orderId, $generator);
+            try {
+                ReviewWorkflowService::assignReviewers($documentId, [$generator], 1);
+                self::fail("{$who} was allowed to review their own document");
+            } catch (\RuntimeException $e) {
+                self::assertSame("This document's own generator cannot be assigned as its reviewer — a different person must review it.", $e->getMessage());
+            }
+            self::assertCount(0, DocumentReviewRepository::forDocument($documentId));
+        }
     }
 
     // ---------------------------------------------------------------
@@ -188,11 +194,12 @@ final class MakerCheckerGuardTest extends DbTestCase
         $emailLogId = EmailLogRepository::create($orderId, $documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, $requester);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('a different privileged user must approve');
+        $this->expectExceptionMessage('You requested this send — a different person must approve it.');
         EmailDispatchService::approveSend($emailLogId, $requester);
     }
 
-    public function testSuperAdminCanApproveTheirOwnEmailSend(): void
+    /** Owner decision 1 Nov 2026 (A-3, Q-MAIL-3): no exception — not even a Super Admin approves their own send. */
+    public function testNotEvenASuperAdminApprovesTheirOwnEmailSend(): void
     {
         $clientId = $this->createTestClient();
         $orderId = $this->createTestOrder($clientId);
@@ -203,8 +210,16 @@ final class MakerCheckerGuardTest extends DbTestCase
         $this->makeSuperAdmin($requester);
         $emailLogId = EmailLogRepository::create($orderId, $documentId, 'send_qt', 'buyer@example.test', 'Subject', 'Body', null, $requester);
 
-        EmailDispatchService::approveSend($emailLogId, $requester);
+        try {
+            EmailDispatchService::approveSend($emailLogId, $requester);
+            self::fail('a Super Admin approved their own send');
+        } catch (\RuntimeException $e) {
+            self::assertSame('You requested this send — a different person must approve it.', $e->getMessage());
+        }
+        self::assertSame('pending_approval', EmailLogRepository::find($emailLogId)['status']);
 
+        // Someone else approves it.
+        EmailDispatchService::approveSend($emailLogId, $this->createTestUser('Admin'));
         self::assertSame('approved', EmailLogRepository::find($emailLogId)['status']);
     }
 

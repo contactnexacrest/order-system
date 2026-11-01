@@ -43,6 +43,9 @@ final class PermittedLinks
         '#^/incentives/payouts(?:[/?\#]|$)#'                        => ['pay_incentives'],
         '#^/reports/staff(?:[/?\#]|$)#'                             => ['view_staff_reports'],
         '#^/reports/order-profitability(?:[/?\#]|$)#'               => ['manage_order_financials'],
+        // Owner decision 1 Nov 2026 (A-7 / A-9): each needs only the money it shows.
+        '#^/reports/freight-cost(?:[/?\#]|$)#'                      => ['view_logistics_costs'],
+        '#^/reports/suppliers(?:[/?\#]|$)#'                         => ['view_purchase_prices'],
         '#^/reports(?:[/?\#]|$)#'                                   => ['view_reports'],
         '#^/clients(?:[/?\#]|$)#'                                   => ['manage_orders', 'view_clients'],
         '#^/orders(?:[/?\#]|$)#'                                    => ['manage_orders', 'view_orders'],

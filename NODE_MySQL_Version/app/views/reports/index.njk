@@ -57,7 +57,7 @@
     <div class="btn-row">
       {% if sees.logistics %}<a class="btn-sm" href="/reports/freight-cost">Open Freight Cost Report</a>{% endif %}
       <a class="btn-sm" href="/reports/products">Open Product Sales Report</a>
-      <a class="btn-sm" href="/reports/suppliers">Open Supplier Performance Report</a>
+      {% if sees.purchase %}<a class="btn-sm" href="/reports/suppliers">Open Supplier Performance Report</a>{% endif %}
     </div>
   </div>
 

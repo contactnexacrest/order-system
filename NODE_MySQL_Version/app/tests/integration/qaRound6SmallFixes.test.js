@@ -70,7 +70,8 @@ describe('QA Round 6 — smaller fixes', () => {
     expect(await approvedAt(orderId)).toBeNull();
   });
 
-  it('only Admin, MD or ED may approve the payment terms of their own order (D-117)', async () => {
+  // Owner decision 1 Nov 2026 (A-1, Q-R6-1; replaces D-117): only the MD or ED approves their own, noted in the audit log.
+  it('only the MD or ED may approve the payment terms of their own order', async () => {
     const exporter = await staff('Export Executive');
     const permission = await db.queryOne("SELECT id FROM permissions WHERE permission_key = 'approve_payment_terms'");
     await db.execute('INSERT INTO user_permissions (user_id, permission_id, is_enabled) VALUES (:u, :p, 1)', { u: exporter.userId, p: permission.id });
@@ -89,7 +90,18 @@ describe('QA Round 6 — smaller fixes', () => {
 
     const adminsOwn = await orderNeedingApproval(admin.userId);
     res = await post(admin, `/orders/${adminsOwn}/payment-terms/approve`, {}, `/orders/${adminsOwn}`);
-    expect((await flashAfter(admin, res)).type).toBe('success');
+    expect((await flashAfter(admin, res)).message).toBe('You created this order, so its payment terms must be approved by someone else.');
+    expect(await approvedAt(adminsOwn)).toBeNull();
+
+    for (const role of ['Managing Director', 'Executive Director']) {
+      const md = await staff(role);
+      const mdsOwn = await orderNeedingApproval(md.userId);
+      res = await post(md, `/orders/${mdsOwn}/payment-terms/approve`, {}, `/orders/${mdsOwn}`);
+      expect([role, (await flashAfter(md, res)).type]).toEqual([role, 'success']);
+      expect(await approvedAt(mdsOwn)).not.toBeNull();
+      const n = await db.queryOne("SELECT COUNT(*) AS n FROM audit_log WHERE action_type = 'PAYMENT_TERMS_SELF_APPROVED' AND entity_id = :o AND user_id = :u", { o: mdsOwn, u: md.userId });
+      expect(Number(n.n)).toBe(1);
+    }
   });
 
   it('"Mark all paid" with nothing selected is a warning (R6-N11)', async () => {

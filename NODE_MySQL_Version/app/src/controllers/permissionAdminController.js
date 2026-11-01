@@ -7,6 +7,7 @@ const recordCheck = require('../helpers/recordCheck');
 const { scalarString } = require('../helpers/input');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const permissionRepository = require('../repositories/permissionRepository');
+const grantGuard = require('../services/grantGuard');
 const roleRepository = require('../repositories/roleRepository');
 const userRepository = require('../repositories/userRepository');
 const lookupRepository = require('../repositories/lookupRepository');
@@ -69,6 +70,24 @@ async function grantOverride(req, res) {
   const expiresAt = String((req.body && req.body.expires_at) || '').trim() || null;
   if (expiresAt !== null && (!isRealDate(expiresAt) || expiresAt < todayIst())) {
     flash.set(req, 'error', 'The "Until" date must be today or later (or leave it empty for no end date).');
+    res.redirect('/admin/permissions');
+    return;
+  }
+
+  // Owner decision 1 Nov 2026 (A-8): no personal exception for yourself, and none you do not hold.
+  const permission = await permissionRepository.find(permissionId);
+  if (!permission) {
+    flash.set(req, 'error', 'Pick a user and a permission.');
+    res.redirect('/admin/permissions');
+    return;
+  }
+  if (userId === Number(user.id) && !req.isSuperAdmin) {
+    flash.set(req, 'error', 'You cannot give yourself an extra permission. Ask another administrator.');
+    res.redirect('/admin/permissions');
+    return;
+  }
+  if (grantGuard.firstNotHeld(req, [permission.permission_key]) !== null) {
+    flash.set(req, 'error', await grantGuard.notHeldMessage(permission.permission_key));
     res.redirect('/admin/permissions');
     return;
   }
@@ -239,8 +258,24 @@ async function rolePermissionsUpdate(req, res) {
     permissionKeysById[p.id] = p.permission_key;
   }
   const keysFor = (ids) => ids.map((id) => permissionKeysById[id]).filter(Boolean).sort().join(', ');
-  const beforeKeys = keysFor(await permissionRepository.enabledForRole(roleId));
+  const beforeIds = (await permissionRepository.enabledForRole(roleId)).map(Number);
+  const beforeKeys = keysFor(beforeIds);
   const afterKeys = keysFor(permissionIds);
+
+  // Owner decision 1 Nov 2026 (A-8): nobody edits the permissions of a role they work under,
+  // and nobody adds a permission they do not hold themselves (removing one is always allowed).
+  if ((await grantGuard.ownRoleIds(req)).includes(roleId) && !req.isSuperAdmin) {
+    flash.set(req, 'error', `You cannot change the permissions of "${role.name}": it is a role you work under. Ask another administrator.`);
+    res.redirect(`/admin/roles/${roleId}/permissions`);
+    return;
+  }
+  const added = permissionIds.filter((id) => !beforeIds.includes(id)).map((id) => permissionKeysById[id]).filter(Boolean);
+  const missing = grantGuard.firstNotHeld(req, added);
+  if (missing !== null) {
+    flash.set(req, 'error', `${await grantGuard.notHeldMessage(missing)} Nothing was changed.`);
+    res.redirect(`/admin/roles/${roleId}/permissions`);
+    return;
+  }
 
   await permissionRepository.setForRole(roleId, permissionIds);
   await auditLogRepository.log(user.id, 'ROLE_PERMISSIONS_UPDATED', 'roles', roleId, 'permissions', beforeKeys, afterKeys);

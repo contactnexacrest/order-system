@@ -157,6 +157,7 @@ CREATE TABLE payment_presets (
                                                            -- instruction. Defaults to 1 (include) so existing
                                                            -- presets/orders render identically to before this
                                                            -- column existed.
+  allow_zero_advance      TINYINT(1) NOT NULL DEFAULT 0,  -- owner decision 1 Nov 2026 (C-4, D-074): 0% advance only with this switch, on for Letter of Credit presets only
   is_active               TINYINT(1) NOT NULL DEFAULT 1,
   is_protected            TINYINT(1) NOT NULL DEFAULT 0,  -- true = cannot be edited/deactivated without
                                                            -- the unlock gesture; flag itself needs a
@@ -4652,4 +4653,15 @@ CREATE TABLE product_category_attributes (
   sort_order INT NOT NULL DEFAULT 0,
   UNIQUE KEY uq_pca_category_label (category_id, label),
   CONSTRAINT fk_pca_category FOREIGN KEY (category_id) REFERENCES product_categories(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Owner decision 1 Nov 2026 (C-7): the daily per-person digest, sent once a day per person.
+CREATE TABLE daily_digest_log (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT UNSIGNED NOT NULL,
+  digest_date DATE NOT NULL,
+  items INT NOT NULL DEFAULT 0,
+  sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_daily_digest_user_date (user_id, digest_date),
+  CONSTRAINT fk_daily_digest_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;

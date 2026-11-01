@@ -10,6 +10,7 @@
       <label><input type="checkbox" name="is_default" value="1"> Default preset (pre-selected on the order-creation form)</label>
       <label><input type="checkbox" name="requires_md_approval" value="1"> Requires MD approval — MD/ED approve an order's terms before its Quotation can be generated or sent</label>
       <label><input type="checkbox" name="show_bl_instructions" value="1" checked> Include BL Type / BL Consignee Instruction on the generated BL Instruction Sheet <small class="muted">(uncheck for payment terms that don't need NexaCrest to retain the BL as leverage, e.g. balance paid before shipment)</small></label>
+      <label><input type="checkbox" name="allow_zero_advance" value="1" > May run without an advance (0%) <small class="muted">(Letter of Credit presets only — owner rule: the advance is zero only for LC)</small></label>
     </fieldset>
 
     <fieldset>

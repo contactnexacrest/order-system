@@ -10,7 +10,6 @@ const notificationRepository = require('../repositories/notificationRepository')
 const userRepository = require('../repositories/userRepository');
 const documentGenerationService = require('./documentGenerationService');
 const emailDispatchService = require('./emailDispatchService');
-const makerCheckerGuard = require('./makerCheckerGuard');
 const stageGateService = require('./stageGateService');
 
 /**
@@ -57,10 +56,10 @@ async function assignReviewers(documentId, reviewerIds, assignedByUserId) {
       // otherwise stall the document in review forever.
       throw new Error(`${reviewer.name} is not an active user and cannot be assigned as a reviewer.`);
     }
-    if (generatedBy !== null && rawId === generatedBy && !(await makerCheckerGuard.selfApprovalAllowed(rawId))) {
-      // QA-5 maker-checker (REV-05): the document's own generator cannot
-      // review/approve their own work, unless they're a Super Admin or
-      // hold manage_permissions (owner decision).
+    if (generatedBy !== null && rawId === generatedBy) {
+      // QA-5 maker-checker (REV-05); owner decision 1 Nov 2026 (A-2,
+      // Q-NEW-3): the document's own generator never reviews it — no
+      // exception, whatever their role.
       throw new Error("This document's own generator cannot be assigned as its reviewer — a different person must review it.");
     }
     toAssign.push(rawId);

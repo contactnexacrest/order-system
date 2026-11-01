@@ -162,6 +162,17 @@ final class PaymentPresetController
             Flash::set('error', 'Advance % must be between 0 and 100.');
             return null;
         }
+        // Owner decision 1 Nov 2026 (C-4, D-074): "advance payment will only and only be zero in case of LC" —
+        // 0% needs the preset's own "may run without an advance" switch, which only a Letter of Credit preset may carry.
+        $allowZero = !empty($_POST['allow_zero_advance']);
+        if ($allowZero && $paymentMethod !== 'LC') {
+            Flash::set('error', 'Only a Letter of Credit preset may run without an advance — untick "May run without an advance (0%)" or choose Letter of Credit.');
+            return null;
+        }
+        if ($advancePct == 0.0 && !$allowZero) {
+            Flash::set('error', 'Advance % is 0: tick "May run without an advance (0%)" (Letter of Credit presets only), or enter the advance %.');
+            return null;
+        }
         if (abs(($advancePct + $balancePct) - 100.0) > 0.01) {
             Flash::set('error', "Advance % and Balance % must add up to 100 (got {$advancePct}% + {$balancePct}% = " . ($advancePct + $balancePct) . '%).');
             return null;
@@ -192,6 +203,7 @@ final class PaymentPresetController
             'currency_id'             => $currencyId,
             'requires_md_approval'    => !empty($_POST['requires_md_approval']),
             'show_bl_instructions'    => !empty($_POST['show_bl_instructions']),
+            'allow_zero_advance'      => $allowZero,
         ];
     }
 }

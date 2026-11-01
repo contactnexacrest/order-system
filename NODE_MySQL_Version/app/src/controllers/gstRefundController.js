@@ -31,6 +31,12 @@ function isDate(value) {
   return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() + 1 === Number(m[2]) && d.getUTCDate() === Number(m[3]);
 }
 
+/** The financial year (April–March) a YYYY-MM-DD date falls in, as its starting year. */
+function financialYear(date) {
+  const year = Number(date.slice(0, 4));
+  return Number(date.slice(5, 7)) >= 4 ? year : year - 1;
+}
+
 async function index(req, res) {
   const claims = await gstRefundRepository.claims();
   for (const claim of claims) {
@@ -59,9 +65,12 @@ async function recordClaim(req, res) {
   const amount = String(body.amount_claimed || '').trim();
   let error = null;
   if (!isDate(from) || !isDate(to) || to < from) error = 'Enter the period the claim covers (from and to; "to" not before "from").';
+  // Owner decision 1 Nov 2026 (B-1, QA R7-N15): RFD-01 covers one financial year (April–March) at most,
+  // and is filed only after the period has ended.
+  else if (financialYear(from) !== financialYear(to)) error = 'The claim period must stay within one financial year (April to March) — the GST portal does not accept a period across two years. Record one claim per year.';
   else if (!/^[A-Z0-9][A-Z0-9-]{5,29}$/.test(arn)) error = 'Enter the RFD-01 claim no. (ARN) as on the GST portal: 6 to 30 letters and digits.';
   else if (await gstRefundRepository.arnTaken(arn)) error = `Claim ${arn} is already recorded.`;
-  else if (!isDate(filedOn) || filedOn > todayIst() || filedOn < from) error = 'Enter the date the claim was filed (not in the future, not before the period starts).';
+  else if (!isDate(filedOn) || filedOn > todayIst() || filedOn <= to) error = 'Enter the date the claim was filed (after the period ends, and not in the future).';
   else error = fieldValidator.moneyAmount(isNum(amount) ? Number(amount) : NaN, 'The amount claimed');
   if (error) {
     flash.set(req, 'error', `${error} Nothing was saved.`);

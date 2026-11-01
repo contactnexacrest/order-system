@@ -1,5 +1,7 @@
 'use strict';
 
+const secretSetting = require('../helpers/secretSetting');
+
 const flash = require('../helpers/flash');
 const reasonValidator = require('../helpers/reasonValidator');
 const settingValueValidator = require('../helpers/settingValueValidator');
@@ -19,6 +21,12 @@ async function index(req, res) {
   const settings = await companySettingsRepository.all();
   const grouped = {};
   for (const row of settings) {
+    // Owner decision 1 Nov 2026 (C-14): a secret is never sent to the browser — only its last 4 characters.
+    if (secretSetting.isSecret(row.setting_key)) {
+      row.is_secret = true;
+      row.secret_hint = secretSetting.hint(row.setting_value);
+      row.setting_value = '';
+    }
     (grouped[row.category] ||= []).push(row);
   }
   if (!zohoMailService.IN_USE) {
@@ -80,6 +88,10 @@ async function update(req, res) {
     if (!byKey[key]) continue; // unknown key submitted — ignore rather than trust client input
     const oldValue = byKey[key].setting_value;
     const newValue = String(rawValue).trim();
+    // Owner decision 1 Nov 2026 (C-14): a secret's field is shown empty — left empty, the stored value stays.
+    if (secretSetting.isSecret(key) && newValue === '') {
+      continue;
+    }
     if (oldValue !== newValue) {
       toApply[key] = { old: oldValue, new: newValue, id: byKey[key].id };
     }
@@ -170,7 +182,9 @@ async function update(req, res) {
     if (byKey[key].is_protected) {
       await auditLogRepository.log(user.id, 'PROTECTED_FIELD_UNLOCKED', 'company_settings', change.id, key, null, null, reason);
     }
-    await auditLogRepository.log(user.id, 'FIELD_EDIT', 'company_settings', change.id, key, change.old, change.new, reason);
+    await auditLogRepository.log(user.id, 'FIELD_EDIT', 'company_settings', change.id, key,
+      secretSetting.isSecret(key) ? secretSetting.forAudit(change.old) : change.old,
+      secretSetting.isSecret(key) ? secretSetting.forAudit(change.new) : change.new, reason);
   }
 
   flash.set(req, 'success', `${Object.keys(toApply).length} setting(s) updated.`);

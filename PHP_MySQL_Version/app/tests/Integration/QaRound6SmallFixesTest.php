@@ -81,8 +81,11 @@ final class QaRound6SmallFixesTest extends DbTestCase
         self::assertNull($this->approvedAt($orderId));
     }
 
-    /** D-117 (Q-R6-1): only Admin, MD and ED may approve the payment terms of an order they created. */
-    public function testOnlyAdminMdOrEdMayApproveTheirOwnOrdersPaymentTerms(): void
+    /**
+     * Owner decision 1 Nov 2026 (A-1, Q-R6-1; replaces D-117): a second person approves an
+     * order's payment terms; only the MD or ED may approve their own, noted in the audit log.
+     */
+    public function testOnlyMdOrEdMayApproveTheirOwnOrdersPaymentTerms(): void
     {
         $exporter = $this->createTestUser('Export Executive');
         $pdo = Database::connection();
@@ -104,7 +107,19 @@ final class QaRound6SmallFixesTest extends DbTestCase
         PermissionService::resetCache();
         $adminsOwn = $this->orderNeedingApproval($this->admin);
         (new OrderController())->approvePaymentTerms(['id' => (string) $adminsOwn]);
-        self::assertSame('success', $this->flash()['type'], 'Admin may approve their own (D-117)');
+        self::assertSame('You created this order, so its payment terms must be approved by someone else.', (string) $this->flash()['message'], 'Admin no longer approves their own');
+        self::assertNull($this->approvedAt($adminsOwn));
+
+        foreach (['Managing Director', 'Executive Director'] as $role) {
+            $md = $this->createTestUser($role);
+            $_SESSION = ['_auth_user_id' => $md];
+            PermissionService::resetCache();
+            $mdsOwn = $this->orderNeedingApproval($md);
+            (new OrderController())->approvePaymentTerms(['id' => (string) $mdsOwn]);
+            self::assertSame('success', $this->flash()['type'], "{$role} may approve their own");
+            self::assertNotNull($this->approvedAt($mdsOwn));
+            self::assertSame(1, (int) $pdo->query("SELECT COUNT(*) FROM audit_log WHERE action_type = 'PAYMENT_TERMS_SELF_APPROVED' AND entity_id = {$mdsOwn} AND user_id = {$md}")->fetchColumn());
+        }
     }
 
     /** R6-N11: "Mark all paid" with nothing selected is a warning, not a green "0 payments recorded". */

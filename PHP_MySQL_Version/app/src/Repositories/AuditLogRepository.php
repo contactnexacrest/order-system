@@ -108,7 +108,7 @@ final class AuditLogRepository
 
         $stmt = Database::connection()->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll();
+        return self::maskSecrets($stmt->fetchAll());
     }
 
     /** @return string[] distinct action_type values, for the filter dropdown */
@@ -162,5 +162,24 @@ final class AuditLogRepository
             'order_id_7' => $orderId,
         ]);
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Owner decision 1 Nov 2026 (C-14): a Zoho secret edited before secrets
+     * were masked may sit in an older audit row; it is never shown again.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
+    private static function maskSecrets(array $rows): array
+    {
+        foreach ($rows as &$row) {
+            if (($row['entity_type'] ?? '') === 'company_settings' && \App\Helpers\SecretSetting::isSecret((string) ($row['field_name'] ?? ''))) {
+                $row['old_value'] = \App\Helpers\SecretSetting::forAudit($row['old_value'] ?? null);
+                $row['new_value'] = \App\Helpers\SecretSetting::forAudit($row['new_value'] ?? null);
+            }
+        }
+        unset($row);
+        return $rows;
     }
 }

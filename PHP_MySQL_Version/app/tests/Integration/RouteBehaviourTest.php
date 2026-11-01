@@ -696,7 +696,7 @@ final class RouteBehaviourTest extends DbTestCase
     public function testGstRefundsLut(): void
     {
         $arn = 'RT' . strtoupper(bin2hex(random_bytes(5)));
-        $this->assertDone($this->call('POST', '/ca/gst-refunds', ['period_from' => '2026-10-01', 'period_to' => '2026-12-31', 'claim_arn' => $arn, 'filed_on' => date('Y-m-d'), 'amount_claimed' => '206000']), 'POST /ca/gst-refunds');
+        $this->assertDone($this->call('POST', '/ca/gst-refunds', ['period_from' => '2026-04-01', 'period_to' => '2026-06-30', 'claim_arn' => $arn, 'filed_on' => date('Y-m-d'), 'amount_claimed' => '206000']), 'POST /ca/gst-refunds');
         $claim = (int) $this->value("SELECT id FROM gst_refund_claims WHERE claim_arn = '{$arn}'");
         self::assertSame(1, $this->audits('GST_REFUND_CLAIM_RECORDED', $claim));
         $this->assertPage($this->call('GET', '/ca/gst-refunds'), $arn, 'GET /ca/gst-refunds');

@@ -107,6 +107,14 @@
                 <?= ($row['is_protected'] || $lockedToSuperAdmin) ? 'disabled' : '' ?>
                 onchange="this.previousElementSibling.value = this.checked ? '1' : '0';"
               >
+            <?php elseif (\App\Helpers\SecretSetting::isSecret((string) $row['setting_key'])): ?>
+              <?php /* Owner decision 1 Nov 2026 (C-14): a secret is never sent to the browser. */ ?>
+              <input type="password" autocomplete="new-password" name="settings[<?= htmlspecialchars($row['setting_key']) ?>]"
+                data-key="<?= htmlspecialchars($row['setting_key']) ?>" value=""
+                placeholder="<?= htmlspecialchars(\App\Helpers\SecretSetting::hint($row['setting_value'] ?? null)) ?> — type a new value to replace it"
+                data-sensitive="<?= $row['is_sensitive'] ? '1' : '0' ?>" data-protected="<?= $row['is_protected'] ? '1' : '0' ?>"
+                <?= ($row['is_protected'] || $lockedToSuperAdmin) ? 'disabled' : '' ?>>
+              <small class="muted"><?= htmlspecialchars(\App\Helpers\SecretSetting::hint($row['setting_value'] ?? null)) ?>. Leave empty to keep it.</small>
             <?php elseif (mb_strlen((string) ($row['setting_value'] ?? '')) > 100): ?>
               <textarea
                 name="settings[<?= htmlspecialchars($row['setting_key']) ?>]"

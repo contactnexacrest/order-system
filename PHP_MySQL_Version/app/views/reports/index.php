@@ -63,7 +63,7 @@ $__uid = $__u ? (int) $__u['id'] : 0;
     <div class="btn-row">
       <?php if ($sees['logistics']): ?><a class="btn-sm" href="/reports/freight-cost">Open Freight Cost Report</a><?php endif; ?>
       <a class="btn-sm" href="/reports/products">Open Product Sales Report</a>
-      <a class="btn-sm" href="/reports/suppliers">Open Supplier Performance Report</a>
+      <?php if ($sees['purchase'] ?? false): ?><a class="btn-sm" href="/reports/suppliers">Open Supplier Performance Report</a><?php endif; ?>
     </div>
   </div>
 

@@ -58,20 +58,27 @@ final class GstRefundTest extends DbTestCase
 
     private function claim(string $arn, float $amount = 206000.0): int
     {
-        $this->post('recordClaim', ['period_from' => '2026-10-01', 'period_to' => '2026-12-31', 'claim_arn' => $arn, 'filed_on' => date('Y-m-d'), 'amount_claimed' => (string) $amount]);
+        $this->post('recordClaim', ['period_from' => '2026-04-01', 'period_to' => '2026-06-30', 'claim_arn' => $arn, 'filed_on' => date('Y-m-d'), 'amount_claimed' => (string) $amount]);
         return (int) Database::connection()->query("SELECT id FROM gst_refund_claims WHERE claim_arn = '{$arn}'")->fetchColumn();
     }
 
     public function testAClaimIsRecordedOnceWithItsPeriodAndAmount(): void
     {
         $arn = "AA27{$this->tag}0001";
-        $body = ['period_from' => '2026-10-01', 'period_to' => '2026-12-31', 'claim_arn' => $arn, 'filed_on' => date('Y-m-d'), 'amount_claimed' => '206000'];
-        self::assertStringContainsString('period the claim covers', $this->post('recordClaim', ['period_to' => '2026-09-30'] + $body)['message']);
+        $body = ['period_from' => '2026-04-01', 'period_to' => '2026-06-30', 'claim_arn' => $arn, 'filed_on' => date('Y-m-d'), 'amount_claimed' => '206000'];
+        self::assertStringContainsString('period the claim covers', $this->post('recordClaim', ['period_to' => '2026-03-31'] + $body)['message']);
+        // Owner decision 1 Nov 2026 (B-1, QA R7-N15): one financial year at most, filed after the period ends.
+        self::assertSame('The claim period must stay within one financial year (April to March) — the GST portal does not accept a period across two years. Record one claim per year. Nothing was saved.',
+            $this->post('recordClaim', ['period_from' => '2026-03-01', 'period_to' => '2026-04-30'] + $body)['message']);
+        self::assertStringContainsString('within one financial year', $this->post('recordClaim', ['period_from' => '2020-04-01', 'period_to' => '2026-06-30'] + $body)['message']);
+        self::assertSame('Enter the date the claim was filed (after the period ends, and not in the future). Nothing was saved.',
+            $this->post('recordClaim', ['filed_on' => '2026-05-01'] + $body)['message']);
+        self::assertStringContainsString('after the period ends', $this->post('recordClaim', ['filed_on' => '2026-06-30'] + $body)['message']);
         self::assertStringContainsString('RFD-01 claim no.', $this->post('recordClaim', ['claim_arn' => 'AB'] + $body)['message']);
         self::assertStringContainsString('amount claimed must be at least 0.01', $this->post('recordClaim', ['amount_claimed' => '0'] + $body)['message']);
         self::assertFalse(GstRefundRepository::arnTaken($arn), 'nothing saved');
 
-        self::assertSame(['type' => 'success', 'message' => "Claim {$arn} for Oct–Dec 2026 recorded: ₹206,000.00 claimed."], $this->post('recordClaim', $body));
+        self::assertSame(['type' => 'success', 'message' => "Claim {$arn} for Apr–Jun 2026 recorded: ₹206,000.00 claimed."], $this->post('recordClaim', $body));
         self::assertSame("Claim {$arn} is already recorded. Nothing was saved.", $this->post('recordClaim', $body)['message']);
     }
 
@@ -88,7 +95,7 @@ final class GstRefundTest extends DbTestCase
         self::assertSame([], GstRefundRepository::creditsFor($claimId), 'nothing saved');
 
         $done = $credit($body);
-        $description = "GST refund under LUT, Oct–Dec 2026, claim {$arn} · provisional · ₹185,400.00 credited " . date('j M Y') . ' · bank ref RFD05-AA270226004411';
+        $description = "GST refund under LUT, Apr–Jun 2026, claim {$arn} · provisional · ₹185,400.00 credited " . date('j M Y') . ' · bank ref RFD05-AA270226004411';
         self::assertSame(['type' => 'success', 'message' => "Recorded: {$description}. It goes to Zoho Books at the next sync."], $done);
 
         // The balance, with part of the claim refused: credited + refused may not pass what is still open.
@@ -131,7 +138,7 @@ final class GstRefundTest extends DbTestCase
         $creditId = (int) GstRefundRepository::creditsFor($claimId)[0]['id'];
 
         self::assertSame(['journals' => 1, 'failed' => 0, 'skipped' => 0], CaSyncService::syncGstRefunds('manual', $this->admin));
-        $description = "GST refund under LUT, Oct–Dec 2026, claim {$arn} · provisional · ₹185,400.00 credited " . date('j M Y') . ' · bank ref RFD05-AA270226004411';
+        $description = "GST refund under LUT, Apr–Jun 2026, claim {$arn} · provisional · ₹185,400.00 credited " . date('j M Y') . ' · bank ref RFD05-AA270226004411';
         self::assertSame([
             'journal_date' => date('Y-m-d'),
             'reference_number' => "GSTREF-{$arn}-{$creditId}",

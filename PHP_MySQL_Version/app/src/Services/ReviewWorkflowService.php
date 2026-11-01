@@ -63,10 +63,10 @@ final class ReviewWorkflowService
                 // forever.
                 throw new \RuntimeException("{$reviewer['name']} is not an active user and cannot be assigned as a reviewer.");
             }
-            if ($generatedBy !== null && $reviewerId === $generatedBy && !MakerCheckerGuard::selfApprovalAllowed($reviewerId)) {
-                // QA-5 maker-checker (REV-05): the document's own generator
-                // cannot review/approve their own work, unless they're a
-                // Super Admin or hold manage_permissions (owner decision).
+            if ($generatedBy !== null && $reviewerId === $generatedBy) {
+                // QA-5 maker-checker (REV-05); owner decision 1 Nov 2026 (A-2,
+                // Q-NEW-3): the document's own generator never reviews it —
+                // no exception, whatever their role.
                 throw new \RuntimeException("This document's own generator cannot be assigned as its reviewer — a different person must review it.");
             }
             $toAssign[] = $reviewerId;

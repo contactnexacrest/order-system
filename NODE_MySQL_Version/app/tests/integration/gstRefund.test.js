@@ -54,19 +54,25 @@ describe('GST refunds under LUT', () => {
   }
 
   async function claim(arn, amount = '206000') {
-    await post('/ca/gst-refunds', { period_from: '2026-10-01', period_to: '2026-12-31', claim_arn: arn, filed_on: todayIst(), amount_claimed: amount });
+    await post('/ca/gst-refunds', { period_from: '2026-04-01', period_to: '2026-06-30', claim_arn: arn, filed_on: todayIst(), amount_claimed: amount });
     return Number((await db.queryOne('SELECT id FROM gst_refund_claims WHERE claim_arn = :arn', { arn })).id);
   }
 
   it('records a claim once, with its period and amount', async () => {
     const arn = `AA27${tag}0001`;
-    const body = { period_from: '2026-10-01', period_to: '2026-12-31', claim_arn: arn, filed_on: todayIst(), amount_claimed: '206000' };
-    expect((await post('/ca/gst-refunds', { ...body, period_to: '2026-09-30' })).message).toContain('period the claim covers');
+    const body = { period_from: '2026-04-01', period_to: '2026-06-30', claim_arn: arn, filed_on: todayIst(), amount_claimed: '206000' };
+    expect((await post('/ca/gst-refunds', { ...body, period_to: '2026-03-31' })).message).toContain('period the claim covers');
+    // Owner decision 1 Nov 2026 (B-1, QA R7-N15): one financial year at most, filed after the period ends.
+    expect((await post('/ca/gst-refunds', { ...body, period_from: '2026-03-01', period_to: '2026-04-30' })).message)
+      .toBe('The claim period must stay within one financial year (April to March) — the GST portal does not accept a period across two years. Record one claim per year. Nothing was saved.');
+    expect((await post('/ca/gst-refunds', { ...body, period_from: '2020-04-01', period_to: '2026-06-30' })).message).toContain('within one financial year');
+    expect((await post('/ca/gst-refunds', { ...body, filed_on: '2026-05-01' })).message).toBe('Enter the date the claim was filed (after the period ends, and not in the future). Nothing was saved.');
+    expect((await post('/ca/gst-refunds', { ...body, filed_on: '2026-06-30' })).message).toContain('after the period ends');
     expect((await post('/ca/gst-refunds', { ...body, claim_arn: 'AB' })).message).toContain('RFD-01 claim no.');
     expect((await post('/ca/gst-refunds', { ...body, amount_claimed: '0' })).message).toContain('amount claimed must be at least 0.01');
     expect(await gstRefundRepository.arnTaken(arn)).toBe(false); // nothing saved
 
-    expect(await post('/ca/gst-refunds', body)).toEqual({ type: 'success', message: `Claim ${arn} for Oct–Dec 2026 recorded: ₹206,000.00 claimed.` });
+    expect(await post('/ca/gst-refunds', body)).toEqual({ type: 'success', message: `Claim ${arn} for Apr–Jun 2026 recorded: ₹206,000.00 claimed.` });
     expect((await post('/ca/gst-refunds', body)).message).toBe(`Claim ${arn} is already recorded. Nothing was saved.`);
   });
 
@@ -81,7 +87,7 @@ describe('GST refunds under LUT', () => {
     expect((await credit({ ...body, amount: '206000.01' })).message).toContain('more than what is still open on this claim (₹206,000.00)');
     expect(await gstRefundRepository.creditsFor(claimId)).toEqual([]); // nothing saved
 
-    const description = `GST refund under LUT, Oct–Dec 2026, claim ${arn} · provisional · ₹185,400.00 credited ${today()} · bank ref RFD05-AA270226004411`;
+    const description = `GST refund under LUT, Apr–Jun 2026, claim ${arn} · provisional · ₹185,400.00 credited ${today()} · bank ref RFD05-AA270226004411`;
     expect(await credit(body)).toEqual({ type: 'success', message: `Recorded: ${description}. It goes to Zoho Books at the next sync.` });
 
     // The balance, with part of the claim refused: credited + refused may not pass what is still open.
@@ -122,7 +128,7 @@ describe('GST refunds under LUT', () => {
       const creditId = Number((await gstRefundRepository.creditsFor(claimId))[0].id);
 
       expect(await caSyncService.syncGstRefunds('manual', adminId)).toEqual({ journals: 1, failed: 0, skipped: 0 });
-      const description = `GST refund under LUT, Oct–Dec 2026, claim ${arn} · provisional · ₹185,400.00 credited ${today()} · bank ref RFD05-AA270226004411`;
+      const description = `GST refund under LUT, Apr–Jun 2026, claim ${arn} · provisional · ₹185,400.00 credited ${today()} · bank ref RFD05-AA270226004411`;
       // bank received, GST Refund Receivable reduced, with the built description (rule D-212)
       expect(journals['JN-1']).toEqual({
         journal_date: todayIst(),

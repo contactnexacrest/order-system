@@ -64,6 +64,15 @@ function collectFormData(req) {
   if (advancePct < 0 || advancePct >= 100) {
     return { error: 'Advance % must be between 0 and 100.' };
   }
+  // Owner decision 1 Nov 2026 (C-4, D-074): "advance payment will only and only be zero in case of LC" —
+  // 0% needs the preset's own "may run without an advance" switch, which only a Letter of Credit preset may carry.
+  const allowZero = !!req.body.allow_zero_advance;
+  if (allowZero && paymentMethod !== 'LC') {
+    return { error: 'Only a Letter of Credit preset may run without an advance — untick "May run without an advance (0%)" or choose Letter of Credit.' };
+  }
+  if (advancePct === 0 && !allowZero) {
+    return { error: 'Advance % is 0: tick "May run without an advance (0%)" (Letter of Credit presets only), or enter the advance %.' };
+  }
   if (Math.abs((advancePct + balancePct) - 100.0) > 0.01) {
     return { error: `Advance % and Balance % must add up to 100 (got ${advancePct}% + ${balancePct}% = ${advancePct + balancePct}%).` };
   }
@@ -91,6 +100,7 @@ function collectFormData(req) {
       currency_id: currencyId,
       requires_md_approval: !!req.body.requires_md_approval,
       show_bl_instructions: !!req.body.show_bl_instructions,
+      allow_zero_advance: allowZero,
     },
   };
 }

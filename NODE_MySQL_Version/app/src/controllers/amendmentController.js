@@ -9,6 +9,13 @@ const amendmentRepository = require('../repositories/amendmentRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const orderRepository = require('../repositories/orderRepository');
 const amendmentService = require('../services/amendmentService');
+const paymentPresetRepository = require('../repositories/paymentPresetRepository');
+
+async function presetAllowsZero(orderId) {
+  const order = await orderRepository.find(orderId);
+  const preset = order && order.payment_preset_id ? await paymentPresetRepository.find(Number(order.payment_preset_id)) : null;
+  return !!preset && Number(preset.allow_zero_advance) === 1;
+}
 const fileUploadService = require('../services/fileUploadService');
 
 // Port of App\Controllers\AmendmentController. Spec Section 8 — Payment
@@ -53,7 +60,9 @@ async function create(req, res) {
     || fieldValidator.decimal(raw('amended_balance_amount'), 'Amended balance amount')
     // QA Round 7, R7-N14: an impossible date (2026-02-30, 31/10/2026, text) used to reach the database and show a generic error.
     || (effectiveFrom !== null && !(/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom) && !Number.isNaN(Date.parse(`${effectiveFrom}T00:00:00Z`)) && new Date(`${effectiveFrom}T00:00:00Z`).toISOString().slice(0, 10) === effectiveFrom)
-      ? 'Effective from: enter a valid date (YYYY-MM-DD).' : null);
+      ? 'Effective from: enter a valid date (YYYY-MM-DD).' : null)
+    // Owner decision 1 Nov 2026 (C-4): an amendment cannot take the advance to 0% unless the order's preset may run without one (LC).
+    || (amendedAdvancePct === 0 && !(await presetAllowsZero(orderId)) ? 'Amended advance %: 0% is allowed only on a Letter of Credit order. Enter the advance %.' : null);
   if (numberError) {
     flash.set(req, 'error', numberError);
     res.redirect(`/orders/${orderId}/amendments`);

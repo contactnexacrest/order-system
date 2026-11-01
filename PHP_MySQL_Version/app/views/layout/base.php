@@ -94,7 +94,10 @@ $canProcurement = $can('manage_purchasing') || $can('approve_purchases');
 $opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canComplaints || $canViewClients || $canViewOrders || $canProcurement;
 // Owner decision D-214, phase 4: the management cockpit.
 $canCockpit = $can('view_cockpit');
-$insightsGroupVisible = $canReports || $canAudit || $canPayIncentives || $canOwnIncentives || $canCockpit;
+// Owner decision 1 Nov 2026 (A-7 / A-9): Logistics and Procurement open their own report without the Reports page.
+$canFreightReport = !$canReports && $can('view_logistics_costs');
+$canSupplierReport = !$canReports && $can('view_purchase_prices');
+$insightsGroupVisible = $canReports || $canAudit || $canPayIncentives || $canOwnIncentives || $canCockpit || $canFreightReport || $canSupplierReport;
 // 90-item backlog #34: $canManageHsCodes/$canManageComplianceTaskTypes/
 // $canManageDropdownOptions/$canManageEmailTemplates each gate their own
 // link inside this dropdown but were never added to the group's own
@@ -188,6 +191,8 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
         <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg></span>Insights</summary>
         <div class="nav-dropdown">
           <?php if ($canReports): ?><a href="/reports" class="<?= $isActive('/reports') ? 'active' : '' ?>">Reports</a><?php endif; ?>
+          <?php if ($canFreightReport): ?><a href="/reports/freight-cost" class="<?= $isActive('/reports/freight-cost') ? 'active' : '' ?>">Freight Cost Report</a><?php endif; ?>
+          <?php if ($canSupplierReport): ?><a href="/reports/suppliers" class="<?= $isActive('/reports/suppliers') ? 'active' : '' ?>">Supplier Report</a><?php endif; ?>
           <?php if ($canPayIncentives): ?><a href="/incentives/payouts" class="<?= $isActive('/incentives/payouts') ? 'active' : '' ?>">Incentive Payouts</a><?php endif; ?>
           <?php if ($canOwnIncentives): ?><a href="/my-incentives" class="<?= $isActive('/my-incentives') ? 'active' : '' ?>">My Incentives</a><?php endif; ?>
           <?php if ($canCockpit): ?><a href="/cockpit" class="<?= $isActive('/cockpit') ? 'active' : '' ?>">Management Cockpit</a><?php endif; ?>

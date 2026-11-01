@@ -1175,9 +1175,10 @@ app.get('/reports/amendments', requireAuth, requirePermission('view_reports'), a
 app.get('/reports/trends', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.trends));
 app.get('/reports/staff', requireAuth, requirePermission('view_staff_reports'), asyncHandler(reportController.staff));
 app.get('/reports/ageing', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.ageing));
-app.get('/reports/freight-cost', requireAuth, requirePermission('view_reports'), requirePermission('view_logistics_costs'), asyncHandler(reportController.freightCost));
+// Owner decision 1 Nov 2026 (A-7 / A-9): each of these two reports needs only the money it shows.
+app.get('/reports/freight-cost', requireAuth, requirePermission('view_logistics_costs'), asyncHandler(reportController.freightCost));
 app.get('/reports/products', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.products));
-app.get('/reports/suppliers', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.suppliers));
+app.get('/reports/suppliers', requireAuth, requirePermission('view_purchase_prices'), asyncHandler(reportController.suppliers));
 app.get('/reports/conversion', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.conversion));
 app.get('/reports/performance', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.performance));
 app.get('/reports/order-profitability', requireAuth, requirePermission('manage_order_financials'), asyncHandler(reportController.profitability));

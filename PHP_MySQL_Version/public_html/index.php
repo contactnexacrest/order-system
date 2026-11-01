@@ -775,9 +775,10 @@ $router->get('/reports/amendments', [$reports, 'amendments'], [SessionAuth::requ
 $router->get('/reports/trends', [$reports, 'trends'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/staff', [$reports, 'staff'], [SessionAuth::required(), PermissionCheck::requires('view_staff_reports')]);
 $router->get('/reports/ageing', [$reports, 'ageing'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/freight-cost', [$reports, 'freightCost'], [SessionAuth::required(), PermissionCheck::requires('view_reports'), PermissionCheck::requires('view_logistics_costs')]);
+// Owner decision 1 Nov 2026 (A-7 / A-9): each of these two reports needs only the money it shows.
+$router->get('/reports/freight-cost', [$reports, 'freightCost'], [SessionAuth::required(), PermissionCheck::requires('view_logistics_costs')]);
 $router->get('/reports/products', [$reports, 'products'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
-$router->get('/reports/suppliers', [$reports, 'suppliers'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
+$router->get('/reports/suppliers', [$reports, 'suppliers'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices')]);
 $router->get('/reports/order-profitability', [$reports, 'profitability'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials')]);
 $router->get('/reports/conversion', [$reports, 'conversion'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/performance', [$reports, 'performance'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);

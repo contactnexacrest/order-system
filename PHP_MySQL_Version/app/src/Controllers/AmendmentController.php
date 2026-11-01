@@ -67,6 +67,14 @@ final class AmendmentController
                 $numberError = 'Effective from: enter a valid date (YYYY-MM-DD).';
             }
         }
+        // Owner decision 1 Nov 2026 (C-4): an amendment cannot take the advance to 0% unless the order's preset may run without one (LC).
+        if ($numberError === null && $amendedAdvancePct !== null && $amendedAdvancePct == 0.0) {
+            $order = \App\Repositories\OrderRepository::find($orderId);
+            $preset = $order !== null && $order['payment_preset_id'] !== null ? \App\Repositories\PaymentPresetRepository::find((int) $order['payment_preset_id']) : null;
+            if ($preset === null || (int) ($preset['allow_zero_advance'] ?? 0) !== 1) {
+                $numberError = 'Amended advance %: 0% is allowed only on a Letter of Credit order. Enter the advance %.';
+            }
+        }
         if ($numberError !== null) {
             Flash::set('error', $numberError);
             header("Location: /orders/{$orderId}/amendments");

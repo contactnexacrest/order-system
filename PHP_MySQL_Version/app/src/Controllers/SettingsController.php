@@ -124,6 +124,10 @@ final class SettingsController
             }
             $oldValue = $byKey[$key]['setting_value'];
             $newValue = trim((string) $newValue);
+            // Owner decision 1 Nov 2026 (C-14): a secret's field is shown empty — left empty, the stored value stays.
+            if (\App\Helpers\SecretSetting::isSecret((string) $key) && $newValue === '') {
+                continue;
+            }
             if ($oldValue !== $newValue) {
                 $toApply[$key] = ['old' => $oldValue, 'new' => $newValue, 'id' => (int) $byKey[$key]['id']];
             }
@@ -233,8 +237,8 @@ final class SettingsController
                 'company_settings',
                 $change['id'],
                 $key,
-                $change['old'],
-                $change['new'],
+                \App\Helpers\SecretSetting::isSecret((string) $key) ? \App\Helpers\SecretSetting::forAudit($change['old']) : $change['old'],
+                \App\Helpers\SecretSetting::isSecret((string) $key) ? \App\Helpers\SecretSetting::forAudit($change['new']) : $change['new'],
                 $reason
             );
         }
