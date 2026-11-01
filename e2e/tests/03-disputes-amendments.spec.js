@@ -3,6 +3,7 @@
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { login, logout, loginClient, ROLES } = require('./support/auth');
+const { assignSecondPersonAndApprove } = require('./support/review');
 const { resetClientPassword } = require('./support/db');
 
 /**
@@ -96,21 +97,9 @@ async function openDocumentReviewCard(page) {
   await page.locator('#document-review-approval').evaluate((el) => { el.open = true; });
 }
 
-async function adminAssignSelfAndApprove(page, typeCode, reviewerName) {
-  await openDocumentReviewCard(page);
-  let panel = documentPanel(page, typeCode);
-  await panel.locator('summary').click();
-  const reviewerSelect = panel.locator('select[name="reviewer_ids[]"]');
-  const selfOptionValue = await panel.locator('option', { hasText: reviewerName }).first().getAttribute('value');
-  await reviewerSelect.selectOption(selfOptionValue);
-  await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
-  await expect(page.locator('.alert')).toBeVisible();
-
-  await openDocumentReviewCard(page);
-  panel = documentPanel(page, typeCode);
-  await panel.locator('summary').click();
-  await panel.getByRole('button', { name: 'Approve', exact: true }).click();
-  await expect(page.locator('.alert')).toBeVisible();
+async function adminAssignSelfAndApprove(page, typeCode) {
+  // Owner decision 1 Nov 2026 (A-2): a second person (the ED) reviews and approves.
+  await assignSecondPersonAndApprove(page, typeCode);
 }
 
 test.describe.serial('Disputes and Amendments — order lifecycle side-flows', () => {

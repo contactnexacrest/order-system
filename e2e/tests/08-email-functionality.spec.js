@@ -3,6 +3,7 @@
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { login, logout, ROLES } = require('./support/auth');
+const { assignSecondPersonAndApprove } = require('./support/review');
 const { resetClientPassword, getMailSending, setMailSending, lastEmailSentWithDocument } = require('./support/db');
 const { mark, sinceMark } = require('./support/mail');
 
@@ -169,18 +170,8 @@ test.describe('Email functionality — real attempts, right recipient, right att
       await openStage(page, stageNumber);
       await docForm(page, orderId, typeCode).locator('button[type="submit"]').click();
       await expect(page.locator('.alert')).toContainText('generated');
-      await openDocumentReviewCard(page);
-      let panel = documentPanel(page, typeCode);
-      await panel.locator('summary').click();
-      const selfValue = await panel.locator('option', { hasText: 'Gulmohar Sontakke' }).first().getAttribute('value');
-      await panel.locator('select[name="reviewer_ids[]"]').selectOption(selfValue);
-      await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
-      await expect(page.locator('.alert')).toBeVisible();
-      await openDocumentReviewCard(page);
-      panel = documentPanel(page, typeCode);
-      await panel.locator('summary').click();
-      await panel.getByRole('button', { name: 'Approve', exact: true }).click();
-      await expect(page.locator('.alert')).toBeVisible();
+      // Owner decision 1 Nov 2026 (A-2): a second person (the ED) reviews and approves.
+      await assignSecondPersonAndApprove(page, typeCode);
     };
     await generateAndApprove('QT', 1);
     await generateAndApprove('BUYERPO', 2);
@@ -266,18 +257,9 @@ test.describe('Email functionality — real attempts, right recipient, right att
     await openStage(page, 1);
     await docForm(page, orderId, 'QT').locator('button[type="submit"]').click();
     await expect(page.locator('.alert')).toContainText('generated');
-    await openDocumentReviewCard(page);
-    let panel = documentPanel(page, 'QT');
-    await panel.locator('summary').click();
-    const selfValue = await panel.locator('option', { hasText: 'Gulmohar Sontakke' }).first().getAttribute('value');
-    await panel.locator('select[name="reviewer_ids[]"]').selectOption(selfValue);
-    await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
-    await expect(page.locator('.alert')).toBeVisible();
-    await openDocumentReviewCard(page);
-    panel = documentPanel(page, 'QT');
-    await panel.locator('summary').click();
-    await panel.getByRole('button', { name: 'Approve', exact: true }).click();
-    await expect(page.locator('.alert')).toBeVisible();
+    // Owner decision 1 Nov 2026 (A-2): a second person (the ED) reviews and approves.
+    await assignSecondPersonAndApprove(page, 'QT');
+    let panel;
 
     await addAssigneeTo(page, orderId, 'exportExecutive');
 

@@ -2,6 +2,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { login, logout, ROLES } = require('./support/auth');
+const { assignSecondPersonAndApprove } = require('./support/review');
 const { getMailSending, setMailSending } = require('./support/db');
 
 /**
@@ -93,21 +94,8 @@ async function addAssigneeTo(page, orderId, roleName) {
 }
 
 async function adminAssignSelfAndApprove(page, typeCode) {
-  const adminName = ROLES.admin.name;
-  await openDocumentReviewCard(page);
-  let panel = documentPanel(page, typeCode);
-  await panel.locator('summary').click();
-  const reviewerSelect = panel.locator('select[name="reviewer_ids[]"]');
-  const selfOptionValue = await panel.locator('option', { hasText: adminName }).first().getAttribute('value');
-  await reviewerSelect.selectOption(selfOptionValue);
-  await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
-  await expect(page.locator('.alert')).toBeVisible();
-
-  await openDocumentReviewCard(page);
-  panel = documentPanel(page, typeCode);
-  await panel.locator('summary').click();
-  await panel.getByRole('button', { name: 'Approve', exact: true }).click();
-  await expect(page.locator('.alert')).toBeVisible();
+  // Owner decision 1 Nov 2026 (A-2): a second person (the ED) reviews and approves.
+  await assignSecondPersonAndApprove(page, typeCode);
 }
 
 test.describe.serial('Email Approvals — the Level-1/Level-2 deferred send queue', () => {

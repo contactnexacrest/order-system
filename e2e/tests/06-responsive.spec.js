@@ -3,6 +3,7 @@
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { login, loginClient } = require('./support/auth');
+const { assignSecondPersonAndApprove } = require('./support/review');
 const { resetClientPassword } = require('./support/db');
 
 const DUMMY_FILE = path.join(__dirname, 'fixtures', 'dummy-signed-copy.pdf');
@@ -217,21 +218,8 @@ test.describe('Mobile viewport (390x844 — iPhone 12/13 sized)', () => {
         .locator('details:not(.step-card)')
         .filter({ has: page.locator('summary', { hasText: new RegExp('^\\s*' + typeCode + '\\s') }) })
         .first();
-      const assignSelfAndApprove = async (typeCode) => {
-        await openDocumentReviewCard();
-        let panel = reviewPanel(typeCode);
-        await panel.locator('summary').click();
-        const selfValue = await panel.locator('option', { hasText: 'Gulmohar Sontakke' }).first().getAttribute('value');
-        await panel.locator('select[name="reviewer_ids[]"]').selectOption(selfValue);
-        await panel.getByRole('button', { name: 'Assign Reviewers' }).click();
-        await expect(page.locator('.alert')).toBeVisible();
-
-        await openDocumentReviewCard();
-        panel = reviewPanel(typeCode);
-        await panel.locator('summary').click();
-        await panel.getByRole('button', { name: 'Approve', exact: true }).click();
-        await expect(page.locator('.alert')).toBeVisible();
-      };
+      // Owner decision 1 Nov 2026 (A-2): a second person (the ED) reviews and approves.
+      const assignSelfAndApprove = async (typeCode) => assignSecondPersonAndApprove(page, typeCode);
       await assignSelfAndApprove('QT');
 
       // Each stage gate waits for its own document to be approved.
