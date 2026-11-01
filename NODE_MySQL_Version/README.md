@@ -318,7 +318,9 @@ web process's own uptime).** Add four crontab entries:
 */15 * * * *  cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/autoConfirmOcAcknowledgments.js >> /var/log/nexacrest/auto_confirm_oc_acknowledgments.log 2>&1
 0 2 * * *     cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/checkAlerts.js >> /var/log/nexacrest/check_alerts.log 2>&1
 0 * * * *     cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/zohoSync.js >> /var/log/nexacrest/zoho_sync.log 2>&1
+15 8 * * *    cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/dailyDigest.js >> /var/log/nexacrest/daily_digest.log 2>&1
 ```
+(`dailyDigest.js`, owner decision 1 Nov 2026: one e-mail per person each morning listing their open tasks and documents to review; set the cron time zone to IST or adjust 08:15. The in-process scheduler runs it at 08:15 IST.)
 (`sudo mkdir -p /var/log/nexacrest` first.) Use the full path to `node`
 (`which node`) — cron's `$PATH` is much smaller than an interactive
 shell's.

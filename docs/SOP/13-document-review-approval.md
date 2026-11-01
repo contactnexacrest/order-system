@@ -114,7 +114,10 @@ type, normal forward progress through the stages, never triggers it.
 ### Assigning reviewers
 
 From the order page, staff assign one or more reviewers to a generated
-document — this moves it from draft to **in review**. Each assigned
+document — this moves it from draft to **in review**. The person who
+generated the document can never be its reviewer, whatever their role
+(owner decision 1 Nov 2026) — a second pair of eyes is the point of the
+review. Each assigned
 reviewer sees it in **My Review Queue** (`/reviews`):
 
 ![My Review Queue — a document pending this reviewer's decision](./images/review_queue.png)
@@ -151,6 +154,9 @@ a dedicated one from Email Templates in Settings.
 **Submit for Level-2 Approval** doesn't send anything yet — it's Level 1.
 A separate approver (anyone with the `approve_email_send` permission) has
 to clear it from the **Email Send Approvals** queue before it goes out.
+The person who requested the send can never approve it themselves, whatever
+their role (owner decision 1 Nov 2026) — an e-mail to a buyer cannot be
+called back.
 That queue has its own item in the sidebar (next to **My Reviews** — not
 tucked under Insights), carrying a live count badge whenever something is
 waiting — same pattern as Quotation Intake Review/PI Intake Review's own

@@ -58,6 +58,22 @@ memberships, current and past.
 
 Founder accounts cannot be changed through the application.
 
+## Nobody raises their own rights
+
+Owner decision 1 Nov 2026. Whoever manages users and permissions:
+
+- **cannot give a permission they do not hold themselves** — not on a
+  role, not as a personal exception, not by giving someone a role or a
+  department membership that carries it;
+- **cannot change their own rights** — not the permissions of a role they
+  work under, not their own role, not a personal exception or membership
+  for themselves. Another administrator does it.
+
+Removing a permission is always allowed. So the System Administrator
+(users, settings, templates, lists — no business money) cannot tick money
+permissions onto any role, and has no full data export. The Operations
+Manager, like the Order Coordinator, sees no money (confirmed 1 Nov 2026).
+
 ## Personal exceptions
 
 Rarely, one person needs one extra right outside their department (for

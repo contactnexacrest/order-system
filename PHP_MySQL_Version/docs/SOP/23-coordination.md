@@ -29,6 +29,21 @@ amounts.
 Management, the Order Desk and Audit have no tasks of their own, so they
 see every department's list.
 
+## The daily digest
+
+Every morning (08:15 IST) each person gets **one e-mail** listing what waits
+on them: the tasks they own or that sit unowned with their department
+(escalated and overdue first) and the documents waiting for their review.
+Nobody with nothing waiting gets one, and nobody gets two in a day. Review
+requests still arrive at once as before; the digest only repeats them
+(owner decision 1 Nov 2026).
+
+## Every order has an assignee
+
+The person who creates an order is its first assignee. An order always
+keeps at least one: to hand it over, add the new person first, then remove
+the old one (owner decision 1 Nov 2026).
+
 ## Order owners
 
 The order page's side panel shows **Owners** — one person per department

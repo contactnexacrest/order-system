@@ -1,0 +1,87 @@
+# Owner decision 1 Nov 2026 (C-5, O-5): PHPUnit and Jest run on every push
+# and pull request, against MySQL 8 (the live host's database — dev runs
+# MariaDB, so this also catches MySQL-only differences and strict mode).
+# The two stacks run side by side; each builds its own throwaway test
+# database from its docs/schema.sql + docs/seed.sql, exactly as on a
+# developer's machine. No secrets are needed: SMTP and Zoho stay off.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  phpunit:
+    name: PHP — PHPUnit
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci-root-password"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    defaults:
+      run:
+        working-directory: PHP_MySQL_Version/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring, gd, zip, intl, bcmath
+          coverage: none
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+      - name: Test configuration
+        run: |
+          cp .env.example .env
+          sed -i -e 's/^APP_ENV=.*/APP_ENV=local/' \
+                 -e 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' -e 's/^DB_PORT=.*/DB_PORT=3306/' \
+                 -e 's/^DB_USERNAME=.*/DB_USERNAME=root/' -e 's/^DB_PASSWORD=.*/DB_PASSWORD=ci-root-password/' \
+                 -e "s#^STORAGE_BASE_PATH=.*#STORAGE_BASE_PATH=$GITHUB_WORKSPACE/PHP_MySQL_Version/storage#" \
+                 -e 's/^APP_ENCRYPTION_KEY=.*/APP_ENCRYPTION_KEY=ci-only-encryption-key-not-secret/' \
+                 -e 's/^SMTP_HOST=.*/SMTP_HOST=/' -e 's/^ZOHO_INTEGRATION_ENABLED=.*/ZOHO_INTEGRATION_ENABLED=false/' .env
+      - name: PHPUnit
+        run: vendor/bin/phpunit
+
+  jest:
+    name: Node — Jest
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci-root-password"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    defaults:
+      run:
+        working-directory: NODE_MySQL_Version/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: NODE_MySQL_Version/app/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+      - name: Test configuration
+        run: |
+          cp .env.example .env
+          sed -i -e 's/^APP_ENV=.*/APP_ENV=local/' \
+                 -e 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' -e 's/^DB_PORT=.*/DB_PORT=3306/' \
+                 -e 's/^DB_USERNAME=.*/DB_USERNAME=root/' -e 's/^DB_PASSWORD=.*/DB_PASSWORD=ci-root-password/' \
+                 -e "s#^STORAGE_BASE_PATH=.*#STORAGE_BASE_PATH=$GITHUB_WORKSPACE/NODE_MySQL_Version/storage#" \
+                 -e 's/^APP_ENCRYPTION_KEY=.*/APP_ENCRYPTION_KEY=ci-only-encryption-key-not-secret/' \
+                 -e 's/^SESSION_SECRET_KEY=.*/SESSION_SECRET_KEY=ci-only-session-secret/' \
+                 -e 's/^SMTP_HOST=.*/SMTP_HOST=/' -e 's/^ZOHO_INTEGRATION_ENABLED=.*/ZOHO_INTEGRATION_ENABLED=false/' .env
+      - name: Jest (one file at a time — the files share one test database)
+        run: npm test

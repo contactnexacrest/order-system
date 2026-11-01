@@ -87,12 +87,18 @@ Everything starts from the **Reports** hub:
   is the report to open when asking "how are we actually doing, and is it
   getting better or worse."
 - **Freight Cost Report** — confirmed freight/insurance terms and
-  invoiced freight, by forwarder, filtered by order creation date.
+  invoiced freight, by forwarder, filtered by order creation date. It needs
+  only **See logistics costs**, so Logistics opens it from
+  **Insights → Freight Cost Report** without the Reports page (owner
+  decision 1 Nov 2026).
 - **Product Sales Report** — which products / HS codes drive FOB value,
   highest first, filtered by order creation date.
 - **Supplier Performance Report** — all-time, per supplier: average days
   from Supplier PO to signature, and the on-time % (packing date against
-  the PO's required delivery date).
+  the PO's required delivery date). Supplier identity is buying-side
+  information: the report needs **See purchase prices** (Procurement,
+  Accounts & Finance, MD/ED) and is hidden from Sales (owner decision
+  1 Nov 2026). Procurement opens it from **Insights → Supplier Report**.
 - **Order Profitability** — revenue, total cost, profit and margin % per
   order for any date range, with a totals row. Visible only to Super
   Admin and roles granted **Manage order financials**; see [Order

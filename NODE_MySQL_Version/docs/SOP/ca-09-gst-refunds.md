@@ -29,9 +29,12 @@ Anyone with the CA module can view the page. Recording on it needs the same perm
 ### 1. Record a claim when it is filed
 
 Enter:
-- **Period from / to**: the months the claim covers.
+- **Period from / to**: the months the claim covers — within one financial
+  year (April to March); the GST portal does not accept a period across two
+  years, so record one claim per year.
 - **RFD-01 claim no. (ARN)**: as on the GST portal. Each claim number can be recorded only once.
-- **Filed on**: the date it was filed.
+- **Filed on**: the date it was filed — after the period has ended, and
+  not in the future.
 - **Amount claimed**: in rupees.
 
 The claims table also shows **GST on bills in the period**, which is the GST on every tax invoice dated in those months, as a check against the amount claimed.

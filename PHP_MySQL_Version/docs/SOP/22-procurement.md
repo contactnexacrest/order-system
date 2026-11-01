@@ -35,7 +35,8 @@ working as:
 
 - within the limit — the purchase is approved at once;
 - above it — it waits for someone with **Approve purchases** whose own
-  limit covers it. Nobody approves their own award (Admin, MD and ED
+  limit covers it. Within your own limit the award is approved at once —
+  the limit is the control; above it, nobody approves their own award (Admin, MD and ED
   excepted, as for other approvals).
 
 The limit applies whatever the department state: a person who holds a

@@ -344,7 +344,13 @@ exist as polling scripts rather than a queue consumer):
 */15 * * * *  php /home/yourcpaneluser/nexacrest_webapp/app/cron/auto_confirm_oc_acknowledgments.php >> /home/yourcpaneluser/logs/auto_confirm_oc_acknowledgments.log 2>&1
 0 6 * * *     php /home/yourcpaneluser/nexacrest_webapp/app/cron/check_alerts.php >> /home/yourcpaneluser/logs/check_alerts.log 2>&1
 0 * * * *     php /home/yourcpaneluser/nexacrest_webapp/app/cron/zoho_sync.php >> /home/yourcpaneluser/logs/zoho_sync.log 2>&1
+15 8 * * *    php /home/yourcpaneluser/nexacrest_webapp/app/cron/daily_digest.php >> /home/yourcpaneluser/logs/daily_digest.log 2>&1
 ```
+
+- `daily_digest.php` — once every morning (owner decision 1 Nov 2026): one
+  e-mail per person listing their open tasks and documents to review. Set
+  the cron time zone to IST (or adjust 08:15 to the server's zone). Safe to
+  run twice; nobody gets two digests a day.
 
 - `dispatch_deferred_emails.php` — recommended every 5–15 minutes. Sends
   every `email_log` row that's `approved` and due

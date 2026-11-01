@@ -129,7 +129,10 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
 - **Company Settings** — legal name, registered/corporate office, GSTIN/IEC,
   bank details, LUT number — the exact fields snapshotted onto every
   generated document (see the note in [Chapter 1](./01-stage1-enquiry-quotation.md)
-  about data integrity). The LUT expiry date and RCMC validity date each
+  about data integrity). The Zoho client secrets and refresh tokens are
+  never shown: the field says "•••• stored, ends in 1a2b"; type a new
+  value to replace one, leave it empty to keep it, and the audit log keeps
+  only the last 4 characters (owner decision 1 Nov 2026). The LUT expiry date and RCMC validity date each
   carry their own alert-days setting; once either is within that many
   days of expiring (or already past it), a warning shows on the
   Dashboard **and** a count badge appears on the sidebar's **Company
@@ -396,6 +399,10 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   orders — every order already created against it, active or closed,
   already has its own copy of the preset's terms and is entirely
   unaffected.
+  **May run without an advance (0%)**: only a Letter of Credit preset may
+  carry this switch, and only a preset with it may have 0% advance — the
+  owner's rule is that the advance is zero only for LC (owner decision
+  1 Nov 2026). An amendment cannot take a cash-advance order to 0% either.
 - **Legal Terms & Definitions** — on every buyer-facing document except
   the BL Instruction Sheet, a final numbered section ("N. LEGAL TERMS &
   DEFINITIONS") prints a red **Legal Terms** box and a blue

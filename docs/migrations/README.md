@@ -22,6 +22,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-01e-line-types.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01f-export-service-invoice.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01g-payment-milestones.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01h-product-categories.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-01i-owner-decisions.sql
 ```
 
 ## Rules every file follows
@@ -78,6 +79,7 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30
 | 31 | `2026-11-01f-export-service-invoice.sql` | D-215 (5a): the Export Service Invoice document type (`ESI`, customer-facing, reference `SC/ESI/{YY}/{DDMM}{NNN}`) with DOCX turned on. New rows only |
 | 32 | `2026-11-01g-payment-milestones.sql` | D-215 (5a): an order's own payment schedule — the milestones between the advance and the balance (`order_payment_milestones`), each with its remittance, bank reference, clearing and Zoho Books payment. New table only |
 | 33 | `2026-11-01h-product-categories.sql` | D-215 (5a): product categories and their attributes (`product_categories`, `product_category_attributes`; Natural Stone = today's products, Dimensions and Finish) and the order line's category and attribute values (`order_products.category_id`, `attribute_values`, every existing line Natural Stone). New tables and columns only |
+| 34 | `2026-11-01i-owner-decisions.sql` | Owner decisions of 1 Nov 2026: System Administrator loses `data_export_run` (A-8); Procurement Executive gets `manage_suppliers` (C-8); `payment_presets.allow_zero_advance`, on for the Letter of Credit presets (C-4); `daily_digest_log` for the once-a-day digest (C-7); an existing order with no assignee gets its creator (C-7). Safe to run twice |
 
 There is no `2026-10-28b` file; that letter was not used.
 
