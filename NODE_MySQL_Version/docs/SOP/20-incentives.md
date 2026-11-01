@@ -62,7 +62,11 @@ associates (outside people who introduced a client; see below).
    fully paid 21 Oct to 20 Nov · paid with the November salary".
 2. Pay staff incentives together with the month's salary, through payroll
    (salary TDS). Pay an associate against their invoice; the CA advises the
-   TDS.
+   TDS. An associate's line can be paid only into their **verified** bank
+   account, past its waiting days; otherwise it is refused, and **Mark all
+   paid** skips it and says how many were skipped. A claw-back (negative
+   line) is deducted from the associate's next payment (see
+   [Chapter 24](./24-associates.md)).
 3. Record each payment: the date, the amount actually paid and any TDS,
    **Paid via** (with the salary / bank transfer / cheque) and the
    **Payment reference** (payroll month, UTR or cheque no.), then **Mark

@@ -258,13 +258,18 @@ or demoing the app.
 
 ## Background jobs
 
-Four jobs need to run outside the request/response cycle:
+Five jobs need to run outside the request/response cycle:
 
 - **`src/jobs/checkAlerts.js`** — run once daily. Checks LUT/RCMC
   certificate expiry against their configured alert/escalation thresholds,
   freight payments overdue (FDN issued, not yet cleared, past
-  `company_settings.fdn_overdue_days_c`), and dispute responses past their
-  due date — creates in-app notifications for Admin/MD for each, with a
+  `company_settings.fdn_overdue_days_c`), balance payments overdue (the
+  day after the balance due date — for post-BL and LC orders that date is
+  set when the scanned BL is sent, gap list G-2; also to the order's
+  assignees), the Letter of Credit's last shipment date, deadline to
+  present documents and expiry (once each, 7 days before, gap list G-4;
+  also to the assignees), quotation/PI validity expired, and dispute
+  responses past their due date — creates in-app notifications for Admin/MD for each, with a
   same-day dedup guard so a still-unresolved condition doesn't re-notify
   on every run.
 - **`src/jobs/dispatchDeferredEmails.js`** — run every 5–15 minutes. Sends
@@ -276,9 +281,19 @@ Four jobs need to run outside the request/response cycle:
   Auto-confirms any Order Confirmation the buyer hasn't acknowledged
   (client portal button, or a staff-recorded email reply) within 48 hours
   of it being emailed, unlocking Stage 5 (docs/schema.sql Section AE).
+  Gap list G-6 (1 Nov 2026): while e-mail sending is off, the 48 hours
+  start only when staff press "Mark Order Confirmation Sent to Buyer"
+  (Step 6c), not when the OC is approved.
   Idempotent — a row is only ever picked up once it has
   `acknowledged_at IS NULL AND due_at <= NOW()`, and acknowledging it (by
   any means) before this runs removes it from that set.
+- **`src/jobs/dailyDigest.js`** — once every morning at 08:15 IST (owner
+  decision 1 Nov 2026): one e-mail per person listing their open tasks and
+  documents to review, at most one a day. The same run also sends the
+  associates' reminders (D-217): 30 and 7 days before a client's 12-month
+  protection ends (if the client has not ordered) and before an
+  associate's agreement ends, each once, and marks one-off invitation
+  links past their 30 days as expired.
 - **`src/jobs/zohoSync.js`** — CA / Accounting module. Run hourly. Runs
   the same `caSyncService.runFullSync()` as the "Sync Now" button on
   `/ca/zoho-sync`: sends Zoho Books the Commercial Invoices and Debit
@@ -298,7 +313,7 @@ Four jobs need to run outside the request/response cycle:
   part and exits 0. The `/ca/zoho-sync` page shows this job's log
   alongside Sync Now's.
 
-All four are plain Node scripts, runnable directly and printing a
+All five are plain Node scripts, runnable directly and printing a
 one-line summary to stdout, exit code 0 on success:
 
 ```bash
@@ -306,13 +321,14 @@ node src/jobs/checkAlerts.js
 node src/jobs/dispatchDeferredEmails.js
 node src/jobs/autoConfirmOcAcknowledgments.js
 node src/jobs/zohoSync.js
+node src/jobs/dailyDigest.js
 ```
 
 **Pick exactly one of these two ways to run them — never both, or the
 same job double-fires:**
 
 **Option 1 — external cron (recommended: simplest, and independent of the
-web process's own uptime).** Add four crontab entries:
+web process's own uptime).** Add five crontab entries:
 ```
 */10 * * * *  cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/dispatchDeferredEmails.js >> /var/log/nexacrest/dispatch_deferred_emails.log 2>&1
 */15 * * * *  cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/autoConfirmOcAcknowledgments.js >> /var/log/nexacrest/auto_confirm_oc_acknowledgments.log 2>&1
@@ -320,7 +336,7 @@ web process's own uptime).** Add four crontab entries:
 0 * * * *     cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/zohoSync.js >> /var/log/nexacrest/zoho_sync.log 2>&1
 15 8 * * *    cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/dailyDigest.js >> /var/log/nexacrest/daily_digest.log 2>&1
 ```
-(`dailyDigest.js`, owner decision 1 Nov 2026: one e-mail per person each morning listing their open tasks and documents to review; set the cron time zone to IST or adjust 08:15. The in-process scheduler runs it at 08:15 IST.)
+(Set the cron time zone to IST, or adjust 08:15 for `dailyDigest.js`.)
 (`sudo mkdir -p /var/log/nexacrest` first.) Use the full path to `node`
 (`which node`) — cron's `$PATH` is much smaller than an interactive
 shell's.
@@ -329,10 +345,10 @@ shell's.
 in `.env` and restart the app (`pm2 restart nexacrest`). `src/server.js`
 then starts `src/jobs/scheduler.js`, which runs `checkAlerts` daily at
 02:00, `dispatchDeferredEmails` every 10 minutes,
-`autoConfirmOcAcknowledgments` every 15 minutes, and `zohoSync` hourly,
-all inside the same process — nothing else to configure, but job
+`autoConfirmOcAcknowledgments` every 15 minutes, `zohoSync` hourly and
+`dailyDigest` at 08:15, all inside the same process — nothing else to configure, but job
 execution is then tied to the web process's uptime (a restart briefly
-pauses all four jobs, and if you run multiple app instances behind a load
+pauses all five jobs, and if you run multiple app instances behind a load
 balancer for scaling, each instance would independently fire the jobs —
 stick to a single instance, or use Option 1, if you ever scale out).
 
@@ -1124,3 +1140,111 @@ Zoho Books, built from the facts and including the bank reference.
 - **Screens:** `/my-tasks`, `/cockpit`, `/admin/task-types`, and the Owners
   panel on the order page (`POST /orders/{id}/department-owners`).
 - **Tests:** `tests/integration/coordination.test.js`.
+
+## Follow-up (added 2026-11-01): order line types, Export Service Invoice, payment milestones, product categories (owner decision D-215, 5a — confirmed twice)
+
+- **Migrations:** `2026-11-01e-line-types.sql`, `2026-11-01f-export-service-invoice.sql`,
+  `2026-11-01g-payment-milestones.sql`, `2026-11-01h-product-categories.sql`.
+- **Line types:** each order line is Goods, Service or Charge (services carry a SAC
+  code). Goods FOB excludes services; the CI, Packing List, COO and Supplier PO show
+  goods only; the Quotation/PI/OC show the service lines.
+- **Export Service Invoice (ESI):** a separate document type, PDF and Word,
+  generated from the order page when the order has service lines.
+- **Payment milestones:** an order may have its own schedule between the advance and
+  the balance; each middle milestone is recorded (remittance, bank reference) and
+  cleared; the PI/OC list them in section 7; the balance waits for them.
+- **Product categories:** Products → Categories (`/products/categories`), each with its own attributes
+  shown on the product line (no document change).
+- **Tests:** `tests/integration/lineTypes.test.js`,
+  `exportServiceInvoice.test.js`,
+  `paymentMilestones.test.js`,
+  `productCategories.test.js`.
+
+## Follow-up (added 2026-11-01): Standard and Kanban templates kept parallel (owner hard rule)
+
+- Every list page (Orders, Disputes, Complaints, Reorder Requests, Quotation Intake,
+  PI Intake, Procurement, My tasks, Associates) offers on its Kanban board every
+  record link, action, filter and count of its Standard list, and the other way round;
+  each switches to the other ("Switch to list view" / "Switch to board view").
+- The Orders board shows 25 cards per column, then "Show more (N more)" (A-5).
+- **Tests:** `tests/integration/kanbanParity.test.js` (enforces the rule),
+  `kanbanCoverage.test.js`.
+
+## Follow-up (added 2026-11-01): QA Round 7 and the owner decisions of 1 Nov (A, B, C)
+
+- **QA Round 7:** fixes R7-N01 … N16 (milestone bound, client name on lists,
+  file links, Node resilience to a lost database connection, amendment date check,
+  procurement saved atomically …) with tests first.
+- **Owner decisions (D-216):** nobody approves their own payment terms (MD/ED
+  excepted, audit-logged), reviews their own document or approves their own e-mail
+  send; nobody grants a permission they do not hold or changes their own rights
+  (`GrantGuard`); System Administrator has no data export; LC-only zero advance;
+  GST refund periods within a financial year; Zoho secrets masked; every order keeps
+  an assignee; the daily digest (`src/jobs/dailyDigest.js`, 08:15 IST).
+- **Migration:** `2026-11-01i-owner-decisions.sql`.
+- **CI:** `.github/workflows/tests.yml` runs PHPUnit and Jest on every push against
+  MySQL 8.
+- **Tests:** `tests/integration/ownerDecisionsNov1.test.js`.
+
+## Follow-up (added 2026-11-01): the associate system (owner decision D-217)
+
+- **Migration:** `2026-11-02a-associate-system.sql` (tables `associate_tokens`,
+  `associate_bank_accounts`, `associate_documents`, `associate_invitations`,
+  `associate_events`, `associate_messages`, `associate_codes`; new columns on
+  associates, client intake submissions, clients, orders, incentive payouts; the
+  standard ladder, TDS %, protection months and bank waiting days in
+  `incentive_settings`; upload context `associate_document`).
+- **Permissions:** `manage_associates` (MD, ED, Admin), `view_associates` (Sales —
+  no amounts), `manage_associate_bank` (Finance Manager/Director, MD, Admin).
+- **Associate portal** `/associate` — its own login (password + e-mailed code),
+  middleware `associateAuth`: home, my clients (one-off links, personal code,
+  registration certificate), orders, commission (statement CSV / print, invoice
+  upload), profile (bank change request, documents, agreement), messages. Never
+  prices, costs, profit, suppliers, CAFIN or documents.
+- **Staff:** `/associates` (Standard list and Kanban board), `/associates/new`,
+  `/associates/{id}`, `/associates/ladder`, `/reports/associates`, payouts hold /
+  release / claw-back, bank first check / verify (two people) / reject, read-only
+  "View their portal".
+- **Buyer:** the associate's link `/invite/{token}` or `?code=` is carried on the
+  quotation form as a hidden field (no checkbox, no code box); the buyer confirms the
+  request with an e-mailed code (`/quotation-details/verify`); staff accept on
+  Quotation Intake.
+- **Commission:** the rate is fixed on the order at creation; earned when the buyer
+  has paid in full; pro rata on short pay; held while suspended; paid only into a
+  verified account; sent to Zoho as the associate's bill + vendor payment.
+- **Reminders:** in the daily digest job.
+- **Tests:** `tests/integration/associateSystem.test.js`, the route, ungated-route and
+  Kanban parity tests, `e2e/tests/11-associates.spec.js`. SOP chapter 24.
+
+## Follow-up (added 2026-11-01): gap list G-1 … G-6 (owner decision D-218)
+
+- **Migrations:** `2026-11-02b-gap-shipment-gates.sql`, `2026-11-02c-gap-due-dates-lc.sql`,
+  `2026-11-02d-gap-part-payments.sql`.
+- **G-1:** a "before shipment" balance is recorded and cleared (Steps 11c/11d) before
+  the Bill of Lading; Step 10f waits for it.
+- **G-2:** a post-BL or LC balance is due from the day the scanned BL is sent (Step
+  11b) plus the balance days; `checkAlerts.js` sends a daily overdue reminder.
+- **G-3:** Step 8a records the pre-shipment inspection Passed/Failed with its report
+  (`order_inspections`); Step 10f waits for a Passed inspection unless it is marked not
+  applicable.
+- A manager with `override_shipment_gates` (MD, ED, Admin) can release Step 10f with a
+  written reason (`order_shipment_gate_overrides`).
+- **G-4:** LC issue, last shipment, presentation and expiry dates with reminders
+  7 days before each; LC amendments (`order_lc_amendments`, upload context
+  `order_lc_amendment`).
+- **G-5:** several receipts per buyer payment (`order_payment_receipts`), "still owed";
+  clearing short needs `approve_short_payment` (MD, ED, Admin, Finance Director) and a
+  reason (`order_payment_shortfalls`). A milestone keeps one receipt.
+- **G-6:** with e-mail off, the OC's 48 hours start at "Mark Order Confirmation Sent to
+  Buyer".
+- **Tests:** `tests/integration/gapShipmentGates.test.js`, `gapDueDatesLc.test.js`,
+  `gapPartPayments.test.js`.
+
+## Follow-up (added 2026-11-01): CFR wording (C-16, confirmed twice) and Q-1 … Q-5 (D-219)
+
+- The "Shipment Booking (CFR/CIF)" clause asks for freight only on CFR orders, freight
+  and the insurance premium on CIF (`2026-11-02e-cfr-wording.sql`, changes only an
+  unedited clause). The Buyer PO's freight sentence follows the incoterm (CIF
+  freight & insurance, CFR freight with "insurance arranged by the buyer", FOB none),
+  PDF and Word.
+- **Tests:** `tests/integration/cfrWording.test.js`.

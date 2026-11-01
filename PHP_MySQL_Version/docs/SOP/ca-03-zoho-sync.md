@@ -168,6 +168,17 @@ What the order pays out goes to Zoho Books too, on the same sync:
   and bank charges (the CA books them from the bank statement), and CHA,
   inland transport and port charges entered as cost lines (record those
   as logistics partner bills, which go to Books themselves).
+- **Associate commission (owner decision D-217, 1 Nov 2026).** Once an
+  order's associate commission is fully paid, it goes to Books not as an
+  expense but as the **associate's own bill** (the associate a vendor, the
+  bill numbered with their invoice, account *Commission Expense*, the
+  gross commission) and a **vendor payment** from the bank with the UTR,
+  applied to it. The bill's description names the associate, the order,
+  the rate, the client number, their invoice and the TDS; the payment's
+  names the bill and the bank reference. The TDS deducted stays open on
+  the bill for the CA to book against TDS payable. A claw-back is not sent:
+  the CA books the recovery (vendor credit). In test mode only associates
+  named `TEST-…` are sent. See [Chapter 24](./24-associates.md).
 
 **What stops a bill, payment or expense, with a message in the Sync Log**
 (retried on every sync until fixed):

@@ -27,6 +27,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-02a-associate-system.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-02b-gap-shipment-gates.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-02c-gap-due-dates-lc.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-02d-gap-part-payments.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-02e-cfr-wording.sql
 ```
 
 ## Rules every file follows

@@ -81,6 +81,40 @@ anyone who merely holds `manage_orders`. This is purely about who can
 work exactly as before, completely independent of who's assigned to the
 order.
 
+### Who may give which rights (owner decision A-8, 1 Nov 2026)
+
+- Nobody can give a permission they do not hold themselves — not on a
+  role, not as a personal extra permission, not by giving someone a role
+  or a department membership. Removing a permission is always allowed.
+- Nobody can change their own rights: their own role's permissions, their
+  own role, or a personal exception or membership for themselves.
+- A Super Admin is the exception, so nobody can be locked out.
+- System Administrator manages users, settings and lists, but has no
+  full data export.
+
+### Permissions added 1 Nov 2026
+
+| Permission | Who has it | What it allows |
+|---|---|---|
+| Manage associates (`manage_associates`) | MD, ED, Admin | The associate register, rates, status, portal access, personal codes, client links, holds and claw-backs, standard rates, the report ([Chapter 24](./24-associates.md)) |
+| View associates (`view_associates`) | Export Executive, Sales/Export Manager, Sales Director (and MD, ED, Admin) | Who introduced which client — no amounts |
+| Associate bank & tax details (`manage_associate_bank`) | Finance Manager, Finance Director, MD, Admin | Associates' bank details: check, verify, full number |
+| Override shipment gates (`override_shipment_gates`) | MD, ED, Admin | Release the Bill of Lading step (10f) with a written reason when the before-shipment balance or the inspection is not cleared ([Stage 7](./07-stage7-packing-bl.md)) |
+| Approve short payment (`approve_short_payment`) | MD, ED, Admin, Finance Director | Clear a buyer payment that is less than due, with a written reason ([Stage 3](./03-stage3-pi-advance.md), [Stage 8](./08-stage8-ci-balance.md)) |
+
+### Scheduled jobs (set up once on the server)
+
+| Job | When | What it does |
+|---|---|---|
+| Deferred e-mail dispatch | every 10 minutes | Sends approved e-mails that are due |
+| OC auto-confirm | every 15 minutes | Confirms an Order Confirmation the buyer has not answered within 48 hours of it being sent (e-mail off: from **Mark Order Confirmation Sent to Buyer**) |
+| Alerts | daily | LUT / RCMC expiry, freight and balance payments overdue, the LC's last shipment date, document deadline and expiry (7 days before), quotation / PI validity expired, dispute replies overdue |
+| Zoho Books sync | hourly | Sends and checks the records that go to Zoho Books ([CA-03](./ca-03-zoho-sync.md)) |
+| Daily digest | 08:15 IST | One e-mail per person with their open tasks and documents to review; also the associates' reminders (protection and agreement ending in 30 and 7 days) |
+
+The server set-up is in each stack's README ("Bluehost cron setup" for PHP,
+"Background jobs" for Node).
+
 ### Users
 
 Create logins, edit an existing one, deactivate one, archive one, delete
@@ -577,7 +611,7 @@ automatically falls back to the company default, or to Standard if
 that's also inactive, the next time they load an affected page.
 
 **Where Kanban actually changes the screen** — the same switch, applied
-independently on each of these eight list pages, each rendering columns
+independently on each of these nine list pages, each rendering columns
 that match the real states that list already tracks elsewhere in this
 manual:
 
@@ -590,7 +624,9 @@ manual:
   they're dead ends, not pipeline stages worth a whole column of cards.
   The board opens on **Active** orders, exactly as the Standard list does;
   choose **Docs Sent**, **Complete** or **All** in the filter row to see
-  the others (QA Round 7, R7-N08).
+  the others (QA Round 7, R7-N08). Each column shows 25 cards, then
+  **Show more (N more)** adds 25 at a time; the count on the column is the
+  whole column (owner decision A-5, 1 Nov 2026).
 - **Disputes** ([Chapter 11](./11-disputes.md)) — one column per
   `dispute_status` dropdown option, in whatever order Admin has them
   configured in (Open / Under Review / Resolved / Escalated by default).
@@ -608,6 +644,8 @@ manual:
   the list.
 - **My tasks** ([Chapter 23](./23-coordination.md)) — Escalated / Overdue /
   Due today / Coming up, with the same "Only orders I own" switch.
+- **Associates** ([Chapter 24](./24-associates.md)) — Invited / Active /
+  Suspended / Agreement ended, with the same status chips and search.
 
 **Both templates do exactly the same (owner rule, 1 Nov 2026).** Anyone can
 use either template, so a board offers everything its list offers, and the
@@ -627,7 +665,7 @@ other way round:
 Every board has a **Switch to list view** button, and a Kanban user on the
 list has **Switch to board view** to go back (filters stay as chosen). A test
 on each stack (`KanbanParityTest` / `kanbanParity.test.js`) compares both
-views of all eight pages with real data and fails if either one lacks a link,
+views of all nine pages with real data and fails if either one lacks a link,
 action or filter the other has. The money each department may see is the same on a board as in
 the list: for example the Orders board shows an order's value only to
 departments that see selling prices. The order page itself is the same in

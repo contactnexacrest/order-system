@@ -103,6 +103,11 @@ Everything starts from the **Reports** hub:
   order for any date range, with a totals row. Visible only to Super
   Admin and roles granted **Manage order financials**; see [Order
   Financials](./ca-08-order-financials.md#the-order-profitability-report).
+- **Associates report** (`/reports/associates`, owner decision D-217) —
+  per financial year: performance per associate (clients, orders, FOB
+  value, commission paid, TDS, waiting), commission waiting (ageing, with
+  holds) and the TDS register; each as CSV. Needs **Manage associates**;
+  opened from **Associates → Report**. See [Chapter 24](./24-associates.md).
 - **Staff Productivity** — documents generated and audit-log activity per
   user (requires the separate `view_staff_reports` permission — this one
   isn't available to every role by default, unlike the others).

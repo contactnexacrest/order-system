@@ -424,6 +424,21 @@ The Playwright suite in `e2e/` adds a browser-level check of the same
 wording: the critical path downloads the generated PI and CI (PDF and
 Word) and reads them (see `e2e/README.md`).
 
+## 10. Added since (31 Oct – 1 Nov 2026)
+
+| Test | What it checks |
+|---|---|
+| `paymentDescriptionRule.test.js` | Rule D-212: every money record's description, exact wording, bank reference required |
+| `ownerDecisionsNov1.test.js`, `makerCheckerGuard.test.js` | D-216: no self-approval of payment terms (MD/ED excepted), no self-review, no self-approved send, nobody grants what they do not hold or changes their own rights, LC-only zero advance, GST refund periods, masked Zoho secrets, every order keeps an assignee, the daily digest |
+| `kanbanParity.test.js`, `kanbanCoverage.test.js` | Owner hard rule: every board offers what its list offers (and back), including Associates; the Orders board pages 25 per column |
+| `lineTypes.test.js`, `exportServiceInvoice.test.js`, `paymentMilestones.test.js`, `productCategories.test.js` | D-215 (5a): line types, the Export Service Invoice, payment milestones, product categories |
+| `associateSystem.test.js` | D-217: personal codes, rates (personal / standard / none) fixed on the order, earned only when paid in full, pro rata, hold, claw-back, bank checks by two people with a wait, the buyer's own registration (hidden field, e-mail code, first completed wins, direct approach caught), MD-only link changes, 2-step login, the portal never showing prices, costs, profit or CAFIN, read-only staff view, Zoho bill wording |
+| `gapShipmentGates.test.js`, `gapDueDatesLc.test.js`, `gapPartPayments.test.js` | D-218: before-shipment balance and inspection gates on the BL with manager release; balance due from the scanned BL and its reminder; LC dates, amendments and reminders; several receipts, still owed, short-pay sign-off; the OC "sent" clock |
+| `cfrWording.test.js` | C-16: the Shipment Booking clause and the Buyer PO freight sentence by incoterm (PDF and Word) |
+| `ungatedRoutes.test.js`, `routeBehaviour.test.js` | Updated for the associate portal (its own sign-in on 18 routes) and the new staff routes |
+
+Browser suite: `e2e/tests/10-departments.spec.js` and `11-associates.spec.js`; the critical path and role workflows now resolve the inspection and clear a before-shipment balance before the BL, and a second person approves each document.
+
 ## Appendix
 
 Full route-by-route and table-by-table inventory:

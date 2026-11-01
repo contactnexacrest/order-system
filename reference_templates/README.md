@@ -44,3 +44,16 @@ render buyer-facing PDFs/DOCX files, and
 they are expected to match this folder's content. When this folder is
 updated, the application templates need a corresponding update pass — they
 are not generated from these files automatically.
+
+## Owner decisions made after v5
+
+Since this set was frozen, the owner has changed some document wording and
+added document types through the decisions register
+(`docs/decisions/owner-decisions-register.md`), each confirmed twice, for
+example: the PI/CI payment wording (28 Oct), the CA Financial Annexure
+(CAFIN, internal), the Export Service Invoice (ESI, D-215), payment
+milestones on the PI/OC (D-215), and the CFR wording on the Shipment
+Booking clause and the Buyer PO (C-16, D-219). Where this folder and the
+register disagree, the register — and the app's templates that follow it
+— win. This folder was not edited for those changes.
+

@@ -120,6 +120,23 @@ Who does which money step:
 - **Mark fully settled** (Step 13) — Accounts & Finance ("Mark an order
   fully settled").
 
+Steps added 1 Nov 2026 (gap list):
+
+- **Pre-shipment inspection result** (Step 8a) — whoever handles shipping
+  ("Manage shipping & freight", usually Logistics); a **Failed** result
+  alerts everyone with "Override shipment gates".
+- **Release the Bill of Lading step** (10f) when the before-shipment
+  balance or the inspection is not cleared — MD, ED, Admin ("Override
+  shipment gates"), with a written reason.
+- **Clear a short buyer payment** — MD, ED, Admin, Finance Director
+  ("Approve short payment"), with a written reason.
+
+Associates (outside agents, [Chapter 24](./24-associates.md)) are not
+staff and have no department: they sign in to their own portal. Staff
+see them through "Manage associates" (MD, ED, Admin), "View associates"
+(Sales — who introduced which client, no amounts) and "Associate bank &
+tax details" (Finance, MD, Admin).
+
 The Commercial Invoice carries selling prices, so Logistics does not
 download it. Sales sends the CI and packing list to the CHA. If one
 logistics person must download it, Admin gives that person the "See

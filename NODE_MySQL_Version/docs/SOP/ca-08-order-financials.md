@@ -216,6 +216,15 @@ matching **Bank Loan Interest (LC order)** row in Other Order Costs
 category isn't needed; change the figure here and the cost entry
 updates itself.
 
+**LC dates and amendments (gap list G-4, owner 1 Nov 2026).** The same
+card (also shown under Step 5 on LC orders) records the **LC issued on**,
+**last shipment date**, **deadline to present documents** and **LC
+expiry** (the last two cannot be after the expiry), and lists every **LC
+amendment** (date, reference, what changed, optional copy). A reminder goes
+to Admin/MD and the order's assignees 7 days before each date, and the card
+warns when a date is within 7 days or past while the bank has not yet paid.
+See [Stage 3](./03-stage3-pi-advance.md).
+
 **LC Payment Received** (owner decision 2026-10-29) — shown in Step 12a
 on an LC order once the LC is confirmed usable: when the bank pays under
 the LC, record the **date the bank paid**, the **amount** in the order

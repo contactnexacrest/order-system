@@ -11,7 +11,17 @@ together with the application.
   company name, NexaCrest.
 - `NexaCrest_Order_Workflow_Guide.html` — the staff checklist: every step of
   the order page in order, by role, with a tick box per order (ticks are
-  kept in the browser on that device). Open it in any browser.
+  kept in the browser on that device). Open it in any browser. Updated
+  1 Nov 2026 for the gap-list gates: the inspection result (8a), the Bill
+  of Lading waiting for a Passed inspection and a before-shipment balance
+  (10f), the balance due from the scanned BL (11b), part payments and
+  short-pay sign-off, LC dates and amendments, and the OC "sent" clock (6c).
+
+The specification (v3) reflects the decisions up to 30 Oct 2026. The
+decisions taken since — D-212 (money descriptions) to D-219 (gap list, CFR
+wording, associates) — are in `docs/decisions/owner-decisions-register.md`
+and in the guide and the SOP; where they differ from the specification,
+the register wins.
 
 When a change adds, removes or renames a step on the order page, or the
 owner makes a workflow decision, update both files here (and the SOP in

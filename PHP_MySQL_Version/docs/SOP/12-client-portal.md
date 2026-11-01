@@ -10,6 +10,11 @@ chapter shows how they fit together on the buyer's actual screens, plus the
 two screens that don't belong to any single stage: the order list and the
 account page.
 
+The client portal is for buyers only. Associates — outside agents who
+introduce buyers — have their own, separate portal (`/associate`, see
+[Chapter 24](./24-associates.md)); a buyer's login never opens it, and an
+associate's login never opens a buyer's orders.
+
 ## The system does this automatically
 
 - **The portal login doesn't exist until Stage 3 → 4** (the advance payment

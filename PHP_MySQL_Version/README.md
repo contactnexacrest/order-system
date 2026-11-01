@@ -74,7 +74,7 @@ correctly once the password is changed.
   payment presets, stages, document types, the 21 real Terms & Conditions
   clauses, 9 email templates for the deferred-send pipeline, and the new
   `cross_verify_documents`/`approve_email_send` permissions.
-- `app/cron/` — the four scheduled jobs (see "Bluehost cron setup" below):
+- `app/cron/` — the five scheduled jobs (see "Bluehost cron setup" below):
   `dispatch_deferred_emails.php`, `auto_confirm_oc_acknowledgments.php`,
   `check_alerts.php` and `zoho_sync.php`; plus two scripts run by hand,
   never from cron: `zoho_cleanup_test_records.php` and
@@ -334,7 +334,7 @@ Send to Buyer" section appears per generated document, plus new
 
 ### Bluehost cron setup
 
-Four scheduled jobs, all plain PHP scripts meant to be run via
+Five scheduled jobs, all plain PHP scripts meant to be run via
 cPanel → Cron Jobs (Bluehost's equivalent of a systemd timer — there is no
 persistent worker process on shared hosting, which is exactly why these
 exist as polling scripts rather than a queue consumer):
@@ -350,7 +350,11 @@ exist as polling scripts rather than a queue consumer):
 - `daily_digest.php` — once every morning (owner decision 1 Nov 2026): one
   e-mail per person listing their open tasks and documents to review. Set
   the cron time zone to IST (or adjust 08:15 to the server's zone). Safe to
-  run twice; nobody gets two digests a day.
+  run twice; nobody gets two digests a day. The same run also sends the
+  associates' reminders (D-217): 30 and 7 days before a client's 12-month
+  protection ends (if the client has not ordered) and before an
+  associate's agreement ends, each once, and marks one-off invitation
+  links past their 30 days as expired.
 
 - `dispatch_deferred_emails.php` — recommended every 5–15 minutes. Sends
   every `email_log` row that's `approved` and due
@@ -360,14 +364,22 @@ exist as polling scripts rather than a queue consumer):
   Auto-confirms any Order Confirmation the buyer hasn't acknowledged
   (client portal button, or a staff-recorded email reply) within 48 hours
   of it being emailed, unlocking Stage 5 (docs/schema.sql Section AE).
+  Gap list G-6 (1 Nov 2026): while e-mail sending is off, the 48 hours
+  start only when staff press "Mark Order Confirmation Sent to Buyer"
+  (Step 6c), not when the OC is approved.
   Idempotent — a row is only ever picked up once it has `acknowledged_at
   IS NULL AND due_at <= NOW()`, and acknowledging it (by any means) before
   this runs removes it from that set.
 - `check_alerts.php` — recommended once daily. Checks LUT/RCMC expiry
   against their configured alert/escalation thresholds, freight payment
   overdue (FDN issued, not yet cleared, past
-  `fdn_overdue_days_c`), and dispute responses past their due date, and
-  creates in-app notifications for Admin/MD (see "Real bugs found" below —
+  `fdn_overdue_days_c`), balance payments overdue (the day after the
+  balance due date — for post-BL and LC orders that date is set when the
+  scanned BL is sent, gap list G-2; also to the order's assignees), the
+  Letter of Credit's last shipment date, deadline to present documents and
+  expiry (once each, 7 days before, gap list G-4; also to the assignees),
+  quotation/PI validity expired, and dispute responses past their due
+  date, and creates in-app notifications for Admin/MD (see "Real bugs found" below —
   this has a same-day dedup guard so it doesn't re-notify on every run
   while a condition remains unresolved).
 - `zoho_sync.php` — CA / Accounting module. Recommended hourly. Runs the
@@ -388,7 +400,7 @@ exist as polling scripts rather than a queue consumer):
   row per part and exits 0. The `/ca/zoho-sync` page shows this job's log
   alongside Sync Now's.
 
-All four scripts print a one-line summary to stdout and exit 0 on
+All five scripts print a one-line summary to stdout and exit 0 on
 success — redirect that to a log file (as above) so a Bluehost cron failure notice
 actually tells you something.
 
@@ -2245,3 +2257,111 @@ Zoho Books, built from the facts and including the bank reference.
 - **Screens:** `/my-tasks`, `/cockpit`, `/admin/task-types`, and the Owners
   panel on the order page (`POST /orders/{id}/department-owners`).
 - **Tests:** `tests/Integration/CoordinationTest.php`.
+
+## Follow-up (added 2026-11-01): order line types, Export Service Invoice, payment milestones, product categories (owner decision D-215, 5a — confirmed twice)
+
+- **Migrations:** `2026-11-01e-line-types.sql`, `2026-11-01f-export-service-invoice.sql`,
+  `2026-11-01g-payment-milestones.sql`, `2026-11-01h-product-categories.sql`.
+- **Line types:** each order line is Goods, Service or Charge (services carry a SAC
+  code). Goods FOB excludes services; the CI, Packing List, COO and Supplier PO show
+  goods only; the Quotation/PI/OC show the service lines.
+- **Export Service Invoice (ESI):** a separate document type, PDF and Word,
+  generated from the order page when the order has service lines.
+- **Payment milestones:** an order may have its own schedule between the advance and
+  the balance; each middle milestone is recorded (remittance, bank reference) and
+  cleared; the PI/OC list them in section 7; the balance waits for them.
+- **Product categories:** Products → Categories (`/products/categories`), each with its own attributes
+  shown on the product line (no document change).
+- **Tests:** `tests/Integration/LineTypesTest.php`,
+  `ExportServiceInvoiceTest.php`,
+  `PaymentMilestoneTest.php`,
+  `ProductCategoryTest.php`.
+
+## Follow-up (added 2026-11-01): Standard and Kanban templates kept parallel (owner hard rule)
+
+- Every list page (Orders, Disputes, Complaints, Reorder Requests, Quotation Intake,
+  PI Intake, Procurement, My tasks, Associates) offers on its Kanban board every
+  record link, action, filter and count of its Standard list, and the other way round;
+  each switches to the other ("Switch to list view" / "Switch to board view").
+- The Orders board shows 25 cards per column, then "Show more (N more)" (A-5).
+- **Tests:** `tests/Integration/KanbanParityTest.php` (enforces the rule),
+  `KanbanCoverageTest.php`.
+
+## Follow-up (added 2026-11-01): QA Round 7 and the owner decisions of 1 Nov (A, B, C)
+
+- **QA Round 7:** fixes R7-N01 … N16 (milestone bound, client name on lists,
+  file links, Node resilience to a lost database connection, amendment date check,
+  procurement saved atomically …) with tests first.
+- **Owner decisions (D-216):** nobody approves their own payment terms (MD/ED
+  excepted, audit-logged), reviews their own document or approves their own e-mail
+  send; nobody grants a permission they do not hold or changes their own rights
+  (`GrantGuard`); System Administrator has no data export; LC-only zero advance;
+  GST refund periods within a financial year; Zoho secrets masked; every order keeps
+  an assignee; the daily digest (`cron/daily_digest.php`, 08:15 IST).
+- **Migration:** `2026-11-01i-owner-decisions.sql`.
+- **CI:** `.github/workflows/tests.yml` runs PHPUnit and Jest on every push against
+  MySQL 8.
+- **Tests:** `tests/Integration/OwnerDecisionsNov1Test.php`.
+
+## Follow-up (added 2026-11-01): the associate system (owner decision D-217)
+
+- **Migration:** `2026-11-02a-associate-system.sql` (tables `associate_tokens`,
+  `associate_bank_accounts`, `associate_documents`, `associate_invitations`,
+  `associate_events`, `associate_messages`, `associate_codes`; new columns on
+  associates, client intake submissions, clients, orders, incentive payouts; the
+  standard ladder, TDS %, protection months and bank waiting days in
+  `incentive_settings`; upload context `associate_document`).
+- **Permissions:** `manage_associates` (MD, ED, Admin), `view_associates` (Sales —
+  no amounts), `manage_associate_bank` (Finance Manager/Director, MD, Admin).
+- **Associate portal** `/associate` — its own login (password + e-mailed code),
+  middleware `AssociateAuth`: home, my clients (one-off links, personal code,
+  registration certificate), orders, commission (statement CSV / print, invoice
+  upload), profile (bank change request, documents, agreement), messages. Never
+  prices, costs, profit, suppliers, CAFIN or documents.
+- **Staff:** `/associates` (Standard list and Kanban board), `/associates/new`,
+  `/associates/{id}`, `/associates/ladder`, `/reports/associates`, payouts hold /
+  release / claw-back, bank first check / verify (two people) / reject, read-only
+  "View their portal".
+- **Buyer:** the associate's link `/invite/{token}` or `?code=` is carried on the
+  quotation form as a hidden field (no checkbox, no code box); the buyer confirms the
+  request with an e-mailed code (`/quotation-details/verify`); staff accept on
+  Quotation Intake.
+- **Commission:** the rate is fixed on the order at creation; earned when the buyer
+  has paid in full; pro rata on short pay; held while suspended; paid only into a
+  verified account; sent to Zoho as the associate's bill + vendor payment.
+- **Reminders:** in the daily digest job.
+- **Tests:** `tests/Integration/AssociateSystemTest.php`, the route, ungated-route and
+  Kanban parity tests, `e2e/tests/11-associates.spec.js`. SOP chapter 24.
+
+## Follow-up (added 2026-11-01): gap list G-1 … G-6 (owner decision D-218)
+
+- **Migrations:** `2026-11-02b-gap-shipment-gates.sql`, `2026-11-02c-gap-due-dates-lc.sql`,
+  `2026-11-02d-gap-part-payments.sql`.
+- **G-1:** a "before shipment" balance is recorded and cleared (Steps 11c/11d) before
+  the Bill of Lading; Step 10f waits for it.
+- **G-2:** a post-BL or LC balance is due from the day the scanned BL is sent (Step
+  11b) plus the balance days; `check_alerts.php` sends a daily overdue reminder.
+- **G-3:** Step 8a records the pre-shipment inspection Passed/Failed with its report
+  (`order_inspections`); Step 10f waits for a Passed inspection unless it is marked not
+  applicable.
+- A manager with `override_shipment_gates` (MD, ED, Admin) can release Step 10f with a
+  written reason (`order_shipment_gate_overrides`).
+- **G-4:** LC issue, last shipment, presentation and expiry dates with reminders
+  7 days before each; LC amendments (`order_lc_amendments`, upload context
+  `order_lc_amendment`).
+- **G-5:** several receipts per buyer payment (`order_payment_receipts`), "still owed";
+  clearing short needs `approve_short_payment` (MD, ED, Admin, Finance Director) and a
+  reason (`order_payment_shortfalls`). A milestone keeps one receipt.
+- **G-6:** with e-mail off, the OC's 48 hours start at "Mark Order Confirmation Sent to
+  Buyer".
+- **Tests:** `tests/Integration/GapShipmentGatesTest.php`, `GapDueDatesLcTest.php`,
+  `GapPartPaymentsTest.php`.
+
+## Follow-up (added 2026-11-01): CFR wording (C-16, confirmed twice) and Q-1 … Q-5 (D-219)
+
+- The "Shipment Booking (CFR/CIF)" clause asks for freight only on CFR orders, freight
+  and the insurance premium on CIF (`2026-11-02e-cfr-wording.sql`, changes only an
+  unedited clause). The Buyer PO's freight sentence follows the incoterm (CIF
+  freight & insurance, CFR freight with "insurance arranged by the buyer", FOB none),
+  PDF and Word.
+- **Tests:** `tests/Integration/CfrWordingTest.php`.

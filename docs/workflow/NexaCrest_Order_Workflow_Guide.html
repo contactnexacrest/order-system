@@ -149,6 +149,9 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
       <li>Record every money receipt with that day's exchange rate, and every payment with its date, mode and UTR. Reference numbers use the 2-digit year (SC/CI/26/…).</li>
       <li>Vendor bills: attach the bill, say whether it is a proforma or the tax invoice, pick GST as a % — the amount and total fill in themselves. A bill can be paid in parts.</li>
       <li>Talk to the client through <b>Order Communication</b> on the order page so the history stays with the order.</li>
+      <li>A buyer payment can arrive in parts: record each receipt; the step shows what is still owed. Clearing a payment that is short needs a manager with <b>Approve short payment</b> and a written reason.</li>
+      <li>The Bill of Lading (Step 10f) waits for a <b>Passed</b> pre-shipment inspection (or the inspection marked not applicable) and, on "before shipment" orders, for the balance to be cleared. Only a manager can release it, with a written reason.</li>
+      <li>Nobody reviews their own document or approves their own e-mail send; a second person does.</li>
     </ul>
     <div class="roles-key" style="margin-top:10px">
       <span><span class="tag">Export</span> Export Executive</span>
@@ -188,16 +191,16 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
         ['5a', 'Generate PI Form Link', ['export'], 'Send the client the PI form link for consignee, notify party, billing and shipping details.', 'the link is sent.'],
         ['5b', 'Apply the Client\'s PI-Stage Confirmation', ['export'], 'Check the submitted details (consignee, notify party, ports, identifiers) and apply them — or Skip with reason, e.g. repeat buyer with unchanged details.', 'details are applied or the step is skipped with a reason.'],
         ['5c', 'Generate Proforma Invoice', ['export'], 'Generate the PI, approve it and send it to the buyer.', 'the PI is approved and sent.'],
-        ['5d', 'Record LC Details', ['accounts', 'mgmt'], 'Upload the final Letter of Credit and record LC number, bank, amount, issue and expiry dates.', 'LC details are recorded.', 'cond:LC orders only'],
+        ['5d', 'Record LC Details', ['accounts', 'mgmt'], 'Upload the final Letter of Credit and record LC number, bank and amount. In the Letter of Credit & Bank Loan card, record the issue date, last shipment date, deadline to present documents and expiry (reminders go out 7 days before each), and every LC amendment.', 'LC details are recorded.', 'cond:LC orders only'],
         ['5e', 'Confirm LC Usable', ['accounts', 'mgmt'], 'Review the LC terms and amendments; confirm it can be used.', 'the LC is confirmed usable.', 'cond:LC orders only'],
-        ['5d', 'Record Advance Remittance', ['accounts', 'export'], 'When the buyer\'s advance arrives (they can upload proof through the Payment Action Link), record the amount received together with that day\'s exchange rate.', 'the remittance is recorded.', 'cond:Advance orders'],
+        ['5d', 'Record Advance Remittance', ['accounts', 'export'], 'When the buyer\'s advance arrives (they can upload proof through the Payment Action Link), record the amount received together with that day\'s exchange rate and the bank reference. Paid in parts? Record each receipt; the step shows what is still owed.', 'the remittance is recorded.', 'cond:Advance orders'],
         ['5e', 'Mark Advance Cleared', ['accounts'], 'Confirm the money is actually in the bank (INR credited, charges) and mark the advance cleared.', 'the advance shows as cleared.', 'cond:Advance orders'],
         ['LC', 'LC Payment Received, Letter of Credit & Bank Loan costs', ['mgmt', 'accounts'], 'On LC orders, record the money the bank paid under the LC (with the INR credited and bank charges) and its FIRC / eBRC. If a bank loan is taken for the order, record the loan, interest payments and the interest charged to this order.', 'LC money and financing costs are recorded.', 'side']
       ]},
       { name: 'Step 6 · Order Confirmation', steps: [
         ['6a', 'Generate Order Confirmation', ['export'], 'Generate the OC once the advance is cleared; approve it.', 'the OC is approved.'],
         ['6b', 'Send Buyer Action Link (OC acknowledgement)', ['export'], 'Send the buyer the link to acknowledge the OC.', 'the link is sent.'],
-        ['6c', 'Record Buyer\'s Acknowledgement', ['export'], 'Record that the buyer acknowledged this OC version. Change requests go through Amendments.', 'the acknowledgement is recorded.']
+        ['6c', 'Record Buyer\'s Acknowledgement', ['export'], 'With e-mail sending off, first press Mark Order Confirmation Sent to Buyer when you send it — the buyer\'s 48 hours start then, after which it confirms itself. Record that the buyer acknowledged this OC version. Change requests go through Amendments.', 'the acknowledgement is recorded.']
       ]}
     ]},
     { key: 'B', color: 'var(--b)', title: 'Procurement & Production', sub: 'Supplier PO → production & estimated shipment', groups: [
@@ -212,7 +215,7 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
         ['7e', 'Supplier Advance Paid', ['accounts'], 'Add the supplier\'s advance bill (proforma invoice, GST %, bill attached), then press the green ₹ Mark Paid with date, mode and UTR — in one payment or several. With 0% advance this step completes by itself.', 'the advance bill is paid (or no advance is planned).']
       ]},
       { name: 'Step 8 · Production', steps: [
-        ['8a', 'Production & Estimated Shipment', ['export'], 'Keep the production status and estimated shipment date up to date — the client sees the estimate. A reminder arrives 7 days before, to arrange the pre-shipment inspection when one applies.', 'production is complete and the shipment date is set.']
+        ['8a', 'Production & Estimated Shipment', ['export'], 'Keep the production status and estimated shipment date up to date — the client sees the estimate. A reminder arrives 7 days before, to arrange the pre-shipment inspection when one applies. Record the inspection result (Passed / Failed, date, agency, report) in this step — a Failed result alerts the managers and holds the Bill of Lading.', 'production is complete and the shipment date is set.']
       ]}
     ]},
     { key: 'C', color: 'var(--c)', title: 'Shipment & Balance', sub: 'Freight → packing & BL → commercial invoice & balance', groups: [
@@ -232,14 +235,14 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
         ['10c', 'Generate Packing List', ['logistics'], 'Generate and approve the Packing List.', 'the Packing List is approved.'],
         ['10d', 'Save Shipping Details', ['logistics'], 'Record booking, vessel, container and seal details.', 'shipping details are saved.'],
         ['10e', 'Generate BL Instruction Sheet', ['logistics'], 'Generate the BL instructions from the approved consignee/notify details and packing list; send them with the packing list to the CHA.', 'instructions are sent to the CHA.'],
-        ['10f', 'Confirm BL Issued', ['logistics'], 'Check each draft BL from the CHA against the instructions until it is right, then confirm the BL and attach the scanned BL copy.', 'the BL is issued and the scan is attached.'],
+        ['10f', 'Confirm BL Issued', ['logistics'], 'Check each draft BL from the CHA against the instructions until it is right, then confirm the BL and attach the scanned BL copy. It waits for a Passed inspection (or the inspection marked not applicable) and, on "before shipment" orders, for the balance to be cleared — a manager can release it with a written reason.', 'the BL is issued and the scan is attached.'],
         ['SB', 'Record the Shipping Bill', ['logistics', 'accounts'], 'Record the shipping bill number, date and the customs exchange rate printed on it. The Commercial Invoice and Debit Note go to Zoho Books at that rate, so they wait for it.', 'the shipping bill is recorded.', 'side']
       ]},
       { name: 'Step 11 · Commercial Invoice & balance', steps: [
         ['11a', 'Generate Commercial Invoice', ['export', 'accounts'], 'Generate the CI. Its date is today by default; pick an earlier date when the CI must carry the BL date (never a future date). FOB orders raise the CI before shipment.', 'the CI is approved.'],
-        ['11b', 'Mark Scanned BL Copy Sent to Buyer', ['export'], 'Send the scanned BL and the CI to the buyer with the payment instructions and due date.', 'it is marked sent.'],
-        ['11c', 'Record Balance Remittance', ['accounts'], 'Record the buyer\'s balance payment with that day\'s exchange rate.', 'the remittance is recorded.'],
-        ['11d', 'Mark Balance Cleared', ['accounts'], 'Confirm the money is in the bank and mark the balance cleared.', 'the balance shows as cleared.']
+        ['11b', 'Mark Scanned BL Copy Sent to Buyer', ['export'], 'Send the scanned BL and the CI to the buyer with the payment instructions and due date. On post-BL and LC orders the balance due date is set now (today + the order\'s balance days); an overdue balance is reminded daily.', 'it is marked sent.'],
+        ['11c', 'Record Balance Remittance', ['accounts'], 'Record the buyer\'s balance payment with that day\'s exchange rate and the bank reference; paid in parts, record each receipt. On "before shipment" orders this is done before the Bill of Lading, against the PI.', 'the remittance is recorded.'],
+        ['11d', 'Mark Balance Cleared', ['accounts'], 'Confirm the money is in the bank and mark the balance cleared. Still owed? A manager with Approve short payment clears it with a reason. On "before shipment" orders the balance is cleared before shipment, and Complete Step 11 passes the stage once the CI is approved.', 'the balance shows as cleared.']
       ]}
     ]},
     { key: 'D', color: 'var(--d)', title: 'Closure & Settlement', sub: 'Financials & benefits → documents despatched → fully settled', groups: [

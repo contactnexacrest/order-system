@@ -16,7 +16,12 @@ rendered pages, not a direct controller/HTTP call.
   Commercial Invoice it generates (PDF and Word) to check their payment
   wording: the ADVANCE PAYABLE NOW box, the balance on the order's own
   terms, the freight & insurance Debit Note line, the bank-charges
-  sentence, the cleared-funds sentence and Calendar Days.
+  sentence, the cleared-funds sentence and Calendar Days. Gap list
+  G-1/G-3 (1 Nov 2026): the balance is "before shipment", so it is
+  recorded and cleared (Steps 11c/11d) before the Bill of Lading, and the
+  compliance checklist (including the pre-shipment inspection) is
+  resolved before Step 10f. Owner decision A-2: a second person (the ED)
+  reviews and approves each document (`support/review.js`).
 - `01-role-visibility.spec.js` — every staff role (Admin, Managing
   Director, Executive Director, Export Executive, Accounts Executive,
   Logistics Executive, Viewer/Auditor, CA) logs in and the nav renders
@@ -58,6 +63,24 @@ rendered pages, not a direct controller/HTTP call.
   does not match), plus the QA Round 5 R5-27 / R5-30 checks (an empty
   dropdown option, a reference document cleared of its text, an order
   message with neither text nor a file).
+- `10-departments.spec.js` — departments (D-214): the menu shows the
+  department a person is logged in as, Admin → Departments shows every
+  department's ladder, and "Preview the app as this" shows what a
+  designation sees until "Exit preview".
+- `11-associates.spec.js` — one associate's journey (D-217): the MD adds
+  the associate, the bank is verified, the associate is set Active and
+  sent portal access, sets a password and logs in with the e-mailed code,
+  creates a one-off link; the buyer opens the link (the associate is
+  carried as a hidden field — no checkbox or code box), registers and
+  enters the e-mailed code; staff accept on Quotation Intake and the
+  client is linked; the associate prints the registration certificate;
+  Sales sees who introduced whom, no amounts.
+
+Support files: `support/auth.js` (staff and client logins),
+`support/db.js` (direct dev-database setup: client logins, mail switch,
+a verified associate bank account), `support/mail.js`,
+`support/review.js` (a second person approves a document — owner
+decision A-2: nobody reviews their own document).
 
 This is real end-to-end coverage of the features above, not exhaustive
 coverage of the whole app — it proves these specific flows work on a

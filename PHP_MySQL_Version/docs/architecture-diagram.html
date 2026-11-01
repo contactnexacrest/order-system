@@ -235,6 +235,7 @@
 
 <div class="section">
   <h2>3 — Nine-stage order gate</h2>
+  <p class="lede"><b>Note (1 Nov 2026):</b> this drawing is from the original proposal. The stages as built are 1 Enquiry &amp; Quotation · 2 Buyer PO · 3 Proforma Invoice · 4 Order Confirmation · 5 Supplier PO · 6 Freight · 7 Packing &amp; BL · 8 Commercial Invoice &amp; Balance · 9 Despatch &amp; Closure — see <code>ARCHITECTURE.html</code> §G at the repository root and the SOP. Since 1 Nov the Bill of Lading step (10f) also waits for a "before shipment" balance to be cleared and for a Passed pre-shipment inspection (a manager can release it with a written reason).</p>
   <p class="lede">Every stage is a hard gate: the next stage stays locked until its condition is met, and every gate condition below comes from your spec's Business Rules (Section 15), not from application guesswork.</p>
   <figure>
     <div class="scroll">

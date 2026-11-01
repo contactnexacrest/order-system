@@ -54,10 +54,10 @@ moment a buyer submits and disappears the moment staff accept or reject
 it. No badge means the queue is empty; staff don't need to open the
 screen just to check. Staff review it here and either:
 
-- **Accept & Create Client** (with a reason, min. 10 characters) — creates
-  the real client record and takes you straight to it, ready to create the
-  order.
-- **Reject** (with a reason) — if it's not a genuine enquiry.
+- **Accept & Create Client** — creates the real client record and takes
+  you straight to it, ready to create the order.
+- **Reject** (with a reason, at least 10 characters) — if it's not a
+  genuine enquiry.
 - **Resend Link** — the buyer gets a one-time self-correction link by
   email right after submitting (good for 7 days), so they can fix a typo
   themselves without staff involvement. If that email never arrived, or
@@ -66,6 +66,35 @@ screen just to check. Staff review it here and either:
   since an expired link can't be reused.
 
 ![Quotation Intake Review queue](./images/s1_intake_review_queue.png)
+
+#### A buyer introduced by an associate (owner decision D-217)
+
+When the buyer opens the form through an associate's link (`/invite/…`)
+or code link (`/quotation-details?code=NXA-…`), the associate is picked up
+automatically and carried as a **hidden field** — the buyer sees the same
+form as everyone else: no checkbox, no associate name, no code box. After
+**Submit Request** the buyer is e-mailed a 6-digit code and confirms the
+request on the next page (**Confirm your request**, code valid 30
+minutes).
+
+On Quotation Intake Review (list or board) such a row shows
+"**Associate: <name> — buyer’s e-mail verified**" and any warnings: the
+buyer used the associate's own e-mail or phone, a free-mail address, an
+e-mail domain not matching the website, the e-mail is not verified yet, or
+the company is already another associate's client.
+
+- Accept is refused until the buyer has entered the code.
+- If another associate's registration of the same company was completed
+  earlier and is still pending, decide that one first (the first completed
+  registration wins).
+- On Accept the client is linked to the associate for 12 months; the
+  associate is told and gets a registration certificate. Reject tells the
+  associate, with the reason.
+- A plain enquiry from a company that is already an associate's client is
+  recognised (name, VAT number, e-mail domain or phone) and the associate
+  is told.
+
+The full associate system is [Chapter 24](./24-associates.md).
 
 Accepting **only creates the client** — it does not create an order or a
 Quotation automatically. Staff still do that next, exactly as in Path B.

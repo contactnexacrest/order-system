@@ -16,6 +16,16 @@ Two parallel, always-in-parity stacks:
 Both stacks share the same MySQL schema and business rules, and every
 feature is built and verified in both before being considered done.
 
+Three separate sign-ins, never mixed:
+
+- **Staff** (`/login`) — departments, roles and permissions decide what each
+  person sees and does (SOP chapter 21).
+- **Buyers** (`/client`) — the client portal: their own orders, documents,
+  payments and feedback (SOP chapter 12).
+- **Associates** (`/associate`) — outside agents who introduce buyers: their
+  own clients, orders, commission and payments, never prices, costs or
+  documents (SOP chapter 24).
+
 Where to look:
 
 - **Setup and deployment:** each stack's own `README.md`.
@@ -41,5 +51,11 @@ Where to look:
 - **QA test plan:** each stack's `docs/QA/TEST_PLAN.md`; the unit and
   integration tests are in each stack's `app/tests/` (PHPUnit for PHP, Jest
   for Node), and the browser suite is in `e2e/` (see `e2e/README.md`).
+  GitHub runs PHPUnit and Jest on every push against MySQL 8
+  (`.github/workflows/tests.yml`).
+- **Standing rules for anyone changing the code:** `CLAUDE.md` (parity,
+  tests on both stacks, ask before pushing, no document change without the
+  owner's double confirmation, Standard/Kanban parity, browser-side
+  validation, money descriptions, Zoho change log).
 - **Reference documents and spec:** `reference_templates/` (not read by the
   app at runtime).

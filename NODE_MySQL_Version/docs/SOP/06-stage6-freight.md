@@ -17,6 +17,15 @@ Proforma Invoice print insurance as "NIL — buyer arranges insurance
 "Freight" instead of "Freight & Insurance". An insurance figure stored on
 a CFR order before this rule is ignored everywhere.
 
+Two more texts follow the same rule (C-16, owner confirmed twice,
+1 Nov 2026): the **Shipment Booking (CFR/CIF)** clause on the Quotation,
+PI and OC asks for "full freight payment (and, for CIF orders, the
+insurance premium)" before booking; and the **Buyer PO**'s Payment Terms
+row (PDF and Word) ends "Freight & Insurance: invoiced separately by Debit
+Note before shipment." on CIF, "Freight: invoiced separately by Debit Note
+before shipment (insurance arranged by the buyer)." on CFR, and nothing on
+FOB. Documents generated before the change keep their old text.
+
 The internal code for this document type stays **FDN** (the reference
 number's old `SC/FDN/…` pattern pre-dating this change, and some of this
 chapter's own wording below, still say "Freight Debit Note"); the button

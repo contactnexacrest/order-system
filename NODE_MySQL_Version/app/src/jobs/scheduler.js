@@ -10,7 +10,7 @@ const logger = require('../helpers/logger');
 
 /**
  * Optional in-process alternative to external OS-level cron/systemd timers
- * for the four background jobs this app needs (checkAlerts.js,
+ * for the five background jobs this app needs (dailyDigest.js, checkAlerts.js,
  * dispatchDeferredEmails.js, autoConfirmOcAcknowledgments.js and
  * zohoSync.js — each also independently runnable via
  * `node src/jobs/<name>.js`, which is what an external cron entry calls).
@@ -86,7 +86,7 @@ function start() {
     })
   );
 
-  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 02:00, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min, zohoSync hourly).');
+  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 02:00, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min, zohoSync hourly, dailyDigest daily @ 08:15 incl. associate reminders).');
   return tasks;
 }
 
