@@ -65,6 +65,19 @@ final class DocxDocumentBuilder
     // Small local helpers
     // ------------------------------------------------------------------
 
+    /**
+     * Owner decision C-16 (confirmed twice, 1 Nov 2026): the Buyer PO's freight sentence follows the
+     * incoterm — CIF freight and insurance, CFR freight only (the buyer insures), FOB nothing.
+     */
+    public static function freightTermsSentence(string $incoterm): string
+    {
+        return match (strtoupper(trim($incoterm))) {
+            'CIF' => ' Freight & Insurance: invoiced separately by Debit Note before shipment.',
+            'CFR' => ' Freight: invoiced separately by Debit Note before shipment (insurance arranged by the buyer).',
+            default => '',
+        };
+    }
+
     private static function g(array $arr, string $path, $default = '—')
     {
         $cur = $arr;
@@ -870,7 +883,7 @@ final class DocxDocumentBuilder
             ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
             ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Certificate of Origin *', 'value' => self::g($order, 'coo_type')],
-            ['label' => 'Payment Terms', 'value' => self::g($financial, 'advance_pct') . '% advance T/T (Telegraphic Transfer) against Proforma Invoice before production. ' . self::g($financial, 'balance_pct') . '% balance T/T before shipment — ' . self::g($financial, 'balance_terms_text') . ' Freight & Insurance (CFR/CIF): invoiced separately by Freight Debit Note before shipment.'],
+            ['label' => 'Payment Terms', 'value' => self::g($financial, 'advance_pct') . '% advance T/T (Telegraphic Transfer) against Proforma Invoice before production. ' . self::g($financial, 'balance_pct') . '% balance T/T before shipment — ' . self::g($financial, 'balance_terms_text') . self::freightTermsSentence((string) self::g($order, 'incoterm_code', ''))],
         ]);
 
         DocxComponents::addSectionTitle($section, '4. BUYER ACCEPTANCE  (Buyer fills this section, signs and returns)');

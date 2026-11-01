@@ -28,6 +28,18 @@ const { convertAnnexureTermsHtml } = require('./annexureTermsDocx');
 // Small local helpers (mirrors PHP's DocxDocumentBuilder::g()/titleFor()/etc.)
 // ------------------------------------------------------------------
 
+/**
+ * Owner decision C-16 (confirmed twice, 1 Nov 2026): the Buyer PO's freight sentence follows the
+ * incoterm — CIF freight and insurance, CFR freight only (the buyer insures), FOB nothing.
+ */
+function freightTermsSentence(incoterm) {
+  switch (String(incoterm || '').trim().toUpperCase()) {
+    case 'CIF': return ' Freight & Insurance: invoiced separately by Debit Note before shipment.';
+    case 'CFR': return ' Freight: invoiced separately by Debit Note before shipment (insurance arranged by the buyer).';
+    default: return '';
+  }
+}
+
 function g(obj, path, fallback = '—') {
   let cur = obj;
   for (const key of path.split('.')) {
@@ -873,7 +885,7 @@ function renderBuyerPo(context) {
       { label: 'Certificate of Origin *', value: g(order, 'coo_type') },
       {
         label: 'Payment Terms',
-        value: `${g(financial, 'advance_pct')}% advance T/T against Proforma Invoice before production. ${g(financial, 'balance_pct')}% balance T/T before shipment — ${g(financial, 'balance_terms_text')} Freight & Insurance (CFR/CIF): invoiced separately by Freight Debit Note before shipment.`,
+        value: `${g(financial, 'advance_pct')}% advance T/T against Proforma Invoice before production. ${g(financial, 'balance_pct')}% balance T/T before shipment — ${g(financial, 'balance_terms_text')}${freightTermsSentence(g(order, 'incoterm_code', ''))}`,
       },
     ])
   );
@@ -1936,4 +1948,4 @@ async function render(documentTypeCode, context) {
   return require('docx').Packer.toBuffer(doc);
 }
 
-module.exports = { render, buildProductRows };
+module.exports = { render, buildProductRows, freightTermsSentence };

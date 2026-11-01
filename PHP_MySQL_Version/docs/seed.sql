@@ -367,7 +367,7 @@ SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Pricing Currency & Basis' AND dt.code IN ('QT','PI');
 
 INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked) VALUES
-  (90, 'Shipment Booking (CFR/CIF)', 'Shipment Booking: For CFR/CIF orders, shipment booking will be confirmed only after full freight and insurance payment is received and cleared in NexaCrest''s bank account against the Debit Note. NexaCrest cannot book the container or hand over cargo to the shipping line until freight payment is verified.', 'active', 0);
+  (90, 'Shipment Booking (CFR/CIF)', 'Shipment Booking: For CFR/CIF orders, shipment booking will be confirmed only after full freight payment (and, for CIF orders, the insurance premium) is received and cleared in NexaCrest''s bank account against the Debit Note. NexaCrest cannot book the container or hand over cargo to the shipping line until freight payment is verified.', 'active', 0);
 INSERT INTO tc_clause_documents (clause_id, document_type_id)
 SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
 WHERE c.clause_title = 'Shipment Booking (CFR/CIF)' AND dt.code IN ('QT','PI','OC');
