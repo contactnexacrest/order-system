@@ -295,6 +295,24 @@ commercially with the buyer. Without this guard, marking an
 already-shipped order "lost" would have been a side door around that
 requirement.
 
+## Cancelling an order
+
+When an order is cancelled rather than lost (for example, the buyer has
+already paid an advance), use **Request Cancellation** on the order page
+and write the reason. Requesting needs the permission **Close or mark an order lost**. The order then
+shows "Cancellation requested by … — awaiting approval." A person with
+**Override locked data** then presses **Approve Cancellation**, choosing the
+refund: **No refund applicable**, **Refund pending** or **Refund already
+completed**. Or they press **Reject Cancellation** and give the reason.
+Once a pending refund has been sent, press **Mark Refund Completed**.
+
+The person who requested the cancellation cannot approve or reject it
+("You requested this cancellation — a different privileged person must
+approve it."). The only exception is a role ticked for this rule in
+**Admin → Self-approval rules** (default: MD and ED). Such a decision is
+logged as ORDER_CANCELLATION_SELF_APPROVED or
+ORDER_CANCELLATION_SELF_REJECTED. See [Chapter 15](./15-admin-settings.md).
+
 ## What the client does (or doesn't)
 
 Nothing inside the system. The buyer receives the physical courier package

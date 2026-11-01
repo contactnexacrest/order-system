@@ -185,6 +185,10 @@ you start noticing them:
   beside the field, and a closed step card holding it opens by itself.
   Fix it and press the button again. The server checks everything again
   after that.
+- **A "*" after a label means the field is required**; a field without
+  one may be left empty. A drop-down that starts with **"Choose…"** needs
+  a choice. Every typed field shows a light example of what to enter
+  (e.g. "e.g. ABCDE1234F") — it is only a hint, not a value.
 - **Every action that matters is logged.** Staff actions, client actions,
   status changes — all of it is in the Audit Log, which is genuinely
   useful when you need to know "who did this and when," not just a

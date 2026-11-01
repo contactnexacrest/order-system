@@ -325,10 +325,12 @@ an order is created. Once approved, the box turns green and says who
 approved and when, and the Quotation can be generated and sent as usual.
 Sending a Quotation is refused too while the terms wait for approval.
 A second person approves the terms of an order: whoever created the order
-cannot approve its terms, whatever their permissions. Only the Managing
-Director or the Executive Director may approve the terms of an order they
-created themselves, and the audit log then records it as a self-approval
-(owner decision 1 Nov 2026; replaces D-117). Terms of a cancelled or lost order
+cannot approve its terms, whatever their permissions. The only exception
+is a person whose role is ticked for this rule in **Admin → Self-approval
+rules** (default: Managing Director and Executive Director; see
+[Chapter 15](./15-admin-settings.md)); the audit log then records it as
+PAYMENT_TERMS_SELF_APPROVED (owner decisions 1 Nov 2026, D-216 and D-221;
+replaces D-117). Terms of a cancelled or lost order
 cannot be approved (QA Round 6, R6-N13).
 
 Insurance belongs to CIF only (owner decision D-049): on a CFR or FOB order

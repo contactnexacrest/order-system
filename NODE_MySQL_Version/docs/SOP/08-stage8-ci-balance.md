@@ -159,5 +159,6 @@ If the buyer pays in more than one wire, record each one at Step 11c
 (**Record Another … Receipt**); the card shows each receipt and **Due ·
 received so far · still owed**. A payment cannot be cleared while money is
 still owed, except by a manager with **Approve short payment**, who writes
-the reason; the shortfall is then recorded as written off and shown on the
+the reason (not the person who recorded the receipts, unless their role is
+ticked in Admin → Self-approval rules); the shortfall is then recorded as written off and shown on the
 order. See chapter 03, "Paid in parts", for the details.

@@ -16,10 +16,13 @@ together with the application.
   of Lading waiting for a Passed inspection and a before-shipment balance
   (10f), the balance due from the scanned BL (11b), part payments and
   short-pay sign-off, LC dates and amendments, and the OC "sent" clock (6c).
+  Updated again 1 Nov 2026 for D-221/D-222: who may approve their own work
+  (Admin → Self-approval rules), original BL copies 1 to 10, and the "*"
+  on required fields.
 
 The specification (v3) reflects the decisions up to 30 Oct 2026. The
-decisions taken since — D-212 (money descriptions) to D-219 (gap list, CFR
-wording, associates) — are in `docs/decisions/owner-decisions-register.md`
+decisions taken since — D-212 (money descriptions) to D-222 (gap list, CFR
+wording, associates, self-approval rules, QA Round 8) — are in `docs/decisions/owner-decisions-register.md`
 and in the guide and the SOP; where they differ from the specification,
 the register wins.
 

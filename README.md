@@ -43,7 +43,7 @@ Where to look:
 - **Order workflow:** `docs/workflow/` — the workflow specification and the
   staff step-by-step checklist (HTML), kept in step with the order page.
 - **Scheduled jobs:** each stack's README — "Bluehost cron setup" (PHP,
-  `app/cron/`) and "Background jobs" (Node, `src/jobs/`).
+  `app/cron/`) and "Background jobs" (Node, `app/src/jobs/`).
 - **Zoho Books integration:** the "Zoho Books" follow-up section of each
   stack's README, the `.env` switches in each `app/.env.example`, and SOP
   chapter `ca-03-zoho-sync.md`. Every change made in Zoho is logged in
@@ -56,6 +56,7 @@ Where to look:
 - **Standing rules for anyone changing the code:** `CLAUDE.md` (parity,
   tests on both stacks, ask before pushing, no document change without the
   owner's double confirmation, Standard/Kanban parity, browser-side
-  validation, money descriptions, Zoho change log).
+  validation, placeholders and labels on every input, money descriptions,
+  Zoho change log).
 - **Reference documents and spec:** `reference_templates/` (not read by the
   app at runtime).

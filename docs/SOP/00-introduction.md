@@ -390,7 +390,8 @@ Auditor**, and **CA / Chartered Accountant** (read-only CA / Accounting
 access, and read-only order pages). Who can do what is governed
 by permissions attached to a role (e.g. `manage_orders`, `generate_documents`,
 `approve_documents`, `view_reports`) — a Super Admin bypasses every
-permission check. This SOP describes actions by *what* they are, not which
+permission check, but not the rule that someone else approves your own
+work: that is set per action in **Admin → Self-approval rules**. This SOP describes actions by *what* they are, not which
 role does them, since that assignment is configurable per organisation —
 see [Admin & Settings](./15-admin-settings.md) for how to check or change
 who can do what.

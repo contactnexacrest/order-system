@@ -29,7 +29,7 @@ implementation detail.
 | 6 | [Freight Payment](./06-stage6-freight.md) |
 | 7 | [Packing & BL Instruction](./07-stage7-packing-bl.md) |
 | 8 | [Commercial Invoice & Balance Payment](./08-stage8-ci-balance.md) |
-| 9 | [Document Despatch & Closure](./09-stage9-despatch-closure.md) |
+| 9 | [Document Despatch & Closure](./09-stage9-despatch-closure.md) (also: marking an order lost, cancelling an order) |
 
 ## Modules alongside the pipeline
 
@@ -38,7 +38,7 @@ implementation detail.
 - [Client Portal](./12-client-portal.md) — everything the buyer can see and do, in one place.
 - [Document Review & Approval](./13-document-review-approval.md) — the draft → review → approved → sent lifecycle every document goes through.
 - [Reports](./14-reports.md) — every reporting screen and what question it answers.
-- [Admin & Settings](./15-admin-settings.md) — roles/permissions, users, signatories, watermarks, HS codes, suppliers, logistics partners, ports, payment presets, company settings (including the mail and Zoho Books connection tests), email templates, UI Template Preference (Standard/Kanban), who may give which rights, the permissions added 1 Nov 2026, and the scheduled jobs.
+- [Admin & Settings](./15-admin-settings.md) — roles/permissions, users, signatories, watermarks, HS codes, suppliers, logistics partners, ports, payment presets, company settings (including the mail and Zoho Books connection tests), email templates, UI Template Preference (Standard/Kanban), who may give which rights, Self-approval rules (who may approve their own work, for seven actions), the permissions added 1 Nov 2026 (including Manage approval limits), and the scheduled jobs.
 - [Test Mode](./16-test-mode.md) — a sandboxed way to rehearse the system without touching real data or sending real email.
 - [Editing, Duplicating & Reordering](./17-order-edit-duplication.md) — changing an order after it's created, cloning a product line or a whole order, and a client's self-service repeat order.
 - [Data Export / Migration](./18-data-export-migration.md) — downloading a structure snapshot and a full data export of the live database, to migrate every historical record into a fresh reinstall without loss.

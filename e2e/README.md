@@ -74,13 +74,16 @@ rendered pages, not a direct controller/HTTP call.
   carried as a hidden field — no checkbox or code box), registers and
   enters the e-mailed code; staff accept on Quotation Intake and the
   client is linked; the associate prints the registration certificate;
-  Sales sees who introduced whom, no amounts.
+  Sales sees who introduced whom, no amounts. The associate's profile
+  shows the personal rate carried upward (D-221: "clients 6–10: 1.25%
+  (personal)" when only 1–5 has a personal rate).
 
 Support files: `support/auth.js` (staff and client logins),
 `support/db.js` (direct dev-database setup: client logins, mail switch,
 a verified associate bank account), `support/mail.js`,
 `support/review.js` (a second person approves a document — owner
-decision A-2: nobody reviews their own document).
+decision A-2; since D-221 an MD or ED may self-review when Admin →
+Self-approval rules allow it, but the suites keep a second reviewer).
 
 This is real end-to-end coverage of the features above, not exhaustive
 coverage of the whole app — it proves these specific flows work on a

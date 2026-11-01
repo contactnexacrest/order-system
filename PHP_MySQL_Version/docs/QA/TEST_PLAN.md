@@ -439,6 +439,22 @@ Word) and reads them (see `e2e/README.md`).
 
 Browser suite: `e2e/tests/10-departments.spec.js` and `11-associates.spec.js`; the critical path and role workflows now resolve the inspection and clear a before-shipment balance before the BL, and a second person approves each document.
 
+## 11. Added since (1 Nov 2026: placeholders, self-approval rules, QA Round 8)
+
+| Test | What it checks |
+|---|---|
+| `FormPlaceholderTest` | D-220: every typed input and text area in every view has a placeholder (not date, file, checkbox, radio, hidden or read-only) |
+| `FormLabelConventionsTest` | D-222 R8-N08: every visible field has a label; a label with "*" belongs to a required field; required drop-downs with no sensible default start with "Choose…"; app.js `markRequiredLabels()` |
+| `SelfApprovalRulesTest` | D-221: Admin → Self-approval rules (Super Admins only), defaults MD + ED, a person qualifies through their own roles, every change audited with roles before and after. (Personal rates carrying upward, D-221: `AssociateSystemTest`) |
+| `SelfApprovalActionsTest` | D-222 R8-N09: all seven self-approvals go through the rules (cancellation approve/reject, purchase award, amendment MD-approval, short-payment clearing, payment terms, document review, e-mail send), exact refusals, audit codes `…_SELF_APPROVED`; no Super Admin / manage_permissions exemption |
+| `QaRound8Part1Test` | D-222 part 1: GST refund credits and claw-backs saved once under a row lock (concurrent requests); safe commission CSV; one-off invitation links used up at the first registration; `clients.associate_client_number`; suspended associate's read-only portal; bank e-mail wording |
+| `QaRound8Part2Test` | D-222 part 2: original BL copies required 1 to 10; reviewer list leaves out the generator unless self-review is allowed ("(generated it — self-review)"); daily digest counts only real sends, mail off says "Daily digest: e-mail sending is off — nothing sent.", a failed send is retried |
+| `DepartmentsTest` | Updated for D-222 R8-N10: approval limits and the 'director' level only with `manage_approval_limits`, never on one's own designation; `APPROVAL_LIMIT_CHANGED` audited |
+| `MakerCheckerGuardTest` | Updated: the guard asks Self-approval rules instead of a fixed MD/ED list |
+| `AssociatePortalRoutesTest` | D-211 for QA Round 8: the 15 routes without a behaviour test (associate portal bank, clients, code, commission invoice, documents, invitation cancel, messages, set-password; `/invite/{token}`, `/quotation-details/verify`, inspection result, OC sent) through the real router |
+
+Browser suite: `11-associates.spec.js` now expects the personal rate carried upward ("clients 6–10: 1.25% (personal)").
+
 ## Appendix
 
 Full route-by-route and table-by-table inventory:

@@ -29,6 +29,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-02c-gap-due-dates-lc.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-02d-gap-part-payments.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-02e-cfr-wording.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-02f-self-approval-rules.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-02g-qa-r8-associates.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-02h-qa-r8-approvals.sql
 ```
 
@@ -47,7 +48,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-02h-qa-r8-approvals.sql
 
 Run each file below that the database has not had yet, in this order, then
 deploy the code for both stacks. As of 30 Oct 2026 the live site still
-needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30c, 30d, 31a, 31b, 31c, 31d, 11-01a, 11-01b, 11-01c, 11-01d and 11-01e**.
+needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30c, 30d, 31a, 31b, 31c, 31d, 11-01a, 11-01b, 11-01c, 11-01d and 11-01e**; every file added since then (**11-01f to 11-01i and 11-02a to 11-02h**, rows 30 to 42 below) is also still to run.
 
 | # | File | What it does |
 |---|---|---|

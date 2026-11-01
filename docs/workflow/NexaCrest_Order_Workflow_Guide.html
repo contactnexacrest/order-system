@@ -151,7 +151,8 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
       <li>Talk to the client through <b>Order Communication</b> on the order page so the history stays with the order.</li>
       <li>A buyer payment can arrive in parts: record each receipt; the step shows what is still owed. Clearing a payment that is short needs a manager with <b>Approve short payment</b> and a written reason.</li>
       <li>The Bill of Lading (Step 10f) waits for a <b>Passed</b> pre-shipment inspection (or the inspection marked not applicable) and, on "before shipment" orders, for the balance to be cleared. Only a manager can release it, with a written reason.</li>
-      <li>Nobody reviews their own document or approves their own e-mail send; a second person does.</li>
+      <li>Nobody approves their own work — their own document, e-mail send, payment terms, cancellation request, purchase award, amendment, or a short payment whose receipts they recorded; a second person does. The only exception is a role ticked in <b>Admin → Self-approval rules</b> (by default the MD and ED); such a self-approval is shown and audited.</li>
+      <li>A field marked <b>*</b> must be filled in; a drop-down starting with "Choose…" needs a choice. The page shows the problem beside the field before anything is saved.</li>
     </ul>
     <div class="roles-key" style="margin-top:10px">
       <span><span class="tag">Export</span> Export Executive</span>
@@ -242,7 +243,7 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
         ['11a', 'Generate Commercial Invoice', ['export', 'accounts'], 'Generate the CI. Its date is today by default; pick an earlier date when the CI must carry the BL date (never a future date). FOB orders raise the CI before shipment.', 'the CI is approved.'],
         ['11b', 'Mark Scanned BL Copy Sent to Buyer', ['export'], 'Send the scanned BL and the CI to the buyer with the payment instructions and due date. On post-BL and LC orders the balance due date is set now (today + the order\'s balance days); an overdue balance is reminded daily.', 'it is marked sent.'],
         ['11c', 'Record Balance Remittance', ['accounts'], 'Record the buyer\'s balance payment with that day\'s exchange rate and the bank reference; paid in parts, record each receipt. On "before shipment" orders this is done before the Bill of Lading, against the PI.', 'the remittance is recorded.'],
-        ['11d', 'Mark Balance Cleared', ['accounts'], 'Confirm the money is in the bank and mark the balance cleared. Still owed? A manager with Approve short payment clears it with a reason. On "before shipment" orders the balance is cleared before shipment, and Complete Step 11 passes the stage once the CI is approved.', 'the balance shows as cleared.']
+        ['11d', 'Mark Balance Cleared', ['accounts'], 'Confirm the money is in the bank and mark the balance cleared. Still owed? A manager with Approve short payment — not the person who recorded the receipts, unless their role is allowed in Self-approval rules — clears it with a reason. On "before shipment" orders the balance is cleared before shipment, and Complete Step 11 passes the stage once the CI is approved.', 'the balance shows as cleared.']
       ]}
     ]},
     { key: 'D', color: 'var(--d)', title: 'Closure & Settlement', sub: 'Financials & benefits → documents despatched → fully settled', groups: [
@@ -254,7 +255,7 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
       ]},
       { name: 'Step 13 · Documents & settlement', steps: [
         ['13a', 'Generate COO Prep Sheet', ['logistics'], 'Generate the Certificate of Origin preparation sheet.', 'the sheet is generated.'],
-        ['13b', 'Record Original BLs Received from CHA', ['logistics'], 'Record when the original BLs arrive from the CHA.', 'receipt is recorded.'],
+        ['13b', 'Record Original BLs Received from CHA', ['logistics'], 'Record when the original BLs arrive from the CHA and how many original copies came (1 to 10).', 'receipt is recorded.'],
         ['13c', 'Save BL Endorsement Details', ['logistics'], 'Enter the endorsement details.', 'details are saved.'],
         ['13d', 'Generate / Print BL Endorsement', ['logistics'], 'Generate and print the endorsement.', 'it is printed.'],
         ['13e', 'Mark Original BLs Endorsed', ['logistics', 'mgmt'], 'Confirm the original BLs are endorsed by NexaCrest. Keep one BL copy in company records.', 'BLs are endorsed.'],

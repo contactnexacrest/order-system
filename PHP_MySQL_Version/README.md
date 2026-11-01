@@ -2365,3 +2365,58 @@ Zoho Books, built from the facts and including the bank reference.
   freight & insurance, CFR freight with "insurance arranged by the buyer", FOB none),
   PDF and Word.
 - **Tests:** `tests/Integration/CfrWordingTest.php`.
+
+## Follow-up (added 2026-11-01): placeholders, self-approval rules, rate carry-forward (D-220, D-221) and QA Round 8 (D-222)
+
+- **Migrations (run in this order):** `2026-11-02f-self-approval-rules.sql`,
+  `2026-11-02g-qa-r8-associates.sql`, `2026-11-02h-qa-r8-approvals.sql`. All are safe to
+  run more than once. See `docs/migrations/README.md` rows 40 to 42.
+- **Placeholders and labels (D-220, R8-N08):** every typed input and text area shows a
+  placeholder with an example or the expected format; every visible field has a label.
+  The sitewide ``public_html/assets/js/app.js`` (`markRequiredLabels()`) puts " *" on the label of every required
+  field (never a second one) and removes it when the field stops being required.
+  Required drop-downs with no sensible default start with "Choose…".
+- **Self-approval rules (D-221, R8-N09):** Admin → **Self-approval rules**
+  (`/admin/self-approval`, Super Admins only). It covers seven rules:
+  - approve the payment terms of an order they created;
+  - review a document they generated;
+  - approve an e-mail send they requested;
+  - approve or reject the cancellation of an order they requested;
+  - approve a purchase award they made;
+  - MD-approve an amendment they requested;
+  - clear short a buyer payment whose receipts they recorded.
+
+  Each rule defaults to Managing Director and Executive Director. A person qualifies only
+  through one of their own roles; Super Admin and `manage_permissions` are no longer an
+  exemption. ``MakerCheckerGuard`` → ``SelfApprovalRules`` is the one check for every self-approval. Each
+  self-approval is audited (`PAYMENT_TERMS_SELF_APPROVED`, `DOCUMENT_SELF_REVIEWED`,
+  `EMAIL_SEND_SELF_APPROVED`, `ORDER_CANCELLATION_SELF_APPROVED`,
+  `PURCHASE_AWARD_SELF_APPROVED`, `AMENDMENT_SELF_APPROVED`,
+  `SHORT_PAYMENT_SELF_APPROVED`), and so is every rule change
+  (`SELF_APPROVAL_RULE_CHANGED`). The Assign reviewers list leaves out the document's
+  generator unless their role may self-review; then the option reads
+  "(generated it — self-review)".
+- **Associate rates (D-221, R8-N05):**
+  - An empty (or 0) personal rung carries on the last personal rate set below it.
+  - "Client no. N" is now fixed on the client (`clients.associate_client_number`), in
+    the order the clients were linked.
+- **Approval limits (R8-N10):** the new permission `manage_approval_limits` (Managing
+  Director, Executive Director; Super Admins as usual) is needed to change a designation's approval limit or
+  make it 'director'. Nobody can do this on a designation they hold themselves
+  ("You cannot change the approval limit of a designation you hold yourself."). Each
+  change is audited (`APPROVAL_LIMIT_CHANGED`).
+- **Money saved once (R8-N11, R8-N12):** GST refund credits and associate claw-backs are
+  saved with the claim or payout row locked, and the open amount is re-checked inside
+  the lock.
+- **Safe CSV (R8-N03):** every CSV, including the associate portal's commission CSV, goes
+  through `Helpers/Csv` (`stream()`, and `send()` where the caller continues). A cell starting =, +, - or @ is written as text.
+- **Invitation links (R8-N04):** a one-off invitation link is used up by the first
+  registration sent through it.
+- **Suspended associates (Q-R8-2):** a suspended associate gets a read-only portal.
+- **Bank e-mails (R8-N01):** bank e-mails say "No payment can be made until new bank
+  details are verified." when no verified account is in use.
+- **Bill of Lading (R8-N13):** the number of original BL copies is required, 1 to 10.
+- **Daily digest (R8-N02):** the digest counts only e-mails that actually left. With
+  e-mail sending off it reports "Daily digest: e-mail sending is off — nothing sent." and
+  the day is not used up.
+- **Tests:** `tests/Unit/FormPlaceholderTest.php`, `tests/Unit/FormLabelConventionsTest.php`, `tests/Integration/SelfApprovalRulesTest.php`, `SelfApprovalActionsTest.php`, `QaRound8Part1Test.php`, `QaRound8Part2Test.php`, `AssociatePortalRoutesTest.php`, plus updates to `MakerCheckerGuardTest.php`, `DepartmentsTest.php` and `AssociateSystemTest.php`. The 15 routes that had no behaviour test (D-211) now have one.
