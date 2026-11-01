@@ -995,6 +995,16 @@ async function show(req, res) {
   const canViewCafin = !!req.permissions.view_cafin;
   let documents = await documentRepository.forOrder(orderId);
   if (!canViewCafin) documents = documents.filter((d) => d.document_type_code !== 'CAFIN');
+  // QA Round 8, R8-N06: the reviewer list offers a document's own generator only when the
+  // self-approval rule 'document_review' allows them (Admin → Self-approval rules, D-221).
+  const selfReviewOk = {};
+  for (const d of documents) {
+    const gen = Number(d.generated_by || 0);
+    if (gen > 0 && selfReviewOk[gen] === undefined) {
+      selfReviewOk[gen] = await require('../services/selfApprovalRules').allowed('document_review', gen);
+    }
+    d.generator_may_self_review = gen > 0 && selfReviewOk[gen];
+  }
   const reviewsByDocument = {};
   const crossVerificationsByDocument = {};
   for (const d of documents) {
@@ -2029,7 +2039,7 @@ async function clearAdvancePayment(req, res) {
     return;
   }
   // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
-  const partCheck = await partPaymentService.clearCheck(orderId, 'advance', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason);
+  const partCheck = await partPaymentService.clearCheck(orderId, 'advance', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason, req.user.id);
   if (partCheck.error) {
     flash.set(req, 'error', partCheck.error);
     res.redirect(`/orders/${orderId}`);
@@ -3019,7 +3029,7 @@ async function clearFreightPayment(req, res) {
     return;
   }
   // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
-  const partCheck = await partPaymentService.clearCheck(orderId, 'freight', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason);
+  const partCheck = await partPaymentService.clearCheck(orderId, 'freight', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason, req.user.id);
   if (partCheck.error) {
     flash.set(req, 'error', partCheck.error);
     res.redirect(`/orders/${orderId}`);
@@ -3647,7 +3657,7 @@ async function clearBalancePayment(req, res) {
     return;
   }
   // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
-  const partCheck = await partPaymentService.clearCheck(orderId, 'balance', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason);
+  const partCheck = await partPaymentService.clearCheck(orderId, 'balance', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason, req.user.id);
   if (partCheck.error) {
     flash.set(req, 'error', partCheck.error);
     res.redirect(`/orders/${orderId}`);
@@ -3976,11 +3986,18 @@ async function recordBlOriginalsReceived(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  const count = parseInt(req.body.bl_originals_count || 3, 10);
-  await orderShippingRepository.recordBlOriginalsReceived(orderId, count || 3);
+  // QA Round 8, R8-N13: a whole number 1-10, never silently 3.
+  const raw = String((req.body || {}).bl_originals_count ?? '').trim();
+  if (!/^\d{1,2}$/.test(raw) || Number(raw) < 1 || Number(raw) > 10) {
+    flash.set(req, 'error', 'Enter how many original BL copies were received (1 to 10).');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const count = Number(raw);
+  await orderShippingRepository.recordBlOriginalsReceived(orderId, count);
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
-  await auditLogRepository.log(req.user.id, 'ORDER_BL_ORIGINALS_RECEIVED', 'order_shipping', orderId, 'bl_originals_received_count', null, String(count || 3));
+  await auditLogRepository.log(req.user.id, 'ORDER_BL_ORIGINALS_RECEIVED', 'order_shipping', orderId, 'bl_originals_received_count', null, String(count));
   flash.set(req, 'success', 'Original BL copies recorded as received from CHA.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -4496,12 +4513,11 @@ async function approveCancellation(req, res) {
     return;
   }
   // QA-5 maker-checker: the person who requested the cancellation must
-  // not also be the one who approves it. External QA report N-04: unlike
-  // other maker-checker checks, this one does NOT exempt
-  // manage_permissions holders — only Super Admin — because every default
-  // role that can approve a cancellation (Admin, MD, ED) also holds
-  // manage_permissions, which made the rule a no-op.
-  if (cancellation.requested_by === user.id && !(await makerCheckerGuard.selfApprovalAllowedStrict(user.id))) {
+  // not also be the one who approves it, unless their role is ticked for
+  // "cancellation" in Admin → Self-approval rules (QA Round 8, R8-N09 —
+  // default MD + ED; no Super Admin exemption).
+  const selfDecision = Number(cancellation.requested_by) === Number(user.id);
+  if (selfDecision && !(await makerCheckerGuard.selfApprovalAllowed('cancellation', user.id))) {
     flash.set(req, 'error', 'You requested this cancellation — a different privileged person must approve it.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -4523,6 +4539,9 @@ async function approveCancellation(req, res) {
   // fired.
   await notificationRepository.create(cancellation.requested_by, null, 'order_cancellation_approved', orderId, `Your cancellation request for order ${freshOrder.order_reference} was approved.`);
   await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_APPROVED', 'orders', orderId, 'status', freshOrder.status, 'cancelled', decisionNotes);
+  if (selfDecision) {
+    await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_SELF_APPROVED', 'order_cancellations', cancellationId, null, null, null, 'Approved the cancellation they requested themselves (Admin → Self-approval rules).');
+  }
   flash.set(req, 'success', 'Cancellation approved — order is now cancelled.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -4537,9 +4556,9 @@ async function rejectCancellation(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  // External QA report N-04: strict variant, no manage_permissions
-  // exemption — see approveCancellation() above.
-  if (cancellation.requested_by === user.id && !(await makerCheckerGuard.selfApprovalAllowedStrict(user.id))) {
+  // Same self-approval rule as approveCancellation() above.
+  const selfDecision = Number(cancellation.requested_by) === Number(user.id);
+  if (selfDecision && !(await makerCheckerGuard.selfApprovalAllowed('cancellation', user.id))) {
     flash.set(req, 'error', 'You requested this cancellation — a different privileged person must decide on it.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -4559,6 +4578,9 @@ async function rejectCancellation(req, res) {
   const freshOrder = await orderRepository.find(orderId);
   await notificationRepository.create(cancellation.requested_by, null, 'order_cancellation_rejected', orderId, `Your cancellation request for order ${freshOrder.order_reference} was rejected: ${decisionNotes}`);
   await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_REJECTED', 'order_cancellations', cancellationId, null, 'pending', 'rejected', decisionNotes);
+  if (selfDecision) {
+    await auditLogRepository.log(user.id, 'ORDER_CANCELLATION_SELF_REJECTED', 'order_cancellations', cancellationId, null, null, null, 'Rejected the cancellation they requested themselves (Admin → Self-approval rules).');
+  }
   flash.set(req, 'success', 'Cancellation request rejected — order is unaffected.');
   res.redirect(`/orders/${orderId}`);
 }

@@ -103,6 +103,15 @@ holders may approve their **own** work:
 | Approve the payment terms of an order they created | Managing Director, Executive Director | "You created this order, so its payment terms must be approved by someone else." |
 | Review (approve) a document they generated | Managing Director, Executive Director | "This document's own generator cannot be assigned as its reviewer — a different person must review it." |
 | Approve an e-mail send they requested | Managing Director, Executive Director | "You requested this send — a different person must approve it." |
+| Approve or reject the cancellation of an order they requested | Managing Director, Executive Director | "You requested this cancellation — a different privileged person must approve it." (rejecting: "… must decide on it.") |
+| Approve a purchase award they made | Managing Director, Executive Director | "You awarded this purchase, so someone else must approve it." |
+| MD-approve an amendment they requested | Managing Director, Executive Director | "You requested this amendment — a different privileged user must MD-approve it." |
+| Clear short a buyer payment whose receipts they recorded | Managing Director, Executive Director | "You recorded this payment's receipts, so a different manager with "Approve short payment" must clear it short." |
+
+QA Round 8 (R8-N09): all seven rules are on this page. There is **no other
+exception** — a Super Admin, an Admin or a System Administrator (anyone
+holding "Manage permissions") approves their own work only if one of their
+roles is ticked here, like everyone else.
 
 1. Tick or untick the roles under each rule, then **Save rules**. The page
    says "Self-approval rules saved. They apply from the next approval."
@@ -110,7 +119,9 @@ holders may approve their **own** work:
    they are logged in as, or a department membership) is ticked. Leave a
    rule empty so that nobody self-approves.
 3. Every self-approval is written to the audit log (PAYMENT_TERMS_SELF_APPROVED,
-   DOCUMENT_SELF_REVIEWED, EMAIL_SEND_SELF_APPROVED); a self-review shows a
+   DOCUMENT_SELF_REVIEWED, EMAIL_SEND_SELF_APPROVED, ORDER_CANCELLATION_SELF_APPROVED
+   or ORDER_CANCELLATION_SELF_REJECTED, PURCHASE_AWARD_SELF_APPROVED,
+   AMENDMENT_SELF_APPROVED, SHORT_PAYMENT_SELF_APPROVED); a self-review shows a
    **self-review** badge in the document's review list. Every change to the
    rules is logged as SELF_APPROVAL_RULE_CHANGED with the roles before and
    after.
@@ -126,6 +137,7 @@ holders may approve their **own** work:
 | Associate bank & tax details (`manage_associate_bank`) | Finance Manager, Finance Director, MD, Admin | Associates' bank details: check, verify, full number |
 | Override shipment gates (`override_shipment_gates`) | MD, ED, Admin | Release the Bill of Lading step (10f) with a written reason when the before-shipment balance or the inspection is not cleared ([Stage 7](./07-stage7-packing-bl.md)) |
 | Approve short payment (`approve_short_payment`) | MD, ED, Admin, Finance Director | Clear a buyer payment that is less than due, with a written reason ([Stage 3](./03-stage3-pi-advance.md), [Stage 8](./08-stage8-ci-balance.md)) |
+| Manage approval limits (`manage_approval_limits`) | MD, ED (and Super Admins) | Change a designation's approval limit or make it 'director' level — never on a designation the person holds ([Chapter 21](./21-departments.md)). Added by QA Round 8 (R8-N10) |
 
 ### Scheduled jobs (set up once on the server)
 

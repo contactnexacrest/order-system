@@ -120,10 +120,15 @@ async function recordCredit(req, res) {
     res.redirect(BACK);
     return;
   }
-  const id = await gstRefundRepository.addCredit(Number(claim.id), Number(amount), creditedOn, reference, part, req.user.id);
-  if (refusedAmount > 0) {
-    await gstRefundRepository.addRefused(Number(claim.id), refusedAmount, `₹${money(refusedAmount)} refused (with the credit of ${longDate(creditedOn)})`);
+  // QA Round 8, R8-N11: re-checked with the claim locked, so simultaneous saves cannot credit more than the claim.
+  const saved = await gstRefundRepository.addCreditWithinClaim(Number(claim.id), Number(amount), refusedAmount,
+    `₹${money(refusedAmount)} refused (with the credit of ${longDate(creditedOn)})`, creditedOn, reference, part, req.user.id);
+  if (saved.id === null) {
+    flash.set(req, 'error', `Credited plus refused (₹${money(Number(amount) + refusedAmount)}) is more than what is still open on this claim (₹${money(Math.max(0, saved.open))}). Nothing was saved.`);
+    res.redirect(BACK);
+    return;
   }
+  const id = saved.id;
   const description = paymentDescription.gstRefund((await gstRefundRepository.findCredit(id)) || {});
   await auditLogRepository.log(req.user.id, 'GST_REFUND_CREDITED', 'gst_refund_credits', id, 'amount', null, Number(amount).toFixed(2), `${description}${refusedAmount > 0 ? ` · ₹${money(refusedAmount)} refused` : ''}`);
   flash.set(req, 'success', `Recorded: ${description}. It goes to Zoho Books at the next sync.`);

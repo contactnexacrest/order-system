@@ -20,12 +20,12 @@
           {% else %}
             <form method="post" action="/admin/field-protection/{{ r.id }}/approve" style="display:inline">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <input type="text" name="resolved_reason" placeholder="Note (optional)" style="width:140px">
+              <input type="text" name="resolved_reason" placeholder="Note (optional)" style="width:140px" aria-label="Note">
               <button type="submit" class="btn-sm btn-success">Approve</button>
             </form>
             <form method="post" action="/admin/field-protection/{{ r.id }}/reject" style="display:inline" onsubmit="return confirm('Reject this unlock request? The field stays protected.');">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <input type="text" name="resolved_reason" placeholder="Reason (mandatory)" required style="width:140px">
+              <input type="text" name="resolved_reason" placeholder="Reason (mandatory)" required style="width:140px" aria-label="Reason">
               <button type="submit" class="btn-sm btn-danger">Reject</button>
             </form>
           {% endif %}
@@ -59,7 +59,7 @@
             <input type="hidden" name="record_id" value="{{ row.id }}">
             <input type="hidden" name="record_label" value="{{ row.label }}">
             <input type="hidden" name="action" value="{{ 'unlock' if row.is_protected else 'lock' }}">
-            <input type="text" name="reason" placeholder="Reason (mandatory)" required style="width:200px">
+            <input type="text" name="reason" placeholder="Reason (mandatory)" required style="width:200px" aria-label="Reason">
             <button type="submit" class="btn-sm">{{ 'Request Unprotect' if row.is_protected else 'Request Protect' }}</button>
           </form>
         </td>

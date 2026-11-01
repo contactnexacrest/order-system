@@ -29,7 +29,7 @@
           </form>
           <form method="post" action="/pi-intake-review/<?= (int) $s['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this PI-stage submission?');">
             <?= Csrf::field() ?>
-            <input type="text" name="reason" placeholder="Reason (required)" required style="width:160px">
+            <input type="text" name="reason" placeholder="Reason (required)" required style="width:160px" aria-label="Reason">
             <button type="submit" class="btn-sm btn-danger">Reject</button>
           </form>
         </td>

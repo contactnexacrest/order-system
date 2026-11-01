@@ -211,6 +211,10 @@ with money that's actually landed:
    far: USD 1,500.00 of USD 1,800.00 due — USD 300.00 is still owed. …").
    Only a manager with **Approve short payment** (MD, ED, Admin, Finance
    Director) can clear it short, writing the reason (10–500 characters).
+   A manager who recorded the receipts themselves is refused ("You recorded
+   this payment's receipts, so a different manager with "Approve short
+   payment" must clear it short.") unless their role is ticked in Admin →
+   Self-approval rules (default MD and ED; QA Round 8, R8-N09).
    The shortfall is recorded and shown on the order with the reason and
    who approved it: on the advance it is **carried into the balance** (the
    balance is always the order value less the advance actually received);

@@ -204,6 +204,11 @@ final class PartPaymentService
             return ['error' => "{$label} received so far: " . self::money($currency, $s['received']) . ' of ' . self::money($currency, (float) $s['expected']) . ' due — ' . self::money($currency, $s['owed'])
                 . ' is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.'];
         }
+        // QA Round 8, R8-N09: a manager who recorded this payment's receipts clears it short only if their role is ticked.
+        if (self::recordedBy($orderId, $leg, $milestone !== null ? (int) $milestone['id'] : null, (int) $user['id'])
+            && !MakerCheckerGuard::selfApprovalAllowed('short_payment', (int) $user['id'])) {
+            return ['error' => 'You recorded this payment\'s receipts, so a different manager with "Approve short payment" must clear it short.'];
+        }
         $reason = trim($reason);
         if (mb_strlen($reason) < 10 || mb_strlen($reason) > 500) {
             return ['error' => self::money($currency, $s['owed']) . ' of the ' . strtolower($label) . ' is still owed. To clear it short, give the reason (10 to 500 characters) — it is recorded and shown on the order.'];
@@ -220,8 +225,19 @@ final class PartPaymentService
              VALUES (:o, :l, :m, :e, :r, :s, :t, :reason, :u)'
         )->execute(['o' => $orderId, 'l' => $leg, 'm' => $milestone['id'] ?? null, 'e' => $short['expected'], 'r' => $short['received'], 's' => $short['owed'], 't' => $treatment, 'reason' => $short['reason'], 'u' => $user['id']]);
         AuditLogRepository::log((int) $user['id'], 'PAYMENT_SHORTFALL_APPROVED', 'orders', $orderId, $leg . ($milestone !== null ? ':' . $milestone['seq'] : ''), (string) $short['expected'], (string) $short['received'], $short['reason']);
+        if (self::recordedBy($orderId, $leg, $milestone !== null ? (int) $milestone['id'] : null, (int) $user['id'])) {
+            AuditLogRepository::log((int) $user['id'], 'SHORT_PAYMENT_SELF_APPROVED', 'orders', $orderId, $leg . ($milestone !== null ? ':' . $milestone['seq'] : ''), null, null, 'Cleared short a payment whose receipts they recorded themselves (Admin → Self-approval rules).');
+        }
         return 'Short by ' . self::money($short['currency'], $short['owed']) . ': approved by ' . $user['name'] . ' — '
             . ($treatment === 'carried_to_balance' ? 'carried into the balance.' : 'written off.');
+    }
+
+    /** Whether this person recorded any receipt of the leg (QA Round 8, R8-N09). */
+    public static function recordedBy(int $orderId, string $leg, ?int $milestoneId, int $userId): bool
+    {
+        $stmt = Database::connection()->prepare('SELECT 1 FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id <=> :m AND recorded_by = :u LIMIT 1');
+        $stmt->execute(['o' => $orderId, 'l' => $leg, 'm' => $milestoneId, 'u' => $userId]);
+        return $stmt->fetchColumn() !== false;
     }
 
     /** The leg is cleared: no receipt may be added. */

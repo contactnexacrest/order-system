@@ -219,7 +219,7 @@ final class EmailDispatchService
         // D-221): whoever requested this send approves it only when one of
         // their roles is ticked in Admin → Self-approval rules.
         $self = $row['requested_by'] !== null && (int) $row['requested_by'] === $approverUserId;
-        if ($self && !SelfApprovalRules::allowed('email_send', $approverUserId)) {
+        if ($self && !MakerCheckerGuard::selfApprovalAllowed('email_send', $approverUserId)) {
             throw new \RuntimeException('You requested this send — a different person must approve it.');
         }
         EmailLogRepository::approve($emailLogId, $approverUserId);

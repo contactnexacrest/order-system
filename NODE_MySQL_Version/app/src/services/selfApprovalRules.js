@@ -9,13 +9,17 @@ const departmentRepository = require('../repositories/departmentRepository');
  * Port of SelfApprovalRules.php. Owner decision 1 Nov 2026 (D-221): who
  * may approve their own work is set in Admin → Self-approval rules (Super
  * Admins only), one list of roles per rule. Defaults: Managing Director
- * and Executive Director on all three. A person qualifies when any of
+ * and Executive Director on every rule (QA Round 8: seven rules). A person qualifies when any of
  * their own roles (primary role or a department membership) is ticked.
  */
 const RULES = {
   payment_terms: 'Approve the payment terms of an order they created',
   document_review: 'Review (approve) a document they generated',
   email_send: 'Approve an e-mail send they requested',
+  cancellation: 'Approve or reject the cancellation of an order they requested',
+  purchase_award: 'Approve a purchase award they made',
+  amendment: 'MD-approve an amendment they requested',
+  short_payment: 'Clear short a buyer payment whose receipts they recorded',
 };
 
 async function roleIds(rule) {

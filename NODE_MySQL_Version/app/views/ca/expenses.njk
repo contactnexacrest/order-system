@@ -31,7 +31,7 @@
             {% elif canEditTds %}
               <form method="post" action="/ca/expenses/{{ e.id }}/link-order" style="display:flex;gap:4px;">
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                <input type="text" name="order_reference" placeholder="Order ref" style="width:110px;">
+                <input type="text" name="order_reference" placeholder="Order ref" style="width:110px;" aria-label="Order ref">
                 <button type="submit" class="btn-sm">Link</button>
               </form>
             {% else %}
@@ -48,7 +48,7 @@
                 <label style="display:flex; gap:4px; align-items:center;">
                   <input type="checkbox" name="is_tds_applicable" value="1" {{ 'checked' if e.is_tds_applicable else '' }}> TDS
                 </label>
-                <input type="text" name="tds_amount" placeholder="Amount" value="{{ e.tds_amount or '' }}" style="width:90px;">
+                <input type="text" name="tds_amount" placeholder="Amount" value="{{ e.tds_amount or '' }}" style="width:90px;" aria-label="Amount">
                 <button type="submit" class="btn-sm">{{ 'Override & Save' if e.lockMessage != null else 'Save' }}</button>
               </form>
             {% else %}

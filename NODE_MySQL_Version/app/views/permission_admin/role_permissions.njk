@@ -8,7 +8,7 @@
       <tr><th></th><th>Permission</th><th>Category</th></tr>
       {% for p in allPermissions %}
       <tr>
-        <td><input type="checkbox" name="permission_ids[]" value="{{ p.id }}" {{ 'checked' if p.id in enabledIds }}></td>
+        <td><input type="checkbox" name="permission_ids[]" value="{{ p.id }}" {{ 'checked' if p.id in enabledIds }} aria-label="Grant this permission"></td>
         <td>{{ p.name }} <span class="muted small">({{ p.permission_key }})</span></td>
         <td>{{ p.category or '—' }}</td>
       </tr>

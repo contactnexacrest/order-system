@@ -28,7 +28,7 @@
           </form>
           <form method="post" action="/pi-intake-review/{{ s.id }}/reject" style="display:inline" onsubmit="return confirm('Reject this PI-stage submission?');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <input type="text" name="reason" placeholder="Reason (required)" required style="width:160px">
+            <input type="text" name="reason" placeholder="Reason (required)" required style="width:160px" aria-label="Reason">
             <button type="submit" class="btn-sm btn-danger">Reject</button>
           </form>
         </td>

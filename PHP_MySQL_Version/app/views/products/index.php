@@ -4,7 +4,7 @@
   <p class="muted">Internal reference only — specs, HS code, cost, and suppliers for staff to consult while preparing quotations manually. This catalog is completely independent of the order pipeline and is never shown to clients or buyers.</p>
 
   <form method="get" action="/products" style="display:flex;gap:8px;margin-bottom:1rem">
-    <input type="text" name="q" value="<?= View::e($query) ?>" placeholder="Search by name, HS code, or specification…" style="flex:1">
+    <input type="text" name="q" value="<?= View::e($query) ?>" placeholder="Search by name, HS code, or specification…" style="flex:1" aria-label="Search by name, HS code, or specification">
     <button type="submit" class="btn-sm">Search</button>
     <?php if ($searched): ?><a class="btn-sm" href="/products">Clear</a><?php endif; ?>
   </form>

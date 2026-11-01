@@ -45,8 +45,24 @@ final class Csv
      */
     public static function stream(string $filename, array $headers, array $rows): never
     {
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        self::send($filename, $headers, $rows);
+        exit;
+    }
+
+    /**
+     * The same CSV as stream(), without ending the request — for a page
+     * that returns afterwards (QA Round 8, R8-N03: the associate's
+     * commission statement).
+     *
+     * @param string[] $headers
+     * @param array<int, array<int|string, mixed>> $rows
+     */
+    public static function send(string $filename, array $headers, array $rows): void
+    {
+        if (!headers_sent()) {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+        }
         $out = fopen('php://output', 'w');
         fprintf($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel opens non-ASCII text correctly
         fputcsv($out, $headers, ',', '"', '\\');
@@ -56,6 +72,5 @@ final class Csv
             fputcsv($out, $safe, ',', '"', '\\');
         }
         fclose($out);
-        exit;
     }
 }

@@ -24,6 +24,7 @@
       <div class="field-grid">
         <label>Incoterm *
           <select name="incoterm_id" id="incoterm-select" required onchange="updateFreightFieldsAvailability(true)">
+            <option value="">Choose…</option>
             <?php foreach ($incoterms as $i): ?>
               <option value="<?= (int) $i['id'] ?>" <?= (isset($old['incoterm_id']) && (int) $i['id'] === (int) $old['incoterm_id']) ? 'selected' : '' ?> data-code="<?= htmlspecialchars($i['code']) ?>"><?= htmlspecialchars($i['code']) ?></option>
             <?php endforeach; ?>
@@ -45,6 +46,7 @@
         </label>
         <label>Payment Preset *
           <select name="payment_preset_id" required>
+            <option value="">Choose…</option>
             <?php foreach ($paymentPresets as $p): ?>
               <option value="<?= (int) $p['id'] ?>" <?= (isset($old['payment_preset_id']) && (int) $p['id'] === (int) $old['payment_preset_id']) ? 'selected' : '' ?>><?= htmlspecialchars($p['preset_name']) ?> (<?= (float) $p['advance_pct'] ?>% adv / <?= (float) $p['balance_pct'] ?>% bal)</option>
             <?php endforeach; ?>
@@ -132,7 +134,7 @@
       <div id="product-rows">
         <?php foreach ($__oldDescriptions as $__i => $__desc): ?>
         <div class="product-row">
-          <label>Description *<input type="text" name="product_description[]" value="<?= htmlspecialchars((string) $__desc) ?>" placeholder="e.g. Granite Memorial Headstone"></label>
+          <label>Description *<input type="text" name="product_description[]" required value="<?= htmlspecialchars((string) $__desc) ?>" placeholder="e.g. Granite Memorial Headstone"></label>
           <label>Dimensions<input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>" placeholder="e.g. 24x12x3 inches"></label>
           <label>Finish
             <select name="product_finish[]">
@@ -174,7 +176,7 @@
 
     <fieldset>
       <legend>Special Requirements/Instructions</legend>
-      <textarea name="special_requirements" rows="2" placeholder="e.g. Fragile items — extra cushioning required in crate"><?= htmlspecialchars((string) ($old['special_requirements'] ?? '')) ?></textarea>
+      <textarea name="special_requirements" rows="2" placeholder="e.g. Fragile items — extra cushioning required in crate" aria-label="Special requirements"><?= htmlspecialchars((string) ($old['special_requirements'] ?? '')) ?></textarea>
     </fieldset>
 
     <fieldset>

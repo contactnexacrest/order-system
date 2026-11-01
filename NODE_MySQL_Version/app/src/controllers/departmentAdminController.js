@@ -44,8 +44,18 @@ async function index(req, res) {
     byDepartment,
     levels: LEVELS,
     roles: await roleRepository.all(),
+    canLimits: canChangeLimits(req),
+    ownRoleIds: await grantGuard.ownRoleIds(req),
   }, 'layout/base');
 }
+
+/** QA Round 8, R8-N10: approval limits and the 'director' level are money controls — MD and ED (manage_approval_limits) only. */
+function canChangeLimits(req) {
+  return !!(req.permissions && req.permissions.manage_approval_limits);
+}
+
+const LIMITS_REFUSED = "Only the MD or ED can change an approval limit or make a designation 'director'.";
+const OWN_LIMIT_REFUSED = 'You cannot change the approval limit of a designation you hold yourself.';
 
 async function createDepartment(req, res) {
   const user = req.user;
@@ -101,6 +111,7 @@ async function createDesignation(req, res) {
   if (!dept) error = 'Choose the department.';
   else if (len(title) < 2 || len(title) > 100) error = 'Enter the designation (2 to 100 characters), e.g. Quality Manager.';
   else if (!Object.prototype.hasOwnProperty.call(LEVELS, level)) error = 'Choose the level.';
+  else if (level === 'director' && !canChangeLimits(req)) error = LIMITS_REFUSED;
   else if (await departmentRepository.designationTitleTaken(departmentId, title)) error = `"${title}" already exists in ${dept.name}.`;
   else if (roleChoice === 'new' && await roleRepository.findByName(title)) error = `A role named "${title}" already exists — choose it from the list instead of a new one.`;
   else if (roleChoice !== 'new' && !(await roleRepository.find(parseInt(roleChoice, 10) || 0))) error = 'Choose the role.';
@@ -129,8 +140,14 @@ async function updateDesignation(req, res) {
   const level = String(req.body.level ?? '');
   const limitRaw = String(req.body.approval_limit_inr ?? '').trim();
   const limitNumber = Number(limitRaw);
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const oldLimit = d.approval_limit_inr !== null && d.approval_limit_inr !== undefined ? round2(Number(d.approval_limit_inr)) : null;
+  const newLimit = limitRaw !== '' && Number.isFinite(limitNumber) ? round2(limitNumber) : null;
+  const limitChanged = level !== d.level || oldLimit !== newLimit;
   let error = null;
-  if (len(title) < 2 || len(title) > 100) error = 'Enter the designation (2 to 100 characters).';
+  if (limitChanged && !canChangeLimits(req)) error = LIMITS_REFUSED;
+  else if (limitChanged && (await grantGuard.ownRoleIds(req)).includes(Number(d.role_id))) error = OWN_LIMIT_REFUSED;
+  else if (len(title) < 2 || len(title) > 100) error = 'Enter the designation (2 to 100 characters).';
   else if (!Object.prototype.hasOwnProperty.call(LEVELS, level)) error = 'Choose the level.';
   else if (await departmentRepository.designationTitleTaken(Number(d.department_id), title, Number(d.id))) error = `"${title}" already exists in ${d.department_name}.`;
   else if (limitRaw !== '' && (!Number.isFinite(limitNumber) || limitNumber < 0)) error = 'Enter the approval limit in rupees, or leave it empty for none.';
@@ -141,6 +158,10 @@ async function updateDesignation(req, res) {
   await departmentRepository.updateDesignation(Number(d.id), title, level, !!req.body.is_active, limitRaw === '' ? null : Math.round(limitNumber * 100) / 100);
   await auditLogRepository.log(user.id, 'DESIGNATION_UPDATED', 'department_designations', Number(d.id), null,
     `${d.title} · ${d.level} · limit ${d.approval_limit_inr ?? '—'}`, `${title} · ${level} · limit ${limitRaw === '' ? '—' : limitRaw}`);
+  if (limitChanged) {
+    await auditLogRepository.log(user.id, 'APPROVAL_LIMIT_CHANGED', 'department_designations', Number(d.id), 'approval_limit_inr',
+      `${d.level} · ${oldLimit === null ? 'no limit' : oldLimit.toFixed(2)}`, `${level} · ${newLimit === null ? 'no limit' : newLimit.toFixed(2)}`);
+  }
   flash.set(req, 'success', `"${title}" saved.`);
   res.redirect(BACK);
 }
@@ -213,4 +234,4 @@ async function endMembership(req, res) {
   res.redirect(back);
 }
 
-module.exports = { index, createDepartment, updateDepartment, createDesignation, updateDesignation, addMembership, endMembership };
+module.exports = { LIMITS_REFUSED, OWN_LIMIT_REFUSED, canChangeLimits, index, createDepartment, updateDepartment, createDesignation, updateDesignation, addMembership, endMembership };

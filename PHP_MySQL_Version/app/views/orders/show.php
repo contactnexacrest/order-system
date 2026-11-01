@@ -1092,7 +1092,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
               <?php endforeach; ?>
             </select>
           </td>
-          <td><input type="text" name="tasks[<?= (int) $__i ?>][skip_reason]" class="compliance-skip-reason" data-compliance-reason value="<?= htmlspecialchars($ct['skip_reason'] ?? '') ?>" placeholder="Why is it not applicable?"></td>
+          <td><input type="text" name="tasks[<?= (int) $__i ?>][skip_reason]" class="compliance-skip-reason" data-compliance-reason value="<?= htmlspecialchars($ct['skip_reason'] ?? '') ?>" placeholder="Why is it not applicable?" aria-label="Why is it not applicable?"></td>
         </tr>
         <?php endforeach; ?>
       </table>
@@ -1227,7 +1227,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
             <?= Csrf::field() ?>
             <label class="small">Refund paid on *<input type="date" name="refund_paid_at" required max="<?= date('Y-m-d') ?>"></label>
             <label class="small">Bank reference of the refund * <input type="text" name="refund_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="SWIFT / UTR" style="width:200px" title="Rule D-212: lets anyone match this refund to the bank statement later"></label>
-            <input type="text" name="refund_notes" placeholder="Note (optional)" style="width:200px">
+            <input type="text" name="refund_notes" placeholder="Note (optional)" style="width:200px" aria-label="Note">
             <button type="submit" class="btn-sm btn-secondary">Mark Refund Completed</button>
           </form>
         <?php endif; ?>
@@ -1239,13 +1239,13 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       <?php if ($canEditLockedData): ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/cancellation/<?= (int) $__pendingCancellation['id'] ?>/approve" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap" onsubmit="return confirm('Approve this cancellation? The order will be locked as CANCELLED and this cannot be undone from this screen.');">
           <?= Csrf::field() ?>
-          <select name="refund_status">
+          <select name="refund_status" aria-label="Refund status">
             <option value="not_applicable">No refund applicable</option>
             <option value="pending">Refund pending</option>
             <option value="completed">Refund already completed</option>
           </select>
-          <input type="text" name="refund_amount" placeholder="Refund amount (optional)" style="width:160px">
-          <input type="text" name="decision_notes" placeholder="Approval notes (optional)" style="width:220px">
+          <input type="text" name="refund_amount" placeholder="Refund amount (optional)" style="width:160px" aria-label="Refund amount">
+          <input type="text" name="decision_notes" placeholder="Approval notes (optional)" style="width:220px" aria-label="Approval notes">
           <button type="submit" class="btn-sm btn-success">Approve Cancellation</button>
         </form>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/cancellation/<?= (int) $__pendingCancellation['id'] ?>/reject" style="display:flex;gap:6px;align-items:center" onsubmit="return confirmRejectCancellation(this);">
@@ -1405,12 +1405,12 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           </form>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>/duplicate" style="display:inline">
             <?= Csrf::field() ?>
-            <?php if ($__productReasonRequired): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;"><?php endif; ?>
+            <?php if ($__productReasonRequired): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;" aria-label="Reason"><?php endif; ?>
             <button type="submit" class="btn-sm btn-secondary" title="Clone this line — handy when only the name or dimensions differ">Duplicate</button>
           </form>
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>/delete" style="display:inline" onsubmit="return confirm('Remove this product line?');">
             <?= Csrf::field() ?>
-            <?php if ($__productReasonRequired): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;"><?php endif; ?>
+            <?php if ($__productReasonRequired): ?><input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;" aria-label="Reason"><?php endif; ?>
             <button type="submit" class="btn-sm btn-danger">Remove</button>
           </form>
         </div>
@@ -1874,7 +1874,9 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                   <label>Assign reviewer(s) * (minimum required: <?= (int) ($d['min_reviewers_default'] ?? 1) ?>)
                     <select name="reviewer_ids[]" multiple size="4" required style="min-width:220px">
                       <?php foreach ($activeUsers as $u): ?>
-                        <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['role_name'] ?? '—') ?>)</option>
+                        <?php // QA Round 8, R8-N06: the generator only when the self-approval rules allow them. ?>
+                        <?php $__isGen = ($d['generated_by'] ?? null) !== null && (int) $d['generated_by'] === (int) $u['id']; if ($__isGen && empty($d['generator_may_self_review'])) { continue; } ?>
+                        <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['role_name'] ?? '—') ?>)<?= $__isGen ? ' (generated it — self-review)' : '' ?></option>
                       <?php endforeach; ?>
                     </select>
                   </label>
@@ -1917,12 +1919,12 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
               <?php if ($myPendingReview): ?>
                 <form method="post" action="/reviews/<?= (int) $myPendingReview['id'] ?>/approve" style="display:inline">
                   <?= Csrf::field() ?>
-                  <input type="text" name="comments" placeholder="Comments (optional)">
+                  <input type="text" name="comments" placeholder="Comments (optional)" aria-label="Comments">
                   <button type="submit" class="btn-sm btn-success">Approve</button>
                 </form>
                 <form method="post" action="/reviews/<?= (int) $myPendingReview['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this document? It goes back for rework.');">
                   <?= Csrf::field() ?>
-                  <input type="text" name="comments" placeholder="Reason (mandatory)" required>
+                  <input type="text" name="comments" placeholder="Reason (mandatory)" required aria-label="Reason">
                   <button type="submit" class="btn-sm btn-danger">Reject</button>
                 </form>
               <?php endif; ?>
@@ -1930,11 +1932,12 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
               <?php if ($canCrossVerifyDocuments): // QA Round 5, R5-20 ?>
               <form method="post" action="/documents/<?= (int) $d['id'] ?>/cross-verify" style="margin-top:6px">
                 <?= Csrf::field() ?>
-                <select name="result" required>
+                <select name="result" required aria-label="Result">
+                  <option value="">Choose…</option>
                   <option value="pass">Cross-verify: Pass</option>
                   <option value="fail">Cross-verify: Fail</option>
                 </select>
-                <input type="text" name="comments" placeholder="Comments (optional)">
+                <input type="text" name="comments" placeholder="Comments (optional)" aria-label="Comments">
                 <button type="submit" class="btn-sm">Record Cross-Verification</button>
               </form>
               <?php endif; ?>
@@ -1980,7 +1983,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                           <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
                             <?= Csrf::field() ?>
                             <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
-                            <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
+                            <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px" aria-label="Cancel reason">
                             <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
                           </form>
                           <?php endif; ?>
@@ -1990,7 +1993,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                           <form method="post" action="/email-log/<?= (int) $log['id'] ?>/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
                             <?= Csrf::field() ?>
                             <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
-                            <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
+                            <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px" aria-label="Cancel reason">
                             <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
                           </form>
                           <?php endif; ?>
@@ -2065,9 +2068,9 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
     <form class="chat-post-form" method="post" action="/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
       <?= Csrf::field() ?>
-      <textarea name="body" data-required-unless="attachments[]" data-required-unless-message="Write a message or attach a file before posting." placeholder="Write an update for the client…"></textarea>
+      <textarea name="body" data-required-unless="attachments[]" data-required-unless-message="Write a message or attach a file before posting." placeholder="Write an update for the client…" aria-label="Write an update for the client"></textarea>
       <div class="chat-post-form-row">
-        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
+        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf" aria-label="Attachments">
         <button type="submit" class="btn-sm" data-loading-text="Posting…"><?= $mailSendingEnabled ? 'Post &amp; email client' : 'Post to client portal' ?></button>
       </div>
     </form>
@@ -2273,7 +2276,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php if ($canManageOrders): // QA Round 5, R5-20 ?>
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
           <?= Csrf::field() ?>
-          <input type="file" name="document" required>
+          <input type="file" name="document" required aria-label="Document">
           <?= $stepBadge('4c') ?><button type="submit" class="btn-sm"><?= empty($buyerPoDocuments) ? 'Attach Buyer PO Copy' : 'Attach Another Copy' ?></button>
         </form>
         <?php endif; ?>
@@ -2336,7 +2339,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
             <span>Current link (valid until <?= htmlspecialchars(Dates::human($piIntake['access_token_expires_at'])) ?>) — copy and send however you like, no need to regenerate:</span>
             <div style="display:flex;gap:6px;align-items:center">
-              <input type="text" readonly value="<?= htmlspecialchars($piFormFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
+              <input type="text" readonly aria-label="Form link" value="<?= htmlspecialchars($piFormFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
               <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($piFormFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
             </div>
           </div>
@@ -2755,7 +2758,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?php endforeach; ?>
           </select>
         </label>
-        <label id="spo-supplier-type-field" style="display:none">Supplier Type for this order *
+        <label id="spo-supplier-type-field" style="display:none">Supplier Type for this order
           <select name="supplier_type" id="spo-supplier-type-select"></select>
           <small class="muted">This supplier has more than one type — pick the one that applies to this order. It prints on the Supplier PO.</small>
         </label>
@@ -2985,7 +2988,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php if ($canManageSupplierPo): // QA Round 5, R5-20 ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/documents" enctype="multipart/form-data" style="margin-top:6px">
         <?= Csrf::field() ?>
-        <input type="file" name="document" required>
+        <input type="file" name="document" required aria-label="Document">
         <?= $stepBadge('7c') ?><button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
       </form>
       <?php endif; ?>
@@ -3165,6 +3168,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </label>
         <label>For *
           <select name="bill_for" required>
+            <option value="">Choose…</option>
             <?php foreach (\App\Repositories\OrderVendorBillRepository::LOGISTICS_SERVICES as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
           </select>
         </label>
@@ -3381,22 +3385,22 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <tr><th>Crate No.</th><th>Marks &amp; Numbers</th><th>Product</th><th>L×W×H (cm)</th><th>Pcs</th><th>Net (kg)</th><th>Gross (kg)</th><th>CBM</th><th>HS Code</th></tr>
           <?php $existingCrates = $crates ?: [[], [], []]; foreach ($existingCrates as $c): ?>
           <tr>
-            <td><input type="text" name="crate_no[]" value="<?= htmlspecialchars($c['crate_no'] ?? '') ?>" style="width:70px;" placeholder="e.g. 1"></td>
-            <td><input type="text" name="crate_marks_numbers[]" value="<?= htmlspecialchars($c['marks_numbers'] ?? '') ?>" style="width:130px;" placeholder="e.g. NX/01-12"></td>
+            <td><input type="text" name="crate_no[]" value="<?= htmlspecialchars($c['crate_no'] ?? '') ?>" style="width:70px;" placeholder="e.g. 1" aria-label="Crate no"></td>
+            <td><input type="text" name="crate_marks_numbers[]" value="<?= htmlspecialchars($c['marks_numbers'] ?? '') ?>" style="width:130px;" placeholder="e.g. NX/01-12" aria-label="Crate marks numbers"></td>
             <td><?php $__crateProduct = (string) ($c['product_description'] ?? ''); $__crateKnown = in_array($__crateProduct, array_map(static fn(array $p): string => (string) $p['description'], $products), true); ?>
-              <select name="crate_product_description[]" data-crate-product style="width:160px;">
+              <select name="crate_product_description[]" data-crate-product style="width:160px;" aria-label="Crate product description">
                 <option value="" data-hs="">— Product —</option>
                 <?php foreach ($products as $__p): ?>
                 <option value="<?= htmlspecialchars((string) $__p['description']) ?>" data-hs="<?= htmlspecialchars((string) $__p['hs_code']) ?>" <?= $__crateProduct === (string) $__p['description'] ? 'selected' : '' ?>><?= htmlspecialchars(mb_strimwidth((string) $__p['description'], 0, 60, '…')) ?></option>
                 <?php endforeach; ?>
                 <?php if ($__crateProduct !== '' && !$__crateKnown): ?><option value="<?= htmlspecialchars($__crateProduct) ?>" data-hs="<?= htmlspecialchars((string) ($c['hs_code'] ?? '')) ?>" selected><?= htmlspecialchars($__crateProduct) ?> (earlier entry)</option><?php endif; ?>
               </select></td>
-            <td><input type="text" name="crate_dimensions[]" value="<?= htmlspecialchars($c['dimensions_lwh_cm'] ?? '') ?>" style="width:80px;" placeholder="e.g. 120 x 80 x 90 cm"></td>
-            <td><input type="text" name="crate_pcs[]" value="<?= htmlspecialchars((string) ($c['pcs'] ?? '')) ?>" style="width:50px;" placeholder="e.g. 20"></td>
-            <td><input type="text" name="crate_net_weight_kg[]" value="<?= htmlspecialchars((string) ($c['net_weight_kg'] ?? '')) ?>" style="width:70px;" placeholder="e.g. 800"></td>
-            <td><input type="text" name="crate_gross_weight_kg[]" value="<?= htmlspecialchars((string) ($c['gross_weight_kg'] ?? '')) ?>" style="width:70px;" placeholder="e.g. 850"></td>
-            <td><input type="text" name="crate_cbm[]" value="<?= htmlspecialchars((string) ($c['cbm'] ?? '')) ?>" style="width:60px;" placeholder="e.g. 1.25"></td>
-            <td><input type="text" value="<?= htmlspecialchars($c['hs_code'] ?? '') ?>" data-crate-hs readonly tabindex="-1" title="Taken from the product's HS code" style="width:70px;"></td>
+            <td><input type="text" name="crate_dimensions[]" value="<?= htmlspecialchars($c['dimensions_lwh_cm'] ?? '') ?>" style="width:80px;" placeholder="e.g. 120 x 80 x 90 cm" aria-label="Crate dimensions"></td>
+            <td><input type="text" name="crate_pcs[]" value="<?= htmlspecialchars((string) ($c['pcs'] ?? '')) ?>" style="width:50px;" placeholder="e.g. 20" aria-label="Crate pcs"></td>
+            <td><input type="text" name="crate_net_weight_kg[]" value="<?= htmlspecialchars((string) ($c['net_weight_kg'] ?? '')) ?>" style="width:70px;" placeholder="e.g. 800" aria-label="Crate net weight kg"></td>
+            <td><input type="text" name="crate_gross_weight_kg[]" value="<?= htmlspecialchars((string) ($c['gross_weight_kg'] ?? '')) ?>" style="width:70px;" placeholder="e.g. 850" aria-label="Crate gross weight kg"></td>
+            <td><input type="text" name="crate_cbm[]" value="<?= htmlspecialchars((string) ($c['cbm'] ?? '')) ?>" style="width:60px;" placeholder="e.g. 1.25" aria-label="Crate cbm"></td>
+            <td><input type="text" aria-label="HS code" value="<?= htmlspecialchars($c['hs_code'] ?? '') ?>" data-crate-hs readonly tabindex="-1" title="Taken from the product's HS code" style="width:70px;"></td>
           </tr>
           <?php endforeach; ?>
         </table>
@@ -3861,12 +3865,14 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <label>Date *<input type="date" name="expense_date" required max="<?= date('Y-m-d') ?>"></label>
             <label>Category *
               <select name="category" required>
+                <option value="">Choose…</option>
                 <?php foreach (\App\Repositories\OrderExpenseRepository::CATEGORIES as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
             <label>Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="amount_inr" required placeholder="e.g. 25000.00"></label>
             <label>Paid by *
               <select name="paid_by" required>
+                <option value="">Choose…</option>
                 <?php foreach (\App\Repositories\OrderExpenseRepository::PAID_BY as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
@@ -3912,6 +3918,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?= Csrf::field() ?>
             <label>Category *
               <select name="category" required>
+                <option value="">Choose…</option>
                 <?php foreach ($costEntryCategories as $key => $label): ?>
                   <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
                 <?php endforeach; ?>
@@ -3923,6 +3930,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?php // Owner decision 2026-10-29: real paid costs go to Zoho Books as expenses, paid from here. ?>
             <label>Paid from *
               <select name="paid_from" required>
+                <option value="">Choose…</option>
                 <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
@@ -3943,6 +3951,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="number" min="0" step="any" name="factory_distance_km" value="<?= htmlspecialchars($orderTravelExpenses && $orderTravelExpenses['factory_distance_km'] !== null ? (string) $orderTravelExpenses['factory_distance_km'] : '') ?>" placeholder="e.g. 120"></label>
             <label>Travel Expense % of FOB Value *
               <select name="expense_pct" required>
+                <option value="">Choose…</option>
                 <?php $savedPct = $orderTravelExpenses ? (string) (float) $orderTravelExpenses['expense_pct'] : ''; ?>
                 <?php foreach (['5', '7', '10', '15'] as $pct): ?>
                   <option value="<?= $pct ?>" <?= $savedPct === $pct ? 'selected' : '' ?>><?= $pct ?>%</option>
@@ -3969,6 +3978,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?= Csrf::field() ?>
             <label>Who pays the inspection fee? *
               <select name="fee_payer" required>
+                <option value="">Choose…</option>
                 <option value="nexacrest" <?= ($orderInspectionFee['fee_payer'] ?? '') === 'nexacrest' ? 'selected' : '' ?>>NexaCrest</option>
                 <option value="client" <?= ($orderInspectionFee['fee_payer'] ?? '') === 'client' ? 'selected' : '' ?>>Client</option>
               </select>
@@ -3978,6 +3988,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?php $__feePaidFrom = null; foreach ($orderCostEntries as $__c) { if ($orderInspectionFee && (int) $__c['id'] === (int) ($orderInspectionFee['cost_entry_id'] ?? 0)) { $__feePaidFrom = $__c['paid_from']; } } ?>
             <label data-show-when="fee_payer=nexacrest">Paid from *
               <select name="paid_from" required>
+                <option value="">Choose…</option>
                 <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__feePaidFrom === $__key ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
@@ -4088,13 +4099,13 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
                 <?php endif; ?>
               </td>
               <td>
-                <select name="schemes[<?= (int) $__i ?>][status]" data-scheme-status style="min-width:140px;">
+                <select name="schemes[<?= (int) $__i ?>][status]" data-scheme-status style="min-width:140px;" aria-label="Status">
                   <?php foreach (\App\Repositories\OrderExportBenefitSchemeRepository::STATUSES as $key => $label): ?>
                   <option value="<?= htmlspecialchars($key) ?>" <?= $sch['status'] === $key ? 'selected' : '' ?><?= $key === 'not_eligible' ? ' data-auto-reason="' . htmlspecialchars(\App\Repositories\OrderExportBenefitSchemeRepository::NOT_ELIGIBLE_REASON) . '"' : '' ?>><?= htmlspecialchars($label) ?></option>
                   <?php endforeach; ?>
                 </select>
               </td>
-              <td><input type="text" name="schemes[<?= (int) $__i ?>][reason]" value="<?= htmlspecialchars($sch['reason'] ?? '') ?>" placeholder="Why it doesn't apply to this order" data-scheme-reason></td>
+              <td><input type="text" name="schemes[<?= (int) $__i ?>][reason]" value="<?= htmlspecialchars($sch['reason'] ?? '') ?>" placeholder="Why it doesn't apply to this order" data-scheme-reason aria-label="Why it doesn't apply to this order"></td>
             </tr>
             <?php endforeach; ?>
           </table>
@@ -4222,7 +4233,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php elseif (!$shipping || !$shipping['bl_originals_received_at']): ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/bl-originals-received">
         <?= Csrf::field() ?>
-        <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3" placeholder="e.g. 3"></label>
+        <label>No. of Original BL Copies Received *<input type="number" name="bl_originals_count" value="3" required min="1" max="10" step="1" placeholder="e.g. 3"></label>
         <?= $stepBadge('13b') ?><button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
       </form>
     <?php else: ?>
@@ -4426,6 +4437,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?= Csrf::field() ?>
             <label>Scheme *
               <select name="scheme_name" required>
+                <option value="">Choose…</option>
                 <?php foreach ($exportBenefitSchemes as $opt): ?>
                   <option value="<?= htmlspecialchars($opt['option_value']) ?>"><?= htmlspecialchars($opt['option_value']) ?></option>
                 <?php endforeach; ?>
@@ -4595,9 +4607,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php if ($canManageOrders): ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
       <?= Csrf::field() ?>
-      <input type="text" name="title" placeholder="Title *" required style="width:220px">
-      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px">
-      <input type="file" name="document" required>
+      <input type="text" name="title" placeholder="Title *" required style="width:220px" aria-label="Title">
+      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px" aria-label="Notes">
+      <input type="file" name="document" required aria-label="Document">
       <button type="submit" class="btn-sm">Attach Document</button>
     </form>
     <?php endif; ?>
@@ -4710,6 +4722,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <input type="hidden" name="override_gate" value="1">
       <label>Document Type
         <select name="document_type" required>
+          <option value="">Choose…</option>
           <?php foreach (['QT' => 'Quotation', 'BUYERPO' => 'Buyer PO', 'PI' => 'Proforma Invoice', 'OC' => 'Order Confirmation', 'SUPPO' => 'Supplier PO', 'FDN' => 'Debit Note', 'PL' => 'Packing List', 'BLI' => 'BL Instruction Sheet', 'CI' => 'Commercial Invoice', 'COOPREP' => 'COO Prep Sheet (internal)'] as $code => $label): ?>
             <option value="<?= $code ?>"><?= htmlspecialchars($label) ?> (<?= $code ?>)</option>
           <?php endforeach; ?>

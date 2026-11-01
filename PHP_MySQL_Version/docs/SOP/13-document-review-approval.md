@@ -115,9 +115,12 @@ type, normal forward progress through the stages, never triggers it.
 
 From the order page, staff assign one or more reviewers to a generated
 document — this moves it from draft to **in review**. The person who
-generated the document can never be its reviewer, whatever their role
-(owner decision 1 Nov 2026) — a second pair of eyes is the point of the
-review. Each assigned
+generated the document is left out of the reviewer list — a second pair
+of eyes is the point of the review — unless **Admin → Self-approval
+rules** let their role review a document they generated (by default the
+Managing Director and Executive Director). Then their name is in the list
+with **(generated it — self-review)** after it (owner decisions 1 Nov
+2026, D-221; QA Round 8). Each assigned
 reviewer sees it in **My Review Queue** (`/reviews`):
 
 ![My Review Queue — a document pending this reviewer's decision](./images/review_queue.png)

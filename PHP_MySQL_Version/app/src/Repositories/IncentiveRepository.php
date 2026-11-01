@@ -228,6 +228,36 @@ final class IncentiveRepository
         return (int) $pdo->lastInsertId();
     }
 
+    /**
+     * QA Round 8, R8-N12: a claw-back is saved only while it fits what is left
+     * of the paid commission — checked with the paid payout row locked, so
+     * simultaneous claw-backs (a double click, two people) cannot take back
+     * more than was paid.
+     *
+     * @return array{id: ?int, left: float} id null when it no longer fits (left = what was still left)
+     */
+    public static function addClawbackWithinPaid(int $payoutId, float $amountInr, string $month, string $noteSuffix): array
+    {
+        return Database::transaction(static function () use ($payoutId, $amountInr, $month, $noteSuffix): array {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare('SELECT * FROM incentive_payouts WHERE id = :id FOR UPDATE');
+            $stmt->execute(['id' => $payoutId]);
+            $paid = $stmt->fetch();
+            if (!$paid || $paid['status'] !== 'paid' || (float) $paid['amount_inr'] <= 0) {
+                return ['id' => null, 'left' => 0.0];
+            }
+            $sum = $pdo->prepare('SELECT COALESCE(-SUM(amount_inr), 0) FROM incentive_payouts WHERE clawback_of_payout_id = :p');
+            $sum->execute(['p' => $payoutId]);
+            $left = round((float) $paid['paid_inr'] - (float) $sum->fetchColumn(), 2);
+            if ($amountInr <= 0 || $amountInr > $left + 0.005) {
+                return ['id' => null, 'left' => $left];
+            }
+            $fc = $paid['amount_fc'] !== null ? round((float) $paid['amount_fc'] * $amountInr / (float) $paid['amount_inr'], 2) : null;
+            $id = self::addClawback($paid, $amountInr, $fc, $month, $noteSuffix);
+            return ['id' => $id, 'left' => $left];
+        });
+    }
+
     public static function deleteOrderPayouts(int $orderId): void
     {
         Database::connection()->prepare('DELETE FROM incentive_payouts WHERE order_id = :id')->execute(['id' => $orderId]);

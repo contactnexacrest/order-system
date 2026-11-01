@@ -5,8 +5,8 @@
   <form method="get" action="/audit-log">
     <div class="kv-grid">
       <label>Entity Type<input type="text" name="entity_type" value="{{ filters.entity_type or '' }}" placeholder="e.g. orders, documents, amendments"></label>
-      <label>Entity ID<input type="number" name="entity_id" value="{{ filters.entity_id or '' }}" placeholder="e.g. 1024"></label>
-      <label>User ID<input type="number" name="user_id" value="{{ filters.user_id or '' }}" placeholder="e.g. 12"></label>
+      <label>Entity ID<input type="number" min="1" step="1" name="entity_id" value="{{ filters.entity_id or '' }}" placeholder="e.g. 1024"></label>
+      <label>User ID<input type="number" min="1" step="1" name="user_id" value="{{ filters.user_id or '' }}" placeholder="e.g. 12"></label>
       <label>Action Type
         <select name="action_type">
           <option value="">All</option>

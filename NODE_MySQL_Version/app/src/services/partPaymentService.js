@@ -176,7 +176,7 @@ async function addMilestoneReceipt(milestone, amount, receivedOn, rate, bankRefe
  * Before a leg is marked cleared. Returns { error } to refuse, or { short } —
  * the shortfall to record once cleared (null when nothing is owed).
  */
-async function clearCheck(orderId, leg, milestone, canApprove, reason) {
+async function clearCheck(orderId, leg, milestone, canApprove, reason, userId = null) {
   const s = await summary(orderId, leg, milestone);
   if (s.owed === null || s.owed <= TOLERANCE) {
     return { short: null };
@@ -186,6 +186,12 @@ async function clearCheck(orderId, leg, milestone, canApprove, reason) {
   const lbl = label(leg, milestone);
   if (!canApprove) {
     return { error: `${lbl} received so far: ${money(currency, s.received)} of ${money(currency, s.expected)} due — ${money(currency, s.owed)} is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.` };
+  }
+  // QA Round 8, R8-N09: a manager who recorded this payment's receipts clears it short only if their role is ticked.
+  if (userId !== null && userId !== undefined
+    && await recordedBy(orderId, leg, milestone ? milestone.id : null, userId)
+    && !(await require('./makerCheckerGuard').selfApprovalAllowed('short_payment', userId))) {
+    return { error: 'You recorded this payment\'s receipts, so a different manager with "Approve short payment" must clear it short.' };
   }
   const why = String(reason || '').trim();
   if ([...why].length < 10 || [...why].length > 500) {
@@ -203,7 +209,16 @@ async function recordShortfall(orderId, leg, milestone, short, user) {
     { o: orderId, l: leg, m: milestone ? milestone.id : null, e: short.expected, r: short.received, s: short.owed, t: treatment, reason: short.reason, u: user.id }
   );
   await require('../repositories/auditLogRepository').log(user.id, 'PAYMENT_SHORTFALL_APPROVED', 'orders', orderId, leg + (milestone ? `:${milestone.seq}` : ''), String(short.expected), String(short.received), short.reason);
+  if (await recordedBy(orderId, leg, milestone ? milestone.id : null, user.id)) {
+    await require('../repositories/auditLogRepository').log(user.id, 'SHORT_PAYMENT_SELF_APPROVED', 'orders', orderId, leg + (milestone ? `:${milestone.seq}` : ''), null, null, 'Cleared short a payment whose receipts they recorded themselves (Admin → Self-approval rules).');
+  }
   return `Short by ${money(short.currency, short.owed)}: approved by ${user.name} — ${treatment === 'carried_to_balance' ? 'carried into the balance.' : 'written off.'}`;
+}
+
+/** Whether this person recorded any receipt of the leg (QA Round 8, R8-N09). */
+async function recordedBy(orderId, leg, milestoneId, userId) {
+  const rows = await db.query('SELECT 1 AS x FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id <=> :m AND recorded_by = :u LIMIT 1', { o: orderId, l: leg, m: milestoneId === undefined ? null : milestoneId, u: userId });
+  return rows.length > 0;
 }
 
 function clearedMessage(leg, milestone = null) {
@@ -224,5 +239,5 @@ async function pageData(orderId, milestones) {
 
 module.exports = {
   LEGS, TOLERANCE, label, money, receipts, receivedTotal, expected, summary, joinReferences, addLegReceipt, addMilestoneReceipt,
-  clearCheck, recordShortfall, clearedMessage, pageData,
+  clearCheck, recordShortfall, recordedBy, clearedMessage, pageData,
 };

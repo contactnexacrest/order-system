@@ -126,7 +126,7 @@ final class AmendmentService
         return $amendmentId;
     }
 
-    public static function approveByMd(int $amendmentId, int $mdUserId): void
+    public static function approveByMd(int $amendmentId, int $mdUserId, bool $sampleDataLoad = false): void
     {
         $amendment = AmendmentRepository::find($amendmentId);
         if (!$amendment) {
@@ -136,16 +136,18 @@ final class AmendmentService
             throw new \RuntimeException('Only a pending amendment can be MD-approved.');
         }
         // QA-5 maker-checker (AMD-05): whoever filed this amendment request
-        // must not also be the one who MD-approves it, unless they're a
-        // Super Admin or hold manage_permissions (owner decision).
-        if ($amendment['created_by'] !== null
-            && (int) $amendment['created_by'] === $mdUserId
-            && !MakerCheckerGuard::selfApprovalAllowed($mdUserId)
-        ) {
+        // does not also MD-approve it, unless their role is ticked in Admin →
+        // Self-approval rules (QA Round 8, R8-N09; default MD and ED).
+        // Sample data (a system load by the Super Admin who loads it, test mode only) is not a person approving their own request.
+        $self = !$sampleDataLoad && $amendment['created_by'] !== null && (int) $amendment['created_by'] === $mdUserId;
+        if ($self && !MakerCheckerGuard::selfApprovalAllowed('amendment', $mdUserId)) {
             throw new \RuntimeException('You requested this amendment — a different privileged user must MD-approve it.');
         }
         AmendmentRepository::approveByMd($amendmentId, $mdUserId);
         AuditLogRepository::log($mdUserId, 'AMENDMENT_MD_APPROVED', 'amendments', $amendmentId);
+        if ($self) {
+            AuditLogRepository::log($mdUserId, 'AMENDMENT_SELF_APPROVED', 'amendments', $amendmentId, null, null, null, 'MD-approved an amendment they requested themselves (Admin → Self-approval rules).');
+        }
     }
 
     public static function rejectAmendment(int $amendmentId, int $userId): void

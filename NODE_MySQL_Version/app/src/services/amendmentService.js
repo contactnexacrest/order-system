@@ -131,7 +131,7 @@ async function createRequest(
   return amendmentId;
 }
 
-async function approveByMd(amendmentId, mdUserId) {
+async function approveByMd(amendmentId, mdUserId, sampleDataLoad = false) {
   const amendment = await amendmentRepository.find(amendmentId);
   if (!amendment) {
     throw new Error(`Amendment ${amendmentId} not found`);
@@ -140,18 +140,21 @@ async function approveByMd(amendmentId, mdUserId) {
     throw new Error('Only a pending amendment can be MD-approved.');
   }
   // QA-5 maker-checker (AMD-05): whoever filed this amendment request must
-  // not also be the one who MD-approves it, unless they're a Super Admin
-  // or hold manage_permissions (owner decision).
-  if (
-    amendment.created_by !== null
+  // not also be the one who MD-approves it, unless their role is ticked for
+  // "amendment" in Admin → Self-approval rules (QA Round 8, R8-N09 —
+  // default MD + ED; no Super Admin / manage_permissions exemption).
+  // Sample data (a system load by the Super Admin who loads it, test mode only) is not a person approving their own request.
+  const self = !sampleDataLoad && amendment.created_by !== null
     && amendment.created_by !== undefined
-    && Number(amendment.created_by) === Number(mdUserId)
-    && !(await makerCheckerGuard.selfApprovalAllowed(mdUserId))
-  ) {
+    && Number(amendment.created_by) === Number(mdUserId);
+  if (self && !(await makerCheckerGuard.selfApprovalAllowed('amendment', mdUserId))) {
     throw new Error('You requested this amendment — a different privileged user must MD-approve it.');
   }
   await amendmentRepository.approveByMd(amendmentId, mdUserId);
   await auditLogRepository.log(mdUserId, 'AMENDMENT_MD_APPROVED', 'amendments', amendmentId);
+  if (self) {
+    await auditLogRepository.log(mdUserId, 'AMENDMENT_SELF_APPROVED', 'amendments', amendmentId, null, null, null, 'MD-approved an amendment they requested themselves (Admin → Self-approval rules).');
+  }
 }
 
 async function rejectAmendment(amendmentId, userId) {

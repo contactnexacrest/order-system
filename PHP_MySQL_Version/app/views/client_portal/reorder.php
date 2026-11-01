@@ -17,7 +17,7 @@
         <?php $rows = !empty($products) ? $products : [['description' => '', 'dimensions' => '', 'finish' => '', 'quantity' => '', 'quantity_is_tbc' => false, 'unit' => '']]; ?>
         <?php foreach ($rows as $idx => $p): ?>
         <div class="product-row">
-          <label>Description *<input type="text" name="product_description[<?= $idx ?>]" value="<?= htmlspecialchars($p['description'] ?? '') ?>" placeholder="e.g. Granite Memorial Headstone"></label>
+          <label>Description *<input type="text" name="product_description[<?= $idx ?>]" required value="<?= htmlspecialchars($p['description'] ?? '') ?>" placeholder="e.g. Granite Memorial Headstone"></label>
           <label>Dimensions<input type="text" name="product_dimensions[<?= $idx ?>]" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>" placeholder="e.g. 24x12x3 inches"></label>
           <label>Finish
             <select name="product_finish[<?= $idx ?>]">
@@ -48,7 +48,7 @@
 
     <fieldset>
       <legend>Anything else we should know?</legend>
-      <textarea name="notes" rows="2" placeholder="e.g. same as before but 2 extra cartons, or a size change on one item"></textarea>
+      <textarea name="notes" rows="2" placeholder="e.g. same as before but 2 extra cartons, or a size change on one item" aria-label="Notes"></textarea>
     </fieldset>
 
     <button type="submit">Submit Reorder Request</button>

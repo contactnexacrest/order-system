@@ -139,7 +139,7 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
           <input type="text" name="country_of_destination" value="<?= htmlspecialchars($submission['country_of_destination'] ?? '') ?>" placeholder="e.g., Hungary / UK / France" required>
         </label>
         <label>Incoterm *
-          <select id="incoterm_select">
+          <select id="incoterm_select" required>
             <option value="">— Select —</option>
             <?php foreach ($incoterms as $i): ?>
               <option value="<?= htmlspecialchars($i['code']) ?>" <?= $incotermValue === $i['code'] ? 'selected' : '' ?>><?= htmlspecialchars($i['code']) ?></option>

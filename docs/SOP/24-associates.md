@@ -70,7 +70,17 @@ the same links, filters and actions, and switch to each other.
 **Change status** needs a reason, which the associate is shown.
 - **Suspended**: every commission waiting to be paid is put **on hold**,
   and new commission is earned on hold; nothing is paid until the MD
-  releases each one (**Release** on the associate's page).
+  releases each one (**Release** on the associate's page). The associate
+  can still log in and see their clients, orders and commission, but the
+  portal is **read-only** (QA Round 8, Q-R8-2): every page shows "Your
+  account is suspended — you can see your clients, orders and commission,
+  but cannot invite clients or change your details." Creating or
+  cancelling a link, choosing the code, saving the profile, uploading a
+  document and changing bank details are refused with "Your account is
+  suspended — you cannot invite clients or change your details. Please
+  contact your NexaCrest relationship manager." **Messages** to NexaCrest
+  and the **invoice upload** for a payout stay open, so they can still ask
+  a question and be paid what was already earned.
 - **Agreement ended**: the portal closes. Commission already earned is
   still paid; no new clients.
 
@@ -94,7 +104,15 @@ details. Two ways, in any mix:
 
 - **One-off link**: in the portal, **My clients → A link for one buyer**
   (company name and country). The link `…/invite/<token>` is valid for 30
-  days and for one registration. The associate can cancel it.
+  days and for **one registration**: the first registration sent through it
+  takes it, and anyone opening or sending it again is told "This invitation
+  link has expired or was already used. Ask the person who sent it for a
+  new one, or send your request without it." (QA Round 8, R8-N04). Accept
+  links the associate only for the registration recorded on the link. If
+  the buyer registered under a different company name from the one the
+  link was made for, staff see "The associate made this link for …, but the
+  buyer registered as …" on Quotation Intake. The associate can cancel an
+  unused link.
 - **Personal code**: every associate has one code, e.g. `NXA-RAJESH-7K`,
   for all their buyers; the link `…/quotation-details?code=NXA-RAJESH-7K`
   carries it. The last letter is
@@ -144,6 +162,12 @@ change it.
 
 ## Commission
 
+- **Client no.** (QA Round 8, R8-N05, AS-17): each client is numbered for
+  its associate **when it is linked** — 1 for the first client they
+  brought, 2 for the second, and so on. The number never changes. If the MD
+  moves a client to another associate, it becomes that associate's next
+  client; removing the link clears it. The rate ladder (1–5, 6–10, …) uses
+  this number, and the rate is fixed on each order when it is created.
 - Earned on the client's first orders — everything ordered in the **10 days
   from the client's first PO received** (chapter 20) — at the rate fixed on
   each order, on the **product FOB value** (services excluded).
@@ -156,8 +180,10 @@ change it.
 - **Cancelled** or not-proceeding orders: no commission.
 - **No commission** associates: none, the portal says so.
 - **Refund after payment — claw-back**: on the associate's page, under
-  Payouts, **Claw back** an amount (at most what was paid) with what was
-  refunded. It becomes a negative line in the current incentive month and
+  Payouts, **Claw back** an amount (at most what is left of what was paid)
+  with what was refunded. Two claw-backs saved at the same moment are
+  checked one after the other, so together they never exceed what was paid
+  (QA Round 8, R8-N12). It becomes a negative line in the current incentive month and
   is deducted from the associate's next payment (the line is marked "Deducted
   from payout no. …").
 - Amounts are worked out in the **order currency** and paid in rupees at
@@ -198,7 +224,13 @@ recovery (vendor credit) from the associate's statement.
   number, ₹1 test credit. **Verify** must be a **different person** (and
   not the one who entered it). Then the account is used after the waiting
   days (default 7). The associate is e-mailed at each step. **Reject**
-  with a reason.
+  with a reason. The e-mails say where payments go meanwhile (QA Round 8,
+  R8-N01): "Payments keep going to your verified account (••••1234)." when
+  a verified account is in use, otherwise "No payment can be made until
+  new bank details are verified." The reason is shown with one full stop,
+  e.g. "Your new bank details (HDFC Bank ••••3333) were not accepted:
+  Account holder name does not match the PAN. No payment can be made until
+  new bank details are verified."
 - The number is stored encrypted and shown ••••1234; **Show full number**
   is Finance / MD only and recorded in the audit log.
 

@@ -1030,6 +1030,16 @@ final class OrderController
         if (!$canViewCafin) {
             $documents = array_values(array_filter($documents, static fn (array $d): bool => $d['document_type_code'] !== 'CAFIN'));
         }
+        // QA Round 8, R8-N06: the reviewer list offers a document's own generator only when the
+        // self-approval rule 'document_review' allows them (Admin → Self-approval rules, D-221).
+        $__selfReviewOk = [];
+        foreach ($documents as $__i => $__d) {
+            $__gen = (int) ($__d['generated_by'] ?? 0);
+            if ($__gen > 0 && !isset($__selfReviewOk[$__gen])) {
+                $__selfReviewOk[$__gen] = \App\Services\SelfApprovalRules::allowed('document_review', $__gen);
+            }
+            $documents[$__i]['generator_may_self_review'] = $__gen > 0 && $__selfReviewOk[$__gen];
+        }
         $reviewsByDocument = [];
         $crossVerificationsByDocument = [];
         foreach ($documents as $d) {
@@ -3843,11 +3853,18 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        $count = (int) ($_POST['bl_originals_count'] ?? 3);
-        OrderShippingRepository::recordBlOriginalsReceived($orderId, $count ?: 3);
+        // QA Round 8, R8-N13: a whole number 1-10, never silently 3.
+        $raw = trim((string) ($_POST['bl_originals_count'] ?? ''));
+        if (!preg_match('/^\d{1,2}$/', $raw) || (int) $raw < 1 || (int) $raw > 10) {
+            Flash::set('error', 'Enter how many original BL copies were received (1 to 10).');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $count = (int) $raw;
+        OrderShippingRepository::recordBlOriginalsReceived($orderId, $count);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
-        AuditLogRepository::log(AuthService::currentUserId(), 'ORDER_BL_ORIGINALS_RECEIVED', 'order_shipping', $orderId, 'bl_originals_received_count', null, (string) ($count ?: 3));
+        AuditLogRepository::log(AuthService::currentUserId(), 'ORDER_BL_ORIGINALS_RECEIVED', 'order_shipping', $orderId, 'bl_originals_received_count', null, (string) $count);
         Flash::set('success', 'Original BL copies recorded as received from CHA.');
         header("Location: /orders/{$orderId}");
     }
@@ -4330,13 +4347,11 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        // QA-5 maker-checker: the person who requested the cancellation
-        // must not also be the one who approves it. External QA report
-        // N-04: unlike other maker-checker checks, this one does NOT
-        // exempt manage_permissions holders — only Super Admin — because
-        // every default role that can approve a cancellation (Admin, MD,
-        // ED) also holds manage_permissions, which made the rule a no-op.
-        if ((int) $cancellation['requested_by'] === (int) $user['id'] && !MakerCheckerGuard::selfApprovalAllowedStrict((int) $user['id'])) {
+        // QA-5 maker-checker: the person who requested the cancellation does
+        // not also approve it, unless their role is ticked in Admin →
+        // Self-approval rules (QA Round 8, R8-N09; default MD and ED).
+        $selfDecision = (int) $cancellation['requested_by'] === (int) $user['id'];
+        if ($selfDecision && !MakerCheckerGuard::selfApprovalAllowed('cancellation', (int) $user['id'])) {
             Flash::set('error', 'You requested this cancellation — a different privileged person must approve it.');
             header("Location: /orders/{$orderId}");
             return;
@@ -4358,6 +4373,9 @@ final class OrderController
         // email below fired.
         \App\Repositories\NotificationRepository::create((int) $cancellation['requested_by'], null, 'order_cancellation_approved', $orderId, "Your cancellation request for order {$order['order_reference']} was approved.");
         AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_APPROVED', 'orders', $orderId, 'status', $order['status'], 'cancelled', $decisionNotes);
+        if ($selfDecision) {
+            AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_SELF_APPROVED', 'order_cancellations', $cancellationId, null, null, null, 'Approved the cancellation they requested themselves (Admin → Self-approval rules).');
+        }
         Flash::set('success', 'Cancellation approved — order is now cancelled.');
         header("Location: /orders/{$orderId}");
     }
@@ -4373,9 +4391,9 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        // External QA report N-04: strict variant, no manage_permissions
-        // exemption — see approveCancellation() above.
-        if ((int) $cancellation['requested_by'] === (int) $user['id'] && !MakerCheckerGuard::selfApprovalAllowedStrict((int) $user['id'])) {
+        // Same rule as approveCancellation() (QA Round 8, R8-N09).
+        $selfDecision = (int) $cancellation['requested_by'] === (int) $user['id'];
+        if ($selfDecision && !MakerCheckerGuard::selfApprovalAllowed('cancellation', (int) $user['id'])) {
             Flash::set('error', 'You requested this cancellation — a different privileged person must decide on it.');
             header("Location: /orders/{$orderId}");
             return;
@@ -4394,6 +4412,9 @@ final class OrderController
         $order = OrderRepository::find($orderId);
         \App\Repositories\NotificationRepository::create((int) $cancellation['requested_by'], null, 'order_cancellation_rejected', $orderId, "Your cancellation request for order {$order['order_reference']} was rejected: {$decisionNotes}");
         AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_REJECTED', 'order_cancellations', $cancellationId, null, 'pending', 'rejected', $decisionNotes);
+        if ($selfDecision) {
+            AuditLogRepository::log((int) $user['id'], 'ORDER_CANCELLATION_SELF_REJECTED', 'order_cancellations', $cancellationId, null, null, null, 'Rejected the cancellation they requested themselves (Admin → Self-approval rules).');
+        }
         Flash::set('success', 'Cancellation request rejected — order is unaffected.');
         header("Location: /orders/{$orderId}");
     }

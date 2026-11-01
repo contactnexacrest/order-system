@@ -115,10 +115,15 @@ final class GstRefundController
             header(self::BACK);
             return;
         }
-        $id = GstRefundRepository::addCredit((int) $claim['id'], (float) $amount, $creditedOn, $reference, $part, (int) $user['id']);
-        if ($refusedAmount > 0) {
-            GstRefundRepository::addRefused((int) $claim['id'], $refusedAmount, '₹' . number_format($refusedAmount, 2) . ' refused (with the credit of ' . date('j M Y', strtotime($creditedOn)) . ')');
+        // QA Round 8, R8-N11: re-checked with the claim locked, so simultaneous saves cannot credit more than the claim.
+        $saved = GstRefundRepository::addCreditWithinClaim((int) $claim['id'], (float) $amount, $refusedAmount,
+            '₹' . number_format($refusedAmount, 2) . ' refused (with the credit of ' . date('j M Y', strtotime($creditedOn)) . ')', $creditedOn, $reference, $part, (int) $user['id']);
+        if ($saved['id'] === null) {
+            Flash::set('error', 'Credited plus refused (₹' . number_format((float) $amount + $refusedAmount, 2) . ') is more than what is still open on this claim (₹' . number_format(max(0, $saved['open']), 2) . '). Nothing was saved.');
+            header(self::BACK);
+            return;
         }
+        $id = (int) $saved['id'];
         $description = PaymentDescription::gstRefund(GstRefundRepository::findCredit($id) ?? []);
         AuditLogRepository::log((int) $user['id'], 'GST_REFUND_CREDITED', 'gst_refund_credits', $id, 'amount', null, number_format((float) $amount, 2, '.', ''), $description . ($refusedAmount > 0 ? ' · ₹' . number_format($refusedAmount, 2) . ' refused' : ''));
         Flash::set('success', 'Recorded: ' . $description . '. It goes to Zoho Books at the next sync.');

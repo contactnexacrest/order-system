@@ -30,8 +30,8 @@
     <h3 style="margin-top:16px">Create a role</h3>
     <form method="post" action="/admin/roles" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <input type="text" name="name" placeholder="Role name" required style="width:200px">
-      <input type="text" name="description" placeholder="Description (optional)" style="width:320px">
+      <input type="text" name="name" placeholder="Role name" required style="width:200px" aria-label="Role name">
+      <input type="text" name="description" placeholder="Description (optional)" style="width:320px" aria-label="Description">
       <button type="submit" class="btn-sm btn-accent">Create Role</button>
     </form>
   </div>
@@ -86,10 +86,10 @@
     <p class="muted small">A new permission does nothing on its own — a developer still has to add a check for its key somewhere in the code before it gates anything.</p>
     <form method="post" action="/admin/permission-definitions" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <input type="text" name="permission_key" placeholder="permission_key (e.g. manage_widgets)" required style="width:220px">
-      <input type="text" name="name" placeholder="Display name" required style="width:200px">
-      <input type="text" name="category" placeholder="Category (optional)" style="width:140px">
-      <input type="text" name="description" placeholder="Description (optional)" style="width:280px">
+      <input type="text" name="permission_key" placeholder="permission_key (e.g. manage_widgets)" required style="width:220px" aria-label="Permission key">
+      <input type="text" name="name" placeholder="Display name" required style="width:200px" aria-label="Display name">
+      <input type="text" name="category" placeholder="Category (optional)" style="width:140px" aria-label="Category">
+      <input type="text" name="description" placeholder="Description (optional)" style="width:280px" aria-label="Description">
       <button type="submit" class="btn-sm btn-accent">Create Permission</button>
     </form>
   </div>
@@ -132,7 +132,7 @@
           <option value="{{ p.id }}">{{ p.name }}</option>
         {% endfor %}
       </select>
-      <input type="text" name="reason" placeholder="Reason (min {{ minReasonLength }} chars)" required minlength="{{ minReasonLength }}" style="width:280px">
+      <input type="text" name="reason" placeholder="Reason (min {{ minReasonLength }} chars)" required minlength="{{ minReasonLength }}" style="width:280px" aria-label="Reason">
       <label class="inline small">Until <input type="date" name="expires_at" min="{{ today }}" aria-label="Until (optional end date)"></label>
       <button type="submit" class="btn-sm btn-success">Grant</button>
     </form>

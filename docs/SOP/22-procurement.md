@@ -36,8 +36,11 @@ working as:
 - within the limit — the purchase is approved at once;
 - above it — it waits for someone with **Approve purchases** whose own
   limit covers it. Within your own limit the award is approved at once —
-  the limit is the control; above it, nobody approves their own award (Admin, MD and ED
-  excepted, as for other approvals).
+  the limit is the control; above it, nobody approves their own award
+  unless their role is ticked for "Approve a purchase award they made" in
+  Admin → Self-approval rules (default MD and ED; logged as
+  PURCHASE_AWARD_SELF_APPROVED). Approval limits themselves are changed only
+  by the MD or ED ([Chapter 21](./21-departments.md)).
 
 The limit applies whatever the department state: a person who holds a
 Procurement role without a department membership, or who has not chosen a

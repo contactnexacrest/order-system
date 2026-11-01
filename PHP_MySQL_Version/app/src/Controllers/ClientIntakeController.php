@@ -83,6 +83,13 @@ final class ClientIntakeController
         }
 
         $id = ClientIntakeRepository::create($data, $_SERVER['REMOTE_ADDR'] ?? null);
+        // QA Round 8, R8-N04: a one-off link registers one company — the first registration through it takes it.
+        if ($intro['invitation'] !== null && !\App\Repositories\AssociateInvitationRepository::claim((int) $intro['invitation']['id'], $id)) {
+            \App\Config\Database::connection()->prepare('DELETE FROM client_intake_submissions WHERE id = :id')->execute(['id' => $id]);
+            Flash::set('error', \App\Services\AssociateIntakeService::LINK_USED);
+            header('Location: /quotation-details');
+            return;
+        }
         $link = self::issueCorrectionLink($id, $data['email']);
         if ($intro['associate'] !== null) {
             $code = \App\Services\AssociateIntakeService::attach($id, $intro['associate'], $intro['invitation'], $data['company_legal_name'], $data['country_of_destination'], $data['email'], true, $website ?: null);

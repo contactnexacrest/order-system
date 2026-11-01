@@ -36,7 +36,7 @@ async function introducer(code, token) {
       return { associate: null, invitation: null, error: 'This invitation link is not valid. You can still send your request without it.' };
     }
     if (!associateInvitationRepository.isUsable(inv)) {
-      return { associate: null, invitation: null, error: 'This invitation link has expired or was already used. Ask the person who sent it for a new one, or send your request without it.' };
+      return { associate: null, invitation: null, error: LINK_USED };
     }
     const a = await associateRepository.find(Number(inv.associate_id));
     if (!a || a.status !== 'active') {
@@ -70,13 +70,17 @@ async function sendEmailCode(submissionId, email) {
 }
 
 /** Ties a new submission to the associate (not yet confirmed) and e-mails the buyer a 6-digit code. Returns the code. */
+/** QA Round 8, R8-N04: the message when a one-off link was already used by another registration. */
+const LINK_USED = 'This invitation link has expired or was already used. Ask the person who sent it for a new one, or send your request without it.';
+
 async function attach(submissionId, associate, invitation, company, country, email, confirmed, website) {
   const invId = invitation ? Number(invitation.id) : await associateInvitationRepository.createForCode(Number(associate.id), company, country);
   await db.execute(
     'UPDATE client_intake_submissions SET associate_id = :a, associate_invitation_id = :i, introduction_confirmed = :c, website = :w WHERE id = :id',
     { a: associate.id, i: invId, c: confirmed ? 1 : 0, w: website || null, id: submissionId }
   );
-  await associateInvitationRepository.setStatus(invId, 'opened', { submission_id: submissionId });
+  // A one-off link was already taken for this registration (claim); a personal code gets a row of its own.
+  if (!invitation) await associateInvitationRepository.setStatus(invId, 'opened', { submission_id: submissionId });
   return sendEmailCode(submissionId, email);
 }
 
@@ -151,6 +155,11 @@ async function reviewInfo(s) {
       flags.push('The buyer did not confirm that this associate introduced them — accepting does not link them.');
     }
   }
+  // QA Round 8, R8-N04: a link made for one company, used by another.
+  const inv = s.associate_invitation_id ? await associateInvitationRepository.find(Number(s.associate_invitation_id)) : null;
+  if (inv && inv.kind === 'client_link' && associateMatchService.normaliseName(String(inv.company_name)) !== associateMatchService.normaliseName(String(s.company_legal_name || ''))) {
+    flags.push(`The associate made this link for ${inv.company_name}, but the buyer registered as ${s.company_legal_name || ''}.`);
+  }
   const matched = await associateMatchService.associatedClient(s.company_legal_name ?? null, s.vat_eori_tax_no ?? null, s.email ?? null, s.phone ?? null);
   if (matched) {
     flags.push(`Same company as ${matched.company_legal_name}, already the client of associate ${matched.associate_name}.`);
@@ -188,6 +197,10 @@ async function onAccepted(s, clientId, userId) {
   if (!a) return null;
   const invId = s.associate_invitation_id ? Number(s.associate_invitation_id) : null;
   const inv = invId !== null ? await associateInvitationRepository.find(invId) : null;
+  // QA Round 8, R8-N04: a link belongs to the one registration that took it.
+  if (inv && Number(inv.submission_id || 0) !== Number(s.id)) {
+    return 'Not linked to the associate: their invitation link was used by another registration.';
+  }
   const already = await associateMatchService.associatedClient(s.company_legal_name, s.vat_eori_tax_no, s.email, s.phone);
   if (already && Number(already.id) !== Number(clientId) && Number(already.associate_id) !== Number(a.id)) {
     if (invId !== null) await associateInvitationRepository.setStatus(invId, 'not_accepted', { client_id: clientId });
@@ -220,4 +233,4 @@ async function onRejected(s, reason, userId) {
   }
 }
 
-module.exports = { SESSION_KEY, introducer, sendEmailCode, attach, submission, verify, directContactCheck, reviewInfo, acceptBlocker, onAccepted, onRejected };
+module.exports = { SESSION_KEY, LINK_USED, introducer, sendEmailCode, attach, submission, verify, directContactCheck, reviewInfo, acceptBlocker, onAccepted, onRejected };

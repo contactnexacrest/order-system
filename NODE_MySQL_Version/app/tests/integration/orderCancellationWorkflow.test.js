@@ -155,7 +155,7 @@ describe('Order cancellation workflow (External QA report M-09)', () => {
     // External QA report N-04: Admin holds manage_permissions via
     // seed.sql's wildcard grant (and is one of the only roles that can
     // approve a cancellation at all), but must still be blocked from
-    // approving their own request — only Super Admin is exempt here.
+    // approving their own request — only a role ticked in Admin → Self-approval rules is exempt.
     const orderId = await createTestOrder(await createTestClient());
     const requester = await createTestUser('Admin');
     const cancellationId = await orderCancellationRepository.create(orderId, 'Requesting and trying to approve my own cancellation as Admin.', requester);
@@ -169,18 +169,27 @@ describe('Order cancellation workflow (External QA report M-09)', () => {
     expect((await orderCancellationRepository.find(cancellationId)).status).toBe('pending');
   });
 
-  it('approveCancellation allows self-approval for a Super Admin', async () => {
+  // QA Round 8, R8-N09: no Super Admin exemption any more — only a role ticked in Admin → Self-approval rules (default MD, ED).
+  it('a Super Admin without a ticked role cannot approve their own cancellation, but an MD can', async () => {
     const orderId = await createTestOrder(await createTestClient());
     const requester = await createTestUser();
     await db.execute('UPDATE users SET is_super_admin = 1 WHERE id = :id', { id: requester });
     const cancellationId = await orderCancellationRepository.create(orderId, 'Requesting and approving my own cancellation as Super Admin.', requester);
-
     await ordersController.approveCancellation(
       fakeReq(orderId, requester, { refund_status: 'not_applicable' }, { cancellationId: String(cancellationId) }),
       fakeRes()
     );
+    expect((await orderRepository.find(orderId)).status).toBe('active');
 
-    expect((await orderRepository.find(orderId)).status).toBe('cancelled');
+    const orderId2 = await createTestOrder(await createTestClient());
+    const md = await createTestUser('Managing Director');
+    const cancellationId2 = await orderCancellationRepository.create(orderId2, 'Requesting and approving my own cancellation as MD.', md);
+    await ordersController.approveCancellation(
+      fakeReq(orderId2, md, { refund_status: 'not_applicable' }, { cancellationId: String(cancellationId2) }),
+      fakeRes()
+    );
+    expect((await orderRepository.find(orderId2)).status).toBe('cancelled');
+    expect(Number((await db.queryOne("SELECT COUNT(*) AS n FROM audit_log WHERE action_type = 'ORDER_CANCELLATION_SELF_APPROVED' AND entity_id = :id", { id: cancellationId2 })).n)).toBe(1);
   });
 
   it('rejectCancellation leaves the order unaffected and requires notes', async () => {

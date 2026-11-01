@@ -48,7 +48,7 @@ Open the claim's **Record money credited to the bank** and enter:
 - **Part**: provisional, or final / balance.
 - **Amount refused, if any**: anything the officer did not allow.
 
-A claim cannot receive more than it claimed: credited plus refused is never more than what is still open. When nothing is left open, the claim shows **Closed**.
+A claim cannot receive more than it claimed: credited plus refused is never more than what is still open. This is checked again at the moment of saving, one save at a time, so a double click or two people saving together cannot credit more than the claim (QA Round 8, R8-N11): the second gets "Credited plus refused (₹…) is more than what is still open on this claim (₹…). Nothing was saved." When nothing is left open, the claim shows **Closed**.
 
 ### 3. What goes to Zoho Books
 

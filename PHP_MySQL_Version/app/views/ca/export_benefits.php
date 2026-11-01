@@ -73,8 +73,8 @@
                 <?php endif; ?>
                 <form method="post" action="/ca/export-benefits/<?= (int) $b['id'] ?>/mark-received" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                   <?= \App\Helpers\Csrf::field() ?>
-                  <input type="number" step="0.01" min="0" name="received_amount" placeholder="Amount" required style="width:100px;">
-                  <input type="date" name="received_at" required>
+                  <input type="number" step="0.01" min="0" name="received_amount" placeholder="Amount" required style="width:100px;" aria-label="Amount">
+                  <input type="date" name="received_at" required aria-label="Received at">
                   <input type="text" name="received_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="Credited by: bank UTR / e-scrip no." aria-label="How it was credited (bank UTR / e-scrip no.)" title="Rule D-212: bank UTR for cash, e-scrip no. for RoDTEP / RoSCTL" style="width:200px;">
                   <button type="submit" class="btn btn-sm">Mark Received</button>
                 </form>

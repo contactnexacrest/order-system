@@ -15,8 +15,8 @@
         <td colspan="2">
           <form method="post" action="/hs-codes/<?= (int) $c['id'] ?>/update" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <?= Csrf::field() ?>
-            <input type="text" name="description" value="<?= htmlspecialchars($c['description']) ?>" placeholder="Description" required style="width:280px">
-            <input type="text" name="usage_note" value="<?= htmlspecialchars($c['usage_note'] ?? '') ?>" placeholder="When to use this one (optional, for freshers)" style="width:320px">
+            <input type="text" name="description" value="<?= htmlspecialchars($c['description']) ?>" placeholder="Description" required style="width:280px" aria-label="Description">
+            <input type="text" name="usage_note" value="<?= htmlspecialchars($c['usage_note'] ?? '') ?>" placeholder="When to use this one (optional, for freshers)" style="width:320px" aria-label="When to use this one (optional, for freshers)">
             <button type="submit" class="btn-sm">Save</button>
           </form>
         </td>
@@ -37,8 +37,8 @@
 
     <form method="post" action="/hs-codes" style="margin-top:8px;display:flex;gap:8px;align-items:center">
       <?= Csrf::field() ?>
-      <input type="text" name="code" placeholder="e.g. 680293" pattern="\d{6}|\d{8}" title="Exactly 6 or 8 digits, no dots" required style="width:140px">
-      <input type="text" name="description" placeholder="Description" required style="width:320px">
+      <input type="text" name="code" placeholder="e.g. 680293" pattern="\d{6}|\d{8}" title="Exactly 6 or 8 digits, no dots" required style="width:140px" aria-label="Code">
+      <input type="text" name="description" placeholder="Description" required style="width:320px" aria-label="Description">
       <button type="submit" class="btn-sm btn-accent">Add HS Code</button>
     </form>
   </div>
@@ -48,7 +48,7 @@
     <p class="muted">Onboarding a real customs reference sheet? Paste it straight from Excel — copying two columns (Code, Description) and pasting here keeps them Tab-separated automatically. One line per code. A comma also works if you're typing lines by hand. Anything that isn't a valid 6- or 8-digit code, or already exists, is skipped and listed below the result.</p>
     <form method="post" action="/hs-codes/bulk-import">
       <?= Csrf::field() ?>
-      <textarea name="bulk_codes" rows="6" style="width:100%;font-family:monospace" placeholder="25161100&#9;Granite - crude / roughly trimmed&#10;25161200&#9;Granite - cut into blocks or slabs" required></textarea>
+      <textarea name="bulk_codes" rows="6" style="width:100%;font-family:monospace" placeholder="25161100&#9;Granite - crude / roughly trimmed&#10;25161200&#9;Granite - cut into blocks or slabs" required aria-label="Bulk codes"></textarea>
       <button type="submit" class="btn-sm btn-accent" style="margin-top:8px">Import Codes</button>
     </form>
   </div>
@@ -78,7 +78,7 @@
 
     <form method="post" action="/hs-codes/product-guide" style="margin-top:8px">
       <?= Csrf::field() ?>
-      <textarea name="bulk_guide" rows="6" style="width:100%;font-family:monospace" placeholder="Custom-to-size slabs (polished)&#9;68022310&#10;Monument slabs / blanks&#9;68022310 / 68029300&#9;Flat blank -&gt; .2310; pre-shaped/profiled blank -&gt; .9300 - check per SKU" required></textarea>
+      <textarea name="bulk_guide" rows="6" style="width:100%;font-family:monospace" placeholder="Custom-to-size slabs (polished)&#9;68022310&#10;Monument slabs / blanks&#9;68022310 / 68029300&#9;Flat blank -&gt; .2310; pre-shaped/profiled blank -&gt; .9300 - check per SKU" required aria-label="Bulk guide"></textarea>
       <p class="muted" style="margin:4px 0">Each line is Product, Code, and an optional Note — Tab-separated (paste straight from Excel) or separated with <code>|</code> if typing by hand.</p>
       <button type="submit" class="btn-sm btn-accent">Import Product Guide Rows</button>
     </form>

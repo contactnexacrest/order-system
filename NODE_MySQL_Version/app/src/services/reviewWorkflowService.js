@@ -56,7 +56,7 @@ async function assignReviewers(documentId, reviewerIds, assignedByUserId) {
       // otherwise stall the document in review forever.
       throw new Error(`${reviewer.name} is not an active user and cannot be assigned as a reviewer.`);
     }
-    if (generatedBy !== null && rawId === generatedBy && !(await require('./selfApprovalRules').allowed('document_review', rawId))) {
+    if (generatedBy !== null && rawId === generatedBy && !(await require('./makerCheckerGuard').selfApprovalAllowed('document_review', rawId))) {
       // QA-5 maker-checker (REV-05); owner decisions 1 Nov 2026 (A-2, then
       // D-221): the document's own generator reviews it only when one of
       // their roles is ticked in Admin → Self-approval rules.
@@ -114,7 +114,7 @@ async function approve(documentReviewId, reviewerUserId, comments) {
 
   // Owner decision D-221: a self-review is allowed only while the rule allows it, and is logged as such.
   const selfReview = Boolean(document && document.generated_by !== null && document.generated_by !== undefined && Number(document.generated_by) === Number(reviewerUserId));
-  if (selfReview && !(await require('./selfApprovalRules').allowed('document_review', reviewerUserId))) {
+  if (selfReview && !(await require('./makerCheckerGuard').selfApprovalAllowed('document_review', reviewerUserId))) {
     throw new Error("This document's own generator cannot be assigned as its reviewer — a different person must review it.");
   }
   await documentReviewRepository.approve(documentReviewId, comments);

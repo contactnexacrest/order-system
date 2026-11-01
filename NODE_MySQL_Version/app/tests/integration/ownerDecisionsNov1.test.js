@@ -216,8 +216,13 @@ describe('Owner decisions of 1 Nov 2026', () => {
     expect(mail.body).toBe('Good morning Asha,\n\nThis is what waits on you today.\n\nTasks (My tasks):\n- A\n\nDocuments to review (My Reviews):\n- B\n\nOpen the app to act on them. You get this e-mail once a day, only when something waits on you.\n');
 
     const date = `2099-01-0${1 + Math.floor(Math.random() * 9)}`;
-    await dailyDigestService.run(date);
-    await dailyDigestService.run(date);
+    dailyDigestService.setSender(async () => true);
+    try {
+      await dailyDigestService.run(date);
+      await dailyDigestService.run(date);
+    } finally {
+      dailyDigestService.setSender(null);
+    }
     expect(Number((await db.queryOne('SELECT COUNT(*) AS n FROM daily_digest_log WHERE user_id = :u AND digest_date = :d', { u: person.userId, d: date })).n)).toBe(1);
     expect(Number((await db.queryOne('SELECT COUNT(*) AS n FROM daily_digest_log WHERE user_id = :u', { u: idle.userId })).n)).toBe(0);
   });

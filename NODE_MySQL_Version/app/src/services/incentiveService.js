@@ -319,7 +319,10 @@ async function calculate(orderId, paidOn = null) {
     && (row.associate_mode === 'yes' || await withinFirstTenDays(order))) {
     const a = await associateRepository.find(Number(client.associate_id));
     if (a) {
-      const number = row.associate_order_number ? Number(row.associate_order_number) : await associateRepository.orderNumberForClient(Number(a.id), Number(order.client_id));
+      // QA Round 8 (R8-N05): the client number fixed on the order when it was created (the client's number for the associate).
+      const number = (order.associate_client_number !== null && order.associate_client_number !== undefined && Number(order.associate_id || 0) === Number(a.id))
+        ? Number(order.associate_client_number)
+        : (row.associate_order_number && row.locked_at ? Number(row.associate_order_number) : await associateRepository.orderNumberForClient(Number(a.id), Number(order.client_id)));
       // Owner decision 1 Nov 2026 (AS-17): the rate fixed on the order when it was created; older orders work it out now.
       let rate;
       let rateSource;

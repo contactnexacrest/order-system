@@ -32,8 +32,8 @@ $canDelete = $__u && PermissionService::can((int) $__u['id'], $__u['role_id'] !=
         <form method="post" action="/company-assets/replace" enctype="multipart/form-data">
           <?= Csrf::field() ?>
           <input type="hidden" name="asset_type" value="<?= htmlspecialchars($type) ?>">
-          <input type="text" name="name" placeholder="<?= htmlspecialchars($label) ?>">
-          <input type="file" name="file" accept=".png,.jpg,.jpeg,.svg" required>
+          <input type="text" name="name" placeholder="<?= htmlspecialchars($label) ?>" aria-label="Name">
+          <input type="file" name="file" accept=".png,.jpg,.jpeg,.svg" required aria-label="File">
           <button type="submit">Replace</button>
         </form>
 

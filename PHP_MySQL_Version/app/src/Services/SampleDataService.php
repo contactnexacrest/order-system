@@ -688,7 +688,7 @@ final class SampleDataService
             date('Y-m-d'),
             $userId
         );
-        AmendmentService::approveByMd($amendmentId, $userId);
+        AmendmentService::approveByMd($amendmentId, $userId, true); // system load, not a self-approval
         AmendmentService::generateDocument($amendmentId, $userId);
         $amendment = AmendmentRepository::find($amendmentId);
         $order = OrderRepository::find($orderId);

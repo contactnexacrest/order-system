@@ -15,7 +15,7 @@
           <?php else: ?>
             <form method="post" action="/signatories/designations/<?= (int) $d['id'] ?>/update" style="display:flex;gap:6px;align-items:center">
               <?= Csrf::field() ?>
-              <input type="text" name="title" value="<?= htmlspecialchars($d['title']) ?>" placeholder="e.g. Director" required style="width:220px">
+              <input type="text" name="title" value="<?= htmlspecialchars($d['title']) ?>" placeholder="e.g. Director" required style="width:220px" aria-label="Title">
               <button type="submit" class="btn-sm">Rename</button>
             </form>
           <?php endif; ?>
@@ -40,7 +40,7 @@
     </table>
     <form method="post" action="/signatories/designations" style="margin-top:8px">
       <?= Csrf::field() ?>
-      <input type="text" name="title" placeholder="New designation (e.g. Director)" required style="width:240px">
+      <input type="text" name="title" placeholder="New designation (e.g. Director)" required style="width:240px" aria-label="New designation">
       <button type="submit" class="btn-sm">Add Designation</button>
     </form>
   </div>
@@ -135,12 +135,12 @@
               <summary class="muted small">Upload new</summary>
               <form method="post" action="/signatories/users/<?= (int) $u['id'] ?>/upload" enctype="multipart/form-data" style="margin-top:4px">
                 <?= Csrf::field() ?>
-                <select name="asset_kind">
+                <select name="asset_kind" aria-label="Asset kind">
                   <option value="signature">Signature</option>
                   <option value="designation_seal">Designation Seal</option>
                 </select>
-                <input type="text" name="label" placeholder="Label (e.g. Default)" style="width:120px">
-                <input type="file" name="file" accept=".png,.jpg,.jpeg,.webp,.svg" required>
+                <input type="text" name="label" placeholder="Label (e.g. Default)" style="width:120px" aria-label="Label">
+                <input type="file" name="file" accept=".png,.jpg,.jpeg,.webp,.svg" required aria-label="File">
                 <button type="submit" class="btn-sm">Upload</button>
               </form>
             </details>

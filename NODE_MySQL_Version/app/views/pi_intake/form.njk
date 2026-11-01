@@ -133,7 +133,7 @@
           <input type="text" name="country_of_destination" value="{{ submission.country_of_destination or '' }}" placeholder="e.g., Hungary / UK / France" required>
         </label>
         <label>Incoterm *
-          <select id="incoterm_select">
+          <select id="incoterm_select" required>
             <option value="">— Select —</option>
             {% for i in incoterms %}
               <option value="{{ i.code }}" {% if submission.incoterm_confirmed == i.code %}selected{% endif %}>{{ i.code }}</option>

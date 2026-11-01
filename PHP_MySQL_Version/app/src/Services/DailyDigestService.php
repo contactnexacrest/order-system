@@ -58,16 +58,47 @@ final class DailyDigestService
     }
 
     /**
-     * Sends today's digest to every active staff member with something waiting, once per day.
-     * @return array{sent:int, skipped:int}
+     * QA Round 8, R8-N02: the line the cron job prints — plain about mail
+     * being off, and about digests that could not be sent.
+     * @param array{sent:int, skipped:int, failed:int, mail_off:bool} $result
+     */
+    public static function summary(array $result): string
+    {
+        if ($result['mail_off']) {
+            return 'Daily digest: e-mail sending is off — nothing sent.';
+        }
+        return "Daily digest: {$result['sent']} sent, {$result['skipped']} with nothing waiting or already sent"
+            . ($result['failed'] > 0 ? ", {$result['failed']} not sent (will be retried on the next run)" : '') . '.';
+    }
+
+    /** @var (callable(string,string,string):bool)|null tests only: replaces the real mail sender */
+    private static $sender = null;
+
+    /** Tests only: send through $sender instead of MailSenderService (null restores it). */
+    public static function setSender(?callable $sender): void
+    {
+        self::$sender = $sender;
+    }
+
+    /**
+     * Sends today's digest to every active staff member with something
+     * waiting, once per day. QA Round 8, R8-N02: only a digest that really
+     * left counts as sent and uses up the day — with e-mail sending off
+     * nothing is claimed, and a failed send is released so the next run
+     * tries again.
+     * @return array{sent:int, skipped:int, failed:int, mail_off:bool}
      */
     public static function run(?string $date = null): array
     {
         $date ??= date('Y-m-d');
+        if (self::$sender === null && \App\Repositories\CompanySettingsRepository::get('mail_sending_enabled') === '0') {
+            return ['sent' => 0, 'skipped' => 0, 'failed' => 0, 'mail_off' => true];
+        }
         $pdo = Database::connection();
         $users = $pdo->query("SELECT id, name, email FROM users WHERE is_active = 1 AND email IS NOT NULL AND email <> '' ORDER BY id")->fetchAll();
         $sent = 0;
         $skipped = 0;
+        $failed = 0;
         foreach ($users as $u) {
             $items = self::itemsFor((int) $u['id']);
             if ($items === []) {
@@ -82,9 +113,16 @@ final class DailyDigestService
                 continue;
             }
             $mail = self::compose((string) $u['name'], $items, $date);
-            MailSenderService::send((string) $u['email'], $mail['subject'], $mail['body']);
-            $sent++;
+            $ok = self::$sender !== null
+                ? (bool) (self::$sender)((string) $u['email'], $mail['subject'], $mail['body'])
+                : MailSenderService::send((string) $u['email'], $mail['subject'], $mail['body']);
+            if ($ok) {
+                $sent++;
+            } else {
+                $pdo->prepare('DELETE FROM daily_digest_log WHERE user_id = :u AND digest_date = :d')->execute(['u' => (int) $u['id'], 'd' => $date]);
+                $failed++;
+            }
         }
-        return ['sent' => $sent, 'skipped' => $skipped];
+        return ['sent' => $sent, 'skipped' => $skipped, 'failed' => $failed, 'mail_off' => false];
     }
 }

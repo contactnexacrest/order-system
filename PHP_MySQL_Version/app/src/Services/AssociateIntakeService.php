@@ -37,7 +37,7 @@ final class AssociateIntakeService
                 return ['associate' => null, 'invitation' => null, 'error' => 'This invitation link is not valid. You can still send your request without it.'];
             }
             if (!AssociateInvitationRepository::isUsable($inv)) {
-                return ['associate' => null, 'invitation' => null, 'error' => 'This invitation link has expired or was already used. Ask the person who sent it for a new one, or send your request without it.'];
+                return ['associate' => null, 'invitation' => null, 'error' => self::LINK_USED];
             }
             $a = AssociateRepository::find((int) $inv['associate_id']);
             if ($a === null || $a['status'] !== 'active') {
@@ -61,13 +61,19 @@ final class AssociateIntakeService
     /** Ties a new submission to the associate (not yet confirmed) and e-mails the buyer a 6-digit code. Returns the code. */
     public static function attach(int $submissionId, array $associate, ?array $invitation, string $company, string $country, string $email, bool $confirmed, ?string $website): string
     {
+        // A one-off link was already taken for this registration (claimLink); a personal code gets a row of its own.
         $invId = $invitation !== null ? (int) $invitation['id'] : AssociateInvitationRepository::createForCode((int) $associate['id'], $company, $country);
         Database::connection()->prepare(
             'UPDATE client_intake_submissions SET associate_id = :a, associate_invitation_id = :i, introduction_confirmed = :c, website = :w WHERE id = :id'
         )->execute(['a' => $associate['id'], 'i' => $invId, 'c' => $confirmed ? 1 : 0, 'w' => $website, 'id' => $submissionId]);
-        AssociateInvitationRepository::setStatus($invId, 'opened', ['submission_id' => $submissionId]);
+        if ($invitation === null) {
+            AssociateInvitationRepository::setStatus($invId, 'opened', ['submission_id' => $submissionId]);
+        }
         return self::sendEmailCode($submissionId, $email);
     }
+
+    /** QA Round 8, R8-N04: the message when a one-off link was already used by another registration. */
+    public const LINK_USED = 'This invitation link has expired or was already used. Ask the person who sent it for a new one, or send your request without it.';
 
     public static function sendEmailCode(int $submissionId, string $email): string
     {
@@ -159,6 +165,11 @@ final class AssociateIntakeService
                 $flags[] = 'The buyer did not confirm that this associate introduced them — accepting does not link them.';
             }
         }
+        // QA Round 8, R8-N04: a link made for one company, used by another.
+        $inv = !empty($s['associate_invitation_id']) ? AssociateInvitationRepository::find((int) $s['associate_invitation_id']) : null;
+        if ($inv !== null && $inv['kind'] === 'client_link' && AssociateMatchService::normaliseName((string) $inv['company_name']) !== AssociateMatchService::normaliseName((string) ($s['company_legal_name'] ?? ''))) {
+            $flags[] = "The associate made this link for {$inv['company_name']}, but the buyer registered as " . ($s['company_legal_name'] ?? '') . '.';
+        }
         $matched = AssociateMatchService::associatedClient($s['company_legal_name'] ?? null, $s['vat_eori_tax_no'] ?? null, $s['email'] ?? null, $s['phone'] ?? null);
         if ($matched !== null) {
             $flags[] = "Same company as {$matched['company_legal_name']}, already the client of associate {$matched['associate_name']}.";
@@ -204,6 +215,10 @@ final class AssociateIntakeService
         }
         $invId = !empty($s['associate_invitation_id']) ? (int) $s['associate_invitation_id'] : null;
         $inv = $invId !== null ? AssociateInvitationRepository::find($invId) : null;
+        // QA Round 8, R8-N04: a link belongs to the one registration that took it.
+        if ($inv !== null && (int) ($inv['submission_id'] ?? 0) !== (int) $s['id']) {
+            return 'Not linked to the associate: their invitation link was used by another registration.';
+        }
         $already = AssociateMatchService::associatedClient($s['company_legal_name'], $s['vat_eori_tax_no'], $s['email'], $s['phone']);
         if ($already !== null && (int) $already['id'] !== $clientId && (int) $already['associate_id'] !== (int) $a['id']) {
             if ($invId !== null) {

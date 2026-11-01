@@ -45,7 +45,7 @@ $canManageCa = \App\Services\PermissionService::can((int) $__caExpensesUser['id'
             <?php elseif ($canEditTds): ?>
               <form method="post" action="/ca/expenses/<?= (int) $e['id'] ?>/link-order" style="display:flex;gap:4px;">
                 <?= \App\Helpers\Csrf::field() ?>
-                <input type="text" name="order_reference" placeholder="Order ref" style="width:110px;">
+                <input type="text" name="order_reference" placeholder="Order ref" style="width:110px;" aria-label="Order ref">
                 <button type="submit" class="btn-sm">Link</button>
               </form>
             <?php else: ?>
@@ -63,7 +63,7 @@ $canManageCa = \App\Services\PermissionService::can((int) $__caExpensesUser['id'
                 <label style="display:flex; gap:4px; align-items:center;">
                   <input type="checkbox" name="is_tds_applicable" value="1" <?= $e['is_tds_applicable'] ? 'checked' : '' ?>> TDS
                 </label>
-                <input type="text" name="tds_amount" placeholder="Amount" value="<?= htmlspecialchars((string) ($e['tds_amount'] ?? '')) ?>" style="width:90px;">
+                <input type="text" name="tds_amount" placeholder="Amount" value="<?= htmlspecialchars((string) ($e['tds_amount'] ?? '')) ?>" style="width:90px;" aria-label="Amount">
                 <button type="submit" class="btn-sm"><?= $expenseLockMessage !== null ? 'Override &amp; Save' : 'Save' ?></button>
               </form>
             <?php else: ?>

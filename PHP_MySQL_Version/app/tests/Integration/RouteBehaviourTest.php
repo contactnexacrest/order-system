@@ -509,7 +509,12 @@ final class RouteBehaviourTest extends DbTestCase
         $before = \App\Services\SelfApprovalRules::roleIds('email_send');
         $md = (string) $this->value("SELECT id FROM roles WHERE name = 'Managing Director'");
         try {
-            $r = $this->call('POST', '/admin/self-approval', ['payment_terms' => \App\Services\SelfApprovalRules::roleIds('payment_terms'), 'document_review' => \App\Services\SelfApprovalRules::roleIds('document_review'), 'email_send' => [$md]]);
+            // Every rule is posted as it stands (the page holds seven since QA Round 8), only e-mail sends change.
+            $post = [];
+            foreach (array_keys(\App\Services\SelfApprovalRules::RULES) as $rule) {
+                $post[$rule] = \App\Services\SelfApprovalRules::roleIds($rule);
+            }
+            $r = $this->call('POST', '/admin/self-approval', ['email_send' => [$md]] + $post);
             $this->assertDone($r, 'POST /admin/self-approval', 'Self-approval rules saved.');
             self::assertSame([(int) $md], \App\Services\SelfApprovalRules::roleIds('email_send'));
         } finally {

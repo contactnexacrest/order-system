@@ -176,7 +176,22 @@ function showCodeOnScreen() {
   return env.isLocal();
 }
 
+/**
+ * QA Round 8 (Q-R8-2, AS-3): a suspended associate may log in and see their
+ * clients, orders and commission, but cannot invite clients or change their
+ * code, profile, bank details or documents. Messages to NexaCrest and
+ * commission invoices stay open, so they can still raise a question and be
+ * paid for work already done.
+ */
+const SUSPENDED_BANNER = 'Your account is suspended — you can see your clients, orders and commission, but cannot invite clients or change your details.';
+const SUSPENDED_REFUSED = 'Your account is suspended — you cannot invite clients or change your details. Please contact your NexaCrest relationship manager.';
+
+function isSuspended(a) {
+  return Boolean(a) && a.status === 'suspended';
+}
+
 module.exports = {
+  SUSPENDED_BANNER, SUSPENDED_REFUSED, isSuspended,
   SESSION_ID, SESSION_PENDING, SESSION_VIEW_AS, issueToken, associateForSetPassword, setPassword, attemptLogin, verifyCode,
   pendingId, currentId, current, logout, startViewAs, viewAsStaffId, endViewAs, showCodeOnScreen,
 };

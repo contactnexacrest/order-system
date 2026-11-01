@@ -21,10 +21,9 @@ const BUYER_EMAIL = `buyer-${process.pid}-${Date.now()}@example.test`;
 /**
  * QA-5 (external QA report cross-verification): maker-checker separation
  * — the person who created/requested an item must not also be the one who
- * approves it, EXCEPT a Super Admin or anyone holding manage_permissions
- * (owner decision: that tier can already grant itself any approval role
- * through the permission system, so enforcing separation on them isn't a
- * real control). Covers REV-05 (document self-review), EML-03 (email
+ * approves it, unless their role is ticked in Admin → Self-approval rules
+ * (D-221; QA Round 8, R8-N09: no Super Admin or manage_permissions blanket
+ * exemption; default MD and ED on every rule). Covers REV-05 (document self-review), EML-03 (email
  * self-approval), AMD-05 (amendment self MD-approval), plus REV-06
  * (inactive reviewer) and REV-07 (duplicate reviewer assignment stalls the
  * document).
@@ -99,31 +98,28 @@ describe('Maker-checker guard (QA-5)', () => {
   // makerCheckerGuard itself
   // ---------------------------------------------------------------
 
-  it('self-approval is allowed for a Super Admin but not an ordinary user', async () => {
-    const ordinary = await createTestUser('Export Executive');
-    expect(await makerCheckerGuard.selfApprovalAllowed(ordinary)).toBe(false);
-
-    await makeSuperAdmin(ordinary);
-    expect(await makerCheckerGuard.selfApprovalAllowed(ordinary)).toBe(true);
-  });
-
-  it('self-approval is allowed for a manage_permissions holder who is not a Super Admin', async () => {
-    // Admin role holds every permission (including manage_permissions) via
-    // seed.sql's wildcard grant, but createTestUser() never sets
-    // is_super_admin — this exercises the "not Super Admin, but holds
-    // manage_permissions" branch specifically.
-    const adminRoleUser = await createTestUser('Admin');
-    expect(await makerCheckerGuard.selfApprovalAllowed(adminRoleUser)).toBe(true);
-  });
-
-  it('strict self-approval denies a manage_permissions holder but allows a Super Admin', async () => {
-    // External QA report N-04: the strict variant used by cancellations
-    // must NOT grant the manage_permissions exemption — only Super Admin.
-    const adminRoleUser = await createTestUser('Admin');
-    expect(await makerCheckerGuard.selfApprovalAllowedStrict(adminRoleUser)).toBe(false);
-
-    await makeSuperAdmin(adminRoleUser);
-    expect(await makerCheckerGuard.selfApprovalAllowedStrict(adminRoleUser)).toBe(true);
+  // QA Round 8, R8-N09: one choke point, seven rules, default MD and ED, no blanket exemption.
+  it('every rule defaults to MD and ED with no blanket exemption', async () => {
+    const rules = ['payment_terms', 'document_review', 'email_send', 'cancellation', 'purchase_award', 'amendment', 'short_payment'];
+    expect(Object.keys(require('../../src/services/selfApprovalRules').RULES)).toEqual(rules);
+    const md = await createTestUser('Managing Director');
+    const ed = await createTestUser('Executive Director');
+    const admin = await createTestUser('Admin');
+    const sysadmin = await createTestUser('System Administrator');
+    const superExporter = await createTestUser('Export Executive');
+    await makeSuperAdmin(superExporter);
+    // The four rules added in QA Round 8 (the first three are unticked and re-ticked by
+    // selfApprovalRules.test.js, which runs in parallel on the same database).
+    for (const rule of rules.slice(3)) {
+      expect([rule, await makerCheckerGuard.selfApprovalAllowed(rule, md)]).toEqual([rule, true]);
+      expect([rule, await makerCheckerGuard.selfApprovalAllowed(rule, ed)]).toEqual([rule, true]);
+    }
+    for (const rule of rules) {
+      expect([rule, await makerCheckerGuard.selfApprovalAllowed(rule, admin)]).toEqual([rule, false]);
+      expect([rule, await makerCheckerGuard.selfApprovalAllowed(rule, sysadmin)]).toEqual([rule, false]);
+      expect([rule, await makerCheckerGuard.selfApprovalAllowed(rule, superExporter)]).toEqual([rule, false]);
+    }
+    expect(await makerCheckerGuard.selfApprovalAllowed('no_such_rule', md)).toBe(false);
   });
 
   // ---------------------------------------------------------------
@@ -254,15 +250,19 @@ describe('Maker-checker guard (QA-5)', () => {
     await expect(amendmentService.approveByMd(amendmentId, requester)).rejects.toThrow('a different privileged user must MD-approve');
   });
 
-  it('a Super Admin can MD-approve their own amendment', async () => {
+  it('an MD can MD-approve their own amendment but a Super Admin exporter cannot', async () => {
     const orderId = await createTestOrder(await createTestClient());
-    const requester = await createTestUser('Export Executive');
-    await makeSuperAdmin(requester);
-    const amendmentId = await createTestAmendment(orderId, requester);
-
-    await amendmentService.approveByMd(amendmentId, requester);
-
+    const md = await createTestUser('Managing Director');
+    const amendmentId = await createTestAmendment(orderId, md);
+    await amendmentService.approveByMd(amendmentId, md);
     expect((await amendmentRepository.find(amendmentId)).status).toBe('md_approved');
+    expect(Number((await db.queryOne("SELECT COUNT(*) AS n FROM audit_log WHERE action_type = 'AMENDMENT_SELF_APPROVED' AND entity_id = :id", { id: amendmentId })).n)).toBe(1);
+
+    const superUser = await createTestUser('Export Executive');
+    await makeSuperAdmin(superUser);
+    const other = await createTestAmendment(orderId, superUser);
+    await expect(amendmentService.approveByMd(other, superUser)).rejects.toThrow('You requested this amendment — a different privileged user must MD-approve it.');
+    expect((await amendmentRepository.find(other)).status).toBe('pending');
   });
 
   it('an uninvolved user can still MD-approve normally', async () => {

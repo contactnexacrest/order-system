@@ -18,6 +18,21 @@ use App\Repositories\LoginAttemptRepository;
  */
 final class AssociatePortalService
 {
+    /**
+     * QA Round 8 (Q-R8-2, AS-3): a suspended associate may log in and see
+     * their clients, orders and commission, but cannot invite clients or
+     * change their code, profile, bank details or documents. Messages to
+     * NexaCrest and commission invoices stay open, so they can still raise
+     * a question and be paid for work already done.
+     */
+    public const SUSPENDED_BANNER = 'Your account is suspended — you can see your clients, orders and commission, but cannot invite clients or change your details.';
+    public const SUSPENDED_REFUSED = 'Your account is suspended — you cannot invite clients or change your details. Please contact your NexaCrest relationship manager.';
+
+    public static function isSuspended(?array $a): bool
+    {
+        return $a !== null && ($a['status'] ?? '') === 'suspended';
+    }
+
     private const SESSION_ID = '_associate_portal_id';
     private const SESSION_PENDING = '_associate_portal_pending_id';
     private const SESSION_VIEW_AS = '_associate_portal_view_as_staff_id';

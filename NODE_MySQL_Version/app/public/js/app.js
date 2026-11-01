@@ -757,6 +757,79 @@
     return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
   }
 
+  // QA Round 8, R8-N08: every required field's label shows "*", once.
+  // A label already written with "*" in the view is left alone; a label
+  // whose field is required but which has no "*" gets
+  // <span class="req-star"> *</span> after its text. When the field stops
+  // being required (show-when rows, "not applicable" rows, a field switched
+  // off by a script) the added star goes again. Checkboxes and radios are
+  // confirmations or choices, not fields to fill, so they get no star.
+  function starredControls(label) {
+    var forId = label.getAttribute('for');
+    if (forId) {
+      var target = document.getElementById(forId);
+      return target ? [target] : [];
+    }
+    return Array.prototype.slice.call(label.querySelectorAll('input, select, textarea'));
+  }
+
+  function needsStar(el) {
+    var type = (el.getAttribute('type') || '').toLowerCase();
+    if (type === 'hidden' || type === 'checkbox' || type === 'radio' || type === 'submit' || type === 'button' || type === 'reset' || type === 'image') return false;
+    return el.required && !el.disabled;
+  }
+
+  function writtenLabelText(label) {
+    var text = '';
+    label.childNodes.forEach(function (node) {
+      if (node.nodeType === 3) { text += node.textContent; return; }
+      if (node.nodeType !== 1 || node.classList.contains('req-star')) return;
+      if (/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(node.tagName) || node.querySelector('input, select, textarea')) return;
+      text += node.textContent;
+    });
+    return text;
+  }
+
+  function starPlace(label) {
+    for (var i = 0; i < label.childNodes.length; i++) {
+      var node = label.childNodes[i];
+      if (node.nodeType !== 1) continue;
+      if (/^(INPUT|SELECT|TEXTAREA|BUTTON|BR)$/.test(node.tagName) || node.querySelector('input, select, textarea')) return node;
+    }
+    return null;
+  }
+
+  function markRequiredLabels() {
+    document.querySelectorAll('label').forEach(function (label) {
+      var required = starredControls(label).some(needsStar);
+      var added = label.querySelector(':scope > .req-star');
+      var written = writtenLabelText(label).indexOf('*') !== -1;
+      if (required && !written && !added) {
+        var star = document.createElement('span');
+        star.className = 'req-star';
+        star.textContent = ' *';
+        var place = starPlace(label);
+        // Trailing spaces before the field would put a gap before the star.
+        var prev = place ? place.previousSibling : label.lastChild;
+        if (prev && prev.nodeType === 3) prev.textContent = prev.textContent.replace(/\s+$/, '');
+        label.insertBefore(star, place);
+      } else if (added && (!required || written)) {
+        added.remove();
+      }
+    });
+  }
+
+  function initRequiredLabels() {
+    markRequiredLabels();
+    if (!window.MutationObserver) return;
+    var queued = false;
+    new MutationObserver(function () {
+      if (queued) return;
+      queued = true;
+      setTimeout(function () { queued = false; markRequiredLabels(); }, 0);
+    }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['required', 'disabled'] });
+  }
+
   // QA Round 5, R5-10: Safari/iOS 14-15.3 ignore :has(), so app.css's
   // "current step" highlight never showed there. Mark each step box whose
   // own header carries the current/locked status icon with a class the
@@ -816,6 +889,7 @@
     initShowWhen();
     initAutoReasons();
     initFieldLabels();
+    initRequiredLabels();
     initStepStatusClasses();
   }
 

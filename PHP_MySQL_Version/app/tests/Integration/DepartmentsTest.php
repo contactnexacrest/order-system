@@ -205,11 +205,75 @@ final class DepartmentsTest extends DbTestCase
         $d = DepartmentRepository::findDesignation($this->designationId("QC Manager {$tag}"));
         self::assertSame("QC Manager {$tag}", $d['role_name'], 'a new role named after the designation');
 
+        // QA Round 8, R8-N10: approval limits change only with "Manage approval limits" (MD, ED).
+        $this->signIn($this->createTestUser('Managing Director'));
         self::assertSame('Enter the approval limit in rupees, or leave it empty for none.',
             $this->post($c, 'updateDesignation', ['title' => $d['title'], 'level' => 'manager', 'approval_limit_inr' => '-5', 'is_active' => '1'], ['id' => $d['id']])['message']);
         $this->post($c, 'updateDesignation', ['title' => $d['title'], 'level' => 'manager', 'approval_limit_inr' => '500000', 'is_active' => '1'], ['id' => $d['id']]);
         self::assertSame('500000.00', (string) DepartmentRepository::findDesignation((int) $d['id'])['approval_limit_inr']);
         self::assertStringContainsString('limit 500000', (string) $this->lastAudit('DESIGNATION_UPDATED')['new_value']);
+    }
+
+    /** QA Round 8, R8-N10: a designation's approval limit and level are MD/ED only, never on their own designation, and audited old → new. */
+    public function testApprovalLimitsChangeOnlyByMdOrEdAndNeverOnTheirOwnDesignation(): void
+    {
+        $c = new DepartmentAdminController();
+        $pm = DepartmentRepository::findDesignation($this->designationId('Procurement Manager'));
+        $before = $pm['approval_limit_inr'];
+        $body = ['title' => $pm['title'], 'level' => $pm['level'], 'is_active' => '1'];
+
+        $this->signIn($this->createTestUser('System Administrator'));
+        self::assertSame(DepartmentAdminController::LIMITS_REFUSED,
+            $this->post($c, 'updateDesignation', ['approval_limit_inr' => '999999999'] + $body, ['id' => $pm['id']])['message']);
+        self::assertSame(DepartmentAdminController::LIMITS_REFUSED,
+            $this->post($c, 'updateDesignation', ['level' => 'director', 'approval_limit_inr' => (string) $before] + $body, ['id' => $pm['id']])['message']);
+        $after = DepartmentRepository::findDesignation((int) $pm['id']);
+        self::assertSame($before, $after['approval_limit_inr'], 'the System Administrator could not lift the limit');
+        self::assertSame($pm['level'], $after['level']);
+        self::assertSame('"' . $pm['title'] . '" saved.',
+            $this->post($c, 'updateDesignation', ['approval_limit_inr' => (string) $before] + $body, ['id' => $pm['id']])['message'], 'the rest of the form still saves');
+        self::assertSame(DepartmentAdminController::LIMITS_REFUSED, $this->post($c, 'createDesignation',
+            ['department_id' => (string) $pm['department_id'], 'title' => 'Deputy Boss ' . bin2hex(random_bytes(2)), 'level' => 'director', 'role_id' => 'new'])['message']);
+        self::assertSame("Only the MD or ED can change an approval limit or make a designation 'director'.", DepartmentAdminController::LIMITS_REFUSED);
+        ob_start();
+        $c->index([]);
+        $sysPage = (string) ob_get_clean();
+        self::assertStringContainsString('Only the MD or ED changes approval limits.', $sysPage);
+        self::assertStringNotContainsString('name="approval_limit_inr" min="0"', $sysPage);
+
+        $md = $this->createTestUser('Managing Director');
+        $this->signIn($md);
+        self::assertSame('"' . $pm['title'] . '" saved.',
+            $this->post($c, 'updateDesignation', ['approval_limit_inr' => '750000'] + $body, ['id' => $pm['id']])['message']);
+        self::assertSame('750000.00', (string) DepartmentRepository::findDesignation((int) $pm['id'])['approval_limit_inr']);
+        $audit = $this->lastAudit('APPROVAL_LIMIT_CHANGED');
+        self::assertSame($md, (int) $audit['user_id']);
+        self::assertSame('approval_limit_inr', $audit['field_name']);
+        self::assertSame($pm['level'] . ' · ' . ($before === null ? 'no limit' : number_format((float) $before, 2, '.', '')), $audit['old_value']);
+        self::assertSame($pm['level'] . ' · 750000.00', $audit['new_value']);
+        self::assertSame("You cannot change the approval limit of a designation you hold yourself.", DepartmentAdminController::OWN_LIMIT_REFUSED);
+        $mdDesignation = DepartmentRepository::findDesignation($this->designationId('Managing Director'));
+        self::assertSame(DepartmentAdminController::OWN_LIMIT_REFUSED, $this->post($c, 'updateDesignation',
+            ['title' => $mdDesignation['title'], 'level' => $mdDesignation['level'], 'approval_limit_inr' => '1', 'is_active' => '1'], ['id' => $mdDesignation['id']])['message']);
+        ob_start();
+        $c->index([]);
+        self::assertStringContainsString('Your own designation — another MD/ED changes it.', (string) ob_get_clean());
+
+        // A Procurement Director cannot lift their own designation's limit — whether or not they also hold MD/ED rights.
+        $pd = DepartmentRepository::findDesignation($this->designationId('Procurement Director'));
+        $pdBody = ['title' => $pd['title'], 'level' => $pd['level'], 'approval_limit_inr' => '999999999', 'is_active' => '1'];
+        $this->signIn($this->createTestUser('Procurement Director'));
+        self::assertSame(DepartmentAdminController::LIMITS_REFUSED, $this->post($c, 'updateDesignation', $pdBody, ['id' => $pd['id']])['message']);
+        $director = $this->createTestUser('Procurement Director');
+        foreach (['manage_permissions', 'manage_approval_limits'] as $key) {
+            Database::connection()->prepare("INSERT INTO user_permissions (user_id, permission_id, is_enabled, reason) SELECT :u, id, 1, 'PHPUnit' FROM permissions WHERE permission_key = :k")
+                ->execute(['u' => $director, 'k' => $key]);
+        }
+        $this->signIn($director);
+        self::assertSame(DepartmentAdminController::OWN_LIMIT_REFUSED, $this->post($c, 'updateDesignation', $pdBody, ['id' => $pd['id']])['message']);
+        self::assertSame($pd['approval_limit_inr'], DepartmentRepository::findDesignation((int) $pd['id'])['approval_limit_inr']);
+
+        DepartmentRepository::updateDesignation((int) $pm['id'], $pm['title'], $pm['level'], true, $before === null ? null : (float) $before);
     }
 
     public function testMembershipsAreAddedAndEndedOnThePersonsPage(): void

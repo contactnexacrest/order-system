@@ -278,7 +278,10 @@ final class IncentiveService
             && ($row['associate_mode'] === 'yes' || self::withinFirstTenDays($order))) {
             $a = AssociateRepository::find((int) $client['associate_id']);
             if ($a !== null) {
-                $number = !empty($row['associate_order_number']) ? (int) $row['associate_order_number'] : AssociateRepository::orderNumberForClient((int) $a['id'], (int) $order['client_id']);
+                // QA Round 8 (R8-N05): the client number fixed on the order when it was created (the client's number for the associate).
+                $number = (($order['associate_client_number'] ?? null) !== null && (int) ($order['associate_id'] ?? 0) === (int) $a['id'])
+                    ? (int) $order['associate_client_number']
+                    : (!empty($row['associate_order_number']) && !empty($row['locked_at']) ? (int) $row['associate_order_number'] : AssociateRepository::orderNumberForClient((int) $a['id'], (int) $order['client_id']));
                 // Owner decision 1 Nov 2026 (AS-17): the rate fixed on the order when it was created; older orders work it out now.
                 if (($order['associate_rate_pct'] ?? null) !== null && (int) ($order['associate_id'] ?? 0) === (int) $a['id']) {
                     $rate = (float) $order['associate_rate_pct'];

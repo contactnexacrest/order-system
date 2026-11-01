@@ -14,7 +14,7 @@
     <p class="muted small">Every outbound business email (order/document notices, buyer communications, reminder alerts) is redirected here while Test Mode is on. Staff's own login verification codes and password-reset emails are never redirected. Editable at any time, whether Test Mode is on or off.</p>
     <form method="post" action="/test-mode/test-email" style="display:flex;gap:8px;align-items:center">
       <?= Csrf::field() ?>
-      <input type="email" name="test_email" value="<?= View::e($settings['test_email'] ?? '') ?>" placeholder="test-inbox@example.com" required style="width:320px">
+      <input type="email" name="test_email" value="<?= View::e($settings['test_email'] ?? '') ?>" placeholder="test-inbox@example.com" required style="width:320px" aria-label="Test email">
       <button type="submit" class="btn-sm">Save</button>
     </form>
   </div>

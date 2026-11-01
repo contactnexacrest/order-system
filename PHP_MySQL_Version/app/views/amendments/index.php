@@ -19,7 +19,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
           <textarea name="reason" required rows="3" placeholder="Explain why these payment terms are being amended" style="width:100%"></textarea>
         </label>
         <label>Requested By *
-          <select name="requested_by">
+          <select name="requested_by" required>
             <option value="importer">The Importer</option>
             <option value="exporter">NexaCrest</option>
           </select>
@@ -85,7 +85,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
               <a href="/documents/<?= (int) $a['document_id'] ?>/download?format=pdf" class="btn-sm">Download Agreement PDF</a>
               <form method="post" action="/amendments/<?= (int) $a['id'] ?>/signed-copy" enctype="multipart/form-data" style="display:inline">
                 <?= Csrf::field() ?>
-                <input type="file" name="signed_copy" required>
+                <input type="file" name="signed_copy" required aria-label="Signed copy">
                 <button type="submit" class="btn-sm btn-success">Upload Signed Copy &amp; Activate</button>
               </form>
             <?php endif; ?>
@@ -100,8 +100,8 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
               <summary class="muted small">Admin override reference</summary>
               <form method="post" action="/amendments/<?= (int) $a['id'] ?>/override-reference" onsubmit="return confirmFieldOverride(this, 'this amendment\'s reference number');">
                 <?= Csrf::field() ?>
-                <input type="text" name="amendment_reference" value="<?= htmlspecialchars($a['amendment_reference']) ?>" placeholder="e.g., AMD-2026-0007">
-                <textarea class="override-reason" name="reason" rows="2" placeholder="Reason for this change *" required></textarea>
+                <input type="text" name="amendment_reference" value="<?= htmlspecialchars($a['amendment_reference']) ?>" placeholder="e.g., AMD-2026-0007" aria-label="Amendment reference">
+                <textarea class="override-reason" name="reason" rows="2" placeholder="Reason for this change *" required aria-label="Reason for this change"></textarea>
                 <button type="submit" class="btn-sm btn-danger">Override</button>
               </form>
             </details>

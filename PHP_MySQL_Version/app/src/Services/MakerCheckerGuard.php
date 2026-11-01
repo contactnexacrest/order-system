@@ -4,53 +4,26 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Repositories\UserRepository;
-
 /**
- * QA-5 maker-checker: the single choke point every self-approval check
- * (document review assignment, email-send approval, amendment MD-approval)
- * delegates to. Owner decision: the person who created/requested an item
- * must not also be the one who approves it — EXCEPT a Super Admin or
- * anyone holding manage_permissions, since that tier can already grant
- * itself any approval role through the permission system, so enforcing
- * separation on them is not a real control.
+ * Maker-checker: the person who created or requested an item does not also
+ * approve it. The single choke point for every self-approval in the app —
+ * payment terms, document review, e-mail send, order cancellation, purchase
+ * award, amendment MD-approval and short-payment clearing. Who may approve
+ * their own item is set per rule in Admin → Self-approval rules (owner
+ * decision D-221; QA Round 8, R8-N09: no Super Admin or manage_permissions
+ * blanket exemption any more — default Managing Director and Executive
+ * Director on every rule).
  */
 final class MakerCheckerGuard
 {
-    public static function selfApprovalAllowed(int $userId): bool
+    public static function selfApprovalAllowed(string $rule, int $userId): bool
     {
-        if (SuperAdminService::isEffective($userId)) {
-            return true;
-        }
-        $user = UserRepository::findById($userId);
-        if (!$user) {
-            return false;
-        }
-        return PermissionService::can($userId, $user['role_id'] !== null ? (int) $user['role_id'] : null, 'manage_permissions');
+        return SelfApprovalRules::allowed($rule, $userId);
     }
 
-    /**
-     * Owner decision 1 Nov 2026 (A-1, then D-221): the payment terms of an
-     * order are approved by a second person; only the roles ticked in Admin →
-     * Self-approval rules (default Managing Director and Executive Director)
-     * may approve the terms of an order they created themselves (written to
-     * the audit log as a self-approval).
-     */
+    /** Owner decision 1 Nov 2026 (A-1, then D-221): payment terms of an order the person created. */
     public static function paymentTermsSelfApprovalAllowed(int $userId): bool
     {
-        return SelfApprovalRules::allowed('payment_terms', $userId);
-    }
-
-    /**
-     * External QA report N-04: order cancellations approve/reject through
-     * this stricter variant instead of selfApprovalAllowed(), because the
-     * default roles that can approve a cancellation (Admin, MD, ED) all
-     * hold manage_permissions — so the general exemption made the
-     * cancellation maker-checker rule a no-op for every role that can
-     * actually use it. Only a Super Admin is exempt here.
-     */
-    public static function selfApprovalAllowedStrict(int $userId): bool
-    {
-        return SuperAdminService::isEffective($userId);
+        return self::selfApprovalAllowed('payment_terms', $userId);
     }
 }

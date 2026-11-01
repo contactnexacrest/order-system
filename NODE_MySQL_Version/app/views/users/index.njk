@@ -55,7 +55,7 @@
             <summary class="muted small">Force password reset</summary>
             <form method="post" action="/users/{{ u.id }}/force-reset-password" data-confirm-name="{{ u.name }}" onsubmit="return confirmForceReset(this);">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-              <textarea class="reset-reason" name="reason" rows="2" placeholder="Reason for this reset *" required></textarea>
+              <textarea class="reset-reason" name="reason" rows="2" placeholder="Reason for this reset *" required aria-label="Reason for this reset"></textarea>
               <button type="submit" class="btn-sm btn-danger">Force Reset</button>
             </form>
           </details>

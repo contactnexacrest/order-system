@@ -560,7 +560,7 @@
               {% endfor %}
             </select>
           </td>
-          <td><input type="text" name="tasks[{{ i }}][skip_reason]" class="compliance-skip-reason" data-compliance-reason value="{{ ct.skip_reason or '' }}" placeholder="Why is it not applicable?"></td>
+          <td><input type="text" name="tasks[{{ i }}][skip_reason]" class="compliance-skip-reason" data-compliance-reason value="{{ ct.skip_reason or '' }}" placeholder="Why is it not applicable?" aria-label="Why is it not applicable?"></td>
         </tr>
         {% endfor %}
       </table>
@@ -705,7 +705,7 @@
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label class="small">Refund paid on *<input type="date" name="refund_paid_at" required max="{{ today() }}"></label>
             <label class="small">Bank reference of the refund * <input type="text" name="refund_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="SWIFT / UTR" style="width:200px" title="Rule D-212: lets anyone match this refund to the bank statement later"></label>
-            <input type="text" name="refund_notes" placeholder="Note (optional)" style="width:200px">
+            <input type="text" name="refund_notes" placeholder="Note (optional)" style="width:200px" aria-label="Note">
             <button type="submit" class="btn-sm btn-secondary">Mark Refund Completed</button>
           </form>
         {% endif %}
@@ -717,13 +717,13 @@
       {% if permissions.edit_locked_data %}
         <form method="post" action="/orders/{{ order.id }}/cancellation/{{ pendingCancellation.id }}/approve" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap" onsubmit="return confirm('Approve this cancellation? The order will be locked as CANCELLED and this cannot be undone from this screen.');">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <select name="refund_status">
+          <select name="refund_status" aria-label="Refund status">
             <option value="not_applicable">No refund applicable</option>
             <option value="pending">Refund pending</option>
             <option value="completed">Refund already completed</option>
           </select>
-          <input type="text" name="refund_amount" placeholder="Refund amount (optional)" style="width:160px">
-          <input type="text" name="decision_notes" placeholder="Approval notes (optional)" style="width:220px">
+          <input type="text" name="refund_amount" placeholder="Refund amount (optional)" style="width:160px" aria-label="Refund amount">
+          <input type="text" name="decision_notes" placeholder="Approval notes (optional)" style="width:220px" aria-label="Approval notes">
           <button type="submit" class="btn-sm btn-success">Approve Cancellation</button>
         </form>
         <form method="post" action="/orders/{{ order.id }}/cancellation/{{ pendingCancellation.id }}/reject" style="display:flex;gap:6px;align-items:center" onsubmit="return confirmRejectCancellation(this);">
@@ -881,12 +881,12 @@
           </form>
           <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}/duplicate" style="display:inline">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            {% if productReasonRequired %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;">{% endif %}
+            {% if productReasonRequired %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;" aria-label="Reason">{% endif %}
             <button type="submit" class="btn-sm btn-secondary" title="Clone this line — handy when only the name or dimensions differ">Duplicate</button>
           </form>
           <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}/delete" style="display:inline" onsubmit="return confirm('Remove this product line?');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            {% if productReasonRequired %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;">{% endif %}
+            {% if productReasonRequired %}<input type="text" name="reason" placeholder="Reason (required)" required minlength="10" style="display:inline-block;width:auto;" aria-label="Reason">{% endif %}
             <button type="submit" class="btn-sm btn-danger">Remove</button>
           </form>
         </div>
@@ -1314,7 +1314,11 @@
                   <label>Assign reviewer(s) * (minimum required: {{ d.min_reviewers_default or 1 }})
                     <select name="reviewer_ids[]" multiple size="4" required style="min-width:220px">
                       {% for u in activeUsers %}
-                        <option value="{{ u.id }}">{{ u.name }} ({{ u.role_name or '—' }})</option>
+                        {# QA Round 8, R8-N06: the generator only when the self-approval rules allow them. #}
+                        {% set isGen = d.generated_by and (d.generated_by | int) == (u.id | int) %}
+                        {% if not isGen or d.generator_may_self_review %}
+                        <option value="{{ u.id }}">{{ u.name }} ({{ u.role_name or '—' }}){{ ' (generated it — self-review)' if isGen else '' }}</option>
+                        {% endif %}
                       {% endfor %}
                     </select>
                   </label>
@@ -1359,12 +1363,12 @@
               {% if myPendingReview %}
                 <form method="post" action="/reviews/{{ myPendingReview.id }}/approve" style="display:inline">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                  <input type="text" name="comments" placeholder="Comments (optional)">
+                  <input type="text" name="comments" placeholder="Comments (optional)" aria-label="Comments">
                   <button type="submit" class="btn-sm btn-success">Approve</button>
                 </form>
                 <form method="post" action="/reviews/{{ myPendingReview.id }}/reject" style="display:inline" onsubmit="return confirm('Reject this document? It goes back for rework.');">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                  <input type="text" name="comments" placeholder="Reason (mandatory)" required>
+                  <input type="text" name="comments" placeholder="Reason (mandatory)" required aria-label="Reason">
                   <button type="submit" class="btn-sm btn-danger">Reject</button>
                 </form>
               {% endif %}
@@ -1372,11 +1376,12 @@
               {% if permissions.cross_verify_documents %}{# QA Round 5, R5-20 #}
               <form method="post" action="/documents/{{ d.id }}/cross-verify" style="margin-top:6px">
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                <select name="result" required>
+                <select name="result" required aria-label="Result">
+                  <option value="">Choose…</option>
                   <option value="pass">Cross-verify: Pass</option>
                   <option value="fail">Cross-verify: Fail</option>
                 </select>
-                <input type="text" name="comments" placeholder="Comments (optional)">
+                <input type="text" name="comments" placeholder="Comments (optional)" aria-label="Comments">
                 <button type="submit" class="btn-sm">Record Cross-Verification</button>
               </form>
               {% endif %}
@@ -1419,7 +1424,7 @@
                           <form method="post" action="/email-log/{{ log.id }}/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
                             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                             <input type="hidden" name="order_id" value="{{ order.id }}">
-                            <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
+                            <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px" aria-label="Cancel reason">
                             <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
                           </form>
                           {% endif %}
@@ -1429,7 +1434,7 @@
                           <form method="post" action="/email-log/{{ log.id }}/cancel" style="margin-top:4px" onsubmit="return confirm('Cancel this send? It will never go out.');">
                             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                             <input type="hidden" name="order_id" value="{{ order.id }}">
-                            <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px">
+                            <input type="text" name="reason" placeholder="Cancel reason (mandatory)" required style="width:200px" aria-label="Cancel reason">
                             <button type="submit" class="btn-sm btn-warning">Cancel Send</button>
                           </form>
                           {% endif %}
@@ -1501,9 +1506,9 @@
     {% if permissions.manage_orders %}{# QA Round 5, R5-20 #}
     <form class="chat-post-form" method="post" action="/orders/{{ order.id }}/comments#order-updates" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <textarea name="body" data-required-unless="attachments" data-required-unless-message="Write a message or attach a file before posting." placeholder="Write an update for the client…"></textarea>
+      <textarea name="body" data-required-unless="attachments" data-required-unless-message="Write a message or attach a file before posting." placeholder="Write an update for the client…" aria-label="Write an update for the client"></textarea>
       <div class="chat-post-form-row">
-        <input type="file" name="attachments" multiple accept="image/*,video/*,.pdf">
+        <input type="file" name="attachments" multiple accept="image/*,video/*,.pdf" aria-label="Attachments">
         <button type="submit" class="btn-sm" data-loading-text="Posting…">{{ 'Post &amp; email client' | safe if mailSendingEnabled else 'Post to client portal' }}</button>
       </div>
     </form>
@@ -1688,7 +1693,7 @@
         {% if permissions.manage_orders %}{# QA Round 5, R5-20 #}
         <form method="post" action="/orders/{{ order.id }}/buyer-po/documents" enctype="multipart/form-data" style="margin-top:6px">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="file" name="document" required>
+          <input type="file" name="document" required aria-label="Document">
           {{ stepBadge('4c') | safe }}<button type="submit" class="btn-sm">{{ 'Attach Another Copy' if (buyerPoDocuments and buyerPoDocuments.length > 0) else 'Attach Buyer PO Copy' }}</button>
         </form>
         {% endif %}
@@ -1750,7 +1755,7 @@
           <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
             <span>Current link (valid until {{ piIntake.access_token_expires_at | humanDate }}) — copy and send however you like, no need to regenerate:</span>
             <div style="display:flex;gap:6px;align-items:center">
-              <input type="text" readonly value="{{ piFormFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
+              <input type="text" readonly aria-label="Form link" value="{{ piFormFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
               <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('{{ piFormFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
             </div>
           </div>
@@ -2163,7 +2168,7 @@
               {% endfor %}
             </select>
           </label>
-          <label id="spo-supplier-type-field" style="display:none">Supplier Type for this order *
+          <label id="spo-supplier-type-field" style="display:none">Supplier Type for this order
             <select name="supplier_type" id="spo-supplier-type-select"></select>
             <small class="muted">This supplier has more than one type — pick the one that applies to this order. It prints on the Supplier PO.</small>
           </label>
@@ -2392,7 +2397,7 @@
         {% if permissions.manage_supplier_po %}{# QA Round 5, R5-20 #}
         <form method="post" action="/orders/{{ order.id }}/supplier-po/documents" enctype="multipart/form-data" style="margin-top:6px">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <input type="file" name="document" required>
+          <input type="file" name="document" required aria-label="Document">
           {{ stepBadge('7c') | safe }}<button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
         </form>
         {% endif %}
@@ -2566,6 +2571,7 @@
         </label>
         <label>For *
           <select name="bill_for" required>
+            <option value="">Choose…</option>
             {% for key, svcLabel in logisticsServices %}<option value="{{ key }}">{{ svcLabel }}</option>{% endfor %}
           </select>
         </label>
@@ -2779,22 +2785,22 @@
           {% set existingCrates = crates if crates and crates.length > 0 else [{}, {}, {}] %}
           {% for c in existingCrates %}
           <tr>
-            <td><input type="text" name="crate_no[]" value="{{ c.crate_no or '' }}" style="width:70px;" placeholder="e.g. 1"></td>
-            <td><input type="text" name="crate_marks_numbers[]" value="{{ c.marks_numbers or '' }}" style="width:130px;" placeholder="e.g. NX/01-12"></td>
+            <td><input type="text" name="crate_no[]" value="{{ c.crate_no or '' }}" style="width:70px;" placeholder="e.g. 1" aria-label="Crate no"></td>
+            <td><input type="text" name="crate_marks_numbers[]" value="{{ c.marks_numbers or '' }}" style="width:130px;" placeholder="e.g. NX/01-12" aria-label="Crate marks numbers"></td>
             <td>{% set crateProduct = c.product_description or '' %}{% set crateKnown = (products | whereEq('description', crateProduct) | length) > 0 %}
-              <select name="crate_product_description[]" data-crate-product style="width:160px;">
+              <select name="crate_product_description[]" data-crate-product style="width:160px;" aria-label="Crate product description">
                 <option value="" data-hs="">— Product —</option>
                 {% for p in products %}
                 <option value="{{ p.description }}" data-hs="{{ p.hs_code }}" {% if crateProduct == p.description %}selected{% endif %}>{{ p.description | truncate(60, true, '…') }}</option>
                 {% endfor %}
                 {% if crateProduct and not crateKnown %}<option value="{{ crateProduct }}" data-hs="{{ c.hs_code or '' }}" selected>{{ crateProduct }} (earlier entry)</option>{% endif %}
               </select></td>
-            <td><input type="text" name="crate_dimensions[]" value="{{ c.dimensions_lwh_cm or '' }}" style="width:80px;" placeholder="e.g. 120 x 80 x 90 cm"></td>
-            <td><input type="text" name="crate_pcs[]" value="{{ c.pcs or '' }}" style="width:50px;" placeholder="e.g. 20"></td>
-            <td><input type="text" name="crate_net_weight_kg[]" value="{{ c.net_weight_kg or '' }}" style="width:70px;" placeholder="e.g. 800"></td>
-            <td><input type="text" name="crate_gross_weight_kg[]" value="{{ c.gross_weight_kg or '' }}" style="width:70px;" placeholder="e.g. 850"></td>
-            <td><input type="text" name="crate_cbm[]" value="{{ c.cbm or '' }}" style="width:60px;" placeholder="e.g. 1.25"></td>
-            <td><input type="text" value="{{ c.hs_code or '' }}" data-crate-hs readonly tabindex="-1" title="Taken from the product's HS code" style="width:70px;"></td>
+            <td><input type="text" name="crate_dimensions[]" value="{{ c.dimensions_lwh_cm or '' }}" style="width:80px;" placeholder="e.g. 120 x 80 x 90 cm" aria-label="Crate dimensions"></td>
+            <td><input type="text" name="crate_pcs[]" value="{{ c.pcs or '' }}" style="width:50px;" placeholder="e.g. 20" aria-label="Crate pcs"></td>
+            <td><input type="text" name="crate_net_weight_kg[]" value="{{ c.net_weight_kg or '' }}" style="width:70px;" placeholder="e.g. 800" aria-label="Crate net weight kg"></td>
+            <td><input type="text" name="crate_gross_weight_kg[]" value="{{ c.gross_weight_kg or '' }}" style="width:70px;" placeholder="e.g. 850" aria-label="Crate gross weight kg"></td>
+            <td><input type="text" name="crate_cbm[]" value="{{ c.cbm or '' }}" style="width:60px;" placeholder="e.g. 1.25" aria-label="Crate cbm"></td>
+            <td><input type="text" aria-label="HS code" value="{{ c.hs_code or '' }}" data-crate-hs readonly tabindex="-1" title="Taken from the product's HS code" style="width:70px;"></td>
           </tr>
           {% endfor %}
         </table>
@@ -3233,12 +3239,14 @@
             <label>Date *<input type="date" name="expense_date" required max="{{ today() }}"></label>
             <label>Category *
               <select name="category" required>
+                <option value="">Choose…</option>
                 {% for key, catLabel in expenseCategories %}<option value="{{ key }}">{{ catLabel }}</option>{% endfor %}
               </select>
             </label>
             <label>Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="amount_inr" required placeholder="e.g. 25000.00"></label>
             <label>Paid by *
               <select name="paid_by" required>
+                <option value="">Choose…</option>
                 {% for key, byLabel in expensePaidBy %}<option value="{{ key }}">{{ byLabel }}</option>{% endfor %}
               </select>
             </label>
@@ -3284,6 +3292,7 @@
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label>Category *
               <select name="category" required>
+                <option value="">Choose…</option>
                 {% for key, label in costEntryCategories %}
                   <option value="{{ key }}">{{ label }}</option>
                 {% endfor %}
@@ -3295,6 +3304,7 @@
             {# Owner decision 2026-10-29: real paid costs go to Zoho Books as expenses, paid from here. #}
             <label>Paid from *
               <select name="paid_from" required>
+                <option value="">Choose…</option>
                 {% for key, label in costEntryPaidFrom %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
               </select>
             </label>
@@ -3316,6 +3326,7 @@
             <label>Factory Distance (km) <small class="muted">(min 175km — for reference only)</small><input type="number" min="0" step="any" name="factory_distance_km" value="{{ orderTravelExpenses.factory_distance_km if orderTravelExpenses and orderTravelExpenses.factory_distance_km != null else '' }}" placeholder="e.g. 120"></label>
             <label>Travel Expense % of FOB Value *
               <select name="expense_pct" required>
+                <option value="">Choose…</option>
                 {% for pct in ['5', '7', '10', '15'] %}
                   <option value="{{ pct }}" {{ 'selected' if savedPct == pct }}>{{ pct }}%</option>
                 {% endfor %}
@@ -3341,6 +3352,7 @@
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label>Who pays the inspection fee? *
               <select name="fee_payer" required>
+                <option value="">Choose…</option>
                 <option value="nexacrest" {{ 'selected' if orderInspectionFee and orderInspectionFee.fee_payer == 'nexacrest' }}>NexaCrest</option>
                 <option value="client" {{ 'selected' if orderInspectionFee and orderInspectionFee.fee_payer == 'client' }}>Client</option>
               </select>
@@ -3351,6 +3363,7 @@
             {% set feePaidFrom = feeEntry.paid_from if feeEntry else null %}
             <label data-show-when="fee_payer=nexacrest">Paid from *
               <select name="paid_from" required>
+                <option value="">Choose…</option>
                 {% for key, label in costEntryPaidFrom %}<option value="{{ key }}"{{ ' selected' if feePaidFrom == key }}>{{ label }}</option>{% endfor %}
               </select>
             </label>
@@ -3461,13 +3474,13 @@
                 {% endif %}
               </td>
               <td>
-                <select name="schemes[{{ loop.index0 }}][status]" data-scheme-status style="min-width:140px;">
+                <select name="schemes[{{ loop.index0 }}][status]" data-scheme-status style="min-width:140px;" aria-label="Status">
                   {% for key, label in exportBenefitEligibilityStatuses %}
                   <option value="{{ key }}" {% if sch.status == key %}selected{% endif %}{% if key == 'not_eligible' %} data-auto-reason="{{ schemeNotEligibleReason }}"{% endif %}>{{ label }}</option>
                   {% endfor %}
                 </select>
               </td>
-              <td><input type="text" name="schemes[{{ loop.index0 }}][reason]" value="{{ sch.reason or '' }}" placeholder="Why it doesn't apply to this order" data-scheme-reason></td>
+              <td><input type="text" name="schemes[{{ loop.index0 }}][reason]" value="{{ sch.reason or '' }}" placeholder="Why it doesn't apply to this order" data-scheme-reason aria-label="Why it doesn't apply to this order"></td>
             </tr>
             {% endfor %}
           </table>
@@ -3584,7 +3597,7 @@
     {% elif not shipping or not shipping.bl_originals_received_at %}
       <form method="post" action="/orders/{{ order.id }}/bl-originals-received">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>No. of Original BL Copies Received<input type="number" name="bl_originals_count" value="3" placeholder="e.g. 3"></label>
+        <label>No. of Original BL Copies Received *<input type="number" name="bl_originals_count" value="3" required min="1" max="10" step="1" placeholder="e.g. 3"></label>
         {{ stepBadge('13b') | safe }}<button type="submit" class="btn-sm">Record Original BLs Received from CHA</button>
       </form>
     {% else %}
@@ -3793,6 +3806,7 @@
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label>Scheme *
               <select name="scheme_name" required>
+                <option value="">Choose…</option>
                 {% for opt in exportBenefitSchemes %}
                   <option value="{{ opt.option_value }}">{{ opt.option_value }}</option>
                 {% endfor %}
@@ -3974,9 +3988,9 @@
     {% if permissions.manage_orders %}
     <form method="post" action="/orders/{{ order.id }}/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <input type="text" name="title" placeholder="Title *" required style="width:220px">
-      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px">
-      <input type="file" name="document" required>
+      <input type="text" name="title" placeholder="Title *" required style="width:220px" aria-label="Title">
+      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px" aria-label="Notes">
+      <input type="file" name="document" required aria-label="Document">
       <button type="submit" class="btn-sm">Attach Document</button>
     </form>
     {% endif %}
@@ -4088,6 +4102,7 @@
       <input type="hidden" name="override_gate" value="1">
       <label>Document Type
         <select name="document_type" required>
+          <option value="">Choose…</option>
           {% for code, label in {"QT": "Quotation", "BUYERPO": "Buyer PO", "PI": "Proforma Invoice", "OC": "Order Confirmation", "SUPPO": "Supplier PO", "FDN": "Debit Note", "PL": "Packing List", "BLI": "BL Instruction Sheet", "CI": "Commercial Invoice", "COOPREP": "COO Prep Sheet (internal)"} %}
             <option value="{{ code }}">{{ label }} ({{ code }})</option>
           {% endfor %}

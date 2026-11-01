@@ -129,7 +129,7 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
       <legend><span class="intake-step-num">3</span> Shipping Preference</legend>
       <div class="field-grid">
         <label>Incoterm *
-          <select id="incoterm_select">
+          <select id="incoterm_select" required>
             <option value="">— Select —</option>
             <?php foreach ($incoterms as $i): ?>
               <option value="<?= htmlspecialchars($i['code']) ?>" <?= $incotermValue === $i['code'] ? 'selected' : '' ?>><?= htmlspecialchars($i['code']) ?></option>

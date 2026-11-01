@@ -141,7 +141,7 @@
 
     <fieldset>
       <legend>Special Requirements/Instructions</legend>
-      <textarea name="special_requirements" rows="2" placeholder="Write NIL if none"><?= htmlspecialchars($order['special_requirements'] ?? '') ?></textarea>
+      <textarea name="special_requirements" rows="2" placeholder="Write NIL if none" aria-label="Special requirements"><?= htmlspecialchars($order['special_requirements'] ?? '') ?></textarea>
     </fieldset>
 
     <p class="muted small">
@@ -152,12 +152,12 @@
     <?php if ($isLocked): ?>
       <fieldset>
         <legend>Reason <small class="muted">(required — this order is locked)</small></legend>
-        <textarea name="reason" rows="2" placeholder="Why does this locked order need to change? (e.g. correcting a genuine mistake found after closure)" required minlength="10"></textarea>
+        <textarea name="reason" rows="2" placeholder="Why does this locked order need to change? (e.g. correcting a genuine mistake found after closure)" required minlength="10" aria-label="Why does this locked order need to change?"></textarea>
       </fieldset>
     <?php elseif ($isPostConfirmation): ?>
       <fieldset>
         <legend>Reason <small class="muted">(required — this order has already reached Order Confirmation)</small></legend>
-        <textarea name="reason" rows="2" placeholder="Why is this changing now, after confirmation? (e.g. client requested a change)" required minlength="10"></textarea>
+        <textarea name="reason" rows="2" placeholder="Why is this changing now, after confirmation? (e.g. client requested a change)" required minlength="10" aria-label="Why is this changing now, after confirmation?"></textarea>
       </fieldset>
     <?php endif; ?>
 

@@ -43,6 +43,8 @@ async function findByToken(token) {
 /** A link that can still be used: created / opened, not past its date (expires_at is IST wall time, like NOW()). */
 function isUsable(inv) {
   if (!['created', 'opened'].includes(inv.status)) return false;
+  // QA Round 8, R8-N04: one registration per link — a link a buyer already submitted through is used.
+  if (inv.submission_id) return false;
   if (inv.expires_at === null || inv.expires_at === undefined) return true;
   const nowIst = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ');
   return String(inv.expires_at) > nowIst;
@@ -75,4 +77,18 @@ async function forAssociate(associateId) {
   return db.query('SELECT * FROM associate_invitations WHERE associate_id = :a ORDER BY id DESC', { a: associateId });
 }
 
-module.exports = { STATUSES, LINK_DAYS, createLink, createForCode, find, findByToken, isUsable, setStatus, expireOld, forAssociate };
+/**
+ * QA Round 8, R8-N04: takes a one-off link for this registration, at once
+ * and only if no other registration took it first (two buyers submitting
+ * through the same link at the same moment: only one wins).
+ */
+async function claim(id, submissionId) {
+  const r = await db.execute(
+    `UPDATE associate_invitations SET submission_id = :s, status = 'opened', opened_at = COALESCE(opened_at, NOW())
+      WHERE id = :id AND submission_id IS NULL AND status IN ('created', 'opened') AND (expires_at IS NULL OR expires_at > NOW())`,
+    { s: submissionId, id }
+  );
+  return r.affectedRows === 1;
+}
+
+module.exports = { STATUSES, LINK_DAYS, createLink, createForCode, find, findByToken, isUsable, claim, setStatus, expireOld, forAssociate };

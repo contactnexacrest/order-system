@@ -26,6 +26,25 @@ final class AssociateService
         return $v > 0 ? $v : 12;
     }
 
+    /**
+     * QA Round 8 (R8-N01): what the associate is told about where payments
+     * go while new bank details are pending or were not accepted — the
+     * verified account only when there is one in use today.
+     */
+    public static function bankPaymentsSentence(int $associateId): string
+    {
+        $usable = \App\Repositories\AssociateBankRepository::usable($associateId);
+        return $usable !== null
+            ? 'Payments keep going to your verified account (••••' . $usable['account_last4'] . ').'
+            : 'No payment can be made until new bank details are verified.';
+    }
+
+    /** A reason typed by staff, without the full stops and spaces at its end (the e-mail adds its own). */
+    public static function cleanReason(string $reason): string
+    {
+        return rtrim(trim($reason), ". \t\n\r\0\x0B");
+    }
+
     public static function bankWaitDays(): int
     {
         $v = IncentiveRepository::settings()['associate_bank_wait_days'] ?? '7';
@@ -53,7 +72,7 @@ final class AssociateService
             'client_accepted' => 'your client is registered', 'client_not_accepted' => 'a registration was not accepted',
             'direct_contact' => 'your client contacted us', 'order_created' => 'new order from your client',
             'commission_earned' => 'commission earned', 'payout_paid' => 'commission paid', 'payout_held' => 'commission on hold',
-            'clawback' => 'commission adjustment', 'bank_changed' => 'your bank details changed', 'link_changed' => 'a client link changed',
+            'clawback' => 'commission adjustment', 'bank_changed' => 'your bank details changed', 'bank_rejected' => 'your new bank details were not accepted', 'link_changed' => 'a client link changed',
             'lock_ending' => 'protection ending soon', 'agreement_ending' => 'agreement ending soon', 'portal_invite' => 'your portal access',
         ][$event] ?? 'update';
     }
@@ -87,8 +106,12 @@ final class AssociateService
     public static function linkClient(int $clientId, int $associateId, string $source, ?int $invitationId, ?string $registeredOn, ?int $userId): void
     {
         $lockUntil = date('Y-m-d', strtotime('+' . self::protectionMonths() . ' months'));
-        Database::connection()->prepare('UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_locked_until = :l, associate_source = :s, associate_invitation_id = :i WHERE id = :id')
-            ->execute(['a' => $associateId, 'd' => $registeredOn ?? date('Y-m-d'), 'l' => $lockUntil, 's' => $source, 'i' => $invitationId, 'id' => $clientId]);
+        // QA Round 8 (R8-N05): the client gets the associate's next client number now, fixed for ever.
+        Database::transaction(static function () use ($clientId, $associateId, $source, $invitationId, $registeredOn, $lockUntil): void {
+            $number = AssociateRepository::clientNumberForLink($clientId, $associateId);
+            Database::connection()->prepare('UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_locked_until = :l, associate_source = :s, associate_invitation_id = :i, associate_client_number = :n WHERE id = :id')
+                ->execute(['a' => $associateId, 'd' => $registeredOn ?? date('Y-m-d'), 'l' => $lockUntil, 's' => $source, 'i' => $invitationId, 'n' => $number, 'id' => $clientId]);
+        });
     }
 
     /**

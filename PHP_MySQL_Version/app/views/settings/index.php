@@ -162,7 +162,7 @@
     <p class="muted">Sends a real email straight through the SMTP server configured in <code>.env</code> (SMTP_HOST etc. — not editable from this screen) so you can confirm those credentials actually work.</p>
     <form method="post" action="/settings/test-smtp-email" style="display:flex;gap:8px;align-items:center">
       <?= Csrf::field() ?>
-      <input type="email" name="test_to" placeholder="you@example.com" required style="width:260px">
+      <input type="email" name="test_to" placeholder="you@example.com" required style="width:260px" aria-label="Test to">
       <button type="submit" class="btn-sm">Send Test Email</button>
     </form>
   </div>
@@ -173,7 +173,7 @@
     <p class="muted">Sends a real email straight through Zoho (bypassing the SMTP fallback) so you can confirm the credentials above actually work. Save your changes above first.</p>
     <form method="post" action="/settings/test-zoho-email" style="display:flex;gap:8px;align-items:center">
       <?= Csrf::field() ?>
-      <input type="email" name="test_to" placeholder="you@example.com" required style="width:260px">
+      <input type="email" name="test_to" placeholder="you@example.com" required style="width:260px" aria-label="Test to">
       <button type="submit" class="btn-sm">Send Test Email</button>
     </form>
   </div>

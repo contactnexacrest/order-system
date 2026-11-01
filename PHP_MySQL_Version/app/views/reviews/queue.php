@@ -17,7 +17,7 @@
         </form>
         <form method="post" action="/reviews/<?= (int) $r['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this document? It goes back for rework.');">
           <?= Csrf::field() ?>
-          <input type="text" name="comments" placeholder="Reason (mandatory)" required style="width:160px">
+          <input type="text" name="comments" placeholder="Reason (mandatory)" required style="width:160px" aria-label="Reason">
           <button type="submit" class="btn-sm btn-danger">Reject</button>
         </form>
       </td>

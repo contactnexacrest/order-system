@@ -136,7 +136,10 @@ final class SelfApprovalRulesTest extends DbTestCase
         Database::connection()->exec("UPDATE users SET is_super_admin = 1 WHERE id = {$super}");
         $_SESSION = ['_auth_user_id' => $super];
         $md = (string) $this->role('Managing Director');
-        $_POST = ['payment_terms' => [$md], 'document_review' => [$md], 'email_send' => [$md]];
+        // QA Round 8: the page holds seven rules; the other four are posted as they are (MD and ED), so only these three change.
+        $both = [$md, (string) $this->role('Executive Director')];
+        $others = ['cancellation' => $both, 'purchase_award' => $both, 'amendment' => $both, 'short_payment' => $both];
+        $_POST = ['payment_terms' => [$md], 'document_review' => [$md], 'email_send' => [$md]] + $others;
         (new SelfApprovalController())->save([]);
         self::assertSame('Self-approval rules saved. They apply from the next approval.', Flash::pull()[0]['message']);
         $log = Database::connection()->query("SELECT old_value, new_value FROM audit_log WHERE action_type = 'SELF_APPROVAL_RULE_CHANGED' AND field_name = 'document_review' ORDER BY id DESC LIMIT 1")->fetch();
@@ -153,7 +156,7 @@ final class SelfApprovalRulesTest extends DbTestCase
         }
         self::assertFalse(MakerCheckerGuard::paymentTermsSelfApprovalAllowed($ed));
 
-        $_POST = ['payment_terms' => [$md], 'document_review' => [$md], 'email_send' => [$md]];
+        $_POST = ['payment_terms' => [$md], 'document_review' => [$md], 'email_send' => [$md]] + $others;
         (new SelfApprovalController())->save([]);
         self::assertSame('Nothing changed.', Flash::pull()[0]['message']);
     }

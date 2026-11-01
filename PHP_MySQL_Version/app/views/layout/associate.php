@@ -36,6 +36,9 @@
   <?php endif; ?>
 </header>
 <main class="page">
+  <?php if (\App\Services\AssociatePortalService::isSuspended($me ?? null)): ?>
+    <div class="alert alert-warning" role="status" data-associate-suspended><?= htmlspecialchars(\App\Services\AssociatePortalService::SUSPENDED_BANNER) ?></div>
+  <?php endif; ?>
   <?php foreach (Flash::pull() as $f): ?>
     <div class="alert alert-<?= htmlspecialchars($f['type']) ?>"><?= htmlspecialchars($f['message']) ?></div>
   <?php endforeach; ?>

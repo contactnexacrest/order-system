@@ -29,6 +29,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-02c-gap-due-dates-lc.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-02d-gap-part-payments.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-02e-cfr-wording.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-02f-self-approval-rules.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-02h-qa-r8-approvals.sql
 ```
 
 ## Rules every file follows
@@ -92,6 +93,8 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30
 | 38 | `2026-11-02d-gap-part-payments.sql` | Gap list answers 1 Nov 2026 (D-218), part C (G-5): new table `order_payment_receipts` (every remittance of the advance, freight, balance and each milestone kept separately; the leg's existing columns keep the total) and `order_payment_shortfalls` (a leg cleared while money was still owed, with the manager's reason); permission `approve_short_payment` (MD, ED, Admin, Finance Director); existing remittances back-filled as one receipt each. Safe to run twice |
 | 39 | `2026-11-02e-cfr-wording.sql` | C-16 (owner confirmed twice, 1 Nov 2026): the "Shipment Booking (CFR/CIF)" clause asks for freight only on CFR orders, freight and the insurance premium on CIF. Only a clause still carrying the old seeded text is changed. Documents already generated keep their text. Safe to run twice |
 | 40 | `2026-11-02f-self-approval-rules.sql` | Owner decision D-221: table `self_approval_rules` — per rule (payment terms of an order you created, review of a document you generated, approval of an e-mail send you requested) the roles that may self-approve, set in Admin → Self-approval rules by Super Admins. Defaults: Managing Director and Executive Director on all three. Safe to run twice |
+| 41 | `2026-11-02g-qa-r8-associates.sql` | QA Round 8 (R8-N05), owner decision AS-17: new column `clients.associate_client_number` — the client's number for its associate (1 for the first client they brought, 2 for the second …), given when the client is linked and never changed (an MD move to another associate gives that associate's next number). Existing linked clients numbered per associate by registration date, then client id; open orders (not cancelled / lost, commission not locked) get their client's number and the rate for it (personal ladder with carry-forward, else the standard ladder; "no commission" 0). Safe to run twice |
+| 42 | `2026-11-02h-qa-r8-approvals.sql` | QA Round 8 (R8-N09, R8-N10): four more Self-approval rules — order cancellation, purchase award, amendment MD-approval, short-payment clearing — default Managing Director and Executive Director (seeded only while a rule has no roles and was never changed on the Admin page); new permission `manage_approval_limits` (Managing Director, Executive Director) — only its holders change a designation's approval limit or make it 'director', never on their own designation. Safe to run twice |
 
 There is no `2026-10-28b` file; that letter was not used.
 

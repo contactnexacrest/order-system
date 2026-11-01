@@ -21,12 +21,12 @@
           <?php else: ?>
             <form method="post" action="/admin/field-protection/<?= (int) $r['id'] ?>/approve" style="display:inline">
               <?= Csrf::field() ?>
-              <input type="text" name="resolved_reason" placeholder="Note (optional)" style="width:140px">
+              <input type="text" name="resolved_reason" placeholder="Note (optional)" style="width:140px" aria-label="Note">
               <button type="submit" class="btn-sm btn-success">Approve</button>
             </form>
             <form method="post" action="/admin/field-protection/<?= (int) $r['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this unlock request? The field stays protected.');">
               <?= Csrf::field() ?>
-              <input type="text" name="resolved_reason" placeholder="Reason (mandatory)" required style="width:140px">
+              <input type="text" name="resolved_reason" placeholder="Reason (mandatory)" required style="width:140px" aria-label="Reason">
               <button type="submit" class="btn-sm btn-danger">Reject</button>
             </form>
           <?php endif; ?>
@@ -61,7 +61,7 @@
             <input type="hidden" name="record_id" value="<?= (int) $row['id'] ?>">
             <input type="hidden" name="record_label" value="<?= htmlspecialchars((string) $row['label']) ?>">
             <input type="hidden" name="action" value="<?= $row['is_protected'] ? 'unlock' : 'lock' ?>">
-            <input type="text" name="reason" placeholder="Reason (mandatory)" required style="width:200px">
+            <input type="text" name="reason" placeholder="Reason (mandatory)" required style="width:200px" aria-label="Reason">
             <button type="submit" class="btn-sm"><?= $row['is_protected'] ? 'Request Unprotect' : 'Request Protect' ?></button>
           </form>
         </td>

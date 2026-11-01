@@ -54,7 +54,7 @@
     <?php if ($canManage): ?>
       <form method="post" action="/products/<?= (int) $product['id'] ?>/images/upload" enctype="multipart/form-data" style="margin-top:0.75rem">
         <?= Csrf::field() ?>
-        <input type="file" name="image" accept=".png,.jpg,.jpeg" required>
+        <input type="file" name="image" accept=".png,.jpg,.jpeg" required aria-label="Image">
         <button type="submit" class="btn-sm">Upload Image</button>
       </form>
     <?php endif; ?>
@@ -106,12 +106,12 @@
                         <option value="computed" <?= $s['fob_source'] === 'computed' ? 'selected' : '' ?>>Computed</option>
                       </select>
                     </label>
-                    <label>FOB Value (direct only)<input type="number" step="0.01" name="fob_value" value="<?= View::e($s['fob_value'] !== null ? (string) $s['fob_value'] : '') ?>" placeholder="e.g. 4500.00"></label>
-                    <label>Factory Cost override<input type="number" step="0.01" name="factory_cost" value="<?= View::e($s['factory_cost'] !== null ? (string) $s['factory_cost'] : '') ?>" placeholder="e.g. 350000"></label>
-                    <label>Transportation Cost override<input type="number" step="0.01" name="transportation_cost" value="<?= View::e($s['transportation_cost'] !== null ? (string) $s['transportation_cost'] : '') ?>" placeholder="e.g. 9000"></label>
-                    <label>Packing Cost override<input type="number" step="0.01" name="packing_cost" value="<?= View::e($s['packing_cost'] !== null ? (string) $s['packing_cost'] : '') ?>" placeholder="e.g. 12000"></label>
-                    <label>Loading Cost override<input type="number" step="0.01" name="loading_cost" value="<?= View::e($s['loading_cost'] !== null ? (string) $s['loading_cost'] : '') ?>" placeholder="e.g. 8000"></label>
-                    <label>CHA Cost override<input type="number" step="0.01" name="cha_cost" value="<?= View::e($s['cha_cost'] !== null ? (string) $s['cha_cost'] : '') ?>" placeholder="e.g. 15000"></label>
+                    <label>FOB Value (direct only)<input type="number" step="0.01" min="0" name="fob_value" value="<?= View::e($s['fob_value'] !== null ? (string) $s['fob_value'] : '') ?>" placeholder="e.g. 4500.00"></label>
+                    <label>Factory Cost override<input type="number" step="0.01" min="0" name="factory_cost" value="<?= View::e($s['factory_cost'] !== null ? (string) $s['factory_cost'] : '') ?>" placeholder="e.g. 350000"></label>
+                    <label>Transportation Cost override<input type="number" step="0.01" min="0" name="transportation_cost" value="<?= View::e($s['transportation_cost'] !== null ? (string) $s['transportation_cost'] : '') ?>" placeholder="e.g. 9000"></label>
+                    <label>Packing Cost override<input type="number" step="0.01" min="0" name="packing_cost" value="<?= View::e($s['packing_cost'] !== null ? (string) $s['packing_cost'] : '') ?>" placeholder="e.g. 12000"></label>
+                    <label>Loading Cost override<input type="number" step="0.01" min="0" name="loading_cost" value="<?= View::e($s['loading_cost'] !== null ? (string) $s['loading_cost'] : '') ?>" placeholder="e.g. 8000"></label>
+                    <label>CHA Cost override<input type="number" step="0.01" min="0" name="cha_cost" value="<?= View::e($s['cha_cost'] !== null ? (string) $s['cha_cost'] : '') ?>" placeholder="e.g. 15000"></label>
                     <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes"><?= View::e($s['notes'] ?? '') ?></textarea></label>
                     <label><input type="checkbox" name="is_primary" value="1" <?= $s['is_primary'] ? 'checked' : '' ?>> Primary supplier</label>
                     <button type="submit" class="btn-sm">Save</button>
@@ -145,12 +145,12 @@
                 <option value="computed">Computed</option>
               </select>
             </label>
-            <label>FOB Value (direct only)<input type="number" step="0.01" name="fob_value" placeholder="e.g. 4500.00"></label>
-            <label>Factory Cost override<input type="number" step="0.01" name="factory_cost" placeholder="e.g. 350000"></label>
-            <label>Transportation Cost override<input type="number" step="0.01" name="transportation_cost" placeholder="e.g. 9000"></label>
-            <label>Packing Cost override<input type="number" step="0.01" name="packing_cost" placeholder="e.g. 12000"></label>
-            <label>Loading Cost override<input type="number" step="0.01" name="loading_cost" placeholder="e.g. 8000"></label>
-            <label>CHA Cost override<input type="number" step="0.01" name="cha_cost" placeholder="e.g. 15000"></label>
+            <label>FOB Value (direct only)<input type="number" step="0.01" min="0" name="fob_value" placeholder="e.g. 4500.00"></label>
+            <label>Factory Cost override<input type="number" step="0.01" min="0" name="factory_cost" placeholder="e.g. 350000"></label>
+            <label>Transportation Cost override<input type="number" step="0.01" min="0" name="transportation_cost" placeholder="e.g. 9000"></label>
+            <label>Packing Cost override<input type="number" step="0.01" min="0" name="packing_cost" placeholder="e.g. 12000"></label>
+            <label>Loading Cost override<input type="number" step="0.01" min="0" name="loading_cost" placeholder="e.g. 8000"></label>
+            <label>CHA Cost override<input type="number" step="0.01" min="0" name="cha_cost" placeholder="e.g. 15000"></label>
             <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes"></textarea></label>
             <label><input type="checkbox" name="is_primary" value="1"> Primary supplier</label>
             <button type="submit" class="btn-sm btn-accent">Add Supplier</button>
@@ -186,9 +186,9 @@
     <?php if ($canManage): ?>
       <form method="post" action="/products/<?= (int) $product['id'] ?>/misc-charges/add" style="display:flex;gap:8px;align-items:center">
         <?= Csrf::field() ?>
-        <input type="text" name="label" placeholder="e.g. Bank charges" required>
-        <input type="number" step="0.01" name="amount" placeholder="Amount" required>
-        <input type="text" name="notes" placeholder="Notes (optional)">
+        <input type="text" name="label" placeholder="e.g. Bank charges" required aria-label="Label">
+        <input type="number" step="0.01" name="amount" placeholder="Amount" required aria-label="Amount">
+        <input type="text" name="notes" placeholder="Notes (optional)" aria-label="Notes">
         <button type="submit" class="btn-sm btn-accent">Add</button>
       </form>
     <?php endif; ?>

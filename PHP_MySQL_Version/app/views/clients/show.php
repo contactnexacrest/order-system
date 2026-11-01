@@ -101,7 +101,7 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
       </form>
       <form method="post" action="/clients/<?= (int) $client['id'] ?>/agreement/renew" enctype="multipart/form-data" style="display:inline-flex;gap:6px;align-items:center">
         <?= Csrf::field() ?>
-        <input type="date" name="agreement_expiry_date" value="<?= htmlspecialchars((string) ($__agreementExpiryDate ?? '')) ?>" <?= !$__agreementRenewEligible ? 'disabled' : '' ?>>
+        <input type="date" name="agreement_expiry_date" value="<?= htmlspecialchars((string) ($__agreementExpiryDate ?? '')) ?>" <?= !$__agreementRenewEligible ? 'disabled' : '' ?> aria-label="Agreement expiry date">
         <button type="submit" class="btn-sm btn-success" <?= !$__agreementRenewEligible ? 'disabled title="Renew becomes available only within 30 days of the current expiry date, or once it has passed."' : '' ?>>Renew</button>
       </form>
       <?php if (!$__agreementRenewEligible): ?><span class="muted small">Renew appears only within 30 days of expiry, or after it's passed.</span><?php endif; ?>
@@ -155,9 +155,9 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
     <?php if ($canManageOrders): ?>
     <form method="post" action="/clients/<?= (int) $client['id'] ?>/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
       <?= Csrf::field() ?>
-      <input type="text" name="title" placeholder="Title *" required style="width:220px">
-      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px">
-      <input type="file" name="document" required>
+      <input type="text" name="title" placeholder="Title *" required style="width:220px" aria-label="Title">
+      <input type="text" name="notes" placeholder="Notes (optional)" style="width:260px" aria-label="Notes">
+      <input type="file" name="document" required aria-label="Document">
       <button type="submit" class="btn-sm">Attach Document</button>
     </form>
     <?php endif; ?>

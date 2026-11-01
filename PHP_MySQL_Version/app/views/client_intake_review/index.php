@@ -27,7 +27,7 @@
           </form>
           <form method="post" action="/client-intake/<?= (int) $s['id'] ?>/reject" style="display:inline" onsubmit="return confirm('Reject this quotation request?');">
             <?= Csrf::field() ?>
-            <input type="text" name="reason" placeholder="Reason (required)" required style="width:160px">
+            <input type="text" name="reason" placeholder="Reason (required)" required style="width:160px" aria-label="Reason">
             <button type="submit" class="btn-sm btn-danger">Reject</button>
           </form>
           <form method="post" action="/client-intake/<?= (int) $s['id'] ?>/resend-link" style="display:inline">

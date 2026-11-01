@@ -53,6 +53,23 @@ async function protectionMonths() {
   return v > 0 ? v : 12;
 }
 
+/**
+ * QA Round 8 (R8-N01): what the associate is told about where payments go
+ * while new bank details are pending or were not accepted — the verified
+ * account only when there is one in use today.
+ */
+async function bankPaymentsSentence(associateId) {
+  const usable = await require('../repositories/associateBankRepository').usable(associateId);
+  return usable
+    ? `Payments keep going to your verified account (••••${usable.account_last4}).`
+    : 'No payment can be made until new bank details are verified.';
+}
+
+/** A reason typed by staff, without the full stops and spaces at its end (the e-mail adds its own). */
+function cleanReason(reason) {
+  return String(reason ?? '').trim().replace(/[.\s]+$/u, '');
+}
+
 async function bankWaitDays() {
   const v = (await incentiveRepository.settings()).associate_bank_wait_days ?? '7';
   return Math.max(0, parseInt(v, 10) || 0);
@@ -66,7 +83,7 @@ const SUBJECTS = {
   client_accepted: 'your client is registered', client_not_accepted: 'a registration was not accepted',
   direct_contact: 'your client contacted us', order_created: 'new order from your client',
   commission_earned: 'commission earned', payout_paid: 'commission paid', payout_held: 'commission on hold',
-  clawback: 'commission adjustment', bank_changed: 'your bank details changed', link_changed: 'a client link changed',
+  clawback: 'commission adjustment', bank_changed: 'your bank details changed', bank_rejected: 'your new bank details were not accepted', link_changed: 'a client link changed',
   lock_ending: 'protection ending soon', agreement_ending: 'agreement ending soon', portal_invite: 'your portal access',
 };
 
@@ -115,10 +132,14 @@ async function invitePortal(associateId, userId) {
  */
 async function linkClient(clientId, associateId, source, invitationId, registeredOn, userId) {
   const lockUntil = addMonths(todayIst(), await protectionMonths());
-  await db.execute(
-    'UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_locked_until = :l, associate_source = :s, associate_invitation_id = :i WHERE id = :id',
-    { a: associateId, d: registeredOn || todayIst(), l: lockUntil, s: source, i: invitationId ?? null, id: clientId }
-  );
+  // QA Round 8 (R8-N05): the client gets the associate's next client number now, fixed for ever.
+  await db.transaction(async (conn) => {
+    const number = await associateRepository.clientNumberForLink(clientId, associateId, conn);
+    await conn.execute(
+      'UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_locked_until = :l, associate_source = :s, associate_invitation_id = :i, associate_client_number = :n WHERE id = :id',
+      { a: associateId, d: registeredOn || todayIst(), l: lockUntil, s: source, i: invitationId ?? null, n: number, id: clientId }
+    );
+  });
 }
 
 /**
@@ -220,6 +241,7 @@ async function dailyReminders(today = null) {
 }
 
 module.exports = {
+  bankPaymentsSentence, cleanReason,
   todayIst, addMonths, addDays, jMY, appUrl, protectionMonths, bankWaitDays, tdsPct, notify, invitePortal, linkClient, canChangeLink,
   onOrderCreated, onPayoutPaid, dailyReminders,
 };

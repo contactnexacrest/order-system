@@ -42,7 +42,8 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
       </label>
       <label>Level *
         <select name="level" required>
-          <?php foreach ($levels as $key => $label): ?><option value="<?= $key ?>"><?= $label ?></option><?php endforeach; ?>
+          <option value="">Choose…</option>
+          <?php foreach ($levels as $key => $label): if ($key === 'director' && empty($canLimits)) { continue; } ?><option value="<?= $key ?>"><?= $label ?></option><?php endforeach; ?>
         </select>
       </label>
       <label>Role (its permissions) *
@@ -90,9 +91,16 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
         <tr><th>Designation</th><th>Level</th><th>Approval limit (₹)</th><th>Active</th><th></th></tr>
         <?php foreach ($list as $d): $formId = 'designation-' . (int) $d['id']; ?>
         <tr>
-          <td><input form="<?= $formId ?>" type="text" name="title" value="<?= htmlspecialchars((string) $d['title']) ?>" required minlength="2" maxlength="100" placeholder="e.g. Logistics Executive"></td>
-          <td><select form="<?= $formId ?>" name="level" required><?php foreach ($levels as $key => $label): ?><option value="<?= $key ?>" <?= $d['level'] === $key ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?></select></td>
-          <td><input form="<?= $formId ?>" type="number" name="approval_limit_inr" min="0" step="0.01" value="<?= $d['approval_limit_inr'] !== null ? htmlspecialchars((string) $d['approval_limit_inr']) : '' ?>" placeholder="none"></td>
+          <td><input form="<?= $formId ?>" type="text" name="title" value="<?= htmlspecialchars((string) $d['title']) ?>" required minlength="2" maxlength="100" placeholder="e.g. Logistics Executive" aria-label="Title"></td>
+          <?php // QA Round 8, R8-N10: the level and approval limit change only with "Manage approval limits" (MD, ED), never on one's own designation. ?>
+          <?php $__lim = !empty($canLimits) && !in_array((int) $d['role_id'], $ownRoleIds ?? [], true); ?>
+          <?php if ($__lim): ?>
+          <td><select form="<?= $formId ?>" name="level" required aria-label="Designation level"><?php foreach ($levels as $key => $label): ?><option value="<?= $key ?>" <?= $d['level'] === $key ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?></select></td>
+          <td><input form="<?= $formId ?>" type="number" name="approval_limit_inr" min="0" step="0.01" value="<?= $d['approval_limit_inr'] !== null ? htmlspecialchars((string) $d['approval_limit_inr']) : '' ?>" placeholder="none" aria-label="Approval limit (INR)"></td>
+          <?php else: ?>
+          <td><input form="<?= $formId ?>" type="hidden" name="level" value="<?= htmlspecialchars((string) $d['level']) ?>"><?= htmlspecialchars($levels[$d['level']] ?? (string) $d['level']) ?></td>
+          <td><input form="<?= $formId ?>" type="hidden" name="approval_limit_inr" value="<?= $d['approval_limit_inr'] !== null ? htmlspecialchars((string) $d['approval_limit_inr']) : '' ?>"><?= $d['approval_limit_inr'] !== null ? number_format((float) $d['approval_limit_inr'], 2) : 'none' ?><br><small class="muted"><?= empty($canLimits) ? 'Only the MD or ED changes approval limits.' : 'Your own designation — another MD/ED changes it.' ?></small></td>
+          <?php endif; ?>
           <td><input form="<?= $formId ?>" type="checkbox" name="is_active" value="1" <?= (int) $d['is_active'] === 1 ? 'checked' : '' ?> aria-label="Active"></td>
           <td><form id="<?= $formId ?>" method="post" action="/admin/designations/<?= (int) $d['id'] ?>/update"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-success">Save</button></form></td>
         </tr>

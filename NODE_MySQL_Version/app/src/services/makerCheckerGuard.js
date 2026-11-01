@@ -1,47 +1,25 @@
 'use strict';
 
-const userRepository = require('../repositories/userRepository');
-const superAdminService = require('./superAdminService');
-const permissionService = require('./permissionService');
+const selfApprovalRules = require('./selfApprovalRules');
 
-// Port of App\Services\MakerCheckerGuard. QA-5 maker-checker: the single
-// choke point every self-approval check (document review assignment,
-// email-send approval, amendment MD-approval) delegates to. Owner
-// decision: the person who created/requested an item must not also be
-// the one who approves it — EXCEPT a Super Admin or anyone holding
-// manage_permissions, since that tier can already grant itself any
-// approval role through the permission system, so enforcing separation
-// on them is not a real control.
+// Port of App\Services\MakerCheckerGuard. The single choke point for every
+// self-approval check: the person who created or requested an item must not
+// also approve it, unless one of their own roles is ticked for that rule in
+// Admin → Self-approval rules (default Managing Director and Executive
+// Director). QA Round 8 (R8-N09): the seven rules are payment_terms,
+// document_review, email_send, cancellation, purchase_award, amendment and
+// short_payment. There is no blanket Super Admin or manage_permissions
+// exemption any more — a Super Admin or System Administrator qualifies only
+// if their own role is ticked, like everyone else.
 
-async function selfApprovalAllowed(userId) {
-  if (await superAdminService.isEffective(userId)) {
-    return true;
-  }
-  const user = await userRepository.findById(userId);
-  if (!user) {
-    return false;
-  }
-  const permissions = await permissionService.load(userId, user.role_id !== null ? user.role_id : null);
-  return Boolean(permissions.manage_permissions);
+async function selfApprovalAllowed(rule, userId) {
+  return selfApprovalRules.allowed(rule, userId);
 }
 
-// External QA report N-04: order cancellations approve/reject through
-// this stricter variant instead of selfApprovalAllowed(), because the
-// default roles that can approve a cancellation (Admin, MD, ED) all
-// hold manage_permissions — so the general exemption made the
-// cancellation maker-checker rule a no-op for every role that can
-// actually use it. Only a Super Admin is exempt here.
-async function selfApprovalAllowedStrict(userId) {
-  return superAdminService.isEffective(userId);
-}
-
-// Owner decision 1 Nov 2026 (A-1, then D-221): the payment terms of an
-// order are approved by a second person; only the roles ticked in Admin →
-// Self-approval rules (default Managing Director and Executive Director)
-// may approve the terms of an order they created themselves (written to
-// the audit log as a self-approval).
+// Owner decision 1 Nov 2026 (A-1, then D-221): payment terms are approved
+// by a second person unless the creator's role is ticked.
 async function paymentTermsSelfApprovalAllowed(userId) {
-  return require('./selfApprovalRules').allowed('payment_terms', userId);
+  return selfApprovalAllowed('payment_terms', userId);
 }
 
-module.exports = { selfApprovalAllowed, selfApprovalAllowedStrict, paymentTermsSelfApprovalAllowed };
+module.exports = { selfApprovalAllowed, paymentTermsSelfApprovalAllowed };

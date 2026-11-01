@@ -2020,3 +2020,21 @@ INSERT INTO self_approval_rules (rule_key, role_id)
 SELECT k.rule_key, r.id FROM (SELECT 'payment_terms' AS rule_key UNION ALL SELECT 'document_review' UNION ALL SELECT 'email_send') k
 JOIN roles r ON r.name IN ('Managing Director', 'Executive Director')
 WHERE NOT EXISTS (SELECT 1 FROM self_approval_rules x WHERE x.rule_key = k.rule_key);
+
+-- QA Round 8 (1 Nov 2026): self-approval rules for cancellation / purchase award / amendment / short payment (default MD, ED) and the manage_approval_limits permission (MD, ED). Same as docs/migrations/2026-11-02h-qa-r8-approvals.sql.
+
+INSERT INTO self_approval_rules (rule_key, role_id)
+SELECT k.rule_key, r.id
+  FROM (SELECT 'cancellation' AS rule_key UNION ALL SELECT 'purchase_award' UNION ALL SELECT 'amendment' UNION ALL SELECT 'short_payment') k
+  JOIN roles r ON r.name IN ('Managing Director', 'Executive Director')
+ WHERE NOT EXISTS (SELECT 1 FROM self_approval_rules x WHERE x.rule_key = k.rule_key)
+   AND NOT EXISTS (SELECT 1 FROM audit_log a WHERE a.action_type = 'SELF_APPROVAL_RULE_CHANGED' AND a.field_name = k.rule_key);
+
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT 'manage_approval_limits', 'Manage approval limits', 'Change a designation''s purchase approval limit or make it a ''director'' (no limit). Never on a designation one holds oneself. QA Round 8, R8-N10.', 'Admin'
+ WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'manage_approval_limits');
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'manage_approval_limits'
+ WHERE r.name IN ('Managing Director', 'Executive Director')
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);

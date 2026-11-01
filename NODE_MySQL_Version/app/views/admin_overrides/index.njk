@@ -14,8 +14,8 @@
         <tr>
           <td>{{ dt.code }}</td>
           <td>{{ dt.name }}</td>
-          <td><input type="text" name="ref_format[f{{ dt.id }}]" value="{{ dt.ref_format or '' }}" placeholder="(none)"></td>
-          <td><input type="text" name="min_reviewers[f{{ dt.id }}]" value="{{ dt.min_reviewers_default }}" placeholder="e.g., 2" style="width:4rem"></td>
+          <td><input type="text" name="ref_format[f{{ dt.id }}]" value="{{ dt.ref_format or '' }}" placeholder="(none)" aria-label="Ref format"></td>
+          <td><input type="text" name="min_reviewers[f{{ dt.id }}]" value="{{ dt.min_reviewers_default }}" placeholder="e.g., 2" style="width:4rem" aria-label="Min reviewers"></td>
         </tr>
         {% endfor %}
       </table>

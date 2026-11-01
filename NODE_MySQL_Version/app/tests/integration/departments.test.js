@@ -170,11 +170,62 @@ describe('Departments, Log in as and Preview as', () => {
     const d = await departmentRepository.findDesignation(await designationId(`QC Manager ${tag}`));
     expect(d.role_name).toBe(`QC Manager ${tag}`);
 
+    // QA Round 8, R8-N10: approval limits change only with "Manage approval limits" (MD, ED).
+    admin = await signIn(await createUser('Managing Director'));
     expect((await post(admin, page, `/admin/designations/${d.id}/update`, { title: d.title, level: 'manager', approval_limit_inr: '-5', is_active: '1' })).message)
       .toBe('Enter the approval limit in rupees, or leave it empty for none.');
     await post(admin, page, `/admin/designations/${d.id}/update`, { title: d.title, level: 'manager', approval_limit_inr: '500000', is_active: '1' });
     expect(String((await departmentRepository.findDesignation(d.id)).approval_limit_inr)).toBe('500000.00');
     expect((await lastAudit('DESIGNATION_UPDATED')).new_value).toContain('limit 500000');
+  });
+
+  // QA Round 8, R8-N10: a designation's approval limit and level are MD/ED only, never on their own designation, and audited old → new.
+  it('changes approval limits only by the MD or ED and never on their own designation', async () => {
+    const LIMITS_REFUSED = "Only the MD or ED can change an approval limit or make a designation 'director'.";
+    const OWN_LIMIT_REFUSED = 'You cannot change the approval limit of a designation you hold yourself.';
+    const page = '/admin/departments';
+    const pm = await departmentRepository.findDesignation(await designationId('Procurement Manager'));
+    const before = pm.approval_limit_inr;
+    const body = { title: pm.title, level: pm.level, is_active: '1' };
+    const update = (agent, d, fields) => post(agent, page, `/admin/designations/${d.id}/update`, fields);
+
+    const sysadmin = await signIn(await createUser('System Administrator'));
+    expect((await update(sysadmin, pm, { ...body, approval_limit_inr: '999999999' })).message).toBe(LIMITS_REFUSED);
+    expect((await update(sysadmin, pm, { ...body, level: 'director', approval_limit_inr: before === null ? '' : String(before) })).message).toBe(LIMITS_REFUSED);
+    const after = await departmentRepository.findDesignation(pm.id);
+    expect([after.approval_limit_inr, after.level]).toEqual([before, pm.level]); // the System Administrator could not lift the limit
+    expect((await update(sysadmin, pm, { ...body, approval_limit_inr: before === null ? '' : String(before) })).message).toBe(`"${pm.title}" saved.`); // the rest of the form still saves
+    expect((await post(sysadmin, page, '/admin/designations', { department_id: String(pm.department_id), title: `Deputy Boss ${crypto.randomBytes(2).toString('hex')}`, level: 'director', role_id: 'new' })).message).toBe(LIMITS_REFUSED);
+    const sysPage = (await sysadmin.get(page)).text;
+    expect(sysPage).toContain('Only the MD or ED changes approval limits.');
+    expect(sysPage).not.toContain('name="approval_limit_inr" min="0"');
+
+    const mdUser = await createUser('Managing Director');
+    const md = await signIn(mdUser);
+    expect((await update(md, pm, { ...body, approval_limit_inr: '750000' })).message).toBe(`"${pm.title}" saved.`);
+    expect(String((await departmentRepository.findDesignation(pm.id)).approval_limit_inr)).toBe('750000.00');
+    const audit = await lastAudit('APPROVAL_LIMIT_CHANGED');
+    expect([Number(audit.user_id), audit.field_name, audit.old_value, audit.new_value])
+      .toEqual([mdUser.id, 'approval_limit_inr', `${pm.level} · ${before === null ? 'no limit' : Number(before).toFixed(2)}`, `${pm.level} · 750000.00`]);
+    const mdDesignation = await departmentRepository.findDesignation(await designationId('Managing Director'));
+    expect((await update(md, mdDesignation, { title: mdDesignation.title, level: mdDesignation.level, approval_limit_inr: '1', is_active: '1' })).message).toBe(OWN_LIMIT_REFUSED);
+    expect((await md.get(page)).text).toContain('Your own designation — another MD/ED changes it.');
+
+    // A Procurement Director cannot lift their own designation's limit — whether or not they also hold MD/ED rights.
+    const pd = await departmentRepository.findDesignation(await designationId('Procurement Director'));
+    const pdBody = { title: pd.title, level: pd.level, approval_limit_inr: '999999999', is_active: '1' };
+    // Without "Manage permissions" the Procurement Director cannot even reach the designation form.
+    const director = await signIn(await createUser('Procurement Director'));
+    const csrf = csrfOf((await director.get(director.landedOn)).text);
+    expect((await director.post(`/admin/designations/${pd.id}/update`).type('form').send({ _csrf: csrf, ...pdBody })).status).toBe(403);
+    const director2 = await createUser('Procurement Director');
+    for (const key of ['manage_permissions', 'manage_approval_limits']) {
+      await db.execute("INSERT INTO user_permissions (user_id, permission_id, is_enabled, reason) SELECT :u, id, 1, 'Jest' FROM permissions WHERE permission_key = :k", { u: director2.id, k: key });
+    }
+    expect((await update(await signIn(director2), pd, pdBody)).message).toBe(OWN_LIMIT_REFUSED);
+    expect((await departmentRepository.findDesignation(pd.id)).approval_limit_inr).toBe(pd.approval_limit_inr);
+
+    await departmentRepository.updateDesignation(Number(pm.id), pm.title, pm.level, true, before === null ? null : Number(before));
   });
 
   it('adds and ends memberships on the person\'s page', async () => {

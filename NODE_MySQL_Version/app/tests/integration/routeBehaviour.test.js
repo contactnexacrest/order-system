@@ -445,7 +445,10 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     const before = await selfApprovalRules.roleIds('email_send');
     const md = String(await value("SELECT id FROM roles WHERE name = 'Managing Director'"));
     try {
-      const body = { 'payment_terms[]': (await selfApprovalRules.roleIds('payment_terms')).map(String), 'document_review[]': (await selfApprovalRules.roleIds('document_review')).map(String), 'email_send[]': [md] };
+      // Every rule is posted as it stands (the page holds seven since QA Round 8), only e-mail sends change.
+      const body = {};
+      for (const rule of Object.keys(selfApprovalRules.RULES)) body[`${rule}[]`] = (await selfApprovalRules.roleIds(rule)).map(String);
+      body['email_send[]'] = [md];
       expectDone(await holder.call('POST', '/admin/self-approval', body), 'POST /admin/self-approval', 'Self-approval rules saved.');
       expect(await selfApprovalRules.roleIds('email_send')).toEqual([Number(md)]);
     } finally {

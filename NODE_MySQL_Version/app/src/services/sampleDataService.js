@@ -652,7 +652,7 @@ async function advanceSampleOrderBJourney(orderId, clientId, supplierId, userId,
     formatDate(new Date()),
     userId
   );
-  await amendmentService.approveByMd(amendmentId, userId);
+  await amendmentService.approveByMd(amendmentId, userId, true); // system load, not a self-approval
   await amendmentService.generateDocument(amendmentId, userId);
   const amendment = await amendmentRepository.find(amendmentId);
   order = await orderRepository.find(orderId);

@@ -186,14 +186,34 @@ async function releasePayout(id) {
  * AS-9: a claw-back after a refund — a negative line in the associate's
  * next payout month, tied to the paid payout it reverses.
  */
-async function addClawback(paid, amountInr, amountFc, month, note) {
-  const r = await db.execute(
+async function addClawback(paid, amountInr, amountFc, month, note, c = db) {
+  const r = await c.execute(
     `INSERT INTO incentive_payouts (order_id, payee_kind, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month, clawback_of_payout_id, note)
      VALUES (:o, 'associate', :a, 'associate', :inr, :fc, :cur, :m, :of, :n)`,
     { o: paid.order_id, a: paid.associate_id, inr: -Math.abs(amountInr), fc: amountFc !== null && amountFc !== undefined ? -Math.abs(amountFc) : null,
       cur: paid.currency_code ?? null, m: month, of: paid.id, n: note }
   );
   return r.insertId;
+}
+
+/**
+ * QA Round 8, R8-N12: a claw-back is saved only while it fits what is left
+ * of the paid commission — checked with the paid payout row locked, so
+ * simultaneous claw-backs (a double click, two people) cannot take back
+ * more than was paid.
+ * @returns {Promise<{id: number|null, left: number}>} id null when it no longer fits
+ */
+async function addClawbackWithinPaid(payoutId, amountInr, month, note) {
+  return db.transaction(async (conn) => {
+    const paid = await conn.queryOne('SELECT * FROM incentive_payouts WHERE id = :id FOR UPDATE', { id: payoutId });
+    if (!paid || paid.status !== 'paid' || Number(paid.amount_inr) <= 0) return { id: null, left: 0 };
+    const sum = await conn.queryOne('SELECT COALESCE(-SUM(amount_inr), 0) AS s FROM incentive_payouts WHERE clawback_of_payout_id = :p', { p: payoutId });
+    const left = Math.round((Number(paid.paid_inr) - Number(sum.s)) * 100) / 100;
+    if (!(amountInr > 0) || amountInr > left + 0.005) return { id: null, left };
+    const fc = paid.amount_fc !== null && paid.amount_fc !== undefined ? Math.round(Number(paid.amount_fc) * amountInr / Number(paid.amount_inr) * 100) / 100 : null;
+    const id = await addClawback(paid, amountInr, fc, month, note, conn);
+    return { id, left };
+  });
 }
 
 async function deleteOrderPayouts(orderId, c = db) {
@@ -245,6 +265,7 @@ async function unlockedOrderIdsWithPayments() {
 }
 
 module.exports = {
+  addClawbackWithinPaid,
   ROLES,
   PAID_VIA,
   settings,

@@ -12,10 +12,10 @@
           <tr><th>Value</th><th>Sort Order</th><th>Default</th><th>Active</th></tr>
           <?php foreach ($options as $o): ?>
             <tr>
-              <td><input type="text" name="option_value[<?= (int) $o['id'] ?>]" required value="<?= htmlspecialchars($o['option_value']) ?>" placeholder="e.g., 20ft Standard"></td>
-              <td><input type="number" min="0" step="1" required name="sort_order[<?= (int) $o['id'] ?>]" value="<?= (int) $o['sort_order'] ?>" placeholder="e.g., 1" style="width:4rem"></td>
-              <td><input type="radio" name="default_id" value="<?= (int) $o['id'] ?>" <?= $o['is_default'] ? 'checked' : '' ?>></td>
-              <td><input type="checkbox" name="is_active[<?= (int) $o['id'] ?>]" value="1" <?= $o['is_active'] ? 'checked' : '' ?>></td>
+              <td><input type="text" name="option_value[<?= (int) $o['id'] ?>]" required value="<?= htmlspecialchars($o['option_value']) ?>" placeholder="e.g., 20ft Standard" aria-label="Option value"></td>
+              <td><input type="number" min="0" step="1" required name="sort_order[<?= (int) $o['id'] ?>]" value="<?= (int) $o['sort_order'] ?>" placeholder="e.g., 1" style="width:4rem" aria-label="Sort order"></td>
+              <td><input type="radio" name="default_id" value="<?= (int) $o['id'] ?>" <?= $o['is_default'] ? 'checked' : '' ?> aria-label="Default option"></td>
+              <td><input type="checkbox" name="is_active[<?= (int) $o['id'] ?>]" value="1" <?= $o['is_active'] ? 'checked' : '' ?> aria-label="Is active"></td>
             </tr>
           <?php endforeach; ?>
         </table>
@@ -24,7 +24,7 @@
 
       <form method="post" action="/admin/dropdown-options/<?= urlencode($listKey) ?>/create" class="btn-row">
         <?= Csrf::field() ?>
-        <input type="text" name="option_value" required placeholder="Add a new option to this list">
+        <input type="text" name="option_value" required placeholder="Add a new option to this list" aria-label="Add a new option to this list">
         <button type="submit" class="btn-sm btn-secondary">Add Option</button>
       </form>
     </div>

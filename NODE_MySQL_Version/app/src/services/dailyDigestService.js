@@ -45,11 +45,37 @@ function compose(name, items, date) {
   return { subject, body };
 }
 
+/**
+ * QA Round 8, R8-N02: the line the cron job prints — plain about mail being
+ * off, and about digests that could not be sent.
+ */
+function summary(result) {
+  if (result.mailOff) return 'Daily digest: e-mail sending is off — nothing sent.';
+  return `Daily digest: ${result.sent} sent, ${result.skipped} with nothing waiting or already sent`
+    + (result.failed > 0 ? `, ${result.failed} not sent (will be retried on the next run)` : '') + '.';
+}
+
+// Tests only: replaces the real mail sender (null restores it).
+let sender = null;
+function setSender(fn) {
+  sender = fn;
+}
+
+/**
+ * Sends today's digest to every active staff member with something waiting,
+ * once per day. QA Round 8, R8-N02: only a digest that really left counts as
+ * sent and uses up the day — with e-mail sending off nothing is claimed, and
+ * a failed send is released so the next run tries again.
+ */
 async function run(date = null) {
   const day = date || todayIst();
+  if (!sender && (await require('../repositories/companySettingsRepository').get('mail_sending_enabled')) === '0') {
+    return { sent: 0, skipped: 0, failed: 0, mailOff: true };
+  }
   const users = await db.query("SELECT id, name, email FROM users WHERE is_active = 1 AND email IS NOT NULL AND email <> '' ORDER BY id");
   let sent = 0;
   let skipped = 0;
+  let failed = 0;
   for (const u of users) {
     const items = await itemsFor(Number(u.id));
     if (!items.length) { skipped++; continue; }
@@ -57,10 +83,15 @@ async function run(date = null) {
     const claim = await db.execute('INSERT IGNORE INTO daily_digest_log (user_id, digest_date, items) VALUES (:u, :d, :n)', { u: u.id, d: day, n: items.length });
     if (claim.affectedRows !== 1) { skipped++; continue; }
     const mail = compose(String(u.name), items, day);
-    await mailSenderService.send(String(u.email), mail.subject, mail.body);
-    sent++;
+    const ok = sender ? await sender(String(u.email), mail.subject, mail.body) : await mailSenderService.send(String(u.email), mail.subject, mail.body);
+    if (ok) {
+      sent++;
+    } else {
+      await db.execute('DELETE FROM daily_digest_log WHERE user_id = :u AND digest_date = :d', { u: u.id, d: day });
+      failed++;
+    }
   }
-  return { sent, skipped };
+  return { sent, skipped, failed, mailOff: false };
 }
 
-module.exports = { itemsFor, compose, run };
+module.exports = { itemsFor, compose, run, setSender, summary };

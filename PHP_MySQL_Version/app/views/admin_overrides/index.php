@@ -15,8 +15,8 @@
         <tr>
           <td><?= htmlspecialchars($dt['code']) ?></td>
           <td><?= htmlspecialchars($dt['name']) ?></td>
-          <td><input type="text" name="ref_format[<?= (int) $dt['id'] ?>]" value="<?= htmlspecialchars($dt['ref_format'] ?? '') ?>" placeholder="(none)"></td>
-          <td><input type="text" name="min_reviewers[<?= (int) $dt['id'] ?>]" value="<?= (int) $dt['min_reviewers_default'] ?>" placeholder="e.g., 2" style="width:4rem"></td>
+          <td><input type="text" name="ref_format[<?= (int) $dt['id'] ?>]" value="<?= htmlspecialchars($dt['ref_format'] ?? '') ?>" placeholder="(none)" aria-label="Ref format"></td>
+          <td><input type="text" name="min_reviewers[<?= (int) $dt['id'] ?>]" value="<?= (int) $dt['min_reviewers_default'] ?>" placeholder="e.g., 2" style="width:4rem" aria-label="Min reviewers"></td>
         </tr>
         <?php endforeach; ?>
       </table>

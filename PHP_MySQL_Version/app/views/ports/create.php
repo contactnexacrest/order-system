@@ -16,6 +16,7 @@
       </label>
       <label>Role *
         <select name="port_role" required>
+          <option value="">Choose…</option>
           <?php foreach ($roles as $key => $label): ?>
             <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
           <?php endforeach; ?>

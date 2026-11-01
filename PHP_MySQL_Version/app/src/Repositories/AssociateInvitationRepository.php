@@ -52,7 +52,24 @@ final class AssociateInvitationRepository
     /** A link that can still be used: created / opened, not past its date. */
     public static function isUsable(array $inv): bool
     {
-        return in_array($inv['status'], ['created', 'opened'], true) && ($inv['expires_at'] === null || strtotime((string) $inv['expires_at']) > time());
+        // QA Round 8, R8-N04: one registration per link — a link a buyer already submitted through is used.
+        return in_array($inv['status'], ['created', 'opened'], true) && empty($inv['submission_id'])
+            && ($inv['expires_at'] === null || strtotime((string) $inv['expires_at']) > time());
+    }
+
+    /**
+     * QA Round 8, R8-N04: takes a one-off link for this registration, at once
+     * and only if no other registration took it first (two buyers submitting
+     * through the same link at the same moment: only one wins).
+     */
+    public static function claim(int $id, int $submissionId): bool
+    {
+        $stmt = Database::connection()->prepare(
+            "UPDATE associate_invitations SET submission_id = :s, status = 'opened', opened_at = COALESCE(opened_at, NOW())
+              WHERE id = :id AND submission_id IS NULL AND status IN ('created', 'opened') AND (expires_at IS NULL OR expires_at > NOW())"
+        );
+        $stmt->execute(['s' => $submissionId, 'id' => $id]);
+        return $stmt->rowCount() === 1;
     }
 
     public static function setStatus(int $id, string $status, array $extra = []): void

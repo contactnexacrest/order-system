@@ -17,10 +17,9 @@ use App\Tests\Support\DbTestCase;
 /**
  * QA-5 (external QA report cross-verification): maker-checker separation
  * — the person who created/requested an item must not also be the one who
- * approves it, EXCEPT a Super Admin or anyone holding manage_permissions
- * (owner decision: that tier can already grant itself any approval role
- * through the permission system, so enforcing separation on them isn't a
- * real control). Covers REV-05 (document self-review), EML-03 (email
+ * approves it, unless their role is ticked in Admin → Self-approval rules
+ * (D-221; QA Round 8, R8-N09: no Super Admin or manage_permissions blanket
+ * exemption; default MD and ED on every rule). Covers REV-05 (document self-review), EML-03 (email
  * self-approval), AMD-05 (amendment self MD-approval), plus REV-06
  * (inactive reviewer) and REV-07 (duplicate reviewer assignment stalls
  * the document).
@@ -57,36 +56,28 @@ final class MakerCheckerGuardTest extends DbTestCase
     // MakerCheckerGuard itself
     // ---------------------------------------------------------------
 
-    public function testSelfApprovalAllowedForSuperAdminButNotOrdinaryUser(): void
+    /** QA Round 8, R8-N09: one choke point, seven rules, default MD and ED, no blanket exemption. */
+    public function testEveryRuleDefaultsToMdAndEdWithNoBlanketExemption(): void
     {
-        $ordinary = $this->createTestUser('Export Executive');
-        self::assertFalse(MakerCheckerGuard::selfApprovalAllowed($ordinary));
-
-        $this->makeSuperAdmin($ordinary);
-        self::assertTrue(MakerCheckerGuard::selfApprovalAllowed($ordinary));
-    }
-
-    public function testSelfApprovalAllowedForManagePermissionsHolderWithoutSuperAdmin(): void
-    {
-        // Admin role holds every permission (including manage_permissions)
-        // via seed.sql's wildcard grant, but createTestUser() never sets
-        // is_super_admin — this exercises the "not Super Admin, but holds
-        // manage_permissions" branch specifically.
-        $adminRoleUser = $this->createTestUser('Admin');
-        self::assertTrue(MakerCheckerGuard::selfApprovalAllowed($adminRoleUser));
-    }
-
-    /**
-     * External QA report N-04: the strict variant used by cancellations
-     * must NOT grant the manage_permissions exemption — only Super Admin.
-     */
-    public function testSelfApprovalAllowedStrictDeniesManagePermissionsHolderButAllowsSuperAdmin(): void
-    {
-        $adminRoleUser = $this->createTestUser('Admin');
-        self::assertFalse(MakerCheckerGuard::selfApprovalAllowedStrict($adminRoleUser));
-
-        $this->makeSuperAdmin($adminRoleUser);
-        self::assertTrue(MakerCheckerGuard::selfApprovalAllowedStrict($adminRoleUser));
+        $rules = ['payment_terms', 'document_review', 'email_send', 'cancellation', 'purchase_award', 'amendment', 'short_payment'];
+        self::assertSame($rules, array_keys(\App\Services\SelfApprovalRules::RULES));
+        $md = $this->createTestUser('Managing Director');
+        $ed = $this->createTestUser('Executive Director');
+        $admin = $this->createTestUser('Admin');
+        $sysadmin = $this->createTestUser('System Administrator');
+        $superExporter = $this->createTestUser('Export Executive');
+        $this->makeSuperAdmin($superExporter);
+        // The four rules added in QA Round 8 (the first three are covered by SelfApprovalRulesTest).
+        foreach (array_slice($rules, 3) as $rule) {
+            self::assertTrue(MakerCheckerGuard::selfApprovalAllowed($rule, $md), "MD: {$rule}");
+            self::assertTrue(MakerCheckerGuard::selfApprovalAllowed($rule, $ed), "ED: {$rule}");
+        }
+        foreach ($rules as $rule) {
+            self::assertFalse(MakerCheckerGuard::selfApprovalAllowed($rule, $admin), "Admin (holds manage_permissions): {$rule}");
+            self::assertFalse(MakerCheckerGuard::selfApprovalAllowed($rule, $sysadmin), "System Administrator: {$rule}");
+            self::assertFalse(MakerCheckerGuard::selfApprovalAllowed($rule, $superExporter), "Super Admin without a ticked role: {$rule}");
+        }
+        self::assertFalse(MakerCheckerGuard::selfApprovalAllowed('no_such_rule', $md));
     }
 
     // ---------------------------------------------------------------
@@ -251,16 +242,25 @@ final class MakerCheckerGuardTest extends DbTestCase
         AmendmentService::approveByMd($amendmentId, $requester);
     }
 
-    public function testSuperAdminCanMdApproveTheirOwnAmendment(): void
+    /** QA Round 8, R8-N09: an MD may MD-approve their own amendment (logged); a Super Admin without a ticked role may not. */
+    public function testMdCanMdApproveTheirOwnAmendmentButASuperAdminExporterCannot(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
-        $requester = $this->createTestUser('Export Executive');
-        $this->makeSuperAdmin($requester);
-        $amendmentId = $this->createTestAmendment($orderId, $requester);
-
-        AmendmentService::approveByMd($amendmentId, $requester);
-
+        $md = $this->createTestUser('Managing Director');
+        $amendmentId = $this->createTestAmendment($orderId, $md);
+        AmendmentService::approveByMd($amendmentId, $md);
         self::assertSame('md_approved', AmendmentRepository::find($amendmentId)['status']);
+        self::assertSame(1, (int) \App\Config\Database::connection()->query("SELECT COUNT(*) FROM audit_log WHERE action_type = 'AMENDMENT_SELF_APPROVED' AND entity_id = {$amendmentId}")->fetchColumn());
+
+        $super = $this->createTestUser('Export Executive');
+        $this->makeSuperAdmin($super);
+        $other = $this->createTestAmendment($orderId, $super);
+        try {
+            AmendmentService::approveByMd($other, $super);
+            self::fail('a Super Admin without a ticked role MD-approved their own amendment');
+        } catch (\RuntimeException $e) {
+            self::assertSame('You requested this amendment — a different privileged user must MD-approve it.', $e->getMessage());
+        }
     }
 
     public function testAnUninvolvedUserCanStillMdApproveNormally(): void

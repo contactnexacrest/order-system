@@ -162,7 +162,7 @@ final class OrderCancellationWorkflowTest extends DbTestCase
         // External QA report N-04: Admin holds manage_permissions via
         // seed.sql's wildcard grant (and is one of the only roles that can
         // approve a cancellation at all), but must still be blocked from
-        // approving their own request — only Super Admin is exempt here.
+        // approving their own request — only a role ticked in Admin → Self-approval rules is exempt.
         $orderId = $this->createTestOrder($this->createTestClient());
         $requester = $this->createTestUser('Admin');
         $cancellationId = OrderCancellationRepository::create($orderId, 'Requesting and trying to approve my own cancellation as Admin.', $requester);
@@ -178,21 +178,29 @@ final class OrderCancellationWorkflowTest extends DbTestCase
         self::assertSame('pending', OrderCancellationRepository::find($cancellationId)['status']);
     }
 
-    public function testApproveCancellationAllowsSelfApprovalForASuperAdmin(): void
+    /** QA Round 8, R8-N09: no Super Admin exemption any more — only a role ticked in Admin → Self-approval rules (default MD, ED). */
+    public function testASuperAdminWithoutATickedRoleCannotApproveTheirOwnCancellationButAnMdCan(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());
         $requester = $this->createTestUser('Export Executive');
         Database::connection()->prepare('UPDATE users SET is_super_admin = 1 WHERE id = :id')->execute(['id' => $requester]);
         $cancellationId = OrderCancellationRepository::create($orderId, 'Requesting and approving my own cancellation as Super Admin.', $requester);
-
         $_SESSION['_auth_user_id'] = $requester;
         $_POST = ['refund_status' => 'not_applicable'];
-
         ob_start();
         (new OrderController())->approveCancellation(['id' => (string) $orderId, 'cancellationId' => (string) $cancellationId]);
         ob_end_clean();
+        self::assertSame('active', OrderRepository::find($orderId)['status']);
 
-        self::assertSame('cancelled', OrderRepository::find($orderId)['status']);
+        $orderId2 = $this->createTestOrder($this->createTestClient());
+        $md = $this->createTestUser('Managing Director');
+        $cancellationId2 = OrderCancellationRepository::create($orderId2, 'Requesting and approving my own cancellation as MD.', $md);
+        $_SESSION['_auth_user_id'] = $md;
+        ob_start();
+        (new OrderController())->approveCancellation(['id' => (string) $orderId2, 'cancellationId' => (string) $cancellationId2]);
+        ob_end_clean();
+        self::assertSame('cancelled', OrderRepository::find($orderId2)['status']);
+        self::assertSame(1, (int) Database::connection()->query("SELECT COUNT(*) FROM audit_log WHERE action_type = 'ORDER_CANCELLATION_SELF_APPROVED' AND entity_id = {$cancellationId2}")->fetchColumn());
     }
 
     public function testRejectCancellationLeavesTheOrderUnaffectedAndRequiresNotes(): void

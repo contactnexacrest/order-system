@@ -185,8 +185,34 @@ final class AssociateRepository
 
     public static function linkClient(int $clientId, ?int $associateId, ?string $registeredOn): void
     {
-        Database::connection()->prepare('UPDATE clients SET associate_id = :a, associate_registered_on = :d WHERE id = :id')
-            ->execute(['a' => $associateId, 'd' => $associateId === null ? null : $registeredOn, 'id' => $clientId]);
+        Database::transaction(static function () use ($clientId, $associateId, $registeredOn): void {
+            $number = $associateId === null ? null : self::clientNumberForLink($clientId, $associateId);
+            Database::connection()->prepare('UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_client_number = :n WHERE id = :id')
+                ->execute(['a' => $associateId, 'd' => $associateId === null ? null : $registeredOn, 'n' => $number, 'id' => $clientId]);
+        });
+    }
+
+    /**
+     * QA Round 8 (R8-N05, owner decision AS-17): the client's number for this
+     * associate — 1 for the first client they brought, 2 for the second, in
+     * the order they were linked. A client already numbered for this
+     * associate keeps its number for ever; a client moving to a new associate
+     * gets that associate's next number. Call inside a transaction: the
+     * associate's row is locked so two links at once never share a number.
+     */
+    public static function clientNumberForLink(int $clientId, int $associateId): int
+    {
+        $pdo = Database::connection();
+        $pdo->prepare('SELECT id FROM associates WHERE id = :a FOR UPDATE')->execute(['a' => $associateId]);
+        $cur = $pdo->prepare('SELECT associate_id, associate_client_number FROM clients WHERE id = :id FOR UPDATE');
+        $cur->execute(['id' => $clientId]);
+        $c = $cur->fetch();
+        if ($c && (int) ($c['associate_id'] ?? 0) === $associateId && $c['associate_client_number'] !== null) {
+            return (int) $c['associate_client_number'];
+        }
+        $next = $pdo->prepare('SELECT COALESCE(MAX(associate_client_number), 0) + 1 FROM clients WHERE associate_id = :a AND id <> :id');
+        $next->execute(['a' => $associateId, 'id' => $clientId]);
+        return (int) $next->fetchColumn();
     }
 
     /** @return list<array<string,mixed>> clients not yet linked to any associate, for the link picker */
@@ -198,28 +224,27 @@ final class AssociateRepository
     }
 
     /**
-     * The associate's commission order number for this client: the same
-     * number for every order of the client's first 10 days (one "order"
-     * under the agreement), otherwise one more than the clients already
-     * counted for this associate.
+     * The associate's client number for this client (QA Round 8, R8-N05):
+     * the number stored on the client when it was linked. A client linked
+     * before numbering existed is numbered now, as the associate's next.
      */
     public static function orderNumberForClient(int $associateId, int $clientId): int
     {
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare(
-            'SELECT oi.associate_order_number FROM order_incentives oi JOIN orders o ON o.id = oi.order_id
-             WHERE oi.associate_id = :a AND o.client_id = :c AND oi.associate_order_number IS NOT NULL LIMIT 1'
-        );
-        $stmt->execute(['a' => $associateId, 'c' => $clientId]);
-        $existing = $stmt->fetchColumn();
-        if ($existing !== false) {
-            return (int) $existing;
+        $stmt = Database::connection()->prepare('SELECT associate_id, associate_client_number FROM clients WHERE id = :id');
+        $stmt->execute(['id' => $clientId]);
+        $c = $stmt->fetch();
+        if ($c && (int) ($c['associate_id'] ?? 0) === $associateId && $c['associate_client_number'] !== null) {
+            return (int) $c['associate_client_number'];
         }
-        $stmt = $pdo->prepare(
-            'SELECT COUNT(DISTINCT o.client_id) FROM order_incentives oi JOIN orders o ON o.id = oi.order_id
-             WHERE oi.associate_id = :a AND oi.associate_order_number IS NOT NULL'
-        );
-        $stmt->execute(['a' => $associateId]);
-        return (int) $stmt->fetchColumn() + 1;
+        if (!$c || (int) ($c['associate_id'] ?? 0) !== $associateId) {
+            $next = Database::connection()->prepare('SELECT COALESCE(MAX(associate_client_number), 0) + 1 FROM clients WHERE associate_id = :a');
+            $next->execute(['a' => $associateId]);
+            return (int) $next->fetchColumn();
+        }
+        return (int) Database::transaction(static function () use ($associateId, $clientId): int {
+            $number = self::clientNumberForLink($clientId, $associateId);
+            Database::connection()->prepare('UPDATE clients SET associate_client_number = :n WHERE id = :id')->execute(['n' => $number, 'id' => $clientId]);
+            return $number;
+        });
     }
 }

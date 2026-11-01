@@ -6,7 +6,7 @@
 <div class="card page-wide">
   <h2 style="margin-top:0;">Search — client or order reference</h2>
   <form method="get" action="/" class="search-box">
-    <input type="text" name="q" value="<?= htmlspecialchars($searchTerm) ?>" placeholder="Order ref, client no., or company name…">
+    <input type="text" name="q" value="<?= htmlspecialchars($searchTerm) ?>" placeholder="Order ref, client no., or company name…" aria-label="Order ref, client no., or company name">
     <button type="submit" class="btn-sm">Search</button>
   </form>
   <?php if ($searchTerm !== ''): ?>

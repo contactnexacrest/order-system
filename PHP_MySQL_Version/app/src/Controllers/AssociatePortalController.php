@@ -35,6 +35,17 @@ final class AssociatePortalController
         return AssociatePortalService::current() ?? [];
     }
 
+    /** Q-R8-2: refuses a change by a suspended associate; true when refused (the redirect is sent). */
+    private static function refuseWhenSuspended(array $a, string $back): bool
+    {
+        if (!AssociatePortalService::isSuspended($a)) {
+            return false;
+        }
+        Flash::set('error', AssociatePortalService::SUSPENDED_REFUSED);
+        header('Location: ' . $back);
+        return true;
+    }
+
     private static function render(string $view, array $data = []): void
     {
         $a = self::me();
@@ -161,6 +172,9 @@ final class AssociatePortalController
     public function createInvitation(array $params): void
     {
         $a = self::me();
+        if (self::refuseWhenSuspended($a, '/associate/clients')) {
+            return;
+        }
         $company = trim((string) ($_POST['company_name'] ?? ''));
         $country = trim((string) ($_POST['country'] ?? ''));
         if ($a['status'] !== 'active') {
@@ -179,6 +193,9 @@ final class AssociatePortalController
     public function cancelInvitation(array $params): void
     {
         $a = self::me();
+        if (self::refuseWhenSuspended($a, '/associate/clients')) {
+            return;
+        }
         $inv = AssociateInvitationRepository::find((int) $params['id']);
         if ($inv === null || (int) $inv['associate_id'] !== (int) $a['id']) {
             http_response_code(404);
@@ -199,6 +216,9 @@ final class AssociatePortalController
     public function chooseCode(array $params): void
     {
         $a = self::me();
+        if (self::refuseWhenSuspended($a, '/associate/clients')) {
+            return;
+        }
         $part = AssociateCodeService::readablePart((string) ($_POST['readable'] ?? ''));
         $events = array_filter(AssociateEventRepository::forAssociate((int) $a['id']), static fn (array $e): bool => $e['event'] === 'code_chosen');
         if ($events !== []) {
@@ -236,15 +256,10 @@ final class AssociatePortalController
         $id = (int) self::me()['id'];
         $payouts = AssociatePortalRepository::payouts($id);
         if (($_GET['format'] ?? '') === 'csv') {
-            header('Content-Type: text/csv; charset=utf-8');
-            header('Content-Disposition: attachment; filename="commission-statement.csv"');
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Incentive month', 'Order', 'Client', 'Amount (order currency)', 'Currency', 'Amount INR', 'Status', 'Paid on', 'Paid INR', 'TDS INR', 'Reference', 'Note']);
-            foreach ($payouts as $p) {
-                fputcsv($out, [$p['incentive_month'], $p['order_reference'], $p['company_legal_name'], $p['amount_fc'], $p['currency_code'], $p['amount_inr'], $p['status'], $p['paid_on'], $p['paid_inr'], $p['tds_inr'], $p['paid_reference'] ?? '', $p['note'] ?? $p['hold_reason'] ?? '']);
-            }
-            fclose($out);
+            // QA Round 8, R8-N03: through the shared CSV writer, so a cell like =HYPERLINK(...) is plain text in Excel.
+            \App\Helpers\Csv::send('commission-statement.csv',
+                ['Incentive month', 'Order', 'Client', 'Amount (order currency)', 'Currency', 'Amount INR', 'Status', 'Paid on', 'Paid INR', 'TDS INR', 'Reference', 'Note'],
+                array_map(static fn (array $p): array => [$p['incentive_month'], $p['order_reference'], $p['company_legal_name'], $p['amount_fc'], $p['currency_code'], $p['amount_inr'], $p['status'], $p['paid_on'], $p['paid_inr'], $p['tds_inr'], $p['paid_reference'] ?? '', $p['note'] ?? $p['hold_reason'] ?? ''], $payouts));
             return;
         }
         self::render('commission', ['payouts' => $payouts, 'totals' => AssociatePortalRepository::totals($id), 'print' => ($_GET['print'] ?? '') === '1',
@@ -308,6 +323,9 @@ final class AssociatePortalController
     public function saveProfile(array $params): void
     {
         $a = self::me();
+        if (self::refuseWhenSuspended($a, '/associate/profile')) {
+            return;
+        }
         $phone = trim((string) ($_POST['phone'] ?? ''));
         $address = trim((string) ($_POST['address'] ?? ''));
         $pan = strtoupper(trim((string) ($_POST['pan'] ?? '')));
@@ -331,6 +349,9 @@ final class AssociatePortalController
     public function uploadDocument(array $params): void
     {
         $a = self::me();
+        if (self::refuseWhenSuspended($a, '/associate/profile')) {
+            return;
+        }
         $kind = (string) ($_POST['kind'] ?? '');
         if (!in_array($kind, AssociateDocumentRepository::ASSOCIATE_KINDS, true) || $kind === 'invoice') {
             Flash::set('error', 'Choose what the document is.');
@@ -354,6 +375,9 @@ final class AssociatePortalController
     public function requestBank(array $params): void
     {
         $a = self::me();
+        if (self::refuseWhenSuspended($a, '/associate/profile')) {
+            return;
+        }
         $result = AssociateAdminController::validateBank($a, $_POST);
         if (is_string($result)) {
             Flash::set('error', $result);
@@ -369,11 +393,12 @@ final class AssociatePortalController
         }
         $id = AssociateBankRepository::request((int) $a['id'], $result, true, null);
         AuditLogRepository::log(null, 'ASSOCIATE_BANK_CHANGE_REQUESTED', 'associate_bank_accounts', $id, null, null, 'by associate');
-        AssociateService::notify($a, 'bank_changed', "A change of your bank details (to {$result['bank_name']} ••••" . substr((string) $result['account_number'], -4) . ') was received on ' . date('j M Y') . '. Your payments keep going to your verified account until NexaCrest has checked the new one. If you did not ask for this, contact NexaCrest at once.');
+        AssociateService::notify($a, 'bank_changed', "A change of your bank details (to {$result['bank_name']} ••••" . substr((string) $result['account_number'], -4) . ') was received on ' . date('j M Y') . '. It is used once NexaCrest has checked it. '
+            . AssociateService::bankPaymentsSentence((int) $a['id']) . ' If you did not ask for this, contact NexaCrest at once.');
         foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_associate_bank') as $uid) {
             \App\Repositories\NotificationRepository::create($uid, null, 'associate_bank_change', null, "Associate {$a['name']} asked to change their bank details — two people must verify it.");
         }
-        Flash::set('success', 'Bank change received. It is used once NexaCrest has verified it; until then payments go to your verified account.');
+        Flash::set('success', 'Bank change received. It is used once NexaCrest has verified it. ' . AssociateService::bankPaymentsSentence((int) $a['id']));
         header('Location: /associate/profile');
     }
 

@@ -38,6 +38,19 @@ the role behind it. From this page Admin can:
   link) or an existing role.
 - **Edit** a department (name, colour, active, sees the whole company) or
   a designation (title, level, active, approval limit in rupees).
+- **Approval limits are MD/ED only** (QA Round 8, R8-N10). A designation's
+  approval limit and its level (making it 'director', which means no limit)
+  change only for holders of **Manage approval limits** (seed: Managing
+  Director, Executive Director; Super Admins as usual) — and never on a
+  designation the person holds themselves (main role or membership).
+  Everyone else with Admin rights sees the level and limit read-only with
+  the note "Only the MD or ED changes approval limits." (on their own
+  designation: "Your own designation — another MD/ED changes it.") and can
+  still change the title and active switch. A refused change says
+  "Only the MD or ED can change an approval limit or make a designation
+  'director'." or "You cannot change the approval limit of a designation you
+  hold yourself." Every change is in the audit log as APPROVAL_LIMIT_CHANGED
+  with the old and new level and limit.
 - **Preview the app as this** — see the app exactly as that designation
   sees it. Admin's own extra rights are off during a preview. A yellow
   banner stays at the top; **Exit preview** returns to Admin.

@@ -128,7 +128,7 @@
       <legend><span class="intake-step-num">3</span> Shipping Preference</legend>
       <div class="field-grid">
         <label>Incoterm *
-          <select id="incoterm_select">
+          <select id="incoterm_select" required>
             <option value="">— Select —</option>
             {% for i in incoterms %}
               <option value="{{ i.code }}">{{ i.code }}</option>

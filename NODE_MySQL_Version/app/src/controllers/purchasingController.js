@@ -220,6 +220,9 @@ async function approve(req, res) {
     return;
   }
   await auditLogRepository.log(req.user.id, 'PURCHASE_APPROVED', 'purchase_requirements', r.id, null, null, `${r.awarded_supplier_name} ₹${fmt(value)}`);
+  if (Number(r.awarded_by) === Number(req.user.id)) {
+    await auditLogRepository.log(req.user.id, 'PURCHASE_AWARD_SELF_APPROVED', 'purchase_requirements', r.id, null, null, null, 'Approved a purchase award they made themselves (Admin → Self-approval rules).');
+  }
   flash.set(req, 'success', `Purchase PR-${r.id} approved: ${r.awarded_supplier_name}, ₹${fmt(value)}.`);
   res.redirect(back);
 }

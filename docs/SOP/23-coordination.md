@@ -38,6 +38,12 @@ Nobody with nothing waiting gets one, and nobody gets two in a day. Review
 requests still arrive at once as before; the digest only repeats them
 (owner decision 1 Nov 2026).
 
+A digest counts as sent only when the e-mail really left. While e-mail
+sending is off (Admin → Settings) the job reports **"Daily digest: e-mail
+sending is off — nothing sent."** and nobody's day is used up, so the
+digest goes out once sending is switched on. A digest that fails to send
+is tried again on the next run (QA Round 8).
+
 ## Every order has an assignee
 
 The person who creates an order is its first assignee. An order always

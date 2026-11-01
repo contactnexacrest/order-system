@@ -41,7 +41,8 @@
       </label>
       <label>Level *
         <select name="level" required>
-          {% for key, label in levels %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+          <option value="">Choose…</option>
+          {% for key, label in levels %}{% if not (key == 'director' and not canLimits) %}<option value="{{ key }}">{{ label }}</option>{% endif %}{% endfor %}
         </select>
       </label>
       <label>Role (its permissions) *
@@ -89,9 +90,16 @@
         <tr><th>Designation</th><th>Level</th><th>Approval limit (₹)</th><th>Active</th><th></th></tr>
         {% for d in list %}{% set formId = 'designation-' + d.id %}
         <tr>
-          <td><input form="{{ formId }}" type="text" name="title" value="{{ d.title }}" required minlength="2" maxlength="100" placeholder="e.g. Logistics Executive"></td>
-          <td><select form="{{ formId }}" name="level" required>{% for key, label in levels %}<option value="{{ key }}" {{ 'selected' if d.level == key else '' }}>{{ label }}</option>{% endfor %}</select></td>
-          <td><input form="{{ formId }}" type="number" name="approval_limit_inr" min="0" step="0.01" value="{{ d.approval_limit_inr if d.approval_limit_inr !== null else '' }}" placeholder="none"></td>
+          <td><input form="{{ formId }}" type="text" name="title" value="{{ d.title }}" required minlength="2" maxlength="100" placeholder="e.g. Logistics Executive" aria-label="Title"></td>
+          {# QA Round 8, R8-N10: the level and approval limit change only with "Manage approval limits" (MD, ED), never on one's own designation. #}
+          {% set limEditable = canLimits and not ((d.role_id | int) in (ownRoleIds or [])) %}
+          {% if limEditable %}
+          <td><select form="{{ formId }}" name="level" required aria-label="Designation level">{% for key, label in levels %}<option value="{{ key }}" {{ 'selected' if d.level == key else '' }}>{{ label }}</option>{% endfor %}</select></td>
+          <td><input form="{{ formId }}" type="number" name="approval_limit_inr" min="0" step="0.01" value="{{ d.approval_limit_inr if d.approval_limit_inr !== null else '' }}" placeholder="none" aria-label="Approval limit (INR)"></td>
+          {% else %}
+          <td><input form="{{ formId }}" type="hidden" name="level" value="{{ d.level }}">{{ levels[d.level] or d.level }}</td>
+          <td><input form="{{ formId }}" type="hidden" name="approval_limit_inr" value="{{ d.approval_limit_inr if d.approval_limit_inr !== null else '' }}">{{ (d.approval_limit_inr | money) if d.approval_limit_inr !== null else 'none' }}<br><small class="muted">{{ 'Only the MD or ED changes approval limits.' if not canLimits else 'Your own designation — another MD/ED changes it.' }}</small></td>
+          {% endif %}
           <td><input form="{{ formId }}" type="checkbox" name="is_active" value="1" {{ 'checked' if d.is_active == 1 else '' }} aria-label="Active"></td>
           <td><form id="{{ formId }}" method="post" action="/admin/designations/{{ d.id }}/update"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-success">Save</button></form></td>
         </tr>

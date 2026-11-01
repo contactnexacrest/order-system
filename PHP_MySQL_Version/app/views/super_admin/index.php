@@ -19,7 +19,7 @@
             <?= Csrf::field() ?>
             <input type="hidden" name="target_id" value="<?= (int) $sa['id'] ?>">
             <input type="hidden" name="is_super_admin" value="0">
-            <input type="text" name="reason" placeholder="Reason (min <?= $minReasonLength ?> chars)" required minlength="<?= $minReasonLength ?>" style="width:220px">
+            <input type="text" name="reason" placeholder="Reason (min <?= $minReasonLength ?> chars)" required minlength="<?= $minReasonLength ?>" style="width:220px" aria-label="Reason">
             <button type="submit" class="btn-sm btn-danger">Remove</button>
           </form>
           <?php else: ?>
@@ -39,7 +39,7 @@
         <?php endforeach; ?>
       </select>
       <input type="hidden" name="is_super_admin" value="1">
-      <input type="text" name="reason" placeholder="Reason (min <?= $minReasonLength ?> chars)" required minlength="<?= $minReasonLength ?>" style="width:220px">
+      <input type="text" name="reason" placeholder="Reason (min <?= $minReasonLength ?> chars)" required minlength="<?= $minReasonLength ?>" style="width:220px" aria-label="Reason">
       <button type="submit" class="btn-sm btn-success">Promote</button>
     </form>
   </div>
@@ -58,7 +58,7 @@
         <td>
           <form method="post" action="/super-admin/delegations/<?= (int) $d['id'] ?>/revoke" style="display:flex;gap:4px;align-items:center" onsubmit="return confirm('Revoke this Super Admin delegation immediately? They lose the unrestricted access right away.');">
             <?= Csrf::field() ?>
-            <input type="text" name="reason" placeholder="Reason (min <?= $minReasonLength ?> chars)" required minlength="<?= $minReasonLength ?>" style="width:180px">
+            <input type="text" name="reason" placeholder="Reason (min <?= $minReasonLength ?> chars)" required minlength="<?= $minReasonLength ?>" style="width:180px" aria-label="Reason">
             <button type="submit" class="btn-sm btn-danger">Revoke</button>
           </form>
         </td>
@@ -77,7 +77,7 @@
           <option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> — <?= htmlspecialchars($u['role_name'] ?? 'No role') ?></option>
         <?php endforeach; ?>
       </select>
-      <input type="text" name="reason" placeholder="Reason (min <?= $minReasonLength ?> chars) — e.g. covering approvals while MD is on leave" required minlength="<?= $minReasonLength ?>" style="width:320px">
+      <input type="text" name="reason" placeholder="Reason (min <?= $minReasonLength ?> chars) — e.g. covering approvals while MD is on leave" required minlength="<?= $minReasonLength ?>" style="width:320px" aria-label="Reason">
       <input type="datetime-local" name="expires_at" aria-label="Expiry" title="Leave blank for no fixed expiry — still revocable at any time">
       <button type="submit" class="btn-sm btn-success">Grant</button>
     </form>

@@ -20,7 +20,8 @@ async function run() {
 if (require.main === module) {
   run()
     .then((r) => {
-      console.log(`Daily digest: ${r.sent} sent, ${r.skipped} with nothing waiting or already sent.`);
+      // QA Round 8, R8-N02: say plainly when nothing could leave.
+      console.log(dailyDigestService.summary(r));
       console.log(`Associate reminders: ${r.associateReminders} sent.`);
       return db.pool.end();
     })

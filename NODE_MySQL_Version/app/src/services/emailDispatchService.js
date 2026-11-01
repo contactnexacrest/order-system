@@ -279,7 +279,7 @@ async function approveSend(emailLogId, approverUserId) {
   // D-221): whoever requested this send approves it only when one of their
   // roles is ticked in Admin → Self-approval rules.
   const self = row.requested_by !== null && row.requested_by !== undefined && Number(row.requested_by) === Number(approverUserId);
-  if (self && !(await require('./selfApprovalRules').allowed('email_send', approverUserId))) {
+  if (self && !(await require('./makerCheckerGuard').selfApprovalAllowed('email_send', approverUserId))) {
     throw new Error('You requested this send — a different person must approve it.');
   }
   await emailLogRepository.approve(emailLogId, approverUserId);

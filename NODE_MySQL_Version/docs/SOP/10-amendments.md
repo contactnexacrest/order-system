@@ -42,7 +42,10 @@ From **Amendments** on the order page, the full sequence is:
 
 2. **MD Approve** — sign-off from whoever holds the `approve_documents`
    permission is required before any amendment document exists at all;
-   **Reject** is available instead if it shouldn't proceed.
+   **Reject** is available instead if it shouldn't proceed. The person who
+   requested the amendment cannot MD-approve it themselves unless their role
+   is ticked in Admin → Self-approval rules (default MD and ED; logged as
+   AMENDMENT_SELF_APPROVED).
 3. **Generate Agreement Document** — produces the actual Payment Terms
    Amendment Agreement PDF, with a blank importer signature/designation/date
    section exactly like the AMD document discussed for Stage 2's Buyer PO —

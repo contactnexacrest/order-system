@@ -89,6 +89,13 @@ async function submit(req, res) {
   }
 
   const id = await clientIntakeRepository.create(data, req.ip || null);
+  // QA Round 8, R8-N04: a one-off link registers one company — the first registration through it takes it.
+  if (intro.invitation && !(await associateInvitationRepository.claim(Number(intro.invitation.id), id))) {
+    await db.execute('DELETE FROM client_intake_submissions WHERE id = :id', { id });
+    flash.set(req, 'error', associateIntakeService.LINK_USED);
+    res.redirect('/quotation-details');
+    return;
+  }
   const link = await issueCorrectionLink(id, data.email);
   if (intro.associate) {
     const code = await associateIntakeService.attach(id, intro.associate, intro.invitation, data.company_legal_name, data.country_of_destination, data.email, true, website || null);

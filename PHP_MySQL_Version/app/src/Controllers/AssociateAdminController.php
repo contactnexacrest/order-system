@@ -467,7 +467,7 @@ final class AssociateAdminController
                 AssociateService::linkClient($clientId, (int) $target['id'], 'md_change', null, date('Y-m-d'), (int) $user['id']);
                 AssociateService::notify($target, 'link_changed', "{$client['company_legal_name']} is now registered as your client (decided by the Managing Director: {$reason}).", $clientId, null, null, (int) $user['id']);
             } else {
-                Database::connection()->prepare('UPDATE clients SET associate_id = NULL, associate_registered_on = NULL, associate_locked_until = NULL, associate_source = NULL, associate_invitation_id = NULL WHERE id = :id')->execute(['id' => $clientId]);
+                Database::connection()->prepare('UPDATE clients SET associate_id = NULL, associate_registered_on = NULL, associate_locked_until = NULL, associate_source = NULL, associate_invitation_id = NULL, associate_client_number = NULL WHERE id = :id')->execute(['id' => $clientId]);
             }
             AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_CLIENT_UNLINKED', 'clients', $clientId, 'associate_id', (string) $a['id'], $target !== null ? (string) $target['id'] : null);
             AssociateService::notify($a, 'link_changed', "{$client['company_legal_name']} is no longer registered as your client" . ($target !== null ? '' : '') . ". Decided by the Managing Director. Reason: {$reason}", $clientId, null, null, (int) $user['id']);
@@ -531,7 +531,8 @@ final class AssociateAdminController
         }
         $id = AssociateBankRepository::request((int) $a['id'], $result, false, (int) self::user()['id']);
         AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_BANK_CHANGE_REQUESTED', 'associate_bank_accounts', $id, null, null, 'by staff');
-        AssociateService::notify($a, 'bank_changed', "NexaCrest recorded new bank details for you ({$result['bank_name']} ••••" . substr((string) $result['account_number'], -4) . ') on ' . date('j M Y') . '. They are used once checked. If you did not send these details, contact NexaCrest at once.', null, null, null, (int) self::user()['id']);
+        AssociateService::notify($a, 'bank_changed', "NexaCrest recorded new bank details for you ({$result['bank_name']} ••••" . substr((string) $result['account_number'], -4) . ') on ' . date('j M Y') . '. They are used once checked. '
+            . AssociateService::bankPaymentsSentence((int) $a['id']) . ' If you did not send these details, contact NexaCrest at once.', null, null, null, (int) self::user()['id']);
         Flash::set('success', 'Bank details recorded — two people must now check them.');
         self::back((int) $a['id'], 'bank');
     }
@@ -601,7 +602,9 @@ final class AssociateAdminController
             Flash::set('error', 'This request is no longer pending.');
         } else {
             AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_BANK_REJECTED', 'associate_bank_accounts', (int) $bank['id'], 'status', 'pending', 'rejected');
-            AssociateService::notify($a, 'bank_rejected', 'Your new bank details (' . AssociateBankRepository::masked($bank) . ") were not accepted: {$reason}. Payments keep going to your verified account.", null, null, null, (int) self::user()['id']);
+            // QA Round 8 (R8-N01): one full stop after the reason; the verified account named only when there is one.
+            AssociateService::notify($a, 'bank_rejected', 'Your new bank details (' . AssociateBankRepository::masked($bank) . ') were not accepted: ' . AssociateService::cleanReason($reason) . '. '
+                . AssociateService::bankPaymentsSentence((int) $a['id']), null, null, null, (int) self::user()['id']);
             Flash::set('success', 'Bank request rejected; the associate was told.');
         }
         self::back((int) $a['id'], 'bank');
@@ -753,21 +756,27 @@ final class AssociateAdminController
         $amount = filter_var($_POST['amount_inr'] ?? '', FILTER_VALIDATE_FLOAT);
         $reason = trim((string) ($_POST['reason'] ?? ''));
         $already = (float) Database::connection()->query('SELECT COALESCE(-SUM(amount_inr), 0) FROM incentive_payouts WHERE clawback_of_payout_id = ' . (int) $p['id'])->fetchColumn();
+        $leftMessage = static fn (float $left): string => 'Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹' . number_format($left, 2) . ').';
         if ($p['status'] !== 'paid' || (float) $p['amount_inr'] <= 0) {
             Flash::set('error', 'Only a paid commission can be clawed back.');
         } elseif ($amount === false || $amount <= 0 || $amount > (float) $p['paid_inr'] - $already + 0.005) {
-            Flash::set('error', 'Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹' . number_format((float) $p['paid_inr'] - $already, 2) . ').');
+            Flash::set('error', $leftMessage((float) $p['paid_inr'] - $already));
         } elseif (mb_strlen($reason) < 10 || mb_strlen($reason) > 300) {
             Flash::set('error', 'Say what was refunded to the buyer (10 to 300 characters) — the associate is shown it.');
         } else {
             $month = IncentiveService::incentiveMonth(date('Y-m-d'), IncentiveService::settings()['cutoff']);
-            $fc = (float) $p['amount_inr'] > 0 && $p['amount_fc'] !== null ? round((float) $p['amount_fc'] * $amount / (float) $p['amount_inr'], 2) : null;
             $order = \App\Repositories\OrderRepository::find((int) $p['order_id']);
-            $id = IncentiveRepository::addClawback($p, (float) $amount, $fc, $month, 'Claw-back of commission paid on order ' . ($order['order_reference'] ?? $p['order_id']) . " (payout no. {$p['id']}, ref " . ($p['paid_reference'] ?? '—') . "): {$reason}");
-            AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_CLAWBACK', 'incentive_payouts', $id, null, null, (string) $amount);
-            $a = AssociateRepository::find((int) $p['associate_id']);
-            AssociateService::notify($a, 'clawback', 'INR ' . number_format((float) $amount, 2) . ' of the commission paid on order ' . ($order['order_reference'] ?? '') . " will be deducted from your " . IncentiveService::monthLabel($month) . " payout: {$reason}", null, (int) $p['order_id'], null, (int) self::user()['id']);
-            Flash::set('success', 'Claw-back recorded; it is deducted from the associate\'s next payout.');
+            // QA Round 8, R8-N12: re-checked with the paid payout locked, so simultaneous claw-backs cannot exceed what was paid.
+            $saved = IncentiveRepository::addClawbackWithinPaid((int) $p['id'], (float) $amount, $month, 'Claw-back of commission paid on order ' . ($order['order_reference'] ?? $p['order_id']) . " (payout no. {$p['id']}, ref " . ($p['paid_reference'] ?? '—') . "): {$reason}");
+            if ($saved['id'] === null) {
+                Flash::set('error', $leftMessage(max(0.0, $saved['left'])));
+            } else {
+                $id = (int) $saved['id'];
+                AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_CLAWBACK', 'incentive_payouts', $id, null, null, (string) $amount);
+                $a = AssociateRepository::find((int) $p['associate_id']);
+                AssociateService::notify($a, 'clawback', 'INR ' . number_format((float) $amount, 2) . ' of the commission paid on order ' . ($order['order_reference'] ?? '') . " will be deducted from your " . IncentiveService::monthLabel($month) . " payout: {$reason}", null, (int) $p['order_id'], null, (int) self::user()['id']);
+                Flash::set('success', 'Claw-back recorded; it is deducted from the associate\'s next payout.');
+            }
         }
         self::back((int) $p['associate_id'], 'commission');
     }

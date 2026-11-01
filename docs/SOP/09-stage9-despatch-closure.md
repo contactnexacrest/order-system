@@ -38,7 +38,10 @@ done:
 - **13a · Generate COO Prep Sheet** (internal worksheet for the
   Certificate of Origin).
 - **13b · Record Original BLs Received from CHA** — how many original
-  Bill of Lading copies came back from the Customs House Agent.
+  Bill of Lading copies came back from the Customs House Agent: a whole
+  number from 1 to 10 (usually 3). A blank, 0, negative or larger number
+  is refused with "Enter how many original BL copies were received (1 to
+  10)." (QA Round 8).
 - **13c · Save BL Endorsement Details** — who to endorse to, BL/vessel/
   voyage, ports and date.
 - **13d · Generate / Print BL Endorsement** — the printable endorsement

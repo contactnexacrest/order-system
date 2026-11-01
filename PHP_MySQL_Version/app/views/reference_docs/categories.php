@@ -11,8 +11,8 @@
         <td>
           <form method="post" action="/reference-docs/categories/<?= (int) $c['id'] ?>/update" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <?= Csrf::field() ?>
-            <input type="text" name="name" value="<?= htmlspecialchars($c['name']) ?>" placeholder="e.g., CA Working Papers" required style="width:200px">
-            <select name="required_permission" style="width:280px">
+            <input type="text" name="name" value="<?= htmlspecialchars($c['name']) ?>" placeholder="e.g., CA Working Papers" required style="width:200px" aria-label="Name">
+            <select name="required_permission" style="width:280px" aria-label="Required permission">
               <option value="">— None (visible to everyone) —</option>
               <?php foreach ($permissions as $p): ?>
                 <option value="<?= htmlspecialchars($p['permission_key']) ?>" <?= $c['required_permission'] === $p['permission_key'] ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?> (<?= htmlspecialchars($p['permission_key']) ?>)</option>

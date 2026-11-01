@@ -9,7 +9,7 @@
       <tr><th></th><th>Permission</th><th>Category</th></tr>
       <?php foreach ($allPermissions as $p): ?>
       <tr>
-        <td><input type="checkbox" name="permission_ids[]" value="<?= (int) $p['id'] ?>" <?= in_array((int) $p['id'], $enabledIds, true) ? 'checked' : '' ?>></td>
+        <td><input type="checkbox" name="permission_ids[]" value="<?= (int) $p['id'] ?>" <?= in_array((int) $p['id'], $enabledIds, true) ? 'checked' : '' ?> aria-label="Grant this permission"></td>
         <td><?= htmlspecialchars($p['name']) ?> <span class="muted small">(<?= htmlspecialchars($p['permission_key']) ?>)</span></td>
         <td><?= htmlspecialchars($p['category'] ?? '—') ?></td>
       </tr>

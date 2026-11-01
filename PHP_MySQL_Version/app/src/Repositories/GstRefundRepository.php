@@ -66,6 +66,38 @@ final class GstRefundRepository
         )->execute(['amt' => round($amount, 2), 'note' => $note, 'id' => $claimId]);
     }
 
+    /**
+     * QA Round 8, R8-N11: a credit (and any amount refused with it) is saved
+     * only if it still fits what is open on the claim — checked with the claim
+     * row locked, so simultaneous saves (a double click, two people) cannot
+     * credit more than the claim.
+     *
+     * @return array{id: ?int, open: float} id null when it no longer fits (open = what was still open)
+     */
+    public static function addCreditWithinClaim(int $claimId, float $amount, float $refused, string $refusedNote, string $creditedOn, string $bankReference, string $part, int $userId): array
+    {
+        return Database::transaction(static function () use ($claimId, $amount, $refused, $refusedNote, $creditedOn, $bankReference, $part, $userId): array {
+            $pdo = Database::connection();
+            $stmt = $pdo->prepare('SELECT amount_claimed, amount_refused FROM gst_refund_claims WHERE id = :id FOR UPDATE');
+            $stmt->execute(['id' => $claimId]);
+            $claim = $stmt->fetch();
+            if (!$claim) {
+                return ['id' => null, 'open' => 0.0];
+            }
+            $sum = $pdo->prepare('SELECT COALESCE(SUM(amount), 0) FROM gst_refund_credits WHERE claim_id = :c');
+            $sum->execute(['c' => $claimId]);
+            $open = round((float) $claim['amount_claimed'] - (float) $sum->fetchColumn() - (float) $claim['amount_refused'], 2);
+            if (round($amount + $refused, 2) > $open + 0.005) {
+                return ['id' => null, 'open' => $open];
+            }
+            $id = self::addCredit($claimId, $amount, $creditedOn, $bankReference, $part, $userId);
+            if ($refused > 0) {
+                self::addRefused($claimId, $refused, $refusedNote);
+            }
+            return ['id' => $id, 'open' => $open];
+        });
+    }
+
     public static function addCredit(int $claimId, float $amount, string $creditedOn, string $bankReference, string $part, int $userId): int
     {
         $pdo = Database::connection();

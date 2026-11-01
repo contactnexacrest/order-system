@@ -117,9 +117,9 @@
     </div>
     <form class="chat-post-form" method="post" action="/client/orders/<?= (int) $order['id'] ?>/comments#order-updates" enctype="multipart/form-data">
       <?= Csrf::field() ?>
-      <textarea name="body" placeholder="Write a message…"><?= htmlspecialchars($oldCommentBody ?? '') ?></textarea>
+      <textarea name="body" placeholder="Write a message…" aria-label="Write a message"><?= htmlspecialchars($oldCommentBody ?? '') ?></textarea>
       <div class="chat-post-form-row">
-        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf">
+        <input type="file" name="attachments[]" multiple accept="image/*,video/*,.pdf" aria-label="Attachments">
         <button type="submit" class="btn-sm" data-loading-text="Sending…">Send</button>
       </div>
     </form>
@@ -208,7 +208,7 @@
         <?php endforeach; ?>
         <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/complaints/<?= (int) $c['id'] ?>/replies" style="margin-top:0.5rem">
           <?= Csrf::field() ?>
-          <textarea name="body" rows="2" placeholder="Reply…" required></textarea>
+          <textarea name="body" rows="2" placeholder="Reply…" required aria-label="Reply"></textarea>
           <button type="submit" class="btn-sm">Send</button>
         </form>
       </div>

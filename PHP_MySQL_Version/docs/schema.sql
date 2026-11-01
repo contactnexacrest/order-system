@@ -4973,3 +4973,8 @@ CREATE TABLE IF NOT EXISTS self_approval_rules (
   CONSTRAINT fk_self_approval_rules_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+
+-- QA Round 8 (R8-N05, AS-17): the client's number for its associate, fixed when linked (docs/migrations/2026-11-02g-qa-r8-associates.sql).
+SET @c := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'associate_client_number');
+SET @s := IF(@c = 0, 'ALTER TABLE clients ADD COLUMN associate_client_number INT NULL', 'SELECT 1');
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;

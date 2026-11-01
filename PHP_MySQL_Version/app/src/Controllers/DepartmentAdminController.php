@@ -35,8 +35,19 @@ final class DepartmentAdminController
             'byDepartment' => $byDepartment,
             'levels' => DepartmentRepository::LEVELS,
             'roles' => RoleRepository::all(),
+            'canLimits' => self::canChangeLimits(AuthService::currentUser() ?? []),
+            'ownRoleIds' => \App\Services\GrantGuard::ownRoleIds(AuthService::currentUser() ?? []),
         ], 'layout/base');
     }
+
+    /** QA Round 8, R8-N10: approval limits and the 'director' level are money controls — MD and ED (manage_approval_limits) only. */
+    public static function canChangeLimits(array $user): bool
+    {
+        return $user !== [] && \App\Services\PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'manage_approval_limits');
+    }
+
+    public const LIMITS_REFUSED = "Only the MD or ED can change an approval limit or make a designation 'director'.";
+    public const OWN_LIMIT_REFUSED = 'You cannot change the approval limit of a designation you hold yourself.';
 
     public function createDepartment(array $params): void
     {
@@ -99,6 +110,7 @@ final class DepartmentAdminController
             $dept === null => 'Choose the department.',
             mb_strlen($title) < 2 || mb_strlen($title) > 100 => 'Enter the designation (2 to 100 characters), e.g. Quality Manager.',
             !array_key_exists($level, DepartmentRepository::LEVELS) => 'Choose the level.',
+            $level === 'director' && !self::canChangeLimits($user) => self::LIMITS_REFUSED,
             DepartmentRepository::designationTitleTaken($departmentId, $title) => "\"{$title}\" already exists in {$dept['name']}.",
             $roleChoice === 'new' && RoleRepository::findByName($title) !== null => "A role named \"{$title}\" already exists — choose it from the list instead of a new one.",
             $roleChoice !== 'new' && RoleRepository::find((int) $roleChoice) === null => 'Choose the role.',
@@ -131,7 +143,12 @@ final class DepartmentAdminController
         $title = Input::scalarString($_POST['title'] ?? '');
         $level = (string) ($_POST['level'] ?? '');
         $limitRaw = trim((string) ($_POST['approval_limit_inr'] ?? ''));
+        $oldLimit = $d['approval_limit_inr'] !== null ? round((float) $d['approval_limit_inr'], 2) : null;
+        $newLimit = $limitRaw !== '' && is_numeric($limitRaw) ? round((float) $limitRaw, 2) : null;
+        $limitChanged = $level !== $d['level'] || $oldLimit !== $newLimit;
         $error = match (true) {
+            $limitChanged && !self::canChangeLimits($user) => self::LIMITS_REFUSED,
+            $limitChanged && in_array((int) $d['role_id'], \App\Services\GrantGuard::ownRoleIds($user), true) => self::OWN_LIMIT_REFUSED,
             mb_strlen($title) < 2 || mb_strlen($title) > 100 => 'Enter the designation (2 to 100 characters).',
             !array_key_exists($level, DepartmentRepository::LEVELS) => 'Choose the level.',
             DepartmentRepository::designationTitleTaken((int) $d['department_id'], $title, (int) $d['id']) => "\"{$title}\" already exists in {$d['department_name']}.",
@@ -146,6 +163,10 @@ final class DepartmentAdminController
         DepartmentRepository::updateDesignation((int) $d['id'], $title, $level, !empty($_POST['is_active']), $limitRaw === '' ? null : round((float) $limitRaw, 2));
         AuditLogRepository::log((int) $user['id'], 'DESIGNATION_UPDATED', 'department_designations', (int) $d['id'], null,
             "{$d['title']} · {$d['level']} · limit " . ($d['approval_limit_inr'] ?? '—'), "{$title} · {$level} · limit " . ($limitRaw === '' ? '—' : $limitRaw));
+        if ($limitChanged) {
+            AuditLogRepository::log((int) $user['id'], 'APPROVAL_LIMIT_CHANGED', 'department_designations', (int) $d['id'], 'approval_limit_inr',
+                "{$d['level']} · " . ($oldLimit === null ? 'no limit' : number_format($oldLimit, 2, '.', '')), "{$level} · " . ($newLimit === null ? 'no limit' : number_format($newLimit, 2, '.', '')));
+        }
         Flash::set('success', "\"{$title}\" saved.");
         header(self::BACK);
     }

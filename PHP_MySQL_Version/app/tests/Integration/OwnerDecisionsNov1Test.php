@@ -295,8 +295,13 @@ final class OwnerDecisionsNov1Test extends DbTestCase
         self::assertSame("Good morning Asha,\n\nThis is what waits on you today.\n\nTasks (My tasks):\n- A\n\nDocuments to review (My Reviews):\n- B\n\nOpen the app to act on them. You get this e-mail once a day, only when something waits on you.\n", $mail['body']);
 
         $date = '2099-01-0' . random_int(1, 9);
-        \App\Services\DailyDigestService::run($date);
-        \App\Services\DailyDigestService::run($date); // a second run the same day sends nothing new
+        \App\Services\DailyDigestService::setSender(static fn (): bool => true);
+        try {
+            \App\Services\DailyDigestService::run($date);
+            \App\Services\DailyDigestService::run($date); // a second run the same day sends nothing new
+        } finally {
+            \App\Services\DailyDigestService::setSender(null);
+        }
         self::assertSame(1, (int) $pdo->query("SELECT COUNT(*) FROM daily_digest_log WHERE user_id = {$person} AND digest_date = '{$date}'")->fetchColumn());
         self::assertSame(0, (int) $pdo->query("SELECT COUNT(*) FROM daily_digest_log WHERE user_id = {$idle}")->fetchColumn());
         self::assertGreaterThan(0, $pr);

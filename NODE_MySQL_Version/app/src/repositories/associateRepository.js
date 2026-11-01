@@ -142,9 +142,30 @@ async function clients(associateId) {
 }
 
 async function linkClient(clientId, associateId, registeredOn) {
-  await db.execute('UPDATE clients SET associate_id = :a, associate_registered_on = :d WHERE id = :id', {
-    a: associateId, d: associateId === null ? null : registeredOn, id: clientId,
+  await db.transaction(async (conn) => {
+    const number = associateId === null ? null : await clientNumberForLink(clientId, associateId, conn);
+    await conn.execute('UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_client_number = :n WHERE id = :id', {
+      a: associateId, d: associateId === null ? null : registeredOn, n: number, id: clientId,
+    });
   });
+}
+
+/**
+ * QA Round 8 (R8-N05, owner decision AS-17): the client's number for this
+ * associate — 1 for the first client they brought, 2 for the second, in the
+ * order they were linked. A client already numbered for this associate keeps
+ * its number for ever; a client moving to a new associate gets that
+ * associate's next number. Pass a transaction connection: the associate's
+ * row is locked so two links at once never share a number.
+ */
+async function clientNumberForLink(clientId, associateId, conn) {
+  await conn.query('SELECT id FROM associates WHERE id = :a FOR UPDATE', { a: associateId });
+  const c = await conn.queryOne('SELECT associate_id, associate_client_number FROM clients WHERE id = :id FOR UPDATE', { id: clientId });
+  if (c && Number(c.associate_id || 0) === Number(associateId) && c.associate_client_number !== null) {
+    return Number(c.associate_client_number);
+  }
+  const next = await conn.queryOne('SELECT COALESCE(MAX(associate_client_number), 0) + 1 AS n FROM clients WHERE associate_id = :a AND id <> :id', { a: associateId, id: clientId });
+  return Number(next.n);
 }
 
 /** Clients not yet linked to any associate, for the link picker. */
@@ -153,26 +174,24 @@ async function unlinkedClients() {
 }
 
 /**
- * The associate's commission order number for this client: the same
- * number for every order of the client's first 10 days (one "order" under
- * the agreement), otherwise one more than the clients already counted for
- * this associate.
+ * The associate's client number for this client (QA Round 8, R8-N05): the
+ * number stored on the client when it was linked. A client linked before
+ * numbering existed is numbered now, as the associate's next.
  */
 async function orderNumberForClient(associateId, clientId) {
-  const existing = await db.queryOne(
-    `SELECT oi.associate_order_number FROM order_incentives oi JOIN orders o ON o.id = oi.order_id
-     WHERE oi.associate_id = :a AND o.client_id = :c AND oi.associate_order_number IS NOT NULL LIMIT 1`,
-    { a: associateId, c: clientId }
-  );
-  if (existing) {
-    return Number(existing.associate_order_number);
+  const c = await db.queryOne('SELECT associate_id, associate_client_number FROM clients WHERE id = :id', { id: clientId });
+  if (c && Number(c.associate_id || 0) === Number(associateId) && c.associate_client_number !== null) {
+    return Number(c.associate_client_number);
   }
-  const row = await db.queryOne(
-    `SELECT COUNT(DISTINCT o.client_id) AS n FROM order_incentives oi JOIN orders o ON o.id = oi.order_id
-     WHERE oi.associate_id = :a AND oi.associate_order_number IS NOT NULL`,
-    { a: associateId }
-  );
-  return Number(row.n) + 1;
+  if (!c || Number(c.associate_id || 0) !== Number(associateId)) {
+    const next = await db.queryOne('SELECT COALESCE(MAX(associate_client_number), 0) + 1 AS n FROM clients WHERE associate_id = :a', { a: associateId });
+    return Number(next.n);
+  }
+  return db.transaction(async (conn) => {
+    const number = await clientNumberForLink(clientId, associateId, conn);
+    await conn.execute('UPDATE clients SET associate_client_number = :n WHERE id = :id', { n: number, id: clientId });
+    return number;
+  });
 }
 
 /** The signed agreement (owner decision 2026-10-30): a file_store row, replaced by a newer upload. */
@@ -211,5 +230,5 @@ async function lineForClient(clientId, permissions) {
 module.exports = {
   lineForClient,
   TIERS, FIELDS, STATUSES, all, find, create, update, setAgreementFile, isAgreementFile, rateFor, rateWithSource, globalLadder,
-  findByEmail, findByCode, setFields, statusCounts, clients, linkClient, unlinkedClients, orderNumberForClient,
+  findByEmail, findByCode, setFields, statusCounts, clients, linkClient, clientNumberForLink, unlinkedClients, orderNumberForClient,
 };

@@ -50,6 +50,16 @@ async function render(req, res, view, data = {}) {
   res.renderView(`associate_portal/${view}`, { ...(await layoutData(req, a)), ...data }, LAYOUT);
 }
 
+/** Q-R8-2: refuses a change by a suspended associate; true when refused (the redirect is sent). */
+function refuseWhenSuspended(req, res, a, back) {
+  if (!associatePortalService.isSuspended(a)) {
+    return false;
+  }
+  flash.set(req, 'error', associatePortalService.SUSPENDED_REFUSED);
+  res.redirect(back);
+  return true;
+}
+
 function notFound(res, text) {
   res.status(404).send(text);
 }
@@ -167,6 +177,9 @@ async function clients(req, res) {
 
 async function createInvitation(req, res) {
   const a = await me(req);
+  if (refuseWhenSuspended(req, res, a, '/associate/clients')) {
+    return;
+  }
   const company = String((req.body || {}).company_name || '').trim();
   const country = String((req.body || {}).country || '').trim();
   if (a.status !== 'active') {
@@ -184,6 +197,9 @@ async function createInvitation(req, res) {
 
 async function cancelInvitation(req, res) {
   const a = await me(req);
+  if (refuseWhenSuspended(req, res, a, '/associate/clients')) {
+    return;
+  }
   const inv = await associateInvitationRepository.find(parseInt(req.params.id, 10));
   if (!inv || Number(inv.associate_id) !== Number(a.id)) {
     notFound(res, 'Invitation not found.');
@@ -202,6 +218,9 @@ async function cancelInvitation(req, res) {
 /** The associate may choose the readable part of their code once (part 4.4-A2). */
 async function chooseCode(req, res) {
   const a = await me(req);
+  if (refuseWhenSuspended(req, res, a, '/associate/clients')) {
+    return;
+  }
   const part = associateCodeService.readablePart(String((req.body || {}).readable || ''));
   const chosen = (await associateEventRepository.forAssociate(Number(a.id))).some((e) => e.event === 'code_chosen');
   if (chosen) {
@@ -331,6 +350,9 @@ async function profile(req, res) {
 
 async function saveProfile(req, res) {
   const a = await me(req);
+  if (refuseWhenSuspended(req, res, a, '/associate/profile')) {
+    return;
+  }
   const body = req.body || {};
   const phone = String(body.phone || '').trim();
   const address = String(body.address || '').trim();
@@ -352,6 +374,9 @@ async function saveProfile(req, res) {
 
 async function uploadDocument(req, res) {
   const a = await me(req);
+  if (refuseWhenSuspended(req, res, a, '/associate/profile')) {
+    return;
+  }
   const kind = String((req.body || {}).kind || '');
   const KINDS = associateDocumentRepository.KINDS;
   if (!associateDocumentRepository.ASSOCIATE_KINDS.includes(kind) || kind === 'invoice') {
@@ -376,6 +401,9 @@ async function uploadDocument(req, res) {
 /** Bank details: a request; the verified account keeps being used until Accounts verify the new one (AS-7). */
 async function requestBank(req, res) {
   const a = await me(req);
+  if (refuseWhenSuspended(req, res, a, '/associate/profile')) {
+    return;
+  }
   const result = validateBank(a, req.body || {});
   if (typeof result === 'string') {
     flash.set(req, 'error', result);
@@ -391,11 +419,11 @@ async function requestBank(req, res) {
   }
   const id = await associateBankRepository.request(Number(a.id), result, true, null);
   await auditLogRepository.log(null, 'ASSOCIATE_BANK_CHANGE_REQUESTED', 'associate_bank_accounts', id, null, null, 'by associate');
-  await associateService.notify(a, 'bank_changed', `A change of your bank details (to ${result.bank_name} ••••${result.account_number.slice(-4)}) was received on ${associateService.jMY()}. Your payments keep going to your verified account until NexaCrest has checked the new one. If you did not ask for this, contact NexaCrest at once.`);
+  await associateService.notify(a, 'bank_changed', `A change of your bank details (to ${result.bank_name} ••••${result.account_number.slice(-4)}) was received on ${associateService.jMY()}. It is used once NexaCrest has checked it. ${await associateService.bankPaymentsSentence(Number(a.id))} If you did not ask for this, contact NexaCrest at once.`);
   for (const uid of await permissionRepository.usersWithPermission('manage_associate_bank')) {
     await notificationRepository.create(uid, null, 'associate_bank_change', null, `Associate ${a.name} asked to change their bank details — two people must verify it.`);
   }
-  flash.set(req, 'success', 'Bank change received. It is used once NexaCrest has verified it; until then payments go to your verified account.');
+  flash.set(req, 'success', `Bank change received. It is used once NexaCrest has verified it. ${await associateService.bankPaymentsSentence(Number(a.id))}`);
   res.redirect('/associate/profile');
 }
 

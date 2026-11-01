@@ -19,7 +19,7 @@
           <div class="card-nested">
             <div class="field-grid">
               <label class="full">Description *
-                <input type="text" name="description[<?= $i ?>]" value="<?= htmlspecialchars($l['description']) ?>" placeholder="e.g. Granite Memorial Headstone">
+                <input type="text" name="description[<?= $i ?>]" required value="<?= htmlspecialchars($l['description']) ?>" placeholder="e.g. Granite Memorial Headstone">
               </label>
               <label>Dimensions
                 <input type="text" name="dimensions[<?= $i ?>]" value="<?= htmlspecialchars($l['dimensions'] ?? '') ?>" placeholder="e.g. 24x12x3 inches">
@@ -40,7 +40,7 @@
                 </select>
               </label>
               <label>Unit Price *
-                <input type="text" name="unit_price[<?= $i ?>]" value="<?= htmlspecialchars((string) ($l['unit_price'] ?? '')) ?>" placeholder="e.g. 45.00">
+                <input type="text" name="unit_price[<?= $i ?>]" required value="<?= htmlspecialchars((string) ($l['unit_price'] ?? '')) ?>" placeholder="e.g. 45.00">
               </label>
               <label>HS Code *
                 <input type="text" name="hs_code[<?= $i ?>]" value="<?= htmlspecialchars($l['hs_code'] ?? '') ?>" list="hs_code_list" placeholder="Type to search…" required>
@@ -61,7 +61,7 @@
       <h2>Reject Instead</h2>
       <form method="post" action="/reorder-requests/<?= (int) $request['id'] ?>/reject" onsubmit="return confirm('Reject this reorder request?');">
         <?= Csrf::field() ?>
-        <textarea name="reason" rows="2" placeholder="Reason (required)" required minlength="10"></textarea>
+        <textarea name="reason" rows="2" placeholder="Reason (required)" required minlength="10" aria-label="Reason"></textarea>
         <button type="submit" class="btn-danger btn-sm">Reject</button>
       </form>
     </div>

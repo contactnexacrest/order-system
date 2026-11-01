@@ -241,6 +241,10 @@ final class PurchasingController
             return;
         }
         AuditLogRepository::log((int) $user['id'], 'PURCHASE_APPROVED', 'purchase_requirements', (int) $r['id'], null, null, "{$r['awarded_supplier_name']} ₹" . number_format($value, 2));
+        if ((int) $r['awarded_by'] === (int) $user['id']) {
+            // QA Round 8, R8-N09: an award approved by the person who made it.
+            AuditLogRepository::log((int) $user['id'], 'PURCHASE_AWARD_SELF_APPROVED', 'purchase_requirements', (int) $r['id'], null, null, null, 'Approved a purchase award they made themselves (Admin → Self-approval rules).');
+        }
         Flash::set('success', "Purchase PR-{$r['id']} approved: {$r['awarded_supplier_name']}, ₹" . number_format($value, 2) . '.');
         self::back((int) $r['id']);
     }

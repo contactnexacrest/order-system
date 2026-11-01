@@ -52,6 +52,35 @@ async function addRefused(claimId, amount, note) {
   );
 }
 
+/**
+ * QA Round 8, R8-N11: a credit (and any amount refused with it) is saved
+ * only if it still fits what is open on the claim — checked with the claim
+ * row locked, so simultaneous saves (a double click, two people) cannot
+ * credit more than the claim.
+ * @returns {Promise<{id: number|null, open: number}>} id null when it no longer fits
+ */
+async function addCreditWithinClaim(claimId, amount, refused, refusedNote, creditedOn, bankReference, part, userId) {
+  return db.transaction(async (conn) => {
+    const claim = await conn.queryOne('SELECT amount_claimed, amount_refused FROM gst_refund_claims WHERE id = :id FOR UPDATE', { id: claimId });
+    if (!claim) return { id: null, open: 0 };
+    const sum = await conn.queryOne('SELECT COALESCE(SUM(amount), 0) AS s FROM gst_refund_credits WHERE claim_id = :c', { c: claimId });
+    const open = r2(Number(claim.amount_claimed) - Number(sum.s) - Number(claim.amount_refused));
+    if (r2(Number(amount) + Number(refused)) > open + 0.005) return { id: null, open };
+    const result = await conn.execute(
+      'INSERT INTO gst_refund_credits (claim_id, amount, credited_on, bank_reference, part, recorded_by) VALUES (:c, :amt, :d, :ref, :part, :u)',
+      { c: claimId, amt: r2(amount), d: creditedOn, ref: String(bankReference).trim(), part, u: userId }
+    );
+    if (Number(refused) > 0) {
+      await conn.execute(
+        `UPDATE gst_refund_claims SET amount_refused = amount_refused + :amt,
+                refused_note = TRIM(BOTH ' · ' FROM CONCAT(COALESCE(refused_note, ''), ' · ', :note)) WHERE id = :id`,
+        { amt: r2(refused), note: refusedNote, id: claimId }
+      );
+    }
+    return { id: result.insertId, open };
+  });
+}
+
 async function addCredit(claimId, amount, creditedOn, bankReference, part, userId) {
   const result = await db.execute(
     'INSERT INTO gst_refund_credits (claim_id, amount, credited_on, bank_reference, part, recorded_by) VALUES (:c, :amt, :d, :ref, :part, :u)',
@@ -119,6 +148,7 @@ async function creditedBetween(from, to) {
 }
 
 module.exports = {
+  addCreditWithinClaim,
   PARTS, claims, findClaim, arnTaken, createClaim, addRefused, addCredit, creditsFor, findCredit, deleteCredit,
   creditsForZohoSync, setCreditZohoJournal, gstOnBills, gstOnOrderBills, creditedBetween,
 };

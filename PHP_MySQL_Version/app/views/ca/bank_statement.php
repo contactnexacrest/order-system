@@ -16,7 +16,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caBankUser['id'],
     <p class="muted small">CSV only, with a header row. Most bank export formats work — the importer looks for Date, Description/Narration, Reference, and either separate Credit/Debit columns or a single Amount + Type column. Uploading the same date range twice never creates duplicate lines.</p>
     <form method="post" action="/ca/bank-statement/upload" enctype="multipart/form-data">
       <?= \App\Helpers\Csrf::field() ?>
-      <input type="file" name="statement" accept=".csv" required>
+      <input type="file" name="statement" accept=".csv" required aria-label="Statement">
       <button type="submit" class="btn-sm">Upload</button>
     </form>
   </div>
@@ -72,7 +72,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caBankUser['id'],
               <?php if ($l['credit_amount'] !== null): ?>
                 <form method="post" action="/ca/bank-statement/<?= (int) $l['id'] ?>/match-revenue" style="display:flex; gap:4px;">
                   <?= \App\Helpers\Csrf::field() ?>
-                  <select name="order_leg" onchange="this.form.order_id.value=this.value.split('|')[0]; this.form.leg.value=this.value.split('|')[1];" style="max-width:220px;">
+                  <select name="order_leg" onchange="this.form.order_id.value=this.value.split('|')[0]; this.form.leg.value=this.value.split('|')[1];" style="max-width:220px;" aria-label="Order leg">
                     <option value="">Match to revenue leg&hellip;</option>
                     <?php foreach ($unmatchedRevenueLegs as $leg): ?>
                       <?php $legLocked = \App\Repositories\CaFyLockRepository::lockMessageForDate($leg['cleared_at']) !== null; ?>
@@ -89,7 +89,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caBankUser['id'],
               <?php if ($l['debit_amount'] !== null): ?>
                 <form method="post" action="/ca/bank-statement/<?= (int) $l['id'] ?>/match-expense" style="display:flex; gap:4px; margin-top:4px;">
                   <?= \App\Helpers\Csrf::field() ?>
-                  <select name="expense_id" style="max-width:220px;">
+                  <select name="expense_id" style="max-width:220px;" aria-label="Expense">
                     <option value="">Match to expense&hellip;</option>
                     <?php foreach ($unmatchedExpenses as $exp): ?>
                       <?php $expLocked = \App\Repositories\CaFyLockRepository::lockMessageForDate($exp['expense_date']) !== null; ?>

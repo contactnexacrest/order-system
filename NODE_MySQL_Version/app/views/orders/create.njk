@@ -23,6 +23,7 @@
       <div class="field-grid">
         <label>Incoterm *
           <select name="incoterm_id" id="incoterm-select" required onchange="updateFreightFieldsAvailability(true)">
+            <option value="">Choose…</option>
             {% for i in incoterms %}
               <option value="{{ i.id }}" {{ 'selected' if old.incoterm_id and i.id == old.incoterm_id else '' }} data-code="{{ i.code }}">{{ i.code }}</option>
             {% endfor %}
@@ -44,6 +45,7 @@
         </label>
         <label>Payment Preset *
           <select name="payment_preset_id" required>
+            <option value="">Choose…</option>
             {% for p in paymentPresets %}
               <option value="{{ p.id }}" {{ 'selected' if old.payment_preset_id and p.id == old.payment_preset_id else '' }}>{{ p.preset_name }} ({{ p.advance_pct }}% adv / {{ p.balance_pct }}% bal)</option>
             {% endfor %}
@@ -130,7 +132,7 @@
       <div id="product-rows">
         {% for desc in oldDescriptionsList %}
         <div class="product-row">
-          <label>Description *<input type="text" name="product_description[]" value="{{ desc or '' }}" placeholder="e.g. Granite Memorial Headstone"></label>
+          <label>Description *<input type="text" name="product_description[]" required value="{{ desc or '' }}" placeholder="e.g. Granite Memorial Headstone"></label>
           <label>Dimensions<input type="text" name="product_dimensions[]" value="{{ old.product_dimensions[loop.index0] or '' if old.product_dimensions else '' }}" placeholder="e.g. 24x12x3 inches"></label>
           <label>Finish
             {% set finishVal = (old.product_finish[loop.index0] or '') if old.product_finish else '' %}
@@ -172,7 +174,7 @@
 
     <fieldset>
       <legend>Special Requirements/Instructions</legend>
-      <textarea name="special_requirements" rows="2" placeholder="e.g. Fragile items — extra cushioning required in crate">{{ old.special_requirements or '' }}</textarea>
+      <textarea name="special_requirements" rows="2" placeholder="e.g. Fragile items — extra cushioning required in crate" aria-label="Special requirements">{{ old.special_requirements or '' }}</textarea>
     </fieldset>
 
     <fieldset>

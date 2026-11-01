@@ -56,7 +56,7 @@
             <summary class="muted small">Force password reset</summary>
             <form method="post" action="/users/<?= (int) $u['id'] ?>/force-reset-password" onsubmit="return confirmForceReset(this, '<?= htmlspecialchars(addslashes($u['name'])) ?>');">
               <?= Csrf::field() ?>
-              <textarea class="reset-reason" name="reason" rows="2" placeholder="Reason for this reset *" required></textarea>
+              <textarea class="reset-reason" name="reason" rows="2" placeholder="Reason for this reset *" required aria-label="Reason for this reset"></textarea>
               <button type="submit" class="btn-sm btn-danger">Force Reset</button>
             </form>
           </details>
