@@ -186,4 +186,37 @@ describe('Owner decisions of 1 Nov 2026', () => {
     await orderAssignmentService.removeAssignee(orderId, creator.userId, md.userId);
     expect(await ids()).toEqual([md.userId]);
   });
+
+  it('C-7b: the daily digest lists what waits on each person, once a day', async () => {
+    const dailyDigestService = require('../../src/services/dailyDigestService');
+    const purchasingRepository = require('../../src/repositories/purchasingRepository');
+    const departmentTaskRepository = require('../../src/repositories/departmentTaskRepository');
+    const documentReviewRepository = require('../../src/repositories/documentReviewRepository');
+    const orderRepository = require('../../src/repositories/orderRepository');
+    const person = await staff('Procurement Manager');
+    const idle = await staff('Viewer / Auditor');
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [person.userId]);
+    const order = await orderRepository.find(orderId);
+    await purchasingRepository.create(orderId, null, 'Granite slabs', null, 10, 'sqm', todayIst(), person.userId, null);
+    const proc = Number((await db.queryOne("SELECT id FROM departments WHERE code = 'PROC'")).id);
+    await departmentTaskRepository.setOwner(orderId, proc, person.userId, person.userId);
+    const docType = await db.queryOne("SELECT id, name FROM document_types WHERE code = 'QT'");
+    const docId = (await db.execute("INSERT INTO documents (order_id, document_type_id, document_reference, status) VALUES (:o, :t, 'TEST-QT-DIGEST-1', 'draft')", { o: orderId, t: docType.id })).insertId;
+    await documentReviewRepository.assign(docId, person.userId);
+
+    const items = await dailyDigestService.itemsFor(person.userId);
+    expect(items).toContainEqual({ kind: 'review', text: `TEST-QT-DIGEST-1 (${docType.name}) — waiting for your review` });
+    expect(items.filter((i) => i.kind === 'task' && i.text.startsWith(`${order.order_reference} — `))).toHaveLength(1);
+    expect(await dailyDigestService.itemsFor(idle.userId)).toEqual([]);
+
+    const mail = dailyDigestService.compose('Asha', [{ kind: 'task', text: 'A' }, { kind: 'review', text: 'B' }], '2026-11-02');
+    expect(mail.subject).toBe('NexaCrest — your day 2 Nov 2026: 1 task, 1 review');
+    expect(mail.body).toBe('Good morning Asha,\n\nThis is what waits on you today.\n\nTasks (My tasks):\n- A\n\nDocuments to review (My Reviews):\n- B\n\nOpen the app to act on them. You get this e-mail once a day, only when something waits on you.\n');
+
+    const date = `2099-01-0${1 + Math.floor(Math.random() * 9)}`;
+    await dailyDigestService.run(date);
+    await dailyDigestService.run(date);
+    expect(Number((await db.queryOne('SELECT COUNT(*) AS n FROM daily_digest_log WHERE user_id = :u AND digest_date = :d', { u: person.userId, d: date })).n)).toBe(1);
+    expect(Number((await db.queryOne('SELECT COUNT(*) AS n FROM daily_digest_log WHERE user_id = :u', { u: idle.userId })).n)).toBe(0);
+  });
 });

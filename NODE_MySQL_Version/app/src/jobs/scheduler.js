@@ -5,6 +5,7 @@ const checkAlerts = require('./checkAlerts');
 const dispatchDeferredEmails = require('./dispatchDeferredEmails');
 const autoConfirmOcAcknowledgments = require('./autoConfirmOcAcknowledgments');
 const zohoSync = require('./zohoSync');
+const dailyDigest = require('./dailyDigest');
 const logger = require('../helpers/logger');
 
 /**
@@ -67,6 +68,13 @@ function start() {
     cron.schedule('*/15 * * * *', () => {
       autoConfirmOcAcknowledgments.run().catch((e) => logger.error('scheduler:autoConfirmOcAcknowledgments', e));
     })
+  );
+
+  // Daily at 08:15 IST — owner decision 1 Nov 2026 (C-7b): the per-person digest of what waits on each person.
+  tasks.push(
+    cron.schedule('15 8 * * *', () => {
+      dailyDigest.run().catch((e) => logger.error('scheduler:dailyDigest', e));
+    }, { timezone: 'Asia/Kolkata' })
   );
 
   // Hourly — CA / Accounting module (Phase 3): pushes any settlement leg

@@ -268,4 +268,37 @@ final class OwnerDecisionsNov1Test extends DbTestCase
         \App\Services\OrderAssignmentService::removeAssignee($orderId, $creator, $md);
         self::assertSame([$md], array_map(static fn (array $a): int => (int) $a['user_id'], \App\Repositories\OrderAssigneeRepository::forOrder($orderId)));
     }
+
+    /** C-7b (O-7): one digest a day per person, only when something waits on them. */
+    public function testTheDailyDigestListsWhatWaitsOnEachPersonOncePerDay(): void
+    {
+        $pdo = Database::connection();
+        $person = $this->createTestUser('Procurement Manager');
+        $idle = $this->createTestUser('Viewer / Auditor');
+        $orderId = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [$person]);
+        $order = \App\Repositories\OrderRepository::find($orderId);
+        $pr = \App\Repositories\PurchasingRepository::create($orderId, null, 'Granite slabs', null, 10.0, 'sqm', date('Y-m-d', strtotime('+10 days')), $person, null);
+        $proc = (int) $pdo->query("SELECT id FROM departments WHERE code = 'PROC'")->fetchColumn();
+        \App\Repositories\DepartmentTaskRepository::setOwner($orderId, $proc, $person, $person);
+        $docType = (int) $pdo->query("SELECT id FROM document_types WHERE code = 'QT'")->fetchColumn();
+        $pdo->prepare("INSERT INTO documents (order_id, document_type_id, document_reference, status) VALUES (:o, :t, 'TEST-QT-DIGEST-1', 'draft')")->execute(['o' => $orderId, 't' => $docType]);
+        \App\Repositories\DocumentReviewRepository::assign((int) $pdo->lastInsertId(), $person);
+
+        $items = \App\Services\DailyDigestService::itemsFor($person);
+        self::assertContains(['kind' => 'review', 'text' => 'TEST-QT-DIGEST-1 (' . $pdo->query("SELECT name FROM document_types WHERE code = 'QT'")->fetchColumn() . ') — waiting for your review'], $items);
+        $taskTexts = array_column(array_filter($items, static fn (array $i): bool => $i['kind'] === 'task'), 'text');
+        self::assertCount(1, array_filter($taskTexts, static fn (string $t): bool => str_starts_with($t, $order['order_reference'] . ' — ')));
+        self::assertSame([], \App\Services\DailyDigestService::itemsFor($idle));
+
+        $mail = \App\Services\DailyDigestService::compose('Asha', [['kind' => 'task', 'text' => 'A'], ['kind' => 'review', 'text' => 'B']], '2026-11-02');
+        self::assertSame('NexaCrest — your day 2 Nov 2026: 1 task, 1 review', $mail['subject']);
+        self::assertSame("Good morning Asha,\n\nThis is what waits on you today.\n\nTasks (My tasks):\n- A\n\nDocuments to review (My Reviews):\n- B\n\nOpen the app to act on them. You get this e-mail once a day, only when something waits on you.\n", $mail['body']);
+
+        $date = '2099-01-0' . random_int(1, 9);
+        \App\Services\DailyDigestService::run($date);
+        \App\Services\DailyDigestService::run($date); // a second run the same day sends nothing new
+        self::assertSame(1, (int) $pdo->query("SELECT COUNT(*) FROM daily_digest_log WHERE user_id = {$person} AND digest_date = '{$date}'")->fetchColumn());
+        self::assertSame(0, (int) $pdo->query("SELECT COUNT(*) FROM daily_digest_log WHERE user_id = {$idle}")->fetchColumn());
+        self::assertGreaterThan(0, $pr);
+    }
 }

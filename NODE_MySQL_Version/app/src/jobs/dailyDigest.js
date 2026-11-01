@@ -1,0 +1,29 @@
+'use strict';
+
+const db = require('../config/db');
+const logger = require('../helpers/logger');
+const dailyDigestService = require('../services/dailyDigestService');
+
+/**
+ * Owner decision 1 Nov 2026 (C-7b): the daily per-person digest. Run once
+ * every morning, e.g. 08:15 IST (`node src/jobs/dailyDigest.js` from an
+ * external cron, or the in-process scheduler). Safe to run twice: each
+ * person gets at most one digest a day.
+ */
+async function run() {
+  return dailyDigestService.run();
+}
+
+if (require.main === module) {
+  run()
+    .then((r) => {
+      console.log(`Daily digest: ${r.sent} sent, ${r.skipped} with nothing waiting or already sent.`);
+      return db.pool.end();
+    })
+    .catch((e) => {
+      logger.error('daily_digest', e);
+      process.exitCode = 1;
+    });
+}
+
+module.exports = { run };
