@@ -1,0 +1,177 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Repositories;
+
+use App\Config\Database;
+use App\Services\IncentiveService;
+
+/**
+ * Owner decision 1 Nov 2026 (AS-2 … AS-4): what the associate portal shows —
+ * only the associate's own clients and their orders: order reference, a short
+ * product description, the product FOB value, the stage in plain words,
+ * whether the buyer has paid in full (no amounts), and the commission.
+ * Never unit prices, costs, profit, suppliers, documents or buyer payment
+ * amounts.
+ */
+final class AssociatePortalRepository
+{
+    /** Plain-word stage, as a buyer would see it. */
+    public static function stageLabel(array $order): string
+    {
+        $status = (string) $order['status'];
+        if ($status === 'cancelled') {
+            return 'Cancelled';
+        }
+        if ($status === 'lost') {
+            return 'Not proceeding';
+        }
+        if (in_array($status, ['shipped_docs_sent', 'complete'], true)) {
+            return 'Shipped';
+        }
+        // stages_master: 1 quotation · 2 buyer PO · 3 PI · 4 OC/production · 5 supplier PO · 6 freight · 7 BL · 8 commercial invoice · 9 closure
+        $n = (int) ($order['current_stage_number'] ?? 1);
+        return match (true) {
+            $n <= 1 => 'Enquiry & quotation',
+            $n <= 3 => 'Order confirmed',
+            $n <= 5 => 'In production',
+            $n <= 8 => 'Shipping',
+            default => 'Shipped',
+        };
+    }
+
+    /** @return list<array<string,mixed>> the associate's clients with first order and the 10-day window */
+    public static function clients(int $associateId): array
+    {
+        $out = [];
+        foreach (AssociateRepository::clients($associateId) as $c) {
+            $stmt = Database::connection()->prepare("SELECT MIN(DATE(created_at)) FROM orders WHERE client_id = :c AND status NOT IN ('cancelled','lost')");
+            $stmt->execute(['c' => $c['id']]);
+            $c['first_order_on'] = $stmt->fetchColumn() ?: null;
+            $po = Database::connection()->prepare('SELECT MIN(buyer_po_received_on) FROM orders WHERE client_id = :c AND buyer_po_received_on IS NOT NULL');
+            $po->execute(['c' => $c['id']]);
+            $first = $po->fetchColumn();
+            $c['window_ends_on'] = $first ? date('Y-m-d', strtotime($first . ' +9 days')) : null;
+            $out[] = $c;
+        }
+        return $out;
+    }
+
+    /** @return list<array<string,mixed>> every order of the associate's clients, newest first */
+    public static function orders(int $associateId, ?int $orderId = null): array
+    {
+        $sql = 'SELECT o.id, o.order_reference, o.status, o.created_at, o.client_id, sm.stage_number AS current_stage_number, o.buyer_po_received_on, o.associate_rate_pct, o.associate_rate_source,
+                       c.company_legal_name, o.currency_code, oi.locked_at, oi.fully_paid_on, oi.associate_id AS paid_associate_id, oi.associate_amount_fc,
+                       oi.associate_rate_pct AS locked_rate, oi.associate_mode, oi.incentive_month
+                  FROM orders o JOIN clients c ON c.id = o.client_id
+                  LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+                  LEFT JOIN order_incentives oi ON oi.order_id = o.id
+                 WHERE c.associate_id = :a AND o.is_test_data = 0';
+        $params = ['a' => $associateId];
+        if ($orderId !== null) {
+            $sql .= ' AND o.id = :o';
+            $params['o'] = $orderId;
+        }
+        $stmt = Database::connection()->prepare($sql . ' ORDER BY o.created_at DESC, o.id DESC');
+        $stmt->execute($params);
+        $rows = [];
+        foreach ($stmt->fetchAll() as $o) {
+            $o['fob_value'] = OrderProductRepository::totalFobValue((int) $o['id']);
+            $o['products'] = self::productSummary((int) $o['id']);
+            $o['stage'] = self::stageLabel($o);
+            $o['buyer_paid_in_full'] = IncentiveService::fullyPaidOn((int) $o['id']) !== null;
+            $o['commission'] = self::commission($associateId, $o);
+            $rows[] = $o;
+        }
+        return $rows;
+    }
+
+    /** "Granite slabs, 3 lines" — descriptions only, never prices. */
+    private static function productSummary(int $orderId): string
+    {
+        $stmt = Database::connection()->prepare('SELECT description FROM order_products WHERE order_id = :o AND is_active = 1 ORDER BY line_no, id');
+        $stmt->execute(['o' => $orderId]);
+        $lines = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        if ($lines === []) {
+            return '—';
+        }
+        $first = mb_substr((string) $lines[0], 0, 60);
+        return count($lines) > 1 ? $first . ' + ' . (count($lines) - 1) . ' more' : $first;
+    }
+
+    /**
+     * The commission line for one order.
+     * @return array{state:string, label:string, rate:?float, source:?string, amount:?float}
+     */
+    public static function commission(int $associateId, array $o): array
+    {
+        $rate = $o['associate_rate_pct'] !== null ? (float) $o['associate_rate_pct'] : null;
+        $source = $o['associate_rate_source'] ?? null;
+        if (in_array($o['status'], ['cancelled', 'lost'], true)) {
+            return ['state' => 'none', 'label' => 'No commission — order cancelled', 'rate' => null, 'source' => null, 'amount' => null];
+        }
+        if (!empty($o['locked_at'])) {
+            if ((int) ($o['paid_associate_id'] ?? 0) === $associateId && (float) $o['associate_amount_fc'] > 0) {
+                $payout = Database::connection()->prepare("SELECT status, paid_on FROM incentive_payouts WHERE order_id = :o AND payee_kind = 'associate' AND associate_id = :a AND clawback_of_payout_id IS NULL ORDER BY id LIMIT 1");
+                $payout->execute(['o' => $o['id'], 'a' => $associateId]);
+                $p = $payout->fetch() ?: ['status' => 'due', 'paid_on' => null];
+                $label = match ($p['status']) {
+                    'paid' => 'Paid on ' . \App\Helpers\Dates::short((string) $p['paid_on']),
+                    'held' => 'On hold',
+                    default => 'Earned — to be paid in the ' . IncentiveService::monthLabel((string) $o['incentive_month']) . ' payout',
+                };
+                return ['state' => $p['status'] === 'paid' ? 'paid' : ($p['status'] === 'held' ? 'held' : 'earned'), 'label' => $label,
+                    'rate' => (float) $o['locked_rate'], 'source' => $source, 'amount' => (float) $o['associate_amount_fc']];
+            }
+            return ['state' => 'none', 'label' => 'No commission — repeat order (outside the 10 days from the first Buyer PO)', 'rate' => null, 'source' => null, 'amount' => null];
+        }
+        if (($o['associate_mode'] ?? 'auto') === 'no') {
+            return ['state' => 'none', 'label' => 'No commission on this order (decided by NexaCrest)', 'rate' => null, 'source' => null, 'amount' => null];
+        }
+        if ($source === 'none') {
+            return ['state' => 'none', 'label' => 'No commission under your agreement', 'rate' => 0.0, 'source' => 'none', 'amount' => null];
+        }
+        $within = ($o['associate_mode'] ?? 'auto') === 'yes' || IncentiveService::withinFirstTenDays(OrderRepository::find((int) $o['id']) ?? []);
+        if (!$within) {
+            return ['state' => 'none', 'label' => 'No commission — repeat order (outside the 10 days from the first Buyer PO)', 'rate' => null, 'source' => null, 'amount' => null];
+        }
+        $expected = $rate !== null ? round((float) $o['fob_value'] * $rate / 100, 2) : null;
+        if (IncentiveService::fullyPaidOn((int) $o['id']) !== null) {
+            return ['state' => 'expected', 'label' => 'Buyer has paid in full — NexaCrest is confirming your commission', 'rate' => $rate, 'source' => $source, 'amount' => $expected];
+        }
+        return ['state' => 'expected', 'label' => 'Not yet earned — waiting for the buyer\'s full payment', 'rate' => $rate, 'source' => $source, 'amount' => $expected];
+    }
+
+    /** @return list<array<string,mixed>> the associate's payouts (commission lines), newest first */
+    public static function payouts(int $associateId): array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT p.*, o.order_reference, c.company_legal_name FROM incentive_payouts p JOIN orders o ON o.id = p.order_id JOIN clients c ON c.id = o.client_id
+              WHERE p.payee_kind = 'associate' AND p.associate_id = :a ORDER BY p.incentive_month DESC, p.id DESC"
+        );
+        $stmt->execute(['a' => $associateId]);
+        return $stmt->fetchAll();
+    }
+
+    /** @return array{earned_year: float, waiting: float, paid_year: float, held: float} INR totals for the home page */
+    public static function totals(int $associateId): array
+    {
+        $year = date('Y');
+        $t = ['earned_year' => 0.0, 'waiting' => 0.0, 'paid_year' => 0.0, 'held' => 0.0];
+        foreach (self::payouts($associateId) as $p) {
+            $amount = (float) $p['amount_inr'];
+            if (str_starts_with((string) $p['incentive_month'], $year)) {
+                $t['earned_year'] += $amount;
+            }
+            if ($p['status'] === 'due') {
+                $t['waiting'] += $amount;
+            } elseif ($p['status'] === 'held') {
+                $t['held'] += $amount;
+            } elseif ($p['status'] === 'paid' && str_starts_with((string) $p['paid_on'], $year)) {
+                $t['paid_year'] += (float) $p['paid_inr'];
+            }
+        }
+        return array_map(static fn (float $v): float => round($v, 2), $t);
+    }
+}

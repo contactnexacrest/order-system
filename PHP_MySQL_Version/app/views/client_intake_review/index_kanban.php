@@ -15,6 +15,7 @@ $renderKanbanCard = static function (array $s): string {
         <span class="entity-card-title"><?= htmlspecialchars($s['company_legal_name']) ?></span>
         <?php if ($status !== 'pending'): ?><span class="badge <?= $status === 'converted' ? 'badge-active' : 'badge-lost' ?>"><?= htmlspecialchars(ucfirst($status)) ?></span><?php endif; ?>
       </div>
+      <?php if ($status === 'pending') { require __DIR__ . '/_associate_info.php'; } ?>
       <?php if ($status === 'pending'): ?>
         <div class="muted small"><?= htmlspecialchars((string) $s['billing_address']) ?></div>
         <div class="entity-card-sub"><?= htmlspecialchars((string) $s['contact_person']) ?></div>

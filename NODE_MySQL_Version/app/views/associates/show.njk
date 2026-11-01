@@ -1,0 +1,231 @@
+{# One associate.
+   Expects: a, statuses, canManage, canBank, canChangeLink, clients (with first_order_on), and when canManage or canBank:
+   orders (with stage, fob_value, buyer_paid_in_full, commission{state,label,rate,source,amount}), payouts (with order_reference, note, hold_reason),
+   invitations, banks (each with b.masked, first_checked_by_name, verified_by_name), usableBankMasked (string|null), documents, events, messages (with user_name),
+   unlinkedClients, rates (list of {label, rate, source}), rm, codeLink, tdsPct, invoiceByPayout (map payoutId → {id, reference}),
+   docKinds (KINDS map), invitationStatuses (map), allAssociates (all associates, for the MD move-to select), csrfToken. #}
+{% set id = a.id %}
+{% set full = canManage or canBank %}
+{% set __sourceLabel = {'link': 'own invitation link', 'code': 'personal code', 'staff': 'linked by NexaCrest', 'md_change': 'changed by the MD'} %}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>{{ a.name }} {% set __st = a.status %}{% include "associates/_status_badge.njk" %}</h1>
+      <p class="muted" style="margin:0">{% if a.based_in == 'india' %}India{% else %}Abroad{% if a.country %} — {{ a.country }}{% endif %}{% endif %}
+        · paid in {{ a.currency_code }}{% if a.personal_code %} · personal code <b>{{ a.personal_code }}</b>{% endif %}
+        {% if a.status_reason %} · {{ a.status_reason }}{% endif %}</p>
+    </div>
+    <div class="btn-row" style="margin-top:0">
+      <a class="btn-sm btn-secondary" href="/associates">All associates</a>
+      {% if canManage %}<a class="btn-sm" href="/associates/{{ id }}/edit">Edit</a> <a class="btn-sm btn-secondary" href="/associates/{{ id }}/view-as">View their portal (read-only)</a>{% endif %}
+    </div>
+  </div>
+
+  {% if canManage %}
+  <div class="section" id="profile">
+    <h2>Profile and agreement</h2>
+    <table class="kv">
+      <tr><th>E-mail / phone</th><td>{{ a.email or '—' }} · {{ a.phone or '—' }}</td></tr>
+      {% set __tax = [a.pan, a.gstin, a.tax_id] | select | join(' · ') %}
+      <tr><th>PAN / GSTIN / tax ID</th><td>{{ __tax or '—' }}</td></tr>
+      <tr><th>Address</th><td>{{ (a.address or '—') | nl2br }}</td></tr>
+      <tr><th>Relationship manager</th><td>{{ rm.name if rm else '—' }}</td></tr>
+      <tr><th>Agreement</th><td>signed {{ (a.agreement_signed_on | shortDate) if a.agreement_signed_on else '—' }}, ends {{ (a.agreement_ends_on | shortDate) if a.agreement_ends_on else '—' }}{% if a.agreement_file_id %} · <a href="/associates/{{ id }}/agreement" class="small">Signed copy</a>{% endif %}</td></tr>
+      <tr><th>Commission</th><td>
+        {% if a.no_commission == 1 %}<b>No commission</b> (introductions only){% else %}
+          {% for r in rates %}
+            <span class="badge">clients {{ r.label }}: {{ r.rate | pct2 }}% {{ '(personal)' if r.source == 'personal' else '(standard)' }}</span>
+          {% endfor %}
+        {% endif %}</td></tr>
+    </table>
+    <form method="post" action="/associates/{{ id }}/status" class="inline-form">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Change status <select name="status" required><option value="">Choose…</option>
+        {% for k, l in statuses %}{% if k != 'inactive' and k != a.status %}<option value="{{ k }}">{{ l }}</option>{% endif %}{% endfor %}
+      </select></label>
+      <label>Reason <input type="text" name="reason" required minlength="10" maxlength="300"></label>
+      <button type="submit" class="btn-sm">Change status</button>
+    </form>
+  </div>
+
+  <div class="section" id="portal">
+    <h2>Portal and personal code</h2>
+    <p>Portal: <b>{{ 'on' if a.portal_enabled == 1 else 'off' }}</b>{% if a.last_login_at %} · last login {{ a.last_login_at | shortDate }}{% endif %}
+      {% if codeLink %}<br>Personal code link: <code>{{ codeLink }}</code>{% endif %}</p>
+    <div class="btn-row">
+      <form method="post" action="/associates/{{ id }}/portal/invite" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">{{ 'Resend portal access' if a.portal_enabled == 1 else 'Send portal access' }}</button></form>
+      {% if a.portal_enabled == 1 %}<form method="post" action="/associates/{{ id }}/portal/disable" style="display:inline" data-confirm="Switch off this associate's portal?"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-secondary">Switch portal off</button></form>{% endif %}
+    </div>
+    <form method="post" action="/associates/{{ id }}/code" class="inline-form" data-confirm="Set a new personal code? The old code stops bringing new clients.">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>New personal code — readable part <input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" placeholder="e.g. RAJESH"></label>
+      <button type="submit" class="btn-sm btn-secondary">Set code</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="section" id="clients">
+    <h2>Clients introduced ({{ clients.length }})</h2>
+    <table class="list">
+      <tr><th>Client</th><th>Country</th><th>Registered</th><th>How</th><th>Protected until</th><th>First order</th>{% if canChangeLink %}<th>Change (MD only)</th>{% endif %}</tr>
+      {% for c in clients %}
+        <tr>
+          <td><a href="/clients/{{ c.id }}">{{ c.company_legal_name }}</a> <small class="muted">{{ c.client_unique_number }}</small></td>
+          <td>{{ c.country_of_destination or '' }}</td>
+          <td>{{ (c.associate_registered_on | shortDate) if c.associate_registered_on else '—' }}</td>
+          <td>{{ __sourceLabel[c.associate_source] or 'linked earlier' }}</td>
+          <td>{{ (c.associate_locked_until | shortDate) if c.associate_locked_until else '—' }}</td>
+          <td>{{ (c.first_order_on | shortDate) if c.first_order_on else '—' }}</td>
+          {% if canChangeLink %}<td>
+            <form method="post" action="/associates/{{ id }}/clients/{{ c.id }}/unlink" class="inline-form" data-confirm="Change this client's associate? The associate is told at once.">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <select name="move_to" aria-label="Move to another associate"><option value="">Remove the link</option>
+                {% for o in allAssociates %}{% if o.id != id %}<option value="{{ o.id }}">Move to {{ o.name }}</option>{% endif %}{% endfor %}
+              </select>
+              <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="Reason (shown to the associate)" aria-label="Reason">
+              <button type="submit" class="btn-sm btn-secondary">Change</button>
+            </form></td>{% endif %}
+        </tr>
+      {% endfor %}
+      {% if clients.length == 0 %}<tr><td colspan="7" class="muted">No clients yet.</td></tr>{% endif %}
+    </table>
+    {% if canManage %}
+      <form method="post" action="/associates/{{ id }}/clients" class="inline-form">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <select name="client_id" required aria-label="Client introduced by {{ a.name }}">
+          <option value="">Link a client already on file…</option>
+          {% for c in unlinkedClients %}<option value="{{ c.id }}">{{ c.company_legal_name }} ({{ c.client_unique_number }})</option>{% endfor %}
+        </select>
+        <input type="date" name="registered_on" required max="{{ today() }}" value="{{ today() }}" aria-label="Introduced on">
+        <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="How they introduced the client" aria-label="How they introduced the client">
+        <button type="submit" class="btn-sm">Link</button>
+      </form>
+      <p class="muted small">Normally the buyer registers through the associate's link or personal code and confirms the introduction themselves; this is for clients already on file. Once linked, only the MD can change it.</p>
+    {% endif %}
+  </div>
+
+  {% if full %}
+  {% if canManage %}
+  <div class="section" id="invitations">
+    <h2>Invitation links</h2>
+    <table class="list">
+      <tr><th>Created</th><th>For</th><th>Kind</th><th>Status</th><th>Expires</th></tr>
+      {% for i in invitations %}
+        <tr><td>{{ (i.created_at | shortDate) if i.created_at else '—' }}</td><td>{{ i.company_name }}{% if i.country %} ({{ i.country }}){% endif %}</td>
+          <td>{{ 'Personal code' if i.kind == 'personal_code' else 'One-off link' }}</td><td>{{ invitationStatuses[i.status] or i.status }}</td><td>{{ (i.expires_at | shortDate) if i.expires_at else '—' }}</td></tr>
+      {% endfor %}
+      {% if invitations.length == 0 %}<tr><td colspan="5" class="muted">None yet.</td></tr>{% endif %}
+    </table>
+  </div>
+
+  <div class="section" id="commission">
+    <h2>Orders and commission</h2>
+    <table class="list">
+      <tr><th>Order</th><th>Client</th><th>Stage</th><th>FOB value</th><th>Buyer paid in full</th><th>Rate</th><th>Commission</th></tr>
+      {% for o in orders %}{% set cm = o.commission %}
+        <tr><td><a href="/orders/{{ o.id }}">{{ o.order_reference }}</a></td><td>{{ o.company_legal_name }}</td><td>{{ o.stage }}</td>
+          <td>{{ o.currency_code }} {{ o.fob_value | money }}</td><td>{{ 'Yes' if o.buyer_paid_in_full else 'No' }}</td>
+          <td>{% if cm.rate !== null and cm.rate !== undefined %}{{ cm.rate | pct2 }}%{{ ' (personal)' if cm.source == 'personal' else (' (standard)' if cm.source == 'global' else '') }}{% else %}—{% endif %}</td>
+          <td>{% if cm.amount !== null and cm.amount !== undefined %}{{ o.currency_code }} {{ cm.amount | money }}<br>{% endif %}<small>{{ cm.label }}</small></td></tr>
+      {% endfor %}
+      {% if orders.length == 0 %}<tr><td colspan="7" class="muted">No orders yet.</td></tr>{% endif %}
+    </table>
+    <h3>Payouts</h3>
+    <table class="list">
+      <tr><th>Month</th><th>Order</th><th>Amount INR</th><th>Status</th><th>Paid</th><th>Invoice</th><th>Action</th></tr>
+      {% for p in payouts %}{% set inv = invoiceByPayout[p.id] %}
+        <tr><td>{{ p.incentive_month }}</td><td>{{ p.order_reference }}{% if p.note %}<br><small class="muted">{{ p.note }}</small>{% endif %}</td>
+          <td>{{ p.amount_inr | money }}</td><td>{{ p.status | capitalize }}{% if p.hold_reason %}<br><small>{{ p.hold_reason }}</small>{% endif %}</td>
+          <td>{% if p.status == 'paid' %}{{ p.paid_on | shortDate }} · ₹{{ p.paid_inr | money }}{% if (p.tds_inr | float) > 0 %} (TDS ₹{{ p.tds_inr | money }}){% endif %}{% if p.paid_reference %}<br><small>{{ p.paid_reference }}</small>{% endif %}{% else %}—{% endif %}</td>
+          <td>{% if inv %}<a href="/associates/{{ id }}/documents/{{ inv.id }}">{{ inv.reference or 'Invoice' }}</a>{% else %}—{% endif %}</td>
+          <td>
+            {% if p.status == 'due' and (p.amount_inr | float) > 0 %}
+              <form method="post" action="/associates/payouts/{{ p.id }}/hold" class="inline-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="text" name="reason" required minlength="10" maxlength="300" placeholder="Reason" aria-label="Reason for the hold"><button type="submit" class="btn-sm btn-secondary">Hold</button></form>
+            {% elif p.status == 'held' %}
+              <form method="post" action="/associates/payouts/{{ p.id }}/release" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">Release</button></form>
+            {% elif p.status == 'paid' and (p.amount_inr | float) > 0 %}
+              <form method="post" action="/associates/payouts/{{ p.id }}/clawback" class="inline-form" data-confirm="Deduct this amount from the associate's next payout?"><input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="number" name="amount_inr" required min="0.01" step="0.01" max="{{ p.paid_inr }}" placeholder="₹" aria-label="Amount to claw back">
+                <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="What was refunded" aria-label="What was refunded to the buyer"><button type="submit" class="btn-sm btn-secondary">Claw back</button></form>
+            {% endif %}
+          </td></tr>
+      {% endfor %}
+      {% if payouts.length == 0 %}<tr><td colspan="7" class="muted">No payouts yet. Commission is earned once the buyer has paid an order in full.</td></tr>{% endif %}
+    </table>
+    <p class="muted small">Accounts pay due payouts on <a href="/incentives/payouts">Incentive payouts</a>, only into a verified bank account. TDS (India, section 194H): {{ tdsPct | pct2 }}% unless the CA advises otherwise; abroad: Form 15CA/15CB.</p>
+  </div>
+  {% endif %}
+
+  <div class="section" id="bank">
+    <h2>Bank details</h2>
+    <p>Payments go to: <b>{{ (usableBankMasked ~ ' (verified)') if usableBankMasked else 'no verified account yet' }}</b></p>
+    <table class="list">
+      <tr><th>Requested</th><th>Account</th><th>Holder</th><th>IFSC / SWIFT</th><th>Status</th><th>Checks</th><th>Action</th></tr>
+      {% for b in banks %}
+        <tr><td>{{ (b.requested_at | shortDate) if b.requested_at else '—' }}<br><small class="muted">{{ 'by the associate' if b.requested_by_associate == 1 else 'by NexaCrest' }}</small></td>
+          <td>{{ b.masked }} <small class="muted">{{ b.account_currency }}</small>{% if canBank %}<br><a class="small" href="/associates/{{ id }}/bank/{{ b.id }}/number">Show full number</a>{% endif %}</td>
+          <td>{{ b.holder_name }}</td><td>{{ ((b.ifsc or '') ~ ' ' ~ (b.swift or '')) | trim }}</td>
+          <td>{{ b.status | capitalize }}{% if b.status == 'verified' and b.usable_from %}<br><small>usable from {{ b.usable_from | shortDate }}</small>{% endif %}{% if b.rejected_reason %}<br><small>{{ b.rejected_reason }}</small>{% endif %}</td>
+          <td><small>{% if b.first_checked_by_name %}1: {{ b.first_checked_by_name }} — {{ b.check_method }}{% endif %}{% if b.verified_by_name %}<br>2: {{ b.verified_by_name }}{% endif %}</small></td>
+          <td>{% if canBank and b.status == 'pending' %}
+            {% if not b.first_checked_by %}
+              <form method="post" action="/associates/{{ id }}/bank/{{ b.id }}/check" class="inline-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="text" name="check_method" required minlength="10" maxlength="300" placeholder="How you checked it (call-back, test credit)" aria-label="How you checked it"><button type="submit" class="btn-sm">First check</button></form>
+            {% else %}
+              <form method="post" action="/associates/{{ id }}/bank/{{ b.id }}/verify" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">Verify (second person)</button></form>
+            {% endif %}
+            <form method="post" action="/associates/{{ id }}/bank/{{ b.id }}/reject" class="inline-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="text" name="reason" required minlength="10" maxlength="300" placeholder="Reason" aria-label="Reason for rejecting"><button type="submit" class="btn-sm btn-secondary">Reject</button></form>
+          {% endif %}</td></tr>
+      {% endfor %}
+      {% if banks.length == 0 %}<tr><td colspan="7" class="muted">No bank details yet — the associate adds them in their portal, or Accounts enter them below.</td></tr>{% endif %}
+    </table>
+    {% if canBank %}
+    <details><summary>Enter bank details from the associate's signed form</summary>
+      <form method="post" action="/associates/{{ id }}/bank" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        {% set __india = a.based_in == 'india' %}{% include "associate_portal/_bank_fields.njk" %}
+        <button type="submit" class="btn-sm">Record — two people then check it</button>
+      </form>
+    </details>
+    {% endif %}
+  </div>
+
+  <div class="section" id="documents">
+    <h2>Documents</h2>
+    <table class="list">
+      <tr><th>Added</th><th>Document</th><th>Reference</th><th>From</th></tr>
+      {% for d in documents %}
+        <tr><td>{{ d.created_at | shortDate }}</td><td><a href="/associates/{{ id }}/documents/{{ d.id }}">{{ docKinds[d.kind] or d.kind }}</a></td><td>{{ d.reference or '' }}</td><td>{{ 'Associate' if d.uploaded_by_associate == 1 else 'NexaCrest' }}</td></tr>
+      {% endfor %}
+      {% if documents.length == 0 %}<tr><td colspan="4" class="muted">None yet.</td></tr>{% endif %}
+    </table>
+    <form method="post" action="/associates/{{ id }}/documents" enctype="multipart/form-data" class="inline-form">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <select name="kind" required aria-label="Document kind"><option value="">What is it?</option>{% for k, l in docKinds %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select>
+      <input type="text" name="reference" maxlength="100" placeholder="Reference (e.g. certificate no.)" aria-label="Reference">
+      <input type="file" name="document_file" required accept=".pdf,.jpg,.jpeg,.png" aria-label="File">
+      <button type="submit" class="btn-sm">Upload</button>
+    </form>
+  </div>
+
+  {% if canManage %}
+  <div class="section" id="messages">
+    <h2>Messages</h2>
+    {% for m in messages %}
+      <div class="comment"><b>{{ a.name if m.from_associate == 1 else (m.user_name or 'NexaCrest') }}</b> <small class="muted">{{ m.created_at | shortDate }}</small><br>{{ m.body | nl2br }}</div>
+    {% endfor %}
+    <form method="post" action="/associates/{{ id }}/messages">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <textarea name="body" required maxlength="4000" rows="3" aria-label="Reply"></textarea>
+      <button type="submit" class="btn-sm">Send</button>
+    </form>
+  </div>
+
+  <div class="section" id="history">
+    <h2>History <small class="muted">(nobody can edit it)</small></h2>
+    <table class="list">
+      {% for e in events %}<tr><td>{{ e.created_at }}</td><td>{{ e.message }}</td></tr>{% endfor %}
+    </table>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>

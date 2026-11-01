@@ -1,0 +1,14 @@
+{# Expects: a, b (bank row), number (full account number). #}
+<div class="card">
+  <h1>Bank account — {{ a.name }}</h1>
+  <p class="muted">Shown to Finance and the MD only. This view is recorded in the audit log.</p>
+  <table class="kv">
+    <tr><th>Holder</th><td>{{ b.holder_name }}</td></tr>
+    <tr><th>Bank</th><td>{{ b.bank_name }}{% if b.bank_branch_address %}<br>{{ b.bank_branch_address }}{% endif %}</td></tr>
+    <tr><th>Account / IBAN</th><td><code>{{ number }}</code></td></tr>
+    <tr><th>IFSC / SWIFT</th><td>{{ ((b.ifsc or '') ~ ' ' ~ (b.swift or '')) | trim }}</td></tr>
+    <tr><th>Intermediary bank</th><td>{{ b.intermediary_bank or '—' }}</td></tr>
+    <tr><th>Currency / status</th><td>{{ b.account_currency }} · {{ b.status | capitalize }}</td></tr>
+  </table>
+  <p><a href="/associates/{{ a.id }}#bank">Back</a></p>
+</div>

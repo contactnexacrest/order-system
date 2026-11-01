@@ -143,7 +143,7 @@ final class QaRound6InputTest extends DbTestCase
         self::assertSame(0, $this->auditCount('CA_INR_ACTUAL_DELETED', $orderId));
 
         ob_start();
-        (new IncentiveController())->associates(['id' => '999999999']);
+        (new \App\Controllers\AssociateAdminController())->edit(['id' => '999999999']);
         self::assertSame('Associate not found.', (string) ob_get_clean());
         self::assertSame(404, http_response_code());
     }

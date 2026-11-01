@@ -61,6 +61,8 @@ const orderExpenseController = require('./controllers/orderExpenseController');
 const vendorBillController = require('./controllers/vendorBillController');
 const assetController = require('./controllers/assetController');
 const clientsController = require('./controllers/clientsController');
+const associateAdminController = require('./controllers/associateAdminController');
+const associatePortalController = require('./controllers/associatePortalController');
 const clientIntakeController = require('./controllers/clientIntakeController');
 const clientIntakeReviewController = require('./controllers/clientIntakeReviewController');
 const piIntakeController = require('./controllers/piIntakeController');
@@ -115,6 +117,7 @@ const emailTemplateController = require('./controllers/emailTemplateController')
 const uiTemplateController = require('./controllers/uiTemplateController');
 const accountController = require('./controllers/accountController');
 const superAdminOnly = require('./middleware/superAdminOnly');
+const associateAuth = require('./middleware/associateAuth');
 const clientAuth = require('./middleware/clientAuth');
 const saveSessionBeforeRedirect = require('./middleware/saveSessionBeforeRedirect');
 
@@ -500,7 +503,7 @@ const uploadMedia = multer({ storage: multer.memoryStorage(), limits: { fileSize
 const ID_PATTERN = /^[1-9][0-9]{0,14}$/;
 const ID_PARAMS = ['id', 'membershipId', 'addressId', 'amendmentId', 'benefitId', 'billId', 'cancellationId', 'chargeId', 'clientId', 'complaintId',
   'disputeId', 'documentId', 'emailLogId', 'entryId', 'expenseId', 'fileId', 'imageId', 'orderId', 'payoutId', 'productId',
-  'creditId', 'reportId', 'requestId', 'reviewId', 'roundId', 'supplierId', 'userId'];
+  'creditId', 'reportId', 'requestId', 'reviewId', 'roundId', 'supplierId', 'userId', 'bankId', 'docId'];
 app.param(ID_PARAMS, (req, res, next, value) => (ID_PATTERN.test(String(value)) ? next() : next('route')));
 
 // QA Round 6, R6-N04: for a signed-in staff member, a page or action of an
@@ -569,6 +572,10 @@ app.post('/reset-password/:token', verifyCsrf, asyncHandler(authController.reset
 // never a client or order (see clientIntakeController's docblock).
 app.get('/quotation-details', asyncHandler(clientIntakeController.show));
 app.post('/quotation-details/submit', verifyCsrf, asyncHandler(clientIntakeController.submit));
+// Owner decision 1 Nov 2026 (AS-5): an associate's one-off link, and the buyer's e-mail code + "X introduced us".
+app.get('/invite/:token', asyncHandler(clientIntakeController.invite));
+app.get('/quotation-details/verify', asyncHandler(clientIntakeController.showVerify));
+app.post('/quotation-details/verify', verifyCsrf, asyncHandler(clientIntakeController.verify));
 app.get('/quotation-details/edit/:token', asyncHandler(clientIntakeController.showEdit));
 app.post('/quotation-details/edit/:token', verifyCsrf, asyncHandler(clientIntakeController.updateSubmission));
 
@@ -922,13 +929,35 @@ app.post('/orders/:id/travel-expenses', requireAuth, requirePermission('manage_o
 // Team incentives and associates (owner decision 2026-10-30).
 app.get('/incentives/settings', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.settings));
 app.post('/incentives/settings', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveSettings));
-app.get('/associates', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.associates));
-app.post('/associates', requireAuth, requirePermission('manage_incentives'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(incentiveController.saveAssociate));
-app.get('/associates/:id/edit', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.associates));
-app.post('/associates/:id/update', requireAuth, requirePermission('manage_incentives'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(incentiveController.saveAssociate));
-app.get('/associates/:id/agreement', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.downloadAgreement));
-app.post('/associates/:id/clients', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.linkClient));
-app.post('/associates/:id/clients/:clientId/unlink', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.unlinkClient));
+// Associates — staff side (owner decision 1 Nov 2026, "AS all as recommended").
+app.get('/associates', requireAuth, requirePermissionAny(['view_associates', 'manage_associates', 'manage_associate_bank']), asyncHandler(associateAdminController.index));
+app.get('/associates/new', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.create));
+app.post('/associates', requireAuth, requirePermission('manage_associates'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(associateAdminController.save));
+app.get('/associates/ladder', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.ladder));
+app.post('/associates/ladder', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.saveLadder));
+app.get('/reports/associates', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.report));
+app.get('/associates/:id', requireAuth, requirePermissionAny(['view_associates', 'manage_associates', 'manage_associate_bank']), asyncHandler(associateAdminController.show));
+app.get('/associates/:id/edit', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.edit));
+app.post('/associates/:id/update', requireAuth, requirePermission('manage_associates'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(associateAdminController.save));
+app.post('/associates/:id/status', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.changeStatus));
+app.post('/associates/:id/portal/invite', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.invitePortal));
+app.post('/associates/:id/portal/disable', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.disablePortal));
+app.post('/associates/:id/code', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.setCode));
+app.get('/associates/:id/view-as', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.viewAs));
+app.get('/associates/:id/agreement', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.downloadAgreement));
+app.post('/associates/:id/clients', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.linkClient));
+app.post('/associates/:id/clients/:clientId/unlink', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.unlinkClient));
+app.post('/associates/:id/bank', requireAuth, requirePermission('manage_associate_bank'), uploadLarge.single('proof_file'), verifyCsrf, asyncHandler(associateAdminController.addBank));
+app.post('/associates/:id/bank/:bankId/check', requireAuth, requirePermission('manage_associate_bank'), verifyCsrf, asyncHandler(associateAdminController.firstCheck));
+app.post('/associates/:id/bank/:bankId/verify', requireAuth, requirePermission('manage_associate_bank'), verifyCsrf, asyncHandler(associateAdminController.verifyBank));
+app.post('/associates/:id/bank/:bankId/reject', requireAuth, requirePermission('manage_associate_bank'), verifyCsrf, asyncHandler(associateAdminController.rejectBank));
+app.get('/associates/:id/bank/:bankId/number', requireAuth, requirePermission('manage_associate_bank'), asyncHandler(associateAdminController.bankNumber));
+app.post('/associates/:id/documents', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_bank']), uploadLarge.single('document_file'), verifyCsrf, asyncHandler(associateAdminController.uploadDocument));
+app.get('/associates/:id/documents/:docId', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_bank']), asyncHandler(associateAdminController.downloadDocument));
+app.post('/associates/:id/messages', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.reply));
+app.post('/associates/payouts/:payoutId/hold', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.holdPayout));
+app.post('/associates/payouts/:payoutId/release', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.releasePayout));
+app.post('/associates/payouts/:payoutId/clawback', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.clawback));
 // Owner decision 2026-10-30: the team incentive is fixed when the buyer has fully paid, which is often when the order is closed; it writes only the incentive's own rows (manage_incentives).
 app.post('/orders/:id/incentive', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveOrder));
 app.post('/orders/:id/incentive/people', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveOrderPeople));
@@ -1214,6 +1243,35 @@ app.post('/users/:id/force-reset-password', requireAuth, requirePermission('mana
 app.get('/sample-data', requireAuth, requirePermission('manage_sample_data'), asyncHandler(sampleDataController.index));
 app.post('/sample-data/load', requireAuth, requirePermission('manage_sample_data'), verifyCsrf, asyncHandler(sampleDataController.load));
 app.post('/sample-data/clear', requireAuth, requirePermission('manage_sample_data'), verifyCsrf, asyncHandler(sampleDataController.clear));
+
+// --- Associate portal (owner decision 1 Nov 2026, AS-1): its own login (password + e-mailed code), separate from staff and buyers. ---
+const requireAssociateAuth = asyncHandler(associateAuth.required());
+app.get('/associate/login', asyncHandler(associatePortalController.showLogin));
+app.post('/associate/login', verifyCsrf, asyncHandler(associatePortalController.login));
+app.get('/associate/login/code', asyncHandler(associatePortalController.showCode));
+app.post('/associate/login/code', verifyCsrf, asyncHandler(associatePortalController.verifyCode));
+app.get('/associate/set-password/:token', asyncHandler(associatePortalController.showSetPassword));
+app.post('/associate/set-password/:token', verifyCsrf, asyncHandler(associatePortalController.setPassword));
+app.get('/associate/logout', asyncHandler(associatePortalController.logout));
+app.post('/associate/logout', verifyCsrf, asyncHandler(associatePortalController.logout));
+app.get('/associate', requireAssociateAuth, asyncHandler(associatePortalController.home));
+app.get('/associate/clients', requireAssociateAuth, asyncHandler(associatePortalController.clients));
+app.get('/associate/clients/:id/certificate', requireAssociateAuth, asyncHandler(associatePortalController.certificate));
+app.post('/associate/invitations', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.createInvitation));
+app.post('/associate/invitations/:id/cancel', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.cancelInvitation));
+app.post('/associate/code', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.chooseCode));
+app.get('/associate/orders', requireAssociateAuth, asyncHandler(associatePortalController.orders));
+app.get('/associate/orders/:id', requireAssociateAuth, asyncHandler(associatePortalController.order));
+app.get('/associate/commission', requireAssociateAuth, asyncHandler(associatePortalController.commission));
+app.post('/associate/commission/:id/invoice', requireAssociateAuth, uploadLarge.single('invoice_file'), verifyCsrf, asyncHandler(associatePortalController.uploadInvoice));
+app.get('/associate/profile', requireAssociateAuth, asyncHandler(associatePortalController.profile));
+app.post('/associate/profile', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.saveProfile));
+app.post('/associate/documents', requireAssociateAuth, uploadLarge.single('document_file'), verifyCsrf, asyncHandler(associatePortalController.uploadDocument));
+app.get('/associate/documents/:id', requireAssociateAuth, asyncHandler(associatePortalController.downloadDocument));
+app.post('/associate/bank', requireAssociateAuth, uploadLarge.single('proof_file'), verifyCsrf, asyncHandler(associatePortalController.requestBank));
+app.get('/associate/agreement', requireAssociateAuth, asyncHandler(associatePortalController.downloadAgreement));
+app.get('/associate/messages', requireAssociateAuth, asyncHandler(associatePortalController.messages));
+app.post('/associate/messages', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.sendMessage));
 
 // --- Client portal (authenticated, structurally separate from staff /
 // requireAuth) — gated by clientAuth.required(), a different session key. ---

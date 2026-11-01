@@ -41,6 +41,12 @@ final class PermittedLinks
         '#^/complaints(?:[/?\#]|$)#'                                => ['manage_complaints', 'respond_to_complaints'],
         '#^/incentives/settings(?:[/?\#]|$)#'                       => ['manage_incentives'],
         '#^/incentives/payouts(?:[/?\#]|$)#'                        => ['pay_incentives'],
+        // Owner decision 1 Nov 2026 (AS-11): associates.
+        '#^/reports/associates(?:[/?\#]|$)#'                       => ['manage_associates'],
+        '#^/associates/\d+/bank/\d+/number(?:[/?\#]|$)#'           => ['manage_associate_bank'],
+        '#^/associates/\d+/documents/\d+(?:[/?\#]|$)#'             => ['manage_associates', 'manage_associate_bank'],
+        '#^/associates/(?:new|ladder|\d+/(?:edit|view-as|agreement))(?:[/?\#]|$)#' => ['manage_associates'],
+        '#^/associates(?:[/?\#]|$)#'                               => ['view_associates', 'manage_associates', 'manage_associate_bank'],
         '#^/reports/staff(?:[/?\#]|$)#'                             => ['view_staff_reports'],
         '#^/reports/order-profitability(?:[/?\#]|$)#'               => ['manage_order_financials'],
         // Owner decision 1 Nov 2026 (A-7 / A-9): each needs only the money it shows.

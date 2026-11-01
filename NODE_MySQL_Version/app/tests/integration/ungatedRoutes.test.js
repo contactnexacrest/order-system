@@ -12,6 +12,36 @@ const { createTestClient, createTestClientLogin } = require('../support/fixtures
 
 /** Every route without a permission check: method, path ({} = a parameter), guard, +csrf. */
 const EXPECTED = [
+  // Owner decision 1 Nov 2026: the associate portal (its own sign-in, requireAssociateAuth) and the buyer's invitation link / e-mail code.
+  'GET /associate associate',
+  'GET /associate/agreement associate',
+  'GET /associate/clients associate',
+  'GET /associate/clients/{}/certificate associate',
+  'GET /associate/commission associate',
+  'GET /associate/documents/{} associate',
+  'GET /associate/login public',
+  'GET /associate/login/code public',
+  'GET /associate/logout public',
+  'GET /associate/messages associate',
+  'GET /associate/orders associate',
+  'GET /associate/orders/{} associate',
+  'GET /associate/profile associate',
+  'GET /associate/set-password/{} public',
+  'GET /invite/{} public',
+  'GET /quotation-details/verify public',
+  'POST /associate/bank associate +csrf',
+  'POST /associate/code associate +csrf',
+  'POST /associate/commission/{}/invoice associate +csrf',
+  'POST /associate/documents associate +csrf',
+  'POST /associate/invitations associate +csrf',
+  'POST /associate/invitations/{}/cancel associate +csrf',
+  'POST /associate/login public +csrf',
+  'POST /associate/login/code public +csrf',
+  'POST /associate/logout public +csrf',
+  'POST /associate/messages associate +csrf',
+  'POST /associate/profile associate +csrf',
+  'POST /associate/set-password/{} public +csrf',
+  'POST /quotation-details/verify public +csrf',
   'GET / staff',
   'GET /2fa public',
   'GET /account staff',
@@ -117,10 +147,11 @@ function routes() {
   return [...source.matchAll(/app\.(get|post)\('([^']+)',([^\n]*)/g)]
     .filter(([, , , rest]) => !rest.includes('requirePermission'))
     .map(([, method, pattern, rest]) => {
-      const middleware = [...rest.matchAll(/\b(requireAuth|requireClientAuth|requireSuperAdmin|verifyCsrf|asyncHandler)\b/g)].map((m) => m[1]);
+      const middleware = [...rest.matchAll(/\b(requireAuth|requireClientAuth|requireAssociateAuth|requireSuperAdmin|verifyCsrf|asyncHandler)\b/g)].map((m) => m[1]);
       let guard = 'public';
       if (middleware.includes('requireSuperAdmin')) guard = 'super-admin';
       else if (middleware.includes('requireClientAuth')) guard = 'client';
+      else if (middleware.includes('requireAssociateAuth')) guard = 'associate';
       else if (middleware.includes('requireAuth')) guard = 'staff';
       return { method: method.toUpperCase(), pattern, guard, csrf: middleware.includes('verifyCsrf'), middleware };
     });
@@ -203,6 +234,25 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
     return agent;
   }
 
+  /** An associate signed in to the associate portal (password, then the e-mailed code — shown on screen in development). */
+  async function associateAgent() {
+    const associateRepository = require('../../src/repositories/associateRepository');
+    const associatePortalService = require('../../src/services/associatePortalService');
+    const email = `jest-ungated-${crypto.randomBytes(4).toString('hex')}@nexacrest.test`;
+    const id = await associateRepository.create({ name: 'Jest Ungated Associate', based_in: 'india', currency_code: 'INR', email, status: 'active' }, null);
+    await associateRepository.setFields(id, { portal_enabled: 1 });
+    await associatePortalService.setPassword(await associatePortalService.issueToken(id, 'set_password', 60), PASSWORD);
+    const agent = request.agent(app);
+    const loginCsrf = extractCsrf((await agent.get('/associate/login')).text);
+    await agent.post('/associate/login').type('form').send({ _csrf: loginCsrf, email, password: PASSWORD });
+    const page = await agent.get('/associate/login/code');
+    const code = page.text.match(/your login code is (\d{6})/)[1];
+    const ok = await agent.post('/associate/login/code').type('form').send({ _csrf: extractCsrf(page.text), code });
+    expect(ok.headers.location).toBe('/associate');
+    agent.csrf = extractCsrf((await agent.get('/associate/profile')).text);
+    return agent;
+  }
+
   /** A signed-out agent that already holds a session CSRF token. */
   async function publicAgent() {
     const agent = request.agent(app);
@@ -218,6 +268,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
         staff: await staffAgent(await createUser('Admin')),
         'super-admin': await staffAgent(await createUser('Admin', { superAdmin: true })),
         client: await clientAgent(await createClientWithLogin()),
+        associate: await associateAgent(),
       };
     }
     return guard === 'public' ? publicAgent() : agents[guard];
@@ -236,7 +287,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       .filter((r) => {
         const csrfAt = r.middleware.indexOf('verifyCsrf');
         const handlerAt = r.middleware.lastIndexOf('asyncHandler');
-        const guardAt = Math.max(r.middleware.indexOf('requireAuth'), r.middleware.indexOf('requireClientAuth'), r.middleware.indexOf('requireSuperAdmin'));
+        const guardAt = Math.max(r.middleware.indexOf('requireAuth'), r.middleware.indexOf('requireClientAuth'), r.middleware.indexOf('requireAssociateAuth'), r.middleware.indexOf('requireSuperAdmin'));
         return csrfAt === -1 || csrfAt > handlerAt || csrfAt < guardAt;
       })
       .map(label);
@@ -278,12 +329,35 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       } else if (route.guard === 'staff') {
         const res = await send(client, route.method, concrete(route.pattern), { _csrf: client.csrf });
         if (res.headers.location !== '/login') wrong.push(`client ${label(route)} → ${res.status} ${res.headers.location}`);
+      } else if (route.guard === 'associate') {
+        // Owner decision 1 Nov 2026 (AS-1): neither a staff nor a buyer sign-in opens the associate portal.
+        for (const [who, agent] of [['staff', staff], ['client', client]]) {
+          const res = await send(agent, route.method, concrete(route.pattern), { _csrf: agent.csrf });
+          if (res.headers.location !== '/associate/login') wrong.push(`${who} ${label(route)} → ${res.status} ${res.headers.location}`);
+        }
       }
     }
     expect(wrong).toEqual([]);
     // and neither sign-in was ended by it
     expect((await staff.get('/account')).status).toBe(200);
     expect((await client.get('/client/account')).status).toBe(200);
+  }, 60000);
+
+  /** Owner decision 1 Nov 2026 (AS-1): signed out — or signed in as staff or a buyer — every associate page goes to the associate login. */
+  it('every associate route needs the associate\'s own sign-in', async () => {
+    const staff = await agentFor('staff');
+    const client = await agentFor('client');
+    const wrong = [];
+    let checked = 0;
+    for (const route of routes().filter((r) => r.guard === 'associate')) {
+      for (const [who, agent] of [['out', request(app)], ['staff', staff], ['client', client]]) {
+        const res = await send(agent, route.method, concrete(route.pattern), { _csrf: agent.csrf });
+        if (res.status !== 302 || res.headers.location !== '/associate/login') wrong.push(`${label(route)} (${who}) → ${res.status} ${res.headers.location}`);
+      }
+      checked++;
+    }
+    expect(checked).toBe(18);
+    expect(wrong).toEqual([]);
   }, 60000);
 
   it('every Super Admin route refuses an Admin', async () => {
@@ -304,9 +378,9 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
     let checked = 0;
     for (const route of routes().filter((r) => r.method === 'POST')) {
       // a signed-in agent shows the refusal kept the session and left no message behind
-      const agent = await agentFor(route.guard === 'client' ? 'client' : 'super-admin');
-      const home = route.guard === 'client' ? '/client/account' : '/account';
-      const loginPath = route.pattern.startsWith('/client/') ? '/client/login' : '/login';
+      const agent = await agentFor(['client', 'associate'].includes(route.guard) ? route.guard : 'super-admin');
+      const home = { client: '/client/account', associate: '/associate/profile' }[route.guard] || '/account';
+      const loginPath = route.pattern.startsWith('/client/') ? '/client/login' : (route.pattern.startsWith('/associate/') ? '/associate/login' : '/login');
       for (const body of [{}, { _csrf: 'not-the-session-token' }]) {
         const res = await agent.post(concrete(route.pattern)).type('form').send(body);
         const after = await agent.get(home);
@@ -316,7 +390,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(47);
+    expect(checked).toBe(60);
     expect(wrong).toEqual([]);
   }, 120000);
 
@@ -329,7 +403,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status >= 500) failed.push(`${label(route)} → ${res.status}`);
       checked++;
     }
-    expect(checked).toBe(46);
+    expect(checked).toBe(54);
     expect(failed).toEqual([]);
   }, 120000);
 
@@ -339,13 +413,13 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
     for (const route of routes().filter((r) => r.method === 'GET' && !r.pattern.includes(':'))) {
       const agent = await agentFor(route.guard);
       const res = await agent.get(route.pattern);
-      const redirectsOnPurpose = ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department'].includes(route.pattern);
+      const redirectsOnPurpose = ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement' /* 404 until a signed agreement is on file */].includes(route.pattern);
       if (res.status >= 500 || (res.status !== 200 && !redirectsOnPurpose) || (res.status === 200 && (res.text || res.body || '').length === 0)) {
         failed.push(`${label(route)} → ${res.status}`);
       }
       checked++;
     }
-    expect(checked).toBe(22);
+    expect(checked).toBe(33);
     expect(failed).toEqual([]);
   }, 120000);
 

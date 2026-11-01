@@ -1,5 +1,7 @@
 'use strict';
 
+const associateIntakeService = require('../services/associateIntakeService');
+
 const flash = require('../helpers/flash');
 const reasonValidator = require('../helpers/reasonValidator');
 const auditLogRepository = require('../repositories/auditLogRepository');
@@ -20,6 +22,15 @@ const clientIntakeController = require('./clientIntakeController');
  * confirmed flow, this never auto-generates a Quotation.
  */
 
+/** Owner decision 1 Nov 2026 (AS-5, guarantees 1–2): who introduced the buyer, and warnings — same on the list and the board. */
+async function withAssociateInfo(rows) {
+  for (const s of rows) {
+    const info = await associateIntakeService.reviewInfo(s);
+    s.associateInfo = { associate: info.associate, verified: info.verified, confirmed: info.confirmed, flags: info.flags };
+  }
+  return rows;
+}
+
 async function index(req, res) {
   if ((await uiTemplateService.showsBoard(req))) {
     await indexKanban(req, res);
@@ -27,7 +38,7 @@ async function index(req, res) {
   }
 
   res.renderView('client_intake_review/index', {
-    pending: await clientIntakeRepository.pending(),
+    pending: await withAssociateInfo(await clientIntakeRepository.pending()),
     resolved: await clientIntakeRepository.recentResolved(),
     // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
     kanbanUser: (await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban',
@@ -36,7 +47,7 @@ async function index(req, res) {
 
 /** The Kanban UI template's Client Intake Review board: Pending / Converted / Rejected columns. */
 async function indexKanban(req, res) {
-  const pending = await clientIntakeRepository.pending();
+  const pending = await withAssociateInfo(await clientIntakeRepository.pending());
   const resolved = await clientIntakeRepository.recentResolved();
   const converted = resolved.filter((s) => s.status === 'converted');
   const rejected = resolved.filter((s) => s.status === 'rejected');
@@ -51,6 +62,14 @@ async function accept(req, res) {
 
   if (!submission || submission.status !== 'pending') {
     flash.set(req, 'error', 'Submission not found, or already resolved.');
+    res.redirect('/client-intake');
+    return;
+  }
+
+  // Owner decision 1 Nov 2026 (AS-5): an associate's buyer must have verified, and the first completed registration goes first.
+  const blocker = await associateIntakeService.acceptBlocker(submission);
+  if (blocker) {
+    flash.set(req, 'error', blocker);
     res.redirect('/client-intake');
     return;
   }
@@ -105,8 +124,9 @@ async function accept(req, res) {
   // External QA report N-08: this action never reached the audit log, so
   // it never notified anyone either.
   await auditLogRepository.log(user.id, 'CLIENT_INTAKE_ACCEPTED', 'client_intake_submissions', id, null, 'pending', 'converted', null);
+  const associateNote = await associateIntakeService.onAccepted(submission, clientId, user.id);
 
-  flash.set(req, 'success', `Client created — Buyer Inquiry Ref ${clientUniqueNumber}. Proceed to create the order and generate the Quotation.`);
+  flash.set(req, 'success', `Client created — Buyer Inquiry Ref ${clientUniqueNumber}. Proceed to create the order and generate the Quotation.${associateNote !== null ? ` ${associateNote}` : ''}`);
   res.redirect(`/clients/${clientId}`);
 }
 
@@ -150,7 +170,11 @@ async function reject(req, res) {
     return;
   }
 
+  const submission = await clientIntakeRepository.find(id);
   await clientIntakeRepository.markRejected(id, user.id, reason);
+  if (submission && submission.status === 'pending') {
+    await associateIntakeService.onRejected(submission, reason, user.id);
+  }
   // External QA report N-08: this action never reached the audit log, so
   // it never notified anyone either.
   await auditLogRepository.log(user.id, 'CLIENT_INTAKE_REJECTED', 'client_intake_submissions', id, null, 'pending', 'rejected', reason);

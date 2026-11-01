@@ -1285,10 +1285,137 @@ function safeJson(text) {
   }
 }
 
+/**
+ * Port of ZohoBooksService::pushAssociateCommission(). Owner decision 1 Nov
+ * 2026 (AS-12): an associate's paid commission goes to Books as the
+ * associate's own bill (the associate a vendor, the bill numbered with
+ * their invoice) and a vendor payment from the bank with the UTR, applied
+ * to it — instead of an expense. The bill is the gross commission; the
+ * payment is what was paid, so any TDS deducted stays on the bill for the
+ * CA to book against the TDS payable account. Returns the Zoho bill_id.
+ */
+async function pushAssociateCommission(cost) {
+  const associateRepository = require('../repositories/associateRepository');
+  zohoGuard.assertCustomerAllowed(String(cost.buyer_name));
+  const c = await associateCommission(cost);
+  assertVendorAllowed(String(c.associate.name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  let vendorId = String(c.associate.zoho_contact_id || '');
+  if (vendorId === '') {
+    const name = String(c.associate.name);
+    const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
+    for (const row of await getList(accessToken, `https://${config.apiDomain}/books/v3/contacts${query}&contact_type=vendor&contact_name=${encodeURIComponent(name)}`, 'contacts')) {
+      if (String(row.contact_name || '') === name) vendorId = String(row.contact_id);
+    }
+    if (vendorId === '') {
+      const payload = { contact_name: name, company_name: name, contact_type: 'vendor', ...(c.associate.pan ? { pan_no: String(c.associate.pan) } : {}) };
+      if (await isGstRegistered(config, accessToken)) {
+        Object.assign(payload, c.associate.gstin ? { gst_treatment: 'business_gst', gst_no: String(c.associate.gstin) }
+          : ((c.associate.based_in || 'india') === 'india' ? { gst_treatment: 'business_none' } : { gst_treatment: 'overseas' }));
+      }
+      const res = await request('POST', `https://${config.apiDomain}/books/v3/contacts${query}`, payload, authHeaders(accessToken));
+      const decoded = safeJson(res.body);
+      vendorId = String((decoded && decoded.contact && decoded.contact.contact_id) || '');
+      if (!res.ok || vendorId === '') {
+        throw new Error(`Zoho Books vendor creation for associate ${name} failed (HTTP ${res.status}): ${String(res.body).slice(0, 500)}`);
+      }
+    }
+    await associateRepository.setFields(Number(c.associate.id), { zoho_contact_id: vendorId });
+  }
+  let bill = await findBill(config, accessToken, c.bill_no, vendorId);
+  if (!bill) {
+    const res = await request('POST', `https://${config.apiDomain}/books/v3/bills?organization_id=${encodeURIComponent(config.organizationId)}`, {
+      vendor_id: vendorId,
+      bill_number: c.bill_no,
+      date: c.paid_on,
+      reference_number: String(cost.buyer_inquiry_ref),
+      line_items: [{
+        account_id: await accountId(config, accessToken, COST_ACCOUNTS.commission),
+        name: 'Associate commission',
+        description: c.bill_description,
+        rate: c.gross_inr,
+        quantity: 1,
+      }],
+    }, authHeaders(accessToken));
+    bill = await findBill(config, accessToken, c.bill_no, vendorId);
+    if (!bill) {
+      throw new Error(`Zoho Books bill for the associate commission on order ${cost.buyer_inquiry_ref} failed (HTTP ${res.status}): ${String(res.body).slice(0, 500)}`);
+    }
+  }
+  if (c.paid_inr > 0 && Number(bill.balance ?? c.gross_inr) >= c.gross_inr - 0.005) {
+    const res = await request('POST', `https://${config.apiDomain}/books/v3/vendorpayments?organization_id=${encodeURIComponent(config.organizationId)}`, {
+      vendor_id: vendorId,
+      amount: c.paid_inr,
+      date: c.paid_on,
+      payment_mode: 'Bank Transfer',
+      reference_number: c.reference,
+      description: c.payment_description,
+      paid_through_account_id: config.depositAccountId,
+      bills: [{ bill_id: String(bill.bill_id), amount_applied: c.paid_inr }],
+    }, authHeaders(accessToken));
+    const decoded = safeJson(res.body);
+    if (!res.ok || !(decoded && decoded.vendorpayment && typeof decoded.vendorpayment.payment_id === 'string')) {
+      throw new Error(`Zoho Books vendor payment for the associate commission on order ${cost.buyer_inquiry_ref} failed (HTTP ${res.status}): ${String(res.body).slice(0, 500)}`);
+    }
+  }
+  return String(bill.bill_id);
+}
+
+/**
+ * Owner rule D-212: what the associate commission bill and payment say —
+ * the associate, the order, the rate and client number, their invoice, the
+ * TDS, and the bank reference. Built from the facts.
+ */
+async function associateCommission(cost) {
+  const db = require('../config/db');
+  const associateRepository = require('../repositories/associateRepository');
+  const associateDocumentRepository = require('../repositories/associateDocumentRepository');
+  const incentiveRepository = require('../repositories/incentiveRepository');
+  const payouts = await db.query(
+    "SELECT * FROM incentive_payouts WHERE order_id = :o AND payee_kind = 'associate' AND status = 'paid' AND amount_inr > 0 AND clawback_of_payout_id IS NULL ORDER BY id",
+    { o: cost.order_id }
+  );
+  if (!payouts.length) {
+    throw new Error(`Associate commission on order ${cost.buyer_inquiry_ref} not sent: no paid commission found.`);
+  }
+  const a = await associateRepository.find(Number(payouts[0].associate_id));
+  if (!a) {
+    throw new Error(`Associate commission on order ${cost.buyer_inquiry_ref} not sent: the associate is missing.`);
+  }
+  const inc = (await incentiveRepository.forOrder(Number(cost.order_id))) || {};
+  const invoices = [];
+  for (const p of payouts) {
+    const inv = await associateDocumentRepository.invoiceForPayout(Number(p.id));
+    if (inv && inv.reference) invoices.push(String(inv.reference));
+  }
+  const paid = round(payouts.reduce((sum, p) => sum + Number(p.paid_inr), 0), 2);
+  const tds = round(payouts.reduce((sum, p) => sum + Number(p.tds_inr || 0), 0), 2);
+  const refs = [...new Set(payouts.map((p) => String(p.paid_reference || '')).filter((r) => r !== ''))];
+  const paidOn = payouts.map((p) => String(p.paid_on).slice(0, 10)).sort().pop();
+  const billNo = invoices.length ? invoices.join('/').slice(0, 50) : `COMM-${cost.buyer_inquiry_ref}-${payouts[0].id}`;
+  const rate = inc.associate_rate_pct !== null && inc.associate_rate_pct !== undefined
+    ? `${Number(inc.associate_rate_pct).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : '';
+  const what = `Associate commission — ${a.name} — for order ${cost.buyer_inquiry_ref} (${cost.buyer_name})`
+    + (rate !== '' ? `, ${rate} of product FOB` : '') + (inc.associate_order_number ? `, client no. ${inc.associate_order_number}` : '');
+  return {
+    associate: a,
+    bill_no: billNo,
+    paid_on: paidOn,
+    gross_inr: round(paid + tds, 2),
+    paid_inr: paid,
+    tds_inr: tds,
+    reference: refs.join(', '),
+    bill_description: what + (invoices.length ? ` · associate invoice ${invoices.join(', ')}` : ' · no associate invoice on file') + (tds > 0 ? ` · TDS ${tds.toFixed(2)} deducted` : ''),
+    payment_description: `Associate commission payment — ${a.name} — for order ${cost.buyer_inquiry_ref} · against bill ${billNo}`
+      + (tds > 0 ? ` · TDS ${tds.toFixed(2)} deducted` : '') + (refs.length ? ` · bank ref ${refs.join(', ')}` : ''),
+  };
+}
+
 module.exports = {
   BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS, COST_ACCOUNTS, BENEFIT_INCOME_ACCOUNT, BENEFIT_SCRIP_ACCOUNT, GST_REFUND_ACCOUNT, pushGstRefundJournal,
   isEnabled, syncStartDate, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense,
-  pushCostEntry, pushBenefitJournal, listTestJournals, contactRecords, readRecord, totalsById, invoiceByNumber,
+  pushCostEntry, pushAssociateCommission, associateCommission, pushBenefitJournal, listTestJournals, contactRecords, readRecord, totalsById, invoiceByNumber,
   restoreVendorPayment, restoreRevenuePayment,
   testConnection, listExpenses, listTestContacts, listTestExpenses, deleteRecord, setTransport,
 };

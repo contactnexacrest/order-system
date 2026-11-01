@@ -1952,3 +1952,36 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'manage_
  WHERE r.name = 'Procurement Executive'
    AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
 UPDATE payment_presets SET allow_zero_advance = 1 WHERE payment_method = 'LC';
+
+-- Owner decision 1 Nov 2026 (associate system): standard ladder, TDS, protection, permissions, upload context
+-- (same as docs/migrations/2026-11-02a-associate-system.sql, data part).
+-- ---------------------------------------------------------------- settings: the global ladder (AS-17), TDS, protection
+INSERT INTO incentive_settings (setting_key, setting_value)
+SELECT k, v FROM (
+  SELECT 'associate_rate_1_5' AS k, '0.70' AS v UNION ALL SELECT 'associate_rate_6_10', '1.00' UNION ALL SELECT 'associate_rate_11_20', '1.50'
+  UNION ALL SELECT 'associate_rate_21_40', '1.75' UNION ALL SELECT 'associate_rate_41_plus', '2.00'
+  UNION ALL SELECT 'associate_tds_pct', '2.00' UNION ALL SELECT 'associate_protection_months', '12'
+  UNION ALL SELECT 'associate_bank_wait_days', '7') d
+WHERE NOT EXISTS (SELECT 1 FROM incentive_settings s WHERE s.setting_key = d.k);
+
+-- ---------------------------------------------------------------- staff permissions (AS-11)
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT k, n, d, 'Associates' FROM (
+  SELECT 'manage_associates' AS k, 'Manage associates' AS n, 'Associate register, agreements, rates, invitations, client links and their changes, portal access' AS d
+  UNION ALL SELECT 'view_associates', 'View associates', 'See which client was introduced by which associate (no amounts, bank details or agreements)'
+  UNION ALL SELECT 'manage_associate_bank', 'Associate bank & tax details', 'See associates'' full bank details and verify bank changes (two people)') p
+WHERE NOT EXISTS (SELECT 1 FROM permissions x WHERE x.permission_key = p.k);
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p
+ WHERE ((p.permission_key IN ('manage_associates', 'view_associates', 'manage_associate_bank') AND r.name IN ('Admin', 'Managing Director'))
+     OR (p.permission_key IN ('manage_associates', 'view_associates') AND r.name = 'Executive Director')
+     OR (p.permission_key = 'view_associates' AND r.name IN ('Export Executive', 'Sales/Export Manager', 'Sales Director'))
+     OR (p.permission_key = 'manage_associate_bank' AND r.name IN ('Finance Manager', 'Finance Director')))
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+
+-- ---------------------------------------------------------------- upload context for associate documents (KYC, invoices, bank proof, 15CA/CB, TDS certificates)
+INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description)
+SELECT 'associate_document', 'pdf,jpg,jpeg,png', 10485760, 'An associate''s own documents (KYC, tax papers, commission invoices, bank proof, 15CA/CB, TDS certificates) — internal; seen by the associate and by manage_associates / manage_associate_bank only.'
+WHERE NOT EXISTS (SELECT 1 FROM file_upload_contexts WHERE context_key = 'associate_document');
+

@@ -1,0 +1,19 @@
+{# Rendered without a layout. Expects: a (associate), c (client), events (oldest first), printedAt ('1 Nov 2026, 14:05' — PHP date('j M Y, H:i')). #}
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Client registration certificate — {{ c.company_legal_name }}</title>
+<style>body{font-family:Georgia,serif;max-width:760px;margin:40px auto;color:#1d2433}h1{color:#013090;font-size:26px}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ddd;padding:6px;text-align:left;vertical-align:top}.muted{color:#5b6478;font-size:13px}@media print{.noprint{display:none}}</style></head>
+<body>
+<p class="noprint"><button onclick="window.print()">Print / save as PDF</button></p>
+<h1>NexaCrest International Private Limited<br><small>Client registration certificate</small></h1>
+<p>This confirms that the company below was registered with NexaCrest as introduced by our associate, under the associate agreement.</p>
+<table>
+  <tr><th>Associate</th><td>{{ a.name }}{% if a.personal_code %} ({{ a.personal_code }}){% endif %}</td></tr>
+  <tr><th>Client</th><td>{{ c.company_legal_name }} — {{ c.client_unique_number }}</td></tr>
+  <tr><th>Country</th><td>{{ c.country_of_destination or '' }}</td></tr>
+  <tr><th>Registered on</th><td>{{ c.associate_registered_on | shortDate }}</td></tr>
+  <tr><th>Protected until</th><td>{{ (c.associate_locked_until | shortDate) if c.associate_locked_until else '—' }}</td></tr>
+</table>
+<h2>History</h2>
+<table>{% for e in events %}<tr><td style="white-space:nowrap">{{ e.created_at }}</td><td>{{ e.message }}</td></tr>{% endfor %}</table>
+<p class="muted">Printed {{ printedAt }} IST from the NexaCrest associate portal. The history above is kept by NexaCrest and cannot be edited.</p>
+</body></html>

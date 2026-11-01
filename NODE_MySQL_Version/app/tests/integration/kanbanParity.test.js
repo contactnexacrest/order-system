@@ -54,7 +54,7 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
   function parts(html) {
     const body = html.replace(/<(header|nav)\b[\s\S]*?<\/\1>/g, '');
     return {
-      records: all(/href="(\/(?:orders|clients|reorder-requests|procurement)\/\d+)(?:[?"/])/g, body),
+      records: all(/href="(\/(?:orders|clients|reorder-requests|procurement|associates)\/\d+)(?:[?"/])/g, body),
       actions: all(/<form method="post" action="([^"]+)"/g, body),
       filters: [...all(/class="filter-chip[^"]*" href="[^"]*">([^<(]+)/g, body), ...all(/<option value="([a-z_]*)"[^>]*>/g, body)].map((f) => f.trim()),
     };
@@ -108,6 +108,8 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
       notify_party_city: null, notify_party_postcode: null, notify_party_country: null,
       notify_party_contact_person: null, notify_party_phone: null, notify_party_email: null,
     }, '127.0.0.1');
+    const associateId = await require('../../src/repositories/associateRepository').create({ name: 'Parity Associate', based_in: 'india', currency_code: 'INR', status: 'active' }, userId);
+    await require('../../src/services/associateService').linkClient(clientId, associateId, 'staff', null, new Date().toISOString().slice(0, 10), userId);
     await purchasingRepository.create(orderId, null, 'Parity test blocks', null, 5, 'CBM', new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10), userId, null);
   }
 
@@ -120,6 +122,8 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
     ['PI Intake', '/pi-intake-review?view=list', '/pi-intake-review', '/pi-intake-review'],
     ['Procurement', '/procurement?view=list', '/procurement', '/procurement'],
     ['My tasks', '/my-tasks?view=list', '/my-tasks', '/my-tasks'],
+    // Owner decision 1 Nov 2026: the associates register, list and board.
+    ['Associates', '/associates?view=list', '/associates', '/associates'],
   ];
 
   it('offers on every board what its list offers', async () => {

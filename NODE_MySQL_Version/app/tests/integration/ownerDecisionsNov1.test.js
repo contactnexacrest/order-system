@@ -77,6 +77,8 @@ describe('Owner decisions of 1 Nov 2026', () => {
     expect((await post(admin, `/admin/roles/${other}/permissions`, { permission_ids: [...otherBefore, await permissionId('view_cafin')].map(String) })).type).toBe('success');
     const adminRole = await roleId('Admin');
     expect((await post(admin, `/admin/roles/${adminRole}/permissions`, { permission_ids: (await rolePermissionIds(adminRole)).map(String) })).message).toContain('it is a role you work under');
+    // Leave Viewer / Auditor as the seed has it: other test files check who holds view_cafin.
+    expect((await post(admin, `/admin/roles/${other}/permissions`, { permission_ids: otherBefore.map(String) })).type).toBe('success');
   });
 
   it('A-8: personal exceptions follow the same rule', async () => {

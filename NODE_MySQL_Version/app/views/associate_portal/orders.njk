@@ -1,0 +1,15 @@
+{# Expects: orders (each with order_reference, created_at, company_legal_name, products, currency_code, fob_value, stage, buyer_paid_in_full, commission). #}
+<div class="card page-wide">
+  <h1>Orders of my clients</h1>
+  <p class="muted">Commission is earned on a client's first orders (everything ordered in the 10 days from their first purchase order), once the buyer has paid the order in full — never on the advance alone. Repeat orders after that earn no commission.</p>
+  <table class="list">
+    <tr><th>Order</th><th>Client</th><th>Products</th><th>FOB value</th><th>Stage</th><th>Buyer paid in full</th><th>Commission</th></tr>
+    {% for o in orders %}
+      <tr><td><a href="/associate/orders/{{ o.id }}">{{ o.order_reference }}</a><br><small class="muted">{{ o.created_at | shortDate }}</small></td>
+        <td>{{ o.company_legal_name }}</td><td>{{ o.products }}</td>
+        <td>{{ o.currency_code }} {{ o.fob_value | money }}</td><td>{{ o.stage }}</td>
+        <td>{{ 'Yes' if o.buyer_paid_in_full else 'Not yet' }}</td><td>{% include "associate_portal/_commission_cell.njk" %}</td></tr>
+    {% endfor %}
+    {% if orders.length == 0 %}<tr><td colspan="7" class="muted">No orders yet.</td></tr>{% endif %}
+  </table>
+</div>

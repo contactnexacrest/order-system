@@ -7,6 +7,7 @@
       &nbsp;&middot;&nbsp; <a href="/reports/client/{{ client.id }}">Full Report</a>
     {% endif %}
   </p>
+  {% include "partials/associate_line.njk" %}
   {% if not client.is_active %}
     <p class="muted small">Deactivated — hidden from the main Clients list. Nothing was deleted.</p>
   {% endif %}

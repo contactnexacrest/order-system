@@ -9,7 +9,7 @@
       <tr><th>Company</th><th>Contact</th><th>Consignee</th><th>Destination</th><th>Submitted</th><th>Action</th></tr>
       {% for s in pending %}
       <tr>
-        <td>{{ s.company_legal_name }}<br><span class="muted small">{{ s.billing_address }}</span></td>
+        <td>{{ s.company_legal_name }}<br><span class="muted small">{{ s.billing_address }}</span>{% include "client_intake_review/_associate_info.njk" %}</td>
         <td>{{ s.contact_person }}<br><span class="muted small">{{ s.email }} &middot; {{ s.phone or '' }}</span></td>
         <td>{{ 'Same as Buyer' if (s.consignee_same_as_buyer | default(1)) | int == 1 else (s.consignee_name or '—') }}</td>
         <td>

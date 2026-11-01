@@ -1,0 +1,19 @@
+{# Expects: o (one order row as on orders.njk, plus buyer_po_received_on), events (this order's notices). #}
+<div class="card">
+  <h1>Order {{ o.order_reference }}</h1>
+  <table class="kv">
+    <tr><th>Client</th><td>{{ o.company_legal_name }}</td></tr>
+    <tr><th>Ordered on</th><td>{{ o.created_at | shortDate }}{% if o.buyer_po_received_on %} · purchase order received {{ o.buyer_po_received_on | shortDate }}{% endif %}</td></tr>
+    <tr><th>Products</th><td>{{ o.products }}</td></tr>
+    <tr><th>Product value (FOB)</th><td>{{ o.currency_code }} {{ o.fob_value | money }}</td></tr>
+    <tr><th>Stage</th><td>{{ o.stage }}</td></tr>
+    <tr><th>Buyer paid in full</th><td>{{ 'Yes' if o.buyer_paid_in_full else 'Not yet' }}</td></tr>
+    <tr><th>Commission</th><td>{% include "associate_portal/_commission_cell.njk" %}</td></tr>
+  </table>
+  <h2>What happened</h2>
+  <table class="list">
+    {% for e in events %}<tr><td>{{ e.created_at | shortDate }}</td><td>{{ e.message }}</td></tr>{% endfor %}
+    {% if events.length == 0 %}<tr><td class="muted">Nothing yet.</td></tr>{% endif %}
+  </table>
+  <p><a href="/associate/orders">All orders</a></p>
+</div>

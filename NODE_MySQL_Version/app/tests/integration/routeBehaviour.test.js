@@ -430,11 +430,75 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expect(await audits('VENDOR_DETAILS_LINK_GENERATED', supplier)).toBe(1);
 
     const associate = await insert('associates', { name: 'Route Test Associate', status: 'active' });
-    expectDone(await holder.call('POST', `/associates/${associate}/clients`, { client_id: String(client), registered_on: todayIst() }), 'POST /associates/:id/clients');
+    expectDone(await holder.call('POST', `/associates/${associate}/clients`, { client_id: String(client), registered_on: todayIst(), reason: 'Introduced at the trade fair.' }), 'POST /associates/:id/clients');
     expect(await value('SELECT associate_id FROM clients WHERE id = :id', { id: client })).toBe(associate);
-    expectDone(await holder.call('POST', `/associates/${associate}/clients/${client}/unlink`), 'POST /associates/:id/clients/:clientId/unlink');
+    // Owner decision 1 Nov 2026 (guarantee 3): only the MD (or a Super Admin) changes the link, with a reason.
+    expectDone(await holder.call('POST', `/associates/${associate}/clients/${client}/unlink`, { reason: 'Route behaviour test: the link was made by mistake.' }), 'POST /associates/:id/clients/:clientId/unlink');
     expect(await value('SELECT associate_id FROM clients WHERE id = :id', { id: client })).toBeNull();
     expect(await audits('ASSOCIATE_CLIENT_UNLINKED', client)).toBe(1);
+  });
+
+  it('associate staff routes', async () => {
+    const associateBankRepository = require('../../src/repositories/associateBankRepository');
+    const associateDocumentRepository = require('../../src/repositories/associateDocumentRepository');
+    const associateRepository = require('../../src/repositories/associateRepository');
+    expectPage(await holder.call('GET', '/associates?view=list'), 'Associates', 'GET /associates');
+    expectPage(await holder.call('GET', '/associates/new'), 'Add an associate', 'GET /associates/new');
+    const email = `route-assoc-${crypto.randomBytes(4).toString('hex')}@nexacrest.test`;
+    expectDone(await holder.call('POST', '/associates', { name: 'Route Associate', based_in: 'india', currency_code: 'INR', email }), 'POST /associates', 'Associate "Route Associate" added.');
+    const id = Number(await value('SELECT id FROM associates WHERE email = :e', { e: email }));
+    expectPage(await holder.call('GET', `/associates/${id}`), 'Route Associate', 'GET /associates/:id');
+    expectPage(await holder.call('GET', `/associates/${id}/edit`), 'Edit Route Associate', 'GET /associates/:id/edit');
+    expectDone(await holder.call('POST', `/associates/${id}/update`, { name: 'Route Associate', based_in: 'india', currency_code: 'INR', email, rate_1_5: '1.10' }), 'POST /associates/:id/update');
+    expect(await value('SELECT rate_1_5 FROM associates WHERE id = :id', { id })).toBe('1.10');
+    expectPage(await holder.call('GET', '/associates/ladder'), 'Standard rate', 'GET /associates/ladder');
+    expectDone(await holder.call('POST', '/associates/ladder', { rate_1_5: '0.70', rate_6_10: '1.00', rate_11_20: '1.50', rate_21_40: '1.75', rate_41_plus: '2.00',
+      associate_tds_pct: '2.00', associate_protection_months: '12', associate_bank_wait_days: '7' }), 'POST /associates/ladder');
+    expectPage(await holder.call('GET', '/reports/associates'), 'TDS register', 'GET /reports/associates');
+
+    let r = await holder.call('POST', `/associates/${id}/status`, { status: 'active', reason: 'Route test activation' });
+    expect(r.flash).toBe('An associate becomes Active once Accounts have verified their bank details (two people).');
+    r = await holder.call('POST', `/associates/${id}/bank`, { holder_name: 'Route Associate', account_number: '123456789012', account_number_confirm: '123456789012', ifsc: 'HDFC0001234', bank_name: 'HDFC Bank', account_currency: 'INR' });
+    expect(r.flash).toBe('Attach a cancelled cheque or a bank letter (PDF or image).');
+    const bankRow = { holder_name: 'Route Associate', account_number: '123456789012', ifsc: 'HDFC0001234', swift: '', bank_name: 'HDFC Bank', bank_branch_address: '', intermediary_bank: '', account_currency: 'INR' };
+    const bank = await associateBankRepository.request(id, bankRow, true, null);
+    expectDone(await holder.call('POST', `/associates/${id}/bank/${bank}/check`, { check_method: 'Route test call-back and test credit.' }), 'POST /associates/:id/bank/:bankId/check');
+    r = await holder.call('POST', `/associates/${id}/bank/${bank}/verify`);
+    expect(r.flash).toBe('A different person must verify — you already acted on this request.');
+    const other = await signIn(await staffUser('Admin', true));
+    expectDone(await other.call('POST', `/associates/${id}/bank/${bank}/verify`), 'POST /associates/:id/bank/:bankId/verify', 'Verified.');
+    expectPage(await holder.call('GET', `/associates/${id}/bank/${bank}/number`), '123456789012', 'GET /associates/:id/bank/:bankId/number');
+    expect(await audits('ASSOCIATE_BANK_NUMBER_VIEWED', bank)).toBe(1);
+    const second = await associateBankRepository.request(id, { ...bankRow, account_number: '555566667777' }, true, null);
+    expectDone(await holder.call('POST', `/associates/${id}/bank/${second}/reject`, { reason: 'Name does not match the PAN.' }), 'POST /associates/:id/bank/:bankId/reject');
+    expectDone(await holder.call('POST', `/associates/${id}/status`, { status: 'active', reason: 'Route test activation' }), 'POST /associates/:id/status');
+
+    expectDone(await holder.call('POST', `/associates/${id}/portal/invite`), 'POST /associates/:id/portal/invite', `Portal access e-mailed to ${email}.`);
+    expectDone(await holder.call('POST', `/associates/${id}/code`, { readable: 'ROUTE' }), 'POST /associates/:id/code', 'Personal code set to NXA-ROUTE-');
+    expectDone(await holder.call('POST', `/associates/${id}/portal/disable`), 'POST /associates/:id/portal/disable');
+    expectDone(await holder.call('POST', `/associates/${id}/messages`, { body: 'Route test message.' }), 'POST /associates/:id/messages');
+    r = await holder.call('POST', `/associates/${id}/documents`, { kind: 'pan' });
+    expect(r.type).toBe('error');
+    const file = await createTestFile(null, null);
+    const doc = await associateDocumentRepository.add(id, 'pan', file, null, null, false, holder.userId);
+    fs.writeFileSync(await value('SELECT server_path FROM file_store WHERE id = :id', { id: file }), '%PDF-1.4 PAN');
+    const download = await holder.get(`/associates/${id}/documents/${doc}`).buffer(true).parse(binary);
+    expect([download.status, Buffer.from(download.body).toString()]).toEqual([200, '%PDF-1.4 PAN']);
+    expect((await holder.call('GET', `/associates/${id}/agreement`)).status).toBe(404);
+
+    const order = await createTestOrder(await createTestClient());
+    const payout = await insert('incentive_payouts', { order_id: order, payee_kind: 'associate', associate_id: id, role: 'associate', amount_inr: 1000, incentive_month: '2026-11' });
+    expectDone(await holder.call('POST', `/associates/payouts/${payout}/hold`, { reason: 'Waiting for the invoice.' }), 'POST /associates/payouts/:payoutId/hold');
+    expectDone(await holder.call('POST', `/associates/payouts/${payout}/release`), 'POST /associates/payouts/:payoutId/release');
+    await db.execute("UPDATE incentive_payouts SET status = 'paid', paid_inr = 1000, paid_on = CURDATE(), paid_reference = 'UTR1' WHERE id = :id", { id: payout });
+    expectDone(await holder.call('POST', `/associates/payouts/${payout}/clawback`, { amount_inr: '250', reason: 'Buyer refunded a damaged crate.' }), 'POST /associates/payouts/:payoutId/clawback');
+    expect(await value('SELECT amount_inr FROM incentive_payouts WHERE clawback_of_payout_id = :id', { id: payout })).toBe('-250.00');
+
+    await associateRepository.setFields(id, { portal_enabled: 1 });
+    const viewAs = await holder.get(`/associates/${id}/view-as`);
+    expect([viewAs.status, viewAs.headers.location]).toEqual([302, '/associate']);
+    const portal = await holder.get('/associate');
+    expect([portal.status, portal.text.includes('Route Associate'), portal.text.includes('read-only')]).toEqual([200, true, true]);
   });
 
   // ---------------------------------------------------------------- orders

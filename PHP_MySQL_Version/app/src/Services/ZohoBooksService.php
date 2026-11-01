@@ -571,6 +571,136 @@ final class ZohoBooksService
         return $expenseId;
     }
 
+    /**
+     * Owner decision 1 Nov 2026 (AS-12): an associate's paid commission goes
+     * to Books as the associate's own bill (the associate a vendor, the bill
+     * numbered with their invoice) and a vendor payment from the bank with
+     * the UTR, applied to it — instead of an expense. The bill is the gross
+     * commission; the payment is what was paid, so any TDS deducted stays on
+     * the bill for the CA to book against the TDS payable account.
+     *
+     * @param array<string,mixed> $cost ZohoPurchaseRepository::costEntriesToSync() row, incentive_kind 'associate'
+     * @throws \RuntimeException on any failure
+     * @return string the Zoho bill_id
+     */
+    public static function pushAssociateCommission(array $cost): string
+    {
+        ZohoGuard::assertCustomerAllowed((string) $cost['buyer_name']);
+        $c = self::associateCommission($cost);
+        self::assertVendorAllowed((string) $c['associate']['name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $vendorId = (string) ($c['associate']['zoho_contact_id'] ?? '');
+        if ($vendorId === '') {
+            $name = (string) $c['associate']['name'];
+            $query = '?organization_id=' . rawurlencode($config['organizationId']);
+            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/contacts{$query}&contact_type=vendor&contact_name=" . rawurlencode($name), 'contacts') as $row) {
+                if ((string) ($row['contact_name'] ?? '') === $name) {
+                    $vendorId = (string) $row['contact_id'];
+                }
+            }
+            if ($vendorId === '') {
+                $payload = ['contact_name' => $name, 'company_name' => $name, 'contact_type' => 'vendor'] + (!empty($c['associate']['pan']) ? ['pan_no' => (string) $c['associate']['pan']] : []);
+                if (self::isGstRegistered($config, $accessToken)) {
+                    $payload += !empty($c['associate']['gstin']) ? ['gst_treatment' => 'business_gst', 'gst_no' => (string) $c['associate']['gstin']]
+                        : (($c['associate']['based_in'] ?? 'india') === 'india' ? ['gst_treatment' => 'business_none'] : ['gst_treatment' => 'overseas']);
+                }
+                $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts{$query}", $payload, self::authHeaders($accessToken));
+                $vendorId = (string) (json_decode($response['body'], true)['contact']['contact_id'] ?? '');
+                if ($response['status'] < 200 || $response['status'] >= 300 || $vendorId === '') {
+                    throw new \RuntimeException('Zoho Books vendor creation for associate ' . $name . ' failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+                }
+            }
+            \App\Repositories\AssociateRepository::setFields((int) $c['associate']['id'], ['zoho_contact_id' => $vendorId]);
+        }
+        $bill = self::findBill($config, $accessToken, $c['bill_no'], $vendorId);
+        if ($bill === null) {
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/bills?organization_id=" . rawurlencode($config['organizationId']), [
+                'vendor_id' => $vendorId,
+                'bill_number' => $c['bill_no'],
+                'date' => $c['paid_on'],
+                'reference_number' => (string) $cost['buyer_inquiry_ref'],
+                'line_items' => [[
+                    'account_id' => self::accountId($config, $accessToken, self::COST_ACCOUNTS['commission']),
+                    'name' => 'Associate commission',
+                    'description' => $c['bill_description'],
+                    'rate' => $c['gross_inr'],
+                    'quantity' => 1,
+                ]],
+            ], self::authHeaders($accessToken));
+            $bill = self::findBill($config, $accessToken, $c['bill_no'], $vendorId);
+            if ($bill === null) {
+                throw new \RuntimeException("Zoho Books bill for the associate commission on order {$cost['buyer_inquiry_ref']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+        }
+        if ($c['paid_inr'] > 0 && (float) ($bill['balance'] ?? $c['gross_inr']) >= $c['gross_inr'] - 0.005) {
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/vendorpayments?organization_id=" . rawurlencode($config['organizationId']), [
+                'vendor_id' => $vendorId,
+                'amount' => $c['paid_inr'],
+                'date' => $c['paid_on'],
+                'payment_mode' => 'Bank Transfer',
+                'reference_number' => $c['reference'],
+                'description' => $c['payment_description'],
+                'paid_through_account_id' => $config['depositAccountId'],
+                'bills' => [['bill_id' => (string) $bill['bill_id'], 'amount_applied' => $c['paid_inr']]],
+            ], self::authHeaders($accessToken));
+            if ($response['status'] < 200 || $response['status'] >= 300 || !is_string(json_decode($response['body'], true)['vendorpayment']['payment_id'] ?? null)) {
+                throw new \RuntimeException("Zoho Books vendor payment for the associate commission on order {$cost['buyer_inquiry_ref']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+        }
+        return (string) $bill['bill_id'];
+    }
+
+    /**
+     * Owner rule D-212: what the associate commission bill and payment say —
+     * the associate, the order, the rate and client number, their invoice,
+     * the TDS, and the bank reference. Built from the facts.
+     *
+     * @return array{associate: array<string,mixed>, bill_no: string, paid_on: string, gross_inr: float, paid_inr: float, tds_inr: float, reference: string, bill_description: string, payment_description: string}
+     */
+    public static function associateCommission(array $cost): array
+    {
+        $pdo = \App\Config\Database::connection();
+        $stmt = $pdo->prepare("SELECT * FROM incentive_payouts WHERE order_id = :o AND payee_kind = 'associate' AND status = 'paid' AND amount_inr > 0 AND clawback_of_payout_id IS NULL ORDER BY id");
+        $stmt->execute(['o' => $cost['order_id']]);
+        $payouts = $stmt->fetchAll();
+        if ($payouts === []) {
+            throw new \RuntimeException("Associate commission on order {$cost['buyer_inquiry_ref']} not sent: no paid commission found.");
+        }
+        $a = \App\Repositories\AssociateRepository::find((int) $payouts[0]['associate_id']);
+        if ($a === null) {
+            throw new \RuntimeException("Associate commission on order {$cost['buyer_inquiry_ref']} not sent: the associate is missing.");
+        }
+        $inc = \App\Repositories\IncentiveRepository::forOrder((int) $cost['order_id']) ?? [];
+        $invoices = [];
+        foreach ($payouts as $p) {
+            $inv = \App\Repositories\AssociateDocumentRepository::invoiceForPayout((int) $p['id']);
+            if ($inv !== null && !empty($inv['reference'])) {
+                $invoices[] = (string) $inv['reference'];
+            }
+        }
+        $paid = round(array_sum(array_map(static fn (array $p): float => (float) $p['paid_inr'], $payouts)), 2);
+        $tds = round(array_sum(array_map(static fn (array $p): float => (float) ($p['tds_inr'] ?? 0), $payouts)), 2);
+        $refs = array_values(array_unique(array_filter(array_map(static fn (array $p): string => (string) ($p['paid_reference'] ?? ''), $payouts))));
+        $paidOn = max(array_map(static fn (array $p): string => (string) $p['paid_on'], $payouts));
+        $billNo = $invoices !== [] ? substr(implode('/', $invoices), 0, 50) : 'COMM-' . $cost['buyer_inquiry_ref'] . '-' . $payouts[0]['id'];
+        $rate = isset($inc['associate_rate_pct']) ? rtrim(rtrim(number_format((float) $inc['associate_rate_pct'], 2, '.', ''), '0'), '.') . '%' : '';
+        $what = "Associate commission — {$a['name']} — for order {$cost['buyer_inquiry_ref']} ({$cost['buyer_name']})"
+            . ($rate !== '' ? ", {$rate} of product FOB" : '') . (!empty($inc['associate_order_number']) ? ", client no. {$inc['associate_order_number']}" : '');
+        return [
+            'associate' => $a,
+            'bill_no' => $billNo,
+            'paid_on' => $paidOn,
+            'gross_inr' => round($paid + $tds, 2),
+            'paid_inr' => $paid,
+            'tds_inr' => $tds,
+            'reference' => implode(', ', $refs),
+            'bill_description' => $what . ($invoices !== [] ? ' · associate invoice ' . implode(', ', $invoices) : ' · no associate invoice on file') . ($tds > 0 ? ' · TDS ' . number_format($tds, 2, '.', '') . ' deducted' : ''),
+            'payment_description' => "Associate commission payment — {$a['name']} — for order {$cost['buyer_inquiry_ref']} · against bill {$billNo}"
+                . ($tds > 0 ? ' · TDS ' . number_format($tds, 2, '.', '') . ' deducted' : '') . ($refs !== [] ? ' · bank ref ' . implode(', ', $refs) : ''),
+        ];
+    }
+
     /** Owner decision 2026-10-29: where an export benefit lands when received. */
     public const BENEFIT_INCOME_ACCOUNT = 'Export Incentive Income';
     public const BENEFIT_SCRIP_ACCOUNT = 'Export Incentive e-Scrips';

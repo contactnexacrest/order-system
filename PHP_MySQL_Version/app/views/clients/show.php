@@ -28,6 +28,7 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
       &nbsp;·&nbsp; <a href="/reports/client/<?= (int) $client['id'] ?>">Full Report</a>
     <?php endif; ?>
   </p>
+  <?php $__clientId = (int) $client['id']; require dirname(__DIR__) . '/partials/associate_line.php'; ?>
   <?php if ((int) $client['is_active'] === 0): ?>
     <p class="muted small">Deactivated — hidden from the main Clients list. Nothing was deleted.</p>
   <?php endif; ?>

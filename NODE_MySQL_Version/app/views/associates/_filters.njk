@@ -1,0 +1,18 @@
+{# Owner hard rule 2026-11-01: the same filters on the list and on the board.
+   Expects: status, q, counts (map status → n), statuses (STATUSES map), listOfBoard (bool), canBank, pendingBank. #}
+{% set __q = ('&amp;q=' ~ (q | urlencode)) if q else '' %}
+{% set __view = '&amp;view=list' if listOfBoard else '' %}
+{% set __total = 0 %}{% for k, n in counts %}{% set __total = __total + n %}{% endfor %}
+<div class="filter-chip-row">
+  <a class="filter-chip{{ ' active' if status == 'all' else '' }}" href="/associates?status=all{{ __view | safe }}{{ __q | safe }}">All ({{ __total }})</a>
+  {% for key, label in statuses %}{% if not (key == 'inactive' and counts.inactive == 0) %}
+    <a class="filter-chip{{ ' active' if status == key else '' }}" href="/associates?status={{ key }}{{ __view | safe }}{{ __q | safe }}">{{ label }} ({{ counts[key] or 0 }})</a>
+  {% endif %}{% endfor %}
+</div>
+<form method="get" action="/associates" class="inline-form" style="margin:8px 0">
+  <input type="hidden" name="status" value="{{ status }}">
+  {% if listOfBoard %}<input type="hidden" name="view" value="list">{% endif %}
+  <input type="search" name="q" value="{{ q }}" maxlength="100" placeholder="Name, e-mail, code or country" aria-label="Search associates">
+  <button type="submit" class="btn-sm">Search</button>
+</form>
+{% if canBank and pendingBank > 0 %}<div class="alert alert-warning">{{ pendingBank }} bank-detail change(s) wait for checking — open the associate, section "Bank details".</div>{% endif %}

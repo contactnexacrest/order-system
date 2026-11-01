@@ -1,0 +1,2 @@
+{# Expects: __st (status key), statuses (STATUSES map). #}
+{% set __cls = {'invited': 'badge-pending', 'active': 'badge-active', 'suspended': 'badge-lost', 'ended': 'badge-inactive', 'inactive': 'badge-inactive'}[__st] or '' %}<span class="badge {{ __cls }}">{{ statuses[__st] or __st }}</span>

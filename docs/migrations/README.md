@@ -23,6 +23,7 @@ mysql -u <user> -p <database> < docs/migrations/2026-11-01f-export-service-invoi
 mysql -u <user> -p <database> < docs/migrations/2026-11-01g-payment-milestones.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01h-product-categories.sql
 mysql -u <user> -p <database> < docs/migrations/2026-11-01i-owner-decisions.sql
+mysql -u <user> -p <database> < docs/migrations/2026-11-02a-associate-system.sql
 ```
 
 ## Rules every file follows
@@ -80,6 +81,7 @@ needs **27f, 27g, 28a, 28c, 28d, 28e, 29a, 29b, 29c, 29d, 29e, 29f, 30a, 30b, 30
 | 32 | `2026-11-01g-payment-milestones.sql` | D-215 (5a): an order's own payment schedule — the milestones between the advance and the balance (`order_payment_milestones`), each with its remittance, bank reference, clearing and Zoho Books payment. New table only |
 | 33 | `2026-11-01h-product-categories.sql` | D-215 (5a): product categories and their attributes (`product_categories`, `product_category_attributes`; Natural Stone = today's products, Dimensions and Finish) and the order line's category and attribute values (`order_products.category_id`, `attribute_values`, every existing line Natural Stone). New tables and columns only |
 | 34 | `2026-11-01i-owner-decisions.sql` | Owner decisions of 1 Nov 2026: System Administrator loses `data_export_run` (A-8); Procurement Executive gets `manage_suppliers` (C-8); `payment_presets.allow_zero_advance`, on for the Letter of Credit presets (C-4); `daily_digest_log` for the once-a-day digest (C-7); an existing order with no assignee gets its creator (C-7). Safe to run twice |
+| 35 | `2026-11-02a-associate-system.sql` | Associate system (owner decision 1 Nov 2026, AS-1 … AS-17): associates get status Invited/Active/Suspended/Ended, personal rates that may be empty (empty = the standard ladder), a no-commission switch, portal login fields, a personal code; new tables `associate_tokens`, `associate_bank_accounts`, `associate_documents`, `associate_invitations`, `associate_events`, `associate_messages`, `associate_codes`; intake submissions carry the associate, the buyer's e-mail verification and confirmation; clients carry the 12-month lock; orders carry the rate fixed at creation; payouts can be held or clawed back; the standard ladder, TDS %, protection months and bank waiting days in `incentive_settings`; permissions `manage_associates`, `view_associates`, `manage_associate_bank`; upload context `associate_document`. Safe to run twice |
 
 There is no `2026-10-28b` file; that letter was not used.
 

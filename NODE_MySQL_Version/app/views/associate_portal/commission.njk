@@ -1,0 +1,34 @@
+{# Expects: payouts (each with p.month_label, order_reference, note, company_legal_name, amount_fc, currency_code, amount_inr, status, hold_reason, paid_on, paid_inr, tds_inr, paid_reference),
+   totals, print (bool), invoiceByPayout (map payoutId → {id, reference}), documents, docKinds (KINDS map), csrfToken. #}
+<div class="card page-wide">
+  <h1>My commission</h1>
+  {% if not print %}<p><a class="btn-sm btn-secondary" href="/associate/commission?format=csv">Statement (CSV)</a> <a class="btn-sm btn-secondary" href="/associate/commission?print=1" target="_blank" rel="noopener">Printable statement</a></p>{% endif %}
+  <p>Waiting to be paid: <b>₹{{ totals.waiting | money }}</b> · Paid this year: <b>₹{{ totals.paid_year | money }}</b>{% if totals.held > 0 %} · On hold: <b>₹{{ totals.held | money }}</b>{% endif %}</p>
+  <p class="muted small">Each commission is paid in the incentive month shown, against your invoice. Upload your invoice for each line below. Payments go only to your verified bank account.</p>
+  <table class="list">
+    <tr><th>Month</th><th>Order</th><th>Client</th><th>Amount</th><th>Status</th><th>Paid</th>{% if not print %}<th>Your invoice</th>{% endif %}</tr>
+    {% for p in payouts %}{% set inv = invoiceByPayout[p.id] %}
+      <tr><td>{{ p.month_label }}</td><td>{{ p.order_reference }}{% if p.note %}<br><small class="muted">{{ p.note }}</small>{% endif %}</td><td>{{ p.company_legal_name }}</td>
+        <td>{% if p.amount_fc !== null and p.amount_fc !== undefined %}{{ p.currency_code }} {{ p.amount_fc | money }}<br>{% endif %}<small>₹{{ p.amount_inr | money }}</small></td>
+        <td>{% if p.status == 'due' %}{{ 'To be deducted' if (p.amount_inr | float) < 0 else 'Waiting' }}{% elif p.status == 'paid' %}Paid{% elif p.status == 'held' %}On hold{% else %}{{ p.status }}{% endif %}{% if p.hold_reason %}<br><small>{{ p.hold_reason }}</small>{% endif %}</td>
+        <td>{% if p.status == 'paid' %}{{ p.paid_on | shortDate }} · ₹{{ p.paid_inr | money }}{% if (p.tds_inr | float) > 0 %}<br><small>TDS ₹{{ p.tds_inr | money }}</small>{% endif %}{% if p.paid_reference %}<br><small>Ref {{ p.paid_reference }}</small>{% endif %}{% else %}—{% endif %}</td>
+        {% if not print %}<td>
+          {% if inv %}<a href="/associate/documents/{{ inv.id }}">{{ inv.reference or 'Invoice' }}</a>
+          {% elif (p.amount_inr | float) > 0 and p.status != 'paid' %}
+            <form method="post" action="/associate/commission/{{ p.id }}/invoice" enctype="multipart/form-data" class="inline-form"><input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="text" name="invoice_no" required maxlength="100" placeholder="Invoice no." aria-label="Invoice number">
+              <input type="file" name="invoice_file" required accept=".pdf,.jpg,.jpeg,.png" aria-label="Invoice file"><button type="submit" class="btn-sm">Upload</button></form>
+          {% else %}—{% endif %}
+        </td>{% endif %}</tr>
+    {% endfor %}
+    {% if payouts.length == 0 %}<tr><td colspan="7" class="muted">No commission yet. It is earned once a buyer has paid an order in full.</td></tr>{% endif %}
+  </table>
+  {% if not print %}
+  <h2>Tax certificates and statements from NexaCrest</h2>
+  <table class="list">
+    {% for d in documents %}{% if d.kind == 'form_16a' or d.kind == 'form_15ca' or d.kind == 'form_15cb' %}
+      <tr><td>{{ d.created_at | shortDate }}</td><td><a href="/associate/documents/{{ d.id }}">{{ docKinds[d.kind] }}</a></td><td>{{ d.reference or '' }}</td></tr>
+    {% endif %}{% endfor %}
+  </table>
+  {% else %}<script>window.addEventListener('load', () => window.print());</script>{% endif %}
+</div>

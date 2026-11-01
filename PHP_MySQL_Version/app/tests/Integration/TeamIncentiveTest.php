@@ -223,7 +223,7 @@ final class TeamIncentiveTest extends DbTestCase
             return (string) ob_get_clean();
         };
         self::assertStringContainsString('Incentive cut-off day', $render(fn () => $controller->settings([])));
-        self::assertStringContainsString('Add an associate', $render(fn () => $controller->associates([])));
+        self::assertStringContainsString('Add an associate', $render(fn () => (new \App\Controllers\AssociateAdminController())->create([])));
         $_GET = ['month' => '2026-11'];
         $payouts = $render(fn () => $controller->payouts([]));
         $_GET = [];

@@ -172,6 +172,30 @@ final class IncentiveService
         return substr((string) (($order['buyer_po_received_on'] ?? null) ?: $order['created_at']), 0, 10);
     }
 
+    /**
+     * Owner decision 1 Nov 2026 (AS-9): the share of the order's product
+     * value the buyer actually paid (advance, middle milestones, balance or
+     * LC), at most 1. 1 when no receipt amounts are recorded.
+     */
+    public static function receivedRatio(array $order): float
+    {
+        $orderId = (int) $order['id'];
+        $value = OrderProductRepository::totalFobValue($orderId) + OrderProductRepository::totalServiceValue($orderId);
+        $payment = OrderPaymentStatusRepository::find($orderId) ?? [];
+        $received = (float) ($payment['advance_amount'] ?? 0) + (float) ($payment['balance_amount'] ?? 0);
+        $stmt = Database::connection()->prepare('SELECT COALESCE(SUM(received_amount), 0) FROM order_payment_milestones WHERE order_id = :o');
+        $stmt->execute(['o' => $orderId]);
+        $received += (float) $stmt->fetchColumn();
+        if (($order['payment_method'] ?? '') === 'LC') {
+            $lc = OrderLcDetailRepository::find($orderId);
+            $received += (float) ($lc['lc_received_amount'] ?? 0);
+        }
+        if ($value <= 0 || $received <= 0) {
+            return 1.0;
+        }
+        return round(min(1.0, $received / $value), 4);
+    }
+
     /** Rupees per unit of the order currency actually received for the products (advance or LC, and balance). */
     private static function productRate(array $order): float
     {
@@ -255,13 +279,24 @@ final class IncentiveService
             $a = AssociateRepository::find((int) $client['associate_id']);
             if ($a !== null) {
                 $number = !empty($row['associate_order_number']) ? (int) $row['associate_order_number'] : AssociateRepository::orderNumberForClient((int) $a['id'], (int) $order['client_id']);
-                $rate = AssociateRepository::rateFor($a, $number);
-                $fc = round(OrderProductRepository::totalFobValue($orderId) * $rate / 100, 2);
-                $associate = [
-                    'id' => (int) $a['id'], 'name' => (string) $a['name'], 'order_number' => $number, 'rate' => $rate,
-                    'amount_fc' => $fc, 'currency' => (string) ($order['currency_code'] ?? 'INR'),
-                    'amount_inr' => round($fc * self::productRate($order), 2),
-                ];
+                // Owner decision 1 Nov 2026 (AS-17): the rate fixed on the order when it was created; older orders work it out now.
+                if (($order['associate_rate_pct'] ?? null) !== null && (int) ($order['associate_id'] ?? 0) === (int) $a['id']) {
+                    $rate = (float) $order['associate_rate_pct'];
+                    $rateSource = (string) ($order['associate_rate_source'] ?? 'global');
+                } else {
+                    ['rate' => $rate, 'source' => $rateSource] = AssociateRepository::rateWithSource($a, $number);
+                }
+                if ($rateSource !== 'none' && $rate > 0) {
+                    // AS-9: pro rata when the buyer paid less than the order value.
+                    $ratio = self::receivedRatio($order);
+                    $fc = round(OrderProductRepository::totalFobValue($orderId) * $rate / 100 * $ratio, 2);
+                    $associate = [
+                        'id' => (int) $a['id'], 'name' => (string) $a['name'], 'order_number' => $number, 'rate' => $rate, 'rate_source' => $rateSource,
+                        'paid_ratio' => $ratio, 'status' => (string) $a['status'],
+                        'amount_fc' => $fc, 'currency' => (string) ($order['currency_code'] ?? 'INR'),
+                        'amount_inr' => round($fc * self::productRate($order), 2),
+                    ];
+                }
             }
         }
         $basis = round($profitBefore - ($associate['amount_inr'] ?? 0.0), 2);
@@ -382,10 +417,15 @@ final class IncentiveService
             $associateEntryId = null;
             $a = $calc['associate'];
             if ($a !== null && $a['amount_fc'] > 0) {
-                IncentiveRepository::addPayout(['order_id' => $orderId, 'payee_kind' => 'associate', 'associate_id' => $a['id'], 'role' => 'associate',
+                $payoutId = IncentiveRepository::addPayout(['order_id' => $orderId, 'payee_kind' => 'associate', 'associate_id' => $a['id'], 'role' => 'associate',
                     'amount_inr' => $a['amount_inr'], 'amount_fc' => $a['amount_fc'], 'currency_code' => $a['currency'], 'incentive_month' => $month]);
+                // AS-3: a suspended associate's commission is held until the MD releases it.
+                if ($a['status'] === 'suspended') {
+                    IncentiveRepository::holdPayout($payoutId, 'The associate is suspended.');
+                }
                 $associateEntryId = IncentiveRepository::addCostEntry($orderId, 'associate',
-                    'Associate commission — ' . $a['name'] . ' (' . number_format($a['rate'], 2) . '%, client no. ' . $a['order_number'] . ')', $a['amount_inr'], $paidOn, $userId);
+                    'Associate commission — ' . $a['name'] . ' (' . number_format($a['rate'], 2) . '%, client no. ' . $a['order_number'] . ')'
+                    . ($a['paid_ratio'] < 1 ? ' — pro rata ' . rtrim(rtrim(number_format($a['paid_ratio'] * 100, 2), '0'), '.') . '% of the order value received' : ''), $a['amount_inr'], $paidOn, $userId);
             }
             IncentiveRepository::saveOrder($orderId, [
                 'locked_at' => date('Y-m-d H:i:s'),
@@ -407,6 +447,17 @@ final class IncentiveService
         } catch (\Throwable $e) {
             $pdo->rollBack();
             throw $e;
+        }
+        if ($a !== null && $a['amount_fc'] > 0) {
+            $associate = AssociateRepository::find((int) $a['id']);
+            $order = OrderRepository::find($orderId);
+            if ($associate !== null && $order !== null) {
+                AssociateService::notify($associate, $a['status'] === 'suspended' ? 'payout_held' : 'commission_earned',
+                    "Your client paid order {$order['order_reference']} in full. Commission earned: {$a['currency']} " . number_format($a['amount_fc'], 2)
+                    . ' (' . number_format($a['rate'], 2) . '%' . ($a['paid_ratio'] < 1 ? ', pro rata on the amount the buyer paid' : '') . ').'
+                    . ($a['status'] === 'suspended' ? ' It is on hold while your account is suspended.' : ' It is paid in the ' . self::monthLabel($month) . ' payout, against your invoice.'),
+                    (int) $order['client_id'], $orderId);
+            }
         }
     }
 

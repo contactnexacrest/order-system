@@ -495,11 +495,78 @@ final class RouteBehaviourTest extends DbTestCase
         self::assertSame(1, $this->audits('VENDOR_DETAILS_LINK_GENERATED', $supplier));
 
         $associate = $this->insert('associates', ['name' => 'Route Test Associate', 'status' => 'active']);
-        $this->assertDone($this->call('POST', "/associates/{$associate}/clients", ['client_id' => (string) $client, 'registered_on' => date('Y-m-d')]), 'POST /associates/{id}/clients');
+        $this->assertDone($this->call('POST', "/associates/{$associate}/clients", ['client_id' => (string) $client, 'registered_on' => date('Y-m-d'), 'reason' => 'Met the buyer at a fair.']), 'POST /associates/{id}/clients');
         self::assertSame($associate, (int) $this->value("SELECT associate_id FROM clients WHERE id = {$client}"));
-        $this->assertDone($this->call('POST', "/associates/{$associate}/clients/{$client}/unlink"), 'POST /associates/{id}/clients/{clientId}/unlink');
+        $this->assertDone($this->call('POST', "/associates/{$associate}/clients/{$client}/unlink", ['reason' => 'Route behaviour test: link removed.']), 'POST /associates/{id}/clients/{clientId}/unlink');
         self::assertNull($this->value("SELECT associate_id FROM clients WHERE id = {$client}"));
         self::assertSame(1, $this->audits('ASSOCIATE_CLIENT_UNLINKED', $client));
+    }
+
+    /** Owner decision 1 Nov 2026: the associate system's staff routes, through the real router. */
+    public function testAssociateStaffRoutes(): void
+    {
+        $this->assertPage($this->call('GET', '/associates?view=list'), 'Associates', 'GET /associates');
+        $this->assertPage($this->call('GET', '/associates/new'), 'Add an associate', 'GET /associates/new');
+        $email = 'route-assoc-' . bin2hex(random_bytes(4)) . '@nexacrest.test';
+        $r = $this->call('POST', '/associates', ['name' => 'Route Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'email' => $email]);
+        $this->assertDone($r, 'POST /associates', 'Associate "Route Associate" added.');
+        $id = (int) $this->value("SELECT id FROM associates WHERE email = '{$email}'");
+        $this->assertPage($this->call('GET', "/associates/{$id}"), 'Route Associate', 'GET /associates/{id}');
+        $this->assertPage($this->call('GET', "/associates/{$id}/edit"), 'Edit Route Associate', 'GET /associates/{id}/edit');
+        $this->assertDone($this->call('POST', "/associates/{$id}/update", ['name' => 'Route Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'email' => $email, 'rate_1_5' => '1.10']), 'POST /associates/{id}/update');
+        self::assertSame('1.10', $this->value("SELECT rate_1_5 FROM associates WHERE id = {$id}"));
+        $this->assertPage($this->call('GET', '/associates/ladder'), 'Standard rate', 'GET /associates/ladder');
+        $this->assertDone($this->call('POST', '/associates/ladder', ['rate_1_5' => '0.70', 'rate_6_10' => '1.00', 'rate_11_20' => '1.50', 'rate_21_40' => '1.75', 'rate_41_plus' => '2.00',
+            'associate_tds_pct' => '2.00', 'associate_protection_months' => '12', 'associate_bank_wait_days' => '7']), 'POST /associates/ladder');
+        $this->assertPage($this->call('GET', '/reports/associates'), 'TDS register', 'GET /reports/associates');
+
+        $r = $this->call('POST', "/associates/{$id}/status", ['status' => 'active', 'reason' => 'Route test activation']);
+        self::assertSame('An associate becomes Active once Accounts have verified their bank details (two people).', $r['flash'], 'POST /associates/{id}/status');
+        $r = $this->call('POST', "/associates/{$id}/bank", ['holder_name' => 'Route Associate', 'account_number' => '123456789012', 'account_number_confirm' => '123456789012', 'ifsc' => 'HDFC0001234', 'bank_name' => 'HDFC Bank', 'account_currency' => 'INR']);
+        self::assertSame('Attach a cancelled cheque or a bank letter (PDF or image).', $r['flash'], 'POST /associates/{id}/bank');
+        $bank = \App\Repositories\AssociateBankRepository::request($id, ['holder_name' => 'Route Associate', 'account_number' => '123456789012', 'ifsc' => 'HDFC0001234', 'swift' => '', 'bank_name' => 'HDFC Bank', 'bank_branch_address' => '', 'intermediary_bank' => '', 'account_currency' => 'INR'], true, null);
+        $this->assertDone($this->call('POST', "/associates/{$id}/bank/{$bank}/check", ['check_method' => 'Route test call-back and test credit.']), 'POST /associates/{id}/bank/{bankId}/check');
+        $r = $this->call('POST', "/associates/{$id}/bank/{$bank}/verify");
+        self::assertSame('A different person must verify — you already acted on this request.', $r['flash'], 'POST /associates/{id}/bank/{bankId}/verify');
+        $other = $this->createTestUser('Admin');
+        Database::connection()->exec("UPDATE users SET is_super_admin = 1 WHERE id = {$other}");
+        $this->signIn($other);
+        $this->assertDone($this->call('POST', "/associates/{$id}/bank/{$bank}/verify"), 'POST /associates/{id}/bank/{bankId}/verify', 'Verified.');
+        $this->signIn($this->holder);
+        $r = $this->call('GET', "/associates/{$id}/bank/{$bank}/number");
+        $this->assertPage($r, '123456789012', 'GET /associates/{id}/bank/{bankId}/number');
+        self::assertSame(1, $this->audits('ASSOCIATE_BANK_NUMBER_VIEWED', $bank));
+        $second = \App\Repositories\AssociateBankRepository::request($id, ['holder_name' => 'Route Associate', 'account_number' => '555566667777', 'ifsc' => 'HDFC0001234', 'swift' => '', 'bank_name' => 'HDFC Bank', 'bank_branch_address' => '', 'intermediary_bank' => '', 'account_currency' => 'INR'], true, null);
+        $this->assertDone($this->call('POST', "/associates/{$id}/bank/{$second}/reject", ['reason' => 'Name does not match the PAN.']), 'POST /associates/{id}/bank/{bankId}/reject');
+        $this->assertDone($this->call('POST', "/associates/{$id}/status", ['status' => 'active', 'reason' => 'Route test activation']), 'POST /associates/{id}/status');
+
+        $this->assertDone($this->call('POST', "/associates/{$id}/portal/invite"), 'POST /associates/{id}/portal/invite', "Portal access e-mailed to {$email}.");
+        $this->assertDone($this->call('POST', "/associates/{$id}/code", ['readable' => 'ROUTE']), 'POST /associates/{id}/code', 'Personal code set to NXA-ROUTE-');
+        $this->assertDone($this->call('POST', "/associates/{$id}/portal/disable"), 'POST /associates/{id}/portal/disable');
+        $this->assertDone($this->call('POST', "/associates/{$id}/messages", ['body' => 'Route test message.']), 'POST /associates/{id}/messages');
+        $r = $this->call('POST', "/associates/{$id}/documents", ['kind' => 'pan']);
+        self::assertSame('error', $r['type'], 'POST /associates/{id}/documents without a file');
+        $file = $this->createTestFile();
+        $doc = \App\Repositories\AssociateDocumentRepository::add($id, 'pan', $file, null, null, false, $this->holder);
+        $path = (string) $this->value("SELECT server_path FROM file_store WHERE id = {$file}");
+        file_put_contents($path, '%PDF-1.4 PAN');
+        $this->assertPage($this->call('GET', "/associates/{$id}/documents/{$doc}"), '%PDF-1.4 PAN', 'GET /associates/{id}/documents/{docId}');
+        self::assertSame(404, $this->call('GET', "/associates/{$id}/agreement")['code'], 'GET /associates/{id}/agreement: none on file');
+
+        $client = $this->createTestClient();
+        $order = $this->createTestOrder($client);
+        $payout = $this->insert('incentive_payouts', ['order_id' => $order, 'payee_kind' => 'associate', 'associate_id' => $id, 'role' => 'associate', 'amount_inr' => 1000, 'incentive_month' => '2026-11']);
+        $this->assertDone($this->call('POST', "/associates/payouts/{$payout}/hold", ['reason' => 'Waiting for the invoice.']), 'POST /associates/payouts/{payoutId}/hold');
+        $this->assertDone($this->call('POST', "/associates/payouts/{$payout}/release"), 'POST /associates/payouts/{payoutId}/release');
+        Database::connection()->exec("UPDATE incentive_payouts SET status = 'paid', paid_inr = 1000, paid_on = CURDATE(), paid_reference = 'UTR1' WHERE id = {$payout}");
+        $this->assertDone($this->call('POST', "/associates/payouts/{$payout}/clawback", ['amount_inr' => '250', 'reason' => 'Buyer refunded a damaged crate.']), 'POST /associates/payouts/{payoutId}/clawback');
+        self::assertSame('-250.00', $this->value("SELECT amount_inr FROM incentive_payouts WHERE clawback_of_payout_id = {$payout}"));
+
+        \App\Repositories\AssociateRepository::setFields($id, ['portal_enabled' => 1]);
+        $r = $this->call('GET', "/associates/{$id}/view-as");
+        self::assertSame(302, $r['code'], 'GET /associates/{id}/view-as');
+        self::assertSame($id, (int) ($_SESSION['_associate_portal_id'] ?? 0));
+        self::assertSame($this->holder, (int) ($_SESSION['_associate_portal_view_as_staff_id'] ?? 0));
     }
 
     // ---------------------------------------------------------------- orders

@@ -230,6 +230,7 @@ async function show(req, res) {
   const agreementRenewEligible = !!(agreementExpiryDate && new Date(agreementExpiryDate).getTime() <= Date.now() + 30 * 86400000);
 
   res.renderView('clients/show', {
+    associateLine: await require('../repositories/associateRepository').lineForClient(client.id, req.permissions),
     client, orders, impersonationGloballyEnabled, orderHistoryGlobalDefault, documentDownloadsGlobalDefault, impersonationUnavailableReason, additionalDocuments,
     agreementForceExpired, agreementExpiryDate, agreementExpired, agreementActive, agreementRenewEligible,
     duplicateOfClient: client.duplicate_of_client_id ? await clientRepository.find(client.duplicate_of_client_id) : null,

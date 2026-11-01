@@ -17,7 +17,7 @@ function verify() {
       // session genuinely timed out while a form sat open. Redirect to
       // the right login screen instead, same as every other
       // session-expiry path in this app.
-      const loginPath = req.path.startsWith('/client/') ? '/client/login' : '/login';
+      const loginPath = req.path.startsWith('/client/') ? '/client/login' : (req.path.startsWith('/associate/') ? '/associate/login' : '/login');
       res.redirect(loginPath);
       return;
     }

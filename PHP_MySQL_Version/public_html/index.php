@@ -21,6 +21,8 @@ use App\Controllers\OrderExpenseController;
 use App\Controllers\VendorBillController;
 use App\Controllers\ClientController;
 use App\Controllers\DataExportController;
+use App\Controllers\AssociateAdminController;
+use App\Controllers\AssociatePortalController;
 use App\Controllers\ClientIntakeController;
 use App\Controllers\ClientIntakeReviewController;
 use App\Controllers\ClientPortalController;
@@ -67,6 +69,7 @@ use App\Middleware\TestModeGate;
 use App\Controllers\TestModeController;
 use App\Controllers\UserController;
 use App\Helpers\Router;
+use App\Middleware\AssociateAuth;
 use App\Middleware\ClientAuth;
 use App\Middleware\CsrfCheck;
 use App\Middleware\OrderLockGuard;
@@ -147,6 +150,8 @@ $gettingStarted = new GettingStartedController();
 $ca = new CaController();
 $orderFinancials = new OrderFinancialsController();
 $incentives = new IncentiveController();
+$associateAdmin = new AssociateAdminController();
+$associatePortal = new AssociatePortalController();
 $orderExpenses = new OrderExpenseController();
 $vendorBills = new VendorBillController();
 $auditLog = new AuditLogController();
@@ -182,6 +187,10 @@ $router->post('/reset-password/{token}', [$auth, 'resetPassword'], [CsrfCheck::v
 // never a client or order (see ClientIntakeController's docblock).
 $router->get('/quotation-details', [$clientIntake, 'show']);
 $router->post('/quotation-details/submit', [$clientIntake, 'submit'], [CsrfCheck::verify()]);
+// Owner decision 1 Nov 2026 (AS-5): an associate's one-off link, and the buyer's e-mail code + "X introduced us".
+$router->get('/invite/{token}', [$clientIntake, 'invite']);
+$router->get('/quotation-details/verify', [$clientIntake, 'showVerify']);
+$router->post('/quotation-details/verify', [$clientIntake, 'verify'], [CsrfCheck::verify()]);
 $router->get('/quotation-details/edit/{token}', [$clientIntake, 'showEdit']);
 $router->post('/quotation-details/edit/{token}', [$clientIntake, 'updateSubmission'], [CsrfCheck::verify()]);
 
@@ -541,13 +550,35 @@ $router->post('/orders/{id}/travel-expenses', [$orderFinancials, 'saveTravelExpe
 // Team incentives and associates (owner decision 2026-10-30).
 $router->get('/incentives/settings', [$incentives, 'settings'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives')]);
 $router->post('/incentives/settings', [$incentives, 'saveSettings'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
-$router->get('/associates', [$incentives, 'associates'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives')]);
-$router->post('/associates', [$incentives, 'saveAssociate'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
-$router->get('/associates/{id}/edit', [$incentives, 'associates'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives')]);
-$router->post('/associates/{id}/update', [$incentives, 'saveAssociate'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
-$router->get('/associates/{id}/agreement', [$incentives, 'downloadAgreement'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives')]);
-$router->post('/associates/{id}/clients', [$incentives, 'linkClient'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
-$router->post('/associates/{id}/clients/{clientId}/unlink', [$incentives, 'unlinkClient'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
+// Associates — staff side (owner decision 1 Nov 2026, "AS all as recommended").
+$router->get('/associates', [$associateAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_associates', 'manage_associates', 'manage_associate_bank'])]);
+$router->get('/associates/new', [$associateAdmin, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
+$router->post('/associates', [$associateAdmin, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->get('/associates/ladder', [$associateAdmin, 'ladder'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
+$router->post('/associates/ladder', [$associateAdmin, 'saveLadder'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->get('/reports/associates', [$associateAdmin, 'report'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
+$router->get('/associates/{id}', [$associateAdmin, 'show'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_associates', 'manage_associates', 'manage_associate_bank'])]);
+$router->get('/associates/{id}/edit', [$associateAdmin, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
+$router->post('/associates/{id}/update', [$associateAdmin, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/status', [$associateAdmin, 'changeStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/portal/invite', [$associateAdmin, 'invitePortal'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/portal/disable', [$associateAdmin, 'disablePortal'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/code', [$associateAdmin, 'setCode'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->get('/associates/{id}/view-as', [$associateAdmin, 'viewAs'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
+$router->get('/associates/{id}/agreement', [$associateAdmin, 'downloadAgreement'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
+$router->post('/associates/{id}/clients', [$associateAdmin, 'linkClient'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/clients/{clientId}/unlink', [$associateAdmin, 'unlinkClient'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/bank', [$associateAdmin, 'addBank'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/bank/{bankId}/check', [$associateAdmin, 'firstCheck'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/bank/{bankId}/verify', [$associateAdmin, 'verifyBank'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/bank/{bankId}/reject', [$associateAdmin, 'rejectBank'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
+$router->get('/associates/{id}/bank/{bankId}/number', [$associateAdmin, 'bankNumber'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank')]);
+$router->post('/associates/{id}/documents', [$associateAdmin, 'uploadDocument'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_bank']), CsrfCheck::verify()]);
+$router->get('/associates/{id}/documents/{docId}', [$associateAdmin, 'downloadDocument'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_bank'])]);
+$router->post('/associates/{id}/messages', [$associateAdmin, 'reply'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/payouts/{payoutId}/hold', [$associateAdmin, 'holdPayout'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/payouts/{payoutId}/release', [$associateAdmin, 'releasePayout'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/payouts/{payoutId}/clawback', [$associateAdmin, 'clawback'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/incentive', [$incentives, 'saveOrder'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/incentive/people', [$incentives, 'saveOrderPeople'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/incentive/recalculate', [$incentives, 'recalculate'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
@@ -817,6 +848,34 @@ $router->post('/users/{id}/archive', [$users, 'archive'], [SessionAuth::required
 $router->post('/users/{id}/unarchive', [$users, 'unarchive'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 $router->post('/users/{id}/delete', [$users, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 $router->post('/users/{id}/force-reset-password', [$users, 'forceResetPassword'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
+
+// --- Associate portal (owner decision 1 Nov 2026, AS-1): its own login (password + e-mailed code), separate from staff and buyers. ---
+$router->get('/associate/login', [$associatePortal, 'showLogin']);
+$router->post('/associate/login', [$associatePortal, 'login'], [CsrfCheck::verify()]);
+$router->get('/associate/login/code', [$associatePortal, 'showCode']);
+$router->post('/associate/login/code', [$associatePortal, 'verifyCode'], [CsrfCheck::verify()]);
+$router->get('/associate/set-password/{token}', [$associatePortal, 'showSetPassword']);
+$router->post('/associate/set-password/{token}', [$associatePortal, 'setPassword'], [CsrfCheck::verify()]);
+$router->get('/associate/logout', [$associatePortal, 'logout']);
+$router->post('/associate/logout', [$associatePortal, 'logout'], [CsrfCheck::verify()]);
+$router->get('/associate', [$associatePortal, 'home'], [AssociateAuth::required()]);
+$router->get('/associate/clients', [$associatePortal, 'clients'], [AssociateAuth::required()]);
+$router->get('/associate/clients/{id}/certificate', [$associatePortal, 'certificate'], [AssociateAuth::required()]);
+$router->post('/associate/invitations', [$associatePortal, 'createInvitation'], [AssociateAuth::required(), CsrfCheck::verify()]);
+$router->post('/associate/invitations/{id}/cancel', [$associatePortal, 'cancelInvitation'], [AssociateAuth::required(), CsrfCheck::verify()]);
+$router->post('/associate/code', [$associatePortal, 'chooseCode'], [AssociateAuth::required(), CsrfCheck::verify()]);
+$router->get('/associate/orders', [$associatePortal, 'orders'], [AssociateAuth::required()]);
+$router->get('/associate/orders/{id}', [$associatePortal, 'order'], [AssociateAuth::required()]);
+$router->get('/associate/commission', [$associatePortal, 'commission'], [AssociateAuth::required()]);
+$router->post('/associate/commission/{id}/invoice', [$associatePortal, 'uploadInvoice'], [AssociateAuth::required(), CsrfCheck::verify()]);
+$router->get('/associate/profile', [$associatePortal, 'profile'], [AssociateAuth::required()]);
+$router->post('/associate/profile', [$associatePortal, 'saveProfile'], [AssociateAuth::required(), CsrfCheck::verify()]);
+$router->post('/associate/documents', [$associatePortal, 'uploadDocument'], [AssociateAuth::required(), CsrfCheck::verify()]);
+$router->get('/associate/documents/{id}', [$associatePortal, 'downloadDocument'], [AssociateAuth::required()]);
+$router->post('/associate/bank', [$associatePortal, 'requestBank'], [AssociateAuth::required(), CsrfCheck::verify()]);
+$router->get('/associate/agreement', [$associatePortal, 'downloadAgreement'], [AssociateAuth::required()]);
+$router->get('/associate/messages', [$associatePortal, 'messages'], [AssociateAuth::required()]);
+$router->post('/associate/messages', [$associatePortal, 'sendMessage'], [AssociateAuth::required(), CsrfCheck::verify()]);
 
 // --- Client portal (authenticated, structurally separate from staff /
 // SessionAuth) — gated by ClientAuth::required(), a different session key. ---

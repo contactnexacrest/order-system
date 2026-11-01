@@ -3998,6 +3998,7 @@
           {% endif %}
           <div><span class="k">Documents Generated</span><span class="v">{{ documents.length }}</span></div>
           {% if sees.client %}<div><span class="k">Client</span><span class="v">{% if permissions.manage_orders or permissions.view_clients %}<a href="/clients/{{ order.client_id }}">{{ order.company_legal_name }}</a>{% else %}{{ order.company_legal_name }}{% endif %}</span></div>{% endif %}
+          {% if sees.client %}{% include "partials/associate_line.njk" %}{% endif %}
           <div><span class="k">Buyer Inquiry Ref</span><span class="v">{{ order.buyer_inquiry_ref }}</span></div>
           <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v">{{ order.incoterm_code }} {{ order.port_of_loading_name or '—' }}</span></div>
           <div><span class="k">Quotation Date</span><span class="v">{{ order.quotation_date or '—' }}</span></div>

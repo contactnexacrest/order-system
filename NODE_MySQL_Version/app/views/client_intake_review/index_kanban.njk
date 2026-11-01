@@ -5,6 +5,7 @@
     <span class="entity-card-title">{{ s.company_legal_name }}</span>
     {% if s.status and s.status != 'pending' %}<span class="badge {{ 'badge-active' if s.status == 'converted' else 'badge-lost' }}">{{ s.status | capitalize }}</span>{% endif %}
   </div>
+  {% if not s.status or s.status == 'pending' %}{% include "client_intake_review/_associate_info.njk" %}{% endif %}
   {% if not s.status or s.status == 'pending' %}
     <div class="muted small">{{ s.billing_address }}</div>
     <div class="entity-card-sub">{{ s.contact_person }}</div>

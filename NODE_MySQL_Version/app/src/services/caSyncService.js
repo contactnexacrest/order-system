@@ -386,6 +386,22 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
       continue;
     }
     const label = orderCostEntryRepository.CATEGORIES[cost.category] || String(cost.category);
+    // Owner decision 1 Nov 2026 (AS-12): an associate's commission is their own bill and a vendor payment, sent once.
+    if ((cost.incentive_kind ?? null) === 'associate') {
+      if (cost.zoho_expense_id !== null) {
+        continue;
+      }
+      try {
+        const zohoBillId = await zohoBooksService.pushAssociateCommission(cost);
+        await zohoPurchaseRepository.setCostEntrySynced(cost.id, zohoBillId, hash);
+        await log('order_cost', cost.order_id, 'cost', 'success', zohoBillId, `Sent the associate commission (INR ${money(cost.amount_inr)}) as the associate's Zoho Books bill with its vendor payment.`);
+        result.bills += 1;
+      } catch (e) {
+        await log('order_cost', cost.order_id, 'cost', 'error', null, e.message);
+        result.failed += 1;
+      }
+      continue;
+    }
     try {
       const zohoExpenseId = await zohoBooksService.pushCostEntry(cost, cost.zoho_expense_id !== null ? String(cost.zoho_expense_id) : null);
       await zohoPurchaseRepository.setCostEntrySynced(cost.id, zohoExpenseId, hash);

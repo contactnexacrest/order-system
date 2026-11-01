@@ -1,0 +1,14 @@
+{# Expects: messages (with from_associate, user_name, created_at, body), rm (relationship manager {name} or null), csrfToken. #}
+<div class="card">
+  <h1>Messages</h1>
+  <p class="muted">Your relationship manager: <b>{{ rm.name if rm else 'NexaCrest associates team' }}</b></p>
+  {% for m in messages %}
+    <div class="comment"><b>{{ 'You' if m.from_associate == 1 else (m.user_name or 'NexaCrest') }}</b> <small class="muted">{{ m.created_at }}</small><br>{{ m.body | nl2br }}</div>
+  {% endfor %}
+  {% if messages.length == 0 %}<p class="muted">No messages yet.</p>{% endif %}
+  <form method="post" action="/associate/messages">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label>Your message<textarea name="body" required maxlength="4000" rows="4"></textarea></label>
+    <button type="submit" class="btn-sm">Send</button>
+  </form>
+</div>

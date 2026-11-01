@@ -26,7 +26,16 @@ final class ClientIntakeController
 {
     public function show(array $params): void
     {
+        // Owner decision 1 Nov 2026 (AS-5): the associate's link (?inv=) or personal code (?code=).
+        $intro = \App\Services\AssociateIntakeService::introducer($_GET['code'] ?? null, $_GET['inv'] ?? null);
+        if ($intro['invitation'] !== null && $intro['invitation']['status'] === 'created') {
+            \App\Repositories\AssociateInvitationRepository::setStatus((int) $intro['invitation']['id'], 'opened');
+            \App\Repositories\AssociateEventRepository::add((int) $intro['associate']['id'], 'link_opened', "Your invitation link for {$intro['invitation']['company_name']} was opened.", null, null, (int) $intro['invitation']['id'], null, false);
+        }
         View::render('client_intake/form', [
+            'introducer' => $intro['associate'] !== null ? ['name' => (string) $intro['associate']['name'], 'code' => $intro['invitation'] === null ? (string) $intro['associate']['personal_code'] : '', 'inv' => (string) ($intro['invitation']['token'] ?? ''),
+                'company' => (string) ($intro['invitation']['company_name'] ?? ''), 'country' => (string) ($intro['invitation']['country'] ?? '')] : null,
+            'introError' => $intro['error'],
             'wrapClass' => 'intake-wrap',
             'containerTypes' => LookupRepository::dropdownOptions('container_type'),
             'cooTypes' => LookupRepository::dropdownOptions('coo_type'),
@@ -53,14 +62,42 @@ final class ClientIntakeController
             return;
         }
 
+        $back = '/quotation-details' . (!empty($_POST['associate_inv']) ? '?inv=' . rawurlencode((string) $_POST['associate_inv']) : (!empty($_POST['associate_code']) ? '?code=' . rawurlencode((string) $_POST['associate_code']) : ''));
         $data = self::extractAndValidate();
         if ($data === null) {
+            header('Location: ' . $back);
+            return;
+        }
+        // Owner decision 1 Nov 2026 (AS-5): introduced by an associate — their link or personal code.
+        $intro = \App\Services\AssociateIntakeService::introducer($_POST['associate_code'] ?? null, $_POST['associate_inv'] ?? null);
+        $website = trim((string) ($_POST['website'] ?? ''));
+        if ($intro['error'] !== null && (!empty($_POST['associate_code']) || !empty($_POST['associate_inv']))) {
+            Flash::set('error', $intro['error']);
             header('Location: /quotation-details');
+            return;
+        }
+        if (mb_strlen($website) > 255 || ($website !== '' && !preg_match('#^(https?://)?[A-Za-z0-9.-]+\.[A-Za-z]{2,}(/\S*)?$#', $website))) {
+            Flash::set('error', 'Enter your company website as an address (e.g. www.example.com), or leave it empty.');
+            header('Location: ' . $back);
             return;
         }
 
         $id = ClientIntakeRepository::create($data, $_SERVER['REMOTE_ADDR'] ?? null);
         $link = self::issueCorrectionLink($id, $data['email']);
+        if ($intro['associate'] !== null) {
+            $code = \App\Services\AssociateIntakeService::attach($id, $intro['associate'], $intro['invitation'], $data['company_legal_name'], $data['country_of_destination'], $data['email'], !empty($_POST['introduction_confirmed']), $website ?: null);
+            $_SESSION[\App\Services\AssociateIntakeService::SESSION_KEY] = $id;
+            \App\Repositories\AuditLogRepository::log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', $id, 'associate_id', null, (string) $intro['associate']['id'], "Submitted by {$data['company_legal_name']} via the public quotation-details form, introduced by associate {$intro['associate']['name']}.");
+            if (\App\Services\AssociatePortalService::showCodeOnScreen()) {
+                Flash::set('info', "Development only — the e-mail code is {$code}.");
+            }
+            header('Location: /quotation-details/verify');
+            return;
+        }
+        if ($website !== '') {
+            \App\Config\Database::connection()->prepare('UPDATE client_intake_submissions SET website = :w WHERE id = :id')->execute(['w' => $website, 'id' => $id]);
+        }
+        \App\Services\AssociateIntakeService::directContactCheck($id, $data);
 
         // "SYSTEM MUST SEND NOTIFICATION FOR ALL ACTIONS ... THIS IS
         // NON NEGOTIABLE" — export process step 0: a prospect filling in
@@ -72,6 +109,62 @@ final class ClientIntakeController
         \App\Repositories\AuditLogRepository::log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', $id, null, null, null, "Submitted by {$data['company_legal_name']} via the public quotation-details form.");
 
         View::render('client_intake/thank_you', ['correctionLink' => $link], 'layout/bare');
+    }
+
+    /** /invite/{token} — an associate's one-off link: the quotation form, with the associate's name to confirm. */
+    public function invite(array $params): void
+    {
+        header('Location: /quotation-details?inv=' . rawurlencode((string) ($params['token'] ?? '')));
+    }
+
+    /** The buyer's e-mail code and "X introduced us" (owner decision 1 Nov 2026, AS-5). */
+    public function showVerify(array $params): void
+    {
+        $id = (int) ($_SESSION[\App\Services\AssociateIntakeService::SESSION_KEY] ?? 0);
+        $s = $id > 0 ? \App\Services\AssociateIntakeService::submission($id) : null;
+        if ($s === null || $s['status'] !== 'pending' || empty($s['associate_id'])) {
+            View::render('client_intake/link_expired', [], 'layout/bare');
+            return;
+        }
+        View::render('client_intake/verify', ['s' => $s, 'wrapClass' => 'intake-wrap'], 'layout/bare');
+    }
+
+    public function verify(array $params): void
+    {
+        $id = (int) ($_SESSION[\App\Services\AssociateIntakeService::SESSION_KEY] ?? 0);
+        $s = $id > 0 ? \App\Services\AssociateIntakeService::submission($id) : null;
+        if ($s === null) {
+            View::render('client_intake/link_expired', [], 'layout/bare');
+            return;
+        }
+        $answer = (string) ($_POST['introduced'] ?? '');
+        if (!in_array($answer, ['yes', 'no'], true)) {
+            Flash::set('error', 'Tell us whether ' . $s['associate_name'] . ' introduced you.');
+            header('Location: /quotation-details/verify');
+            return;
+        }
+        if (RateLimiter::tooManyRequests('quotation_intake_verify', (string) $id, 10, 30)) {
+            Flash::set('error', 'Too many attempts. Please wait and try again.');
+            header('Location: /quotation-details/verify');
+            return;
+        }
+        $error = \App\Services\AssociateIntakeService::verify($id, (string) ($_POST['code'] ?? ''), $answer === 'yes');
+        if ($error !== null) {
+            if (str_contains($error, 'expired')) {
+                $code = \App\Services\AssociateIntakeService::sendEmailCode($id, (string) $s['email']);
+                if (\App\Services\AssociatePortalService::showCodeOnScreen()) {
+                    $error .= " Development only — the new code is {$code}.";
+                }
+            }
+            Flash::set('error', $error);
+            header('Location: /quotation-details/verify');
+            return;
+        }
+        unset($_SESSION[\App\Services\AssociateIntakeService::SESSION_KEY]);
+        foreach (\App\Repositories\PermissionRepository::usersWithPermission('manage_orders') as $staffUserId) {
+            \App\Repositories\NotificationRepository::create($staffUserId, null, 'client_intake_submitted', null, "New Quotation-stage intake submitted: {$s['company_legal_name']} (introduced by associate {$s['associate_name']}).");
+        }
+        View::render('client_intake/thank_you', ['correctionLink' => null], 'layout/bare');
     }
 
     public function showEdit(array $params): void

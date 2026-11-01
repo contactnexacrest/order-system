@@ -1,0 +1,65 @@
+{# Expects: me, rates (list of {label, rate, source}), banks (each with b.masked, b.usable_later = usable_from after today), usableBankMasked (string|null),
+   documents, docKinds (KINDS map), associateKinds (list of kinds the associate may upload), bankWaitDays, csrfToken. #}
+{% set __india = me.based_in == 'india' %}
+<div class="card page-wide">
+  <h1>My profile</h1>
+  <table class="kv">
+    <tr><th>Name</th><td>{{ me.name }}</td></tr>
+    <tr><th>E-mail (login)</th><td>{{ me.email }} <small class="muted">— ask NexaCrest to change it</small></td></tr>
+    <tr><th>Agreement</th><td>signed {{ (me.agreement_signed_on | shortDate) if me.agreement_signed_on else '—' }}, ends {{ (me.agreement_ends_on | shortDate) if me.agreement_ends_on else '—' }}{% if me.agreement_file_id %} · <a href="/associate/agreement">Download my agreement</a>{% endif %}</td></tr>
+    <tr><th>My commission</th><td>
+      {% if me.no_commission == 1 %}No commission under your agreement.{% else %}
+      {% for r in rates %}
+        <span class="badge">clients {{ r.label }}: {{ r.rate | pct2 }}%</span>
+      {% endfor %}<br><small class="muted">% of the product FOB value of a client's first orders, earned when the buyer has paid in full.</small>{% endif %}</td></tr>
+  </table>
+
+  <div class="section">
+    <h2>Contact and tax details</h2>
+    <form method="post" action="/associate/profile">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <div class="field-grid">
+        <label>Phone<input type="tel" name="phone" maxlength="40" value="{{ me.phone or '' }}"></label>
+        {% if __india %}<label>PAN<input type="text" name="pan" maxlength="10" pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]" title="As on the card, e.g. ABCDE1234F" value="{{ me.pan or '' }}"></label>{% endif %}
+        <label>GSTIN (if registered)<input type="text" name="gstin" maxlength="15" pattern="[0-9]{2}[A-Za-z0-9]{13}" value="{{ me.gstin or '' }}"></label>
+        <label style="grid-column:1/-1">Address<textarea name="address" maxlength="1000" rows="2">{{ me.address or '' }}</textarea></label>
+      </div>
+      <button type="submit" class="btn-sm">Save</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Bank details</h2>
+    <p>Payments go to: <b>{{ usableBankMasked or 'no verified account yet' }}</b></p>
+    <table class="list"><tr><th>Sent</th><th>Account</th><th>Status</th></tr>
+      {% for b in banks %}<tr><td>{{ (b.requested_at | shortDate) if b.requested_at else '—' }}</td><td>{{ b.masked }}</td>
+        <td>{% if b.status == 'pending' %}Being checked by NexaCrest{% elif b.status == 'verified' %}Verified{% if b.usable_later %} — used from {{ b.usable_from | shortDate }}{% endif %}{% elif b.status == 'rejected' %}Not accepted: {{ b.rejected_reason }}{% elif b.status == 'superseded' %}Replaced{% else %}{{ b.status }}{% endif %}</td></tr>{% endfor %}
+      {% if banks.length == 0 %}<tr><td colspan="3" class="muted">None yet.</td></tr>{% endif %}
+    </table>
+    <details><summary>{{ 'Add my bank details' if banks.length == 0 else 'Change my bank details' }}</summary>
+      <p class="muted small">A change is checked by two people at NexaCrest and e-mailed to you. Until then, payments keep going to your verified account; a new account is used {{ bankWaitDays }} days after it is verified.</p>
+      <form method="post" action="/associate/bank" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        {% include "associate_portal/_bank_fields.njk" %}
+        <button type="submit" class="btn-sm">Send for checking</button>
+      </form>
+    </details>
+  </div>
+
+  <div class="section">
+    <h2>My documents</h2>
+    <table class="list"><tr><th>Added</th><th>Document</th><th>Reference</th></tr>
+      {% for d in documents %}<tr><td>{{ d.created_at | shortDate }}</td><td><a href="/associate/documents/{{ d.id }}">{{ docKinds[d.kind] or d.kind }}</a></td><td>{{ d.reference or '' }}</td></tr>{% endfor %}
+      {% if documents.length == 0 %}<tr><td colspan="3" class="muted">None yet.</td></tr>{% endif %}
+    </table>
+    <form method="post" action="/associate/documents" enctype="multipart/form-data" class="inline-form">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <select name="kind" required aria-label="Document kind"><option value="">What is it?</option>
+        {% for k in associateKinds %}{% if k != 'invoice' %}<option value="{{ k }}">{{ docKinds[k] }}</option>{% endif %}{% endfor %}
+      </select>
+      <input type="file" name="document_file" required accept=".pdf,.jpg,.jpeg,.png" aria-label="File">
+      <button type="submit" class="btn-sm">Upload</button>
+    </form>
+    <p class="muted small">{{ 'India: PAN card, address proof, GST certificate if registered.' if __india else 'Abroad: passport or company registration, tax residency certificate, Form 10F, no-PE declaration.' }}</p>
+  </div>
+</div>

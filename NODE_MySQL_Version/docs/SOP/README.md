@@ -44,6 +44,7 @@ implementation detail.
 - [Data Export / Migration](./18-data-export-migration.md) — downloading a structure snapshot and a full data export of the live database, to migrate every historical record into a fresh reinstall without loss.
 - [Complaints](./19-complaints.md) — a buyer flagging a process issue with no intent to cancel, a two-way conversation separate from Disputes.
 - [Incentives](./20-incentives.md) — the incentive cycle, My Incentives, and paying incentives (Accounts).
+- [Associates](./24-associates.md) — the associate portal, how a buyer becomes an associate's client, commission, bank checks and payment.
 - [Departments & Log in as](./21-departments.md) — departments and their designations, choosing and switching department, Admin's Preview as, a person's memberships, personal exceptions with an end date.
 - [Procurement](./22-procurement.md) — purchase requirements from Sales, supplier quotes and comparison, award and approval limits, receipt and quality check, supplier performance.
 - [My tasks, owners & cockpit](./23-coordination.md) — each department's task list built from the orders, one owner per department per order, due and escalation days, the management cockpit, the optional Order Coordinator.

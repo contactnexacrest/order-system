@@ -33,8 +33,17 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
     <span>&#9989; Fields marked * are required</span>
   </div>
 
+  <?php if (!empty($introError)): ?><div class="alert alert-warning"><?= htmlspecialchars($introError) ?></div><?php endif; ?>
   <form method="post" action="/quotation-details/submit">
     <?= Csrf::field() ?>
+    <?php // Owner decision 1 Nov 2026 (AS-5): introduced by an associate — the buyer confirms it themselves. ?>
+    <?php if (!empty($introducer)): ?>
+      <div class="alert alert-info">
+        <?php if ($introducer['inv'] !== ''): ?><input type="hidden" name="associate_inv" value="<?= htmlspecialchars($introducer['inv']) ?>"><?php else: ?><input type="hidden" name="associate_code" value="<?= htmlspecialchars($introducer['code']) ?>"><?php endif; ?>
+        <label class="checkbox"><input type="checkbox" name="introduction_confirmed" value="1"> <b><?= htmlspecialchars($introducer['name']) ?></b> introduced us to NexaCrest — correct</label>
+        <small class="muted">We will also e-mail you a code to confirm your request. Please fill in your own company's details below.</small>
+      </div>
+    <?php endif; ?>
 
     <fieldset class="intake-step">
       <legend><span class="intake-step-num">1</span> Your Details</legend>
@@ -150,6 +159,14 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
             <?php endforeach; ?>
           </select>
         </label>
+        <label>Company website
+          <input type="text" name="website" maxlength="255" placeholder="e.g., www.example.com">
+        </label>
+        <?php if (empty($introducer)): ?>
+        <label>Associate code <small class="muted">(only if a NexaCrest associate introduced you)</small>
+          <input type="text" name="associate_code" maxlength="30" pattern="[Nn][Xx][Aa]-[A-Za-z0-9]{3,12}-[A-Za-z0-9]{2}" title="As the associate gave it, e.g. NXA-RAJESH-7K" placeholder="e.g., NXA-RAJESH-7K">
+        </label>
+        <?php endif; ?>
         <label class="full">Your Own Reference Number
           <input type="text" name="buyer_own_reference" placeholder="Your internal reference number, if any — write NIL if none">
         </label>

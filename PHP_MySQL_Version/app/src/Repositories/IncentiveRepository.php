@@ -198,6 +198,36 @@ final class IncentiveRepository
         return $stmt->rowCount() === 1;
     }
 
+    /** Owner decision 1 Nov 2026 (AS-3): a due payout put on hold, with the reason. */
+    public static function holdPayout(int $id, string $reason): bool
+    {
+        $stmt = Database::connection()->prepare("UPDATE incentive_payouts SET status = 'held', hold_reason = :r WHERE id = :id AND status = 'due'");
+        $stmt->execute(['r' => $reason, 'id' => $id]);
+        return $stmt->rowCount() === 1;
+    }
+
+    public static function releasePayout(int $id): bool
+    {
+        $stmt = Database::connection()->prepare("UPDATE incentive_payouts SET status = 'due', hold_reason = NULL WHERE id = :id AND status = 'held'");
+        $stmt->execute(['id' => $id]);
+        return $stmt->rowCount() === 1;
+    }
+
+    /**
+     * AS-9: a claw-back after a refund — a negative line in the associate's
+     * next payout month, tied to the paid payout it reverses.
+     */
+    public static function addClawback(array $paid, float $amountInr, ?float $amountFc, string $month, string $note): int
+    {
+        $pdo = Database::connection();
+        $pdo->prepare(
+            "INSERT INTO incentive_payouts (order_id, payee_kind, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month, clawback_of_payout_id, note)
+             VALUES (:o, 'associate', :a, 'associate', :inr, :fc, :cur, :m, :of, :n)"
+        )->execute(['o' => $paid['order_id'], 'a' => $paid['associate_id'], 'inr' => -abs($amountInr), 'fc' => $amountFc !== null ? -abs($amountFc) : null,
+            'cur' => $paid['currency_code'], 'm' => $month, 'of' => $paid['id'], 'n' => $note]);
+        return (int) $pdo->lastInsertId();
+    }
+
     public static function deleteOrderPayouts(int $orderId): void
     {
         Database::connection()->prepare('DELETE FROM incentive_payouts WHERE order_id = :id')->execute(['id' => $orderId]);

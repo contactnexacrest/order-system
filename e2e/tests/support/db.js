@@ -119,4 +119,17 @@ function lastEmailSentWithDocument(recipient) {
   return status === 'sent' && documentId !== '';
 }
 
-module.exports = { resetClientPassword, provisionClientLogin, getMailSending, setMailSending, lastEmailSentWithDocument };
+/**
+ * Owner decision 1 Nov 2026 (associates): a verified bank account for the
+ * associate with this e-mail, usable today — the two-person check itself is
+ * covered by the PHPUnit / Jest suites; here it only lets the browser test
+ * set the associate Active.
+ */
+function verifyAssociateBank(email) {
+  const id = runSql(`SELECT id FROM associates WHERE email = '${email.replace(/'/g, "''")}'`, 'find associate');
+  runSql(`INSERT INTO associate_bank_accounts (associate_id, status, holder_name, account_number_enc, account_last4, ifsc, bank_name, account_currency, verified_at, usable_from)
+          VALUES (${Number(id)}, 'verified', 'E2E Associate', 'e2e-not-encrypted', '9012', 'HDFC0001234', 'HDFC Bank', 'INR', NOW(), CURDATE())`, 'verified bank');
+  return Number(id);
+}
+
+module.exports = { resetClientPassword, provisionClientLogin, getMailSending, setMailSending, lastEmailSentWithDocument, verifyAssociateBank };

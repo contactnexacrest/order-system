@@ -163,10 +163,10 @@ describe('Associate agreement on file and the buyer PO received date', () => {
     const audit = await db.queryOne("SELECT COUNT(*) AS n FROM audit_log WHERE action_type = 'ASSOCIATE_AGREEMENT_UPLOADED' AND entity_id = :id", { id: saved.id });
     expect(Number(audit.n)).toBe(1);
 
-    const html = (await agent.get('/associates')).text;
+    const html = (await agent.get('/associates/new')).text;
     expect(html).toContain('enctype="multipart/form-data"');
     expect(html).toContain('<input type="file" name="agreement_file" accept=".pdf,application/pdf" data-required-if="agreement_signed_on"');
-    expect(html).toContain(`<a href="/associates/${saved.id}/agreement" class="small">Signed copy</a>`);
+    expect((await agent.get(`/associates/${saved.id}`)).text).toContain(`<a href="/associates/${saved.id}/agreement" class="small">Signed copy</a>`);
 
     const download = await agent.get(`/associates/${saved.id}/agreement`);
     expect(download.status).toBe(200);

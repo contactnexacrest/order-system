@@ -119,11 +119,11 @@ $currentPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH
 $isActive = static function (string $path) use ($currentPath): bool {
     return $path === '/' ? $currentPath === '/' : str_starts_with($currentPath, $path);
 };
-$opsGroupActive = $isActive('/procurement') || $isActive('/clients') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes') || $isActive('/complaints');
-$insightsGroupActive = $isActive('/cockpit') || $isActive('/reports') || $isActive('/audit-log') || $isActive('/incentives/payouts') || $isActive('/my-incentives');
+$opsGroupActive = $isActive('/procurement') || $isActive('/clients') || $isActive('/associates') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes') || $isActive('/complaints');
+$insightsGroupActive = $isActive('/cockpit') || ($isActive('/reports') && !$isActive('/reports/associates')) || $isActive('/audit-log') || $isActive('/incentives/payouts') || $isActive('/my-incentives');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates') || $isActive('/ui-templates')
-    || $isActive('/logistics-partners') || $isActive('/suppliers') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types') || $isActive('/ports') || $isActive('/incentives/settings') || $isActive('/associates');
+    || $isActive('/logistics-partners') || $isActive('/suppliers') || $isActive('/payment-presets') || $isActive('/admin/dropdown-options') || $isActive('/compliance-task-types') || $isActive('/ports') || $isActive('/incentives/settings');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -172,6 +172,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
         <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></span>Operations</summary>
         <div class="nav-dropdown">
           <?php if ($canOrders || $canViewClients): ?><a href="/clients" class="<?= $isActive('/clients') ? 'active' : '' ?>">Clients</a><?php endif; ?>
+          <?php if ($can('view_associates') || $can('manage_associates') || $can('manage_associate_bank')): ?><a href="/associates" class="<?= $isActive('/associates') ? 'active' : '' ?>">Associates</a><?php endif; ?>
           <?php if ($canOrders || $canViewOrders): ?><a href="/orders" class="<?= $currentPath === '/orders' || (str_starts_with($currentPath, '/orders/') && !str_starts_with($currentPath, '/orders/archived')) ? 'active' : '' ?>">Orders</a><?php endif; ?>
           <?php if ($canViewArchivedOrders): ?><a href="/orders/archived" class="<?= $isActive('/orders/archived') ? 'active' : '' ?>">Archived Orders</a><?php endif; ?>
           <?php // QA Round 5, R5-22: these three routes need manage_orders. ?>
@@ -223,7 +224,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canPermissions): ?><a href="/admin/permissions" class="<?= $isActive('/admin/permissions') ? 'active' : '' ?>">Permissions</a><?php endif; ?>
           <?php if ($canUsers): ?><a href="/users" class="<?= $isActive('/users') ? 'active' : '' ?>">Users</a><?php endif; ?>
           <?php if ($canFieldProtection): ?><a href="/admin/field-protection" class="<?= $isActive('/admin/field-protection') ? 'active' : '' ?>">Field Protection</a><?php endif; ?>
-          <?php if ($canManageIncentives): ?><a href="/incentives/settings" class="<?= $isActive('/incentives/settings') ? 'active' : '' ?>">Team Incentives</a><a href="/associates" class="<?= $isActive('/associates') ? 'active' : '' ?>">Associates</a><?php endif; ?>
+          <?php if ($canManageIncentives): ?><a href="/incentives/settings" class="<?= $isActive('/incentives/settings') ? 'active' : '' ?>">Team Incentives</a><?php endif; ?>
           <?php if ($canOverrides): ?><a href="/admin/overrides" class="<?= $isActive('/admin/overrides') ? 'active' : '' ?>">Admin Overrides</a><?php endif; ?>
           <?php if ($canSampleData): ?><a href="/sample-data" class="<?= $isActive('/sample-data') ? 'active' : '' ?>">Sample Data</a><?php endif; ?>
           <?php if ($canDataExport): ?><a href="/admin/data-export" class="<?= $isActive('/admin/data-export') ? 'active' : '' ?>">Data Export / Migration</a><?php endif; ?>

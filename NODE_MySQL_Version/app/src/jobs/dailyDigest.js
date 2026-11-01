@@ -11,13 +11,17 @@ const dailyDigestService = require('../services/dailyDigestService');
  * person gets at most one digest a day.
  */
 async function run() {
-  return dailyDigestService.run();
+  const result = await dailyDigestService.run();
+  // Owner decision 1 Nov 2026 (AS-5, guarantee 7): associates' protection and agreement reminders (30 and 7 days), expired links.
+  result.associateReminders = await require('../services/associateService').dailyReminders();
+  return result;
 }
 
 if (require.main === module) {
   run()
     .then((r) => {
       console.log(`Daily digest: ${r.sent} sent, ${r.skipped} with nothing waiting or already sent.`);
+      console.log(`Associate reminders: ${r.associateReminders} sent.`);
       return db.pool.end();
     })
     .catch((e) => {

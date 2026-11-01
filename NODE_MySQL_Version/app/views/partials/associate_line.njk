@@ -1,0 +1,6 @@
+{# Owner decision 1 Nov 2026 (guarantee 2): staff see first that a client is an associate's — on the client page and the order page.
+   Expects: associateLine = {id, name, associate_registered_on, associate_locked_until} or null (null when the viewer may not see associates). #}
+{% if associateLine %}
+  <div class="alert alert-info associate-line">&#129309; Associate client — introduced by <a href="/associates/{{ associateLine.id }}">{{ associateLine.name }}</a>
+    {% if associateLine.associate_registered_on %} on {{ associateLine.associate_registered_on | shortDate }}{% endif %}{% if associateLine.associate_locked_until %}, protected until {{ associateLine.associate_locked_until | shortDate }}{% endif %}. Only the MD can change this.</div>
+{% endif %}

@@ -201,6 +201,8 @@ final class OrderRepository
         if ($createdBy > 0) {
             OrderAssigneeRepository::add($orderId, $createdBy, $createdBy);
         }
+        // Owner decision 1 Nov 2026 (AS-17): the associate's rate is fixed on the order now; the associate is told.
+        \App\Services\AssociateService::onOrderCreated($orderId);
         return ['orderId' => $orderId, 'sequenceNo' => $sequenceNo, 'orderReference' => $fields['order_reference']];
     }
 

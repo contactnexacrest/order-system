@@ -1,0 +1,32 @@
+{# Associates register — Standard list.
+   Expects: rows (associates, each with clients[], pending_bank, personal_code, no_commission, rate_*), status, q, counts, statuses, canManage, canBank, pendingBank, kanbanUser. #}
+{% set listOfBoard = kanbanUser %}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>Associates</h1>
+      <p class="muted" style="margin:0">Outside people who introduce clients under a signed agreement. They follow their clients, orders and commission in their own portal.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0">
+      {% if kanbanUser %}<a class="btn-sm btn-secondary" href="/associates">Switch to board view</a>{% endif %}
+      {% if canManage %}<a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/ladder">Standard rates</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a>{% endif %}
+    </div>
+  </div>
+  {% include "associates/_filters.njk" %}
+  <table class="list">
+    <tr><th>Associate</th><th>Status</th><th>Based in</th><th>Personal code</th><th>Clients</th>{% if canManage %}<th>Commission terms</th>{% endif %}{% if canManage or canBank %}<th>Bank</th>{% endif %}<th></th></tr>
+    {% for a in rows %}
+      <tr>
+        <td><a href="/associates/{{ a.id }}">{{ a.name }}</a>{% if a.email %}<br><small class="muted">{{ a.email }}</small>{% endif %}</td>
+        <td>{% set __st = a.status %}{% include "associates/_status_badge.njk" %}</td>
+        <td>{% if a.based_in == 'india' %}India{% else %}Abroad{% if a.country %} — {{ a.country }}{% endif %}{% endif %}</td>
+        <td>{{ a.personal_code or '—' }}</td>
+        <td>{{ a.clients.length }}{% for c in a.clients.slice(0, 3) %}<br><small><a href="/clients/{{ c.id }}">{{ c.company_legal_name }}</a></small>{% endfor %}</td>
+        {% if canManage %}<td>{% if a.no_commission == 1 %}No commission{% elif (a.rate_1_5 | float) > 0 or (a.rate_6_10 | float) > 0 or (a.rate_11_20 | float) > 0 or (a.rate_21_40 | float) > 0 or (a.rate_41_plus | float) > 0 %}Personal rates{% else %}Standard rates{% endif %}</td>{% endif %}
+        {% if canManage or canBank %}<td>{% if a.pending_bank > 0 %}<span class="badge badge-pending">Change to check</span>{% endif %}</td>{% endif %}
+        <td><a class="btn-sm" href="/associates/{{ a.id }}">Open</a></td>
+      </tr>
+    {% endfor %}
+    {% if rows.length == 0 %}<tr><td colspan="8" class="muted">No associates match.</td></tr>{% endif %}
+  </table>
+</div>

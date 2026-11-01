@@ -1,0 +1,9 @@
+{# Owner decision 1 Nov 2026 (AS-5, guarantees 1–2): who introduced the buyer, and warnings — same on the list and the board.
+   Expects: s.associateInfo = {associate (name or null), verified, confirmed, flags[]} (precomputed per submission). #}
+{% set __ai = s.associateInfo %}
+{% if __ai and (__ai.associate or __ai.flags.length) %}
+  <div class="small associate-intake-info">
+    {% if __ai.associate %}<span class="badge {{ 'badge-active' if (__ai.verified and __ai.confirmed) else 'badge-pending' }}">Associate: {{ __ai.associate }}{{ ((' — confirmed by the buyer' if __ai.confirmed else ' — not confirmed') if __ai.verified else ' — e-mail not verified') }}</span>{% endif %}
+    {% for __f in __ai.flags %}<div class="text-warning">&#9888; {{ __f }}</div>{% endfor %}
+  </div>
+{% endif %}

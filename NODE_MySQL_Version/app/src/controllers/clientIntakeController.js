@@ -13,6 +13,11 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const countryList = require('../helpers/countryList');
 const { formatForDb } = require('../helpers/dbDateTime');
+const db = require('../config/db');
+const associateEventRepository = require('../repositories/associateEventRepository');
+const associateInvitationRepository = require('../repositories/associateInvitationRepository');
+const associateIntakeService = require('../services/associateIntakeService');
+const associatePortalService = require('../services/associatePortalService');
 
 // QA-5 INT-05: this form has no auth, no CAPTCHA, and no per-order token
 // the way PI-intake does — a scripted flood from a single IP is otherwise
@@ -33,7 +38,18 @@ const RATE_LIMIT_WINDOW_MINUTES = 15;
  */
 
 async function show(req, res) {
+  // Owner decision 1 Nov 2026 (AS-5): the associate's link (?inv=) or personal code (?code=).
+  const intro = await associateIntakeService.introducer(typeof req.query.code === 'string' ? req.query.code : null, typeof req.query.inv === 'string' ? req.query.inv : null);
+  if (intro.invitation && intro.invitation.status === 'created') {
+    await associateInvitationRepository.setStatus(Number(intro.invitation.id), 'opened');
+    await associateEventRepository.add(Number(intro.associate.id), 'link_opened', `Your invitation link for ${intro.invitation.company_name} was opened.`, null, null, Number(intro.invitation.id), null, false);
+  }
   res.renderView('client_intake/form', {
+    introducer: intro.associate ? {
+      name: String(intro.associate.name), code: intro.invitation ? '' : String(intro.associate.personal_code || ''), inv: String((intro.invitation && intro.invitation.token) || ''),
+      company: String((intro.invitation && intro.invitation.company_name) || ''), country: String((intro.invitation && intro.invitation.country) || ''),
+    } : null,
+    introError: intro.error,
     wrapClass: 'intake-wrap',
     containerTypes: await lookupRepository.dropdownOptions('container_type'),
     cooTypes: await lookupRepository.dropdownOptions('coo_type'),
@@ -49,14 +65,45 @@ async function submit(req, res) {
     return;
   }
 
+  const body = req.body || {};
+  const postedInv = typeof body.associate_inv === 'string' ? body.associate_inv : '';
+  const postedCode = typeof body.associate_code === 'string' ? body.associate_code : '';
+  const backTo = `/quotation-details${postedInv ? `?inv=${encodeURIComponent(postedInv)}` : (postedCode ? `?code=${encodeURIComponent(postedCode)}` : '')}`;
   const data = await extractAndValidate(req);
   if (!data) {
+    res.redirect(backTo);
+    return;
+  }
+  // Owner decision 1 Nov 2026 (AS-5): introduced by an associate — their link or personal code.
+  const intro = await associateIntakeService.introducer(postedCode, postedInv);
+  const website = typeof body.website === 'string' ? body.website.trim() : '';
+  if (intro.error !== null && (postedCode || postedInv)) {
+    flash.set(req, 'error', intro.error);
     res.redirect('/quotation-details');
+    return;
+  }
+  if ([...website].length > 255 || (website !== '' && !/^(https?:\/\/)?[A-Za-z0-9.-]+\.[A-Za-z]{2,}(\/\S*)?$/.test(website))) {
+    flash.set(req, 'error', 'Enter your company website as an address (e.g. www.example.com), or leave it empty.');
+    res.redirect(backTo);
     return;
   }
 
   const id = await clientIntakeRepository.create(data, req.ip || null);
   const link = await issueCorrectionLink(id, data.email);
+  if (intro.associate) {
+    const code = await associateIntakeService.attach(id, intro.associate, intro.invitation, data.company_legal_name, data.country_of_destination, data.email, !!body.introduction_confirmed, website || null);
+    req.session[associateIntakeService.SESSION_KEY] = id;
+    await auditLogRepository.log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', id, 'associate_id', null, String(intro.associate.id), `Submitted by ${data.company_legal_name} via the public quotation-details form, introduced by associate ${intro.associate.name}.`);
+    if (associatePortalService.showCodeOnScreen()) {
+      flash.set(req, 'info', `Development only — the e-mail code is ${code}.`);
+    }
+    res.redirect('/quotation-details/verify');
+    return;
+  }
+  if (website !== '') {
+    await db.execute('UPDATE client_intake_submissions SET website = :w WHERE id = :id', { w: website, id });
+  }
+  await associateIntakeService.directContactCheck(id, data);
 
   // "SYSTEM MUST SEND NOTIFICATION FOR ALL ACTIONS ... THIS IS NON
   // NEGOTIABLE" — export process step 0: a prospect filling in the
@@ -68,6 +115,59 @@ async function submit(req, res) {
   await auditLogRepository.log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', id, null, null, null, `Submitted by ${data.company_legal_name} via the public quotation-details form.`);
 
   res.renderView('client_intake/thank_you', { correctionLink: link }, 'layout/bare');
+}
+
+/** /invite/:token — an associate's one-off link: the quotation form, with the associate's name to confirm. */
+async function invite(req, res) {
+  res.redirect(`/quotation-details?inv=${encodeURIComponent(String(req.params.token || ''))}`);
+}
+
+/** The buyer's e-mail code and "X introduced us" (owner decision 1 Nov 2026, AS-5). */
+async function showVerify(req, res) {
+  const id = Number(req.session[associateIntakeService.SESSION_KEY] || 0);
+  const s = id > 0 ? await associateIntakeService.submission(id) : null;
+  if (!s || s.status !== 'pending' || !s.associate_id) {
+    res.renderView('client_intake/link_expired', {}, 'layout/bare');
+    return;
+  }
+  res.renderView('client_intake/verify', { s, wrapClass: 'intake-wrap' }, 'layout/bare');
+}
+
+async function verify(req, res) {
+  const id = Number(req.session[associateIntakeService.SESSION_KEY] || 0);
+  const s = id > 0 ? await associateIntakeService.submission(id) : null;
+  if (!s) {
+    res.renderView('client_intake/link_expired', {}, 'layout/bare');
+    return;
+  }
+  const answer = String((req.body || {}).introduced || '');
+  if (!['yes', 'no'].includes(answer)) {
+    flash.set(req, 'error', `Tell us whether ${s.associate_name} introduced you.`);
+    res.redirect('/quotation-details/verify');
+    return;
+  }
+  if (await rateLimiter.tooManyRequests('quotation_intake_verify', String(id), 10, 30)) {
+    flash.set(req, 'error', 'Too many attempts. Please wait and try again.');
+    res.redirect('/quotation-details/verify');
+    return;
+  }
+  let error = await associateIntakeService.verify(id, String((req.body || {}).code || ''), answer === 'yes');
+  if (error !== null) {
+    if (error.includes('expired')) {
+      const code = await associateIntakeService.sendEmailCode(id, String(s.email));
+      if (associatePortalService.showCodeOnScreen()) {
+        error += ` Development only — the new code is ${code}.`;
+      }
+    }
+    flash.set(req, 'error', error);
+    res.redirect('/quotation-details/verify');
+    return;
+  }
+  delete req.session[associateIntakeService.SESSION_KEY];
+  for (const staffUserId of await permissionRepository.usersWithPermission('manage_orders')) {
+    await notificationRepository.create(staffUserId, null, 'client_intake_submitted', null, `New Quotation-stage intake submitted: ${s.company_legal_name} (introduced by associate ${s.associate_name}).`);
+  }
+  res.renderView('client_intake/thank_you', { correctionLink: null }, 'layout/bare');
 }
 
 async function showEdit(req, res) {
@@ -249,4 +349,4 @@ async function issueCorrectionLink(submissionId, email) {
   return link;
 }
 
-module.exports = { show, submit, showEdit, updateSubmission, issueCorrectionLink };
+module.exports = { show, submit, invite, showVerify, verify, showEdit, updateSubmission, issueCorrectionLink };

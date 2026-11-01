@@ -1,0 +1,27 @@
+{# Expects: me, statuses (STATUSES map), totals {earned_year, waiting, paid_year, held}, clients, orders (latest 5, each with stage and commission),
+   events (notices: created_at, message, read_at, is_notice), openInvitations (count of created/opened/registered invitations). #}
+<div class="card page-wide">
+  <h1>Welcome, {{ me.name }}</h1>
+  {% if me.status != 'active' %}<div class="alert alert-warning">Your account is {{ (statuses[me.status] or me.status) | lower }}. {{ 'It becomes active once NexaCrest has checked your documents and bank details — add them under Profile.' if me.status == 'invited' else 'Contact your relationship manager.' }}</div>{% endif %}
+  <div class="stat-row">
+    <div class="stat"><div class="stat-label">Earned this year</div><div class="stat-value">₹{{ totals.earned_year | money }}</div></div>
+    <div class="stat"><div class="stat-label">Waiting to be paid</div><div class="stat-value">₹{{ totals.waiting | money }}</div></div>
+    <div class="stat"><div class="stat-label">Paid this year</div><div class="stat-value">₹{{ totals.paid_year | money }}</div></div>
+    {% if totals.held > 0 %}<div class="stat"><div class="stat-label">On hold</div><div class="stat-value">₹{{ totals.held | money }}</div></div>{% endif %}
+  </div>
+  <p>Clients: <b>{{ clients.length }}</b> · Invitations open: <b>{{ openInvitations }}</b>
+    {% if me.personal_code %} · Your personal code: <b>{{ me.personal_code }}</b>{% endif %}</p>
+  <p><a class="btn-sm" href="/associate/clients">Invite a client</a></p>
+
+  <h2>Latest orders</h2>
+  <table class="list"><tr><th>Order</th><th>Client</th><th>Stage</th><th>Commission</th></tr>
+    {% for o in orders %}<tr><td><a href="/associate/orders/{{ o.id }}">{{ o.order_reference }}</a></td><td>{{ o.company_legal_name }}</td><td>{{ o.stage }}</td><td>{% include "associate_portal/_commission_cell.njk" %}</td></tr>{% endfor %}
+    {% if orders.length == 0 %}<tr><td colspan="4" class="muted">No orders yet.</td></tr>{% endif %}
+  </table>
+
+  <h2>Notices</h2>
+  <table class="list">
+    {% for e in events %}<tr><td style="white-space:nowrap">{{ e.created_at | shortDate }}</td><td>{% if not e.read_at and e.is_notice == 1 %}<b>{{ e.message }}</b>{% else %}{{ e.message }}{% endif %}</td></tr>{% endfor %}
+    {% if events.length == 0 %}<tr><td class="muted">Nothing yet.</td></tr>{% endif %}
+  </table>
+</div>

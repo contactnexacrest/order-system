@@ -1,19 +1,15 @@
 'use strict';
 
-const fs = require('fs');
-const recordCheck = require('../helpers/recordCheck');
 const csv = require('../helpers/csv');
 const dates = require('../helpers/dates');
 const flash = require('../helpers/flash');
-const associateRepository = require('../repositories/associateRepository');
+const associateBankRepository = require('../repositories/associateBankRepository');
+const associateService = require('../services/associateService');
 const auditLogRepository = require('../repositories/auditLogRepository');
-const fileStoreRepository = require('../repositories/fileStoreRepository');
 const incentiveRepository = require('../repositories/incentiveRepository');
-const lookupRepository = require('../repositories/lookupRepository');
 const orderRepository = require('../repositories/orderRepository');
 const userRepository = require('../repositories/userRepository');
 const incentiveService = require('../services/incentiveService');
-const fileUploadService = require('../services/fileUploadService');
 const fieldValidator = require('../helpers/fieldValidator');
 
 /**
@@ -164,152 +160,6 @@ async function saveSettings(req, res) {
   }
   flash.set(req, 'success', 'Team incentive settings saved.');
   res.redirect('/incentives/settings');
-}
-
-async function associates(req, res) {
-  // QA Round 6, R6-N07: editing an associate that does not exist is "not found".
-  if (req.params.id !== undefined && !(await associateRepository.find(parseInt(req.params.id, 10)))) {
-    res.status(404).send('Associate not found.');
-    return;
-  }
-  const list = await associateRepository.all();
-  const clientsByAssociate = {};
-  for (const a of list) {
-    clientsByAssociate[Number(a.id)] = await associateRepository.clients(Number(a.id));
-  }
-  for (const a of list) {
-    a.rateText = [a.rate_1_5, a.rate_6_10, a.rate_11_20, a.rate_21_40, a.rate_41_plus].map((r) => `${trimPct(r)}%`).join(' / ');
-  }
-  res.renderView('incentives/associates', {
-    rateFields: [
-      { name: 'rate_1_5', label: 'Orders 1–5', default: '0.70' },
-      { name: 'rate_6_10', label: 'Orders 6–10', default: '1.00' },
-      { name: 'rate_11_20', label: 'Orders 11–20', default: '1.50' },
-      { name: 'rate_21_40', label: 'Orders 21–40', default: '1.75' },
-      { name: 'rate_41_plus', label: 'Order 41 onward', default: '2.00' },
-    ],
-    associates: list,
-    clientsByAssociate,
-    unlinkedClients: await associateRepository.unlinkedClients(),
-    currencies: await lookupRepository.currencies(),
-    editing: req.params.id ? await associateRepository.find(parseInt(req.params.id, 10)) : null,
-  }, 'layout/base');
-}
-
-async function saveAssociate(req, res) {
-  const id = req.params.id ? parseInt(req.params.id, 10) : null;
-  if (id !== null && await recordCheck.missing(req, res, 'associates', id, '/associates', 'associate')) return;
-  const body = req.body || {};
-  const data = {};
-  for (const f of associateRepository.FIELDS) {
-    const v = String(body[f] ?? '').trim();
-    data[f] = v === '' ? null : v;
-  }
-  const errors = [];
-  if (data.name === null || [...data.name].length > 150) {
-    errors.push('Enter the associate\'s name (up to 150 characters).');
-  }
-  if (!['india', 'abroad'].includes(data.based_in)) {
-    errors.push('Choose whether the associate is in India or abroad.');
-  }
-  if (!/^[A-Z]{3}$/.test(String(data.currency_code ?? ''))) {
-    errors.push('Choose the currency the associate is paid in.');
-  }
-  if (data.email !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-    errors.push('Enter a valid email address, or leave it empty.');
-  }
-  if (data.agreement_signed_on !== null && !DATE_RE.test(data.agreement_signed_on)) {
-    errors.push('Enter the agreement date as a date.');
-  }
-  for (const r of ['rate_1_5', 'rate_6_10', 'rate_11_20', 'rate_21_40', 'rate_41_plus']) {
-    if (!isNum(data[r]) || Number(data[r]) < 0 || Number(data[r]) > 20) {
-      errors.push('Enter every commission rate as a % from 0 to 20.');
-      break;
-    }
-  }
-  data.status = data.status === 'inactive' ? 'inactive' : 'active';
-  // Owner decision 2026-10-30: the signed agreement is kept with its date —
-  // a signing date needs the signed copy on file, and the other way round.
-  const existing = id !== null ? await associateRepository.find(id) : null;
-  const hasUpload = Boolean(req.file && req.file.originalname);
-  if (data.agreement_signed_on !== null && !hasUpload && !(existing && existing.agreement_file_id)) {
-    errors.push('Attach the signed agreement (PDF) with its signing date.');
-  }
-  if ((hasUpload || (existing && existing.agreement_file_id)) && data.agreement_signed_on === null) {
-    errors.push('Enter the date the agreement was signed with its signed copy.');
-  }
-  if (errors.length) {
-    flash.set(req, 'error', errors.join(' '));
-    res.redirect(id ? `/associates/${id}/edit` : '/associates');
-    return;
-  }
-  let fileId = null;
-  if (hasUpload) {
-    try {
-      fileId = await fileUploadService.handleUpload(req, 'agreement_file', 'associate_agreement', 'associates/agreements', null, null, req.user.id, null, data.name, 'Signed associate agreement');
-    } catch (e) {
-      flash.setErrorFromException(req, e);
-      res.redirect(id ? `/associates/${id}/edit` : '/associates');
-      return;
-    }
-  }
-  let savedId = id;
-  if (id === null) {
-    savedId = await associateRepository.create(data, req.user.id);
-    await auditLogRepository.log(req.user.id, 'ASSOCIATE_ADDED', 'associates', savedId, null, null, data.name);
-    flash.set(req, 'success', `Associate "${data.name}" added.`);
-  } else {
-    await associateRepository.update(id, data);
-    await auditLogRepository.log(req.user.id, 'ASSOCIATE_UPDATED', 'associates', id, null, null, JSON.stringify(data));
-    flash.set(req, 'success', `Associate "${data.name}" saved.`);
-  }
-  if (fileId !== null) {
-    await associateRepository.setAgreementFile(savedId, fileId);
-    await auditLogRepository.log(req.user.id, 'ASSOCIATE_AGREEMENT_UPLOADED', 'associates', savedId, 'agreement_file_id', existing && existing.agreement_file_id ? String(existing.agreement_file_id) : null, String(fileId));
-  }
-  res.redirect('/associates');
-}
-
-/** The signed agreement — internal (manage_incentives only), every download audit-logged. */
-async function downloadAgreement(req, res) {
-  const associate = await associateRepository.find(parseInt(req.params.id, 10));
-  const file = associate && associate.agreement_file_id ? await fileStoreRepository.find(Number(associate.agreement_file_id)) : null;
-  if (!file || !fs.existsSync(file.server_path)) {
-    res.status(404).send('No signed agreement is on file for this associate.');
-    return;
-  }
-  await auditLogRepository.log(req.user.id, 'ASSOCIATE_AGREEMENT_DOWNLOADED', 'associates', Number(associate.id), null, null, file.original_filename);
-  // eslint-disable-next-line no-control-regex
-  const name = String(file.original_filename).replace(/[\x00-\x1F\x7F"/\\]/g, '-');
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
-  res.setHeader('Content-Length', String(fs.statSync(file.server_path).size));
-  res.setHeader('Cache-Control', 'private, no-store');
-  res.send(fs.readFileSync(file.server_path));
-}
-
-async function linkClient(req, res) {
-  const associateId = parseInt(req.params.id, 10);
-  const clientId = parseInt((req.body || {}).client_id || 0, 10);
-  const registeredOn = String((req.body || {}).registered_on || '');
-  if (!(await associateRepository.find(associateId)) || !(clientId > 0) || !DATE_RE.test(registeredOn)) {
-    flash.set(req, 'error', 'Choose the client and the date the associate registered the lead.');
-    res.redirect('/associates');
-    return;
-  }
-  await associateRepository.linkClient(clientId, associateId, registeredOn);
-  await auditLogRepository.log(req.user.id, 'ASSOCIATE_CLIENT_LINKED', 'clients', clientId, 'associate_id', null, String(associateId));
-  flash.set(req, 'success', 'Client linked to the associate.');
-  res.redirect('/associates');
-}
-
-async function unlinkClient(req, res) {
-  const clientId = parseInt(req.params.clientId, 10);
-  if (await recordCheck.missing(req, res, 'clients', clientId, '/associates', 'client link', { associate_id: parseInt(req.params.id, 10) })) return;
-  await associateRepository.linkClient(clientId, null, null);
-  await auditLogRepository.log(req.user.id, 'ASSOCIATE_CLIENT_UNLINKED', 'clients', clientId, 'associate_id', String(req.params.id), null);
-  flash.set(req, 'success', 'Client unlinked from the associate.');
-  res.redirect('/associates');
 }
 
 async function saveOrder(req, res) {
@@ -479,9 +329,21 @@ async function markPaid(req, res) {
     return;
   }
   let count = 0;
+  let skipped = 0;
   for (const id of ids) {
     const payout = await incentiveRepository.findPayout(id);
-    if (!payout || payout.status !== 'due') {
+    if (!payout || payout.status !== 'due' || Number(payout.amount_inr) < 0) {
+      // A claw-back line (negative) is settled with the associate's next payment, never paid on its own.
+      continue;
+    }
+    // Owner decision 1 Nov 2026 (AS-7): an associate is paid only into a verified bank account past its waiting days.
+    if (payout.payee_kind === 'associate' && !(await associateBankRepository.usable(Number(payout.associate_id), paidOn))) {
+      if (single) {
+        flash.set(req, 'error', `This associate has no verified bank account usable on ${dates.short(paidOn)} — Accounts must verify their bank details first (two people), and a new account is usable only after its waiting days.`);
+        res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+        return;
+      }
+      skipped++;
       continue;
     }
     const paidInr = single && isNum(body.paid_inr) ? Number(body.paid_inr) : Number(payout.amount_inr);
@@ -508,13 +370,16 @@ async function markPaid(req, res) {
       continue;
     }
     await auditLogRepository.log(req.user.id, 'INCENTIVE_PAID', 'incentive_payouts', id, 'status', 'due', 'paid');
+    if (payout.payee_kind === 'associate') {
+      await associateService.onPayoutPaid(id, req.user.id);
+    }
     count++;
   }
   // QA Round 6, R6-N11: nothing selected (or all already paid) is not a success.
   if (count === 0) {
-    flash.set(req, 'warning', 'Nothing was recorded — no payout due for payment was selected.');
+    flash.set(req, 'warning', `Nothing was recorded — no payout due for payment was selected.${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}`);
   } else {
-    flash.set(req, 'success', count === 1 ? 'Payment recorded.' : `${count} payments recorded.`);
+    flash.set(req, 'success', `${count === 1 ? 'Payment recorded.' : `${count} payments recorded.`}${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}`);
   }
   res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
 }
@@ -522,11 +387,6 @@ async function markPaid(req, res) {
 module.exports = {
   settings,
   saveSettings,
-  associates,
-  saveAssociate,
-  downloadAgreement,
-  linkClient,
-  unlinkClient,
   saveOrder,
   saveOrderPeople,
   recalculate,

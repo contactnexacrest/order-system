@@ -43,7 +43,7 @@ final class CsrfCheck
                 // same as every other session-expiry path (SessionAuth's
                 // idle-timeout branch) already does.
                 $requestPath = (string) (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/');
-                $loginPath = str_starts_with($requestPath, '/client/') ? '/client/login' : '/login';
+                $loginPath = str_starts_with($requestPath, '/client/') ? '/client/login' : (str_starts_with($requestPath, '/associate/') ? '/associate/login' : '/login');
                 header('Location: ' . $loginPath);
                 return false;
             }

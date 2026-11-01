@@ -4577,6 +4577,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <?php if ($sees['client']): // D-214: Procurement sees the order number only (QA R7-N02) ?>
           <div><span class="k">Client</span><span class="v"><?php if ($canOpenClient): ?><a href="/clients/<?= (int) $order['client_id'] ?>"><?= htmlspecialchars($order['company_legal_name']) ?></a><?php else: ?><?= htmlspecialchars($order['company_legal_name']) ?><?php endif; ?></span></div>
           <?php endif; ?>
+          <?php if ($sees['client']) { $__clientId = (int) $order['client_id']; require dirname(__DIR__) . '/partials/associate_line.php'; } ?>
           <div><span class="k">Buyer Inquiry Ref</span><span class="v"><?= htmlspecialchars($order['buyer_inquiry_ref']) ?></span></div>
           <div><span class="k">Incoterm &amp; Port of Loading</span><span class="v"><?= htmlspecialchars($order['incoterm_code']) ?> <?= htmlspecialchars($order['port_of_loading_name'] ?? '—') ?></span></div>
           <div><span class="k">Quotation Date</span><span class="v"><?= htmlspecialchars($order['quotation_date'] ?? '—') ?></span></div>

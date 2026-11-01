@@ -1183,6 +1183,7 @@ async function show(req, res) {
   res.renderView(
     'orders/show',
     {
+      associateLine: await require('../repositories/associateRepository').lineForClient(Number(order.client_id), req.permissions),
       stageGateDisabled,
       stageGateNotice,
       canManageIncentives,

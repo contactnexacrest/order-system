@@ -129,6 +129,36 @@ final class UngatedRoutesTest extends DbTestCase
         'POST /test-mode/enable super-admin +csrf',
         'POST /test-mode/test-email super-admin +csrf',
         'POST /vendor-details/{} public +csrf',
+        // Owner decision 1 Nov 2026 (AS-1, AS-5): the associate portal (its own sign-in) and the buyer's invitation link / e-mail code.
+        'GET /associate associate',
+        'GET /associate/agreement associate',
+        'GET /associate/clients associate',
+        'GET /associate/clients/{}/certificate associate',
+        'GET /associate/commission associate',
+        'GET /associate/documents/{} associate',
+        'GET /associate/login public',
+        'GET /associate/login/code public',
+        'GET /associate/logout public',
+        'GET /associate/messages associate',
+        'GET /associate/orders associate',
+        'GET /associate/orders/{} associate',
+        'GET /associate/profile associate',
+        'GET /associate/set-password/{} public',
+        'GET /invite/{} public',
+        'GET /quotation-details/verify public',
+        'POST /associate/bank associate +csrf',
+        'POST /associate/code associate +csrf',
+        'POST /associate/commission/{}/invoice associate +csrf',
+        'POST /associate/documents associate +csrf',
+        'POST /associate/invitations associate +csrf',
+        'POST /associate/invitations/{}/cancel associate +csrf',
+        'POST /associate/login public +csrf',
+        'POST /associate/login/code public +csrf',
+        'POST /associate/logout public +csrf',
+        'POST /associate/messages associate +csrf',
+        'POST /associate/profile associate +csrf',
+        'POST /associate/set-password/{} public +csrf',
+        'POST /quotation-details/verify public +csrf',
     ];
 
     private const PASSWORD = 'UngatedRoutes123!';
@@ -170,6 +200,7 @@ final class UngatedRoutesTest extends DbTestCase
             $guard = match (true) {
                 in_array('SuperAdminOnly', $names[1], true) => 'super-admin',
                 in_array('ClientAuth', $names[1], true) => 'client',
+                in_array('AssociateAuth', $names[1], true) => 'associate',
                 in_array('SessionAuth', $names[1], true) => 'staff',
                 default => 'public',
             };
@@ -213,10 +244,23 @@ final class UngatedRoutesTest extends DbTestCase
             'staff' => $this->signInStaff($this->adminId()),
             'super-admin' => $this->signInStaff($this->superAdminId()),
             'client' => $this->signInClient($this->clientWithLogin()),
+            'associate' => $this->signInAssociate(),
             default => $this->signOut(),
         };
     }
 
+    private function signInAssociate(): void
+    {
+        if ($this->associate === null) {
+            $this->associate = \App\Repositories\AssociateRepository::create(['name' => 'Ungated Routes Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'status' => 'active',
+                'email' => 'ungated-assoc-' . bin2hex(random_bytes(4)) . '@nexacrest.test'], $this->adminId());
+            \App\Repositories\AssociateRepository::setFields($this->associate, ['portal_enabled' => 1]);
+        }
+        $_SESSION = ['_associate_portal_id' => $this->associate];
+        PermissionService::resetCache();
+    }
+
+    private ?int $associate = null;
     private ?int $admin = null;
     private ?int $superAdmin = null;
     private ?int $client = null;
@@ -397,6 +441,30 @@ final class UngatedRoutesTest extends DbTestCase
         self::assertSame([], $wrong);
     }
 
+    /** Owner decision 1 Nov 2026 (AS-1): signed out — or signed in as staff or a buyer — every associate page goes to the associate login. */
+    public function testEveryAssociateRouteNeedsTheAssociatesOwnSignIn(): void
+    {
+        $wrong = [];
+        $checked = 0;
+        foreach (self::routes() as $route) {
+            if ($route['guard'] !== 'associate') {
+                continue;
+            }
+            foreach (['out' => fn () => $this->signOut(), 'staff' => fn () => $this->signInStaff($this->adminId()), 'client' => fn () => $this->signInClient($this->clientWithLogin())] as $who => $signIn) {
+                $signIn();
+                $refusedBy = $this->refusedBy($route);
+                $signIn();
+                [$code, $body] = $this->dispatch($route['method'], self::concrete($route['pattern']));
+                if ($refusedBy !== 'AssociateAuth' || $code !== 302 || trim($body) !== '') {
+                    $wrong[] = self::label($route) . " ({$who}) → refused by {$refusedBy}, {$code}";
+                }
+            }
+            $checked++;
+        }
+        self::assertSame(18, $checked);
+        self::assertSame([], $wrong);
+    }
+
     public function testAStaffSignInDoesNotOpenTheClientPortalAndAClientSignInDoesNotOpenStaffPages(): void
     {
         $wrong = [];
@@ -461,7 +529,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(47, $checked);
+        self::assertSame(60, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -485,7 +553,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(46, $checked);
+        self::assertSame(54, $checked);
         self::assertSame([], $failed);
     }
 
@@ -500,7 +568,8 @@ final class UngatedRoutesTest extends DbTestCase
             $this->signInFor($route['guard']);
             try {
                 [$code, $body] = $this->dispatch('GET', $route['pattern']);
-                $redirectsOnPurpose = in_array($route['pattern'], ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department'], true);
+                // /associate/login/code and /associate/logout go to the login, /associate/agreement is 404 until an agreement is on file.
+                $redirectsOnPurpose = in_array($route['pattern'], ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement'], true);
                 if ($code >= 500 || ($code !== 200 && !$redirectsOnPurpose) || ($code === 200 && trim($body) === '')) {
                     $failed[] = self::label($route) . " → {$code}";
                 }
@@ -510,7 +579,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(22, $checked);
+        self::assertSame(33, $checked);
         self::assertSame([], $failed);
     }
 

@@ -1,0 +1,3 @@
+<?php $cm = $o['commission']; ?>
+<?= $cm['amount'] !== null ? htmlspecialchars((string) $o['currency_code']) . ' ' . number_format((float) $cm['amount'], 2) . ($cm['rate'] !== null ? ' <small class="muted">(' . rtrim(rtrim(number_format((float) $cm['rate'], 2), '0'), '.') . '%' . ($cm['source'] === 'personal' ? ' personal' : ($cm['source'] === 'global' ? ' standard' : '')) . ')</small>' : '') . '<br>' : '' ?>
+<span class="badge <?= ['paid' => 'badge-active', 'earned' => 'badge-active', 'held' => 'badge-lost', 'expected' => 'badge-pending'][$cm['state']] ?? 'badge-inactive' ?>"><?= htmlspecialchars($cm['label']) ?></span>

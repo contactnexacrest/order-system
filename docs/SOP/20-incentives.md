@@ -88,6 +88,9 @@ Annexure. Only management sees how an order's incentive was decided.
 
 ## Associates
 
+The full associate system — portal, invitations, bank checks, holds and
+claw-backs, Zoho bills — is chapter [24 Associates](./24-associates.md).
+
 Associates are outside people, in India or abroad, who introduce new
 clients under a signed Associate Agreement. Management keeps their register
 and links each client to the associate who introduced it. An associate is
@@ -106,8 +109,7 @@ Yes or No by hand when management decides otherwise.
 
 **The signed agreement.** On **Associates**, add or edit the associate and
 enter **Agreement signed on** together with **Signed agreement (PDF)**:
-one is refused without the other. The list then shows a **Signed copy**
-link under the date. Choosing a new file on Edit replaces the copy on file
-(the earlier one stays in storage). Only people with "Manage team
-incentives" can open the copy; the general file link refuses everyone
+one is refused without the other. The associate's page then shows a
+**Signed copy** link. Choosing a new file on Edit replaces the copy on file
+(the earlier one stays in storage). Only people with "Manage associates" can open the copy; the general file link refuses everyone
 else, and every upload and download is recorded in the audit log.

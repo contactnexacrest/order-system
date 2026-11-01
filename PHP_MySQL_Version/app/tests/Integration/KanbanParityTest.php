@@ -73,7 +73,7 @@ final class KanbanParityTest extends DbTestCase
     {
         $html = preg_replace('#<(header|nav)\b.*?</\1>#s', '', $html) ?? $html; // the site menu is the same either way
         return [
-            'records' => self::all('#href="(/(?:orders|clients|reorder-requests|procurement)/\d+)(?:[?"/])#', $html),
+            'records' => self::all('#href="(/(?:orders|clients|reorder-requests|procurement|associates)/\d+)(?:[?"/])#', $html),
             'actions' => self::all('#<form method="post" action="([^"]+)"#', $html),
             'filters' => array_merge(self::all('#class="filter-chip[^"]*" href="[^"]*">([^<(]+)#', $html), self::all('#<option value="([a-z_]*)"[^>]*>#', $html)),
         ];
@@ -135,6 +135,8 @@ final class KanbanParityTest extends DbTestCase
             'port_of_discharge_text' => null, 'coo_type' => null, 'incoterm_preference' => null, 'container_type_text' => null, 'buyer_own_reference' => null, 'notes' => null,
         ], '127.0.0.1');
         $this->seedPiSubmission();
+        $associateId = \App\Repositories\AssociateRepository::create(['name' => 'Parity Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'status' => 'active'], $this->userId);
+        \App\Services\AssociateService::linkClient($clientId, $associateId, 'staff', null, date('Y-m-d'), $this->userId);
         PurchasingRepository::create($orderId, null, 'Parity test blocks', null, 5.0, 'CBM', date('Y-m-d', strtotime('+5 days')), $this->userId, null);
     }
 
@@ -150,6 +152,8 @@ final class KanbanParityTest extends DbTestCase
             ['PI Intake', new PiIntakeReviewController(), 'index', ['view' => 'list'], [], '/pi-intake-review'],
             ['Procurement', new PurchasingController(), 'queue', ['view' => 'list'], [], '/procurement'],
             ['My tasks', new CoordinationController(), 'myTasks', ['view' => 'list'], [], '/my-tasks'],
+            // Owner decision 1 Nov 2026: the associates register, list and board.
+            ['Associates', new \App\Controllers\AssociateAdminController(), 'index', ['view' => 'list'], [], '/associates'],
         ];
     }
 

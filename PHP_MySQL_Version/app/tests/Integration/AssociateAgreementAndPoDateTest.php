@@ -6,6 +6,7 @@ namespace App\Tests\Integration;
 
 use App\Config\Database;
 use App\Controllers\FileStoreController;
+use App\Controllers\AssociateAdminController;
 use App\Controllers\IncentiveController;
 use App\Controllers\OrderController;
 use App\Helpers\Flash;
@@ -142,7 +143,7 @@ final class AssociateAgreementAndPoDateTest extends DbTestCase
     {
         $before = $this->associateCount();
         $_POST = $this->associate(['agreement_signed_on' => '2026-10-01']);
-        (new IncentiveController())->saveAssociate([]);
+        (new AssociateAdminController())->save([]);
         self::assertSame('error', Flash::pull()[0]['type'], 'a signing date needs the signed copy');
         self::assertSame($before, $this->associateCount());
 
@@ -151,13 +152,13 @@ final class AssociateAgreementAndPoDateTest extends DbTestCase
         $_FILES['agreement_file'] = ['name' => 'agreement.pdf', 'type' => 'application/pdf', 'tmp_name' => $tmp, 'error' => UPLOAD_ERR_OK, 'size' => filesize($tmp)];
         try {
             $_POST = $this->associate();
-            (new IncentiveController())->saveAssociate([]);
+            (new AssociateAdminController())->save([]);
             self::assertStringContainsString('date the agreement was signed', Flash::pull()[0]['message'], 'a signed copy needs its signing date');
 
             // With both, the upload reaches storage: move_uploaded_file() cannot succeed outside a real
             // HTTP upload, so getting that far (the associate_agreement context resolves) is the proof.
             $_POST = $this->associate(['agreement_signed_on' => '2026-10-01']);
-            (new IncentiveController())->saveAssociate([]);
+            (new AssociateAdminController())->save([]);
             self::assertStringContainsString('Failed to move the uploaded file', Flash::pull()[0]['message']);
             self::assertSame($before, $this->associateCount(), 'nothing is saved when the file cannot be stored');
         } finally {
@@ -166,10 +167,10 @@ final class AssociateAgreementAndPoDateTest extends DbTestCase
 
         $_FILES = [];
         $_POST = $this->associate();
-        (new IncentiveController())->saveAssociate([]);
+        (new AssociateAdminController())->save([]);
         self::assertSame('success', Flash::pull()[0]['type'], 'an associate without an agreement yet can still be added');
         ob_start();
-        (new IncentiveController())->associates([]);
+        (new AssociateAdminController())->create([]);
         $html = (string) ob_get_clean();
         self::assertStringContainsString('enctype="multipart/form-data"', $html);
         self::assertStringContainsString('<input type="file" name="agreement_file" accept=".pdf,application/pdf" data-required-if="agreement_signed_on"', $html);
@@ -184,12 +185,12 @@ final class AssociateAgreementAndPoDateTest extends DbTestCase
         AssociateRepository::setAgreementFile($id, $fileId);
         try {
             ob_start();
-            (new IncentiveController())->downloadAgreement(['id' => (string) $id]);
+            (new AssociateAdminController())->downloadAgreement(['id' => (string) $id]);
             self::assertSame('%PDF-1.4 signed agreement', (string) ob_get_clean());
             self::assertSame(1, (int) Database::connection()->query("SELECT COUNT(*) FROM audit_log WHERE action_type = 'ASSOCIATE_AGREEMENT_DOWNLOADED' AND entity_id = {$id}")->fetchColumn(), 'every download is logged');
 
             ob_start();
-            (new IncentiveController())->associates([]);
+            (new AssociateAdminController())->show(['id' => (string) $id]);
             self::assertStringContainsString('<a href="/associates/' . $id . '/agreement" class="small">Signed copy</a>', (string) ob_get_clean());
 
             $exporter = $this->createTestUser('Export Executive');

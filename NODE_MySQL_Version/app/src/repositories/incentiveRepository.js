@@ -171,6 +171,31 @@ async function markPayoutPaid(id, paidOn, paidInr, tdsInr, userId, paidVia = nul
   return result.affectedRows === 1;
 }
 
+/** Owner decision 1 Nov 2026 (AS-3): a due payout put on hold, with the reason. */
+async function holdPayout(id, reason, c = db) {
+  const r = await c.execute("UPDATE incentive_payouts SET status = 'held', hold_reason = :r WHERE id = :id AND status = 'due'", { r: reason, id });
+  return r.affectedRows === 1;
+}
+
+async function releasePayout(id) {
+  const r = await db.execute("UPDATE incentive_payouts SET status = 'due', hold_reason = NULL WHERE id = :id AND status = 'held'", { id });
+  return r.affectedRows === 1;
+}
+
+/**
+ * AS-9: a claw-back after a refund — a negative line in the associate's
+ * next payout month, tied to the paid payout it reverses.
+ */
+async function addClawback(paid, amountInr, amountFc, month, note) {
+  const r = await db.execute(
+    `INSERT INTO incentive_payouts (order_id, payee_kind, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month, clawback_of_payout_id, note)
+     VALUES (:o, 'associate', :a, 'associate', :inr, :fc, :cur, :m, :of, :n)`,
+    { o: paid.order_id, a: paid.associate_id, inr: -Math.abs(amountInr), fc: amountFc !== null && amountFc !== undefined ? -Math.abs(amountFc) : null,
+      cur: paid.currency_code ?? null, m: month, of: paid.id, n: note }
+  );
+  return r.insertId;
+}
+
 async function deleteOrderPayouts(orderId, c = db) {
   await c.execute('DELETE FROM incentive_payouts WHERE order_id = :id', { id: orderId });
 }
@@ -237,6 +262,9 @@ module.exports = {
   payoutsForUser,
   findPayout,
   markPayoutPaid,
+  holdPayout,
+  releasePayout,
+  addClawback,
   deleteOrderPayouts,
   costEntries,
   addCostEntry,

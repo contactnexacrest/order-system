@@ -1,0 +1,37 @@
+{# Owner hard rule 2026-11-01: every field, link and action of the Standard list (associates/index.njk), as cards by status.
+   Expects: same as index.njk (rows, status, q, counts, statuses, canManage, canBank, pendingBank). #}
+{% macro kanbanCard(a, canManage, canBank) %}
+    <div class="entity-card kanban-card">
+      <div class="entity-card-header"><a class="entity-card-title" href="/associates/{{ a.id }}">{{ a.name }}</a></div>
+      {% if a.email %}<div class="muted small">{{ a.email }}</div>{% endif %}
+      <div class="entity-card-sub">{% if a.based_in == 'india' %}India{% else %}Abroad{% if a.country %} — {{ a.country }}{% endif %}{% endif %} · Code {{ a.personal_code or '—' }}</div>
+      <div class="small">Clients: {{ a.clients.length }}{% for c in a.clients.slice(0, 3) %}<br><a href="/clients/{{ c.id }}">{{ c.company_legal_name }}</a>{% endfor %}</div>
+      {% if canManage %}<div class="muted small">{% if a.no_commission == 1 %}No commission{% elif (a.rate_1_5 | float) > 0 or (a.rate_6_10 | float) > 0 or (a.rate_11_20 | float) > 0 or (a.rate_21_40 | float) > 0 or (a.rate_41_plus | float) > 0 %}Personal rates{% else %}Standard rates{% endif %}</div>{% endif %}
+      {% if (canManage or canBank) and a.pending_bank > 0 %}<span class="badge badge-pending">Change to check</span>{% endif %}
+      <div class="entity-card-footer"><a class="btn-sm" href="/associates/{{ a.id }}">Open</a></div>
+    </div>
+{% endmacro %}
+{% set listOfBoard = false %}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>Associates — Kanban Board</h1>
+      <p class="muted" style="margin:0">Outside people who introduce clients under a signed agreement. They follow their clients, orders and commission in their own portal.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0">
+      <a class="btn-sm btn-secondary" href="/associates?view=list">Switch to list view</a>
+      {% if canManage %}<a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/ladder">Standard rates</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a>{% endif %}
+    </div>
+  </div>
+  {% include "associates/_filters.njk" %}
+  <div class="kanban-board">
+    {% for key, label in statuses %}{% if (status == 'all' and not (key == 'inactive' and counts.inactive == 0)) or status == key %}
+      {% set __in = rows | whereEq('status', key) %}
+      <div class="kanban-column">
+        <div class="kanban-column-header"><span class="kanban-column-title">{{ label }}</span><span class="kanban-column-count">{{ __in.length }}</span></div>
+        {% if __in.length == 0 %}<p class="kanban-column-empty">Nothing here</p>{% endif %}
+        {% for a in __in %}{{ kanbanCard(a, canManage, canBank) }}{% endfor %}
+      </div>
+    {% endif %}{% endfor %}
+  </div>
+</div>

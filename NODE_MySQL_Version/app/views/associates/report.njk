@@ -1,0 +1,26 @@
+{# Expects: year (string), perf (rows {id, name, status, clients, orders, fob, paid, tds, waiting}),
+   ageing (rows {name, order_reference, incentive_month, amount_inr, status, hold_reason, age_days}),
+   tds (rows {paid_on, name, pan, order_reference, paid_inr, tds_inr, paid_reference}). #}
+{% set __next = ((year | int) + 1) % 100 %}
+<div class="card page-wide">
+  <h1>Associates report — FY {{ year }}–{{ ('0' if __next < 10 else '') ~ __next }}</h1>
+  <form method="get" action="/reports/associates" class="inline-form"><label>Financial year from April <input type="number" name="fy" min="2020" max="2100" required value="{{ year }}"></label><button type="submit" class="btn-sm">Show</button></form>
+
+  <div class="section"><h2>Performance <a class="btn-sm btn-secondary" href="/reports/associates?fy={{ year | urlencode }}&amp;format=performance">CSV</a></h2>
+    <table class="list"><tr><th>Associate</th><th>Status</th><th>Clients</th><th>Orders in year</th><th>FOB value of orders</th><th>Paid INR</th><th>TDS INR</th><th>Waiting INR</th></tr>
+      {% for r in perf %}<tr><td><a href="/associates/{{ r.id }}">{{ r.name }}</a></td><td>{{ r.status }}</td><td>{{ r.clients }}</td><td>{{ r.orders }}</td><td>{{ r.fob | money }}</td><td>{{ r.paid | money }}</td><td>{{ r.tds | money }}</td><td>{{ r.waiting | money }}</td></tr>{% endfor %}
+      {% if perf.length == 0 %}<tr><td colspan="8" class="muted">No associates.</td></tr>{% endif %}
+    </table></div>
+
+  <div class="section"><h2>Commission waiting (ageing) <a class="btn-sm btn-secondary" href="/reports/associates?fy={{ year | urlencode }}&amp;format=ageing">CSV</a></h2>
+    <table class="list"><tr><th>Associate</th><th>Order</th><th>Month</th><th>Amount INR</th><th>Status</th><th>Days</th></tr>
+      {% for r in ageing %}<tr><td>{{ r.name }}</td><td>{{ r.order_reference }}</td><td>{{ r.incentive_month }}</td><td>{{ r.amount_inr | money }}</td><td>{{ r.status }}{% if r.hold_reason %} — {{ r.hold_reason }}{% endif %}</td><td>{{ r.age_days | int }}</td></tr>{% endfor %}
+      {% if ageing.length == 0 %}<tr><td colspan="6" class="muted">Nothing waiting.</td></tr>{% endif %}
+    </table></div>
+
+  <div class="section"><h2>TDS register <a class="btn-sm btn-secondary" href="/reports/associates?fy={{ year | urlencode }}&amp;format=tds">CSV</a></h2>
+    <table class="list"><tr><th>Paid on</th><th>Associate</th><th>PAN</th><th>Order</th><th>Paid INR</th><th>TDS INR</th><th>Bank reference</th></tr>
+      {% for r in tds %}<tr><td>{{ r.paid_on }}</td><td>{{ r.name }}</td><td>{{ r.pan or '' }}</td><td>{{ r.order_reference }}</td><td>{{ r.paid_inr | money }}</td><td>{{ r.tds_inr | money }}</td><td>{{ r.paid_reference or '' }}</td></tr>{% endfor %}
+      {% if tds.length == 0 %}<tr><td colspan="7" class="muted">No payments in this year.</td></tr>{% endif %}
+    </table></div>
+</div>

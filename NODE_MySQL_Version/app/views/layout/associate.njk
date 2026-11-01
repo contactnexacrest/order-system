@@ -1,0 +1,46 @@
+{# The associate portal's layout (owner decision 1 Nov 2026, AS-1), like layout/client.njk.
+   Expects: me (the signed-in associate, or empty on login pages), unread (unread notices), viewAs (bool: a staff read-only view), flashes, devServerEnabled, csrfToken, content. #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NexaCrest International — Associate Portal</title>
+<link rel="icon" href="/img/favicon.ico?v=2" sizes="any">
+<link rel="stylesheet" href="{{ asset('/css/app.css') }}">
+<script src="{{ asset('/js/app.js') }}" defer></script>
+</head>
+<body>
+{% if devServerEnabled %}
+  <div class="dev-server-banner">&#9888; DEV / TEST ENVIRONMENT — this is not the production server &#9888;</div>
+{% endif %}
+{% if viewAs %}
+  <div class="impersonation-banner">&#128100; Staff view of this associate's portal — read-only.
+    <a class="impersonation-banner-end" href="/associate/logout">End staff view</a></div>
+{% endif %}
+<header class="client-topbar">
+  <div class="topbar-brand">
+    <span class="bare-brand-mark" aria-hidden="true"><img src="/img/logo.jpg" alt=""></span>
+    NexaCrest <span>Associate Portal</span>
+  </div>
+  {% if me and me.id %}
+  <nav class="topbar-nav">
+    <a href="/associate">Home{{ (' (' ~ unread ~ ' new)') if unread else '' }}</a>
+    <a href="/associate/clients">My clients</a>
+    <a href="/associate/orders">Orders</a>
+    <a href="/associate/commission">Commission</a>
+    <a href="/associate/messages">Messages</a>
+    <a href="/associate/profile">Profile</a>
+    {% if viewAs %}<a href="/associate/logout" style="margin-left:auto">End staff view</a>{% else %}
+    <form method="post" action="/associate/logout" style="margin-left:auto"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="topbar-nav-logout">Log out</button></form>{% endif %}
+  </nav>
+  {% endif %}
+</header>
+<main class="page">
+  {% for f in flashes %}
+    <div class="alert alert-{{ f.type }}">{{ f.message }}</div>
+  {% endfor %}
+  {{ content | safe }}
+</main>
+</body>
+</html>

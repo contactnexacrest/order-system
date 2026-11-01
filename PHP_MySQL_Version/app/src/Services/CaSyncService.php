@@ -479,6 +479,22 @@ final class CaSyncService
                 continue;
             }
             $label = \App\Repositories\OrderCostEntryRepository::CATEGORIES[$cost['category']] ?? (string) $cost['category'];
+            // Owner decision 1 Nov 2026 (AS-12): an associate's commission is their own bill and a vendor payment, sent once.
+            if (($cost['incentive_kind'] ?? null) === 'associate') {
+                if ($cost['zoho_expense_id'] !== null) {
+                    continue;
+                }
+                try {
+                    $zohoBillId = ZohoBooksService::pushAssociateCommission($cost);
+                    ZohoPurchaseRepository::setCostEntrySynced((int) $cost['id'], $zohoBillId, $hash);
+                    $log('order_cost', (int) $cost['order_id'], 'cost', 'success', $zohoBillId, 'Sent the associate commission (INR ' . number_format((float) $cost['amount_inr'], 2, '.', '') . ') as the associate\'s Zoho Books bill with its vendor payment.');
+                    $result['bills']++;
+                } catch (\Throwable $e) {
+                    $log('order_cost', (int) $cost['order_id'], 'cost', 'error', null, $e->getMessage());
+                    $result['failed']++;
+                }
+                continue;
+            }
             try {
                 $zohoExpenseId = ZohoBooksService::pushCostEntry($cost, $cost['zoho_expense_id'] !== null ? (string) $cost['zoho_expense_id'] : null);
                 ZohoPurchaseRepository::setCostEntrySynced((int) $cost['id'], $zohoExpenseId, $hash);

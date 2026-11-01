@@ -69,6 +69,13 @@ final class ClientIntakeReviewController
             return;
         }
 
+        // Owner decision 1 Nov 2026 (AS-5): an associate's buyer must have verified, and the first completed registration goes first.
+        if ($blocker = \App\Services\AssociateIntakeService::acceptBlocker($submission)) {
+            Flash::set('error', $blocker);
+            header('Location: /client-intake');
+            return;
+        }
+
         // QA Round 5, R5-02: an enquiry from an email another client already
         // uses is not accepted as a new client.
         if ($other = ClientRepository::findOtherWithEmail($submission['email'] ?? null)) {
@@ -114,8 +121,9 @@ final class ClientIntakeReviewController
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
         AuditLogRepository::log((int) $user['id'], 'CLIENT_INTAKE_ACCEPTED', 'client_intake_submissions', $id, null, 'pending', 'converted', null);
+        $associateNote = \App\Services\AssociateIntakeService::onAccepted($submission, $clientId, (int) $user['id']);
 
-        Flash::set('success', "Client created — Buyer Inquiry Ref {$clientUniqueNumber}. Proceed to create the order and generate the Quotation.");
+        Flash::set('success', "Client created — Buyer Inquiry Ref {$clientUniqueNumber}. Proceed to create the order and generate the Quotation." . ($associateNote !== null ? ' ' . $associateNote : ''));
         header("Location: /clients/{$clientId}");
     }
 
@@ -160,7 +168,11 @@ final class ClientIntakeReviewController
             return;
         }
 
+        $submission = ClientIntakeRepository::find($id);
         ClientIntakeRepository::markRejected($id, (int) $user['id'], $reason);
+        if ($submission !== null && $submission['status'] === 'pending') {
+            \App\Services\AssociateIntakeService::onRejected($submission, $reason, (int) $user['id']);
+        }
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
         AuditLogRepository::log((int) $user['id'], 'CLIENT_INTAKE_REJECTED', 'client_intake_submissions', $id, null, 'pending', 'rejected', $reason);

@@ -10,7 +10,7 @@
       <tr><th>Company</th><th>Contact</th><th>Consignee</th><th>Destination</th><th>Submitted</th><th>Action</th></tr>
       <?php foreach ($pending as $s): ?>
       <tr>
-        <td><?= htmlspecialchars($s['company_legal_name']) ?><br><span class="muted small"><?= htmlspecialchars($s['billing_address']) ?></span></td>
+        <td><?= htmlspecialchars($s['company_legal_name']) ?><br><span class="muted small"><?= htmlspecialchars($s['billing_address']) ?></span><?php require __DIR__ . '/_associate_info.php'; ?></td>
         <td><?= htmlspecialchars($s['contact_person']) ?><br><span class="muted small"><?= htmlspecialchars($s['email']) ?> · <?= htmlspecialchars($s['phone'] ?? '') ?></span></td>
         <td><?= (int) ($s['consignee_same_as_buyer'] ?? 1) === 1 ? 'Same as Buyer' : htmlspecialchars($s['consignee_name'] ?? '—') ?></td>
         <td>
