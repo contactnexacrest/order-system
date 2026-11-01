@@ -95,4 +95,36 @@ final class SupplierAdvanceBeforeProductionTest extends DbTestCase
         self::assertTrue($this->opens($page, 'phase-shipment'), 'Group C opens once Group B is finished');
         self::assertStringContainsString('2 of 2 steps done', $page);
     }
+
+    /**
+     * Owner decision 1 Nov 2026 (C-10, O-10): the FOB case. On FOB the
+     * freight stage is skipped when 7d passes Stage 5, so the same rules
+     * must hold with the real gate: 7e is next, Step 8 waits, Group C stays
+     * closed until Step 8 has an entry.
+     */
+    public function testOnFobTheSameOrderOfStepsHoldsAfter7d(): void
+    {
+        $order = \App\Repositories\OrderRepository::find($this->orderId);
+        self::assertSame('FOB', $order['incoterm_code'] ?? Database::connection()->query("SELECT code FROM incoterms WHERE id = " . (int) $order['incoterm_id'])->fetchColumn());
+        $this->setStages([6, 7, 8, 9], 'locked');
+        $this->setStages([5], 'in_progress');
+        \App\Services\StageGateService::passAndUnlockNext($this->orderId, 5, null);
+        \App\Services\StageGateService::maybeAutoSkipFreightStage($this->orderId, (int) $_SESSION['_auth_user_id']); // as the 7d confirmation does
+        $status = static fn (int $n): string => (string) Database::connection()->query("SELECT os.status FROM order_stages os JOIN stages_master sm ON sm.id = os.stage_id WHERE os.order_id = " . (int) $order['id'] . " AND sm.stage_number = {$n}")->fetchColumn();
+        self::assertSame(['skipped', 'in_progress'], [$status(6), $status(7)], 'FOB: the freight stage is skipped');
+
+        $page = $this->page();
+        self::assertSame('current', $this->icon($page, 'step-7e-supplier-advance-paid'));
+        self::assertSame('locked', $this->icon($page, 'step-group-stage-production'), 'Step 8 waits for Step 7');
+        self::assertFalse($this->opens($page, 'phase-shipment'), 'Group C stays closed');
+
+        Database::connection()->prepare('UPDATE order_supplier_po SET advance_paid_at = CURDATE() WHERE order_id = :id')->execute(['id' => $this->orderId]);
+        $page = $this->page();
+        self::assertSame('current', $this->icon($page, 'step-group-stage-production'));
+        self::assertFalse($this->opens($page, 'phase-shipment'));
+        Database::connection()->prepare("UPDATE orders SET production_status_text = 'Cutting in progress' WHERE id = :id")->execute(['id' => $this->orderId]);
+        $page = $this->page();
+        self::assertSame('done', $this->icon($page, 'step-group-stage-production'));
+        self::assertTrue($this->opens($page, 'phase-shipment'));
+    }
 }

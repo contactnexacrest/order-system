@@ -88,4 +88,32 @@ describe('supplier advance before production', () => {
     expect(opens(html, 'phase-shipment')).toBe(true);
     expect(html).toContain('2 of 2 steps done');
   });
+
+  // Owner decision 1 Nov 2026 (C-10, O-10): the FOB case — the freight stage is skipped when 7d passes
+  // Stage 5, and the same rules hold with the real gate: 7e is next, Step 8 waits, Group C stays closed.
+  it('on FOB, the same order of steps holds after 7d', async () => {
+    const stageGateService = require('../../src/services/stageGateService');
+    const order = await db.queryOne('SELECT i.code, o.created_by FROM orders o JOIN incoterms i ON i.id = o.incoterm_id WHERE o.id = :id', { id: orderId });
+    expect(order.code).toBe('FOB');
+    await setStages([6, 7, 8, 9], 'locked');
+    await setStages([5], 'in_progress');
+    await stageGateService.passAndUnlockNext(orderId, 5, null);
+    const admin = await db.queryOne('SELECT id FROM users WHERE email = :e', { e: TEST_ADMIN_EMAIL });
+    await stageGateService.maybeAutoSkipFreightStage(orderId, admin.id); // as the 7d confirmation does
+    const status = async (n) => (await db.queryOne('SELECT os.status FROM order_stages os JOIN stages_master sm ON sm.id = os.stage_id WHERE os.order_id = :o AND sm.stage_number = :n', { o: orderId, n })).status;
+    expect([await status(6), await status(7)]).toEqual(['skipped', 'in_progress']);
+
+    let html = await page();
+    expect(icon(html, 'step-7e-supplier-advance-paid')).toBe('current');
+    expect(icon(html, 'step-group-stage-production')).toBe('locked');
+    expect(opens(html, 'phase-shipment')).toBe(false);
+    await db.execute('UPDATE order_supplier_po SET advance_paid_at = CURDATE() WHERE order_id = :id', { id: orderId });
+    html = await page();
+    expect(icon(html, 'step-group-stage-production')).toBe('current');
+    expect(opens(html, 'phase-shipment')).toBe(false);
+    await db.execute("UPDATE orders SET production_status_text = 'Cutting in progress' WHERE id = :id", { id: orderId });
+    html = await page();
+    expect(icon(html, 'step-group-stage-production')).toBe('done');
+    expect(opens(html, 'phase-shipment')).toBe(true);
+  });
 });
