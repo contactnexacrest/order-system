@@ -300,13 +300,14 @@ final class CaController
         $purchases = $result['purchases'];
         $benefits = $result['benefits'];
         $gstRefunds = $result['gst_refunds'];
+        $master = $result['master_data'] ?? ['clients' => 0, 'products' => 0, 'inactivated' => 0, 'failed' => 0];
 
-        $done = "{$revenue['invoices']} invoice(s) sent or updated, {$revenue['synced']} payment(s) pushed, {$revenue['applied']} payment(s) applied to invoices, "
+        $done = ($master['clients'] + $master['products'] + $master['inactivated'] > 0 ? "{$master['clients']} client(s) and {$master['products']} product(s) sent or updated, {$master['inactivated']} marked inactive, " : '') . "{$revenue['invoices']} invoice(s) sent or updated, {$revenue['synced']} payment(s) pushed, {$revenue['applied']} payment(s) applied to invoices, "
             . "{$purchases['bills']} bill(s), {$purchases['payments']} vendor payment(s) ({$purchases['applied']} applied to bills) and {$purchases['expenses']} order expense(s) / cost(s) sent, {$benefits['journals']} export benefit journal(s) sent or updated, {$gstRefunds['journals']} GST refund journal(s) sent, {$expenses['imported']} expense(s) imported, {$expenses['updated']} updated and {$expenses['removed']} removed as in Zoho Books";
-        $failed = $revenue['failed'] + $purchases['failed'] + $expenses['failed'] + $benefits['failed'] + $gstRefunds['failed'];
+        $failed = $revenue['failed'] + $purchases['failed'] + $expenses['failed'] + $benefits['failed'] + $gstRefunds['failed'] + $master['failed'];
         if ($failed > 0) {
             Flash::set('warning', "Sync finished: {$done}, {$failed} failed — see the log below for details.");
-        } elseif ($revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $purchases['bills'] + $purchases['payments'] + $purchases['applied'] + $purchases['expenses'] > 0 || $benefits['journals'] + $benefits['removed'] + $gstRefunds['journals'] > 0 || $expenses['imported'] + $expenses['updated'] + $expenses['removed'] > 0) {
+        } elseif ($master['clients'] + $master['products'] + $master['inactivated'] > 0 || $revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $purchases['bills'] + $purchases['payments'] + $purchases['applied'] + $purchases['expenses'] > 0 || $benefits['journals'] + $benefits['removed'] + $gstRefunds['journals'] > 0 || $expenses['imported'] + $expenses['updated'] + $expenses['removed'] > 0) {
             Flash::set('success', "Sync finished: {$done}.");
         } else {
             Flash::set('success', 'Sync ran — nothing was pending (or Zoho Books isn\'t configured yet). See the log below.');
@@ -314,6 +315,25 @@ final class CaController
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
         AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['invoices']} invoices, {$revenue['synced']} synced, {$revenue['applied']} applied/{$revenue['failed']} failed, purchases: {$purchases['bills']} bills, {$purchases['payments']} payments, {$purchases['applied']} applied, {$purchases['expenses']} expenses/{$purchases['failed']} failed, benefits: {$benefits['journals']} journals, {$benefits['removed']} removed/{$benefits['failed']} failed, GST refunds: {$gstRefunds['journals']} journals/{$gstRefunds['failed']} failed, expenses: {$expenses['imported']} imported, {$expenses['updated']} updated, {$expenses['removed']} removed/{$expenses['failed']} failed");
+        header('Location: /ca/zoho-sync');
+    }
+
+    /**
+     * Owner decision 2 Nov 2026 (D-238): "Re-push all" — every client and
+     * product is sent to Zoho Books again at the next sync (or Sync now),
+     * putting back anything edited directly in Books.
+     */
+    public function repushMasterData(array $params): void
+    {
+        $user = AuthService::currentUser();
+        if (!\App\Services\ZohoMasterDataSync::clientsOn() && !\App\Services\ZohoMasterDataSync::productsOn()) {
+            Flash::set('error', 'Client and product sync are both switched off (Settings → Zoho Books) — nothing to re-push.');
+            header('Location: /ca/zoho-sync');
+            return;
+        }
+        \App\Services\ZohoMasterDataSync::forgetHashes();
+        AuditLogRepository::log((int) $user['id'], 'ZOHO_MASTER_DATA_REPUSH', 'zoho_sync_log', null, null, null, 'All clients and products queued to be sent to Zoho Books again', null);
+        Flash::set('success', 'Every client and product will be sent to Zoho Books again at the next sync (hourly) — or press Sync now.');
         header('Location: /ca/zoho-sync');
     }
 

@@ -69,6 +69,8 @@ final class CaSyncService
         // The day's full check of the records already in Books (ZohoRestoreService::due()).
         $dailyCheck = $triggeredBy !== 'manual' && ZohoBooksService::isEnabled() && ZohoRestoreService::due($triggeredBy);
         $result = [
+            // Owner decision 2 Nov 2026 (D-238): clients and products first, so invoices find their customer.
+            'master_data' => ZohoMasterDataSync::run($triggeredBy, $triggeredByUserId),
             'revenue' => self::syncPendingRevenue($triggeredBy, $triggeredByUserId),
             // Stage 3 runs before the expense import, so the order expenses it
             // sends are already marked and the import skips them.

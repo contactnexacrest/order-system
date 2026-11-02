@@ -1123,6 +1123,168 @@ final class ZohoBooksService
         return true;
     }
 
+    /**
+     * Owner decision 2 Nov 2026 (D-238): a client pushed to Books as a
+     * customer on its own (Settings → zoho_sync_clients), not only when its
+     * first invoice syncs. Creates it when $contactId is null (linking an
+     * existing Books customer of the same name instead of creating a
+     * duplicate), otherwise updates it. The currency is set only on create —
+     * a Books customer's currency cannot change.
+     *
+     * @param array{company_legal_name:string, billing_address_line1:?string, billing_address_line2:?string, billing_city:?string, billing_postcode:?string, billing_country:?string, vat_eori_tax_no:?string, contact_person:?string, email:?string, phone:?string} $client
+     * @return array{contact_id:string, action:string} action = created | linked | updated
+     */
+    public static function pushCustomerContact(array $client, ?string $contactId, string $currencyCode): array
+    {
+        $name = (string) $client['company_legal_name'];
+        ZohoGuard::assertCustomerAllowed($name);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $query = '?organization_id=' . rawurlencode($config['organizationId']);
+        $gst = self::isGstRegistered($config, $accessToken);
+        $payload = self::customerPayload($client, $gst);
+        $action = 'updated';
+        if ($contactId === null) {
+            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/contacts{$query}&contact_name=" . rawurlencode($name), 'contacts') as $row) {
+                if ((string) ($row['contact_name'] ?? '') === $name && (string) ($row['contact_type'] ?? 'customer') === 'customer') {
+                    $contactId = (string) $row['contact_id'];
+                    $action = 'linked';
+                    break;
+                }
+            }
+        }
+        if ($contactId === null) {
+            $currencyId = null;
+            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/settings/currencies{$query}", 'currencies') as $row) {
+                if (($row['currency_code'] ?? null) === $currencyCode) {
+                    $currencyId = (string) $row['currency_id'];
+                }
+            }
+            if ($currencyId === null) {
+                throw new \RuntimeException("Currency {$currencyCode} is not turned on in Zoho Books. Add it in Zoho Books -> Settings -> Currencies, then sync again.");
+            }
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts{$query}", $payload + ['contact_type' => 'customer', 'currency_id' => $currencyId], self::authHeaders($accessToken));
+            $decoded = json_decode($response['body'], true);
+            $newId = $decoded['contact']['contact_id'] ?? null;
+            if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($newId)) {
+                throw new \RuntimeException('Zoho Books customer creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+            return ['contact_id' => $newId, 'action' => 'created'];
+        }
+        $response = self::request('PUT', "https://{$config['apiDomain']}/books/v3/contacts/" . rawurlencode($contactId) . $query, $payload, self::authHeaders($accessToken));
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            throw new \RuntimeException('Zoho Books customer update failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        // A customer marked inactive earlier is made active again when the client is active in the app.
+        self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts/" . rawurlencode($contactId) . '/active' . $query, [], self::authHeaders($accessToken));
+        return ['contact_id' => $contactId, 'action' => $action];
+    }
+
+    /** @return array<string, mixed> the customer fields the app owns (never amounts or costs) */
+    public static function customerPayload(array $client, bool $gstRegistered): array
+    {
+        $name = (string) $client['company_legal_name'];
+        $address = array_filter([
+            'address' => (string) ($client['billing_address_line1'] ?? ''),
+            'street2' => (string) ($client['billing_address_line2'] ?? ''),
+            'city' => (string) ($client['billing_city'] ?? ''),
+            'zip' => (string) ($client['billing_postcode'] ?? ''),
+            'country' => (string) ($client['billing_country'] ?? ''),
+        ], static fn (string $v): bool => trim($v) !== '');
+        $payload = ['contact_name' => $name, 'company_name' => $name, 'billing_address' => $address];
+        $person = array_filter([
+            'first_name' => mb_substr(trim((string) ($client['contact_person'] ?? '')), 0, 100),
+            'email' => trim((string) ($client['email'] ?? '')),
+            'phone' => trim((string) ($client['phone'] ?? '')),
+        ], static fn (string $v): bool => $v !== '');
+        if ($person !== []) {
+            $payload['contact_persons'] = [$person + ['is_primary_contact' => true]];
+        }
+        $vat = trim((string) ($client['vat_eori_tax_no'] ?? ''));
+        $payload['notes'] = 'Kept in step by the NexaCrest order system' . ($vat !== '' ? " · VAT / EORI / Tax Reg. No.: {$vat}" : '') . '.';
+        if ($gstRegistered) {
+            $payload['gst_treatment'] = 'overseas';
+        }
+        return $payload;
+    }
+
+    /**
+     * Owner decision 2 Nov 2026 (D-238): a product of the Products menu as a
+     * Books sales item. Rate 0 — the catalogue holds sourcing costs only,
+     * never a selling price, and no cost is ever sent to Books.
+     *
+     * @param array{name:string, specifications:?string, hs_code:?string} $product
+     * @return array{item_id:string, action:string} action = created | linked | updated
+     */
+    public static function pushItem(array $product, ?string $itemId): array
+    {
+        $name = mb_substr((string) $product['name'], 0, 100);
+        if (!ZohoGuard::isProduction() && !str_starts_with($name, 'TEST-')) {
+            throw new \RuntimeException("Not sent: ZOHO_ENVIRONMENT is test, and only products whose name starts with TEST- may go to Zoho (this one is \"{$name}\").");
+        }
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $query = '?organization_id=' . rawurlencode($config['organizationId']);
+        $payload = self::itemPayload($product, self::isGstRegistered($config, $accessToken));
+        $action = 'updated';
+        if ($itemId === null) {
+            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/items{$query}&name=" . rawurlencode($name), 'items') as $row) {
+                if ((string) ($row['name'] ?? '') === $name) {
+                    $itemId = (string) $row['item_id'];
+                    $action = 'linked';
+                    break;
+                }
+            }
+        }
+        if ($itemId === null) {
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/items{$query}", $payload, self::authHeaders($accessToken));
+            $decoded = json_decode($response['body'], true);
+            $newId = $decoded['item']['item_id'] ?? null;
+            if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($newId)) {
+                throw new \RuntimeException('Zoho Books item creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+            return ['item_id' => $newId, 'action' => 'created'];
+        }
+        $response = self::request('PUT', "https://{$config['apiDomain']}/books/v3/items/" . rawurlencode($itemId) . $query, $payload, self::authHeaders($accessToken));
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            throw new \RuntimeException('Zoho Books item update failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        self::request('POST', "https://{$config['apiDomain']}/books/v3/items/" . rawurlencode($itemId) . '/active' . $query, [], self::authHeaders($accessToken));
+        return ['item_id' => $itemId, 'action' => $action];
+    }
+
+    /** @return array<string, mixed> the item fields: name, description, HS code, rate 0 — never a cost */
+    public static function itemPayload(array $product, bool $gstRegistered): array
+    {
+        $description = mb_substr(trim((string) ($product['specifications'] ?? '')), 0, 2000);
+        $hs = trim((string) ($product['hs_code'] ?? ''));
+        $payload = ['name' => mb_substr((string) $product['name'], 0, 100), 'rate' => 0, 'item_type' => 'sales', 'product_type' => 'goods'];
+        if ($hs !== '') {
+            if ($gstRegistered) {
+                $payload['hsn_or_sac'] = $hs;
+            } else {
+                $description = trim($description . ($description !== '' ? '. ' : '') . 'HS code ' . $hs);
+            }
+        }
+        $payload['description'] = $description;
+        return $payload;
+    }
+
+    /** Owner decision 2 Nov 2026 (D-238): a client or product no longer active in the app — inactive in Books, never deleted. */
+    public static function markInactive(string $kind, string $id): void
+    {
+        $path = ['contact' => 'contacts', 'item' => 'items'][$kind] ?? null;
+        if ($path === null) {
+            throw new \InvalidArgumentException("Unknown kind {$kind}");
+        }
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/{$path}/" . rawurlencode($id) . '/inactive?organization_id=' . rawurlencode($config['organizationId']), [], self::authHeaders($accessToken));
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            throw new \RuntimeException("Zoho Books could not mark the {$kind} inactive (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+    }
+
     private static function config(): array
     {
         // The .env switch comes first, so "switched off on this server" is

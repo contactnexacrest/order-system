@@ -24,6 +24,13 @@
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <button type="submit" class="btn-sm">Sync Now</button>
     </form>
+    <p class="muted small" style="margin-top:10px;">Clients to Zoho: <strong>{{ 'on' if syncClientsOn else 'off' }}</strong> &middot; Products to Zoho: <strong>{{ 'on' if syncProductsOn else 'off' }}</strong> (Admin &rarr; Settings &rarr; Zoho Books: <code>zoho_sync_clients</code>, <code>zoho_sync_products</code>). One way, app &rarr; Zoho: new or changed clients and products go at the next sync; anything no longer active is marked inactive in Zoho, never deleted. A client goes once its first order has set its currency; products go with rate 0 &mdash; costs are never sent.</p>
+    {% if syncClientsOn or syncProductsOn %}
+    <form method="post" action="/ca/zoho-sync/repush-master-data" onsubmit="return confirm('Send every client and product to Zoho Books again at the next sync? Edits made directly in Zoho are overwritten with the app\'s values.');">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm btn-secondary">Re-push all clients and products</button>
+    </form>
+    {% endif %}
   </div>
 
   <div class="section">

@@ -255,6 +255,36 @@ journals. Each line says one of:
 The page only reads: it changes nothing in the app or in Books. Correct
 whichever side is wrong.
 
+## Clients and products in Zoho Books (owner decision 2 Nov 2026)
+
+Two switches under **Admin → Settings → Zoho Books**, both **off** by
+default and each saved with a reason (D-238):
+
+| Switch | When on, at every sync (hourly, or Sync now) |
+|---|---|
+| `zoho_sync_clients` | Each active client becomes (or stays) a Zoho Books **customer**: legal name, billing address, country, VAT/EORI number (in the customer's notes), contact person, e-mail and phone. A client edited in the app is updated in Zoho. A client made inactive is marked **inactive** in Zoho. |
+| `zoho_sync_products` | Each product of the **Products** menu becomes (or stays) a Zoho Books **item**: name, specifications, HS code, **rate 0**. A product made inactive — or deleted — is marked **inactive** in Zoho. |
+
+- **One way, app → Zoho.** The app is the master record. If someone edits a
+  customer or item directly in Zoho, the app's values go back the next time
+  that client or product changes in the app — or for all of them at once
+  with **Re-push all clients and products** on the Zoho Books Sync page.
+- **Nothing is deleted in Zoho**, so old invoices stay intact.
+- **No duplicates:** before creating, the sync looks for a Zoho customer or
+  item with exactly the same name and links to it.
+- **A client goes once its first order exists** — the order sets the
+  customer's currency, and a Zoho customer's currency can never change.
+- **Products go with rate 0.** The Products menu holds sourcing costs only
+  (factory, transport, CHA, supplier FOB) — never a selling price — and **no
+  cost is ever sent to Zoho**. The products are not linked to order lines, so
+  invoices keep their own line descriptions as before.
+- **"Sync this order"** on an order page does not send clients or products —
+  only the full sync does.
+- While testing (`ZOHO_ENVIRONMENT=test`) only clients and products whose
+  name starts with `TEST-` go to the test organisation.
+- Both count in the **Waiting for Zoho** badge while their switch is on, and
+  every create, update or inactivation is a row in the Sync Log.
+
 ## Who owns what: the app and Zoho Books (owner decision 2026-10-29)
 
 **The app owns what it sends.** Commercial Invoices and Debit Notes, the

@@ -18,6 +18,10 @@ const { run } = require('../../src/jobs/checkAlerts');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 const { TEST_ADMIN_EMAIL } = require('../support/globalSetup');
 
+// This file runs whole-database jobs (the nightly alerts job / reminders). Late in the full
+// suite the shared test database holds thousands of orders, so allow two minutes per test.
+jest.setTimeout(120000);
+
 /**
  * Port of OrderShipmentInspectionTest.php. docs/schema.sql Section BT —
  * export process step 8 (estimated shipment date update notifies the

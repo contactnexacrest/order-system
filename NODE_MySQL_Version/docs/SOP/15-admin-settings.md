@@ -327,6 +327,13 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   blocked; a warning lists any of those `.env` lines that are missing (they
   are then read as the safe choice: Zoho off, test, e-invoice off). See
   [Zoho Books Sync](./ca-03-zoho-sync.md).
+  Two more switches there (owner decision 2 Nov 2026, D-238), both **off**
+  until you tick them, each saved with a reason like every setting:
+  **`zoho_sync_clients`** sends clients to Zoho Books as customers on their
+  own, and **`zoho_sync_products`** sends the products of the Products menu
+  as Zoho Books items. One way, app → Zoho, at the hourly sync (or Sync
+  now) — no extra scheduled job. See
+  [Clients and products in Zoho Books](./ca-03-zoho-sync.md#clients-and-products-in-zoho-books-owner-decision-2-nov-2026).
 
   **Which emails staff receive** (owner decision 2026-10-26). The audit
   trail records every action, but **recording an action never sends an

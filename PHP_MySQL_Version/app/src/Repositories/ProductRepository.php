@@ -120,6 +120,11 @@ final class ProductRepository
      */
     public static function delete(int $id): void
     {
+        // Owner decision 2 Nov 2026 (D-238): a product already in Zoho Books is marked inactive there at the next sync.
+        $product = self::find($id);
+        if ($product !== null) {
+            \App\Services\ZohoMasterDataSync::rememberDeletedProduct($product);
+        }
         Database::connection()->prepare('DELETE FROM catalog_products WHERE id = :id')->execute(['id' => $id]);
     }
 }

@@ -98,6 +98,8 @@ async function update(id, data, userId) {
  * the order pipeline).
  */
 async function remove(id) {
+  // Owner decision 2 Nov 2026 (D-238): a product already in Zoho Books is marked inactive there at the next sync.
+  await require('../services/zohoMasterDataSync').rememberDeletedProduct(await find(id));
   await db.execute('DELETE FROM catalog_products WHERE id = :id', { id });
 }
 

@@ -2200,3 +2200,8 @@ SELECT k, v FROM (
   SELECT 'associate_15cb_required', '1' UNION ALL
   SELECT 'zoho_tds_tax_id', ''
 ) d WHERE NOT EXISTS (SELECT 1 FROM incentive_settings s WHERE s.setting_key = d.k);
+
+-- Owner decision 2 Nov 2026 (D-238, migration 2026-11-02za): client / product sync to Zoho Books, both off by default.
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
+  ('zoho_sync_clients', '0', 'boolean', 'zoho_books', 'Send clients to Zoho Books as customers on their own (one way, app → Zoho, at the hourly sync / Sync now): new and changed clients are created or updated, inactive ones marked inactive. A client goes once its first order has set its currency. Off by default.', 0),
+  ('zoho_sync_products', '0', 'boolean', 'zoho_books', 'Send the products of the Products menu to Zoho Books as items (one way, app → Zoho, at the hourly sync / Sync now): name, specifications, HS code, rate 0 — no cost is ever sent. Inactive or deleted products are marked inactive in Zoho. Off by default.', 0);

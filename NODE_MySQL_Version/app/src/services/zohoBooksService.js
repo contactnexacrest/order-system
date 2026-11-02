@@ -869,6 +869,145 @@ async function deleteRecord(kind, id) {
   return true;
 }
 
+/**
+ * Owner decision 2 Nov 2026 (D-238): a client pushed to Books as a customer
+ * on its own (zoho_sync_clients). Creates it when contactId is null (linking
+ * an existing Books customer of the same name instead of a duplicate),
+ * otherwise updates it. Currency only on create — it cannot change.
+ * Returns { contact_id, action: 'created' | 'linked' | 'updated' }.
+ */
+async function pushCustomerContact(client, contactId, currencyCode) {
+  const name = String(client.company_legal_name);
+  zohoGuard.assertCustomerAllowed(name);
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const payload = customerPayload(client, await isGstRegistered(config, accessToken));
+  let id = contactId;
+  let action = 'updated';
+  if (id === null) {
+    const found = (await getList(accessToken, `https://${config.apiDomain}/books/v3/contacts${query}&contact_name=${encodeURIComponent(name)}`, 'contacts'))
+      .find((row) => String(row.contact_name || '') === name && String(row.contact_type || 'customer') === 'customer');
+    if (found) {
+      id = String(found.contact_id);
+      action = 'linked';
+    }
+  }
+  if (id === null) {
+    const currency = (await getList(accessToken, `https://${config.apiDomain}/books/v3/settings/currencies${query}`, 'currencies')).find((c) => c.currency_code === currencyCode);
+    if (!currency) {
+      throw new Error(`Currency ${currencyCode} is not turned on in Zoho Books. Add it in Zoho Books -> Settings -> Currencies, then sync again.`);
+    }
+    const res = await request('POST', `https://${config.apiDomain}/books/v3/contacts${query}`, { ...payload, contact_type: 'customer', currency_id: String(currency.currency_id) }, authHeaders(accessToken));
+    const decoded = safeJson(res.body);
+    const newId = decoded && decoded.contact && decoded.contact.contact_id;
+    if (!res.ok || typeof newId !== 'string') {
+      throw new Error(`Zoho Books customer creation failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+    }
+    return { contact_id: newId, action: 'created' };
+  }
+  const res = await request('PUT', `https://${config.apiDomain}/books/v3/contacts/${encodeURIComponent(id)}${query}`, payload, authHeaders(accessToken));
+  if (!res.ok) {
+    throw new Error(`Zoho Books customer update failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+  // A customer marked inactive earlier is made active again when the client is active in the app.
+  await request('POST', `https://${config.apiDomain}/books/v3/contacts/${encodeURIComponent(id)}/active${query}`, {}, authHeaders(accessToken));
+  return { contact_id: id, action };
+}
+
+/** The customer fields the app owns (never amounts or costs). */
+function customerPayload(client, gstRegistered) {
+  const name = String(client.company_legal_name);
+  const address = {};
+  for (const [key, col] of [['address', 'billing_address_line1'], ['street2', 'billing_address_line2'], ['city', 'billing_city'], ['zip', 'billing_postcode'], ['country', 'billing_country']]) {
+    const v = String(client[col] || '');
+    if (v.trim() !== '') address[key] = v;
+  }
+  const payload = { contact_name: name, company_name: name, billing_address: address };
+  const person = {};
+  const first = String(client.contact_person || '').trim().slice(0, 100);
+  const email = String(client.email || '').trim();
+  const phone = String(client.phone || '').trim();
+  if (first) person.first_name = first;
+  if (email) person.email = email;
+  if (phone) person.phone = phone;
+  if (Object.keys(person).length > 0) {
+    payload.contact_persons = [{ ...person, is_primary_contact: true }];
+  }
+  const vat = String(client.vat_eori_tax_no || '').trim();
+  payload.notes = `Kept in step by the NexaCrest order system${vat ? ` · VAT / EORI / Tax Reg. No.: ${vat}` : ''}.`;
+  if (gstRegistered) payload.gst_treatment = 'overseas';
+  return payload;
+}
+
+/**
+ * Owner decision 2 Nov 2026 (D-238): a product of the Products menu as a
+ * Books sales item, rate 0 — the catalogue holds sourcing costs only, never
+ * a selling price, and no cost is ever sent to Books.
+ */
+async function pushItem(product, itemId) {
+  const name = String(product.name).slice(0, 100);
+  if (!zohoGuard.isProduction() && !name.startsWith(zohoGuard.TEST_PREFIX)) {
+    throw new Error(`Not sent: ZOHO_ENVIRONMENT is test, and only products whose name starts with TEST- may go to Zoho (this one is "${name}").`);
+  }
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const payload = itemPayload(product, await isGstRegistered(config, accessToken));
+  let id = itemId;
+  let action = 'updated';
+  if (id === null) {
+    const found = (await getList(accessToken, `https://${config.apiDomain}/books/v3/items${query}&name=${encodeURIComponent(name)}`, 'items')).find((row) => String(row.name || '') === name);
+    if (found) {
+      id = String(found.item_id);
+      action = 'linked';
+    }
+  }
+  if (id === null) {
+    const res = await request('POST', `https://${config.apiDomain}/books/v3/items${query}`, payload, authHeaders(accessToken));
+    const decoded = safeJson(res.body);
+    const newId = decoded && decoded.item && decoded.item.item_id;
+    if (!res.ok || typeof newId !== 'string') {
+      throw new Error(`Zoho Books item creation failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+    }
+    return { item_id: newId, action: 'created' };
+  }
+  const res = await request('PUT', `https://${config.apiDomain}/books/v3/items/${encodeURIComponent(id)}${query}`, payload, authHeaders(accessToken));
+  if (!res.ok) {
+    throw new Error(`Zoho Books item update failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+  await request('POST', `https://${config.apiDomain}/books/v3/items/${encodeURIComponent(id)}/active${query}`, {}, authHeaders(accessToken));
+  return { item_id: id, action };
+}
+
+/** The item fields: name, description, HS code, rate 0 — never a cost. */
+function itemPayload(product, gstRegistered) {
+  let description = String(product.specifications || '').trim().slice(0, 2000);
+  const hs = String(product.hs_code || '').trim();
+  const payload = { name: String(product.name).slice(0, 100), rate: 0, item_type: 'sales', product_type: 'goods' };
+  if (hs !== '') {
+    if (gstRegistered) {
+      payload.hsn_or_sac = hs;
+    } else {
+      description = `${description}${description !== '' ? '. ' : ''}HS code ${hs}`.trim();
+    }
+  }
+  payload.description = description;
+  return payload;
+}
+
+/** Owner decision 2 Nov 2026 (D-238): inactive in Books, never deleted. kind = 'contact' | 'item'. */
+async function markInactive(kind, id) {
+  const path = { contact: 'contacts', item: 'items' }[kind];
+  if (!path) throw new Error(`Unknown kind ${kind}`);
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const res = await request('POST', `https://${config.apiDomain}/books/v3/${path}/${encodeURIComponent(id)}/inactive?organization_id=${encodeURIComponent(config.organizationId)}`, {}, authHeaders(accessToken));
+  if (!res.ok) {
+    throw new Error(`Zoho Books could not mark the ${kind} inactive (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+}
+
 async function loadConfig() {
   // The .env switch comes first, so "switched off on this server" is what
   // staff see — not a missing-credentials message.
@@ -1431,4 +1570,6 @@ module.exports = {
   pushCostEntry, pushAssociateCommission, associateCommission, pushBenefitJournal, listTestJournals, contactRecords, readRecord, totalsById, invoiceByNumber,
   restoreVendorPayment, restoreRevenuePayment,
   testConnection, listExpenses, listTestContacts, listTestExpenses, deleteRecord, setTransport,
+  // Owner decision 2 Nov 2026 (D-238): clients and products kept in Books.
+  pushCustomerContact, customerPayload, pushItem, itemPayload, markInactive,
 };

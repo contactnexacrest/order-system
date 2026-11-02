@@ -927,6 +927,8 @@ app.get('/ca/cafin-export', requireAuth, requirePermission('view_cafin'), asyncH
 app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.reports));
 app.get('/ca/zoho-sync', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.zohoSync));
 app.post('/ca/zoho-sync/run', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.runZohoSync));
+// Owner decision 2 Nov 2026 (D-238): send every client and product to Zoho Books again.
+app.post('/ca/zoho-sync/repush-master-data', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.repushMasterData));
 app.get('/orders/:id/zoho-check', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.orderZohoCheck));
 // Owner 2 Nov 2026 (point 16): sync one order's records to Zoho Books from the order page.
 app.post('/orders/:id/zoho-sync', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.syncOrderToZoho));

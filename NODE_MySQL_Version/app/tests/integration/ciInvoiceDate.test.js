@@ -13,6 +13,10 @@ const documentController = require('../../src/controllers/documentController');
 const { todayIst } = require('../../src/helpers/dbDateTime');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// This file runs whole-database jobs (the nightly alerts job / reminders). Late in the full
+// suite the shared test database holds thousands of orders, so allow two minutes per test.
+jest.setTimeout(120000);
+
 // An Export Executive, not an Admin: the alerts job (checkAlerts) notifies
 // every Admin/MD once per expired order, so each extra Admin test user makes
 // expiryAlerts.test.js slower in the full run.

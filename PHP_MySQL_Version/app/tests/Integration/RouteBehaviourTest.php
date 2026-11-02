@@ -1171,6 +1171,19 @@ final class RouteBehaviourTest extends DbTestCase
         self::assertSame(1, $this->audits('REMITTANCE_REASON_DEACTIVATED', $id));
     }
 
+    /** Owner decision 2 Nov 2026 (D-238): "Re-push all clients and products" on the Zoho Sync page, through the real router. */
+    public function testZohoRepushMasterDataRoute(): void
+    {
+        \App\Repositories\CompanySettingsRepository::set('zoho_sync_clients', '0');
+        \App\Repositories\CompanySettingsRepository::set('zoho_sync_products', '0');
+        self::assertSame('error', $this->call('POST', '/ca/zoho-sync/repush-master-data', [])['type'], 'both switches off — nothing to re-push');
+        \App\Repositories\CompanySettingsRepository::set('zoho_sync_clients', '1');
+        $before = $this->audits('ZOHO_MASTER_DATA_REPUSH');
+        $this->assertDone($this->call('POST', '/ca/zoho-sync/repush-master-data', []), 'POST /ca/zoho-sync/repush-master-data', 'sent to Zoho Books again');
+        self::assertSame($before + 1, $this->audits('ZOHO_MASTER_DATA_REPUSH'));
+        \App\Repositories\CompanySettingsRepository::set('zoho_sync_clients', '0');
+    }
+
     /** Owner decision 2 Nov 2026 (D-235): the associate TDS settings and register routes, through the real router. */
     public function testAssociateTdsRoutes(): void
     {

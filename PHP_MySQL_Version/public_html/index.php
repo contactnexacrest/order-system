@@ -549,6 +549,8 @@ $router->get('/ca/cafin-export', [$ca, 'cafinExport'], [SessionAuth::required(),
 $router->get('/ca/reports', [$ca, 'reports'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->get('/ca/zoho-sync', [$ca, 'zohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
 $router->post('/ca/zoho-sync/run', [$ca, 'runZohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
+// Owner decision 2 Nov 2026 (D-238): send every client and product to Zoho Books again.
+$router->post('/ca/zoho-sync/repush-master-data', [$ca, 'repushMasterData'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 $router->get('/orders/{id}/zoho-check', [$ca, 'orderZohoCheck'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
 // Owner 2 Nov 2026 (point 16): sync one order's records to Zoho Books from the order page.
 $router->post('/orders/{id}/zoho-sync', [$ca, 'syncOrderToZoho'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);

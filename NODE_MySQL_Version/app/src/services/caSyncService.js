@@ -37,6 +37,8 @@ async function runFullSync(triggeredBy, triggeredByUserId) {
   // The day's full check of the records already in Books (zohoRestoreService.due()).
   const dailyCheck = triggeredBy !== 'manual' && (await zohoBooksService.isEnabled()) && (await zohoRestoreService.due(triggeredBy));
   const result = {
+    // Owner decision 2 Nov 2026 (D-238): clients and products first, so invoices find their customer.
+    master_data: await require('./zohoMasterDataSync').run(triggeredBy, triggeredByUserId),
     revenue: await syncPendingRevenue(triggeredBy, triggeredByUserId),
     // Stage 3 runs before the expense import, so the order expenses it sends
     // are already marked and the import skips them.

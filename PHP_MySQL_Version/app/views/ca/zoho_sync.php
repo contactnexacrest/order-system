@@ -24,6 +24,14 @@
       <?= \App\Helpers\Csrf::field() ?>
       <button type="submit" class="btn-sm">Sync Now</button>
     </form>
+    <?php $__cOn = \App\Services\ZohoMasterDataSync::clientsOn(); $__pOn = \App\Services\ZohoMasterDataSync::productsOn(); ?>
+    <p class="muted small" style="margin-top:10px;">Clients to Zoho: <strong><?= $__cOn ? 'on' : 'off' ?></strong> &middot; Products to Zoho: <strong><?= $__pOn ? 'on' : 'off' ?></strong> (Admin &rarr; Settings &rarr; Zoho Books: <code>zoho_sync_clients</code>, <code>zoho_sync_products</code>). One way, app &rarr; Zoho: new or changed clients and products go at the next sync; anything no longer active is marked inactive in Zoho, never deleted. A client goes once its first order has set its currency; products go with rate 0 &mdash; costs are never sent.</p>
+    <?php if ($__cOn || $__pOn): ?>
+    <form method="post" action="/ca/zoho-sync/repush-master-data" onsubmit="return confirm('Send every client and product to Zoho Books again at the next sync? Edits made directly in Zoho are overwritten with the app\'s values.');">
+      <?= \App\Helpers\Csrf::field() ?>
+      <button type="submit" class="btn-sm btn-secondary">Re-push all clients and products</button>
+    </form>
+    <?php endif; ?>
   </div>
 
   <div class="section">

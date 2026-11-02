@@ -8,6 +8,10 @@ const db = require('../../src/config/db');
 const { todayIst } = require('../../src/helpers/dbDateTime');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// This file runs whole-database jobs (the nightly alerts job / reminders). Late in the full
+// suite the shared test database holds thousands of orders, so allow two minutes per test.
+jest.setTimeout(120000);
+
 /**
  * Port of OwnerDecisionsNov1Test.php. Owner decisions of 1 Nov 2026
  * ("A all yes, B all yes, C all as recommended"), driven through the real

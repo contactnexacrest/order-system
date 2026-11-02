@@ -109,6 +109,12 @@ final class ZohoPendingService
         if ($orderId === null) {
             $add('gst_refund', count(\App\Repositories\GstRefundRepository::creditsForZohoSync($start)));
         }
+        if ($orderId === null) {
+            // Owner decision 2 Nov 2026 (D-238): clients / products, only while their switch is on.
+            foreach (ZohoMasterDataSync::pendingCounts() as $type => $n) {
+                $add($type, $n);
+            }
+        }
         return ['enabled' => true, 'total' => array_sum($by), 'by_type' => $by];
     }
 
@@ -123,6 +129,8 @@ final class ZohoPendingService
         'order_cost' => 'order cost',
         'export_benefit' => 'export benefit journal',
         'gst_refund' => 'GST refund journal',
+        'client' => 'client (customer)',
+        'product' => 'product (item)',
     ];
 
     /**

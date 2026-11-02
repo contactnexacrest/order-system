@@ -919,6 +919,18 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     await db.execute('DELETE FROM remittance_difference_reasons WHERE id = :id', { id });
   });
 
+  it('re-push all clients and products to Zoho (D-238, 2 Nov 2026)', async () => {
+    const settings = require('../../src/repositories/companySettingsRepository');
+    await settings.set('zoho_sync_clients', '0');
+    await settings.set('zoho_sync_products', '0');
+    expect((await holder.call('POST', '/ca/zoho-sync/repush-master-data', {})).type).toBe('error');
+    await settings.set('zoho_sync_clients', '1');
+    const before = await audits('ZOHO_MASTER_DATA_REPUSH');
+    expectDone(await holder.call('POST', '/ca/zoho-sync/repush-master-data', {}), 'POST /ca/zoho-sync/repush-master-data', 'sent to Zoho Books again');
+    expect(await audits('ZOHO_MASTER_DATA_REPUSH')).toBe(before + 1);
+    await settings.set('zoho_sync_clients', '0');
+  });
+
   it('associate TDS settings and register routes (D-235, 2 Nov 2026)', async () => {
     expectPage(await holder.call('GET', '/settings/associate-tds'), 'Associate TDS', 'GET /settings/associate-tds');
     const post = { associate_tds_section: '194H', associate_tds_pct: '2', associate_tds_threshold_inr: '20000', associate_tds_no_pan_pct: '20',

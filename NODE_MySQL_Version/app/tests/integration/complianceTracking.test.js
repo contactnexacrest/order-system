@@ -166,5 +166,7 @@ describe('Compliance tracking — eBRC, ECGC, incentive claims (gap-list Q-6)', 
     expect(Number((await db.queryOne('SELECT COUNT(*) AS n FROM notifications WHERE user_id = :u', { u: finance.id })).n)).toBe(before);
     await svc.runReminders(TEST_DAYS[1]); // 7 days before is a new threshold
     expect(Number((await db.queryOne("SELECT COUNT(*) AS n FROM notifications WHERE user_id = :u AND type = 'benefit_claim_deadline'", { u: finance.id })).n)).toBe(2);
-  }, 60000);
+  // Three reminder runs over every order in the shared test database — late in the full
+  // suite (and on the slower GitHub runner) that takes longer than a minute.
+  }, 240000);
 });

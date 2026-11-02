@@ -29,6 +29,8 @@ const TYPE_LABELS = {
   order_cost: 'order cost',
   export_benefit: 'export benefit journal',
   gst_refund: 'GST refund journal',
+  client: 'client (customer)',
+  product: 'product (item)',
 };
 
 const sha = (value) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -98,6 +100,10 @@ async function counts(orderId = null) {
 
   if (orderId === null) {
     add('gst_refund', (await gstRefundRepository.creditsForZohoSync(start)).length);
+  }
+  if (orderId === null) {
+    // Owner decision 2 Nov 2026 (D-238): clients / products, only while their switch is on.
+    for (const [type, n] of Object.entries(await require('./zohoMasterDataSync').pendingCounts())) add(type, n);
   }
   return { enabled: true, total: Object.values(by).reduce((a, b) => a + b, 0), by_type: by };
 }

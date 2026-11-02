@@ -5072,3 +5072,19 @@ CREATE TABLE IF NOT EXISTS compliance_alerts_sent (
   sent_on     DATE         NOT NULL,
   UNIQUE KEY uq_compliance_alert (alert_kind, ref_key, threshold)
 ) ENGINE=InnoDB;
+
+-- Owner decision 2 Nov 2026 (D-238, migration 2026-11-02za): clients and the
+-- Products menu kept in Zoho Books on their own (switches zoho_sync_clients /
+-- zoho_sync_products, off by default). One way, app → Books.
+ALTER TABLE clients ADD COLUMN zoho_synced_hash CHAR(64) NULL AFTER zoho_contact_id;
+ALTER TABLE clients ADD COLUMN zoho_synced_at DATETIME NULL AFTER zoho_synced_hash;
+ALTER TABLE catalog_products ADD COLUMN zoho_item_id VARCHAR(40) NULL AFTER is_active;
+ALTER TABLE catalog_products ADD COLUMN zoho_synced_hash CHAR(64) NULL AFTER zoho_item_id;
+ALTER TABLE catalog_products ADD COLUMN zoho_synced_at DATETIME NULL AFTER zoho_synced_hash;
+CREATE TABLE zoho_pending_inactivations (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  kind        VARCHAR(20)  NOT NULL,          -- 'item' (a product deleted while in Books)
+  zoho_id     VARCHAR(40)  NOT NULL,
+  name        VARCHAR(255) NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
