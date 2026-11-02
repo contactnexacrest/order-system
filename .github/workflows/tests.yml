@@ -44,6 +44,10 @@ jobs:
                  -e "s#^STORAGE_BASE_PATH=.*#STORAGE_BASE_PATH=$GITHUB_WORKSPACE/PHP_MySQL_Version/storage#" \
                  -e 's/^APP_ENCRYPTION_KEY=.*/APP_ENCRYPTION_KEY=ci-only-encryption-key-not-secret/' \
                  -e 's/^SMTP_HOST=.*/SMTP_HOST=/' -e 's/^ZOHO_INTEGRATION_ENABLED=.*/ZOHO_INTEGRATION_ENABLED=false/' .env
+      # The PDF checks read the generated PDFs with pdftotext / pdfinfo (poppler-utils),
+      # and the Word checks unzip the .docx — the GitHub runner has neither by default.
+      - name: Install PDF/Word reading tools
+        run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils unzip
       - name: PHPUnit
         run: vendor/bin/phpunit
 
