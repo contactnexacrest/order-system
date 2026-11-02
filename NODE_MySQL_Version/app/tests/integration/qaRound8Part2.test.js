@@ -176,5 +176,7 @@ describe('QA Round 8, part 2', () => {
     expect(again.sent).toBe(0);
     expect(await digestRows(person, date)).toBe(1);
     expect(dailyDigestService.summary(retry)).toBe(`Daily digest: ${retry.sent} sent, ${retry.skipped} with nothing waiting or already sent.`);
-  });
+  // Three full digest runs over every user in the shared test database — on the slower
+  // GitHub runner, late in the suite, that takes longer than the default 20 s.
+  }, 120000);
 });
