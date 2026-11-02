@@ -138,7 +138,7 @@ final class SelfApprovalRulesTest extends DbTestCase
         $md = (string) $this->role('Managing Director');
         // QA Round 8: the page holds seven rules; the other four are posted as they are (MD and ED), so only these three change.
         $both = [$md, (string) $this->role('Executive Director')];
-        $others = ['cancellation' => $both, 'purchase_award' => $both, 'amendment' => $both, 'short_payment' => $both];
+        $others = ['cancellation' => $both, 'purchase_award' => $both, 'amendment' => $both, 'short_payment' => $both, 'price_discount' => $both];
         $_POST = ['payment_terms' => [$md], 'document_review' => [$md], 'email_send' => [$md]] + $others;
         (new SelfApprovalController())->save([]);
         self::assertSame('Self-approval rules saved. They apply from the next approval.', Flash::pull()[0]['message']);

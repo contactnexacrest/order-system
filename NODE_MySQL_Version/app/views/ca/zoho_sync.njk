@@ -12,8 +12,11 @@
       <div><span class="k">Payments Held (not yet applied to an invoice)</span><span class="v">{{ heldCount }}</span></div>
       <div><span class="k">Bills, Vendor Payments, Order Expenses &amp; Costs Pending</span><span class="v">{{ purchasesPendingCount }}</span></div>
       <div><span class="k">Export Benefits Pending</span><span class="v">{{ benefitsPendingCount }}</span></div>
+      {% if apiUsage %}{# D-239: this app's share of the Zoho API calls #}
+      <div><span class="k">Zoho API calls (this app)</span><span class="v zoho-api-usage">Zoho calls today: {{ apiUsage.today }} of {{ apiUsage.daily_limit }} · this minute: {{ apiUsage.minute }} of {{ apiUsage.minute_limit }}{% if apiUsage.exhausted %} <span class="badge badge-danger">Paused: daily allowance used — resumes tomorrow</span>{% endif %} <span class="muted small">({{ apiUsage.environment }} organisation; limits in Settings → Zoho Books; other Zoho apps of the company share Zoho's own limit)</span></span></div>
+      {% endif %}
       {% if waiting and waiting.enabled %}{# D-233 #}
-      <div><span class="k">Waiting for Zoho (all records)</span><span class="v"><span class="badge {{ 'badge-success' if waiting.total == 0 else 'badge-warning' }} zoho-waiting" data-zoho-waiting="{{ waiting.total }}">Waiting for Zoho: {{ waiting.total }}</span>{% if waiting.total > 0 %} <span class="muted small">{{ zohoWaitingSummary(waiting.by_type) }} — sent at the next sync (hourly, or Sync Now).</span>{% endif %}</span></div>
+      <div><span class="k">Waiting for Zoho (all records)</span><span class="v"><span class="badge {{ 'badge-success' if waiting.total == 0 else 'badge-warning' }} zoho-waiting" data-zoho-waiting="{{ waiting.total }}">Waiting for Zoho: {{ waiting.total }}</span>{% if waiting.total > 0 %} <span class="muted small">{{ zohoWaitingSummary(waiting.by_type) }} — {{ zohoPausedText or 'sent at the next sync (hourly, or Sync Now)' }}.</span>{% endif %}</span></div>
       {% endif %}
     </div>
     <p class="muted small">Only records dated on or after the go-live date go to Zoho Books; the CA books everything earlier as the opening position. Set it under Admin &rarr; Settings (<code>zoho_books_sync_start_date</code>). On the live server nothing is sent until it is set.</p>
@@ -30,6 +33,20 @@
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <button type="submit" class="btn-sm btn-secondary">Re-push all clients and products</button>
     </form>
+    {% endif %}
+    {% if apiUsage %}{# D-239: the last 7 days of this app's Zoho API calls #}
+    <h3 style="margin-top:14px;">Zoho API calls — last 7 days (this app)</h3>
+    <p class="muted small">Every call counts — reads, the login token and sends. The scheduled sync waits when this minute's limit is reached; Sync now and the order buttons stop and say so. When the day's allowance is used, syncing pauses until midnight (India time). Zoho's own limit is shared with the company's other Zoho apps, so keep the allowance below it.</p>
+    <table class="list zoho-api-history">
+      <thead><tr><th>Day</th><th>Calls</th><th>Allowance</th></tr></thead>
+      <tbody>
+      {% if apiUsage.history.length == 0 %}
+        <tr><td colspan="3" class="muted">No Zoho calls in the last 7 days.</td></tr>
+      {% else %}{% for d in apiUsage.history %}
+        <tr><td>{{ d.day }}</td><td>{{ d.calls }}</td><td>{{ apiUsage.daily_limit }}</td></tr>
+      {% endfor %}{% endif %}
+      </tbody>
+    </table>
     {% endif %}
   </div>
 

@@ -809,7 +809,7 @@
   <div class="order-layout" id="order-layout">
     <div class="step-sequence" id="order-panels">
 
-  <details class="step-card" id="step-products">
+  <details class="step-card" id="step-products"{{ ' open' if (sees.selling and not priceCheck.covered) else '' }}>
     <summary><h2>Products</h2></summary>
     {% set canEditProducts = permissions.manage_orders and sees.selling and (not isLockedOrder or canOverrideLockEdit) and (not isPostConfirmationOrder or canOverrideOrderEdit) %}
     {% if not canEditProducts %}
@@ -822,7 +822,10 @@
           <td>{{ 'To Be Confirmed' if p.quantity_is_tbc else p.quantity }}</td>
           <td>{{ p.unit or '' }}</td>
           {% if sees.selling %}
-          <td>{{ (p.unit_price | money) if p.unit_price != null else 'To Be Confirmed' }}</td>
+          <td>{{ (p.unit_price | money) if p.unit_price != null else 'To Be Confirmed' }}
+            {% set rp = refPriceLines[p.id] %}
+            {% if rp and rp.note %}<span class="ref-price-note small{{ rp.cls }}">{{ rp.note.text }}</span>{% endif %}
+          </td>
           <td>{{ (p.fob_value | money) if p.fob_value != null else 'To Be Confirmed' }}</td>
           {% endif %}
         </tr>
@@ -845,6 +848,7 @@
           <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <div class="kv-grid">
+              {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = p.catalog_product_id or 0 %}{% set pickerCurrency = order.currency_code or '' %}{% include "orders/_product_picker.njk" %}
               <label>Description *<input type="text" name="description" value="{{ p.description }}" required placeholder="e.g. Granite slabs, polished"></label>
               <label>Dimensions<input type="text" name="dimensions" value="{{ p.dimensions or '' }}" placeholder="e.g. 240 x 120 x 2 cm"></label>
               <label>Finish
@@ -864,7 +868,15 @@
                   {% endfor %}
                 </select>
               </label>
-              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ p.unit_price or '' }}" placeholder="e.g. 45.00"></label>
+              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ p.unit_price or '' }}" placeholder="e.g. 45.00">
+                {# Owner decision 2 Nov 2026 (D-240): difference from the reference price — selling-visible people only, never on a document. #}
+                {% if sees.selling %}
+                  {% set rp = refPriceLines[p.id] %}
+                  <span class="ref-price-note small{{ rp.cls if rp else '' }}"
+                    data-enabled="{{ '1' if refPriceSettings.enabled else '0' }}" data-note="{{ refPriceSettings.note_pct }}" data-warning="{{ refPriceSettings.warning_pct }}"
+                    data-ref="{{ rp.ref if rp else '' }}" data-label="{{ rp.label if rp else '' }}">{{ rp.note.text if (rp and rp.note) else '' }}</span>
+                {% endif %}
+              </label>
               <label>Line type
                 <select name="line_type">
                   {% for lt, ltLabel in lineTypes %}<option value="{{ lt }}" {{ 'selected' if (p.line_type or 'goods') == lt else '' }}>{{ ltLabel }}</option>{% endfor %}
@@ -910,6 +922,7 @@
         <form method="post" action="/orders/{{ order.id }}/products">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <div class="kv-grid">
+            {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = 0 %}{% set pickerCurrency = order.currency_code or '' %}{% include "orders/_product_picker.njk" %}
             <label>Description *<input type="text" name="description" required placeholder="e.g. Granite slabs, polished"></label>
             <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 240 x 120 x 2 cm"></label>
             <label>Finish
@@ -929,7 +942,9 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 45.00"></label>
+            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 45.00">
+              {% if sees.selling %}<span class="ref-price-note small" data-enabled="{{ '1' if refPriceSettings.enabled else '0' }}" data-note="{{ refPriceSettings.note_pct }}" data-warning="{{ refPriceSettings.warning_pct }}" data-ref="" data-label=""></span>{% endif %}
+            </label>
             <label>Line type
               <select name="line_type">
                 {% for lt, ltLabel in lineTypes %}<option value="{{ lt }}">{{ ltLabel }}</option>{% endfor %}
@@ -976,7 +991,39 @@
         </form>
       </div>
     {% endif %}
+
+  {# Owner decision 2 Nov 2026 (D-240): Price check — discounts below the reference price at the warning level (inside the Products card). #}
+  {% if sees.selling and (priceCheck.needing.length or priceCheck.approval) %}
+  <div class="price-check" id="price-check">
+    <h3>Price check <small class="muted">(reference price)</small></h3>
+    {% if not priceCheck.needing.length %}
+      <p class="muted">No line is below its reference price by {{ refPriceWarningText }}% or more.</p>
+    {% else %}
+      <table class="list">
+        <tr><th>Line</th><th>Description</th><th>Price</th><th>Reference</th><th>Below by</th></tr>
+        {% for pc in priceCheck.needing %}
+          <tr><td>{{ pc.line_no }}</td><td>{{ pc.description }}</td><td>{{ pc.unit_price | money }}</td><td>{{ pc.label }}</td><td class="ref-price-warning">⚠ {{ pc.belowText }}%</td></tr>
+        {% endfor %}
+      </table>
+      {% if priceCheck.covered %}
+        <p class="notice notice-success">Discount approved by {{ priceCheck.approval.approver_name }} on {{ priceCheck.approval.approved_at | string }} — reason: {{ priceCheck.approval.reason }}</p>
+      {% else %}
+        <p class="notice notice-warning">These lines are {{ refPriceWarningText }}% or more below their reference price. The Proforma Invoice can be generated once an MD/ED approves the discount.{{ ' An earlier approval no longer covers the lines (a price dropped further or a new line was added).' if priceCheck.approval else '' }}</p>
+        {% if canApprovePriceDiscount %}
+        <form method="post" action="/orders/{{ order.id }}/price-approval">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <label>Reason for approving the discount *<textarea name="reason" rows="2" required minlength="10" maxlength="500" placeholder="e.g. Repeat buyer, volume order — agreed by MD on call"></textarea></label>
+          <button type="submit" class="btn-sm">Approve discount</button>
+        </form>
+        {% else %}
+          <p class="muted small">Only an MD or ED (permission "Approve price discounts") can approve it.</p>
+        {% endif %}
+      {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
   </details>
+  {% include "orders/_product_picker_js.njk" %}
 
   <details class="step-card step-card-reference" id="payment-overview">
     <summary><h2>Payment Overview <small class="muted">(reference — every leg, always current)</small></h2></summary>
@@ -1809,6 +1856,10 @@
 
     <details class="step-card" id="step-5c-pi-generate"{{ flow.subCardOpen('s5', '5c') }}>
       <summary>{{ stepStatusIcon(flow.subStepStatus('s5', '5c')) }}<h2>Step 5c &middot; Generate Proforma Invoice</h2></summary>
+      {# Owner decision 2 Nov 2026 (D-240): a discount at the warning level needs an MD/ED approval before the PI. #}
+      {% if not priceCheck.covered %}{% set pcFirst = priceCheck.uncovered[0] %}
+        <p class="notice notice-error">The Proforma Invoice cannot be generated yet: line {{ pcFirst.line_no }} is {{ pcFirst.belowText }}% below its reference price — an MD/ED must approve the discount first (<a href="#price-check">Price check</a>).</p>
+      {% endif %}
       {% if stage3 and stage3.status != 'locked' %}
         {% if permissions.generate_documents %}{# QA Round 5, R5-20 #}
         <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">

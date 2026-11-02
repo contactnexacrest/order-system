@@ -93,8 +93,20 @@ async function duplicate(id, targetOrderId = null) {
   );
   await setLineType(newId, source.line_type || 'goods', source.sac_code || null);
   // D-215 (5a): the copy keeps the line's product category and attribute values.
-  await db.execute('UPDATE order_products SET category_id = :c, attribute_values = :v WHERE id = :id', { c: source.category_id || null, v: source.attribute_values || null, id: newId });
+  await db.execute('UPDATE order_products SET category_id = :c, attribute_values = :v, catalog_product_id = :cp, price_set_by = :pb WHERE id = :id', {
+    c: source.category_id || null, v: source.attribute_values || null, cp: source.catalog_product_id || null, pb: source.price_set_by || null, id: newId,
+  });
   return newId;
+}
+
+// Owner decision 2 Nov 2026 (D-240): the Products-menu product a line was picked from (null = typed by
+// hand), and who set its unit price (for the self-approval rule on a discount below the reference price).
+async function setCatalogProduct(id, catalogProductId, executor = db) {
+  await executor.execute('UPDATE order_products SET catalog_product_id = :c WHERE id = :id', { c: catalogProductId || null, id });
+}
+
+async function setPriceSetBy(id, userId, executor = db) {
+  await executor.execute('UPDATE order_products SET price_set_by = :u WHERE id = :id', { u: userId, id });
 }
 
 /** Owner decision D-215: a line is goods, a service (SAC code, its own Export Service Invoice) or a charge. */
@@ -148,4 +160,4 @@ async function orderedQuantitySummary(orderId) {
   return { total, unit: [...units][0], comparable: true };
 }
 
-module.exports = { LINE_TYPES, forOrder, add, find, nextLineNo, update, softDelete, duplicate, setLineType, totalServiceValue, totalFobValue, orderedQuantitySummary };
+module.exports = { LINE_TYPES, forOrder, add, find, nextLineNo, update, softDelete, duplicate, setLineType, totalServiceValue, totalFobValue, orderedQuantitySummary, setCatalogProduct, setPriceSetBy };

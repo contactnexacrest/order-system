@@ -123,7 +123,17 @@ final class ZohoInvoiceData
         return hash('sha256', (string) json_encode($invoice));
     }
 
-    /** @return list<array{name:string, description:string, hs_code:?string, quantity:float, unit:?string, rate:float}> */
+    private static function zohoItemId(mixed $catalogProductId): ?string
+    {
+        if ($catalogProductId === null || (int) $catalogProductId <= 0) {
+            return null;
+        }
+        $product = \App\Repositories\ProductRepository::find((int) $catalogProductId);
+        $itemId = $product['zoho_item_id'] ?? null;
+        return $itemId !== null && $itemId !== '' ? (string) $itemId : null;
+    }
+
+    /** @return list<array{name:string, description:string, hs_code:?string, quantity:float, unit:?string, rate:float, item_id:?string}> */
     private static function ciLines(int $orderId, string $label): array
     {
         $lines = [];
@@ -144,7 +154,7 @@ final class ZohoInvoiceData
                 !empty($product['dimensions']) ? 'Size: ' . $product['dimensions'] : null,
                 !empty($product['finish']) ? 'Finish: ' . $product['finish'] : null,
             ]);
-            $lines[] = [
+            $line = [
                 'name' => mb_substr($description !== '' ? $description : 'Line ' . $product['line_no'], 0, 100),
                 'description' => implode('. ', array_merge([$description], $details)),
                 'hs_code' => $product['hs_code'] ?: null,
@@ -152,6 +162,13 @@ final class ZohoInvoiceData
                 'unit' => $product['unit'] ?: null,
                 'rate' => $rate,
             ];
+            // Owner decision 2 Nov 2026 (D-240): the Zoho item of the Products-menu product the line was picked
+            // from. Added only when there is one, so invoices already in Books keep their fingerprint.
+            $itemId = self::zohoItemId($product['catalog_product_id'] ?? null);
+            if ($itemId !== null) {
+                $line['item_id'] = $itemId;
+            }
+            $lines[] = $line;
         }
         if ($lines === []) {
             throw new \RuntimeException("{$label} not sent: the order has no products.");

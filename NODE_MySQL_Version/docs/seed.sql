@@ -2206,3 +2206,21 @@ SELECT k, v FROM (
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
   ('zoho_sync_clients', '0', 'boolean', 'zoho_books', 'Send clients to Zoho Books as customers on their own (one way, app → Zoho, at the hourly sync / Sync now): new and changed clients are created or updated, inactive ones marked inactive. A client goes once its first order has set its currency. Off by default.', 0),
   ('zoho_sync_products', '0', 'boolean', 'zoho_books', 'Send the products of the Products menu to Zoho Books as items (one way, app → Zoho, at the hourly sync / Sync now): name, specifications, HS code, rate 0 — no cost is ever sent. Inactive or deleted products are marked inactive in Zoho. Off by default.', 0);
+
+-- Owner decision 2 Nov 2026 (D-239, migration 2026-11-02zb): this app's Zoho API call allowance.
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
+  ('zoho_api_daily_limit', '800', 'number', 'zoho_books', 'Max Zoho calls per day for this app (India time). Every Zoho Books call counts — reads, the login token and sends. When used up, syncing pauses until midnight. Zoho''s own daily limit is per organisation and shared with the company''s other Zoho apps, so keep this below it.', 0),
+  ('zoho_api_minute_limit', '30', 'number', 'zoho_books', 'Max Zoho calls per minute for this app. The scheduled sync waits for the next minute; Sync now and the order buttons stop and ask to try again in a minute. Zoho allows about 100 per minute per organisation, shared with the company''s other Zoho apps.', 0);
+
+-- Owner decision 2 Nov 2026 (D-240, migration 2026-11-02zc): reference price note + discount approval.
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
+  ('ref_price_note_enabled', '1', 'boolean', 'products & pricing', 'Show the difference from the reference price on order lines (only to people who may see selling prices; never on a document or in the client portal).', 0),
+  ('ref_price_note_pct', '5', 'number', 'products & pricing', 'Show "X% below reference price" only when the line price is at least this many % below the product''s reference price.', 0),
+  ('ref_price_warning_pct', '10', 'number', 'products & pricing', 'At this many % below the reference price the note turns red and the Proforma Invoice needs an MD/ED discount approval first.', 0);
+INSERT INTO permissions (permission_key, name, description, category) VALUES
+  ('approve_price_discount', 'Approve price discounts', 'Approve an order whose line price is below the product''s reference price by the warning % or more, so its Proforma Invoice can be generated (D-240).', 'Orders');
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'approve_price_discount'
+ WHERE r.name IN ('Managing Director', 'Executive Director');
+INSERT INTO self_approval_rules (rule_key, role_id)
+SELECT 'price_discount', r.id FROM roles r WHERE r.name IN ('Managing Director', 'Executive Director');

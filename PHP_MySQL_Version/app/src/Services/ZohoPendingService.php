@@ -24,6 +24,17 @@ use App\Repositories\ZohoPurchaseRepository;
  */
 final class ZohoPendingService
 {
+    /**
+     * Owner decision 2 Nov 2026 (D-239): while today's allowance of Zoho API
+     * calls for this app is used up, what is waiting cannot go until tomorrow.
+     */
+    public static function pausedText(): ?string
+    {
+        return ZohoBooksService::isEnabled() && ZohoApiBudget::exhaustedToday()
+            ? 'paused — daily Zoho allowance used, resumes tomorrow'
+            : null;
+    }
+
     /** @return array{enabled:bool, total:int, by_type: array<string,int>} */
     public static function counts(?int $orderId = null): array
     {

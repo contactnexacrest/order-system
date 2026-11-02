@@ -54,7 +54,7 @@ function pages(seed) {
     '/dashboard', '/orders', '/orders/archived', `/orders/${o}`, `/orders/${o}/audit-log`, `/orders/${o}/audit-log?format=csv`,
     `/orders/${o}/amendments`, `/orders/${o}/annexure`, `/orders/${o}/disputes`, `/orders/${o}/complaints`, `/orders/${o}/edit`,
     `/orders/${o}/zoho-check`, '/my-tasks', '/cockpit', '/notifications', '/reviews', '/email-approvals', '/disputes', '/complaints',
-    '/clients', `/clients/${c}`, '/suppliers', `/suppliers/${s}/edit`, '/logistics-partners', '/products', '/procurement', '/procurement/suppliers',
+    '/clients', `/clients/${c}`, '/suppliers', `/suppliers/${s}/edit`, '/logistics-partners', '/products', `/products/${seed.catalogProductId}`, `/products/${seed.catalogProductId}/edit`, '/procurement', '/procurement/suppliers',
     '/associates', '/reports/associates', '/incentives/payouts', '/my-incentives', '/reorder-requests', '/pi-intake-review',
     '/reports', `/reports/order/${o}`, `/reports/order/${o}?format=csv`, `/reports/client/${c}`, `/reports/client/${c}?format=csv`,
     '/reports/aggregate', '/reports/aggregate?format=csv', '/reports/queues', '/reports/payments', '/reports/payments?format=csv',

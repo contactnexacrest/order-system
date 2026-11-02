@@ -177,6 +177,8 @@ function required() {
     req.zohoWaitingMenu = null;
     if (req.permissions.ca_module_manage && req.method === 'GET') {
       req.zohoWaitingMenu = await require('../services/zohoPendingService').menuCount(req.session);
+      // Owner decision 2 Nov 2026 (D-239): the badge says so when the day's Zoho allowance is used.
+      req.zohoPausedText = req.zohoWaitingMenu > 0 ? await require('../services/zohoPendingService').pausedText() : null;
     }
 
     // QA Round 5, R5-24: the archived-order and assignment rules apply to

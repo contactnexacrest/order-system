@@ -543,6 +543,8 @@ $router->get('/orders/{id}/additional-documents/removed', [$orders, 'showRemoved
 $router->post('/orders/{id}/products', [$orders, 'addProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}', [$orders, 'updateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}/delete', [$orders, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// Owner decision 2 Nov 2026 (D-240): MD/ED approval of a discount below the reference price.
+$router->post('/orders/{id}/price-approval', [$orders, 'approvePriceDiscount'], [SessionAuth::required(), PermissionCheck::requires('approve_price_discount'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}/duplicate', [$orders, 'duplicateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->get('/ca', [$ca, 'index'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->get('/ca/cafin-export', [$ca, 'cafinExport'], [SessionAuth::required(), PermissionCheck::requires('view_cafin')]);

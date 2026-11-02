@@ -37,6 +37,17 @@ const sha = (value) => crypto.createHash('sha256').update(JSON.stringify(value))
 const round2 = (n) => Math.round(Number(n) * 100) / 100;
 
 /** @return {Promise<{enabled: boolean, total: number, by_type: Object<string, number>}>} */
+/**
+ * Owner decision 2 Nov 2026 (D-239): while today's allowance of Zoho API
+ * calls for this app is used up, what is waiting cannot go until tomorrow.
+ */
+async function pausedText() {
+  const zohoBooksService = require('./zohoBooksService');
+  return (await zohoBooksService.isEnabled()) && (await require('./zohoApiBudget').exhaustedToday())
+    ? 'paused — daily Zoho allowance used, resumes tomorrow'
+    : null;
+}
+
 async function counts(orderId = null) {
   if (!(await zohoBooksService.isEnabled())) {
     return { enabled: false, total: 0, by_type: {} };
@@ -131,4 +142,4 @@ function summary(byType) {
     .join(', ');
 }
 
-module.exports = { counts, menuCount, summary, TYPE_LABELS };
+module.exports = { counts, menuCount, summary, pausedText, TYPE_LABELS };

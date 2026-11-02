@@ -445,6 +445,7 @@ app.use((req, res, next) => {
       emailApprovalsPendingCount: req.emailApprovalsPendingCount || 0,
       settingsExpiryWarningCount: req.settingsExpiryWarningCount || 0,
       zohoWaitingMenu: req.zohoWaitingMenu ?? null,
+      zohoPausedText: req.zohoPausedText ?? null,
       // Owner decision D-214: the department this person works as, the others they can switch to, and a preview.
       actingMembership: req.actingMembership || null,
       myMemberships: req.myMemberships || [],
@@ -914,6 +915,8 @@ app.post('/orders/:id/duplicate', requireAuth, requirePermission('manage_orders'
 app.post('/orders/:id/products', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.addProduct));
 app.post('/orders/:id/products/:productId', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProduct));
 app.post('/orders/:id/products/:productId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteProduct));
+// Owner decision 2 Nov 2026 (D-240): MD/ED approval of a discount below the reference price.
+app.post('/orders/:id/price-approval', requireAuth, requirePermission('approve_price_discount'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.approvePriceDiscount));
 app.post('/orders/:id/products/:productId/duplicate', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.duplicateProduct));
 app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBuyerPo));
 app.post('/orders/:id/buyer-po/received-date', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.correctBuyerPoReceivedDate));

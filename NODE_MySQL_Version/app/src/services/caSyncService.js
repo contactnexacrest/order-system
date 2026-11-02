@@ -1,5 +1,6 @@
 'use strict';
 
+const zohoApiBudget = require('./zohoApiBudget');
 const caRepository = require('../repositories/caRepository');
 const crypto = require('crypto');
 const caExpenseRepository = require('../repositories/caExpenseRepository');
@@ -32,23 +33,57 @@ const zohoSyncFailureNotifier = require('./zohoSyncFailureNotifier');
  * error — see point 5 of the CA module brief: "if zoho credentials are
  * not present, then it shouldn't be a blocker for our application."
  */
+function emptyResult() {
+  return {
+    master_data: { clients: 0, products: 0, inactivated: 0, failed: 0, skipped: 0 },
+    revenue: { synced: 0, failed: 0, skipped: 0, invoices: 0, applied: 0 },
+    purchases: { bills: 0, payments: 0, applied: 0, expenses: 0, failed: 0, skipped: 0 },
+    expenses: { imported: 0, updated: 0, removed: 0, failed: 0, skipped: 0 },
+    benefits: { journals: 0, removed: 0, failed: 0, skipped: 0 },
+    gst_refunds: { journals: 0, failed: 0, skipped: 0 },
+    stopped: null,
+  };
+}
+
+/**
+ * Owner decision 2 Nov 2026 (D-239): the run stopped at once — one Sync Log
+ * row says why; the failure e-mail (D-233) carries it once; the records not
+ * reached stay waiting for the next sync.
+ */
+async function logStop(stop, triggeredBy, triggeredByUserId, orderId) {
+  await zohoSyncLogRepository.log('sync_run', orderId != null ? 'order' : null, orderId != null ? Number(orderId) : null, null, 'error', null, stop.message, triggeredBy, triggeredByUserId);
+  return stop.message;
+}
+
 async function runFullSync(triggeredBy, triggeredByUserId) {
+  // Owner decision 2 Nov 2026 (D-239): the scheduled run waits out the per-minute limit; a person's "Sync now" does not.
+  if (triggeredBy === 'scheduled') {
+    return zohoApiBudget.inBackground(() => fullSync(triggeredBy, triggeredByUserId));
+  }
+  return fullSync(triggeredBy, triggeredByUserId);
+}
+
+async function fullSync(triggeredBy, triggeredByUserId) {
   const since = await zohoSyncFailureNotifier.mark();
-  // The day's full check of the records already in Books (zohoRestoreService.due()).
-  const dailyCheck = triggeredBy !== 'manual' && (await zohoBooksService.isEnabled()) && (await zohoRestoreService.due(triggeredBy));
-  const result = {
+  const result = emptyResult();
+  try {
+    // The day's full check of the records already in Books (zohoRestoreService.due()).
+    const dailyCheck = triggeredBy !== 'manual' && (await zohoBooksService.isEnabled()) && (await zohoRestoreService.due(triggeredBy));
     // Owner decision 2 Nov 2026 (D-238): clients and products first, so invoices find their customer.
-    master_data: await require('./zohoMasterDataSync').run(triggeredBy, triggeredByUserId),
-    revenue: await syncPendingRevenue(triggeredBy, triggeredByUserId),
+    result.master_data = await require('./zohoMasterDataSync').run(triggeredBy, triggeredByUserId);
+    result.revenue = await syncPendingRevenue(triggeredBy, triggeredByUserId);
     // Stage 3 runs before the expense import, so the order expenses it sends
     // are already marked and the import skips them.
-    purchases: await syncPurchases(triggeredBy, triggeredByUserId),
-    expenses: await importPendingExpenses(triggeredBy, triggeredByUserId),
-    benefits: await syncBenefits(triggeredBy, triggeredByUserId),
-    gst_refunds: await syncGstRefunds(triggeredBy, triggeredByUserId),
-  };
-  if (dailyCheck) {
-    await zohoRestoreService.markScheduledCheckDone();
+    result.purchases = await syncPurchases(triggeredBy, triggeredByUserId);
+    result.expenses = await importPendingExpenses(triggeredBy, triggeredByUserId);
+    result.benefits = await syncBenefits(triggeredBy, triggeredByUserId);
+    result.gst_refunds = await syncGstRefunds(triggeredBy, triggeredByUserId);
+    if (dailyCheck) {
+      await zohoRestoreService.markScheduledCheckDone();
+    }
+  } catch (e) {
+    if (!(e instanceof zohoApiBudget.ZohoSyncStop)) throw e;
+    result.stopped = await logStop(e, triggeredBy, triggeredByUserId, null);
   }
   // Owner decision 2 Nov 2026 (D-233): failures reach Finance once per run.
   await zohoSyncFailureNotifier.afterRun(since, triggeredBy, null);
@@ -112,6 +147,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId, onlyOrderId = 
       await zohoSyncLogRepository.log('invoice', 'order', item.order_id, item.kind, 'success', pushed.zoho_invoice_id, `${zohoRestoreService.note(`invoice:${item.order_id}:${item.kind}`)}${what} ${label} ${invoice.invoice_number} as Zoho Books invoice (${invoice.currency_code} ${invoice.total.toFixed(2)} @ ${invoice.exchange_rate}).`, triggeredBy, triggeredByUserId);
       invoices += 1;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await zohoSyncLogRepository.log('invoice', 'order', item.order_id, item.kind, 'error', null, e.message, triggeredBy, triggeredByUserId);
       failed += 1;
     }
@@ -149,6 +185,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId, onlyOrderId = 
       await zohoSyncLogRepository.log('revenue_payment', 'order_payment_status', leg.order_id, leg.leg, 'success', zohoReference, `${zohoRestoreService.note(`leg:${leg.order_id}:${leg.leg}`)}Pushed as Zoho Books customer payment ${zohoReference}${appliedNote(leg.leg, target, result.applied)}`, triggeredBy, triggeredByUserId);
       synced += 1;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await zohoSyncLogRepository.log('revenue_payment', 'order_payment_status', leg.order_id, leg.leg, 'error', null, e.message, triggeredBy, triggeredByUserId);
       failed += 1;
     }
@@ -178,6 +215,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId, onlyOrderId = 
       await zohoSyncLogRepository.log('payment_apply', 'order_payment_status', leg.order_id, leg.leg, 'success', String(leg.zoho_reference), `Applied ${amount.toFixed(2)} of payment ${leg.zoho_reference} to ${zohoInvoiceData.KIND_LABELS[LEG_INVOICE[leg.leg]]} ${target.zoho_invoice_number}.`, triggeredBy, triggeredByUserId);
       applied += 1;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await zohoSyncLogRepository.log('payment_apply', 'order_payment_status', leg.order_id, leg.leg, 'error', String(leg.zoho_reference), e.message, triggeredBy, triggeredByUserId);
       failed += 1;
     }
@@ -211,6 +249,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId, onlyOrderId = 
       await zohoSyncLogRepository.log('revenue_payment', 'order_payment_milestones', Number(m.id), 'milestone', 'success', result.payment_id, `Pushed payment milestone ${m.seq} as Zoho Books customer payment ${result.payment_id}${appliedNote('balance', target, result.applied)}`, triggeredBy, triggeredByUserId);
       synced++;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await zohoSyncLogRepository.log('revenue_payment', 'order_payment_milestones', Number(m.id), 'milestone', 'error', null, e.message, triggeredBy, triggeredByUserId);
       failed++;
     }
@@ -232,6 +271,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId, onlyOrderId = 
       await zohoSyncLogRepository.log('payment_apply', 'order_payment_milestones', Number(m.id), 'milestone', 'success', String(m.zoho_reference), `Applied ${Number(amount).toFixed(2)} of milestone payment ${m.zoho_reference} to Commercial Invoice ${target.zoho_invoice_number}.`, triggeredBy, triggeredByUserId);
       applied++;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await zohoSyncLogRepository.log('payment_apply', 'order_payment_milestones', Number(m.id), 'milestone', 'error', String(m.zoho_reference), e.message, triggeredBy, triggeredByUserId);
       failed++;
     }
@@ -263,6 +303,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId, onlyOrderId = 
         applied += 1;
       }
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await zohoSyncLogRepository.log(lc.lc_zoho_synced_at === null ? 'revenue_payment' : 'payment_apply', 'order_lc_details', orderId, 'lc', 'error', lc.lc_zoho_payment_id, e.message, triggeredBy, triggeredByUserId);
       failed += 1;
     }
@@ -344,6 +385,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId, onlyOrderId = null)
       await log('vendor_bill', bill.order_id, 'bill', 'success', zohoBillId, `${zohoRestoreService.note(`bill:${bill.id}`)}Sent bill ${bill.bill_no} from ${bill.vendor_name} (INR ${money(bill.total_inr)}${Number(bill.gst_reverse_charge) ? ', reverse charge' : ''}) as Zoho Books bill.`);
       result.bills += 1;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await log('vendor_bill', bill.order_id, 'bill', 'error', null, e.message);
       result.failed += 1;
     }
@@ -362,6 +404,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId, onlyOrderId = null)
       result.payments += 1;
       result.applied += pushed.applied > 0 ? 1 : 0;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await log('vendor_payment', bill.order_id, 'payment', 'error', null, e.message);
       result.failed += 1;
     }
@@ -377,6 +420,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId, onlyOrderId = null)
       await log('vendor_payment_apply', bill.order_id, 'payment', 'success', String(payment.zoho_payment_id), `Applied ${money(amount)} of payment ${payment.payment_ref} to bill ${target.bill_no}.`);
       result.applied += 1;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await log('vendor_payment_apply', bill.order_id, 'payment', 'error', String(payment.zoho_payment_id), e.message);
       result.failed += 1;
     }
@@ -390,6 +434,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId, onlyOrderId = null)
       await log('order_expense', expense.order_id, 'expense', 'success', zohoExpenseId, `${zohoRestoreService.note(`exp:${expense.id}`)}Sent expense "${expense.details}" (INR ${money(expense.amount_inr)}) as Zoho Books expense.`);
       result.expenses += 1;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await log('order_expense', expense.order_id, 'expense', 'error', null, e.message);
       result.failed += 1;
     }
@@ -421,10 +466,11 @@ async function syncPurchases(triggeredBy, triggeredByUserId, onlyOrderId = null)
               ? ` TDS INR ${Number(c.tds_inr).toFixed(2)} booked on the bill with Zoho TDS tax ${c.tds_tax_id}.`
               : ` TDS INR ${Number(c.tds_inr).toFixed(2)} left on the bill for the CA to book (no Zoho TDS tax set in Settings → Associate TDS).`;
           }
-        } catch (e) { /* the note is informational only */ }
+        } catch (e) { zohoApiBudget.rethrow(e); /* the note is informational only */ }
         await log('order_cost', cost.order_id, 'cost', 'success', zohoBillId, `Sent the associate commission (INR ${money(cost.amount_inr)}) as the associate's Zoho Books bill with its vendor payment.${tdsNote}`);
         result.bills += 1;
       } catch (e) {
+        zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
         await log('order_cost', cost.order_id, 'cost', 'error', null, e.message);
         result.failed += 1;
       }
@@ -436,6 +482,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId, onlyOrderId = null)
       await log('order_cost', cost.order_id, 'cost', 'success', zohoExpenseId, `${zohoRestoreService.note(`cost:${cost.id}`)}${cost.zoho_expense_id !== null ? 'Updated' : 'Sent'} order cost "${label}" (INR ${money(cost.amount_inr)}) as Zoho Books expense.`);
       result.expenses += 1;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await log('order_cost', cost.order_id, 'cost', 'error', null, e.message);
       result.failed += 1;
     }
@@ -472,6 +519,7 @@ async function importPendingExpenses(triggeredBy, triggeredByUserId) {
   try {
     expenses = await zohoBooksService.listExpenses();
   } catch (e) {
+    zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
     await zohoSyncLogRepository.log('expense_import', null, null, null, 'error', null, e.message, triggeredBy, triggeredByUserId);
     return { ...none, failed: 1 };
   }
@@ -622,6 +670,7 @@ async function syncBenefits(triggeredBy, triggeredByUserId, onlyOrderId = null) 
       await zohoSyncLogRepository.log('export_benefit', 'order', orderId, 'journal', 'success', newId, `${zohoRestoreService.note(`ben:${id}`)}${journalId !== null ? 'Updated' : 'Sent'} export benefit ${what} (claim #${id}) received on ${benefit.received_at} as Zoho Books journal.`, triggeredBy, triggeredByUserId);
       result.journals += 1;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await zohoSyncLogRepository.log('export_benefit', 'order', orderId, 'journal', 'error', journalId, e.message, triggeredBy, triggeredByUserId);
       result.failed += 1;
     }
@@ -660,6 +709,7 @@ async function syncGstRefunds(triggeredBy, triggeredByUserId) {
       await zohoSyncLogRepository.log('gst_refund', 'gst_refund_credit', Number(credit.id), 'journal', 'success', journalId, `Sent as Zoho Books journal: ${paymentDescription.gstRefund(credit)}.`, triggeredBy, triggeredByUserId);
       result.journals += 1;
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await zohoSyncLogRepository.log('gst_refund', 'gst_refund_credit', Number(credit.id), 'journal', 'error', null, e.message, triggeredBy, triggeredByUserId);
       result.failed += 1;
     }
@@ -683,13 +733,16 @@ function inScope(onlyOrderId, orderId) {
 
 async function runForOrder(orderId, triggeredByUserId) {
   const since = await zohoSyncFailureNotifier.mark();
-  const result = {
-    revenue: await syncPendingRevenue('manual', triggeredByUserId, orderId),
-    purchases: await syncPurchases('manual', triggeredByUserId, orderId),
-    expenses: { imported: 0, updated: 0, removed: 0, failed: 0, skipped: 0 },
-    benefits: await syncBenefits('manual', triggeredByUserId, orderId),
-    gst_refunds: { journals: 0, failed: 0, skipped: 0 },
-  };
+  const result = emptyResult();
+  delete result.master_data; // D-238: clients and products go only with the full sync
+  try {
+    result.revenue = await syncPendingRevenue('manual', triggeredByUserId, orderId);
+    result.purchases = await syncPurchases('manual', triggeredByUserId, orderId);
+    result.benefits = await syncBenefits('manual', triggeredByUserId, orderId);
+  } catch (e) {
+    if (!(e instanceof zohoApiBudget.ZohoSyncStop)) throw e;
+    result.stopped = await logStop(e, 'manual', triggeredByUserId, orderId);
+  }
   // Owner decision 2 Nov 2026 (D-233): failures reach Finance once per run.
   await zohoSyncFailureNotifier.afterRun(since, 'manual', Number(orderId));
   return result;

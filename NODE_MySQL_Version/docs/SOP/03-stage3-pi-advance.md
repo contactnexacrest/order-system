@@ -134,6 +134,31 @@ PI is **approved** (email sending off) or **sent** to the buyer (email
 sending on), so take it through
 [Document Review & Approval](./13-document-review-approval.md) first.
 
+### Price check before the PI (owner decision 2 Nov 2026, D-240)
+
+When a line picked from the Products menu is priced at or beyond the
+**warning level** below its reference price (Settings → Products & pricing,
+default 10 %), Step 5c shows a red notice and **Generate Proforma Invoice**
+is refused with "Line 1 is 20% below its reference price — an MD/ED must
+approve the discount first (order page → Price check)."
+
+The **Price check** card under the Products card lists those lines (price,
+reference, % below). Someone with **Approve price discount**
+(`approve_price_discount` — MD and ED) writes a reason (at least 10
+characters) and clicks **Approve discount**: "Discount approved — the
+Proforma Invoice can now be generated." The approval records who, when, why
+and the prices it covered (audit PRICE_DISCOUNT_APPROVED).
+
+- Raising a price again keeps the approval. **Lowering an approved line
+  further, or adding another line below the warning level, ends the
+  approval** (audit PRICE_DISCOUNT_LAPSED) — the PI is refused again until
+  it is approved again.
+- The person who set the discounted price approves it only when Admin →
+  Self-approval rules allows their role (rule "price discount", default MD
+  and ED); otherwise "You set a discounted price on this order — a different
+  MD/ED must approve the discount."
+- The Price check card is never on a document or in the client portal.
+
 **What the PI asks the buyer to pay** (owner decision 2026-10-28). Under the
 second **TOTAL PI VALUE** the PI (PDF and Word) prints an amber box:
 

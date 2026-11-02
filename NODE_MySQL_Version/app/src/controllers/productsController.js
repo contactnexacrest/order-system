@@ -84,6 +84,12 @@ async function index(req, res) {
       delete product.default_cha_cost;
     }
   }
+  // Owner decision 2 Nov 2026 (D-240): the reference SELLING price only for people who may see selling prices.
+  if (!sellingVisible(req)) {
+    for (const product of products) stripReference(product);
+  } else {
+    for (const product of products) if (product.reference_price !== null) product.reference_label = require('../services/referencePrice').label(product);
+  }
 
   res.renderView('products/index', {
     products,
@@ -96,12 +102,16 @@ async function index(req, res) {
 }
 
 async function create(req, res) {
-  res.renderView('products/create', { product: null }, 'layout/base');
+  res.renderView('products/create', {
+    product: null,
+    referenceCurrencies: await productRepository.referenceCurrencies(),
+    referenceUnits: await require('../repositories/lookupRepository').dropdownOptions('unit'),
+  }, 'layout/base');
 }
 
 async function store(req, res) {
   const data = readProductForm(req);
-  const error = validateProduct(data);
+  const error = validateProduct(data) || (await applyReferencePrice(req, data, null));
   if (error) {
     flash.set(req, 'error', error);
     res.redirect('/products/create');
@@ -134,6 +144,8 @@ async function show(req, res) {
     details.suppliers = [];
     details.misc_charges = [];
   }
+  if (!sellingVisible(req)) stripReference(details.product);
+  else if (details.product.reference_price !== null) details.product.reference_label = require('../services/referencePrice').label(details.product);
 
   res.renderView('products/show', {
     product: details.product,
@@ -152,7 +164,12 @@ async function edit(req, res) {
     res.status(404).send('Product not found.');
     return;
   }
-  res.renderView('products/edit', { product }, 'layout/base');
+  if (!sellingVisible(req)) stripReference(product);
+  res.renderView('products/edit', {
+    product,
+    referenceCurrencies: await productRepository.referenceCurrencies(),
+    referenceUnits: await require('../repositories/lookupRepository').dropdownOptions('unit'),
+  }, 'layout/base');
 }
 
 async function update(req, res) {
@@ -164,7 +181,7 @@ async function update(req, res) {
   }
 
   const data = readProductForm(req);
-  const error = validateProduct(data);
+  const error = validateProduct(data) || (await applyReferencePrice(req, data, product));
   if (error) {
     flash.set(req, 'error', error);
     res.redirect(`/products/${id}/edit`);
@@ -174,6 +191,14 @@ async function update(req, res) {
   const user = req.user;
   await productRepository.update(id, data, user.id);
   await auditLogRepository.log(user.id, 'PRODUCT_UPDATED', 'products', id, null, null, data.name);
+  if (product.reference_price !== null || data.reference_price !== null) {
+    const referencePrice = require('../services/referencePrice');
+    const oldRef = product.reference_price === null ? '—' : referencePrice.label(product);
+    const newRef = data.reference_price === null ? '—' : referencePrice.label(data);
+    if (oldRef !== newRef) {
+      await auditLogRepository.log(user.id, 'PRODUCT_REFERENCE_PRICE_CHANGED', 'products', id, 'reference_price', oldRef, newRef);
+    }
+  }
   flash.set(req, 'success', 'Product updated.');
   res.redirect(`/products/${id}`);
 }
@@ -416,6 +441,53 @@ function readProductForm(req) {
     default_cha_cost: nullableDecimal(req.body.default_cha_cost),
     is_active: req.body.is_active !== undefined ? 1 : 0,
   };
+}
+
+function sellingVisible(req) {
+  return !!(req.permissions && req.permissions.view_selling_prices);
+}
+
+function stripReference(product) {
+  if (!product) return;
+  delete product.reference_price;
+  delete product.reference_currency;
+  delete product.reference_unit;
+}
+
+/**
+ * Owner decision 2 Nov 2026 (D-240): the reference selling price (price, currency, unit). Read and
+ * validated only for people who may see selling prices; for anyone else the product keeps what it had.
+ */
+async function applyReferencePrice(req, data, existing) {
+  if (!sellingVisible(req)) {
+    data.reference_price = existing ? existing.reference_price ?? null : null;
+    data.reference_currency = existing ? existing.reference_currency ?? null : null;
+    data.reference_unit = existing ? existing.reference_unit ?? null : null;
+    return null;
+  }
+  const price = String(req.body.reference_price ?? '').trim();
+  const currency = String(req.body.reference_currency ?? '').trim().toUpperCase();
+  const unit = String(req.body.reference_unit ?? '').trim();
+  if (price === '') {
+    data.reference_price = null;
+    data.reference_currency = null;
+    data.reference_unit = null;
+    return null;
+  }
+  if (Number.isNaN(Number(price)) || Number(price) <= 0 || Number(price) > 999999999999.99 || /\.\d{3,}$/.test(price)) {
+    return 'Reference selling price must be a number above 0 with at most 2 decimals.';
+  }
+  if (!(await productRepository.referenceCurrencies()).includes(currency)) {
+    return 'Choose the currency of the reference selling price.';
+  }
+  const units = (await require('../repositories/lookupRepository').dropdownOptions('unit')).map((u) => u.option_value);
+  if (unit !== '' && !units.includes(unit)) {
+    return 'Choose the unit of the reference selling price from the list.';
+  }
+  data.reference_price = Number(price).toFixed(2);
+  data.reference_currency = currency;
+  data.reference_unit = unit !== '' ? unit : null;
+  return null;
 }
 
 /** hs_code (and name/specifications, both NOT NULL columns) validated server-side — never trusted from client-side only. */

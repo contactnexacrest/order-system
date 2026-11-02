@@ -212,6 +212,9 @@ async function zohoSync(req, res) {
     syncProductsOn: await require('../services/zohoMasterDataSync').productsOn(),
     zohoWaitingSummary: require('../services/zohoPendingService').summary,
     log: await zohoSyncLogRepository.recent(100),
+    // Owner decision 2 Nov 2026 (D-239): this app's Zoho API calls today / this minute.
+    apiUsage: await require('../services/zohoApiBudget').usage(),
+    zohoPausedText: await require('../services/zohoPendingService').pausedText(),
   }, 'layout/base');
 }
 
@@ -274,7 +277,10 @@ async function syncOrderToZoho(req, res) {
   const sent = rev.invoices + rev.synced + rev.applied + pur.bills + pur.payments + pur.applied + pur.expenses + ben.journals + ben.removed;
   const failed = rev.failed + pur.failed + ben.failed;
   const summary = `${rev.invoices} invoice(s), ${rev.synced} buyer payment(s) (${rev.applied} applied), ${pur.bills} bill(s), ${pur.payments} vendor payment(s) (${pur.applied} applied), ${pur.expenses} expense(s) / cost(s), ${ben.journals} export benefit journal(s)`;
-  if (failed > 0) {
+  if (r.stopped) {
+    // Owner decision 2 Nov 2026 (D-239): stopped at once — the rest waits for the next sync.
+    flash.set(req, 'warning', `Order sync stopped: ${r.stopped} Sent before it stopped: ${summary}.`);
+  } else if (failed > 0) {
     flash.set(req, 'warning', `Order sync finished: ${summary} sent or updated; ${failed} failed — see the Zoho Sync Log.`);
   } else if (sent > 0) {
     flash.set(req, 'success', `Order sync finished: ${summary} sent or updated.`);
@@ -295,7 +301,10 @@ async function runZohoSync(req, res) {
   const done = (master.clients + master.products + master.inactivated > 0 ? `${master.clients} client(s) and ${master.products} product(s) sent or updated, ${master.inactivated} marked inactive, ` : '') + `${revenue.invoices} invoice(s) sent or updated, ${revenue.synced} payment(s) pushed, ${revenue.applied} payment(s) applied to invoices, `
     + `${purchases.bills} bill(s), ${purchases.payments} vendor payment(s) (${purchases.applied} applied to bills) and ${purchases.expenses} order expense(s) / cost(s) sent, ${benefits.journals} export benefit journal(s) sent or updated, ${gstRefunds.journals} GST refund journal(s) sent, ${expenses.imported} expense(s) imported, ${expenses.updated} updated and ${expenses.removed} removed as in Zoho Books`;
   const failed = revenue.failed + purchases.failed + expenses.failed + benefits.failed + gstRefunds.failed + master.failed;
-  if (failed > 0) {
+  if (result.stopped) {
+    // Owner decision 2 Nov 2026 (D-239): stopped at once — the rest waits for the next sync.
+    flash.set(req, 'warning', `Sync stopped: ${result.stopped} Sent before it stopped: ${done}.`);
+  } else if (failed > 0) {
     flash.set(req, 'warning', `Sync finished: ${done}, ${failed} failed — see the log below for details.`);
   } else if (master.clients + master.products + master.inactivated > 0 || revenue.synced > 0 || revenue.invoices > 0 || revenue.applied > 0 || purchases.bills + purchases.payments + purchases.applied + purchases.expenses > 0 || benefits.journals + benefits.removed + gstRefunds.journals > 0 || expenses.imported + expenses.updated + expenses.removed > 0) {
     flash.set(req, 'success', `Sync finished: ${done}.`);

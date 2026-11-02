@@ -128,7 +128,7 @@ describe('Self-approval rules (D-221)', () => {
     // QA Round 8: the page holds seven rules; the other four are posted as they are (MD and ED), so only these three change.
     const both = [md, String(await roleId('Executive Director'))];
     const res = { redirect(l) { this.location = l; } };
-    const req = { user: await userRepository.findById(superId), session, body: { payment_terms: [md], document_review: [md], email_send: [md], cancellation: both, purchase_award: both, amendment: both, short_payment: both } };
+    const req = { user: await userRepository.findById(superId), session, body: { payment_terms: [md], document_review: [md], email_send: [md], cancellation: both, purchase_award: both, amendment: both, short_payment: both, price_discount: both } };
     await selfApprovalController.save(req, res);
     expect(session._flash[0].message).toBe('Self-approval rules saved. They apply from the next approval.');
     const log = await db.queryOne("SELECT old_value, new_value FROM audit_log WHERE action_type = 'SELF_APPROVAL_RULE_CHANGED' AND field_name = 'document_review' ORDER BY id DESC LIMIT 1");

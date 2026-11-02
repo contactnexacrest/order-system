@@ -62,6 +62,12 @@ final class DocumentController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner decision 2 Nov 2026 (D-240): a discount at the warning level needs an MD/ED approval before the PI.
+        if ($type === 'PI' && ($priceBlock = \App\Services\ReferencePrice::piBlockReason($orderId, (int) $user['id'])) !== null) {
+            Flash::set('error', $priceBlock);
+            header("Location: /orders/{$orderId}#price-check");
+            return;
+        }
         // Owner decision D-226: without the general permission, Export Compliance generates only its own documents.
         $__roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         if (!PermissionService::can((int) $user['id'], $__roleId, 'generate_documents') && !in_array($type, self::COMPLIANCE_TYPES, true)) {

@@ -20,6 +20,7 @@
  * PHP twin: ZohoMasterDataSync.php.
  */
 
+const zohoApiBudget = require('./zohoApiBudget');
 const crypto = require('crypto');
 const db = require('../config/db');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
@@ -129,6 +130,7 @@ async function pushClient(c, triggeredBy, userId, result) {
     await zohoSyncLogRepository.log('client', 'client', id, null, 'success', r.contact_id, `${VERB[r.action]} Zoho Books customer "${c.company_legal_name}" from the client record.`, triggeredBy, userId);
     result.clients += 1;
   } catch (e) {
+    zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
     await zohoSyncLogRepository.log('client', 'client', id, null, 'error', zohoId, `Client "${c.company_legal_name}": ${e.message}`, triggeredBy, userId);
     result.failed += 1;
   }
@@ -150,6 +152,7 @@ async function pushProduct(p, triggeredBy, userId, result) {
     await zohoSyncLogRepository.log('product', 'catalog_product', id, null, 'success', r.item_id, `${VERB[r.action]} Zoho Books item "${p.name}" from the Products menu.`, triggeredBy, userId);
     result.products += 1;
   } catch (e) {
+    zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
     await zohoSyncLogRepository.log('product', 'catalog_product', id, null, 'error', zohoId, `Product "${p.name}": ${e.message}`, triggeredBy, userId);
     result.failed += 1;
   }
@@ -177,6 +180,7 @@ async function run(triggeredBy, userId) {
         await zohoSyncLogRepository.log('product', 'catalog_product', null, null, 'success', String(t.zoho_id), `Marked Zoho Books item "${t.name}" inactive: the product was deleted from the Products menu.`, triggeredBy, userId);
         result.inactivated += 1;
       } catch (e) {
+        zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
         await zohoSyncLogRepository.log('product', 'catalog_product', null, null, 'error', String(t.zoho_id), e.message, triggeredBy, userId);
         result.failed += 1;
       }

@@ -151,6 +151,7 @@ final class ZohoRestoreService
                     self::$notes[$key] = self::RESTORED . '(Books had ' . number_format((float) $row['total'], 2, '.', '') . ') ';
                 }
             } catch (\Throwable $e) {
+                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log('invoice', 'order', (int) $inv['order_id'], $inv['kind'], 'error', (string) $inv['zoho_invoice_id'], "Could not check {$label} in Zoho Books: " . $e->getMessage(), $triggeredBy, $userId);
                 $out['failed']++;
             }
@@ -185,6 +186,7 @@ final class ZohoRestoreService
                     $out['restored']++;
                 }
             } catch (\Throwable $e) {
+                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log('revenue_payment', 'order', $p['order_id'], $p['leg'], 'error', $p['id'], "Could not check {$what} in Zoho Books: " . $e->getMessage(), $triggeredBy, $userId);
                 $out['failed']++;
             }
@@ -234,6 +236,7 @@ final class ZohoRestoreService
                     $out['bills']++;
                 }
             } catch (\Throwable $e) {
+                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
                 $log('vendor_bill', (int) $bill['order_id'], 'bill', 'error', $zohoId, "Could not check {$what} in Zoho Books: " . $e->getMessage());
                 $out['failed']++;
             }
@@ -263,6 +266,7 @@ final class ZohoRestoreService
                     $out['payments']++;
                 }
             } catch (\Throwable $e) {
+                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
                 $log('vendor_payment', (int) $bill['order_id'], 'payment', 'error', $zohoId, "Could not check {$what} in Zoho Books: " . $e->getMessage());
                 $out['failed']++;
             }
@@ -277,6 +281,7 @@ final class ZohoRestoreService
         try {
             $totals = ZohoBooksService::totalsById('expense');
         } catch (\Throwable $e) {
+            ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
             ZohoSyncLogRepository::log('order_expense', null, null, null, 'error', null, 'Could not read the expenses in Zoho Books to check them: ' . $e->getMessage(), $triggeredBy, $userId);
             $out['failed']++;
             return $out;
@@ -301,6 +306,7 @@ final class ZohoRestoreService
                     $out['expenses']++;
                 }
             } catch (\Throwable $e) {
+                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
                 $log('order_expense', (int) $expense['order_id'], 'expense', 'error', $zohoId, "Could not check {$what} in Zoho Books: " . $e->getMessage());
                 $out['failed']++;
             }
@@ -325,6 +331,7 @@ final class ZohoRestoreService
                     self::$notes["cost:{$cost['id']}"] = self::RESTORED . '(Books had ' . number_format($total, 2, '.', '') . ') ';
                 }
             } catch (\Throwable $e) {
+                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
                 $log('order_cost', (int) $cost['order_id'], 'cost', 'error', $zohoId, "Could not check {$what} in Zoho Books: " . $e->getMessage());
                 $out['failed']++;
             }
@@ -351,6 +358,7 @@ final class ZohoRestoreService
         try {
             $totals = ZohoBooksService::totalsById('journal');
         } catch (\Throwable $e) {
+            ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
             ZohoSyncLogRepository::log('export_benefit', null, null, null, 'error', null, 'Could not read the journals in Zoho Books to check them: ' . $e->getMessage(), $triggeredBy, $userId);
             return ['failed' => 1];
         }
@@ -375,6 +383,7 @@ final class ZohoRestoreService
                     self::$notes["ben:{$b['id']}"] = self::RESTORED . '(Books had ' . number_format($total, 2, '.', '') . ') ';
                 }
             } catch (\Throwable $e) {
+                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
                 ZohoSyncLogRepository::log('export_benefit', 'order', $orderId, 'journal', 'error', $zohoId, "Could not check {$what} in Zoho Books: " . $e->getMessage(), $triggeredBy, $userId);
                 $out['failed']++;
             }

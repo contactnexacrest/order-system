@@ -359,6 +359,8 @@ final class OrderController
             'cooTypes'        => LookupRepository::dropdownOptions('coo_type'),
             'containerTypes'  => LookupRepository::dropdownOptions('container_type'),
             'units'           => LookupRepository::dropdownOptions('unit'),
+            // Owner decision 2 Nov 2026 (D-240): "Pick from Products" (the reference price only for selling-visible people).
+            'pickerProducts'  => \App\Repositories\ProductRepository::forPicker(),
             'packageTypes'    => LookupRepository::dropdownOptions('package_type'),
             'surfaceFinishes' => LookupRepository::dropdownOptions('surface_finish'),
             'preselectedClientId' => $preselectedClientId,
@@ -565,7 +567,7 @@ final class OrderController
                     continue; // blank row — skip rather than insert an empty product
                 }
                 $quantityIsTbc = !empty($_POST['product_quantity_tbc'][$i]);
-                OrderProductRepository::add(
+                $__lineId = OrderProductRepository::add(
                     $orderId,
                     $lineNo++,
                     $description,
@@ -577,6 +579,11 @@ final class OrderController
                     trim((string) ($_POST['product_unit_price'][$i] ?? '')) ?: null,
                     trim((string) ($_POST['product_hs_code'][$i] ?? ''))
                 );
+                // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
+                OrderProductRepository::setCatalogProduct($__lineId, self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''));
+                if (trim((string) ($_POST['product_unit_price'][$i] ?? '')) !== '') {
+                    OrderProductRepository::setPriceSetBy($__lineId, (int) $user['id']);
+                }
             }
 
             $pdo->commit();
@@ -805,6 +812,32 @@ final class OrderController
         return [$categoryId, $values, null];
     }
 
+    /** Owner decision 2 Nov 2026 (D-240): a posted "Pick from Products" id — only an active Products-menu product counts. */
+    private static function catalogProductInput(mixed $value): ?int
+    {
+        $id = (int) $value;
+        if ($id <= 0) {
+            return null;
+        }
+        $product = \App\Repositories\ProductRepository::find($id);
+        return ($product !== null && (int) $product['is_active'] === 1) ? $id : null;
+    }
+
+    /** Owner decision 2 Nov 2026 (D-240): an MD/ED approves the order's discount below the reference price. */
+    public function approvePriceDiscount(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        if (OrderRepository::find($orderId) === null) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $user = AuthService::currentUser();
+        $error = \App\Services\ReferencePrice::approve($orderId, (int) $user['id'], (string) ($_POST['reason'] ?? ''));
+        Flash::set($error === null ? 'success' : 'error', $error ?? 'Discount approved — the Proforma Invoice can now be generated.');
+        header("Location: /orders/{$orderId}#price-check");
+    }
+
     public function addProduct(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -858,6 +891,11 @@ final class OrderController
         );
         OrderProductRepository::setLineType($newLineId, $lineType, $sacCode);
         \App\Repositories\ProductCategoryRepository::setLineCategory($newLineId, $categoryId, $attributeValues);
+        // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
+        OrderProductRepository::setCatalogProduct($newLineId, self::catalogProductInput($_POST['catalog_product_id'] ?? ''));
+        if (trim((string) ($_POST['unit_price'] ?? '')) !== '') {
+            OrderProductRepository::setPriceSetBy($newLineId, (int) $user['id']);
+        }
         Flash::set('success', 'Product line added.');
         header("Location: /orders/{$orderId}");
     }
@@ -916,6 +954,14 @@ final class OrderController
         );
         OrderProductRepository::setLineType($productId, $lineType, $sacCode);
         \App\Repositories\ProductCategoryRepository::setLineCategory($productId, $categoryId, $attributeValues);
+        // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
+        if (array_key_exists('catalog_product_id', $_POST)) {
+            OrderProductRepository::setCatalogProduct($productId, self::catalogProductInput($_POST['catalog_product_id']));
+        }
+        $__newPrice = trim((string) ($_POST['unit_price'] ?? ''));
+        if ($__newPrice !== '' && ($product['unit_price'] === null || abs((float) $product['unit_price'] - (float) $__newPrice) > 0.0001)) {
+            OrderProductRepository::setPriceSetBy($productId, (int) $user['id']);
+        }
         Flash::set('success', 'Product line updated.');
         header("Location: /orders/{$orderId}");
     }
@@ -1166,6 +1212,12 @@ final class OrderController
             'production' => OrderProductionRepository::find($orderId),
             'units' => LookupRepository::dropdownOptions('unit'),
             'surfaceFinishes' => LookupRepository::dropdownOptions('surface_finish'),
+            // Owner decision 2 Nov 2026 (D-240): "Pick from Products", the reference-price note per line and the discount approval.
+            'pickerProducts' => \App\Repositories\ProductRepository::forPicker(),
+            'refPriceSettings' => \App\Services\ReferencePrice::settings(),
+            'refPriceProducts' => \App\Services\ReferencePrice::productsFor(OrderProductRepository::forOrder($orderId)),
+            'priceCheck' => \App\Services\ReferencePrice::status($orderId),
+            'canApprovePriceDiscount' => PermissionService::can((int) $actor['id'], $actorRoleId, 'approve_price_discount'),
             'gstRates' => LookupRepository::dropdownOptions('gst_rate'),
             'dimensionalTolerances' => LookupRepository::dropdownOptions('dimensional_tolerance'),
             'supplierFactoryAddressesBySupplier' => SupplierFactoryAddressRepository::allGroupedBySupplier(),

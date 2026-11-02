@@ -5090,3 +5090,41 @@ CREATE TABLE zoho_pending_inactivations (
   name        VARCHAR(255) NOT NULL,
   created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+-- Owner decision 2 Nov 2026 (D-239, migration 2026-11-02zb): Zoho API call meter and shared access-token cache.
+CREATE TABLE IF NOT EXISTS zoho_api_usage (
+  environment  VARCHAR(12) NOT NULL,              -- 'test' | 'production'
+  bucket_type  VARCHAR(8)  NOT NULL,              -- 'minute' | 'day'
+  bucket       VARCHAR(16) NOT NULL,              -- 'YYYY-MM-DD HH:MM' | 'YYYY-MM-DD' (Asia/Kolkata)
+  calls        INT UNSIGNED NOT NULL DEFAULT 0,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (environment, bucket_type, bucket)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS zoho_token_cache (
+  cache_key   CHAR(64)  NOT NULL PRIMARY KEY,     -- sha256(environment | refresh token)
+  token_enc   TEXT      NOT NULL,                 -- access token, encrypted (APP_ENCRYPTION_KEY)
+  expires_at  DATETIME  NOT NULL,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Owner decision 2 Nov 2026 (D-240, migration 2026-11-02zc): reference selling price on the
+-- Products menu, the product an order line was picked from, who set its price, and the MD/ED
+-- approval of a discount below the warning level.
+ALTER TABLE catalog_products ADD COLUMN reference_price DECIMAL(14,2) NULL AFTER default_cha_cost;
+ALTER TABLE catalog_products ADD COLUMN reference_currency VARCHAR(10) NULL AFTER reference_price;
+ALTER TABLE catalog_products ADD COLUMN reference_unit VARCHAR(30) NULL AFTER reference_currency;
+ALTER TABLE order_products ADD COLUMN catalog_product_id BIGINT UNSIGNED NULL;
+ALTER TABLE order_products ADD COLUMN price_set_by BIGINT UNSIGNED NULL;
+ALTER TABLE order_products ADD CONSTRAINT fk_order_products_catalog_product FOREIGN KEY (catalog_product_id) REFERENCES catalog_products(id) ON DELETE SET NULL;
+CREATE TABLE order_price_approvals (
+  id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id     BIGINT UNSIGNED NOT NULL,
+  approved_by  BIGINT UNSIGNED NOT NULL,
+  reason       VARCHAR(500) NOT NULL,
+  snapshot     TEXT NOT NULL,          -- JSON: [{line_id, line_no, unit_price, reference_price, pct}]
+  approved_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  lapsed_at    DATETIME NULL,
+  KEY idx_order_price_approvals_order (order_id),
+  CONSTRAINT fk_order_price_approvals_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -142,6 +142,7 @@
       <div id="product-rows">
         <?php foreach ($__oldDescriptions as $__i => $__desc): ?>
         <div class="product-row">
+          <?php $__pickerName = 'product_catalog_id[]'; $__pickerSelected = (int) ($old['product_catalog_id'][$__i] ?? 0); include __DIR__ . '/_product_picker.php'; ?>
           <label>Description *<input type="text" name="product_description[]" required value="<?= htmlspecialchars((string) $__desc) ?>" placeholder="e.g. Granite Memorial Headstone"></label>
           <label>Dimensions<input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>" placeholder="e.g. 24x12x3 inches"></label>
           <label>Finish
@@ -197,6 +198,7 @@
     <button type="submit">Create Order</button>
   </form>
 </div>
+<?php include __DIR__ . '/_product_picker_js.php'; ?>
 <script>
 // 90-item backlog #67: the Freight/Insurance hints used to say the literal
 // placeholder text "order currency" instead of the actual currency the
@@ -283,6 +285,8 @@ document.getElementById('add-product-row').addEventListener('click', function ()
   var rows = document.getElementById('product-rows');
   var clone = rows.firstElementChild.cloneNode(true);
   clone.querySelectorAll('input').forEach(function (el) { el.value = ''; });
+  clone.querySelectorAll('select.product-picker').forEach(function (el) { el.selectedIndex = 0; });
+  clone.querySelectorAll('.product-picker-hint').forEach(function (el) { el.textContent = ''; });
   rows.appendChild(clone);
 });
 // Point 6 — same idea as the "Duplicate" button on the post-confirmation

@@ -65,6 +65,7 @@ final class ZohoMasterDataSync
                     ZohoSyncLogRepository::log('product', 'catalog_product', null, null, 'success', (string) $t['zoho_id'], "Marked Zoho Books item \"{$t['name']}\" inactive: the product was deleted from the Products menu.", $triggeredBy, $userId);
                     $result['inactivated']++;
                 } catch (\Throwable $e) {
+                    ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
                     ZohoSyncLogRepository::log('product', 'catalog_product', null, null, 'error', (string) $t['zoho_id'], $e->getMessage(), $triggeredBy, $userId);
                     $result['failed']++;
                 }
@@ -92,6 +93,7 @@ final class ZohoMasterDataSync
             ZohoSyncLogRepository::log('client', 'client', $id, null, 'success', $r['contact_id'], "{$verb} Zoho Books customer \"{$c['company_legal_name']}\" from the client record.", $triggeredBy, $userId);
             $result['clients']++;
         } catch (\Throwable $e) {
+            ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
             ZohoSyncLogRepository::log('client', 'client', $id, null, 'error', $zohoId, "Client \"{$c['company_legal_name']}\": " . $e->getMessage(), $triggeredBy, $userId);
             $result['failed']++;
         }
@@ -116,6 +118,7 @@ final class ZohoMasterDataSync
             ZohoSyncLogRepository::log('product', 'catalog_product', $id, null, 'success', $r['item_id'], "{$verb} Zoho Books item \"{$p['name']}\" from the Products menu.", $triggeredBy, $userId);
             $result['products']++;
         } catch (\Throwable $e) {
+            ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
             ZohoSyncLogRepository::log('product', 'catalog_product', $id, null, 'error', $zohoId, "Product \"{$p['name']}\": " . $e->getMessage(), $triggeredBy, $userId);
             $result['failed']++;
         }

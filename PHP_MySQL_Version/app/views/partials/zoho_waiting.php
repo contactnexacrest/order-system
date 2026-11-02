@@ -10,7 +10,11 @@ if (!empty($zohoWaiting) && !empty($zohoWaiting['enabled'])):
     $__zwN = (int) $zohoWaiting['total'];
     $__zwText = $__zwN === 0 ? 'Waiting for Zoho: 0 — everything on this order is in Zoho Books' : 'Waiting for Zoho: ' . $__zwN;
     $__zwTitle = $__zwN === 0 ? '' : \App\Services\ZohoPendingService::summary($zohoWaiting['by_type']) . ' — sent at the next sync (hourly, or Sync now).';
+    $__zwPaused = $__zwN > 0 ? \App\Services\ZohoPendingService::pausedText() : null; // D-239
+    if ($__zwPaused !== null) {
+        $__zwText .= ' — ' . $__zwPaused;
+    }
 ?>
 <span class="badge <?= $__zwN === 0 ? 'badge-success' : 'badge-warning' ?> zoho-waiting" data-zoho-waiting="<?= $__zwN ?>"<?= $__zwTitle !== '' ? ' title="' . htmlspecialchars($__zwTitle) . '"' : '' ?>><?php if (!empty($__zwLink)): ?><a href="/orders/<?= (int) $order['id'] ?>/zoho-check"><?= htmlspecialchars($__zwText) ?></a><?php else: ?><?= htmlspecialchars($__zwText) ?><?php endif; ?></span>
-<?php if ($__zwN > 0): ?><span class="muted small"><?= htmlspecialchars(\App\Services\ZohoPendingService::summary($zohoWaiting['by_type'])) ?> — sent at the next sync (hourly, or Sync now).</span><?php endif; ?>
+<?php if ($__zwN > 0): ?><span class="muted small"><?= htmlspecialchars(\App\Services\ZohoPendingService::summary($zohoWaiting['by_type'])) ?> — <?= $__zwPaused !== null ? 'sent once Zoho calls are allowed again (tomorrow).' : 'sent at the next sync (hourly, or Sync now).' ?></span><?php endif; ?>
 <?php endif; ?>

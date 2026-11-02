@@ -221,6 +221,8 @@ final class CaController
             // Owner decision 2 Nov 2026 (D-233): everything the next sync would send.
             'waiting' => \App\Services\ZohoPendingService::counts(null),
             'log' => ZohoSyncLogRepository::recent(100),
+            // Owner decision 2 Nov 2026 (D-239): this app's Zoho API calls today / this minute.
+            'apiUsage' => \App\Services\ZohoApiBudget::usage(),
         ], 'layout/base');
     }
 
@@ -280,7 +282,10 @@ final class CaController
         $sent = $rev['invoices'] + $rev['synced'] + $rev['applied'] + $pur['bills'] + $pur['payments'] + $pur['applied'] + $pur['expenses'] + $ben['journals'] + $ben['removed'];
         $failed = $rev['failed'] + $pur['failed'] + $ben['failed'];
         $summary = "{$rev['invoices']} invoice(s), {$rev['synced']} buyer payment(s) ({$rev['applied']} applied), {$pur['bills']} bill(s), {$pur['payments']} vendor payment(s) ({$pur['applied']} applied), {$pur['expenses']} expense(s) / cost(s), {$ben['journals']} export benefit journal(s)";
-        if ($failed > 0) {
+        if (!empty($r['stopped'])) {
+            // Owner decision 2 Nov 2026 (D-239): stopped at once — the rest waits for the next sync.
+            Flash::set('warning', "Order sync stopped: {$r['stopped']} Sent before it stopped: {$summary}.");
+        } elseif ($failed > 0) {
             Flash::set('warning', "Order sync finished: {$summary} sent or updated; {$failed} failed — see the Zoho Sync Log.");
         } elseif ($sent > 0) {
             Flash::set('success', "Order sync finished: {$summary} sent or updated.");
@@ -305,7 +310,10 @@ final class CaController
         $done = ($master['clients'] + $master['products'] + $master['inactivated'] > 0 ? "{$master['clients']} client(s) and {$master['products']} product(s) sent or updated, {$master['inactivated']} marked inactive, " : '') . "{$revenue['invoices']} invoice(s) sent or updated, {$revenue['synced']} payment(s) pushed, {$revenue['applied']} payment(s) applied to invoices, "
             . "{$purchases['bills']} bill(s), {$purchases['payments']} vendor payment(s) ({$purchases['applied']} applied to bills) and {$purchases['expenses']} order expense(s) / cost(s) sent, {$benefits['journals']} export benefit journal(s) sent or updated, {$gstRefunds['journals']} GST refund journal(s) sent, {$expenses['imported']} expense(s) imported, {$expenses['updated']} updated and {$expenses['removed']} removed as in Zoho Books";
         $failed = $revenue['failed'] + $purchases['failed'] + $expenses['failed'] + $benefits['failed'] + $gstRefunds['failed'] + $master['failed'];
-        if ($failed > 0) {
+        if (!empty($result['stopped'])) {
+            // Owner decision 2 Nov 2026 (D-239): stopped at once — the rest waits for the next sync.
+            Flash::set('warning', "Sync stopped: {$result['stopped']} Sent before it stopped: {$done}.");
+        } elseif ($failed > 0) {
             Flash::set('warning', "Sync finished: {$done}, {$failed} failed — see the log below for details.");
         } elseif ($master['clients'] + $master['products'] + $master['inactivated'] > 0 || $revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $purchases['bills'] + $purchases['payments'] + $purchases['applied'] + $purchases['expenses'] > 0 || $benefits['journals'] + $benefits['removed'] + $gstRefunds['journals'] > 0 || $expenses['imported'] + $expenses['updated'] + $expenses['removed'] > 0) {
             Flash::set('success', "Sync finished: {$done}.");

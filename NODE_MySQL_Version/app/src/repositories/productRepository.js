@@ -26,6 +26,19 @@ async function search(term) {
   );
 }
 
+// Owner decision 2 Nov 2026 (D-240): the reference selling price's currencies — the order
+// currencies plus INR (the only currency Zoho items can carry a rate in).
+async function referenceCurrencies() {
+  const codes = (await db.query('SELECT code FROM currencies WHERE is_active = 1 ORDER BY id')).map((r) => String(r.code));
+  if (!codes.includes('INR')) codes.push('INR');
+  return codes;
+}
+
+// Active products for "Pick from Products" on an order line.
+async function forPicker() {
+  return db.query('SELECT id, name, hs_code, specifications, reference_price, reference_currency, reference_unit FROM catalog_products WHERE is_active = 1 ORDER BY name');
+}
+
 async function find(id) {
   return db.queryOne('SELECT * FROM catalog_products WHERE id = :id', { id });
 }
@@ -35,11 +48,13 @@ async function create(data, userId) {
     `INSERT INTO catalog_products
         (name, specifications, hs_code, origin,
          default_factory_cost, default_transportation_cost, default_packing_cost,
-         default_loading_cost, default_cha_cost, is_active, created_by, updated_by)
+         default_loading_cost, default_cha_cost, reference_price, reference_currency, reference_unit,
+         is_active, created_by, updated_by)
      VALUES
         (:name, :specifications, :hs_code, :origin,
          :default_factory_cost, :default_transportation_cost, :default_packing_cost,
-         :default_loading_cost, :default_cha_cost, :is_active, :created_by, :updated_by)`,
+         :default_loading_cost, :default_cha_cost, :reference_price, :reference_currency, :reference_unit,
+         :is_active, :created_by, :updated_by)`,
     {
       name: data.name,
       specifications: data.specifications,
@@ -50,6 +65,9 @@ async function create(data, userId) {
       default_packing_cost: data.default_packing_cost ?? null,
       default_loading_cost: data.default_loading_cost ?? null,
       default_cha_cost: data.default_cha_cost ?? null,
+      reference_price: data.reference_price ?? null,
+      reference_currency: data.reference_currency ?? null,
+      reference_unit: data.reference_unit ?? null,
       is_active: data.is_active !== undefined && data.is_active !== null ? Number(data.is_active) : 1,
       created_by: userId,
       updated_by: userId,
@@ -70,6 +88,9 @@ async function update(id, data, userId) {
         default_packing_cost = :default_packing_cost,
         default_loading_cost = :default_loading_cost,
         default_cha_cost = :default_cha_cost,
+        reference_price = :reference_price,
+        reference_currency = :reference_currency,
+        reference_unit = :reference_unit,
         is_active = :is_active,
         updated_by = :updated_by
      WHERE id = :id`,
@@ -83,6 +104,9 @@ async function update(id, data, userId) {
       default_packing_cost: data.default_packing_cost ?? null,
       default_loading_cost: data.default_loading_cost ?? null,
       default_cha_cost: data.default_cha_cost ?? null,
+      reference_price: data.reference_price ?? null,
+      reference_currency: data.reference_currency ?? null,
+      reference_unit: data.reference_unit ?? null,
       is_active: data.is_active !== undefined && data.is_active !== null ? Number(data.is_active) : 1,
       updated_by: userId,
       id,
@@ -103,4 +127,4 @@ async function remove(id) {
   await db.execute('DELETE FROM catalog_products WHERE id = :id', { id });
 }
 
-module.exports = { all, search, find, create, update, remove };
+module.exports = { all, search, find, create, update, remove, referenceCurrencies, forPicker };

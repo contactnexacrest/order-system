@@ -107,8 +107,9 @@ holders may approve their **own** work:
 | Approve a purchase award they made | Managing Director, Executive Director | "You awarded this purchase, so someone else must approve it." |
 | MD-approve an amendment they requested | Managing Director, Executive Director | "You requested this amendment — a different privileged user must MD-approve it." |
 | Clear short a buyer payment whose receipts they recorded | Managing Director, Executive Director | "You recorded this payment's receipts, so a different manager with "Approve short payment" must clear it short." |
+| Approve a price discount on an order where they set the discounted price (D-240) | Managing Director, Executive Director | "You set a discounted price on this order — a different MD/ED must approve the discount." |
 
-QA Round 8 (R8-N09): all seven rules are on this page. There is **no other
+QA Round 8 (R8-N09): all the rules are on this page (eight since D-240, 2 Nov 2026). There is **no other
 exception** — a Super Admin, an Admin or a System Administrator (anyone
 holding "Manage permissions") approves their own work only if one of their
 roles is ticked here, like everyone else.
@@ -121,7 +122,7 @@ roles is ticked here, like everyone else.
 3. Every self-approval is written to the audit log (PAYMENT_TERMS_SELF_APPROVED,
    DOCUMENT_SELF_REVIEWED, EMAIL_SEND_SELF_APPROVED, ORDER_CANCELLATION_SELF_APPROVED
    or ORDER_CANCELLATION_SELF_REJECTED, PURCHASE_AWARD_SELF_APPROVED,
-   AMENDMENT_SELF_APPROVED, SHORT_PAYMENT_SELF_APPROVED); a self-review shows a
+   AMENDMENT_SELF_APPROVED, SHORT_PAYMENT_SELF_APPROVED, PRICE_DISCOUNT_SELF_APPROVED); a self-review shows a
    **self-review** badge in the document's review list. Every change to the
    rules is logged as SELF_APPROVAL_RULE_CHANGED with the roles before and
    after.
@@ -138,6 +139,20 @@ roles is ticked here, like everyone else.
 | Override shipment gates (`override_shipment_gates`) | MD, ED, Admin | Release the Bill of Lading step (10f) with a written reason when the before-shipment balance or the inspection is not cleared ([Stage 7](./07-stage7-packing-bl.md)) |
 | Approve short payment (`approve_short_payment`) | MD, ED, Admin, Finance Director | Clear a buyer payment that is less than due, with a written reason ([Stage 3](./03-stage3-pi-advance.md), [Stage 8](./08-stage8-ci-balance.md)) |
 | Manage approval limits (`manage_approval_limits`) | MD, ED (and Super Admins) | Change a designation's approval limit or make it 'director' level — never on a designation the person holds ([Chapter 21](./21-departments.md)). Added by QA Round 8 (R8-N10) |
+
+### Products & pricing (owner decision 2 Nov 2026, D-240)
+
+**Settings → Products & pricing** (Manage company settings), each change
+saved with a reason like every setting:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `ref_price_note_enabled` | 1 (on) | Show the reference-price note beside order line prices (off: no note at all; the PI approval below still applies) |
+| `ref_price_note_pct` | 5 | A line this many % or more below its product's reference price shows "X% below reference price (…)" |
+| `ref_price_warning_pct` | 10 | At this many % or more below, the note turns red "⚠ X% below …" and the Proforma Invoice needs an MD/ED approval first ([Stage 3](./03-stage3-pi-advance.md#price-check-before-the-pi-owner-decision-2-nov-2026-d-240)) |
+
+New permission **Approve price discount** (`approve_price_discount`): MD and
+ED. How the reference price works: [Stage 1](./01-stage1-enquiry-quotation.md#reference-selling-price-and-pick-from-products-owner-decision-2-nov-2026-d-240).
 
 ### Scheduled jobs (set up once on the server)
 
@@ -334,6 +349,14 @@ password-change path, and is audited the same way (`PASSWORD_CHANGED`).
   as Zoho Books items. One way, app → Zoho, at the hourly sync (or Sync
   now) — no extra scheduled job. See
   [Clients and products in Zoho Books](./ca-03-zoho-sync.md#clients-and-products-in-zoho-books-owner-decision-2-nov-2026).
+  Two limits there too (owner decision 2 Nov 2026, D-239): **Max Zoho calls
+  per day for this app** (`zoho_api_daily_limit`, 800) and **Max Zoho calls
+  per minute for this app** (`zoho_api_minute_limit`, 30). Zoho's own limits
+  are per organisation and shared with the company's other Zoho apps; when
+  the day's allowance is used, syncing pauses until midnight (India time);
+  the scheduled sync waits out the per-minute limit, while a person's Sync
+  Now / Sync this order stops and asks to try again in a minute. Today's
+  usage is on the Zoho Sync page. See [Zoho Books Sync](./ca-03-zoho-sync.md).
 
   **Which emails staff receive** (owner decision 2026-10-26). The audit
   trail records every action, but **recording an action never sends an

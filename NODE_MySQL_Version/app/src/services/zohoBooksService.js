@@ -4,6 +4,10 @@ const companySettingsRepository = require('../repositories/companySettingsReposi
 const clientRepository = require('../repositories/clientRepository');
 const lookupRepository = require('../repositories/lookupRepository');
 const zohoGuard = require('./zohoGuard');
+const crypto = require('crypto');
+const db = require('../config/db');
+const encryptionService = require('./encryptionService');
+const zohoApiBudget = require('./zohoApiBudget');
 const { todayIst } = require('../helpers/dbDateTime');
 const { KIND_LABELS } = require('./zohoInvoiceData');
 const { LOGISTICS_SERVICES, DOC_KINDS } = require('../repositories/orderVendorBillRepository');
@@ -50,10 +54,27 @@ const orgGstin = new Map();
 // Tax id by tax name (GST18, IGST18, ...), per organisation.
 const taxes = new Map();
 
+// Owner decision 2 Nov 2026 (D-239): token → how to refresh it (re-fetch on 401).
+const tokenOwners = new Map();
+// Tests: a fresh fake Zoho starts with no shared token and no calls counted.
+let resetDone = Promise.resolve();
+
+/** Tests only: a second process — nothing in memory, only the shared token cache (D-239). */
+function forgetTokensInMemoryForTests() {
+  tokens.clear();
+  tokenOwners.clear();
+}
+
 /** Tests only: answer every Zoho request with fn(method, url, payload, headers, formEncoded) instead of the network (null restores real HTTP). */
 function setTransport(fn) {
   transport = fn;
   tokens.clear();
+  tokenOwners.clear();
+  if (fn) {
+    resetDone = Promise.all([db.execute('DELETE FROM zoho_token_cache'), db.execute('DELETE FROM zoho_api_usage')]).catch(() => {});
+  }
+  // A fake Zoho is not limited unless a test asks for the real limits (zohoApiBudget.useSettingLimits()).
+  zohoApiBudget.setTestLimits(fn ? 1000000 : null, fn ? 1000000 : null);
   gstRegistered.clear();
   orgGstin.clear();
   taxes.clear();
@@ -151,6 +172,8 @@ async function pushInvoice(invoice) {
 
   const lineItems = invoice.lines.map((line) => {
     const item = { name: line.name, description: line.description, quantity: line.quantity, rate: line.rate };
+    // Owner decision 2 Nov 2026 (D-240): a line picked from a product already in Books is linked to its item.
+    if (line.item_id) item.item_id = String(line.item_id);
     if (line.unit !== null) item.unit = line.unit;
     if (line.hs_code !== null) {
       // A Books organisation that is not GST-registered rejects hsn_or_sac
@@ -222,6 +245,7 @@ async function pushInvoice(invoice) {
       await request('POST', `https://${config.apiDomain}/books/v3/invoices/${encodeURIComponent(String(saved.invoice_id))}/comments?organization_id=${encodeURIComponent(config.organizationId)}`,
         { description: String(invoice.summary), show_comment_to_clients: false }, authHeaders(accessToken));
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a rate limit still stops the run
       // the invoice itself is in Books; the comment is a courtesy
     }
   }
@@ -984,7 +1008,19 @@ async function pushItem(product, itemId) {
 function itemPayload(product, gstRegistered) {
   let description = String(product.specifications || '').trim().slice(0, 2000);
   const hs = String(product.hs_code || '').trim();
-  const payload = { name: String(product.name).slice(0, 100), rate: 0, item_type: 'sales', product_type: 'goods' };
+  // Owner decision 2 Nov 2026 (D-240): a Zoho item's rate is in the organisation's base currency (INR), so
+  // only an INR reference selling price becomes its rate; any other currency goes into the description
+  // ("Reference price: USD 45.00 per SQFT"). Costs are never sent.
+  let rate = 0;
+  const refPrice = product.reference_price;
+  if (refPrice !== null && refPrice !== undefined && refPrice !== '' && Number(refPrice) > 0) {
+    if (String(product.reference_currency || '').toUpperCase() === 'INR') {
+      rate = Math.round(Number(refPrice) * 100) / 100;
+    } else {
+      description = `${description}${description !== '' ? '. ' : ''}Reference price: ${require('./referencePrice').label(product)}`.trim();
+    }
+  }
+  const payload = { name: String(product.name).slice(0, 100), rate, item_type: 'sales', product_type: 'goods' };
   if (hs !== '') {
     if (gstRegistered) {
       payload.hsn_or_sac = hs;
@@ -1383,29 +1419,97 @@ function authHeaders(accessToken) {
 }
 
 async function getAccessToken(accountsDomain, clientId, clientSecret, refreshToken) {
-  // Zoho issues only a few access tokens per refresh token in ten minutes,
-  // and a Stage 2 run makes many calls: one token (valid an hour) is
-  // reused for 50 minutes.
+  // Zoho issues only a few access tokens per refresh token in ten minutes.
+  // Owner decision 2 Nov 2026 (D-239): one token (valid an hour) is shared
+  // for 50 minutes by every process — the hourly sync, "Sync now", "Sync this
+  // order", the checks, and the PHP stack — through zoho_token_cache
+  // (encrypted), refreshed under a database lock so two requests never both
+  // fetch a new one.
+  await resetDone;
   const cached = tokens.get(refreshToken);
   if (cached && cached.expires > Date.now()) {
     return cached.token;
   }
-  const res = await request('POST', `https://${accountsDomain}/oauth/v2/token`, {
-    refresh_token: refreshToken,
-    client_id: clientId,
-    client_secret: clientSecret,
-    grant_type: 'refresh_token',
-  }, { 'Content-Type': 'application/x-www-form-urlencoded' }, true);
-  const decoded = safeJson(res.body);
-  if (!res.ok || !decoded || !decoded.access_token) {
-    throw new Error(`Zoho Books OAuth token refresh failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  const owner = [accountsDomain, clientId, clientSecret, refreshToken];
+  const key = crypto.createHash('sha256').update(`${zohoGuard.environment()}|${refreshToken}`).digest('hex');
+  let fromDb = await cachedToken(key);
+  if (fromDb) return rememberToken(refreshToken, fromDb.token, fromDb.expires, owner);
+  const lockName = `nx_zoho_token_${key.slice(0, 40)}`;
+  const conn = await db.pool.getConnection();
+  try {
+    await conn.query('SELECT GET_LOCK(?, 15)', [lockName]);
+    fromDb = await cachedToken(key); // another request may have refreshed it while we waited
+    if (fromDb) return rememberToken(refreshToken, fromDb.token, fromDb.expires, owner);
+    const res = await request('POST', `https://${accountsDomain}/oauth/v2/token`, {
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'refresh_token',
+    }, { 'Content-Type': 'application/x-www-form-urlencoded' }, true);
+    const decoded = safeJson(res.body);
+    if (!res.ok || !decoded || !decoded.access_token) {
+      throw new Error(`Zoho Books OAuth token refresh failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+    }
+    const expires = Date.now() + 3000 * 1000;
+    await db.execute(`INSERT INTO zoho_token_cache (cache_key, token_enc, expires_at) VALUES (:k, :t, FROM_UNIXTIME(:x))
+                      ON DUPLICATE KEY UPDATE token_enc = VALUES(token_enc), expires_at = VALUES(expires_at)`,
+    { k: key, t: encryptionService.encrypt(String(decoded.access_token)), x: Math.floor(expires / 1000) });
+    return rememberToken(refreshToken, String(decoded.access_token), expires, owner);
+  } finally {
+    try {
+      await conn.query('SELECT RELEASE_LOCK(?)', [lockName]);
+    } finally {
+      conn.release();
+    }
   }
-  tokens.set(refreshToken, { token: decoded.access_token, expires: Date.now() + 3000 * 1000 });
-  return decoded.access_token;
+}
+
+async function cachedToken(key) {
+  const row = await db.queryOne('SELECT token_enc, UNIX_TIMESTAMP(expires_at) AS x FROM zoho_token_cache WHERE cache_key = :k AND expires_at > NOW()', { k: key });
+  if (!row) return null;
+  const token = encryptionService.decrypt(String(row.token_enc));
+  return token ? { token, expires: Number(row.x) * 1000 } : null;
+}
+
+function rememberToken(refreshToken, token, expires, owner) {
+  tokens.set(refreshToken, { token, expires });
+  tokenOwners.set(token, owner);
+  return token;
+}
+
+/** D-239: Zoho refused the token (401) — forget it everywhere, so the next call fetches a new one. */
+async function forgetToken(token) {
+  const owner = tokenOwners.get(token);
+  tokenOwners.delete(token);
+  if (!owner) return;
+  tokens.delete(owner[3]);
+  const key = crypto.createHash('sha256').update(`${zohoGuard.environment()}|${owner[3]}`).digest('hex');
+  await db.execute('DELETE FROM zoho_token_cache WHERE cache_key = :k', { k: key });
 }
 
 async function request(method, url, payload, headers, formEncoded = false) {
   zohoGuard.assertRequestAllowed(url);
+  await resetDone;
+  // Owner decision 2 Nov 2026 (D-239): every call counts against this app's daily / per-minute allowance.
+  await zohoApiBudget.acquire();
+  let res = await send(method, url, payload, headers, formEncoded);
+  if (res.status === 401 && headers && typeof headers.Authorization === 'string' && headers.Authorization.startsWith('Zoho-oauthtoken ')) {
+    // A token Zoho no longer accepts: forget it, fetch a new one, try once more.
+    const old = headers.Authorization.slice('Zoho-oauthtoken '.length);
+    const owner = tokenOwners.get(old);
+    if (owner) {
+      await forgetToken(old);
+      const fresh = await getAccessToken(...owner);
+      headers = { ...headers, Authorization: `Zoho-oauthtoken ${fresh}` };
+      await zohoApiBudget.acquire();
+      res = await send(method, url, payload, headers, formEncoded);
+    }
+  }
+  zohoApiBudget.assertNotRateLimited(res.status, res.body);
+  return res;
+}
+
+async function send(method, url, payload, headers, formEncoded) {
   if (transport) {
     const fake = await transport(method, url, payload, headers, formEncoded);
     return { ok: fake.status >= 200 && fake.status < 300, status: fake.status, body: fake.body };
@@ -1569,7 +1673,7 @@ module.exports = {
   isEnabled, syncStartDate, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense,
   pushCostEntry, pushAssociateCommission, associateCommission, pushBenefitJournal, listTestJournals, contactRecords, readRecord, totalsById, invoiceByNumber,
   restoreVendorPayment, restoreRevenuePayment,
-  testConnection, listExpenses, listTestContacts, listTestExpenses, deleteRecord, setTransport,
+  testConnection, listExpenses, listTestContacts, listTestExpenses, deleteRecord, setTransport, forgetTokensInMemoryForTests,
   // Owner decision 2 Nov 2026 (D-238): clients and products kept in Books.
   pushCustomerContact, customerPayload, pushItem, itemPayload, markInactive,
 };

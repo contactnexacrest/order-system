@@ -274,10 +274,17 @@ default and each saved with a reason (D-238):
   item with exactly the same name and links to it.
 - **A client goes once its first order exists** — the order sets the
   customer's currency, and a Zoho customer's currency can never change.
-- **Products go with rate 0.** The Products menu holds sourcing costs only
-  (factory, transport, CHA, supplier FOB) — never a selling price — and **no
-  cost is ever sent to Zoho**. The products are not linked to order lines, so
-  invoices keep their own line descriptions as before.
+- **Products and their rate** (owner decision 2 Nov 2026, D-240). **No
+  cost is ever sent to Zoho.** A product's **reference selling price**
+  becomes the Zoho item's rate when it is in INR (Zoho's base currency);
+  in any other currency the rate stays 0 and the item description ends with
+  "Reference price: USD 45.00 per SQFT". A product without a reference
+  price goes with rate 0, as before. A change to the reference price sends
+  the item again.
+- **Invoice lines link the item.** A Commercial Invoice line picked from a
+  product that is already a Zoho item carries that item, so Zoho's item
+  reports show it; the line keeps its own description and its own price.
+  Lines typed by hand go as before.
 - **"Sync this order"** on an order page does not send clients or products —
   only the full sync does.
 - While testing (`ZOHO_ENVIRONMENT=test`) only clients and products whose
@@ -553,6 +560,38 @@ while testing is removed before go-live:
 what exactly (with the Zoho ID), before and after, why, whether it is
 test data, and when it was removed. The clean-up script writes its own
 rows there with `--log`.
+
+## Zoho's call limits — this app's share (owner decision 2 Nov 2026, D-239)
+
+Zoho Books limits how many API calls an **organisation** may make — about
+**100 a minute** and a **daily** number that depends on the plan (roughly
+1,000 Free, 2,000 Standard, 5,000 Professional, 10,000 Premium and above;
+check your own plan). Every Zoho app and integration of the company draws on
+the same limit, so this app keeps to its own share:
+
+| Setting (Admin → Settings → Zoho Books) | Default | What happens when it is reached |
+|---|---|---|
+| `zoho_api_daily_limit` — max Zoho calls per day for this app (midnight to midnight, India time) | 800 | Syncing **pauses until midnight**. The run stops with "Paused: daily Zoho allowance for this app (800 calls) used — resumes tomorrow."; the "Waiting for Zoho" badges say "paused — daily Zoho allowance used, resumes tomorrow". |
+| `zoho_api_minute_limit` — max Zoho calls per minute for this app | 30 | The **scheduled (hourly) sync waits** for the next minute and carries on. **Sync Now**, **Sync this order**, **Check against Zoho** and a delete wait at most 5 seconds; otherwise they stop with "Zoho speed limit for this app reached — try again in a minute." |
+
+- **Every call counts** — reads (checks, look-ups), the login token and the
+  sends. The **Zoho Sync** page shows "Zoho calls today: X of N · this
+  minute: Y of M" and the last 7 days.
+- **Zoho says "too many requests"** (because other apps used the limit, or
+  Zoho is busy): the run **stops at once** — it does not keep trying the
+  remaining records — with one Sync Log line "Stopped: Zoho rate limit —
+  remaining records will be sent at the next sync." and one failure e-mail
+  to Finance (D-233). Nothing is lost: everything not sent stays waiting.
+- **One login token for everyone.** The token Zoho issues is valid an hour;
+  the app keeps it (encrypted) and every part of the app — the hourly sync,
+  Sync Now, the order buttons, the checks — uses the same one for 50
+  minutes, instead of asking Zoho for a new one each time (Zoho also limits
+  how many tokens it hands out). If Zoho stops accepting it, the app fetches
+  a new one once and carries on.
+- **Choosing the numbers.** Keep the daily allowance well below your plan's
+  limit so the company's other Zoho apps keep working; a normal day of this
+  app is a few hundred calls. Raise it only if the Zoho Sync page shows the
+  app regularly pausing.
 
 ## What to do if a sync fails
 

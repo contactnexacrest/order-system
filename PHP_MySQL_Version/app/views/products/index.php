@@ -22,11 +22,12 @@
         <th>HS Code</th>
         <th>Origin</th>
         <?php if ($canViewPricing): ?><th>Headline FOB</th><?php endif; ?>
+        <?php if (!empty($sees['selling'])): ?><th>Reference Price</th><?php endif; ?>
         <th>Status</th>
         <th></th>
       </tr>
       <?php if (empty($products)): ?>
-        <tr><td colspan="6" class="muted">No products found.</td></tr>
+        <tr><td colspan="7" class="muted">No products found.</td></tr>
       <?php endif; ?>
       <?php foreach ($products as $p): ?>
         <tr>
@@ -35,6 +36,9 @@
           <td><?= View::e($p['origin'] ?? '—') ?></td>
           <?php if ($canViewPricing): ?>
             <td><?= $p['headline_fob'] === null ? 'To Be Confirmed' : number_format((float) $p['headline_fob'], 2) ?></td>
+          <?php endif; ?>
+          <?php if (!empty($sees['selling'])): ?>
+            <td><?= ($p['reference_price'] ?? null) === null ? '—' : View::e(\App\Services\ReferencePrice::label($p)) ?></td>
           <?php endif; ?>
           <td><span class="badge <?= $p['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $p['is_active'] ? 'Active' : 'Inactive' ?></span></td>
           <td><a class="btn-sm" href="/products/<?= (int) $p['id'] ?>">View</a></td>

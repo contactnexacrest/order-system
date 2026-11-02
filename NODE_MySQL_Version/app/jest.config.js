@@ -20,7 +20,10 @@ module.exports = {
   globalSetup: '<rootDir>/tests/support/globalSetup.js',
   globalTeardown: '<rootDir>/tests/support/globalTeardown.js',
   testMatch: ['<rootDir>/tests/**/*.test.js'],
-  testTimeout: 20000,
+  // 60 s: integration tests run one at a time against one shared database that grows
+  // to thousands of orders by the end of a run; on GitHub's slower runner some page
+  // renders and whole-database jobs late in the suite pass 20 s. A real hang still fails.
+  testTimeout: 60000,
   // Integration tests share one disposable database and mutate real rows in
   // it (stage-gate transitions, etc.) — running them one at a time avoids
   // cross-test races over the same order rows.

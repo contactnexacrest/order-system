@@ -108,8 +108,8 @@ final class OrderProductRepository
         );
         self::setLineType($newId, (string) ($source['line_type'] ?? 'goods'), $source['sac_code'] ?? null);
         // D-215 (5a): the copy keeps the line's product category and attribute values.
-        Database::connection()->prepare('UPDATE order_products SET category_id = :c, attribute_values = :v WHERE id = :id')
-            ->execute(['c' => $source['category_id'] ?? null, 'v' => $source['attribute_values'] ?? null, 'id' => $newId]);
+        Database::connection()->prepare('UPDATE order_products SET category_id = :c, attribute_values = :v, catalog_product_id = :cp, price_set_by = :pb WHERE id = :id')
+            ->execute(['c' => $source['category_id'] ?? null, 'v' => $source['attribute_values'] ?? null, 'cp' => $source['catalog_product_id'] ?? null, 'pb' => $source['price_set_by'] ?? null, 'id' => $newId]);
         return $newId;
     }
 
@@ -150,6 +150,23 @@ final class OrderProductRepository
             'hs_code'         => $hsCode ?: '680293',
         ]);
         return (int) $pdo->lastInsertId();
+    }
+
+    /**
+     * Owner decision 2 Nov 2026 (D-240): the Products-menu product a line was picked
+     * from (null = typed by hand), and who set its unit price (for the self-approval
+     * rule on a discount below the reference price).
+     */
+    public static function setCatalogProduct(int $id, ?int $catalogProductId): void
+    {
+        Database::connection()->prepare('UPDATE order_products SET catalog_product_id = :c WHERE id = :id')
+            ->execute(['c' => $catalogProductId, 'id' => $id]);
+    }
+
+    public static function setPriceSetBy(int $id, int $userId): void
+    {
+        Database::connection()->prepare('UPDATE order_products SET price_set_by = :u WHERE id = :id')
+            ->execute(['u' => $userId, 'id' => $id]);
     }
 
     /** Owner decision D-215: a line is goods, a service (SAC code, its own Export Service Invoice) or a charge. */

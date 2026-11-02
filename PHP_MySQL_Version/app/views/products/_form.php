@@ -25,6 +25,33 @@ $action = $isEdit ? '/products/' . (int) $product['id'] . '/update' : '/products
     </div>
   </fieldset>
 
+  <?php // Owner decision 2 Nov 2026 (D-240): reference SELLING price — only for people who may see selling prices. ?>
+  <?php if (!empty($sees['selling'])): ?>
+  <fieldset>
+    <legend>Reference Selling Price <small class="muted">(a starting point for order lines — each order's own price can differ; never printed on a document)</small></legend>
+    <div class="field-grid">
+      <label>Reference Price<input type="number" step="0.01" min="0.01" max="999999999999.99" name="reference_price" value="<?= View::e(($product['reference_price'] ?? '') !== null ? (string) ($product['reference_price'] ?? '') : '') ?>" placeholder="e.g., 45.00"></label>
+      <label>Currency
+        <select name="reference_currency">
+          <option value="">Choose…</option>
+          <?php foreach ($referenceCurrencies ?? [] as $__c): ?>
+            <option value="<?= View::e($__c) ?>" <?= ($product['reference_currency'] ?? '') === $__c ? 'selected' : '' ?>><?= View::e($__c) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <label>Per (unit)
+        <select name="reference_unit">
+          <option value="">—</option>
+          <?php foreach ($referenceUnits ?? [] as $__u): ?>
+            <option value="<?= View::e($__u['option_value']) ?>" <?= ($product['reference_unit'] ?? '') === $__u['option_value'] ? 'selected' : '' ?>><?= View::e($__u['option_value']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+    </div>
+    <p class="muted small">Only INR reference prices go to Zoho Books as the item's rate; any other currency is written into the Zoho item's description.</p>
+  </fieldset>
+  <?php endif; ?>
+
   <label><input type="checkbox" name="is_active" value="1" <?= (!$isEdit || !empty($product['is_active'])) ? 'checked' : '' ?>> Active</label>
 
   <button type="submit"><?= $isEdit ? 'Save Changes' : 'Add Product' ?></button>

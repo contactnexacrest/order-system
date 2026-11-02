@@ -495,6 +495,44 @@ Country of Origin: India", in the category's order; an attribute left empty
 prints "To Be Confirmed". A category can be made inactive: new lines no longer
 offer it, existing lines keep it.
 
+### Reference selling price and "Pick from Products" (owner decision 2 Nov 2026, D-240)
+
+**Products menu.** A product can carry a **Reference Selling Price** — an
+amount, its currency and the unit it is per (e.g. "USD 45.00 per SQFT"). It
+is the usual price, not a fixed one. Only people who may see selling prices
+(Sales, the directors, Admin) see or change it on the product list, the
+product page and the product form; Procurement and Logistics do not see it,
+and if they save a product the reference price stays as it was. Every change
+is in the audit log (PRODUCT_REFERENCE_PRICE_CHANGED, old and new). The form
+refuses "Reference selling price must be a number above 0 with at most 2
+decimals.", "Choose the currency of the reference selling price." and
+"Choose the unit of the reference selling price from the list."
+
+**Order lines.** The New Order form and the order page's add / edit line
+forms have **Pick from Products** (optional). Picking a product fills the
+description, HS code and unit, and shows its specifications. When the
+reference price is in the order's currency it fills the unit price too
+("Reference price USD 45.00 per SQFT filled in — change it if this order
+differs."); in another currency the price is left blank ("Reference: USD
+45.00 per SQFT — different currency, so no price was filled in."). The line
+remembers the product; its own unit price stays freely editable, and **every
+document (QT, PI, OC, CI …) prints the line's own price — never the reference
+price.**
+
+**The note** beside a line's price (only for people who may see selling
+prices; never on a document or in the client portal), set under Settings →
+**Products & pricing**:
+
+- "6.7% below reference price (USD 45.00 per SQFT)" — at or beyond the note
+  level (default 5 %);
+- red "⚠ 20% below reference price (USD 45.00 per SQFT)" — at or beyond the
+  warning level (default 10 %); the Proforma Invoice then needs an MD/ED
+  approval first ([Stage 3](./03-stage3-pi-advance.md#price-check-before-the-pi-owner-decision-2-nov-2026-d-240));
+- green "11.1% above reference price (USD 45.00 per SQFT)".
+
+Nothing is compared when the product has no reference price or it is in
+another currency than the order.
+
 ### Export Service Invoice (D-215)
 
 When an order has at least one service line, the **Products** card on the

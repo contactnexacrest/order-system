@@ -8,6 +8,8 @@
 {% if zohoWaiting and zohoWaiting.enabled %}
 {% set zwN = zohoWaiting.total %}
 {% set zwText = ('Waiting for Zoho: 0 — everything on this order is in Zoho Books' if zwN == 0 else 'Waiting for Zoho: ' ~ zwN) %}
+{% set zwPaused = zohoPausedText if zwN > 0 else null %}{# D-239 #}
+{% if zwPaused %}{% set zwText = zwText ~ ' — ' ~ zwPaused %}{% endif %}
 <span class="badge {{ 'badge-success' if zwN == 0 else 'badge-warning' }} zoho-waiting" data-zoho-waiting="{{ zwN }}"{% if zwN > 0 %} title="{{ zohoWaitingSummary(zohoWaiting.by_type) }} — sent at the next sync (hourly, or Sync now)."{% endif %}>{% if zwLink %}<a href="/orders/{{ order.id }}/zoho-check">{{ zwText }}</a>{% else %}{{ zwText }}{% endif %}</span>
-{% if zwN > 0 %}<span class="muted small">{{ zohoWaitingSummary(zohoWaiting.by_type) }} — sent at the next sync (hourly, or Sync now).</span>{% endif %}
+{% if zwN > 0 %}<span class="muted small">{{ zohoWaitingSummary(zohoWaiting.by_type) }} — {{ 'sent once Zoho calls are allowed again (tomorrow).' if zwPaused else 'sent at the next sync (hourly, or Sync now).' }}</span>{% endif %}
 {% endif %}

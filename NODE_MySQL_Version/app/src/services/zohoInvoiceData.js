@@ -122,14 +122,21 @@ async function ciLines(orderId, label) {
     }
     const description = String(product.description || '').trim();
     const details = [product.dimensions ? `Size: ${product.dimensions}` : null, product.finish ? `Finish: ${product.finish}` : null].filter(Boolean);
-    lines.push({
+    const line = {
       name: (description !== '' ? description : `Line ${product.line_no}`).slice(0, 100),
       description: [description, ...details].join('. '),
       hs_code: product.hs_code || null,
       quantity,
       unit: product.unit || null,
       rate,
-    });
+    };
+    // Owner decision 2 Nov 2026 (D-240): the Zoho item of the Products-menu product the line was picked
+    // from. Added only when there is one, so invoices already in Books keep their fingerprint.
+    if (product.catalog_product_id) {
+      const catalogProduct = await require('../repositories/productRepository').find(Number(product.catalog_product_id));
+      if (catalogProduct && catalogProduct.zoho_item_id) line.item_id = String(catalogProduct.zoho_item_id);
+    }
+    lines.push(line);
   }
   if (lines.length === 0) {
     throw new Error(`${label} not sent: the order has no products.`);
@@ -162,4 +169,4 @@ async function debitNoteLines(orderId, order, label) {
   return lines;
 }
 
-module.exports = { KIND_LABELS, build, fingerprint, summary };
+module.exports = { KIND_LABELS, build, fingerprint, summary, ciLines };

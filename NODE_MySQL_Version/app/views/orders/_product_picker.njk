@@ -1,0 +1,23 @@
+{#
+  Owner decision 2 Nov 2026 (D-240): "Pick from Products" on an order line. Fills description,
+  HS code, unit and — when the product's reference price is in the order's currency — the unit
+  price, which stays freely editable. The reference price reaches the browser only for people
+  who may see selling prices. Port of views/orders/_product_picker.php.
+  In: pickerProducts, pickerName, pickerSelected, sees, optional pickerCurrency.
+#}
+<label class="full">Pick from Products <small class="muted">(optional — fills the line; you can still change anything)</small>
+  <select name="{{ pickerName }}" class="product-picker"{% if pickerCurrency %} data-order-currency="{{ pickerCurrency }}"{% endif %}>
+    <option value="">— Type the line by hand —</option>
+    {% for pp in pickerProducts %}
+      {% set hasRef = sees.selling and pp.reference_price != null %}
+      <option value="{{ pp.id }}"
+        data-name="{{ pp.name }}"
+        data-hs="{{ pp.hs_code }}"
+        data-specs="{{ (pp.specifications or '') | truncate(200, true, '') }}"
+        data-unit="{{ pp.reference_unit or '' }}"
+        {% if hasRef %}data-price="{{ pp.reference_price_fixed }}" data-currency="{{ pp.reference_currency }}" data-label="{{ pp.reference_label }}"{% endif %}
+        {{ 'selected' if (pickerSelected | int) == pp.id }}>{{ pp.name }} (HS {{ pp.hs_code }})</option>
+    {% endfor %}
+  </select>
+  <span class="muted small product-picker-hint" aria-live="polite"></span>
+</label>

@@ -394,6 +394,8 @@ async function create(req, res) {
       cooTypes: await lookupRepository.dropdownOptions('coo_type'),
       containerTypes: await lookupRepository.dropdownOptions('container_type'),
       units: await lookupRepository.dropdownOptions('unit'),
+      // Owner decision 2 Nov 2026 (D-240): "Pick from Products" (the reference price only for selling-visible people).
+      pickerProducts: await require('../services/referencePrice').pickerList(),
       packageTypes: await lookupRepository.dropdownOptions('package_type'),
       surfaceFinishes: await lookupRepository.dropdownOptions('surface_finish'),
       hsCodes: await hsCodeRepository.active(),
@@ -586,13 +588,17 @@ async function store(req, res) {
     const units = [].concat(body.product_unit || []);
     const unitPrices = [].concat(body.product_unit_price || []);
     const hsCodes = [].concat(body.product_hs_code || []);
+    // Owner decision 2 Nov 2026 (D-240): the product each line was picked from.
+    const catalogIds = [].concat(body.product_catalog_id || []);
+    const pickedIds = [];
+    for (const v of catalogIds) pickedIds.push(await catalogProductInput(v));
 
     let lineNo = 1;
     for (let i = 0; i < descriptions.length; i++) {
       const description = str(descriptions[i]);
       if (description === '') continue; // blank row — skip rather than insert an empty product
       const quantityIsTbc = !!(Array.isArray(quantityTbcFlags) ? quantityTbcFlags[i] : quantityTbcFlags[i]);
-      await orderProductRepository.add(
+      const lineId = await orderProductRepository.add(
         orderId,
         lineNo++,
         description,
@@ -605,6 +611,9 @@ async function store(req, res) {
         str(hsCodes[i]),
         trx
       );
+      // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
+      await orderProductRepository.setCatalogProduct(lineId, pickedIds[i] || null, trx);
+      if (str(unitPrices[i]) !== '') await orderProductRepository.setPriceSetBy(lineId, user.id, trx);
     }
 
     return result;
@@ -815,6 +824,61 @@ async function lineTypeInput(body) {
   return { lineType, hsCode, sacCode: null, error: null };
 }
 
+// Owner decision 2 Nov 2026 (D-240): what the order page needs for the reference price.
+async function referencePriceViewData(orderId) {
+  const referencePrice = require('../services/referencePrice');
+  const order = await orderRepository.find(orderId);
+  const lines = await orderProductRepository.forOrder(orderId);
+  const products = await referencePrice.productsFor(lines);
+  const settings = await referencePrice.settings();
+  const refPriceLines = {};
+  for (const line of lines) {
+    const diff = referencePrice.lineDifference(line, products[Number(line.catalog_product_id || 0)] || null, order && order.currency_code);
+    const note = referencePrice.note(diff, settings);
+    refPriceLines[line.id] = {
+      diff, note,
+      cls: note ? ` ref-price-${note.kind === 'note' ? 'below' : note.kind}` : '',
+      ref: diff ? diff.reference.toFixed(2) : '',
+      label: diff ? diff.label : '',
+    };
+  }
+  const priceCheck = await referencePrice.status(orderId);
+  for (const l of priceCheck.needing) { l.belowText = referencePrice.pct(-l.pct); }
+  for (const l of priceCheck.uncovered) { l.belowText = referencePrice.pct(-l.pct); }
+  if (priceCheck.approval) {
+    const approver = await require('../repositories/userRepository').findById(Number(priceCheck.approval.approved_by));
+    priceCheck.approval.approver_name = approver ? approver.name : '—';
+  }
+  return {
+    pickerProducts: await referencePrice.pickerList(),
+    refPriceSettings: settings,
+    refPriceWarningText: referencePrice.pct(settings.warning_pct),
+    refPriceLines,
+    priceCheck,
+    canApprovePriceDiscount: false,
+  };
+}
+
+// Owner decision 2 Nov 2026 (D-240): a posted "Pick from Products" id — only an active Products-menu product counts.
+async function catalogProductInput(value) {
+  const id = parseInt(value, 10) || 0;
+  if (id <= 0) return null;
+  const product = await require('../repositories/productRepository').find(id);
+  return product && Number(product.is_active) === 1 ? id : null;
+}
+
+// Owner decision 2 Nov 2026 (D-240): an MD/ED approves the order's discount below the reference price.
+async function approvePriceDiscount(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  if (!(await orderRepository.find(orderId))) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const error = await require('../services/referencePrice').approve(orderId, req.user.id, req.body.reason);
+  flash.set(req, error === null ? 'success' : 'error', error ?? 'Discount approved — the Proforma Invoice can now be generated.');
+  res.redirect(`/orders/${orderId}#price-check`);
+}
+
 async function addProduct(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -865,6 +929,9 @@ async function addProduct(req, res) {
   );
   await orderProductRepository.setLineType(newLineId, lineType, sacCode);
   await require('../repositories/productCategoryRepository').setLineCategory(newLineId, categoryId, attributeValues);
+  // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
+  await orderProductRepository.setCatalogProduct(newLineId, await catalogProductInput(body.catalog_product_id));
+  if (str(body.unit_price) !== '') await orderProductRepository.setPriceSetBy(newLineId, req.user.id);
   flash.set(req, 'success', 'Product line added.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -920,6 +987,14 @@ async function updateProduct(req, res) {
   );
   await orderProductRepository.setLineType(productId, lineType, sacCode);
   await require('../repositories/productCategoryRepository').setLineCategory(productId, categoryId, attributeValues);
+  // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
+  if (Object.prototype.hasOwnProperty.call(body, 'catalog_product_id')) {
+    await orderProductRepository.setCatalogProduct(productId, await catalogProductInput(body.catalog_product_id));
+  }
+  const newPrice = str(body.unit_price);
+  if (newPrice !== '' && (product.unit_price === null || Math.abs(Number(product.unit_price) - Number(newPrice)) > 0.0001)) {
+    await orderProductRepository.setPriceSetBy(productId, req.user.id);
+  }
   flash.set(req, 'success', 'Product line updated.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -1323,6 +1398,9 @@ async function show(req, res) {
       emailLogByDocument,
       activeUsers,
       fobTotal: await orderProductRepository.totalFobValue(orderId),
+      // Owner decision 2 Nov 2026 (D-240): "Pick from Products", the reference-price note per line and the discount approval.
+      ...(await referencePriceViewData(orderId)),
+      canApprovePriceDiscount: !!(req.permissions && req.permissions.approve_price_discount),
       suppliers: await supplierRepository.all(),
       logisticsPartners: await logisticsPartnerRepository.all(),
       logisticsServiceTypes: logisticsPartnerRepository.SERVICE_TYPES,
@@ -1403,6 +1481,8 @@ async function show(req, res) {
       // Owner decision 2 Nov 2026 (D-233): "Waiting for Zoho: N" for whoever may see Zoho status.
       zohoWaiting: (req.permissions.ca_module_manage || req.permissions.ca_module_view) ? await require('../services/zohoPendingService').counts(Number(orderId)) : null,
       zohoWaitingSummary: require('../services/zohoPendingService').summary,
+      // Owner decision 2 Nov 2026 (D-239): the badge says so when the day's Zoho allowance is used.
+      zohoPausedText: (req.permissions.ca_module_manage || req.permissions.ca_module_view) ? await require('../services/zohoPendingService').pausedText() : null,
       linkedExportBenefits: req.permissions.ca_module_view ? await caExportBenefitRepository.forOrder(orderId) : [],
       // Owner request (2026-10-26): Step 12c lists this order's claims for manage_order_financials holders.
       orderBenefitClaims: req.permissions.manage_order_financials ? await caExportBenefitRepository.forOrder(orderId) : [],
@@ -4729,7 +4809,7 @@ module.exports = {
   markOcSentToBuyer,
   recordInspectionResult,
   index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, addAssignee, removeAssignee, downloadDossier, generatePiFormLink, generateBuyerActionLink, generatePaymentActionLink,
-  editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct,
+  editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct, approvePriceDiscount,
   recordBuyerPo, correctBuyerPoReceivedDate, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, saveLcDates, addLcAmendment, updateProductionStatus,
   recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, skipPiForm, confirmSupplierSigned, uploadSupplierPoDocument, generateSupplierActionLink, skipSupplierPoAck, markSupplierAdvancePaid, markSupplierBalancePaid,

@@ -20,6 +20,8 @@ const RULES = {
   purchase_award: 'Approve a purchase award they made',
   amendment: 'MD-approve an amendment they requested',
   short_payment: 'Clear short a buyer payment whose receipts they recorded',
+  // Owner decision 2 Nov 2026 (D-240): a price below the reference by the warning % or more.
+  price_discount: 'Approve a price discount on an order where they set the discounted price',
 };
 
 async function roleIds(rule) {

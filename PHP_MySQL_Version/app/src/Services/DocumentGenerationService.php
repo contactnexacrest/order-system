@@ -86,6 +86,10 @@ final class DocumentGenerationService
         // can only be set here, at actual PI-generation time — set (or
         // reset, on a re-issued PI) every time a PI is generated so the
         // validity window always reflects the most recent issue.
+        // Owner decision 2 Nov 2026 (D-240): no PI while a discount at the warning level waits for MD/ED approval.
+        if ($documentTypeCode === 'PI' && ($priceBlock = ReferencePrice::piBlockReason($orderId, $generatedByUserId)) !== null) {
+            throw new \RuntimeException($priceBlock);
+        }
         if ($documentTypeCode === 'PI') {
             $piValidityDays = (int) (CompanySettingsRepository::get('pi_validity_days') ?? 15);
             OrderRepository::setPiDates(

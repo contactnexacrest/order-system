@@ -59,7 +59,8 @@ final class MakerCheckerGuardTest extends DbTestCase
     /** QA Round 8, R8-N09: one choke point, seven rules, default MD and ED, no blanket exemption. */
     public function testEveryRuleDefaultsToMdAndEdWithNoBlanketExemption(): void
     {
-        $rules = ['payment_terms', 'document_review', 'email_send', 'cancellation', 'purchase_award', 'amendment', 'short_payment'];
+        // D-240 (2 Nov 2026) added 'price_discount'.
+        $rules = ['payment_terms', 'document_review', 'email_send', 'cancellation', 'purchase_award', 'amendment', 'short_payment', 'price_discount'];
         self::assertSame($rules, array_keys(\App\Services\SelfApprovalRules::RULES));
         $md = $this->createTestUser('Managing Director');
         $ed = $this->createTestUser('Executive Director');

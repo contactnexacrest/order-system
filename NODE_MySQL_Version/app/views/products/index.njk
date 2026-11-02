@@ -21,11 +21,12 @@
         <th>HS Code</th>
         <th>Origin</th>
         {% if canViewPricing %}<th>Headline FOB</th>{% endif %}
+        {% if sees.selling %}<th>Reference Price</th>{% endif %}
         <th>Status</th>
         <th></th>
       </tr>
       {% if not products.length %}
-        <tr><td colspan="6" class="muted">No products found.</td></tr>
+        <tr><td colspan="7" class="muted">No products found.</td></tr>
       {% endif %}
       {% for p in products %}
         <tr>
@@ -34,6 +35,9 @@
           <td>{{ p.origin or '—' }}</td>
           {% if canViewPricing %}
             <td>{{ 'To Be Confirmed' if p.headline_fob == null else (p.headline_fob | money) }}</td>
+          {% endif %}
+          {% if sees.selling %}
+            <td>{{ p.reference_label or '—' }}</td>
           {% endif %}
           <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
           <td><a class="btn-sm" href="/products/{{ p.id }}">View</a></td>

@@ -135,6 +135,7 @@
       <div id="product-rows">
         {% for desc in oldDescriptionsList %}
         <div class="product-row">
+          {% set pickerName = 'product_catalog_id[]' %}{% set pickerSelected = (old.product_catalog_id[loop.index0] if old.product_catalog_id else 0) %}{% set pickerCurrency = '' %}{% include "orders/_product_picker.njk" %}
           <label>Description *<input type="text" name="product_description[]" required value="{{ desc or '' }}" placeholder="e.g. Granite Memorial Headstone"></label>
           <label>Dimensions<input type="text" name="product_dimensions[]" value="{{ old.product_dimensions[loop.index0] or '' if old.product_dimensions else '' }}" placeholder="e.g. 24x12x3 inches"></label>
           <label>Finish
@@ -190,6 +191,7 @@
     <button type="submit">Create Order</button>
   </form>
 </div>
+{% include "orders/_product_picker_js.njk" %}
 <script>
 // 90-item backlog #67: the Freight/Insurance hints used to say the literal
 // placeholder text "order currency" instead of the actual currency the
@@ -276,6 +278,8 @@ document.getElementById('add-product-row').addEventListener('click', function ()
   var rows = document.getElementById('product-rows');
   var clone = rows.firstElementChild.cloneNode(true);
   clone.querySelectorAll('input').forEach(function (el) { el.value = ''; });
+  clone.querySelectorAll('select.product-picker').forEach(function (el) { el.selectedIndex = 0; });
+  clone.querySelectorAll('.product-picker-hint').forEach(function (el) { el.textContent = ''; });
   rows.appendChild(clone);
 });
 // Point 6 — same idea as the "Duplicate" button on the post-confirmation

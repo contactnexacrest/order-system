@@ -1244,4 +1244,17 @@ final class RouteBehaviourTest extends DbTestCase
         self::assertSame('950.00', $this->value("SELECT sanctioned_amount FROM ca_export_benefits WHERE id = {$benefitId}"));
         $this->assertPage($this->call('GET', '/reports/missing-ebrc'), 'Missing eBRC / FIRC', 'GET /reports/missing-ebrc');
     }
+
+    /** Owner decision 2 Nov 2026 (D-240): MD/ED approval of a discount below the reference price. */
+    public function testPriceApprovalRoute(): void
+    {
+        $orderId = $this->createTestOrder($this->createTestClient());
+        self::assertSame('error', $this->call('POST', "/orders/{$orderId}/price-approval", ['reason' => 'Nothing to approve here'])['type'], 'no line below the warning level');
+        $productId = \App\Repositories\ProductRepository::create(['name' => 'Route Ref Granite', 'specifications' => 'Slab', 'hs_code' => '68022310', 'reference_price' => '45.00', 'reference_currency' => 'USD', 'reference_unit' => 'SQFT'], $this->holder);
+        $line = \App\Repositories\OrderProductRepository::add($orderId, 1, 'Route Ref Granite', null, null, '10', false, 'SQFT', '36.00', '68022310');
+        \App\Repositories\OrderProductRepository::setCatalogProduct($line, $productId);
+        self::assertSame('error', $this->call('POST', "/orders/{$orderId}/price-approval", ['reason' => 'x'])['type'], 'a reason is needed');
+        $this->assertDone($this->call('POST', "/orders/{$orderId}/price-approval", ['reason' => 'Route test — volume order agreed']), 'POST /orders/{id}/price-approval', 'Discount approved');
+        self::assertSame(1, $this->audits('PRICE_DISCOUNT_APPROVED', $orderId));
+    }
 }

@@ -40,6 +40,8 @@ final class ZohoBooksService
 
     /** @var array<string, array{token: string, expires: int}> access tokens by refresh token — Zoho limits how many may be issued, so one run reuses one */
     private static array $tokens = [];
+    /** @var array<string, array{0:string,1:string,2:string,3:string}> token => how to refresh it (D-239: re-fetch on 401) */
+    private static array $tokenOwners = [];
     /** @var array<string, bool> whether each Books organisation is GST-registered */
     private static array $gstRegistered = [];
     /** @var array<string, string> each GST-registered Books organisation's own GSTIN */
@@ -52,6 +54,11 @@ final class ZohoBooksService
     {
         self::$transport = $transport;
         self::$tokens = [];
+        self::$tokenOwners = [];
+        // Tests: a fresh fake Zoho starts with no shared token and no calls counted (D-239).
+        \App\Config\Database::connection()->exec('DELETE FROM zoho_token_cache');
+        \App\Config\Database::connection()->exec('DELETE FROM zoho_api_usage');
+        ZohoApiBudget::setTestLimits($transport !== null ? 1000000 : null, $transport !== null ? 1000000 : null);
         self::$gstRegistered = [];
         self::$orgGstin = [];
         self::$taxes = [];
@@ -187,6 +194,10 @@ final class ZohoBooksService
         $lineItems = [];
         foreach ($invoice['lines'] as $line) {
             $item = ['name' => $line['name'], 'description' => $line['description'], 'quantity' => $line['quantity'], 'rate' => $line['rate']];
+            // Owner decision 2 Nov 2026 (D-240): a line picked from a product already in Books is linked to its item.
+            if (!empty($line['item_id'])) {
+                $item['item_id'] = (string) $line['item_id'];
+            }
             if ($line['unit'] !== null) {
                 $item['unit'] = $line['unit'];
             }
@@ -269,7 +280,8 @@ final class ZohoBooksService
             try {
                 self::request('POST', "https://{$config['apiDomain']}/books/v3/invoices/" . rawurlencode((string) $saved['invoice_id']) . '/comments?organization_id=' . rawurlencode($config['organizationId']),
                     ['description' => (string) $invoice['summary'], 'show_comment_to_clients' => false], self::authHeaders($accessToken));
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                ZohoSyncStop::rethrow($e); // D-239: a rate limit still stops the run
                 // the invoice itself is in Books; the comment is a courtesy
             }
         }
@@ -1258,7 +1270,19 @@ final class ZohoBooksService
     {
         $description = mb_substr(trim((string) ($product['specifications'] ?? '')), 0, 2000);
         $hs = trim((string) ($product['hs_code'] ?? ''));
-        $payload = ['name' => mb_substr((string) $product['name'], 0, 100), 'rate' => 0, 'item_type' => 'sales', 'product_type' => 'goods'];
+        // Owner decision 2 Nov 2026 (D-240): a Zoho item's rate is in the organisation's base currency (INR),
+        // so only an INR reference selling price becomes its rate; any other currency goes into the
+        // description ("Reference price: USD 45.00 per SQFT"). Costs are never sent.
+        $rate = 0;
+        $refPrice = $product['reference_price'] ?? null;
+        if ($refPrice !== null && $refPrice !== '' && (float) $refPrice > 0) {
+            if (strtoupper((string) ($product['reference_currency'] ?? '')) === 'INR') {
+                $rate = round((float) $refPrice, 2);
+            } else {
+                $description = trim($description . ($description !== '' ? '. ' : '') . 'Reference price: ' . ReferencePrice::label($product));
+            }
+        }
+        $payload = ['name' => mb_substr((string) $product['name'], 0, 100), 'rate' => $rate, 'item_type' => 'sales', 'product_type' => 'goods'];
         if ($hs !== '') {
             if ($gstRegistered) {
                 $payload['hsn_or_sac'] = $hs;
@@ -1719,32 +1743,88 @@ final class ZohoBooksService
     private static function getAccessToken(string $accountsDomain, string $clientId, string $clientSecret, string $refreshToken): string
     {
         // Zoho issues only a few access tokens per refresh token in ten
-        // minutes, and a Stage 2 run makes many calls: one token (valid an
-        // hour) is reused for 50 minutes.
+        // minutes. Owner decision 2 Nov 2026 (D-239): one token (valid an
+        // hour) is shared for 50 minutes by every process — the hourly sync,
+        // "Sync now", "Sync this order", the checks — through
+        // zoho_token_cache (encrypted), refreshed under a database lock so
+        // two requests never both fetch a new one.
         $cached = self::$tokens[$refreshToken] ?? null;
         if ($cached !== null && $cached['expires'] > time()) {
             return $cached['token'];
         }
-        $response = self::request(
-            'POST',
-            "https://{$accountsDomain}/oauth/v2/token",
-            [
-                'refresh_token' => $refreshToken,
-                'client_id'     => $clientId,
-                'client_secret' => $clientSecret,
-                'grant_type'    => 'refresh_token',
-            ],
-            [],
-            true // form-encoded, not JSON — Zoho's token endpoint expects application/x-www-form-urlencoded
-        );
-
-        $decoded = json_decode($response['body'], true);
-        if ($response['status'] !== 200 || !is_array($decoded) || empty($decoded['access_token'])) {
-            throw new \RuntimeException('Zoho Books OAuth token refresh failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        $key = hash('sha256', ZohoGuard::environment() . '|' . $refreshToken);
+        $fromDb = self::cachedToken($key);
+        if ($fromDb !== null) {
+            return self::rememberToken($refreshToken, $fromDb['token'], $fromDb['expires'], [$accountsDomain, $clientId, $clientSecret, $refreshToken]);
         }
+        $pdo = \App\Config\Database::connection();
+        $lockName = 'nx_zoho_token_' . substr($key, 0, 40);
+        $lock = $pdo->prepare('SELECT GET_LOCK(:n, 15)');
+        $lock->execute(['n' => $lockName]);
+        try {
+            $fromDb = self::cachedToken($key); // another request may have refreshed it while we waited
+            if ($fromDb !== null) {
+                return self::rememberToken($refreshToken, $fromDb['token'], $fromDb['expires'], [$accountsDomain, $clientId, $clientSecret, $refreshToken]);
+            }
+            $response = self::request(
+                'POST',
+                "https://{$accountsDomain}/oauth/v2/token",
+                [
+                    'refresh_token' => $refreshToken,
+                    'client_id'     => $clientId,
+                    'client_secret' => $clientSecret,
+                    'grant_type'    => 'refresh_token',
+                ],
+                [],
+                true // form-encoded, not JSON — Zoho's token endpoint expects application/x-www-form-urlencoded
+            );
 
-        self::$tokens[$refreshToken] = ['token' => (string) $decoded['access_token'], 'expires' => time() + 3000];
-        return (string) $decoded['access_token'];
+            $decoded = json_decode($response['body'], true);
+            if ($response['status'] !== 200 || !is_array($decoded) || empty($decoded['access_token'])) {
+                throw new \RuntimeException('Zoho Books OAuth token refresh failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+            $expires = time() + 3000;
+            $pdo->prepare('INSERT INTO zoho_token_cache (cache_key, token_enc, expires_at) VALUES (:k, :t, FROM_UNIXTIME(:x))
+                           ON DUPLICATE KEY UPDATE token_enc = VALUES(token_enc), expires_at = VALUES(expires_at)')
+                ->execute(['k' => $key, 't' => \App\Services\EncryptionService::encrypt((string) $decoded['access_token']), 'x' => $expires]);
+            return self::rememberToken($refreshToken, (string) $decoded['access_token'], $expires, [$accountsDomain, $clientId, $clientSecret, $refreshToken]);
+        } finally {
+            $pdo->prepare('SELECT RELEASE_LOCK(:n)')->execute(['n' => $lockName]);
+        }
+    }
+
+    /** @return array{token:string, expires:int}|null */
+    private static function cachedToken(string $key): ?array
+    {
+        $stmt = \App\Config\Database::connection()->prepare('SELECT token_enc, UNIX_TIMESTAMP(expires_at) AS x FROM zoho_token_cache WHERE cache_key = :k AND expires_at > NOW()');
+        $stmt->execute(['k' => $key]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            return null;
+        }
+        $token = \App\Services\EncryptionService::decrypt((string) $row['token_enc']);
+        return $token !== null && $token !== '' ? ['token' => $token, 'expires' => (int) $row['x']] : null;
+    }
+
+    /** @param array{0:string,1:string,2:string,3:string} $owner */
+    private static function rememberToken(string $refreshToken, string $token, int $expires, array $owner): string
+    {
+        self::$tokens[$refreshToken] = ['token' => $token, 'expires' => $expires];
+        self::$tokenOwners[$token] = $owner;
+        return $token;
+    }
+
+    /** D-239: Zoho refused the token (401) — forget it everywhere, so the next call fetches a new one. */
+    private static function forgetToken(string $token): void
+    {
+        $owner = self::$tokenOwners[$token] ?? null;
+        unset(self::$tokenOwners[$token]);
+        if ($owner === null) {
+            return;
+        }
+        unset(self::$tokens[$owner[3]]);
+        \App\Config\Database::connection()->prepare('DELETE FROM zoho_token_cache WHERE cache_key = :k')
+            ->execute(['k' => hash('sha256', ZohoGuard::environment() . '|' . $owner[3])]);
     }
 
     /**
@@ -1755,6 +1835,36 @@ final class ZohoBooksService
     private static function request(string $method, string $url, array $payload, array $headers, bool $formEncoded = false): array
     {
         ZohoGuard::assertRequestAllowed($url);
+        // Owner decision 2 Nov 2026 (D-239): every call counts against this app's daily / per-minute allowance.
+        ZohoApiBudget::acquire();
+        $response = self::send($method, $url, $payload, $headers, $formEncoded);
+        if ($response['status'] === 401) {
+            // A token Zoho no longer accepts: forget it, fetch a new one, try once more.
+            foreach ($headers as $i => $h) {
+                if (str_starts_with($h, 'Authorization: Zoho-oauthtoken ')) {
+                    $old = substr($h, strlen('Authorization: Zoho-oauthtoken '));
+                    $owner = self::$tokenOwners[$old] ?? null;
+                    if ($owner !== null) {
+                        self::forgetToken($old);
+                        $headers[$i] = 'Authorization: Zoho-oauthtoken ' . self::getAccessToken(...$owner);
+                        ZohoApiBudget::acquire();
+                        $response = self::send($method, $url, $payload, $headers, $formEncoded);
+                    }
+                    break;
+                }
+            }
+        }
+        ZohoApiBudget::assertNotRateLimited($response['status'], $response['body']);
+        return $response;
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @param string[] $headers
+     * @return array{status:int, body:string}
+     */
+    private static function send(string $method, string $url, array $payload, array $headers, bool $formEncoded): array
+    {
         if (self::$transport !== null) {
             return (self::$transport)($method, $url, $payload, $headers, $formEncoded);
         }

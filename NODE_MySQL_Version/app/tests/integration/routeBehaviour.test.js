@@ -986,6 +986,18 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expectPage(await holder.call('GET', '/reports/missing-ebrc'), 'Missing eBRC / FIRC', 'GET /reports/missing-ebrc');
   });
 
+  it('price discount approval route (D-240, 2 Nov 2026)', async () => {
+    const orderId = await createTestOrder(await createTestClient());
+    expect((await holder.call('POST', `/orders/${orderId}/price-approval`, { reason: 'Nothing to approve here' })).type).toBe('error');
+    const productId = await require('../../src/repositories/productRepository').create({ name: `Route Ref Granite ${Date.now()}`, specifications: 'Slab', hs_code: '68022310', reference_price: '45.00', reference_currency: 'USD', reference_unit: 'SQFT' }, holderUser.id);
+    const orderProductRepository = require('../../src/repositories/orderProductRepository');
+    const line = await orderProductRepository.add(orderId, 1, 'Route Ref Granite', null, null, '10', false, 'SQFT', '36.00', '68022310');
+    await orderProductRepository.setCatalogProduct(line, productId);
+    expect((await holder.call('POST', `/orders/${orderId}/price-approval`, { reason: 'x' })).type).toBe('error');
+    expectDone(await holder.call('POST', `/orders/${orderId}/price-approval`, { reason: 'Route test — volume order agreed' }), 'POST /orders/:id/price-approval', 'Discount approved');
+    expect(await audits('PRICE_DISCOUNT_APPROVED', orderId)).toBe(1);
+  });
+
   it('every route answers a missing id as not found and writes nothing', async () => {
     // Other test files run alongside this one, so the check is on audit rows for the missing id itself.
     const auditBefore = Number(await value('SELECT COUNT(*) AS n FROM audit_log WHERE entity_id = 999999999'));

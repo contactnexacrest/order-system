@@ -1,5 +1,6 @@
 'use strict';
 
+const zohoApiBudget = require('./zohoApiBudget');
 const db = require('../config/db');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
 const financialYear = require('../helpers/financialYear');
@@ -155,6 +156,7 @@ async function revenue(startDate, triggeredBy, userId) {
         notes.set(key, `${RESTORED}(Books had ${fmt(row.total)}) `);
       }
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await zohoSyncLogRepository.log('invoice', 'order', orderId, inv.kind, 'error', String(inv.zoho_invoice_id), `Could not check ${label} in Zoho Books: ${e.message}`, triggeredBy, userId);
       out.failed += 1;
     }
@@ -183,6 +185,7 @@ async function revenue(startDate, triggeredBy, userId) {
         out.restored += 1;
       }
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await zohoSyncLogRepository.log('revenue_payment', 'order', p.order_id, p.leg, 'error', p.id, `Could not check ${what} in Zoho Books: ${e.message}`, triggeredBy, userId);
       out.failed += 1;
     }
@@ -226,6 +229,7 @@ async function purchases(startDate, triggeredBy, userId) {
         out.bills += 1;
       }
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await log('vendor_bill', orderId, 'bill', 'error', zohoId, `Could not check ${what} in Zoho Books: ${e.message}`);
       out.failed += 1;
     }
@@ -250,6 +254,7 @@ async function purchases(startDate, triggeredBy, userId) {
         out.payments += 1;
       }
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await log('vendor_payment', orderId, 'payment', 'error', zohoId, `Could not check ${what} in Zoho Books: ${e.message}`);
       out.failed += 1;
     }
@@ -262,6 +267,7 @@ async function purchases(startDate, triggeredBy, userId) {
   try {
     totals = await zohoBooksService.totalsById('expense');
   } catch (e) {
+    zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
     await zohoSyncLogRepository.log('order_expense', null, null, null, 'error', null, `Could not read the expenses in Zoho Books to check them: ${e.message}`, triggeredBy, userId);
     out.failed += 1;
     return out;
@@ -288,6 +294,7 @@ async function purchases(startDate, triggeredBy, userId) {
         out.expenses += 1;
       }
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await log('order_expense', orderId, 'expense', 'error', zohoId, `Could not check ${what} in Zoho Books: ${e.message}`);
       out.failed += 1;
     }
@@ -309,6 +316,7 @@ async function purchases(startDate, triggeredBy, userId) {
         notes.set(`cost:${cost.id}`, `${RESTORED}(Books had ${fmt(total)}) `);
       }
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await log('order_cost', orderId, 'cost', 'error', zohoId, `Could not check ${what} in Zoho Books: ${e.message}`);
       out.failed += 1;
     }
@@ -331,6 +339,7 @@ async function benefits(startDate, triggeredBy, userId) {
   try {
     totals = await zohoBooksService.totalsById('journal');
   } catch (e) {
+    zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
     await zohoSyncLogRepository.log('export_benefit', null, null, null, 'error', null, `Could not read the journals in Zoho Books to check them: ${e.message}`, triggeredBy, userId);
     return { failed: 1 };
   }
@@ -355,6 +364,7 @@ async function benefits(startDate, triggeredBy, userId) {
         notes.set(`ben:${b.id}`, `${RESTORED}(Books had ${fmt(total)}) `);
       }
     } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
       await zohoSyncLogRepository.log('export_benefit', 'order', orderId, 'journal', 'error', zohoId, `Could not check ${what} in Zoho Books: ${e.message}`, triggeredBy, userId);
       out.failed += 1;
     }
