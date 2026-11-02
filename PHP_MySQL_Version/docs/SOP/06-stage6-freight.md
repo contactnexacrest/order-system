@@ -72,7 +72,12 @@ Partners** directory like the supplier in Step 7a comes from the
 Suppliers directory (owner request 2026-10-27). The directory has a
 **Freight Forwarder** service type for them (alongside CHA and
 Transportation) — add one at Logistics Partners → Add Partner. Their name
-and contact are copied onto the order when the terms are saved. This
+and contact are copied onto the order when the terms are saved. The
+drop-down starts on the partner already used on this order (owner request
+2026-11-02): the forwarder already saved, else the one partner whose bills
+are on the order (Logistics Partner Bills card), else — when several have
+billed — the only one listed as a Freight Forwarder; the note
+"Pre-selected: …" says so, and you can still pick another. This
 is internal record-keeping only and doesn't pass any gate. **Generate
 Debit Note** (9b) then produces the FDN — the actual invoice sent to the
 buyer for these charges. Take it through [Document Review &
@@ -165,6 +170,15 @@ order's financials (Step 12) as logistics cost. When the Zoho Books
 integration is on, each tax invoice also goes to Zoho Books as a bill and
 each payment as a vendor payment (see [Zoho Books
 Sync](./ca-03-zoho-sync.md#bills-vendor-payments-and-order-expenses-in-zoho-books-2026-10-29)).
+
+### Step-by-step guide with screenshots
+
+The **[Supplier & logistics partner payments — step by step](/help/supplier-logistics-payments#guide-c)**
+page (linked as "How to fill this" on the Logistics Partner Bills card)
+shows, with real screenshots: the CHA & transport advance proforma and its
+payment, the final tax invoice that replaces it, the Step 9d rule for Final
+bills on CFR/CIF orders, and the freight forwarder's ocean freight bill.
+Owner request, 2 Nov 2026.
 
 ## What the client does (or doesn't)
 

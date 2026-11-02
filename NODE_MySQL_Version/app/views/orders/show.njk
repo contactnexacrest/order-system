@@ -439,7 +439,11 @@
 {# The bill fields both kinds share (type, number, date, taxable, GST, the
    bill itself). Owner decision (2026-10-28, Option B): a Proforma may say
    how much it asks for now; a Tax invoice may replace an earlier proforma. #}
-{% macro vendorBillFields(gstRates, defaultKind = 'invoice', replaceable = [], askedHint = null) %}
+{# Owner request (2 Nov 2026): prefill carries what the app already knows (the Supplier PO's
+   taxable value and GST rate, the advance still to ask for) and a hint naming its source — see
+   vendorBillsView.supplierPrefill / prefillFigures. #}
+{% macro vendorBillFields(gstRates, defaultKind = 'invoice', replaceable = [], askedHint = null, prefill = null) %}
+    {% set pf = vendorBillsView.prefillFigures(gstRates, prefill) %}
     <fieldset class="full radio-row">
       <legend>Bill type *</legend>
       <label><input type="radio" name="doc_kind" value="proforma" required{{ ' checked' if defaultKind == 'proforma' else '' }}> <span><b>Proforma / advance request</b><br><small class="muted">Asks for money now. Not counted as a cost.</small></span></label>
@@ -447,17 +451,17 @@
     </fieldset>
     <label>Bill / invoice no. *<input type="text" name="bill_no" required maxlength="100" placeholder="e.g. INV-120"></label>
     <label>Bill date *<input type="date" name="bill_date" required max="{{ today() }}"></label>
-    <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base placeholder="e.g. 10000.00"></label>
+    <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base placeholder="e.g. 10000.00"{% if pf.taxable !== null %} value="{{ pf.taxable }}"{% endif %}>{% if pf.hint %}<small class="muted bill-prefill-hint">{{ pf.hint }}</small>{% endif %}</label>
     <label>GST rate (%) *
       <select name="gst_rate_pct" required data-gst-rate data-zero-if="gst_charge=reverse" data-zero-if-message="Under reverse charge the transporter charges no GST — pick 0%. We pay the 5% to the government ourselves.">
         {% for o in gstRates %}
-          <option value="{{ o.option_value }}" {{ 'selected' if o.is_default else '' }}>{{ o.option_value }}%</option>
+          <option value="{{ o.option_value }}" {{ 'selected' if pf.isSelected(o) else '' }}>{{ o.option_value }}%</option>
         {% endfor %}
       </select>
     </label>
-    <label>GST (&#8377;) <small class="muted">(auto: Taxable &times; GST rate)</small><input type="text" readonly tabindex="-1" data-gst-amount value="0.00"></label>
-    <label>Bill total (&#8377;) <small class="muted">(auto: Taxable + GST)</small><input type="text" readonly tabindex="-1" data-gst-total value="0.00"></label>
-    <label data-show-when="doc_kind=proforma">Amount asked now (&#8377;) <small class="muted">(leave blank when the proforma asks for the whole bill{{ (' — ' + askedHint) if askedHint !== null else '' }})</small><input type="number" step="0.01" min="0.01" name="requested_amount_inr" data-not-more-than="[data-gst-total]" data-not-more-than-message="The amount asked now cannot be more than the bill total." placeholder="e.g. 25000.00"></label>
+    <label>GST (&#8377;) <small class="muted">(auto: Taxable &times; GST rate)</small><input type="text" readonly tabindex="-1" data-gst-amount value="{{ pf.gst }}"></label>
+    <label>Bill total (&#8377;) <small class="muted">(auto: Taxable + GST)</small><input type="text" readonly tabindex="-1" data-gst-total value="{{ pf.total }}"></label>
+    <label data-show-when="doc_kind=proforma">Amount asked now (&#8377;) <small class="muted">(leave blank when the proforma asks for the whole bill{{ (' — ' + askedHint) if askedHint !== null else '' }})</small><input type="number" step="0.01" min="0.01" name="requested_amount_inr" data-not-more-than="[data-gst-total]" data-not-more-than-message="The amount asked now cannot be more than the bill total." placeholder="e.g. 25000.00"{% if pf.asked !== null %} value="{{ pf.asked }}"{% endif %}>{% if pf.asked !== null and pf.askedHint %}<small class="muted bill-prefill-hint">{{ pf.askedHint }}</small>{% endif %}</label>
     {% if replaceable.length %}
     <label class="full" data-show-when="doc_kind=invoice">Advance already paid on a proforma from this vendor
       <select name="replaces_bill_id">
@@ -487,6 +491,8 @@
     {% set carriedIds = vendorBillsView.ids(vendorBillsView.supplierCarried(vendorBills, supplierPo.id, leg)) %}
     {% set replaceableBills = vendorBillsView.replaceable(vendorBillsView.supplierBills(vendorBills, supplierPo.id)) %}
     <div class="plan-bar"><div>Supplier PO<b>{{ supplierPo.supplier_po_reference }}</b></div><div>PO total<b>{{ ('&#8377;' + (supplierPo.total_payable_inr | money)) | safe if supplierPo.total_payable_inr !== null else '—' }}</b></div><div>{{ label }} planned<b>{{ ('&#8377;' + (supplierPo[leg + '_amount_inr'] | money)) | safe if supplierPo[leg + '_amount_inr'] !== null else '—' }}</b></div>{% if supplierPo[leg + '_paid_at'] %}<div>{{ label }} paid<b class="vendor-bill-paid">&#8377;{{ (supplierPo[leg + '_paid_amount_inr'] or supplierPo[leg + '_amount_inr']) | money }} on {{ supplierPo[leg + '_paid_at'] | humanDate }}</b></div>{% endif %}</div>
+    {# Owner request (2 Nov 2026): the illustrated bill + payment guide. #}
+    <p class="small pay-guide-link"><a href="/help/supplier-logistics-payments#guide-{{ 'a' if leg == 'advance' else 'b' }}" target="_blank" rel="noopener">How to fill this — step-by-step guide with screenshots</a></p>
     {% if supplierPo[leg + '_paid_at'] and not legBills.length %}
       {# Recorded before bills were kept — the payment stands as it is. #}
       <p class="muted small">Paid before supplier bills were recorded here.</p>
@@ -508,7 +514,7 @@
         <form method="post" action="/orders/{{ order.id }}/vendor-bills/supplier" enctype="multipart/form-data" class="field-grid">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <input type="hidden" name="bill_for" value="{{ leg }}">
-          {{ vendorBillFields(gstRates, 'proforma' if leg == 'advance' else 'invoice', replaceableBills, ('the planned advance is ₹' + (supplierPo.advance_amount_inr | money)) if (leg == 'advance' and (supplierPo.advance_amount_inr | float(0)) > 0) else null) }}
+          {{ vendorBillFields(gstRates, 'proforma' if leg == 'advance' else 'invoice', replaceableBills, ('the planned advance is ₹' + (supplierPo.advance_amount_inr | money)) if (leg == 'advance' and (supplierPo.advance_amount_inr | float(0)) > 0) else null, vendorBillsView.supplierPrefill(vendorBills, supplierPo, leg)) }}
           <div><button type="submit" class="btn-sm">Add Bill</button></div>
         </form>
       </details>
@@ -1200,7 +1206,7 @@
     <h3 style="font-size:0.95em;">All Documents</h3>
     <table class="list">
       <tr><th>Type</th><th>Reference</th><th>Rev. (internal / client-facing)</th><th>Generated</th><th>Status</th><th>Download</th><th></th></tr>
-      {% for d in documents %}
+      {% for d in visibleDocuments %}
       <tr>
         <td>{{ d.document_type_code }}</td>
         <td>{{ d.document_reference or '—' }}</td>
@@ -1233,7 +1239,7 @@
         </td>
       </tr>
       {% endfor %}
-      {% if not documents or documents.length == 0 %}
+      {% if not visibleDocuments or visibleDocuments.length == 0 %}
       <tr><td colspan="7" class="muted">No documents generated yet.</td></tr>
       {% endif %}
     </table>
@@ -2551,6 +2557,7 @@
   <details class="step-card step-card-parallel" id="logistics-bills"{% if inGroupC and (not logisticsBillsList.length or logisticsUnpaid > 0) %} open{% endif %}>
     <summary>{{ stepStatusIcon(logisticsStatus) }}<h2>Logistics Partner Bills &amp; Payments — CHA · Transport · Freight Forwarder{% if logisticsUnpaid > 0 %} <small class="muted">({{ logisticsUnpaid }} unpaid)</small>{% endif %}</h2></summary>
     <p class="muted small">One row per bill from the partner — a partner doing both CHA and transport can send one combined bill or separate bills. Runs alongside Steps 9–11 and never locks them.{% if not isFob %} On this {{ order.incoterm_code }} order an Advance bill can be paid any time; the Final bill once the buyer's Debit Note payment has cleared (Step 9d).{% endif %} Bills go into the order's financials (Step 12) automatically.</p>
+    <p class="small pay-guide-link"><a href="/help/supplier-logistics-payments#guide-c" target="_blank" rel="noopener">How to fill this — step-by-step guide with screenshots</a></p>
     {{ vendorBillTable(logisticsBillsList, true, permissions.manage_supplier_payments, logisticsPaymentBlocked) }}
     {% if permissions.manage_supplier_payments %}
     {% set activePartners = logisticsPartners | whereEq('is_active', 1) %}
@@ -2591,7 +2598,7 @@
           </select>
           <small class="muted">Reverse charge: the bill shows no GST; we pay 5% to the government and claim it back. Pick GST rate 0% below.</small>
         </label>
-        {{ vendorBillFields(gstRates, 'invoice', vendorBillsView.replaceable(logisticsBillsList)) }}
+        {{ vendorBillFields(gstRates, 'invoice', vendorBillsView.replaceable(logisticsBillsList), null, { hint: "The amount before GST printed on the partner's bill (e.g. the CHA, transport or freight charge without GST)." }) }}
         <div><button type="submit" class="btn-sm">Add Bill</button></div>
       </form>
       {% endif %}
@@ -2625,13 +2632,15 @@
         {% endif %}
         {# Owner request (2026-10-27): the forwarder comes from the Logistics Partners directory, like the supplier in 7a. #}
         <label>Freight Forwarder (Logistics Partner) *
+          {% set suggestedForwarder = vendorBillsView.suggestedForwarderId(freight, vendorBills, logisticsPartners) %}{# owner request (2 Nov 2026) #}
           <select name="freight_forwarder_partner_id" required>
             <option value="">Select logistics partner…</option>
             {% for lp in logisticsPartners %}
-              <option value="{{ lp.id }}">{{ lp.partner_name }} ({{ logisticsServiceTypes[lp.service_type] or lp.service_type }})</option>
+              <option value="{{ lp.id }}"{{ ' selected' if (lp.id | int) == suggestedForwarder else '' }}>{{ lp.partner_name }} ({{ logisticsServiceTypes[lp.service_type] or lp.service_type }})</option>
             {% endfor %}
           </select>
         </label>
+        {% if suggestedForwarder !== null %}<p class="muted small bill-prefill-hint">Pre-selected: the logistics partner already used on this order — change it if a different forwarder carries the freight.</p>{% endif %}
         <p class="muted small">Partners come from the Logistics Partners directory{% if permissions.manage_logistics_partners %} — <a href="/logistics-partners/create" target="_blank" rel="noopener">add one</a> (opens in a new tab; reload this page afterwards){% else %} — ask an Admin/MD/ED to add one there{% endif %}. Their name and contact are copied onto this order.</p>
         {{ stepBadge('9a') | safe }}<button type="submit" class="btn-sm">Save Freight Terms</button>
       </form>
@@ -4202,15 +4211,15 @@
       <div class="sidebar-panel">
         <details class="sidebar-docs-toggle">
           {% set uploadedFiles = uploadedFiles or [] %}
-          <summary>All Documents ({{ documents.length + uploadedFiles.length }}) &mdash; quick links</summary>
-          <p class="small sidebar-doc-group"><strong>Generated ({{ documents.length }})</strong></p>
-        {% if documents.length == 0 %}
+          <summary>All Documents ({{ visibleDocuments.length + uploadedFiles.length }}) &mdash; quick links</summary>
+          <p class="small sidebar-doc-group"><strong>Generated ({{ visibleDocuments.length }})</strong></p>
+        {% if visibleDocuments.length == 0 %}
           <p class="muted small">No documents generated yet.</p>
         {% else %}
           <ul class="sidebar-doc-list">
-            {% for d in documents %}
+            {% for d in visibleDocuments %}
               <li>
-                {% if d.pdf_file_id and permissions.download_pdf and canSeeDocument(d.document_type_code) %}<a href="/documents/{{ d.id }}/download?format=pdf">{{ d.document_type_code }} {{ d.document_reference or '—' }}</a>{% else %}{{ d.document_type_code }} {{ d.document_reference or '—' }}{% endif %}
+                {% if d.pdf_file_id and permissions.download_pdf %}<a href="/documents/{{ d.id }}/download?format=pdf">{{ d.document_type_code }} {{ d.document_reference or '—' }}</a>{% else %}{{ d.document_type_code }} {{ d.document_reference or '—' }}{% endif %}
                 <span class="muted small">Rev.{{ d.revision_number }} &middot; {{ d.status | replace('_', ' ') }}</span>
               </li>
             {% endfor %}

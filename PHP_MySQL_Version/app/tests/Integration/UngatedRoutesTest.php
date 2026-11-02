@@ -61,6 +61,8 @@ final class UngatedRoutesTest extends DbTestCase
         'GET /gallery staff',
         'GET /gallery/file staff',
         'GET /getting-started staff',
+        // Owner request 2 Nov 2026: the illustrated supplier / logistics payment guide, any staff member.
+        'GET /help/supplier-logistics-payments staff',
         'GET /login public',
         'GET /notifications staff',
         'GET /payment-action/{} public',
@@ -419,7 +421,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(39, $checked);
+        self::assertSame(40, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -582,7 +584,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(34, $checked);
+        self::assertSame(35, $checked);
         self::assertSame([], $failed);
     }
 

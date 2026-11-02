@@ -310,7 +310,13 @@ uploaded for the order by anyone — the client's buyer PO copy and payment
 screenshots, supplier and logistics bills, signed amendments, LC and BL
 copies, inspection reports, extra documents, comment attachments — each
 with who sent it and the date. You only see the files you may download
-(money you may see; CAFIN never appears there).
+(money you may see; CAFIN never appears there). Since 2 Nov 2026 both
+lists — and the **All Documents** table under Document Review & Approval —
+leave out entirely anything you may not open: Sales never sees the
+Supplier PO, the supplier's acknowledgment or supplier bills; Procurement
+never sees the Quotation, PI or the buyer's payment screenshots;
+Logistics sees the BL Instruction and logistics bills, not the Supplier
+PO. The counts show only what is listed.
 
 The steps are grouped into five coloured sections — **A** Order Booking,
 **B** Procurement & Production, **C** Shipment & Balance, **D** Closure &

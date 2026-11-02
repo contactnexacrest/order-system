@@ -998,6 +998,10 @@ async function show(req, res) {
   // Owner request (1 Nov 2026): the "All Documents" panel also lists every file uploaded for the
   // order (client, staff, associate) — only those this person may download (same gates as
   // fileStoreController.download, so no link answers 403).
+  // Owner request (2 Nov 2026): the document lists show only what this person may open —
+  // a document whose money they cannot see (e.g. the Supplier PO for Sales, the BL
+  // Instruction for Procurement) is left out entirely, not listed without a link.
+  const visibleDocuments = documents.filter((d) => moneyVisibility.canSeeDocument(req.permissions, d.document_type_code));
   const uploadedFiles = [];
   for (const f of await require('../repositories/fileStoreRepository').uploadedForOrder(orderId)) {
     if (!(await moneyVisibility.canSeeFile(req.permissions, f.id))) continue;
@@ -1271,6 +1275,7 @@ async function show(req, res) {
       payment: await orderPaymentStatusRepository.find(orderId),
       documents,
       uploadedFiles,
+      visibleDocuments,
       regenerationRisk,
       pendingCancellation,
       approvedCancellation,

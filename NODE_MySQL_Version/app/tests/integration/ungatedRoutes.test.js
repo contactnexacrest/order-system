@@ -66,6 +66,8 @@ const EXPECTED = [
   'GET /gallery staff',
   'GET /gallery/file staff',
   'GET /getting-started staff',
+  // Owner request 2 Nov 2026: the illustrated supplier / logistics payment guide, any staff member.
+  'GET /help/supplier-logistics-payments staff',
   'GET /login public',
   'GET /notifications staff',
   'GET /payment-action/{} public',
@@ -305,7 +307,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status !== 302 || res.headers.location !== '/login') wrong.push(`${label(route)} → ${res.status} ${res.headers.location}`);
       checked++;
     }
-    expect(checked).toBe(39);
+    expect(checked).toBe(40);
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -422,7 +424,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(34);
+    expect(checked).toBe(35);
     expect(failed).toEqual([]);
   }, 120000);
 

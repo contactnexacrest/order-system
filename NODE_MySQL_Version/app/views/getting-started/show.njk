@@ -316,6 +316,7 @@ details.gs-conv .gs-body{padding:0 16px 15px 42px; font-size:13.6px; color:var(-
           <tr data-cat="issues"><td>Handle a buyer wanting to cancel</td><td class="go"><a href="/disputes">Disputes</a></td><td><a href="/sop/11-disputes">Ch. 11</a></td></tr>
           <tr data-cat="issues"><td>Handle a process complaint (no cancel intent)</td><td class="go"><a href="/complaints">Complaints</a></td><td><a href="/sop/19-complaints">Ch. 19</a></td></tr>
           <tr data-cat="orders"><td>Change payment terms after the PI is out</td><td class="go">Amendments, from the order page</td><td><a href="/sop/10-amendments">Ch. 10</a></td></tr>
+          <tr data-cat="orders"><td>Add a supplier or logistics partner bill and pay it (advance, balance)</td><td class="go"><a href="/help/supplier-logistics-payments">Step-by-step guide with screenshots</a> — Steps 7e, 10a and Logistics Partner Bills in the order</td><td><a href="/sop/05-stage5-supplier-po">Ch. 5</a></td></tr>
           <tr data-cat="admin"><td>Run a report</td><td class="go"><a href="/reports">Insights → Reports</a></td><td><a href="/sop/14-reports">Ch. 14</a></td></tr>
           <tr data-cat="admin"><td>Check who did what, and when</td><td class="go"><a href="/audit-log">Insights → Audit Log</a></td><td>—</td></tr>
           <tr data-cat="admin"><td>Manage roles, users, or company settings</td><td class="go"><a href="/settings">Admin</a></td><td><a href="/sop/15-admin-settings">Ch. 15</a></td></tr>

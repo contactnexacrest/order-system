@@ -1,0 +1,153 @@
+{#
+  Owner request (2 Nov 2026): an illustrated, step-by-step guide to the
+  supplier and logistics partner bill + payment forms (Steps 7e, 10a and the
+  Logistics Partner Bills card). Static content — the same text as PHP's
+  views/help/supplier_logistics_payments.php (helpGuideParity test checks it).
+  Screenshots: public/img/guide/ (sample order, sample names).
+#}
+<style>
+.pay-guide figure{margin:10px 0 14px;}
+.pay-guide figure img{max-width:100%;height:auto;border:1px solid var(--line, #e5e0d5);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+.pay-guide-table td,.pay-guide-table th{vertical-align:top;}
+.pay-guide-rules{background:var(--surface-2, #f7f4ee);border-radius:8px;padding:10px 14px;margin:12px 0;}
+.pay-guide-toc{margin:10px 0 18px;}
+.pay-guide-mistakes{background:#FBF1DC;border:1px solid #E9CF95;border-radius:8px;padding:10px 14px;}
+.pay-guide-mistakes ul{margin:4px 0 0 18px;padding:0;}
+.pay-guide-mistakes li{margin:4px 0;}
+.pay-guide h2{margin-top:28px;}
+</style>
+<div class="card page-wide pay-guide">
+  <h1>Supplier &amp; logistics partner payments — step by step</h1>
+  <p class="muted">What to type in each box when a supplier or a logistics partner (CHA, transport, freight forwarder) asks to be paid. Every screenshot below is the real order page; the order, the supplier and the partners are samples.</p>
+
+  <div class="pay-guide-rules">
+    <p><strong>Two rules cover almost everything:</strong></p>
+    <ol>
+      <li><strong>Bill first, then pay.</strong> Add the bill they sent you (with the scan attached), then record the payment against that bill.</li>
+      <li><strong>Proforma or tax invoice?</strong> A <em>proforma</em> (advance request) asks for money now — it is <em>not</em> a cost. A <em>tax invoice</em> (final bill) is the real bill — it <em>is</em> the order's cost. When the tax invoice arrives, pick the proforma it replaces, so what you already paid counts towards it.</li>
+    </ol>
+  </div>
+
+  <nav class="pay-guide-toc">
+    <strong>Jump to:</strong>
+    <a href="#guide-a">A. Supplier advance</a> ·
+    <a href="#guide-b">B. Supplier balance</a> ·
+    <a href="#guide-c">C. CHA / transport</a> ·
+    <a href="#guide-d">D. Freight forwarder</a> ·
+    <a href="#guide-e">E. Common mistakes</a>
+  </nav>
+
+  <h2>The example order</h2>
+  <table class="list pay-guide-table">
+    <tr><th>Who</th><th>What they asked for</th></tr>
+    <tr><td>Supplier (Sample Quarry)</td><td>Supplier PO: ₹45,000.00 before GST + 5% GST ₹2,250.00 = <strong>₹47,250.00</strong>. Terms: 30% advance = <strong>₹14,175.00</strong>, balance ₹33,075.00 before packing.</td></tr>
+    <tr><td>CHA &amp; transport (Sample CHA &amp; Transport)</td><td>One combined bill: ₹1,00,000.00 + 18% GST ₹18,000.00 = ₹1,18,000.00. First an advance proforma asking for <strong>₹25,000.00</strong> now, later the tax invoice.</td></tr>
+    <tr><td>Freight forwarder (Sample Freight Forwarder)</td><td>Ocean freight tax invoice ₹85,000.00, no GST.</td></tr>
+  </table>
+
+  <h2 id="guide-a">A. Supplier advance — Step 7e</h2>
+
+  <h3>A1. Add the supplier's advance bill</h3>
+  <p>Open <strong>Step 7e · Supplier Advance Paid</strong> → <strong>+ Add the supplier's advance bill</strong>. The taxable value, GST rate and amount asked now are already filled in from the Supplier PO — check them against the paper bill and change them only if the bill says something different.</p>
+  <figure><img src="/img/guide/a1-supplier-advance-proforma-form.png" alt="Step 7e: the supplier's advance proforma being added"></figure>
+  <table class="list pay-guide-table">
+    <tr><th>Field</th><th>What to type</th><th>Where it is on the supplier's paper</th></tr>
+    <tr><td>Bill type</td><td><strong>Proforma / advance request</strong> (most advances). Pick Tax invoice only if the supplier sent a real GST invoice for the advance.</td><td>Title of the paper: "Proforma Invoice" / "Advance request" → proforma. "Tax Invoice" → tax invoice.</td></tr>
+    <tr><td>Bill / invoice no.</td><td>Exactly as printed, e.g. TEST-SQ-PF-01</td><td>"Invoice No." / "PI No." at the top</td></tr>
+    <tr><td>Bill date</td><td>The date printed on the bill (not today, unless it is today's bill)</td><td>"Date" at the top</td></tr>
+    <tr><td>Taxable value (₹)</td><td>The amount <strong>before GST</strong> — 45,000.00 (pre-filled)</td><td>"Taxable value" / "Sub-total" / "Assessable value" — the line just above CGST/SGST/IGST</td></tr>
+    <tr><td>GST rate (%)</td><td>5% (pre-filled). GST ₹ and Bill total ₹ fill themselves in.</td><td>The CGST + SGST rates added up (2.5% + 2.5% = 5%), or the IGST rate</td></tr>
+    <tr><td>Amount asked now (₹)</td><td>What this proforma asks you to pay now — 14,175.00 (pre-filled with the planned advance)</td><td>"Advance payable" / "Amount due now". Leave blank if the proforma asks for the whole bill.</td></tr>
+    <tr><td>Attach bill</td><td>The scan or PDF of the bill</td><td>—</td></tr>
+  </table>
+
+  <h3>A2. Record the payment</h3>
+  <p>After you pay from the bank, click <strong>Mark Paid</strong> on the bill's row. Check the <strong>Pay to</strong> bank details first (they must show ✓ Verified).</p>
+  <figure><img src="/img/guide/a2-supplier-advance-payment-form.png" alt="Step 7e: recording the advance payment with its UTR"></figure>
+  <table class="list pay-guide-table">
+    <tr><th>Field</th><th>What to type</th><th>Where you find it</th></tr>
+    <tr><td>Amount paid (₹)</td><td>What actually left the bank — 14,175.00 (pre-filled with what is due)</td><td>Your bank's transfer confirmation</td></tr>
+    <tr><td>Paid on</td><td>The transfer date</td><td>Bank confirmation / statement</td></tr>
+    <tr><td>Mode</td><td>NEFT / RTGS, IMPS, UPI or Cheque</td><td>How you paid</td></tr>
+    <tr><td>UTR / reference</td><td><strong>Always</strong> — the UTR (cheque no. for a cheque). The app refuses to save without it.</td><td>"UTR No." / "Transaction reference" on the bank confirmation</td></tr>
+  </table>
+
+  <h3>A3. What you see afterwards</h3>
+  <p>The row shows the payment with its UTR. A paid proforma is <em>not a cost yet</em>: what was paid counts until the supplier's tax invoice arrives (Step 10a).</p>
+  <figure><img src="/img/guide/a3-supplier-advance-paid.png" alt="Step 7e after payment: advance paid, proforma not a cost"></figure>
+
+  <h2 id="guide-b">B. Supplier balance — Step 10a (before packing)</h2>
+
+  <h3>B1. Add the supplier's tax invoice</h3>
+  <p>Open <strong>Step 10a · Supplier Balance Paid</strong> → <strong>+ Add the supplier's balance bill</strong>. Choose <strong>Tax invoice / final bill</strong> and, in <strong>Advance already paid on a proforma</strong>, pick the advance proforma from A1 — that is what makes the ₹14,175.00 you already paid count towards this invoice.</p>
+  <figure><img src="/img/guide/b1-supplier-tax-invoice-form.png" alt="Step 10a: the supplier's tax invoice replacing the advance proforma"></figure>
+  <table class="list pay-guide-table">
+    <tr><th>Field</th><th>What to type</th><th>Where it is on the supplier's invoice</th></tr>
+    <tr><td>Bill type</td><td><strong>Tax invoice / final bill</strong></td><td>"Tax Invoice" at the top</td></tr>
+    <tr><td>Bill / invoice no., Bill date</td><td>As printed, e.g. TEST-SQ-INV-01</td><td>Top of the invoice</td></tr>
+    <tr><td>Taxable value (₹)</td><td>The <strong>whole</strong> invoice before GST — 45,000.00 (pre-filled from the PO). Not the balance.</td><td>"Taxable value" line</td></tr>
+    <tr><td>GST rate (%)</td><td>5%</td><td>CGST + SGST, or IGST</td></tr>
+    <tr><td>Advance already paid on a proforma</td><td>The proforma from A1 (TEST-SQ-PF-01)</td><td>The supplier usually prints "Less: advance received"</td></tr>
+  </table>
+
+  <h3>B2. Pay the balance</h3>
+  <p>The row shows the advance already paid and <strong>Due ₹33,075.00</strong> (bill total ₹47,250.00 − advance ₹14,175.00). Mark Paid is pre-filled with that balance — enter the transfer date, mode and UTR.</p>
+  <figure><img src="/img/guide/b2-supplier-balance-payment-form.png" alt="Step 10a: paying the balance with its UTR"></figure>
+
+  <h3>B3. Done</h3>
+  <p>Nothing due: the tax invoice is now the order's cost (₹47,250.00) and the proforma no longer counts separately.</p>
+  <figure><img src="/img/guide/b3-supplier-balance-paid.png" alt="Step 10a after payment: nothing due"></figure>
+
+  <h2 id="guide-c">C. CHA / transport — Logistics Partner Bills</h2>
+  <p>The <strong>Logistics Partner Bills &amp; Payments</strong> card runs alongside Steps 9–11. One row per bill; a partner doing both CHA and transport can send one combined bill (For = "CHA + Transport (one bill)") or separate bills.</p>
+  <p class="review-banner warn">⚠ <span>On a CFR / CIF order: an <strong>Advance</strong> bill can be paid any time; a <strong>Final</strong> bill can be paid only after the buyer's Debit Note payment has cleared (Step 9d). On an FOB order both can be paid any time.</span></p>
+
+  <h3>C1. Add the partner's advance proforma</h3>
+  <figure><img src="/img/guide/c1-logistics-advance-proforma-form.png" alt="Logistics bills: the CHA and transport advance proforma being added"></figure>
+  <table class="list pay-guide-table">
+    <tr><th>Field</th><th>What to type</th><th>Where it is on the partner's paper</th></tr>
+    <tr><td>Logistics partner</td><td>Sample CHA &amp; Transport</td><td>Letterhead</td></tr>
+    <tr><td>For</td><td>CHA + Transport (one bill) — or CHA charges / Transport / Ocean freight / Other</td><td>What the bill is for</td></tr>
+    <tr><td>Payment</td><td><strong>Advance</strong> — paid before the service</td><td>"Advance" / "Proforma"</td></tr>
+    <tr><td>Bill type</td><td><strong>Proforma / advance request</strong></td><td>"Proforma Invoice"</td></tr>
+    <tr><td>Taxable value (₹) and GST rate</td><td>100,000.00 and 18% (no pre-fill here — the app has no PO for partners)</td><td>The amount before GST, and the GST rate</td></tr>
+    <tr><td>Amount asked now (₹)</td><td>25,000.00</td><td>"Advance payable"</td></tr>
+    <tr><td>GST on this bill (transport only)</td><td>"Reverse charge — no GST on the bill" when a road transporter charges no GST; then pick GST rate 0%</td><td>Bill shows no GST and says "reverse charge" / GTA</td></tr>
+  </table>
+
+  <h3>C2. Record the advance payment</h3>
+  <p>Same as A2: Mark Paid → amount, date, mode and the <strong>UTR</strong>.</p>
+  <figure><img src="/img/guide/c2-logistics-advance-payment-form.png" alt="Logistics bills: recording the advance payment"></figure>
+
+  <h3>C3. Add the partner's final tax invoice</h3>
+  <p>When the service is done, add their tax invoice: <strong>Payment = Final</strong>, <strong>Bill type = Tax invoice</strong>, and in <strong>Advance already paid on a proforma</strong> pick the proforma from C1.</p>
+  <figure><img src="/img/guide/c3-logistics-final-invoice-form.png" alt="Logistics bills: the final tax invoice replacing the advance proforma"></figure>
+
+  <h3>C4. The balance — and the Step 9d rule</h3>
+  <p>The tax invoice now shows the ₹25,000.00 advance and <strong>Due ₹93,000.00</strong>. On this CIF order the yellow note says the final bill waits for Step 9d — once the buyer's Debit Note payment has cleared, the Mark Paid button appears on the row; pay it with the UTR as in C2.</p>
+  <figure><img src="/img/guide/c4-logistics-final-waits-for-9d.png" alt="Logistics bills: final bill due, waiting for Step 9d on a CIF order"></figure>
+
+  <h2 id="guide-d">D. Freight forwarder — ocean freight bill</h2>
+  <p>Add the forwarder's bill in the same Logistics Partner Bills card with <strong>For = Ocean freight</strong>. In Step 9a you saved the <em>confirmed freight rate</em> (what the buyer is charged on the Debit Note); once an ocean freight bill is added, the order's freight <em>cost</em> comes from the forwarder's bills instead of that rate.</p>
+  <figure><img src="/img/guide/d1-freight-forwarder-bill-form.png" alt="Logistics bills: the freight forwarder's ocean freight bill being added"></figure>
+  <table class="list pay-guide-table">
+    <tr><th>Field</th><th>What to type</th></tr>
+    <tr><td>Logistics partner</td><td>The forwarder (the one picked in Step 9a is usually the same)</td></tr>
+    <tr><td>For / Payment / Bill type</td><td>Ocean freight / Final / Tax invoice (or Advance + Proforma first, exactly as in C1–C3)</td></tr>
+    <tr><td>Taxable value (₹), GST rate</td><td>The rupee amount on the forwarder's bill before GST, and its GST rate (often 0% on export ocean freight)</td></tr>
+  </table>
+
+  <h2 id="guide-e">E. Common mistakes</h2>
+  <div class="pay-guide-mistakes">
+    <ul>
+      <li><strong>Taxable value is the amount before GST.</strong> Do not type the bill total (with GST) there — the app adds the GST itself. Typing 47,250 as taxable would make the bill ₹49,612.50.</li>
+      <li><strong>The tax invoice's taxable value is the whole invoice</strong>, not the balance still due. The app takes off the advance for you.</li>
+      <li><strong>Never forget the UTR.</strong> Every payment needs the bank reference — it goes into the payment's description in the app and in Zoho.</li>
+      <li><strong>Don't add an advance request as a tax invoice.</strong> It would count as a cost twice once the real invoice comes. Advance request = Proforma.</li>
+      <li><strong>Always pick the proforma being replaced</strong> when you add the tax invoice — otherwise the advance looks unpaid against the invoice.</li>
+      <li><strong>CFR / CIF: a Final logistics bill is paid only after Step 9d</strong> (the buyer's freight payment cleared). An Advance bill can be paid any time.</li>
+      <li><strong>Check "Pay to" shows ✓ Verified</strong> before sending money. New or changed bank details must be verified first.</li>
+    </ul>
+  </div>
+  <p class="muted small">This guide is also in the SOP: chapters 05 (Supplier PO) and 06 (Freight).</p>
+</div>

@@ -22,6 +22,40 @@ final class LogisticsPartnerRepository
         'freight_forwarder' => 'Freight Forwarder',
     ];
 
+    /**
+     * Owner request (2 Nov 2026): Step 9a's Freight Forwarder drop-down starts on the partner
+     * already used on this order — the forwarder already saved on the order; else the one
+     * partner the order's logistics bills come from; else, among several, the only one whose
+     * service is freight forwarding. Null when none of these picks exactly one (still changeable).
+     *
+     * @param array<int,array<string,mixed>> $orderBills the order's bills (any kind; only logistics count)
+     * @param array<int,array<string,mixed>> $partners   the directory rows the drop-down offers
+     */
+    public static function suggestedForwarderId(?array $freight, array $orderBills, array $partners): ?int
+    {
+        $offered = [];
+        foreach ($partners as $p) {
+            $offered[(int) $p['id']] = $p;
+        }
+        $saved = (int) ($freight['freight_forwarder_partner_id'] ?? 0);
+        if ($saved > 0 && isset($offered[$saved])) {
+            return $saved;
+        }
+        $used = [];
+        foreach ($orderBills as $b) {
+            $id = (int) ($b['logistics_partner_id'] ?? 0);
+            if (($b['vendor_kind'] ?? '') === 'logistics' && $id > 0 && isset($offered[$id])) {
+                $used[$id] = true;
+            }
+        }
+        $used = array_keys($used);
+        if (count($used) === 1) {
+            return $used[0];
+        }
+        $forwarders = array_values(array_filter($used, static fn (int $id): bool => ($offered[$id]['service_type'] ?? '') === 'freight_forwarder'));
+        return count($forwarders) === 1 ? $forwarders[0] : null;
+    }
+
     /** @return array<int, array<string,mixed>> newest first; $serviceType filters to 'cha'/'transportation' matching either that type alone or 'both' */
     public static function all(bool $includeInactive = false, ?string $serviceType = null): array
     {

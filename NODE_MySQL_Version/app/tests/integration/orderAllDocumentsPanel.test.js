@@ -93,6 +93,63 @@ describe('Order page — All Documents panel lists uploaded files', () => {
     expect(html).toContain('Uploaded / received (1)');
   });
 
+  // Owner request (2 Nov 2026): "all documents should show only the necessary documents to the
+  // logged-in user as per his role — sales should not see suppliers related any document". A
+  // document or file whose money the person cannot see is left out of both lists entirely.
+  it('each role sees only its own side of the order, and the counts match', async () => {
+    const md = await signedInAs('Managing Director');
+    const sales = await signedInAs('Export Executive');
+    const procurement = await signedInAs('Procurement Executive');
+    const logistics = await signedInAs('Logistics Executive');
+    const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, md.id);
+    for (const u of [sales, procurement, logistics]) {
+      await db.execute('INSERT INTO order_assignees (order_id, user_id) VALUES (:o, :u)', { o: orderId, u: u.id });
+    }
+    for (const code of ['QT', 'PI', 'SUPPO', 'BLI']) {
+      const d = await createTestDocument(orderId, code, 'approved');
+      await db.execute('UPDATE documents SET pdf_file_id = :f WHERE id = :id', { f: await createTestFile(orderId, null), id: d });
+    }
+    const shot = await upload(orderId, 'Client payment self-report screenshot', 'Client (self-reported)');
+    const buyerPo = await upload(orderId, 'Buyer PO copy', 'buyer');
+    await db.execute('INSERT INTO order_buyer_po_documents (order_id, file_id) VALUES (:o, :f)', { o: orderId, f: buyerPo });
+    const ack = await upload(orderId, 'Supplier PO acknowledgment', 'supplier');
+    const supplierId = (await db.execute("INSERT INTO suppliers (supplier_legal_name) VALUES ('Panel Supplier')")).insertId;
+    const spoId = (await db.execute(
+      "INSERT INTO order_supplier_po (order_id, supplier_id, supplier_legal_name, supplier_po_reference) VALUES (:o, :s, 'Panel Supplier', 'PANEL-SPO')",
+      { o: orderId, s: supplierId }
+    )).insertId;
+    await db.execute('INSERT INTO order_supplier_po_documents (order_supplier_po_id, file_id) VALUES (:p, :f)', { p: spoId, f: ack });
+    const supplierBill = await upload(orderId, 'Supplier bill / invoice', 'Panel Supplier');
+    const logisticsBill = await upload(orderId, 'Logistics partner bill', 'Panel Forwarder');
+    for (const [file, kind, forWhat] of [[supplierBill, 'supplier', 'goods'], [logisticsBill, 'logistics', 'cha']]) {
+      await db.execute(
+        "INSERT INTO order_vendor_bills (order_id, vendor_kind, bill_for, bill_no, bill_date, taxable_inr, total_inr, bill_file_id) VALUES (:o, :k, :b, :n, '2026-11-02', 100, 118, :f)",
+        { o: orderId, k: kind, b: forWhat, n: `PANEL-${kind}`, f: file }
+      );
+    }
+    const all = [shot, buyerPo, ack, supplierBill, logisticsBill];
+    const expectations = [
+      ['MD', md, ['QT', 'PI', 'SUPPO', 'BLI'], all],
+      ['Sales', sales, ['QT', 'PI'], [shot, buyerPo]],
+      ['Procurement', procurement, ['SUPPO'], [ack, supplierBill]],
+      ['Logistics', logistics, ['BLI'], [logisticsBill]],
+    ];
+    for (const [who, user, codes, files] of expectations) {
+      const html = await panel(user.agent, orderId);
+      for (const code of ['QT', 'PI', 'SUPPO', 'BLI']) {
+        const listed = new RegExp(`<li>\\s*(?:<a [^>]*>)?${code} JEST-DOC-`).test(html);
+        expect([who, code, listed]).toEqual([who, code, codes.includes(code)]);
+      }
+      for (const f of all) {
+        expect([who, f, html.includes(`/file-store/${f}/download`)]).toEqual([who, f, files.includes(f)]);
+      }
+      expect([who, Number(html.match(/Generated \((\d+)\)/)[1])]).toEqual([who, codes.length]);
+      expect([who, Number(html.match(/Uploaded \/ received \((\d+)\)/)[1])]).toEqual([who, files.length]);
+      expect([who, Number(html.match(/All Documents \((\d+)\)/)[1])]).toEqual([who, codes.length + files.length]);
+      expect([who, html.split('JEST-DOC-').length - 1]).toEqual([who, codes.length]);
+    }
+  });
+
   it('shows the empty state', async () => {
     const md = await signedInAs('Managing Director');
     const orderId = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, md.id);

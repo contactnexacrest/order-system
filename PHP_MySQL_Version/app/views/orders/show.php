@@ -718,7 +718,30 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
 // The bill fields both kinds share (type, number, date, taxable, GST, the
 // bill itself). Owner decision (2026-10-28, Option B): a Proforma may say
 // how much it asks for now; a Tax invoice may replace an earlier proforma.
-$vendorBillFields = static function (string $defaultKind = 'invoice', array $replaceable = [], ?string $askedHint = null) use ($gstRates): void {
+// Owner request (2 Nov 2026): "I am not sure what to put as taxable value — can you prefill
+// taxable value / amount asked now". $prefill carries what the app already knows (the Supplier
+// PO's taxable value and GST rate, the advance still to ask for) and the hint naming its source;
+// staff change it when the bill shows a different amount. Without a known figure, $prefill['hint']
+// alone says what to type.
+$vendorBillFields = static function (string $defaultKind = 'invoice', array $replaceable = [], ?string $askedHint = null, array $prefill = []) use ($gstRates): void {
+    $__pfTaxable = isset($prefill['taxable']) && (float) $prefill['taxable'] > 0 ? round((float) $prefill['taxable'], 2) : null;
+    $__pfRate = isset($prefill['gst_rate']) && is_numeric($prefill['gst_rate']) ? (float) $prefill['gst_rate'] : null;
+    $__pfRateKnown = false;
+    foreach ($gstRates as $__o) {
+        if ($__pfRate !== null && abs((float) $__o['option_value'] - $__pfRate) < 0.001) {
+            $__pfRateKnown = true;
+        }
+    }
+    $__pfAsked = isset($prefill['asked']) && (float) $prefill['asked'] > 0 ? round((float) $prefill['asked'], 2) : null;
+    $__pfRateUsed = $__pfRateKnown ? $__pfRate : null;
+    if ($__pfRateUsed === null) {
+        foreach ($gstRates as $__o) {
+            if ($__o['is_default']) {
+                $__pfRateUsed = (float) $__o['option_value'];
+            }
+        }
+    }
+    $__pfGst = $__pfTaxable !== null ? round($__pfTaxable * (float) $__pfRateUsed / 100, 2) : 0.0;
     ?>
     <fieldset class="full radio-row">
       <legend>Bill type *</legend>
@@ -727,17 +750,17 @@ $vendorBillFields = static function (string $defaultKind = 'invoice', array $rep
     </fieldset>
     <label>Bill / invoice no. *<input type="text" name="bill_no" required maxlength="100" placeholder="e.g. INV-120"></label>
     <label>Bill date *<input type="date" name="bill_date" required max="<?= date('Y-m-d') ?>"></label>
-    <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base placeholder="e.g. 10000.00"></label>
+    <label>Taxable value (&#8377;) * <small class="muted">(as printed on the bill)</small><input type="number" step="0.01" min="0.01" name="taxable_inr" required data-gst-base placeholder="e.g. 10000.00"<?= $__pfTaxable !== null ? ' value="' . number_format($__pfTaxable, 2, '.', '') . '"' : '' ?>><?php if (!empty($prefill['hint'])): ?><small class="muted bill-prefill-hint"><?= htmlspecialchars((string) $prefill['hint']) ?></small><?php endif; ?></label>
     <label>GST rate (%) *
       <select name="gst_rate_pct" required data-gst-rate data-zero-if="gst_charge=reverse" data-zero-if-message="Under reverse charge the transporter charges no GST — pick 0%. We pay the 5% to the government ourselves.">
         <?php foreach ($gstRates as $o): ?>
-          <option value="<?= htmlspecialchars((string) $o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $o['option_value']) ?>%</option>
+          <option value="<?= htmlspecialchars((string) $o['option_value']) ?>" <?= ($__pfRateKnown ? abs((float) $o['option_value'] - $__pfRate) < 0.001 : $o['is_default']) ? 'selected' : '' ?>><?= htmlspecialchars((string) $o['option_value']) ?>%</option>
         <?php endforeach; ?>
       </select>
     </label>
-    <label>GST (&#8377;) <small class="muted">(auto: Taxable &times; GST rate)</small><input type="text" readonly tabindex="-1" data-gst-amount value="0.00"></label>
-    <label>Bill total (&#8377;) <small class="muted">(auto: Taxable + GST)</small><input type="text" readonly tabindex="-1" data-gst-total value="0.00"></label>
-    <label data-show-when="doc_kind=proforma">Amount asked now (&#8377;) <small class="muted">(leave blank when the proforma asks for the whole bill<?= $askedHint !== null ? ' — ' . htmlspecialchars($askedHint) : '' ?>)</small><input type="number" step="0.01" min="0.01" name="requested_amount_inr" data-not-more-than="[data-gst-total]" data-not-more-than-message="The amount asked now cannot be more than the bill total." placeholder="e.g. 25000.00"></label>
+    <label>GST (&#8377;) <small class="muted">(auto: Taxable &times; GST rate)</small><input type="text" readonly tabindex="-1" data-gst-amount value="<?= number_format($__pfGst, 2, '.', '') ?>"></label>
+    <label>Bill total (&#8377;) <small class="muted">(auto: Taxable + GST)</small><input type="text" readonly tabindex="-1" data-gst-total value="<?= number_format(($__pfTaxable ?? 0.0) + $__pfGst, 2, '.', '') ?>"></label>
+    <label data-show-when="doc_kind=proforma">Amount asked now (&#8377;) <small class="muted">(leave blank when the proforma asks for the whole bill<?= $askedHint !== null ? ' — ' . htmlspecialchars($askedHint) : '' ?>)</small><input type="number" step="0.01" min="0.01" name="requested_amount_inr" data-not-more-than="[data-gst-total]" data-not-more-than-message="The amount asked now cannot be more than the bill total." placeholder="e.g. 25000.00"<?= $__pfAsked !== null ? ' value="' . number_format($__pfAsked, 2, '.', '') . '"' : '' ?>><?php if ($__pfAsked !== null && !empty($prefill['asked_hint'])): ?><small class="muted bill-prefill-hint"><?= htmlspecialchars((string) $prefill['asked_hint']) ?></small><?php endif; ?></label>
     <?php if ($replaceable !== []): ?>
     <label class="full" data-show-when="doc_kind=invoice">Advance already paid on a proforma from this vendor
       <select name="replaces_bill_id">
@@ -784,6 +807,8 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
         . '<div>' . $label . ' planned<b>' . $inr($planned) . '</b></div>'
         . ($paidAt ? '<div>' . $label . ' paid<b class="vendor-bill-paid">' . $inr($supplierPo[$leg . '_paid_amount_inr'] ?? $planned) . ' on ' . htmlspecialchars(\App\Helpers\Dates::human((string) $paidAt)) . '</b></div>' : '')
         . '</div>';
+    // Owner request (2 Nov 2026): the illustrated bill + payment guide.
+    echo '<p class="small pay-guide-link"><a href="/help/supplier-logistics-payments#guide-' . ($leg === 'advance' ? 'a' : 'b') . '" target="_blank" rel="noopener">How to fill this — step-by-step guide with screenshots</a></p>';
     if ($paidAt && $legBills === []) {
         // Recorded before bills were kept — the payment stands as it is.
         echo '<p class="muted small">Paid before supplier bills were recorded here.</p>';
@@ -813,7 +838,29 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/supplier" enctype="multipart/form-data" class="field-grid">
         <?= \App\Helpers\Csrf::field() ?>
         <input type="hidden" name="bill_for" value="<?= htmlspecialchars($leg) ?>">
-        <?php $vendorBillFields($leg === 'advance' ? 'proforma' : 'invoice', $replaceable, $leg === 'advance' && (float) ($planned ?? 0) > 0 ? 'the planned advance is ₹' . number_format((float) $planned, 2) : null); ?>
+        <?php
+        // Owner request (2 Nov 2026): pre-fill from the Supplier PO — its value before GST, its GST
+        // rate and, on the advance, what is still to ask for (planned advance less what was already
+        // paid on this PO's advance proformas).
+        $__spoRef = (string) $supplierPo['supplier_po_reference'];
+        $__advancePaidOnProformas = 0.0;
+        foreach ($poBills as $__b) {
+            if ($__b['bill_for'] === 'advance' && $__b['doc_kind'] === 'proforma') {
+                $__advancePaidOnProformas += (float) ($__b['own_paid'] ?? 0);
+            }
+        }
+        $__askLeft = $leg === 'advance' ? (float) ($planned ?? 0) - $__advancePaidOnProformas : 0.0;
+        $__prefill = [
+            'taxable' => $supplierPo['basic_value_inr'] ?? null,
+            'gst_rate' => $supplierPo['gst_rate_pct'] ?? null,
+            'hint' => is_numeric($supplierPo['basic_value_inr'] ?? null) && (float) $supplierPo['basic_value_inr'] > 0
+                ? 'Pre-filled from Supplier PO ' . $__spoRef . ' — change it if the bill shows a different amount.'
+                : 'The amount before GST printed on the supplier\'s bill.',
+            'asked' => $__askLeft > 0.004 ? $__askLeft : null,
+            'asked_hint' => 'Pre-filled with the advance still to ask for under Supplier PO ' . $__spoRef . ' — change it if the proforma asks for a different amount.',
+        ];
+        $vendorBillFields($leg === 'advance' ? 'proforma' : 'invoice', $replaceable, $leg === 'advance' && (float) ($planned ?? 0) > 0 ? 'the planned advance is ₹' . number_format((float) $planned, 2) : null, $__prefill);
+        ?>
         <div><button type="submit" class="btn-sm">Add Bill</button></div>
       </form>
     </details>
@@ -1734,7 +1781,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <h3 style="font-size:0.95em;">All Documents</h3>
     <table class="list">
       <tr><th>Type</th><th>Reference</th><th>Rev. (internal / client-facing)</th><th>Generated</th><th>Status</th><th>Download</th><th></th></tr>
-      <?php foreach ($documents as $d): ?>
+      <?php foreach ($visibleDocuments as $d): ?>
       <tr>
         <td><?= htmlspecialchars($d['document_type_code']) ?></td>
         <td><?= htmlspecialchars($d['document_reference'] ?? '—') ?></td>
@@ -1767,7 +1814,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         </td>
       </tr>
       <?php endforeach; ?>
-      <?php if (empty($documents)): ?>
+      <?php if (empty($visibleDocuments)): ?>
       <tr><td colspan="7" class="muted">No documents generated yet.</td></tr>
       <?php endif; ?>
     </table>
@@ -3148,6 +3195,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
   <details class="step-card step-card-parallel" id="logistics-bills"<?= in_array($currentUserStep, ['9', '10', '11'], true) && ($__logisticsBills === [] || $__logisticsUnpaid > 0) ? ' open' : '' ?>>
     <summary><?= $stepStatusIcon($__logisticsStatus) ?><h2>Logistics Partner Bills &amp; Payments — CHA · Transport · Freight Forwarder<?php if ($__logisticsUnpaid > 0): ?> <small class="muted">(<?= $__logisticsUnpaid ?> unpaid)</small><?php endif; ?></h2></summary>
     <p class="muted small">One row per bill from the partner — a partner doing both CHA and transport can send one combined bill or separate bills. Runs alongside Steps 9–11 and never locks them.<?= $isFob ? '' : ' On this ' . htmlspecialchars((string) $order['incoterm_code']) . ' order an Advance bill can be paid any time; the Final bill once the buyer\'s Debit Note payment has cleared (Step 9d).' ?> Bills go into the order's financials (Step 12) automatically.</p>
+    <p class="small pay-guide-link"><a href="/help/supplier-logistics-payments#guide-c" target="_blank" rel="noopener">How to fill this — step-by-step guide with screenshots</a></p>
     <?php $renderVendorBills($__logisticsBills, true, $canManageSupplierPayments, $logisticsPaymentBlocked, static fn (array $b): string => $vendorBillPayTo($logisticsBanks[(int) $b['logistics_partner_id']] ?? null, '/logistics-partners/' . (int) $b['logistics_partner_id'] . '/edit', $canManageLogisticsPartners)); ?>
     <?php if ($canManageSupplierPayments): ?>
     <?php $__activePartners = array_values(array_filter($logisticsPartners, static fn (array $lp): bool => !empty($lp['is_active']))); ?>
@@ -3188,7 +3236,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           </select>
           <small class="muted">Reverse charge: the bill shows no GST; we pay 5% to the government and claim it back. Pick GST rate 0% below.</small>
         </label>
-        <?php $vendorBillFields('invoice', array_values(array_filter($__logisticsBills, static fn (array $b): bool => $b['doc_kind'] === 'proforma' && $b['replaced_by'] === null))); ?>
+        <?php $vendorBillFields('invoice', array_values(array_filter($__logisticsBills, static fn (array $b): bool => $b['doc_kind'] === 'proforma' && $b['replaced_by'] === null)), null, ['hint' => 'The amount before GST printed on the partner\'s bill (e.g. the CHA, transport or freight charge without GST).']); ?>
         <div><button type="submit" class="btn-sm">Add Bill</button></div>
       </form>
       <?php endif; ?>
@@ -3222,13 +3270,15 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php endif; ?>
         <?php // Owner request (2026-10-27): the forwarder comes from the Logistics Partners directory, like the supplier in 7a. ?>
         <label>Freight Forwarder (Logistics Partner) *
+          <?php $__suggestedForwarder = \App\Repositories\LogisticsPartnerRepository::suggestedForwarderId($freight ?: null, $vendorBills, $logisticsPartners); // owner request (2 Nov 2026) ?>
           <select name="freight_forwarder_partner_id" required>
             <option value="">Select logistics partner…</option>
             <?php foreach ($logisticsPartners as $lp): ?>
-              <option value="<?= (int) $lp['id'] ?>"><?= htmlspecialchars($lp['partner_name']) ?> (<?= htmlspecialchars(\App\Repositories\LogisticsPartnerRepository::SERVICE_TYPES[$lp['service_type']] ?? $lp['service_type']) ?>)</option>
+              <option value="<?= (int) $lp['id'] ?>"<?= (int) $lp['id'] === $__suggestedForwarder ? ' selected' : '' ?>><?= htmlspecialchars($lp['partner_name']) ?> (<?= htmlspecialchars(\App\Repositories\LogisticsPartnerRepository::SERVICE_TYPES[$lp['service_type']] ?? $lp['service_type']) ?>)</option>
             <?php endforeach; ?>
           </select>
         </label>
+        <?php if ($__suggestedForwarder !== null): ?><p class="muted small bill-prefill-hint">Pre-selected: the logistics partner already used on this order — change it if a different forwarder carries the freight.</p><?php endif; ?>
         <p class="muted small">Partners come from the Logistics Partners directory<?php if ($canManageLogisticsPartners): ?> — <a href="/logistics-partners/create" target="_blank" rel="noopener">add one</a> (opens in a new tab; reload this page afterwards)<?php else: ?> — ask an Admin/MD/ED to add one there<?php endif; ?>. Their name and contact are copied onto this order.</p>
         <?= $stepBadge('9a') ?><button type="submit" class="btn-sm">Save Freight Terms</button>
       </form>
@@ -4832,15 +4882,15 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <div class="sidebar-panel">
         <details class="sidebar-docs-toggle">
           <?php $uploadedFiles = $uploadedFiles ?? []; ?>
-          <summary>All Documents (<?= count($documents) + count($uploadedFiles) ?>) &mdash; quick links</summary>
-          <p class="small sidebar-doc-group"><strong>Generated (<?= count($documents) ?>)</strong></p>
-        <?php if (empty($documents)): ?>
+          <summary>All Documents (<?= count($visibleDocuments) + count($uploadedFiles) ?>) &mdash; quick links</summary>
+          <p class="small sidebar-doc-group"><strong>Generated (<?= count($visibleDocuments) ?>)</strong></p>
+        <?php if (empty($visibleDocuments)): ?>
           <p class="muted small">No documents generated yet.</p>
         <?php else: ?>
           <ul class="sidebar-doc-list">
-            <?php foreach ($documents as $d): ?>
+            <?php foreach ($visibleDocuments as $d): ?>
               <li>
-                <?php if ($d['pdf_file_id'] && $canDownloadPdf && \App\Services\MoneyVisibility::canSeeDocument((string) $d['document_type_code'])): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf"><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?></a><?php else: ?><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?><?php endif; ?>
+                <?php if ($d['pdf_file_id'] && $canDownloadPdf): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf"><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?></a><?php else: ?><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?><?php endif; ?>
                 <span class="muted small">Rev.<?= (int) $d['revision_number'] ?> &middot; <?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?></span>
               </li>
             <?php endforeach; ?>

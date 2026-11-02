@@ -53,6 +53,7 @@ const referenceDocController = require('./controllers/referenceDocController');
 const sopController = require('./controllers/sopController');
 const galleryController = require('./controllers/galleryController');
 const gettingStartedController = require('./controllers/gettingStartedController');
+const helpController = require('./controllers/helpController');
 const caController = require('./controllers/caController');
 const gstRefundController = require('./controllers/gstRefundController');
 const orderFinancialsController = require('./controllers/orderFinancialsController');
@@ -739,6 +740,8 @@ app.post('/reference-docs/:code', requireAuth, requirePermission('manage_company
 
 // SOP viewer — reads docs/SOP/*.md live off disk, any logged-in staff member can view.
 app.get('/getting-started', requireAuth, asyncHandler(gettingStartedController.show));
+// Owner request (2 Nov 2026): illustrated supplier / logistics partner bill + payment guide.
+app.get('/help/supplier-logistics-payments', requireAuth, asyncHandler(helpController.supplierLogisticsPayments));
 app.get('/sop', requireAuth, asyncHandler(sopController.index));
 app.get('/sop-assets/:file', requireAuth, asyncHandler(sopController.asset));
 app.get('/sop/:chapter', requireAuth, asyncHandler(sopController.show));

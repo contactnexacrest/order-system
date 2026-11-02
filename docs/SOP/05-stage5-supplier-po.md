@@ -167,6 +167,14 @@ Each leg is **bill first, then payment**:
      counting as a cost — so the same goods are never paid or counted
      twice.
 
+   The form starts from the Supplier PO (owner request 2026-11-02):
+   **Taxable value** holds the PO's value before GST and **GST rate** the
+   PO's rate, with the note "Pre-filled from Supplier PO … — change it if
+   the bill shows a different amount"; on the advance, **Amount asked now**
+   holds the planned advance less anything already paid on this PO's
+   advance proformas. Always check the figures against the bill itself and
+   correct them when the bill differs.
+
    Then the bill number, bill date, taxable value, **GST rate (%)** picked
    from the GST Rate list (0, 5, 12, 18, 28 — 18% preselected), the bill
    file and an optional note. **GST (₹)** and **Bill total (₹)** fill in by
@@ -221,6 +229,18 @@ supplier)
 Once confirmed:
 
 ![Stage 5 section — supplier signature confirmed](./images/s5_signed_confirmed.png)
+
+## Step-by-step guide with screenshots (supplier advance and balance)
+
+Not sure what goes in which box when the supplier sends a proforma or a tax
+invoice? Open **[Supplier & logistics partner payments — step by step](/help/supplier-logistics-payments)**
+(also linked as "How to fill this" on Steps 7e and 10a). It walks one sample
+order through: adding the advance proforma (7e), paying it with the UTR,
+adding the supplier's tax invoice against that proforma (10a), paying the
+balance, and the common mistakes (taxable value is the amount **before**
+GST; the tax invoice's taxable value is the whole invoice, not the balance;
+always pick the proforma it replaces; never save a payment without the UTR).
+Owner request, 2 Nov 2026.
 
 ## What the client does (or doesn't)
 

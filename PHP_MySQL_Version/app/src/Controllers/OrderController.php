@@ -1033,6 +1033,11 @@ final class OrderController
         // Owner request (1 Nov 2026): the "All Documents" panel also lists every file uploaded for the
         // order (client, staff, associate) — only those this person may download (same gates as
         // FileStoreController::download, so no link answers 403).
+        // Owner request (2 Nov 2026): the document lists show only what this person may open —
+        // a document whose money they cannot see (e.g. the Supplier PO for Sales, the BL
+        // Instruction for Procurement) is left out entirely, not listed without a link.
+        $visibleDocuments = array_values(array_filter($documents,
+            static fn (array $d): bool => \App\Services\MoneyVisibility::canSeeDocument((string) $d['document_type_code'])));
         $canManageIncentivesForFiles = PermissionService::can((int) $actor['id'], $actorRoleId, 'manage_incentives');
         $uploadedFiles = array_values(array_filter(FileStoreRepository::uploadedForOrder($orderId),
             static fn (array $f): bool => \App\Services\MoneyVisibility::canSeeFile((int) $f['id'])
@@ -1118,6 +1123,7 @@ final class OrderController
             'payment'  => OrderPaymentStatusRepository::find($orderId),
             'documents' => $documents,
             'uploadedFiles' => $uploadedFiles,
+            'visibleDocuments' => $visibleDocuments,
             'regenerationRisk' => $regenerationRisk,
             'reviewsByDocument' => $reviewsByDocument,
             'crossVerificationsByDocument' => $crossVerificationsByDocument,

@@ -148,6 +148,7 @@ $watermarks = new WatermarkController();
 $referenceDocs = new ReferenceDocController();
 $sop = new SopController();
 $gettingStarted = new GettingStartedController();
+$help = new \App\Controllers\HelpController();
 $ca = new CaController();
 $orderFinancials = new OrderFinancialsController();
 $incentives = new IncentiveController();
@@ -357,6 +358,8 @@ $router->post('/reference-docs/{code}', [$referenceDocs, 'update'], [SessionAuth
 
 // SOP viewer — reads docs/SOP/*.md live off disk, any logged-in staff member can view.
 $router->get('/getting-started', [$gettingStarted, 'show'], [SessionAuth::required()]);
+// Owner request (2 Nov 2026): illustrated supplier / logistics partner bill + payment guide.
+$router->get('/help/supplier-logistics-payments', [$help, 'supplierLogisticsPayments'], [SessionAuth::required()]);
 $router->get('/sop', [$sop, 'index'], [SessionAuth::required()]);
 $router->get('/sop-assets/{file}', [$sop, 'asset'], [SessionAuth::required()]);
 $router->get('/sop/{chapter}', [$sop, 'show'], [SessionAuth::required()]);
