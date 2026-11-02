@@ -131,7 +131,7 @@ async function detailRows(ids) {
     }
     add('A. Products', 'TOTAL FOB', '', '', s.fob_total, s.currency);
     for (const r of s.receipts) {
-      add('A. Money received from the buyer', r.leg, `rate ${r.rate} · received ${r.received}`, r.cleared, r.amount, s.currency, r.inr, r.basis);
+      add('A. Money received from the buyer', r.leg, `rate ${r.rate} · received ${r.received}`, r.cleared, r.amount, s.currency, r.inr, r.basis + (r.bank_charges ? ` · credited after bank charges ${s.currency} ${r.bank_charges} (₹${r.bank_charges_inr}) — received ${r.received_net}` : '') + (r.own_bank_charges_inr ? ` · after our bank's charges ₹${r.own_bank_charges_inr}` : ''));
     }
     add('A. Money received from the buyer', 'TOTAL', '', '', s.receipts_foreign, s.currency, s.receipts_inr);
     for (const r of ((s.supplier || {}).rows || [])) {

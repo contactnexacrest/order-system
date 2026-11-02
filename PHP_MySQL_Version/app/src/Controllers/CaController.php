@@ -218,6 +218,8 @@ final class CaController
             'purchasesPendingCount' => count(\App\Repositories\ZohoPurchaseRepository::billsToSync($startDate)) + count(\App\Repositories\ZohoPurchaseRepository::paymentsToSync($startDate)) + count(\App\Repositories\ZohoPurchaseRepository::expensesToSync($startDate))
                 + count(array_filter(\App\Repositories\ZohoPurchaseRepository::costEntriesToSync($startDate), static fn (array $c): bool => $c['zoho_expense_id'] === null)),
             'benefitsPendingCount' => count(array_filter(\App\Repositories\CaExportBenefitRepository::forZohoSync($startDate), static fn (array $b): bool => $b['zoho_journal_id'] === null)),
+            // Owner decision 2 Nov 2026 (D-233): everything the next sync would send.
+            'waiting' => \App\Services\ZohoPendingService::counts(null),
             'log' => ZohoSyncLogRepository::recent(100),
         ], 'layout/base');
     }
@@ -248,6 +250,45 @@ final class CaController
             }
         }
         View::render('ca/order_zoho_check', ['order' => $order, 'result' => $result, 'error' => $error, 'startDate' => ZohoBooksService::syncStartDate()], 'layout/base');
+    }
+
+    /**
+     * Owner 2 Nov 2026 (point 16): "Sync this order to Zoho now" — the same
+     * pushes as Sync Now, limited to this order's records (same duplicate
+     * guards; every record logged in the Zoho Sync Log).
+     */
+    public function syncOrderToZoho(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $order = \App\Repositories\OrderRepository::find($orderId);
+        if ($order === null || !\App\Services\OrderAccessService::currentUserMayOpenOrderId($orderId)) {
+            http_response_code(404);
+            echo 'Order not found.';
+            return;
+        }
+        $back = "/orders/{$orderId}#order-financials";
+        if (!ZohoBooksService::isEnabled()) {
+            Flash::set('warning', 'Zoho is not connected — Settings → Zoho Books. Nothing was synced.');
+            header("Location: {$back}");
+            return;
+        }
+        $user = AuthService::currentUser();
+        $r = CaSyncService::runForOrder($orderId, (int) $user['id']);
+        $rev = $r['revenue'];
+        $pur = $r['purchases'];
+        $ben = $r['benefits'];
+        $sent = $rev['invoices'] + $rev['synced'] + $rev['applied'] + $pur['bills'] + $pur['payments'] + $pur['applied'] + $pur['expenses'] + $ben['journals'] + $ben['removed'];
+        $failed = $rev['failed'] + $pur['failed'] + $ben['failed'];
+        $summary = "{$rev['invoices']} invoice(s), {$rev['synced']} buyer payment(s) ({$rev['applied']} applied), {$pur['bills']} bill(s), {$pur['payments']} vendor payment(s) ({$pur['applied']} applied), {$pur['expenses']} expense(s) / cost(s), {$ben['journals']} export benefit journal(s)";
+        if ($failed > 0) {
+            Flash::set('warning', "Order sync finished: {$summary} sent or updated; {$failed} failed — see the Zoho Sync Log.");
+        } elseif ($sent > 0) {
+            Flash::set('success', "Order sync finished: {$summary} sent or updated.");
+        } else {
+            Flash::set('success', 'Order sync ran — nothing on this order was waiting for Zoho Books.');
+        }
+        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'orders', $orderId, null, null, "order {$orderId} only: {$summary}; {$failed} failed");
+        header("Location: {$back}");
     }
 
     public function runZohoSync(array $params): void

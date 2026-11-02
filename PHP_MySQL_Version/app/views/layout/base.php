@@ -65,6 +65,7 @@ $canSampleData = $can('manage_sample_data');
 $canViewProducts = $can('view_product_catalog');
 $canViewArchivedOrders = $can('view_archived_orders');
 $canCaModule = $can('ca_module_view');
+$canZohoSync = $can('ca_module_manage'); // Owner 2 Nov 2026 (point 16): app-wide Zoho Sync in the menu
 $canDataExport = $can('data_export_run');
 // docs/schema.sql Section AO — no longer folded into manage_orders.
 $canDisputes = $can('manage_disputes') || $can('respond_to_disputes');
@@ -119,7 +120,7 @@ $currentPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH
 $isActive = static function (string $path) use ($currentPath): bool {
     return $path === '/' ? $currentPath === '/' : str_starts_with($currentPath, $path);
 };
-$opsGroupActive = $isActive('/procurement') || $isActive('/clients') || $isActive('/associates') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes') || $isActive('/complaints');
+$opsGroupActive = $isActive('/procurement') || $isActive('/clients') || $isActive('/associates') || $isActive('/agreements') || $isActive('/orders') || $isActive('/client-intake') || $isActive('/pi-intake-review') || $isActive('/reorder-requests') || $isActive('/disputes') || $isActive('/complaints');
 $insightsGroupActive = $isActive('/cockpit') || ($isActive('/reports') && !$isActive('/reports/associates')) || $isActive('/audit-log') || $isActive('/incentives/payouts') || $isActive('/my-incentives');
 $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActive('/company-assets') || $isActive('/signatories')
     || $isActive('/admin') || $isActive('/users') || $isActive('/sample-data') || $isActive('/hs-codes') || $isActive('/watermarks') || $isActive('/email-templates') || $isActive('/ui-templates')
@@ -165,6 +166,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
       <?php if ($can('manage_orders') || $can('view_orders')): ?><a href="/my-tasks" class="<?= $isActive('/my-tasks') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>My Tasks</a><?php endif; ?>
       <?php if ($canApproveEmail): ?><a href="/email-approvals" class="<?= $isActive('/email-approvals') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-10 6L2 7"></path></svg></span>Email Approvals<?= $emailApprovalsPendingCount > 0 ? ' <span class="nav-badge">' . (int) $emailApprovalsPendingCount . '</span>' : '' ?></a><?php endif; ?>
       <?php if ($canCaModule): ?><a href="/ca" class="<?= $isActive('/ca') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>CA / Accounting</a><?php endif; ?>
+      <?php if ($canZohoSync): ?><a href="/ca/zoho-sync" class="<?= $isActive('/ca/zoho-sync') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg></span>Zoho Sync<?php $__zwMenu = \App\Services\ZohoPendingService::menuCount(); if ($__zwMenu !== null && $__zwMenu > 0): // D-233 ?> <span class="badge badge-warning nav-badge zoho-waiting-menu" title="Waiting for Zoho: <?= (int) $__zwMenu ?> — sent at the next sync (hourly, or Sync now)"><?= (int) $__zwMenu ?></span><?php endif; ?></a><?php endif; ?>
       <?php if ($canViewProducts): ?><a href="/products" class="<?= $isActive('/products') ? 'active' : '' ?>"><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></span>Products</a><?php endif; ?>
     <?php endif; ?>
     <?php if ($opsGroupVisible): ?>
@@ -173,6 +175,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
         <div class="nav-dropdown">
           <?php if ($canOrders || $canViewClients): ?><a href="/clients" class="<?= $isActive('/clients') ? 'active' : '' ?>">Clients</a><?php endif; ?>
           <?php if ($can('view_associates') || $can('manage_associates') || $can('manage_associate_bank')): ?><a href="/associates" class="<?= $isActive('/associates') ? 'active' : '' ?>">Associates</a><?php endif; ?>
+          <?php if ($can('view_agreements') || $can('manage_agreements')): ?><a href="/agreements" class="<?= $isActive('/agreements') ? 'active' : '' ?>">Agreements</a><?php endif; ?>
           <?php if ($canOrders || $canViewOrders): ?><a href="/orders" class="<?= $currentPath === '/orders' || (str_starts_with($currentPath, '/orders/') && !str_starts_with($currentPath, '/orders/archived')) ? 'active' : '' ?>">Orders</a><?php endif; ?>
           <?php if ($canViewArchivedOrders): ?><a href="/orders/archived" class="<?= $isActive('/orders/archived') ? 'active' : '' ?>">Archived Orders</a><?php endif; ?>
           <?php // QA Round 5, R5-22: these three routes need manage_orders. ?>

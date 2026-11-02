@@ -71,3 +71,5 @@
     <div class="btn-row"><button type="submit" class="btn-sm btn-accent">+ Add membership</button></div>
   </form>
 </div>
+
+<?php $__partyType = "staff"; $__partyId = (int) $target["id"]; require __DIR__ . "/../agreements/_party_card.php"; ?>

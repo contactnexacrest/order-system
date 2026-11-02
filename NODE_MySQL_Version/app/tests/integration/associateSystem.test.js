@@ -302,7 +302,8 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect(flash().message).toMatch(/^This associate has no verified bank account usable on /);
     await verifiedBank(a);
     await call(incentiveController.markPaid, { as: admin, params: { payoutId: String(p1.id) },
-      body: { ...pay, paid_inr: String(Math.round(Number(p1.amount_inr) * 98) / 100), tds_inr: String(Math.round(Number(p1.amount_inr) * 2) / 100) } });
+      // D-235: below the ₹20,000 threshold the app works out no TDS; a different figure needs a reason.
+      body: { ...pay, paid_inr: String(Math.round(Number(p1.amount_inr) * 98) / 100), tds_inr: String(Math.round(Number(p1.amount_inr) * 2) / 100), tds_override_reason: 'CA advised deducting from the first payment.' } });
     expect(flash().message).toBe('Payment recorded.');
     expect(await associateEventRepository.hasEvent(Number(a.id), 'payout_paid', null, o1)).toBe(true);
 
@@ -620,7 +621,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     const ref = await value('SELECT buyer_inquiry_ref FROM orders WHERE id = :id', { id: o });
     const z = await zohoBooksService.associateCommission({ order_id: o, buyer_inquiry_ref: ref, buyer_name: `Zoho Buyer ${tag}` });
     expect(z.bill_description).toBe(`Associate commission — ${a.name} — for order ${ref} (Zoho Buyer ${tag}), 0.7% of product FOB, client no. 1 · associate invoice RK/24-25/017 · TDS 56.00 deducted`);
-    expect(z.payment_description).toBe(`Associate commission payment — ${a.name} — for order ${ref} · against bill RK/24-25/017 · TDS 56.00 deducted · bank ref UTR777888`);
+    expect(z.payment_description).toBe(`Associate commission for ${a.name} — order ${ref} — gross ₹2,800.00, TDS u/s 194H ₹56.00, net paid ₹2,744.00 · UTR UTR777888 · against bill RK/24-25/017`);
     expect([z.bill_no, z.gross_inr, z.paid_inr, z.tds_inr, z.reference]).toEqual(['RK/24-25/017', 2800, 2744, 56, 'UTR777888']);
   });
 

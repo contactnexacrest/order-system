@@ -1,0 +1,19 @@
+<!doctype html><meta charset=utf-8><title>Money visibility proof</title>
+<style>body{font:15px system-ui;margin:28px;max-width:900px;line-height:1.5}code{background:#f3f3f3;padding:1px 4px}</style>
+<h1>How the money-visibility proof works</h1>
+<p><b>The question:</b> can anybody see an amount they are not allowed to see — selling prices, buyer payments, purchase / supplier prices, logistics / CHA costs, costs and profit, incentives / associate commission, or the CA annexure (CAFIN)?</p>
+<h2>1. Unmistakable test amounts</h2>
+<p>The test creates one sample order in which every kind of money carries a unique amount that exists nowhere else in the system:</p>
+<ul><li>Selling price <code>917.43</code></li><li>Buyer payment <code>823.61</code></li><li>Purchase / supplier <code>731.29</code></li><li>Logistics / CHA <code>649.17</code></li><li>Costs, expenses, profit <code>557.83</code></li><li>Incentive / associate commission <code>461.39</code></li></ul>
+<p>It also creates each kind of file (supplier bill, logistics bill, expense receipt, payment screenshot, buyer PO, packing photo) and every generated document — the current copy <i>and</i> an old draft copy — plus audit-log rows carrying each amount.</p>
+<h2>2. Every role, every screen, every file</h2>
+<p>One login is made for <b>every role in the system</b> (23 roles). Each of them, in turn:</p>
+<ul><li>opens 71 screens in the Standard look and 12 in the Kanban look — order page, lists, dashboard, My tasks, cockpit, every report and its CSV export, audit logs, the CA module, suppliers, logistics partners, products, procurement, associates, incentives, help pages;</li>
+<li>tries to download all 20 files of the order (current and old copies of every document, every uploaded file);</li>
+<li>downloads the order's dossier ZIP and checks which files are inside.</li></ul>
+<h2>3. The rule checked</h2>
+<p>A test amount may appear — and a file may download — <b>only</b> for a role that holds the matching permission (see <code>role_permissions.html</code>). Anything else is counted as a <b>violation</b>.</p>
+<h2>4. Result</h2>
+<p><b>0 violations</b> means no role saw a single amount or file it is not allowed to see, on any screen, export, download or ZIP. The two matrix reports show, role by role, which kinds of money each one saw ("seen") or did not ("hidden"), so you can also check that each role <i>does</i> see what its job needs.</p>
+<h2>Files in this zip</h2>
+<ul><li><code>money_matrix_php.html</code>, <code>money_matrix_node.html</code> — the role × money matrix for each version of the app</li><li><code>run_php.log</code>, <code>run_node.log</code> — the raw test output</li><li><code>role_permissions.html</code> — which role holds which money permission, read straight from each database</li><li><code>12-money-matrix.spec.js</code>, <code>moneyMatrixSeed.js</code> — the test itself (it stays in the code and can be re-run any time)</li></ul>

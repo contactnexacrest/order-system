@@ -73,7 +73,7 @@ final class KanbanParityTest extends DbTestCase
     {
         $html = preg_replace('#<(header|nav)\b.*?</\1>#s', '', $html) ?? $html; // the site menu is the same either way
         return [
-            'records' => self::all('#href="(/(?:orders|clients|reorder-requests|procurement|associates)/\d+)(?:[?"/])#', $html),
+            'records' => self::all('#href="(/(?:orders|clients|reorder-requests|procurement|associates|agreements)/\d+)(?:[?"/])#', $html),
             'actions' => self::all('#<form method="post" action="([^"]+)"#', $html),
             'filters' => array_merge(self::all('#class="filter-chip[^"]*" href="[^"]*">([^<(]+)#', $html), self::all('#<option value="([a-z_]*)"[^>]*>#', $html)),
         ];
@@ -138,6 +138,8 @@ final class KanbanParityTest extends DbTestCase
         $associateId = \App\Repositories\AssociateRepository::create(['name' => 'Parity Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'status' => 'active'], $this->userId);
         \App\Services\AssociateService::linkClient($clientId, $associateId, 'staff', null, date('Y-m-d'), $this->userId);
         PurchasingRepository::create($orderId, null, 'Parity test blocks', null, 5.0, 'CBM', date('Y-m-d', strtotime('+5 days')), $this->userId, null);
+        // Owner decision 2 Nov 2026 (point 4): the Agreements register.
+        \App\Repositories\AgreementRepository::create(['party_type' => 'client', 'party_id' => $clientId, 'agreement_type' => 'Commercial NDA', 'signed_on' => date('Y-m-d', strtotime('-10 days')), 'expires_on' => date('Y-m-d', strtotime('+20 days')), 'file_id' => $this->createTestFile()], $this->userId);
     }
 
     /** @return list<array{0: string, 1: object, 2: string, 3: array, 4: array, 5: string}> page, controller, action, list query, board query, board path */
@@ -154,6 +156,8 @@ final class KanbanParityTest extends DbTestCase
             ['My tasks', new CoordinationController(), 'myTasks', ['view' => 'list'], [], '/my-tasks'],
             // Owner decision 1 Nov 2026: the associates register, list and board.
             ['Associates', new \App\Controllers\AssociateAdminController(), 'index', ['view' => 'list'], [], '/associates'],
+            // Owner decision 2 Nov 2026 (point 4): the Agreements register, list and board.
+            ['Agreements', new \App\Controllers\AgreementController(), 'index', ['view' => 'list'], [], '/agreements'],
         ];
     }
 

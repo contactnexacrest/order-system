@@ -99,7 +99,12 @@ section shows what's on file and offers the one action that matters here:
 Exactly like Stage 2's Buyer PO, the last two sub-steps are done in this
 order:
 
-1. **7c · Attach Supplier PO Acknowledgment** — upload the supplier's
+1. **7c · Attach Supplier PO Acknowledgment** — owner decision 2 Nov 2026:
+   the card now starts with **1. Send the Supplier Link first**, then
+   **2. When the supplier has acknowledged** (their upload, or attach it
+   yourself). On the Purchase Requirements card, "Award" only means the
+   supplier was chosen; the Supplier PO is generated in 7b and the supplier
+   acknowledges it in 7c. Upload the supplier's
    actual signed copy, kept on record with version history. Like the Buyer
    PO's attachment, this **does not by itself confirm the signature or
    pass the gate**. The supplier doesn't always send one back, so 7c also
@@ -241,6 +246,8 @@ balance, and the common mistakes (taxable value is the amount **before**
 GST; the tax invoice's taxable value is the whole invoice, not the balance;
 always pick the proforma it replaces; never save a payment without the UTR).
 Owner request, 2 Nov 2026.
+
+To print or share it, the full **Supplier & Logistics Payments Guide** ([PDF](./guides/Supplier_and_Logistics_Payments_Guide.pdf) · [Word](./guides/Supplier_and_Logistics_Payments_Guide.docx)) is also in the app's Reference Library.
 
 ## What the client does (or doesn't)
 

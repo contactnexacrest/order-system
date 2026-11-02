@@ -627,13 +627,14 @@ final class ZohoBooksService
                     'rate' => $c['gross_inr'],
                     'quantity' => 1,
                 ]],
-            ], self::authHeaders($accessToken));
+            ] + ($c['tds_tax_id'] !== null ? ['tds_tax_id' => $c['tds_tax_id']] : []), self::authHeaders($accessToken));
             $bill = self::findBill($config, $accessToken, $c['bill_no'], $vendorId);
             if ($bill === null) {
                 throw new \RuntimeException("Zoho Books bill for the associate commission on order {$cost['buyer_inquiry_ref']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
             }
         }
-        if ($c['paid_inr'] > 0 && (float) ($bill['balance'] ?? $c['gross_inr']) >= $c['gross_inr'] - 0.005) {
+        $openBalance = $c['tds_tax_id'] !== null ? $c['paid_inr'] : $c['gross_inr'];
+        if ($c['paid_inr'] > 0 && (float) ($bill['balance'] ?? $openBalance) >= $openBalance - 0.005) {
             $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/vendorpayments?organization_id=" . rawurlencode($config['organizationId']), [
                 'vendor_id' => $vendorId,
                 'amount' => $c['paid_inr'],
@@ -684,6 +685,16 @@ final class ZohoBooksService
         $refs = array_values(array_unique(array_filter(array_map(static fn (array $p): string => (string) ($p['paid_reference'] ?? ''), $payouts))));
         $paidOn = max(array_map(static fn (array $p): string => (string) $p['paid_on'], $payouts));
         $billNo = $invoices !== [] ? substr(implode('/', $invoices), 0, 50) : 'COMM-' . $cost['buyer_inquiry_ref'] . '-' . $payouts[0]['id'];
+        // Owner decision 2 Nov 2026 (D-235): the rate and section the app worked out for the TDS.
+        $tdsRate = null;
+        $tdsSection = null;
+        foreach ($payouts as $p) {
+            if ((float) ($p['tds_inr'] ?? 0) > 0) {
+                $tdsRate ??= isset($p['tds_rate']) ? (float) $p['tds_rate'] : null;
+                $tdsSection ??= $p['tds_section'] ?? null;
+            }
+        }
+        $tdsTaxId = \App\Services\AssociateTds::settings()['zoho_tax_id'];
         $rate = isset($inc['associate_rate_pct']) ? rtrim(rtrim(number_format((float) $inc['associate_rate_pct'], 2, '.', ''), '0'), '.') . '%' : '';
         $what = "Associate commission — {$a['name']} — for order {$cost['buyer_inquiry_ref']} ({$cost['buyer_name']})"
             . ($rate !== '' ? ", {$rate} of product FOB" : '') . (!empty($inc['associate_order_number']) ? ", client no. {$inc['associate_order_number']}" : '');
@@ -696,8 +707,11 @@ final class ZohoBooksService
             'tds_inr' => $tds,
             'reference' => implode(', ', $refs),
             'bill_description' => $what . ($invoices !== [] ? ' · associate invoice ' . implode(', ', $invoices) : ' · no associate invoice on file') . ($tds > 0 ? ' · TDS ' . number_format($tds, 2, '.', '') . ' deducted' : ''),
-            'payment_description' => "Associate commission payment — {$a['name']} — for order {$cost['buyer_inquiry_ref']} · against bill {$billNo}"
-                . ($tds > 0 ? ' · TDS ' . number_format($tds, 2, '.', '') . ' deducted' : '') . ($refs !== [] ? ' · bank ref ' . implode(', ', $refs) : ''),
+            'payment_description' => \App\Services\AssociateTds::paymentDescription((string) $a['name'], [(string) $cost['buyer_inquiry_ref']], round($paid + $tds, 2), $tds, $tdsRate, $tdsSection, $paid, implode(', ', $refs)) . ' · against bill ' . $billNo,
+            // With a Zoho TDS tax set in Settings the bill carries the TDS (Zoho's TDS feature) and its balance is the net; otherwise the
+            // bill is the gross, the payment the net, and the TDS is left on the bill for the CA to book.
+            'tds_tax_id' => $tds > 0 && $tdsTaxId !== '' ? $tdsTaxId : null,
+            'tds_left_for_ca' => $tds > 0 && $tdsTaxId === '',
         ];
     }
 

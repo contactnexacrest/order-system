@@ -48,6 +48,11 @@ final class PaymentDescription
                 $rate = $ops[$leg . '_exchange_rate'] ?? null;
                 $parts[] = "{$currency} " . number_format((float) $ops[$leg . '_amount'], 2) . ($rate !== null ? ' at ₹' . self::rate((float) $rate) : '');
             }
+            // Owner 2 Nov 2026: charges the banks deducted on the way (an order cost; the leg counts as paid in full).
+            $charges = RemittanceDifference::chargesInr($orderId, $leg);
+            if ($charges > 0) {
+                $parts[] = '₹' . number_format($charges, 2) . ' bank charges deducted by the banks';
+            }
             $bankRef = $ops[$leg . '_bank_reference'] ?? null;
         }
         $against = self::against($orderId, $leg, $invoiceNumber);
@@ -76,6 +81,10 @@ final class PaymentDescription
         if (($milestone['received_amount'] ?? null) !== null) {
             $parts[] = "{$currency} " . number_format((float) $milestone['received_amount'], 2)
                 . (($milestone['exchange_rate'] ?? null) !== null ? ' at ₹' . self::rate((float) $milestone['exchange_rate']) : '');
+            $charges = isset($milestone['id']) ? RemittanceDifference::chargesInr($orderId, 'milestone', (int) $milestone['id']) : 0.0;
+            if ($charges > 0) {
+                $parts[] = '₹' . number_format($charges, 2) . ' bank charges deducted by the banks';
+            }
         }
         if ($invoiceNumber !== null && $invoiceNumber !== '') {
             $parts[] = "against Commercial Invoice {$invoiceNumber}";

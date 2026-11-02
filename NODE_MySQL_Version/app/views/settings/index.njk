@@ -3,6 +3,9 @@
   <p class="muted">Every value here is what document templates actually read at generation time — nothing is hardcoded in a template. Fields marked <span class="badge badge-sensitive">sensitive</span> affect banking/RBI-facing documents; double-check before saving.</p>
   <p class="muted small">Spec Section 13 — every edit here is logged with who/when/field/old value/new value/reason, and cannot be undone through this UI; only a further edit can change a value back.</p>
   <p class="muted small">🔒 <strong>Protected</strong> fields are locked against accidental edits — click <em>Unlock</em> on a row before you can change it. Protecting or unprotecting a field itself is a separate, peer-approved request: see <a href="/admin/field-protection">Field Protection</a>.</p>
+  <p class="muted small">&#8377; <a href="/settings/associate-tds">Associate TDS</a> — section, rate, threshold, rate without PAN and the rules for associates abroad used to work out TDS on associate commission (D-235).</p>
+  <p class="muted small">&#9776; <a href="/settings/remittance-reasons">Remittance difference reasons</a> — the list behind "Why is it different?" when a buyer remittance differs from what is due (bank charges, buyer paid less, buyer paid more).</p>
+  <p class="muted small">&#128465; <a href="/settings/document-cleanup">Document copies clean-up</a> — remove draft and other un-needed copies of generated documents to save storage (off until switched on).</p>
   <p class="muted small"><strong>Super Admin only</strong> fields (the mail CC list) can only be changed by a Super Admin — everyone else sees them read-only, with no unlock option.</p>
 
   <form method="post" action="/settings/update" onsubmit="return confirmSettingsSave(this);">

@@ -1,0 +1,56 @@
+{# Owner decision 2 Nov 2026 (D-235): TDS on associate commission, by financial-year quarter, with the challan. Port of views/associates/tds.php. #}
+<div class="card">
+  <h1>TDS on associate commission</h1>
+  <p class="muted"><a href="/associates">&larr; Associates</a> &middot; <a href="/associates/report">Associate report</a></p>
+  <form method="get" action="/associates/tds" class="btn-row">
+    <label>Financial year
+      <select name="fy" aria-label="Financial year">
+        {% for y in years %}<option value="{{ y.value }}"{% if y.value == fyStart %} selected{% endif %}>{{ y.label }}</option>{% endfor %}
+      </select></label>
+    <label>Quarter
+      <select name="q" aria-label="Quarter">
+        <option value="">Whole year</option>
+        {% for qq in [[1, 'Q1 Apr–Jun'], [2, 'Q2 Jul–Sep'], [3, 'Q3 Oct–Dec'], [4, 'Q4 Jan–Mar']] %}
+          <option value="{{ qq[0] }}"{% if quarter == qq[0] %} selected{% endif %}>{{ qq[1] }}</option>
+        {% endfor %}
+      </select></label>
+    <button type="submit" class="btn-sm">Show</button>
+    <a class="btn-sm" href="/associates/tds?fy={{ fyStart | urlencode }}{% if quarter %}&amp;q={{ quarter }}{% endif %}&amp;format=csv">Download (CSV)</a>
+  </form>
+  <p class="small muted">Deposit each month's TDS by the 7th of the next month (challan 281) and enter the challan here; file Form 26Q after each quarter (by 31 Jul, 31 Oct, 31 Jan, 31 May) and upload each associate's Form 16A on their Documents tab — they see it in their portal. Values from Settings &rarr; Associate TDS.</p>
+  <table class="list">
+    <tr><th>Qtr</th><th>Paid on</th><th>Associate</th><th>PAN</th><th>Order</th><th>Gross</th><th>TDS</th><th>Section · rate</th><th>Net paid</th><th>Reason</th><th>Challan</th><th>Form 16A</th></tr>
+    {% for r in rows %}
+      <tr>
+        <td>Q{{ r.quarter }}</td>
+        <td>{{ r.paid_on | shortDate }}</td>
+        <td><a href="/associates/{{ r.associate_id }}">{{ r.name }}</a>{% if r.based_in != 'india' %} <small class="muted">(abroad, {{ r.country }})</small>{% endif %}</td>
+        <td>{{ r.pan or '—' }}</td>
+        <td>{{ r.buyer_inquiry_ref or r.order_reference }}</td>
+        <td>&#8377;{{ r.gross | money }}</td>
+        <td>&#8377;{{ (r.tds_inr or 0) | money }}</td>
+        <td>{% if r.tds_section or r.rateLabel %}{{ r.tds_section or '' }}{% if r.rateLabel %}{% if r.tds_section %} · {% endif %}{{ r.rateLabel }}{% endif %}{% else %}—{% endif %}</td>
+        <td>&#8377;{{ r.paid_inr | money }}</td>
+        <td class="small">{{ r.tds_reason or '—' }}</td>
+        <td>
+          {% if (r.tds_inr or 0) <= 0 %}
+            <span class="muted">—</span>
+          {% elif canEditChallan %}
+            <form method="post" action="/associates/tds/{{ r.id }}/challan" style="display:flex;gap:4px;flex-wrap:wrap">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="hidden" name="fy" value="{{ fyStart }}">
+              <input type="text" name="tds_challan_no" required minlength="5" maxlength="40" pattern="[0-9A-Za-z/ \-]+" value="{{ r.tds_challan_no or '' }}" placeholder="e.g. 0510308 07112026 00045" aria-label="Challan no. (BSR code, date, serial)" style="width:12em">
+              <input type="date" name="tds_challan_date" required min="{{ r.paid_on }}" max="{{ today }}" value="{{ r.tds_challan_date or '' }}" aria-label="Challan date">
+              <button type="submit" class="btn-sm">Save</button>
+            </form>
+          {% else %}
+            {{ r.tds_challan_no or 'not yet deposited' }}
+          {% endif %}
+        </td>
+        <td>{% if r.form16a_count > 0 %}<span class="badge badge-success">Uploaded</span>{% elif (r.tds_inr or 0) > 0 %}<span class="badge badge-warning">Not yet</span>{% else %}—{% endif %}</td>
+      </tr>
+    {% endfor %}
+    {% if rows.length == 0 %}<tr><td colspan="12" class="muted">No associate commission paid in {{ fyLabel }}{% if quarter %} Q{{ quarter }}{% endif %}.</td></tr>{% endif %}
+  </table>
+  <p><strong>Total:</strong> gross &#8377;{{ gross | money }} &middot; TDS &#8377;{{ tds | money }} &middot; net paid &#8377;{{ (gross - tds) | money }}</p>
+</div>

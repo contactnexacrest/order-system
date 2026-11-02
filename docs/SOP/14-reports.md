@@ -1,5 +1,13 @@
 # Reports
 
+
+> **Who can open which report (2 Nov 2026).** Reports that show selling
+> prices or buyer payments open only for people who may see that money
+> (see [Who sees which money](./21-departments.md#who-sees-which-money));
+> others get "You do not have permission to see the amounts in this
+> report." The Full Audit Trail of an order report hides amounts the
+> reader may not see.
+
 ## What this module is for
 
 Answering business questions about the whole book of orders — money

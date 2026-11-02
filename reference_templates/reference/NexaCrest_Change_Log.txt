@@ -3264,3 +3264,7 @@ DOCUMENT: every app-generated document that carries an SC/ reference number
          09_Checklists / SOP_02_Accounts left unchanged pending the CA.
   Register: D-223, D-224 (D1–D5), D-225 (D6).
 
+
+2 November 2026 — internal guides, "IGST refund" wording (owner: "go with your recommendation", D-234; to be confirmed by the CA)
+- internal_documents/09_Checklists.docx: "wrong LUT number can invalidate IGST refund claim" and "Wrong/expired LUT = IGST refund rejected" now say that without a valid LUT the export is not "without payment of IGST": IGST becomes payable (refunded only through the shipping bill) and the refund of unutilised input tax credit (GST refund under LUT) can be rejected.
+- internal_documents/SOP_02_Accounts.docx: "The CI value determines IGST refund eligibility" now says the CI value must match the shipping bill — with a valid LUT it supports the refund of unutilised input tax credit; without one, IGST is paid and refunded through the shipping bill.

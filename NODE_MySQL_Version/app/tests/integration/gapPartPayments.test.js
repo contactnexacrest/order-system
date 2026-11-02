@@ -20,6 +20,12 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * which is recorded.
  */
 describe('Gap list G-5: part payments and short payments', () => {
+  // Follow-up (2 Nov 2026): the reason is a list entry — the first of each treatment.
+  const RID = {};
+  beforeAll(async () => {
+    const rd = require('../../src/services/remittanceDifference');
+    for (const t of ['bank_charges', 'short', 'excess']) RID[t] = String(await rd.reasonIdFor(t));
+  });
   let admin;
   let md;
   let accounts;
@@ -70,7 +76,7 @@ describe('Gap list G-5: part payments and short payments', () => {
     return orderId;
   }
 
-  const receipt = (amount, date, rate, ref, differs = true) => ({ advance_amount: amount, advance_received_at: date, advance_exchange_rate: rate, advance_bank_reference: ref, ...(differs ? { confirm_amount_differs: '1' } : {}) });
+  const receipt = (amount, date, rate, ref, differs = true) => ({ advance_amount: amount, advance_received_at: date, advance_exchange_rate: rate, advance_bank_reference: ref, ...(differs ? { difference_reason_choice: RID[Number(amount) > 1800 ? 'excess' : 'short'] } : {}) });
 
   beforeAll(async () => {
     admin = await createTestUser('Admin');
@@ -134,7 +140,7 @@ describe('Gap list G-5: part payments and short payments', () => {
     const orderId = await orderAtAdvance();
     await paymentMilestoneRepository.replaceSchedule(orderId, [{ pct: 20, due_text: 'when production starts' }], 40);
     const m = (await paymentMilestoneRepository.forOrder(orderId))[0];
-    const rec = await call('record', orderId, { amount: '700', exchange_rate: '84', bank_reference: 'UTR0301', received_on: '2026-10-22', confirm_amount_differs: '1' }, admin, { milestoneId: String(m.id) });
+    const rec = await call('record', orderId, { amount: '700', exchange_rate: '84', bank_reference: 'UTR0301', received_on: '2026-10-22', difference_reason_choice: RID.short }, admin, { milestoneId: String(m.id) });
     expect(rec.type).toBe('success');
     expect((await partPaymentService.receipts(orderId, 'milestone', Number(m.id))).length).toBe(1); // in the history
 

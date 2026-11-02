@@ -812,6 +812,10 @@ async function downloadDocument(req, res) {
     return;
   }
 
+  // Owner points 5/8/9 (2 Nov 2026): the client now has this copy — flag it so the
+  // document copies clean-up never removes it.
+  await fileStoreRepository.markSentToClient(file.id);
+
   let safeDownloadName = file.original_filename.replace(/[\\/]/g, '-');
   // eslint-disable-next-line no-control-regex
   safeDownloadName = safeDownloadName.replace(/[\x00-\x1F\x7F"]/g, '');

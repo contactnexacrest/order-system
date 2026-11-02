@@ -27,9 +27,45 @@ use App\Repositories\ZohoSyncLogRepository;
  */
 final class CaSyncService
 {
+    /**
+     * Owner 2 Nov 2026 (point 16): "Sync this order to Zoho now" on the order
+     * page. While set, every push loop skips other orders' records; the
+     * app-wide repairs (restore of records changed in Books), the expense
+     * import from Books and the GST refund journals (per claim, not per
+     * order) wait for the full sync. The same duplicate guards apply.
+     */
+    private static ?int $onlyOrderId = null;
+
+    private static function inScope($orderId): bool
+    {
+        return self::$onlyOrderId === null || ($orderId !== null && (int) $orderId === self::$onlyOrderId);
+    }
+
+    /** @return array same shape as runFullSync(); expenses and gst_refunds are zero (app-wide only) */
+    public static function runForOrder(int $orderId, ?int $triggeredByUserId): array
+    {
+        $since = ZohoSyncFailureNotifier::mark();
+        self::$onlyOrderId = $orderId;
+        try {
+            $result = [
+                'revenue' => self::syncPendingRevenue('manual', $triggeredByUserId),
+                'purchases' => self::syncPurchases('manual', $triggeredByUserId),
+                'expenses' => ['imported' => 0, 'updated' => 0, 'removed' => 0, 'failed' => 0, 'skipped' => 0],
+                'benefits' => self::syncBenefits('manual', $triggeredByUserId),
+                'gst_refunds' => ['journals' => 0, 'failed' => 0, 'skipped' => 0],
+            ];
+        } finally {
+            self::$onlyOrderId = null;
+        }
+        // Owner decision 2 Nov 2026 (D-233): failures reach Finance once per run.
+        ZohoSyncFailureNotifier::afterRun($since, 'manual', $orderId);
+        return $result;
+    }
+
     /** @return array{revenue: array{synced:int, failed:int, skipped:int, invoices:int, applied:int}, purchases: array{bills:int, payments:int, applied:int, expenses:int, failed:int, skipped:int}, expenses: array{imported:int, failed:int, skipped:int}} */
     public static function runFullSync(string $triggeredBy, ?int $triggeredByUserId): array
     {
+        $since = ZohoSyncFailureNotifier::mark();
         // The day's full check of the records already in Books (ZohoRestoreService::due()).
         $dailyCheck = $triggeredBy !== 'manual' && ZohoBooksService::isEnabled() && ZohoRestoreService::due($triggeredBy);
         $result = [
@@ -44,6 +80,8 @@ final class CaSyncService
         if ($dailyCheck) {
             ZohoRestoreService::markScheduledCheckDone();
         }
+        // Owner decision 2 Nov 2026 (D-233): failures reach Finance once per run.
+        ZohoSyncFailureNotifier::afterRun($since, $triggeredBy, null);
         return $result;
     }
 
@@ -70,8 +108,13 @@ final class CaSyncService
             return $result;
         }
         // Owner decision 2026-10-29: put back what was deleted or changed in Books.
-        $result['failed'] += ZohoRestoreService::benefits($startDate, $triggeredBy, $triggeredByUserId)['failed'];
+        if (self::$onlyOrderId === null) {
+            $result['failed'] += ZohoRestoreService::benefits($startDate, $triggeredBy, $triggeredByUserId)['failed'];
+        }
         foreach (CaExportBenefitRepository::forZohoSync($startDate) as $benefit) {
+            if (!self::inScope($benefit['order_id'] ?? null)) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             $id = (int) $benefit['id'];
             $journalId = $benefit['zoho_journal_id'] !== null ? (string) $benefit['zoho_journal_id'] : null;
             $received = $benefit['received_amount'] !== null && (float) $benefit['received_amount'] > 0;
@@ -167,10 +210,13 @@ final class CaSyncService
         }
 
         // Owner decision 2026-10-29: put back what was deleted or changed in Books.
-        $restore = ZohoRestoreService::revenue($startDate, $triggeredBy, $triggeredByUserId);
+        $restore = self::$onlyOrderId === null ? ZohoRestoreService::revenue($startDate, $triggeredBy, $triggeredByUserId) : ['failed' => 0, 'restored' => 0];
         $failed = $restore['failed'];
         $invoices = 0;
         foreach (OrderZohoInvoiceRepository::documentsToSync($startDate) as $item) {
+            if (!self::inScope($item['order_id'])) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             $label = ZohoInvoiceData::KIND_LABELS[$item['kind']];
             try {
                 $invoice = ZohoInvoiceData::build($item['order_id'], $item['kind'], $item['document_id']);
@@ -208,6 +254,9 @@ final class CaSyncService
         $synced = $restore['restored'];
         $applied = 0;
         foreach (CaRepository::legsPendingZohoSync() as $leg) {
+            if (!self::inScope($leg['order_id'])) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             if ($startDate !== null && substr((string) $leg['cleared_at'], 0, 10) < $startDate) {
                 continue; // before the go-live date: the CA books it as the opening position
             }
@@ -223,7 +272,8 @@ final class CaSyncService
                     substr((string) $leg['cleared_at'], 0, 10),
                     $referenceNumber,
                     $target['zoho_invoice_number'] ?? null,
-                    0.0,
+                    // Owner 2 Nov 2026: bank charges deducted on the way go with the payment, so the invoice settles in full.
+                    RemittanceDifference::chargesInr((int) $leg['order_id'], (string) $leg['leg']),
                     PaymentDescription::buyerPayment((int) $leg['order_id'], (string) $leg['leg'], $target['zoho_invoice_number'] ?? null)
                 );
                 $zohoReference = $result['payment_id'];
@@ -241,6 +291,9 @@ final class CaSyncService
         }
 
         foreach (CaRepository::legsHeldInZoho() as $leg) {
+            if (!self::inScope($leg['order_id'])) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             $target = self::invoiceFor((int) $leg['order_id'], $leg['leg']);
             if ($target === null) {
                 continue; // still waiting for its invoice — nothing to do yet
@@ -256,7 +309,7 @@ final class CaSyncService
                     substr((string) $leg['cleared_at'], 0, 10),
                     $leg['buyer_inquiry_ref'] . '-' . $leg['leg'],
                     $target['zoho_invoice_number'],
-                    0.0,
+                    RemittanceDifference::chargesInr((int) $leg['order_id'], (string) $leg['leg']),
                     PaymentDescription::buyerPayment((int) $leg['order_id'], (string) $leg['leg'], $target['zoho_invoice_number'])
                 );
                 OrderPaymentStatusRepository::setLegZohoApplied((int) $leg['order_id'], $leg['leg']);
@@ -273,6 +326,9 @@ final class CaSyncService
         // to the CI when the CI is in Books, else held unapplied (like the
         // advance) and applied on a later run.
         foreach (\App\Repositories\PaymentMilestoneRepository::pendingZohoSync() as $m) {
+            if (!self::inScope($m['order_id'])) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             if ($startDate !== null && (string) $m['cleared_on'] < $startDate) {
                 continue; // before the go-live date: the CA books it as the opening position
             }
@@ -281,9 +337,9 @@ final class CaSyncService
             try {
                 $result = ZohoBooksService::pushRevenuePayment(
                     (int) $m['client_id'], (string) $m['company_legal_name'], (string) ($m['currency_code'] ?? 'INR'),
-                    (float) $m['received_amount'], round((float) $m['received_amount'] * (float) $m['exchange_rate'], 2),
+                    (float) $m['received_amount'], round((float) $m['received_amount'] * (float) $m['exchange_rate'] - RemittanceDifference::chargesInr($orderId, 'milestone', (int) $m['id']), 2),
                     (string) $m['cleared_on'], $m['buyer_inquiry_ref'] . '-m' . $m['seq'],
-                    $target['zoho_invoice_number'] ?? null, 0.0,
+                    $target['zoho_invoice_number'] ?? null, RemittanceDifference::chargesInr($orderId, 'milestone', (int) $m['id']),
                     PaymentDescription::milestonePayment($m, $target['zoho_invoice_number'] ?? null)
                 );
                 \App\Repositories\PaymentMilestoneRepository::setZohoReference((int) $m['id'], $result['payment_id']);
@@ -299,6 +355,9 @@ final class CaSyncService
             }
         }
         foreach (\App\Repositories\PaymentMilestoneRepository::heldInZoho() as $m) {
+            if (!self::inScope($m['order_id'])) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             $target = OrderZohoInvoiceRepository::find((int) $m['order_id'], 'ci');
             if ($target === null) {
                 continue; // still waiting for the CI — nothing to do yet
@@ -306,8 +365,8 @@ final class CaSyncService
             try {
                 $amount = ZohoBooksService::applyPaymentToInvoice(
                     (string) $m['zoho_reference'], (int) $m['client_id'], (string) $m['company_legal_name'], (string) ($m['currency_code'] ?? 'INR'),
-                    (float) $m['received_amount'], round((float) $m['received_amount'] * (float) $m['exchange_rate'], 2),
-                    (string) $m['cleared_on'], $m['buyer_inquiry_ref'] . '-m' . $m['seq'], $target['zoho_invoice_number'], 0.0,
+                    (float) $m['received_amount'], round((float) $m['received_amount'] * (float) $m['exchange_rate'] - RemittanceDifference::chargesInr((int) $m['order_id'], 'milestone', (int) $m['id']), 2),
+                    (string) $m['cleared_on'], $m['buyer_inquiry_ref'] . '-m' . $m['seq'], $target['zoho_invoice_number'], RemittanceDifference::chargesInr((int) $m['order_id'], 'milestone', (int) $m['id']),
                     PaymentDescription::milestonePayment($m, $target['zoho_invoice_number'])
                 );
                 \App\Repositories\PaymentMilestoneRepository::setZohoApplied((int) $m['id']);
@@ -323,6 +382,9 @@ final class CaSyncService
         // customer payment applied to the CI (held until the CI is in Books,
         // like the advance), with the bank charges the bank kept.
         foreach (OrderLcDetailRepository::receiptsForZohoSync() as $lc) {
+            if (!self::inScope($lc['order_id'])) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             if ($lc['lc_zoho_synced_at'] === null && $startDate !== null && (string) $lc['lc_received_at'] < $startDate) {
                 continue; // before the go-live date: the CA books it as the opening position
             }
@@ -409,11 +471,14 @@ final class CaSyncService
             ZohoSyncLogRepository::log($type, 'order', $orderId, $leg, $status, $reference, $message, $triggeredBy, $triggeredByUserId);
         };
         // Owner decision 2026-10-29: put back what was deleted or changed in Books.
-        foreach (ZohoRestoreService::purchases($startDate, $triggeredBy, $triggeredByUserId) as $key => $count) {
+        foreach (self::$onlyOrderId === null ? ZohoRestoreService::purchases($startDate, $triggeredBy, $triggeredByUserId) : [] as $key => $count) {
             $result[$key] += $count;
         }
 
         foreach (ZohoPurchaseRepository::billsToSync($startDate) as $bill) {
+            if (!self::inScope($bill['order_id'])) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             try {
                 $zohoBillId = ZohoBooksService::pushBill($bill);
                 ZohoPurchaseRepository::setBillSynced((int) $bill['id'], $zohoBillId);
@@ -426,6 +491,9 @@ final class CaSyncService
         }
 
         foreach (ZohoPurchaseRepository::paymentsToSync($startDate) as ['payment' => $payment, 'bill' => $bill]) {
+            if (!self::inScope($bill['order_id'])) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             $target = ZohoPurchaseRepository::targetBillFor(ZohoPurchaseRepository::findBill((int) $bill['id']) ?? $bill);
             try {
                 $pushed = ZohoBooksService::pushVendorPayment($payment, $bill, $target);
@@ -443,6 +511,9 @@ final class CaSyncService
         }
 
         foreach (ZohoPurchaseRepository::heldPayments() as ['payment' => $payment, 'bill' => $bill]) {
+            if (!self::inScope($bill['order_id'])) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             $target = ZohoPurchaseRepository::targetBillFor($bill);
             if ($target === null) {
                 continue; // its tax invoice is not in Books yet — nothing to do
@@ -459,6 +530,9 @@ final class CaSyncService
         }
 
         foreach (ZohoPurchaseRepository::expensesToSync($startDate) as $expense) {
+            if (!self::inScope($expense['order_id'])) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             try {
                 $zohoExpenseId = ZohoBooksService::pushExpense($expense);
                 ZohoPurchaseRepository::setExpenseSynced((int) $expense['id'], $zohoExpenseId);
@@ -474,6 +548,9 @@ final class CaSyncService
         // Books expenses — sent once, and updated when the amount, date or
         // "paid from" changes afterwards. Counted with the expenses.
         foreach (ZohoPurchaseRepository::costEntriesToSync($startDate) as $cost) {
+            if (!self::inScope($cost['order_id'])) {
+                continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
+            }
             $hash = hash('sha256', (string) json_encode([$cost['category'], round((float) $cost['amount_inr'], 2), (string) $cost['cost_date'], $cost['paid_from'], $cost['description']]));
             if ($cost['zoho_expense_id'] !== null && $cost['zoho_pushed_hash'] === $hash) {
                 continue;
@@ -487,7 +564,17 @@ final class CaSyncService
                 try {
                     $zohoBillId = ZohoBooksService::pushAssociateCommission($cost);
                     ZohoPurchaseRepository::setCostEntrySynced((int) $cost['id'], $zohoBillId, $hash);
-                    $log('order_cost', (int) $cost['order_id'], 'cost', 'success', $zohoBillId, 'Sent the associate commission (INR ' . number_format((float) $cost['amount_inr'], 2, '.', '') . ') as the associate\'s Zoho Books bill with its vendor payment.');
+                    $tdsNote = '';
+                    try {
+                        $c = ZohoBooksService::associateCommission($cost);
+                        if ($c['tds_inr'] > 0) {
+                            $tdsNote = $c['tds_tax_id'] !== null
+                                ? ' TDS INR ' . number_format($c['tds_inr'], 2, '.', '') . ' booked on the bill with Zoho TDS tax ' . $c['tds_tax_id'] . '.'
+                                : ' TDS INR ' . number_format($c['tds_inr'], 2, '.', '') . ' left on the bill for the CA to book (no Zoho TDS tax set in Settings → Associate TDS).';
+                        }
+                    } catch (\Throwable) {
+                    }
+                    $log('order_cost', (int) $cost['order_id'], 'cost', 'success', $zohoBillId, 'Sent the associate commission (INR ' . number_format((float) $cost['amount_inr'], 2, '.', '') . ') as the associate\'s Zoho Books bill with its vendor payment.' . $tdsNote);
                     $result['bills']++;
                 } catch (\Throwable $e) {
                     $log('order_cost', (int) $cost['order_id'], 'cost', 'error', null, $e->getMessage());

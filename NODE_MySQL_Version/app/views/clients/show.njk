@@ -134,6 +134,8 @@
     {% endif %}
   </div>
 
+  {% include "clients/_ecgc.njk" %}
+
   <div class="section">
     <h2>Orders</h2>
     {% if permissions.manage_orders %}
@@ -243,3 +245,5 @@
   </script>
   {% endif %}
 </div>
+
+{% include "agreements/_party_card.njk" %}

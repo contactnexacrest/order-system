@@ -132,4 +132,4 @@ function verifyAssociateBank(email) {
   return Number(id);
 }
 
-module.exports = { resetClientPassword, provisionClientLogin, getMailSending, setMailSending, lastEmailSentWithDocument, verifyAssociateBank };
+module.exports = { resetClientPassword, provisionClientLogin, getMailSending, setMailSending, lastEmailSentWithDocument, verifyAssociateBank, runSql, dbName, bcryptHash };

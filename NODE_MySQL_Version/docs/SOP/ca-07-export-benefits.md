@@ -127,6 +127,23 @@ order, reference, claimed amount/currency, received amount/date, status)
 — never a separately computed export, so it can never disagree with
 what's on screen.
 
+## Sanctioned amount, deadline and status (2 Nov 2026, gap-list Q-6)
+
+On the order page, **Incentive claims — tracking** shows each claim's claimed,
+sanctioned and received amounts side by side, the claim deadline and a status
+(Filed / Sanctioned / Received / Rejected, with the reason when rejected). The
+default deadline per scheme is a company setting counted from the shipping
+bill date (RoDTEP, RoSCTL 365 days; Duty Drawback none) — to be confirmed with
+the CA. Reminders go to Export Compliance and Finance 30 and 7 days before.
+Export Compliance and Finance can update the tracking; the money received is
+still recorded by Finance.
+
+**Missing eBRC / FIRC** (Reports) lists every buyer payment received without a
+FIRC / eBRC reference — settling an order never waits for one. Under a valid
+LUT no IGST is paid on the export; the refund that applies is the refund of
+unutilised input tax credit (see [CA-09](./ca-09-gst-refunds.md)). Without a
+valid LUT, IGST is paid and refunded through the shipping bill.
+
 ## What this doesn't do yet
 
 - No automatic pull from ICEGATE/DGFT — every claim is entered manually.

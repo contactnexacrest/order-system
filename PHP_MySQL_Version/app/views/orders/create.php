@@ -5,6 +5,14 @@
   <form method="post" action="/orders">
     <?= Csrf::field() ?>
 
+    <?php
+      // Owner decision (2 Nov 2026, Q-6b): soft ECGC warning for a pre-selected buyer.
+      $__ecgcClientId = (int) ($old['client_id'] ?? ($preselectedClientId ?? 0));
+      $__ecgcNew = $__ecgcClientId > 0 ? \App\Services\ComplianceTrackingService::ecgcPosition($__ecgcClientId) : null;
+    ?>
+    <?php if ($__ecgcNew !== null && $__ecgcNew['limit'] !== null && $__ecgcNew['over_limit']): ?>
+      <p class="review-banner warn" id="ecgc-new-order-warning">&#9888; <?= !empty($sees['selling']) ? htmlspecialchars($__ecgcNew['warning']) : 'This buyer\'s open orders are already above (or outside) the ECGC-approved credit limit — check with Finance.' ?> You can still create the order.</p>
+    <?php endif; ?>
     <fieldset>
       <legend>Client</legend>
       <label>Client *

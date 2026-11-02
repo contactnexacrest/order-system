@@ -514,7 +514,8 @@ final class IncentiveService
         }
         $entry = IncentiveRepository::costEntries((int) $payout['order_id'])[$kind] ?? null;
         if ($entry !== null) {
-            IncentiveRepository::settleCostEntry((int) $entry['id'], round(array_sum(array_map(static fn (array $p): float => (float) $p['paid_inr'], $rows)), 2),
+            // Owner decision 2 Nov 2026 (D-235): an associate's cost is the gross commission — the TDS kept back is still part of it.
+            IncentiveRepository::settleCostEntry((int) $entry['id'], round(array_sum(array_map(static fn (array $p): float => (float) $p['paid_inr'] + ($payout['payee_kind'] === 'associate' ? (float) ($p['tds_inr'] ?? 0) : 0.0), $rows)), 2),
                 max(array_map(static fn (array $p): string => (string) $p['paid_on'], $rows)), self::paidNote($rows));
         }
         return true;

@@ -148,9 +148,91 @@ roles is ticked here, like everyone else.
 | Alerts | daily | LUT / RCMC expiry, freight and balance payments overdue, the LC's last shipment date, document deadline and expiry (7 days before), quotation / PI validity expired, dispute replies overdue |
 | Zoho Books sync | hourly | Sends and checks the records that go to Zoho Books ([CA-03](./ca-03-zoho-sync.md)) |
 | Daily digest | 08:15 IST | One e-mail per person with their open tasks and documents to review; also the associates' reminders (protection and agreement ending in 30 and 7 days) |
+| Document copies clean-up | daily 02:15 | Removes the document copies switched on under **Document copies clean-up** (below); nothing while every rule is off |
 
 The server set-up is in each stack's README ("Bluehost cron setup" for PHP,
 "Background jobs" for Node).
+
+### Associate TDS (owner, 2 Nov 2026, D-235)
+
+**Settings → Associate TDS** (`/settings/associate-tds`, Manage company
+settings; link at the top of Company Settings): the values the app uses to
+work out TDS on associate commission — TDS section (194H), rate (2 %),
+threshold per associate per financial year (₹20,000), rate without a
+verified PAN (20 %, section 206AA), whether associates abroad have TDS
+deducted (off), whether Form 15CB is required with Form 15CA (on), and the
+Zoho Books TDS tax id (blank = the CA books the TDS). Every change needs a
+reason and is audited (ASSOCIATE_TDS_SETTING_CHANGED); payments already
+recorded keep the TDS they were paid with. How the rules work: [Chapter
+24](./24-associates.md#tds-on-associate-commission-owner-decision-2-nov-2026-d-235).
+
+### Remittance difference reasons (owner, 2 Nov 2026)
+
+**Settings → Remittance difference reasons** (link at the top of Company
+Settings; needs *Manage company settings*). The list behind **"Why is it
+different?"** on the advance, freight, balance and milestone remittance
+forms, used when the money a buyer sends differs from what is due. Each
+reason has a name, an order and how it is **treated**:
+
+| Treated as | What happens to the receipt |
+|---|---|
+| Bank charges deducted by the banks | Counted as received in full; the charges become an order cost "Bank Charges" and go to Zoho Books with the payment at the next sync (hourly, or Sync now) |
+| Buyer paid less (short payment) | Recorded as received; the rest is awaited, or a manager clears it short with a reason |
+| Buyer paid more | Recorded as received; on the advance the balance due goes down by the same amount |
+
+Eleven usual reasons come ready (four bank-charges, four buyer-paid-less,
+three buyer-paid-more). On the page you can **add** a reason, **rename**
+it, change its **order**, and **switch it off** (it disappears from the
+forms; receipts that used it keep it) or on again. Once a reason is on a
+receipt **how it is treated cannot change** — switch it off and add a new
+one instead, so past receipts keep meaning what they meant. Every change is
+in the audit log (REMITTANCE_REASON_ADDED / _UPDATED / _DEACTIVATED /
+_REACTIVATED).
+
+The forms offer only the reasons that fit the amount typed and always end
+with **"Other — type the reason"** (a reason in the person's own words plus
+how to treat it). The page's **"Reasons typed in by hand"** table lists
+those, most used first — add the frequent ones to the list so the team can
+pick them.
+
+### Document copies clean-up (owner, 2 Nov 2026)
+
+**Settings → Document copies clean-up** (link at the top of Company
+Settings; needs *Manage company settings*). Every generated document keeps
+several copies: the **DRAFT** copy made when it is generated, the **final**
+copy made on approval (the one the buyer gets), a **SUPERSEDED** copy when a
+newer revision is approved, the internal Word copy, and every **CAFIN** ever
+generated. Three rules remove the ones nobody needs. All three are **off**
+until switched on.
+
+| Rule | Options | What it removes |
+|---|---|---|
+| Draft copies of approved documents | Off / 30 / 90 / 180 days after approval | Only the DRAFT-watermarked PDF, once the final copy exists |
+| Superseded revisions never sent to the client | Off / 90 / 180 / 365 days after it was superseded | The draft, final and Word copies of an older revision the client never received; the one SUPERSEDED-stamped copy stays so the history still opens |
+| Old CAFIN copies | Keep all / Keep only the latest per order | Every CAFIN except the order's latest, 30 days after a newer one was made |
+
+**Never removed**, whatever is switched on: anything sent to the client
+(e-mailed, counted as sent with e-mail off, or downloaded in the client
+portal); the current copy of every document; the Word copy of a document
+that is still current; uploaded files (signed copies, bills, payment
+screenshots, the buyer's PO, BL scans …); every file of an order with an
+open dispute; documents generated in a financial year the CA has locked.
+
+1. Choose an option for each rule, give a reason (at least 10 characters)
+   and **Save**. The change is in the Audit Log.
+2. The page shows, for each rule, about how many files and how much space
+   it would free now — also for a rule that is still off.
+3. **Preview what would be removed** lists every copy (order, document,
+   revision, file, size, why).
+4. The daily job removes them; or tick *I understand removed copies cannot
+   be restored* and press **Run clean-up now**.
+5. Each removed copy is in the Audit Log as `DOCUMENT_COPY_REMOVED` (document,
+   file name, size, reason), each run as `DOCUMENT_COPY_CLEANUP_RUN`. A
+   removed copy cannot be restored.
+
+Why keep anything: the final copy is the record of what the buyer was
+given; a sent revision may be needed in a dispute or by customs or the CA;
+drafts and never-sent revisions only show the work in between.
 
 ### Users
 

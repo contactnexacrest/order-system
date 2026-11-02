@@ -233,3 +233,5 @@ $__sourceLabel = ['link' => 'own invitation link', 'code' => 'personal code', 's
   <?php endif; ?>
   <?php endif; ?>
 </div>
+
+<?php $__partyType = "associate"; $__partyId = (int) $a["id"]; require __DIR__ . "/../agreements/_party_card.php"; ?>

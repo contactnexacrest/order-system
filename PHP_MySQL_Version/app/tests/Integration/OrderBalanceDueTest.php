@@ -47,7 +47,7 @@ final class OrderBalanceDueTest extends DbTestCase
 
     public function testAnAdvanceAboveTheOrderValueIsRefused(): void
     {
-        $result = $this->recordAdvance(['advance_amount' => '7600', 'confirm_amount_differs' => '1']);
+        $result = $this->recordAdvance(['advance_amount' => '7600', 'difference_reason_choice' => (string) \App\Services\RemittanceDifference::reasonIdFor('excess')]);
         self::assertSame('error', $result['type']);
         self::assertStringContainsString('more than the whole order value', $result['message']);
         self::assertNull(OrderPaymentStatusRepository::find($this->orderId)['advance_amount']);
@@ -57,18 +57,20 @@ final class OrderBalanceDueTest extends DbTestCase
     {
         $result = $this->recordAdvance(['advance_amount' => '7300']);
         self::assertSame('error', $result['type']);
-        self::assertStringContainsString('The advance due on this order is USD 3,000.00 (40% of USD 7,500.00)', $result['message']);
+        self::assertSame('The advance still due is USD 3,000.00. You entered USD 7,300.00 — a difference of USD 4,300.00. Choose why it is different in the Reason list and save again.', $result['message']);
         self::assertNull(OrderPaymentStatusRepository::find($this->orderId)['advance_amount']);
 
         self::assertSame('success', $this->recordAdvance(['advance_amount' => '2985'])['type'], 'within 1% (bank charges) needs no confirmation');
         // Gap list G-5 (1 Nov 2026): a further remittance is a second receipt and adds to the advance (no tick needed).
-        self::assertSame('success', $this->recordAdvance(['advance_amount' => '515', 'advance_received_at' => '2026-10-28'])['type']);
+        // Owner 2 Nov 2026 ("18 yes"): more than is still due says why.
+        self::assertSame('error', $this->recordAdvance(['advance_amount' => '515', 'advance_received_at' => '2026-10-28'])['type']);
+        self::assertSame('success', $this->recordAdvance(['advance_amount' => '515', 'advance_received_at' => '2026-10-28', 'difference_reason_choice' => (string) \App\Services\RemittanceDifference::reasonIdFor('excess')])['type']);
         self::assertEqualsWithDelta(3500, (float) OrderPaymentStatusRepository::find($this->orderId)['advance_amount'], 0.001);
     }
 
     public function testBalanceDueIsTheOrderValueMinusTheAdvanceActuallyReceived(): void
     {
-        $this->recordAdvance(['advance_amount' => '3500', 'confirm_amount_differs' => '1']);
+        $this->recordAdvance(['advance_amount' => '3500', 'difference_reason_choice' => (string) \App\Services\RemittanceDifference::reasonIdFor('excess')]);
         $this->createTestDocument($this->orderId, 'PI', 'approved');
         $_POST = ['advance_cleared_at' => '2026-10-27'];
         ob_start();

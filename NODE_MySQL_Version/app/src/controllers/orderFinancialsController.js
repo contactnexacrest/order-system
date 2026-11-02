@@ -279,6 +279,12 @@ async function skipExportBenefitClaim(req, res) {
  * above. 'not_eligible' requires a reason, same deliberate "never
  * silently skipped" rule as orderComplianceTaskRepository's skip_reason.
  */
+// Owner decision D-226: Export Compliance answers eligibility from Step 13g
+// (they do not open Step 12, which shows the profit) — send them back there.
+function eligibilityAnchor(req) {
+  return req.permissions && req.permissions.manage_order_financials ? '#order-financials' : '#step-13g-benefits';
+}
+
 async function setExportBenefitSchemeStatus(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -297,21 +303,21 @@ async function setExportBenefitSchemeStatus(req, res) {
   const status = String(req.body.status || '').trim();
   if (schemeName === '' || !Object.prototype.hasOwnProperty.call(orderExportBenefitSchemeRepository.STATUSES, status) || status === 'pending') {
     flash.set(req, 'error', 'Select a valid scheme and eligibility status.');
-    res.redirect(`/orders/${orderId}#order-financials`);
+    res.redirect(`/orders/${orderId}${eligibilityAnchor(req)}`);
     return;
   }
 
   const reason = String(req.body.reason || '').trim();
   if (status === 'not_eligible' && reason === '') {
     flash.set(req, 'error', 'A reason is required to mark a scheme Not Eligible.');
-    res.redirect(`/orders/${orderId}#order-financials`);
+    res.redirect(`/orders/${orderId}${eligibilityAnchor(req)}`);
     return;
   }
 
   await orderExportBenefitSchemeRepository.setStatus(orderId, schemeName, status, status === 'not_eligible' ? reason : null, user.id);
   await auditLogRepository.log(user.id, 'EXPORT_BENEFIT_SCHEME_STATUS_UPDATED', 'orders', orderId, `export_benefit_scheme:${schemeName}`, null, status, status === 'not_eligible' ? reason : null);
   flash.set(req, 'success', `${schemeName} eligibility updated.`);
-  res.redirect(`/orders/${orderId}#order-financials`);
+  res.redirect(`/orders/${orderId}${eligibilityAnchor(req)}`);
 }
 
 /**
@@ -354,7 +360,7 @@ async function saveAllExportBenefitSchemes(req, res, orderId, userId) {
 
   if (errors.length) {
     flash.set(req, 'error', `Nothing saved — ${errors.join('; ')}.`);
-    res.redirect(`/orders/${orderId}#order-financials`);
+    res.redirect(`/orders/${orderId}${eligibilityAnchor(req)}`);
     return;
   }
   for (const [schemeName, status, storedReason] of changes) {
@@ -364,7 +370,7 @@ async function saveAllExportBenefitSchemes(req, res, orderId, userId) {
   flash.set(req, 'success', changes.length
     ? `Export benefit eligibility saved for ${changes.map((c) => c[0]).join(', ')}.`
     : 'No changes to save.');
-  res.redirect(`/orders/${orderId}#order-financials`);
+  res.redirect(`/orders/${orderId}${eligibilityAnchor(req)}`);
 }
 
 async function addCostEntry(req, res) {

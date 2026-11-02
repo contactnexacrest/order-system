@@ -157,6 +157,14 @@ function computeStepFlow(rawStepStates, rawSubStepDone, procurement = null) {
         if (done) return 'done';
         return sub === '11c' || (subStepDone.s11 && subStepDone.s11['11c']) ? 'current' : 'locked';
       }
+      // Owner 2 Nov 2026 (point 14): the COO Prep Sheet (13a) opens with Stage 8, before the balance.
+      if (procurement && procurement.cooPrepEarly && step === 's13' && sub === '13a' && parent !== 'done') {
+        return done ? 'done' : 'current';
+      }
+      // Owner decision D-226: Export Compliance answers the benefit eligibility (13g) as soon as the BL is issued.
+      if (procurement && procurement.benefitEligibilityEarly && step === 's13' && sub === '13g' && parent !== 'done') {
+        return 'current';
+      }
       if (HONEST_SUB_STEPS.has(sub) && parent === 'done' && done !== null && done !== undefined) {
         return done ? 'done' : 'current';
       }

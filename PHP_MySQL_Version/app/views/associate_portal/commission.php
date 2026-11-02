@@ -16,7 +16,10 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
       <tr><td><?= htmlspecialchars(\App\Services\IncentiveService::monthLabel((string) $p['incentive_month'])) ?></td><td><?= htmlspecialchars((string) $p['order_reference']) ?><?= $p['note'] ? '<br><small class="muted">' . htmlspecialchars((string) $p['note']) . '</small>' : '' ?></td><td><?= htmlspecialchars((string) $p['company_legal_name']) ?></td>
         <td><?= $p['amount_fc'] !== null ? htmlspecialchars((string) $p['currency_code']) . ' ' . $__m($p['amount_fc']) . '<br>' : '' ?><small>₹<?= $__m($p['amount_inr']) ?></small></td>
         <td><?= htmlspecialchars(['due' => (float) $p['amount_inr'] < 0 ? 'To be deducted' : 'Waiting', 'paid' => 'Paid', 'held' => 'On hold'][$p['status']] ?? $p['status']) ?><?= $p['hold_reason'] ? '<br><small>' . htmlspecialchars((string) $p['hold_reason']) . '</small>' : '' ?></td>
-        <td><?= $p['status'] === 'paid' ? $__d($p['paid_on']) . ' · ₹' . $__m($p['paid_inr']) . ((float) $p['tds_inr'] > 0 ? '<br><small>TDS ₹' . $__m($p['tds_inr']) . '</small>' : '') . ($p['paid_reference'] ? '<br><small>Ref ' . htmlspecialchars((string) $p['paid_reference']) . '</small>' : '') : '—' ?></td>
+        <td><?= $p['status'] === 'paid' ? $__d($p['paid_on']) . ((float) $p['tds_inr'] > 0
+            ? '<br><small data-tds-breakdown>Gross ₹' . $__m((float) $p['paid_inr'] + (float) $p['tds_inr']) . ' · TDS ₹' . $__m($p['tds_inr'])
+                . (!empty($p['tds_section']) ? ' (u/s ' . htmlspecialchars((string) $p['tds_section']) . (!empty($p['tds_rate']) ? ' at ' . \App\Services\AssociateTds::pct((float) $p['tds_rate']) : '') . ')' : '') . '</small><br>Net paid ₹' . $__m($p['paid_inr'])
+            : ' · ₹' . $__m($p['paid_inr'])) . ($p['paid_reference'] ? '<br><small>Ref ' . htmlspecialchars((string) $p['paid_reference']) . '</small>' : '') : '—' ?></td>
         <?php if (!$print): ?><td>
           <?php if ($inv): ?><a href="/associate/documents/<?= (int) $inv['id'] ?>"><?= htmlspecialchars((string) ($inv['reference'] ?? 'Invoice')) ?></a>
           <?php elseif ((float) $p['amount_inr'] > 0 && $p['status'] !== 'paid'): ?>
@@ -29,7 +32,8 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
     <?php if ($payouts === []): ?><tr><td colspan="7" class="muted">No commission yet. It is earned once a buyer has paid an order in full.</td></tr><?php endif; ?>
   </table>
   <?php if (!$print): ?>
-  <h2>Tax certificates and statements from NexaCrest</h2>
+  <h2>TDS certificates (Form 16A) and remittance forms from NexaCrest</h2>
+  <p class="small muted">NexaCrest deducts TDS on commission as the law requires and issues your Form 16A each quarter; it appears here.</p>
   <table class="list">
     <?php foreach (array_filter($documents, static fn (array $d): bool => in_array($d['kind'], ['form_16a', 'form_15ca', 'form_15cb'], true)) as $d): ?>
       <tr><td><?= $__d($d['created_at']) ?></td><td><a href="/associate/documents/<?= (int) $d['id'] ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$d['kind']]) ?></a></td><td><?= htmlspecialchars((string) ($d['reference'] ?? '')) ?></td></tr>

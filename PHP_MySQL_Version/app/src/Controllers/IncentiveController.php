@@ -218,12 +218,21 @@ final class IncentiveController
         $rows = IncentiveRepository::payoutsForMonth($month);
         if (($_GET['format'] ?? '') === 'csv') {
             \App\Helpers\Csv::stream('incentives-' . $month . '.csv',
-                ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)'],
+                ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)', 'TDS section', 'TDS rate %', 'TDS reason'],
                 array_map(static fn (array $r): array => [$r['user_name'] ?? $r['associate_name'], $r['payee_kind'], $r['buyer_inquiry_ref'] ?: $r['order_reference'],
                     $r['payee_kind'] === 'associate' ? 'Associate (agreement)' : (IncentiveRepository::ROLES[$r['role']] ?? $r['role']),
-                    $r['amount_inr'], $r['amount_fc'], $r['currency_code'], $r['status'], $r['paid_on'], $r['paid_inr'], $r['tds_inr']], $rows));
+                    $r['amount_inr'], $r['amount_fc'], $r['currency_code'], $r['status'], $r['paid_on'], $r['paid_inr'], $r['tds_inr'],
+                    $r['tds_section'] ?? null, $r['tds_rate'] ?? null, $r['tds_reason'] ?? null], $rows));
+        }
+        // Owner decision 2 Nov 2026 (D-235): the TDS worked out for each associate payout still due, as of today.
+        $tdsCalc = [];
+        foreach ($rows as $r) {
+            if ($r['payee_kind'] === 'associate' && $r['status'] === 'due' && (float) $r['amount_inr'] > 0) {
+                $tdsCalc[(int) $r['id']] = \App\Services\AssociateTds::compute($r, date('Y-m-d'));
+            }
         }
         View::render('incentives/payouts', [
+            'tdsCalc' => $tdsCalc,
             'month' => $month,
             'months' => array_values(array_unique(array_merge([$month], $months))),
             'rows' => $rows,
@@ -273,8 +282,46 @@ final class IncentiveController
                 $skipped = ($skipped ?? 0) + 1;
                 continue;
             }
-            $paidInr = isset($params['payoutId']) && is_numeric($_POST['paid_inr'] ?? null) ? (float) $_POST['paid_inr'] : (float) $payout['amount_inr'];
-            $tds = isset($params['payoutId']) && is_numeric($_POST['tds_inr'] ?? null) ? (float) $_POST['tds_inr'] : null;
+            // Owner decision 2 Nov 2026 (D-235): the app works out the TDS on an associate's commission.
+            $tdsCalc = null;
+            $overrideReason = null;
+            if ($payout['payee_kind'] === 'associate') {
+                $tdsCalc = \App\Services\AssociateTds::compute($payout, $paidOn);
+                if ($tdsCalc['abroad']) {
+                    if (isset($params['payoutId'])) {
+                        self::storeRemittanceForms($payout, (int) $user['id']);
+                        $tdsCalc = \App\Services\AssociateTds::compute($payout, $paidOn);
+                    }
+                    $missing = array_merge($tdsCalc['missing_foreign'], $tdsCalc['missing_payout']);
+                    if ($missing !== []) {
+                        if (isset($params['payoutId'])) {
+                            Flash::set('error', 'Before paying an associate based abroad, these must be on file: ' . implode(', ', $missing)
+                                . '. The TRC, Form 10F and no-PE declaration are accepted on the associate\'s Documents tab; Form 15CA' . (\App\Services\AssociateTds::settings()['cb_required'] ? ' and 15CB are' : ' is') . ' attached to this payment.');
+                            header('Location: /incentives/payouts?month=' . rawurlencode($month));
+                            return;
+                        }
+                        $skippedDocs = ($skippedDocs ?? 0) + 1;
+                        continue;
+                    }
+                }
+            }
+            $paidInr = isset($params['payoutId']) && is_numeric($_POST['paid_inr'] ?? null) ? (float) $_POST['paid_inr'] : ($tdsCalc !== null ? $tdsCalc['net'] : (float) $payout['amount_inr']);
+            $tds = isset($params['payoutId']) && is_numeric($_POST['tds_inr'] ?? null) ? (float) $_POST['tds_inr'] : ($tdsCalc !== null ? $tdsCalc['tds'] : null);
+            if ($tdsCalc !== null) {
+                if (abs((float) ($tds ?? 0) - $tdsCalc['tds']) > 0.5) {
+                    $overrideReason = trim((string) ($_POST['tds_override_reason'] ?? ''));
+                    if (mb_strlen($overrideReason) < 10) {
+                        Flash::set('error', 'The TDS worked out for this payment is ₹' . number_format($tdsCalc['tds'], 2) . ' (' . $tdsCalc['reason'] . '). To record a different TDS, give the reason (at least 10 characters), e.g. the CA\'s advice or a lower-deduction certificate.');
+                        header('Location: /incentives/payouts?month=' . rawurlencode($month));
+                        return;
+                    }
+                }
+                if ($paidInr + (float) ($tds ?? 0) > $tdsCalc['gross'] + 0.005) {
+                    Flash::set('error', 'The amount paid plus the TDS cannot be more than the commission (₹' . number_format($tdsCalc['gross'], 2) . ').');
+                    header('Location: /incentives/payouts?month=' . rawurlencode($month));
+                    return;
+                }
+            }
             if ($paidInr <= 0 || ($tds !== null && ($tds < 0 || $tds > $paidInr))) {
                 Flash::set('error', 'Enter the amount paid above 0, and TDS between 0 and that amount.');
                 header('Location: /incentives/payouts?month=' . rawurlencode($month));
@@ -297,6 +344,16 @@ final class IncentiveController
                 continue;
             }
             AuditLogRepository::log((int) $user['id'], 'INCENTIVE_PAID', 'incentive_payouts', $id, 'status', 'due', 'paid');
+            if ($tdsCalc !== null) {
+                $recordedTds = (float) ($tds ?? 0);
+                IncentiveRepository::setPayoutTds($id, $recordedTds > 0 ? ($overrideReason !== null && $tdsCalc['gross'] > 0 ? round($recordedTds / $tdsCalc['gross'] * 100, 2) : $tdsCalc['rate']) : 0.0,
+                    $recordedTds > 0 ? ($tdsCalc['section'] ?? \App\Services\AssociateTds::settings()['section']) : null,
+                    $overrideReason !== null ? 'changed by hand: ' . $overrideReason . ' (worked out: ₹' . number_format($tdsCalc['tds'], 2) . ', ' . $tdsCalc['reason'] . ')' : $tdsCalc['reason'],
+                    $overrideReason);
+                if ($overrideReason !== null) {
+                    AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_TDS_OVERRIDDEN', 'incentive_payouts', $id, 'tds_inr', number_format($tdsCalc['tds'], 2, '.', ''), number_format($recordedTds, 2, '.', ''), $overrideReason);
+                }
+            }
             if ($payout['payee_kind'] === 'associate') {
                 \App\Services\AssociateService::onPayoutPaid($id, (int) $user['id']);
             }
@@ -304,10 +361,35 @@ final class IncentiveController
         }
         // QA Round 6, R6-N11: nothing selected (or all already paid) is not a success.
         if ($count === 0) {
-            Flash::set('warning', 'Nothing was recorded — no payout due for payment was selected.' . (!empty($skipped) ? " {$skipped} associate payout(s) skipped: no verified bank account yet." : ''));
+            Flash::set('warning', 'Nothing was recorded — no payout due for payment was selected.' . (!empty($skipped) ? " {$skipped} associate payout(s) skipped: no verified bank account yet." : '')
+                . (!empty($skippedDocs) ? " {$skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA" . (\App\Services\AssociateTds::settings()['cb_required'] ? '/15CB' : '') . ' not yet on file — pay them one by one.' : ''));
         } else {
-            Flash::set('success', ($count === 1 ? 'Payment recorded.' : "{$count} payments recorded.") . (!empty($skipped) ? " {$skipped} associate payout(s) skipped: no verified bank account yet." : ''));
+            Flash::set('success', ($count === 1 ? 'Payment recorded.' : "{$count} payments recorded.") . (!empty($skipped) ? " {$skipped} associate payout(s) skipped: no verified bank account yet." : '')
+                . (!empty($skippedDocs) ? " {$skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA" . (\App\Services\AssociateTds::settings()['cb_required'] ? '/15CB' : '') . ' not yet on file — pay them one by one.' : ''));
         }
         header('Location: /incentives/payouts?month=' . rawurlencode($month));
+    }
+
+    /**
+     * Owner decision 2 Nov 2026 (D-235): Form 15CA / 15CB attached to the
+     * payment of an associate based abroad, kept on the associate's documents
+     * against this payout.
+     */
+    private static function storeRemittanceForms(array $payout, int $userId): void
+    {
+        $associate = \App\Repositories\AssociateRepository::find((int) $payout['associate_id']);
+        foreach (['form_15ca' => 'form_15ca_file', 'form_15cb' => 'form_15cb_file'] as $kind => $field) {
+            if (empty($_FILES[$field]['name'] ?? '')) {
+                continue;
+            }
+            try {
+                $fileId = \App\Services\FileUploadService::handleUpload($field, 'associate_document', 'associates/documents', null, null, $userId, null, (string) ($associate['name'] ?? ''), \App\Repositories\AssociateDocumentRepository::KINDS[$kind]);
+            } catch (\Throwable $e) {
+                Flash::setErrorFromException($e);
+                continue;
+            }
+            $docId = \App\Repositories\AssociateDocumentRepository::add((int) $payout['associate_id'], $kind, $fileId, (int) $payout['id'], null, false, $userId);
+            AuditLogRepository::log($userId, 'ASSOCIATE_DOCUMENT_UPLOADED', 'associates', (int) $payout['associate_id'], 'kind', null, $kind);
+        }
     }
 }

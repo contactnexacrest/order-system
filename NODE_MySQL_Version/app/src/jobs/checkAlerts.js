@@ -102,6 +102,18 @@ async function run() {
     }
   }
 
+  // --- Agreements expiring (owner decision 2 Nov 2026, point 4): 30 / 7 days before and on the day, once each ---
+  created += await require('../services/agreementAlertService').run(todayIst());
+  // --- TDS on associate commission (owner decision 2 Nov 2026, D-235): deposit by the 7th, Form 26Q after each quarter ---
+  {
+    const payIncentiveIds = await permissionRepository.usersWithPermission('pay_incentives');
+    for (const reminder of await require('../services/associateTds').reminders(todayIst())) {
+      created += await notifyMdAndAdmin(payIncentiveIds, reminder.type, reminder.message, null);
+    }
+  }
+  // Owner decision (2 Nov 2026, gap-list Q-6): eBRC / ECGC / incentive-claim reminders, each once.
+  created += await require('../services/complianceTrackingService').runReminders(todayIst());
+
   // --- RCMC expiry ---
   const rcmcExpiry = await companySettingsRepository.get('rcmc_valid_until');
   if (rcmcExpiry) {

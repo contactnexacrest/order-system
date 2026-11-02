@@ -12,6 +12,9 @@
       <div><span class="k">Payments Held (not yet applied to an invoice)</span><span class="v"><?= (int) $heldCount ?></span></div>
       <div><span class="k">Bills, Vendor Payments, Order Expenses &amp; Costs Pending</span><span class="v"><?= (int) $purchasesPendingCount ?></span></div>
       <div><span class="k">Export Benefits Pending</span><span class="v"><?= (int) $benefitsPendingCount ?></span></div>
+      <?php if (!empty($waiting['enabled'])): // D-233 ?>
+      <div><span class="k">Waiting for Zoho (all records)</span><span class="v"><span class="badge <?= (int) $waiting['total'] === 0 ? 'badge-success' : 'badge-warning' ?> zoho-waiting" data-zoho-waiting="<?= (int) $waiting['total'] ?>">Waiting for Zoho: <?= (int) $waiting['total'] ?></span><?php if ((int) $waiting['total'] > 0): ?> <span class="muted small"><?= htmlspecialchars(\App\Services\ZohoPendingService::summary($waiting['by_type'])) ?> — sent at the next sync (hourly, or Sync Now).</span><?php endif; ?></span></div>
+      <?php endif; ?>
     </div>
     <p class="muted small">Only records dated on or after the go-live date go to Zoho Books; the CA books everything earlier as the opening position. Set it under Admin &rarr; Settings (<code>zoho_books_sync_start_date</code>). On the live server nothing is sent until it is set.</p>
     <?php if (!$isEnabled): ?>

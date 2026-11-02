@@ -62,7 +62,14 @@ async function computeForOrder(orderId) {
   const payment = await withLcPayment(order, await orderPaymentStatusRepository.find(orderId));
 
   const [revenueBeforeLcExtra, revenueIsEstimated] = revenueInInr(fobValue, payment);
-  const revenueInr = revenueBeforeLcExtra + Number((payment && payment.lc_extra_inr) || 0);
+  let revenueInr = revenueBeforeLcExtra + Number((payment && payment.lc_extra_inr) || 0);
+  // Owner 2 Nov 2026: where the rupees actually credited are used, the bank charges the banks
+  // deducted are added back — the buyer paid them; they are counted once, as the order cost.
+  for (const leg of ['advance', 'balance', 'freight']) {
+    if (payment && payment[`${leg}_inr_actual`] !== null && payment[`${leg}_inr_actual`] !== undefined) {
+      revenueInr += await require('./remittanceDifference').chargesInr(orderId, leg);
+    }
+  }
 
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
   const supplierCostInr = supplierPo && supplierPo.total_payable_inr !== null

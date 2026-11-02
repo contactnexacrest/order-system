@@ -175,8 +175,11 @@ What the order pays out goes to Zoho Books too, on the same sync:
   gross commission) and a **vendor payment** from the bank with the UTR,
   applied to it. The bill's description names the associate, the order,
   the rate, the client number, their invoice and the TDS; the payment's
-  names the bill and the bank reference. The TDS deducted stays open on
-  the bill for the CA to book against TDS payable. A claw-back is not sent:
+  gives the gross, the TDS (section and rate), the net and the UTR, and
+  names the bill (D-235). With a Zoho TDS tax id set in Settings →
+  Associate TDS the bill carries the TDS and the payment is the net;
+  without one the TDS deducted stays open on the bill for the CA to book
+  against TDS payable, and the Sync Log says so. A claw-back is not sent:
   the CA books the recovery (vendor credit). In test mode only associates
   named `TEST-…` are sent. See [Chapter 24](./24-associates.md).
 
@@ -359,10 +362,44 @@ created in Zoho Books.
 
 ## Running a sync
 
+**When a record reaches Zoho Books (owner decision 2 Nov 2026, D-233).**
+Saving a receipt, bill, payment, expense, cost or benefit in the app
+**never** sends it to Zoho Books at that moment: it is saved in the app and
+waits for the next sync — the **hourly scheduled job**, **Sync Now**, or
+**Sync this order to Zoho now**. (Removing an expense or cost that is
+already in Books is the one exception: it is removed from Books straight
+away.) While something is waiting:
+
+- the order page shows **Waiting for Zoho: N** (in At a Glance, and in
+  Step 12 beside the Zoho buttons) with what is waiting, e.g. "1 buyer
+  payment, 2 order costs"; "Waiting for Zoho: 0 — everything on this order
+  is in Zoho Books" once all is sent. People with "Manage CA module" can
+  click it to open the order's Zoho check; people who can only view the CA
+  module see the count;
+- the **Zoho Sync** menu item carries the number of records waiting across
+  all orders (worked out at most once a minute), and the Zoho Sync page
+  lists them by kind.
+
+Nothing is shown while Zoho Books is off. **The hourly scheduled job must
+be installed on the live server** (see the deployment README); without it,
+records only reach Zoho Books when someone presses Sync Now.
+
+Owner decision 2 Nov 2026: **Zoho Sync** is in the main menu for everyone
+with "Manage CA module", and each order's Step 12 has **Sync this order to
+Zoho now** beside "Check this order against Zoho Books". The order button
+sends only that order's invoices, buyer payments, bills, vendor payments,
+expenses, costs and export benefit journals — with the same duplicate
+guards, each one in the Zoho Sync Log. The repairs of records changed in
+Books, the expense import from Books and the GST refund journals (per
+claim, not per order) run with the full sync. When Zoho Books is not
+connected it says "Zoho is not connected — Settings → Zoho Books" and
+sends nothing.
+
 **CA / Accounting → Zoho Books sync** shows:
 
-- **Status** — whether Zoho Books is currently enabled, and how many
-  settlement legs are waiting to be pushed.
+- **Status** — whether Zoho Books is currently enabled, how many
+  settlement legs are waiting to be pushed, and **Waiting for Zoho (all
+  records)** with what is waiting by kind.
 - A **Sync Now** button — runs the sync immediately, gated on the "Manage
   CA / Accounting integrations" permission (a step up from just viewing
   the register, since this calls an external API and can surface error
@@ -488,6 +525,15 @@ test data, and when it was removed. The clean-up script writes its own
 rows there with `--log`.
 
 ## What to do if a sync fails
+
+**Finance is told (owner decision 2 Nov 2026, D-233).** When a sync run —
+scheduled, Sync Now, or Sync this order — has any failure, everyone with
+"Manage CA module" gets **one e-mail for that run** (subject "Zoho Books
+sync: N records could not be sent") listing each failed record's kind, its
+order and Zoho's error message — never amounts — plus an in-app
+notification. With business e-mail switched off (Settings), only the
+in-app notification is sent; the Sync Log has every detail either way. A
+run with no failures sends nothing.
 
 Check the Sync Log's message column — most failures will be either a
 configuration problem (a missing or expired credential) or a genuine Zoho

@@ -1,5 +1,6 @@
 'use strict';
 
+const db = require('../config/db');
 const dates = require('../helpers/dates');
 const caExpenseRepository = require('../repositories/caExpenseRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
@@ -96,15 +97,38 @@ async function build(orderId) {
   const receipts = [];
   let receiptsForeign = 0;
   let receiptsInr = 0;
+  // Owner decision 2 Nov 2026 (D-236, confirmed twice): when the banks deducted charges from a
+  // remittance (D-227), the leg's amount is what the buyer paid (received + charges), but the
+  // rupees shown are what actually reached our bank, with the charges beside them. The charges
+  // stay counted once, as the order's "Bank Charges" cost.
+  // Our own bank's inward charges (migration 2026-11-02v, when present) also never reach the account.
+  const hasOwn = Number((await db.queryOne(
+    `SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'order_payment_receipts' AND COLUMN_NAME = 'own_bank_charges_inr'`
+  )).n) > 0;
+  const legCharges = {};
+  const chargeRows = await db.query(
+    `SELECT leg, COALESCE(SUM(bank_charges), 0) AS fx, COALESCE(SUM(bank_charges_inr), 0) AS inr, ${hasOwn ? 'COALESCE(SUM(own_bank_charges_inr), 0)' : '0'} AS own
+       FROM order_payment_receipts WHERE order_id = :o AND milestone_id IS NULL GROUP BY leg`,
+    { o: orderId }
+  );
+  for (const c of chargeRows) legCharges[c.leg] = { fx: Number(c.fx), inr: Number(c.inr), own: Number(c.own) };
+  const round2 = (v) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
   for (const [leg, label] of [['advance', 'Advance'], ['freight', 'Freight & insurance (Debit Note)'], ['balance', 'Balance']]) {
     if (!payment[`${leg}_remittance_received_at`]) continue;
     const amount = Number(payment[`${leg}_amount`] || 0);
     const rate = num(payment[`${leg}_exchange_rate`]);
     const actual = num(payment[`${leg}_inr_actual`]);
-    const inr = actual !== null ? actual : (rate !== null ? amount * rate : null);
+    const chargesFx = round2((legCharges[leg] || {}).fx || 0);
+    let chargesInr = round2((legCharges[leg] || {}).inr || 0);
+    if (chargesFx > 0 && chargesInr <= 0 && rate !== null) chargesInr = round2(chargesFx * rate);
+    const ownInr = round2((legCharges[leg] || {}).own || 0);
+    // An INR actual is already the rupees credited; otherwise credited = (paid − charges) at the rate,
+    // less our own bank's inward charges.
+    const inr = actual !== null ? actual : (rate !== null ? amount * rate - chargesInr - ownInr : null);
     receiptsForeign += amount;
     receiptsInr += inr || 0;
-    receipts.push({
+    const row = {
       leg: label,
       amount: money(amount),
       rate: rate !== null ? rate.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '—',
@@ -112,7 +136,20 @@ async function build(orderId) {
       received: date(payment[`${leg}_remittance_received_at`]),
       cleared: date(payment[`${leg}_cleared_at`]),
       basis: actual !== null ? 'INR actual' : (rate !== null ? 'at recorded rate' : 'no rate yet'),
-    });
+    };
+    if (chargesFx > 0) {
+      row.received_net = money(amount - chargesFx);
+      row.bank_charges = money(chargesFx);
+      row.bank_charges_inr = money(chargesInr);
+      row.amount_display = `${row.amount} (received ${row.received_net} + bank charges ${row.bank_charges})`;
+    }
+    if (chargesFx > 0 || ownInr > 0) {
+      row.inr_display = `${inr !== null ? money(inr) : '—'} credited`
+        + (chargesFx > 0 ? ` · bank charges ₹${money(chargesInr)}` : '')
+        + (ownInr > 0 ? ` · our bank's charges ₹${money(ownInr)}` : '');
+      if (ownInr > 0) row.own_bank_charges_inr = money(ownInr);
+    }
+    receipts.push(row);
   }
   // Owner decision 2026-10-29 (confirmed twice): the money the bank paid under an LC, at the rupees credited.
   const lc = await orderLcDetailRepository.find(orderId);

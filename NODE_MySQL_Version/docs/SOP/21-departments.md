@@ -107,6 +107,12 @@ set-up (all editable in **Admin → Permissions**):
 | Purchase prices — Supplier PO values, supplier bills and their scans, the factory cost in the catalogue, the Supplier PO document | – | ✅ | – | ✅ |
 | Logistics costs — CHA, transport and packing costs in the catalogue, logistics bills and their scans, the BL Instruction, the freight-cost report | – | – | ✅ | ✅ |
 
+**Logistics bills — maker and checker (owner, 2 Nov 2026).** Logistics
+(Executive, Manager, Director) adds the CHA, transport and freight-forwarder
+bills (**Add logistics partner bills**) and sees their status; only
+**Manage supplier payments** holders (Accounts, Finance, management) record
+the payment. Export Compliance and Procurement do not add logistics bills.
+
 Where money is hidden, the page still shows the **status**: for example
 Logistics sees "Remittance recorded on 3 Jun" without the amount, and Sales
 sees "Supplier advance: paid on 12 Jun" without the bill.
@@ -117,6 +123,28 @@ screenshot downloads only for someone who may see the money it carries
 a person may not see. The order page shows such a file as plain text
 ("Screenshot received", the file's label) instead of a link that would be
 refused.
+
+**Every copy follows the rule, not only the current one (2 Nov 2026).**
+A document's draft copy, an earlier approved copy that a newer revision
+replaced, and every older CAFIN copy carry the same money as the current
+one, so they download (and appear in the dossier ZIP and All Documents)
+only for the same people. The All Documents panel and the document counts
+list only what the person may open.
+
+**Audit trails and reports hide amounts too.** In the Audit Log, an
+order's audit log, the Full Audit Trail of an order report (and their CSV
+files) and the dashboard's Recent Activity, an entry about money the person
+may not see shows its action, date and person, with the amounts replaced by
+"— hidden (no permission to see these amounts)". Reports that show selling
+prices or buyer payments (client, aggregate, trends, products, performance,
+amendments, payments, today's payments, ageing) open only for someone who
+may see that money; the others get "You do not have permission to see the
+amounts in this report." Product list prices need selling-price rights.
+
+**How this is checked.** An automatic test (`e2e/tests/12-money-matrix.spec.js`)
+signs in as one person of every role, opens about 75 screens, reports and
+CSV files, tries every file of a sample order and lists the dossier ZIP,
+and fails if any amount appears for a role that may not see it.
 
 **Procurement sees the order number, not the client.** Anyone working as
 a Procurement designation sees orders by their number only: the client's

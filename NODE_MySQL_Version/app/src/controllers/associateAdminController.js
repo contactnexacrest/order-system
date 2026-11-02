@@ -304,6 +304,7 @@ async function show(req, res) {
       tdsPctText: trimPct(await associateService.tdsPct()),
     });
   }
+  data.agreementCard = await require('./agreementController').partyCard(req, 'associate', a.id);
   res.renderView('associates/show', data, 'layout/base');
 }
 

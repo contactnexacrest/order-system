@@ -134,6 +134,9 @@ async function record(req, res) {
     ?? fieldValidator.bankReference(bankRef)
     ?? (!isDate(receivedOn) || receivedOn > todayIst() ? 'Enter the date the money was received — today or earlier.' : null)
     ?? ([...note].length > 255 ? 'The note can be at most 255 characters.' : null);
+  const remittanceDifference = require('../services/remittanceDifference');
+  let diffEval = { reason: null, charges: 0, excess: 0, remaining: 0 };
+  let currencyForOutcome = '';
   if (error === null) {
     // QA Round 7, R7-N03: the advance leg's rules — never more than the whole order, and an
     // amount that differs from the milestone due by more than 1% is confirmed on purpose.
@@ -144,8 +147,12 @@ async function record(req, res) {
     const money2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     if (fob > 0 && amount > fob + 0.005) {
       error = `${currency} ${money2(amount)} is more than the whole order value (${currency} ${money2(fob)}). Check the amount the bank received.`;
-    } else if (due > 0 && Math.abs(amount - due) > Math.max(1, due * 0.01) && !req.body.confirm_amount_differs) {
-      error = `Milestone ${Number(m.seq)} due on this order is ${currency} ${money2(due)} (${pct(m.pct)}% of ${currency} ${money2(fob)}). You entered ${currency} ${money2(amount)} — if that really is what the bank received, tick "The amount received differs from the milestone due" and save again.`;
+    } else {
+      // Owner 2 Nov 2026 ("18 yes"): an amount that differs from the milestone due says why.
+      // Follow-up (2 Nov 2026): the reason comes from the admin-managed list, or "Other" typed in.
+      diffEval = await remittanceDifference.evaluatePosted(req.body, `Milestone ${Number(m.seq)}`, currency, due, 0, amount);
+      error = diffEval.error || null;
+      currencyForOutcome = currency;
     }
   }
   if (error !== null) {
@@ -153,12 +160,16 @@ async function record(req, res) {
     back(res, orderId);
     return;
   }
-  await paymentMilestoneRepository.recordReceived(Number(m.id), amount, receivedOn, rate, bankRef, note, req.user.id);
+  const charges = Number(diffEval.charges) || 0;
+  // The milestone holds what the buyer paid: received plus any bank charges the banks deducted (owner, 2 Nov 2026).
+  await paymentMilestoneRepository.recordReceived(Number(m.id), r2(amount + charges), receivedOn, rate, bankRef, note, req.user.id);
   // Gap list G-5: the receipt is kept in the order's receipt history too.
-  await require('../services/partPaymentService').addMilestoneReceipt(m, amount, receivedOn, rate, bankRef, note, req.user.id);
+  const receiptId = await require('../services/partPaymentService').addMilestoneReceipt(m, amount, receivedOn, rate, bankRef, note, req.user.id, diffEval.reason, charges);
+  await remittanceDifference.afterReceipt(orderId, 'milestone', m, receiptId, diffEval, amount, rate, receivedOn, bankRef, req.user.id);
   const description = await paymentDescription.milestonePayment((await paymentMilestoneRepository.find(Number(m.id))) || m);
   await auditLogRepository.log(req.user.id, 'MILESTONE_PAYMENT_RECORDED', 'order_payment_milestones', Number(m.id), 'received_amount', null, description);
-  flash.set(req, 'success', `Recorded: ${description}. Mark it cleared once your bank confirms receipt.`);
+  const outcome = remittanceDifference.outcome('milestone', `Milestone ${Number(m.seq)}`, currencyForOutcome, diffEval, amount, rate);
+  flash.set(req, 'success', `Recorded: ${description}.${outcome ? ` ${outcome}` : ''} Mark it cleared once your bank confirms receipt.`);
   back(res, orderId);
 }
 

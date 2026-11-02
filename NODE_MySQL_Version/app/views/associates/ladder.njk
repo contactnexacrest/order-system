@@ -13,7 +13,7 @@
       </div>
     </fieldset>
     <div class="field-grid">
-      <label>TDS on commission, India (section 194H) % *<input type="number" name="associate_tds_pct" required min="0" max="30" step="0.01" value="{{ (tds | float).toFixed(2) }}" placeholder="e.g. 2.00"></label>
+      <label>TDS on commission, India (section 194H) % *<input type="number" name="associate_tds_pct" required min="0" max="30" step="0.01" value="{{ (tds | float).toFixed(2) }}" placeholder="e.g. 2.00"></label> <small class="muted">Threshold, rate without PAN and the rules for associates abroad: <a href="/settings/associate-tds">Settings &rarr; Associate TDS</a>.</small>
       <label>Client protection (months from acceptance) *<input type="number" name="associate_protection_months" required min="1" max="60" step="1" value="{{ protection | int }}" placeholder="e.g. 12"></label>
       <label>Wait before a new bank account is used (days) *<input type="number" name="associate_bank_wait_days" required min="0" max="60" step="1" value="{{ wait | int }}" placeholder="e.g. 7"></label>
     </div>

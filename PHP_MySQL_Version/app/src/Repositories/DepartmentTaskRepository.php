@@ -63,7 +63,48 @@ final class DepartmentTaskRepository
           FROM orders o JOIN order_payment_status ps ON ps.order_id = o.id
          WHERE o.status = 'active' AND ps.balance_cleared_at IS NOT NULL
            -- Gap list G-1: a balance cleared before shipment waits for the Bill of Lading
-           AND EXISTS (SELECT 1 FROM order_shipping sh WHERE sh.order_id = o.id AND sh.bl_number IS NOT NULL)";
+           AND EXISTS (SELECT 1 FROM order_shipping sh WHERE sh.order_id = o.id AND sh.bl_number IS NOT NULL)
+        -- Owner decision D-226: the Export Compliance queue.
+        UNION ALL
+        SELECT o.id, 'compliance_checklist_item', ct.name, DATE(COALESCE(IF(ct.phase = 'order', ps.advance_cleared_at, st7.unlocked_at), o.created_at)), CONCAT('/orders/', o.id, '#compliance-checklist')
+          FROM orders o
+          JOIN order_payment_status ps ON ps.order_id = o.id
+          JOIN compliance_task_types ct ON ct.is_active = 1
+          LEFT JOIN order_stages st7 ON st7.order_id = o.id AND st7.stage_id = (SELECT sm.id FROM stages_master sm WHERE sm.stage_number = 7)
+         WHERE o.status = 'active' AND ps.advance_cleared_at IS NOT NULL
+           AND (ct.phase = 'order' OR (st7.status IS NOT NULL AND st7.status <> 'locked'))
+           AND NOT EXISTS (SELECT 1 FROM order_compliance_tasks oct WHERE oct.order_id = o.id AND oct.task_type_id = ct.id AND oct.status IN ('approved', 'skipped'))
+        UNION ALL
+        SELECT o.id, 'apply_coo', 'COO Prep Sheet — apply for the Certificate of Origin', DATE(st8.unlocked_at), CONCAT('/orders/', o.id, '#step-11a-coo-prep')
+          FROM orders o
+          JOIN order_stages st8 ON st8.order_id = o.id AND st8.stage_id = (SELECT sm.id FROM stages_master sm WHERE sm.stage_number = 8)
+         WHERE o.status = 'active' AND st8.status <> 'locked' AND st8.unlocked_at IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
+                            WHERE d.order_id = o.id AND dt.code = 'COOPREP' AND d.status IN ('approved', 'sent'))
+        UNION ALL
+        SELECT o.id, 'answer_benefit_eligibility', CONCAT(COUNT(*), ' scheme(s) still Pending'), MIN(COALESCE(sh.bl_date, DATE(o.created_at))), CONCAT('/orders/', o.id, '#step-13g-benefits')
+          FROM orders o
+          JOIN order_shipping sh ON sh.order_id = o.id AND sh.bl_number IS NOT NULL
+          JOIN order_export_benefit_schemes es ON es.order_id = o.id AND es.status = 'pending'
+         WHERE o.status IN ('active', 'shipped_docs_sent', 'complete')
+         GROUP BY o.id
+        UNION ALL
+        SELECT o.id, 'file_export_benefit_claim', es.scheme_name, DATE(ps.balance_remittance_received_at), CONCAT('/orders/', o.id, '#step-13g-benefits')
+          FROM orders o
+          JOIN order_payment_status ps ON ps.order_id = o.id
+          JOIN order_export_benefit_schemes es ON es.order_id = o.id AND es.status = 'eligible' AND es.claim_skipped_at IS NULL
+         WHERE o.status IN ('shipped_docs_sent', 'complete') AND ps.balance_remittance_received_at IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM ca_export_benefits b WHERE b.order_id = o.id AND b.scheme_name = es.scheme_name)
+        UNION ALL
+        SELECT o.id, 'ebrc_followup', 'Advance — eBRC / FIRC not on record yet', DATE(ps.advance_cleared_at), CONCAT('/orders/', o.id)
+          FROM orders o JOIN order_payment_status ps ON ps.order_id = o.id
+         WHERE o.status IN ('active', 'shipped_docs_sent', 'complete') AND ps.advance_cleared_at IS NOT NULL
+           AND (ps.advance_firc_reference IS NULL OR ps.advance_firc_reference = '')
+        UNION ALL
+        SELECT o.id, 'ebrc_followup', 'Balance — eBRC / FIRC not on record yet', DATE(ps.balance_cleared_at), CONCAT('/orders/', o.id)
+          FROM orders o JOIN order_payment_status ps ON ps.order_id = o.id
+         WHERE o.status IN ('active', 'shipped_docs_sent', 'complete') AND ps.balance_cleared_at IS NOT NULL
+           AND (ps.balance_firc_reference IS NULL OR ps.balance_firc_reference = '')";
 
     /**
      * @param list<string>|null $departmentCodes only these departments' tasks (null = every department)
@@ -146,7 +187,7 @@ final class DepartmentTaskRepository
                FROM departments d
                LEFT JOIN order_department_owners odo ON odo.department_id = d.id AND odo.order_id = :o
                LEFT JOIN users u ON u.id = odo.user_id
-              WHERE d.is_active = 1 AND d.code IN ('SALES', 'PROC', 'LOG', 'FIN')
+              WHERE d.is_active = 1 AND d.code IN ('SALES', 'PROC', 'LOG', 'EXPORT_COMPLIANCE', 'FIN') -- D-226: Export Compliance owns its part too
               ORDER BY d.sort_order"
         );
         $stmt->execute(['o' => $orderId]);

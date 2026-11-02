@@ -36,7 +36,8 @@ function perms(req) {
   const p = req.permissions || {};
   return {
     canBrowse: !!p.browse_product_catalog,
-    canViewPricing: !!p.view_product_pricing,
+    // Owner points 6/15: prices only for people who may also see selling prices.
+    canViewPricing: !!p.view_product_pricing && !!p.view_selling_prices,
     canManage: !!p.manage_product_catalog,
   };
 }

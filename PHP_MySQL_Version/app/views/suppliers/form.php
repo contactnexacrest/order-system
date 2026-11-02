@@ -107,3 +107,5 @@ $selectedTypes = $supplier['types'] ?? [];
   </div>
   <?php endif; ?>
 </div>
+
+<?php if (!empty($isEdit)) { $__partyType = "supplier"; $__partyId = (int) $supplier["id"]; require __DIR__ . "/../agreements/_party_card.php"; } ?>

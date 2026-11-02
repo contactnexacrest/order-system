@@ -230,7 +230,15 @@ async function show(req, res) {
   const agreementRenewEligible = !!(agreementExpiryDate && new Date(agreementExpiryDate).getTime() <= Date.now() + 30 * 86400000);
 
   res.renderView('clients/show', {
+    agreementCard: await require('./agreementController').partyCard(req, 'client', client.id),
     associateLine: await require('../repositories/associateRepository').lineForClient(client.id, req.permissions),
+    // Owner decision (2 Nov 2026, gap-list Q-6b): the buyer's ECGC-approved credit limit.
+    ecgcCard: await (async () => {
+      const p = req.permissions || {};
+      const edit = !!(p.manage_export_benefit_claims || p.ca_module_manage);
+      const see = edit || !!p.manage_order_financials;
+      return see ? { edit, position: await require('../services/complianceTrackingService').ecgcPosition(Number(client.id)) } : null;
+    })(),
     client, orders, impersonationGloballyEnabled, orderHistoryGlobalDefault, documentDownloadsGlobalDefault, impersonationUnavailableReason, additionalDocuments,
     agreementForceExpired, agreementExpiryDate, agreementExpired, agreementActive, agreementRenewEligible,
     duplicateOfClient: client.duplicate_of_client_id ? await clientRepository.find(client.duplicate_of_client_id) : null,

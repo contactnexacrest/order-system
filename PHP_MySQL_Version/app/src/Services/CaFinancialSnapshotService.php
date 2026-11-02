@@ -127,6 +127,24 @@ final class CaFinancialSnapshotService
         $receipts = [];
         $receiptsForeign = 0.0;
         $receiptsInr = 0.0;
+        // Owner decision 2 Nov 2026 (D-236, confirmed twice): when the banks deducted charges from a
+        // remittance (D-227), the leg's amount is what the buyer paid (received + charges), but the
+        // rupees shown are what actually reached our bank, with the charges beside them. The charges
+        // stay counted once, as the order's "Bank Charges" cost.
+        // Our own bank's inward charges (migration 2026-11-02v, when present) also never reach the account.
+        $pdo = \App\Config\Database::connection();
+        $hasOwn = (bool) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'order_payment_receipts' AND COLUMN_NAME = 'own_bank_charges_inr'")->fetchColumn();
+        $legCharges = [];
+        $chargeStmt = $pdo->prepare(
+            'SELECT leg, COALESCE(SUM(bank_charges), 0) AS fx, COALESCE(SUM(bank_charges_inr), 0) AS inr, '
+            . ($hasOwn ? 'COALESCE(SUM(own_bank_charges_inr), 0)' : '0') . ' AS own
+               FROM order_payment_receipts WHERE order_id = :o AND milestone_id IS NULL GROUP BY leg'
+        );
+        $chargeStmt->execute(['o' => $orderId]);
+        foreach ($chargeStmt->fetchAll() as $c) {
+            $legCharges[(string) $c['leg']] = ['fx' => (float) $c['fx'], 'inr' => (float) $c['inr'], 'own' => (float) $c['own']];
+        }
         foreach (['advance' => 'Advance', 'freight' => 'Freight & insurance (Debit Note)', 'balance' => 'Balance'] as $leg => $label) {
             if (empty($payment[$leg . '_remittance_received_at'])) {
                 continue;
@@ -134,10 +152,18 @@ final class CaFinancialSnapshotService
             $amount = (float) ($payment[$leg . '_amount'] ?? 0);
             $rate = $payment[$leg . '_exchange_rate'] ?? null;
             $actual = $payment[$leg . '_inr_actual'] ?? null;
-            $inr = $actual !== null ? (float) $actual : ($rate !== null ? $amount * (float) $rate : null);
+            $chargesFx = round($legCharges[$leg]['fx'] ?? 0.0, 2);
+            $chargesInr = round($legCharges[$leg]['inr'] ?? 0.0, 2);
+            if ($chargesFx > 0 && $chargesInr <= 0 && $rate !== null) {
+                $chargesInr = round($chargesFx * (float) $rate, 2);
+            }
+            $ownInr = round($legCharges[$leg]['own'] ?? 0.0, 2);
+            // An INR actual is already the rupees credited; otherwise credited = (paid − charges) at the rate,
+            // less our own bank's inward charges.
+            $inr = $actual !== null ? (float) $actual : ($rate !== null ? $amount * (float) $rate - $chargesInr - $ownInr : null);
             $receiptsForeign += $amount;
             $receiptsInr += (float) $inr;
-            $receipts[] = [
+            $row = [
                 'leg' => $label,
                 'amount' => self::money($amount),
                 'rate' => $rate !== null ? number_format((float) $rate, 4) : '—',
@@ -146,6 +172,21 @@ final class CaFinancialSnapshotService
                 'cleared' => self::date($payment[$leg . '_cleared_at'] ?? null),
                 'basis' => $actual !== null ? 'INR actual' : ($rate !== null ? 'at recorded rate' : 'no rate yet'),
             ];
+            if ($chargesFx > 0) {
+                $row['received_net'] = self::money($amount - $chargesFx);
+                $row['bank_charges'] = self::money($chargesFx);
+                $row['bank_charges_inr'] = self::money($chargesInr);
+                $row['amount_display'] = $row['amount'] . ' (received ' . $row['received_net'] . ' + bank charges ' . $row['bank_charges'] . ')';
+            }
+            if ($chargesFx > 0 || $ownInr > 0) {
+                $row['inr_display'] = ($inr !== null ? self::money($inr) : '—') . ' credited'
+                    . ($chargesFx > 0 ? ' · bank charges ₹' . self::money($chargesInr) : '')
+                    . ($ownInr > 0 ? " · our bank's charges ₹" . self::money($ownInr) : '');
+                if ($ownInr > 0) {
+                    $row['own_bank_charges_inr'] = self::money($ownInr);
+                }
+            }
+            $receipts[] = $row;
         }
         // Owner decision 2026-10-29 (confirmed twice): the money the bank paid under an LC, at the rupees credited.
         $lc = \App\Repositories\OrderLcDetailRepository::find($orderId);

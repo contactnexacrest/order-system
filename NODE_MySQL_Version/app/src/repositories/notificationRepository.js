@@ -53,6 +53,19 @@ async function emailNotification(userId, message) {
   return user.email;
 }
 
+/**
+ * Owner decision 2 Nov 2026 (D-233): an in-app notification only — for a caller
+ * that sends its own fuller e-mail (the Zoho sync failure list), so the person
+ * never gets the same news twice.
+ */
+async function createInAppOnly(userId, type, relatedOrderId, message) {
+  const result = await db.execute(
+    'INSERT INTO notifications (user_id, role_id, type, related_order_id, message) VALUES (:u, NULL, :t, :o, :m)',
+    { u: userId, t: type, o: relatedOrderId, m: message }
+  );
+  return result.insertId;
+}
+
 async function create(userId, roleId, type, relatedOrderId, message) {
   const result = await db.execute(
     `INSERT INTO notifications (user_id, role_id, type, related_order_id, message)
@@ -126,4 +139,4 @@ async function existsToday(userId, type, relatedOrderId) {
   return row ? parseInt(row.c, 10) > 0 : false;
 }
 
-module.exports = { create, forUser, unreadCountForUser, markRead, markAllRead, existsToday, emailNotification, emailSubject, notifyOrderTeam };
+module.exports = { create, createInAppOnly, forUser, unreadCountForUser, markRead, markAllRead, existsToday, emailNotification, emailSubject, notifyOrderTeam };

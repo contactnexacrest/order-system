@@ -98,7 +98,8 @@ async function editForm(req, res) {
   const memberships = await departmentRepository.membershipsForUser(userId);
   const designations = (await departmentRepository.designations())
     .filter((d) => Number(d.is_active) === 1 && Number(d.department_active) === 1);
-  res.renderView('users/edit', { target, roles, memberships, designations, today: todayIst() }, 'layout/base');
+  const agreementCard = await require('./agreementController').partyCard(req, 'staff', target.id);
+  res.renderView('users/edit', { target, roles, memberships, designations, today: todayIst(), agreementCard }, 'layout/base');
 }
 
 async function update(req, res) {

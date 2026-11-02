@@ -49,7 +49,8 @@ async function legacyReceipt(orderId, leg, milestoneId, c = db) {
 }
 
 async function receivedTotal(orderId, leg, milestoneId = null) {
-  const row = await db.queryOne('SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS t FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id <=> :m', { o: orderId, l: leg, m: milestoneId });
+  // Owner 2 Nov 2026 ("18 yes"): bank charges the banks deducted count as paid by the buyer.
+  const row = await db.queryOne('SELECT COUNT(*) AS n, COALESCE(SUM(amount + COALESCE(bank_charges, 0)), 0) AS t FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id <=> :m', { o: orderId, l: leg, m: milestoneId });
   if (!row || Number(row.n) === 0) {
     // A remittance written to the leg itself counts as its one receipt.
     const legacy = await legacyReceipt(orderId, leg, milestoneId);
@@ -125,7 +126,7 @@ function joinReferences(rows) {
  * back on order_payment_status, in one transaction. Returns false (nothing
  * recorded) for a second click with the same amount, day and rate.
  */
-async function addLegReceipt(orderId, leg, amount, receivedOn, rate, bankReference, userId) {
+async function addLegReceipt(orderId, leg, amount, receivedOn, rate, bankReference, userId, differenceReason = null, bankCharges = 0) {
   if (!LEGS.includes(leg)) {
     throw new Error(`Unknown payment leg ${leg}`);
   }
@@ -146,30 +147,48 @@ async function addLegReceipt(orderId, leg, amount, receivedOn, rate, bankReferen
       await c.execute('INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, staff_note) VALUES (:o, :l, :a, :d, :r, :b, :n)',
         { o: orderId, l: leg, a: legacy.amount, d: legacy.received_on, r: legacy.exchange_rate, b: legacy.bank_reference, n: 'Recorded before part payments were kept separately' });
     }
-    await c.execute(
-      'INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, recorded_by) VALUES (:o, :l, :a, :d, :r, :b, :u)',
-      { o: orderId, l: leg, a: round2(amount), d: String(receivedOn).slice(0, 10), r: round4(rate), b: String(bankReference || '').trim(), u: userId }
+    const charges = Number(bankCharges) > 0 ? round2(bankCharges) : null;
+    const inserted = await c.execute(
+      `INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, difference_reason, bank_charges, bank_charges_inr, recorded_by)
+       VALUES (:o, :l, :a, :d, :r, :b, :dr, :bc, :bci, :u)`,
+      { o: orderId, l: leg, a: round2(amount), d: String(receivedOn).slice(0, 10), r: round4(rate), b: String(bankReference || '').trim(),
+        dr: differenceReason || null, bc: charges, bci: charges !== null ? round2(charges * rate) : null, u: userId }
     );
     const rows = await receipts(orderId, leg, null, c);
-    const total = round2(rows.reduce((t, r) => t + Number(r.amount), 0));
+    // The leg holds what the buyer paid: received plus any bank charges the banks deducted (owner, 2 Nov 2026).
+    const credited = (r) => Number(r.amount) + Number(r.bank_charges || 0);
+    const total = round2(rows.reduce((t, r) => t + credited(r), 0));
     const latest = rows.map((r) => String(r.received_on)).sort().pop();
-    const weighted = rows.reduce((t, r) => t + Number(r.amount) * Number(r.exchange_rate !== null ? r.exchange_rate : rate), 0);
+    const weighted = rows.reduce((t, r) => t + credited(r) * Number(r.exchange_rate !== null ? r.exchange_rate : rate), 0);
     const avgRate = total > 0 ? round4(weighted / total) : round4(rate);
     await c.execute(`UPDATE order_payment_status SET ${leg}_amount = :amount, ${leg}_remittance_received_at = :received_at, ${leg}_bank_reference = :ref WHERE order_id = :o`,
       { amount: total, received_at: latest, ref: joinReferences(rows), o: orderId });
     await c.execute(`UPDATE order_payment_status SET ${leg}_exchange_rate = :rate, ${leg}_exchange_rate_set_at = NOW(), ${leg}_exchange_rate_set_by = :u WHERE order_id = :o`,
       { rate: avgRate, u: userId, o: orderId });
-    return true;
+    return Number(inserted.insertId) || true;
   });
 }
 
-/** Adds a milestone receipt to the history (the milestone row itself holds its one remittance). */
-async function addMilestoneReceipt(milestone, amount, receivedOn, rate, bankReference, note, userId) {
-  await db.execute(
-    `INSERT INTO order_payment_receipts (order_id, leg, milestone_id, amount, received_on, exchange_rate, bank_reference, staff_note, recorded_by)
-     VALUES (:o, 'milestone', :m, :a, :d, :r, :b, :n, :u)`,
-    { o: milestone.order_id, m: milestone.id, a: round2(amount), d: String(receivedOn).slice(0, 10), r: round4(rate), b: String(bankReference || '').trim(), n: note && String(note).trim() !== '' ? String(note).trim() : null, u: userId }
+/** A second click of the same form: this exact receipt is already there (checked before the reason is). */
+async function receiptExists(orderId, leg, amount, receivedOn, rate) {
+  const row = await db.queryOne(
+    `SELECT 1 AS x FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id IS NULL
+        AND ABS(amount - :a) < 0.005 AND received_on = :d AND ABS(COALESCE(exchange_rate, 0) - :r) < 0.00005 LIMIT 1`,
+    { o: orderId, l: leg, a: round2(amount), d: String(receivedOn).slice(0, 10), r: round4(rate) }
   );
+  return !!row;
+}
+
+/** Adds a milestone receipt to the history (the milestone row itself holds its one remittance). */
+async function addMilestoneReceipt(milestone, amount, receivedOn, rate, bankReference, note, userId, differenceReason = null, bankCharges = 0) {
+  const charges = Number(bankCharges) > 0 ? round2(bankCharges) : null;
+  const result = await db.execute(
+    `INSERT INTO order_payment_receipts (order_id, leg, milestone_id, amount, received_on, exchange_rate, bank_reference, staff_note, difference_reason, bank_charges, bank_charges_inr, recorded_by)
+     VALUES (:o, 'milestone', :m, :a, :d, :r, :b, :n, :dr, :bc, :bci, :u)`,
+    { o: milestone.order_id, m: milestone.id, a: round2(amount), d: String(receivedOn).slice(0, 10), r: round4(rate), b: String(bankReference || '').trim(), n: note && String(note).trim() !== '' ? String(note).trim() : null,
+      dr: differenceReason || null, bc: charges, bci: charges !== null ? round2(charges * rate) : null, u: userId }
+  );
+  return Number(result.insertId);
 }
 
 /**
@@ -238,6 +257,7 @@ async function pageData(orderId, milestones) {
 }
 
 module.exports = {
+  receiptExists,
   LEGS, TOLERANCE, label, money, receipts, receivedTotal, expected, summary, joinReferences, addLegReceipt, addMilestoneReceipt,
   clearCheck, recordShortfall, recordedBy, clearedMessage, pageData,
 };

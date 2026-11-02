@@ -1,5 +1,9 @@
 'use strict';
 
+const moneyVisibility = require('../services/moneyVisibility');
+
+const auditMoneyMask = require('../services/auditMoneyMask');
+
 const querystring = require('querystring');
 
 const flash = require('../helpers/flash');
@@ -47,11 +51,30 @@ async function index(req, res) {
  * documents too, so it is taken out there as well.
  */
 function withoutCafinUnlessAllowed(req, documents) {
-  if (req.permissions && req.permissions.view_cafin) return documents;
-  return documents.filter((d) => (d.document_type_code ?? d.type_code ?? '') !== 'CAFIN');
+  const withoutCafin = req.permissions && req.permissions.view_cafin
+    ? documents
+    : documents.filter((d) => (d.document_type_code ?? d.type_code ?? '') !== 'CAFIN');
+  // Owner points 6/15: and only the document types whose money this person may see.
+  return withoutCafin.filter((d) => moneyVisibility.canSeeDocument(req.permissions, d.document_type_code ?? d.type_code ?? ''));
+}
+
+/**
+ * Owner points 6/15 (2 Nov 2026): a report that prints amounts opens only for
+ * people who may see that money (moneyVisibility), whatever reports
+ * permission they hold. PHP twin: ReportController::refusedForMoney().
+ */
+function refusedForMoney(req, res, classes) {
+  for (const cls of classes) {
+    if (!moneyVisibility.can(req.permissions, cls)) {
+      res.status(403).send('You do not have permission to see the amounts in this report.');
+      return true;
+    }
+  }
+  return false;
 }
 
 async function client(req, res) {
+  if (refusedForMoney(req, res, ['selling', 'buyer_payments'])) return;
   const clientId = parseInt(req.params.clientId, 10);
   const data = await reportRepository.perClient(clientId, orderAccessService.visibilitySql(req.user.id, req.permissions));
   if (!data.client) {
@@ -111,6 +134,8 @@ async function order(req, res) {
     return;
   }
   data.documents = withoutCafinUnlessAllowed(req, data.documents);
+  // Owner points 6/15: audit values hidden unless the viewer may see that money.
+  data.audit = await auditMoneyMask.maskAll(req.permissions, data.audit);
 
   if (req.query.format === 'csv') {
     const { headers, rows } = orderAuditCsvRows(data.audit);
@@ -122,6 +147,7 @@ async function order(req, res) {
 }
 
 async function aggregate(req, res) {
+  if (refusedForMoney(req, res, ['selling'])) return;
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
   const stageId = req.query.stage_id ? (parseInt(req.query.stage_id, 10) || null) : null;
@@ -285,6 +311,7 @@ async function disputes(req, res) {
 
 /** Cross-order amendment report — closes the gap where amendments only ever showed a bare count in the funnel section. */
 async function amendments(req, res) {
+  if (refusedForMoney(req, res, ['selling'])) return;
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
@@ -351,6 +378,7 @@ function trendsCsvRows(months) {
 
 /** Month-over-month trend view — everything else in this module is either a snapshot or a single flat total. */
 async function trends(req, res) {
+  if (refusedForMoney(req, res, ['selling'])) return;
   const months = await reportRepository.monthlyTrends(12);
 
   if (req.query.format === 'csv') {
@@ -400,6 +428,7 @@ async function staff(req, res) {
  * created_at date range) for predictable, consistent semantics.
  */
 async function payments(req, res) {
+  if (refusedForMoney(req, res, ['buyer_payments'])) return;
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
@@ -448,6 +477,7 @@ async function payments(req, res) {
  * supplier legs paid (order_supplier_po).
  */
 async function todaysPayments(req, res) {
+  if (refusedForMoney(req, res, ['buyer_payments'])) return;
   const date = str(req.query.date) || todayIst();
 
   // External QA report Q-RPT-1: supplier payment amounts are internal
@@ -625,6 +655,7 @@ async function deleteDefinition(req, res) {
 
 /** Debtors/receivables ageing report — closes a real gap flagged in the CA/Reports review: outstanding amounts existed, "how overdue" did not. */
 async function ageing(req, res) {
+  if (refusedForMoney(req, res, ['buyer_payments'])) return;
   const data = await reportRepository.ageingReport();
 
   if (req.query.format === 'csv') {
@@ -674,6 +705,7 @@ async function freightCost(req, res) {
 
 /** Product/HS-code sales report — closes a real gap: no view anywhere of which products actually drive business. */
 async function products(req, res) {
+  if (refusedForMoney(req, res, ['selling'])) return;
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
 
@@ -846,6 +878,7 @@ function performanceCsvRows(report) {
 }
 
 async function performance(req, res) {
+  if (refusedForMoney(req, res, ['selling'])) return;
   const preset = str(req.query.preset);
   const preRange = preset !== '' ? presetRange(preset) : null;
 

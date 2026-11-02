@@ -61,8 +61,9 @@ associates (outside people who introduced a client; see below).
 1. Choose the **incentive month**. The list shows its cycle, e.g. "orders
    fully paid 21 Oct to 20 Nov · paid with the November salary".
 2. Pay staff incentives together with the month's salary, through payroll
-   (salary TDS). Pay an associate against their invoice; the CA advises the
-   TDS. An associate's line can be paid only into their **verified** bank
+   (salary TDS). Pay an associate against their invoice; the app works out
+   the associate's TDS (194H, threshold, catch-up, no-PAN rate, abroad
+   papers — [Chapter 24](./24-associates.md), D-235) and fills in the net. An associate's line can be paid only into their **verified** bank
    account, past its waiting days; otherwise it is refused, and **Mark all
    paid** skips it and says how many were skipped. A claw-back (negative
    line) is deducted from the associate's next payment (see

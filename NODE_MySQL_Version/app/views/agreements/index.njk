@@ -1,0 +1,29 @@
+{# Agreements register — Standard list (owner decision 2 Nov 2026, point 4). Port of agreements/index.php. #}
+{% set listOfBoard = kanbanUser %}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>Agreements</h1>
+      <p class="muted" style="margin:0">Every agreement signed with a client, supplier, logistics partner, associate{{ ' or staff member' if canManage else '' }} — its signed copy and dates. A reminder goes out 30 and 7 days before an agreement expires, and on the day.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0">
+      {% if kanbanUser %}<a class="btn-sm btn-secondary" href="/agreements">Switch to board view</a>{% endif %}
+      {% if canManage %}<a class="btn-sm" href="/agreements/new">Add an agreement</a>{% endif %}
+    </div>
+  </div>
+  {% include "agreements/_filters.njk" %}
+  <table class="list">
+    <tr><th>With</th><th>Agreement</th><th>Signed</th><th>Expires</th><th>Status</th><th></th></tr>
+    {% for __a in rows %}
+      <tr>
+        <td><a href="{{ partyUrl(__a.party_type, __a.party_id) }}">{{ __a.party_name }}</a><br><small class="muted">{{ partyTypes[__a.party_type] }}</small></td>
+        <td>{{ __a.agreement_type }}{% if __a.title %}<br><small class="muted">{{ __a.title }}</small>{% endif %}</td>
+        <td>{{ __a.signed_on or '—' }}</td>
+        <td>{{ __a.expires_on or 'No expiry' }}{% if __a.days_left !== null and __a.days_left >= 0 and (__a.status == 'expiring' or __a.status == 'active') %}<br><small class="muted">in {{ __a.days_left }} day(s)</small>{% endif %}{% if __a.terminated_on %}<br><small class="muted">Ended {{ __a.terminated_on }} — {{ __a.terminated_reason }}</small>{% endif %}</td>
+        <td>{% set __st = __a.status %}{% include "agreements/_status_badge.njk" %}</td>
+        <td>{% include "agreements/_actions.njk" %}</td>
+      </tr>
+    {% endfor %}
+    {% if rows.length == 0 %}<tr><td colspan="6" class="muted">No agreements match.</td></tr>{% endif %}
+  </table>
+</div>

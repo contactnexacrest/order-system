@@ -19,10 +19,18 @@ together with the application.
   Updated again 1 Nov 2026 for D-221/D-222: who may approve their own work
   (Admin → Self-approval rules), original BL copies 1 to 10, and the "*"
   on required fields.
+  Updated 2 Nov 2026: 7c starts with the Supplier Link; 7e / 10a start from
+  the Supplier PO; 9a pre-selects the forwarder; the "why is it different?"
+  reason on the advance, freight and balance remittances (5d, 9c, 11c); the
+  COO Prep Sheet (13a) from Stage 8, before the balance clears; the
+  Export Compliance department (filter chip, compliance checklist, 13a);
+  "Sync this order to Zoho now".
 
 The specification (v3) reflects the decisions up to 30 Oct 2026. The
-decisions taken since — D-212 (money descriptions) to D-222 (gap list, CFR
-wording, associates, self-approval rules, QA Round 8) — are in `docs/decisions/owner-decisions-register.md`
+decisions taken since — D-212 (money descriptions) to D-231 (gap list, CFR
+wording, associates, self-approval rules, QA Round 8, document layout and
+wording, freight in rupees, Export Compliance, remittance differences,
+Agreements register, money safety, document copies clean-up) — are in `docs/decisions/owner-decisions-register.md`
 and in the guide and the SOP; where they differ from the specification,
 the register wins.
 

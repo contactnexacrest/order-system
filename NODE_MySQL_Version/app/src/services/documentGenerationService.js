@@ -412,10 +412,11 @@ function stageSequenceFor(code) {
     case 'PL':
     case 'BLI':
       return 7;
+    // Owner 2 Nov 2026 (point 14): the COO Prep Sheet is internal and may be prepared as soon as
+    // Stage 8 opens, so the Certificate of Origin application is ready when the balance clears.
     case 'CI':
-      return 8;
     case 'COOPREP':
-      return 9;
+      return 8;
     default:
       return null;
   }

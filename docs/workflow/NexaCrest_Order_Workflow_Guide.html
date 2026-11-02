@@ -126,6 +126,7 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
         <button class="chip" data-role="export" aria-pressed="false">Export Executive</button>
         <button class="chip" data-role="accounts" aria-pressed="false">Accounts</button>
         <button class="chip" data-role="logistics" aria-pressed="false">Logistics</button>
+        <button class="chip" data-role="compliance" aria-pressed="false">Export Compliance</button>
         <button class="chip" data-role="mgmt" aria-pressed="false">MD / ED / Admin</button>
       </div>
       <span style="flex:1"></span>
@@ -172,7 +173,7 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
 
 <script>
 (function () {
-  var R = { export: 'Export', accounts: 'Accounts', logistics: 'Logistics', mgmt: 'MD/ED/Admin' };
+  var R = { export: 'Export', accounts: 'Accounts', logistics: 'Logistics', compliance: 'Export Compliance', mgmt: 'MD/ED/Admin' };
   // [id, title, roles[], what to do, done when, tag: '' | 'cond:text' | 'side', note]
   var SECTIONS = [
     { key: 'A', color: 'var(--a)', title: 'Order Booking', sub: 'Quotation → Buyer PO → PI & advance → Order Confirmation', groups: [
@@ -194,7 +195,7 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
         ['5c', 'Generate Proforma Invoice', ['export'], 'Generate the PI, approve it and send it to the buyer.', 'the PI is approved and sent.'],
         ['5d', 'Record LC Details', ['accounts', 'mgmt'], 'Upload the final Letter of Credit and record LC number, bank and amount. In the Letter of Credit & Bank Loan card, record the issue date, last shipment date, deadline to present documents and expiry (reminders go out 7 days before each), and every LC amendment.', 'LC details are recorded.', 'cond:LC orders only'],
         ['5e', 'Confirm LC Usable', ['accounts', 'mgmt'], 'Review the LC terms and amendments; confirm it can be used.', 'the LC is confirmed usable.', 'cond:LC orders only'],
-        ['5d', 'Record Advance Remittance', ['accounts', 'export'], 'When the buyer\'s advance arrives (they can upload proof through the Payment Action Link), record the amount received together with that day\'s exchange rate and the bank reference. Paid in parts? Record each receipt; the step shows what is still owed.', 'the remittance is recorded.', 'cond:Advance orders'],
+        ['5d', 'Record Advance Remittance', ['accounts', 'export'], 'When the buyer\'s advance arrives (they can upload proof through the Payment Action Link), record the amount received together with that day\'s exchange rate and the bank reference. Paid in parts? Record each receipt; the step shows what is still owed. If the amount differs from what is due, choose why (a reason from the list, or Other with your own words): bank charges are recorded as a cost and the payment counts as fully received; a short or extra payment is carried to the balance.', 'the remittance is recorded.', 'cond:Advance orders'],
         ['5e', 'Mark Advance Cleared', ['accounts'], 'Confirm the money is actually in the bank (INR credited, charges) and mark the advance cleared.', 'the advance shows as cleared.', 'cond:Advance orders'],
         ['LC', 'LC Payment Received, Letter of Credit & Bank Loan costs', ['mgmt', 'accounts'], 'On LC orders, record the money the bank paid under the LC (with the INR credited and bank charges) and its FIRC / eBRC. If a bank loan is taken for the order, record the loan, interest payments and the interest charged to this order.', 'LC money and financing costs are recorded.', 'side']
       ]},
@@ -206,14 +207,14 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
     ]},
     { key: 'B', color: 'var(--b)', title: 'Procurement & Production', sub: 'Supplier PO → production & estimated shipment', groups: [
       { name: 'Alongside Step 7', steps: [
-        ['CL', 'Compliance Checklist — order tasks', ['mgmt', 'export'], 'Due Diligence, ECGC cover (filed after the OC, so no fee is paid before the buyer commits) and other order tasks: mark each Approved, Not Applicable or Skipped, then Save Checklist.', 'every order task is resolved.', 'side']
+        ['CL', 'Compliance Checklist — order tasks', ['compliance', 'mgmt', 'export'], 'Due Diligence, ECGC cover (filed after the OC, so no fee is paid before the buyer commits) and other order tasks: mark each Approved, Not Applicable or Skipped, then Save Checklist.', 'every order task is resolved.', 'side']
       ]},
       { name: 'Step 7 · Supplier PO', steps: [
         ['7a', 'Save Supplier PO Terms', ['export', 'accounts'], 'Pick the supplier from the Suppliers directory; enter material, grade, finish, size, quantity, unit price, GST % and advance %. An advance of 0% is allowed — the whole amount then becomes the balance.', 'the terms are saved.'],
         ['7b', 'Generate Supplier PO', ['export', 'accounts'], 'Generate the Supplier PO, approve it and send it to the supplier. It never shows the buyer or the buyer\'s prices.', 'the Supplier PO is approved and sent.'],
-        ['7c', 'Attach Supplier PO Acknowledgment', ['export'], 'Send the Supplier Action Link or upload the signed PO yourself — or record that the supplier did not acknowledge, with a reason.', 'the acknowledgment is on file or skipped with a reason.', 'cond:Optional'],
+        ['7c', 'Attach Supplier PO Acknowledgment', ['export'], 'First send the Supplier Link (the supplier uploads the signed PO / acknowledgment there); when they have not, upload it yourself — or record that the supplier did not acknowledge, with a reason.', 'the acknowledgment is on file or skipped with a reason.', 'cond:Optional'],
         ['7d', 'Confirm Supplier Signed & Returned PO', ['export'], 'Confirm the signed PO. Any change to price, quantity or lead time must be reviewed before it changes what we promised the buyer.', 'the signed PO is confirmed.'],
-        ['7e', 'Supplier Advance Paid', ['accounts'], 'Add the supplier\'s advance bill (proforma invoice, GST %, bill attached), then press the green ₹ Mark Paid with date, mode and UTR — in one payment or several. With 0% advance this step completes by itself.', 'the advance bill is paid (or no advance is planned).']
+        ['7e', 'Supplier Advance Paid', ['accounts'], 'Add the supplier\'s advance bill (proforma invoice, GST %, bill attached — taxable value, GST rate and amount asked now start from the Supplier PO; change them if the bill differs; see Help → Supplier & logistics partner payments), then press the green ₹ Mark Paid with date, mode and UTR — in one payment or several. With 0% advance this step completes by itself.', 'the advance bill is paid (or no advance is planned).']
       ]},
       { name: 'Step 8 · Production', steps: [
         ['8a', 'Production & Estimated Shipment', ['export'], 'Keep the production status and estimated shipment date up to date — the client sees the estimate. A reminder arrives 7 days before, to arrange the pre-shipment inspection when one applies. Record the inspection result (Passed / Failed, date, agency, report) in this step — a Failed result alerts the managers and holds the Bill of Lading.', 'production is complete and the shipment date is set.']
@@ -224,14 +225,14 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
         ['LB', 'Logistics Partner Bills & Payments', ['accounts'], 'Add each CHA, transport and freight-forwarder bill, marked Advance or Final, with GST % and the bill attached. An Advance can be paid any time; on CFR/CIF orders a Final bill is paid only after Step 9d. CHA/logistics payments are made in India.', 'every logistics bill is paid.', 'side']
       ]},
       { name: 'Step 9 · Freight payment', steps: [
-        ['9a', 'Save Freight Terms', ['logistics'], 'Record the forwarder\'s freight quote (and insurance for CIF).', 'freight terms are saved.', 'cond:CFR / CIF only — not applicable on FOB'],
+        ['9a', 'Save Freight Terms', ['logistics'], 'Record the forwarder\'s freight quote (and insurance for CIF) in the order\'s currency. The forwarder already billing this order is pre-selected.', 'freight terms are saved.', 'cond:CFR / CIF only — not applicable on FOB'],
         ['9b', 'Generate Debit Note', ['logistics'], 'Generate the freight Debit Note, approve it and send it to the buyer.', 'the Debit Note is sent.', 'cond:CFR / CIF only'],
-        ['9c', 'Record Freight Remittance', ['accounts'], 'Record the buyer\'s freight payment with that day\'s exchange rate. Freight is a separate item from the goods balance.', 'the remittance is recorded.', 'cond:CFR / CIF only'],
+        ['9c', 'Record Freight Remittance', ['accounts'], 'Record the buyer\'s freight payment with that day\'s exchange rate. Freight is a separate item from the goods balance. If the amount differs from what is due, choose why (a reason from the list, or Other with your own words): bank charges are recorded as a cost and the payment counts as fully received; a short or extra payment is carried to the balance.', 'the remittance is recorded.', 'cond:CFR / CIF only'],
         ['9d', 'Mark Freight Cleared', ['accounts', 'logistics'], 'Confirm the freight money is in the bank and mark it cleared. Final logistics bills can be paid from here on.', 'freight shows as cleared.', 'cond:CFR / CIF only']
       ]},
       { name: 'Step 10 · Packing & BL instruction', steps: [
-        ['CL', 'Compliance Checklist — shipment tasks', ['logistics', 'mgmt'], 'Fumigation, phytosanitary certificate, pre-shipment inspection and other shipment tasks: Approved, Not Applicable or Skipped.', 'every shipment task is resolved.', 'side'],
-        ['10a', 'Supplier Balance Paid (before packing)', ['accounts'], 'Add the supplier\'s tax invoice for the balance and Mark Paid. When an advance was planned, it must be paid first.', 'the supplier balance is paid.'],
+        ['CL', 'Compliance Checklist — shipment tasks', ['compliance', 'logistics', 'mgmt'], 'Fumigation, phytosanitary certificate, pre-shipment inspection and other shipment tasks: Approved, Not Applicable or Skipped.', 'every shipment task is resolved.', 'side'],
+        ['10a', 'Supplier Balance Paid (before packing)', ['accounts'], 'Add the supplier\'s tax invoice for the balance (pre-filled from the Supplier PO; pick the proforma it replaces) and Mark Paid the balance (bill total minus the advance already paid). When an advance was planned, it must be paid first.', 'the supplier balance is paid.'],
         ['10b', 'Save Packing & Crates', ['logistics'], 'Enter crate numbers, marks, products, quantities, net/gross weights and dimensions.', 'packing is saved.'],
         ['10c', 'Generate Packing List', ['logistics'], 'Generate and approve the Packing List.', 'the Packing List is approved.'],
         ['10d', 'Save Shipping Details', ['logistics'], 'Record booking, vessel, container and seal details.', 'shipping details are saved.'],
@@ -242,7 +243,7 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
       { name: 'Step 11 · Commercial Invoice & balance', steps: [
         ['11a', 'Generate Commercial Invoice', ['export', 'accounts'], 'Generate the CI. Its date is today by default; pick an earlier date when the CI must carry the BL date (never a future date). FOB orders raise the CI before shipment.', 'the CI is approved.'],
         ['11b', 'Mark Scanned BL Copy Sent to Buyer', ['export'], 'Send the scanned BL and the CI to the buyer with the payment instructions and due date. On post-BL and LC orders the balance due date is set now (today + the order\'s balance days); an overdue balance is reminded daily.', 'it is marked sent.'],
-        ['11c', 'Record Balance Remittance', ['accounts'], 'Record the buyer\'s balance payment with that day\'s exchange rate and the bank reference; paid in parts, record each receipt. On "before shipment" orders this is done before the Bill of Lading, against the PI.', 'the remittance is recorded.'],
+        ['11c', 'Record Balance Remittance', ['accounts'], 'Record the buyer\'s balance payment with that day\'s exchange rate and the bank reference; paid in parts, record each receipt. On "before shipment" orders this is done before the Bill of Lading, against the PI. If the amount differs from what is due, choose why (a reason from the list, or Other with your own words): bank charges are recorded as a cost and the payment counts as fully received; a short or extra payment is carried to the balance.', 'the remittance is recorded.'],
         ['11d', 'Mark Balance Cleared', ['accounts'], 'Confirm the money is in the bank and mark the balance cleared. Still owed? A manager with Approve short payment — not the person who recorded the receipts, unless their role is allowed in Self-approval rules — clears it with a reason. On "before shipment" orders the balance is cleared before shipment, and Complete Step 11 passes the stage once the CI is approved.', 'the balance shows as cleared.']
       ]}
     ]},
@@ -254,7 +255,7 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
         ['12d', 'Team Incentive', ['mgmt'], 'Owner and MD only: set the reward for this order (₹0 = the reward table), exclude it, change who did a role, or switch associate commission. It is fixed by itself when the buyer has fully paid and becomes the order\'s Commission cost; Accounts pays it with the salary on the last day of the month.', 'the incentive is fixed and paid.', 'side']
       ]},
       { name: 'Step 13 · Documents & settlement', steps: [
-        ['13a', 'Generate COO Prep Sheet', ['logistics'], 'Generate the Certificate of Origin preparation sheet.', 'the sheet is generated.'],
+        ['13a', 'Generate COO Prep Sheet', ['compliance', 'logistics'], 'Generate the Certificate of Origin preparation sheet — possible as soon as the BL is issued (Stage 8), before the balance clears, so the Certificate of Origin can be applied for early. Originals still go to the buyer only after the balance clears.', 'the sheet is generated.'],
         ['13b', 'Record Original BLs Received from CHA', ['logistics'], 'Record when the original BLs arrive from the CHA and how many original copies came (1 to 10).', 'receipt is recorded.'],
         ['13c', 'Save BL Endorsement Details', ['logistics'], 'Enter the endorsement details.', 'details are saved.'],
         ['13d', 'Generate / Print BL Endorsement', ['logistics'], 'Generate and print the endorsement.', 'it is printed.'],
@@ -271,7 +272,7 @@ footer{font-size:12.5px;color:var(--muted);text-align:center}
     { key: 'E', color: 'var(--e)', title: 'After-Sales & Records', sub: 'Use whenever needed — these never block the order', groups: [
       { name: 'Any time', steps: [
         ['DR', 'Document Review & Approval', ['export', 'mgmt'], 'Every generated document is reviewed and approved here before it is sent.', 'no document is waiting for action.', 'side'],
-        ['ZB', 'Check against Zoho Books', ['accounts', 'mgmt'], 'Once Zoho Books is switched on, the order page\'s "Check this order against Zoho Books" compares the invoices, payments, bills and expenses with Books (it only reads).', 'everything shows as a match.', 'side'],
+        ['ZB', 'Check against Zoho Books', ['accounts', 'mgmt'], 'Once Zoho Books is switched on, the order page\'s "Check this order against Zoho Books" compares the invoices, payments, bills and expenses with Books (it only reads). "Sync this order to Zoho now" next to it sends this order\'s records straight away; the whole app syncs from Zoho Sync in the menu.', 'everything shows as a match.', 'side'],
         ['OC', 'Order Communication', ['export'], 'Messages with the client about this order.', '—', 'side'],
         ['AM', 'Amendments', ['mgmt', 'export'], 'Record a mutually agreed change to the terms; affected documents are flagged for regeneration.', 'the amendment is recorded.', 'side'],
         ['14', 'Additional Documents', ['export', 'logistics'], 'Upload any other document the order needs.', '—', 'side'],

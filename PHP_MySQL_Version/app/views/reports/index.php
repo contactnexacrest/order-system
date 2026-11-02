@@ -39,6 +39,12 @@ $__uid = $__u ? (int) $__u['id'] : 0;
   </div>
 
   <div class="section">
+    <h2>Missing eBRC / FIRC</h2>
+    <p class="muted">Buyer payments received with no FIRC / eBRC reference yet — settling an order does not wait for them, this list does the chasing.</p>
+    <a class="btn-sm" href="/reports/missing-ebrc">Open Missing eBRC / FIRC</a>
+  </div>
+
+  <div class="section">
     <h2>Disputes &amp; Amendments</h2>
     <p class="muted">Status/aging breakdown for disputes, and status/requested-by breakdown for amendments — across all orders.</p>
     <div class="btn-row">

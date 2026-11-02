@@ -43,6 +43,8 @@ final class PermittedLinks
         '#^/incentives/payouts(?:[/?\#]|$)#'                        => ['pay_incentives'],
         // Owner decision 1 Nov 2026 (AS-11): associates.
         '#^/reports/associates(?:[/?\#]|$)#'                       => ['manage_associates'],
+        // D-235 (2 Nov 2026): the associate TDS register is for Finance / incentive payers / the CA.
+        '#^/associates/tds(?:[/?\#]|$)#'                           => ['manage_incentives', 'pay_incentives', 'ca_module_view'],
         '#^/associates/\d+/bank/\d+/number(?:[/?\#]|$)#'           => ['manage_associate_bank'],
         '#^/associates/\d+/documents/\d+(?:[/?\#]|$)#'             => ['manage_associates', 'manage_associate_bank'],
         '#^/associates/(?:new|ladder|\d+/(?:edit|view-as|agreement))(?:[/?\#]|$)#' => ['manage_associates'],
@@ -52,6 +54,8 @@ final class PermittedLinks
         // Owner decision 1 Nov 2026 (A-7 / A-9): each needs only the money it shows.
         '#^/reports/freight-cost(?:[/?\#]|$)#'                      => ['view_logistics_costs'],
         '#^/reports/suppliers(?:[/?\#]|$)#'                         => ['view_purchase_prices'],
+        // D-234 (2 Nov 2026): Missing eBRC / FIRC report.
+        '#^/reports/missing-ebrc(?:[/?\#]|$)#'                     => ['ca_module_view', 'manage_export_benefit_claims', 'manage_order_financials'],
         '#^/reports(?:[/?\#]|$)#'                                   => ['view_reports'],
         '#^/clients(?:[/?\#]|$)#'                                   => ['manage_orders', 'view_clients'],
         '#^/orders(?:[/?\#]|$)#'                                    => ['manage_orders', 'view_orders'],

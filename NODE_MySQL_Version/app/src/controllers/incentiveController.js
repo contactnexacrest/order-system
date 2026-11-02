@@ -10,6 +10,10 @@ const incentiveRepository = require('../repositories/incentiveRepository');
 const orderRepository = require('../repositories/orderRepository');
 const userRepository = require('../repositories/userRepository');
 const incentiveService = require('../services/incentiveService');
+const associateTds = require('../services/associateTds');
+const associateDocumentRepository = require('../repositories/associateDocumentRepository');
+const associateRepository = require('../repositories/associateRepository');
+const fileUploadService = require('../services/fileUploadService');
 const fieldValidator = require('../helpers/fieldValidator');
 
 /**
@@ -264,10 +268,10 @@ async function payouts(req, res) {
   const rows = await incentiveRepository.payoutsForMonth(month);
   if ((req.query || {}).format === 'csv') {
     csv.stream(res, `incentives-${month}.csv`,
-      ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)'],
+      ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)', 'TDS section', 'TDS rate %', 'TDS reason'],
       rows.map((r) => [r.user_name ?? r.associate_name, r.payee_kind, r.buyer_inquiry_ref || r.order_reference,
         r.payee_kind === 'associate' ? 'Associate (agreement)' : (incentiveRepository.ROLES[r.role] ?? r.role),
-        r.amount_inr, r.amount_fc, r.currency_code, r.status, r.paid_on, r.paid_inr, r.tds_inr]));
+        r.amount_inr, r.amount_fc, r.currency_code, r.status, r.paid_on, r.paid_inr, r.tds_inr, r.tds_section ?? null, r.tds_rate ?? null, r.tds_reason ?? null]));
     return;
   }
   let staffTotal = 0;
@@ -288,7 +292,12 @@ async function payouts(req, res) {
     }
     r.amountPlain = Number(r.amount_inr).toFixed(2);
     r.earliestPaidOn = incentiveService.earliestPaidOn(String(r.incentive_month));
+    // Owner decision 2 Nov 2026 (D-235): the TDS worked out for each associate payout still due, as of today.
+    if (r.payee_kind === 'associate' && r.status === 'due' && Number(r.amount_inr) > 0) {
+      r.tdsCalc = await associateTds.compute(r, todayIso());
+    }
   }
+  const tdsSettings = await associateTds.settings();
   res.renderView('incentives/payouts', {
     paidVia: incentiveRepository.PAID_VIA,
     staffTotal,
@@ -300,6 +309,8 @@ async function payouts(req, res) {
     rows,
     earliestPaidOn: incentiveService.earliestPaidOn(month),
     cutoff: s.cutoff,
+    tdsSettings,
+    tdsRatePct: associateTds.pct(tdsSettings.rate),
   }, 'layout/base');
 }
 
@@ -330,6 +341,7 @@ async function markPaid(req, res) {
   }
   let count = 0;
   let skipped = 0;
+  let skippedDocs = 0;
   for (const id of ids) {
     const payout = await incentiveRepository.findPayout(id);
     if (!payout || payout.status !== 'due' || Number(payout.amount_inr) < 0) {
@@ -346,8 +358,45 @@ async function markPaid(req, res) {
       skipped++;
       continue;
     }
-    const paidInr = single && isNum(body.paid_inr) ? Number(body.paid_inr) : Number(payout.amount_inr);
-    const tds = single && isNum(body.tds_inr) ? Number(body.tds_inr) : null;
+    // Owner decision 2 Nov 2026 (D-235): the app works out the TDS on an associate's commission.
+    let tdsCalc = null;
+    let overrideReason = null;
+    if (payout.payee_kind === 'associate') {
+      tdsCalc = await associateTds.compute(payout, paidOn);
+      if (tdsCalc.abroad) {
+        if (single) {
+          await storeRemittanceForms(req, payout);
+          tdsCalc = await associateTds.compute(payout, paidOn);
+        }
+        const missing = [...tdsCalc.missing_foreign, ...tdsCalc.missing_payout];
+        if (missing.length > 0) {
+          if (single) {
+            flash.set(req, 'error', `Before paying an associate based abroad, these must be on file: ${missing.join(', ')}. The TRC, Form 10F and no-PE declaration are accepted on the associate's Documents tab; Form 15CA${(await associateTds.settings()).cb_required ? ' and 15CB are' : ' is'} attached to this payment.`);
+            res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+            return;
+          }
+          skippedDocs++;
+          continue;
+        }
+      }
+    }
+    const paidInr = single && isNum(body.paid_inr) ? Number(body.paid_inr) : (tdsCalc ? tdsCalc.net : Number(payout.amount_inr));
+    const tds = single && isNum(body.tds_inr) ? Number(body.tds_inr) : (tdsCalc ? tdsCalc.tds : null);
+    if (tdsCalc) {
+      if (Math.abs(Number(tds || 0) - tdsCalc.tds) > 0.5) {
+        overrideReason = String(body.tds_override_reason || '').trim();
+        if ([...overrideReason].length < 10) {
+          flash.set(req, 'error', `The TDS worked out for this payment is ₹${money(tdsCalc.tds)} (${tdsCalc.reason}). To record a different TDS, give the reason (at least 10 characters), e.g. the CA's advice or a lower-deduction certificate.`);
+          res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+          return;
+        }
+      }
+      if (paidInr + Number(tds || 0) > tdsCalc.gross + 0.005) {
+        flash.set(req, 'error', `The amount paid plus the TDS cannot be more than the commission (₹${money(tdsCalc.gross)}).`);
+        res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+        return;
+      }
+    }
     if (paidInr <= 0 || (tds !== null && (tds < 0 || tds > paidInr))) {
       flash.set(req, 'error', 'Enter the amount paid above 0, and TDS between 0 and that amount.');
       res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
@@ -370,18 +419,60 @@ async function markPaid(req, res) {
       continue;
     }
     await auditLogRepository.log(req.user.id, 'INCENTIVE_PAID', 'incentive_payouts', id, 'status', 'due', 'paid');
+    if (tdsCalc) {
+      const recordedTds = Number(tds || 0);
+      await incentiveRepository.setPayoutTds(id,
+        recordedTds > 0 ? (overrideReason !== null && tdsCalc.gross > 0 ? Math.round(recordedTds / tdsCalc.gross * 10000) / 100 : tdsCalc.rate) : 0,
+        recordedTds > 0 ? (tdsCalc.section || (await associateTds.settings()).section) : null,
+        overrideReason !== null ? `changed by hand: ${overrideReason} (worked out: ₹${money(tdsCalc.tds)}, ${tdsCalc.reason})` : tdsCalc.reason,
+        overrideReason);
+      if (overrideReason !== null) {
+        await auditLogRepository.log(req.user.id, 'ASSOCIATE_TDS_OVERRIDDEN', 'incentive_payouts', id, 'tds_inr', tdsCalc.tds.toFixed(2), recordedTds.toFixed(2), overrideReason);
+      }
+    }
     if (payout.payee_kind === 'associate') {
       await associateService.onPayoutPaid(id, req.user.id);
     }
     count++;
   }
   // QA Round 6, R6-N11: nothing selected (or all already paid) is not a success.
+  const docsNote = skippedDocs ? ` ${skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA${(await associateTds.settings()).cb_required ? '/15CB' : ''} not yet on file — pay them one by one.` : '';
   if (count === 0) {
-    flash.set(req, 'warning', `Nothing was recorded — no payout due for payment was selected.${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}`);
+    flash.set(req, 'warning', `Nothing was recorded — no payout due for payment was selected.${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}${docsNote}`);
   } else {
-    flash.set(req, 'success', `${count === 1 ? 'Payment recorded.' : `${count} payments recorded.`}${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}`);
+    flash.set(req, 'success', `${count === 1 ? 'Payment recorded.' : `${count} payments recorded.`}${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}${docsNote}`);
   }
   res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+}
+
+
+const money = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * Owner decision 2 Nov 2026 (D-235): Form 15CA / 15CB attached to the
+ * payment of an associate based abroad, kept on the associate's documents
+ * against this payout.
+ */
+async function storeRemittanceForms(req, payout) {
+  const files = req.files || {};
+  const associate = await associateRepository.find(Number(payout.associate_id));
+  for (const [kind, field] of [['form_15ca', 'form_15ca_file'], ['form_15cb', 'form_15cb_file']]) {
+    const f = Array.isArray(files[field]) ? files[field][0] : null;
+    if (!f) continue;
+    let fileId;
+    const saved = req.file;
+    req.file = f;
+    try {
+      fileId = await fileUploadService.handleUpload(req, field, 'associate_document', 'associates/documents', null, null, req.user.id, null, associate ? associate.name : '', associateDocumentRepository.KINDS[kind]);
+    } catch (e) {
+      flash.setErrorFromException(req, e);
+      continue;
+    } finally {
+      req.file = saved;
+    }
+    await associateDocumentRepository.add(Number(payout.associate_id), kind, fileId, Number(payout.id), null, false, req.user.id);
+    await auditLogRepository.log(req.user.id, 'ASSOCIATE_DOCUMENT_UPLOADED', 'associates', Number(payout.associate_id), 'kind', null, kind);
+  }
 }
 
 module.exports = {

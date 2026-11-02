@@ -165,9 +165,13 @@ final class PaymentMilestoneController
             $due = round($fob * (float) $m['pct'] / 100, 2);
             if ($fob > 0 && $amount > $fob + 0.005) {
                 $error = sprintf('%s %s is more than the whole order value (%s %s). Check the amount the bank received.', $currency, number_format($amount, 2), $currency, number_format($fob, 2));
-            } elseif ($due > 0 && abs($amount - $due) > max(1.0, $due * 0.01) && empty($_POST['confirm_amount_differs'])) {
-                $error = sprintf('Milestone %d due on this order is %s %s (%s%% of %s %s). You entered %s %s — if that really is what the bank received, tick "The amount received differs from the milestone due" and save again.',
-                    (int) $m['seq'], $currency, number_format($due, 2), self::pct((float) $m['pct']), $currency, number_format($fob, 2), $currency, number_format($amount, 2));
+            } else {
+                // Owner 2 Nov 2026 ("18 yes"): an amount that differs from the milestone due says why.
+                // Follow-up (2 Nov 2026): the reason comes from the admin-managed list, or "Other" typed in.
+                $chargesRaw = trim((string) ($_POST['bank_charges'] ?? ''));
+                $diffEval = \App\Services\RemittanceDifference::evaluatePosted($_POST, 'Milestone ' . (int) $m['seq'], $currency, $due, 0.0, $amount,
+                    $chargesRaw !== '' && is_numeric($chargesRaw) ? (float) $chargesRaw : null);
+                $error = $diffEval['error'] ?? null;
             }
         }
         if ($error !== null) {
@@ -176,12 +180,19 @@ final class PaymentMilestoneController
             return;
         }
         $userId = (int) AuthService::currentUserId();
-        PaymentMilestoneRepository::recordReceived((int) $m['id'], $amount, $receivedOn, $rate, $bankRef, $note, $userId);
-        // Gap list G-5: the receipt is kept in the order's receipt history too.
-        \App\Services\PartPaymentService::addMilestoneReceipt($m, $amount, $receivedOn, $rate, $bankRef, $note, $userId);
+        $diffEval = $diffEval ?? ['reason' => null, 'charges' => 0.0, 'excess' => 0.0, 'remaining' => 0.0];
+        $charges = (float) $diffEval['charges'];
+        \App\Config\Database::transaction(static function () use ($m, $amount, $charges, $receivedOn, $rate, $bankRef, $note, $userId, $diffEval, $orderId): void {
+            // The milestone holds what the buyer paid: received plus any bank charges the banks deducted (owner, 2 Nov 2026).
+            PaymentMilestoneRepository::recordReceived((int) $m['id'], round($amount + $charges, 2), $receivedOn, $rate, $bankRef, $note, $userId);
+            // Gap list G-5: the receipt is kept in the order's receipt history too.
+            $receiptId = \App\Services\PartPaymentService::addMilestoneReceipt($m, $amount, $receivedOn, $rate, $bankRef, $note, $userId, $diffEval['reason'], $charges);
+            \App\Services\RemittanceDifference::afterReceipt($orderId, 'milestone', $m, $receiptId, $diffEval, $amount, $rate, $receivedOn, $bankRef, $userId);
+        });
         $description = PaymentDescription::milestonePayment(PaymentMilestoneRepository::find((int) $m['id']) ?? $m);
         AuditLogRepository::log($userId, 'MILESTONE_PAYMENT_RECORDED', 'order_payment_milestones', (int) $m['id'], 'received_amount', null, $description);
-        Flash::set('success', "Recorded: {$description}. Mark it cleared once your bank confirms receipt.");
+        $outcome = \App\Services\RemittanceDifference::outcome('milestone', 'Milestone ' . (int) $m['seq'], (string) ((OrderRepository::find($orderId) ?? [])['currency_code'] ?? ''), $diffEval, $amount, $rate);
+        Flash::set('success', "Recorded: {$description}." . ($outcome !== '' ? " {$outcome}" : '') . ' Mark it cleared once your bank confirms receipt.');
         self::back($orderId);
     }
 

@@ -303,8 +303,10 @@ final class DocumentGenerationService
             'SUPPO' => 5,
             'FDN' => 6,
             'PL', 'BLI' => 7,
-            'CI' => 8,
-            'COOPREP' => 9,
+            // Owner 2 Nov 2026 (point 14): the COO Prep Sheet is internal and may be prepared
+            // as soon as Stage 8 opens, so the Certificate of Origin application is ready when the
+            // balance clears. Nothing goes to the buyer from it.
+            'CI', 'COOPREP' => 8,
             default => null,
         };
     }

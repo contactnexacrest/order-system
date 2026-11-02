@@ -564,7 +564,8 @@ async function markPaid(payoutId, paidOn, paidInr, tdsInr, userId, paidVia = nul
   }
   const entry = (await incentiveRepository.costEntries(Number(payout.order_id)))[kind];
   if (entry) {
-    await incentiveRepository.settleCostEntry(Number(entry.id), round2(rows.reduce((sum, p) => sum + Number(p.paid_inr), 0)),
+    // Owner decision 2 Nov 2026 (D-235): an associate's cost is the gross commission — the TDS kept back is still part of it.
+    await incentiveRepository.settleCostEntry(Number(entry.id), round2(rows.reduce((sum, p) => sum + Number(p.paid_inr) + (payout.payee_kind === 'associate' ? Number(p.tds_inr || 0) : 0), 0)),
       rows.map((p) => String(p.paid_on).slice(0, 10)).sort().pop(), paidNote(rows));
   }
   return true;

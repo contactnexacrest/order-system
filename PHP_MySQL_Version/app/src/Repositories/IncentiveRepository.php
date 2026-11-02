@@ -198,6 +198,20 @@ final class IncentiveRepository
         return $stmt->rowCount() === 1;
     }
 
+    /** Owner decision 2 Nov 2026 (D-235): the TDS rate, section and reason used on an associate payout. */
+    public static function setPayoutTds(int $id, ?float $rate, ?string $section, ?string $reason, ?string $overrideReason): void
+    {
+        Database::connection()->prepare('UPDATE incentive_payouts SET tds_rate = :r, tds_section = :s, tds_reason = :why, tds_override_reason = :o WHERE id = :id')
+            ->execute(['r' => $rate, 's' => $section, 'why' => $reason !== null ? mb_substr($reason, 0, 255) : null, 'o' => $overrideReason !== null ? mb_substr($overrideReason, 0, 255) : null, 'id' => $id]);
+    }
+
+    /** Owner decision 2 Nov 2026 (D-235): the challan Accounts deposited the TDS with. */
+    public static function setPayoutChallan(int $id, ?string $challanNo, ?string $challanDate): void
+    {
+        Database::connection()->prepare("UPDATE incentive_payouts SET tds_challan_no = :n, tds_challan_date = :d WHERE id = :id AND payee_kind = 'associate' AND status = 'paid' AND tds_inr > 0")
+            ->execute(['n' => $challanNo, 'd' => $challanDate, 'id' => $id]);
+    }
+
     /** Owner decision 1 Nov 2026 (AS-3): a due payout put on hold, with the reason. */
     public static function holdPayout(int $id, string $reason): bool
     {

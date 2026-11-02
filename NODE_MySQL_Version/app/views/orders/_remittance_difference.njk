@@ -1,0 +1,46 @@
+{#
+  Owner decision (2 Nov 2026, "18 yes"): on every buyer remittance form, when
+  the amount differs from what is still due, the person recording it says
+  why. Follow-up the same day: the reason is chosen from a list Admin keeps
+  (Settings → Remittance difference reasons), each reason mapped to how the
+  difference is treated, with "Other — type the reason" last; the browser
+  offers only the reasons that fit the amount typed and the server checks the
+  same. Port of _remittance_difference.php. Expects rd = { label, due, so_far,
+  currency, max_pct } and remittanceReasons (the active list).
+#}
+{% set rdRemaining = ((rd.due | float) - (rd.so_far | float)) if ((rd.due | float) - (rd.so_far | float)) > 0 else 0 %}
+{% set rdGroups = [
+  ['bank_charges', 'Bank charges deducted — counted as received in full; the charges become an order cost'],
+  ['short', 'Buyer paid less (short payment)'],
+  ['excess', 'Buyer paid more']
+] %}
+<fieldset class="remit-diff" data-remit-diff data-due="{{ (rd.due | float).toFixed(2) }}" data-remaining="{{ rdRemaining.toFixed(2) }}" data-currency="{{ rd.currency }}" data-label="{{ rd.label | lower }}" data-max-pct="{{ rd.max_pct }}">
+  <label>Why is it different? <small class="muted">(only when the amount differs from the {{ rd.label | lower }} still due{% if (rd.due | float) > 0 %}, {{ rd.currency }} {{ rdRemaining | money }}{% endif %})</small>
+    <select name="difference_reason_choice" data-remit-reason>
+      <option value="" data-none>Amount as due — no difference</option>
+      {% for g in rdGroups %}
+        <optgroup label="{{ g[1] }}" data-treatment-group="{{ g[0] }}">
+          {% for r in remittanceReasons %}{% if r.treatment == g[0] %}
+            <option value="{{ r.id }}" data-treatment="{{ g[0] }}">{{ r.label }}</option>
+          {% endif %}{% endfor %}
+        </optgroup>
+      {% endfor %}
+      <option value="other" data-treatment="other">Other — type the reason</option>
+    </select>
+  </label>
+  <div data-show-when="difference_reason_choice=other" class="remit-diff-other">
+    <label>Reason in your own words * <input type="text" name="difference_reason_other" minlength="10" maxlength="255" required placeholder="e.g. Buyer's bank deducted a SWIFT fee and a courier charge"></label>
+    <label>Treat it as *
+      <select name="difference_treatment" required data-remit-treatment>
+        <option value="">Choose…</option>
+        <option value="bank_charges">Bank charges deducted by the banks</option>
+        <option value="short">Buyer paid less (short payment)</option>
+        <option value="excess">Buyer paid more</option>
+      </select>
+    </label>
+  </div>
+  <label data-remit-charges-wrap hidden style="display:none;">Bank charges <small class="muted">(in {{ rd.currency }} — filled with the difference; change it if the bank's advice shows another figure; at most {{ rd.max_pct }}% of the amount due)</small><input type="number" step="0.01" min="0.01" name="bank_charges" data-remit-charges placeholder="e.g. 20.00" disabled></label>
+  <p class="muted small" data-remit-diff-preview></p>
+</fieldset>
+{# Owner (2 Nov 2026): our own bank's fee, recorded with the receipt so nobody books it again later. #}
+<label>Our bank's charges on this credit (&#8377;, incl. GST) <small class="muted">(optional — the inward-remittance fee our bank debits separately, from the bank advice; booked as an order cost "Bank Charges" now)</small><input type="number" step="0.01" min="0.01" max="100000.00" name="own_bank_charges_inr" placeholder="e.g. 590.00"></label>

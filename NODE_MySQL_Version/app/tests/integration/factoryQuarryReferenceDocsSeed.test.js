@@ -32,6 +32,9 @@ describe('Factory/Quarry reference documents seed', () => {
     'International Sales & Supply Agreement (Template)',
     'Mutual NDA — Commercial Counterparty (Template)',
     'Staff Confidentiality & NDA (Template)',
+    // Owner points 11/12 (2 Nov 2026): the payment guide sits with the other guidelines.
+    'Supplier & Logistics Payments Guide (PDF)',
+    'Supplier & Logistics Payments Guide (Word)',
   ];
 
   it('seed creates all seven documents with files attached', async () => {
@@ -59,6 +62,6 @@ describe('Factory/Quarry reference documents seed', () => {
       checked += 1;
     }
 
-    expect(checked).toBe(7);
+    expect(checked).toBe(9);
   });
 });

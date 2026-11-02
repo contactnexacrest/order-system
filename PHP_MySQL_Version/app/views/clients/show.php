@@ -163,6 +163,8 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
     <?php endif; ?>
   </div>
 
+  <?php require __DIR__ . '/_ecgc.php'; ?>
+
   <div class="section">
     <h2>Orders</h2>
     <?php if ($canManageOrders): ?>
@@ -278,3 +280,5 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
   </script>
   <?php endif; ?>
 </div>
+
+<?php if (!empty($client["id"])) { $__partyType = "client"; $__partyId = (int) $client["id"]; require __DIR__ . "/../agreements/_party_card.php"; } ?>

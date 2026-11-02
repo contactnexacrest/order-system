@@ -262,10 +262,10 @@ final class PaymentMilestoneTest extends DbTestCase
         $post = ['exchange_rate' => '84.1', 'bank_reference' => 'UTR778899', 'received_on' => date('Y-m-d')];
         self::assertSame('USD 999,999.00 is more than the whole order value (USD 4,500.00). Check the amount the bank received.',
             $this->call('record', ['amount' => '999999'] + $post, ['milestoneId' => (string) $m['id']]));
-        self::assertSame('Milestone 2 due on this order is USD 2,250.00 (50% of USD 4,500.00). You entered USD 2,000.00 — if that really is what the bank received, tick "The amount received differs from the milestone due" and save again.',
+        self::assertSame('The milestone 2 still due is USD 2,250.00. You entered USD 2,000.00 — a difference of USD 250.00. Choose why it is different in the Reason list and save again.',
             $this->call('record', ['amount' => '2000'] + $post, ['milestoneId' => (string) $m['id']]));
         self::assertNull(PaymentMilestoneRepository::find((int) $m['id'])['received_amount']);
-        self::assertStringStartsWith('Recorded: Milestone 2', $this->call('record', ['amount' => '2000', 'confirm_amount_differs' => '1'] + $post, ['milestoneId' => (string) $m['id']]));
+        self::assertStringStartsWith('Recorded: Milestone 2', $this->call('record', ['amount' => '2000', 'difference_reason_choice' => (string) \App\Services\RemittanceDifference::reasonIdFor('short')] + $post, ['milestoneId' => (string) $m['id']]));
         self::assertSame('2000.00', PaymentMilestoneRepository::find((int) $m['id'])['received_amount']);
     }
 }

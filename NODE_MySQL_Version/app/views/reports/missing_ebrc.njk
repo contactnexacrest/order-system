@@ -1,0 +1,26 @@
+{# Port of missing_ebrc.php. Owner decision (2 Nov 2026, gap-list Q-6a): settle without waiting for eBRC — list what is missing instead. #}
+<div class="card page-wide">
+  <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
+  <h1>Missing eBRC / FIRC</h1>
+  <p class="muted">Every buyer payment that has reached the bank but has no FIRC / eBRC reference recorded yet. Marking an order fully settled does not wait for these — this list is how nothing is forgotten. Rows older than {{ alertDays }} days are past the FEMA realisation reminder.</p>
+  <p><a class="btn-sm" href="/reports/missing-ebrc?format=csv">Download CSV</a></p>
+  {% if not rows.length %}
+    <p class="muted">Nothing missing — every received payment has its FIRC / eBRC reference.</p>
+  {% else %}
+  <table class="list">
+    <tr><th>Order</th><th>Buyer</th><th>Payment</th>{% if showAmounts %}<th>Amount</th>{% endif %}<th>Received on</th><th>Days since receipt</th><th>Owner</th></tr>
+    {% for r in rows %}
+    <tr{% if r.days > alertDays %} class="row-warn"{% endif %}>
+      <td><a href="/orders/{{ r.order_id }}">{{ r.order_reference }}</a></td>
+      <td>{{ r.client }}</td>
+      <td>{{ r.label }}</td>
+      {% if showAmounts %}<td>{{ r.currency }} {{ r.amount | money }}</td>{% endif %}
+      <td>{{ r.received_at }}</td>
+      <td>{{ r.days }}{% if r.days > alertDays %} &#9888;{% endif %}</td>
+      <td>{{ r.owners if r.owners != '' else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="muted small">{{ rows.length }} payment(s) on {{ orderCount }} order(s).</p>
+  {% endif %}
+</div>

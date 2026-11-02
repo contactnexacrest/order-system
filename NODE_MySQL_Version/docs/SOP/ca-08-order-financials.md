@@ -58,7 +58,7 @@ later):
 | **12a · Order Costs** | One table of every cost on the order, and a **+ Add a cost** button that opens and closes like **+ Add an expense** (owner request 2026-10-27), with a type picker inside (other cost, travel, inspection fee, LC/bank loan — each opens its own short form; parts 4–6 below). Actual order expenses with receipts are added under **+ Add an expense** (see "Order expenses" below); supplier and logistics bills come in by themselves. Expenses booked in Zoho Books and linked to the order are listed under it and count in its cost, except a possible duplicate (part 3 below). | You click **Costs are complete** (you can still add a cost later, or **Reopen costs**). |
 | **12b · Export Benefit Eligibility** | Answer Eligible / Not Eligible for every scheme (part 1). | No scheme is still Pending. |
 | **12c · Review Profit & Complete** | Read the Profitability Summary (part 7; it also shows, for information only, the GST paid on the order's purchases — refundable under LUT for the whole period, see [CA-09](./ca-09-gst-refunds.md)), generate the Internal Annexure if needed, then **Mark Step 12 complete** (needs 12a and 12b done). | Marked complete — or skipped with a reason. |
-| **12d · Team Incentive** (only people with "Manage team incentives": the owner and the MD) | The order's team incentive and any associate commission: the amount set on this order or the reward table, who gets what, Exclude, and associate commission Automatic / Yes / No. Fixed when the buyer has fully paid; it then shows in 12a as the order's **Commission** cost lines and goes to Zoho Books once paid. See [chapter 20](./20-incentives.md). | Nothing to tick: it is fixed by itself when the buyer has fully paid. |
+| **12d · Team Incentive** (only people with "Manage team incentives": the owner and the MD) | The order's team incentive and any associate commission: the amount set on this order or the reward table, who gets what, Exclude, and associate commission Automatic / Yes / No (shown only when the client was brought by an associate — owner decision 2 Nov 2026; otherwise nothing associate-related appears on the order page). Fixed when the buyer has fully paid; it then shows in 12a as the order's **Commission** cost lines and goes to Zoho Books once paid. See [chapter 20](./20-incentives.md). | Nothing to tick: it is fixed by itself when the buyer has fully paid. |
 
 **Government benefits claimed & received moved to Step 13g** (owner
 decision 2026-10-27) — just before Mark Fully Settled, because the money
@@ -231,7 +231,8 @@ the LC, record the **date the bank paid**, the **amount** in the order
 currency, the **rupees credited** (from the bank's credit advice) and the
 **bank charges deducted**, and the **bank reference of the credit** (UTR /
 bank ref. / FIRC no.; required, rule D-212 — it goes into the payment's
-description). It goes to Zoho Books as the buyer's payment
+description). It goes to Zoho Books at the next sync (hourly, or Sync now)
+as the buyer's payment
 against the Commercial Invoice (see
 [CA-03](./ca-03-zoho-sync.md)); until then it can be corrected here, after
 that only in Books.

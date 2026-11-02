@@ -1,0 +1,27 @@
+{# "Agreements" card on a client / supplier / logistics partner / associate / staff page (owner decision 2 Nov 2026, point 4).
+   Expects agreementCard (from agreementController.partyCard, null when this person may not see it). Port of agreements/_party_card.php. #}
+{% if agreementCard %}
+{% set canManage = agreementCard.canManage %}{% set canClientFile = agreementCard.canClientFile %}{% set canAssociateFile = agreementCard.canAssociateFile %}{% set agreementStatuses = agreementCard.agreementStatuses %}
+<div class="card" id="agreements">
+  <div class="page-header-row">
+    <h2 style="margin:0">Agreements</h2>
+    {% if agreementCard.canManage %}<a class="btn-sm" href="/agreements/new?party_type={{ agreementCard.partyType }}&amp;party_id={{ agreementCard.partyId }}">Add agreement</a>{% endif %}
+  </div>
+  {% if agreementCard.rows.length == 0 %}
+    <p class="muted">No agreement on record yet.</p>
+  {% else %}
+    <table class="list">
+      <tr><th>Agreement</th><th>Signed</th><th>Expires</th><th>Status</th><th></th></tr>
+      {% for __a in agreementCard.rows %}
+        <tr>
+          <td>{{ __a.agreement_type }}{% if __a.title %}<br><small class="muted">{{ __a.title }}</small>{% endif %}</td>
+          <td>{{ __a.signed_on or '—' }}</td>
+          <td>{{ __a.expires_on or 'No expiry' }}</td>
+          <td>{% set __st = __a.status %}{% include "agreements/_status_badge.njk" %}</td>
+          <td>{% include "agreements/_actions.njk" %}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+</div>
+{% endif %}

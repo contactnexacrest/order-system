@@ -46,7 +46,8 @@ final class CoordinationTest extends DbTestCase
     {
         $keys = [];
         foreach (DepartmentTaskRepository::open($departments) as $t) {
-            if ((int) $t['order_id'] === $this->orderId) {
+            // D-226: Export Compliance runs alongside (checklist, eBRC) — ExportComplianceTest covers it.
+            if ((int) $t['order_id'] === $this->orderId && $t['department_code'] !== 'EXPORT_COMPLIANCE') {
                 $keys[] = (string) $t['task_key'];
             }
         }

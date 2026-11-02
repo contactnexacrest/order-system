@@ -1161,6 +1161,8 @@ CREATE TABLE file_store (
   uploaded_by         BIGINT UNSIGNED NULL,
   uploaded_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   is_active           TINYINT(1) NOT NULL DEFAULT 1,   -- soft delete only — never hard delete
+  removed_at          TIMESTAMP NULL,                  -- owner points 5/8/9 (2 Nov 2026): set when Admin → Document copies clean-up deleted the file itself
+  removed_reason      VARCHAR(255) NULL,
   FOREIGN KEY (client_id) REFERENCES clients(id),
   FOREIGN KEY (order_id) REFERENCES orders(id),
   FOREIGN KEY (stage_id) REFERENCES stages_master(id),
@@ -4446,6 +4448,14 @@ ALTER TABLE order_lc_details ADD COLUMN lc_bank_reference VARCHAR(100) NULL AFTE
 ALTER TABLE incentive_payouts
   ADD COLUMN paid_via VARCHAR(20) NULL AFTER tds_inr,
   ADD COLUMN paid_reference VARCHAR(100) NULL AFTER paid_via;
+-- Owner decision 2 Nov 2026 (D-235): TDS on associate commission worked out by the app (migration 2026-11-02x-associate-tds.sql).
+ALTER TABLE incentive_payouts
+  ADD COLUMN tds_rate DECIMAL(5,2) NULL AFTER tds_inr,
+  ADD COLUMN tds_section VARCHAR(20) NULL AFTER tds_rate,
+  ADD COLUMN tds_reason VARCHAR(255) NULL AFTER tds_section,
+  ADD COLUMN tds_override_reason VARCHAR(255) NULL AFTER tds_reason,
+  ADD COLUMN tds_challan_no VARCHAR(40) NULL AFTER tds_override_reason,
+  ADD COLUMN tds_challan_date DATE NULL AFTER tds_challan_no;
 ALTER TABLE ca_export_benefits ADD COLUMN received_reference VARCHAR(100) NULL AFTER received_at;
 ALTER TABLE order_cancellations
   ADD COLUMN refund_paid_at DATE NULL AFTER refund_notes,
@@ -4943,11 +4953,33 @@ CREATE TABLE IF NOT EXISTS order_payment_receipts (
   exchange_rate DECIMAL(12,4) NULL,
   bank_reference VARCHAR(100) NULL,
   staff_note VARCHAR(255) NULL,
+  difference_reason VARCHAR(20) NULL,
+  difference_reason_id BIGINT UNSIGNED NULL,
+  difference_reason_text VARCHAR(255) NULL,
+  difference_reason_custom TINYINT(1) NOT NULL DEFAULT 0,
+  bank_charges DECIMAL(14,2) NULL,
+  bank_charges_inr DECIMAL(14,2) NULL,
+  bank_charges_cost_id BIGINT UNSIGNED NULL,
+  own_bank_charges_inr DECIMAL(14,2) NULL,      -- our own bank's inward-remittance fee (INR incl. GST), D-227 follow-up
+  own_bank_charges_cost_id BIGINT UNSIGNED NULL,
   recorded_by BIGINT UNSIGNED NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_payment_receipts_leg (order_id, leg, milestone_id),
   CONSTRAINT fk_payment_receipts_order FOREIGN KEY (order_id) REFERENCES orders(id)
 ) ENGINE=InnoDB;
+
+-- Owner follow-up on point 18 (2 Nov 2026): admin-managed "Why is it different?" reasons (docs/migrations/2026-11-02t-remittance-difference-reasons.sql).
+CREATE TABLE IF NOT EXISTS remittance_difference_reasons (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  label VARCHAR(150) NOT NULL,
+  treatment ENUM('bank_charges','short','excess') NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_rdr_treatment (treatment, is_active, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS order_payment_shortfalls (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -4978,3 +5010,67 @@ CREATE TABLE IF NOT EXISTS self_approval_rules (
 SET @c := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'associate_client_number');
 SET @s := IF(@c = 0, 'ALTER TABLE clients ADD COLUMN associate_client_number INT NULL', 'SELECT 1');
 PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Owner decision 2 Nov 2026 (point 4): Agreements register (docs/migrations/2026-11-02s-agreements-register.sql).
+CREATE TABLE IF NOT EXISTS agreements (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  party_type ENUM('client','supplier','logistics_partner','associate','staff') NOT NULL,
+  party_id BIGINT UNSIGNED NOT NULL,
+  agreement_type VARCHAR(100) NOT NULL,
+  title VARCHAR(200) NULL,
+  signed_on DATE NOT NULL,
+  starts_on DATE NULL,
+  expires_on DATE NULL,
+  file_id BIGINT UNSIGNED NULL,
+  renews_agreement_id BIGINT UNSIGNED NULL,
+  terminated_on DATE NULL,
+  terminated_reason VARCHAR(500) NULL,
+  notes TEXT NULL,
+  created_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  KEY idx_agreements_party (party_type, party_id),
+  KEY idx_agreements_expires (expires_on),
+  CONSTRAINT fk_agreements_file FOREIGN KEY (file_id) REFERENCES file_store(id),
+  CONSTRAINT fk_agreements_renews FOREIGN KEY (renews_agreement_id) REFERENCES agreements(id),
+  CONSTRAINT fk_agreements_created_by FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS agreement_alerts_sent (
+  agreement_key VARCHAR(40) NOT NULL,
+  expires_on DATE NOT NULL,
+  threshold_days INT NOT NULL,
+  sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (agreement_key, expires_on, threshold_days)
+) ENGINE=InnoDB;
+
+-- ================================================================
+-- Owner decision (2 Nov 2026, gap-list Q-6): ECGC buyer credit limit and
+-- shipment declaration; claim tracking for export incentives; one-off
+-- compliance reminders. docs/migrations/2026-11-02y-ecgc-ebrc-incentive-tracking.sql
+-- ================================================================
+ALTER TABLE clients
+  ADD COLUMN ecgc_limit_amount DECIMAL(14,2) NULL,
+  ADD COLUMN ecgc_limit_currency VARCHAR(10) NULL,
+  ADD COLUMN ecgc_limit_approved_on DATE NULL,
+  ADD COLUMN ecgc_limit_valid_to DATE NULL,
+  ADD COLUMN ecgc_limit_ref VARCHAR(100) NULL,
+  ADD COLUMN ecgc_limit_file_id BIGINT UNSIGNED NULL;
+ALTER TABLE orders
+  ADD COLUMN ecgc_declared_on DATE NULL,
+  ADD COLUMN ecgc_declaration_ref VARCHAR(100) NULL;
+ALTER TABLE ca_export_benefits
+  ADD COLUMN sanctioned_amount DECIMAL(14,2) NULL,
+  ADD COLUMN sanctioned_at DATE NULL,
+  ADD COLUMN claim_deadline DATE NULL,
+  ADD COLUMN claim_status VARCHAR(20) NOT NULL DEFAULT 'filed',
+  ADD COLUMN rejected_reason VARCHAR(500) NULL;
+CREATE TABLE IF NOT EXISTS compliance_alerts_sent (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  alert_kind  VARCHAR(40)  NOT NULL,
+  ref_key     VARCHAR(100) NOT NULL,
+  threshold   VARCHAR(20)  NOT NULL,
+  sent_on     DATE         NOT NULL,
+  UNIQUE KEY uq_compliance_alert (alert_kind, ref_key, threshold)
+) ENGINE=InnoDB;

@@ -40,6 +40,12 @@ const { createTestClient, createTestOrder, createTestDocument } = require('../su
  * milestone. An order without milestones works exactly as before.
  */
 describe('Payment milestones (D-215, 5a)', () => {
+  // Follow-up (2 Nov 2026): the reason is a list entry — the first of each treatment.
+  const RID = {};
+  beforeAll(async () => {
+    const rd = require('../../src/services/remittanceDifference');
+    for (const t of ['bank_charges', 'short', 'excess']) RID[t] = String(await rd.reasonIdFor(t));
+  });
   const DUE = 'on shipment — within 3 Calendar Days of receiving the scanned Bill of Lading';
   let orderId;
   let userId;
@@ -254,9 +260,9 @@ describe('Payment milestones (D-215, 5a)', () => {
     expect(await call('record', { amount: '999999', ...body }, { milestoneId: String(m.id) }))
       .toBe('USD 999,999.00 is more than the whole order value (USD 4,500.00). Check the amount the bank received.');
     expect(await call('record', { amount: '2000', ...body }, { milestoneId: String(m.id) }))
-      .toBe('Milestone 2 due on this order is USD 2,250.00 (50% of USD 4,500.00). You entered USD 2,000.00 — if that really is what the bank received, tick "The amount received differs from the milestone due" and save again.');
+      .toBe('The milestone 2 still due is USD 2,250.00. You entered USD 2,000.00 — a difference of USD 250.00. Choose why it is different in the Reason list and save again.');
     expect((await paymentMilestoneRepository.find(Number(m.id))).received_amount).toBeNull();
-    expect(await call('record', { amount: '2000', confirm_amount_differs: '1', ...body }, { milestoneId: String(m.id) })).toMatch(/^Recorded: Milestone 2/);
+    expect(await call('record', { amount: '2000', difference_reason_choice: RID.short, ...body }, { milestoneId: String(m.id) })).toMatch(/^Recorded: Milestone 2/);
     expect((await paymentMilestoneRepository.find(Number(m.id))).received_amount).toBe('2000.00');
   });
 });

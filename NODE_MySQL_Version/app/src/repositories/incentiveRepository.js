@@ -171,6 +171,20 @@ async function markPayoutPaid(id, paidOn, paidInr, tdsInr, userId, paidVia = nul
   return result.affectedRows === 1;
 }
 
+/** Owner decision 2 Nov 2026 (D-235): the TDS rate, section and reason used on an associate payout. */
+async function setPayoutTds(id, rate, section, reason, overrideReason) {
+  await db.execute('UPDATE incentive_payouts SET tds_rate = :r, tds_section = :s, tds_reason = :why, tds_override_reason = :o WHERE id = :id', {
+    r: rate, s: section, why: reason !== null && reason !== undefined ? String(reason).slice(0, 255) : null,
+    o: overrideReason !== null && overrideReason !== undefined ? String(overrideReason).slice(0, 255) : null, id,
+  });
+}
+
+/** Owner decision 2 Nov 2026 (D-235): the challan Accounts deposited the TDS with. */
+async function setPayoutChallan(id, challanNo, challanDate) {
+  await db.execute("UPDATE incentive_payouts SET tds_challan_no = :n, tds_challan_date = :d WHERE id = :id AND payee_kind = 'associate' AND status = 'paid' AND tds_inr > 0",
+    { n: challanNo, d: challanDate, id });
+}
+
 /** Owner decision 1 Nov 2026 (AS-3): a due payout put on hold, with the reason. */
 async function holdPayout(id, reason, c = db) {
   const r = await c.execute("UPDATE incentive_payouts SET status = 'held', hold_reason = :r WHERE id = :id AND status = 'due'", { r: reason, id });
@@ -265,6 +279,8 @@ async function unlockedOrderIdsWithPayments() {
 }
 
 module.exports = {
+  setPayoutTds,
+  setPayoutChallan,
   addClawbackWithinPaid,
   ROLES,
   PAID_VIA,

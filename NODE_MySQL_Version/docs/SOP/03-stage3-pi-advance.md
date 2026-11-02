@@ -179,10 +179,55 @@ with money that's actually landed:
 1. **Record Advance Remittance** (5d) — the card shows the **advance due**
    (e.g. *USD 3,000.00 — 40% of the order value USD 7,500.00*) and fills it
    in. Enter what the bank actually received. An amount above the whole
-   order value is refused; an amount that differs from the advance due by
-   more than 1% (bank charges aside) needs the tick **"The amount received
-   differs from the advance due"** — so a typing mistake can't flow into
-   the Order Confirmation. Staff type the amount received, the
+   order value is refused. When the amount differs from the advance still
+   due, choose a reason under **"Why is it different?"** (owner, 2 Nov
+   2026) — the first receipt must say why if it is more than 1% off, and
+   any amount above what is still due always must, so a typing mistake
+   can't flow into the Order Confirmation. The reason is a **drop-down of
+   the usual reasons** (e.g. *Intermediary / correspondent bank charges
+   deducted*, *Buyer deducted an agreed discount*, *Buyer paid extra —
+   adjust against balance*), kept by Admin under **Settings → Remittance
+   difference reasons** (Stage 15 SOP). Only the reasons that fit the
+   amount typed are offered — less than due: bank-charges and
+   buyer-paid-less reasons; more than due: buyer-paid-more reasons — and
+   the server checks the same. When none fits, choose **"Other — type the
+   reason"**: type the reason in your own words (at least 10 characters)
+   and choose how to treat it. The reason chosen or typed is kept on the
+   receipt, shown in the receipt history, and added to the payment's
+   description ("· Reason: …"). Each reason is treated one of three ways:
+   - **Bank charges deducted by the banks** — the advance counts as
+     received in full. The charges (filled in with the difference; change
+     them if the bank's advice shows another figure; at most the
+     *max_bank_charges_pct* setting, 3% of the amount due) become an order
+     cost "Bank Charges" with a description built from the facts (rule
+     D-212: "Bank charges deducted from <buyer>'s advance remittance for
+     order <ref>: received USD 4,980.20 of USD 5,000.20 due, charges USD
+     20.00 (₹1,812.00) · bank ref <UTR>"), and go to Zoho Books with the
+     customer payment at the next sync (hourly, or Sync now), so the
+     invoice is settled in full there too.
+   - **Buyer paid less (short payment)** — recorded as received; record the
+     rest when it arrives, or a manager with "Approve short payment" clears
+     the advance short and the difference is carried into the balance.
+   - **Buyer paid more** — recorded; the balance due goes down by the same
+     amount.
+   A line under the form shows what will be saved, e.g. *Due USD 5,000.20 ·
+   Received USD 4,980.20 · Difference USD 20.00 → recorded as bank charges
+   ₹1,812.00 (cost) — advance counted as fully received*. The receipt
+   history shows each receipt's reason and any bank charges.
+
+   **Our bank's charges on this credit** (optional, owner 2 Nov 2026) — when
+   our own bank debits an inward-remittance fee for this credit (for
+   example SBI's fee + GST, debited separately in rupees), type it here from
+   the bank advice. It is booked at once as an order cost **"Bank Charges"**
+   (paid from the company account) with the description *"Our bank's inward
+   remittance charges on <buyer>'s <advance / freight / balance /
+   milestone> remittance for order <ref>, ₹<amount> incl. GST · bank ref
+   <UTR>"*, so nobody books it again later. It does not change the amount
+   received or clearing. Like every Bank Charges cost it is **not** sent to
+   Zoho Books — the CA books bank charges from the bank statement (owner
+   decision 29 Oct 2026). Leave it empty when the bank charged nothing or
+   the fee is not yet known.
+   Staff type the amount received, the
    date, and the **@ Exchange Rate** (₹ per 1 unit of the order
    currency) it was received at, once the buyer's T/T notification comes in. The rate is
    required and is recorded together with the remittance; the form reads

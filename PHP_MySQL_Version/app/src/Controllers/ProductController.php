@@ -449,7 +449,8 @@ final class ProductController
         $userId = (int) $user['id'];
         return [
             PermissionService::can($userId, $roleId, 'browse_product_catalog'),
-            PermissionService::can($userId, $roleId, 'view_product_pricing'),
+            // Owner points 6/15: prices only for people who may also see selling prices (MoneyVisibility).
+            PermissionService::can($userId, $roleId, 'view_product_pricing') && \App\Services\MoneyVisibility::can('selling'),
             PermissionService::can($userId, $roleId, 'manage_product_catalog'),
         ];
     }

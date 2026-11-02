@@ -285,6 +285,8 @@ final class AssociateSystemTest extends DbTestCase
         $this->verifiedBank($a);
         $_POST['paid_inr'] = (string) round((float) $p1['amount_inr'] * 0.98, 2);
         $_POST['tds_inr'] = (string) round((float) $p1['amount_inr'] * 0.02, 2);
+        // D-235: below the ₹20,000 threshold the app works out no TDS; a different figure needs a reason.
+        $_POST['tds_override_reason'] = 'CA advised deducting from the first payment.';
         (new IncentiveController())->markPaid(['payoutId' => (string) $p1['id']]);
         self::assertSame('Payment recorded.', $this->flash()['message']);
         self::assertTrue(AssociateEventRepository::hasEvent((int) $a['id'], 'payout_paid', null, $o1));
@@ -635,7 +637,7 @@ final class AssociateSystemTest extends DbTestCase
         $ref = (string) Database::connection()->query("SELECT buyer_inquiry_ref FROM orders WHERE id = {$o}")->fetchColumn();
         $c = ZohoBooksService::associateCommission(['order_id' => $o, 'buyer_inquiry_ref' => $ref, 'buyer_name' => 'Zoho Buyer ' . $this->tag]);
         self::assertSame("Associate commission — {$a['name']} — for order {$ref} (Zoho Buyer {$this->tag}), 0.7% of product FOB, client no. 1 · associate invoice RK/24-25/017 · TDS 56.00 deducted", $c['bill_description']);
-        self::assertSame("Associate commission payment — {$a['name']} — for order {$ref} · against bill RK/24-25/017 · TDS 56.00 deducted · bank ref UTR777888", $c['payment_description']);
+        self::assertSame("Associate commission for {$a['name']} — order {$ref} — gross ₹2,800.00, TDS u/s 194H ₹56.00, net paid ₹2,744.00 · UTR UTR777888 · against bill RK/24-25/017", $c['payment_description']);
         self::assertSame(['RK/24-25/017', 2800.0, 2744.0, 56.0, 'UTR777888'], [$c['bill_no'], $c['gross_inr'], $c['paid_inr'], $c['tds_inr'], $c['reference']]);
     }
 

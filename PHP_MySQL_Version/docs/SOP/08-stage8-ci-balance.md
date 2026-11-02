@@ -114,6 +114,16 @@ pattern as every other payment in this pipeline:
    actually been generated — the buyer can't be remitting against an
    invoice they were never sent — and, like every stage-gated action,
    until Stage 8 itself has unlocked.
+   When the amount differs from what is still due, choose a reason under
+   **"Why is it different?"** from the drop-down Admin keeps (or "Other —
+   type the reason") — each reason is treated as bank charges deducted by
+   the banks (counted as received in full; the charges become an order
+   cost and go to Zoho Books with the payment at the next sync), buyer paid less, or buyer
+   paid more — exactly as for the advance (Stage 3 SOP, Step 5d).
+   The optional **Our bank's charges on this credit** field (our own bank's
+   inward-remittance fee, in rupees incl. GST) works as for the advance:
+   booked at once as an order cost "Bank Charges", not sent to Zoho Books.
+   The same field is on Freight (9c) and milestone receipts.
 
    ![Stage 8 section — balance recorded, awaiting clearance](./images/s8_recorded_awaiting_clear.png)
 
@@ -130,7 +140,7 @@ pattern as every other payment in this pipeline:
 **On a Letter of Credit order** the money the bank pays under the LC, once
 the documents are presented, is also recorded in **Step 12a → LC Payment
 Received** (date the bank paid, amount, rupees credited, bank charges).
-That is what goes to Zoho Books as the buyer's payment against the CI —
+That is what goes to Zoho Books (at the next sync — hourly, or Sync now) as the buyer's payment against the CI —
 see [Order Financials](./ca-08-order-financials.md#4-letter-of-credit--bank-loan).
 
 ## What the client does (or doesn't)

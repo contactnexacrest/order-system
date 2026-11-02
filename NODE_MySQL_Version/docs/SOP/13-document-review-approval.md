@@ -71,6 +71,18 @@ created by accident.
   issue of a document carries no revision stamp — there's nothing yet to
   distinguish it from.
 
+
+**Copies the app keeps (2 Nov 2026).** Each revision keeps its draft
+(DRAFT watermark), its approved copy and, once a newer revision is
+approved, a copy stamped "INVALID DOCUMENT — SUPERSEDED". The exact PDF the
+buyer received is now marked *sent to client* — when it is e-mailed, when
+approval counts as sent while e-mail is off, or when the buyer downloads it
+from the client portal. Draft and never-sent copies can be removed after a
+chosen number of days in **Admin → Company Settings → Document copies
+clean-up** (off until switched on); anything sent to the client, the
+current copy of every document and uploaded files are never removed. See
+[Admin & Settings](./15-admin-settings.md).
+
 ## What staff do
 
 ### Generating and tracking documents

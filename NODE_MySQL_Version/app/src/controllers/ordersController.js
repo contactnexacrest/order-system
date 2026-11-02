@@ -98,6 +98,7 @@ const fileUploadService = require('../services/fileUploadService');
 const testModeService = require('../services/testModeService');
 const wetSignatureGuardService = require('../services/wetSignatureGuardService');
 const partPaymentService = require('../services/partPaymentService');
+const remittanceDifference = require('../services/remittanceDifference');
 const { todayIst } = require('../helpers/dbDateTime');
 const dates = require('../helpers/dates');
 
@@ -379,6 +380,11 @@ async function create(req, res) {
   res.renderView(
     'orders/create',
     {
+      // Owner decision (2 Nov 2026, Q-6b): soft ECGC warning for a pre-selected buyer.
+      ecgcNew: await (async () => {
+        const cid = parseInt(old.client_id || preselectedClientId || 0, 10) || 0;
+        return cid > 0 ? require('../services/complianceTrackingService').ecgcPosition(cid) : null;
+      })(),
       clients: await clientRepository.all(),
       incoterms,
       currencies: await lookupRepository.currencies(),
@@ -615,6 +621,13 @@ async function store(req, res) {
   }
 
   flash.set(req, 'success', `Order ${orderReference} created for ${client.company_legal_name}.`);
+  // Owner decision (2 Nov 2026, Q-6b): a soft warning when the buyer's open orders now exceed the ECGC limit.
+  const ecgc = await require('../services/complianceTrackingService').ecgcPosition(Number(client.id));
+  if (ecgc.limit !== null && ecgc.over_limit) {
+    flash.set(req, 'warning', require('../services/moneyVisibility').can(req.permissions, 'selling')
+      ? `ECGC: ${ecgc.warning}`
+      : "ECGC: this buyer's open orders are above (or outside) the ECGC-approved credit limit — check with Finance.");
+  }
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -1176,6 +1189,8 @@ async function show(req, res) {
       incentiveCalc: await incentiveService.calculate(orderId),
       incentivePayouts: await incentiveRepository.payoutsForOrder(orderId),
       incentiveUsers: await userRepository.listActive(),
+      // Owner 2 Nov 2026 (point 10): nothing associate-related when the client has no associate.
+      incentiveHasAssociate: !!(await db.queryOne('SELECT 1 AS x FROM clients WHERE id = :c AND associate_id IS NOT NULL', { c: order.client_id })),
     };
   }
 
@@ -1208,6 +1223,27 @@ async function show(req, res) {
     'orders/show',
     {
       associateLine: await require('../repositories/associateRepository').lineForClient(Number(order.client_id), req.permissions),
+      // Owner decision (2 Nov 2026, gap-list Q-6): ECGC cover, incentive claim tracking, missing eBRC / FIRC.
+      complianceTracking: await (async () => {
+        const svc = require('../services/complianceTrackingService');
+        const p = req.permissions || {};
+        const ecgcEdit = !!(p.manage_export_benefit_claims || p.ca_module_manage);
+        const ecgcSee = ecgcEdit || !!p.manage_order_financials;
+        const claimsSee = !!(p.manage_export_benefit_claims || p.manage_order_financials);
+        const claims = claimsSee ? await require('../repositories/caExportBenefitRepository').forOrder(orderId) : [];
+        const views = [];
+        for (const c of claims) views.push(await svc.claimView(c));
+        return {
+          ecgcEdit,
+          ecgcSee,
+          claimsSee,
+          ecgc: ecgcSee ? await svc.ecgcPosition(Number(order.client_id)) : null,
+          decl: ecgcSee ? await svc.declarationStatus(orderId) : null,
+          claims: views,
+          missingFirc: await svc.missingFircLegs(orderId),
+          today: svc.todayStr(),
+        };
+      })(),
       stageGateDisabled,
       stageGateNotice,
       canManageIncentives,
@@ -1230,6 +1266,9 @@ async function show(req, res) {
       paymentSchedule: await require('./paymentMilestoneController').scheduleView(orderId, order),
       // Gap list G-5 (owner, 1 Nov 2026): each leg's receipts, what is still owed, and an approved shortfall.
       partPayments: await partPaymentService.pageData(orderId, await require('../repositories/paymentMilestoneRepository').forOrder(orderId)),
+      maxBankChargesPct: await remittanceDifference.maxBankChargesPct(),
+      // Follow-up on point 18 (2 Nov 2026): the admin-managed "Why is it different?" reasons.
+      remittanceReasons: await remittanceDifference.reasons(),
       canApproveShort: !!(req.permissions && req.permissions.approve_short_payment),
       // Owner decision D-214, phase 4: one owner per department; a department's manager picks theirs.
       departmentOwners: await departmentOwnersFor(req, orderId),
@@ -1361,6 +1400,9 @@ async function show(req, res) {
       canViewCaLinks: !!req.permissions.ca_module_view,
       // Owner decision 2026-10-29: the per-order "App vs Zoho" check, for whoever runs the Zoho sync.
       canCheckZoho: !!req.permissions.ca_module_manage,
+      // Owner decision 2 Nov 2026 (D-233): "Waiting for Zoho: N" for whoever may see Zoho status.
+      zohoWaiting: (req.permissions.ca_module_manage || req.permissions.ca_module_view) ? await require('../services/zohoPendingService').counts(Number(orderId)) : null,
+      zohoWaitingSummary: require('../services/zohoPendingService').summary,
       linkedExportBenefits: req.permissions.ca_module_view ? await caExportBenefitRepository.forOrder(orderId) : [],
       // Owner request (2026-10-26): Step 12c lists this order's claims for manage_order_financials holders.
       orderBenefitClaims: req.permissions.manage_order_financials ? await caExportBenefitRepository.forOrder(orderId) : [],
@@ -1964,20 +2006,28 @@ async function recordAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  // Gap list G-5: a further receipt of a part-paid advance needs no confirming tick.
-  if (advanceSoFar <= 0 && advanceDue > 0 && Math.abs(amount - advanceDue) > Math.max(1, advanceDue * 0.01) && !req.body.confirm_amount_differs) {
-    const pctLabel = advancePctNum.toFixed(2).replace(/\.?0+$/, '');
-    flash.set(req, 'error', `The advance due on this order is ${currency} ${money(advanceDue)} (${pctLabel}% of ${currency} ${money(fobTotal)}). You entered ${currency} ${money(amount)} — if that really is what the bank received, tick "The amount received differs from the advance due" and save again.`);
+  if (await partPaymentService.receiptExists(orderId, 'advance', amount, receivedAt, rate)) {
+    flash.set(req, 'warning', 'Advance remittance already recorded with these details — nothing changed.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why —
+  // bank charges deducted, the buyer paid less, or the buyer paid more.
+  const diffEval = await remittanceDifference.evaluatePosted(req.body, 'Advance', currency, advanceDue, advanceSoFar, amount);
+  if (diffEval.error) {
+    flash.set(req, 'error', diffEval.error);
     res.redirect(`/orders/${orderId}`);
     return;
   }
   // QA Round 6, R6-N22: saved together or not at all.
   // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'advance', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef))) {
+  const advanceReceiptId = await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'advance', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef, diffEval.reason, diffEval.charges);
+  if (!advanceReceiptId) {
     flash.set(req, 'warning', 'Advance remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  await remittanceDifference.afterReceipt(orderId, 'advance', null, Number(advanceReceiptId), diffEval, amount, rate, receivedAt, bankRef, req.user ? req.user.id : null);
   await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'advance_exchange_rate', null, String(rate));
   // External QA report L-23: advance payment recording was never audit-logged.
   await auditLogRepository.log(req.user ? req.user.id : null, 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', orderId, 'advance_amount', null, String(amount));
@@ -1994,7 +2044,7 @@ async function recordAdvancePayment(req, res) {
     }
   }
 
-  flash.set(req, 'success', `${await remittanceStatement(orderId, amount, rate)} ${'Advance remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
+  flash.set(req, 'success', `${`${await remittanceStatement(orderId, amount, rate)} ${remittanceDifference.outcome('advance', 'Advance', currency, diffEval, amount, rate)}`.trim()} ${'Advance remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -3011,18 +3061,34 @@ async function recordFreightPayment(req, res) {
     return;
   }
 
-  // QA Round 6, R6-N22: saved together or not at all.
-  // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'freight', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef))) {
+  if (await partPaymentService.receiptExists(orderId, 'freight', amount, receivedAt, rate)) {
     flash.set(req, 'warning', 'Freight remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why.
+  const freightCurrency = ((await orderRepository.find(orderId)) || {}).currency_code || '';
+  const freightDiff = await remittanceDifference.evaluatePosted(req.body, 'Freight', freightCurrency, Number((await partPaymentService.expected(orderId, 'freight')) || 0),
+    await partPaymentService.receivedTotal(orderId, 'freight'), amount);
+  if (freightDiff.error) {
+    flash.set(req, 'error', freightDiff.error);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // QA Round 6, R6-N22: saved together or not at all.
+  // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
+  const freightReceiptId = await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'freight', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef, freightDiff.reason, freightDiff.charges);
+  if (!freightReceiptId) {
+    flash.set(req, 'warning', 'Freight remittance already recorded with these details — nothing changed.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  await remittanceDifference.afterReceipt(orderId, 'freight', null, Number(freightReceiptId), freightDiff, amount, rate, receivedAt, bankRef, req.user ? req.user.id : null);
   await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'freight_exchange_rate', null, String(rate));
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
   await auditLogRepository.log(req.user.id, 'FREIGHT_PAYMENT_RECORDED', 'order_payment_status', orderId, 'freight_amount', null, String(amount));
-  flash.set(req, 'success', `${await remittanceStatement(orderId, amount, rate)} ${'Freight remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
+  flash.set(req, 'success', `${`${await remittanceStatement(orderId, amount, rate)} ${remittanceDifference.outcome('freight', 'Freight', freightCurrency, freightDiff, amount, rate)}`.trim()} ${'Freight remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -3592,17 +3658,33 @@ async function recordBalancePayment(req, res) {
     return;
   }
 
-  // QA Round 6, R6-N22: saved together or not at all.
-  // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-  if (!(await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'balance', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef))) {
+  if (await partPaymentService.receiptExists(orderId, 'balance', amount, receivedAt, rate)) {
     flash.set(req, 'warning', 'Balance remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why.
+  const balanceCurrency = ((await orderRepository.find(orderId)) || {}).currency_code || '';
+  const balanceDiff = await remittanceDifference.evaluatePosted(req.body, 'Balance', balanceCurrency, Number((await partPaymentService.expected(orderId, 'balance')) || 0),
+    await partPaymentService.receivedTotal(orderId, 'balance'), amount);
+  if (balanceDiff.error) {
+    flash.set(req, 'error', balanceDiff.error);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // QA Round 6, R6-N22: saved together or not at all.
+  // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
+  const balanceReceiptId = await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'balance', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef, balanceDiff.reason, balanceDiff.charges);
+  if (!balanceReceiptId) {
+    flash.set(req, 'warning', 'Balance remittance already recorded with these details — nothing changed.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  await remittanceDifference.afterReceipt(orderId, 'balance', null, Number(balanceReceiptId), balanceDiff, amount, rate, receivedAt, bankRef, req.user ? req.user.id : null);
   await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'balance_exchange_rate', null, String(rate));
   // External QA report L-23: balance payment recording was never audit-logged.
   await auditLogRepository.log(req.user ? req.user.id : null, 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', orderId, 'balance_amount', null, String(amount));
-  flash.set(req, 'success', `${await remittanceStatement(orderId, amount, rate)} ${'Balance remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
+  flash.set(req, 'success', `${`${await remittanceStatement(orderId, amount, rate)} ${remittanceDifference.outcome('balance', 'Balance', balanceCurrency, balanceDiff, amount, rate)}`.trim()} ${'Balance remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -4258,7 +4340,7 @@ async function updateComplianceTask(req, res) {
     flash.set(req, ok ? 'success' : 'error', message);
     res.redirect(`/orders/${orderId}#compliance-checklist`);
   };
-  if (!req.permissions || !req.permissions.close_orders) {
+  if (!req.permissions || !req.permissions.manage_compliance_checklist) { // D-226: split out of close_orders
     respond(false, 'You do not have permission to update the compliance checklist.');
     return;
   }
@@ -4344,7 +4426,7 @@ async function saveComplianceChecklist(req, res, orderId, user, rows, phase) {
 async function markAllComplianceTasksNotApplicable(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
-  if (!req.permissions || !req.permissions.close_orders) {
+  if (!req.permissions || !req.permissions.manage_compliance_checklist) { // D-226
     flash.set(req, 'error', 'You do not have permission to update the compliance checklist.');
     res.redirect(`/orders/${orderId}`);
     return;

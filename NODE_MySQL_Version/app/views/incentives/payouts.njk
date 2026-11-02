@@ -9,7 +9,7 @@
       </select></label>
     <noscript><button type="submit" class="btn-sm">Show</button></noscript>
   </form>
-  <p class="muted">Pay these together with the {{ incentive.monthName(month) }} salary on {{ incentive.payDay(month) }} (associates: against their invoice), then mark them paid. Each order's incentive then goes to Zoho Books as Commission Expense. Staff incentives go through payroll (salary TDS); the CA advises the TDS for associates.</p>
+  <p class="muted">Pay these together with the {{ incentive.monthName(month) }} salary on {{ incentive.payDay(month) }} (associates: against their invoice), then mark them paid. Each order's incentive then goes to Zoho Books as Commission Expense. Staff incentives go through payroll (salary TDS). For associates the app works out the TDS (Settings &rarr; Associate TDS: section {{ tdsSettings.section }} at {{ tdsRatePct }} once the financial year passes &#8377;{{ tdsSettings.threshold | money0 }}) — pay the net amount and deposit the TDS by the 7th of next month.</p>
 
   <table class="list">
     <tr><th>Person</th><th>Order</th><th>Role</th><th>Amount</th><th>Status</th><th>Paid on · amount paid · TDS</th></tr>
@@ -21,14 +21,31 @@
         <td>&#8377;{{ r.amount_inr | money }}{% if r.payee_kind == 'associate' and r.currency_code and r.currency_code != 'INR' %}<br><small class="muted">{{ r.currency_code }} {{ r.amount_fc | money }} (order currency)</small>{% endif %}</td>
         <td>{% if r.status == 'paid' %}<span class="badge badge-success">Paid {{ r.paid_on | shortDate }}</span><br><small class="muted">&#8377;{{ r.paid_inr | money }}{% if r.tds_inr !== null %} · TDS &#8377;{{ r.tds_inr | money }}{% endif %}</small>{% else %}<span class="badge badge-warning">Due</span>{% endif %}</td>
         <td>
+          {% set t = r.tdsCalc %}
+          {% if r.status == 'paid' and r.payee_kind == 'associate' and r.tds_reason %}
+            <small class="muted">TDS: {{ r.tds_reason }}</small>
+          {% endif %}
           {% if r.status == 'due' %}
-            <form method="post" action="/incentives/payouts/{{ r.id }}/paid">
+            <form method="post" action="/incentives/payouts/{{ r.id }}/paid"{% if t and t.abroad %} enctype="multipart/form-data"{% endif %}>
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <input type="hidden" name="month" value="{{ month }}">
+              {% if t %}
+                <p class="small" data-associate-tds style="margin:0 0 4px">Gross &#8377;{{ t.gross | money }} &middot; TDS &#8377;{{ t.tds | money }} <span class="muted">({{ t.reason }})</span> &middot; <strong>Net to pay &#8377;{{ t.net | money }}</strong></p>
+                {% if t.abroad and (t.missing_foreign.length or t.missing_payout.length) %}
+                  <p class="small" style="margin:0 0 4px;color:#9a3412">Before paying: {{ (t.missing_foreign.concat(t.missing_payout)) | join(', ') }} must be on file.{% if t.missing_foreign.length %} Accept the TRC / Form 10F / no-PE on the associate's Documents tab first.{% endif %}</p>
+                {% endif %}
+              {% endif %}
               <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">
                 <input type="date" name="paid_on" required min="{{ r.earliestPaidOn }}" max="{{ today() }}" value="{{ today() }}" aria-label="Paid on" title="Paid on" style="width:10.5em">
-                <input type="number" name="paid_inr" required min="0.01" max="{{ r.amountPlain }}" step="0.01" value="{{ r.amountPlain }}" aria-label="Amount paid (₹)" title="Amount paid (₹)" style="width:8.5em" placeholder="e.g. 25000.00">
-                <input type="number" name="tds_inr" min="0" step="0.01" placeholder="TDS ₹" aria-label="TDS (₹)" title="TDS (₹), if any" style="width:7em" data-not-more-than="[name=paid_inr]" data-not-more-than-message="TDS cannot be more than the amount paid.">
+                <input type="number" name="paid_inr" required min="0.01" max="{{ r.amountPlain }}" step="0.01" value="{{ t.net.toFixed(2) if t else r.amountPlain }}" aria-label="Amount paid (₹)" title="{{ 'Net amount paid (₹) — the commission less TDS' if t else 'Amount paid (₹)' }}" style="width:8.5em" placeholder="e.g. 25000.00">
+                <input type="number" name="tds_inr" min="0" step="0.01" placeholder="TDS ₹" aria-label="TDS (₹)" title="TDS (₹){{ ' — worked out by the app; change it only with a reason' if t else ', if any' }}" style="width:7em"{% if t %} value="{{ t.tds.toFixed(2) }}"{% endif %} data-not-more-than="[name=paid_inr]" data-not-more-than-message="TDS cannot be more than the amount paid.">
+                {% if t %}
+                  <input type="text" name="tds_override_reason" minlength="10" maxlength="255" placeholder="Only if you change the TDS: why (e.g. CA advice)" aria-label="Reason for a different TDS" title="Needed only when the TDS differs from the amount worked out" style="width:16em">
+                  {% if t.abroad %}
+                    <label class="small">Form 15CA <input type="file" name="form_15ca_file" accept=".pdf,.jpg,.jpeg,.png"></label>
+                    {% if tdsSettings.cb_required %}<label class="small">Form 15CB <input type="file" name="form_15cb_file" accept=".pdf,.jpg,.jpeg,.png"></label>{% endif %}
+                  {% endif %}
+                {% endif %}
                 <select name="paid_via" required aria-label="Paid via" title="Paid via"><option value="">Paid via…</option>{% for k, v in paidVia %}<option value="{{ k }}">{{ v | capitalize }}</option>{% endfor %}</select>
                 <input type="text" name="paid_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="Payroll Nov-2026 / UTR / cheque no." aria-label="Payment reference" title="Payment reference: payroll month, UTR or cheque no. (rule D-212)" style="width:13em">
                 <button type="submit" class="btn-sm">Mark paid</button>

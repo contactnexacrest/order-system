@@ -345,7 +345,16 @@ exist as polling scripts rather than a queue consumer):
 0 6 * * *     php /home/yourcpaneluser/nexacrest_webapp/app/cron/check_alerts.php >> /home/yourcpaneluser/logs/check_alerts.log 2>&1
 0 * * * *     php /home/yourcpaneluser/nexacrest_webapp/app/cron/zoho_sync.php >> /home/yourcpaneluser/logs/zoho_sync.log 2>&1
 15 8 * * *    php /home/yourcpaneluser/nexacrest_webapp/app/cron/daily_digest.php >> /home/yourcpaneluser/logs/daily_digest.log 2>&1
+15 2 * * *    php /home/yourcpaneluser/nexacrest_webapp/app/cron/document_copy_cleanup.php >> /home/yourcpaneluser/logs/document_copy_cleanup.log 2>&1
 ```
+
+- `document_copy_cleanup.php` — once a day (owner points 5/8/9, 2 Nov 2026):
+  removes the document copies Admin → Settings → Document copies clean-up
+  lists in its preview (drafts of approved documents, never-sent superseded
+  revisions, old CAFIN copies). Removes nothing while every rule there is
+  off (the default). Never removes anything sent to the client, the current
+  copy of a document, uploaded files, files of an order with an open
+  dispute, or documents in a CA-locked financial year.
 
 - `daily_digest.php` — once every morning (owner decision 1 Nov 2026): one
   e-mail per person listing their open tasks and documents to review. Set
@@ -382,7 +391,16 @@ exist as polling scripts rather than a queue consumer):
   date, and creates in-app notifications for Admin/MD (see "Real bugs found" below —
   this has a same-day dedup guard so it doesn't re-notify on every run
   while a condition remains unresolved).
-- `zoho_sync.php` — CA / Accounting module. Recommended hourly. Runs the
+  Since 2 Nov 2026 it also sends the Agreements register reminders (D-228):
+  30 days, 7 days and on the expiry day, once each, to holders of
+  `manage_agreements` (client agreements included).
+- `zoho_sync.php` — CA / Accounting module. **Must be installed, hourly**
+  (owner decision 2 Nov 2026, D-233): saving a receipt, bill, payment,
+  expense or cost in the app never sends it to Zoho Books at that moment —
+  it waits for the next sync ("Waiting for Zoho: N" on the order page and
+  beside Zoho Sync in the menu). Without this job records reach Books only
+  when someone presses Sync Now. A run with failures e-mails every
+  "Manage CA module" holder once (and notifies them in the app). Runs the
   same `CaSyncService::runFullSync()` as the "Sync Now" button on
   `/ca/zoho-sync`: sends Zoho Books the Commercial Invoices and Debit Notes
   (as export invoices), the buyer's payments and the LC payment (applied
@@ -2420,3 +2438,25 @@ Zoho Books, built from the facts and including the bank reference.
   e-mail sending off it reports "Daily digest: e-mail sending is off — nothing sent." and
   the day is not used up.
 - **Tests:** `tests/Unit/FormPlaceholderTest.php`, `tests/Unit/FormLabelConventionsTest.php`, `tests/Integration/SelfApprovalRulesTest.php`, `SelfApprovalActionsTest.php`, `QaRound8Part1Test.php`, `QaRound8Part2Test.php`, `AssociatePortalRoutesTest.php`, plus updates to `MakerCheckerGuardTest.php`, `DepartmentsTest.php` and `AssociateSystemTest.php`. The 15 routes that had no behaviour test (D-211) now have one.
+
+## Follow-up (added 2026-11-02): owner's 2 Nov list — documents, money safety, compliance, agreements, remittances
+
+Migrations, in this order after `2026-11-02h`: `2026-11-02m-generated-file-links.sql`, `2026-11-02n-document-copy-cleanup.sql`, `2026-11-02r-export-compliance.sql`, `2026-11-02q-remittance-difference.sql`, `2026-11-02s-agreements-register.sql`, `2026-11-02t-remittance-difference-reasons.sql`, `2026-11-02u-reference-library-payment-guide.sql` (see `docs/migrations/README.md`, rows 43–49). Schema: **148 tables**.
+
+- **Documents (D-223, D-224 — owner confirmed twice):** Quotation and Proforma Invoice have no untitled CoO / Port of Discharge table; the PI prints Buyer's PO / Ref No. in Buyer Details only when entered; the Order Confirmation shows the Buyer's PO; the Debit Note's "To (Buyer)" is the full buyer block; BL Instruction section 8 no longer gives payment terms ("Original BL release: CHA to hand all 3 originals to NexaCrest only"); the Commercial Invoice says "the value declared on the Indian Shipping Bill" (no "IGST refund") and prints the total in words (`Helpers/AmountInWords`). PDF and Word alike; the reference Word files (`reference_templates/`) match. Tests: `QuotationPiLayoutTest`, `DocumentWordingD224Test`.
+- **Freight in rupees (D-225):** Step 9a freight and insurance are order currency; `OrderProfitabilityService` converts them (freight receipt rate → freight leg → advance/balance rate), flags a missing rate instead of adding foreign units as rupees, and the working line ("EUR 950.00 × 90.50 = ₹85,975.00") shows in Step 12c and CAFIN C1. Fixed incentives are not recalculated. Test: `FreightCostInInrTest`.
+- **Money never leaks (owner points 6/15):** every generated file carries `file_store.linked_document_id`, so drafts, superseded copies and older CAFIN copies follow the same money rule as the current copy (download, dossier ZIP, All Documents); `Services/AuditMoneyMask` hides amounts in the Audit Log, an order's audit log, the order report's Full Audit Trail (and their CSVs) and the dashboard's Recent Activity; reports with selling prices or buyer payments refuse people who may not see that money; product list prices need selling rights; document counts count only what the person may see. Proof: `e2e/tests/12-money-matrix.spec.js` (every role × ~75 screens, files, ZIP; 0 violations). Test: `MoneyLeakClosuresTest`.
+- **All Documents panel:** generated documents and every uploaded file of the order, only those the person may open (Sales sees no supplier or logistics papers). Tests: `OrderAllDocumentsPanelTest`.
+- **Bill forms and guide:** Steps 7e/10a start from the Supplier PO (taxable value, GST rate, amount asked now); Step 9a pre-selects the forwarder already on the order; `/help/supplier-logistics-payments` explains supplier and logistics payments with screenshots; the 21-page *Supplier & Logistics Payments Guide* (PDF + Word) is in `docs/guides/`, `docs/SOP/guides/` and the Reference Library (`storage/assets/reference_library/supplier_and_logistics_payments_guide.*`). Tests: `BillPrefillAndForwarderTest`, `HelpGuideTest`.
+- **Order page (points 10/13/14/16):** no associate controls when the client has no associate; Step 7c starts with the Supplier Link; the COO Prep Sheet can be generated once Stage 8 is open (before the balance clears); "Zoho Sync" in the menu and "Sync this order to Zoho now" (`POST /orders/{id}/zoho-sync`, `ca_module_manage`, also on closed orders) next to the Zoho check. Test: `OrderPageOwnerPointsNov2Test`.
+- **Document copies clean-up (points 5/8/9):** Admin → Company Settings → Document copies clean-up (`/settings/document-cleanup`), off by default: drafts of approved documents, never-sent superseded revisions, older CAFIN copies, after a chosen number of days, with preview and audit; never anything sent to the client, current copies, uploads, open disputes or CA-locked years. The exact PDF the buyer received is now marked `sent_to_client`. Cron `document_copy_cleanup.php` (daily). Test: `DocumentCopyCleanupTest`.
+- **Export Compliance department (D-226):** Executive / Manager / Director roles for ECGC, COO, phytosanitary/fumigation/inspection, benefit claims and eBRC follow-up; permissions `manage_compliance_checklist`, `manage_export_benefit_claims`, `generate_compliance_documents`, `upload_order_documents`; its own My tasks queue; no purchase, logistics, buyer-payment, profit, incentive or CAFIN figures. SOP 25. Test: `ExportComplianceTest`.
+- **Remittance differences (D-227):** the advance, freight, balance and milestone remittance forms ask "Why is it different?" from Admin-managed reasons (Settings → Remittance difference reasons) or "Other — type the reason"; bank charges become an order cost "Bank Charges" (D-212 description, Zoho `bank_charges`) and the leg counts as fully received (cap `max_bank_charges_pct`, 3%); short and excess are recorded and explained. Tests: `RemittanceDifferenceTest`, `RemittanceDifferenceReasonsTest`.
+- **Agreements register (D-228):** `/agreements` (Standard + Kanban) for client, supplier, logistics partner, associate and staff agreements — signed copy, dates, renew, end early; reminders 30 / 7 / 0 days before expiry from `check_alerts.php`; a card on each party's page; client and associate agreements listed automatically. Permissions `manage_agreements`, `view_agreements`. SOP 26. Test: `AgreementsRegisterTest`.
+
+### TDS on associate commission (D-235, added 2026-11-02)
+
+- Migration `docs/migrations/2026-11-02x-associate-tds.sql` (after 02v).
+- The app works out the TDS on each associate payout: section 194H at 2 % once the associate's commission in the financial year passes ₹20,000 (catch-up on the crossing payment), 20 % (206AA) without an accepted PAN, none for associates abroad once TRC / Form 10F / no-PE are accepted (each payment abroad needs Form 15CA, and 15CB when required). Values: Settings → Associate TDS (`/settings/associate-tds`). Register by quarter with challans: `/associates/tds`.
+- Reminders to *Pay incentives* holders come from the existing daily alert job (`check_alerts`): deposit by the 7th, Form 26Q after each quarter.
+- **Deployment note for the CA:** to have Zoho Books book the TDS on the associate's bill, the CA turns on TDS in Zoho Books (Settings → Taxes → TDS in Zoho, a manual Zoho change — log it in `docs/zoho/zoho-change-log.csv` when done) and puts the 194H tax's id into Settings → Associate TDS → Zoho Books TDS tax id. Until then the bill is the gross, the payment the net, and the Sync Log says the TDS is left on the bill for the CA.

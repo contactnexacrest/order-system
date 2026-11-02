@@ -45,6 +45,17 @@ final class FileStoreRepository
     }
 
     /**
+     * Owner points 5/8/9 (2 Nov 2026): this exact file reached the client (e-mail, portal
+     * download) — the document copies clean-up never removes a file flagged here.
+     */
+    public static function markSentToClient(int $fileId): void
+    {
+        Database::connection()->prepare(
+            'UPDATE file_store SET sent_to_client = 1, sent_at = COALESCE(sent_at, NOW()) WHERE id = :id'
+        )->execute(['id' => $fileId]);
+    }
+
+    /**
      * A file NexaCrest received from someone else (signed amendment copy,
      * dispute correspondence, ...) rather than generated — see
      * FileUploadService. file_origin='RECEIVED', never internal_only
@@ -96,11 +107,16 @@ final class FileStoreRepository
     /** The document type code (QT, PI, CAFIN, ...) this file is the PDF/DOCX of, or null for an uploaded file. */
     public static function documentTypeCodeFor(int $fileId): ?string
     {
+        // Owner points 6/15 (2 Nov 2026): also a generated copy that is no
+        // longer the document's current PDF (draft after approval, the final
+        // after a supersede, an older CAFIN) — through file_store.linked_document_id.
         $stmt = Database::connection()->prepare(
-            'SELECT dt.code FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
-             WHERE d.pdf_file_id = :pdf OR d.docx_file_id = :docx LIMIT 1'
+            "SELECT dt.code FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
+             WHERE d.pdf_file_id = :pdf OR d.docx_file_id = :docx
+                OR d.id = (SELECT fs.linked_document_id FROM file_store fs WHERE fs.id = :f AND fs.file_origin <> 'RECEIVED')
+             LIMIT 1"
         );
-        $stmt->execute(['pdf' => $fileId, 'docx' => $fileId]);
+        $stmt->execute(['pdf' => $fileId, 'docx' => $fileId, 'f' => $fileId]);
         $code = $stmt->fetchColumn();
         return $code === false ? null : (string) $code;
     }
@@ -211,7 +227,7 @@ final class FileStoreRepository
                AND NOT EXISTS (
                    SELECT 1 FROM documents d
                    JOIN document_types dt ON dt.id = d.document_type_id
-                   WHERE dt.code = 'CAFIN' AND (d.pdf_file_id = fs.id OR d.docx_file_id = fs.id)
+                   WHERE dt.code = 'CAFIN' AND (d.pdf_file_id = fs.id OR d.docx_file_id = fs.id OR d.id = fs.linked_document_id)
                )
              ORDER BY fs.file_origin, fs.uploaded_at"
         );

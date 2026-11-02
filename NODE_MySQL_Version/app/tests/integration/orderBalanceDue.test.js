@@ -21,6 +21,12 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * the OC is issued.
  */
 describe('Balance due after the actual advance (owner report 2026-10-27)', () => {
+  // Follow-up (2 Nov 2026): the reason is a list entry — the first of each treatment.
+  const RID = {};
+  beforeAll(async () => {
+    const rd = require('../../src/services/remittanceDifference');
+    for (const t of ['bank_charges', 'short', 'excess']) RID[t] = String(await rd.reasonIdFor(t));
+  });
   afterAll(async () => {
     await db.pool.end();
   });
@@ -62,7 +68,7 @@ describe('Balance due after the actual advance (owner report 2026-10-27)', () =>
 
   it('refuses an advance above the order value', async () => {
     const { orderId, userId } = await setup();
-    const result = await recordAdvance(orderId, userId, { advance_amount: '7600', confirm_amount_differs: '1' });
+    const result = await recordAdvance(orderId, userId, { advance_amount: '7600', difference_reason_choice: RID.excess });
     expect(result.type).toBe('error');
     expect(result.message).toContain('more than the whole order value');
     expect((await orderPaymentStatusRepository.find(orderId)).advance_amount).toBeNull();
@@ -72,16 +78,18 @@ describe('Balance due after the actual advance (owner report 2026-10-27)', () =>
     const { orderId, userId } = await setup();
     const refused = await recordAdvance(orderId, userId, { advance_amount: '7300' });
     expect(refused.type).toBe('error');
-    expect(refused.message).toContain('The advance due on this order is USD 3,000.00 (40% of USD 7,500.00)');
+    expect(refused.message).toBe('The advance still due is USD 3,000.00. You entered USD 7,300.00 — a difference of USD 4,300.00. Choose why it is different in the Reason list and save again.');
     expect((await recordAdvance(orderId, userId, { advance_amount: '2985' })).type).toBe('success');
     // Gap list G-5 (1 Nov 2026): a further remittance is a second receipt and adds to the advance (no tick needed).
-    expect((await recordAdvance(orderId, userId, { advance_amount: '515', advance_received_at: '2026-10-28' })).type).toBe('success');
+    // Owner 2 Nov 2026 ("18 yes"): more than is still due says why.
+    expect((await recordAdvance(orderId, userId, { advance_amount: '515', advance_received_at: '2026-10-28' })).type).toBe('error');
+    expect((await recordAdvance(orderId, userId, { advance_amount: '515', advance_received_at: '2026-10-28', difference_reason_choice: RID.excess })).type).toBe('success');
     expect(parseFloat((await orderPaymentStatusRepository.find(orderId)).advance_amount)).toBeCloseTo(3500);
   });
 
   it('balance due is the order value minus the advance actually received', async () => {
     const { orderId, userId } = await setup();
-    await recordAdvance(orderId, userId, { advance_amount: '3500', confirm_amount_differs: '1' });
+    await recordAdvance(orderId, userId, { advance_amount: '3500', difference_reason_choice: RID.excess });
     await createTestDocument(orderId, 'PI', 'approved');
     await ordersController.clearAdvancePayment(
       { user: { id: userId }, params: { id: String(orderId) }, session: {}, body: { advance_cleared_at: '2026-10-27' } },

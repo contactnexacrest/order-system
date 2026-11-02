@@ -38,6 +38,14 @@ async function insertGenerated(
 }
 
 /**
+ * Owner points 5/8/9 (2 Nov 2026): this exact file reached the client (e-mail, portal
+ * download) — the document copies clean-up never removes a file flagged here.
+ */
+async function markSentToClient(fileId) {
+  await db.execute('UPDATE file_store SET sent_to_client = 1, sent_at = COALESCE(sent_at, NOW()) WHERE id = :id', { id: fileId });
+}
+
+/**
  * A file NexaCrest received from someone else (signed amendment copy,
  * dispute correspondence, ...) rather than generated — see
  * fileUploadService. file_origin='RECEIVED', never internal_only (that
@@ -138,7 +146,7 @@ async function forOrderExcludingInternalCaDocs(orderId) {
        AND NOT EXISTS (
            SELECT 1 FROM documents d
            JOIN document_types dt ON dt.id = d.document_type_id
-           WHERE dt.code = 'CAFIN' AND (d.pdf_file_id = fs.id OR d.docx_file_id = fs.id)
+           WHERE dt.code = 'CAFIN' AND (d.pdf_file_id = fs.id OR d.docx_file_id = fs.id OR d.id = fs.linked_document_id)
        )
      ORDER BY fs.file_origin, fs.uploaded_at`,
     { order_id: orderId }
@@ -224,9 +232,14 @@ async function removedAdditionalDocumentsForClient(clientId) {
 /** QA Round 5, R5-21: the document type of the generated document this file belongs to, if any. */
 async function documentTypeCodeFor(fileId) {
   const rows = await db.query(
+    // Owner points 6/15 (2 Nov 2026): also a generated copy that is no longer
+    // the document's current PDF (draft after approval, the final after a
+    // supersede, an older CAFIN) — through file_store.linked_document_id.
     `SELECT dt.code FROM documents d JOIN document_types dt ON dt.id = d.document_type_id
-     WHERE d.pdf_file_id = :pdf OR d.docx_file_id = :docx LIMIT 1`,
-    { pdf: fileId, docx: fileId }
+     WHERE d.pdf_file_id = :pdf OR d.docx_file_id = :docx
+        OR d.id = (SELECT fs.linked_document_id FROM file_store fs WHERE fs.id = :f AND fs.file_origin <> 'RECEIVED')
+     LIMIT 1`,
+    { pdf: fileId, docx: fileId, f: fileId }
   );
   return rows.length ? rows[0].code : null;
 }
@@ -271,7 +284,7 @@ async function moneyClassFor(fileId) {
 
 module.exports = {
   documentTypeCodeFor, moneyClassFor,
-  insertGenerated, insertReceived, find, forOrder, forOrderExcludingInternalCaDocs, uploadedForOrder,
+  insertGenerated, insertReceived, markSentToClient, find, forOrder, forOrderExcludingInternalCaDocs, uploadedForOrder,
   markAsAdditionalDocument, additionalDocumentsForOrder, additionalDocumentsForClient, deactivate,
   removedAdditionalDocumentsForOrder, removedAdditionalDocumentsForClient,
 };

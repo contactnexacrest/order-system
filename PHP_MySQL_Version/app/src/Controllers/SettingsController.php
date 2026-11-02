@@ -33,6 +33,8 @@ final class SettingsController
         if (!ZohoMailService::IN_USE) {
             unset($grouped['zoho']); // mail goes through Bluehost SMTP only (owner decision 2026-10-29)
         }
+        // Owner points 5/8/9 (2 Nov 2026): edited on its own page with its own rules (/settings/document-cleanup).
+        unset($grouped[\App\Controllers\DocumentCleanupController::CATEGORY]);
         $user = AuthService::currentUser();
         View::render('settings/index', [
             'grouped' => $grouped,
@@ -121,6 +123,9 @@ final class SettingsController
         foreach ($submitted as $key => $newValue) {
             if (!isset($byKey[$key])) {
                 continue; // unknown key submitted — ignore rather than trust client input
+            }
+            if ($byKey[$key]['category'] === DocumentCleanupController::CATEGORY) {
+                continue; // saved only through /settings/document-cleanup, with its own allowed values
             }
             $oldValue = $byKey[$key]['setting_value'];
             $newValue = trim((string) $newValue);

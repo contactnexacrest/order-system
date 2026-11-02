@@ -193,14 +193,14 @@ async function setLegExchangeRate(orderId, leg, rate, setBy) {
  * QA Round 6, R6-N22: a remittance and its exchange rate are saved together
  * or not at all. Owner rule D-212: with the bank reference it came with.
  */
-async function recordLegReceivedWithRate(orderId, leg, amount, receivedAt, rate, setBy, bankReference = null) {
+async function recordLegReceivedWithRate(orderId, leg, amount, receivedAt, rate, setBy, bankReference = null, differenceReason = null, bankCharges = 0) {
   if (!EXCHANGE_RATE_LEGS.includes(leg)) {
     throw new Error(`Unknown settlement leg: ${leg}`);
   }
   // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total, the latest
   // date, the amount-weighted rate and the receipts' bank references. QA Round 6, R6-N17: a second click with
   // the same amount, day and rate records nothing more (the row is locked inside the transaction).
-  return require('../services/partPaymentService').addLegReceipt(orderId, leg, amount, receivedAt, rate, bankReference, setBy);
+  return require('../services/partPaymentService').addLegReceipt(orderId, leg, amount, receivedAt, rate, bankReference, setBy, differenceReason, bankCharges);
 }
 
 async function setAdvanceFirc(orderId, reference, receivedAt) {

@@ -36,7 +36,9 @@ describe('Coordination (D-214 phase 4)', () => {
   });
 
   async function taskKeys(departments = null) {
-    return (await departmentTaskRepository.open(departments)).filter((t) => Number(t.order_id) === orderId).map((t) => t.task_key);
+    // D-226: Export Compliance runs alongside (checklist, eBRC) — exportCompliance.test.js covers it.
+    return (await departmentTaskRepository.open(departments))
+      .filter((t) => Number(t.order_id) === orderId && t.department_code !== 'EXPORT_COMPLIANCE').map((t) => t.task_key);
   }
 
   async function createUser(roleName) {

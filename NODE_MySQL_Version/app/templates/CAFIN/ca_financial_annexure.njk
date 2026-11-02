@@ -97,7 +97,7 @@
 <table class="data">
   <tr><th>Leg</th><th class="num">Amount ({{ snapshot.currency }})</th><th class="num">Rate (&#8377;)</th><th class="num">INR</th><th>Received</th><th>Cleared</th><th>Basis</th></tr>
   {% for r in snapshot.receipts %}
-  <tr><td>{{ r.leg }}</td><td class="num">{{ r.amount }}</td><td class="num">{{ r.rate }}</td><td class="num">{{ r.inr }}</td><td>{{ r.received }}</td><td>{{ r.cleared }}</td><td>{{ r.basis }}</td></tr>
+  <tr><td>{{ r.leg }}</td><td class="num">{{ r.amount_display or r.amount }}</td><td class="num">{{ r.rate }}</td><td class="num">{{ r.inr_display or r.inr }}</td><td>{{ r.received }}</td><td>{{ r.cleared }}</td><td>{{ r.basis }}</td></tr>
   {% endfor %}
   <tr class="totals"><td>TOTAL</td><td class="num">{{ snapshot.receipts_foreign }}</td><td></td><td class="num">{{ snapshot.receipts_inr }}</td><td colspan="3"></td></tr>
 </table>

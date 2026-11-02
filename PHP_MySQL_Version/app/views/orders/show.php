@@ -36,7 +36,22 @@ $renderReceipts = static function (string $leg, ?array $milestone = null) use ($
     $__cur = (string) ($order['currency_code'] ?? '');
     echo '<div class="part-payments small" data-part-payments="' . htmlspecialchars($leg) . '"><table class="list compact"><tr><th>Received on</th><th>Amount</th><th>Rate</th><th>Bank reference</th><th>Recorded by</th></tr>';
     foreach ($__s['receipts'] as $__r) {
-        echo '<tr><td>' . htmlspecialchars(Dates::short((string) $__r['received_on'])) . '</td><td>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['amount'])) . '</td><td>'
+        // Owner 2 Nov 2026: the reason a receipt differed, and any bank charges the banks deducted.
+        $__why = match ($__r['difference_reason'] ?? null) {
+            'bank_charges' => ' <small class="muted">+ ' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['bank_charges'])) . ' bank charges (&#8377;' . number_format((float) $__r['bank_charges_inr'], 2) . ', order cost)</small>',
+            'short' => ' <small class="muted">· buyer paid less</small>',
+            'excess' => ' <small class="muted">· buyer paid more</small>',
+            default => '',
+        };
+        // Follow-up (2 Nov 2026): the reason chosen from the Admin list (or typed in).
+        if ($__why !== '' && !empty($__r['difference_reason_text'])) {
+            $__why .= ' <small class="muted">— ' . htmlspecialchars((string) $__r['difference_reason_text']) . (!empty($__r['difference_reason_custom']) ? ' (typed in)' : '') . '</small>';
+        }
+        // Owner (2 Nov 2026): our own bank's fee on this credit, booked as an order cost with the receipt.
+        if (!empty($__r['own_bank_charges_inr'])) {
+            $__why .= ' <small class="muted">· our bank\'s charges &#8377;' . number_format((float) $__r['own_bank_charges_inr'], 2) . ' (order cost)</small>';
+        }
+        echo '<tr><td>' . htmlspecialchars(Dates::short((string) $__r['received_on'])) . '</td><td>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['amount'])) . $__why . '</td><td>'
             . ($__r['exchange_rate'] !== null ? '&#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['exchange_rate'], 4), '0'), '.')) : '—') . '</td><td>' . htmlspecialchars((string) ($__r['bank_reference'] ?? '—')) . '</td><td>'
             . htmlspecialchars((string) ($__r['recorded_by_name'] ?? '—')) . '</td></tr>';
     }
@@ -109,12 +124,17 @@ if ($canManageIncentives) {
     $incentiveCalc = \App\Services\IncentiveService::calculate((int) $order['id']);
     $incentivePayouts = \App\Repositories\IncentiveRepository::payoutsForOrder((int) $order['id']);
     $incentiveUsers = \App\Repositories\UserRepository::listActive();
+    // Owner 2 Nov 2026 (point 10): nothing associate-related when the client has no associate.
+    $__hasAsStmt = \App\Config\Database::connection()->prepare('SELECT 1 FROM clients WHERE id = :c AND associate_id IS NOT NULL');
+    $__hasAsStmt->execute(['c' => (int) $order['client_id']]);
+    $incentiveHasAssociate = $__hasAsStmt->fetchColumn() !== false;
 }
 // External QA report Q-ROLE-3: split out of manage_order_financials so
 // Accounts can confirm supplier payments without gaining the broader
 // financials permission's access to cost entries/export benefits/the
 // profitability report.
 $canManageSupplierPayments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_supplier_payments');
+$canManageLogisticsBills = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_logistics_bills');
 $canManageShipping = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_shipping');
 $canCloseOrders = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'close_orders');
 // Owner decision D-214, phase 2: the Supplier PO and production belong to Procurement; settling to Finance.
@@ -147,6 +167,12 @@ $canViewOrderComplaints = $canManageComplaints || $canRespondToComplaints;
 $canManageComplianceTaskTypes = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_compliance_task_types');
 // External QA report U-01: /orders/{id}/email/compose and .../email/send both require this (see public_html/index.php) — Accounts Executive and Viewer / Auditor both lack it.
 $canGenerateDocuments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'generate_documents');
+// Owner decision D-226: Export Compliance — the checklist, the COO Prep Sheet, benefit claims and
+// government / agency documents, each through its own narrow permission.
+$canManageComplianceChecklist = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_compliance_checklist');
+$canFileBenefitClaims = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_export_benefit_claims');
+$canGenerateComplianceDocuments = $canGenerateDocuments || PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'generate_compliance_documents');
+$canUploadOrderDocuments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'upload_order_documents');
 // QA Round 5, R5-20: every form and link on this page is shown only to
 // someone its route would let through (the route checks stay as well).
 $canApproveDocuments = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'approve_documents');
@@ -631,7 +657,9 @@ $vendorBillPayTo = static function (?array $bank, string $editUrl, bool $canEdit
 // invoice; a bill takes as many payments as it needs. $leg is the supplier
 // step a payment recorded here counts towards (7e advance, 10a balance);
 // $carriedIds are 7e bills shown in 10a until fully paid.
-$renderVendorBills = static function (array $bills, bool $showPartner, bool $canPay, ?string $payBlocked, callable $payToFor, ?string $leg = null, array $carriedIds = []) use ($order): void {
+// Owner decision (2 Nov 2026): $canRemove = may remove an unpaid bill (Logistics may add/remove logistics bills; paying needs $canPay).
+$renderVendorBills = static function (array $bills, bool $showPartner, bool $canPay, ?string $payBlocked, callable $payToFor, ?string $leg = null, array $carriedIds = [], ?bool $canRemove = null) use ($order): void {
+    $canRemove ??= $canPay;
     if ($bills === []) {
         echo '<p class="muted small">No bills added yet.</p>';
         if ($canPay && $payBlocked !== null) {
@@ -697,12 +725,14 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
                 <div><button type="submit" class="btn-sm">Save Payment</button></div>
               </form>
             </details>
-            <?php if ($b['payments'] === []): ?>
+            <?php elseif (!$canPay && $canRemove): ?>
+            <br><small class="muted">Accounts records the payment.</small>
+            <?php endif; ?>
+            <?php if ($canRemove && $b['payments'] === []): ?>
             <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/<?= (int) $b['id'] ?>/delete" data-confirm="Remove the unpaid bill <?= htmlspecialchars((string) $b['bill_no'], ENT_QUOTES) ?>?" style="display:inline">
               <?= \App\Helpers\Csrf::field() ?>
               <button type="submit" class="btn-link small">Remove</button>
             </form>
-            <?php endif; ?>
             <?php endif; ?>
           <?php endif; ?>
         </td>
@@ -995,9 +1025,20 @@ foreach ($subStepDone as $__step => $__subs) {
 // overrides every sub-step; inside the current step, done sub-steps show
 // done, the first unfinished one is current, and the rest wait their turn.
 $__balanceEarly = !empty($balanceOpenEarly);
-$subStepStatus = static function (string $step, string $sub) use ($stepStates, $subStepDone, $currentSubStep, $honestSubSteps, $__balanceEarly): string {
+// Owner 2 Nov 2026 (point 14): the COO Prep Sheet (13a) opens with Stage 8, before the balance.
+$__cooPrepEarly = $stage8 !== null && $stage8['status'] !== 'locked';
+// Owner decision D-226: Export Compliance answers the benefit eligibility (13g) as soon as the BL is issued.
+$__benefitEligibilityEarly = !empty($canFileBenefitClaims) && empty($canManageOrderFinancials) && !empty($shipping['bl_number'])
+    && array_filter($exportBenefitEligibility ?? [], static fn(array $sch): bool => $sch['status'] === 'pending') !== [];
+$subStepStatus = static function (string $step, string $sub) use ($stepStates, $subStepDone, $currentSubStep, $honestSubSteps, $__balanceEarly, $__cooPrepEarly, $__benefitEligibilityEarly): string {
     $parent = $stepStates[$step];
     $done = $subStepDone[$step][$sub] ?? null;
+    if ($__benefitEligibilityEarly && $step === '13' && $sub === '13g' && $parent !== 'done') {
+        return 'current';
+    }
+    if ($__cooPrepEarly && $step === '13' && $sub === '13a' && $parent !== 'done') {
+        return $done ? 'done' : 'current';
+    }
     // Gap list G-1 (owner, 1 Nov 2026): a "before shipment" balance is recorded (11c) and cleared (11d) before Step 11 is reached.
     if ($__balanceEarly && $step === '11' && ($sub === '11c' || $sub === '11d') && $parent !== 'done') {
         if ($done) {
@@ -1092,8 +1133,8 @@ $phaseSummary = static function (string $key, string $badges = '') use ($phases,
 // Phytosanitary, Pre-Shipment Inspection...) at the start of Step 10. Both
 // run alongside the other cards and never lock them. Each row saves on its
 // own without reloading the page.
-$renderComplianceCard = static function (string $phase, string $step) use ($complianceTasks, $order, $canCloseOrders, $canManageComplianceTaskTypes, $stepStates, $currentUserStep, $stepStatusIcon, $inspection): void {
-    if (!$canCloseOrders) {
+$renderComplianceCard = static function (string $phase, string $step) use ($complianceTasks, $order, $canManageComplianceChecklist, $canManageComplianceTaskTypes, $stepStates, $currentUserStep, $stepStatusIcon, $inspection): void {
+    if (!$canManageComplianceChecklist) { // D-226: split out of close_orders
         return;
     }
     $tasks = array_values(array_filter($complianceTasks, static fn(array $ct): bool => ($ct['phase'] ?? 'shipment') === $phase));
@@ -1728,12 +1769,12 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/milestones/<?= (int) $__m['id'] ?>" class="inline-form milestone-record">
           <?= Csrf::field() ?>
           <strong>Milestone <?= (int) $__m['seq'] ?> received</strong>
-          <label>Amount received (<?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="amount" step="0.01" min="0.01" max="<?= $__msFob > 0 ? number_format($__msFob, 2, '.', '') : '999999999999.99' ?>" required value="<?= number_format(round($__msFob * (float) $__m['pct'] / 100, 2), 2, '.', '') ?>" placeholder="e.g. 1500.00"></label>
-          <label>Exchange rate (₹ per 1 <?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="exchange_rate" step="0.0001" min="0.0001" max="999999.9999" required placeholder="e.g. 83.25"></label>
+          <label>Amount received (<?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="amount" data-remit-amount step="0.01" min="0.01" max="<?= $__msFob > 0 ? number_format($__msFob, 2, '.', '') : '999999999999.99' ?>" required value="<?= number_format(round($__msFob * (float) $__m['pct'] / 100, 2), 2, '.', '') ?>" placeholder="e.g. 1500.00"></label>
+          <label>Exchange rate (₹ per 1 <?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="exchange_rate" data-remit-rate step="0.0001" min="0.0001" max="999999.9999" required placeholder="e.g. 83.25"></label>
           <label>Bank reference (UTR / SWIFT) *<input type="text" name="bank_reference" minlength="4" maxlength="100" required placeholder="e.g. HDFCN26304123456"></label>
           <label>Received on *<input type="date" name="received_on" required value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>"></label>
           <label>Note <small class="muted">(added to the description)</small><input type="text" name="staff_note" maxlength="255" placeholder="Optional note"></label>
-          <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the milestone due (e.g. bank charges deducted) — record it anyway</label>
+          <?php $rd = ['label' => 'Milestone ' . (int) $__m['seq'], 'due' => round($__msFob * (float) $__m['pct'] / 100, 2), 'so_far' => 0.0, 'currency' => (string) ($order['currency_code'] ?? ''), 'max_pct' => \App\Services\RemittanceDifference::maxBankChargesPct()]; require __DIR__ . '/_remittance_difference.php'; ?>
           <button type="submit" class="btn-sm">Record Milestone <?= (int) $__m['seq'] ?> Remittance</button>
         </form>
         <?php elseif ($__m['received_amount'] !== null && $__m['cleared_on'] === null && $canClearPayments): ?>
@@ -1768,7 +1809,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
 
   <?php // Owner decision (2026-10-26): opens by itself only when a document is waiting on someone; otherwise a slim bar with the count. ?>
   <details class="step-card step-card-reference" id="document-review-approval"<?= $docPendingActions ? ' open' : '' ?>>
-    <summary><h2>Document Review &amp; Approval <small class="muted">(reference &mdash; every document, every step)</small><?php if ($docPendingActions): ?> <span class="nav-badge doc-pending-badge"><?= count($docPendingActions) ?> need<?= count($docPendingActions) === 1 ? 's' : '' ?> action</span><?php elseif ($documents): ?> <span class="phase-pill"><?= count($documents) ?> document<?= count($documents) === 1 ? '' : 's' ?></span><?php endif; ?></h2></summary>
+    <summary><h2>Document Review &amp; Approval <small class="muted">(reference &mdash; every document, every step)</small><?php if ($docPendingActions): ?> <span class="nav-badge doc-pending-badge"><?= count($docPendingActions) ?> need<?= count($docPendingActions) === 1 ? 's' : '' ?> action</span><?php elseif ($visibleDocuments ?? $documents): ?> <span class="phase-pill"><?= count($visibleDocuments ?? $documents) ?> document<?= count($visibleDocuments ?? $documents) === 1 ? '' : 's' ?></span><?php endif; ?></h2></summary>
     <?php if ($docPendingActions): ?>
     <div class="review-banner warn doc-pending-actions">
       <div><strong>Waiting on someone — don't move on without these:</strong>
@@ -2506,7 +2547,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <?php $advanceDue = round((float) $fobTotal * (float) ($order['advance_pct'] ?? 0) / 100, 2); ?>
           <p class="advance-due-note">Advance due on this order: <strong><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format($advanceDue, 2) ?></strong> (<?= htmlspecialchars(rtrim(rtrim(number_format((float) ($order['advance_pct'] ?? 0), 2), '0'), '.')) ?>% of the order value <?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $fobTotal, 2) ?>). Enter what the bank actually received.</p>
           <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required data-remit-amount value="<?= $advanceDue > 0 ? number_format($advanceDue, 2, '.', '') : '' ?>" placeholder="e.g. 1800.00"></label>
-          <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the advance due (e.g. bank charges deducted) — record it anyway</label>
+          <?php $rd = ['label' => 'Advance', 'due' => $advanceDue, 'so_far' => \App\Services\PartPaymentService::receivedTotal((int) $order['id'], 'advance'), 'currency' => (string) ($order['currency_code'] ?? ''), 'max_pct' => \App\Services\RemittanceDifference::maxBankChargesPct()]; require __DIR__ . '/_remittance_difference.php'; ?>
           <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="advance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
@@ -2618,7 +2659,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
   <details class="step-card" id="step-6a-oc-generate"<?= $subCardOpen('6', '6a') ?>>
     <summary><?= $stepStatusIcon($subStepStatus('6', '6a')) ?><h2>Step 6a &middot; Generate Order Confirmation</h2></summary>
-    <?php if ($canCloseOrders): ?>
+    <?php if ($canManageComplianceChecklist): ?>
     <p class="muted small">ECGC Cover is tracked on the <a href="#compliance-checklist">Compliance Checklist</a>.<?php if ($canManageOrderFinancials): ?> The premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 12) as an "ECGC insurance" cost entry — filed here, once the order is confirmed, so the fee is never paid before the order is certain to proceed.<?php endif; ?></p>
     <?php elseif ($canManageOrderFinancials): ?>
     <p class="muted small">The ECGC insurance premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 12) once the order is confirmed.</p>
@@ -2741,6 +2782,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       </tr>
       <?php endforeach; ?>
     </table>
+    <p class="muted small">Award = supplier chosen. The Supplier PO is then generated in Step 7b, and the supplier acknowledges it in Step 7c.</p>
     <?php endif; ?>
     <?php if ($__canRaisePr && !$isLockedOrder): ?>
     <h3>Ask Procurement for what this order needs</h3>
@@ -3020,6 +3062,32 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php if ($supplierPoLocked): ?>
       <p class="muted">Confirm buyer acknowledgement first to unlock this gate.</p>
     <?php elseif ($supplierPo): ?>
+      <?php
+        // Owner 2 Nov 2026 (point 13): the Supplier Link comes first, then the supplier's acknowledgment.
+        // Owner request (2026-10-26, t4): the supplier can upload it themselves
+        // through a no-login link (like the Buyer Action Link), and when they
+        // never acknowledge, staff record that with a reason.
+        $supplierActionTokenPlain = \App\Services\EncryptionService::decrypt($supplierPo['supplier_action_token_plain'] ?? null);
+        $supplierActionLinkValid = !empty($supplierActionTokenPlain) && !empty($supplierPo['supplier_action_token_expires_at']) && strtotime((string) $supplierPo['supplier_action_token_expires_at']) > time();
+      ?>
+      <div class="supplier-action-link" style="margin-top:6px;">
+        <p class="muted small"><strong>1. Send the Supplier Link first:</strong> a direct link (no login) where the supplier uploads their signed PO / acknowledgment — emailed to them when the PO has their email<?= !empty($supplierPo['supplier_email']) ? ' (' . htmlspecialchars((string) $supplierPo['supplier_email']) . ')' : '' ?>. You'll be notified when they upload.</p>
+        <?php if ($supplierActionLinkValid): ?>
+          <?php $supplierActionFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/supplier-action/' . $supplierActionTokenPlain; ?>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <input type="text" readonly value="<?= htmlspecialchars($supplierActionFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Supplier Action Link">
+            <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($supplierActionFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+          </div>
+          <p class="muted small">Valid until <?= htmlspecialchars(Dates::human($supplierPo['supplier_action_token_expires_at'])) ?>.</p>
+        <?php endif; ?>
+        <?php if ($canManageSupplierPo): // QA Round 5, R5-20 ?>
+        <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/supplier-link" style="display:inline">
+          <?= Csrf::field() ?>
+          <button type="submit" class="btn-sm btn-secondary"><?= $supplierActionLinkValid ? 'Regenerate Supplier Link' : 'Generate Supplier Link' ?></button>
+        </form>
+        <?php endif; ?>
+      </div>
+      <p class="muted small" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;"><strong>2. When the supplier has acknowledged:</strong> their upload appears below — or attach the signed PO / acknowledgment yourself.</p>
       <?php if (!empty($supplierPoDocuments)): ?>
         <table class="list" style="margin-top:8px">
           <tr><th>File</th><th>Uploaded</th><th></th></tr>
@@ -3039,30 +3107,6 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?= $stepBadge('7c') ?><button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
       </form>
       <?php endif; ?>
-      <?php
-        // Owner request (2026-10-26, t4): the supplier can upload it themselves
-        // through a no-login link (like the Buyer Action Link), and when they
-        // never acknowledge, staff record that with a reason.
-        $supplierActionTokenPlain = \App\Services\EncryptionService::decrypt($supplierPo['supplier_action_token_plain'] ?? null);
-        $supplierActionLinkValid = !empty($supplierActionTokenPlain) && !empty($supplierPo['supplier_action_token_expires_at']) && strtotime((string) $supplierPo['supplier_action_token_expires_at']) > time();
-      ?>
-      <div class="supplier-action-link" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;">
-        <p class="muted small"><strong>Or let the supplier upload it:</strong> a direct link (no login) where the supplier uploads their signed PO / acknowledgment — emailed to them when the PO has their email<?= !empty($supplierPo['supplier_email']) ? ' (' . htmlspecialchars((string) $supplierPo['supplier_email']) . ')' : '' ?>. You'll be notified when they upload.</p>
-        <?php if ($supplierActionLinkValid): ?>
-          <?php $supplierActionFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/supplier-action/' . $supplierActionTokenPlain; ?>
-          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-            <input type="text" readonly value="<?= htmlspecialchars($supplierActionFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Supplier Action Link">
-            <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($supplierActionFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
-          </div>
-          <p class="muted small">Valid until <?= htmlspecialchars(Dates::human($supplierPo['supplier_action_token_expires_at'])) ?>.</p>
-        <?php endif; ?>
-        <?php if ($canManageSupplierPo): // QA Round 5, R5-20 ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/supplier-po/supplier-link" style="display:inline">
-          <?= Csrf::field() ?>
-          <button type="submit" class="btn-sm btn-secondary"><?= $supplierActionLinkValid ? 'Regenerate Supplier Link' : 'Generate Supplier Link' ?></button>
-        </form>
-        <?php endif; ?>
-      </div>
       <?php if (!empty($supplierPo['ack_skipped_at'])): ?>
         <p class="small" style="margin-top:8px;">&#10003; Recorded that the supplier did not acknowledge — <?= htmlspecialchars((string) $supplierPo['ack_skip_reason']) ?> <span class="muted">(<?= htmlspecialchars((string) $supplierPo['ack_skipped_at']) ?>)</span></p>
       <?php elseif (empty($supplierPoDocuments) && $supplierPo['status'] !== 'signed' && $canManageSupplierPo): ?>
@@ -3191,13 +3235,14 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     $__logisticsUnpaid = count(array_filter($__logisticsBills, static fn (array $b): bool => !$b['settled']));
     $__logisticsStatus = $__logisticsBills !== [] && $__logisticsUnpaid === 0 ? 'done' : (in_array($currentUserStep, ['9', '10', '11'], true) ? 'current' : 'locked');
   ?>
-  <?php if ($canManageSupplierPayments || $canManageOrderFinancials): ?>
+  <?php // Owner decision (2 Nov 2026): Logistics sees the card (view_logistics_costs) and adds bills (manage_logistics_bills); Accounts pays them. ?>
+  <?php if ($canManageSupplierPayments || $canManageOrderFinancials || $sees['logistics']): ?>
   <details class="step-card step-card-parallel" id="logistics-bills"<?= in_array($currentUserStep, ['9', '10', '11'], true) && ($__logisticsBills === [] || $__logisticsUnpaid > 0) ? ' open' : '' ?>>
     <summary><?= $stepStatusIcon($__logisticsStatus) ?><h2>Logistics Partner Bills &amp; Payments — CHA · Transport · Freight Forwarder<?php if ($__logisticsUnpaid > 0): ?> <small class="muted">(<?= $__logisticsUnpaid ?> unpaid)</small><?php endif; ?></h2></summary>
     <p class="muted small">One row per bill from the partner — a partner doing both CHA and transport can send one combined bill or separate bills. Runs alongside Steps 9–11 and never locks them.<?= $isFob ? '' : ' On this ' . htmlspecialchars((string) $order['incoterm_code']) . ' order an Advance bill can be paid any time; the Final bill once the buyer\'s Debit Note payment has cleared (Step 9d).' ?> Bills go into the order's financials (Step 12) automatically.</p>
     <p class="small pay-guide-link"><a href="/help/supplier-logistics-payments#guide-c" target="_blank" rel="noopener">How to fill this — step-by-step guide with screenshots</a></p>
-    <?php $renderVendorBills($__logisticsBills, true, $canManageSupplierPayments, $logisticsPaymentBlocked, static fn (array $b): string => $vendorBillPayTo($logisticsBanks[(int) $b['logistics_partner_id']] ?? null, '/logistics-partners/' . (int) $b['logistics_partner_id'] . '/edit', $canManageLogisticsPartners)); ?>
-    <?php if ($canManageSupplierPayments): ?>
+    <?php $renderVendorBills($__logisticsBills, true, $canManageSupplierPayments, $logisticsPaymentBlocked, static fn (array $b): string => $vendorBillPayTo($logisticsBanks[(int) $b['logistics_partner_id']] ?? null, '/logistics-partners/' . (int) $b['logistics_partner_id'] . '/edit', $canManageLogisticsPartners), null, [], $canManageLogisticsBills); ?>
+    <?php if ($canManageLogisticsBills): ?>
     <?php $__activePartners = array_values(array_filter($logisticsPartners, static fn (array $lp): bool => !empty($lp['is_active']))); ?>
     <details class="vendor-bill-add"<?= $__logisticsBills === [] ? ' open' : '' ?>>
       <summary class="small"><strong>+ Add a bill</strong></summary>
@@ -3334,6 +3379,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/payment/freight">
         <?= Csrf::field() ?>
         <label>Freight Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="freight_amount" required data-remit-amount placeholder="e.g. 950.00"></label>
+        <?php $rd = ['label' => 'Freight', 'due' => (float) (\App\Services\PartPaymentService::expected((int) $order['id'], 'freight') ?? 0.0), 'so_far' => \App\Services\PartPaymentService::receivedTotal((int) $order['id'], 'freight'), 'currency' => (string) ($order['currency_code'] ?? ''), 'max_pct' => \App\Services\RemittanceDifference::maxBankChargesPct()]; require __DIR__ . '/_remittance_difference.php'; ?>
         <label>Received On<input type="date" name="freight_received_at" value="<?= date('Y-m-d') ?>"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="freight_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
@@ -3730,6 +3776,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?= Csrf::field() ?>
         <?php $__balOwed = \App\Services\PartPaymentService::summary((int) $order['id'], 'balance')['owed']; ?>
         <label>Balance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="balance_amount" required data-remit-amount value="<?= htmlspecialchars($payment && $payment['balance_remittance_received_at'] !== null ? ($__balOwed !== null && $__balOwed > 0 ? number_format($__balOwed, 2, '.', '') : '') : (string) ($payment['balance_amount'] ?? '')) ?>" placeholder="e.g. 2700.00"></label>
+        <?php $rd = ['label' => 'Balance', 'due' => (float) (\App\Services\PartPaymentService::expected((int) $order['id'], 'balance') ?? 0.0), 'so_far' => \App\Services\PartPaymentService::receivedTotal((int) $order['id'], 'balance'), 'currency' => (string) ($order['currency_code'] ?? ''), 'max_pct' => \App\Services\RemittanceDifference::maxBankChargesPct()]; require __DIR__ . '/_remittance_difference.php'; ?>
         <label>Received On<input type="date" name="balance_received_at" value="<?= date('Y-m-d') ?>"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="balance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
@@ -3826,7 +3873,14 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
   <details class="step-group" id="order-financials"<?= $stepCardOpen('12') ?>>
     <summary><?= $stepStatusIcon($stepStates['12']) ?><span class="step-group-num">STEP 12</span><h3>Closure &mdash; Financials, Benefits &amp; Costs</h3><span class="fin-progress"><?= count(array_filter($__finDone)) ?> of 3 done</span></summary>
     <p class="muted small">Everything financial about this order, in three short parts (government benefits are recorded later, in Step 13g) — visible only to Super Admin and roles granted "Manage order financials". Work top to bottom; the next unfinished part opens by itself.</p>
-    <?php if (!empty($canCheckZoho)): ?><p class="small"><a href="/orders/<?= (int) $order['id'] ?>/zoho-check">Check this order against Zoho Books &rarr;</a> <span class="muted">(reads only)</span></p><?php endif; ?>
+    <?php if (!empty($zohoWaiting['enabled'])): $__zwLink = !empty($canCheckZoho); ?><p class="small"><?php require dirname(__DIR__) . '/partials/zoho_waiting.php'; ?></p><?php endif; ?>
+    <?php if (!empty($canCheckZoho)): ?><p class="small"><a href="/orders/<?= (int) $order['id'] ?>/zoho-check">Check this order against Zoho Books &rarr;</a> <span class="muted">(reads only)</span></p>
+    <?php // Owner 2 Nov 2026 (point 16): send this order's records to Zoho Books now. ?>
+    <form method="post" action="/orders/<?= (int) $order['id'] ?>/zoho-sync" class="zoho-order-sync" data-confirm="Send this order's invoices, payments, bills, expenses and benefits to Zoho Books now?" style="margin:4px 0 10px">
+      <?= Csrf::field() ?>
+      <button type="submit" class="btn-sm btn-secondary">Sync this order to Zoho now</button>
+      <span class="muted small">Only this order. The full sync (all orders) is under <a href="/ca/zoho-sync">Zoho Books Sync</a>.</span>
+    </form><?php endif; ?>
 
     <div class="fin-kpis">
       <div class="fin-kpi"><span class="l">Received from buyer<?= $profitability && $profitability['revenue_is_estimated'] ? ' (estimated)' : '' ?></span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['revenue_inr'], 2) : '—' ?></span></div>
@@ -4086,7 +4140,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php if (!empty($orderLcDetails['lc_received_at'])): ?>
         <p>Paid by the bank on <strong><?= htmlspecialchars(\App\Helpers\Dates::short((string) $orderLcDetails['lc_received_at'])) ?></strong>: <?= htmlspecialchars($__cur) ?> <?= number_format((float) $orderLcDetails['lc_received_amount'], 2) ?> &middot; &#8377;<?= number_format((float) $orderLcDetails['lc_inr_credited'], 2) ?> credited &middot; &#8377;<?= number_format((float) $orderLcDetails['lc_bank_charges_inr'], 2) ?> bank charges<?= !empty($orderLcDetails['lc_zoho_synced_at']) ? ' &middot; <span class="muted">in Zoho Books</span>' : '' ?></p>
       <?php else: ?>
-        <p class="muted small">Not recorded yet. When the bank pays under the LC (after the documents are presented), record it here: it goes to Zoho Books as the buyer's payment against the Commercial Invoice.</p>
+        <p class="muted small">Not recorded yet. When the bank pays under the LC (after the documents are presented), record it here: it goes to Zoho Books at the next sync (hourly, or Sync now) as the buyer's payment against the Commercial Invoice.</p>
       <?php endif; ?>
       <?php if (!empty($orderLcDetails['lc_received_at'])): ?>
         <?php // Owner decision 2026-10-29 (CAFIN change confirmed twice): the LC payment's FIRC / eBRC, like the other legs'. ?>
@@ -4255,12 +4309,14 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
   <details class="step-card" id="step-11a-coo-prep"<?= $subCardOpen('13', '13a') ?>>
     <summary><?= $stepStatusIcon($subStepStatus('13', '13a')) ?><h2>Step 13a &middot; Generate COO Prep Sheet</h2></summary>
-    <?php if ($despatchLocked): ?>
-      <p class="muted">Clear the balance payment first to unlock this gate.</p>
+    <?php $__cooPrepLocked = !$stage8 || $stage8['status'] === 'locked'; // Owner 2 Nov 2026 (point 14): opens with Stage 8, not the balance ?>
+    <?php if ($__cooPrepLocked): ?>
+      <p class="muted">Opens once the BL is issued (Step 10) — you can prepare it before the balance is cleared.</p>
     <?php else: ?>
+      <?php if ($despatchLocked): ?><p class="small review-banner info">&#8505; Prepared early — the Certificate of Origin can be applied for now; the original documents still go to the buyer only after the balance clears.</p><?php endif; ?>
       <h3 style="font-size:0.95em; margin-top:0;">COO Prep Sheet (internal — for the Chamber of Commerce application)</h3>
       <p class="muted small">Generates an internal worksheet summarizing everything needed to apply for the Certificate of Origin with the Chamber of Commerce — shipper, consignee, shipment, and cargo details, the same source data as the BL Instruction Sheet. Never shown to the client.</p>
-      <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>
+      <?php if ($canGenerateComplianceDocuments): // QA Round 5, R5-20; D-226 Export Compliance ?>
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <?= Csrf::field() ?>
         <input type="hidden" name="document_type" value="COOPREP">
@@ -4389,8 +4445,38 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
   <div class="step-group-connector">then the government benefits — they usually arrive after the buyer has paid</div>
 
+  <?php require __DIR__ . '/_compliance_tracking.php'; ?>
   <details class="step-card" id="step-13g-benefits"<?= $subCardOpen('13', '13g') ?>>
     <summary><?= $stepStatusIcon($subStepStatus('13', '13g')) ?><h2>Step 13g &middot; Government Benefits &mdash; Claimed &amp; Received</h2><span class="fin-sub-summary"><?php if ($benefitSettlement['waiting'] !== []): ?><span class="phase-pill warn"><?= count($benefitSettlement['waiting']) ?> waiting for money</span><?php elseif ($benefitSettlement['unclaimed'] !== []): ?><?= count($benefitSettlement['unclaimed']) ?> not claimed yet<?php elseif ($benefitSettlement['undecided'] !== []): ?>eligibility not answered (12b)<?php else: ?>all received or skipped<?php endif; ?></span></summary>
+    <?php
+      // Owner decision D-226: Export Compliance answers the scheme eligibility here (Step 12b,
+      // where Finance answers it, also shows the profit) — the same form and route.
+      $__complianceOnly = $canFileBenefitClaims && !$canManageOrderFinancials;
+      $__pendingSchemes = array_values(array_filter($exportBenefitEligibility, static fn(array $sch): bool => $sch['status'] === 'pending'));
+    ?>
+    <?php if ($__complianceOnly && $__pendingSchemes !== []): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefit-schemes" id="step-13g-eligibility">
+        <?= Csrf::field() ?>
+        <p class="muted small"><strong>Which schemes is this order eligible for?</strong> Answer each one (never leave it Pending) — Mark Fully Settled waits for every answer.</p>
+        <table class="list">
+          <tr><th>Scheme</th><th>Eligibility</th><th>Reason <small class="muted">(required when Not Eligible)</small></th></tr>
+          <?php foreach ($__pendingSchemes as $__i => $sch): ?>
+          <tr>
+            <td><?= htmlspecialchars($sch['scheme_name']) ?><input type="hidden" name="schemes[<?= (int) $__i ?>][scheme_name]" value="<?= htmlspecialchars($sch['scheme_name']) ?>"></td>
+            <td>
+              <select name="schemes[<?= (int) $__i ?>][status]" data-scheme-status style="min-width:140px;" aria-label="Eligibility">
+                <?php foreach (\App\Repositories\OrderExportBenefitSchemeRepository::STATUSES as $key => $label): ?>
+                <option value="<?= htmlspecialchars($key) ?>" <?= $sch['status'] === $key ? 'selected' : '' ?><?= $key === 'not_eligible' ? ' data-auto-reason="' . htmlspecialchars(\App\Repositories\OrderExportBenefitSchemeRepository::NOT_ELIGIBLE_REASON) . '"' : '' ?>><?= htmlspecialchars($label) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </td>
+            <td><input type="text" name="schemes[<?= (int) $__i ?>][reason]" value="<?= htmlspecialchars((string) ($sch['reason'] ?? '')) ?>" placeholder="e.g. Product not covered by the scheme" data-scheme-reason aria-label="Reason"></td>
+          </tr>
+          <?php endforeach; ?>
+        </table>
+        <button type="submit" class="btn-sm">Save Eligibility</button>
+      </form>
+    <?php endif; ?>
     <?php if (!$orderClosed && $order['status'] !== 'shipped_docs_sent'): ?>
       <p class="muted">Not applicable until the order is complete — claims are recorded here once the documents are sent to the buyer (Step 13f) and the balance has landed.</p>
     <?php else: ?>
@@ -4405,7 +4491,27 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <tr><td><?= htmlspecialchars($__s['scheme_name']) ?></td><td><?= htmlspecialchars(['undecided' => 'Eligibility not answered', 'skipped' => 'Skipped', 'received' => 'Received', 'waiting' => 'Claimed — waiting for money', 'unclaimed' => 'Not claimed yet'][$__s['settlement']]) ?></td></tr>
         <?php endforeach; ?>
       </table>
-      <p class="muted small">Recorded by users with the "Manage order financials" permission.</p>
+      <?php if ($__complianceOnly && in_array($order['status'], ['shipped_docs_sent', 'complete'], true) && !empty($payment['balance_remittance_received_at']) && $benefitSettlement['unclaimed'] !== []): ?>
+      <form method="post" action="/orders/<?= (int) $order['id'] ?>/export-benefits" id="step-13g-file-claim" class="field-grid">
+        <?= Csrf::field() ?>
+        <p class="muted small full"><strong>File a claim</strong> once it is submitted to the government portal. The money received is recorded by Accounts &amp; Finance.</p>
+        <label>Scheme *
+          <select name="scheme_name" required>
+            <option value="">Choose…</option>
+            <?php foreach ($benefitSettlement['unclaimed'] as $__name): ?>
+              <option value="<?= htmlspecialchars($__name) ?>"><?= htmlspecialchars($__name) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number" placeholder="e.g. SB 1234567 / scroll 98765"></label>
+        <label>Claimed Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required placeholder="e.g. 25000.00"></label>
+        <label>Claimed On *<input type="date" name="claimed_at" value="<?= date('Y-m-d') ?>" required></label>
+        <input type="hidden" name="currency_code" value="INR">
+        <label>Notes<input type="text" name="notes" placeholder="Optional — e.g. filed on ICEGATE"></label>
+        <button type="submit" class="btn-sm">File Claim</button>
+      </form>
+      <?php endif; ?>
+      <p class="muted small"><?= $__complianceOnly ? 'Eligibility and claims are filed by Export Compliance; the money received is recorded by users with the "Manage order financials" permission.' : 'Recorded by users with the "Manage order financials" permission.' ?></p>
     <?php else: ?>
       <p class="muted small">The government benefits usually arrive after the buyer has paid in full. One row per claim, plus an empty row for each eligible scheme not claimed yet: fill in the claim when you file it and the <strong>received amount when the money lands</strong>, then <strong>Save Benefits</strong> — or skip a scheme you will not claim (reason required). The order can be marked fully settled (13h) once every eligible scheme is received or skipped.</p>
       <?php if (!$__benefitsApplicable): ?>
@@ -4574,6 +4680,11 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?= $stepBadge('13h') ?><button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
       <p class="muted small">Blocked until Step 13g is done — every eligible government export benefit received, or skipped with a reason.</p>
+      <?php // Owner decision (2 Nov 2026, Q-6a): a missing eBRC / FIRC is a warning here, never a block. ?>
+      <?php $__missingFirc = \App\Services\ComplianceTrackingService::missingFircLegs((int) $order['id']); ?>
+      <?php if ($__missingFirc !== []): ?>
+        <p class="review-banner warn" id="missing-firc-warning">&#9888; No FIRC / eBRC reference yet for: <?= htmlspecialchars(implode(', ', array_map(static fn (array $m): string => $m['label'] . (!empty($sees['buyer_payments']) ? ' (' . $m['currency'] . ' ' . number_format($m['amount'], 2) . ')' : '') . ' — received ' . $m['received_at'], $__missingFirc))) ?>. You can still settle the order; it stays on the <a href="/reports/missing-ebrc">Missing eBRC / FIRC</a> list until the reference is recorded.</p>
+      <?php endif; ?>
       <?php
         // Owner decision (2026-10-27): unpaid supplier / logistics bills are a
         // warning here, not a block — accounts may settle vendor bills later.
@@ -4654,7 +4765,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <tr><td colspan="5" class="muted">No additional documents attached yet.</td></tr>
       <?php endif; ?>
     </table>
-    <?php if ($canManageOrders): ?>
+    <?php if ($canManageOrders || $canUploadOrderDocuments): // D-226: Export Compliance attaches government / agency documents ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
       <?= Csrf::field() ?>
       <input type="text" name="title" placeholder="Title *" required style="width:220px" aria-label="Title">
@@ -4830,7 +4941,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <?php if ($canCloseOrders): ?>
           <div><span class="k">Compliance Checklist</span><span class="v"><?= $complianceSummary['total'] === 0 ? 'No task types configured' : $complianceSummary['approved'] . ' of ' . $complianceSummary['total'] . ' resolved' ?> — <a href="#compliance-checklist">see checklist</a></span></div>
           <?php endif; ?>
-          <div><span class="k">Documents Generated</span><span class="v"><?= count($documents) ?></span></div>
+          <div><span class="k">Documents Generated</span><span class="v"><?= count($visibleDocuments ?? $documents) ?></span></div>
+          <?php if (!empty($zohoWaiting['enabled'])): $__zwLink = !empty($canCheckZoho); // D-233 ?>
+          <div><span class="k">Zoho Books</span><span class="v"><?php require dirname(__DIR__) . '/partials/zoho_waiting.php'; ?></span></div>
+          <?php endif; ?>
           <?php if ($sees['client']): // D-214: Procurement sees the order number only (QA R7-N02) ?>
           <div><span class="k">Client</span><span class="v"><?php if ($canOpenClient): ?><a href="/clients/<?= (int) $order['client_id'] ?>"><?= htmlspecialchars($order['company_legal_name']) ?></a><?php else: ?><?= htmlspecialchars($order['company_legal_name']) ?><?php endif; ?></span></div>
           <?php endif; ?>

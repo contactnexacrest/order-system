@@ -865,6 +865,10 @@ final class ClientPortalController
             return;
         }
 
+        // Owner points 5/8/9 (2 Nov 2026): the client now has this copy — flag it so the
+        // document copies clean-up never removes it.
+        FileStoreRepository::markSentToClient((int) $file['id']);
+
         $safeDownloadName = str_replace(['/', '\\'], '-', $file['original_filename']);
         $safeDownloadName = preg_replace('/[\x00-\x1F\x7F"]/', '', $safeDownloadName) ?? $safeDownloadName;
         header('Content-Type: ' . $file['mime_type']);

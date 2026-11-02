@@ -108,6 +108,9 @@ describe('orderLockGuard middleware (External QA report L-28)', () => {
       // buyer has fully paid, which is often when the order is closed;
       // it writes only the incentive's own rows (manage_incentives).
       '/orders/:id/incentive', '/orders/:id/incentive/people', '/orders/:id/incentive/recalculate',
+      // Owner request (2 Nov 2026): per-order Zoho sync writes no order data and is
+      // needed most after an order has closed.
+      '/orders/:id/zoho-sync',
     ]);
     const lines = source.split('\n').filter((line) => /^app\.post\('\/orders\/:id/.test(line.trim()));
     expect(lines.length).toBeGreaterThan(0);

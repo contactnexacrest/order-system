@@ -251,6 +251,23 @@ $router->post('/settings/update', [$settings, 'update'], [SessionAuth::required(
 $router->post('/settings/test-zoho-email', [$settings, 'testZohoEmail'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/settings/test-zoho-books', [$settings, 'testZohoBooks'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/settings/test-smtp-email', [$settings, 'testSmtpEmail'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+// Owner points 5/8/9 (2 Nov 2026): Document copies clean-up (drafts, never-sent superseded copies, old CAFIN).
+$documentCleanup = new \App\Controllers\DocumentCleanupController();
+$router->get('/settings/document-cleanup', [$documentCleanup, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/settings/document-cleanup', [$documentCleanup, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/settings/document-cleanup/run', [$documentCleanup, 'run'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+// Owner follow-up on point 18 (2 Nov 2026): the "Why is it different?" reasons on buyer remittance forms.
+// Owner decision 2 Nov 2026 (D-235): TDS on associate commission — settings and the quarterly TDS register.
+$associateTds = new \App\Controllers\AssociateTdsController();
+$router->get('/settings/associate-tds', [$associateTds, 'settings'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/settings/associate-tds', [$associateTds, 'saveSettings'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->get('/associates/tds', [$associateTds, 'register'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_incentives', 'pay_incentives', 'ca_module_view'])]);
+$router->post('/associates/tds/{payoutId}/challan', [$associateTds, 'saveChallan'], [SessionAuth::required(), PermissionCheck::requires('pay_incentives'), CsrfCheck::verify()]);
+$remittanceReasons = new \App\Controllers\RemittanceReasonController();
+$router->get('/settings/remittance-reasons', [$remittanceReasons, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/settings/remittance-reasons', [$remittanceReasons, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/settings/remittance-reasons/{id}/update', [$remittanceReasons, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/settings/remittance-reasons/{id}/toggle', [$remittanceReasons, 'toggle'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->get('/holidays', [$holidays, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/holidays', [$holidays, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/holidays/{id}/update', [$holidays, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
@@ -520,7 +537,7 @@ $router->post('/orders/{id}/buyer-po', [$orders, 'recordBuyerPo'], [SessionAuth:
 $router->post('/orders/{id}/buyer-po/received-date', [$orders, 'correctBuyerPoReceivedDate'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/buyer-po/documents', [$orders, 'uploadBuyerPoDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 // Batch 3 #13b — free-form extra documents attached to this order (schema.sql Section AZ).
-$router->post('/orders/{id}/additional-documents', [$orders, 'uploadAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/additional-documents', [$orders, 'uploadAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'upload_order_documents']), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/additional-documents/{fileId}/delete', [$orders, 'deleteAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->get('/orders/{id}/additional-documents/removed', [$orders, 'showRemovedAdditionalDocuments'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders/{id}/products', [$orders, 'addProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -533,13 +550,15 @@ $router->get('/ca/reports', [$ca, 'reports'], [SessionAuth::required(), Permissi
 $router->get('/ca/zoho-sync', [$ca, 'zohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
 $router->post('/ca/zoho-sync/run', [$ca, 'runZohoSync'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 $router->get('/orders/{id}/zoho-check', [$ca, 'orderZohoCheck'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage')]);
+// Owner 2 Nov 2026 (point 16): sync one order's records to Zoho Books from the order page.
+$router->post('/orders/{id}/zoho-sync', [$ca, 'syncOrderToZoho'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 $router->get('/ca/expenses', [$ca, 'expenses'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->get('/ca/tds-summary', [$ca, 'tdsSummary'], [SessionAuth::required(), PermissionCheck::requires('ca_module_view')]);
 $router->post('/ca/expenses/{id}/tds', [$ca, 'setExpenseTds'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/ca/expenses/{id}/link-order', [$ca, 'linkExpenseToOrder'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/ca-internal-doc/toggle', [$ca, 'toggleInternalDoc'], [SessionAuth::required(), PermissionCheck::requires('ca_internal_doc_manage'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/ca-internal-doc/generate', [$ca, 'generateInternalDoc'], [SessionAuth::required(), PermissionCheck::requires('ca_internal_doc_manage'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/export-benefits', [$orderFinancials, 'addExportBenefit'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/export-benefits', [$orderFinancials, 'addExportBenefit'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_order_financials', 'manage_export_benefit_claims']), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/export-benefits/{benefitId}/received', [$orderFinancials, 'markExportBenefitReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/financials/costs-confirmed', [$orderFinancials, 'confirmCosts'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/financials/complete', [$orderFinancials, 'completeFinancials'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -549,7 +568,13 @@ $router->post('/orders/{id}/export-benefits/{benefitId}/correct', [$orderFinanci
 $router->post('/orders/{id}/export-benefits/{benefitId}/delete', [$orderFinancials, 'deleteExportBenefit'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/financials/skip', [$orderFinancials, 'skipFinancials'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/financials/skip/undo', [$orderFinancials, 'undoSkipFinancials'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/export-benefit-schemes', [$orderFinancials, 'setExportBenefitSchemeStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/export-benefit-schemes', [$orderFinancials, 'setExportBenefitSchemeStatus'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_order_financials', 'manage_export_benefit_claims']), OrderLockGuard::check(), CsrfCheck::verify()]);
+// Owner decision (2 Nov 2026, gap-list Q-6): ECGC buyer limit + shipment declaration, claim tracking, Missing eBRC / FIRC report.
+$complianceTracking = new \App\Controllers\ComplianceTrackingController();
+$router->post('/clients/{id}/ecgc', [$complianceTracking, 'saveClientEcgc'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_export_benefit_claims', 'ca_module_manage']), CsrfCheck::verify()]);
+$router->post('/orders/{id}/ecgc-declaration', [$complianceTracking, 'declareShipment'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_export_benefit_claims', 'ca_module_manage']), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/export-benefits/{benefitId}/tracking', [$complianceTracking, 'saveClaimTracking'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_export_benefit_claims', 'manage_order_financials']), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->get('/reports/missing-ebrc', [$complianceTracking, 'missingEbrcReport'], [SessionAuth::required(), PermissionCheck::requiresAny(['ca_module_view', 'manage_export_benefit_claims', 'manage_order_financials'])]);
 $router->post('/orders/{id}/lc-details', [$orderFinancials, 'saveLcDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/lc-received', [$orderFinancials, 'recordLcReceived'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment/lc/firc', [$orderFinancials, 'recordLcFirc'], [SessionAuth::required(), PermissionCheck::requires('inr_actual_edit'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -587,6 +612,15 @@ $router->post('/associates/{id}/messages', [$associateAdmin, 'reply'], [SessionA
 $router->post('/associates/payouts/{payoutId}/hold', [$associateAdmin, 'holdPayout'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->post('/associates/payouts/{payoutId}/release', [$associateAdmin, 'releasePayout'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->post('/associates/payouts/{payoutId}/clawback', [$associateAdmin, 'clawback'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+// Owner decision 2 Nov 2026 (point 4): the Agreements register.
+$agreements = new \App\Controllers\AgreementController();
+$router->get('/agreements', [$agreements, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_agreements', 'manage_agreements'])]);
+$router->get('/agreements/new', [$agreements, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_agreements')]);
+$router->post('/agreements', [$agreements, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_agreements'), CsrfCheck::verify()]);
+$router->get('/agreements/{id}/edit', [$agreements, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_agreements')]);
+$router->post('/agreements/{id}/update', [$agreements, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_agreements'), CsrfCheck::verify()]);
+$router->post('/agreements/{id}/terminate', [$agreements, 'terminate'], [SessionAuth::required(), PermissionCheck::requires('manage_agreements'), CsrfCheck::verify()]);
+$router->get('/agreements/{id}/file', [$agreements, 'download'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_agreements', 'manage_agreements'])]);
 $router->post('/orders/{id}/incentive', [$incentives, 'saveOrder'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/incentive/people', [$incentives, 'saveOrderPeople'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/incentive/recalculate', [$incentives, 'recalculate'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
@@ -683,9 +717,10 @@ $router->post('/orders/{id}/supplier-po/balance-paid', [$orders, 'markSupplierBa
 // Owner decisions (2026-10-27): bill first, then pay — the supplier's bills
 // (7e / 10a) and the logistics partners' bills (CHA, transport, forwarder).
 $router->post('/orders/{id}/vendor-bills/supplier', [$vendorBills, 'addSupplierBill'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/vendor-bills/logistics', [$vendorBills, 'addLogisticsBill'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// Owner decision (2 Nov 2026): Logistics enters the logistics partners' bills (manage_logistics_bills); paying stays with manage_supplier_payments.
+$router->post('/orders/{id}/vendor-bills/logistics', [$vendorBills, 'addLogisticsBill'], [SessionAuth::required(), PermissionCheck::requires('manage_logistics_bills'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/vendor-bills/{billId}/pay', [$vendorBills, 'payBill'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/vendor-bills/{billId}/delete', [$vendorBills, 'deleteBill'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/vendor-bills/{billId}/delete', [$vendorBills, 'deleteBill'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_supplier_payments', 'manage_logistics_bills']), OrderLockGuard::check(), CsrfCheck::verify()]);
 // Owner decisions (2026-10-27): the order's actual expenses with receipts (Step 12a).
 $router->post('/orders/{id}/expenses', [$orderExpenses, 'add'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/expenses/{expenseId}/delete', [$orderExpenses, 'delete'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials'), OrderLockGuard::check(), CsrfCheck::verify()]);
@@ -731,10 +766,10 @@ $router->post('/orders/{id}/cancellation/request', [$orders, 'requestCancellatio
 $router->post('/orders/{id}/cancellation/{cancellationId}/approve', [$orders, 'approveCancellation'], [SessionAuth::required(), PermissionCheck::requires('edit_locked_data'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/cancellation/{cancellationId}/reject', [$orders, 'rejectCancellation'], [SessionAuth::required(), PermissionCheck::requires('edit_locked_data'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/cancellation/{cancellationId}/complete-refund', [$orders, 'completeCancellationRefund'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), CsrfCheck::verify()]);
-$router->post('/orders/{id}/compliance-tasks', [$orders, 'updateComplianceTask'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
-$router->post('/orders/{id}/compliance-tasks/mark-all-na', [$orders, 'markAllComplianceTasksNotApplicable'], [SessionAuth::required(), PermissionCheck::requires('close_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/compliance-tasks', [$orders, 'updateComplianceTask'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_checklist'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/compliance-tasks/mark-all-na', [$orders, 'markAllComplianceTasksNotApplicable'], [SessionAuth::required(), PermissionCheck::requires('manage_compliance_checklist'), OrderLockGuard::check(), CsrfCheck::verify()]);
 
-$router->post('/orders/{id}/documents/generate', [$documents, 'generate'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
+$router->post('/orders/{id}/documents/generate', [$documents, 'generate'], [SessionAuth::required(), PermissionCheck::requiresAny(['generate_documents', 'generate_compliance_documents']), CsrfCheck::verify()]);
 $router->post('/orders/{id}/documents/{documentId}/delete', [$documents, 'delete'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->get('/documents/{documentId}/download', [$documents, 'download'], [SessionAuth::required(), PermissionCheck::requiresAny(['download_pdf', 'view_cafin'])]);
 // Batch 3 #13b/#13a — widened so a view-only visitor (view_orders/view_clients) can open what they can already see listed on the order/client page.

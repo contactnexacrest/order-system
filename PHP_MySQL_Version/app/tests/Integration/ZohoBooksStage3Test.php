@@ -262,6 +262,116 @@ final class ZohoBooksStage3Test extends DbTestCase
         self::assertTrue(ZohoPurchaseRepository::isPushedExpense('EX-1'));
     }
 
+    /** Owner 2 Nov 2026 (point 16): "Sync this order to Zoho now" sends only that order's records, once. */
+    public function testRunForOrderSendsOnlyThatOrdersRecordsAndNeverTwice(): void
+    {
+        $a = $this->createOrder('TEST-Stage3 Buyer A');
+        $b = $this->createOrder('TEST-Stage3 Buyer B', 'TEST-Stage3 Supplier B');
+        OrderExpenseRepository::create($a['order'], ['expense_date' => '2026-10-22', 'category' => 'courier', 'details' => 'Courier for A', 'amount_inr' => 900, 'paid_by' => 'company_account', 'no_receipt_reason' => 'test'], $this->userId);
+        OrderExpenseRepository::create($b['order'], ['expense_date' => '2026-10-22', 'category' => 'courier', 'details' => 'Courier for B', 'amount_inr' => 700, 'paid_by' => 'company_account', 'no_receipt_reason' => 'test'], $this->userId);
+
+        $first = CaSyncService::runForOrder($a['order'], $this->userId);
+        self::assertSame(1, $first['purchases']['expenses']);
+        self::assertSame(['Courier for A'], array_map(static fn (array $e): string => substr($e['description'], -13), array_values($this->expenses)));
+        self::assertSame(0, $first['expenses']['imported'], 'the import from Books waits for the full sync');
+
+        self::assertSame(0, CaSyncService::runForOrder($a['order'], $this->userId)['purchases']['expenses'], 'never sent twice');
+        self::assertSame(1, CaSyncService::runForOrder($b['order'], $this->userId)['purchases']['expenses'], "the other order's record was left for its own sync");
+        self::assertCount(2, $this->expenses);
+    }
+
+    /** Owner decision 2 Nov 2026 (D-233): "Waiting for Zoho: N" counts what the next sync sends. */
+    public function testWaitingForZohoCountsWhatTheNextSyncSendsThenZero(): void
+    {
+        $a = $this->createOrder('TEST-Stage3 Buyer A');
+        $b = $this->createOrder('TEST-Stage3 Buyer B', 'TEST-Stage3 Supplier B');
+        OrderExpenseRepository::create($a['order'], ['expense_date' => '2026-10-22', 'category' => 'courier', 'details' => 'Courier for A', 'amount_inr' => 900, 'paid_by' => 'company_account', 'no_receipt_reason' => 'test'], $this->userId);
+        $this->supplierBill($a, 'invoice', 'TEST-INV-WAIT', 10000.0, 500.0);
+
+        $before = \App\Services\ZohoPendingService::counts($a['order']);
+        self::assertTrue($before['enabled']);
+        self::assertSame(['vendor_bill' => 1, 'order_expense' => 1], $before['by_type']);
+        self::assertSame(2, $before['total']);
+        self::assertSame('1 supplier / partner bill, 1 order expense', \App\Services\ZohoPendingService::summary($before['by_type']));
+        self::assertSame(0, \App\Services\ZohoPendingService::counts($b['order'])['total'], 'another order has nothing waiting');
+
+        CaSyncService::runForOrder($a['order'], $this->userId);
+        self::assertSame(0, \App\Services\ZohoPendingService::counts($a['order'])['total'], 'nothing left once the sync sent it');
+    }
+
+    public function testNothingIsCountedWhileZohoIsOff(): void
+    {
+        $a = $this->createOrder();
+        OrderExpenseRepository::create($a['order'], ['expense_date' => '2026-10-22', 'category' => 'courier', 'details' => 'Courier', 'amount_inr' => 900, 'paid_by' => 'company_account', 'no_receipt_reason' => 'test'], $this->userId);
+        CompanySettingsRepository::set('zoho_books_enabled', '0');
+        self::assertSame(['enabled' => false, 'total' => 0, 'by_type' => []], \App\Services\ZohoPendingService::counts($a['order']));
+        self::assertNull(\App\Services\ZohoPendingService::menuCount());
+    }
+
+    /** Owner decision 2 Nov 2026 (D-233): a failing run e-mails Finance once and notifies them; a clean run sends nothing. */
+    public function testAFailedRunEmailsFinanceOnceWithTypeOrderAndErrorAndNoAmounts(): void
+    {
+        $sent = [];
+        \App\Services\ZohoSyncFailureNotifier::$sender = static function (string $to, string $subject, string $body) use (&$sent): bool {
+            $sent[] = compact('to', 'subject', 'body');
+            return true;
+        };
+        $mailBefore = (string) CompanySettingsRepository::get('mail_sending_enabled');
+        CompanySettingsRepository::set('mail_sending_enabled', '1');
+        try {
+            $finance = $this->createTestUser('Accounts Executive');
+            $o = $this->createOrder();
+            OrderExpenseRepository::create($o['order'], ['expense_date' => '2026-10-22', 'category' => 'hotel', 'details' => 'Hotel', 'amount_inr' => 3456.78, 'paid_by' => 'company_card', 'no_receipt_reason' => 'test'], $this->userId);
+
+            CaSyncService::runForOrder($o['order'], $this->userId);
+
+            $email = Database::connection()->query("SELECT email FROM users WHERE id = {$finance}")->fetchColumn();
+            $toFinance = array_values(array_filter($sent, static fn (array $m): bool => $m['to'] === $email));
+            self::assertCount(1, $toFinance, 'one e-mail per run with failures');
+            self::assertSame('Zoho Books sync: 1 record could not be sent', $toFinance[0]['subject']);
+            self::assertStringContainsString('Run: "Sync this order to Zoho now"', $toFinance[0]['body']);
+            self::assertStringContainsString("- Order expense — order NX-{$o['order']} (expense): Zoho Books has no account named \"Company Card\".", $toFinance[0]['body']);
+            self::assertStringNotContainsString('3456', $toFinance[0]['body'], 'no amounts in the e-mail');
+            $notes = Database::connection()->query("SELECT message FROM notifications WHERE user_id = {$finance} AND type = 'zoho_sync_failed'")->fetchAll(\PDO::FETCH_COLUMN);
+            self::assertSame(['Zoho Books sync: 1 record could not be sent — see Zoho Sync (Sync Log).'], $notes);
+
+            // A clean run afterwards: nothing more is sent.
+            $sent = [];
+            Database::connection()->exec("DELETE FROM order_expenses WHERE order_id = {$o['order']}");
+            CaSyncService::runForOrder($o['order'], $this->userId);
+            self::assertSame([], $sent, 'no e-mail when the run has no failures');
+        } finally {
+            \App\Services\ZohoSyncFailureNotifier::$sender = null;
+            CompanySettingsRepository::set('mail_sending_enabled', $mailBefore);
+        }
+    }
+
+    public function testWithEmailSendingOffFinanceGetsOnlyTheInAppNotification(): void
+    {
+        $sent = [];
+        \App\Services\ZohoSyncFailureNotifier::$sender = static function (string $to, string $subject, string $body) use (&$sent): bool {
+            $sent[] = $to;
+            return true;
+        };
+        $mailBefore = (string) CompanySettingsRepository::get('mail_sending_enabled');
+        CompanySettingsRepository::set('mail_sending_enabled', '0');
+        try {
+            $finance = $this->createTestUser('Accounts Executive');
+            $o = $this->createOrder();
+            OrderExpenseRepository::create($o['order'], ['expense_date' => '2026-10-22', 'category' => 'hotel', 'details' => 'Hotel', 'amount_inr' => 3000, 'paid_by' => 'company_card', 'no_receipt_reason' => 'test'], $this->userId);
+            $since = \App\Services\ZohoSyncFailureNotifier::mark();
+            CaSyncService::syncPurchases('scheduled', null);
+            $r = \App\Services\ZohoSyncFailureNotifier::afterRun($since, 'scheduled');
+            self::assertSame([], $sent);
+            self::assertTrue($r['mail_off']);
+            self::assertSame(1, $r['failures']);
+            self::assertSame(1, (int) Database::connection()->query("SELECT COUNT(*) FROM notifications WHERE user_id = {$finance} AND type = 'zoho_sync_failed'")->fetchColumn());
+        } finally {
+            \App\Services\ZohoSyncFailureNotifier::$sender = null;
+            CompanySettingsRepository::set('mail_sending_enabled', $mailBefore);
+        }
+    }
+
     public function testAMissingBooksAccountIsRefusedWithWhereToAddIt(): void
     {
         $o = $this->createOrder();

@@ -231,6 +231,116 @@ describe('Zoho Books Stage 3', () => {
     expect(await zohoPurchaseRepository.isPushedExpense('EX-1')).toBe(true);
   });
 
+  // Owner 2 Nov 2026 (point 16): "Sync this order to Zoho now" sends only that order's records, once.
+  it('runForOrder sends only that order\'s records and never twice', async () => {
+    const a = await createOrder('TEST-Stage3 Buyer A');
+    const b = await createOrder('TEST-Stage3 Buyer B', 'TEST-Stage3 Supplier B');
+    await orderExpenseRepository.create(a.order, { expense_date: '2026-10-22', category: 'courier', details: 'Courier for A', amount_inr: 900, paid_by: 'company_account', no_receipt_reason: 'test' }, userId);
+    await orderExpenseRepository.create(b.order, { expense_date: '2026-10-22', category: 'courier', details: 'Courier for B', amount_inr: 700, paid_by: 'company_account', no_receipt_reason: 'test' }, userId);
+
+    const first = await caSyncService.runForOrder(a.order, userId);
+    expect(first.purchases.expenses).toBe(1);
+    expect(Object.values(expenses).map((e) => e.description.slice(-13))).toEqual(['Courier for A']);
+    expect(first.expenses.imported).toBe(0); // the import from Books waits for the full sync
+
+    expect((await caSyncService.runForOrder(a.order, userId)).purchases.expenses).toBe(0); // never sent twice
+    expect((await caSyncService.runForOrder(b.order, userId)).purchases.expenses).toBe(1);
+    expect(Object.keys(expenses)).toHaveLength(2);
+  });
+
+  // Owner decision 2 Nov 2026 (D-233): "Waiting for Zoho: N" counts what the next sync sends.
+  it('Waiting for Zoho counts what the next sync sends, then zero', async () => {
+    const zohoPendingService = require('../../src/services/zohoPendingService');
+    const a = await createOrder('TEST-Stage3 Buyer A');
+    const b = await createOrder('TEST-Stage3 Buyer B', 'TEST-Stage3 Supplier B');
+    await orderExpenseRepository.create(a.order, { expense_date: '2026-10-22', category: 'courier', details: 'Courier for A', amount_inr: 900, paid_by: 'company_account', no_receipt_reason: 'test' }, userId);
+    await supplierBill(a, 'invoice', 'TEST-INV-WAIT', 10000, 500);
+
+    const before = await zohoPendingService.counts(a.order);
+    expect(before.enabled).toBe(true);
+    expect(before.by_type).toEqual({ vendor_bill: 1, order_expense: 1 });
+    expect(before.total).toBe(2);
+    expect(zohoPendingService.summary(before.by_type)).toBe('1 supplier / partner bill, 1 order expense');
+    expect((await zohoPendingService.counts(b.order)).total).toBe(0); // another order has nothing waiting
+
+    await caSyncService.runForOrder(a.order, userId);
+    expect((await zohoPendingService.counts(a.order)).total).toBe(0); // nothing left once the sync sent it
+  });
+
+  it('nothing is counted while Zoho is off', async () => {
+    const zohoPendingService = require('../../src/services/zohoPendingService');
+    const a = await createOrder();
+    await orderExpenseRepository.create(a.order, { expense_date: '2026-10-22', category: 'courier', details: 'Courier', amount_inr: 900, paid_by: 'company_account', no_receipt_reason: 'test' }, userId);
+    await companySettingsRepository.set('zoho_books_enabled', '0');
+    expect(await zohoPendingService.counts(a.order)).toEqual({ enabled: false, total: 0, by_type: {} });
+    expect(await zohoPendingService.menuCount({})).toBeNull();
+  });
+
+  async function financeUser() {
+    const role = await db.queryOne("SELECT id FROM roles WHERE name = 'Accounts Executive'");
+    const email = `jest-finance-${Math.random().toString(16).slice(2, 10)}@nexacrest.test`;
+    const id = (await db.execute(
+      `INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
+       VALUES ('Jest Finance', :email, NULL, 'x', :role, 1, 0, 0)`, { email, role: role.id })).insertId;
+    return { id, email };
+  }
+
+  // Owner decision 2 Nov 2026 (D-233): a failing run e-mails Finance once and notifies them; a clean run sends nothing.
+  it('a failed run e-mails Finance once with type, order and error and no amounts', async () => {
+    const notifier = require('../../src/services/zohoSyncFailureNotifier');
+    const sent = [];
+    notifier.state.sender = async (to, subject, body) => { sent.push({ to, subject, body }); return true; };
+    const mailBefore = String(await companySettingsRepository.get('mail_sending_enabled'));
+    await companySettingsRepository.set('mail_sending_enabled', '1');
+    try {
+      const finance = await financeUser();
+      const o = await createOrder();
+      await orderExpenseRepository.create(o.order, { expense_date: '2026-10-22', category: 'hotel', details: 'Hotel', amount_inr: 3456.78, paid_by: 'company_card', no_receipt_reason: 'test' }, userId);
+
+      await caSyncService.runForOrder(o.order, userId);
+
+      const toFinance = sent.filter((m) => m.to === finance.email);
+      expect(toFinance).toHaveLength(1); // one e-mail per run with failures
+      expect(toFinance[0].subject).toBe('Zoho Books sync: 1 record could not be sent');
+      expect(toFinance[0].body).toContain('Run: "Sync this order to Zoho now"');
+      expect(toFinance[0].body).toContain(`- Order expense — order NX-${o.order} (expense): Zoho Books has no account named "Company Card".`);
+      expect(toFinance[0].body).not.toContain('3456'); // no amounts in the e-mail
+      const notes = (await db.query("SELECT message FROM notifications WHERE user_id = :u AND type = 'zoho_sync_failed'", { u: finance.id })).map((r) => r.message);
+      expect(notes).toEqual(['Zoho Books sync: 1 record could not be sent — see Zoho Sync (Sync Log).']);
+
+      sent.length = 0;
+      await db.execute('DELETE FROM order_expenses WHERE order_id = :o', { o: o.order });
+      await caSyncService.runForOrder(o.order, userId);
+      expect(sent).toEqual([]); // no e-mail when the run has no failures
+    } finally {
+      notifier.state.sender = null;
+      await companySettingsRepository.set('mail_sending_enabled', mailBefore);
+    }
+  });
+
+  it('with e-mail sending off Finance gets only the in-app notification', async () => {
+    const notifier = require('../../src/services/zohoSyncFailureNotifier');
+    const sent = [];
+    notifier.state.sender = async (to) => { sent.push(to); return true; };
+    const mailBefore = String(await companySettingsRepository.get('mail_sending_enabled'));
+    await companySettingsRepository.set('mail_sending_enabled', '0');
+    try {
+      const finance = await financeUser();
+      const o = await createOrder();
+      await orderExpenseRepository.create(o.order, { expense_date: '2026-10-22', category: 'hotel', details: 'Hotel', amount_inr: 3000, paid_by: 'company_card', no_receipt_reason: 'test' }, userId);
+      const since = await notifier.mark();
+      await caSyncService.syncPurchases('scheduled', null);
+      const r = await notifier.afterRun(since, 'scheduled');
+      expect(sent).toEqual([]);
+      expect(r.mail_off).toBe(true);
+      expect(r.failures).toBe(1);
+      expect(Number((await db.queryOne("SELECT COUNT(*) AS n FROM notifications WHERE user_id = :u AND type = 'zoho_sync_failed'", { u: finance.id })).n)).toBe(1);
+    } finally {
+      notifier.state.sender = null;
+      await companySettingsRepository.set('mail_sending_enabled', mailBefore);
+    }
+  });
+
   it('a missing Books account is refused with where to add it', async () => {
     const o = await createOrder();
     await orderExpenseRepository.create(o.order, { expense_date: '2026-10-22', category: 'hotel', details: 'Hotel', amount_inr: 3000, paid_by: 'company_card', no_receipt_reason: 'test' }, userId);

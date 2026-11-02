@@ -1,5 +1,7 @@
 'use strict';
 
+const auditMoneyMask = require('../services/auditMoneyMask');
+
 const querystring = require('querystring');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const orderRepository = require('../repositories/orderRepository');
@@ -39,7 +41,7 @@ async function index(req, res) {
     dateTo,
     limit: PAGE_SIZE,
     offset: PAGE_SIZE * (page - 1),
-  });
+  }).then((r) => auditMoneyMask.maskAll(req.permissions, r));
 
   const filters = { entity_type: entityType, entity_id: entityId, user_id: userId, action_type: actionType, date_from: dateFrom, date_to: dateTo };
 
@@ -72,7 +74,8 @@ async function forOrder(req, res) {
     return;
   }
 
-  const rows = await auditLogRepository.forOrder(orderId);
+  // Owner points 6/15: values hidden unless the viewer may see that money.
+  const rows = await auditMoneyMask.maskAll(req.permissions, await auditLogRepository.forOrder(orderId));
 
   // External QA report M-03: "One-click export of an order's audit log
   // (privileged only)." Reuses this page's own existing view_audit_log

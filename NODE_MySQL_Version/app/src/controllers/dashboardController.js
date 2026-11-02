@@ -1,5 +1,7 @@
 'use strict';
 
+const auditMoneyMask = require('../services/auditMoneyMask');
+
 const dashboardRepository = require('../repositories/dashboardRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 
@@ -50,9 +52,11 @@ async function index(req, res) {
   }
 
   if (canViewReports) {
-    data.recentActivity = await auditLogRepository.search({ limit: 15, offset: 0 });
+    data.recentActivity = await auditMoneyMask.maskAll(req.permissions, await auditLogRepository.search({ limit: 15, offset: 0 }));
   }
 
+  data.agreementsExpiring = await require('./agreementController').expiringSoon(req);
+  data.agreementPartyTypes = require('../repositories/agreementRepository').PARTY_TYPES;
   res.renderView('dashboard/index', data, 'layout/base');
 }
 

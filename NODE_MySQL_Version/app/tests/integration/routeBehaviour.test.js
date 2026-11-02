@@ -874,6 +874,106 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expect(await audits('PURCHASE_REQUIREMENT_CANCELLED', pr)).toBe(1);
   });
 
+  it('document copies clean-up routes (owner points 5/8/9, 2 Nov 2026)', async () => {
+    const r = await holder.call('GET', '/settings/document-cleanup');
+    expectPage(r, 'Document copies clean-up', 'GET /settings/document-cleanup');
+    expect(r.body).toContain('Never removed, whatever is switched on');
+
+    const bad = await holder.call('POST', '/settings/document-cleanup', { draft_days: '45', superseded_days: '0', cafin_mode: 'keep_all', reason: 'Save storage space now' });
+    expect(bad.type).toBe('error');
+    expect(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'")).toBe('0');
+
+    const before = await audits('FIELD_EDIT');
+    expectDone(await holder.call('POST', '/settings/document-cleanup', { draft_days: '90', superseded_days: '0', cafin_mode: 'keep_all', reason: 'Save storage space now' }),
+      'POST /settings/document-cleanup', 'Document copies clean-up settings saved.');
+    expect(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'")).toBe('90');
+    expect(await audits('FIELD_EDIT')).toBe(before + 1);
+
+    expect((await holder.call('POST', '/settings/document-cleanup/run', {})).type).toBe('error');
+    const runs = await audits('DOCUMENT_COPY_CLEANUP_RUN');
+    expectDone(await holder.call('POST', '/settings/document-cleanup/run', { confirm_permanent: '1' }), 'POST /settings/document-cleanup/run', 'Clean-up done:');
+    expect(await audits('DOCUMENT_COPY_CLEANUP_RUN')).toBe(runs + 1);
+
+    await holder.call('POST', '/settings/document-cleanup', { draft_days: '0', superseded_days: '0', cafin_mode: 'keep_all', reason: 'Back to the default, all off' });
+    expect(await value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'")).toBe('0');
+  });
+
+  it('remittance difference reasons routes (owner follow-up on point 18, 2 Nov 2026)', async () => {
+    const tag = Math.random().toString(16).slice(2, 8);
+    const r = await holder.call('GET', '/settings/remittance-reasons');
+    expectPage(r, 'Remittance difference reasons', 'GET /settings/remittance-reasons');
+    expect(r.body).toContain('Reasons typed in by hand');
+
+    expect((await holder.call('POST', '/settings/remittance-reasons', { label: `Route test reason ${tag}`, treatment: 'refund' })).type).toBe('error');
+    expectDone(await holder.call('POST', '/settings/remittance-reasons', { label: `Route test reason ${tag}`, treatment: 'excess' }), 'POST /settings/remittance-reasons', 'Reason added:');
+    const id = Number(await value('SELECT id FROM remittance_difference_reasons WHERE label = :l', { l: `Route test reason ${tag}` }));
+    expect(await audits('REMITTANCE_REASON_ADDED', id)).toBe(1);
+
+    expectDone(await holder.call('POST', `/settings/remittance-reasons/${id}/update`, { label: `Route test renamed ${tag}`, treatment: 'excess', sort_order: '999' }),
+      'POST /settings/remittance-reasons/:id/update', 'Reason saved:');
+    expect(await value('SELECT label FROM remittance_difference_reasons WHERE id = :id', { id })).toBe(`Route test renamed ${tag}`);
+
+    expectDone(await holder.call('POST', `/settings/remittance-reasons/${id}/toggle`, {}), 'POST /settings/remittance-reasons/:id/toggle', 'is switched off');
+    expect(String(await value('SELECT is_active FROM remittance_difference_reasons WHERE id = :id', { id }))).toBe('0');
+    expect(await audits('REMITTANCE_REASON_DEACTIVATED', id)).toBe(1);
+    await db.execute('DELETE FROM remittance_difference_reasons WHERE id = :id', { id });
+  });
+
+  it('associate TDS settings and register routes (D-235, 2 Nov 2026)', async () => {
+    expectPage(await holder.call('GET', '/settings/associate-tds'), 'Associate TDS', 'GET /settings/associate-tds');
+    const post = { associate_tds_section: '194H', associate_tds_pct: '2', associate_tds_threshold_inr: '20000', associate_tds_no_pan_pct: '20',
+      associate_15cb_required: '1', zoho_tds_tax_id: '', reason: 'Route test: CA confirmed the values.' };
+    expect((await holder.call('POST', '/settings/associate-tds', { ...post, associate_tds_section: 'abc' })).type).toBe('error');
+    expectDone(await holder.call('POST', '/settings/associate-tds', { ...post, associate_tds_threshold_inr: '25000' }), 'POST /settings/associate-tds', 'Saved.');
+    expect(String(await value("SELECT setting_value FROM incentive_settings WHERE setting_key = 'associate_tds_threshold_inr'"))).toBe('25000');
+    await holder.call('POST', '/settings/associate-tds', post);
+
+    expectPage(await holder.call('GET', '/associates/tds'), 'TDS on associate commission', 'GET /associates/tds');
+    const orderId = await createTestOrder(await createTestClient());
+    const assoc = await insert('associates', { name: 'Route TDS Associate', based_in: 'india', currency_code: 'INR', email: `route-tds-${Math.random().toString(16).slice(2, 8)}@assoc.test`, status: 'active' });
+    const today = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+    const payout = await insert('incentive_payouts', { order_id: orderId, payee_kind: 'associate', associate_id: assoc, role: 'associate', amount_inr: 25000,
+      incentive_month: '2026-10', status: 'paid', paid_on: today, paid_inr: 24500, tds_inr: 500, tds_rate: 2, tds_section: '194H' });
+    expect((await holder.call('POST', `/associates/tds/${payout}/challan`, { tds_challan_no: 'x', tds_challan_date: today })).type).toBe('error');
+    expectDone(await holder.call('POST', `/associates/tds/${payout}/challan`, { tds_challan_no: '0510308 01112026 00012', tds_challan_date: today }), 'POST /associates/tds/:payoutId/challan', 'Challan saved.');
+    expect(await audits('ASSOCIATE_TDS_CHALLAN_RECORDED', payout)).toBe(1);
+  });
+
+  it('agreements register routes (owner point 4, 2 Nov 2026)', async () => {
+    const supplierId = await insert('suppliers', { supplier_legal_name: 'Route Agreement Quarry', is_active: 1 });
+    expectPage(await holder.call('GET', '/agreements?view=list'), 'Agreements', 'GET /agreements');
+    expectPage(await holder.call('GET', `/agreements/new?party_type=supplier&party_id=${supplierId}`), 'Add an agreement', 'GET /agreements/new');
+    const r = await holder.call('POST', '/agreements', { party_type: 'supplier', [`party_id_supplier`]: String(supplierId), agreement_type: 'Commercial NDA', signed_on: '2026-10-01' });
+    expect(r.flash).toBe('Attach the signed copy of the agreement (PDF, Word or a scan).');
+    const file = await insert('file_store', { file_origin: 'RECEIVED', server_path: tmpFile('pdf', '%PDF-1.4 route agreement'), uuid_filename: 'route-agreement.pdf', original_filename: 'nda.pdf', file_size_bytes: 24, mime_type: 'application/pdf' });
+    const id = await require('../../src/repositories/agreementRepository').create({ party_type: 'supplier', party_id: supplierId, agreement_type: 'Commercial NDA', signed_on: '2026-10-01', expires_on: '2027-10-01', file_id: file }, holderUser.id);
+    expectPage(await holder.call('GET', `/agreements/${id}/edit`), 'Edit an agreement', 'GET /agreements/:id/edit');
+    expectDone(await holder.call('POST', `/agreements/${id}/update`, { agreement_type: 'Commercial NDA', signed_on: '2026-10-01', expires_on: '2027-12-31' }), 'POST /agreements/:id/update', 'Agreement updated.');
+    expect(await value('SELECT expires_on FROM agreements WHERE id = :id', { id })).toBe('2027-12-31');
+    const dl = await holder.call('GET', `/agreements/${id}/file`);
+    expect(dl.status).toBe(200);
+    expect(await audits('AGREEMENT_DOWNLOADED', id)).toBe(1);
+    expect((await holder.call('POST', `/agreements/${id}/terminate`, { terminated_on: '2026-11-02', terminated_reason: 'x' })).type).toBe('error');
+    expectDone(await holder.call('POST', `/agreements/${id}/terminate`, { terminated_on: '2026-11-02', terminated_reason: 'Route test — ended by consent' }), 'POST /agreements/:id/terminate', 'recorded as ended');
+    expect(await audits('AGREEMENT_TERMINATED', id)).toBe(1);
+    expectPage(await holder.call('GET', `/suppliers/${supplierId}/edit`), 'Agreements', 'supplier page card');
+  });
+
+  it('compliance tracking routes (gap-list Q-6, 2 Nov 2026)', async () => {
+    const clientId = await createTestClient();
+    const orderId = await createTestOrder(clientId);
+    expectDone(await holder.call('POST', `/clients/${clientId}/ecgc`, { ecgc_limit_amount: '50000', ecgc_limit_currency: 'usd', ecgc_limit_ref: 'ECGC/CL/ROUTE' }), 'POST /clients/:id/ecgc', 'ECGC credit limit saved.');
+    expect(await value('SELECT ecgc_limit_currency FROM clients WHERE id = :id', { id: clientId })).toBe('USD');
+    expect(await audits('CLIENT_ECGC_LIMIT_SET', clientId)).toBe(1);
+    expect((await holder.call('POST', `/orders/${orderId}/ecgc-declaration`, { ecgc_declared_on: '2026-11-01', ecgc_declaration_ref: 'x' })).type).toBe('error');
+    expectDone(await holder.call('POST', `/orders/${orderId}/ecgc-declaration`, { ecgc_declared_on: '2026-11-01', ecgc_declaration_ref: 'ECGC/DECL/ROUTE' }), 'POST /orders/:id/ecgc-declaration', 'declaration to ECGC recorded');
+    expect(await audits('ORDER_ECGC_DECLARED', orderId)).toBe(1);
+    const benefitId = await insert('ca_export_benefits', { order_id: orderId, scheme_name: 'RODTEP', claimed_amount: '1000.00', claimed_at: '2026-11-01', currency_code: 'INR', recorded_by: holderUser.id });
+    expectDone(await holder.call('POST', `/orders/${orderId}/export-benefits/${benefitId}/tracking`, { claim_status: 'sanctioned', sanctioned_amount: '950', sanctioned_at: '2026-11-02', claim_deadline: '2027-10-01' }), 'POST /orders/:id/export-benefits/:benefitId/tracking', 'claim updated');
+    expect(await value('SELECT sanctioned_amount FROM ca_export_benefits WHERE id = :id', { id: benefitId })).toBe('950.00');
+    expectPage(await holder.call('GET', '/reports/missing-ebrc'), 'Missing eBRC / FIRC', 'GET /reports/missing-ebrc');
+  });
+
   it('every route answers a missing id as not found and writes nothing', async () => {
     // Other test files run alongside this one, so the check is on audit rows for the missing id itself.
     const auditBefore = Number(await value('SELECT COUNT(*) AS n FROM audit_log WHERE entity_id = 999999999'));

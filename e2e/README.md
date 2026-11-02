@@ -77,10 +77,25 @@ rendered pages, not a direct controller/HTTP call.
   Sales sees who introduced whom, no amounts. The associate's profile
   shows the personal rate carried upward (D-221: "clients 6–10: 1.25%
   (personal)" when only 1–5 has a personal rate).
+- `12-money-matrix.spec.js` — proof that no amount reaches a person who
+  may not see it (owner points 6/15, 2 Nov 2026). `support/moneyMatrixSeed.js`
+  creates one user per seeded role and a sentinel order whose selling
+  prices, buyer payments, purchase prices, logistics costs, order costs
+  and incentives each carry a distinctive amount, plus current and older
+  (draft / superseded) document copies and one upload of each money kind.
+  For every role it opens about 75 screens in the Standard template and 12
+  in Kanban (order page, lists, dashboard, reports and their CSVs, audit
+  log pages, CA module, cockpit, My tasks), tries all 18 files and lists
+  the dossier ZIP, then fails on any amount a role may not see. It writes
+  a role × money matrix report. Runtime: about 2 minutes on PHP; about 24
+  minutes on Node (the order-profitability report is slow on a large dev
+  database). It leaves `money-matrix-role-N@nexacrest.test` users and
+  `MM-SENTINEL-*` orders in the dev database.
 
 Support files: `support/auth.js` (staff and client logins),
 `support/db.js` (direct dev-database setup: client logins, mail switch,
-a verified associate bank account), `support/mail.js`,
+a verified associate bank account; `runSql`, `dbName`, `bcryptHash` for
+the money matrix), `support/mail.js`,
 `support/review.js` (a second person approves a document — owner
 decision A-2; since D-221 an MD or ED may self-review when Admin →
 Self-approval rules allow it, but the suites keep a second reviewer).

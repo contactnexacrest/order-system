@@ -60,7 +60,7 @@ final class DashboardController
         }
 
         if ($canViewReports) {
-            $data['recentActivity'] = AuditLogRepository::search(null, null, null, null, null, null, 15, 0);
+            $data['recentActivity'] = \App\Services\AuditMoneyMask::maskAll(AuditLogRepository::search(null, null, null, null, null, null, 15, 0));
         }
 
         View::render('dashboard/index', $data, 'layout/base');

@@ -118,7 +118,7 @@ final class CafinExportService
             }
             $add('A. Products', 'TOTAL FOB', '', '', $s['fob_total'], $s['currency']);
             foreach ($s['receipts'] as $r) {
-                $add('A. Money received from the buyer', $r['leg'], 'rate ' . $r['rate'] . ' · received ' . $r['received'], $r['cleared'], $r['amount'], $s['currency'], $r['inr'], $r['basis']);
+                $add('A. Money received from the buyer', $r['leg'], 'rate ' . $r['rate'] . ' · received ' . $r['received'], $r['cleared'], $r['amount'], $s['currency'], $r['inr'], $r['basis'] . (isset($r['bank_charges']) ? ' · credited after bank charges ' . $s['currency'] . ' ' . $r['bank_charges'] . ' (₹' . $r['bank_charges_inr'] . ') — received ' . $r['received_net'] : '') . (isset($r['own_bank_charges_inr']) ? " · after our bank's charges ₹" . $r['own_bank_charges_inr'] : ''));
             }
             $add('A. Money received from the buyer', 'TOTAL', '', '', $s['receipts_foreign'], $s['currency'], $s['receipts_inr']);
             foreach ($s['supplier']['rows'] ?? [] as $r) {

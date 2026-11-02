@@ -1119,4 +1119,116 @@ final class RouteBehaviourTest extends DbTestCase
         self::assertSame('cancelled', $this->value("SELECT status FROM purchase_requirements WHERE id = {$pr}"));
         self::assertSame(1, $this->audits('PURCHASE_REQUIREMENT_CANCELLED', $pr));
     }
+
+    /** Owner points 5/8/9 (2 Nov 2026): Admin → Settings → Document copies clean-up. */
+    public function testDocumentCopiesCleanupRoutes(): void
+    {
+        $r = $this->call('GET', '/settings/document-cleanup');
+        $this->assertPage($r, 'Document copies clean-up', 'GET /settings/document-cleanup');
+        self::assertStringContainsString('Never removed, whatever is switched on', $r['body']);
+
+        $bad = $this->call('POST', '/settings/document-cleanup', ['draft_days' => '45', 'superseded_days' => '0', 'cafin_mode' => 'keep_all', 'reason' => 'Save storage space now']);
+        self::assertSame('error', $bad['type'], 'only the listed options are accepted');
+        self::assertSame('0', $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'"));
+
+        $before = $this->audits('FIELD_EDIT');
+        $r = $this->call('POST', '/settings/document-cleanup', ['draft_days' => '90', 'superseded_days' => '0', 'cafin_mode' => 'keep_all', 'reason' => 'Save storage space now']);
+        $this->assertDone($r, 'POST /settings/document-cleanup', 'Document copies clean-up settings saved.');
+        self::assertSame('90', $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'"));
+        self::assertSame($before + 1, $this->audits('FIELD_EDIT'));
+
+        self::assertSame('error', $this->call('POST', '/settings/document-cleanup/run', [])['type'], 'the run needs the confirmation tick');
+        $runs = $this->audits('DOCUMENT_COPY_CLEANUP_RUN');
+        $r = $this->call('POST', '/settings/document-cleanup/run', ['confirm_permanent' => '1']);
+        $this->assertDone($r, 'POST /settings/document-cleanup/run', 'Clean-up done:');
+        self::assertSame($runs + 1, $this->audits('DOCUMENT_COPY_CLEANUP_RUN'));
+
+        // Back to the default (all off) for every later test.
+        $this->call('POST', '/settings/document-cleanup', ['draft_days' => '0', 'superseded_days' => '0', 'cafin_mode' => 'keep_all', 'reason' => 'Back to the default, all off']);
+        self::assertSame('0', $this->value("SELECT setting_value FROM company_settings WHERE setting_key = 'doc_cleanup_draft_days'"));
+    }
+
+    /** Owner follow-up on point 18 (2 Nov 2026): Admin → Settings → Remittance difference reasons. */
+    public function testRemittanceDifferenceReasonsRoutes(): void
+    {
+        $r = $this->call('GET', '/settings/remittance-reasons');
+        $this->assertPage($r, 'Remittance difference reasons', 'GET /settings/remittance-reasons');
+        self::assertStringContainsString('Reasons typed in by hand', $r['body']);
+
+        self::assertSame('error', $this->call('POST', '/settings/remittance-reasons', ['label' => 'Route test reason', 'treatment' => 'refund'])['type'], 'only the three treatments');
+        $r = $this->call('POST', '/settings/remittance-reasons', ['label' => 'Route test reason added here', 'treatment' => 'excess']);
+        $this->assertDone($r, 'POST /settings/remittance-reasons', 'Reason added:');
+        $id = (int) $this->value("SELECT id FROM remittance_difference_reasons WHERE label = 'Route test reason added here'");
+        self::assertSame(1, $this->audits('REMITTANCE_REASON_ADDED', $id));
+
+        $r = $this->call('POST', "/settings/remittance-reasons/{$id}/update", ['label' => 'Route test reason renamed', 'treatment' => 'excess', 'sort_order' => '999']);
+        $this->assertDone($r, 'POST /settings/remittance-reasons/{id}/update', 'Reason saved:');
+        self::assertSame('Route test reason renamed', $this->value("SELECT label FROM remittance_difference_reasons WHERE id = {$id}"));
+
+        $r = $this->call('POST', "/settings/remittance-reasons/{$id}/toggle", []);
+        $this->assertDone($r, 'POST /settings/remittance-reasons/{id}/toggle', 'is switched off');
+        self::assertSame('0', (string) $this->value("SELECT is_active FROM remittance_difference_reasons WHERE id = {$id}"));
+        self::assertSame(1, $this->audits('REMITTANCE_REASON_DEACTIVATED', $id));
+    }
+
+    /** Owner decision 2 Nov 2026 (D-235): the associate TDS settings and register routes, through the real router. */
+    public function testAssociateTdsRoutes(): void
+    {
+        $this->assertPage($this->call('GET', '/settings/associate-tds'), 'Associate TDS', 'GET /settings/associate-tds');
+        $post = ['associate_tds_section' => '194H', 'associate_tds_pct' => '2', 'associate_tds_threshold_inr' => '20000', 'associate_tds_no_pan_pct' => '20',
+            'associate_15cb_required' => '1', 'zoho_tds_tax_id' => '', 'reason' => 'Route test: CA confirmed the values.'];
+        self::assertSame('error', $this->call('POST', '/settings/associate-tds', ['associate_tds_section' => 'abc'] + $post)['type'], 'a section like 194H only');
+        $this->assertDone($this->call('POST', '/settings/associate-tds', ['associate_tds_threshold_inr' => '25000'] + $post), 'POST /settings/associate-tds', 'Saved.');
+        self::assertSame('25000', (string) $this->value("SELECT setting_value FROM incentive_settings WHERE setting_key = 'associate_tds_threshold_inr'"));
+        $this->call('POST', '/settings/associate-tds', $post);
+
+        $this->assertPage($this->call('GET', '/associates/tds'), 'TDS on associate commission', 'GET /associates/tds');
+        $orderId = $this->createTestOrder($this->createTestClient());
+        $assoc = $this->insert('associates', ['name' => 'Route TDS Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'email' => 'route-tds-' . bin2hex(random_bytes(3)) . '@assoc.test', 'status' => 'active']);
+        $payout = $this->insert('incentive_payouts', ['order_id' => $orderId, 'payee_kind' => 'associate', 'associate_id' => $assoc, 'role' => 'associate', 'amount_inr' => 25000,
+            'incentive_month' => '2026-10', 'status' => 'paid', 'paid_on' => date('Y-m-d'), 'paid_inr' => 24500, 'tds_inr' => 500, 'tds_rate' => 2, 'tds_section' => '194H']);
+        self::assertSame('error', $this->call('POST', "/associates/tds/{$payout}/challan", ['tds_challan_no' => 'x', 'tds_challan_date' => date('Y-m-d')])['type']);
+        $this->assertDone($this->call('POST', "/associates/tds/{$payout}/challan", ['tds_challan_no' => '0510308 01112026 00012', 'tds_challan_date' => date('Y-m-d')]), 'POST /associates/tds/{payoutId}/challan', 'Challan saved.');
+        self::assertSame(1, $this->audits('ASSOCIATE_TDS_CHALLAN_RECORDED', $payout));
+    }
+
+    /** Owner decision 2 Nov 2026 (point 4): the Agreements register's routes, through the real router. */
+    public function testAgreementsRoutes(): void
+    {
+        $supplierId = $this->insert('suppliers', ['supplier_legal_name' => 'Route Agreement Quarry', 'is_active' => 1]);
+        $this->assertPage($this->call('GET', '/agreements?view=list'), 'Agreements', 'GET /agreements');
+        $this->assertPage($this->call('GET', "/agreements/new?party_type=supplier&party_id={$supplierId}"), 'Add an agreement', 'GET /agreements/new');
+        $r = $this->call('POST', '/agreements', ['party_type' => 'supplier', 'party_id_supplier' => (string) $supplierId, 'agreement_type' => 'Commercial NDA', 'signed_on' => '2026-10-01']);
+        self::assertSame('Attach the signed copy of the agreement (PDF, Word or a scan).', $r['flash'], 'POST /agreements needs the signed copy');
+        $file = $this->insert('file_store', ['file_origin' => 'RECEIVED', 'server_path' => $this->tmpFile('pdf', '%PDF-1.4 route agreement'), 'uuid_filename' => 'route-agreement.pdf', 'original_filename' => 'nda.pdf', 'file_size_bytes' => 24, 'mime_type' => 'application/pdf']);
+        $id = \App\Repositories\AgreementRepository::create(['party_type' => 'supplier', 'party_id' => $supplierId, 'agreement_type' => 'Commercial NDA', 'signed_on' => '2026-10-01', 'expires_on' => '2027-10-01', 'file_id' => $file], $this->holder);
+        $this->assertPage($this->call('GET', "/agreements/{$id}/edit"), 'Edit an agreement', 'GET /agreements/{id}/edit');
+        $this->assertDone($this->call('POST', "/agreements/{$id}/update", ['agreement_type' => 'Commercial NDA', 'signed_on' => '2026-10-01', 'expires_on' => '2027-12-31']), 'POST /agreements/{id}/update', 'Agreement updated.');
+        self::assertSame('2027-12-31', $this->value("SELECT expires_on FROM agreements WHERE id = {$id}"));
+        $r = $this->call('GET', "/agreements/{$id}/file");
+        self::assertSame(200, $r['code'], 'GET /agreements/{id}/file');
+        self::assertStringContainsString('%PDF-1.4 route agreement', $r['body']);
+        self::assertSame(1, $this->audits('AGREEMENT_DOWNLOADED', $id));
+        self::assertSame('error', $this->call('POST', "/agreements/{$id}/terminate", ['terminated_on' => '2026-11-02', 'terminated_reason' => 'x'])['type'], 'a reason is needed');
+        $this->assertDone($this->call('POST', "/agreements/{$id}/terminate", ['terminated_on' => '2026-11-02', 'terminated_reason' => 'Route test — ended by consent']), 'POST /agreements/{id}/terminate', 'recorded as ended');
+        self::assertSame(1, $this->audits('AGREEMENT_TERMINATED', $id));
+        $this->assertPage($this->call('GET', "/suppliers/{$supplierId}/edit"), 'Agreements', 'supplier page card');
+    }
+
+    /** Owner decision (2 Nov 2026, gap-list Q-6): ECGC limit + declaration, claim tracking, Missing eBRC / FIRC report. */
+    public function testComplianceTrackingRoutes(): void
+    {
+        $clientId = $this->createTestClient();
+        $orderId = $this->createTestOrder($clientId);
+        $this->assertDone($this->call('POST', "/clients/{$clientId}/ecgc", ['ecgc_limit_amount' => '50000', 'ecgc_limit_currency' => 'usd', 'ecgc_limit_ref' => 'ECGC/CL/ROUTE']), 'POST /clients/{id}/ecgc', 'ECGC credit limit saved.');
+        self::assertSame('USD', $this->value("SELECT ecgc_limit_currency FROM clients WHERE id = {$clientId}"));
+        self::assertSame(1, $this->audits('CLIENT_ECGC_LIMIT_SET', $clientId));
+        self::assertSame('error', $this->call('POST', "/orders/{$orderId}/ecgc-declaration", ['ecgc_declared_on' => '2026-11-01', 'ecgc_declaration_ref' => 'x'])['type'], 'a reference is needed');
+        $this->assertDone($this->call('POST', "/orders/{$orderId}/ecgc-declaration", ['ecgc_declared_on' => '2026-11-01', 'ecgc_declaration_ref' => 'ECGC/DECL/ROUTE']), 'POST /orders/{id}/ecgc-declaration', 'declaration to ECGC recorded');
+        self::assertSame(1, $this->audits('ORDER_ECGC_DECLARED', $orderId));
+        $benefitId = $this->insert('ca_export_benefits', ['order_id' => $orderId, 'scheme_name' => 'RODTEP', 'claimed_amount' => '1000.00', 'claimed_at' => '2026-11-01', 'currency_code' => 'INR', 'recorded_by' => $this->holder]);
+        $this->assertDone($this->call('POST', "/orders/{$orderId}/export-benefits/{$benefitId}/tracking", ['claim_status' => 'sanctioned', 'sanctioned_amount' => '950', 'sanctioned_at' => '2026-11-02', 'claim_deadline' => '2027-10-01']), 'POST /orders/{id}/export-benefits/{benefitId}/tracking', 'claim updated');
+        self::assertSame('950.00', $this->value("SELECT sanctioned_amount FROM ca_export_benefits WHERE id = {$benefitId}"));
+        $this->assertPage($this->call('GET', '/reports/missing-ebrc'), 'Missing eBRC / FIRC', 'GET /reports/missing-ebrc');
+    }
 }

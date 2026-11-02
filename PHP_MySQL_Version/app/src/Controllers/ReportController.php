@@ -20,6 +20,26 @@ use App\Services\PermissionService;
 /** Spec Section 16 — REPORTS: per-client, per-order, aggregate, CSV export, saved report definitions. */
 final class ReportController
 {
+    /**
+     * Owner points 6/15 (2 Nov 2026): a report that prints amounts opens only
+     * for people who may see that money (MoneyVisibility), whatever reports
+     * permission they hold — so granting view_reports to a Logistics or
+     * Procurement role never shows them selling prices or buyer payments.
+     *
+     * @param list<string> $classes
+     */
+    private static function refusedForMoney(array $classes): bool
+    {
+        foreach ($classes as $class) {
+            if (!\App\Services\MoneyVisibility::can($class)) {
+                http_response_code(403);
+                echo 'You do not have permission to see the amounts in this report.';
+                return true;
+            }
+        }
+        return false;
+    }
+
     public function index(array $params): void
     {
         $user = AuthService::currentUser();
@@ -41,6 +61,9 @@ final class ReportController
 
     public function client(array $params): void
     {
+        if (self::refusedForMoney(['selling', 'buyer_payments'])) {
+            return;
+        }
         $clientId = (int) $params['clientId'];
         $data = ReportRepository::perClient($clientId);
         if (!$data['client']) {
@@ -79,10 +102,11 @@ final class ReportController
     private static function withoutCafinUnlessAllowed(array $documents): array
     {
         $user = \App\Services\AuthService::currentUser();
-        if ($user && \App\Services\PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'view_cafin')) {
-            return $documents;
+        if (!($user && \App\Services\PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'view_cafin'))) {
+            $documents = array_values(array_filter($documents, static fn (array $d): bool => ($d['document_type_code'] ?? $d['type_code'] ?? '') !== 'CAFIN'));
         }
-        return array_values(array_filter($documents, static fn (array $d): bool => ($d['document_type_code'] ?? $d['type_code'] ?? '') !== 'CAFIN'));
+        // Owner points 6/15: and only the document types whose money this person may see.
+        return array_values(array_filter($documents, static fn (array $d): bool => \App\Services\MoneyVisibility::canSeeDocument((string) ($d['document_type_code'] ?? $d['type_code'] ?? ''))));
     }
 
     public function order(array $params): void
@@ -95,6 +119,8 @@ final class ReportController
             return;
         }
         $data['documents'] = self::withoutCafinUnlessAllowed($data['documents']);
+        // Owner points 6/15: audit values hidden unless the viewer may see that money.
+        $data['audit'] = \App\Services\AuditMoneyMask::maskAll($data['audit']);
 
         if (($_GET['format'] ?? '') === 'csv') {
             ['headers' => $headers, 'rows' => $csvRows] = self::orderAuditCsvRows($data['audit']);
@@ -129,6 +155,9 @@ final class ReportController
 
     public function aggregate(array $params): void
     {
+        if (self::refusedForMoney(['selling'])) {
+            return;
+        }
         $dateFrom = trim((string) ($_GET['date_from'] ?? '')) ?: null;
         $dateTo = trim((string) ($_GET['date_to'] ?? '')) ?: null;
         $stageId = ($_GET['stage_id'] ?? '') !== '' ? (int) $_GET['stage_id'] : null;
@@ -236,6 +265,9 @@ final class ReportController
      */
     public function payments(array $params): void
     {
+        if (self::refusedForMoney(['buyer_payments'])) {
+            return;
+        }
         $dateFrom = trim((string) ($_GET['date_from'] ?? '')) ?: null;
         $dateTo = trim((string) ($_GET['date_to'] ?? '')) ?: null;
 
@@ -284,6 +316,9 @@ final class ReportController
      */
     public function todaysPayments(array $params): void
     {
+        if (self::refusedForMoney(['buyer_payments'])) {
+            return;
+        }
         $date = trim((string) ($_GET['date'] ?? '')) ?: date('Y-m-d');
 
         // External QA report Q-RPT-1: supplier payment amounts are
@@ -465,6 +500,9 @@ final class ReportController
     /** Cross-order amendment report — closes the gap where amendments only ever showed a bare count in the funnel section. */
     public function amendments(array $params): void
     {
+        if (self::refusedForMoney(['selling'])) {
+            return;
+        }
         $dateFrom = trim((string) ($_GET['date_from'] ?? '')) ?: null;
         $dateTo = trim((string) ($_GET['date_to'] ?? '')) ?: null;
 
@@ -498,6 +536,9 @@ final class ReportController
     /** Month-over-month trend view — everything else in this module is either a snapshot or a single flat total. */
     public function trends(array $params): void
     {
+        if (self::refusedForMoney(['selling'])) {
+            return;
+        }
         $months = ReportRepository::monthlyTrends(12);
 
         if (($_GET['format'] ?? '') === 'csv') {
@@ -584,6 +625,9 @@ final class ReportController
     /** Debtors/receivables ageing report — closes a real gap flagged in the CA/Reports review: outstanding amounts existed, "how overdue" did not. */
     public function ageing(array $params): void
     {
+        if (self::refusedForMoney(['buyer_payments'])) {
+            return;
+        }
         $data = ReportRepository::ageingReport();
 
         if (($_GET['format'] ?? '') === 'csv') {
@@ -637,6 +681,9 @@ final class ReportController
     /** Product/HS-code sales report — closes a real gap: no view anywhere of which products actually drive business. */
     public function products(array $params): void
     {
+        if (self::refusedForMoney(['selling'])) {
+            return;
+        }
         $dateFrom = trim((string) ($_GET['date_from'] ?? '')) ?: null;
         $dateTo = trim((string) ($_GET['date_to'] ?? '')) ?: null;
 
@@ -787,6 +834,9 @@ final class ReportController
      */
     public function performance(array $params): void
     {
+        if (self::refusedForMoney(['selling'])) {
+            return;
+        }
         $preset = trim((string) ($_GET['preset'] ?? ''));
         $presetRange = $preset !== '' ? self::presetRange($preset) : null;
 

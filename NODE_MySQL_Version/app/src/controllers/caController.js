@@ -205,6 +205,9 @@ async function zohoSync(req, res) {
       + (await zohoPurchaseRepository.costEntriesToSync(startDate)).filter((c) => c.zoho_expense_id === null).length,
     benefitsPendingCount: (await caExportBenefitRepository.forZohoSync(startDate)).filter((b) => b.zoho_journal_id === null).length,
     legLabels: zohoInvoiceData.KIND_LABELS,
+    // Owner decision 2 Nov 2026 (D-233): everything the next sync would send.
+    waiting: await require('../services/zohoPendingService').counts(null),
+    zohoWaitingSummary: require('../services/zohoPendingService').summary,
     log: await zohoSyncLogRepository.recent(100),
   }, 'layout/base');
 }
@@ -241,6 +244,42 @@ async function orderZohoCheck(req, res) {
     startDateLabel: startDate ? new Date(`${startDate}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
     statusLabels: orderZohoMatchService.STATUS_LABELS,
   }, 'layout/base');
+}
+
+/**
+ * Owner 2 Nov 2026 (point 16): "Sync this order to Zoho now" — the same
+ * pushes as Sync Now, limited to this order's records (same duplicate
+ * guards; every record logged in the Zoho Sync Log).
+ */
+async function syncOrderToZoho(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const order = await orderRepository.find(orderId);
+  if (!order || (await orderAccessService.denialReason(order, req.user.id, req.permissions)) !== null) {
+    res.status(404).send('Order not found.');
+    return;
+  }
+  const back = `/orders/${orderId}#order-financials`;
+  if (!(await zohoBooksService.isEnabled())) {
+    flash.set(req, 'warning', 'Zoho is not connected — Settings → Zoho Books. Nothing was synced.');
+    res.redirect(back);
+    return;
+  }
+  const r = await caSyncService.runForOrder(orderId, req.user.id);
+  const rev = r.revenue;
+  const pur = r.purchases;
+  const ben = r.benefits;
+  const sent = rev.invoices + rev.synced + rev.applied + pur.bills + pur.payments + pur.applied + pur.expenses + ben.journals + ben.removed;
+  const failed = rev.failed + pur.failed + ben.failed;
+  const summary = `${rev.invoices} invoice(s), ${rev.synced} buyer payment(s) (${rev.applied} applied), ${pur.bills} bill(s), ${pur.payments} vendor payment(s) (${pur.applied} applied), ${pur.expenses} expense(s) / cost(s), ${ben.journals} export benefit journal(s)`;
+  if (failed > 0) {
+    flash.set(req, 'warning', `Order sync finished: ${summary} sent or updated; ${failed} failed — see the Zoho Sync Log.`);
+  } else if (sent > 0) {
+    flash.set(req, 'success', `Order sync finished: ${summary} sent or updated.`);
+  } else {
+    flash.set(req, 'success', 'Order sync ran — nothing on this order was waiting for Zoho Books.');
+  }
+  await auditLogRepository.log(req.user.id, 'CA_ZOHO_SYNC_RUN', 'orders', orderId, null, null, `order ${orderId} only: ${summary}; ${failed} failed`);
+  res.redirect(back);
 }
 
 async function runZohoSync(req, res) {
@@ -841,7 +880,7 @@ async function tdsSummary(req, res) {
 }
 
 module.exports = {
-  index, cafinExport, reports, zohoSync, runZohoSync, orderZohoCheck, expenses, setExpenseTds, linkExpenseToOrder, tdsSummary,
+  index, cafinExport, reports, zohoSync, runZohoSync, syncOrderToZoho, orderZohoCheck, expenses, setExpenseTds, linkExpenseToOrder, tdsSummary,
   exportBenefits, recordExportBenefit, markExportBenefitReceived,
   bankStatement, uploadBankStatement, matchBankLineToRevenue, matchBankLineToExpense, unmatchBankLine, reconciliation,
   fyLocks, lockFinancialYear, unlockFinancialYear,

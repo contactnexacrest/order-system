@@ -28,6 +28,8 @@
     </ol>
   </div>
 
+  <p class="pay-guide-download"><strong>Full guide to print or share:</strong> the <em>Supplier &amp; Logistics Payments Guide</em> (21 pages, PDF and Word, with every step marked on the screenshots and a one-page cheat sheet) is in the <a href="/reference-docs">Reference Library</a>.</p>
+
   <nav class="pay-guide-toc">
     <strong>Jump to:</strong>
     <a href="#guide-a">A. Supplier advance</a> ·
@@ -100,6 +102,7 @@
 
   <h2 id="guide-c">C. CHA / transport — Logistics Partner Bills</h2>
   <p>The <strong>Logistics Partner Bills &amp; Payments</strong> card runs alongside Steps 9–11. One row per bill; a partner doing both CHA and transport can send one combined bill (For = "CHA + Transport (one bill)") or separate bills.</p>
+  <p><strong>Who does what:</strong> Logistics (Executive / Manager / Director) adds the partner's bill as soon as it arrives; Accounts / Finance records the payment and its UTR. On a Logistics login the bill row says "Accounts records the payment." instead of a Mark Paid button.</p>
   <p class="review-banner warn">⚠ <span>On a CFR / CIF order: an <strong>Advance</strong> bill can be paid any time; a <strong>Final</strong> bill can be paid only after the buyer's Debit Note payment has cleared (Step 9d). On an FOB order both can be paid any time.</span></p>
 
   <h3>C1. Add the partner's advance proforma</h3>
@@ -142,7 +145,7 @@
     <ul>
       <li><strong>Taxable value is the amount before GST.</strong> Do not type the bill total (with GST) there — the app adds the GST itself. Typing 47,250 as taxable would make the bill ₹49,612.50.</li>
       <li><strong>The tax invoice's taxable value is the whole invoice</strong>, not the balance still due. The app takes off the advance for you.</li>
-      <li><strong>Never forget the UTR.</strong> Every payment needs the bank reference — it goes into the payment's description in the app and in Zoho.</li>
+      <li><strong>Never forget the UTR.</strong> Every payment needs the bank reference — it goes into the payment's description in the app and in Zoho Books, which receives each bill and payment at the next sync (hourly, or Sync now) — until then the order shows "Waiting for Zoho".</li>
       <li><strong>Don't add an advance request as a tax invoice.</strong> It would count as a cost twice once the real invoice comes. Advance request = Proforma.</li>
       <li><strong>Always pick the proforma being replaced</strong> when you add the tax invoice — otherwise the advance looks unpaid against the invoice.</li>
       <li><strong>CFR / CIF: a Final logistics bill is paid only after Step 9d</strong> (the buyer's freight payment cleared). An Advance bill can be paid any time.</li>

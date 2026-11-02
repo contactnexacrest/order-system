@@ -11,7 +11,7 @@
       <tr><td>{{ p.month_label }}</td><td>{{ p.order_reference }}{% if p.note %}<br><small class="muted">{{ p.note }}</small>{% endif %}</td><td>{{ p.company_legal_name }}</td>
         <td>{% if p.amount_fc !== null and p.amount_fc !== undefined %}{{ p.currency_code }} {{ p.amount_fc | money }}<br>{% endif %}<small>₹{{ p.amount_inr | money }}</small></td>
         <td>{% if p.status == 'due' %}{{ 'To be deducted' if (p.amount_inr | float) < 0 else 'Waiting' }}{% elif p.status == 'paid' %}Paid{% elif p.status == 'held' %}On hold{% else %}{{ p.status }}{% endif %}{% if p.hold_reason %}<br><small>{{ p.hold_reason }}</small>{% endif %}</td>
-        <td>{% if p.status == 'paid' %}{{ p.paid_on | shortDate }} · ₹{{ p.paid_inr | money }}{% if (p.tds_inr | float) > 0 %}<br><small>TDS ₹{{ p.tds_inr | money }}</small>{% endif %}{% if p.paid_reference %}<br><small>Ref {{ p.paid_reference }}</small>{% endif %}{% else %}—{% endif %}</td>
+        <td>{% if p.status == 'paid' %}{{ p.paid_on | shortDate }}{% if (p.tds_inr | float) > 0 %}<br><small data-tds-breakdown>Gross ₹{{ p.gross_inr | money }} · TDS ₹{{ p.tds_inr | money }}{% if p.tds_section %} (u/s {{ p.tds_section }}{% if p.tdsRateLabel %} at {{ p.tdsRateLabel }}{% endif %}){% endif %}</small><br>Net paid ₹{{ p.paid_inr | money }}{% else %} · ₹{{ p.paid_inr | money }}{% endif %}{% if p.paid_reference %}<br><small>Ref {{ p.paid_reference }}</small>{% endif %}{% else %}—{% endif %}</td>
         {% if not print %}<td>
           {% if inv %}<a href="/associate/documents/{{ inv.id }}">{{ inv.reference or 'Invoice' }}</a>
           {% elif (p.amount_inr | float) > 0 and p.status != 'paid' %}
@@ -24,7 +24,8 @@
     {% if payouts.length == 0 %}<tr><td colspan="7" class="muted">No commission yet. It is earned once a buyer has paid an order in full.</td></tr>{% endif %}
   </table>
   {% if not print %}
-  <h2>Tax certificates and statements from NexaCrest</h2>
+  <h2>TDS certificates (Form 16A) and remittance forms from NexaCrest</h2>
+  <p class="small muted">NexaCrest deducts TDS on commission as the law requires and issues your Form 16A each quarter; it appears here.</p>
   <table class="list">
     {% for d in documents %}{% if d.kind == 'form_16a' or d.kind == 'form_15ca' or d.kind == 'form_15cb' %}
       <tr><td>{{ d.created_at | shortDate }}</td><td><a href="/associate/documents/{{ d.id }}">{{ docKinds[d.kind] }}</a></td><td>{{ d.reference or '' }}</td></tr>

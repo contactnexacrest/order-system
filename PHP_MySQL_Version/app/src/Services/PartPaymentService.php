@@ -49,7 +49,8 @@ final class PartPaymentService
 
     public static function receivedTotal(int $orderId, string $leg, ?int $milestoneId = null): float
     {
-        $stmt = Database::connection()->prepare('SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id <=> :m');
+        // Owner 2 Nov 2026 ("18 yes"): bank charges the banks deducted count as paid by the buyer.
+        $stmt = Database::connection()->prepare('SELECT COUNT(*) AS n, COALESCE(SUM(amount + COALESCE(bank_charges, 0)), 0) AS total FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id <=> :m');
         $stmt->execute(['o' => $orderId, 'l' => $leg, 'm' => $milestoneId]);
         $row = $stmt->fetch();
         if ((int) $row['n'] === 0) {
@@ -130,7 +131,7 @@ final class PartPaymentService
      * totals back on order_payment_status (amount, latest date, weighted rate,
      * bank references). Call inside the transaction that checked receiptExists().
      */
-    public static function addLegReceipt(int $orderId, string $leg, float $amount, string $receivedOn, float $rate, string $bankReference, int $userId): void
+    public static function addLegReceipt(int $orderId, string $leg, float $amount, string $receivedOn, float $rate, string $bankReference, int $userId, ?string $differenceReason = null, float $bankCharges = 0.0): int
     {
         if (!in_array($leg, self::LEGS, true)) {
             throw new \InvalidArgumentException("Unknown payment leg {$leg}");
@@ -141,20 +142,24 @@ final class PartPaymentService
             $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, staff_note) VALUES (:o, :l, :a, :d, :r, :b, :n)')
                 ->execute(['o' => $orderId, 'l' => $leg, 'a' => $legacy['amount'], 'd' => $legacy['received_on'], 'r' => $legacy['exchange_rate'], 'b' => $legacy['bank_reference'], 'n' => 'Recorded before part payments were kept separately']);
         }
-        $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, recorded_by) VALUES (:o, :l, :a, :d, :r, :b, :u)')
-            ->execute(['o' => $orderId, 'l' => $leg, 'a' => round($amount, 2), 'd' => substr($receivedOn, 0, 10), 'r' => round($rate, 4), 'b' => trim($bankReference), 'u' => $userId]);
+        $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, difference_reason, bank_charges, bank_charges_inr, recorded_by) VALUES (:o, :l, :a, :d, :r, :b, :dr, :bc, :bci, :u)')
+            ->execute(['o' => $orderId, 'l' => $leg, 'a' => round($amount, 2), 'd' => substr($receivedOn, 0, 10), 'r' => round($rate, 4), 'b' => trim($bankReference),
+                'dr' => $differenceReason, 'bc' => $bankCharges > 0 ? round($bankCharges, 2) : null, 'bci' => $bankCharges > 0 ? round($bankCharges * $rate, 2) : null, 'u' => $userId]);
+        $receiptId = (int) $pdo->lastInsertId();
         $receipts = self::receipts($orderId, $leg);
-        $total = round(array_sum(array_map(static fn (array $r): float => (float) $r['amount'], $receipts)), 2);
+        // The leg holds what the buyer paid: received plus any bank charges the banks deducted (owner, 2 Nov 2026).
+        $total = round(array_sum(array_map(static fn (array $r): float => (float) $r['amount'] + (float) ($r['bank_charges'] ?? 0), $receipts)), 2);
         $latest = max(array_map(static fn (array $r): string => (string) $r['received_on'], $receipts));
         $weighted = 0.0;
         foreach ($receipts as $r) {
-            $weighted += (float) $r['amount'] * (float) ($r['exchange_rate'] ?? $rate);
+            $weighted += ((float) $r['amount'] + (float) ($r['bank_charges'] ?? 0)) * (float) ($r['exchange_rate'] ?? $rate);
         }
         $avgRate = $total > 0 ? round($weighted / $total, 4) : round($rate, 4);
         $method = 'record' . ucfirst($leg) . 'Received';
         OrderPaymentStatusRepository::$method($orderId, $total, $latest);
         OrderPaymentStatusRepository::setLegBankReference($orderId, $leg, self::joinReferences($receipts));
         OrderPaymentStatusRepository::setLegExchangeRate($orderId, $leg, $avgRate, $userId);
+        return $receiptId;
     }
 
     /** The receipts' bank references, each once, joined ", " (cut to the column's 100 characters). */
@@ -172,11 +177,14 @@ final class PartPaymentService
     }
 
     /** Adds a milestone receipt to the history (the milestone row itself holds its one remittance). */
-    public static function addMilestoneReceipt(array $milestone, float $amount, string $receivedOn, float $rate, string $bankReference, ?string $note, int $userId): void
+    public static function addMilestoneReceipt(array $milestone, float $amount, string $receivedOn, float $rate, string $bankReference, ?string $note, int $userId, ?string $differenceReason = null, float $bankCharges = 0.0): int
     {
-        Database::connection()->prepare('INSERT INTO order_payment_receipts (order_id, leg, milestone_id, amount, received_on, exchange_rate, bank_reference, staff_note, recorded_by) VALUES (:o, \'milestone\', :m, :a, :d, :r, :b, :n, :u)')
+        $pdo = Database::connection();
+        $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, milestone_id, amount, received_on, exchange_rate, bank_reference, staff_note, difference_reason, bank_charges, bank_charges_inr, recorded_by) VALUES (:o, \'milestone\', :m, :a, :d, :r, :b, :n, :dr, :bc, :bci, :u)')
             ->execute(['o' => $milestone['order_id'], 'm' => $milestone['id'], 'a' => round($amount, 2), 'd' => substr($receivedOn, 0, 10), 'r' => round($rate, 4), 'b' => trim($bankReference),
-                'n' => $note !== null && trim($note) !== '' ? trim($note) : null, 'u' => $userId]);
+                'n' => $note !== null && trim($note) !== '' ? trim($note) : null, 'dr' => $differenceReason,
+                'bc' => $bankCharges > 0 ? round($bankCharges, 2) : null, 'bci' => $bankCharges > 0 ? round($bankCharges * $rate, 2) : null, 'u' => $userId]);
+        return (int) $pdo->lastInsertId();
     }
 
     public static function money(string $currency, float $amount): string

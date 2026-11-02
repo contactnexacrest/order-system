@@ -100,6 +100,17 @@ function run(): int
         }
     }
 
+    // --- Agreements expiring (owner decision 2 Nov 2026, point 4): 30 / 7 days before and on the day, once each ---
+    $created += \App\Services\AgreementAlertService::run($today->format('Y-m-d'));
+
+    // --- TDS on associate commission (owner decision 2 Nov 2026, D-235): deposit by the 7th, Form 26Q after each quarter ---
+    $payIncentiveIds = PermissionRepository::usersWithPermission('pay_incentives');
+    foreach (\App\Services\AssociateTds::reminders($today->format('Y-m-d')) as $reminder) {
+        $created += notifyMdAndAdmin($payIncentiveIds, $reminder['type'], $reminder['message'], null);
+    }
+    // Owner decision (2 Nov 2026, gap-list Q-6): eBRC / ECGC / incentive-claim reminders, each once.
+    $created += \App\Services\ComplianceTrackingService::runReminders($today->format('Y-m-d'));
+
     // --- RCMC expiry ---
     $rcmcExpiry = CompanySettingsRepository::get('rcmc_valid_until');
     if ($rcmcExpiry) {

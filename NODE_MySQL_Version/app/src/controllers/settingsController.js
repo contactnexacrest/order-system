@@ -32,6 +32,8 @@ async function index(req, res) {
   if (!zohoMailService.IN_USE) {
     delete grouped.zoho; // mail goes through Bluehost SMTP only (owner decision 2026-10-29)
   }
+  // Owner points 5/8/9 (2 Nov 2026): edited on its own page with its own rules (/settings/document-cleanup).
+  delete grouped.document_cleanup;
   const isSuperAdmin = await superAdminService.isEffective(req.user.id);
   // 90-item backlog #31: rbi_purpose_code_advance/balance/freight were
   // plain free-text settings with no standard list — same dropdown
@@ -86,6 +88,7 @@ async function update(req, res) {
   const toApply = {};
   for (const [key, rawValue] of Object.entries(submitted)) {
     if (!byKey[key]) continue; // unknown key submitted — ignore rather than trust client input
+    if (byKey[key].category === 'document_cleanup') continue; // saved only through /settings/document-cleanup
     const oldValue = byKey[key].setting_value;
     const newValue = String(rawValue).trim();
     // Owner decision 1 Nov 2026 (C-14): a secret's field is shown empty — left empty, the stored value stays.

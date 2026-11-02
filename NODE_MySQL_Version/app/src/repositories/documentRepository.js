@@ -105,6 +105,22 @@ async function findLatestForOrderAndTypeCode(orderId, documentTypeCode) {
 
 async function markApproved(id, finalPdfFileId) {
   await db.execute("UPDATE documents SET status = 'approved', pdf_file_id = :pdf_file_id WHERE id = :id", { pdf_file_id: finalPdfFileId, id });
+  await linkFiles(id, [finalPdfFileId]);
+}
+
+/**
+ * Owner points 6/15 (2 Nov 2026): every generated file records which
+ * document it belongs to, so a copy that is no longer the document's current
+ * PDF (the draft after approval, the sent final after a newer revision
+ * supersedes it) keeps its document type — and so its money class — for
+ * moneyVisibility.canSeeFile(), the file-store download and the dossier ZIP.
+ */
+async function linkFiles(documentId, fileIds) {
+  for (const fileId of fileIds) {
+    if (fileId !== null && fileId !== undefined) {
+      await db.execute('UPDATE file_store SET linked_document_id = :d WHERE id = :f', { d: documentId, f: fileId });
+    }
+  }
 }
 
 /**
@@ -116,6 +132,7 @@ async function markApproved(id, finalPdfFileId) {
  */
 async function markSuperseded(id, pdfFileId) {
   await db.execute("UPDATE documents SET status = 'superseded', pdf_file_id = :pdf_file_id WHERE id = :id", { pdf_file_id: pdfFileId, id });
+  await linkFiles(id, [pdfFileId]);
 }
 
 async function markInReview(id) {
@@ -143,6 +160,14 @@ async function markDraft(id) {
 
 async function markSent(id) {
   await db.execute("UPDATE documents SET status = 'sent' WHERE id = :id", { id });
+  // Owner points 5/8/9 (2 Nov 2026): the exact PDF the client got is flagged, so the
+  // document copies clean-up can never remove it (file_store.sent_to_client was always 0).
+  await db.execute(
+    `UPDATE file_store fs JOIN documents d ON d.pdf_file_id = fs.id
+        SET fs.sent_to_client = 1, fs.sent_at = COALESCE(fs.sent_at, NOW())
+      WHERE d.id = :id`,
+    { id }
+  );
 }
 
 /**
@@ -177,6 +202,7 @@ async function create(orderId, documentTypeId, documentReference, revisionNumber
       company_snapshot_json: companySnapshot !== null ? JSON.stringify(companySnapshot) : null,
     }
   );
+  await linkFiles(result.insertId, [pdfFileId, docxFileId]);
   return result.insertId;
 }
 
@@ -217,6 +243,6 @@ async function deleteDraft(id) {
 
 module.exports = {
   customerFacingForOrder, forOrder, find, findLatestForOrderAndType, findLatestForOrderAndTypeCode,
-  allForOrderAndType, countPriorSent, markApproved, markSuperseded, markInReview, markDraft, markSent, create, deleteDraft,
+  allForOrderAndType, countPriorSent, markApproved, linkFiles, markSuperseded, markInReview, markDraft, markSent, create, deleteDraft,
   flagDrift, setDocumentDate, printedDate,
 };

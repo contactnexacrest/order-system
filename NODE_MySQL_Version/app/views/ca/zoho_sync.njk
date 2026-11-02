@@ -12,6 +12,9 @@
       <div><span class="k">Payments Held (not yet applied to an invoice)</span><span class="v">{{ heldCount }}</span></div>
       <div><span class="k">Bills, Vendor Payments, Order Expenses &amp; Costs Pending</span><span class="v">{{ purchasesPendingCount }}</span></div>
       <div><span class="k">Export Benefits Pending</span><span class="v">{{ benefitsPendingCount }}</span></div>
+      {% if waiting and waiting.enabled %}{# D-233 #}
+      <div><span class="k">Waiting for Zoho (all records)</span><span class="v"><span class="badge {{ 'badge-success' if waiting.total == 0 else 'badge-warning' }} zoho-waiting" data-zoho-waiting="{{ waiting.total }}">Waiting for Zoho: {{ waiting.total }}</span>{% if waiting.total > 0 %} <span class="muted small">{{ zohoWaitingSummary(waiting.by_type) }} — sent at the next sync (hourly, or Sync Now).</span>{% endif %}</span></div>
+      {% endif %}
     </div>
     <p class="muted small">Only records dated on or after the go-live date go to Zoho Books; the CA books everything earlier as the opening position. Set it under Admin &rarr; Settings (<code>zoho_books_sync_start_date</code>). On the live server nothing is sent until it is set.</p>
     {% if not isEnabled %}

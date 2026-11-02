@@ -16,7 +16,7 @@
 {# Gap list G-5 (owner, 1 Nov 2026): part payments — each receipt, what is still owed, and a manager's reason to clear short. #}
 {% macro renderReceipts(key) %}{% set ps5 = partPayments[key] if (partPayments and sees.buyer_payments) else null %}{% if ps5 and (ps5.receipts.length or ps5.shortfall) %}
 <div class="part-payments small" data-part-payments="{{ key }}"><table class="list compact"><tr><th>Received on</th><th>Amount</th><th>Rate</th><th>Bank reference</th><th>Recorded by</th></tr>
-{% for r in ps5.receipts %}<tr><td>{{ r.received_on | shortDate }}</td><td>{{ order.currency_code or '' }} {{ r.amount | money }}</td><td>{% if r.exchange_rate != null %}&#8377;{{ r.exchange_rate | rate4 }}{% else %}—{% endif %}</td><td>{{ r.bank_reference or '—' }}</td><td>{{ r.recorded_by_name or '—' }}</td></tr>{% endfor %}
+{% for r in ps5.receipts %}<tr><td>{{ r.received_on | shortDate }}</td><td>{{ order.currency_code or '' }} {{ r.amount | money }}{% if r.difference_reason == 'bank_charges' %} <small class="muted">+ {{ order.currency_code or '' }} {{ r.bank_charges | money }} bank charges (&#8377;{{ r.bank_charges_inr | money }}, order cost)</small>{% elif r.difference_reason == 'short' %} <small class="muted">· buyer paid less</small>{% elif r.difference_reason == 'excess' %} <small class="muted">· buyer paid more</small>{% endif %}{% if r.difference_reason and r.difference_reason_text %} <small class="muted">— {{ r.difference_reason_text }}{% if r.difference_reason_custom %} (typed in){% endif %}</small>{% endif %}{% if r.own_bank_charges_inr %} <small class="muted">· our bank's charges &#8377;{{ r.own_bank_charges_inr | money }} (order cost)</small>{% endif %}</td><td>{% if r.exchange_rate != null %}&#8377;{{ r.exchange_rate | rate4 }}{% else %}—{% endif %}</td><td>{{ r.bank_reference or '—' }}</td><td>{{ r.recorded_by_name or '—' }}</td></tr>{% endfor %}
 </table><p>{% if ps5.expected != null %}Due: <strong>{{ order.currency_code or '' }} {{ ps5.expected | money }}</strong> &middot; received so far: <strong>{{ order.currency_code or '' }} {{ ps5.received | money }}</strong> &middot; {% if ps5.owed > 0.01 %}<strong class="text-warning">still owed: {{ order.currency_code or '' }} {{ ps5.owed | money }}</strong>{% elif ps5.owed < -0.01 %}paid {{ order.currency_code or '' }} {{ (0 - ps5.owed) | money }} more than due{% else %}received in full{% endif %}{% else %}Received so far: <strong>{{ order.currency_code or '' }} {{ ps5.received | money }}</strong>{% endif %}</p>
 {% if ps5.shortfall %}<p class="notice notice-warning">Cleared short by {{ order.currency_code or '' }} {{ ps5.shortfall.shortfall_amount | money }} on {{ ps5.shortfall.approved_on | shortDate }}: approved by {{ ps5.shortfall.approved_by_name or '—' }} — {{ 'carried into the balance' if ps5.shortfall.treatment == 'carried_to_balance' else 'written off' }}. Reason: {{ ps5.shortfall.reason }}</p>{% endif %}
 </div>{% endif %}{% endmacro %}
@@ -360,7 +360,9 @@
    invoice; a bill takes as many payments as it needs. leg is the supplier
    step a payment recorded here counts towards (7e advance, 10a balance);
    carriedIds are 7e bills shown in 10a until fully paid. #}
-{% macro vendorBillTable(bills, showPartner, canPay, payBlocked, leg = null, carriedIds = []) %}
+{# Owner decision (2 Nov 2026): canRemove = may remove an unpaid bill (Logistics may add/remove logistics bills; paying needs canPay). #}
+{% macro vendorBillTable(bills, showPartner, canPay, payBlocked, leg = null, carriedIds = [], canRemove = null) %}
+{% set mayRemove = canPay if canRemove === null else canRemove %}
   {% if not bills.length %}
     <p class="muted small">No bills added yet.</p>
     {% if canPay and payBlocked !== null %}<p class="review-banner warn">&#9888; {{ payBlocked }} Bills can still be added now.</p>{% endif %}
@@ -418,12 +420,14 @@
               <div><button type="submit" class="btn-sm">Save Payment</button></div>
             </form>
           </details>
-          {% if not b.payments.length %}
+          {% elif not canPay and mayRemove %}
+          <br><small class="muted">Accounts records the payment.</small>
+          {% endif %}
+          {% if mayRemove and not b.payments.length %}
           <form method="post" action="/orders/{{ order.id }}/vendor-bills/{{ b.id }}/delete" data-confirm="Remove the unpaid bill {{ b.bill_no }}?" style="display:inline">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-link small">Remove</button>
           </form>
-          {% endif %}
           {% endif %}
         {% endif %}
       </td>
@@ -529,7 +533,7 @@
    Step 10. Both run alongside the other cards and never lock them. Each row
    saves on its own without reloading the page (public/js/app.js). #}
 {% macro complianceCard(phase, step) %}
-  {% if permissions.close_orders %}
+  {% if permissions.manage_compliance_checklist %}{# D-226: split out of close_orders #}
   {% set tasks = complianceTasks | whereEq('phase', phase) %}
   {% if tasks.length %}
   {% set outstanding = tasks | whereNotIn('status', ['approved', 'skipped']) | length %}
@@ -593,7 +597,9 @@
   supplierAdvancePending: (supplierPo and (supplierPo.advance_amount_inr | float) > 0 and not supplierPo.advance_paid_at),
   productionUpdated: ((order.production_status_text and (order.production_status_text | trim) != 'Not yet commenced') or order.est_shipment_date_text or order.est_shipment_date),
   freightSkipped: (stage6 and stage6.status == 'skipped'),
-  balanceOpenEarly: balanceOpenEarly
+  balanceOpenEarly: balanceOpenEarly,
+  cooPrepEarly: (stage8 and stage8.status != 'locked'),
+  benefitEligibilityEarly: (permissions.manage_export_benefit_claims and not canManageOrderFinancials and shipping and shipping.bl_number and (exportBenefitEligibility | whereEq('status', 'pending') | length) > 0)
 }) %}
 {% set stepStates = flow.stepStates %}
 {% set currentUserStep = flow.currentUserStep %}
@@ -1152,12 +1158,12 @@
         <form method="post" action="/orders/{{ order.id }}/payment/milestones/{{ m.id }}" class="inline-form milestone-record">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <strong>Milestone {{ m.seq }} received</strong>
-          <label>Amount received ({{ order.currency_code }}) *<input type="number" name="amount" step="0.01" min="0.01" max="{{ ps.fobInput }}" required value="{{ m.amountInput }}" placeholder="e.g. 1500.00"></label>
-          <label>Exchange rate (₹ per 1 {{ order.currency_code }}) *<input type="number" name="exchange_rate" step="0.0001" min="0.0001" max="999999.9999" required placeholder="e.g. 83.25"></label>
+          <label>Amount received ({{ order.currency_code }}) *<input type="number" name="amount" data-remit-amount step="0.01" min="0.01" max="{{ ps.fobInput }}" required value="{{ m.amountInput }}" placeholder="e.g. 1500.00"></label>
+          <label>Exchange rate (₹ per 1 {{ order.currency_code }}) *<input type="number" name="exchange_rate" data-remit-rate step="0.0001" min="0.0001" max="999999.9999" required placeholder="e.g. 83.25"></label>
           <label>Bank reference (UTR / SWIFT) *<input type="text" name="bank_reference" minlength="4" maxlength="100" required placeholder="e.g. HDFCN26304123456"></label>
           <label>Received on *<input type="date" name="received_on" required value="{{ todayDate }}" max="{{ todayDate }}"></label>
           <label>Note <small class="muted">(added to the description)</small><input type="text" name="staff_note" maxlength="255" placeholder="Optional note"></label>
-          <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the milestone due (e.g. bank charges deducted) — record it anyway</label>
+          {% set rd = { label: 'Milestone ' ~ m.seq, due: (m.amountInput | float), so_far: 0, currency: order.currency_code or '', max_pct: maxBankChargesPct } %}{% include 'orders/_remittance_difference.njk' %}
           <button type="submit" class="btn-sm">Record Milestone {{ m.seq }} Remittance</button>
         </form>
         {% elif m.received_amount !== null and not m.cleared_on and permissions.clear_payments %}
@@ -1193,7 +1199,7 @@
   {% set pendingDocActions = docPendingActions(documents, mailSendingEnabled) %}
   {# Owner decision (2026-10-26): opens by itself only when a document is waiting on someone; otherwise a slim bar with the count. #}
   <details class="step-card step-card-reference" id="document-review-approval"{{ ' open' if pendingDocActions.length else '' }}>
-    <summary><h2>Document Review &amp; Approval <small class="muted">(reference &mdash; every document, every step)</small>{% if pendingDocActions.length %} <span class="nav-badge doc-pending-badge">{{ pendingDocActions.length }} need{{ 's' if pendingDocActions.length == 1 else '' }} action</span>{% elif documents and documents.length %} <span class="phase-pill">{{ documents.length }} document{{ '' if documents.length == 1 else 's' }}</span>{% endif %}</h2></summary>
+    <summary><h2>Document Review &amp; Approval <small class="muted">(reference &mdash; every document, every step)</small>{% if pendingDocActions.length %} <span class="nav-badge doc-pending-badge">{{ pendingDocActions.length }} need{{ 's' if pendingDocActions.length == 1 else '' }} action</span>{% elif (visibleDocuments or documents) and (visibleDocuments or documents).length %} <span class="phase-pill">{{ (visibleDocuments or documents).length }} document{{ '' if (visibleDocuments or documents).length == 1 else 's' }}</span>{% endif %}</h2></summary>
     {% if pendingDocActions.length %}
     <div class="review-banner warn doc-pending-actions">
       <div><strong>Waiting on someone — don't move on without these:</strong>
@@ -1881,7 +1887,7 @@
           {% set advanceDue = ((fobTotal | float) * (order.advance_pct | float) / 100) | round(2) %}
           <p class="advance-due-note">Advance due on this order: <strong>{{ order.currency_code or '' }} {{ advanceDue | money }}</strong> ({{ (order.advance_pct | float) }}% of the order value {{ order.currency_code or '' }} {{ (fobTotal or 0) | money }}). Enter what the bank actually received.</p>
           <label>Advance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="advance_amount" required data-remit-amount value="{{ advanceDue.toFixed(2) if advanceDue > 0 else '' }}" placeholder="e.g. 1800.00"></label>
-          <label class="checkbox-row small" style="font-weight:normal;"><input type="checkbox" name="confirm_amount_differs" value="1"> The amount received differs from the advance due (e.g. bank charges deducted) — record it anyway</label>
+          {% set rd = { label: 'Advance', due: advanceDue, so_far: (partPayments.advance.received if partPayments else 0), currency: order.currency_code or '', max_pct: maxBankChargesPct } %}{% include 'orders/_remittance_difference.njk' %}
           <label>Received On<input type="date" name="advance_received_at"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="advance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
@@ -1993,7 +1999,7 @@
 
   <details class="step-card" id="step-6a-oc-generate"{{ flow.subCardOpen('s6', '6a') }}>
     <summary>{{ stepStatusIcon(flow.subStepStatus('s6', '6a')) }}<h2>Step 6a &middot; Generate Order Confirmation</h2></summary>
-    {% if permissions.close_orders %}
+    {% if permissions.manage_compliance_checklist %}
     <p class="muted small">ECGC Cover is tracked on the <a href="#compliance-checklist">Compliance Checklist</a>.{% if canManageOrderFinancials %} The premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 12) as an "ECGC insurance" cost entry — filed here, once the order is confirmed, so the fee is never paid before the order is certain to proceed.{% endif %}</p>
     {% elif canManageOrderFinancials %}
     <p class="muted small">The ECGC insurance premium paid is recorded under <a href="#order-financials">Order Financials</a> (Step 12) once the order is confirmed.</p>
@@ -2111,6 +2117,7 @@
       </tr>
       {% endfor %}
     </table>
+    <p class="muted small">Award = supplier chosen. The Supplier PO is then generated in Step 7b, and the supplier acknowledges it in Step 7c.</p>
     {% endif %}
     {% if canRaisePr and not isLockedOrder %}
     <h3>Ask Procurement for what this order needs</h3>
@@ -2388,6 +2395,25 @@
     {% if supplierPoLocked %}
       <p class="muted">Confirm buyer acknowledgement first to unlock this gate.</p>
     {% elif supplierPo %}
+        {# Owner 2 Nov 2026 (point 13): the Supplier Link comes first, then the supplier's acknowledgment. #}
+        {# Owner request (2026-10-26, t4): the supplier can upload it themselves through a no-login link (like the Buyer Action Link), and when they never acknowledge, staff record that with a reason. #}
+        <div class="supplier-action-link" style="margin-top:6px;">
+          <p class="muted small"><strong>1. Send the Supplier Link first:</strong> a direct link (no login) where the supplier uploads their signed PO / acknowledgment — emailed to them when the PO has their email{% if supplierPo.supplier_email %} ({{ supplierPo.supplier_email }}){% endif %}. You'll be notified when they upload.</p>
+          {% if supplierActionFullLink %}
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+              <input type="text" readonly value="{{ supplierActionFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Supplier Action Link">
+              <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('{{ supplierActionFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
+            </div>
+            <p class="muted small">Valid until {{ supplierPo.supplier_action_token_expires_at | humanDate }}.</p>
+          {% endif %}
+          {% if permissions.manage_supplier_po %}{# QA Round 5, R5-20 #}
+          <form method="post" action="/orders/{{ order.id }}/supplier-po/supplier-link" style="display:inline">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-secondary">{{ 'Regenerate Supplier Link' if supplierActionFullLink else 'Generate Supplier Link' }}</button>
+          </form>
+          {% endif %}
+        </div>
+        <p class="muted small" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;"><strong>2. When the supplier has acknowledged:</strong> their upload appears below — or attach the signed PO / acknowledgment yourself.</p>
         {% if supplierPoDocuments and supplierPoDocuments.length > 0 %}
           <table class="list" style="margin-top:8px">
             <tr><th>File</th><th>Uploaded</th><th></th></tr>
@@ -2407,23 +2433,6 @@
           {{ stepBadge('7c') | safe }}<button type="submit" class="btn-sm">Attach Supplier PO Acknowledgment</button>
         </form>
         {% endif %}
-        {# Owner request (2026-10-26, t4): the supplier can upload it themselves through a no-login link (like the Buyer Action Link), and when they never acknowledge, staff record that with a reason. #}
-        <div class="supplier-action-link" style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;">
-          <p class="muted small"><strong>Or let the supplier upload it:</strong> a direct link (no login) where the supplier uploads their signed PO / acknowledgment — emailed to them when the PO has their email{% if supplierPo.supplier_email %} ({{ supplierPo.supplier_email }}){% endif %}. You'll be notified when they upload.</p>
-          {% if supplierActionFullLink %}
-            <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-              <input type="text" readonly value="{{ supplierActionFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Supplier Action Link">
-              <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('{{ supplierActionFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
-            </div>
-            <p class="muted small">Valid until {{ supplierPo.supplier_action_token_expires_at | humanDate }}.</p>
-          {% endif %}
-          {% if permissions.manage_supplier_po %}{# QA Round 5, R5-20 #}
-          <form method="post" action="/orders/{{ order.id }}/supplier-po/supplier-link" style="display:inline">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <button type="submit" class="btn-sm btn-secondary">{{ 'Regenerate Supplier Link' if supplierActionFullLink else 'Generate Supplier Link' }}</button>
-          </form>
-          {% endif %}
-        </div>
         {% if supplierPo.ack_skipped_at %}
           <p class="small" style="margin-top:8px;">&#10003; Recorded that the supplier did not acknowledge — {{ supplierPo.ack_skip_reason }} <span class="muted">({{ supplierPo.ack_skipped_at }})</span></p>
         {% elif not (supplierPoDocuments and supplierPoDocuments.length > 0) and supplierPo.status != 'signed' and permissions.manage_supplier_po %}
@@ -2553,13 +2562,14 @@
   {% set logisticsUnpaid = vendorBillsView.unpaid(logisticsBillsList) | length %}
   {% set inGroupC = currentUserStep in ['s9', 's10', 's11'] %}
   {% set logisticsStatus = 'done' if (logisticsBillsList.length and logisticsUnpaid == 0) else ('current' if inGroupC else 'locked') %}
-  {% if permissions.manage_supplier_payments or permissions.manage_order_financials %}
+  {# Owner decision (2 Nov 2026): Logistics sees the card (view_logistics_costs) and adds bills (manage_logistics_bills); Accounts pays them. #}
+  {% if permissions.manage_supplier_payments or permissions.manage_order_financials or sees.logistics %}
   <details class="step-card step-card-parallel" id="logistics-bills"{% if inGroupC and (not logisticsBillsList.length or logisticsUnpaid > 0) %} open{% endif %}>
     <summary>{{ stepStatusIcon(logisticsStatus) }}<h2>Logistics Partner Bills &amp; Payments — CHA · Transport · Freight Forwarder{% if logisticsUnpaid > 0 %} <small class="muted">({{ logisticsUnpaid }} unpaid)</small>{% endif %}</h2></summary>
     <p class="muted small">One row per bill from the partner — a partner doing both CHA and transport can send one combined bill or separate bills. Runs alongside Steps 9–11 and never locks them.{% if not isFob %} On this {{ order.incoterm_code }} order an Advance bill can be paid any time; the Final bill once the buyer's Debit Note payment has cleared (Step 9d).{% endif %} Bills go into the order's financials (Step 12) automatically.</p>
     <p class="small pay-guide-link"><a href="/help/supplier-logistics-payments#guide-c" target="_blank" rel="noopener">How to fill this — step-by-step guide with screenshots</a></p>
-    {{ vendorBillTable(logisticsBillsList, true, permissions.manage_supplier_payments, logisticsPaymentBlocked) }}
-    {% if permissions.manage_supplier_payments %}
+    {{ vendorBillTable(logisticsBillsList, true, permissions.manage_supplier_payments, logisticsPaymentBlocked, null, [], permissions.manage_logistics_bills) }}
+    {% if permissions.manage_logistics_bills %}
     {% set activePartners = logisticsPartners | whereEq('is_active', 1) %}
     <details class="vendor-bill-add"{% if not logisticsBillsList.length %} open{% endif %}>
       <summary class="small"><strong>+ Add a bill</strong></summary>
@@ -2696,6 +2706,7 @@
       <form method="post" action="/orders/{{ order.id }}/payment/freight">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Freight Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="freight_amount" required data-remit-amount placeholder="e.g. 950.00"></label>
+        {% set rd = { label: 'Freight', due: (partPayments.freight.expected if (partPayments and partPayments.freight.expected != null) else 0), so_far: (partPayments.freight.received if partPayments else 0), currency: order.currency_code or '', max_pct: maxBankChargesPct } %}{% include 'orders/_remittance_difference.njk' %}
         <label>Received On<input type="date" name="freight_received_at"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="freight_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
@@ -3090,6 +3101,7 @@
       <form method="post" action="/orders/{{ order.id }}/payment/balance">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Balance Amount Received * <small class="muted">(in {{ order.currency_code or '' }})</small><input type="text" name="balance_amount" required data-remit-amount value="{% if payment and payment.balance_remittance_received_at != null %}{% if partPayments.balance.owed != null and partPayments.balance.owed > 0 %}{{ partPayments.balance.owed.toFixed(2) }}{% endif %}{% else %}{{ payment.balance_amount or '' }}{% endif %}" placeholder="e.g. 2700.00"></label>
+        {% set rd = { label: 'Balance', due: (partPayments.balance.expected if (partPayments and partPayments.balance.expected != null) else 0), so_far: (partPayments.balance.received if partPayments else 0), currency: order.currency_code or '', max_pct: maxBankChargesPct } %}{% include 'orders/_remittance_difference.njk' %}
         <label>Received On<input type="date" name="balance_received_at"></label>
           <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 {{ order.currency_code or '' }})</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="balance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
@@ -3164,7 +3176,14 @@
   <details class="step-group" id="order-financials"{{ stepCardOpen('s12') }}>
     <summary>{{ stepStatusIcon(stepStates['s12']) }}<span class="step-group-num">STEP 12</span><h3>Closure &mdash; Financials, Benefits &amp; Costs</h3><span class="fin-progress">{{ fin.doneCount }} of 3 done</span></summary>
     <p class="muted small">Everything financial about this order, in three short parts (government benefits are recorded later, in Step 13g) — visible only to Super Admin and roles granted "Manage order financials". Work top to bottom; the next unfinished part opens by itself.</p>
-    {% if canCheckZoho %}<p class="small"><a href="/orders/{{ order.id }}/zoho-check">Check this order against Zoho Books &rarr;</a> <span class="muted">(reads only)</span></p>{% endif %}
+    {% if zohoWaiting and zohoWaiting.enabled %}{% set zwLink = canCheckZoho %}<p class="small">{% include 'partials/zoho_waiting.njk' %}</p>{% endif %}
+    {% if canCheckZoho %}<p class="small"><a href="/orders/{{ order.id }}/zoho-check">Check this order against Zoho Books &rarr;</a> <span class="muted">(reads only)</span></p>
+    {# Owner 2 Nov 2026 (point 16): send this order's records to Zoho Books now. #}
+    <form method="post" action="/orders/{{ order.id }}/zoho-sync" class="zoho-order-sync" data-confirm="Send this order's invoices, payments, bills, expenses and benefits to Zoho Books now?" style="margin:4px 0 10px">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <button type="submit" class="btn-sm btn-secondary">Sync this order to Zoho now</button>
+      <span class="muted small">Only this order. The full sync (all orders) is under <a href="/ca/zoho-sync">Zoho Books Sync</a>.</span>
+    </form>{% endif %}
 
     <div class="fin-kpis">
       <div class="fin-kpi"><span class="l">Received from buyer{{ ' (estimated)' if profitability and profitability.revenue_is_estimated else '' }}</span><span class="v">{% if profitability %}&#8377;{{ profitability.revenue_inr | money }}{% else %}—{% endif %}</span></div>
@@ -3420,7 +3439,7 @@
       {% if orderLcDetails and orderLcDetails.lc_received_at %}
         <p>Paid by the bank on <strong>{{ orderLcDetails.lc_received_at | shortDate }}</strong>: {{ lcCur }} {{ orderLcDetails.lc_received_amount | money }} &middot; &#8377;{{ orderLcDetails.lc_inr_credited | money }} credited &middot; &#8377;{{ orderLcDetails.lc_bank_charges_inr | money }} bank charges{% if orderLcDetails.lc_zoho_synced_at %} &middot; <span class="muted">in Zoho Books</span>{% endif %}</p>
       {% else %}
-        <p class="muted small">Not recorded yet. When the bank pays under the LC (after the documents are presented), record it here: it goes to Zoho Books as the buyer's payment against the Commercial Invoice.</p>
+        <p class="muted small">Not recorded yet. When the bank pays under the LC (after the documents are presented), record it here: it goes to Zoho Books at the next sync (hourly, or Sync now) as the buyer's payment against the Commercial Invoice.</p>
       {% endif %}
       {% if orderLcDetails and orderLcDetails.lc_received_at %}
         {# Owner decision 2026-10-29 (CAFIN change confirmed twice): the LC payment's FIRC / eBRC, like the other legs'. #}
@@ -3578,12 +3597,14 @@
 
   <details class="step-card" id="step-11a-coo-prep"{{ flow.subCardOpen('s13', '13a') }}>
     <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13a')) }}<h2>Step 13a &middot; Generate COO Prep Sheet</h2></summary>
-    {% if despatchLocked %}
-      <p class="muted">Clear the balance payment first to unlock this gate.</p>
+    {# Owner 2 Nov 2026 (point 14): opens with Stage 8, not the balance #}
+    {% if not stage8 or stage8.status == 'locked' %}
+      <p class="muted">Opens once the BL is issued (Step 10) — you can prepare it before the balance is cleared.</p>
     {% else %}
+      {% if despatchLocked %}<p class="small review-banner info">&#8505; Prepared early — the Certificate of Origin can be applied for now; the original documents still go to the buyer only after the balance clears.</p>{% endif %}
       <h3 style="font-size:0.95em; margin-top:0;">COO Prep Sheet (internal — for the Chamber of Commerce application)</h3>
       <p class="muted small">Generates an internal worksheet summarizing everything needed to apply for the Certificate of Origin with the Chamber of Commerce — shipper, consignee, shipment, and cargo details, the same source data as the BL Instruction Sheet. Never shown to the client.</p>
-      {% if permissions.generate_documents %}{# QA Round 5, R5-20 #}
+      {% if permissions.generate_documents or permissions.generate_compliance_documents %}{# QA Round 5, R5-20; D-226 Export Compliance #}
       <form method="post" action="/orders/{{ order.id }}/documents/generate" style="display:inline" onsubmit="return confirmDocumentRegeneration(this);">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="hidden" name="document_type" value="COOPREP">
@@ -3712,8 +3733,36 @@
 
   <div class="step-group-connector">then the government benefits — they usually arrive after the buyer has paid</div>
 
+  {% include 'orders/_compliance_tracking.njk' %}
   <details class="step-card" id="step-13g-benefits"{{ flow.subCardOpen('s13', '13g') }}>
     <summary>{{ stepStatusIcon(flow.subStepStatus('s13', '13g')) }}<h2>Step 13g &middot; Government Benefits &mdash; Claimed &amp; Received</h2><span class="fin-sub-summary">{% if benefitSettlement.waiting.length %}<span class="phase-pill warn">{{ benefitSettlement.waiting.length }} waiting for money</span>{% elif benefitSettlement.unclaimed.length %}{{ benefitSettlement.unclaimed.length }} not claimed yet{% elif benefitSettlement.undecided.length %}eligibility not answered (12b){% else %}all received or skipped{% endif %}</span></summary>
+    {# Owner decision D-226: Export Compliance answers the scheme eligibility here (Step 12b, where
+       Finance answers it, also shows the profit) — the same form and route. #}
+    {% set complianceOnly = permissions.manage_export_benefit_claims and not canManageOrderFinancials %}
+    {% set pendingSchemes = exportBenefitEligibility | whereEq('status', 'pending') %}
+    {% if complianceOnly and pendingSchemes.length %}
+      <form method="post" action="/orders/{{ order.id }}/export-benefit-schemes" id="step-13g-eligibility">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <p class="muted small"><strong>Which schemes is this order eligible for?</strong> Answer each one (never leave it Pending) — Mark Fully Settled waits for every answer.</p>
+        <table class="list">
+          <tr><th>Scheme</th><th>Eligibility</th><th>Reason <small class="muted">(required when Not Eligible)</small></th></tr>
+          {% for sch in pendingSchemes %}
+          <tr>
+            <td>{{ sch.scheme_name }}<input type="hidden" name="schemes[{{ loop.index0 }}][scheme_name]" value="{{ sch.scheme_name }}"></td>
+            <td>
+              <select name="schemes[{{ loop.index0 }}][status]" data-scheme-status style="min-width:140px;" aria-label="Eligibility">
+                {% for key, label in exportBenefitEligibilityStatuses %}
+                <option value="{{ key }}" {% if sch.status == key %}selected{% endif %}{% if key == 'not_eligible' %} data-auto-reason="{{ schemeNotEligibleReason }}"{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td><input type="text" name="schemes[{{ loop.index0 }}][reason]" value="{{ sch.reason or '' }}" placeholder="e.g. Product not covered by the scheme" data-scheme-reason aria-label="Reason"></td>
+          </tr>
+          {% endfor %}
+        </table>
+        <button type="submit" class="btn-sm">Save Eligibility</button>
+      </form>
+    {% endif %}
     {% if not orderClosed and order.status != 'shipped_docs_sent' %}
       <p class="muted">Not applicable until the order is complete — claims are recorded here once the documents are sent to the buyer (Step 13f) and the balance has landed.</p>
     {% else %}
@@ -3728,7 +3777,27 @@
           <tr><td>{{ sch.scheme_name }}</td><td>{{ settlementLabels[sch.settlement] }}</td></tr>
         {% endif %}{% endfor %}
       </table>
-      <p class="muted small">Recorded by users with the "Manage order financials" permission.</p>
+      {% if complianceOnly and order.status in ['shipped_docs_sent', 'complete'] and payment and payment.balance_remittance_received_at and benefitSettlement.unclaimed.length %}
+      <form method="post" action="/orders/{{ order.id }}/export-benefits" id="step-13g-file-claim" class="field-grid">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <p class="muted small full"><strong>File a claim</strong> once it is submitted to the government portal. The money received is recorded by Accounts &amp; Finance.</p>
+        <label>Scheme *
+          <select name="scheme_name" required>
+            <option value="">Choose…</option>
+            {% for name in benefitSettlement.unclaimed %}
+              <option value="{{ name }}">{{ name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number" placeholder="e.g. SB 1234567 / scroll 98765"></label>
+        <label>Claimed Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="claimed_amount" required placeholder="e.g. 25000.00"></label>
+        <label>Claimed On *<input type="date" name="claimed_at" value="{{ today() }}" required></label>
+        <input type="hidden" name="currency_code" value="INR">
+        <label>Notes<input type="text" name="notes" placeholder="Optional — e.g. filed on ICEGATE"></label>
+        <button type="submit" class="btn-sm">File Claim</button>
+      </form>
+      {% endif %}
+      <p class="muted small">{% if complianceOnly %}Eligibility and claims are filed by Export Compliance; the money received is recorded by users with the "Manage order financials" permission.{% else %}Recorded by users with the "Manage order financials" permission.{% endif %}</p>
     {% else %}
       {% set fin = financialsStep(order, exportBenefitEligibility, orderBenefitClaims, orderCostEntries, payment) %}
       {% set benefitsDisabled = '' if fin.benefitsApplicable else ' disabled' %}
@@ -3899,6 +3968,10 @@
         {{ stepBadge('13h') | safe }}<button type="submit" class="btn-sm btn-success">Mark Fully Settled</button>
       </form>
       <p class="muted small">Blocked until Step 13g is done — every eligible government export benefit received, or skipped with a reason.</p>
+      {# Owner decision (2 Nov 2026, Q-6a): a missing eBRC / FIRC is a warning here, never a block. #}
+      {% if complianceTracking and complianceTracking.missingFirc.length %}
+        <p class="review-banner warn" id="missing-firc-warning">&#9888; No FIRC / eBRC reference yet for: {% for m in complianceTracking.missingFirc %}{{ m.label }}{% if sees.buyer_payments %} ({{ m.currency }} {{ m.amount | money }}){% endif %} — received {{ m.received_at }}{% if not loop.last %}, {% endif %}{% endfor %}. You can still settle the order; it stays on the <a href="/reports/missing-ebrc">Missing eBRC / FIRC</a> list until the reference is recorded.</p>
+      {% endif %}
       {# Owner decision (2026-10-27): unpaid supplier / logistics bills are a warning here, not a block — accounts may settle vendor bills later. #}
       {% set unpaidBills = vendorBillsView.unpaid(vendorBills) %}
       {% if unpaidBills.length %}
@@ -3994,7 +4067,7 @@
         return confirm('Remove this document? The file itself is never deleted from disk.');
       }
     </script>
-    {% if permissions.manage_orders %}
+    {% if permissions.manage_orders or permissions.upload_order_documents %}{# D-226: Export Compliance attaches government / agency documents #}
     <form method="post" action="/orders/{{ order.id }}/additional-documents" enctype="multipart/form-data" style="margin-top:6px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <input type="text" name="title" placeholder="Title *" required style="width:220px" aria-label="Title">
@@ -4161,7 +4234,10 @@
           {% if permissions.close_orders %}
           <div><span class="k">Compliance Checklist</span><span class="v">{{ 'No task types configured' if complianceTotal == 0 else (complianceApproved ~ ' of ' ~ complianceTotal ~ ' resolved') }} — <a href="#compliance-checklist">see checklist</a></span></div>
           {% endif %}
-          <div><span class="k">Documents Generated</span><span class="v">{{ documents.length }}</span></div>
+          <div><span class="k">Documents Generated</span><span class="v">{{ (visibleDocuments or documents).length }}</span></div>
+          {% if zohoWaiting and zohoWaiting.enabled %}{% set zwLink = canCheckZoho %}{# D-233 #}
+          <div><span class="k">Zoho Books</span><span class="v">{% include 'partials/zoho_waiting.njk' %}</span></div>
+          {% endif %}
           {% if sees.client %}<div><span class="k">Client</span><span class="v">{% if permissions.manage_orders or permissions.view_clients %}<a href="/clients/{{ order.client_id }}">{{ order.company_legal_name }}</a>{% else %}{{ order.company_legal_name }}{% endif %}</span></div>{% endif %}
           {% if sees.client %}{% include "partials/associate_line.njk" %}{% endif %}
           <div><span class="k">Buyer Inquiry Ref</span><span class="v">{{ order.buyer_inquiry_ref }}</span></div>

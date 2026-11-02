@@ -302,6 +302,17 @@ final class OrderFinancialsController
      * "never silently skipped" rule as OrderComplianceTaskRepository's
      * skip_reason.
      */
+    /**
+     * Owner decision D-226: Export Compliance answers eligibility from Step 13g
+     * (they do not open Step 12, which shows the profit) — send them back there.
+     */
+    private static function eligibilityAnchor(): string
+    {
+        $user = AuthService::currentUser();
+        $can = $user !== null && \App\Services\PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'manage_order_financials');
+        return $can ? '#order-financials' : '#step-13g-benefits';
+    }
+
     public function setExportBenefitSchemeStatus(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -322,21 +333,21 @@ final class OrderFinancialsController
         $status = trim((string) ($_POST['status'] ?? ''));
         if ($schemeName === '' || !array_key_exists($status, \App\Repositories\OrderExportBenefitSchemeRepository::STATUSES) || $status === 'pending') {
             Flash::set('error', 'Select a valid scheme and eligibility status.');
-            header("Location: /orders/{$orderId}#order-financials");
+            header("Location: /orders/{$orderId}" . self::eligibilityAnchor());
             return;
         }
 
         $reason = trim((string) ($_POST['reason'] ?? ''));
         if ($status === 'not_eligible' && $reason === '') {
             Flash::set('error', 'A reason is required to mark a scheme Not Eligible.');
-            header("Location: /orders/{$orderId}#order-financials");
+            header("Location: /orders/{$orderId}" . self::eligibilityAnchor());
             return;
         }
 
         \App\Repositories\OrderExportBenefitSchemeRepository::setStatus($orderId, $schemeName, $status, $status === 'not_eligible' ? $reason : null, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'EXPORT_BENEFIT_SCHEME_STATUS_UPDATED', 'orders', $orderId, 'export_benefit_scheme:' . $schemeName, null, $status, $status === 'not_eligible' ? $reason : null);
         Flash::set('success', "{$schemeName} eligibility updated.");
-        header("Location: /orders/{$orderId}#order-financials");
+        header("Location: /orders/{$orderId}" . self::eligibilityAnchor());
     }
 
     /**
@@ -380,7 +391,7 @@ final class OrderFinancialsController
 
         if ($errors !== []) {
             Flash::set('error', 'Nothing saved — ' . implode('; ', $errors) . '.');
-            header("Location: /orders/{$orderId}#order-financials");
+            header("Location: /orders/{$orderId}" . self::eligibilityAnchor());
             return;
         }
         foreach ($changes as [$schemeName, $status, $storedReason]) {
@@ -390,7 +401,7 @@ final class OrderFinancialsController
         Flash::set('success', $changes === []
             ? 'No changes to save.'
             : 'Export benefit eligibility saved for ' . implode(', ', array_column($changes, 0)) . '.');
-        header("Location: /orders/{$orderId}#order-financials");
+        header("Location: /orders/{$orderId}" . self::eligibilityAnchor());
     }
 
     public function addCostEntry(array $params): void

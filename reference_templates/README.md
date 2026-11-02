@@ -23,7 +23,14 @@ where the two disagree, the Developer Spec wins — it says so explicitly).
   relationship, not generated per order.
 - `internal_documents/` — staff-only documents (COO prep sheet, checklists,
   Supplier PO, Payment Terms Amendment, SOPs, Stage Gate, Wall Reference, BL
-  Endorsement, BL Reasoning Guide). Never shown to a buyer.
+  Endorsement, BL Reasoning Guide; the BL Reasoning Guide and Checklists
+  were aligned on 2 Nov 2026 with the buyer documents' rule: all 3 originals
+  come to NexaCrest, 2 go to the buyer once the balance clears, 1 is kept).
+  Never shown to a buyer.
+- Staff guidelines that are not document templates live outside this folder:
+  the *Supplier & Logistics Payments Guide* (PDF + Word, 2 Nov 2026) is in
+  `docs/guides/` and `docs/SOP/guides/`, and in the app's Reference Library
+  (`storage/assets/reference_library/`, migration `2026-11-02u`).
 - `reference/` — the governing text and lookup files:
   - `NexaCrest_Developer_Spec.txt` — **authoritative.** Single source of truth
     for section structure, field lists, exact clause text, and legal-language

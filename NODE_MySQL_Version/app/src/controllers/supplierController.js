@@ -129,6 +129,7 @@ async function editForm(req, res) {
   }
   res.renderView('suppliers/form', {
     supplier,
+    agreementCard: await require('./agreementController').partyCard(req, 'supplier', supplier.id),
     editFingerprint: editFingerprintHelper.of(supplier, supplierRepository.EDIT_FIELDS),
     supplierTypes: await typeOptions(supplier.types),
     factoryAddresses: await supplierFactoryAddressRepository.forSupplier(id),

@@ -24,6 +24,19 @@ use App\Config\Database;
  */
 final class NotificationRepository
 {
+    /**
+     * Owner decision 2 Nov 2026 (D-233): an in-app notification only — for a
+     * caller that sends its own fuller e-mail (the Zoho sync failure list),
+     * so the person never gets the same news twice.
+     */
+    public static function createInAppOnly(int $userId, string $type, ?int $relatedOrderId, string $message): int
+    {
+        $pdo = Database::connection();
+        $pdo->prepare('INSERT INTO notifications (user_id, role_id, type, related_order_id, message) VALUES (:u, NULL, :t, :o, :m)')
+            ->execute(['u' => $userId, 't' => $type, 'o' => $relatedOrderId, 'm' => $message]);
+        return (int) $pdo->lastInsertId();
+    }
+
     public static function create(?int $userId, ?int $roleId, string $type, ?int $relatedOrderId, string $message): int
     {
         $pdo = Database::connection();

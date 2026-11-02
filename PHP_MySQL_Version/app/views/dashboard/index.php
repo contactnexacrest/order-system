@@ -3,6 +3,25 @@
   <p>Signed in as <strong><?= htmlspecialchars($user['name']) ?></strong> (<?= htmlspecialchars($user['email']) ?>).</p>
 </div>
 
+<?php
+// Owner decision 2 Nov 2026 (point 4): agreements expiring within 30 days, for whoever may see the register.
+$__agCanManage = \App\Controllers\AgreementController::can('manage_agreements');
+if ($__agCanManage || \App\Controllers\AgreementController::can('view_agreements')):
+    $__agSoon = array_values(array_filter(\App\Repositories\AgreementRepository::visibleTo(\App\Repositories\AgreementRepository::all(), $__agCanManage), static fn (array $r): bool => $r['status'] === 'expiring'));
+    if ($__agSoon !== []):
+?>
+<div class="card page-wide" id="agreements-expiring">
+  <h2 style="margin-top:0;">Agreements expiring soon (<?= count($__agSoon) ?>)</h2>
+  <table class="list">
+    <tr><th>With</th><th>Agreement</th><th>Expires</th></tr>
+    <?php foreach (array_slice($__agSoon, 0, 10) as $__r): ?>
+      <tr><td><?= htmlspecialchars((string) $__r['party_name']) ?> <small class="muted">(<?= htmlspecialchars(\App\Repositories\AgreementRepository::PARTY_TYPES[$__r['party_type']]) ?>)</small></td><td><?= htmlspecialchars((string) $__r['agreement_type']) ?></td><td><?= htmlspecialchars((string) $__r['expires_on']) ?> — in <?= (int) $__r['days_left'] ?> day(s)</td></tr>
+    <?php endforeach; ?>
+  </table>
+  <p><a href="/agreements?status=expiring">Open the Agreements register →</a></p>
+</div>
+<?php endif; endif; ?>
+
 <div class="card page-wide">
   <h2 style="margin-top:0;">Search — client or order reference</h2>
   <form method="get" action="/" class="search-box">

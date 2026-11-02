@@ -93,7 +93,8 @@ describe('Step badges on the order detail page (90-item backlog #80)', () => {
       '10a': 7, '10b': 7, '10c': 7, '10d': 7, '10e': 7, '10f': 7,
       // Gap list G-1: this order's balance is due before shipment — 11c/11d open from Step 9 (stage 6) on.
       '11a': 8, '11b': 8, '11c': 6, '11d': 6,
-      '13a': 9, '13b': 9, '13c': 9, '13d': 9, '13e': 9, '13f': 9, '13g': 9,
+      '13a': 8, '13b': 9, // 13a: COO Prep Sheet opens with Stage 8 (owner, 2 Nov 2026)
+      '13c': 9, '13d': 9, '13e': 9, '13f': 9, '13g': 9,
     };
 
     for (let reachedStage = 1; reachedStage <= 9; reachedStage++) {

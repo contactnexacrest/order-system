@@ -134,7 +134,7 @@ describe('Compliance checklist (per order)', () => {
     const taskTypeId = await complianceTaskTypeRepository.create('Jest ECGC Cover', await createTestUser('Admin'));
     const userId = await createTestUser('Export Executive');
 
-    const req = { params: { id: String(orderId) }, body: { task_type_id: String(taskTypeId), status: 'approved' }, user: { id: userId }, permissions: { close_orders: true }, session: {} };
+    const req = { params: { id: String(orderId) }, body: { task_type_id: String(taskTypeId), status: 'approved' }, user: { id: userId }, permissions: { manage_compliance_checklist: true } /* D-226: split out of close_orders */, session: {} };
     await ordersController.updateComplianceTask(req, fakeRes());
 
     const row = findRow(await orderComplianceTaskRepository.forOrder(orderId), taskTypeId);
@@ -146,7 +146,7 @@ describe('Compliance checklist (per order)', () => {
     const taskTypeId = await complianceTaskTypeRepository.create('Jest ECGC Cover', await createTestUser('Admin'));
     const userId = await createTestUser('Export Executive');
 
-    const req = { params: { id: String(orderId) }, body: { task_type_id: String(taskTypeId), status: 'skipped' }, user: { id: userId }, permissions: { close_orders: true }, session: {} };
+    const req = { params: { id: String(orderId) }, body: { task_type_id: String(taskTypeId), status: 'skipped' }, user: { id: userId }, permissions: { manage_compliance_checklist: true } /* D-226: split out of close_orders */, session: {} };
     await ordersController.updateComplianceTask(req, fakeRes());
 
     const row = findRow(await orderComplianceTaskRepository.forOrder(orderId), taskTypeId);
@@ -162,7 +162,7 @@ describe('Compliance checklist (per order)', () => {
       params: { id: String(orderId) },
       body: { task_type_id: String(taskTypeId), status: 'skipped', skip_reason: 'Buyer exempt under scheme X' },
       user: { id: userId },
-      permissions: { close_orders: true },
+      permissions: { manage_compliance_checklist: true } /* D-226: split out of close_orders */,
       session: {},
     };
     await ordersController.updateComplianceTask(req, fakeRes());
@@ -193,7 +193,7 @@ describe('Compliance checklist (per order)', () => {
     const taskTypeId = await complianceTaskTypeRepository.create('Jest ECGC Cover', await createTestUser('Admin'));
     const userId = await createTestUser('Export Executive');
 
-    const req = { params: { id: String(orderId) }, body: {}, user: { id: userId }, permissions: { close_orders: true }, session: {} };
+    const req = { params: { id: String(orderId) }, body: {}, user: { id: userId }, permissions: { manage_compliance_checklist: true } /* D-226: split out of close_orders */, session: {} };
     await ordersController.markAllComplianceTasksNotApplicable(req, fakeRes());
 
     const row = findRow(await orderComplianceTaskRepository.forOrder(orderId), taskTypeId);
@@ -214,7 +214,7 @@ describe('Compliance checklist (per order)', () => {
     // read the real outstanding count fresh rather than hardcoding it.
     const expectedOutstanding = (await orderComplianceTaskRepository.summaryForOrder(orderId)).outstanding;
 
-    const req = { params: { id: String(orderId) }, body: { skip_reason: 'Repeat order — buyer previously cleared' }, user: { id: userId }, permissions: { close_orders: true }, session: {} };
+    const req = { params: { id: String(orderId) }, body: { skip_reason: 'Repeat order — buyer previously cleared' }, user: { id: userId }, permissions: { manage_compliance_checklist: true } /* D-226: split out of close_orders */, session: {} };
     await ordersController.markAllComplianceTasksNotApplicable(req, fakeRes());
 
     const rows = await orderComplianceTaskRepository.forOrder(orderId);

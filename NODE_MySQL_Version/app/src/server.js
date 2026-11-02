@@ -444,6 +444,7 @@ app.use((req, res, next) => {
       myReviewsPendingCount: req.myReviewsPendingCount || 0,
       emailApprovalsPendingCount: req.emailApprovalsPendingCount || 0,
       settingsExpiryWarningCount: req.settingsExpiryWarningCount || 0,
+      zohoWaitingMenu: req.zohoWaitingMenu ?? null,
       // Owner decision D-214: the department this person works as, the others they can switch to, and a preview.
       actingMembership: req.actingMembership || null,
       myMemberships: req.myMemberships || [],
@@ -634,6 +635,23 @@ app.post('/settings/update', requireAuth, requirePermission('manage_company_sett
 app.post('/settings/test-zoho-email', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.testZohoEmail));
 app.post('/settings/test-zoho-books', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.testZohoBooks));
 app.post('/settings/test-smtp-email', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(settingsController.testSmtpEmail));
+// Owner points 5/8/9 (2 Nov 2026): Document copies clean-up (drafts, never-sent superseded copies, old CAFIN).
+const documentCleanupController = require('./controllers/documentCleanupController');
+app.get('/settings/document-cleanup', requireAuth, requirePermission('manage_company_settings'), asyncHandler(documentCleanupController.index));
+app.post('/settings/document-cleanup', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(documentCleanupController.save));
+app.post('/settings/document-cleanup/run', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(documentCleanupController.run));
+// Owner follow-up on point 18 (2 Nov 2026): the "Why is it different?" reasons on buyer remittance forms.
+const remittanceReasonController = require('./controllers/remittanceReasonController');
+// Owner decision 2 Nov 2026 (D-235): TDS on associate commission — settings and the quarterly TDS register.
+const associateTdsController = require('./controllers/associateTdsController');
+app.get('/settings/associate-tds', requireAuth, requirePermission('manage_company_settings'), asyncHandler(associateTdsController.settings));
+app.post('/settings/associate-tds', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(associateTdsController.saveSettings));
+app.get('/associates/tds', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'ca_module_view']), asyncHandler(associateTdsController.register));
+app.post('/associates/tds/:payoutId/challan', requireAuth, requirePermission('pay_incentives'), verifyCsrf, asyncHandler(associateTdsController.saveChallan));
+app.get('/settings/remittance-reasons', requireAuth, requirePermission('manage_company_settings'), asyncHandler(remittanceReasonController.index));
+app.post('/settings/remittance-reasons', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(remittanceReasonController.create));
+app.post('/settings/remittance-reasons/:id/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(remittanceReasonController.update));
+app.post('/settings/remittance-reasons/:id/toggle', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(remittanceReasonController.toggle));
 
 // docs/schema.sql Section AI — email template CRUD (add/edit, never delete).
 app.get('/email-templates', requireAuth, requirePermission('manage_email_templates'), asyncHandler(emailTemplateController.index));
@@ -901,7 +919,7 @@ app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders')
 app.post('/orders/:id/buyer-po/received-date', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.correctBuyerPoReceivedDate));
 app.post('/orders/:id/buyer-po/documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadBuyerPoDocument));
 // Batch 3 #13b — free-form extra documents attached to this order (schema.sql Section AZ).
-app.post('/orders/:id/additional-documents', requireAuth, requirePermission('manage_orders'), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadAdditionalDocument));
+app.post('/orders/:id/additional-documents', requireAuth, requirePermissionAny(['manage_orders', 'upload_order_documents']), uploadLarge.single('document'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.uploadAdditionalDocument));
 app.post('/orders/:id/additional-documents/:fileId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteAdditionalDocument));
 app.get('/orders/:id/additional-documents/removed', requireAuth, requirePermission('manage_orders'), asyncHandler(ordersController.showRemovedAdditionalDocuments));
 app.get('/ca', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.index));
@@ -910,13 +928,15 @@ app.get('/ca/reports', requireAuth, requirePermission('ca_module_view'), asyncHa
 app.get('/ca/zoho-sync', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.zohoSync));
 app.post('/ca/zoho-sync/run', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.runZohoSync));
 app.get('/orders/:id/zoho-check', requireAuth, requirePermission('ca_module_manage'), asyncHandler(caController.orderZohoCheck));
+// Owner 2 Nov 2026 (point 16): sync one order's records to Zoho Books from the order page.
+app.post('/orders/:id/zoho-sync', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(caController.syncOrderToZoho));
 app.get('/ca/expenses', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.expenses));
 app.get('/ca/tds-summary', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.tdsSummary));
 app.post('/ca/expenses/:id/tds', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.setExpenseTds));
 app.post('/ca/expenses/:id/link-order', requireAuth, requirePermission('inr_actual_edit'), verifyCsrf, asyncHandler(caController.linkExpenseToOrder));
 app.post('/orders/:id/ca-internal-doc/toggle', requireAuth, requirePermission('ca_internal_doc_manage'), checkOrderLock, verifyCsrf, asyncHandler(caController.toggleInternalDoc));
 app.post('/orders/:id/ca-internal-doc/generate', requireAuth, requirePermission('ca_internal_doc_manage'), verifyCsrf, asyncHandler(caController.generateInternalDoc));
-app.post('/orders/:id/export-benefits', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addExportBenefit));
+app.post('/orders/:id/export-benefits', requireAuth, requirePermissionAny(['manage_order_financials', 'manage_export_benefit_claims']), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addExportBenefit));
 app.post('/orders/:id/export-benefits/:benefitId/received', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.markExportBenefitReceived));
 app.post('/orders/:id/financials/costs-confirmed', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.confirmCosts));
 app.post('/orders/:id/financials/complete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.completeFinancials));
@@ -926,7 +946,13 @@ app.post('/orders/:id/export-benefits/:benefitId/correct', requireAuth, requireP
 app.post('/orders/:id/export-benefits/:benefitId/delete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.deleteExportBenefit));
 app.post('/orders/:id/financials/skip', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.skipFinancials));
 app.post('/orders/:id/financials/skip/undo', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.undoSkipFinancials));
-app.post('/orders/:id/export-benefit-schemes', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.setExportBenefitSchemeStatus));
+app.post('/orders/:id/export-benefit-schemes', requireAuth, requirePermissionAny(['manage_order_financials', 'manage_export_benefit_claims']), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.setExportBenefitSchemeStatus));
+// Owner decision (2 Nov 2026, gap-list Q-6): ECGC buyer limit + shipment declaration, claim tracking, Missing eBRC / FIRC report.
+const complianceTrackingController = require('./controllers/complianceTrackingController');
+app.post('/clients/:id/ecgc', requireAuth, requirePermissionAny(['manage_export_benefit_claims', 'ca_module_manage']), uploadLarge.single('ecgc_limit_file'), verifyCsrf, asyncHandler(complianceTrackingController.saveClientEcgc));
+app.post('/orders/:id/ecgc-declaration', requireAuth, requirePermissionAny(['manage_export_benefit_claims', 'ca_module_manage']), checkOrderLock, verifyCsrf, asyncHandler(complianceTrackingController.declareShipment));
+app.post('/orders/:id/export-benefits/:benefitId/tracking', requireAuth, requirePermissionAny(['manage_export_benefit_claims', 'manage_order_financials']), checkOrderLock, verifyCsrf, asyncHandler(complianceTrackingController.saveClaimTracking));
+app.get('/reports/missing-ebrc', requireAuth, requirePermissionAny(['ca_module_view', 'manage_export_benefit_claims', 'manage_order_financials']), asyncHandler(complianceTrackingController.missingEbrcReport));
 app.post('/orders/:id/lc-details', requireAuth, requirePermission('manage_order_financials'), upload.single('lc_file'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.saveLcDetails));
 app.post('/orders/:id/lc-received', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.recordLcReceived));
 app.post('/orders/:id/payment/lc/firc', requireAuth, requirePermission('inr_actual_edit'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.recordLcFirc));
@@ -935,6 +961,15 @@ app.post('/orders/:id/travel-expenses', requireAuth, requirePermission('manage_o
 // Team incentives and associates (owner decision 2026-10-30).
 app.get('/incentives/settings', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.settings));
 app.post('/incentives/settings', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveSettings));
+// Owner decision 2 Nov 2026 (point 4): the Agreements register.
+const agreementController = require('./controllers/agreementController');
+app.get('/agreements', requireAuth, requirePermissionAny(['view_agreements', 'manage_agreements']), asyncHandler(agreementController.index));
+app.get('/agreements/new', requireAuth, requirePermission('manage_agreements'), asyncHandler(agreementController.create));
+app.post('/agreements', requireAuth, requirePermission('manage_agreements'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(agreementController.save));
+app.get('/agreements/:id/edit', requireAuth, requirePermission('manage_agreements'), asyncHandler(agreementController.edit));
+app.post('/agreements/:id/update', requireAuth, requirePermission('manage_agreements'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(agreementController.save));
+app.post('/agreements/:id/terminate', requireAuth, requirePermission('manage_agreements'), verifyCsrf, asyncHandler(agreementController.terminate));
+app.get('/agreements/:id/file', requireAuth, requirePermissionAny(['view_agreements', 'manage_agreements']), asyncHandler(agreementController.download));
 // Associates — staff side (owner decision 1 Nov 2026, "AS all as recommended").
 app.get('/associates', requireAuth, requirePermissionAny(['view_associates', 'manage_associates', 'manage_associate_bank']), asyncHandler(associateAdminController.index));
 app.get('/associates/new', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.create));
@@ -971,7 +1006,7 @@ app.post('/orders/:id/incentive/recalculate', requireAuth, requirePermission('ma
 app.get('/my-incentives', requireAuth, requirePermission('view_own_incentives'), asyncHandler(incentiveController.mine));
 app.get('/incentives/payouts', requireAuth, requirePermission('pay_incentives'), asyncHandler(incentiveController.payouts));
 app.post('/incentives/payouts/paid-all', requireAuth, requirePermission('pay_incentives'), verifyCsrf, asyncHandler(incentiveController.markPaid));
-app.post('/incentives/payouts/:payoutId/paid', requireAuth, requirePermission('pay_incentives'), verifyCsrf, asyncHandler(incentiveController.markPaid));
+app.post('/incentives/payouts/:payoutId/paid', requireAuth, requirePermission('pay_incentives'), uploadLarge.fields([{ name: 'form_15ca_file', maxCount: 1 }, { name: 'form_15cb_file', maxCount: 1 }]), verifyCsrf, asyncHandler(incentiveController.markPaid));
 app.post('/orders/:id/cost-entries', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.addCostEntry));
 app.post('/orders/:id/cost-entries/:entryId/delete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderFinancialsController.deleteCostEntry));
 app.get('/ca/bank-statement', requireAuth, requirePermission('ca_module_view'), asyncHandler(caController.bankStatement));
@@ -1055,9 +1090,10 @@ app.post('/orders/:id/supplier-po/balance-paid', requireAuth, requirePermission(
 // Owner decisions (2026-10-27): bill first, then pay — the supplier's bills
 // (7e / 10a) and the logistics partners' bills (CHA, transport, forwarder).
 app.post('/orders/:id/vendor-bills/supplier', requireAuth, requirePermission('manage_supplier_payments'), uploadLarge.single('bill_file'), checkOrderLock, verifyCsrf, asyncHandler(vendorBillController.addSupplierBill));
-app.post('/orders/:id/vendor-bills/logistics', requireAuth, requirePermission('manage_supplier_payments'), uploadLarge.single('bill_file'), checkOrderLock, verifyCsrf, asyncHandler(vendorBillController.addLogisticsBill));
+// Owner decision (2 Nov 2026): Logistics enters the logistics partners' bills (manage_logistics_bills); paying stays with manage_supplier_payments.
+app.post('/orders/:id/vendor-bills/logistics', requireAuth, requirePermission('manage_logistics_bills'), uploadLarge.single('bill_file'), checkOrderLock, verifyCsrf, asyncHandler(vendorBillController.addLogisticsBill));
 app.post('/orders/:id/vendor-bills/:billId/pay', requireAuth, requirePermission('manage_supplier_payments'), checkOrderLock, verifyCsrf, asyncHandler(vendorBillController.payBill));
-app.post('/orders/:id/vendor-bills/:billId/delete', requireAuth, requirePermission('manage_supplier_payments'), checkOrderLock, verifyCsrf, asyncHandler(vendorBillController.deleteBill));
+app.post('/orders/:id/vendor-bills/:billId/delete', requireAuth, requirePermissionAny(['manage_supplier_payments', 'manage_logistics_bills']), checkOrderLock, verifyCsrf, asyncHandler(vendorBillController.deleteBill));
 // Owner decisions (2026-10-27): the order's actual expenses with receipts (Step 12a).
 app.post('/orders/:id/expenses', requireAuth, requirePermission('manage_order_financials'), uploadLarge.single('receipt'), checkOrderLock, verifyCsrf, asyncHandler(orderExpenseController.add));
 app.post('/orders/:id/expenses/:expenseId/delete', requireAuth, requirePermission('manage_order_financials'), checkOrderLock, verifyCsrf, asyncHandler(orderExpenseController.remove));
@@ -1099,10 +1135,10 @@ app.post('/orders/:id/cancellation/request', requireAuth, requirePermission('clo
 app.post('/orders/:id/cancellation/:cancellationId/approve', requireAuth, requirePermission('edit_locked_data'), verifyCsrf, asyncHandler(ordersController.approveCancellation));
 app.post('/orders/:id/cancellation/:cancellationId/reject', requireAuth, requirePermission('edit_locked_data'), verifyCsrf, asyncHandler(ordersController.rejectCancellation));
 app.post('/orders/:id/cancellation/:cancellationId/complete-refund', requireAuth, requirePermission('close_orders'), verifyCsrf, asyncHandler(ordersController.completeCancellationRefund));
-app.post('/orders/:id/compliance-tasks', requireAuth, requirePermission('close_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateComplianceTask));
-app.post('/orders/:id/compliance-tasks/mark-all-na', requireAuth, requirePermission('close_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markAllComplianceTasksNotApplicable));
+app.post('/orders/:id/compliance-tasks', requireAuth, requirePermission('manage_compliance_checklist'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateComplianceTask));
+app.post('/orders/:id/compliance-tasks/mark-all-na', requireAuth, requirePermission('manage_compliance_checklist'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.markAllComplianceTasksNotApplicable));
 
-app.post('/orders/:id/documents/generate', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.generate));
+app.post('/orders/:id/documents/generate', requireAuth, requirePermissionAny(['generate_documents', 'generate_compliance_documents']), verifyCsrf, asyncHandler(documentController.generate));
 app.post('/orders/:id/documents/:documentId/delete', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(documentController.deleteDraft));
 app.get('/documents/:documentId/download', requireAuth, requirePermissionAny(['download_pdf', 'view_cafin']), asyncHandler(documentController.download));
 // Batch 3 #13b/#13a — widened so a view-only visitor (view_orders/view_clients) can open what they can already see listed on the order/client page.

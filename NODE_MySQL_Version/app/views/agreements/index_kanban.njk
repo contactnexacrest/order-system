@@ -1,0 +1,35 @@
+{# Owner hard rule 2026-11-01: every field, link and action of the Standard list (agreements/index.njk), as cards by status. #}
+{% set listOfBoard = false %}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>Agreements — Kanban Board</h1>
+      <p class="muted" style="margin:0">Every agreement signed with a client, supplier, logistics partner, associate{{ ' or staff member' if canManage else '' }} — its signed copy and dates. A reminder goes out 30 and 7 days before an agreement expires, and on the day.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0">
+      <a class="btn-sm btn-secondary" href="/agreements?view=list">Switch to list view</a>
+      {% if canManage %}<a class="btn-sm" href="/agreements/new">Add an agreement</a>{% endif %}
+    </div>
+  </div>
+  {% include "agreements/_filters.njk" %}
+  <div class="kanban-board">
+    {% for key, label in agreementStatuses %}{% if (f.status == 'all' and not (key == 'renewed' and counts.renewed == 0)) or f.status == key %}
+      {% set __in = rows | whereEq('status', key) %}
+      <div class="kanban-column">
+        <div class="kanban-column-header"><span class="kanban-column-title">{{ label }}</span><span class="kanban-column-count">{{ __in.length }}</span></div>
+        {% if __in.length == 0 %}<p class="kanban-column-empty">Nothing here</p>{% endif %}
+        {% for __a in __in %}
+          <div class="entity-card kanban-card">
+            <div class="entity-card-header"><a class="entity-card-title" href="{{ partyUrl(__a.party_type, __a.party_id) }}">{{ __a.party_name }}</a></div>
+            <div class="muted small">{{ partyTypes[__a.party_type] }}</div>
+            <div class="entity-card-sub">{{ __a.agreement_type }}{% if __a.title %} — {{ __a.title }}{% endif %}</div>
+            <div class="small">Signed {{ __a.signed_on or '—' }} · Expires {{ __a.expires_on or 'No expiry' }}{% if __a.days_left !== null and __a.days_left >= 0 and (__a.status == 'expiring' or __a.status == 'active') %} (in {{ __a.days_left }} day(s)){% endif %}</div>
+            {% if __a.terminated_on %}<div class="muted small">Ended {{ __a.terminated_on }} — {{ __a.terminated_reason }}</div>{% endif %}
+            {% set __st = __a.status %}{% include "agreements/_status_badge.njk" %}
+            <div class="entity-card-footer">{% include "agreements/_actions.njk" %}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}{% endfor %}
+  </div>
+</div>

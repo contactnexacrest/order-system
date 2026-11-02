@@ -333,6 +333,17 @@ final class VendorBillController
             return;
         }
         $anchor = $bill['vendor_kind'] === 'supplier' ? self::ANCHORS[$bill['bill_for']] ?? self::ANCHORS['advance'] : self::ANCHORS['logistics'];
+        // Owner decision (2 Nov 2026): a supplier bill stays with manage_supplier_payments;
+        // a logistics partner bill may also be removed by whoever may add one (manage_logistics_bills).
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        $needed = $bill['vendor_kind'] === 'supplier' ? 'manage_supplier_payments' : 'manage_logistics_bills';
+        if (!\App\Services\PermissionService::can((int) $user['id'], $roleId, $needed)) {
+            AuditLogRepository::log((int) $user['id'], 'PERMISSION_DENIED', 'permissions', null, $needed);
+            http_response_code(403);
+            echo 'You do not have permission to remove this bill.';
+            return;
+        }
         if (!OrderVendorBillRepository::deleteUnpaid((int) $bill['id'])) {
             $this->back($orderId, $anchor, 'error', 'A bill with a payment on it stays on record and cannot be removed.');
             return;

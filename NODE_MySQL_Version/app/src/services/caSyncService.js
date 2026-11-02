@@ -15,10 +15,12 @@ const zohoGuard = require('../services/zohoGuard');
 const zohoInvoiceData = require('../services/zohoInvoiceData');
 const zohoRestoreService = require('../services/zohoRestoreService');
 const paymentDescription = require('../services/paymentDescription');
+const remittanceDifference = require('./remittanceDifference');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const caFyLockRepository = require('../repositories/caFyLockRepository');
 const financialYear = require('../helpers/financialYear');
 const db = require('../config/db');
+const zohoSyncFailureNotifier = require('./zohoSyncFailureNotifier');
 
 /**
  * CA / Accounting module — orchestrates a Zoho Books sync run, from either
@@ -31,6 +33,7 @@ const db = require('../config/db');
  * not present, then it shouldn't be a blocker for our application."
  */
 async function runFullSync(triggeredBy, triggeredByUserId) {
+  const since = await zohoSyncFailureNotifier.mark();
   // The day's full check of the records already in Books (zohoRestoreService.due()).
   const dailyCheck = triggeredBy !== 'manual' && (await zohoBooksService.isEnabled()) && (await zohoRestoreService.due(triggeredBy));
   const result = {
@@ -45,6 +48,8 @@ async function runFullSync(triggeredBy, triggeredByUserId) {
   if (dailyCheck) {
     await zohoRestoreService.markScheduledCheckDone();
   }
+  // Owner decision 2 Nov 2026 (D-233): failures reach Finance once per run.
+  await zohoSyncFailureNotifier.afterRun(since, triggeredBy, null);
   return result;
 }
 
@@ -59,7 +64,7 @@ async function runFullSync(triggeredBy, triggeredByUserId) {
  *
  * @return {Promise<{synced: number, failed: number, skipped: number, invoices: number, applied: number}>}
  */
-async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
+async function syncPendingRevenue(triggeredBy, triggeredByUserId, onlyOrderId = null) {
   if (!(await zohoBooksService.isEnabled())) {
     await zohoSyncLogRepository.log('revenue_payment', null, null, null, 'skipped', null, `${offReason()} — nothing synced.`, triggeredBy, triggeredByUserId);
     return { synced: 0, failed: 0, skipped: 1, invoices: 0, applied: 0 };
@@ -71,10 +76,11 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
   }
 
   // Owner decision 2026-10-29: put back what was deleted or changed in Books.
-  const restore = await zohoRestoreService.revenue(startDate, triggeredBy, triggeredByUserId);
+  const restore = onlyOrderId === null ? await zohoRestoreService.revenue(startDate, triggeredBy, triggeredByUserId) : { failed: 0, restored: 0 };
   let failed = restore.failed;
   let invoices = 0;
   for (const item of await orderZohoInvoiceRepository.documentsToSync(startDate)) {
+    if (!inScope(onlyOrderId, item.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     const label = zohoInvoiceData.KIND_LABELS[item.kind];
     try {
       const invoice = await zohoInvoiceData.build(item.order_id, item.kind, item.document_id);
@@ -112,6 +118,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
   let synced = restore.restored;
   let applied = 0;
   for (const leg of await caRepository.legsPendingZohoSync()) {
+    if (!inScope(onlyOrderId, leg.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     if (startDate !== null && String(leg.cleared_at).slice(0, 10) < startDate) {
       continue; // before the go-live date: the CA books it as the opening position
     }
@@ -127,7 +134,8 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
         String(leg.cleared_at).slice(0, 10),
         referenceNumber,
         target ? target.zoho_invoice_number : null,
-        0,
+        // Owner 2 Nov 2026: bank charges deducted on the way go with the payment, so the invoice settles in full.
+        await remittanceDifference.chargesInr(Number(leg.order_id), String(leg.leg)),
         await paymentDescription.buyerPayment(Number(leg.order_id), String(leg.leg), target ? target.zoho_invoice_number : null)
       );
       const zohoReference = result.payment_id;
@@ -145,6 +153,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
   }
 
   for (const leg of await caRepository.legsHeldInZoho()) {
+    if (!inScope(onlyOrderId, leg.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     const target = await invoiceFor(leg.order_id, leg.leg);
     if (!target) {
       continue; // still waiting for its invoice — nothing to do yet
@@ -160,7 +169,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
         String(leg.cleared_at).slice(0, 10),
         `${leg.buyer_inquiry_ref}-${leg.leg}`,
         target.zoho_invoice_number,
-        0,
+        await remittanceDifference.chargesInr(Number(leg.order_id), String(leg.leg)),
         await paymentDescription.buyerPayment(Number(leg.order_id), String(leg.leg), target.zoho_invoice_number)
       );
       await orderPaymentStatusRepository.setLegZohoApplied(leg.order_id, leg.leg);
@@ -178,6 +187,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
   // applied on a later run.
   const paymentMilestoneRepository = require('../repositories/paymentMilestoneRepository');
   for (const m of await paymentMilestoneRepository.pendingZohoSync()) {
+    if (!inScope(onlyOrderId, m.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     if (startDate !== null && String(m.cleared_on) < startDate) {
       continue; // before the go-live date: the CA books it as the opening position
     }
@@ -186,9 +196,9 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
     try {
       const result = await zohoBooksService.pushRevenuePayment(
         Number(m.client_id), String(m.company_legal_name), String(m.currency_code || 'INR'),
-        Number(m.received_amount), Math.round(Number(m.received_amount) * Number(m.exchange_rate) * 100) / 100,
+        Number(m.received_amount), Math.round((Number(m.received_amount) * Number(m.exchange_rate) - await remittanceDifference.chargesInr(orderId, 'milestone', Number(m.id))) * 100) / 100,
         String(m.cleared_on), `${m.buyer_inquiry_ref}-m${m.seq}`,
-        target ? target.zoho_invoice_number : null, 0,
+        target ? target.zoho_invoice_number : null, await remittanceDifference.chargesInr(orderId, 'milestone', Number(m.id)),
         await paymentDescription.milestonePayment(m, target ? target.zoho_invoice_number : null)
       );
       await paymentMilestoneRepository.setZohoReference(Number(m.id), result.payment_id);
@@ -204,6 +214,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
     }
   }
   for (const m of await paymentMilestoneRepository.heldInZoho()) {
+    if (!inScope(onlyOrderId, m.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     const target = await orderZohoInvoiceRepository.find(Number(m.order_id), 'ci');
     if (!target) {
       continue; // still waiting for the CI — nothing to do yet
@@ -211,8 +222,8 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
     try {
       const amount = await zohoBooksService.applyPaymentToInvoice(
         String(m.zoho_reference), Number(m.client_id), String(m.company_legal_name), String(m.currency_code || 'INR'),
-        Number(m.received_amount), Math.round(Number(m.received_amount) * Number(m.exchange_rate) * 100) / 100,
-        String(m.cleared_on), `${m.buyer_inquiry_ref}-m${m.seq}`, target.zoho_invoice_number, 0,
+        Number(m.received_amount), Math.round((Number(m.received_amount) * Number(m.exchange_rate) - await remittanceDifference.chargesInr(Number(m.order_id), 'milestone', Number(m.id))) * 100) / 100,
+        String(m.cleared_on), `${m.buyer_inquiry_ref}-m${m.seq}`, target.zoho_invoice_number, await remittanceDifference.chargesInr(Number(m.order_id), 'milestone', Number(m.id)),
         await paymentDescription.milestonePayment(m, target.zoho_invoice_number)
       );
       await paymentMilestoneRepository.setZohoApplied(Number(m.id));
@@ -228,6 +239,7 @@ async function syncPendingRevenue(triggeredBy, triggeredByUserId) {
   // customer payment applied to the CI (held until the CI is in Books, like
   // the advance), with the bank charges the bank kept.
   for (const lc of await orderLcDetailRepository.receiptsForZohoSync()) {
+    if (!inScope(onlyOrderId, lc.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     if (lc.lc_zoho_synced_at === null && startDate !== null && String(lc.lc_received_at) < startDate) {
       continue; // before the go-live date: the CA books it as the opening position
     }
@@ -302,7 +314,7 @@ async function markSynced(orderId, leg, zohoReference) {
  *
  * @return {Promise<{bills: number, payments: number, applied: number, expenses: number, failed: number, skipped: number}>}
  */
-async function syncPurchases(triggeredBy, triggeredByUserId) {
+async function syncPurchases(triggeredBy, triggeredByUserId, onlyOrderId = null) {
   const result = { bills: 0, payments: 0, applied: 0, expenses: 0, failed: 0, skipped: 0 };
   if (!(await zohoBooksService.isEnabled())) {
     await zohoSyncLogRepository.log('vendor_bill', null, null, null, 'skipped', null, `${offReason()} — no bills, vendor payments or expenses sent.`, triggeredBy, triggeredByUserId);
@@ -318,11 +330,12 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
   const log = (type, orderId, leg, status, reference, message) => zohoSyncLogRepository.log(type, 'order', orderId, leg, status, reference, message, triggeredBy, triggeredByUserId);
   const money = (n) => Number(n).toFixed(2);
   // Owner decision 2026-10-29: put back what was deleted or changed in Books.
-  for (const [key, count] of Object.entries(await zohoRestoreService.purchases(startDate, triggeredBy, triggeredByUserId))) {
+  for (const [key, count] of Object.entries(onlyOrderId === null ? await zohoRestoreService.purchases(startDate, triggeredBy, triggeredByUserId) : {})) {
     result[key] += count;
   }
 
   for (const bill of await zohoPurchaseRepository.billsToSync(startDate)) {
+    if (!inScope(onlyOrderId, bill.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     try {
       const zohoBillId = await zohoBooksService.pushBill(bill);
       await zohoPurchaseRepository.setBillSynced(bill.id, zohoBillId);
@@ -335,6 +348,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
   }
 
   for (const { payment, bill } of await zohoPurchaseRepository.paymentsToSync(startDate)) {
+    if (!inScope(onlyOrderId, bill.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     const target = await zohoPurchaseRepository.targetBillFor((await zohoPurchaseRepository.findBill(bill.id)) || bill);
     try {
       const pushed = await zohoBooksService.pushVendorPayment(payment, bill, target);
@@ -352,6 +366,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
   }
 
   for (const { payment, bill } of await zohoPurchaseRepository.heldPayments()) {
+    if (!inScope(onlyOrderId, bill.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     const target = await zohoPurchaseRepository.targetBillFor(bill);
     if (!target) continue; // its tax invoice is not in Books yet — nothing to do
     try {
@@ -366,6 +381,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
   }
 
   for (const expense of await zohoPurchaseRepository.expensesToSync(startDate)) {
+    if (!inScope(onlyOrderId, expense.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     try {
       const zohoExpenseId = await zohoBooksService.pushExpense(expense);
       await zohoPurchaseRepository.setExpenseSynced(expense.id, zohoExpenseId);
@@ -381,6 +397,7 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
   // expenses — sent once, and updated when the amount, date or "paid from"
   // changes afterwards. Counted with the expenses.
   for (const cost of await zohoPurchaseRepository.costEntriesToSync(startDate)) {
+    if (!inScope(onlyOrderId, cost.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     const hash = crypto.createHash('sha256').update(JSON.stringify([cost.category, Math.round(Number(cost.amount_inr) * 100) / 100, String(cost.cost_date), cost.paid_from, cost.description])).digest('hex');
     if (cost.zoho_expense_id !== null && cost.zoho_pushed_hash === hash) {
       continue;
@@ -394,7 +411,16 @@ async function syncPurchases(triggeredBy, triggeredByUserId) {
       try {
         const zohoBillId = await zohoBooksService.pushAssociateCommission(cost);
         await zohoPurchaseRepository.setCostEntrySynced(cost.id, zohoBillId, hash);
-        await log('order_cost', cost.order_id, 'cost', 'success', zohoBillId, `Sent the associate commission (INR ${money(cost.amount_inr)}) as the associate's Zoho Books bill with its vendor payment.`);
+        let tdsNote = '';
+        try {
+          const c = await zohoBooksService.associateCommission(cost);
+          if (c.tds_inr > 0) {
+            tdsNote = c.tds_tax_id !== null
+              ? ` TDS INR ${Number(c.tds_inr).toFixed(2)} booked on the bill with Zoho TDS tax ${c.tds_tax_id}.`
+              : ` TDS INR ${Number(c.tds_inr).toFixed(2)} left on the bill for the CA to book (no Zoho TDS tax set in Settings → Associate TDS).`;
+          }
+        } catch (e) { /* the note is informational only */ }
+        await log('order_cost', cost.order_id, 'cost', 'success', zohoBillId, `Sent the associate commission (INR ${money(cost.amount_inr)}) as the associate's Zoho Books bill with its vendor payment.${tdsNote}`);
         result.bills += 1;
       } catch (e) {
         await log('order_cost', cost.order_id, 'cost', 'error', null, e.message);
@@ -553,7 +579,7 @@ function offReason() {
  * when the receipt is corrected, removed from Books when the receipt is
  * cleared. Each logged on its own.
  */
-async function syncBenefits(triggeredBy, triggeredByUserId) {
+async function syncBenefits(triggeredBy, triggeredByUserId, onlyOrderId = null) {
   const result = { journals: 0, removed: 0, failed: 0, skipped: 0 };
   if (!(await zohoBooksService.isEnabled())) {
     await zohoSyncLogRepository.log('export_benefit', null, null, null, 'skipped', null, `${offReason()} — nothing synced.`, triggeredBy, triggeredByUserId);
@@ -567,8 +593,11 @@ async function syncBenefits(triggeredBy, triggeredByUserId) {
     return result;
   }
   // Owner decision 2026-10-29: put back what was deleted or changed in Books.
-  result.failed += (await zohoRestoreService.benefits(startDate, triggeredBy, triggeredByUserId)).failed;
+  if (onlyOrderId === null) {
+    result.failed += (await zohoRestoreService.benefits(startDate, triggeredBy, triggeredByUserId)).failed;
+  }
   for (const benefit of await caExportBenefitRepository.forZohoSync(startDate)) {
+    if (!inScope(onlyOrderId, benefit.order_id)) continue; // Owner 2 Nov 2026: "Sync this order" — other orders wait for the full sync
     const id = Number(benefit.id);
     const orderId = benefit.order_id !== null ? Number(benefit.order_id) : null;
     const journalId = benefit.zoho_journal_id !== null ? String(benefit.zoho_journal_id) : null;
@@ -640,4 +669,28 @@ async function syncGstRefunds(triggeredBy, triggeredByUserId) {
   return result;
 }
 
-module.exports = { runFullSync, syncPendingRevenue, syncPurchases, importPendingExpenses, syncBenefits, syncGstRefunds };
+/**
+ * Owner 2 Nov 2026 (point 16): "Sync this order to Zoho now" on the order page.
+ * Same pushes and duplicate guards as runFullSync(), limited to one order's
+ * records. The app-wide repairs, the expense import from Books and the GST
+ * refund journals (per claim, not per order) wait for the full sync.
+ */
+function inScope(onlyOrderId, orderId) {
+  return onlyOrderId === null || (orderId !== null && orderId !== undefined && Number(orderId) === Number(onlyOrderId));
+}
+
+async function runForOrder(orderId, triggeredByUserId) {
+  const since = await zohoSyncFailureNotifier.mark();
+  const result = {
+    revenue: await syncPendingRevenue('manual', triggeredByUserId, orderId),
+    purchases: await syncPurchases('manual', triggeredByUserId, orderId),
+    expenses: { imported: 0, updated: 0, removed: 0, failed: 0, skipped: 0 },
+    benefits: await syncBenefits('manual', triggeredByUserId, orderId),
+    gst_refunds: { journals: 0, failed: 0, skipped: 0 },
+  };
+  // Owner decision 2 Nov 2026 (D-233): failures reach Finance once per run.
+  await zohoSyncFailureNotifier.afterRun(since, 'manual', Number(orderId));
+  return result;
+}
+
+module.exports = { runFullSync, runForOrder, syncPendingRevenue, syncPurchases, importPendingExpenses, syncBenefits, syncGstRefunds };

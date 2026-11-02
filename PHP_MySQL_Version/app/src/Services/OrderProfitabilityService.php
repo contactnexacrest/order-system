@@ -70,6 +70,13 @@ final class OrderProfitabilityService
 
         [$revenueInr, $isEstimated] = self::revenueInInr($fobValue, $payment);
         $revenueInr += (float) ($payment['lc_extra_inr'] ?? 0.0);
+        // Owner 2 Nov 2026: where the rupees actually credited are used, the bank charges the banks
+        // deducted are added back — the buyer paid them; they are counted once, as the order cost.
+        foreach (['advance', 'balance', 'freight'] as $__leg) {
+            if ($payment !== null && ($payment[$__leg . '_inr_actual'] ?? null) !== null) {
+                $revenueInr += RemittanceDifference::chargesInr($orderId, $__leg);
+            }
+        }
 
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
         $supplierCostInr = ($supplierPo !== null && $supplierPo['total_payable_inr'] !== null) ? (float) $supplierPo['total_payable_inr'] : 0.0;

@@ -1337,13 +1337,15 @@ async function pushAssociateCommission(cost) {
         rate: c.gross_inr,
         quantity: 1,
       }],
+      ...(c.tds_tax_id !== null ? { tds_tax_id: c.tds_tax_id } : {}),
     }, authHeaders(accessToken));
     bill = await findBill(config, accessToken, c.bill_no, vendorId);
     if (!bill) {
       throw new Error(`Zoho Books bill for the associate commission on order ${cost.buyer_inquiry_ref} failed (HTTP ${res.status}): ${String(res.body).slice(0, 500)}`);
     }
   }
-  if (c.paid_inr > 0 && Number(bill.balance ?? c.gross_inr) >= c.gross_inr - 0.005) {
+  const openBalance = c.tds_tax_id !== null ? c.paid_inr : c.gross_inr;
+  if (c.paid_inr > 0 && Number(bill.balance ?? openBalance) >= openBalance - 0.005) {
     const res = await request('POST', `https://${config.apiDomain}/books/v3/vendorpayments?organization_id=${encodeURIComponent(config.organizationId)}`, {
       vendor_id: vendorId,
       amount: c.paid_inr,
@@ -1394,6 +1396,12 @@ async function associateCommission(cost) {
   const refs = [...new Set(payouts.map((p) => String(p.paid_reference || '')).filter((r) => r !== ''))];
   const paidOn = payouts.map((p) => String(p.paid_on).slice(0, 10)).sort().pop();
   const billNo = invoices.length ? invoices.join('/').slice(0, 50) : `COMM-${cost.buyer_inquiry_ref}-${payouts[0].id}`;
+  // Owner decision 2 Nov 2026 (D-235): the rate and section the app worked out for the TDS.
+  const associateTds = require('./associateTds');
+  const tdsSettings = await associateTds.settings();
+  const taxed = payouts.find((p) => Number(p.tds_inr || 0) > 0);
+  const tdsRate = taxed && taxed.tds_rate !== null && taxed.tds_rate !== undefined ? Number(taxed.tds_rate) : null;
+  const tdsSection = taxed ? (taxed.tds_section || null) : null;
   const rate = inc.associate_rate_pct !== null && inc.associate_rate_pct !== undefined
     ? `${Number(inc.associate_rate_pct).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : '';
   const what = `Associate commission — ${a.name} — for order ${cost.buyer_inquiry_ref} (${cost.buyer_name})`
@@ -1407,12 +1415,17 @@ async function associateCommission(cost) {
     tds_inr: tds,
     reference: refs.join(', '),
     bill_description: what + (invoices.length ? ` · associate invoice ${invoices.join(', ')}` : ' · no associate invoice on file') + (tds > 0 ? ` · TDS ${tds.toFixed(2)} deducted` : ''),
-    payment_description: `Associate commission payment — ${a.name} — for order ${cost.buyer_inquiry_ref} · against bill ${billNo}`
-      + (tds > 0 ? ` · TDS ${tds.toFixed(2)} deducted` : '') + (refs.length ? ` · bank ref ${refs.join(', ')}` : ''),
+    payment_description: `${associateTds.paymentDescription(a.name, [String(cost.buyer_inquiry_ref)], round(paid + tds, 2), tds, tdsRate, tdsSection, paid, refs.join(', '), tdsSettings.section)} · against bill ${billNo}`,
+    // With a Zoho TDS tax set in Settings the bill carries the TDS (Zoho's TDS feature) and its balance is the net; otherwise the
+    // bill is the gross, the payment the net, and the TDS is left on the bill for the CA to book.
+    tds_tax_id: tds > 0 && tdsSettings.zoho_tax_id !== '' ? tdsSettings.zoho_tax_id : null,
+    tds_left_for_ca: tds > 0 && tdsSettings.zoho_tax_id === '',
   };
 }
 
 module.exports = {
+  // Owner 2 Nov 2026: exported for the bank-charges payload test (remittanceDifference.test.js).
+  paymentPayload,
   BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS, COST_ACCOUNTS, BENEFIT_INCOME_ACCOUNT, BENEFIT_SCRIP_ACCOUNT, GST_REFUND_ACCOUNT, pushGstRefundJournal,
   isEnabled, syncStartDate, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense,
   pushCostEntry, pushAssociateCommission, associateCommission, pushBenefitJournal, listTestJournals, contactRecords, readRecord, totalsById, invoiceByNumber,

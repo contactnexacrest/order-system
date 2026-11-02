@@ -18,8 +18,9 @@ feature is built and verified in both before being considered done.
 
 Three separate sign-ins, never mixed:
 
-- **Staff** (`/login`) — departments, roles and permissions decide what each
-  person sees and does (SOP chapter 21).
+- **Staff** (`/login`) — departments (Management, Sales & Export, Procurement,
+  Logistics, Accounts & Finance, Export Compliance, Audit, Admin), roles and
+  permissions decide what each person sees and does (SOP chapters 21, 25).
 - **Buyers** (`/client`) — the client portal: their own orders, documents,
   payments and feedback (SOP chapter 12).
 - **Associates** (`/associate`) — outside agents who introduce buyers: their
@@ -60,3 +61,9 @@ Where to look:
   Zoho change log).
 - **Reference documents and spec:** `reference_templates/` (not read by the
   app at runtime).
+- **Guides to print or share:** `docs/guides/` (also in `docs/SOP/guides/`
+  and the in-app Reference Library) — the *Supplier & Logistics Payments
+  Guide* (PDF + Word): supplier and logistics partner advance and balance
+  payments, step by step with screenshots.
+- **Who sees which money:** SOP chapter 21; the automatic proof that no
+  amount reaches a role that may not see it is `e2e/tests/12-money-matrix.spec.js`.

@@ -106,6 +106,16 @@ two-step pattern as the advance payment in Stage 3:
    reference** (SWIFT / UTR; rule D-212) once the buyer's
    payment notification comes in, exactly as for the advance. Does not
    pass the gate yet:
+   When the amount differs from what is still due, choose a reason under
+   **"Why is it different?"** from the drop-down Admin keeps (or "Other —
+   type the reason") — each reason is treated as bank charges deducted by
+   the banks (counted as received in full; the charges become an order
+   cost and go to Zoho Books with the payment at the next sync), buyer paid less, or buyer
+   paid more — exactly as for the advance (Stage 3 SOP, Step 5d).
+   The optional **Our bank's charges on this credit** field (our own bank's
+   inward-remittance fee in rupees, incl. GST) is booked at once as an
+   order cost "Bank Charges" — not sent to Zoho Books (the CA books bank
+   charges from the bank statement).
 
    ![Stage 6 section — freight recorded, awaiting clearance](./images/s6_recorded_awaiting_clear.png)
 
@@ -121,10 +131,22 @@ two-step pattern as the advance payment in Stage 3:
 The **Logistics Partner Bills & Payments** card (in section C, alongside
 Steps 9–11 — it never locks them) records what NexaCrest pays its own
 logistics partners, as opposed to the freight the buyer pays NexaCrest.
-It is shown to staff with the **Manage supplier payments** or **Order
-Financials** permission; bills are added and paid by **Manage supplier
-payments** holders (Admin, MD, ED and Accounts Executive by default).
-CHA/logistics payments are made in India.
+It is shown to staff who may see logistics costs (**See logistics costs**)
+or hold **Manage supplier payments** / **Order Financials**.
+
+**Who does what (owner decision, 2 Nov 2026 — maker / checker):**
+
+| | Logistics Executive / Manager / Director | Accounts / Finance / management |
+|---|---|---|
+| Add a bill (CHA, transport, forwarder — number, date, taxable, GST, the scan, proforma / tax invoice) | ✅ (**Add logistics partner bills**) | ✅ |
+| Remove a bill that has no payment on it | ✅ | ✅ |
+| See every bill and its status (paid / due / not a cost yet) | ✅ | ✅ |
+| **Record the payment** (amount paid, UTR) | ❌ — the row says *"Accounts records the payment."* | ✅ (**Manage supplier payments**) |
+
+Logistics gets the partner's bill first, so Logistics enters it; the person
+who books a bill is not the one who pays it. Supplier (quarry / factory)
+bills stay with Procurement and Finance as before. CHA/logistics payments
+are made in India.
 
 **+ Add a bill** — one row per bill from the partner (a partner doing both
 CHA and transport can send one combined bill or separate bills):
@@ -207,3 +229,5 @@ received so far · still owed**. A payment cannot be cleared while money is
 still owed, except by a manager with **Approve short payment**, who writes
 the reason; the shortfall is then recorded as written off and shown on the
 order. See chapter 03, "Paid in parts", for the details.
+
+To print or share it, the full **Supplier & Logistics Payments Guide** ([PDF](./guides/Supplier_and_Logistics_Payments_Guide.pdf) · [Word](./guides/Supplier_and_Logistics_Payments_Guide.docx)) is also in the app's Reference Library.

@@ -292,6 +292,14 @@ async function deleteBill(req, res) {
     return;
   }
   const anchor = bill.vendor_kind === 'supplier' ? (ANCHORS[bill.bill_for] || ANCHORS.advance) : ANCHORS.logistics;
+  // Owner decision (2 Nov 2026): a supplier bill stays with manage_supplier_payments;
+  // a logistics partner bill may also be removed by whoever may add one (manage_logistics_bills).
+  const needed = bill.vendor_kind === 'supplier' ? 'manage_supplier_payments' : 'manage_logistics_bills';
+  if (!(req.permissions || {})[needed]) {
+    await auditLogRepository.log(req.user.id, 'PERMISSION_DENIED', 'permissions', null, needed);
+    res.status(403).send('You do not have permission to remove this bill.');
+    return;
+  }
   if (!(await orderVendorBillRepository.deleteUnpaid(bill.id))) {
     back(req, res, orderId, anchor, 'error', 'A bill with a payment on it stays on record and cannot be removed.');
     return;

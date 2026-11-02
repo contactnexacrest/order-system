@@ -1,0 +1,2 @@
+{# Expects __st (one of agreementRepository.STATUSES) and agreementStatuses. #}
+{% set __cls = {'expiring': 'badge-warning', 'active': 'badge-success', 'no_expiry': 'badge-active', 'expired': 'badge-danger', 'terminated': 'badge-inactive', 'renewed': 'badge-inactive'}[__st] or '' %}<span class="badge {{ __cls }}">{{ agreementStatuses[__st] or __st }}</span>

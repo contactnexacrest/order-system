@@ -4,6 +4,9 @@
   <form method="post" action="/orders">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
+    {% if ecgcNew and ecgcNew.limit !== null and ecgcNew.over_limit %}
+      <p class="review-banner warn" id="ecgc-new-order-warning">&#9888; {% if sees.selling %}{{ ecgcNew.warning }}{% else %}This buyer's open orders are already above (or outside) the ECGC-approved credit limit — check with Finance.{% endif %} You can still create the order.</p>
+    {% endif %}
     <fieldset>
       <legend>Client</legend>
       <label>Client *

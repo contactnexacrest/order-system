@@ -36,7 +36,12 @@ sequence, 2026-10-26) — each sub-step opens once the one before it is
 done:
 
 - **13a · Generate COO Prep Sheet** (internal worksheet for the
-  Certificate of Origin).
+  Certificate of Origin). Owner decision 2 Nov 2026: it can be generated
+  as soon as the BL is issued (Stage 8 open), **before the balance is
+  cleared**, so the Certificate of Origin application is ready the moment
+  the payment clears. The card then says "Prepared early"; nothing goes to
+  the buyer from it, and the original documents still go only after the
+  balance clears.
 - **13b · Record Original BLs Received from CHA** — how many original
   Bill of Lading copies came back from the Customs House Agent: a whole
   number from 1 to 10 (usually 3). A blank, 0, negative or larger number
@@ -69,6 +74,8 @@ done:
   tick only once this is done. A user with "Override locked data" can
   still force it through from 13g with a reason (a benefit genuinely never
   arriving).
+  A payment still without a FIRC / eBRC reference shows as a warning on 13h
+  and on Reports → Missing eBRC / FIRC — it never blocks the close (2 Nov 2026).
 
 ![Stage 9 section — originals received and endorsed](./images/s9_originals_endorsed.png)
 

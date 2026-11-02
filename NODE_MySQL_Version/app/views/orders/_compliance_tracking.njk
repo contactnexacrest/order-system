@@ -1,0 +1,66 @@
+{#
+  Port of _compliance_tracking.php. Owner decision (2 Nov 2026, gap-list Q-6):
+  ECGC cover (the buyer's ECGC-approved limit against open orders, and this
+  shipment's monthly declaration) and incentive claim tracking (sanctioned
+  amount, deadline, status). Shown to Export Compliance, Finance and management.
+#}
+{% set ct = complianceTracking %}
+{% set ctMoney = sees.selling %}
+{% if ct and ct.ecgcSee and (ct.ecgc.policy_no != '' or ct.ecgc.limit !== null) %}
+<details class="step-card" id="ecgc-cover"{% if ct.ecgc.warning or ct.decl.state in ['due', 'overdue'] %} open{% endif %}>
+  <summary><h2>ECGC cover</h2><span class="fin-sub-summary">{% if ct.ecgc.warning %}<span class="phase-pill warn">limit warning</span> {% endif %}{% if ct.decl.state == 'declared' %}declared{% elif ct.decl.state == 'overdue' %}<span class="phase-pill warn">declaration overdue</span>{% elif ct.decl.state == 'due' %}declaration due {{ ct.decl.due }}{% else %}declare after the BL{% endif %}</span></summary>
+  <p class="muted small">ECGC policy {{ ct.ecgc.policy_no if ct.ecgc.policy_no != '' else 'not set (Admin → Company Settings)' }}{% if ct.ecgc.cover_pct != '' %} · cover {{ ct.ecgc.cover_pct }}%{% endif %}.
+    Buyer limit: {% if ct.ecgc.limit === null %}not recorded — <a href="/clients/{{ order.client_id }}#ecgc">record it on the buyer's page</a>{% else %}{% if ctMoney %}{{ ct.ecgc.currency }} {{ ct.ecgc.limit | money }}{% else %}recorded{% endif %}{% if ct.ecgc.valid_to %} (valid until {{ ct.ecgc.valid_to }}){% endif %}{% if ctMoney %} · open orders {% for c, a in ct.ecgc.exposure %}{{ c }} {{ a | money }} {% endfor %}{% endif %}{% endif %}.</p>
+  {% if ct.ecgc.warning %}
+    <p class="review-banner warn">&#9888; {% if ctMoney %}{{ ct.ecgc.warning }}{% else %}This buyer's open orders are above (or outside) the ECGC-approved credit limit — check with Finance.{% endif %}</p>
+  {% endif %}
+  <p class="{{ 'review-banner warn' if ct.decl.state == 'overdue' else 'muted small' }}">{% if ct.decl.state == 'overdue' %}&#9888; {% endif %}{{ ct.decl.text }}</p>
+  {% if ct.ecgcEdit and ct.decl.state != 'declared' and ct.decl.state != 'not_due' %}
+    <form method="post" action="/orders/{{ order.id }}/ecgc-declaration" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Declared to ECGC on *<input type="date" name="ecgc_declared_on" required max="{{ ct.today }}" value="{{ ct.today }}"></label>
+      <label>Declaration reference *<input type="text" name="ecgc_declaration_ref" required minlength="3" maxlength="100" placeholder="e.g. ECGC/DECL/2026-11/0042"></label>
+      <div><button type="submit" class="btn-sm">Record declaration</button></div>
+    </form>
+  {% endif %}
+</details>
+{% endif %}
+{% set ctClaimsVisible = ct and ct.claimsSee and order.status in ['shipped_docs_sent', 'complete'] and payment and payment.balance_remittance_received_at %}
+{% if ctClaimsVisible and ct.claims.length %}
+<details class="step-card" id="benefit-claim-tracking" open>
+  <summary><h2>Incentive claims &mdash; tracking</h2><span class="fin-sub-summary">{{ ct.claims.length }} claim(s)</span></summary>
+  <p class="muted small">Claimed, sanctioned and received side by side, with the deadline to complete each claim. A default deadline comes from Admin → Company Settings (per scheme, counted from the shipping bill date — to be confirmed with the CA); change it here when the scheme says otherwise. Reminders go out 30 and 7 days before.</p>
+  <table class="list">
+    <tr><th>Scheme</th><th>Claimed (&#8377;)</th><th>Sanctioned (&#8377;)</th><th>Received (&#8377;)</th><th>Deadline</th><th>Status</th></tr>
+    {% for b in ct.claims %}
+    <tr>
+      <td><strong>{{ b.scheme_name }}</strong><br><span class="muted small">{{ b.reference_number or 'no ref.' }}</span></td>
+      <td>{{ b.claimed_amount | money }}<br><span class="muted small">on {{ b.claimed_at }}</span></td>
+      <td>{% if b.sanctioned_amount !== null %}{{ b.sanctioned_amount | money }}<br><span class="muted small">on {{ b.sanctioned_at or '—' }}</span>{% else %}—{% endif %}</td>
+      <td>{% if b.received_amount !== null %}{{ b.received_amount | money }}{% else %}—{% endif %}</td>
+      <td>{% if b.effective_deadline !== null %}{{ b.effective_deadline }}{% if b.deadline_is_default %} <span class="muted small">(default)</span>{% endif %}{% if b.effective_status != 'received' and b.effective_status != 'rejected' and b.days_left !== null %}<br><span class="{{ 'phase-pill warn' if b.days_left <= 30 else 'muted small' }}">{% if b.days_left < 0 %}passed{% else %}{{ b.days_left }} day(s) left{% endif %}</span>{% endif %}{% else %}<span class="muted">no deadline</span>{% endif %}</td>
+      <td><span class="badge{% if b.effective_status == 'received' %} good{% elif b.effective_status == 'rejected' %} danger{% endif %}">{{ b.status_label }}</span>{% if b.effective_status == 'rejected' and b.rejected_reason %}<br><span class="muted small">{{ b.rejected_reason }}</span>{% endif %}</td>
+    </tr>
+    {% if b.effective_status != 'received' or b.sanctioned_amount === null %}
+    <tr><td colspan="6">
+      <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/tracking" class="field-grid">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Status *
+          <select name="claim_status" required>
+            {% for k, l in {'filed': 'Filed', 'sanctioned': 'Sanctioned', 'rejected': 'Rejected'} %}
+              <option value="{{ k }}"{% if b.effective_status == k or (b.effective_status == 'received' and k == 'sanctioned') %} selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Sanctioned amount (&#8377;)<input type="number" step="0.01" min="0" name="sanctioned_amount" value="{{ b.sanctioned_amount if b.sanctioned_amount !== null else '' }}" placeholder="e.g. 24500.00"></label>
+        <label>Sanctioned on<input type="date" name="sanctioned_at" value="{{ b.sanctioned_at or '' }}"></label>
+        <label>Claim deadline<input type="date" name="claim_deadline" value="{{ b.claim_deadline or '' }}"></label>
+        <label>Reason if rejected<input type="text" name="rejected_reason" maxlength="500" placeholder="e.g. Shipping bill not transmitted to DGFT"></label>
+        <div><button type="submit" class="btn-sm">Save claim tracking</button></div>
+      </form>
+    </td></tr>
+    {% endif %}
+    {% endfor %}
+  </table>
+</details>
+{% endif %}

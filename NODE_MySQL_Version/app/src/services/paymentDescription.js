@@ -115,6 +115,11 @@ async function buyerPayment(orderId, leg, invoiceNumber = null) {
       const r = ops[`${leg}_exchange_rate`];
       parts.push(`${currency} ${money(ops[`${leg}_amount`])}${r !== null && r !== undefined ? ` at ₹${rate(r)}` : ''}`);
     }
+    // Owner 2 Nov 2026: charges the banks deducted on the way (an order cost; the leg counts as paid in full).
+    const charges = await require('./remittanceDifference').chargesInr(orderId, leg);
+    if (charges > 0) {
+      parts.push(`₹${money(charges)} bank charges deducted by the banks`);
+    }
     bankRef = ops[`${leg}_bank_reference`];
   }
   const what = await against(orderId, leg, invoiceNumber);
@@ -141,6 +146,10 @@ async function milestonePayment(milestone, invoiceNumber = null) {
     + `${order.company_legal_name || 'the buyer'} for order ${order.buyer_inquiry_ref || order.order_reference || `#${orderId}`}`];
   if (milestone.received_amount !== null && milestone.received_amount !== undefined) {
     parts.push(`${currency} ${money(milestone.received_amount)}${milestone.exchange_rate !== null && milestone.exchange_rate !== undefined ? ` at ₹${rate(milestone.exchange_rate)}` : ''}`);
+    const charges = milestone.id ? await require('./remittanceDifference').chargesInr(Number(milestone.order_id), 'milestone', Number(milestone.id)) : 0;
+    if (charges > 0) {
+      parts.push(`₹${money(charges)} bank charges deducted by the banks`);
+    }
   }
   if (invoiceNumber !== null && invoiceNumber !== undefined && invoiceNumber !== '') {
     parts.push(`against Commercial Invoice ${invoiceNumber}`);

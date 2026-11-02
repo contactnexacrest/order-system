@@ -203,7 +203,9 @@ async function onPayoutPaid(payoutId, userId) {
   if (a) {
     const fmt = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     await notify(a, 'payout_paid', `Commission paid for order ${order ? order.order_reference : p.order_id}: INR ${fmt(p.paid_inr)}`
-      + (Number(p.tds_inr || 0) > 0 ? ` (TDS deducted INR ${fmt(p.tds_inr)})` : '')
+      // Owner decision 2 Nov 2026 (D-235): gross, TDS (section and rate) and net.
+      + (Number(p.tds_inr || 0) > 0 ? ` (gross INR ${fmt(Number(p.paid_inr) + Number(p.tds_inr))}, TDS deducted INR ${fmt(p.tds_inr)}`
+        + (p.tds_section ? ` u/s ${p.tds_section}` : '') + (Number(p.tds_rate || 0) > 0 ? ` at ${require('./associateTds').pct(Number(p.tds_rate))}` : '') + ')' : '')
       + ` on ${dates.short(String(p.paid_on))}${p.paid_reference ? `, bank reference ${p.paid_reference}` : ''}.`, null, Number(p.order_id), null, userId);
   }
 }

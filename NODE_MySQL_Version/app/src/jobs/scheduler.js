@@ -6,6 +6,7 @@ const dispatchDeferredEmails = require('./dispatchDeferredEmails');
 const autoConfirmOcAcknowledgments = require('./autoConfirmOcAcknowledgments');
 const zohoSync = require('./zohoSync');
 const dailyDigest = require('./dailyDigest');
+const documentCopyCleanup = require('./documentCopyCleanup');
 const logger = require('../helpers/logger');
 
 /**
@@ -86,7 +87,15 @@ function start() {
     })
   );
 
-  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 02:00, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min, zohoSync hourly, dailyDigest daily @ 08:15 incl. associate reminders).');
+  // Daily at 02:15 IST — owner points 5/8/9 (2 Nov 2026): Document copies clean-up.
+  // Removes nothing while every rule in Admin → Settings → Document copies clean-up is off (the default).
+  tasks.push(
+    cron.schedule('15 2 * * *', () => {
+      documentCopyCleanup.run().catch((e) => logger.error('scheduler:documentCopyCleanup', e));
+    }, { timezone: 'Asia/Kolkata' })
+  );
+
+  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 02:00, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min, zohoSync hourly, dailyDigest daily @ 08:15 incl. associate reminders, documentCopyCleanup daily @ 02:15).');
   return tasks;
 }
 

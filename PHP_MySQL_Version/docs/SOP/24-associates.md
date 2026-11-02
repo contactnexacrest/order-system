@@ -194,10 +194,55 @@ change it.
 On **Incentive Payouts** (chapter 20), an associate's line can be paid only
 into a **verified bank account past its waiting days**; otherwise it is
 refused ("This associate has no verified bank account usable on …") and
-**Mark all paid** skips it and says how many were skipped. Record the amount
-paid, the TDS (India: 194H; abroad: Form 15CA/CB — upload them under
-Documents), "bank transfer" and the **UTR**. The associate is e-mailed the
-amount, TDS and bank reference.
+**Mark all paid** skips it and says how many were skipped. Record the date,
+"bank transfer" and the **UTR**; the app fills in the TDS and the net amount
+(below). The associate is e-mailed the gross, the TDS (section and rate) and
+the net paid, with the bank reference.
+
+### TDS on associate commission (owner decision 2 Nov 2026, D-235)
+
+The app works out the TDS on each associate payment, so Accounts never has
+to guess. Every value is in **Settings → Associate TDS** (Manage company
+settings; every change needs a reason and is audited) and can be changed on
+the CA's advice — payments already recorded keep the TDS they were paid with.
+
+- **Associates in India — section 194H, 2 %.** No TDS while the associate's
+  commission in the financial year (1 April – 31 March) stays within the
+  threshold (₹20,000). The payment that takes the year past it carries TDS
+  on itself **and** on the commission paid earlier that year without TDS
+  (the *catch-up*); every later payment that year carries TDS on its full
+  amount. A new financial year starts again below the threshold.
+  *Example:* ₹12,000 paid in October (no TDS — "below threshold — FY
+  2026-27 total ₹12,000.00 of ₹20,000.00"); ₹10,000 due in November → TDS
+  2 % of (10,000 + 12,000) = ₹440, net paid ₹9,560 ("194H 2% — includes
+  catch-up on ₹12,000.00 paid earlier this FY 2026-27 without TDS");
+  ₹5,000 in December → TDS ₹100, net ₹4,900.
+- **No PAN, or the PAN card not accepted on the Documents tab → 20 %
+  (section 206AA).** TDS is rounded to the nearest rupee.
+- **Associates abroad — no TDS** (setting "Deduct TDS for associates abroad"
+  off), but only once the **Tax Residency Certificate, Form 10F and the
+  no-PE declaration** are on file and **accepted** on the associate's
+  Documents tab. Each payment also needs its **Form 15CA** (and **15CB**,
+  setting on by default) — attach them in the payment row itself. Without
+  them the payment is refused with the list of what is missing, and **Mark
+  all paid** skips it.
+- **The payment row** shows "Gross ₹… · TDS ₹… (reason) · Net to pay ₹…",
+  with the net amount and the TDS filled in. To record a different TDS (e.g.
+  a lower-deduction certificate u/s 197 or the CA's advice) give the reason
+  (10+ characters); it is kept on the payment ("changed by hand: … (worked
+  out: …)") and audited (ASSOCIATE_TDS_OVERRIDDEN). Paid + TDS can never be
+  more than the commission.
+- **The order's cost** is the gross commission (TDS included).
+- **Deposit and returns.** Deposit each month's TDS by the **7th of the next
+  month** (challan 281) and enter the challan no. and date in **Associates →
+  TDS register** (`/associates/tds`, by financial-year quarter, CSV). File
+  **Form 26Q** after each quarter (by 31 Jul, 31 Oct, 31 Jan, 31 May) and
+  upload each associate's **Form 16A** on their Documents tab — they see it
+  in the portal under "TDS certificates (Form 16A) and remittance forms".
+  The daily alert job reminds holders of *Pay incentives* on the 1st–7th
+  (TDS not yet deposited) and from the 20th of the 26Q month.
+- The register is open to holders of Manage incentives, Pay incentives or
+  the CA module.
 
 **Zoho Books** (owner decision AS-12): when an order's commission is fully
 paid, the next sync sends it as the **associate's own bill** (the associate
@@ -207,11 +252,17 @@ applied to it. Wording (rule D-212):
 - Bill: "Associate commission — <associate> — for order <ref> (<buyer>),
   0.7% of product FOB, client no. 1 · associate invoice <no.> · TDS 56.00
   deducted"
-- Payment: "Associate commission payment — <associate> — for order <ref> ·
-  against bill <no.> · TDS 56.00 deducted · bank ref <UTR>"
+- Payment (D-235): "Associate commission for <associate> — order <ref> —
+  gross ₹25,000.00, TDS u/s 194H ₹500.00 (2%), net paid ₹24,500.00 · UTR
+  <UTR> · against bill <no.>"
 
-The TDS deducted stays open on the bill; the CA books it against TDS
-payable. A claw-back is not sent to Zoho automatically: the CA books the
+With a **Zoho Books TDS tax id** in Settings → Associate TDS, the bill
+carries the TDS through Zoho's TDS feature and the payment is the net. Left
+blank (the default), the bill is the gross, the payment the net, and the
+TDS stays open on the bill for the CA to book against TDS payable — the
+Sync Log says so ("TDS INR … left on the bill for the CA to book"). Turning
+on TDS in Zoho Books is a change the CA makes in Zoho (and logs in the Zoho
+change log); then its tax id goes into the setting. A claw-back is not sent to Zoho automatically: the CA books the
 recovery (vendor credit) from the associate's statement.
 
 ## Bank details (two people, a wait, an e-mail)
@@ -249,7 +300,8 @@ e-mailed) · History (nobody can edit it).
 **Associates → Report** (`/reports/associates`), per financial year:
 performance per associate (clients, orders, FOB value, paid, TDS, waiting),
 commission waiting (ageing, with holds) and the **TDS register** (paid on,
-PAN, order, paid, TDS, bank reference); each as CSV.
+PAN, order, paid, TDS, bank reference); each as CSV. **By quarter, with
+challans →** opens `/associates/tds` (D-235).
 
 ## The associate portal (what the associate does)
 

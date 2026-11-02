@@ -1,0 +1,13 @@
+{#
+  Owner decision 2 Nov 2026 (D-233): "Waiting for Zoho: N" on the order page.
+  A record saved in the app goes to Zoho Books at the next sync (hourly, or
+  Sync now). Shown to ca_module_manage / ca_module_view holders while Zoho is
+  on; nothing while it is off. Expects zohoWaiting, zohoWaitingSummary, order;
+  zwLink true links to the order's Zoho check (ca_module_manage).
+#}
+{% if zohoWaiting and zohoWaiting.enabled %}
+{% set zwN = zohoWaiting.total %}
+{% set zwText = ('Waiting for Zoho: 0 — everything on this order is in Zoho Books' if zwN == 0 else 'Waiting for Zoho: ' ~ zwN) %}
+<span class="badge {{ 'badge-success' if zwN == 0 else 'badge-warning' }} zoho-waiting" data-zoho-waiting="{{ zwN }}"{% if zwN > 0 %} title="{{ zohoWaitingSummary(zohoWaiting.by_type) }} — sent at the next sync (hourly, or Sync now)."{% endif %}>{% if zwLink %}<a href="/orders/{{ order.id }}/zoho-check">{{ zwText }}</a>{% else %}{{ zwText }}{% endif %}</span>
+{% if zwN > 0 %}<span class="muted small">{{ zohoWaitingSummary(zohoWaiting.by_type) }} — sent at the next sync (hourly, or Sync now).</span>{% endif %}
+{% endif %}

@@ -265,6 +265,9 @@ async function commission(req, res) {
   const invoiceByPayout = {};
   for (const p of payouts) {
     p.month_label = incentiveService.monthLabel(String(p.incentive_month));
+    // Owner decision 2 Nov 2026 (D-235): gross / TDS (section, rate) / net.
+    p.gross_inr = Number(p.paid_inr || 0) + Number(p.tds_inr || 0);
+    p.tdsRateLabel = Number(p.tds_rate || 0) > 0 ? require('../services/associateTds').pct(Number(p.tds_rate)) : '';
     const inv = await associateDocumentRepository.invoiceForPayout(Number(p.id));
     if (inv) invoiceByPayout[p.id] = { id: Number(inv.id), reference: inv.reference };
   }

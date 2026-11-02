@@ -173,8 +173,10 @@ final class AssociateService
         $a = AssociateRepository::find((int) $p['associate_id']);
         $order = \App\Repositories\OrderRepository::find((int) $p['order_id']);
         if ($a !== null) {
+            // Owner decision 2 Nov 2026 (D-235): gross, TDS (section and rate) and net.
             self::notify($a, 'payout_paid', 'Commission paid for order ' . ($order['order_reference'] ?? $p['order_id']) . ': INR ' . number_format((float) $p['paid_inr'], 2)
-                . ((float) ($p['tds_inr'] ?? 0) > 0 ? ' (TDS deducted INR ' . number_format((float) $p['tds_inr'], 2) . ')' : '')
+                . ((float) ($p['tds_inr'] ?? 0) > 0 ? ' (gross INR ' . number_format((float) $p['paid_inr'] + (float) $p['tds_inr'], 2) . ', TDS deducted INR ' . number_format((float) $p['tds_inr'], 2)
+                    . (!empty($p['tds_section']) ? ' u/s ' . $p['tds_section'] : '') . (!empty($p['tds_rate']) ? ' at ' . AssociateTds::pct((float) $p['tds_rate']) : '') . ')' : '')
                 . ' on ' . \App\Helpers\Dates::short((string) $p['paid_on']) . (!empty($p['paid_reference']) ? ', bank reference ' . $p['paid_reference'] : '') . '.', null, (int) $p['order_id'], null, $userId);
         }
     }

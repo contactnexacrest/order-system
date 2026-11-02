@@ -173,6 +173,12 @@ function required() {
       req.settingsExpiryWarningCount = 0;
     }
 
+    // Owner decision 2 Nov 2026 (D-233): "Waiting for Zoho: N" next to Zoho Sync in the menu.
+    req.zohoWaitingMenu = null;
+    if (req.permissions.ca_module_manage && req.method === 'GET') {
+      req.zohoWaitingMenu = await require('../services/zohoPendingService').menuCount(req.session);
+    }
+
     // QA Round 5, R5-24: the archived-order and assignment rules apply to
     // every page and action of an order, not just its main page — checked
     // once here for every staff route.

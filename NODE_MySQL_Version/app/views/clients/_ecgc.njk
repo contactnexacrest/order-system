@@ -1,0 +1,34 @@
+{# Port of _ecgc.php. Owner decision (2 Nov 2026, gap-list Q-6b): the buyer's ECGC-approved credit limit. #}
+{% if ecgcCard %}
+{% set ep = ecgcCard.position %}
+{% set ecgcMoney = sees.selling %}
+  <div class="section" id="ecgc">
+    <h2>ECGC credit limit</h2>
+    <p class="muted small">ECGC policy {{ ep.policy_no if ep.policy_no != '' else 'not set (Admin → Company Settings)' }}{% if ep.cover_pct != '' %} · cover {{ ep.cover_pct }}%{% endif %}. Shipments to this buyer are covered up to the limit ECGC approved; the open orders below count against it.</p>
+    {% if ep.limit !== null %}
+      <p>Approved limit: <strong>{% if ecgcMoney %}{{ ep.currency }} {{ ep.limit | money }}{% else %}recorded{% endif %}</strong>
+        {% if ep.approved_on %} · approved {{ ep.approved_on }}{% endif %}{% if ep.valid_to %} · valid until {{ ep.valid_to }}{% endif %}{% if ep.ref %} · ref {{ ep.ref }}{% endif %}
+        {% if ep.file_id %} · <a href="/file-store/{{ ep.file_id }}/download">approval letter</a>{% endif %}</p>
+      {% if ecgcMoney %}<p class="muted small">Open orders: {% if not (ep.exposure | dictsort | length) %}none{% else %}{% for c, a in ep.exposure %}{{ c }} {{ a | money }} {% endfor %}{% endif %} ({{ ep.open_orders }} order(s), value not yet received).</p>{% endif %}
+    {% else %}
+      <p class="muted">No ECGC limit recorded for this buyer.</p>
+    {% endif %}
+    {% if ep.warning %}
+      <p class="review-banner warn">&#9888; {% if ecgcMoney %}{{ ep.warning }}{% else %}Open orders are above (or outside) the ECGC-approved limit — check with Finance.{% endif %}</p>
+    {% endif %}
+    {% if ecgcCard.edit %}
+    <details{% if ep.limit === null %} open{% endif %}><summary>{{ 'Record the ECGC limit' if ep.limit === null else 'Change the ECGC limit' }}</summary>
+    <form method="post" action="/clients/{{ client.id }}/ecgc" enctype="multipart/form-data" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Limit approved by ECGC *<input type="number" step="0.01" min="0" name="ecgc_limit_amount" required value="{{ ep.limit if ep.limit !== null else '' }}" placeholder="e.g. 50000.00"></label>
+      <label>Currency *<input type="text" name="ecgc_limit_currency" required pattern="[A-Za-z]{3}" maxlength="3" value="{{ ep.currency or '' }}" placeholder="e.g. USD"></label>
+      <label>Approved on<input type="date" name="ecgc_limit_approved_on" value="{{ ep.approved_on or '' }}"></label>
+      <label>Valid until<input type="date" name="ecgc_limit_valid_to" value="{{ ep.valid_to or '' }}"></label>
+      <label>ECGC approval reference<input type="text" name="ecgc_limit_ref" maxlength="100" value="{{ ep.ref or '' }}" placeholder="e.g. ECGC/CL/2026/1182"></label>
+      <label>Approval letter<input type="file" name="ecgc_limit_file" accept=".pdf,.jpg,.jpeg,.png"></label>
+      <div><button type="submit" class="btn-sm">Save ECGC limit</button></div>
+    </form>
+    </details>
+    {% endif %}
+  </div>
+{% endif %}

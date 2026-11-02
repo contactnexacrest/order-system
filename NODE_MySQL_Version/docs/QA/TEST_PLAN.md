@@ -455,6 +455,26 @@ Browser suite: `e2e/tests/10-departments.spec.js` and `11-associates.spec.js`; t
 
 Browser suite: `11-associates.spec.js` now expects the personal rate carried upward ("clients 6–10: 1.25% (personal)").
 
+## 12. Added since (2 Nov 2026: documents, money safety, compliance, agreements, remittances)
+
+| Test | What it checks |
+|---|---|
+| `quotationPiLayout.test.js` | D-223: QT and PI have no untitled CoO / Port table (PDF and Word); Port of Discharge once in Shipping; the CoO line follows the selected type; the PI's Buyer's PO in Buyer Details only when entered |
+| `documentWordingD224.test.js` | D-224: OC Buyer's PO row; Debit Note full buyer block; BL Instruction section 8 without payment terms; CI wording without "IGST refund"; total invoice value in words (USD, EUR, GBP, AED, INR …) |
+| `freightCostInInr.test.js` | D-225: Step 9a freight and insurance converted at the freight receipt / freight leg / advance-balance rate; missing rate flagged, not counted; forwarder's rupee bills still replace it; CAFIN C1 wording |
+| `orderAllDocumentsPanel.test.js` | All Documents lists generated documents and uploaded files, only those the person may open (Sales, Procurement, Logistics, MD); CAFIN never for others |
+| `billPrefillAndForwarder.test.js` | Steps 7e / 10a pre-filled from the Supplier PO; Step 9a forwarder pre-selected |
+| `helpGuide.test.js` | `/help/supplier-logistics-payments` for any staff member, screenshots present and small, same text on both stacks, linked from 7e, 10a, the logistics card and Getting Started |
+| `moneyLeakClosures.test.js` | Drafts, superseded copies and older CAFIN copies carry their document's money class; CAFIN left out of the dossier for others; audit amounts masked per role; money reports refused |
+| `documentCopyCleanup.test.js` | Clean-up rules remove exactly the preview; never sent copies, current copies, open disputes or locked years; audit rows; `markSent` flags the file |
+| `orderPageOwnerPointsNov2.test.js` | No associate controls without an associate; 7c starts with the Supplier Link; COO Prep Sheet from Stage 8; per-order Zoho sync (fake Zoho) |
+| `exportCompliance.test.js` | D-226: the three roles and their permissions; compliance checklist, COO Prep Sheet, benefit claims and uploads allowed; no purchase, logistics, buyer-payment, profit, incentive or CAFIN amounts; compliance tasks in My tasks |
+| `remittanceDifference.test.js`, `remittanceDifferenceReasons.test.js` | D-227: "why is it different?" on advance, freight, balance and milestones; bank charges cost with D-212 wording and Zoho `bank_charges`; 3% cap; short / excess; Admin-managed reasons filtered by direction; "Other" needs text and treatment; treatment locked once used |
+| `agreementsRegister.test.js` | D-228: add / renew / end early; status; reminders 30 / 7 / 0 days once each; staff agreements only for `manage_agreements`; client and associate agreements listed; Kanban parity |
+| `orderLockGuardMiddleware.test.js` | Updated: `/orders/:id/zoho-sync` works on a closed order |
+
+Browser suite: `12-money-matrix.spec.js` — every role × about 75 screens, 18 files and the dossier ZIP; fails on any amount a role may not see (0 violations on both stacks, 2 Nov 2026).
+
 ## Appendix
 
 Full route-by-route and table-by-table inventory:

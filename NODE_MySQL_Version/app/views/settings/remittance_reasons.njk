@@ -1,0 +1,82 @@
+{# Owner follow-up on point 18 (2 Nov 2026): Admin → Settings → Remittance difference reasons. Port of remittance_reasons.php. #}
+<div class="card">
+  <h1>Remittance difference reasons</h1>
+  <p class="muted"><a href="/settings">&larr; Company Settings</a></p>
+  <p>When the money a buyer sends differs from what is due, the person recording it chooses a reason from this list under <strong>"Why is it different?"</strong> on the advance, freight, balance and milestone remittance forms. Each reason is treated one of three ways:</p>
+  <ul class="small">
+    <li><strong>Bank charges deducted</strong> — the payment counts as received in full; the charges become an order cost ("Bank Charges") and go to Zoho Books with the payment at the next sync (hourly, or Sync now).</li>
+    <li><strong>Buyer paid less</strong> — recorded as received; the rest is awaited, or a manager clears it short with a reason.</li>
+    <li><strong>Buyer paid more</strong> — recorded as received; on the advance the balance due goes down by the same amount.</li>
+  </ul>
+  <p class="muted small">The forms offer only the reasons that fit the amount typed (less than due → bank charges or buyer paid less; more → buyer paid more). The last option is always "Other — type the reason". Once a reason is on a receipt, how it is treated cannot change — switch it off and add a new one instead; receipts keep the reason they were saved with.</p>
+</div>
+
+<div class="card">
+  <h2>The list</h2>
+  <table class="list">
+    <tr><th>Order</th><th>Reason</th><th>Treated as</th><th>Used on</th><th>Status</th><th></th></tr>
+    {% for r in reasons %}{% set used = usage[r.id] or 0 %}{% set fid = 'rr-' ~ r.id %}
+      <tr{% if not r.is_active %} class="muted"{% endif %}>
+        <td><input form="{{ fid }}" type="number" name="sort_order" min="0" step="1" value="{{ r.sort_order }}" placeholder="e.g. 10" aria-label="Order" style="width:5em;"></td>
+        <td><input form="{{ fid }}" type="text" name="label" required minlength="3" maxlength="150" value="{{ r.label }}" placeholder="e.g. Intermediary bank charges deducted" aria-label="Reason" style="min-width:15em;"></td>
+        <td>
+          {% if used > 0 %}
+            <input form="{{ fid }}" type="hidden" name="treatment" value="{{ r.treatment }}">
+            <span class="small">{{ treatments[r.treatment] }} <small class="muted">(fixed — used)</small></span>
+          {% else %}
+            <select form="{{ fid }}" name="treatment" required aria-label="Treated as" style="min-width:12em;">
+              {% for tk, tl in treatments %}
+                <option value="{{ tk }}"{% if tk == r.treatment %} selected{% endif %}>{{ tl }}</option>
+              {% endfor %}
+            </select>
+          {% endif %}
+        </td>
+        <td class="small">{{ used }} receipt(s)</td>
+        <td class="small">{% if r.is_active %}In the list{% else %}Switched off{% endif %}</td>
+        <td style="white-space:nowrap;">
+          <form id="{{ fid }}" method="post" action="/settings/remittance-reasons/{{ r.id }}/update" style="display:inline;">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm">Save</button>
+          </form>
+          <form method="post" action="/settings/remittance-reasons/{{ r.id }}/toggle" style="display:inline;">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <button type="submit" class="btn-sm btn-secondary">{% if r.is_active %}Switch off{% else %}Switch on{% endif %}</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>Add a reason</h2>
+  <form method="post" action="/settings/remittance-reasons" class="form-grid">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label>Reason * <input type="text" name="label" required minlength="3" maxlength="150" placeholder="e.g. SWIFT charges deducted by the intermediary bank"></label>
+    <label>Treated as *
+      <select name="treatment" required>
+        <option value="">Choose…</option>
+        {% for tk, tl in treatments %}
+          <option value="{{ tk }}">{{ tl }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Order <small class="muted">(blank = at the end)</small> <input type="number" name="sort_order" min="0" step="1" placeholder="e.g. 45"></label>
+    <div><button type="submit">Add reason</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Reasons typed in by hand</h2>
+  <p class="muted small">What staff typed under "Other — type the reason", most used first. Add the frequent ones to the list above so the team can pick them.</p>
+  {% if not custom.length %}
+    <p class="muted small">None yet.</p>
+  {% else %}
+    <table class="list">
+      <tr><th>Reason typed in</th><th>Treated as</th><th>Times used</th><th>Last used</th></tr>
+      {% for c in custom %}
+        <tr><td>{{ c.reason }}</td><td>{{ treatments[c.treatment] or c.treatment }}</td><td>{{ c.uses }}</td><td>{{ c.last_used_day }}</td></tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+</div>

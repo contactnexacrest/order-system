@@ -86,6 +86,7 @@ async function editForm(req, res) {
   }
   res.renderView('logistics_partners/edit', {
     partner,
+    agreementCard: await require('./agreementController').partyCard(req, 'logistics_partner', partner.id),
     bank: vendorDetailsRepository.bankDetails(partner),
     bankAccountTypes: bankDetailsInput.ACCOUNT_TYPES,
     detailsLink: vendorDetailsService.detailsLinkUrl(partner),

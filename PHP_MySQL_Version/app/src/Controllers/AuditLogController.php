@@ -53,7 +53,8 @@ final class AuditLogController
             return;
         }
 
-        $rows = AuditLogRepository::forOrder($orderId);
+        // Owner points 6/15: values hidden unless the viewer may see that money.
+        $rows = \App\Services\AuditMoneyMask::maskAll(AuditLogRepository::forOrder($orderId));
 
         // External QA report M-03: "One-click export of an order's audit
         // log (privileged only)." Reuses the page's own existing
@@ -95,6 +96,7 @@ final class AuditLogController
             self::PAGE_SIZE,
             (self::PAGE_SIZE) * ($page - 1)
         );
+        $rows = \App\Services\AuditMoneyMask::maskAll($rows);
 
         View::render('audit_log/index', [
             'rows'        => $rows,

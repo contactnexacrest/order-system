@@ -62,7 +62,7 @@
   // Mirrors the min length enforced server-side in ReasonValidator.php.
   function initReasonFieldValidation() {
     var MIN_LENGTH = 10;
-    document.querySelectorAll('input[name*="reason" i]:not([type="hidden"]), textarea[name*="reason" i]').forEach(function (field) {
+    document.querySelectorAll('input[name*="reason" i]:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]), textarea[name*="reason" i]').forEach(function (field) {
       var container = field.closest('label') || field.parentElement;
       var alreadyHinted = container && /\b\d+\s*characters?\b/i.test(container.textContent);
       var hint = null;
@@ -158,6 +158,125 @@
       };
       select.addEventListener('change', sync);
       sync();
+    });
+  }
+
+  // Owner decision (2 Nov 2026, "18 yes"): a buyer remittance that differs
+  // from what is still due says why. Follow-up the same day: the reason comes
+  // from a list Admin keeps (each reason treated as bank charges, buyer paid
+  // less or buyer paid more), or "Other — type the reason". Only the reasons
+  // that fit the amount typed are offered (less arrived → bank charges or
+  // short; more → excess); the Reason becomes required when the difference
+  // needs one. This also fills the bank charges with the difference and
+  // spells out what will be saved, e.g. "Due 5,000.20 · Received 4,980.20 ·
+  // Difference 20.00 → recorded as bank charges ₹1,812.00 (cost) — advance
+  // counted as fully received".
+  function initRemittanceDifference() {
+    document.querySelectorAll('[data-remit-diff]').forEach(function (box) {
+      var form = box.closest('form');
+      var amountEl = form && form.querySelector('[data-remit-amount]');
+      var rateEl = form && form.querySelector('[data-remit-rate]');
+      var chargesEl = box.querySelector('[data-remit-charges]');
+      var chargesWrap = box.querySelector('[data-remit-charges-wrap]');
+      var reasonEl = box.querySelector('[data-remit-reason]');
+      var treatmentEl = box.querySelector('[data-remit-treatment]');
+      var preview = box.querySelector('[data-remit-diff-preview]');
+      if (!form || !amountEl || !preview || !reasonEl) return;
+      var noneOption = reasonEl.querySelector('option[data-none]');
+      var remaining = parseFloat(box.getAttribute('data-remaining')) || 0;
+      var due = parseFloat(box.getAttribute('data-due')) || 0;
+      var soFar = Math.round((due - remaining) * 100) / 100;
+      var maxPct = parseFloat(box.getAttribute('data-max-pct')) || 3;
+      var currency = box.getAttribute('data-currency') || '';
+      var label = box.getAttribute('data-label') || 'payment';
+      function money(n) {
+        return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      function chosenOption() {
+        return reasonEl.options[reasonEl.selectedIndex] || null;
+      }
+      function treatment() {
+        var opt = chosenOption();
+        var t = opt ? (opt.getAttribute('data-treatment') || '') : '';
+        if (t === 'other') return treatmentEl ? treatmentEl.value : '';
+        return t;
+      }
+      function allowedFor(diff) {
+        if (diff > 0.005) return { bank_charges: true, short: true };
+        if (diff < -0.005) return { excess: true };
+        return {};
+      }
+      function filterOptions(diff) {
+        var allowed = allowedFor(diff);
+        Array.prototype.forEach.call(reasonEl.querySelectorAll('optgroup[data-treatment-group]'), function (group) {
+          var ok = !!allowed[group.getAttribute('data-treatment-group')];
+          group.hidden = !ok;
+          group.style.display = ok ? '' : 'none';
+          Array.prototype.forEach.call(group.querySelectorAll('option'), function (o) { o.disabled = !ok; o.hidden = !ok; });
+        });
+        var other = reasonEl.querySelector('option[value="other"]');
+        if (other) { var anyAllowed = Object.keys(allowed).length > 0; other.disabled = !anyAllowed; other.hidden = !anyAllowed; }
+        var opt = chosenOption();
+        if (opt && opt.disabled) { reasonEl.value = ''; }
+        if (treatmentEl) {
+          Array.prototype.forEach.call(treatmentEl.options, function (o) {
+            if (!o.value) return;
+            o.disabled = !allowed[o.value];
+            o.hidden = !allowed[o.value];
+          });
+          if (treatmentEl.value && !allowed[treatmentEl.value]) treatmentEl.value = '';
+        }
+        var needs = (soFar <= 0.005 && Math.abs(diff) > Math.max(1, due * 0.01)) || diff < -0.005;
+        reasonEl.required = needs;
+        if (noneOption) {
+          noneOption.textContent = needs ? 'Choose…' : 'Amount as due — no difference';
+        }
+      }
+      function showCharges(on) {
+        if (!chargesWrap || !chargesEl) return;
+        chargesWrap.hidden = !on;
+        chargesWrap.style.display = on ? '' : 'none';
+        chargesEl.disabled = !on;
+      }
+      function update() {
+        var amount = parseFloat(amountEl.value);
+        var rate = rateEl ? parseFloat(rateEl.value) : NaN;
+        if (!(amount > 0) || !(remaining > 0)) {
+          preview.textContent = '';
+          filterOptions(0);
+          showCharges(false);
+          return;
+        }
+        var diff = Math.round((remaining - amount) * 100) / 100;
+        filterOptions(diff);
+        var t = treatment();
+        showCharges(t === 'bank_charges' && diff > 0);
+        var head = 'Due ' + currency + ' ' + money(remaining) + ' · Received ' + currency + ' ' + money(amount) + ' · Difference ' + currency + ' ' + money(Math.abs(diff));
+        if (chargesEl && t === 'bank_charges' && !chargesEl.value && diff > 0) {
+          chargesEl.value = diff.toFixed(2);
+        }
+        var tail;
+        if (Math.abs(diff) < 0.005) {
+          tail = ' → nothing different: the ' + label + ' is received in full.';
+        } else if (t === 'bank_charges') {
+          var charges = chargesEl ? parseFloat(chargesEl.value) : diff;
+          if (!(charges > 0)) charges = diff;
+          tail = ' → recorded as bank charges ' + (rate > 0 ? '₹' + money(charges * rate) : currency + ' ' + money(charges)) + ' (cost) — ' + label + ' counted as fully received';
+          if (charges > due * maxPct / 100 + 0.005) {
+            tail += '. More than ' + maxPct + '% of the amount due — if the buyer paid less, choose a "Buyer paid less" reason instead.';
+          }
+        } else if (t === 'short') {
+          tail = ' → short by ' + currency + ' ' + money(diff) + '; record the rest when it arrives, or a manager clears it short with a reason.';
+        } else if (t === 'excess') {
+          tail = ' → the buyer paid ' + currency + ' ' + money(-diff) + ' more.';
+        } else {
+          tail = ' → choose why it is different' + (diff > 0 ? ' (bank charges deducted, or the buyer paid less).' : ' (the buyer paid more).');
+        }
+        preview.textContent = head + tail;
+      }
+      form.addEventListener('input', update);
+      form.addEventListener('change', update);
+      update();
     });
   }
 
@@ -883,6 +1002,7 @@
     initCrateHsCodes();
     initFinCostPicker();
     initRemittanceStatements();
+    initRemittanceDifference();
     initSchemeRows();
     initGstCalc();
     initShowWhen();

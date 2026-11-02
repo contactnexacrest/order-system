@@ -662,6 +662,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('rcmc_alert_days_a',     '30', 'number', 'alerts', 'Days before RCMC expiry to raise an alert.', 0),
   ('rcmc_escalation_days_b','15', 'number', 'alerts', 'Days before RCMC expiry to escalate to MD.', 0),
   ('fdn_overdue_days_c',    '3',  'number', 'alerts', 'WORKING days after FDN issue before a freight payment is flagged overdue — must match the "payable within 3 working days of issue" figure in the CFR/CIF Indicative Freight Validity clause (QT/PI) verbatim, since that clause is the written promise to the buyer. (Corrected from an earlier placeholder of 7, which did not match the clause text and used calendar-day arithmetic instead of working days — see check_alerts.php.)', 0),
+  ('max_bank_charges_pct', '3', 'number', 'tolerances', 'The most bank charges one buyer remittance may carry, as a % of the amount due. Above it the difference must be recorded as a short payment instead.', 0),
   ('fema_realization_alert_days', '270', 'number', 'alerts', 'Days after a settlement leg is marked cleared before the CA / Accounting module flags its FIRC/eBRC reference as still missing — 270 days (9 months) mirrors the RBI/FEMA export-proceeds realization period as a practical proof-of-realization deadline, not a legal shipment-date calculation (this system does not track the shipment date this rule technically runs from).', 0),
   ('session_timeout_minutes', '30', 'number', 'security', 'Idle session timeout, in minutes.', 0),
   ('failed_login_lockout_count', '5', 'number', 'security', 'Failed login attempts before account lockout.', 0),
@@ -1496,7 +1497,9 @@ INSERT INTO reference_library_documents (title, file_path, file_original_name, f
   ('Quarry Block Supply Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/quarry_block_supply_agreement_template.docx', 'Quarry Block Supply Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
   ('International Sales & Supply Agreement (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/sales_supply_agreement_template.docx', 'International Sales & Supply Agreement (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
   ('Mutual NDA — Commercial Counterparty (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/nda_commercial_counterparty_template.docx', 'Mutual NDA - Commercial Counterparty (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
-  ('Staff Confidentiality & NDA (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/nda_staff_template.docx', 'Staff Confidentiality and NDA (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  ('Staff Confidentiality & NDA (Template)', '__STORAGE_BASE_PATH__/assets/reference_library/nda_staff_template.docx', 'Staff Confidentiality and NDA (Template).docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+  ('Supplier & Logistics Payments Guide (PDF)', '__STORAGE_BASE_PATH__/assets/reference_library/supplier_and_logistics_payments_guide.pdf', 'Supplier_and_Logistics_Payments_Guide.pdf', 'application/pdf'),
+  ('Supplier & Logistics Payments Guide (Word)', '__STORAGE_BASE_PATH__/assets/reference_library/supplier_and_logistics_payments_guide.docx', 'Supplier_and_Logistics_Payments_Guide.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 
 -- ================================================================
 -- COMPLIANCE TASK TYPES — the defaults the checklist on every order ships
@@ -2037,3 +2040,163 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'manage_approval_limits'
  WHERE r.name IN ('Managing Director', 'Executive Director')
    AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+
+
+-- Owner points 5 / 8 / 9 (2 Nov 2026): Admin → Settings → Document copies clean-up.
+-- All off by default. Edited on its own page (/settings/document-cleanup), not the generic settings list.
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive)
+SELECT x.k, x.v, x.t, 'document_cleanup', x.d, 0 FROM (
+  SELECT 'doc_cleanup_draft_days' AS k, '0' AS v, 'number' AS t, 'Remove the DRAFT copy of an approved document after this many days (0 = off; 30, 90 or 180).' AS d
+  UNION ALL SELECT 'doc_cleanup_superseded_days', '0', 'number', 'Remove the copies of a superseded revision that was never sent to the client after this many days (0 = off; 90, 180 or 365). The SUPERSEDED-stamped copy is kept.'
+  UNION ALL SELECT 'doc_cleanup_cafin_mode', 'keep_all', 'string', 'Old CAFIN copies: keep_all, or latest_only (older copies removed 30 days after a newer one was made).'
+) x WHERE NOT EXISTS (SELECT 1 FROM company_settings c WHERE c.setting_key = x.k);
+
+-- Owner decision 2 Nov 2026 (point 4): Agreements register permissions, upload context and agreement types. Same as docs/migrations/2026-11-02s-agreements-register.sql.
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT k, n, d, 'Agreements' FROM (
+  SELECT 'manage_agreements' AS k, 'Manage agreements' AS n, 'Add, edit, renew and terminate agreements with clients, suppliers, logistics partners, associates and staff; sees staff NDAs; gets the expiry reminders' AS d
+  UNION ALL SELECT 'view_agreements', 'View agreements', 'See the agreements register and download signed copies (not staff agreements)') p
+WHERE NOT EXISTS (SELECT 1 FROM permissions x WHERE x.permission_key = p.k);
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p
+ WHERE ((p.permission_key IN ('manage_agreements', 'view_agreements') AND r.name IN ('Admin', 'Managing Director', 'Executive Director'))
+     OR (p.permission_key = 'view_agreements' AND r.name IN ('Sales Director', 'Procurement Director', 'Logistics Director', 'Finance Director')))
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+
+INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description)
+SELECT 'agreement_file', 'pdf,doc,docx,jpg,jpeg,png', 15728640, 'The signed copy of an agreement in the Agreements register (client, supplier, logistics partner, associate or staff).'
+WHERE NOT EXISTS (SELECT 1 FROM file_upload_contexts WHERE context_key = 'agreement_file');
+
+-- Agreement types: an admin-managed list (Admin → Dropdown Option Lists, list "agreement_type").
+INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
+SELECT t.list_key, t.option_value, t.sort_order, 0, 1 FROM (
+  SELECT 'agreement_type' AS list_key, 'Sales & Supply Agreement' AS option_value, 1 AS sort_order
+  UNION ALL SELECT 'agreement_type', 'Commercial NDA', 2
+  UNION ALL SELECT 'agreement_type', 'Staff NDA', 3
+  UNION ALL SELECT 'agreement_type', 'Supply Agreement (Quarry/Factory)', 4
+  UNION ALL SELECT 'agreement_type', 'Logistics Services Agreement', 5
+  UNION ALL SELECT 'agreement_type', 'Associate Agreement', 6
+  UNION ALL SELECT 'agreement_type', 'Other', 7) t
+WHERE NOT EXISTS (SELECT 1 FROM dropdown_options d WHERE d.list_key = t.list_key AND d.option_value = t.option_value);
+
+-- ---------------------------------------------------------------
+-- Owner decision D-226 (2 Nov 2026): the Export Compliance department
+-- (same rows as docs/migrations/2026-11-02r-export-compliance.sql).
+INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
+  ('manage_compliance_checklist', 'Compliance checklist', 'Work the order''s compliance checklist (ECGC cover, inspection, fumigation, phytosanitary, due diligence …). D-226: Export Compliance, and everyone who could already do it through Close orders.', 'orders'),
+  ('manage_export_benefit_claims', 'File export benefit claims', 'Answer which export benefit schemes an order is eligible for and file the claims (scheme, reference no., amount claimed, date). Recording the money received stays with Manage order financials. D-226: Export Compliance.', 'orders'),
+  ('generate_compliance_documents', 'Generate compliance documents', 'Generate the COO Prep Sheet (for the Certificate of Origin application) without the general Generate documents permission. D-226: Export Compliance.', 'documents'),
+  ('upload_order_documents', 'Attach documents to an order', 'Attach government and agency documents (ECGC policy, Certificate of Origin, phytosanitary / fumigation / inspection certificates, eBRC …) to an order in Step 14, without Manage orders. D-226: Export Compliance.', 'orders');
+
+-- Nothing changes for the roles that worked the checklist through Close orders.
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT rp.role_id, pn.id, rp.is_enabled
+  FROM role_permissions rp
+  JOIN permissions po ON po.id = rp.permission_id AND po.permission_key = 'close_orders'
+  JOIN permissions pn ON pn.permission_key = 'manage_compliance_checklist';
+
+-- Management holds every permission.
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key IN ('manage_compliance_checklist', 'manage_export_benefit_claims', 'generate_compliance_documents', 'upload_order_documents')
+  AND r.name IN ('Admin', 'Managing Director', 'Executive Director');
+
+-- Finance already records benefits through Manage order financials; filing a claim follows.
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'manage_export_benefit_claims'
+  AND r.name IN ('Finance Manager', 'Finance Director');
+
+-- The department and its ladder.
+INSERT IGNORE INTO departments (code, name, color, sees_whole_company, sort_order, is_active) VALUES
+  ('EXPORT_COMPLIANCE', 'Export Compliance', '#1d7f8c', 0, 45, 1);
+
+INSERT IGNORE INTO roles (name, description, is_system_role) VALUES
+  ('Export Compliance Executive', 'Export Compliance department — Executive', 0),
+  ('Export Compliance Manager',   'Export Compliance department — Manager', 0),
+  ('Export Compliance Director',  'Export Compliance department — Director', 0);
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r JOIN permissions p ON (
+     (r.name IN ('Export Compliance Executive', 'Export Compliance Manager', 'Export Compliance Director')
+      AND p.permission_key IN ('view_orders', 'download_pdf', 'view_selling_prices', 'view_own_incentives',
+                               'manage_compliance_checklist', 'manage_export_benefit_claims',
+                               'generate_compliance_documents', 'upload_order_documents'))
+  OR (r.name IN ('Export Compliance Manager', 'Export Compliance Director')
+      AND p.permission_key IN ('view_all_orders', 'assign_order_owner', 'assign_department_owner', 'approve_documents',
+                               'manage_compliance_task_types'))
+  OR (r.name = 'Export Compliance Director' AND p.permission_key IN ('view_cockpit'))
+);
+
+INSERT IGNORE INTO department_designations (department_id, title, level, role_id, sort_order)
+SELECT d.id, x.title, x.level, r.id, x.sort_order FROM (
+  SELECT 'Export Compliance Executive' AS title, 'executive' AS level, 1 AS sort_order
+  UNION ALL SELECT 'Export Compliance Manager', 'manager', 2
+  UNION ALL SELECT 'Export Compliance Director', 'director', 3
+) x JOIN departments d ON d.code = 'EXPORT_COMPLIANCE' JOIN roles r ON r.name = x.title;
+
+-- Their work queue (built from the order's own state, like the other departments').
+INSERT IGNORE INTO department_task_types (task_key, department_code, title, standard_days, escalate_after_days, sort_order) VALUES
+  ('compliance_checklist_item', 'EXPORT_COMPLIANCE', 'Compliance checklist item (ECGC, inspection, fumigation, phytosanitary …)', 5, 3, 90),
+  ('apply_coo', 'EXPORT_COMPLIANCE', 'Apply for the Certificate of Origin (COO Prep Sheet)', 2, 2, 91),
+  ('answer_benefit_eligibility', 'EXPORT_COMPLIANCE', 'Answer export benefit eligibility (BL issued)', 3, 3, 92),
+  ('file_export_benefit_claim', 'EXPORT_COMPLIANCE', 'File the export benefit claim', 7, 7, 93),
+  ('ebrc_followup', 'EXPORT_COMPLIANCE', 'Get the eBRC / FIRC from the bank (payment cleared)', 7, 7, 94);
+
+-- Owner follow-up on point 18 (2 Nov 2026): the usual "Why is it different?" reasons (Admin → Remittance difference reasons).
+INSERT INTO remittance_difference_reasons (label, treatment, sort_order) VALUES
+  ('Intermediary / correspondent bank charges deducted', 'bank_charges', 10),
+  ('Buyer''s bank (remitting) charges deducted', 'bank_charges', 20),
+  ('Our bank deducted its charges from the amount credited', 'bank_charges', 30),
+  ('Currency conversion difference (small)', 'bank_charges', 40),
+  ('Buyer deducted an agreed discount', 'short', 50),
+  ('Buyer deducted a quality / quantity claim', 'short', 60),
+  ('Buyer paid in instalments — rest to follow', 'short', 70),
+  ('Buyer disputes part of the amount', 'short', 80),
+  ('Buyer paid extra — adjust against balance', 'excess', 90),
+  ('Buyer included next order''s advance', 'excess', 100),
+  ('Buyer rounded up the amount', 'excess', 110);
+
+-- Owner decision (2 Nov 2026): Logistics enters the logistics partners' bills, Finance pays them.
+INSERT INTO permissions (permission_key, name, description, category)
+SELECT 'manage_logistics_bills', 'Add logistics partner bills',
+       'Add a CHA, transport or freight-forwarder bill to an order and remove one that has no payment on it. Paying it needs Manage supplier payments.',
+       'orders'
+WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'manage_logistics_bills');
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT DISTINCT r.id, p.id
+  FROM roles r
+  JOIN permissions p ON p.permission_key = 'manage_logistics_bills'
+ WHERE (r.name IN ('Logistics Executive', 'Logistics Manager', 'Logistics Director')
+        OR r.id IN (SELECT rp.role_id FROM role_permissions rp
+                      JOIN permissions sp ON sp.id = rp.permission_id
+                     WHERE sp.permission_key = 'manage_supplier_payments'))
+   AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = r.id AND x.permission_id = p.id);
+
+-- Owner decision (2 Nov 2026, gap-list Q-6): ECGC policy and incentive claim deadlines (deadlines to be confirmed with the CA).
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description)
+SELECT * FROM (
+  SELECT 'ecgc_policy_no' AS k, '' AS v, 'string' AS t, 'compliance' AS c, 'ECGC policy number of the company (Shipments Comprehensive Risk policy). Leave empty if there is no ECGC policy.' AS d
+  UNION ALL SELECT 'ecgc_policy_cover_pct', '90', 'number', 'compliance', 'ECGC cover percentage of the policy (shown on the buyer and order pages).'
+  UNION ALL SELECT 'ecgc_policy_valid_to', '', 'date', 'compliance', 'ECGC policy valid until (YYYY-MM-DD). A reminder goes out 30 days before.'
+  UNION ALL SELECT 'ecgc_declaration_day', '10', 'number', 'compliance', 'Day of the month by which last month''s shipments must be declared to ECGC.'
+  UNION ALL SELECT 'benefit_deadline_days_rodtep', '365', 'number', 'compliance', 'RoDTEP: days after the shipping bill (LEO) date to file the claim — default 365 (1 year); 0 = no deadline. To be confirmed with the CA.'
+  UNION ALL SELECT 'benefit_deadline_days_rosctl', '365', 'number', 'compliance', 'RoSCTL: days after the shipping bill (LEO) date to file the claim — default 365; 0 = no deadline. To be confirmed with the CA.'
+  UNION ALL SELECT 'benefit_deadline_days_duty_drawback', '0', 'number', 'compliance', 'Duty Drawback: 0 = no deadline (paid automatically through the shipping bill). To be confirmed with the CA.'
+  UNION ALL SELECT 'benefit_deadline_days_other', '0', 'number', 'compliance', 'Any other scheme: days after the shipping bill (LEO) date to file; 0 = no deadline.'
+) x WHERE NOT EXISTS (SELECT 1 FROM company_settings s WHERE s.setting_key = x.k);
+INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description)
+SELECT 'ecgc_limit_letter', 'pdf,jpg,jpeg,png', 10485760, 'ECGC credit-limit approval letter for a buyer (clients.ecgc_limit_file_id).'
+WHERE NOT EXISTS (SELECT 1 FROM file_upload_contexts WHERE context_key = 'ecgc_limit_letter');
+
+-- Owner decision 2 Nov 2026 (D-235): TDS on associate commission — settings (migration 2026-11-02x-associate-tds.sql).
+INSERT INTO incentive_settings (setting_key, setting_value)
+SELECT k, v FROM (
+  SELECT 'associate_tds_section' AS k, '194H' AS v UNION ALL
+  SELECT 'associate_tds_threshold_inr', '20000' UNION ALL
+  SELECT 'associate_tds_no_pan_pct', '20.00' UNION ALL
+  SELECT 'associate_tds_foreign', '0' UNION ALL
+  SELECT 'associate_15cb_required', '1' UNION ALL
+  SELECT 'zoho_tds_tax_id', ''
+) d WHERE NOT EXISTS (SELECT 1 FROM incentive_settings s WHERE s.setting_key = d.k);

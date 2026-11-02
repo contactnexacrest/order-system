@@ -1,0 +1,17 @@
+{# The links and buttons of one agreement row — the same on the list, the board and a party's card.
+   Expects __a (the row), canManage, canClientFile, canAssociateFile. #}
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+{% if __a.source == 'register' %}
+  {% if __a.file_id %}<a class="btn-sm btn-secondary" href="/agreements/{{ __a.id }}/file">Signed copy</a>{% endif %}
+  {% if canManage %}
+    <a class="btn-sm" href="/agreements/{{ __a.id }}/edit">Edit</a>
+    {% if __a.status != 'terminated' and __a.status != 'renewed' %}<a class="btn-sm btn-secondary" href="/agreements/new?renew={{ __a.id }}">Renew</a>{% endif %}
+  {% endif %}
+{% elif __a.source == 'client' %}
+  {% if canClientFile %}<a class="btn-sm btn-secondary" href="/clients/{{ __a.party_id }}/agreement/download">Signed copy</a>{% endif %}
+  <a class="btn-sm btn-secondary" href="/clients/{{ __a.party_id }}">Managed on the client page</a>
+{% else %}
+  {% if canAssociateFile %}<a class="btn-sm btn-secondary" href="/associates/{{ __a.party_id }}/agreement">Signed copy</a>{% endif %}
+  <a class="btn-sm btn-secondary" href="/associates/{{ __a.party_id }}">Managed on the associate page</a>
+{% endif %}
+</div>

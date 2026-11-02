@@ -598,6 +598,13 @@ final class OrderController
         }
 
         Flash::set('success', "Order {$orderReference} created for {$client['company_legal_name']}.");
+        // Owner decision (2 Nov 2026, Q-6b): a soft warning when the buyer's open orders now exceed the ECGC limit.
+        $__ecgc = \App\Services\ComplianceTrackingService::ecgcPosition((int) $client['id']);
+        if ($__ecgc['limit'] !== null && $__ecgc['over_limit']) {
+            Flash::set('warning', \App\Services\MoneyVisibility::can(\App\Services\MoneyVisibility::SELLING)
+                ? 'ECGC: ' . $__ecgc['warning']
+                : 'ECGC: this buyer\'s open orders are above (or outside) the ECGC-approved credit limit — check with Finance.');
+        }
         header("Location: /orders/{$orderId}");
     }
 
@@ -1187,6 +1194,8 @@ final class OrderController
             'canDeleteInrActual' => $canDeleteInrActual,
             'canViewCaLinks' => $canViewCaLinks,
             'canCheckZoho' => $canCheckZoho,
+            // Owner decision 2 Nov 2026 (D-233): "Waiting for Zoho: N" for whoever may see Zoho status.
+            'zohoWaiting' => ($canCheckZoho || $canViewCaLinks) ? \App\Services\ZohoPendingService::counts($orderId) : null,
             'linkedExportBenefits' => $canViewCaLinks ? CaExportBenefitRepository::forOrder($orderId) : [],
             // Owner request (2026-10-26): Step 12c lists this order's claims for manage_order_financials holders.
             'orderBenefitClaims' => $canManageOrderFinancials ? CaExportBenefitRepository::forOrder($orderId) : [],
@@ -1744,6 +1753,13 @@ final class OrderController
         ]);
     }
 
+    /** The bank charges typed with "Bank charges deducted" (order currency), or null to use the difference. */
+    private static function postedBankCharges(): ?float
+    {
+        $raw = trim((string) ($_POST['bank_charges'] ?? ''));
+        return $raw !== '' && is_numeric($raw) ? (float) $raw : null;
+    }
+
     public function recordAdvancePayment(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -1787,21 +1803,29 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        // Gap list G-5: a further receipt of a part-paid advance needs no confirming tick.
-        if ($advanceSoFar <= 0 && $advanceDue > 0 && abs($amount - $advanceDue) > max(1.0, $advanceDue * 0.01) && empty($_POST['confirm_amount_differs'])) {
-            Flash::set('error', sprintf('The advance due on this order is %s %s (%s%% of %s %s). You entered %s %s — if that really is what the bank received, tick "The amount received differs from the advance due" and save again.', $currency, number_format($advanceDue, 2), rtrim(rtrim(number_format((float) $orderForAdvance['advance_pct'], 2), '0'), '.'), $currency, number_format($fobTotal, 2), $currency, number_format($amount, 2)));
+        // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why —
+        // bank charges deducted, the buyer paid less, or the buyer paid more.
+        if (\App\Services\PartPaymentService::receiptExists($orderId, 'advance', null, $amount, $receivedAt, $rate)) {
+            Flash::set('warning', 'Advance remittance already recorded with these details — nothing changed.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $diffEval = \App\Services\RemittanceDifference::evaluatePosted($_POST, 'Advance', $currency, $advanceDue, $advanceSoFar, $amount, self::postedBankCharges());
+        if (isset($diffEval['error'])) {
+            Flash::set('error', $diffEval['error']);
             header("Location: /orders/{$orderId}");
             return;
         }
         // QA Round 6, R6-N22: the amount, its rate and their audit rows are
         // saved together or not at all.
-        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef): bool {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
             if (\App\Services\PartPaymentService::receiptExists($orderId, 'advance', null, $amount, $receivedAt, $rate)) {
                 return false;
             }
-            \App\Services\PartPaymentService::addLegReceipt($orderId, 'advance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId());
+            $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'advance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges']);
+            \App\Services\RemittanceDifference::afterReceipt($orderId, 'advance', null, $receiptId, $diffEval, $amount, $rate, $receivedAt, $bankRef, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'advance_exchange_rate', null, (string) $rate);
             // External QA report L-23: advance payment recording was never audit-logged.
             AuditLogRepository::log(AuthService::currentUserId(), 'ADVANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'advance_amount', null, (string) $amount);
@@ -1823,7 +1847,7 @@ final class OrderController
             ClientRepository::lockData((int) $order['client_id'], 'Auto-locked: advance remittance recorded before client PI-details consent');
         }
 
-        Flash::set('success', $this->remittanceStatement($orderId, $amount, $rate) . ' ' . 'Advance remittance recorded. Mark it cleared once your bank confirms receipt.');
+        Flash::set('success', trim($this->remittanceStatement($orderId, $amount, $rate) . ' ' . \App\Services\RemittanceDifference::outcome('advance', 'Advance', $currency, $diffEval, $amount, $rate)) . ' ' . 'Advance remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
 
@@ -2841,14 +2865,29 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why.
+        if (\App\Services\PartPaymentService::receiptExists($orderId, 'freight', null, $amount, $receivedAt, $rate)) {
+            Flash::set('warning', 'Freight remittance already recorded with these details — nothing changed.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $currency = (string) ((OrderRepository::find($orderId) ?? [])['currency_code'] ?? '');
+        $diffEval = \App\Services\RemittanceDifference::evaluatePosted($_POST, 'Freight', $currency, (float) (\App\Services\PartPaymentService::expected($orderId, 'freight') ?? 0.0),
+            \App\Services\PartPaymentService::receivedTotal($orderId, 'freight'), $amount, self::postedBankCharges());
+        if (isset($diffEval['error'])) {
+            Flash::set('error', $diffEval['error']);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         // QA Round 6, R6-N22: saved together or not at all.
-        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef): bool {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
             if (\App\Services\PartPaymentService::receiptExists($orderId, 'freight', null, $amount, $receivedAt, $rate)) {
                 return false;
             }
-            \App\Services\PartPaymentService::addLegReceipt($orderId, 'freight', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId());
+            $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'freight', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges']);
+            \App\Services\RemittanceDifference::afterReceipt($orderId, 'freight', null, $receiptId, $diffEval, $amount, $rate, $receivedAt, $bankRef, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'freight_exchange_rate', null, (string) $rate);
             // External QA report N-08: this action never reached the audit
             // log, so it never notified anyone either.
@@ -2860,7 +2899,7 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        Flash::set('success', $this->remittanceStatement($orderId, $amount, $rate) . ' ' . 'Freight remittance recorded. Mark it cleared once your bank confirms receipt.');
+        Flash::set('success', trim($this->remittanceStatement($orderId, $amount, $rate) . ' ' . \App\Services\RemittanceDifference::outcome('freight', 'Freight', $currency, $diffEval, $amount, $rate)) . ' ' . 'Freight remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
 
@@ -3425,14 +3464,29 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why.
+        if (\App\Services\PartPaymentService::receiptExists($orderId, 'balance', null, $amount, $receivedAt, $rate)) {
+            Flash::set('warning', 'Balance remittance already recorded with these details — nothing changed.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $currency = (string) ((OrderRepository::find($orderId) ?? [])['currency_code'] ?? '');
+        $diffEval = \App\Services\RemittanceDifference::evaluatePosted($_POST, 'Balance', $currency, (float) (\App\Services\PartPaymentService::expected($orderId, 'balance') ?? 0.0),
+            \App\Services\PartPaymentService::receivedTotal($orderId, 'balance'), $amount, self::postedBankCharges());
+        if (isset($diffEval['error'])) {
+            Flash::set('error', $diffEval['error']);
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         // QA Round 6, R6-N22: saved together or not at all.
-        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef): bool {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
             if (\App\Services\PartPaymentService::receiptExists($orderId, 'balance', null, $amount, $receivedAt, $rate)) {
                 return false;
             }
-            \App\Services\PartPaymentService::addLegReceipt($orderId, 'balance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId());
+            $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'balance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges']);
+            \App\Services\RemittanceDifference::afterReceipt($orderId, 'balance', null, $receiptId, $diffEval, $amount, $rate, $receivedAt, $bankRef, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'balance_exchange_rate', null, (string) $rate);
             // External QA report L-23: balance payment recording was never audit-logged.
             AuditLogRepository::log(AuthService::currentUserId(), 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', $orderId, 'balance_amount', null, (string) $amount);
@@ -3443,7 +3497,7 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        Flash::set('success', $this->remittanceStatement($orderId, $amount, $rate) . ' ' . 'Balance remittance recorded. Mark it cleared once your bank confirms receipt.');
+        Flash::set('success', trim($this->remittanceStatement($orderId, $amount, $rate) . ' ' . \App\Services\RemittanceDifference::outcome('balance', 'Balance', $currency, $diffEval, $amount, $rate)) . ' ' . 'Balance remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
 
@@ -4133,7 +4187,7 @@ final class OrderController
             Flash::set($ok ? 'success' : 'error', $message);
             header("Location: /orders/{$orderId}#compliance-checklist");
         };
-        if (!PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'close_orders')) {
+        if (!PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'manage_compliance_checklist')) { // D-226: split out of close_orders
             $respond(false, 'You do not have permission to update the compliance checklist.');
             return;
         }
@@ -4221,7 +4275,7 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
-        if (!PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'close_orders')) {
+        if (!PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, 'manage_compliance_checklist')) { // D-226
             Flash::set('error', 'You do not have permission to update the compliance checklist.');
             header("Location: /orders/{$orderId}");
             return;

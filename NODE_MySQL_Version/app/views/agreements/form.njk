@@ -1,0 +1,73 @@
+{# Add / edit / renew an agreement (owner decision 2 Nov 2026, point 4). Port of agreements/form.php. #}
+{% set __isNew = not agreement %}
+<div class="card">
+  <h1>{% if __isNew %}{% if renews %}Renew an agreement{% else %}Add an agreement{% endif %}{% else %}Edit an agreement{% endif %}</h1>
+  {% if renews %}<p class="muted">Renewing {{ renews.agreement_type }} signed {{ renews.signed_on }}. Attach the newly signed copy; the old agreement is then shown as "Renewed (replaced)" and gets no more reminders.</p>{% endif %}
+  <form method="post" action="{{ '/agreements' if __isNew else '/agreements/' + agreement.id + '/update' }}" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="field-grid">
+    {% if renews %}<input type="hidden" name="renews_agreement_id" value="{{ renews.id }}">{% endif %}
+    {% if __isNew %}
+      <label>Agreement with
+        <select name="party_type" required>
+          <option value="">Choose…</option>
+          {% for k, label in partyTypes %}<option value="{{ k }}"{{ ' selected' if v.party_type == k else '' }}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      {% for k, label in partyTypes %}
+        <label data-show-when="party_type={{ k }}">{{ label }}
+          <select name="party_id_{{ k }}" required>
+            <option value="">Choose…</option>
+            {% for p in parties[k] %}<option value="{{ p.id }}"{{ ' selected' if (v.party_type == k and (v.party_id | int) == p.id) else '' }}>{{ p.name }}</option>{% endfor %}
+          </select>
+        </label>
+      {% endfor %}
+    {% else %}
+      <p style="grid-column:1/-1"><strong>With:</strong> {{ partyTypes[agreement.party_type] }} — {{ partyName }}</p>
+    {% endif %}
+    <label>Type of agreement
+      <select name="agreement_type" required>
+        <option value="">Choose…</option>
+        {% for t in types %}<option value="{{ t }}"{{ ' selected' if v.agreement_type == t else '' }}>{{ t }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Title <small class="muted">(optional)</small>
+      <input type="text" name="title" maxlength="200" value="{{ v.title or '' }}" placeholder="e.g. Granite supply 2026–2028">
+    </label>
+    <label>Signed on
+      <input type="date" name="signed_on" required max="{{ today }}" value="{{ v.signed_on or '' }}">
+    </label>
+    <label>Starts on <small class="muted">(if different)</small>
+      <input type="date" name="starts_on" value="{{ v.starts_on or '' }}">
+    </label>
+    <label>Expires on <small class="muted">(leave empty if it never expires)</small>
+      <input type="date" name="expires_on" value="{{ v.expires_on or '' }}">
+    </label>
+    <label>Signed copy <small class="muted">(PDF, Word or a scan{{ '' if __isNew else ' — attach only to replace the copy on file' }})</small>
+      <input type="file" name="agreement_file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"{{ ' required' if __isNew else '' }}>
+    </label>
+    <label style="grid-column:1/-1">Notes <small class="muted">(optional)</small>
+      <textarea name="notes" maxlength="2000" rows="3" placeholder="e.g. Renewal needs 60 days' notice; exclusive for Georgia">{{ v.notes or '' }}</textarea>
+    </label>
+    </div>
+    <div class="btn-row"><button type="submit" class="btn">Save agreement</button> <a class="btn-sm btn-secondary" href="/agreements">Cancel</a></div>
+  </form>
+</div>
+{% if not __isNew and not agreement.terminated_on %}
+<div class="card">
+  <h2>The agreement has ended early</h2>
+  <p class="muted">Record it here so no more reminders go out. To continue with a new signed agreement, use Renew on the register instead.</p>
+  <form method="post" action="/agreements/{{ agreement.id }}/terminate" onsubmit="return confirm('Record this agreement as ended?');">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <div class="field-grid">
+    <label>Ended on
+      <input type="date" name="terminated_on" required value="{{ today }}">
+    </label>
+    <label style="grid-column:1/-1">Reason
+      <textarea name="terminated_reason" required minlength="5" maxlength="500" rows="2" placeholder="e.g. Supplier relationship ended by mutual consent"></textarea>
+    </label>
+    </div>
+    <div class="btn-row"><button type="submit" class="btn-sm btn-danger">Record as ended</button></div>
+  </form>
+</div>
+{% endif %}

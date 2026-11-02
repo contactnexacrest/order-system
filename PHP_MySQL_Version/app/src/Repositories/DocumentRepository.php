@@ -154,6 +154,27 @@ final class DocumentRepository
         Database::connection()->prepare(
             "UPDATE documents SET status = 'approved', pdf_file_id = :pdf_file_id WHERE id = :id"
         )->execute(['pdf_file_id' => $finalPdfFileId, 'id' => $id]);
+        self::linkFiles($id, [$finalPdfFileId]);
+    }
+
+    /**
+     * Owner points 6/15 (2 Nov 2026): every generated file records which
+     * document it belongs to, so a copy that is no longer the document's
+     * current PDF (the draft after approval, the sent final after a newer
+     * revision supersedes it) keeps its document type — and so its money
+     * class — for MoneyVisibility::canSeeFile(), the file-store download and
+     * the dossier ZIP.
+     *
+     * @param array<int,int|null> $fileIds
+     */
+    public static function linkFiles(int $documentId, array $fileIds): void
+    {
+        foreach ($fileIds as $fileId) {
+            if ($fileId !== null) {
+                Database::connection()->prepare('UPDATE file_store SET linked_document_id = :d WHERE id = :f')
+                    ->execute(['d' => $documentId, 'f' => (int) $fileId]);
+            }
+        }
     }
 
     /**
@@ -168,6 +189,7 @@ final class DocumentRepository
         Database::connection()->prepare(
             "UPDATE documents SET status = 'superseded', pdf_file_id = :pdf_file_id WHERE id = :id"
         )->execute(['pdf_file_id' => $pdfFileId, 'id' => $id]);
+        self::linkFiles($id, [$pdfFileId]);
     }
 
     /**
@@ -207,6 +229,13 @@ final class DocumentRepository
     {
         Database::connection()->prepare(
             "UPDATE documents SET status = 'sent' WHERE id = :id"
+        )->execute(['id' => $id]);
+        // Owner points 5/8/9 (2 Nov 2026): the exact PDF the client got is flagged, so the
+        // document copies clean-up can never remove it (file_store.sent_to_client was always 0).
+        Database::connection()->prepare(
+            'UPDATE file_store fs JOIN documents d ON d.pdf_file_id = fs.id
+                SET fs.sent_to_client = 1, fs.sent_at = COALESCE(fs.sent_at, NOW())
+              WHERE d.id = :id'
         )->execute(['id' => $id]);
     }
 
@@ -262,7 +291,9 @@ final class DocumentRepository
             'used_designation_seal' => !empty($signatory['used_designation_seal']) ? 1 : 0,
             'company_snapshot_json' => $companySnapshot !== null ? json_encode($companySnapshot) : null,
         ]);
-        return (int) $pdo->lastInsertId();
+        $documentId = (int) $pdo->lastInsertId();
+        self::linkFiles($documentId, [$pdfFileId, $docxFileId]);
+        return $documentId;
     }
 
     /**

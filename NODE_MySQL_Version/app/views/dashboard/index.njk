@@ -3,6 +3,20 @@
   <p>Signed in as <strong>{{ user.name }}</strong> ({{ user.email }}).</p>
 </div>
 
+{# Owner decision 2 Nov 2026 (point 4): agreements expiring within 30 days, for whoever may see the register. #}
+{% if agreementsExpiring and agreementsExpiring.length %}
+<div class="card page-wide" id="agreements-expiring">
+  <h2 style="margin-top:0;">Agreements expiring soon ({{ agreementsExpiring.length }})</h2>
+  <table class="list">
+    <tr><th>With</th><th>Agreement</th><th>Expires</th></tr>
+    {% for __r in agreementsExpiring.slice(0, 10) %}
+      <tr><td>{{ __r.party_name }} <small class="muted">({{ agreementPartyTypes[__r.party_type] }})</small></td><td>{{ __r.agreement_type }}</td><td>{{ __r.expires_on }} — in {{ __r.days_left }} day(s)</td></tr>
+    {% endfor %}
+  </table>
+  <p><a href="/agreements?status=expiring">Open the Agreements register →</a></p>
+</div>
+{% endif %}
+
 <div class="card page-wide">
   <h2 style="margin-top:0;">Search — client or order reference</h2>
   <form method="get" action="/" class="search-box">

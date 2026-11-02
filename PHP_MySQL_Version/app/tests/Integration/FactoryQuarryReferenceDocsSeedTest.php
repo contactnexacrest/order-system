@@ -32,6 +32,9 @@ final class FactoryQuarryReferenceDocsSeedTest extends DbTestCase
         'International Sales & Supply Agreement (Template)',
         'Mutual NDA — Commercial Counterparty (Template)',
         'Staff Confidentiality & NDA (Template)',
+        // Owner points 11/12 (2 Nov 2026): the payment guide sits with the other guidelines.
+        'Supplier & Logistics Payments Guide (PDF)',
+        'Supplier & Logistics Payments Guide (Word)',
     ];
 
     public function testSeedCreatesAllSevenDocumentsWithFilesAttached(): void
@@ -64,6 +67,6 @@ final class FactoryQuarryReferenceDocsSeedTest extends DbTestCase
             $checked++;
         }
 
-        self::assertSame(7, $checked, 'expected exactly 7 seeded reference-library documents backed by a committed file');
+        self::assertSame(9, $checked, 'expected exactly 9 seeded reference-library documents backed by a committed file');
     }
 }

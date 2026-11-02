@@ -1,0 +1,27 @@
+<?php
+use App\Helpers\Csrf;
+
+/** Owner decision 2 Nov 2026 (D-235): Settings → Associate TDS. @var array $s */
+?>
+<div class="card">
+  <h1>Associate TDS</h1>
+  <p class="muted"><a href="/settings">&larr; Company Settings</a> &middot; <a href="/associates/tds">TDS register</a></p>
+  <p>The app works out the TDS on each associate commission payment from these values, so Accounts pays the right net amount. Change them only on the CA's advice — payments already recorded keep the TDS they were paid with.</p>
+  <ul class="small">
+    <li><strong>Associates in India:</strong> no TDS while the associate's commission in the financial year (April–March) stays within the threshold. The payment that takes the year past it carries TDS on itself <em>and</em> on the commission paid earlier that year without TDS (catch-up); every later payment that year carries TDS on its full amount. Without a PAN on file and accepted, the higher rate applies (section 206AA). TDS is rounded to the nearest rupee.</li>
+    <li><strong>Associates abroad:</strong> no TDS unless switched on below — but only once the Tax Residency Certificate, Form 10F and no-PE declaration are on file and accepted; each payment also needs its Form 15CA (and 15CB when required) attached before it is marked paid.</li>
+    <li><strong>Zoho Books:</strong> with a TDS tax id the commission bill carries the TDS (Zoho's TDS feature) and the payment is the net. Left blank, the bill is the gross, the payment the net, and the TDS stays on the bill for the CA to book. Switching on TDS in Zoho Books is done by the CA in Zoho (log it in the Zoho change log), then its tax id goes here.</li>
+  </ul>
+  <form method="post" action="/settings/associate-tds" class="form-grid">
+    <?= Csrf::field() ?>
+    <label>TDS section *<input type="text" name="associate_tds_section" required pattern="[0-9]{3}[A-Za-z]{0,3}" maxlength="6" value="<?= htmlspecialchars($s['section']) ?>" placeholder="e.g. 194H"></label>
+    <label>TDS rate (%) *<input type="number" name="associate_tds_pct" required min="0" max="30" step="0.01" value="<?= htmlspecialchars(number_format($s['rate'], 2, '.', '')) ?>" placeholder="e.g. 2.00"></label>
+    <label>Threshold per associate per financial year (&#8377;) *<input type="number" name="associate_tds_threshold_inr" required min="0" max="10000000" step="0.01" value="<?= htmlspecialchars((string) $s['threshold']) ?>" placeholder="e.g. 20000"></label>
+    <label>Rate without a verified PAN (%) *<input type="number" name="associate_tds_no_pan_pct" required min="0" max="40" step="0.01" value="<?= htmlspecialchars(number_format($s['no_pan_rate'], 2, '.', '')) ?>" placeholder="e.g. 20.00"></label>
+    <label class="full"><input type="checkbox" name="associate_tds_foreign" value="1"<?= $s['foreign'] ? ' checked' : '' ?>> Deduct TDS for associates based abroad too (off: no TDS once TRC, 10F and no-PE are on file)</label>
+    <label class="full"><input type="checkbox" name="associate_15cb_required" value="1"<?= $s['cb_required'] ? ' checked' : '' ?>> Form 15CB (CA certificate) required with Form 15CA for each payment abroad</label>
+    <label>Zoho Books TDS tax id<input type="text" name="zoho_tds_tax_id" maxlength="40" pattern="[0-9A-Za-z_\-]*" value="<?= htmlspecialchars($s['zoho_tax_id']) ?>" placeholder="e.g. 460000000012345 (blank = CA books TDS)"></label>
+    <label class="full">Reason for the change *<input type="text" name="reason" required minlength="10" maxlength="255" placeholder="e.g. CA confirmed 194H at 2% on 2 Nov 2026"></label>
+    <div class="full"><button type="submit">Save</button></div>
+  </form>
+</div>

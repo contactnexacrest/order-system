@@ -15,7 +15,7 @@
       <?php if ($ageing === []): ?><tr><td colspan="6" class="muted">Nothing waiting.</td></tr><?php endif; ?>
     </table></div>
 
-  <div class="section"><h2>TDS register <a class="btn-sm btn-secondary" href="/reports/associates?fy=<?= urlencode($year) ?>&amp;format=tds">CSV</a></h2>
+  <div class="section"><h2>TDS register <a class="btn-sm btn-secondary" href="/reports/associates?fy=<?= urlencode($year) ?>&amp;format=tds">CSV</a> <a class="btn-sm btn-secondary" href="/associates/tds">By quarter, with challans &rarr;</a></h2>
     <table class="list"><tr><th>Paid on</th><th>Associate</th><th>PAN</th><th>Order</th><th>Paid INR</th><th>TDS INR</th><th>Bank reference</th></tr>
       <?php foreach ($tds as $r): ?><tr><td><?= htmlspecialchars((string) $r['paid_on']) ?></td><td><?= htmlspecialchars((string) $r['name']) ?></td><td><?= htmlspecialchars((string) ($r['pan'] ?? '')) ?></td><td><?= htmlspecialchars((string) $r['order_reference']) ?></td><td><?= $__m($r['paid_inr']) ?></td><td><?= $__m($r['tds_inr']) ?></td><td><?= htmlspecialchars((string) ($r['paid_reference'] ?? '')) ?></td></tr><?php endforeach; ?>
       <?php if ($tds === []): ?><tr><td colspan="7" class="muted">No payments in this year.</td></tr><?php endif; ?>

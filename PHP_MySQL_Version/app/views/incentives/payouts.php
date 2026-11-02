@@ -33,7 +33,7 @@ $__payDay = date('j M', strtotime(date('Y-m-t', strtotime($month . '-01'))));
       </select></label>
     <noscript><button type="submit" class="btn-sm">Show</button></noscript>
   </form>
-  <p class="muted">Pay these together with the <?= htmlspecialchars(date('F', strtotime($month . '-01'))) ?> salary on <?= htmlspecialchars($__payDay) ?> (associates: against their invoice), then mark them paid. Each order's incentive then goes to Zoho Books as Commission Expense. Staff incentives go through payroll (salary TDS); the CA advises the TDS for associates.</p>
+  <p class="muted">Pay these together with the <?= htmlspecialchars(date('F', strtotime($month . '-01'))) ?> salary on <?= htmlspecialchars($__payDay) ?> (associates: against their invoice), then mark them paid. Each order's incentive then goes to Zoho Books as Commission Expense. Staff incentives go through payroll (salary TDS). For associates the app works out the TDS (Settings &rarr; Associate TDS: section <?= htmlspecialchars(\App\Services\AssociateTds::settings()['section']) ?> at <?= htmlspecialchars(\App\Services\AssociateTds::pct(\App\Services\AssociateTds::settings()['rate'])) ?> once the financial year passes &#8377;<?= number_format(\App\Services\AssociateTds::settings()['threshold'], 0) ?>) — pay the net amount and deposit the TDS by the 7th of next month.</p>
 
   <table class="list">
     <tr><th>Person</th><th>Order</th><th>Role</th><th>Amount</th><th>Status</th><th>Paid on · amount paid · TDS</th></tr>
@@ -45,14 +45,31 @@ $__payDay = date('j M', strtotime(date('Y-m-t', strtotime($month . '-01'))));
         <td>&#8377;<?= number_format((float) $r['amount_inr'], 2) ?><?= $r['payee_kind'] === 'associate' && $r['currency_code'] !== null && $r['currency_code'] !== 'INR' ? '<br><small class="muted">' . htmlspecialchars((string) $r['currency_code']) . ' ' . number_format((float) $r['amount_fc'], 2) . ' (order currency)</small>' : '' ?></td>
         <td><?= $r['status'] === 'paid' ? '<span class="badge badge-success">Paid ' . htmlspecialchars(\App\Helpers\Dates::short((string) $r['paid_on'])) . '</span><br><small class="muted">&#8377;' . number_format((float) $r['paid_inr'], 2) . ($r['tds_inr'] !== null ? ' · TDS &#8377;' . number_format((float) $r['tds_inr'], 2) : '') . '</small>' : '<span class="badge badge-warning">Due</span>' ?></td>
         <td>
+          <?php $__t = $tdsCalc[(int) $r['id']] ?? null; ?>
+          <?php if ($r['status'] === 'paid' && $r['payee_kind'] === 'associate' && !empty($r['tds_reason'])): ?>
+            <small class="muted">TDS: <?= htmlspecialchars((string) $r['tds_reason']) ?></small>
+          <?php endif; ?>
           <?php if ($r['status'] === 'due'): ?>
-            <form method="post" action="/incentives/payouts/<?= (int) $r['id'] ?>/paid">
+            <form method="post" action="/incentives/payouts/<?= (int) $r['id'] ?>/paid"<?= $__t !== null && $__t['abroad'] ? ' enctype="multipart/form-data"' : '' ?>>
               <?= Csrf::field() ?>
               <input type="hidden" name="month" value="<?= htmlspecialchars($month) ?>">
+              <?php if ($__t !== null): ?>
+                <p class="small" data-associate-tds style="margin:0 0 4px">Gross &#8377;<?= number_format($__t['gross'], 2) ?> &middot; TDS &#8377;<?= number_format($__t['tds'], 2) ?> <span class="muted">(<?= htmlspecialchars($__t['reason']) ?>)</span> &middot; <strong>Net to pay &#8377;<?= number_format($__t['net'], 2) ?></strong></p>
+                <?php if ($__t['abroad'] && ($__t['missing_foreign'] !== [] || $__t['missing_payout'] !== [])): ?>
+                  <p class="small" style="margin:0 0 4px;color:#9a3412">Before paying: <?= htmlspecialchars(implode(', ', array_merge($__t['missing_foreign'], $__t['missing_payout']))) ?> must be on file.<?= $__t['missing_foreign'] !== [] ? ' Accept the TRC / Form 10F / no-PE on the associate\'s Documents tab first.' : '' ?></p>
+                <?php endif; ?>
+              <?php endif; ?>
               <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">
                 <input type="date" name="paid_on" required min="<?= \App\Services\IncentiveService::earliestPaidOn((string) $r['incentive_month']) ?>" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>" aria-label="Paid on" title="Paid on" style="width:10.5em">
-                <input type="number" name="paid_inr" required min="0.01" max="<?= number_format((float) $r['amount_inr'], 2, '.', '') ?>" step="0.01" value="<?= number_format((float) $r['amount_inr'], 2, '.', '') ?>" aria-label="Amount paid (₹)" title="Amount paid (₹)" style="width:8.5em" placeholder="e.g. 25000.00">
-                <input type="number" name="tds_inr" min="0" step="0.01" placeholder="TDS ₹" aria-label="TDS (₹)" title="TDS (₹), if any" style="width:7em" data-not-more-than="[name=paid_inr]" data-not-more-than-message="TDS cannot be more than the amount paid.">
+                <input type="number" name="paid_inr" required min="0.01" max="<?= number_format((float) $r['amount_inr'], 2, '.', '') ?>" step="0.01" value="<?= number_format($__t !== null ? $__t['net'] : (float) $r['amount_inr'], 2, '.', '') ?>" aria-label="Amount paid (₹)" title="<?= $__t !== null ? 'Net amount paid (₹) — the commission less TDS' : 'Amount paid (₹)' ?>" style="width:8.5em" placeholder="e.g. 25000.00">
+                <input type="number" name="tds_inr" min="0" step="0.01" placeholder="TDS ₹" aria-label="TDS (₹)" title="TDS (₹)<?= $__t !== null ? ' — worked out by the app; change it only with a reason' : ', if any' ?>" style="width:7em"<?= $__t !== null ? ' value="' . number_format($__t['tds'], 2, '.', '') . '"' : '' ?> data-not-more-than="[name=paid_inr]" data-not-more-than-message="TDS cannot be more than the amount paid.">
+                <?php if ($__t !== null): ?>
+                  <input type="text" name="tds_override_reason" minlength="10" maxlength="255" placeholder="Only if you change the TDS: why (e.g. CA advice)" aria-label="Reason for a different TDS" title="Needed only when the TDS differs from the amount worked out" style="width:16em">
+                  <?php if ($__t['abroad']): ?>
+                    <label class="small">Form 15CA <input type="file" name="form_15ca_file" accept=".pdf,.jpg,.jpeg,.png"></label>
+                    <?php if (\App\Services\AssociateTds::settings()['cb_required']): ?><label class="small">Form 15CB <input type="file" name="form_15cb_file" accept=".pdf,.jpg,.jpeg,.png"></label><?php endif; ?>
+                  <?php endif; ?>
+                <?php endif; ?>
                 <select name="paid_via" required aria-label="Paid via" title="Paid via"><option value="">Paid via…</option><?php foreach (IncentiveRepository::PAID_VIA as $__k => $__v): ?><option value="<?= $__k ?>"><?= htmlspecialchars(ucfirst($__v)) ?></option><?php endforeach; ?></select>
                 <input type="text" name="paid_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="Payroll Nov-2026 / UTR / cheque no." aria-label="Payment reference" title="Payment reference: payroll month, UTR or cheque no. (rule D-212)" style="width:13em">
                 <button type="submit" class="btn-sm">Mark paid</button>

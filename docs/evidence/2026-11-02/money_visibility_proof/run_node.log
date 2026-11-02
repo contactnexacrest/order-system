@@ -1,0 +1,9 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/12-money-matrix.spec.js:98:1 › Money matrix: every role sees only the money its permissions allow (27.7m)
+
+  Slow test file: tests/12-money-matrix.spec.js (27.7m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 passed (27.7m)
+EXIT 0

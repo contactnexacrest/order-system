@@ -48,6 +48,14 @@ implementation detail.
 - [Departments & Log in as](./21-departments.md) — departments and their designations, choosing and switching department, Admin's Preview as, a person's memberships, personal exceptions with an end date.
 - [Procurement](./22-procurement.md) — purchase requirements from Sales, supplier quotes and comparison, award and approval limits, receipt and quality check, supplier performance.
 - [My tasks, owners & cockpit](./23-coordination.md) — each department's task list built from the orders, one owner per department per order, due and escalation days, the management cockpit, the optional Order Coordinator.
+- [Export Compliance](./25-export-compliance.md) — the department for government and agency work (ECGC, Certificate of Origin, phytosanitary / fumigation / inspection, export benefit claims, eBRC / FIRC): its three roles, its task list, and what it never sees.
+- [Agreements](./26-agreements.md) — the register of agreements with clients, suppliers, logistics partners, associates and staff: signed copies, expiry dates, reminders 30 and 7 days before and on the day, renew and end early.
+
+## Guides to print or share
+
+Stand-alone guideline documents that go with this manual. Each one is also in the app's **Reference Library** (menu → Reference Library) so every user finds it in the same place.
+
+- **Supplier & Logistics Payments Guide** — [PDF](./guides/Supplier_and_Logistics_Payments_Guide.pdf) · [Word](./guides/Supplier_and_Logistics_Payments_Guide.docx). Only supplier and logistics partner (CHA, transport, freight forwarder) advance and balance payments: what to type in each box, with numbered screenshots, a marked-up sample bill, 10 common mistakes and a one-page cheat sheet. The same steps are on screen at **Help → Supplier & logistics partner payments** (`/help/supplier-logistics-payments`), linked from Steps 7e, 10a and the Logistics Partner Bills card.
 
 ## The running examples
 
