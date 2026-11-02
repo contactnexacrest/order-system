@@ -318,6 +318,11 @@ final class DocumentDataAssembler
                 // computation above for the full rationale. CI-only;
                 // every other document keeps using total_value above.
                 'total_commercial_invoice_value' => self::formatMoney($totalCommercialInvoiceValue),
+                // Owner decision D-224 (D5, 2 Nov 2026, confirmed twice): the CI's
+                // "Total Invoice Value in Words" line prints the same figure as
+                // Total Commercial Invoice Value, in words — never a blank line.
+                'total_invoice_value_in_words' => \App\Helpers\AmountInWords::format(round((float) $totalCommercialInvoiceValue, 2), $order['currency_code'] ?? null),
+                'fob_value_in_words' => \App\Helpers\AmountInWords::format(round((float) $fobValue, 2), $order['currency_code'] ?? null),
                 'freight_insurance_amount' => $freightForTotal !== null ? self::formatMoney($freightForTotal) : null,
                 'preset_name'      => $order['preset_name'],
             ],

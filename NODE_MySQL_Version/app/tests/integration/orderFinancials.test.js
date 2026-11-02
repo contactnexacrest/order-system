@@ -148,7 +148,8 @@ describe('Order Financials (Section AP)', () => {
     const supplierId = await supplierRepository.create({ supplier_legal_name: 'Jest Test Supplier' });
     await orderSupplierPoRepository.create(orderId, supplierId, 'SUPPO-JTEST-1', { total_payable_inr: '30000' }, 'issued');
 
-    await orderFreightRepository.upsert(orderId, { confirmed_freight_rate: 5000, insurance_amount: 1000 });
+    // D6 (2 Nov 2026): Step 9a freight/insurance are in the order currency — 50 + 10 at 85.
+    await orderFreightRepository.upsert(orderId, { confirmed_freight_rate: 50, insurance_amount: 10 });
 
     await orderCostEntryRepository.create(orderId, 'cha_charges', null, 2000.0, null, userId);
     await orderCostEntryRepository.create(orderId, 'bank_charges', null, 500.0, null, userId);
@@ -157,12 +158,12 @@ describe('Order Financials (Section AP)', () => {
 
     expect(p.revenue_inr).toBe(85000);
     expect(p.supplier_cost_inr).toBe(30000);
-    expect(p.freight_cost_inr).toBe(5000);
-    expect(p.insurance_cost_inr).toBe(1000);
+    expect(p.freight_cost_inr).toBe(4250);
+    expect(p.insurance_cost_inr).toBe(850);
     expect(p.other_costs_inr).toBe(2500);
-    expect(p.total_cost_inr).toBe(38500);
-    expect(p.profit_inr).toBe(46500);
-    expect(p.margin_pct).toBeCloseTo(Math.round((46500 / 85000) * 100 * 100) / 100, 2);
+    expect(p.total_cost_inr).toBe(37600);
+    expect(p.profit_inr).toBe(47400);
+    expect(p.margin_pct).toBeCloseTo(Math.round((47400 / 85000) * 100 * 100) / 100, 2);
   });
 
   /**
@@ -233,7 +234,8 @@ describe('Order Financials (Section AP)', () => {
     await orderPaymentStatusRepository.setAdvanceInrActual(orderId, 42500.0, userId);
     await orderPaymentStatusRepository.recordFreightReceived(orderId, 200.0, '2026-06-10');
     await orderPaymentStatusRepository.setLegExchangeRate(orderId, 'freight', 85.0, userId);
-    await orderFreightRepository.upsert(orderId, { confirmed_freight_rate: '17000', insurance_amount: null });
+    // D6 (2 Nov 2026): the confirmed rate is in the order currency (200, the amount the Debit Note asks), at the freight leg's 85.
+    await orderFreightRepository.upsert(orderId, { confirmed_freight_rate: '200', insurance_amount: null });
 
     const p = await orderProfitabilityService.computeForOrder(orderId);
 

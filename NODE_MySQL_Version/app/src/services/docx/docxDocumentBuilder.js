@@ -40,6 +40,25 @@ function freightTermsSentence(incoterm) {
   }
 }
 
+// The rows of the shared Buyer Details block (templates/_buyer_details),
+// in the same order and with the same blanks rule as the PDF.
+function buyerDetailsRows(buyer) {
+  const v = (k) => String((buyer && buyer[k]) ?? '').trim();
+  const rows = [
+    { label: 'Company Legal Name *', value: g(buyer, 'company_legal_name') },
+    { label: 'Billing Address Line 1 *', value: v('billing_address_line1') !== '' ? v('billing_address_line1') : g(buyer, 'billing_address') },
+  ];
+  if (v('billing_address_line2') !== '') rows.push({ label: 'Billing Address Line 2', value: v('billing_address_line2') });
+  if (v('billing_city') !== '') rows.push({ label: 'City / Town *', value: v('billing_city') });
+  if (v('billing_postcode') !== '') rows.push({ label: 'Postcode *', value: v('billing_postcode') });
+  rows.push({ label: 'Country *', value: v('country_of_destination') !== '' ? v('country_of_destination') : 'To Be Confirmed' });
+  rows.push({ label: 'VAT / EORI / Tax Reg. No. *', value: v('vat_eori_tax_no') !== '' ? v('vat_eori_tax_no') : 'To Be Confirmed' });
+  rows.push({ label: 'Contact Person *', value: v('contact_person') !== '' ? v('contact_person') : 'To Be Confirmed' });
+  rows.push({ label: 'Phone *', value: v('phone') !== '' ? v('phone') : '—' });
+  rows.push({ label: 'Email *', value: v('email') !== '' ? v('email') : 'To Be Confirmed' });
+  return rows;
+}
+
 // Owner (1 Nov 2026, confirmed twice): the PI prints Buyer's PO / Ref No.
 // only once one has been entered — no empty or "NIL" row.
 function buyerPoRow(order) {
@@ -589,6 +608,8 @@ function renderOc(context) {
       { label: 'Quotation No. *', value: g(order, 'quotation_ref', '—') },
       { label: 'Quotation Date *', value: g(order, 'quotation_date', '—') },
       { label: 'Proforma Invoice No. *', value: g(order, 'pi_ref', '—') },
+      // Owner decision D-224 (D1, 2 Nov 2026, confirmed twice): the buyer's PO number, when entered.
+      ...buyerPoRow(order),
       { label: 'Product(s) *', value: productList.join('; ') },
       { label: 'Total Order Value (FOB) *', value: `${currency} ${g(financial, 'total_value')}` },
       { label: 'Incoterm', value: g(order, 'incoterm_label') },
@@ -1140,15 +1161,9 @@ function renderFdn(context) {
 
   children.push(...defaultSection1(context, 'FROM (SELLER / EXPORTER)'));
 
+  // Owner decision D-224 (D2, 2 Nov 2026, confirmed twice): the full buyer block, as on the QT/PI/CI PDF.
   children.push(...C.sectionTitle('2. TO (BUYER)'));
-  children.push(
-    ...C.kvTable([
-      { label: 'Company Legal Name *', value: g(buyer, 'company_legal_name') },
-      { label: 'Billing Address *', value: g(buyer, 'billing_address') },
-      { label: 'Contact Person *', value: g(buyer, 'contact_person', 'To Be Confirmed') },
-      { label: 'Email *', value: g(buyer, 'email', 'To Be Confirmed') },
-    ])
-  );
+  children.push(...C.kvTable(buyerDetailsRows(buyer)));
 
   const productList = (context.products || []).map((p) => `${p.description || ''} (${p.quantity ?? ''} ${p.unit || ''})`).join('; ');
   children.push(...C.sectionTitle('3. ORDER REFERENCE'));
@@ -1477,33 +1492,24 @@ function renderBli(context) {
     ...C.colorBox(C.RED_BG, C.RED_BORDER, [
       C.plain('MANDATORY INSTRUCTION — DO NOT ISSUE SEA WAYBILL OR EXPRESS BL', { bold: true, size: 22 }),
       C.rich([['Always issue: ', { bold: true }], ['ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS', { bold: true, size: 24 }]]),
-      C.rich([
-        ['Reason: ', { bold: true, color: C.RED_TEXT }],
-        [
-          `NexaCrest payment terms are ${g(context.financial || {}, 'advance_pct')}% advance + ${g(context.financial || {}, 'balance_pct')}% balance payable against the original BL. NexaCrest retains all 3 original BLs and only releases them to the buyer AFTER the balance T/T is received and cleared in the NexaCrest bank account. Under a Sea Waybill or Express BL, the buyer can collect the cargo without surrendering any document — NexaCrest would lose all financial leverage and may not receive the balance. A Sea Waybill must NEVER be issued for NexaCrest shipments.`,
-          { color: C.RED_SUB },
-        ],
-      ]),
     ])
   );
   const blRows = [];
   if ((bl.type_instruction ?? null) !== null) {
     blRows.push({ label: 'BL Type *', value: g(bl, 'type_instruction') });
   }
-  blRows.push({ label: 'No. of Original Copies *', value: '3 (three originals) — NexaCrest will hold all 3 originals until balance payment is received.' });
-  blRows.push({ label: 'No. of Non-Negotiable Copies', value: '3 — for buyer records and NexaCrest file; released freely.' });
+  blRows.push({ label: 'No. of Original Copies *', value: '3 (three originals)' });
+  blRows.push({ label: 'No. of Non-Negotiable Copies', value: '3' });
   if ((bl.consignee_instruction ?? null) !== null) {
-    blRows.push({ label: 'BL Consignee Instruction *', value: `${g(bl, 'consignee_instruction')} — ensures the BL is to NexaCrest's order; buyer cannot endorse or use the BL until NexaCrest endorses and releases it.` });
+    blRows.push({ label: 'BL Consignee Instruction *', value: g(bl, 'consignee_instruction') });
   }
   children.push(...C.kvTable(blRows, true));
   children.push(
     ...C.colorBox(C.BLUE_BG, '042C53', [
       C.rich([
-        ['Original BL release process: ', { bold: true }],
-        [
-          'Once all 3 originals are issued, CHA to hand them to NexaCrest only. NexaCrest will courier originals to the buyer after confirming receipt of the balance T/T payment in the NexaCrest bank account. NexaCrest retains all original BLs until balance payment is received and cleared. Cargo release at destination is subject to carrier and destination port procedures.',
-          { color: C.BLUE_TEXT },
-        ],
+        // Owner decision D-224 (D3, 2 Nov 2026, confirmed twice): the CHA gets the instruction only.
+        ['Original BL release: ', { bold: true }],
+        ['CHA to hand all 3 originals to NexaCrest only — never to the buyer or anyone else.', { color: C.BLUE_TEXT }],
       ]),
     ], 0)
   );
@@ -1603,7 +1609,7 @@ function renderCi(context) {
   children.push(
     ...C.colorBox('E8F1FB', C.BLUE_TEXT, [
       C.plain(
-        'FOB Value is the basis for all payments and required for Indian Shipping Bill & IGST refund — shown separately below regardless of Incoterm. '
+        'FOB Value is the basis for all payments and is the value declared on the Indian Shipping Bill — shown separately below regardless of Incoterm. '
           + (isFob
             ? 'Freight & Insurance is not applicable — buyer arranges, FOB.'
             : `${isCif ? 'Freight & Insurance is' : 'Freight is'} recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.`),
@@ -1614,7 +1620,7 @@ function renderCi(context) {
 
   const freightRemark = isFob ? 'FOB: buyer arranges — write NIL' : `Paid separately via Freight Debit Note No. ${g(order, 'fdn_ref', 'To Be Confirmed')} dated ${g(order, 'fdn_date', 'To Be Confirmed')}. Included in the Total Commercial Invoice Value below.`;
   const sectionARows = [
-    ['FOB Value (goods)', `${currency} ${g(financial, 'fob_value')} *`, 'Sum of all product lines above — basis for all payments; required for Indian Shipping Bill & IGST refund'],
+    ['FOB Value (goods)', `${currency} ${g(financial, 'fob_value')} *`, 'Sum of all product lines above — basis for all payments; the value declared on the Indian Shipping Bill'],
     [isCif || isFob ? 'Freight & Insurance' : 'Freight', `${isFob ? 'NIL — FOB order' : `${currency} ${g(financial, 'freight_insurance_amount', 'To Be Confirmed')}`} *`, freightRemark],
     ['TOTAL COMMERCIAL INVOICE VALUE', `${currency} ${g(financial, 'total_commercial_invoice_value')} *`, `${isFob ? '= FOB Value (no freight/insurance on an FOB order)' : isCif ? '= FOB Value + Freight & Insurance' : '= FOB Value + Freight'} · Currency: ${currency}`],
   ];
@@ -1665,7 +1671,7 @@ function renderCi(context) {
   children.push(
     C.rich([
       [`Total Invoice Value in Words (${currency}): `, { bold: true }],
-      [g(financial, 'fob_value_in_words', '_________________________________________________________'), { italics: true, color: C.MUTED }],
+      [g(financial, 'total_invoice_value_in_words', '_________________________________________________________'), { bold: true }],
       [' *', { bold: true, color: 'C0392B' }],
     ])
   );

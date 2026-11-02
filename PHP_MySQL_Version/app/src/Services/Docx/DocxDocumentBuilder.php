@@ -79,6 +79,36 @@ final class DocxDocumentBuilder
     }
 
     /**
+     * The rows of the shared Buyer Details block (templates/_buyer_details),
+     * in the same order and with the same blanks rule as the PDF.
+     *
+     * @return array<int,array{label:string,value:string}>
+     */
+    private static function buyerDetailsRows(array $buyer): array
+    {
+        $v = static fn(string $k): string => trim((string) ($buyer[$k] ?? ''));
+        $rows = [
+            ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
+            ['label' => 'Billing Address Line 1 *', 'value' => $v('billing_address_line1') !== '' ? $v('billing_address_line1') : self::g($buyer, 'billing_address')],
+        ];
+        if ($v('billing_address_line2') !== '') {
+            $rows[] = ['label' => 'Billing Address Line 2', 'value' => $v('billing_address_line2')];
+        }
+        if ($v('billing_city') !== '') {
+            $rows[] = ['label' => 'City / Town *', 'value' => $v('billing_city')];
+        }
+        if ($v('billing_postcode') !== '') {
+            $rows[] = ['label' => 'Postcode *', 'value' => $v('billing_postcode')];
+        }
+        $rows[] = ['label' => 'Country *', 'value' => $v('country_of_destination') !== '' ? $v('country_of_destination') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => $v('vat_eori_tax_no') !== '' ? $v('vat_eori_tax_no') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'Contact Person *', 'value' => $v('contact_person') !== '' ? $v('contact_person') : 'To Be Confirmed'];
+        $rows[] = ['label' => 'Phone *', 'value' => $v('phone') !== '' ? $v('phone') : '—'];
+        $rows[] = ['label' => 'Email *', 'value' => $v('email') !== '' ? $v('email') : 'To Be Confirmed'];
+        return $rows;
+    }
+
+    /**
      * Owner (1 Nov 2026, confirmed twice): the PI prints Buyer's PO / Ref No.
      * only once one has been entered — no empty or "NIL" row.
      *
@@ -604,6 +634,8 @@ final class DocxDocumentBuilder
             ['label' => 'Quotation No. *', 'value' => self::g($order, 'quotation_ref', '—')],
             ['label' => 'Quotation Date *', 'value' => self::g($order, 'quotation_date', '—')],
             ['label' => 'Proforma Invoice No. *', 'value' => self::g($order, 'pi_ref', '—')],
+            // Owner decision D-224 (D1, 2 Nov 2026, confirmed twice): the buyer's PO number, when entered.
+            ...self::buyerPoRow($order),
             ['label' => 'Product(s) *', 'value' => implode('; ', $productList)],
             ['label' => 'Total Order Value (FOB) *', 'value' => $currency . ' ' . self::g($financial, 'total_value')],
             ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label')],
@@ -1121,13 +1153,9 @@ final class DocxDocumentBuilder
 
         self::addDefaultSection1($section, $context, 'FROM (SELLER / EXPORTER)');
 
+        // Owner decision D-224 (D2, 2 Nov 2026, confirmed twice): the full buyer block, as on the QT/PI/CI PDF.
         DocxComponents::addSectionTitle($section, '2. TO (BUYER)');
-        DocxComponents::addKvTable($section, [
-            ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
-            ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
-            ['label' => 'Contact Person *', 'value' => self::g($buyer, 'contact_person', 'To Be Confirmed')],
-            ['label' => 'Email *', 'value' => self::g($buyer, 'email', 'To Be Confirmed')],
-        ]);
+        DocxComponents::addKvTable($section, self::buyerDetailsRows($buyer));
 
         $productList = implode('; ', array_map(static fn(array $p) => ($p['description'] ?? '') . ' (' . ($p['quantity'] ?? '') . ' ' . ($p['unit'] ?? '') . ')', $context['products'] ?? []));
         DocxComponents::addSectionTitle($section, '3. ORDER REFERENCE');
@@ -1396,24 +1424,22 @@ final class DocxDocumentBuilder
             $run = $cell->addTextRun();
             $run->addText('Always issue: ', ['bold' => true]);
             $run->addText('ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS', ['bold' => true, 'size' => 12]);
-            $run2 = $cell->addTextRun();
-            $run2->addText('Reason: ', ['bold' => true, 'color' => DocxComponents::RED_TEXT]);
-            $run2->addText('NexaCrest payment terms are ' . self::g($context['financial'] ?? [], 'advance_pct') . '% advance + ' . self::g($context['financial'] ?? [], 'balance_pct') . '% balance payable against the original BL. NexaCrest retains all 3 original BLs and only releases them to the buyer AFTER the balance T/T is received and cleared in the NexaCrest bank account. Under a Sea Waybill or Express BL, the buyer can collect the cargo without surrendering any document — NexaCrest would lose all financial leverage and may not receive the balance. A Sea Waybill must NEVER be issued for NexaCrest shipments.', ['color' => DocxComponents::RED_SUB]);
         });
         $blRows = [];
         if (($bl['type_instruction'] ?? null) !== null) {
             $blRows[] = ['label' => 'BL Type *', 'value' => self::g($bl, 'type_instruction')];
         }
-        $blRows[] = ['label' => 'No. of Original Copies *', 'value' => '3 (three originals) — NexaCrest will hold all 3 originals until balance payment is received.'];
-        $blRows[] = ['label' => 'No. of Non-Negotiable Copies', 'value' => '3 — for buyer records and NexaCrest file; released freely.'];
+        $blRows[] = ['label' => 'No. of Original Copies *', 'value' => '3 (three originals)'];
+        $blRows[] = ['label' => 'No. of Non-Negotiable Copies', 'value' => '3'];
         if (($bl['consignee_instruction'] ?? null) !== null) {
-            $blRows[] = ['label' => 'BL Consignee Instruction *', 'value' => self::g($bl, 'consignee_instruction') . ' — ensures the BL is to NexaCrest\'s order; buyer cannot endorse or use the BL until NexaCrest endorses and releases it.'];
+            $blRows[] = ['label' => 'BL Consignee Instruction *', 'value' => self::g($bl, 'consignee_instruction')];
         }
         DocxComponents::addKvTable($section, $blRows, true);
         DocxComponents::addColorBox($section, DocxComponents::BLUE_BG, '042C53', function (AbstractContainer $cell) {
             $run = $cell->addTextRun();
-            $run->addText('Original BL release process: ', ['bold' => true]);
-            $run->addText('Once all 3 originals are issued, CHA to hand them to NexaCrest only. NexaCrest will courier originals to the buyer after confirming receipt of the balance T/T payment in the NexaCrest bank account. NexaCrest retains all original BLs until balance payment is received and cleared. Cargo release at destination is subject to carrier and destination port procedures.', ['color' => DocxComponents::BLUE_TEXT]);
+            // Owner decision D-224 (D3, 2 Nov 2026, confirmed twice): the CHA gets the instruction only.
+            $run->addText('Original BL release: ', ['bold' => true]);
+            $run->addText('CHA to hand all 3 originals to NexaCrest only — never to the buyer or anyone else.', ['color' => DocxComponents::BLUE_TEXT]);
         }, 0);
 
         DocxComponents::addTermsSection($section, $context, (int) ($context['terms_section_number'] ?? 9), (string) ($context['terms_section_title'] ?? 'TERMS & CONDITIONS'));
@@ -1499,7 +1525,7 @@ final class DocxDocumentBuilder
         $isFob = !empty($order['is_fob']);
         $isCif = !empty($order['is_cif']);
         DocxComponents::addColorBox($section, 'E8F1FB', DocxComponents::BLUE_TEXT, function (AbstractContainer $cell) use ($isFob, $isCif) {
-            $text = 'FOB Value is the basis for all payments and required for Indian Shipping Bill & IGST refund — shown separately below regardless of Incoterm. '
+            $text = 'FOB Value is the basis for all payments and is the value declared on the Indian Shipping Bill — shown separately below regardless of Incoterm. '
                 . ($isFob
                     ? 'Freight & Insurance is not applicable — buyer arranges, FOB.'
                     : ($isCif ? 'Freight & Insurance is' : 'Freight is') . ' recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.');
@@ -1515,7 +1541,7 @@ final class DocxDocumentBuilder
             ? 'FOB: buyer arranges — write NIL'
             : 'Paid separately via Freight Debit Note No. ' . self::g($order, 'fdn_ref', 'To Be Confirmed') . ' dated ' . self::g($order, 'fdn_date', 'To Be Confirmed') . '. Included in the Total Commercial Invoice Value below.';
         $sectionARows = [
-            ['FOB Value (goods)', $currency . ' ' . self::g($financial, 'fob_value') . ' *', 'Sum of all product lines above — basis for all payments; required for Indian Shipping Bill & IGST refund'],
+            ['FOB Value (goods)', $currency . ' ' . self::g($financial, 'fob_value') . ' *', 'Sum of all product lines above — basis for all payments; the value declared on the Indian Shipping Bill'],
             [$isCif || $isFob ? 'Freight & Insurance' : 'Freight', ($isFob ? 'NIL — FOB order' : ($currency . ' ' . self::g($financial, 'freight_insurance_amount', 'To Be Confirmed'))) . ' *', $freightRemark],
             ['TOTAL COMMERCIAL INVOICE VALUE', $currency . ' ' . self::g($financial, 'total_commercial_invoice_value') . ' *', ($isFob ? '= FOB Value (no freight/insurance on an FOB order)' : ($isCif ? '= FOB Value + Freight & Insurance' : '= FOB Value + Freight')) . ' · Currency: ' . $currency],
         ];
@@ -1547,7 +1573,7 @@ final class DocxDocumentBuilder
 
         DocxComponents::addRichParagraph($section, [
             ['Total Invoice Value in Words (' . $currency . '): ', ['bold' => true]],
-            [self::g($financial, 'fob_value_in_words', '_________________________________________________________'), ['italic' => true, 'color' => DocxComponents::MUTED]],
+            [self::g($financial, 'total_invoice_value_in_words', '_________________________________________________________'), ['bold' => true]],
             [' *', ['bold' => true, 'color' => 'C0392B']],
         ]);
 

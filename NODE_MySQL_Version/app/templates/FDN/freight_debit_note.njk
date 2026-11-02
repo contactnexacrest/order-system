@@ -22,13 +22,8 @@
 
 {% block body %}
 
-<div class="section-title">2. TO (BUYER)</div>
-<table class="kv">
-  <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
-  <tr><td class="k">Billing Address *</td><td class="v">{{ buyer.billing_address }}</td></tr>
-  <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person or 'To Be Confirmed' }}</td></tr>
-  <tr><td class="k">Email *</td><td class="v">{{ buyer.email or 'To Be Confirmed' }}</td></tr>
-</table>
+{# Owner decision D-224 (D2, 2 Nov 2026, confirmed twice): the full buyer block, as on the QT/PI/CI. #}
+{% set section_number = 2 %}{% set section_title = 'TO (BUYER)' %}{% include '_buyer_details.njk' %}{% set section_title = false %}
 
 <div class="section-title">3. ORDER REFERENCE</div>
 {% set productList = [] %}

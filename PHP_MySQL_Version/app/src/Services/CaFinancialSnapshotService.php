@@ -216,8 +216,8 @@ final class CaFinancialSnapshotService
 
         // C1 — freight & insurance as counted in the profit.
         $freightRows = [
-            ['Ocean freight', $profit['freight_from_bills'] ? "Freight forwarder's bills (listed in C2)" : 'Confirmed rate (Step 9a) — replaced by the forwarder\'s bills once added', self::money($profit['freight_cost_inr'])],
-            ['Insurance', 'Step 9a', self::money($profit['insurance_cost_inr'])],
+            ['Ocean freight', $profit['freight_from_bills'] ? "Freight forwarder's bills (listed in C2)" : 'Confirmed rate (Step 9a)' . (($__ft = OrderProfitabilityService::conversionText($profit, 'freight')) !== null ? ': ' . $__ft : '') . ' — replaced by the forwarder\'s bills once added', self::money($profit['freight_cost_inr'])],
+            ['Insurance', 'Step 9a' . (($__it = OrderProfitabilityService::conversionText($profit, 'insurance')) !== null ? ': ' . $__it : ''), self::money($profit['insurance_cost_inr'])],
         ];
         $c1 = $profit['freight_cost_inr'] + $profit['insurance_cost_inr'];
 

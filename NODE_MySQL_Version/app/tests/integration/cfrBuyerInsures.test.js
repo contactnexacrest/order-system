@@ -67,8 +67,14 @@ describe('CFR: buyer insures (QA Round 5, Q-R5-2)', () => {
   });
 
   it('profit ignores insurance on CFR', async () => {
-    expect((await orderProfitabilityService.computeForOrder(await orderWithFreight('CFR'))).insurance_cost_inr).toBe(0);
-    expect((await orderProfitabilityService.computeForOrder(await orderWithFreight('CIF'))).insurance_cost_inr).toBe(150);
+    // D6 (2 Nov 2026): the Step 9a insurance is in the order currency and
+    // only becomes rupees with a rate (none recorded here) — what matters
+    // for this rule is that a CFR order carries none at all.
+    const cfr = await orderProfitabilityService.computeForOrder(await orderWithFreight('CFR'));
+    const cif = await orderProfitabilityService.computeForOrder(await orderWithFreight('CIF'));
+    expect(cfr.insurance_cost_inr).toBe(0);
+    expect(cfr.insurance_foreign).toBeNull();
+    expect(cif.insurance_foreign).toBe(150);
   });
 
   it('the Quotation and Proforma print "buyer insures" on CFR', () => {

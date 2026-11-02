@@ -3508,8 +3508,8 @@
             <div><span class="k">Revenue (INR){% if profitability.revenue_is_estimated %} — estimated{% endif %}</span><span class="v">{{ profitability.revenue_inr | money }}</span></div>
             <div><span class="k">Govt. Export Benefits (INR){% if profitability.export_benefits_is_estimated %} — claimed, not yet received{% endif %}</span><span class="v">{{ profitability.export_benefits_inr | money }}</span></div>
             <div><span class="k">Supplier Cost (INR)</span><span class="v">{{ profitability.supplier_cost_inr | money }}</span></div>
-            <div><span class="k">Ocean Freight (INR){{ " — from the forwarder's bills" if profitability.freight_from_bills else '' }}</span><span class="v">{{ profitability.freight_cost_inr | money }}</span></div>
-            <div><span class="k">Insurance (INR)</span><span class="v">{{ profitability.insurance_cost_inr | money }}</span></div>
+            <div><span class="k">Ocean Freight (INR){{ " — from the forwarder's bills" if profitability.freight_from_bills else '' }}</span><span class="v">{{ profitability.freight_cost_inr | money }}{% if profitability.freight_conversion_text %}<br><small class="muted">Step 9a rate: {{ profitability.freight_conversion_text }}</small>{% endif %}</span></div>
+            <div><span class="k">Insurance (INR)</span><span class="v">{{ profitability.insurance_cost_inr | money }}{% if profitability.insurance_conversion_text %}<br><small class="muted">Step 9a: {{ profitability.insurance_conversion_text }}</small>{% endif %}</span></div>
             <div><span class="k">Logistics Bills — CHA / Transport (INR)</span><span class="v">{{ profitability.logistics_cost_inr | money }}</span></div>
             <div><span class="k">Order Expenses (INR)</span><span class="v">{{ profitability.expenses_inr | money }}</span></div>
             <div><span class="k">Expenses Booked in Zoho Books (INR)</span><span class="v">{{ profitability.zoho_expenses_inr | money }}</span></div>

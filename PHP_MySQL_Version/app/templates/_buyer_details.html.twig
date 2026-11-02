@@ -7,7 +7,7 @@
   No "Same as X" checkbox here — this section is always the buyer's own
   independently-entered details.
 #}
-<div class="section-title">{{ section_number }}. BUYER DETAILS</div>
+<div class="section-title">{{ section_number }}. {{ section_title|default('BUYER DETAILS') }}</div>
 <table class="kv">
   <tr><td class="k">Company Legal Name *</td><td class="v">{{ buyer.company_legal_name }}</td></tr>
   <tr><td class="k">Billing Address Line 1 *</td><td class="v">{{ buyer.billing_address_line1 ?: buyer.billing_address }}</td></tr>

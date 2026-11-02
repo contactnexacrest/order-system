@@ -68,8 +68,14 @@ final class CfrBuyerInsuresTest extends DbTestCase
 
     public function testProfitIgnoresInsuranceOnCfr(): void
     {
-        self::assertSame(0.0, OrderProfitabilityService::computeForOrder($this->orderWithFreight('CFR'))['insurance_cost_inr']);
-        self::assertSame(150.0, OrderProfitabilityService::computeForOrder($this->orderWithFreight('CIF'))['insurance_cost_inr']);
+        // D6 (2 Nov 2026): the Step 9a insurance is in the order currency and
+        // only becomes rupees with a rate (none recorded here) — what matters
+        // for this rule is that a CFR order carries none at all.
+        $cfr = OrderProfitabilityService::computeForOrder($this->orderWithFreight('CFR'));
+        $cif = OrderProfitabilityService::computeForOrder($this->orderWithFreight('CIF'));
+        self::assertSame(0.0, $cfr['insurance_cost_inr']);
+        self::assertNull($cfr['insurance_foreign']);
+        self::assertSame(150.0, $cif['insurance_foreign']);
     }
 
     public function testQuotationAndProformaPrintBuyerInsuresOnCfr(): void

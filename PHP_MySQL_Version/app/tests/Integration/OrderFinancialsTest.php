@@ -136,7 +136,8 @@ final class OrderFinancialsTest extends DbTestCase
         $supplierId = SupplierRepository::create(['supplier_legal_name' => 'PHPUnit Test Supplier']);
         OrderSupplierPoRepository::create($orderId, $supplierId, 'SUPPO-TEST-1', $this->fullSupplierPoData(['total_payable_inr' => '30000']), 'issued');
 
-        OrderFreightRepository::upsert($orderId, ['confirmed_freight_rate' => 5000, 'insurance_amount' => 1000]);
+        // D6 (2 Nov 2026): Step 9a freight/insurance are in the order currency — 50 + 10 at 85.
+        OrderFreightRepository::upsert($orderId, ['confirmed_freight_rate' => 50, 'insurance_amount' => 10]);
 
         OrderCostEntryRepository::create($orderId, 'cha_charges', null, 2000.0, null, $userId);
         OrderCostEntryRepository::create($orderId, 'bank_charges', null, 500.0, null, $userId);
@@ -145,12 +146,12 @@ final class OrderFinancialsTest extends DbTestCase
 
         self::assertSame(85000.0, $p['revenue_inr']);
         self::assertSame(30000.0, $p['supplier_cost_inr']);
-        self::assertSame(5000.0, $p['freight_cost_inr']);
-        self::assertSame(1000.0, $p['insurance_cost_inr']);
+        self::assertSame(4250.0, $p['freight_cost_inr']);
+        self::assertSame(850.0, $p['insurance_cost_inr']);
         self::assertSame(2500.0, $p['other_costs_inr']);
-        self::assertSame(38500.0, $p['total_cost_inr']);
-        self::assertSame(46500.0, $p['profit_inr']);
-        self::assertSame(round(46500 / 85000 * 100, 2), $p['margin_pct']);
+        self::assertSame(37600.0, $p['total_cost_inr']);
+        self::assertSame(47400.0, $p['profit_inr']);
+        self::assertSame(round(47400 / 85000 * 100, 2), $p['margin_pct']);
     }
 
     /**
@@ -237,7 +238,8 @@ final class OrderFinancialsTest extends DbTestCase
         OrderPaymentStatusRepository::setAdvanceInrActual($orderId, 42500.0, $userId);
         OrderPaymentStatusRepository::recordFreightReceived($orderId, 200.0, '2026-06-10');
         OrderPaymentStatusRepository::setLegExchangeRate($orderId, 'freight', 85.0, $userId);
-        OrderFreightRepository::upsert($orderId, ['confirmed_freight_rate' => '17000', 'insurance_amount' => null]);
+        // D6 (2 Nov 2026): the confirmed rate is in the order currency (200, the amount the Debit Note asks), at the freight leg's 85.
+        OrderFreightRepository::upsert($orderId, ['confirmed_freight_rate' => '200', 'insurance_amount' => null]);
 
         $p = OrderProfitabilityService::computeForOrder($orderId);
 

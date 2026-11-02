@@ -57,3 +57,16 @@ Booking clause and the Buyer PO (C-16, D-219). Where this folder and the
 register disagree, the register — and the app's templates that follow it
 — win. This folder was not edited for those changes.
 
+**Exception — 1–2 November 2026 (D-223, D1–D5):** these changes were made in
+this folder too, so the reference Word documents, the app's PDFs and the
+app's Word output say the same thing (owner: "reference document + system
+generated word + pdf all must be in sync"): the Proforma Invoice and Order
+Confirmation carry "Buyer's PO / Ref No."; the Debit Note's To (Buyer) has
+the full buyer field list; the BL Instruction's section 8 has no grey notes
+under the copies and ends with "Original BL release: CHA to hand all 3
+originals to NexaCrest only — never to the buyer or anyone else."
+(`buyer_documents/` both tiers and `internal_documents/BL_Instruction.docx`);
+the Commercial Invoice no longer mentions an IGST refund and its amount in
+words is a bold placeholder the app fills. See `reference/NexaCrest_Change_Log.txt`
+(1–2 November 2026) and `reference/NexaCrest_Developer_Spec.txt`.
+

@@ -41,11 +41,11 @@ const orderSupplierPoRepository = require('../repositories/orderSupplierPoReposi
  *     marks the figure estimated on its account.
  *   - Supplier cost: order_supplier_po.total_payable_inr (already INR).
  *   - Freight/insurance cost: order_freight.confirmed_freight_rate +
- *     insurance_amount. ASSUMPTION (documented, not verified against a
- *     real invoice): both are treated as INR figures, the same convention
- *     order_supplier_po already uses, since in practice NexaCrest pays
- *     its freight forwarder domestically — see docs/SOP for the caveat if
- *     a forwarder is ever paid in foreign currency instead.
+ *     insurance_amount, entered in the ORDER currency (Step 9a; the Debit
+ *     Note charges the buyer exactly that) and converted to INR with
+ *     freightRateToInr() — owner decision D6 of 2 Nov 2026 (register D-225). Until a rate
+ *     is known they are left out of the INR total and flagged
+ *     freight_rate_missing.
  *   - Every other cost line (CHA, documentation, port charges, bank
  *     charges, commission, packing/crates, ECGC insurance, due diligence,
  *     inland transport, other): orderCostEntryRepository, manually
@@ -69,15 +69,22 @@ async function computeForOrder(orderId) {
     ? Number(supplierPo.total_payable_inr)
     : 0;
 
-  const freight = await orderFreightRepository.find(orderId);
-  let freightCostInr = freight && freight.confirmed_freight_rate !== null
-    ? Number(freight.confirmed_freight_rate)
-    : 0;
+  // Owner decision D6 of 2 Nov 2026 (confirmed twice; register D-225): the Step 9a
+  // confirmed freight rate and insurance are entered in the ORDER's
+  // currency (the Debit Note charges the buyer exactly that), so they are
+  // converted to INR here — never added to rupee costs as they are.
   // Q-R5-2: insurance is a seller cost on CIF only; on FOB/CFR the buyer insures.
+  const freight = await orderFreightRepository.find(orderId);
   const isCif = String((order && order.incoterm_code) || '').toUpperCase() === 'CIF';
-  const insuranceCostInr = isCif && freight && freight.insurance_amount !== null
+  const freightForeign = freight && freight.confirmed_freight_rate !== null && freight.confirmed_freight_rate !== undefined
+    ? Number(freight.confirmed_freight_rate)
+    : null;
+  const insuranceForeign = isCif && freight && freight.insurance_amount !== null && freight.insurance_amount !== undefined
     ? Number(freight.insurance_amount)
-    : 0;
+    : null;
+  const [freightRate, freightRateSource] = freightRateToInr(payment);
+  let freightCostInr = freightForeign !== null && freightRate !== null ? freightForeign * freightRate : 0;
+  const insuranceCostInr = insuranceForeign !== null && freightRate !== null ? insuranceForeign * freightRate : 0;
 
   // Owner decisions (2026-10-27): the logistics partners' bills (CHA,
   // transport, forwarder) are costs of the order. The forwarder's real
@@ -98,6 +105,9 @@ async function computeForOrder(orderId) {
   if (oceanFreightBillsInr !== null) {
     freightCostInr = oceanFreightBillsInr;
   }
+  // Foreign amounts still waiting for a rate: kept out of the INR total and flagged.
+  const freightRateMissing = freightRate === null
+    && ((freightForeign !== null && oceanFreightBillsInr === null) || insuranceForeign !== null);
 
   // The order's actual expenses. Once any real travel expense is recorded, it
   // replaces the provisional travel % cost line.
@@ -128,7 +138,7 @@ async function computeForOrder(orderId) {
   const marginPct = revenueInr > 0 ? round2(profitInr / revenueInr * 100) : null;
 
   const incentiveEntries = await require('../repositories/incentiveRepository').costEntries(orderId);
-  return {
+  const result = {
     currency_code: currencyCode,
     fob_value_foreign: fobValue,
     revenue_inr: round2(revenueInr),
@@ -147,12 +157,20 @@ async function computeForOrder(orderId) {
     other_costs_by_category: byCategory,
     logistics_cost_inr: round2(logisticsCostInr),
     freight_from_bills: oceanFreightBillsInr !== null,
+    freight_foreign: freightForeign,
+    insurance_foreign: insuranceForeign,
+    freight_rate_used: freightRate,
+    freight_rate_source: freightRateSource,
+    freight_rate_missing: freightRateMissing,
     expenses_inr: round2(expenses.total),
     travel_is_provisional: !expenses.has_travel,
     total_cost_inr: round2(totalCostInr),
     profit_inr: round2(profitInr),
     margin_pct: marginPct,
   };
+  result.freight_conversion_text = result.freight_from_bills ? null : conversionText(result, 'freight');
+  result.insurance_conversion_text = conversionText(result, 'insurance');
+  return result;
 }
 
 /**
@@ -286,6 +304,51 @@ function revenueInInr(fobValue, payment) {
 }
 
 /**
+ * Owner decision D6 of 2 Nov 2026 (register D-225): how a Step 9a amount became rupees, for the Step 12
+ * screen and the CA annexure — "USD 6,000.00 × 83.50 = ₹501,000.00", or
+ * "USD 6,000.00 — not counted yet, no exchange rate". Null when there is no
+ * such amount. Mirrors PHP's OrderProfitabilityService::conversionText().
+ */
+function conversionText(profit, which) {
+  const foreign = profit[which === 'insurance' ? 'insurance_foreign' : 'freight_foreign'];
+  if (foreign === null || foreign === undefined) return null;
+  const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const amount = `${profit.currency_code || ''} ${fmt(foreign)}`.trim();
+  const rate = profit.freight_rate_used;
+  if (rate === null || rate === undefined) return `${amount} — not counted yet, no exchange rate`;
+  return `${amount} × ${fmt(rate)} = ₹${fmt(round2(Number(foreign) * Number(rate)))}`;
+}
+
+/**
+ * Owner decision D6 of 2 Nov 2026 (register D-225): the rate that turns the Step 9a
+ * freight and insurance (order currency) into INR. In order of preference:
+ * the buyer's freight payment as actually credited (INR actual ÷ amount),
+ * else that leg's own rate; else the rate the advance or balance actually
+ * settled at; else the advance/balance rate already used for the estimated
+ * revenue. [null, null] when no rate is known yet. Mirrors PHP's
+ * OrderProfitabilityService::freightRateToInr().
+ *
+ * @returns {[number|null, string|null]} [rate, source]
+ */
+function freightRateToInr(payment) {
+  if (!payment) return [null, null];
+  const num = (v) => (v !== null && v !== undefined && v !== '' ? Number(v) : null);
+  const actualRate = (inr, amount) => (inr !== null && amount !== null && amount > 0 ? inr / amount : null);
+  const candidates = [
+    ['freight_payment', actualRate(num(payment.freight_inr_actual), num(payment.freight_amount))],
+    ['freight_rate', num(payment.freight_exchange_rate)],
+    ['advance_payment', actualRate(num(payment.advance_inr_actual), num(payment.advance_amount))],
+    ['balance_payment', actualRate(num(payment.balance_inr_actual), num(payment.balance_amount))],
+    ['advance_rate', num(payment.advance_exchange_rate)],
+    ['balance_rate', num(payment.balance_exchange_rate)],
+  ];
+  for (const [source, rate] of candidates) {
+    if (rate !== null && rate > 0) return [rate, source];
+  }
+  return [null, null];
+}
+
+/**
  * 90-item backlog #83: the freight reimbursement leg (CFR/CIF orders only
  * — see computeForOrder()'s doc comment above). Mirrors the same
  * actual-vs-estimated rule the advance/balance legs use, with one
@@ -313,4 +376,4 @@ function round2(value) {
   return Math.round(value * 100) / 100;
 }
 
-module.exports = { computeForOrder };
+module.exports = { computeForOrder, conversionText };

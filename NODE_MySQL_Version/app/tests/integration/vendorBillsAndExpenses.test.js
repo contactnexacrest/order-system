@@ -212,7 +212,9 @@ describe('vendor bills and order expenses', () => {
     await db.execute('INSERT INTO order_freight (order_id, confirmed_freight_rate, insurance_amount) VALUES (:id, 90000, 1000) ON DUPLICATE KEY UPDATE confirmed_freight_rate = 90000, insurance_amount = 1000', { id: orderId });
     const travelEntry = await orderCostEntryRepository.create(orderId, 'travel_expenses', 'Travel 7% of FOB', 50000, todayIst(), adminId);
     const before = await orderProfitabilityService.computeForOrder(orderId);
-    expect(before.freight_cost_inr).toBe(90000);
+    // D6 (2 Nov 2026): the 9a rate is in the order currency and no exchange rate is recorded yet — left out and flagged.
+    expect(before.freight_cost_inr).toBe(0);
+    expect(before.freight_rate_missing).toBe(true);
     expect(before.travel_is_provisional).toBe(true);
 
     const partnerId = await logisticsPartnerRepository.create({ partner_name: 'Bills Forwarder', service_type: 'freight_forwarder' }, adminId);
@@ -226,7 +228,7 @@ describe('vendor bills and order expenses', () => {
     expect(after.logistics_cost_inr).toBe(18500);
     expect(after.expenses_inr).toBe(6200);
     expect(after.travel_is_provisional).toBe(false);
-    expect(after.total_cost_inr).toBeCloseTo(before.total_cost_inr - 90000 + 85000 + 18500 + 6200 - 50000, 2);
+    expect(after.total_cost_inr).toBeCloseTo(before.total_cost_inr + 85000 + 18500 + 6200 - 50000, 2);
 
     await clearFreight(orderId);
     await pay(orderId, cha, 18500);

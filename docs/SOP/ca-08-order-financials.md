@@ -385,14 +385,20 @@ tracks** rather than asking staff to re-enter them:
   INR, pulled automatically. Nothing to enter here.
 - **Ocean freight and insurance** — `order_freight.confirmed_freight_rate`
   and `insurance_amount`, pulled automatically. Insurance counts on CIF
-  orders only; on FOB and CFR the buyer insures (QA Round 5, Q-R5-2). **Assumption** (not
-  verified against a real invoice): both are treated as INR figures,
-  the same convention `order_supplier_po` already uses, since in
-  practice NexaCrest pays its freight forwarder domestically. If a
-  forwarder is ever paid in a foreign currency instead, the
-  profitability figures for that order will be off by whatever the
-  actual conversion difference is — there is currently no separate
-  foreign-currency freight cost field to handle that case.
+  orders only; on FOB and CFR the buyer insures (QA Round 5, Q-R5-2).
+  Both are entered at Step 9a in the **order's currency** (the Debit Note
+  charges the buyer exactly that), so they are converted to rupees
+  (owner decision D6 of 2 Nov 2026, confirmed twice; register D-225) at,
+  in this order: the rate the buyer's freight payment was actually
+  credited at; else the freight leg's own rate; else the rate the
+  advance or balance actually settled at; else the advance/balance rate
+  the estimated revenue uses. Step 12 and the CA annexure show the
+  working under each figure, e.g. "EUR 950.00 × 90.50 = ₹85,975.00".
+  Until any rate is known the amount is **not counted** and the line says
+  "EUR 950.00 — not counted yet, no exchange rate" — a foreign amount is
+  never added to rupee costs as it is. Once the forwarder's own
+  ocean-freight bills are added (already in rupees), they replace the
+  converted freight figure.
 - **Other order costs** — the sum of every Order Cost Entry above.
 - **Expenses booked in Zoho Books** — the linked Zoho expenses that count
   (section 3 above: not a possible duplicate, in rupees).
@@ -492,10 +498,12 @@ on record at the moment it's viewed.
 
 ## What this doesn't do yet
 
-- No handling for a freight forwarder paid in a foreign currency instead
-  of INR — see the assumption noted above.
+- A freight forwarder's bill is entered in rupees (the rupees actually
+  paid); a forwarder billing in a foreign currency is entered at the
+  rupees paid for it.
 - No separate multi-currency support in the Profitability Sheet: revenue
-  is always converted to INR, and every cost is assumed INR, so there is
+  and the Step 9a freight/insurance are converted to INR and every other
+  cost is entered in INR, so there is
   currently no way to see a profitability figure in the order's own
   quoted currency.
 - The draft Supplier PO carried forward on reorder is not automatically

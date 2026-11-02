@@ -232,6 +232,10 @@ SECTION 3: SECTION STRUCTURE BY DOCUMENT
   2. BUYER DETAILS         ← was "2. BUYER / CONSIGNEE" — now buyer only
   3. CONSIGNEE DETAILS     ← NEW — separate section
   4. ORDER SUMMARY (was 3)
+       Rows: Quotation No., Quotation Date, Proforma Invoice No.,
+       Buyer's PO / Ref No. (NEW 2 Nov 2026, D1 — printed only when entered),
+       Product(s), Total Order Value, Incoterm, Port of Loading, Port of
+       Discharge, Certificate of Origin.
   5. PAYMENT STATUS (was 4)
   6. PRODUCTION & ESTIMATED SHIPMENT (was 5)
   7. DOCUMENTS TO BE PROVIDED (was 6)
@@ -258,6 +262,13 @@ SECTION 3: SECTION STRUCTURE BY DOCUMENT
   5. SHIPPING DETAILS      ← was "3. SHIPPING DETAILS" — duplicate fixed
   6. PRODUCT / ORDER DETAILS (was 4)
   7. INVOICE VALUE & PAYMENT SETTLEMENT (was 5)
+       FOB note (2 Nov 2026, D4): "FOB Value is the basis for all payments
+       and is the value declared on the Indian Shipping Bill." — never "IGST
+       refund" (exports are under LUT, without payment of IGST).
+       "Total Invoice Value in Words ([CCY]):" (2 Nov 2026, D5) is always
+       filled by the app in bold from the TOTAL invoice value, e.g. "US
+       Dollars Twelve Thousand Five Hundred and Fifty Cents Only" — never a
+       blank line.
   8. BANK DETAILS (was 6)
   9. DOCUMENTS PROVIDED WITH THIS SHIPMENT (was 7)
   10. DECLARATION (was 8 — duplicate fixed)
@@ -267,6 +278,8 @@ SECTION 3: SECTION STRUCTURE BY DOCUMENT
 ---------------------
   1. FROM (SELLER / EXPORTER)
   2. TO (BUYER)             ← buyer only — no consignee section in DN
+                              Full Buyer Details field list (Section 4) —
+                              2 Nov 2026, D2 (was 4 rows)
   3. ORDER REFERENCE
   4. FREIGHT & CHARGES
   5. PAYMENT INSTRUCTIONS
@@ -304,6 +317,20 @@ FIELDS (in this order, two-column table, col1=label, col2=placeholder):
   Contact Person *            [Full name]
   Phone *                     [+country code number]
   Email *                     [buyer@email.com]
+
+  PI ONLY (owner, 1–2 Nov 2026, D-223): one extra last row —
+  Buyer's PO / Ref No.         [Buyer's PO / reference no. — printed only when entered]
+  The app prints it only when a buyer PO / reference number has been
+  entered (never blank, never "NIL").
+  DEBIT NOTE (owner, 2 Nov 2026, D2): "2. TO (BUYER)" uses this same full
+  field list (was 4 rows: Company Legal Name, Billing Address, Contact
+  Person, Email). Company Legal Name placeholder: [Must match PI exactly].
+  NO untitled table (owner, 1 Nov 2026, D-223): QT and PI carry no
+  heading-less "Certificate of Origin Type / Port of Discharge / Buyer's
+  PO" table after the party sections. Port of Discharge prints in
+  Shipping / Commercial Terms; "Certificate of Origin — [type] — Issued by
+  CAPEXIL" prints in Documents to be provided (QT) / Export Documentation
+  (PI) with the type selected on the order.
 
 IMPORTANT: Company Legal Name placeholder text varies by document:
   QT:  [Exact legal name as per company registration]
@@ -495,6 +522,13 @@ DO NOT regenerate from earlier versions. These are the authoritative final files
        Red box: MANDATORY — DO NOT ISSUE SEA WAYBILL OR EXPRESS BL
        BL Type = ORIGINAL NEGOTIABLE BILL OF LADING — 3 ORIGINALS
        BL Consignee instruction = TO ORDER OF NEXACREST INTERNATIONAL PRIVATE LIMITED
+       (2 Nov 2026, D3) No "Reason" paragraph (the CHA / shipping line is not
+       told the payment terms) and no grey notes under the number of original
+       / non-negotiable copies. One line after the table:
+       "Original BL release: CHA to hand all 3 originals to NexaCrest only —
+        never to the buyer or anyone else."
+       What happens to the originals afterwards is stated only on the buyer
+       documents (QT/PI/CI "Documents to be provided").
 
 10.2 BL ENDORSEMENT — FIELDS:
   Pay to the order of (Consignee):  [Buyer/Consignee full legal name — the party

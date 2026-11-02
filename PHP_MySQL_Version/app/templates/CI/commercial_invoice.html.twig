@@ -89,14 +89,14 @@
 {%- endif -%}.</p>
 
 <div class="section-title">{{ section_numbers.invoice_value }}. INVOICE VALUE &amp; PAYMENT SETTLEMENT</div>
-<div class="banner" style="background:#E8F1FB; color:#185FA5;">FOB Value is the basis for all payments and required for Indian Shipping Bill &amp; IGST refund — shown separately below regardless of Incoterm.{% if not order.is_fob %} {% if order.is_cif %}Freight &amp; Insurance is{% else %}Freight is{% endif %} recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.{% else %} Freight &amp; Insurance is not applicable — buyer arranges, FOB.{% endif %}</div>
+<div class="banner" style="background:#E8F1FB; color:#185FA5;">FOB Value is the basis for all payments and is the value declared on the Indian Shipping Bill — shown separately below regardless of Incoterm.{% if not order.is_fob %} {% if order.is_cif %}Freight &amp; Insurance is{% else %}Freight is{% endif %} recovered separately via Debit Note and is also added into the Total Commercial Invoice Value below, as required for buyer-country customs/import duty assessment.{% else %} Freight &amp; Insurance is not applicable — buyer arranges, FOB.{% endif %}</div>
 
 <table class="kv" style="table-layout:fixed;">
   <tr><td colspan="3" style="background:#173B73; color:#FFFFFF; font-weight:bold; border-color:#173B73;">SECTION A — INVOICE VALUE</td></tr>
   <tr>
     <td class="k" style="width:34%;">FOB Value (goods)</td>
     <td class="v" style="width:26%; text-align:right;">{{ order.currency_code }} {{ financial.fob_value }} <strong style="color:#C0392B;">*</strong></td>
-    <td class="v" style="width:40%; font-style:italic; font-size:8.5pt; color:#555555;">Sum of all product lines above — basis for all payments; required for Indian Shipping Bill &amp; IGST refund</td>
+    <td class="v" style="width:40%; font-style:italic; font-size:8.5pt; color:#555555;">Sum of all product lines above — basis for all payments; the value declared on the Indian Shipping Bill</td>
   </tr>
   <tr>
     <td class="k">Freight{% if order.is_cif or order.is_fob %} &amp; Insurance{% endif %}</td>
@@ -145,7 +145,7 @@
     <td class="v" style="font-style:italic; font-size:8.5pt; color:#555555;">{% if order.is_fob %}Freight &amp; Insurance not applicable on an FOB order.{% else %}Freight{% if order.is_cif %} &amp; Insurance is{% else %} is{% endif %} paid separately via Debit Note, not through this Advance/Balance schedule — this verification covers the FOB-value payment schedule only; see Total Commercial Invoice Value above for the full customs-declared figure.{% endif %}</td>
   </tr>
 </table>
-<p class="mandatory-note" style="margin-top:6pt;"><strong>Total Invoice Value in Words ({{ order.currency_code }}):</strong> <span class="placeholder-italic">{{ financial.fob_value_in_words ?: '_________________________________________________________' }}</span> <strong style="color:#C0392B;">*</strong></p>
+<p class="mandatory-note" style="margin-top:6pt;"><strong>Total Invoice Value in Words ({{ order.currency_code }}):</strong> <strong>{{ financial.total_invoice_value_in_words }}</strong> <strong style="color:#C0392B;">*</strong></p>
 
 <div class="section-title">{{ section_numbers.bank }}. BANK DETAILS &nbsp;(for balance T/T payment)</div>
 <table class="kv">

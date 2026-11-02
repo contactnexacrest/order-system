@@ -36,6 +36,7 @@
   <tr><td class="k">Quotation No. *</td><td class="v">{{ order.quotation_ref or '—' }}</td></tr>
   <tr><td class="k">Quotation Date *</td><td class="v">{{ order.quotation_date or '—' }}</td></tr>
   <tr><td class="k">Proforma Invoice No. *</td><td class="v">{{ order.pi_ref or '—' }}</td></tr>
+  {% if order.buyers_po_ref and order.buyers_po_ref != 'NIL' %}<tr><td class="k">Buyer's PO / Ref No.</td><td class="v">{{ order.buyers_po_ref }}</td></tr>{% endif %}
   <tr><td class="k">Product(s) *</td><td class="v">{{ productList|join('; ') }}</td></tr>
   <tr><td class="k">Total Order Value (FOB) *</td><td class="v">{{ order.currency_code }} {{ financial.total_value }}</td></tr>
   <tr><td class="k">Incoterm</td><td class="v">{{ order.incoterm_label }}</td></tr>

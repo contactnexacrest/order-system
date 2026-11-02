@@ -1,5 +1,6 @@
 'use strict';
 
+const amountInWords = require('../helpers/amountInWords');
 const fs = require('fs');
 
 const { parseDbDateTime } = require('../helpers/dbDateTime');
@@ -304,6 +305,11 @@ async function assemble(orderId, documentTypeCode = null) {
       // for the full rationale. CI-only; every other document keeps
       // using total_value above.
       total_commercial_invoice_value: formatMoney(totalCommercialInvoiceValue),
+      // Owner decision D-224 (D5, 2 Nov 2026, confirmed twice): the CI's
+      // "Total Invoice Value in Words" line prints the same figure as Total
+      // Commercial Invoice Value, in words — never a blank line.
+      total_invoice_value_in_words: amountInWords.format(Math.round(Number(totalCommercialInvoiceValue) * 100) / 100, order.currency_code || null),
+      fob_value_in_words: amountInWords.format(Math.round(Number(fobValue) * 100) / 100, order.currency_code || null),
       freight_insurance_amount: freightForTotal !== null ? formatMoney(freightForTotal) : null,
       preset_name: order.preset_name,
     },

@@ -3221,3 +3221,46 @@ DOCUMENT: every app-generated document that carries an SC/ reference number
     30 Oct); CAFIN can also be exported as CSV for a financial year.
   - Team incentives, the associate register, the buyer PO received date and
     the stage document notice change no generated document.
+
+================================================================================
+1–2 NOVEMBER 2026 — BUYER DOCUMENTS (OWNER CONFIRMED)
+================================================================================
+
+  Reference Word documents, the app's PDF templates and the app's Word
+  output are kept the same (owner, 2 Nov 2026: "reference document + system
+  generated word + pdf all must be in sync").
+
+  D-223  Quotation / Proforma Invoice (confirmed twice, 1 Nov)
+         No heading-less Certificate of Origin Type / Port of Discharge /
+         Buyer's PO table after the party sections (the reference QT/PI
+         never had it). PI: "Buyer's PO / Ref No." is the last row of
+         2. BUYER DETAILS, printed only when entered.
+  D1     Order Confirmation — "Buyer's PO / Ref No." added to 4. ORDER
+         SUMMARY after Proforma Invoice No., printed only when entered.
+  D2     Debit Note — 2. TO (BUYER) uses the full Buyer Details field list
+         (Billing Address Line 1/2, City/Town, Postcode, Country, VAT / EORI /
+         Tax Ref, Contact Person, Phone, Email); was 4 rows.
+  D3     BL Instruction (buyer_documents both tiers + internal_documents)
+         — 8. BILL OF LADING TYPE: the grey notes under No. of Original copies
+         ("NexaCrest will hold all 3 originals until Balance Payment is
+         received.") and No. of Non-negotiable copies are removed; the empty
+         Reason line is removed; new line after the table: "Original BL
+         release: CHA to hand all 3 originals to NexaCrest only — never to the
+         buyer or anyone else."
+  D4     Commercial Invoice — "…and required for Indian Shipping Bill & IGST
+         refund." → "…and is the value declared on the Indian Shipping Bill."
+  D5     Commercial Invoice — Total Invoice Value in Words: placeholder now
+         bold "[Total invoice value in words — e.g. US Dollars Twelve Thousand
+         Five Hundred and Fifty Cents Only]"; the app fills it from the total
+         invoice value.
+  D6     (no reference document) profit: freight and insurance converted to
+         INR (affects CAFIN, internal).
+  Internal guides aligned (owner, 2 Nov 2026, "update guides"):
+         BL_Reasoning_Guide.docx and 09_Checklists.docx now say NexaCrest
+         receives and holds all 3 originals until the Balance Payment is
+         cleared, then 2 endorsed originals are couriered to the buyer and 1
+         is retained by NexaCrest (matching QT/PI/CI). The hardcoded "60%" in
+         that 09_Checklists line is dropped. IGST-refund sentences in
+         09_Checklists / SOP_02_Accounts left unchanged pending the CA.
+  Register: D-223, D-224 (D1–D5), D-225 (D6).
+

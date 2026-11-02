@@ -181,8 +181,8 @@ async function build(orderId) {
 
   // C1 — freight & insurance as counted in the profit.
   const freightRows = [
-    ['Ocean freight', profit.freight_from_bills ? "Freight forwarder's bills (listed in C2)" : "Confirmed rate (Step 9a) — replaced by the forwarder's bills once added", money(profit.freight_cost_inr)],
-    ['Insurance', 'Step 9a', money(profit.insurance_cost_inr)],
+    ['Ocean freight', profit.freight_from_bills ? "Freight forwarder's bills (listed in C2)" : `Confirmed rate (Step 9a)${orderProfitabilityService.conversionText(profit, 'freight') !== null ? `: ${orderProfitabilityService.conversionText(profit, 'freight')}` : ''} — replaced by the forwarder's bills once added`, money(profit.freight_cost_inr)],
+    ['Insurance', `Step 9a${orderProfitabilityService.conversionText(profit, 'insurance') !== null ? `: ${orderProfitabilityService.conversionText(profit, 'insurance')}` : ''}`, money(profit.insurance_cost_inr)],
   ];
   const c1 = profit.freight_cost_inr + profit.insurance_cost_inr;
 

@@ -256,7 +256,9 @@ final class VendorBillsAndExpensesTest extends DbTestCase
         Database::connection()->prepare("INSERT INTO order_freight (order_id, confirmed_freight_rate, insurance_amount) VALUES (:id, 90000, 1000) ON DUPLICATE KEY UPDATE confirmed_freight_rate = 90000, insurance_amount = 1000")->execute(['id' => $orderId]);
         $travelEntry = OrderCostEntryRepository::create($orderId, 'travel_expenses', 'Travel 7% of FOB', 50000, date('Y-m-d'), $this->userId);
         $before = OrderProfitabilityService::computeForOrder($orderId);
-        self::assertSame(90000.0, $before['freight_cost_inr']);
+        // D6 (2 Nov 2026): the 9a rate is in the order currency and no exchange rate is recorded yet — left out and flagged.
+        self::assertSame(0.0, $before['freight_cost_inr']);
+        self::assertTrue($before['freight_rate_missing']);
         self::assertTrue($before['travel_is_provisional']);
 
         $partnerId = LogisticsPartnerRepository::create(['partner_name' => 'Bills Forwarder', 'service_type' => 'freight_forwarder'], $this->userId);
@@ -270,7 +272,7 @@ final class VendorBillsAndExpensesTest extends DbTestCase
         self::assertSame(18500.0, $after['logistics_cost_inr']);
         self::assertSame(6200.0, $after['expenses_inr']);
         self::assertFalse($after['travel_is_provisional']);
-        self::assertSame(round($before['total_cost_inr'] - 90000 + 85000 + 18500 + 6200 - 50000, 2), $after['total_cost_inr'], 'the provisional travel line is replaced, not added to');
+        self::assertSame(round($before['total_cost_inr'] + 85000 + 18500 + 6200 - 50000, 2), $after['total_cost_inr'], 'the provisional travel line is replaced, not added to');
 
 
         Database::connection()->prepare('INSERT INTO order_payment_status (order_id, freight_cleared_at) VALUES (:id, NOW()) ON DUPLICATE KEY UPDATE freight_cleared_at = NOW()')->execute(['id' => $orderId]);

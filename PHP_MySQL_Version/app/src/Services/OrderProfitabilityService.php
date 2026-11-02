@@ -44,11 +44,11 @@ use App\Repositories\OrderVendorBillRepository;
  *     marks the figure estimated on its account.
  *   - Supplier cost: order_supplier_po.total_payable_inr (already INR).
  *   - Freight/insurance cost: order_freight.confirmed_freight_rate +
- *     insurance_amount. ASSUMPTION (documented, not verified against a
- *     real invoice): both are treated as INR figures, the same convention
- *     order_supplier_po already uses, since in practice NexaCrest pays
- *     its freight forwarder domestically — see docs/SOP for the caveat if
- *     a forwarder is ever paid in foreign currency instead.
+ *     insurance_amount, entered in the ORDER currency (Step 9a; the Debit
+ *     Note charges the buyer exactly that) and converted to INR with
+ *     freightRateToInr() — owner decision D6 of 2 Nov 2026 (register D-225). Until a rate
+ *     is known they are left out of the INR total and flagged
+ *     'freight_rate_missing'.
  *   - Logistics partners' bills (CHA, transport, forwarder) and the order's
  *     actual expenses (owner decisions 2026-10-27): order_vendor_bills /
  *     order_expenses. Real ocean-freight bills replace the confirmed rate
@@ -74,11 +74,18 @@ final class OrderProfitabilityService
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
         $supplierCostInr = ($supplierPo !== null && $supplierPo['total_payable_inr'] !== null) ? (float) $supplierPo['total_payable_inr'] : 0.0;
 
-        $freight = OrderFreightRepository::find($orderId);
-        $freightCostInr = ($freight !== null && $freight['confirmed_freight_rate'] !== null) ? (float) $freight['confirmed_freight_rate'] : 0.0;
+        // Owner decision D6 of 2 Nov 2026 (confirmed twice; register D-225): the Step 9a
+        // confirmed freight rate and insurance are entered in the ORDER's
+        // currency (the Debit Note charges the buyer exactly that), so they
+        // are converted to INR here — never added to rupee costs as they are.
         // Q-R5-2: insurance is a seller cost on CIF only; on FOB/CFR the buyer insures.
+        $freight = OrderFreightRepository::find($orderId);
         $isCif = strtoupper((string) ($order['incoterm_code'] ?? '')) === 'CIF';
-        $insuranceCostInr = ($isCif && $freight !== null && $freight['insurance_amount'] !== null) ? (float) $freight['insurance_amount'] : 0.0;
+        $freightForeign = ($freight !== null && $freight['confirmed_freight_rate'] !== null) ? (float) $freight['confirmed_freight_rate'] : null;
+        $insuranceForeign = ($isCif && $freight !== null && $freight['insurance_amount'] !== null) ? (float) $freight['insurance_amount'] : null;
+        [$freightRate, $freightRateSource] = self::freightRateToInr($payment);
+        $freightCostInr = ($freightForeign !== null && $freightRate !== null) ? $freightForeign * $freightRate : 0.0;
+        $insuranceCostInr = ($insuranceForeign !== null && $freightRate !== null) ? $insuranceForeign * $freightRate : 0.0;
 
         // Owner decisions (2026-10-27): the logistics partners' bills (CHA,
         // transport, forwarder) are costs of the order. The forwarder's real
@@ -99,6 +106,9 @@ final class OrderProfitabilityService
         if ($oceanFreightBillsInr !== null) {
             $freightCostInr = $oceanFreightBillsInr;
         }
+        // Foreign amounts still waiting for a rate: kept out of the INR total and flagged.
+        $freightRateMissing = $freightRate === null
+            && (($freightForeign !== null && $oceanFreightBillsInr === null) || $insuranceForeign !== null);
 
         // The order's actual expenses. Once any real travel expense is
         // recorded, it replaces the provisional travel % cost line.
@@ -130,7 +140,7 @@ final class OrderProfitabilityService
         $profitInr = $revenueInr + $exportBenefitsInr - $totalCostInr;
         $marginPct = $revenueInr > 0 ? round($profitInr / $revenueInr * 100, 2) : null;
 
-        return [
+        $result = [
             'currency_code'        => $currencyCode,
             'fob_value_foreign'    => $fobValue,
             'revenue_inr'          => round($revenueInr, 2),
@@ -149,12 +159,20 @@ final class OrderProfitabilityService
             'other_costs_by_category' => $byCategory,
             'logistics_cost_inr'   => round($logisticsCostInr, 2),
             'freight_from_bills'   => $oceanFreightBillsInr !== null,
+            'freight_foreign'      => $freightForeign,
+            'insurance_foreign'    => $insuranceForeign,
+            'freight_rate_used'    => $freightRate,
+            'freight_rate_source'  => $freightRateSource,
+            'freight_rate_missing' => $freightRateMissing,
             'expenses_inr'         => round($expenses['total'], 2),
             'travel_is_provisional' => !$expenses['has_travel'],
             'total_cost_inr'       => round($totalCostInr, 2),
             'profit_inr'           => round($profitInr, 2),
             'margin_pct'           => $marginPct,
         ];
+        $result['freight_conversion_text'] = $result['freight_from_bills'] ? null : self::conversionText($result, 'freight');
+        $result['insurance_conversion_text'] = self::conversionText($result, 'insurance');
+        return $result;
     }
 
     /**
@@ -285,6 +303,64 @@ final class OrderProfitabilityService
 
         $isEstimated = $advanceInrActual === null || $balanceInrActual === null || $freightIsEstimated;
         return [($advancePortion ?? 0.0) + ($balancePortion ?? 0.0) + $freightPortion, $isEstimated];
+    }
+
+    /**
+     * Owner decision D6 of 2 Nov 2026 (register D-225): how a Step 9a amount became rupees, for the
+     * Step 12 screen and the CA annexure — "USD 6,000.00 × 83.50 =
+     * ₹5,01,000.00", or "USD 6,000.00 — not counted yet, no exchange rate".
+     * Null when there is no such amount.
+     *
+     * @param array<string,mixed> $profit computeForOrder()'s result
+     */
+    public static function conversionText(array $profit, string $which): ?string
+    {
+        $foreign = $profit[$which === 'insurance' ? 'insurance_foreign' : 'freight_foreign'] ?? null;
+        if ($foreign === null) {
+            return null;
+        }
+        $amount = trim((string) ($profit['currency_code'] ?? '') . ' ' . number_format((float) $foreign, 2));
+        $rate = $profit['freight_rate_used'] ?? null;
+        if ($rate === null) {
+            return $amount . ' — not counted yet, no exchange rate';
+        }
+        $inr = round((float) $foreign * (float) $rate, 2);
+        return $amount . ' × ' . number_format((float) $rate, 2) . ' = ₹' . number_format($inr, 2);
+    }
+
+    /**
+     * Owner decision D6 of 2 Nov 2026 (register D-225): the rate that turns the Step 9a
+     * freight and insurance (order currency) into INR. In order of
+     * preference: the buyer's freight payment as actually credited (INR
+     * actual ÷ amount), else that leg's own rate; else the rate the advance
+     * or balance actually settled at; else the advance/balance rate already
+     * used for the estimated revenue. Null when no rate is known yet.
+     *
+     * @return array{0: ?float, 1: ?string} [rate, source]
+     */
+    private static function freightRateToInr(?array $payment): array
+    {
+        if ($payment === null) {
+            return [null, null];
+        }
+        $num = static fn ($v): ?float => $v !== null && $v !== '' ? (float) $v : null;
+        $actualRate = static function (?float $inr, ?float $amount): ?float {
+            return ($inr !== null && $amount !== null && $amount > 0) ? $inr / $amount : null;
+        };
+        $candidates = [
+            'freight_payment' => $actualRate($num($payment['freight_inr_actual'] ?? null), $num($payment['freight_amount'] ?? null)),
+            'freight_rate'    => $num($payment['freight_exchange_rate'] ?? null),
+            'advance_payment' => $actualRate($num($payment['advance_inr_actual'] ?? null), $num($payment['advance_amount'] ?? null)),
+            'balance_payment' => $actualRate($num($payment['balance_inr_actual'] ?? null), $num($payment['balance_amount'] ?? null)),
+            'advance_rate'    => $num($payment['advance_exchange_rate'] ?? null),
+            'balance_rate'    => $num($payment['balance_exchange_rate'] ?? null),
+        ];
+        foreach ($candidates as $source => $rate) {
+            if ($rate !== null && $rate > 0) {
+                return [$rate, $source];
+            }
+        }
+        return [null, null];
     }
 
     /**
