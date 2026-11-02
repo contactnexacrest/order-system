@@ -60,10 +60,23 @@ async function main() {
   const orderId = await createTestOrder(clientId, 'CIF', 'Standard — New Buyer', 'USD', null, null, users.map((u) => u.id));
   await db.execute("UPDATE orders SET order_reference = CONCAT('MM-SENTINEL-', id) WHERE id = :id", { id: orderId });
 
+  // D-240 (2 Nov 2026): a Products-menu product whose reference SELLING price is the selling sentinel,
+  // picked on the sentinel order's line — so the proof covers the product pages and the order-line note.
+  let catalogProduct = await db.queryOne("SELECT id FROM catalog_products WHERE name = 'MM Sentinel Product'");
+  if (!catalogProduct) {
+    const r = await db.execute(
+      "INSERT INTO catalog_products (name, specifications, hs_code, is_active) VALUES ('MM Sentinel Product', 'Sentinel slab', '68022310', 1)"
+    );
+    catalogProduct = { id: r.insertId };
+  }
   await db.execute(
-    `INSERT INTO order_products (order_id, line_no, line_type, description, quantity, unit, unit_price, fob_value, is_active)
-     VALUES (:o, 1, 'goods', 'MM sentinel granite', 1, 'PCS', :p, :p, 1)`,
-    { o: orderId, p: SENTINELS.selling }
+    "UPDATE catalog_products SET reference_price = :p, reference_currency = 'USD', reference_unit = 'PCS' WHERE id = :id",
+    { p: SENTINELS.selling, id: catalogProduct.id }
+  );
+  await db.execute(
+    `INSERT INTO order_products (order_id, line_no, line_type, description, quantity, unit, unit_price, fob_value, is_active, catalog_product_id)
+     VALUES (:o, 1, 'goods', 'MM sentinel granite', 1, 'PCS', :p, :p, 1, :cp)`,
+    { o: orderId, p: SENTINELS.selling, cp: catalogProduct.id }
   );
   await db.execute(
     `INSERT INTO order_payment_status (order_id, advance_amount, advance_remittance_received_at)
@@ -178,7 +191,7 @@ async function main() {
     await db.execute('UPDATE file_store SET linked_document_id = :d WHERE id IN (:a, :b)', { d: r.insertId, a: draft, b: current });
   }
 
-  process.stdout.write(JSON.stringify({ orderId, clientId, supplierId: supplier.id, users, files, sentinels: SENTINELS }));
+  process.stdout.write(JSON.stringify({ orderId, clientId, supplierId: supplier.id, catalogProductId: catalogProduct.id, users, files, sentinels: SENTINELS }));
   await db.pool.end();
 }
 

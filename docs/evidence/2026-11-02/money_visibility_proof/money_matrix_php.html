@@ -2,622 +2,663 @@
 <style>body{font:14px system-ui;margin:24px}td,th{border:1px solid #ccc;padding:6px 8px;vertical-align:top}table{border-collapse:collapse}
 .seen{background:#e7f6ec}.hidden{background:#f4f4f4;color:#555}.bad{background:#fde2e1;color:#900;font-weight:bold}small{color:#666;font-weight:normal}</style>
 <h1>Money visibility proof — http://127.0.0.1:8080 (nexacrest_php_dev)</h1>
-<p>Run 2026-11-02T05:46:21.974Z. Each role logged in and opened 71 screens in the Standard template and 12 in Kanban, including reports, CSV exports and the audit log,
+<p>Run 2026-11-02T14:36:52.164Z. Each role logged in and opened 73 screens in the Standard template and 12 in Kanban, including reports, CSV exports and the audit log,
 then tried to download each of the order's 20 files and the dossier ZIP. Sentinel amounts: Selling prices = 917.43, Buyer payments = 823.61, Purchase / supplier = 731.29, Logistics / CHA = 649.17, Costs, expenses, profit = 557.83, Incentives / commission = 461.39.
 "seen (n)" = the amount appeared on n screens or files (hover for the list); "hidden" = it never appeared. A red cell is a leak.</p>
 <p><strong>Violations: 0</strong></p>
 <table><tr><th>Role</th><th>Selling prices</th><th>Buyer payments</th><th>Purchase / supplier</th><th>Logistics / CHA</th><th>Costs, expenses, profit</th><th>Incentives / commission</th><th>CAFIN</th></tr>
 <tr><th>Admin</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/products (Standard)
+/products/2 (Standard)
+/products/2/edit (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/aggregate (Standard)
 /reports/aggregate?format=csv (Standard)
 /audit-log (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/products (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf
 dossier: buyer-po.pdf
-dossier: QT MM-481 Rev.0.pdf
-dossier: QT MM-481.pdf
-dossier: PI MM-481 Rev.0.pdf
-dossier: PI MM-481.pdf
-dossier: CI MM-481 Rev.0.pdf
-dossier: CI MM-481.pdf">seen (26)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+dossier: QT MM-523 Rev.0.pdf
+dossier: QT MM-523.pdf
+dossier: PI MM-523 Rev.0.pdf
+dossier: PI MM-523.pdf
+dossier: CI MM-523 Rev.0.pdf
+dossier: CI MM-523.pdf">seen (30)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/payments (Standard)
 /reports/payments?format=csv (Standard)
 /reports/ageing (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file payment-screenshot.pdf
-dossier: payment-screenshot.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
+dossier: payment-screenshot.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file supplier-bill.pdf
-file SUPPO MM-481 Rev.0.pdf
-file SUPPO MM-481.pdf
+file SUPPO MM-523 Rev.0.pdf
+file SUPPO MM-523.pdf
 dossier: supplier-bill.pdf
-dossier: SUPPO MM-481 Rev.0.pdf
-dossier: SUPPO MM-481.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
+dossier: SUPPO MM-523 Rev.0.pdf
+dossier: SUPPO MM-523.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file logistics-bill.pdf
-file BLI MM-481 Rev.0.pdf
-file BLI MM-481.pdf
+file BLI MM-523 Rev.0.pdf
+file BLI MM-523.pdf
 dossier: logistics-bill.pdf
-dossier: BLI MM-481 Rev.0.pdf
-dossier: BLI MM-481.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
+dossier: BLI MM-523 Rev.0.pdf
+dossier: BLI MM-523.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file expense-receipt.pdf
-dossier: expense-receipt.pdf">seen (9)<br><small>permitted</small></td><td class="seen" title="/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
+dossier: expense-receipt.pdf">seen (9)<br><small>permitted</small></td><td class="seen" title="/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
 /incentives/payouts (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/audit-log (Standard)">seen (6)<br><small>permitted</small></td><td class="seen" title="file CAFIN MM-481 Rev.0.pdf
-file CAFIN MM-481.pdf">seen (2)<br><small>permitted</small></td></tr>
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/audit-log (Standard)">seen (6)<br><small>permitted</small></td><td class="seen" title="file CAFIN MM-523 Rev.0.pdf
+file CAFIN MM-523.pdf">seen (2)<br><small>permitted</small></td></tr>
 <tr><th>Managing Director</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/products (Standard)
+/products/2 (Standard)
+/products/2/edit (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/aggregate (Standard)
 /reports/aggregate?format=csv (Standard)
 /audit-log (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/products (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf
 dossier: buyer-po.pdf
-dossier: QT MM-481 Rev.0.pdf
-dossier: QT MM-481.pdf
-dossier: PI MM-481 Rev.0.pdf
-dossier: PI MM-481.pdf
-dossier: CI MM-481 Rev.0.pdf
-dossier: CI MM-481.pdf">seen (26)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+dossier: QT MM-523 Rev.0.pdf
+dossier: QT MM-523.pdf
+dossier: PI MM-523 Rev.0.pdf
+dossier: PI MM-523.pdf
+dossier: CI MM-523 Rev.0.pdf
+dossier: CI MM-523.pdf">seen (30)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/payments (Standard)
 /reports/payments?format=csv (Standard)
 /reports/ageing (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file payment-screenshot.pdf
-dossier: payment-screenshot.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
+dossier: payment-screenshot.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file supplier-bill.pdf
-file SUPPO MM-481 Rev.0.pdf
-file SUPPO MM-481.pdf
+file SUPPO MM-523 Rev.0.pdf
+file SUPPO MM-523.pdf
 dossier: supplier-bill.pdf
-dossier: SUPPO MM-481 Rev.0.pdf
-dossier: SUPPO MM-481.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
+dossier: SUPPO MM-523 Rev.0.pdf
+dossier: SUPPO MM-523.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file logistics-bill.pdf
-file BLI MM-481 Rev.0.pdf
-file BLI MM-481.pdf
+file BLI MM-523 Rev.0.pdf
+file BLI MM-523.pdf
 dossier: logistics-bill.pdf
-dossier: BLI MM-481 Rev.0.pdf
-dossier: BLI MM-481.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
+dossier: BLI MM-523 Rev.0.pdf
+dossier: BLI MM-523.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file expense-receipt.pdf
-dossier: expense-receipt.pdf">seen (9)<br><small>permitted</small></td><td class="seen" title="/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
+dossier: expense-receipt.pdf">seen (9)<br><small>permitted</small></td><td class="seen" title="/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
 /incentives/payouts (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/audit-log (Standard)">seen (6)<br><small>permitted</small></td><td class="seen" title="file CAFIN MM-481 Rev.0.pdf
-file CAFIN MM-481.pdf">seen (2)<br><small>permitted</small></td></tr>
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/audit-log (Standard)">seen (6)<br><small>permitted</small></td><td class="seen" title="file CAFIN MM-523 Rev.0.pdf
+file CAFIN MM-523.pdf">seen (2)<br><small>permitted</small></td></tr>
 <tr><th>Executive Director</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/products (Standard)
+/products/2 (Standard)
+/products/2/edit (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/aggregate (Standard)
 /reports/aggregate?format=csv (Standard)
 /audit-log (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/products (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf
 dossier: buyer-po.pdf
-dossier: QT MM-481 Rev.0.pdf
-dossier: QT MM-481.pdf
-dossier: PI MM-481 Rev.0.pdf
-dossier: PI MM-481.pdf
-dossier: CI MM-481 Rev.0.pdf
-dossier: CI MM-481.pdf">seen (26)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+dossier: QT MM-523 Rev.0.pdf
+dossier: QT MM-523.pdf
+dossier: PI MM-523 Rev.0.pdf
+dossier: PI MM-523.pdf
+dossier: CI MM-523 Rev.0.pdf
+dossier: CI MM-523.pdf">seen (30)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/payments (Standard)
 /reports/payments?format=csv (Standard)
 /reports/ageing (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file payment-screenshot.pdf
-dossier: payment-screenshot.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
+dossier: payment-screenshot.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file supplier-bill.pdf
-file SUPPO MM-481 Rev.0.pdf
-file SUPPO MM-481.pdf
+file SUPPO MM-523 Rev.0.pdf
+file SUPPO MM-523.pdf
 dossier: supplier-bill.pdf
-dossier: SUPPO MM-481 Rev.0.pdf
-dossier: SUPPO MM-481.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
+dossier: SUPPO MM-523 Rev.0.pdf
+dossier: SUPPO MM-523.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file logistics-bill.pdf
-file BLI MM-481 Rev.0.pdf
-file BLI MM-481.pdf
+file BLI MM-523 Rev.0.pdf
+file BLI MM-523.pdf
 dossier: logistics-bill.pdf
-dossier: BLI MM-481 Rev.0.pdf
-dossier: BLI MM-481.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
+dossier: BLI MM-523 Rev.0.pdf
+dossier: BLI MM-523.pdf">seen (13)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
 /audit-log (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file expense-receipt.pdf
-dossier: expense-receipt.pdf">seen (9)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="file CAFIN MM-481 Rev.0.pdf
-file CAFIN MM-481.pdf">seen (2)<br><small>permitted</small></td></tr>
+dossier: expense-receipt.pdf">seen (9)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="file CAFIN MM-523 Rev.0.pdf
+file CAFIN MM-523.pdf">seen (2)<br><small>permitted</small></td></tr>
 <tr><th>Export Executive</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+/orders/523 (Standard)
+/products (Standard)
+/products/2 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/aggregate (Standard)
 /reports/aggregate?format=csv (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/products (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf
 dossier: buyer-po.pdf
-dossier: QT MM-481 Rev.0.pdf
-dossier: QT MM-481.pdf
-dossier: PI MM-481 Rev.0.pdf
-dossier: PI MM-481.pdf
-dossier: CI MM-481 Rev.0.pdf
-dossier: CI MM-481.pdf">seen (23)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+dossier: QT MM-523 Rev.0.pdf
+dossier: QT MM-523.pdf
+dossier: PI MM-523 Rev.0.pdf
+dossier: PI MM-523.pdf
+dossier: CI MM-523 Rev.0.pdf
+dossier: CI MM-523.pdf">seen (26)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/payments (Standard)
 /reports/payments?format=csv (Standard)
 /reports/ageing (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file payment-screenshot.pdf
 dossier: payment-screenshot.pdf">seen (10)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
 <tr><th>Accounts Executive</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+/orders/523 (Standard)
+/products (Standard)
+/products/2 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/aggregate (Standard)
 /reports/aggregate?format=csv (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/products (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf
 dossier: buyer-po.pdf
-dossier: QT MM-481 Rev.0.pdf
-dossier: QT MM-481.pdf
-dossier: PI MM-481 Rev.0.pdf
-dossier: PI MM-481.pdf
-dossier: CI MM-481 Rev.0.pdf
-dossier: CI MM-481.pdf">seen (23)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+dossier: QT MM-523 Rev.0.pdf
+dossier: QT MM-523.pdf
+dossier: PI MM-523 Rev.0.pdf
+dossier: PI MM-523.pdf
+dossier: CI MM-523 Rev.0.pdf
+dossier: CI MM-523.pdf">seen (26)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/payments (Standard)
 /reports/payments?format=csv (Standard)
 /reports/ageing (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file payment-screenshot.pdf
-dossier: payment-screenshot.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/orders/481 (Kanban)
+dossier: payment-screenshot.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/orders/523 (Kanban)
 file supplier-bill.pdf
-file SUPPO MM-481 Rev.0.pdf
-file SUPPO MM-481.pdf
+file SUPPO MM-523 Rev.0.pdf
+file SUPPO MM-523.pdf
 dossier: supplier-bill.pdf
-dossier: SUPPO MM-481 Rev.0.pdf
-dossier: SUPPO MM-481.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/orders/481 (Kanban)
+dossier: SUPPO MM-523 Rev.0.pdf
+dossier: SUPPO MM-523.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/orders/523 (Kanban)
 file logistics-bill.pdf
-file BLI MM-481 Rev.0.pdf
-file BLI MM-481.pdf
+file BLI MM-523 Rev.0.pdf
+file BLI MM-523.pdf
 dossier: logistics-bill.pdf
-dossier: BLI MM-481 Rev.0.pdf
-dossier: BLI MM-481.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)">seen (2)<br><small>permitted</small></td><td class="seen" title="/incentives/payouts (Standard)">seen (1)<br><small>permitted</small></td><td class="seen" title="file CAFIN MM-481 Rev.0.pdf
-file CAFIN MM-481.pdf">seen (2)<br><small>permitted</small></td></tr>
-<tr><th>Logistics Executive</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="file logistics-bill.pdf
-file BLI MM-481 Rev.0.pdf
-file BLI MM-481.pdf
+dossier: BLI MM-523 Rev.0.pdf
+dossier: BLI MM-523.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)">seen (2)<br><small>permitted</small></td><td class="seen" title="/incentives/payouts (Standard)">seen (1)<br><small>permitted</small></td><td class="seen" title="file CAFIN MM-523 Rev.0.pdf
+file CAFIN MM-523.pdf">seen (2)<br><small>permitted</small></td></tr>
+<tr><th>Logistics Executive</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523 (Kanban)
+file logistics-bill.pdf
+file BLI MM-523 Rev.0.pdf
+file BLI MM-523.pdf
 dossier: logistics-bill.pdf
-dossier: BLI MM-481 Rev.0.pdf
-dossier: BLI MM-481.pdf">seen (6)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
+dossier: BLI MM-523 Rev.0.pdf
+dossier: BLI MM-523.pdf">seen (8)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
 <tr><th>Viewer / Auditor</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/products/2 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/aggregate (Standard)
 /reports/aggregate?format=csv (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf">seen (18)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf">seen (19)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/payments (Standard)
 /reports/payments?format=csv (Standard)
 /reports/ageing (Standard)
-/orders/481 (Kanban)
-file payment-screenshot.pdf">seen (11)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
+file payment-screenshot.pdf">seen (11)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/orders/523 (Kanban)
 file supplier-bill.pdf
-file SUPPO MM-481 Rev.0.pdf
-file SUPPO MM-481.pdf">seen (9)<br><small>permitted</small></td><td class="seen" title="/orders/481/audit-log (Standard)
-/orders/481/audit-log?format=csv (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
+file SUPPO MM-523 Rev.0.pdf
+file SUPPO MM-523.pdf">seen (9)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523/audit-log (Standard)
+/orders/523/audit-log?format=csv (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/orders/523 (Kanban)
 file logistics-bill.pdf
-file BLI MM-481 Rev.0.pdf
-file BLI MM-481.pdf">seen (7)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
+file BLI MM-523 Rev.0.pdf
+file BLI MM-523.pdf">seen (9)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
 <tr><th>CA / Chartered Accountant</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
+/orders/523 (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf">seen (11)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481 (Kanban)
-file payment-screenshot.pdf">seen (3)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481 (Kanban)
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf">seen (11)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523 (Kanban)
+file payment-screenshot.pdf">seen (3)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523 (Kanban)
 file supplier-bill.pdf
-file SUPPO MM-481 Rev.0.pdf
-file SUPPO MM-481.pdf">seen (5)<br><small>permitted</small></td><td class="seen" title="file logistics-bill.pdf
-file BLI MM-481 Rev.0.pdf
-file BLI MM-481.pdf">seen (3)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="file CAFIN MM-481 Rev.0.pdf
-file CAFIN MM-481.pdf">seen (2)<br><small>permitted</small></td></tr>
+file SUPPO MM-523 Rev.0.pdf
+file SUPPO MM-523.pdf">seen (5)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523 (Kanban)
+file logistics-bill.pdf
+file BLI MM-523 Rev.0.pdf
+file BLI MM-523.pdf">seen (5)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="file CAFIN MM-523 Rev.0.pdf
+file CAFIN MM-523.pdf">seen (2)<br><small>permitted</small></td></tr>
 <tr><th>Sales/Export Manager</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+/orders/523 (Standard)
+/products (Standard)
+/products/2 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/aggregate (Standard)
 /reports/aggregate?format=csv (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/products (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf
 dossier: buyer-po.pdf
-dossier: QT MM-481 Rev.0.pdf
-dossier: QT MM-481.pdf
-dossier: PI MM-481 Rev.0.pdf
-dossier: PI MM-481.pdf
-dossier: CI MM-481 Rev.0.pdf
-dossier: CI MM-481.pdf">seen (23)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+dossier: QT MM-523 Rev.0.pdf
+dossier: QT MM-523.pdf
+dossier: PI MM-523 Rev.0.pdf
+dossier: PI MM-523.pdf
+dossier: CI MM-523 Rev.0.pdf
+dossier: CI MM-523.pdf">seen (26)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/payments (Standard)
 /reports/payments?format=csv (Standard)
 /reports/ageing (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file payment-screenshot.pdf
 dossier: payment-screenshot.pdf">seen (10)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
 <tr><th>Sales Director</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+/orders/523 (Standard)
+/products (Standard)
+/products/2 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/aggregate (Standard)
 /reports/aggregate?format=csv (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/products (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf
 dossier: buyer-po.pdf
-dossier: QT MM-481 Rev.0.pdf
-dossier: QT MM-481.pdf
-dossier: PI MM-481 Rev.0.pdf
-dossier: PI MM-481.pdf
-dossier: CI MM-481 Rev.0.pdf
-dossier: CI MM-481.pdf">seen (23)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+dossier: QT MM-523 Rev.0.pdf
+dossier: QT MM-523.pdf
+dossier: PI MM-523 Rev.0.pdf
+dossier: PI MM-523.pdf
+dossier: CI MM-523 Rev.0.pdf
+dossier: CI MM-523.pdf">seen (26)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/payments (Standard)
 /reports/payments?format=csv (Standard)
 /reports/ageing (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file payment-screenshot.pdf
 dossier: payment-screenshot.pdf">seen (10)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
-<tr><th>Procurement Executive</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481 (Kanban)
+<tr><th>Procurement Executive</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523 (Kanban)
 file supplier-bill.pdf
-file SUPPO MM-481 Rev.0.pdf
-file SUPPO MM-481.pdf">seen (5)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
-<tr><th>Procurement Manager</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481 (Kanban)
+file SUPPO MM-523 Rev.0.pdf
+file SUPPO MM-523.pdf">seen (5)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
+<tr><th>Procurement Manager</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523 (Kanban)
 file supplier-bill.pdf
-file SUPPO MM-481 Rev.0.pdf
-file SUPPO MM-481.pdf">seen (5)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
-<tr><th>Procurement Director</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/orders/481 (Kanban)
+file SUPPO MM-523 Rev.0.pdf
+file SUPPO MM-523.pdf">seen (5)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
+<tr><th>Procurement Director</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523 (Kanban)
 file supplier-bill.pdf
-file SUPPO MM-481 Rev.0.pdf
-file SUPPO MM-481.pdf">seen (5)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
-<tr><th>Logistics Manager</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="file logistics-bill.pdf
-file BLI MM-481 Rev.0.pdf
-file BLI MM-481.pdf
+file SUPPO MM-523 Rev.0.pdf
+file SUPPO MM-523.pdf">seen (5)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
+<tr><th>Logistics Manager</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523 (Kanban)
+file logistics-bill.pdf
+file BLI MM-523 Rev.0.pdf
+file BLI MM-523.pdf
 dossier: logistics-bill.pdf
-dossier: BLI MM-481 Rev.0.pdf
-dossier: BLI MM-481.pdf">seen (6)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
-<tr><th>Logistics Director</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="file logistics-bill.pdf
-file BLI MM-481 Rev.0.pdf
-file BLI MM-481.pdf
+dossier: BLI MM-523 Rev.0.pdf
+dossier: BLI MM-523.pdf">seen (8)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
+<tr><th>Logistics Director</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/orders/523 (Kanban)
+file logistics-bill.pdf
+file BLI MM-523 Rev.0.pdf
+file BLI MM-523.pdf
 dossier: logistics-bill.pdf
-dossier: BLI MM-481 Rev.0.pdf
-dossier: BLI MM-481.pdf">seen (6)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
+dossier: BLI MM-523 Rev.0.pdf
+dossier: BLI MM-523.pdf">seen (8)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
 <tr><th>Finance Manager</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+/orders/523 (Standard)
+/products (Standard)
+/products/2 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/aggregate (Standard)
 /reports/aggregate?format=csv (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/products (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf
 dossier: buyer-po.pdf
-dossier: QT MM-481 Rev.0.pdf
-dossier: QT MM-481.pdf
-dossier: PI MM-481 Rev.0.pdf
-dossier: PI MM-481.pdf
-dossier: CI MM-481 Rev.0.pdf
-dossier: CI MM-481.pdf">seen (23)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+dossier: QT MM-523 Rev.0.pdf
+dossier: QT MM-523.pdf
+dossier: PI MM-523 Rev.0.pdf
+dossier: PI MM-523.pdf
+dossier: CI MM-523 Rev.0.pdf
+dossier: CI MM-523.pdf">seen (26)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/payments (Standard)
 /reports/payments?format=csv (Standard)
 /reports/ageing (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file payment-screenshot.pdf
-dossier: payment-screenshot.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/orders/481 (Kanban)
+dossier: payment-screenshot.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/orders/523 (Kanban)
 file supplier-bill.pdf
-file SUPPO MM-481 Rev.0.pdf
-file SUPPO MM-481.pdf
+file SUPPO MM-523 Rev.0.pdf
+file SUPPO MM-523.pdf
 dossier: supplier-bill.pdf
-dossier: SUPPO MM-481 Rev.0.pdf
-dossier: SUPPO MM-481.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/orders/481 (Kanban)
+dossier: SUPPO MM-523 Rev.0.pdf
+dossier: SUPPO MM-523.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/orders/523 (Kanban)
 file logistics-bill.pdf
-file BLI MM-481 Rev.0.pdf
-file BLI MM-481.pdf
+file BLI MM-523 Rev.0.pdf
+file BLI MM-523.pdf
 dossier: logistics-bill.pdf
-dossier: BLI MM-481 Rev.0.pdf
-dossier: BLI MM-481.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/orders/481 (Kanban)
+dossier: BLI MM-523 Rev.0.pdf
+dossier: BLI MM-523.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/orders/523 (Kanban)
 file expense-receipt.pdf
-dossier: expense-receipt.pdf">seen (6)<br><small>permitted</small></td><td class="seen" title="/incentives/payouts (Standard)">seen (1)<br><small>permitted</small></td><td class="seen" title="file CAFIN MM-481 Rev.0.pdf
-file CAFIN MM-481.pdf">seen (2)<br><small>permitted</small></td></tr>
+dossier: expense-receipt.pdf">seen (6)<br><small>permitted</small></td><td class="seen" title="/incentives/payouts (Standard)">seen (1)<br><small>permitted</small></td><td class="seen" title="file CAFIN MM-523 Rev.0.pdf
+file CAFIN MM-523.pdf">seen (2)<br><small>permitted</small></td></tr>
 <tr><th>Finance Director</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+/orders/523 (Standard)
+/products (Standard)
+/products/2 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/aggregate (Standard)
 /reports/aggregate?format=csv (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/products (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf
 dossier: buyer-po.pdf
-dossier: QT MM-481 Rev.0.pdf
-dossier: QT MM-481.pdf
-dossier: PI MM-481 Rev.0.pdf
-dossier: PI MM-481.pdf
-dossier: CI MM-481 Rev.0.pdf
-dossier: CI MM-481.pdf">seen (23)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/reports/client/445 (Standard)
+dossier: QT MM-523 Rev.0.pdf
+dossier: QT MM-523.pdf
+dossier: PI MM-523 Rev.0.pdf
+dossier: PI MM-523.pdf
+dossier: CI MM-523 Rev.0.pdf
+dossier: CI MM-523.pdf">seen (26)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/reports/client/487 (Standard)
 /reports/payments (Standard)
 /reports/payments?format=csv (Standard)
 /reports/ageing (Standard)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file payment-screenshot.pdf
-dossier: payment-screenshot.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/orders/481 (Kanban)
+dossier: payment-screenshot.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/orders/523 (Kanban)
 file supplier-bill.pdf
-file SUPPO MM-481 Rev.0.pdf
-file SUPPO MM-481.pdf
+file SUPPO MM-523 Rev.0.pdf
+file SUPPO MM-523.pdf
 dossier: supplier-bill.pdf
-dossier: SUPPO MM-481 Rev.0.pdf
-dossier: SUPPO MM-481.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/orders/481 (Kanban)
+dossier: SUPPO MM-523 Rev.0.pdf
+dossier: SUPPO MM-523.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/orders/523 (Kanban)
 file logistics-bill.pdf
-file BLI MM-481 Rev.0.pdf
-file BLI MM-481.pdf
+file BLI MM-523 Rev.0.pdf
+file BLI MM-523.pdf
 dossier: logistics-bill.pdf
-dossier: BLI MM-481 Rev.0.pdf
-dossier: BLI MM-481.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/481 (Standard)
-/reports/order/481 (Standard)
-/reports/order/481?format=csv (Standard)
-/orders/481 (Kanban)
+dossier: BLI MM-523 Rev.0.pdf
+dossier: BLI MM-523.pdf">seen (10)<br><small>permitted</small></td><td class="seen" title="/orders/523 (Standard)
+/reports/order/523 (Standard)
+/reports/order/523?format=csv (Standard)
+/orders/523 (Kanban)
 file expense-receipt.pdf
-dossier: expense-receipt.pdf">seen (6)<br><small>permitted</small></td><td class="seen" title="/incentives/payouts (Standard)">seen (1)<br><small>permitted</small></td><td class="seen" title="file CAFIN MM-481 Rev.0.pdf
-file CAFIN MM-481.pdf">seen (2)<br><small>permitted</small></td></tr>
+dossier: expense-receipt.pdf">seen (6)<br><small>permitted</small></td><td class="seen" title="/incentives/payouts (Standard)">seen (1)<br><small>permitted</small></td><td class="seen" title="file CAFIN MM-523 Rev.0.pdf
+file CAFIN MM-523.pdf">seen (2)<br><small>permitted</small></td></tr>
 <tr><th>System Administrator</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
 <tr><th>Order Coordinator</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
 <tr><th>Operations Manager</th><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
 <tr><th>Export Compliance Executive</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
+/orders/523 (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf">seen (11)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf">seen (11)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
 <tr><th>Export Compliance Manager</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
+/orders/523 (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf">seen (11)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf">seen (11)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr>
 <tr><th>Export Compliance Director</th><td class="seen" title="/orders (Standard)
-/orders/481 (Standard)
+/orders/523 (Standard)
 /orders (Kanban)
-/orders/481 (Kanban)
+/orders/523 (Kanban)
 file buyer-po.pdf
-file QT MM-481 Rev.0.pdf
-file QT MM-481.pdf
-file PI MM-481 Rev.0.pdf
-file PI MM-481.pdf
-file CI MM-481 Rev.0.pdf
-file CI MM-481.pdf">seen (11)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr></table>
+file QT MM-523 Rev.0.pdf
+file QT MM-523.pdf
+file PI MM-523 Rev.0.pdf
+file PI MM-523.pdf
+file CI MM-523 Rev.0.pdf
+file CI MM-523.pdf">seen (11)<br><small>permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td><td class="hidden" title="">hidden<br><small>not permitted</small></td></tr></table>

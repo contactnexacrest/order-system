@@ -6,4 +6,3 @@ Running 1 test using 1 worker
   Slow test file: tests/12-money-matrix.spec.js (27.7m)
   Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
   1 passed (27.7m)
-EXIT 0
