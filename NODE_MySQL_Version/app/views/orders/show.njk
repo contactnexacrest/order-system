@@ -4201,7 +4201,9 @@
 
       <div class="sidebar-panel">
         <details class="sidebar-docs-toggle">
-          <summary>All Documents ({{ documents.length }}) &mdash; quick links</summary>
+          {% set uploadedFiles = uploadedFiles or [] %}
+          <summary>All Documents ({{ documents.length + uploadedFiles.length }}) &mdash; quick links</summary>
+          <p class="small sidebar-doc-group"><strong>Generated ({{ documents.length }})</strong></p>
         {% if documents.length == 0 %}
           <p class="muted small">No documents generated yet.</p>
         {% else %}
@@ -4210,6 +4212,20 @@
               <li>
                 {% if d.pdf_file_id and permissions.download_pdf and canSeeDocument(d.document_type_code) %}<a href="/documents/{{ d.id }}/download?format=pdf">{{ d.document_type_code }} {{ d.document_reference or '—' }}</a>{% else %}{{ d.document_type_code }} {{ d.document_reference or '—' }}{% endif %}
                 <span class="muted small">Rev.{{ d.revision_number }} &middot; {{ d.status | replace('_', ' ') }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        <p class="small sidebar-doc-group"><strong>Uploaded / received ({{ uploadedFiles.length }})</strong></p>
+        {% if uploadedFiles.length == 0 %}
+          <p class="muted small">No files uploaded yet.</p>
+        {% else %}
+          <ul class="sidebar-doc-list sidebar-uploaded-list">
+            {% for f in uploadedFiles %}
+              {% set fileFrom = f.received_from if (f.received_from and f.received_from | trim != '') else (f.uploader_name or '') %}
+              <li>
+                <a href="/file-store/{{ f.id }}/download">{{ f.document_type_label if f.document_type_label else f.original_filename }}</a>
+                <span class="muted small">{% if fileFrom != '' %}from {{ fileFrom }} &middot; {% endif %}{{ (f.uploaded_at or '').slice(0, 10) }}</span>
               </li>
             {% endfor %}
           </ul>

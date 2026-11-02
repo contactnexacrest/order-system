@@ -2,6 +2,8 @@
   Buyer Details — Developer Spec Section 4. Shared across QT/PI/OC/PL/CI
   so the field list/order is defined once, not duplicated five times.
   Caller sets `section_number` (via {% include with %}) before including.
+  The PI also sets show_buyer_po: Buyer's PO / Ref No. then prints as the
+  last row, only when one has been entered (owner, 1 Nov 2026).
   No "Same as X" checkbox here — this section is always the buyer's own
   independently-entered details.
 #}
@@ -17,4 +19,5 @@
   <tr><td class="k">Contact Person *</td><td class="v">{{ buyer.contact_person ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Phone *</td><td class="v">{{ buyer.phone ?: '—' }}</td></tr>
   <tr><td class="k">Email *</td><td class="v">{{ buyer.email ?: 'To Be Confirmed' }}</td></tr>
+  {% if show_buyer_po|default(false) and order.buyers_po_ref and order.buyers_po_ref != 'NIL' %}<tr><td class="k">Buyer's PO / Ref No.</td><td class="v">{{ order.buyers_po_ref }}</td></tr>{% endif %}
 </table>

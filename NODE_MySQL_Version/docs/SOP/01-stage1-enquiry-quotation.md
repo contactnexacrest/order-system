@@ -196,6 +196,14 @@ client's page as **Certificate of Origin Type**), the New Order form
 starts with it selected, and the order page's At a Glance panel shows the
 order's own value.
 
+On the Quotation, the selected type prints in **Documents to be provided**
+("Certificate of Origin — Non-Preferential — Issued by CAPEXIL", or
+"GSP Form A (Preferential)" when that is selected, "To Be Confirmed" while
+none is), and the Port of Discharge prints in **Shipping / Commercial
+Terms**. The Proforma Invoice prints the type in **Export Documentation**
+and the buyer's PO / reference number as the last row of **Buyer Details**,
+only once one has been entered (owner, 1 Nov 2026, D-223).
+
 This same **Same as Buyer?** self-service — not just a staff-only admin
 screen — is also built into the two client-facing forms that create or
 confirm this data in the first place:

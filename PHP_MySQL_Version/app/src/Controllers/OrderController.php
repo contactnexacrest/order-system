@@ -1030,6 +1030,13 @@ final class OrderController
         if (!$canViewCafin) {
             $documents = array_values(array_filter($documents, static fn (array $d): bool => $d['document_type_code'] !== 'CAFIN'));
         }
+        // Owner request (1 Nov 2026): the "All Documents" panel also lists every file uploaded for the
+        // order (client, staff, associate) — only those this person may download (same gates as
+        // FileStoreController::download, so no link answers 403).
+        $canManageIncentivesForFiles = PermissionService::can((int) $actor['id'], $actorRoleId, 'manage_incentives');
+        $uploadedFiles = array_values(array_filter(FileStoreRepository::uploadedForOrder($orderId),
+            static fn (array $f): bool => \App\Services\MoneyVisibility::canSeeFile((int) $f['id'])
+                && ($canManageIncentivesForFiles || !\App\Repositories\AssociateRepository::isAgreementFile((int) $f['id']))));
         // QA Round 8, R8-N06: the reviewer list offers a document's own generator only when the
         // self-approval rule 'document_review' allows them (Admin → Self-approval rules, D-221).
         $__selfReviewOk = [];
@@ -1110,6 +1117,7 @@ final class OrderController
             'stageByNumber' => $stageByNumber,
             'payment'  => OrderPaymentStatusRepository::find($orderId),
             'documents' => $documents,
+            'uploadedFiles' => $uploadedFiles,
             'regenerationRisk' => $regenerationRisk,
             'reviewsByDocument' => $reviewsByDocument,
             'crossVerificationsByDocument' => $crossVerificationsByDocument,

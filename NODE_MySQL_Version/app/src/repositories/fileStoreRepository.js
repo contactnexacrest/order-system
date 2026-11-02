@@ -99,6 +99,27 @@ async function forOrder(orderId) {
 }
 
 /**
+ * Owner request (1 Nov 2026): every file uploaded or received for this
+ * order, by anyone (client portal, staff, associate) — buyer PO copies,
+ * payment screenshots, bills, signed amendments, LC/BL copies, extra
+ * documents, comment attachments. Generated documents (and so CAFIN) are
+ * left out: the order page lists those separately. Callers still apply the
+ * download gates (moneyVisibility.canSeeFile, agreement files).
+ */
+async function uploadedForOrder(orderId) {
+  return db.query(
+    `SELECT fs.*, u.name AS uploader_name FROM file_store fs
+             LEFT JOIN users u ON u.id = fs.uploaded_by
+             WHERE fs.order_id = :order_id AND fs.is_active = 1
+               AND fs.file_origin <> 'GENERATED_AUTO'
+               AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.pdf_file_id = fs.id OR d.docx_file_id = fs.id)
+               AND NOT EXISTS (SELECT 1 FROM document_revisions r WHERE r.pdf_file_id = fs.id OR r.docx_file_id = fs.id)
+             ORDER BY fs.uploaded_at, fs.id`,
+    { order_id: orderId }
+  );
+}
+
+/**
  * Point 2 follow-up — same as forOrder(), but excludes the internal-only
  * CA Financial Annexure (CAFIN). Used by the general-purpose staff
  * dossier ZIP (ordersController.downloadDossier()), which is gated only
@@ -250,7 +271,7 @@ async function moneyClassFor(fileId) {
 
 module.exports = {
   documentTypeCodeFor, moneyClassFor,
-  insertGenerated, insertReceived, find, forOrder, forOrderExcludingInternalCaDocs,
+  insertGenerated, insertReceived, find, forOrder, forOrderExcludingInternalCaDocs, uploadedForOrder,
   markAsAdditionalDocument, additionalDocumentsForOrder, additionalDocumentsForClient, deactivate,
   removedAdditionalDocumentsForOrder, removedAdditionalDocumentsForClient,
 };

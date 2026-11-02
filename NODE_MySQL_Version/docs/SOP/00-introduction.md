@@ -304,7 +304,13 @@ the page**, above the step-cards (owner request 2026-10-27, so the
 step-cards and document tables get the full width), sit the "At a
 Glance" summary, the CAFIN box (only for holders of "View & download CAFIN" — see [CA
 Overview](./ca-01-overview.md)) and an **▸ All Documents (N) — quick
-links** button that opens the list of documents generated so far.
+links** button that opens the list of documents generated so far and,
+below it (owner request 2026-11-01), **Uploaded / received**: every file
+uploaded for the order by anyone — the client's buyer PO copy and payment
+screenshots, supplier and logistics bills, signed amendments, LC and BL
+copies, inspection reports, extra documents, comment attachments — each
+with who sent it and the date. You only see the files you may download
+(money you may see; CAFIN never appears there).
 
 The steps are grouped into five coloured sections — **A** Order Booking,
 **B** Procurement & Production, **C** Shipment & Balance, **D** Closure &

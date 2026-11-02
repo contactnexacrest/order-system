@@ -995,6 +995,15 @@ async function show(req, res) {
   const canViewCafin = !!req.permissions.view_cafin;
   let documents = await documentRepository.forOrder(orderId);
   if (!canViewCafin) documents = documents.filter((d) => d.document_type_code !== 'CAFIN');
+  // Owner request (1 Nov 2026): the "All Documents" panel also lists every file uploaded for the
+  // order (client, staff, associate) — only those this person may download (same gates as
+  // fileStoreController.download, so no link answers 403).
+  const uploadedFiles = [];
+  for (const f of await require('../repositories/fileStoreRepository').uploadedForOrder(orderId)) {
+    if (!(await moneyVisibility.canSeeFile(req.permissions, f.id))) continue;
+    if (!req.permissions.manage_incentives && (await require('../repositories/associateRepository').isAgreementFile(f.id))) continue;
+    uploadedFiles.push(f);
+  }
   // QA Round 8, R8-N06: the reviewer list offers a document's own generator only when the
   // self-approval rule 'document_review' allows them (Admin → Self-approval rules, D-221).
   const selfReviewOk = {};
@@ -1261,6 +1270,7 @@ async function show(req, res) {
       stageByNumber,
       payment: await orderPaymentStatusRepository.find(orderId),
       documents,
+      uploadedFiles,
       regenerationRisk,
       pendingCancellation,
       approvedCancellation,

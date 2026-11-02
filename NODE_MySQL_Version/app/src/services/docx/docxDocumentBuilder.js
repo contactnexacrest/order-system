@@ -40,6 +40,13 @@ function freightTermsSentence(incoterm) {
   }
 }
 
+// Owner (1 Nov 2026, confirmed twice): the PI prints Buyer's PO / Ref No.
+// only once one has been entered — no empty or "NIL" row.
+function buyerPoRow(order) {
+  const po = String((order && order.buyers_po_ref) ?? '').trim();
+  return po === '' || po === 'NIL' ? [] : [{ label: "Buyer's PO / Ref No.", value: po }];
+}
+
 function g(obj, path, fallback = '—') {
   let cur = obj;
   for (const key of path.split('.')) {
@@ -263,11 +270,9 @@ function renderQt(context) {
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
       { label: 'VAT / EORI / Tax Reg. No. *', value: g(consignee, 'vat_eori_tax_no', 'To Be Confirmed') },
       { label: 'Country of Destination *', value: g(consignee, 'country', 'To Be Confirmed') },
-      { label: 'Certificate of Origin Type', value: g(order, 'coo_type') },
       { label: 'Contact Person *', value: g(consignee, 'contact_person', 'To Be Confirmed') },
       { label: 'Email *', value: g(consignee, 'email', 'To Be Confirmed') },
       { label: 'Phone', value: g(consignee, 'phone', '—') },
-      { label: 'Port of Discharge *', value: g(order, 'port_of_discharge') },
     ])
   );
 
@@ -386,12 +391,11 @@ function renderPi(context) {
       { label: 'Consignee Address *', value: g(buyer, 'consignee_address') },
       { label: 'VAT / EORI / Tax Reg. No. *', value: g(consignee, 'vat_eori_tax_no', 'To Be Confirmed') },
       { label: 'Country of Final Destination *', value: g(consignee, 'country', 'To Be Confirmed') },
-      { label: 'Certificate of Origin Type', value: g(order, 'coo_type') },
-      { label: "Buyer's PO / Ref No.", value: g(order, 'buyers_po_ref') },
       { label: 'Contact Person *', value: g(consignee, 'contact_person', 'To Be Confirmed') },
       { label: 'Email *', value: g(consignee, 'email', 'To Be Confirmed') },
       { label: 'Phone', value: g(consignee, 'phone', '—') },
       { label: 'Notify Party', value: g(buyer, 'notify_party', 'SAME as buyer') },
+      ...buyerPoRow(order),
     ])
   );
 

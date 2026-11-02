@@ -18,17 +18,13 @@
 
 {% block body %}
 
-{% include '_buyer_details.html.twig' with {'section_number': section_numbers.buyer} %}
+{% include '_buyer_details.html.twig' with {'section_number': section_numbers.buyer, 'show_buyer_po': true} %}
 {% if show_consignee_section %}
 {% include '_consignee_details.html.twig' with {'section_number': section_numbers.consignee} %}
 {% endif %}
 {% if show_notify_party_section %}
 {% include '_notify_party.html.twig' with {'section_number': section_numbers.notify_party} %}
 {% endif %}
-<table class="kv">
-  <tr><td class="k">Certificate of Origin Type</td><td class="v">{{ order.coo_type }}</td></tr>
-  <tr><td class="k">Buyer's PO / Ref No.</td><td class="v">{{ order.buyers_po_ref }}</td></tr>
-</table>
 
 <div class="section-title">{{ section_numbers.product }}. PRODUCT / ORDER DETAILS</div>
 <table class="products">

@@ -20,10 +20,6 @@
 {% if show_consignee_section %}
 {% set section_number = section_numbers.consignee %}{% include '_consignee_details.njk' %}
 {% endif %}
-<table class="kv">
-  <tr><td class="k">Certificate of Origin Type</td><td class="v">{{ order.coo_type }}</td></tr>
-  <tr><td class="k">Port of Discharge *</td><td class="v">{{ order.port_of_discharge }}</td></tr>
-</table>
 
 <div class="section-title">{{ section_numbers.product }}. PRODUCT / ORDER DETAILS</div>
 <table class="products">

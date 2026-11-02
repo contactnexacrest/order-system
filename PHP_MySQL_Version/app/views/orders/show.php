@@ -4831,7 +4831,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
       <div class="sidebar-panel">
         <details class="sidebar-docs-toggle">
-          <summary>All Documents (<?= count($documents) ?>) &mdash; quick links</summary>
+          <?php $uploadedFiles = $uploadedFiles ?? []; ?>
+          <summary>All Documents (<?= count($documents) + count($uploadedFiles) ?>) &mdash; quick links</summary>
+          <p class="small sidebar-doc-group"><strong>Generated (<?= count($documents) ?>)</strong></p>
         <?php if (empty($documents)): ?>
           <p class="muted small">No documents generated yet.</p>
         <?php else: ?>
@@ -4840,6 +4842,20 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
               <li>
                 <?php if ($d['pdf_file_id'] && $canDownloadPdf && \App\Services\MoneyVisibility::canSeeDocument((string) $d['document_type_code'])): ?><a href="/documents/<?= (int) $d['id'] ?>/download?format=pdf"><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?></a><?php else: ?><?= htmlspecialchars($d['document_type_code']) ?> <?= htmlspecialchars($d['document_reference'] ?? '—') ?><?php endif; ?>
                 <span class="muted small">Rev.<?= (int) $d['revision_number'] ?> &middot; <?= htmlspecialchars(str_replace('_', ' ', $d['status'])) ?></span>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
+        <p class="small sidebar-doc-group"><strong>Uploaded / received (<?= count($uploadedFiles) ?>)</strong></p>
+        <?php if (empty($uploadedFiles)): ?>
+          <p class="muted small">No files uploaded yet.</p>
+        <?php else: ?>
+          <ul class="sidebar-doc-list sidebar-uploaded-list">
+            <?php foreach ($uploadedFiles as $f): ?>
+              <?php $fileFrom = trim((string) ($f['received_from'] ?? '')) !== '' ? (string) $f['received_from'] : (string) ($f['uploader_name'] ?? ''); ?>
+              <li>
+                <a href="/file-store/<?= (int) $f['id'] ?>/download"><?= htmlspecialchars((string) (($f['document_type_label'] ?? '') !== '' ? $f['document_type_label'] : $f['original_filename'])) ?></a>
+                <span class="muted small"><?= $fileFrom !== '' ? 'from ' . htmlspecialchars($fileFrom) . ' &middot; ' : '' ?><?= htmlspecialchars(substr((string) $f['uploaded_at'], 0, 10)) ?></span>
               </li>
             <?php endforeach; ?>
           </ul>

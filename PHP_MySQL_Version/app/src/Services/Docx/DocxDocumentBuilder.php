@@ -78,6 +78,18 @@ final class DocxDocumentBuilder
         };
     }
 
+    /**
+     * Owner (1 Nov 2026, confirmed twice): the PI prints Buyer's PO / Ref No.
+     * only once one has been entered — no empty or "NIL" row.
+     *
+     * @return array<int,array{label:string,value:string}>
+     */
+    private static function buyerPoRow(array $order): array
+    {
+        $po = trim((string) ($order['buyers_po_ref'] ?? ''));
+        return ($po === '' || $po === 'NIL') ? [] : [['label' => "Buyer's PO / Ref No.", 'value' => $po]];
+    }
+
     private static function g(array $arr, string $path, $default = '—')
     {
         $cur = $arr;
@@ -324,11 +336,9 @@ final class DocxDocumentBuilder
             ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
             ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
             ['label' => 'Country of Destination *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
-            ['label' => 'Certificate of Origin Type', 'value' => self::g($order, 'coo_type')],
             ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
             ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
             ['label' => 'Phone', 'value' => self::g($consignee, 'phone', '—')],
-            ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
         ]);
 
         DocxComponents::addSectionTitle($section, '3. PRODUCT / ORDER DETAILS');
@@ -426,20 +436,18 @@ final class DocxDocumentBuilder
         self::addDefaultSection1($section, $context, 'SELLER / EXPORTER');
 
         DocxComponents::addSectionTitle($section, '2. BUYER / CONSIGNEE DETAILS');
-        DocxComponents::addKvTable($section, [
+        DocxComponents::addKvTable($section, array_merge([
             ['label' => 'Company Legal Name *', 'value' => self::g($buyer, 'company_legal_name')],
             ['label' => 'Billing Address *', 'value' => self::g($buyer, 'billing_address')],
             ['label' => 'Consignee Name *', 'value' => self::g($buyer, 'consignee_name')],
             ['label' => 'Consignee Address *', 'value' => self::g($buyer, 'consignee_address')],
             ['label' => 'VAT / EORI / Tax Reg. No. *', 'value' => self::g($consignee, 'vat_eori_tax_no', 'To Be Confirmed')],
             ['label' => 'Country of Final Destination *', 'value' => self::g($consignee, 'country', 'To Be Confirmed')],
-            ['label' => 'Certificate of Origin Type', 'value' => self::g($order, 'coo_type')],
-            ['label' => "Buyer's PO / Ref No.", 'value' => self::g($order, 'buyers_po_ref')],
             ['label' => 'Contact Person *', 'value' => self::g($consignee, 'contact_person', 'To Be Confirmed')],
             ['label' => 'Email *', 'value' => self::g($consignee, 'email', 'To Be Confirmed')],
             ['label' => 'Phone', 'value' => self::g($consignee, 'phone', '—')],
             ['label' => 'Notify Party', 'value' => self::g($buyer, 'notify_party', 'SAME as buyer')],
-        ]);
+        ], self::buyerPoRow($order)));
 
         DocxComponents::addSectionTitle($section, '3. PRODUCT / ORDER DETAILS');
         $products = $context['products'] ?? [];
