@@ -46,7 +46,7 @@ app/                    the application itself — this is what you deploy
   package.json / package-lock.json
   .env.example            template — copy to .env and fill in real values
 docs/
-  schema.sql              the MySQL schema — 119 tables, 232 foreign keys
+  schema.sql              the MySQL schema — 153 tables, 279 foreign keys
                           as of 2026-10-30 (plus this stack's own
                           `sessions` table = 120; see the file's own
                           trailing changelog comments)
@@ -115,8 +115,9 @@ storage/
    mysql -u nexacrest_app -p nexacrest < docs/schema.sql
    mysql -u nexacrest_app -p nexacrest < docs/seed.sql
    ```
-   This creates all 119 tables (120 once this stack's own `sessions` store
-   is added at first run) and seeds: the roles/permissions matrix, one
+   This creates all 153 tables (154 once this stack's own `sessions` store
+   is added at first run) — the whole database: a new installation runs
+   **no** migration (D-241) and seeds: the roles/permissions matrix, one
    Admin login, company settings (with `PLACEHOLDER` values you must
    replace — see below), lookup tables (incoterms, currencies, ports, T&C
    clauses, payment presets), and 4 placeholder brand assets (logo,
@@ -808,6 +809,12 @@ README — see the PHP/MySQL README's matching section for how (a small
 PHPWord-based Markdown → OOXML converter, plus a real bug caught and
 fixed in that converter itself: PHPWord doesn't escape XML by default).
 
+> **Go-live note (2 Nov 2026, D-241):** the migration files named in the follow-up sections below were folded into
+> `docs/schema.sql` / `docs/seed.sql` before the first live installation and removed from `docs/migrations/`
+> (git history keeps them). A new installation runs **no** migration — `schema.sql` then `seed.sql` is the whole
+> database. Those names stay below only as history of what changed and why. From go-live on, see
+> `docs/migrations/README.md` for how a change ships.
+
 ## Follow-up (added 2026-10-23): UI Templates/Kanban, Complaints split, two-phase closure, LC & travel-expense tracking
 
 Same delivery as the PHP/MySQL README's matching section — see there for
@@ -845,9 +852,9 @@ tables, same 112-table total plus this stack's own `sessions` table, 60
 permissions, 466 routes). Full suite: 1795 Jest tests, plus the Playwright
 e2e suite green against `BASE_URL=http://127.0.0.1:3000`.
 
-**Upgrading an existing database:** run the files in `docs/migrations/`
-the database has not had yet, in filename order — run order and checks in
-the repository's `docs/migrations/README.md`.
+**Database changes:** before go-live every migration was folded into `docs/schema.sql` / `docs/seed.sql`
+(D-241). After go-live a change ships as a new file in the repository's `docs/migrations/` — see its
+`README.md`.
 
 ## Follow-up (added 2026-10-29): Zoho Books integration, shipping bill, LC payment received, 2-digit-year references
 
@@ -1271,7 +1278,7 @@ Zoho Books, built from the facts and including the bank reference.
 
 - **Migrations (run in this order):** `2026-11-02f-self-approval-rules.sql`,
   `2026-11-02g-qa-r8-associates.sql`, `2026-11-02h-qa-r8-approvals.sql`. All are safe to
-  run more than once. See `docs/migrations/README.md` rows 40 to 42.
+  run more than once. (History — now part of schema.sql / seed.sql, D-241.)
 - **Placeholders and labels (D-220, R8-N08):** every typed input and text area shows a
   placeholder with an example or the expected format; every visible field has a label.
   The sitewide ``public/js/app.js`` (`markRequiredLabels()`) puts " *" on the label of every required
@@ -1324,7 +1331,7 @@ Zoho Books, built from the facts and including the bank reference.
 
 ## Follow-up (added 2026-11-02): owner's 2 Nov list — documents, money safety, compliance, agreements, remittances
 
-Migrations, in this order after `2026-11-02h`: `2026-11-02m-generated-file-links.sql`, `2026-11-02n-document-copy-cleanup.sql`, `2026-11-02r-export-compliance.sql`, `2026-11-02q-remittance-difference.sql`, `2026-11-02s-agreements-register.sql`, `2026-11-02t-remittance-difference-reasons.sql`, `2026-11-02u-reference-library-payment-guide.sql` (see `docs/migrations/README.md`, rows 43–49). Schema: **148 tables**.
+Migrations, in this order after `2026-11-02h`: `2026-11-02m-generated-file-links.sql`, `2026-11-02n-document-copy-cleanup.sql`, `2026-11-02r-export-compliance.sql`, `2026-11-02q-remittance-difference.sql`, `2026-11-02s-agreements-register.sql`, `2026-11-02t-remittance-difference-reasons.sql`, `2026-11-02u-reference-library-payment-guide.sql` (history — now part of schema.sql / seed.sql, D-241). Schema: **148 tables** at that point (**153** at go-live, after D-238 – D-240).
 
 - **Documents (D-223, D-224 — owner confirmed twice):** Quotation and Proforma Invoice have no untitled CoO / Port of Discharge table; the PI prints Buyer's PO / Ref No. in Buyer Details only when entered; the Order Confirmation shows the Buyer's PO; the Debit Note's "To (Buyer)" is the full buyer block; BL Instruction section 8 no longer gives payment terms ("Original BL release: CHA to hand all 3 originals to NexaCrest only"); the Commercial Invoice says "the value declared on the Indian Shipping Bill" (no "IGST refund") and prints the total in words (`src/helpers/amountInWords.js`). PDF and Word alike; the reference Word files (`reference_templates/`) match. Tests: `quotationPiLayout.test.js`, `documentWordingD224.test.js`.
 - **Freight in rupees (D-225):** Step 9a freight and insurance are order currency; `orderProfitabilityService.js` converts them (freight receipt rate → freight leg → advance/balance rate), flags a missing rate instead of adding foreign units as rupees, and the working line ("EUR 950.00 × 90.50 = ₹85,975.00") shows in Step 12c and CAFIN C1. Fixed incentives are not recalculated. Test: `freightCostInInr.test.js`.
@@ -1346,8 +1353,16 @@ Migrations, in this order after `2026-11-02h`: `2026-11-02m-generated-file-links
 
 ### Follow-up (added 2026-11-02): clients and products in Zoho Books (D-238)
 
-Run `docs/migrations/2026-11-02za-zoho-clients-products.sql` after `2026-11-02y` (`docs/migrations/README.md`, row 53). It adds two switches under **Admin → Settings → Zoho Books**, both **off**: `zoho_sync_clients` (clients as Zoho Books customers) and `zoho_sync_products` (products of the Products menu as Zoho Books items, rate 0 — no cost is ever sent). One way, app → Zoho, done by `app/src/services/zohoMasterDataSync.js` inside the existing hourly Zoho sync (`app/src/jobs/zohoSync.js`) and Sync now — **no new scheduled job**. "Re-push all clients and products" on the Zoho Books Sync page (`POST /ca/zoho-sync/repush-master-data`, `ca_module_manage`) sends everything again. Nothing is deleted in Zoho: inactive or deleted records are marked inactive there. A client goes once its first order has set its currency. See SOP `ca-03-zoho-sync.md` → "Clients and products in Zoho Books". Tests: `ZohoClientsProductsSyncTest` / `zohoClientsProductsSync.test.js`.
+Migration `docs/migrations/2026-11-02za-zoho-clients-products.sql` (history — now part of schema.sql / seed.sql, D-241). It adds two switches under **Admin → Settings → Zoho Books**, both **off**: `zoho_sync_clients` (clients as Zoho Books customers) and `zoho_sync_products` (products of the Products menu as Zoho Books items, rate 0 — no cost is ever sent). One way, app → Zoho, done by `app/src/services/zohoMasterDataSync.js` inside the existing hourly Zoho sync (`app/src/jobs/zohoSync.js`) and Sync now — **no new scheduled job**. "Re-push all clients and products" on the Zoho Books Sync page (`POST /ca/zoho-sync/repush-master-data`, `ca_module_manage`) sends everything again. Nothing is deleted in Zoho: inactive or deleted records are marked inactive there. A client goes once its first order has set its currency. See SOP `ca-03-zoho-sync.md` → "Clients and products in Zoho Books". Tests: `ZohoClientsProductsSyncTest` / `zohoClientsProductsSync.test.js`.
 
 ### Follow-up (added 2026-11-02): Zoho API call limits for this app (D-239)
 
-Run `docs/migrations/2026-11-02zb-zoho-api-limits.sql` after `2026-11-02za` (`docs/migrations/README.md`, row 54). Zoho limits API calls **per organisation** (about 100 a minute and a daily number by plan) and every Zoho app of the company shares that limit, so this app keeps to its own share: **Admin → Settings → Zoho Books** → `zoho_api_daily_limit` (**800**) and `zoho_api_minute_limit` (**30**). Every Zoho Books call — reads, the OAuth token and sends — is counted in `zoho_api_usage` by `app/src/services/zohoApiBudget.js` (meter) and `zohoBooksService.request()` / `getAccessToken()`. When the day's allowance is used, syncing pauses until midnight (India time); the scheduled sync (`src/jobs/zohoSync.js` (in-process scheduler or external cron)) waits out the per-minute limit, while Sync now / Sync this order / the Zoho check stop and ask to try again in a minute. Zoho's own "too many requests" (HTTP 429, codes 44/45, the OAuth "too many requests continuously") **stops the run at once** with one Sync Log line and one failure e-mail (D-233); nothing is lost. The access token is shared (encrypted, `zoho_token_cache`) by every process for 50 minutes and refreshed under a database lock. Usage today and the last 7 days are on the Zoho Books Sync page. See SOP `ca-03-zoho-sync.md` → "Zoho's call limits". Tests: `zohoApiLimits.test.js`.
+Migration `docs/migrations/2026-11-02zb-zoho-api-limits.sql` (history — now part of schema.sql / seed.sql, D-241). Zoho limits API calls **per organisation** (about 100 a minute and a daily number by plan) and every Zoho app of the company shares that limit, so this app keeps to its own share: **Admin → Settings → Zoho Books** → `zoho_api_daily_limit` (**800**) and `zoho_api_minute_limit` (**30**). Every Zoho Books call — reads, the OAuth token and sends — is counted in `zoho_api_usage` by `app/src/services/zohoApiBudget.js` (meter) and `zohoBooksService.request()` / `getAccessToken()`. When the day's allowance is used, syncing pauses until midnight (India time); the scheduled sync (`src/jobs/zohoSync.js` (in-process scheduler or external cron)) waits out the per-minute limit, while Sync now / Sync this order / the Zoho check stop and ask to try again in a minute. Zoho's own "too many requests" (HTTP 429, codes 44/45, the OAuth "too many requests continuously") **stops the run at once** with one Sync Log line and one failure e-mail (D-233); nothing is lost. The access token is shared (encrypted, `zoho_token_cache`) by every process for 50 minutes and refreshed under a database lock. Usage today and the last 7 days are on the Zoho Books Sync page. See SOP `ca-03-zoho-sync.md` → "Zoho's call limits". Tests: `zohoApiLimits.test.js`.
+
+### Follow-up (added 2026-11-02): Logistics enters logistics bills, Accounts pays (D-232)
+
+Part of schema.sql / seed.sql (D-241). Permission `manage_logistics_bills`: add a CHA / transport / freight-forwarder bill (number, date, taxable value, GST, scan, proforma or tax invoice, the proforma it replaces) and remove one that has no payment. Held by Logistics Executive, Manager and Director and by every role that holds `manage_supplier_payments`. **Recording a payment (amount, UTR) stays with `manage_supplier_payments`** (Finance / Accounts / management) — a Logistics login sees "Accounts records the payment." and the pay route answers 403. The Logistics Partner Bills card shows to anyone who may see logistics costs. Buyer remittance forms (advance, milestone, freight, balance) also have an optional **"Our bank's charges on this credit (₹, incl. GST)"**, booked at once as an order cost "Bank Charges" with a D-212 description; it is not sent to Zoho (the CA books bank charges from the bank statement). Tests: LogisticsBillsAndOwnBankChargesTest / logisticsBillsAndOwnBankCharges.test.js.
+
+### Follow-up (added 2026-11-02): reference selling price with discount approval (D-240)
+
+Part of schema.sql / seed.sql (D-241). **Products menu:** a product may carry a reference selling price with currency and unit (e.g. "USD 45.00 per SQFT"), seen and changed only with View selling prices (`view_selling_prices`). **Order lines:** "Pick from Products" fills description, HS code, unit and — when the currencies match — the unit price; the line's own price stays editable and **every document prints the line's own price**. **Note beside the price** (selling-visible staff only; never on documents or the client portal), set under **Admin → Settings → Products & pricing**: on/off (`ref_price_note_enabled`), note level (`ref_price_note_pct`, default 5 %), warning level (`ref_price_warning_pct`, default 10 %). **At or beyond the warning level the Proforma Invoice cannot be generated** until someone with `approve_price_discount` (MD, ED) approves the discount with a reason on the order page's Price check (inside the Products card); a further drop or a new line below the warning level cancels the approval; the self-approval rule `price_discount` decides whether the person who set the price may approve it. **Zoho (D-238):** an INR reference price becomes the Zoho item rate; another currency leaves the rate at 0 and puts "Reference price: …" in the item description; invoice lines carry the Zoho item when the line's product is already in Zoho. Tests: ReferencePriceTest / referencePrice.test.js.

@@ -27,6 +27,23 @@ Three separate sign-ins, never mixed:
   own clients, orders, commission and payments, never prices, costs or
   documents (SOP chapter 24).
 
+What the app does at go-live (2 Nov 2026), in brief — details in the SOP:
+
+- The nine-stage export order with every document (PDF and Word), review and
+  approval, and the client portal (SOP chapters 01–13).
+- Money visibility by role: each person sees only the amounts their
+  permissions allow, proven by an automatic test (SOP chapter 21).
+- Procurement, logistics partner bills (Logistics enters, Accounts pays),
+  coordination queues, Export Compliance (ECGC, COO, eBRC, export benefits),
+  the Agreements register, associates with commission and TDS (chapters 22–26).
+- Products with a reference selling price; a discount beyond the warning
+  level needs MD/ED approval before the Proforma Invoice (chapters 01, 03, 15).
+- Remittances with "why is it different?" reasons and bank charges booked at
+  receipt (chapters 03, 06, 08).
+- Zoho Books: hourly sync (with optional client and product sync), a
+  "Waiting for Zoho" count, call limits for this app and failure e-mails
+  (CA chapter ca-03).
+
 Where to look:
 
 - **Setup and deployment:** each stack's own `README.md`.
@@ -34,8 +51,9 @@ Where to look:
   `NODE_MySQL_Version/docs/ARCHITECTURE.md` (same content, each with its
   own file names), and the diagram-led overview of both stacks in
   `ARCHITECTURE.html` (open it in a browser).
-- **Upgrading a live database:** `docs/migrations/README.md` (run order,
-  checks), with the read-only checks in `docs/checks/`.
+- **Database install and changes:** go-live = each stack's `docs/schema.sql` then
+  `docs/seed.sql`, no migrations (D-241). How a change ships after go-live:
+  `docs/migrations/README.md`; read-only checks in `docs/checks/`.
 - **Staff manual (SOP):** `docs/SOP/` (copied into each stack's
   `docs/SOP`, where the in-app SOP reads it).
 - **Owner decisions:** `docs/decisions/owner-decisions-register.md` — every

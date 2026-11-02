@@ -91,6 +91,11 @@ around it:
 - **Operations, Insights, and Admin are collapsible groups** — click the
   group name to open it and see what's inside. The system remembers which
   ones you had open.
+- **Added 2 Nov 2026:** **Operations → Agreements** (the register of signed
+  agreements with expiry reminders, [Chapter 26](./26-agreements.md)) and,
+  for Finance and management, **Zoho Sync** (send everything waiting to Zoho
+  Books now; it shows a "Waiting for Zoho" count and today's Zoho call
+  usage, [CA Zoho Sync](./ca-03-zoho-sync.md)).
 - **"SOP / Operations Guide"** is this exact manual, reachable from inside
   the app itself at any time — you're looking at it right now, just
   outside the app. Bookmark it; you'll be back.
@@ -231,6 +236,8 @@ time, from the sidebar, so you never have to go hunting for it.
 | Manage roles, users, or company settings | **Admin** | [Chapter 15](./15-admin-settings.md) |
 | Rehearse something without touching real data | **Test Mode** (if you have access) | [Chapter 16](./16-test-mode.md) |
 | CA / Accounting work | **CA / Accounting** | [CA Overview](./ca-01-overview.md) |
+| Check an agreement or when it expires | **Operations → Agreements** | [Chapter 26](./26-agreements.md) |
+| Fill in a supplier or CHA / logistics payment | Order page Steps 7e / 10a / Logistics Partner Bills — "How to fill this" link | [Payments guide](./guides/Supplier_and_Logistics_Payments_Guide.pdf) |
 
 ## Your first week
 

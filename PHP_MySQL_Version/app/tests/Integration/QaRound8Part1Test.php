@@ -343,37 +343,6 @@ final class QaRound8Part1Test extends DbTestCase
         self::assertSame(['1', '2'], array_map('strval', $n));
     }
 
-    public function testTheMigrationNumbersExistingClientsByRegistrationThenIdAndFixesOpenOrders(): void
-    {
-        $a = $this->associate(['rate_1_5' => '1.25']);
-        $pdo = Database::connection();
-        $ids = [];
-        foreach (['2026-10-05', '2026-10-01', '2026-10-01', '2026-09-20'] as $i => $date) {
-            $ids[$i] = $this->client("R8 Backfill {$i} {$this->tag}");
-            AssociateService::linkClient($ids[$i], (int) $a['id'], 'code', null, $date, $this->admin);
-        }
-        $open = $this->order($ids[0]);
-        $locked = $this->order($ids[1]);
-        // As the old code left them: no client numbers; every order "client no. 1".
-        $pdo->exec("UPDATE clients SET associate_client_number = NULL WHERE associate_id = {$a['id']}");
-        $pdo->exec("UPDATE orders SET associate_client_number = 1, associate_rate_pct = 0.70, associate_rate_source = 'global' WHERE id IN ({$open}, {$locked})");
-        $pdo->exec("INSERT INTO order_incentives (order_id, locked_at, associate_id, associate_order_number) VALUES ({$locked}, NOW(), {$a['id']}, 1)");
-        $pdo->exec("UPDATE associates SET rate_1_5 = NULL, rate_6_10 = NULL WHERE id = {$a['id']}");
-
-        $run = new \ReflectionMethod(DbTestCase::class, 'runSqlFile');
-        $file = __DIR__ . '/../../../../docs/migrations/2026-11-02g-qa-r8-associates.sql';
-        $run->invoke(null, 'nexacrest_phpunit_test', $file);
-        $run->invoke(null, 'nexacrest_phpunit_test', $file);
-
-        $numbers = [];
-        foreach ($ids as $i => $id) {
-            $numbers[$i] = (int) $pdo->query("SELECT associate_client_number FROM clients WHERE id = {$id}")->fetchColumn();
-        }
-        // 2026-09-20 first, then the two of 2026-10-01 by client id, then 2026-10-05.
-        self::assertSame([4, 2, 3, 1], [$numbers[0], $numbers[1], $numbers[2], $numbers[3]]);
-        self::assertSame(['4', '0.70', 'global'], array_map('strval', array_values($pdo->query("SELECT associate_client_number, associate_rate_pct, associate_rate_source FROM orders WHERE id = {$open}")->fetch(\PDO::FETCH_ASSOC))));
-        self::assertSame('1', (string) $pdo->query("SELECT associate_client_number FROM orders WHERE id = {$locked}")->fetchColumn(), 'a locked order is never changed');
-    }
 
     // ---------------------------------------------------------------- Q-R8-2: a suspended associate's portal is read-only
 

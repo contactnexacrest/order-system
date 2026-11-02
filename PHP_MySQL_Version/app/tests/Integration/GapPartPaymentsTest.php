@@ -168,21 +168,4 @@ final class GapPartPaymentsTest extends DbTestCase
         self::assertStringContainsString(' · USD 1,800.00 at ₹83.25 · ', $description);
         self::assertStringEndsWith(' · bank ref HDFCN26304123456', $description);
     }
-
-    public function testTheMigrationBackFillsOneReceiptPerRecordedLeg(): void
-    {
-        $orderId = $this->orderAtAdvance();
-        Database::connection()->prepare("UPDATE order_payment_status SET advance_amount = 1800, advance_remittance_received_at = '2026-10-01 10:00:00', advance_exchange_rate = 83.5, advance_bank_reference = 'OLD0001' WHERE order_id = :o")->execute(['o' => $orderId]);
-        $sql = (string) file_get_contents(dirname(__DIR__, 4) . '/docs/migrations/2026-11-02d-gap-part-payments.sql');
-        $backfill = substr($sql, (int) strpos($sql, '-- Existing orders'));
-        foreach (array_filter(array_map('trim', explode(';', $backfill))) as $statement) {
-            if (str_contains($statement, 'INSERT')) {
-                Database::connection()->exec($statement);
-                Database::connection()->exec($statement); // safe to run twice
-            }
-        }
-        $receipts = PartPaymentService::receipts($orderId, 'advance');
-        self::assertCount(1, $receipts);
-        self::assertSame(['1800.00', '2026-10-01', '83.5000', 'OLD0001'], [$receipts[0]['amount'], $receipts[0]['received_on'], $receipts[0]['exchange_rate'], $receipts[0]['bank_reference']]);
-    }
 }

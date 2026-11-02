@@ -472,8 +472,19 @@ Browser suite: `11-associates.spec.js` now expects the personal rate carried upw
 | `remittanceDifference.test.js`, `remittanceDifferenceReasons.test.js` | D-227: "why is it different?" on advance, freight, balance and milestones; bank charges cost with D-212 wording and Zoho `bank_charges`; 3% cap; short / excess; Admin-managed reasons filtered by direction; "Other" needs text and treatment; treatment locked once used |
 | `agreementsRegister.test.js` | D-228: add / renew / end early; status; reminders 30 / 7 / 0 days once each; staff agreements only for `manage_agreements`; client and associate agreements listed; Kanban parity |
 | `orderLockGuardMiddleware.test.js` | Updated: `/orders/:id/zoho-sync` works on a closed order |
+| `logisticsBillsAndOwnBankCharges.test.js` | D-232: Logistics adds a logistics bill but gets 403 on paying it or removing a supplier bill; Accounts still pays; Procurement refused; "our bank's charges" booked as a Bank Charges cost with the exact description |
+| `cafinReceiptsBankCharges.test.js` | D-236: CAFIN receipts show received + bank charges and the INR credited; an INR actual is not reduced again; rows without charges unchanged; Excel note |
+| `complianceTracking.test.js` | D-234: ECGC limit / exposure warnings, declaration reminder, Missing eBRC / FIRC report, claim sanctioned amount, deadline and reminders once each |
+| `associateTds.test.js` | D-235: 194H 2 % after the ₹20,000 threshold with catch-up, 20 % without PAN, abroad papers before payout, exact D-212 wording, Zoho payload with/without tax id, TDS register |
+| `zohoClientsProductsSync.test.js` | D-238: switches off send nothing; clients created / linked by name / updated / inactivated; products without cost, inactivated; pending counts; re-push all |
+| `zohoApiLimits.test.js` | D-239: every Zoho call metered (token included); daily allowance stops before calling; minute pacing waits in the background and refuses a person quickly; 429 / code 44 / OAuth stop the run; shared token reused and refreshed once after 401 |
+| `referencePrice.test.js` | D-240: reference price seen by role; Pick from Products (same / different currency); note levels and switch; PI refused → approved → cancelled on a further drop; self-approval rule; Zoho item rate / description and invoice item |
+| `zohoBooksStage3.test.js` (extended) | D-233: "Waiting for Zoho" counts, nothing while Zoho is off, one failure e-mail per failing run without amounts, mail-off path |
+| `mysqlCompatibleDdl.test.js` (changed) | D-241: also checks `seed.sql`; any future migration file still checked |
 
 Browser suite: `12-money-matrix.spec.js` — every role × about 75 screens, 18 files and the dossier ZIP; fails on any amount a role may not see (0 violations on both stacks, 2 Nov 2026).
+
+Totals at go-live (2 Nov 2026): PHPUnit 2,191 tests; Jest 392 suites / 2,258 tests; browser suite 58 tests per stack (including `12-money-matrix.spec.js`, 0 violations). Two tests that exercised back-fills of existing data were removed with the migration files (D-241): the go-live database has no existing data to back-fill.
 
 ## Appendix
 

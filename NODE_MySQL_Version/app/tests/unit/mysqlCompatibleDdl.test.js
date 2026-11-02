@@ -12,8 +12,12 @@ const path = require('path');
 describe('schema and migrations use MySQL-compatible DDL', () => {
   const root = path.join(__dirname, '../../..');
   const migrations = path.join(root, '../docs/migrations');
+  // Go-live (2 Nov 2026): schema.sql + seed.sql are the install; the old migrations were folded
+  // into them and removed, so docs/migrations may hold only its README. Any migration added from
+  // now on is still checked.
   const files = [
     path.join(root, 'docs/schema.sql'),
+    path.join(root, 'docs/seed.sql'),
     ...fs.readdirSync(migrations).filter((f) => f.endsWith('.sql')).map((f) => path.join(migrations, f)),
   ];
   const pattern = /\b(?:(?:ADD|DROP|CHANGE|MODIFY)\s+(?:COLUMN|INDEX|KEY|UNIQUE\s+(?:INDEX|KEY))\s+IF\s+(?:NOT\s+)?EXISTS|CREATE\s+(?:UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS)\b/i;

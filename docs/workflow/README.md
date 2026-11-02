@@ -27,10 +27,13 @@ together with the application.
   "Sync this order to Zoho now".
 
 The specification (v3) reflects the decisions up to 30 Oct 2026. The
-decisions taken since — D-212 (money descriptions) to D-231 (gap list, CFR
+decisions taken since — D-212 (money descriptions) to D-241 (gap list, CFR
 wording, associates, self-approval rules, QA Round 8, document layout and
 wording, freight in rupees, Export Compliance, remittance differences,
-Agreements register, money safety, document copies clean-up) — are in `docs/decisions/owner-decisions-register.md`
+Agreements register, money safety, document copies clean-up, associate TDS,
+ECGC / eBRC tracking, Logistics entering logistics bills, Zoho client / product
+sync and call limits, the reference price with discount approval, and go-live
+without migrations) — are in `docs/decisions/owner-decisions-register.md`
 and in the guide and the SOP; where they differ from the specification,
 the register wins.
 

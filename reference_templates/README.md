@@ -30,7 +30,7 @@ where the two disagree, the Developer Spec wins — it says so explicitly).
 - Staff guidelines that are not document templates live outside this folder:
   the *Supplier & Logistics Payments Guide* (PDF + Word, 2 Nov 2026) is in
   `docs/guides/` and `docs/SOP/guides/`, and in the app's Reference Library
-  (`storage/assets/reference_library/`, migration `2026-11-02u`).
+  (`storage/assets/reference_library/`, listed by `seed.sql`).
 - `reference/` — the governing text and lookup files:
   - `NexaCrest_Developer_Spec.txt` — **authoritative.** Single source of truth
     for section structure, field lists, exact clause text, and legal-language

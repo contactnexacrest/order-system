@@ -1,7 +1,5 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const db = require('../../src/config/db');
 const ordersController = require('../../src/controllers/ordersController');
 const paymentMilestoneController = require('../../src/controllers/paymentMilestoneController');
@@ -163,17 +161,4 @@ describe('Gap list G-5: part payments and short payments', () => {
     expect(description.endsWith(' · bank ref HDFCN26304123456')).toBe(true);
   });
 
-  it('the migration back-fills one receipt per recorded leg', async () => {
-    const orderId = await orderAtAdvance();
-    await db.execute("UPDATE order_payment_status SET advance_amount = 1800, advance_remittance_received_at = '2026-10-01 10:00:00', advance_exchange_rate = 83.5, advance_bank_reference = 'OLD0001' WHERE order_id = :o", { o: orderId });
-    const sql = fs.readFileSync(path.join(__dirname, '../../../../docs/migrations/2026-11-02d-gap-part-payments.sql'), 'utf8');
-    const backfill = sql.slice(sql.indexOf('-- Existing orders'));
-    for (const statement of backfill.split(';').map((x) => x.trim()).filter((x) => x.includes('INSERT'))) {
-      await db.pool.query(statement.replace(/^--.*$/gm, ''));
-      await db.pool.query(statement.replace(/^--.*$/gm, '')); // safe to run twice
-    }
-    const rows = await partPaymentService.receipts(orderId, 'advance');
-    expect(rows.length).toBe(1);
-    expect([String(rows[0].amount), rows[0].received_on, String(rows[0].exchange_rate), rows[0].bank_reference]).toEqual(['1800.00', '2026-10-01', '83.5000', 'OLD0001']);
-  });
 });

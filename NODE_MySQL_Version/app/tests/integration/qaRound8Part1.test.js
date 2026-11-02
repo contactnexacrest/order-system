@@ -1,9 +1,6 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
-const { execFileSync } = require('child_process');
 const bcrypt = require('bcrypt');
 const dotenv = require('dotenv');
 const request = require('supertest');
@@ -303,36 +300,6 @@ describe('QA Round 8, part 1', () => {
     await Promise.all([associateRepository.linkClient(c1, Number(a.id), '2026-10-01'), associateRepository.linkClient(c2, Number(a.id), '2026-10-01')]);
     const n = (await db.query('SELECT associate_client_number AS n FROM clients WHERE id IN (:a, :b) ORDER BY n', { a: c1, b: c2 })).map((r) => Number(r.n));
     expect(n).toEqual([1, 2]);
-  });
-
-  it('the migration numbers existing clients by registration, then id, and fixes open orders', async () => {
-    const a = await associate({ rate_1_5: '1.25' });
-    const ids = [];
-    for (const [i, date] of ['2026-10-05', '2026-10-01', '2026-10-01', '2026-09-20'].entries()) {
-      ids[i] = await client(`R8 Backfill ${i} ${tag}`);
-      await associateService.linkClient(ids[i], Number(a.id), 'code', null, date, admin);
-    }
-    const open = await order(ids[0]);
-    const locked = await order(ids[1]);
-    await db.execute('UPDATE clients SET associate_client_number = NULL WHERE associate_id = :a', { a: a.id });
-    await db.execute("UPDATE orders SET associate_client_number = 1, associate_rate_pct = 0.70, associate_rate_source = 'global' WHERE id IN (:o, :l)", { o: open, l: locked });
-    await db.execute('INSERT INTO order_incentives (order_id, locked_at, associate_id, associate_order_number) VALUES (:l, NOW(), :a, 1)', { l: locked, a: a.id });
-    await db.execute('UPDATE associates SET rate_1_5 = NULL, rate_6_10 = NULL WHERE id = :a', { a: a.id });
-
-    const env = dotenv.parse(fs.readFileSync(path.join(__dirname, '..', '..', '.env')));
-    const file = path.join(__dirname, '..', '..', '..', '..', 'docs', 'migrations', '2026-11-02g-qa-r8-associates.sql');
-    for (let run = 0; run < 2; run++) {
-      execFileSync('mysql', ['-h', env.DB_HOST || '127.0.0.1', '-P', env.DB_PORT || '3306', '-u', env.DB_USERNAME, `-p${env.DB_PASSWORD || ''}`, 'nexacrest_node_jest'],
-        { stdio: ['pipe', 'pipe', 'pipe'], input: fs.readFileSync(file) });
-    }
-    const numbers = [];
-    for (const id of ids) {
-      numbers.push(Number(await value('SELECT associate_client_number FROM clients WHERE id = :id', { id })));
-    }
-    expect(numbers).toEqual([4, 2, 3, 1]); // 2026-09-20 first, then the two of 2026-10-01 by client id, then 2026-10-05
-    const row = await db.queryOne('SELECT associate_client_number, associate_rate_pct, associate_rate_source FROM orders WHERE id = :id', { id: open });
-    expect([String(row.associate_client_number), String(row.associate_rate_pct), row.associate_rate_source]).toEqual(['4', '0.70', 'global']);
-    expect(Number(await value('SELECT associate_client_number FROM orders WHERE id = :id', { id: locked }))).toBe(1); // a locked order is never changed
   });
 
   // ---------------------------------------------------------------- Q-R8-2: a suspended associate's portal is read-only

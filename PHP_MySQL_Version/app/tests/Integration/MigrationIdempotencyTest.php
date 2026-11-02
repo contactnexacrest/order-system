@@ -31,7 +31,11 @@ final class MigrationIdempotencyTest extends DbTestCase
         $dir = __DIR__ . '/../../../../docs/migrations';
         $files = glob($dir . '/*.sql');
         sort($files);
-        self::assertNotEmpty($files, 'sanity check: the migrations folder must actually be found and non-empty');
+        // Go-live (2 Nov 2026): the old migrations were folded into schema.sql/seed.sql and
+        // removed, so the folder may hold only its README. Every migration added from now on
+        // is still checked here.
+        self::assertDirectoryExists($dir, 'sanity check: the migrations folder must exist');
+        self::assertFileExists($dir . '/README.md');
         return $files;
     }
 

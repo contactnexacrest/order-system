@@ -116,6 +116,18 @@ Everything starts from the **Reports** hub:
   value, commission paid, TDS, waiting), commission waiting (ageing, with
   holds) and the TDS register; each as CSV. Needs **Manage associates**;
   opened from **Associates → Report**. See [Chapter 24](./24-associates.md).
+- **Associate TDS register** (`/associates/tds`, D-235, 2 Nov 2026) — TDS
+  deducted on associate commission by financial year and quarter (gross,
+  TDS, section and rate, net, challan no. and date, Form 16A uploaded);
+  CSV. Opens for **Manage incentives**, **Pay incentives** or the CA module
+  (view). See [Chapter 24](./24-associates.md).
+- **Missing eBRC / FIRC** (`/reports/missing-ebrc`, D-234, 2 Nov 2026) —
+  every buyer payment that has arrived with no FIRC / eBRC reference yet:
+  order, buyer, payment, received on, days since receipt, owner (amounts
+  only for people who may see buyer payments); CSV. Opens for the CA
+  module (view), **Manage export benefit claims** or **Manage order
+  financials**; a reminder goes out once a month. See
+  [Chapter 25](./25-export-compliance.md).
 - **Staff Productivity** — documents generated and audit-log activity per
   user (requires the separate `view_staff_reports` permission — this one
   isn't available to every role by default, unlike the others).
