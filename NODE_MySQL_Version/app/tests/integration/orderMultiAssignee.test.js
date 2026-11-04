@@ -12,6 +12,9 @@ const permissionCheck = require('../../src/middleware/permissionCheck');
 const orderAssignmentService = require('../../src/services/orderAssignmentService');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// Owner decision D-245 P2: this file types goods lines by hand on USD orders; it is about something else.
+beforeAll(() => require('../support/fixtures').allowHandTypedGoodsLines());
+
 function extractCsrf(html) {
   const m = html.match(/name="_csrf"\s+value="([^"]+)"/);
   if (!m) throw new Error('CSRF token not found in response HTML');

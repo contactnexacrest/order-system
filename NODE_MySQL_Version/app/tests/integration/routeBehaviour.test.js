@@ -463,11 +463,11 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expectPage(await holder.call('GET', '/associates?view=list'), 'Associates', 'GET /associates');
     expectPage(await holder.call('GET', '/associates/new'), 'Add an associate', 'GET /associates/new');
     const email = `route-assoc-${crypto.randomBytes(4).toString('hex')}@nexacrest.test`;
-    expectDone(await holder.call('POST', '/associates', { name: 'Route Associate', based_in: 'india', currency_code: 'INR', email }), 'POST /associates', 'Associate "Route Associate" added.');
+    expectDone(await holder.call('POST', '/associates', { name: 'Route Associate', based_in: 'india', currency_code: 'INR', email, commission_mode: 'ladder' }), 'POST /associates', 'Associate "Route Associate" added.');
     const id = Number(await value('SELECT id FROM associates WHERE email = :e', { e: email }));
     expectPage(await holder.call('GET', `/associates/${id}`), 'Route Associate', 'GET /associates/:id');
     expectPage(await holder.call('GET', `/associates/${id}/edit`), 'Edit Route Associate', 'GET /associates/:id/edit');
-    expectDone(await holder.call('POST', `/associates/${id}/update`, { name: 'Route Associate', based_in: 'india', currency_code: 'INR', email, rate_1_5: '1.10' }), 'POST /associates/:id/update');
+    expectDone(await holder.call('POST', `/associates/${id}/update`, { name: 'Route Associate', based_in: 'india', currency_code: 'INR', email, rate_1_5: '1.10', commission_mode: 'ladder' }), 'POST /associates/:id/update');
     expect(await value('SELECT rate_1_5 FROM associates WHERE id = :id', { id })).toBe('1.10');
     expectPage(await holder.call('GET', '/associates/ladder'), 'Standard rate', 'GET /associates/ladder');
     expectDone(await holder.call('POST', '/associates/ladder', { rate_1_5: '0.70', rate_6_10: '1.00', rate_11_20: '1.50', rate_21_40: '1.75', rate_41_plus: '2.00',
@@ -558,7 +558,9 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     const hs = await value('SELECT code FROM hs_codes WHERE is_active = 1 ORDER BY id LIMIT 1');
     const line = await insert('order_products', { order_id: order, line_no: 1, description: 'Route line', quantity: 10, unit: 'pcs', unit_price: 12, hs_code: hs });
 
-    expectDone(await holder.call('POST', `/orders/${order}/products/${line}`, { description: 'Route edited line', hs_code: hs, quantity: '12', unit: 'pcs', unit_price: '15', reason: 'Route behaviour test edit' }), 'POST /orders/:id/products/:productId');
+    // D-245 P2: on a USD order a goods line is picked from Products.
+    const picked = await require('../../src/repositories/productRepository').create({ name: `Route Picked Granite ${crypto.randomBytes(3).toString('hex')}`, specifications: 'Slab', hs_code: hs }, holderUser.id);
+    expectDone(await holder.call('POST', `/orders/${order}/products/${line}`, { catalog_product_id: String(picked), description: 'Route edited line', hs_code: hs, quantity: '12', unit: 'pcs', unit_price: '15', reason: 'Route behaviour test edit' }), 'POST /orders/:id/products/:productId');
     expect(await value('SELECT description FROM order_products WHERE id = :id', { id: line })).toBe('Route edited line');
 
     expectDone(await holder.call('POST', `/orders/${order}/products/${line}/duplicate`, { reason: 'Route behaviour test copy' }), 'POST /orders/:id/products/:productId/duplicate');
@@ -752,7 +754,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
   it('associate and partner edits, the balance exchange rate and a review rejection', async () => {
     const associate = await insert('associates', { name: 'Route Test Associate', based_in: 'india', currency_code: 'INR', status: 'active' });
     const rates = { rate_1_5: '5', rate_6_10: '5', rate_11_20: '4', rate_21_40: '3', rate_41_plus: '2' };
-    expectDone(await holder.call('POST', `/associates/${associate}/update`, { name: 'Route Test Associate B', based_in: 'india', currency_code: 'INR', status: 'active', ...rates }), 'POST /associates/:id/update');
+    expectDone(await holder.call('POST', `/associates/${associate}/update`, { name: 'Route Test Associate B', based_in: 'india', currency_code: 'INR', status: 'active', commission_mode: 'ladder', ...rates }), 'POST /associates/:id/update');
     expect(await value('SELECT name FROM associates WHERE id = :id', { id: associate })).toBe('Route Test Associate B');
     expect(await audits('ASSOCIATE_UPDATED', associate)).toBe(1);
 
@@ -810,7 +812,8 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     ['POST', '/orders/:id/payment/balance/inr-actual/delete'], ['POST', '/orders/:id/payment/freight/firc'],
     ['POST', '/orders/:id/payment/freight/inr-actual'], ['POST', '/orders/:id/payment/freight/inr-actual/delete'],
     ['POST', '/orders/:id/pi-form/skip'], ['POST', '/orders/:id/products/:id'], ['POST', '/orders/:id/products/:id/delete'],
-    ['POST', '/orders/:id/products/:id/duplicate'], ['POST', '/orders/:id/vendor-bills/:id/delete'], ['GET', '/orders/:id/zoho-check'],
+    ['POST', '/orders/:id/products/:id/duplicate'], ['POST', '/orders/:id/products/:id/price-approval-request'],
+    ['GET', '/orders/:id/products/:id/price-approval'], ['POST', '/orders/:id/products/:id/price-approval', { reason: 'Route behaviour test approval', decision: 'approve' }], ['POST', '/orders/:id/vendor-bills/:id/delete'], ['GET', '/orders/:id/zoho-check'],
     ['GET', '/payment-presets/:id/edit'], ['POST', '/payment-presets/:id/toggle'], ['POST', '/payment-presets/:id/update'],
     ['GET', '/port-routes/:id/edit'], ['POST', '/port-routes/:id/update'],
     ['GET', '/ports/:id/edit'], ['POST', '/ports/:id/set-default'], ['POST', '/ports/:id/toggle'], ['POST', '/ports/:id/update'],
@@ -986,16 +989,27 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expectPage(await holder.call('GET', '/reports/missing-ebrc'), 'Missing eBRC / FIRC', 'GET /reports/missing-ebrc');
   });
 
-  it('price discount approval route (D-240, 2 Nov 2026)', async () => {
-    const orderId = await createTestOrder(await createTestClient());
-    expect((await holder.call('POST', `/orders/${orderId}/price-approval`, { reason: 'Nothing to approve here' })).type).toBe('error');
-    const productId = await require('../../src/repositories/productRepository').create({ name: `Route Ref Granite ${Date.now()}`, specifications: 'Slab', hs_code: '68022310', reference_price: '45.00', reference_currency: 'USD', reference_unit: 'SQFT' }, holderUser.id);
-    const orderProductRepository = require('../../src/repositories/orderProductRepository');
-    const line = await orderProductRepository.add(orderId, 1, 'Route Ref Granite', null, null, '10', false, 'SQFT', '36.00', '68022310');
-    await orderProductRepository.setCatalogProduct(line, productId);
-    expect((await holder.call('POST', `/orders/${orderId}/price-approval`, { reason: 'x' })).type).toBe('error');
-    expectDone(await holder.call('POST', `/orders/${orderId}/price-approval`, { reason: 'Route test — volume order agreed' }), 'POST /orders/:id/price-approval', 'Discount approved');
-    expect(await audits('PRICE_DISCOUNT_APPROVED', orderId)).toBe(1);
+  it('line price approval routes (D-245 P2)', async () => {
+    await db.execute("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'"); // staff floor 1,287.50 above the minimum 1,250.00
+    try {
+      const orderId = await createTestOrder(await createTestClient());
+      const productId = await require('../../src/repositories/productRepository').create({ name: `Route Priced Granite ${Date.now()}`, specifications: 'Block', hs_code: '68022310', reference_unit: 'CBM' }, holderUser.id);
+      const supplier = await require('../../src/repositories/productSupplierRepository').create({ product_id: productId, supplier_name: 'Route Quarry', location: null, contact_person: null, contact_phone: null, contact_email: null,
+        fob_source: 'direct', fob_value: 80000, factory_cost: null, transportation_cost: null, packing_cost: null, loading_cost: null, cha_cost: null, is_primary: 1, notes: null }, holderUser.id);
+      await require('../../src/repositories/pricingRepository').setSupplierDates(supplier, todayIst(), null);
+      const orderProductRepository = require('../../src/repositories/orderProductRepository');
+      const line = await orderProductRepository.add(orderId, 1, 'Route Priced Granite', null, null, '10', false, 'CBM', '1300.00', '68022310');
+      await orderProductRepository.setCatalogProduct(line, productId);
+      expect((await holder.call('POST', `/orders/${orderId}/products/${line}/price-approval-request`)).type).toBe('error');
+      await db.execute('UPDATE order_products SET unit_price = 1260.00 WHERE id = :id', { id: line });
+      expectDone(await holder.call('POST', `/orders/${orderId}/products/${line}/price-approval-request`), 'POST /orders/:id/products/:productId/price-approval-request', 'Sent to the MD');
+      expectPage(await holder.call('GET', `/orders/${orderId}/products/${line}/price-approval`), 'Approve a price below the floor', 'GET /orders/:id/products/:productId/price-approval');
+      expect((await holder.call('POST', `/orders/${orderId}/products/${line}/price-approval`, { reason: 'x' })).type).toBe('error');
+      expectDone(await holder.call('POST', `/orders/${orderId}/products/${line}/price-approval`, { reason: 'Route test — volume order agreed', decision: 'approve' }), 'POST /orders/:id/products/:productId/price-approval', 'Price approved');
+      expect(await audits('LINE_PRICE_APPROVED', line)).toBe(1);
+    } finally {
+      await db.execute("UPDATE incentive_settings SET setting_value = '0' WHERE setting_key = 'program_enabled'");
+    }
   });
 
   it('every route answers a missing id as not found and writes nothing', async () => {
@@ -1008,7 +1022,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
       if (!notFound || r.status >= 500) wrong.push(`${method} ${pattern} → ${r.status} ${r.type || ''} ${r.flash || r.body.replace(/<[^>]+>/g, ' ').trim().slice(0, 80)}`);
     }
     expect(wrong).toEqual([]);
-    expect(ID_ROUTES.length).toBe(92);
+    expect(ID_ROUTES.length).toBe(95);
     expect(Number(await value('SELECT COUNT(*) AS n FROM audit_log WHERE entity_id = 999999999'))).toBe(auditBefore);
   }, 120000);
 });

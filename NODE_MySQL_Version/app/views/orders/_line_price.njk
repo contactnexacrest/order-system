@@ -1,0 +1,26 @@
+{#
+  Owner decision D-245 P2: one order line's price check — "Quote · lowest" and a badge; MD/ED
+  (view_price_buildup) also see the minimum price. Selling-visible people only; never on a
+  document or in the client portal. In: lc (orderLinePricing.checkLine result), seesPriceBuildup.
+  Port of views/orders/_line_price.php.
+#}
+{% if lc %}{% set lcf = lc.figures %}
+<span class="price-check-line small">
+  {% if lcf %}
+    <span class="price-range muted">Quote {{ lcf.quote | money }} · lowest {{ lcf.floor | money }}{% if seesPriceBuildup %} · minimum {{ lcf.minimum | money }}{% endif %}{% if lc.fixed %} <span title="Fixed when the Proforma Invoice was issued">(fixed at PI)</span>{% endif %}</span>
+  {% endif %}
+  {% if lc.status == 'ok' %}
+    <span class="price-badge price-badge-ok">✓ OK</span>
+  {% elif lc.status == 'below' %}
+    <span class="price-badge price-badge-bad">✗ Below your lowest price</span>
+  {% elif lc.status == 'below_minimum' %}
+    <span class="price-badge price-badge-bad">✗ Below what NexaCrest can accept</span>
+  {% elif lc.status == 'no_price' %}
+    <span class="price-badge price-badge-bad">No price set — needs MD approval</span>
+  {% elif lc.status == 'approved' %}
+    <span class="price-badge price-badge-approved">Approved by the MD</span>
+  {% elif lc.note %}
+    <span class="price-badge price-badge-none">{{ lc.note }}</span>
+  {% endif %}
+</span>
+{% endif %}

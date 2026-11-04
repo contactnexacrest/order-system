@@ -132,4 +132,26 @@ function verifyAssociateBank(email) {
   return Number(id);
 }
 
-module.exports = { resetClientPassword, provisionClientLogin, getMailSending, setMailSending, lastEmailSentWithDocument, verifyAssociateBank, runSql, dbName, bcryptHash };
+/**
+ * Owner decision D-245 P2: on a USD order a goods line is picked from Products. Makes sure
+ * there is an active product with a supplier price "used for pricing" (₹80,000, quoted
+ * today), so Pick from Products fills a quote price at or above the floor; returns its id.
+ */
+function ensurePricedProduct() {
+  const name = 'E2E Priced Granite Block';
+  let id = runSql(`SELECT id FROM catalog_products WHERE name = '${name}' LIMIT 1`, 'priced product lookup');
+  if (!id) {
+    runSql(`INSERT INTO catalog_products (name, specifications, hs_code, is_active) VALUES ('${name}', 'Granite block, polished', '68022310', 1)`, 'priced product insert');
+    id = runSql(`SELECT id FROM catalog_products WHERE name = '${name}' LIMIT 1`, 'priced product lookup');
+  }
+  runSql(`UPDATE catalog_products SET is_active = 1 WHERE id = ${Number(id)}`, 'priced product activate');
+  const supplier = runSql(`SELECT id FROM catalog_product_suppliers WHERE product_id = ${Number(id)} AND is_primary = 1 LIMIT 1`, 'priced product supplier lookup');
+  if (!supplier) {
+    runSql(`INSERT INTO catalog_product_suppliers (product_id, supplier_name, fob_source, fob_value, is_primary, quoted_on) VALUES (${Number(id)}, 'E2E Quarry', 'direct', 80000, 1, CURDATE())`, 'priced product supplier insert');
+  } else {
+    runSql(`UPDATE catalog_product_suppliers SET fob_source = 'direct', fob_value = 80000, quoted_on = CURDATE(), valid_until = NULL WHERE id = ${Number(supplier)}`, 'priced product supplier refresh');
+  }
+  return Number(id);
+}
+
+module.exports = { resetClientPassword, provisionClientLogin, getMailSending, setMailSending, lastEmailSentWithDocument, verifyAssociateBank, runSql, dbName, bcryptHash, ensurePricedProduct };

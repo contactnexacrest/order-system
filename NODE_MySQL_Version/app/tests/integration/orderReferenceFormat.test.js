@@ -7,6 +7,9 @@ const ordersController = require('../../src/controllers/ordersController');
 const referenceNumberService = require('../../src/services/referenceNumberService');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// Owner decision D-245 P2: this file types goods lines by hand on USD orders; it is about something else.
+beforeAll(() => require('../support/fixtures').allowHandTypedGoodsLines());
+
 /**
  * Port of OrderReferenceFormatTest.php. 90-item backlog "order-ID prefix
  * change to SC/ORD/{YYYY}/{NNN}": the seeded order_ref_format default

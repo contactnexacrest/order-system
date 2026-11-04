@@ -27,6 +27,7 @@ final class PricingService
         'incentive_mode' => 'pct',
         'incentive_value' => '15.0000',
         'stale_days' => '60',
+        'require_product_pick' => '1',
     ];
 
     /** Labels for the settings page and the audit log. */
@@ -38,6 +39,7 @@ final class PricingService
         'incentive_mode' => 'Team incentive reserve type',
         'incentive_value' => 'Team incentive reserve value',
         'stale_days' => 'Supplier price is stale after (days)',
+        'require_product_pick' => 'Goods lines must be picked from Products',
     ];
 
     /** @return array{margin_pct: float, other_cost_pct: float, pricing_fx_rate: float, buffer_pct: float, incentive_mode: string, incentive_value: float, stale_days: int} */
@@ -52,6 +54,7 @@ final class PricingService
             'incentive_mode' => $raw['incentive_mode'] === 'usd' ? 'usd' : 'pct',
             'incentive_value' => (float) $raw['incentive_value'],
             'stale_days' => max(1, (int) $raw['stale_days']),
+            'require_product_pick' => (string) $raw['require_product_pick'] === '1',
         ];
     }
 
@@ -100,6 +103,10 @@ final class PricingService
             $values['stale_days'] = '';
         } else {
             $values['stale_days'] = (string) $days;
+        }
+        // D-245 P2: only when the form carries it (a form without the field keeps the stored value).
+        if (array_key_exists('require_product_pick', $post)) {
+            $values['require_product_pick'] = (string) $post['require_product_pick'] === '1' ? '1' : '0';
         }
         return [$values, $errors];
     }

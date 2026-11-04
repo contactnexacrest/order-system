@@ -22,6 +22,9 @@ const documentGenerationService = require('../../src/services/documentGeneration
 const { buildProductRows } = require('../../src/services/docx/docxDocumentBuilder');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// Owner decision D-245 P2: this file types goods lines by hand on USD orders; it is about something else.
+beforeAll(() => require('../support/fixtures').allowHandTypedGoodsLines());
+
 /**
  * Port of ProductCategoryTest.php. Owner decision D-215 (5a, confirmed
  * twice): product categories with their own attributes (Products →

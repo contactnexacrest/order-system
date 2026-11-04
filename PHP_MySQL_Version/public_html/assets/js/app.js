@@ -1107,6 +1107,43 @@
   // Owner request (3 Nov 2026): a click anywhere in a date box opens the calendar,
   // not only a click on the small calendar icon. Typing still works; browsers
   // without showPicker() simply keep their usual behaviour.
+  // Owner decision D-245 P2: data-floor="<number>" on a price field — the
+  // lowest price this person may agree for the line. Below it the message in
+  // data-floor-message (or a default) shows beside the field as the user
+  // types; the line can still be saved, and is then sent to the MD for
+  // approval (the server checks it again and never accepts a price below the
+  // product's minimum). The floor changes when "Pick from Products" fills the
+  // line, so it is read afresh on every input.
+  function floorNote(el) {
+    var note = el.parentElement.querySelector('.floor-note');
+    var floor = parseFloat(el.dataset.floor);
+    var value = parseFloat(el.value);
+    var below = el.dataset.floor !== undefined && el.dataset.floor !== '' && !isNaN(floor) && el.value.trim() !== '' && !isNaN(value) && value < floor - 0.0001;
+    if (!below) {
+      if (note) note.remove();
+      el.classList.remove('below-floor');
+      return;
+    }
+    if (!note) {
+      note = document.createElement('span');
+      note.className = 'floor-note small';
+      note.setAttribute('aria-live', 'polite');
+      el.insertAdjacentElement('afterend', note);
+    }
+    note.textContent = (el.dataset.floorMessage || 'Below your lowest price') + ' (' + floor.toFixed(2) + ') — saving sends this line to the MD for approval; the Proforma Invoice waits for it.';
+    el.classList.add('below-floor');
+  }
+
+  function initFloorNotes() {
+    document.addEventListener('input', function (e) {
+      if (e.target.matches && e.target.matches('[data-floor]')) floorNote(e.target);
+    });
+    document.addEventListener('floor-changed', function (e) {
+      if (e.target.matches && e.target.matches('[data-floor]')) floorNote(e.target);
+    });
+    document.querySelectorAll('[data-floor]').forEach(floorNote);
+  }
+
   function initDatePickers() {
     document.addEventListener('click', function (e) {
       var input = e.target;
@@ -1161,6 +1198,7 @@
     initStepStatusClasses();
     initDatePickers();
     initFocusLink();
+    initFloorNotes();
   }
 
   if (document.readyState === 'loading') {

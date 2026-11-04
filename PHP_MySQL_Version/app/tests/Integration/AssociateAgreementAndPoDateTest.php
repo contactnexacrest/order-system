@@ -52,7 +52,7 @@ final class AssociateAgreementAndPoDateTest extends DbTestCase
     {
         return $overrides + ['name' => 'PHPUnit Associate', 'based_in' => 'india', 'country' => '', 'currency_code' => 'INR', 'email' => '', 'phone' => '',
             'tax_id' => '', 'agreement_signed_on' => '', 'rate_1_5' => '0.70', 'rate_6_10' => '1.00', 'rate_11_20' => '1.50', 'rate_21_40' => '1.75',
-            'rate_41_plus' => '2.00', 'status' => 'active', 'notes' => ''];
+            'rate_41_plus' => '2.00', 'status' => 'active', 'notes' => '', 'commission_mode' => 'ladder'];
     }
 
     private function associateCount(): int

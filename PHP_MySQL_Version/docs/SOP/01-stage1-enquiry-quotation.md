@@ -351,6 +351,14 @@ always made; tick **DOCX** as well if you want an editable Word copy for
 internal use. Once one exists, the button reads **Regenerate Quotation (new
 revision)**.
 
+**Price check first** (owner decision D-245 P2, 4 Nov 2026). The Quotation is
+refused — like the Proforma Invoice — while a line picked from Products is below
+the lowest price of whoever sells the order, below the product's minimum price,
+or picked from a product with no price set, unless the MD has approved it; Step 1
+shows the reason in red, e.g. "Line 1 is below the lowest price for this order —
+raise it, or ask the MD to approve it, before the Quotation (order page →
+Products)." See [Pricing](./27-pricing.md#prices-on-order-lines-phase-p2).
+
 The new QT document appears in the documents table as a **draft** — it
 still needs to go through [review and approval](./13-document-review-approval.md)
 before it's the final, sendable version. A draft can be deleted (**Delete
@@ -495,43 +503,23 @@ Country of Origin: India", in the category's order; an attribute left empty
 prints "To Be Confirmed". A category can be made inactive: new lines no longer
 offer it, existing lines keep it.
 
-### Reference selling price and "Pick from Products" (owner decision 2 Nov 2026, D-240)
+### "Pick from Products" and the price check (D-240; owner decision D-245 P2, 4 Nov 2026)
 
-**Products menu.** A product can carry a **Reference Selling Price** — an
-amount, its currency and the unit it is per (e.g. "USD 45.00 per SQFT"). It
-is the usual price, not a fixed one. Only people who may see selling prices
-(Sales, the directors, Admin) see or change it on the product list, the
-product page and the product form; Procurement and Logistics do not see it,
-and if they save a product the reference price stays as it was. Every change
-is in the audit log (PRODUCT_REFERENCE_PRICE_CHANGED, old and new). The form
-refuses "Reference selling price must be a number above 0 with at most 2
-decimals.", "Choose the currency of the reference selling price." and
-"Choose the unit of the reference selling price from the list."
-
-**Order lines.** The New Order form and the order page's add / edit line
-forms have **Pick from Products** (optional). Picking a product fills the
-description, HS code and unit, and shows its specifications. When the
-reference price is in the order's currency it fills the unit price too
-("Reference price USD 45.00 per SQFT filled in — change it if this order
-differs."); in another currency the price is left blank ("Reference: USD
-45.00 per SQFT — different currency, so no price was filled in."). The line
-remembers the product; its own unit price stays freely editable, and **every
-document (QT, PI, OC, CI …) prints the line's own price — never the reference
-price.**
-
-**The note** beside a line's price (only for people who may see selling
-prices; never on a document or in the client portal), set under Settings →
-**Products & pricing**:
-
-- "6.7% below reference price (USD 45.00 per SQFT)" — at or beyond the note
-  level (default 5 %);
-- red "⚠ 20% below reference price (USD 45.00 per SQFT)" — at or beyond the
-  warning level (default 10 %); the Proforma Invoice then needs an MD/ED
-  approval first ([Stage 3](./03-stage3-pi-advance.md#price-check-before-the-pi-owner-decision-2-nov-2026-d-240));
-- green "11.1% above reference price (USD 45.00 per SQFT)".
-
-Nothing is compared when the product has no reference price or it is in
-another currency than the order.
+The New Order form and the order page's add / edit line forms have **Pick from
+Products**. On a **USD order** a goods line must be picked from it while Admin →
+Pricing → "Goods lines must be picked from Products" is on (the default): a goods
+line typed by hand is refused ("Pick this goods line from Products — on a USD
+order goods lines cannot be typed by hand (service and charge lines can)."),
+beside the picker in the browser and again on saving. Service and charge lines,
+and orders in other currencies, can still be typed. Picking a product fills the description, HS code and
+selling unit, shows its specifications and — on a USD order, for people who may
+see selling prices — fills the **quote price of whoever sells the order** (staff,
+or the client's associate at their commission level). The price stays editable;
+below the seller's lowest price a red note appears beside it and the saved line
+goes to the MD for approval; below the product's minimum price the line is
+refused. **Every document (QT, PI, OC, CI …) prints the line's own price.** The
+whole flow — who sees what, the MD's approval, the PI waiting, the figures fixed
+at the PI — is in [Pricing](./27-pricing.md#prices-on-order-lines-phase-p2).
 
 ### Export Service Invoice (D-215)
 

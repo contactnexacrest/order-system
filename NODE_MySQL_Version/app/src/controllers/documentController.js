@@ -91,9 +91,9 @@ async function generate(req, res) {
     return;
   }
   // Owner decision D-226: without the general permission, Export Compliance generates only its own documents.
-  // Owner decision 2 Nov 2026 (D-240): a discount at the warning level needs an MD/ED approval before the PI.
-  if (type === 'PI') {
-    const priceBlock = await require('../services/referencePrice').piBlockReason(orderId, req.user.id);
+  // Owner decision D-245 P2: a line below its floor (or without a price) needs the MD's approval before the Quotation or PI.
+  if (type === 'QT' || type === 'PI') {
+    const priceBlock = await require('../services/orderLinePricing').documentBlockReason(orderId, type);
     if (priceBlock !== null) {
       flash.set(req, 'error', priceBlock);
       res.redirect(`/orders/${orderId}#price-check`);

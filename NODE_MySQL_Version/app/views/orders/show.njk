@@ -814,7 +814,7 @@
   <div class="order-layout" id="order-layout">
     <div class="step-sequence" id="order-panels">
 
-  <details class="step-card" id="step-products"{{ ' open' if (sees.selling and not priceCheck.covered) else '' }}>
+  <details class="step-card" id="step-products"{{ ' open' if (sees.selling and linePricing.blocking.length) else '' }}>
     <summary><h2>Products</h2></summary>
     {% set canEditProducts = permissions.manage_orders and sees.selling and (not isLockedOrder or canOverrideLockEdit) and (not isPostConfirmationOrder or canOverrideOrderEdit) %}
     {% if not canEditProducts %}
@@ -828,8 +828,8 @@
           <td>{{ p.unit or '' }}</td>
           {% if sees.selling %}
           <td>{{ (p.unit_price | money) if p.unit_price != null else 'To Be Confirmed' }}
-            {% set rp = refPriceLines[p.id] %}
-            {% if rp and rp.note %}<span class="ref-price-note small{{ rp.cls }}">{{ rp.note.text }}</span>{% endif %}
+            {# Owner decision D-245 P2: the line's price check. #}
+            {% set lc = linePricing.lines[p.id] %}{% include "orders/_line_price.njk" %}
           </td>
           <td>{{ (p.fob_value | money) if p.fob_value != null else 'To Be Confirmed' }}</td>
           {% endif %}
@@ -853,7 +853,7 @@
           <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <div class="kv-grid">
-              {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = p.catalog_product_id or 0 %}{% set pickerCurrency = order.currency_code or '' %}{% include "orders/_product_picker.njk" %}
+              {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = p.catalog_product_id or 0 %}{% set pickerCurrency = order.currency_code or '' %}{% set pickerKey = linePricing.ctx.key or 'staff' %}{% include "orders/_product_picker.njk" %}
               <label>Description *<input type="text" name="description" value="{{ p.description }}" required placeholder="e.g. Granite slabs, polished"></label>
               <label>Dimensions<input type="text" name="dimensions" value="{{ p.dimensions or '' }}" placeholder="e.g. 240 x 120 x 2 cm"></label>
               <label>Finish
@@ -873,14 +873,11 @@
                   {% endfor %}
                 </select>
               </label>
-              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ p.unit_price or '' }}" placeholder="e.g. 45.00">
-                {# Owner decision 2 Nov 2026 (D-240): difference from the reference price — selling-visible people only, never on a document. #}
-                {% if sees.selling %}
-                  {% set rp = refPriceLines[p.id] %}
-                  <span class="ref-price-note small{{ rp.cls if rp else '' }}"
-                    data-enabled="{{ '1' if refPriceSettings.enabled else '0' }}" data-note="{{ refPriceSettings.note_pct }}" data-warning="{{ refPriceSettings.warning_pct }}"
-                    data-ref="{{ rp.ref if rp else '' }}" data-label="{{ rp.label if rp else '' }}">{{ rp.note.text if (rp and rp.note) else '' }}</span>
-                {% endif %}
+              {% set lc = linePricing.lines[p.id] %}
+              {% set lcFloor = (lc.figures.floor | fixed2) if (sees.selling and lc and lc.figures and lc.status != 'approved') else null %}
+              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="{{ p.unit_price or '' }}" placeholder="e.g. 45.00"{% if lcFloor %} data-floor="{{ lcFloor }}" data-floor-message="Below your lowest price"{% endif %}>
+                {# Owner decision D-245 P2: the line's price check — selling-visible people only, never on a document. #}
+                {% if sees.selling %}{% include "orders/_line_price.njk" %}{% endif %}
               </label>
               <label>Line type
                 <select name="line_type">
@@ -927,7 +924,7 @@
         <form method="post" action="/orders/{{ order.id }}/products">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <div class="kv-grid">
-            {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = 0 %}{% set pickerCurrency = order.currency_code or '' %}{% include "orders/_product_picker.njk" %}
+            {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = 0 %}{% set pickerCurrency = order.currency_code or '' %}{% set pickerKey = linePricing.ctx.key or 'staff' %}{% include "orders/_product_picker.njk" %}
             <label>Description *<input type="text" name="description" required placeholder="e.g. Granite slabs, polished"></label>
             <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 240 x 120 x 2 cm"></label>
             <label>Finish
@@ -947,9 +944,7 @@
                 {% endfor %}
               </select>
             </label>
-            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 45.00">
-              {% if sees.selling %}<span class="ref-price-note small" data-enabled="{{ '1' if refPriceSettings.enabled else '0' }}" data-note="{{ refPriceSettings.note_pct }}" data-warning="{{ refPriceSettings.warning_pct }}" data-ref="" data-label=""></span>{% endif %}
-            </label>
+            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 45.00" data-floor-message="Below your lowest price"></label>
             <label>Line type
               <select name="line_type">
                 {% for lt, ltLabel in lineTypes %}<option value="{{ lt }}">{{ ltLabel }}</option>{% endfor %}
@@ -997,33 +992,48 @@
       </div>
     {% endif %}
 
-  {# Owner decision 2 Nov 2026 (D-240): Price check — discounts below the reference price at the warning level (inside the Products card). #}
-  {% if sees.selling and (priceCheck.needing.length or priceCheck.approval) %}
+  {# Owner decision D-245 P2: Price check — lines below the floor of whoever sells the order (inside the Products card). #}
+  {% if sees.selling and pcLines.length %}
   <div class="price-check" id="price-check">
-    <h3>Price check <small class="muted">(reference price)</small></h3>
-    {% if not priceCheck.needing.length %}
-      <p class="muted">No line is below its reference price by {{ refPriceWarningText }}% or more.</p>
-    {% else %}
-      <table class="list">
-        <tr><th>Line</th><th>Description</th><th>Price</th><th>Reference</th><th>Below by</th></tr>
-        {% for pc in priceCheck.needing %}
-          <tr><td>{{ pc.line_no }}</td><td>{{ pc.description }}</td><td>{{ pc.unit_price | money }}</td><td>{{ pc.label }}</td><td class="ref-price-warning">⚠ {{ pc.belowText }}%</td></tr>
-        {% endfor %}
-      </table>
-      {% if priceCheck.covered %}
-        <p class="notice notice-success">Discount approved by {{ priceCheck.approval.approver_name }} on {{ priceCheck.approval.approved_at | string }} — reason: {{ priceCheck.approval.reason }}</p>
-      {% else %}
-        <p class="notice notice-warning">These lines are {{ refPriceWarningText }}% or more below their reference price. The Proforma Invoice can be generated once an MD/ED approves the discount.{{ ' An earlier approval no longer covers the lines (a price dropped further or a new line was added).' if priceCheck.approval else '' }}</p>
-        {% if canApprovePriceDiscount %}
-        <form method="post" action="/orders/{{ order.id }}/price-approval">
-          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-          <label>Reason for approving the discount *<textarea name="reason" rows="2" required minlength="10" maxlength="500" placeholder="e.g. Repeat buyer, volume order — agreed by MD on call"></textarea></label>
-          <button type="submit" class="btn-sm">Approve discount</button>
-        </form>
-        {% else %}
-          <p class="muted small">Only an MD or ED (permission "Approve price discounts") can approve it.</p>
-        {% endif %}
-      {% endif %}
+    <h3>Price check <small class="muted">(sold by {{ linePricing.ctx.label }})</small></h3>
+    <table class="list">
+      <tr><th>Line</th><th>Description</th><th>Price (USD)</th><th>Quote · lowest</th><th>Check</th><th></th></tr>
+      {% for pc in pcLines %}{% set pl = pc.line %}{% set pf = pc.figures %}
+        <tr>
+          <td>{{ pl.line_no }}</td>
+          <td>{{ pl.description }}</td>
+          <td>{{ pl.unit_price | money }}</td>
+          <td>{{ ((pf.quote | money) + ' · ' + (pf.floor | money)) if pf else '—' }}</td>
+          <td>
+            {% if pc.status == 'approved' %}
+              <span class="price-badge price-badge-approved">Approved by {{ pc.approval.approver_name }}</span>
+              <div class="muted small">{{ pc.approval.at | string }} — {{ pc.approval.reason }}</div>
+            {% elif pc.status == 'below_minimum' %}
+              <span class="price-badge price-badge-bad">✗ Below what NexaCrest can accept — raise it</span>
+            {% elif pc.status == 'no_price' %}
+              <span class="price-badge price-badge-bad">No price set — needs MD approval</span>
+            {% else %}
+              <span class="price-badge price-badge-bad">✗ Below your lowest price</span>
+            {% endif %}
+            {% if pc.requested and pc.status != 'approved' %}<div class="muted small">Sent to the MD for approval.</div>{% endif %}
+          </td>
+          <td>
+            {% if pc.status == 'below' or pc.status == 'no_price' %}
+              {% if canManagePricing %}
+                <a class="btn-sm" href="/orders/{{ order.id }}/products/{{ pl.id }}/price-approval">Review and approve line {{ pl.line_no }}</a>
+              {% elif canEditProducts and not pc.requested %}
+                <form method="post" action="/orders/{{ order.id }}/products/{{ pl.id }}/price-approval-request" style="display:inline">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <button type="submit" class="btn-sm">Ask MD to approve line {{ pl.line_no }}</button>
+                </form>
+              {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </table>
+    {% if linePricing.blocking.length %}
+      <p class="notice notice-error">⛔ The Proforma Invoice cannot be issued until every line is at or above its lowest price, or the MD has approved it. Raise the price, or ask the MD to approve it. Below the minimum price nobody can approve it.</p>
     {% endif %}
   </div>
   {% endif %}
@@ -1585,6 +1595,10 @@
 
   <details class="step-card" id="step-1-quotation-prepare"{{ stepCardOpen('s1') }}>
     <summary>{{ stepStatusIcon(stepStates['s1']) }}<span class="step-group-num">STEP 1</span><h2>Prepare Quotation</h2></summary>
+    {# Owner decision D-245 P2: a line below its floor (or without a price) needs the MD's approval before the Quotation. #}
+    {% if qtBlockReason %}
+      <p class="notice notice-error">The Quotation cannot be generated yet: {{ qtBlockReason }} (<a href="#price-check" data-focus-link>Price check</a>)</p>
+    {% endif %}
     {# QA Round 5, R5-03 (owner decision 2026-10-28, Option A): terms on a
        "Requires MD approval" preset are approved before the Quotation. #}
     {% set termsPending = paymentTermsApproval.required and not paymentTermsApproval.approved %}
@@ -1863,9 +1877,9 @@
 
     <details class="step-card" id="step-5c-pi-generate"{{ flow.subCardOpen('s5', '5c') }}>
       <summary>{{ stepStatusIcon(flow.subStepStatus('s5', '5c')) }}<h2>Step 5c &middot; Generate Proforma Invoice</h2></summary>
-      {# Owner decision 2 Nov 2026 (D-240): a discount at the warning level needs an MD/ED approval before the PI. #}
-      {% if not priceCheck.covered %}{% set pcFirst = priceCheck.uncovered[0] %}
-        <p class="notice notice-error">The Proforma Invoice cannot be generated yet: line {{ pcFirst.line_no }} is {{ pcFirst.belowText }}% below its reference price — an MD/ED must approve the discount first (<a href="#price-check">Price check</a>).</p>
+      {# Owner decision D-245 P2: a line below its floor (or without a price) needs the MD's approval before the PI. #}
+      {% if piBlockReason %}
+        <p class="notice notice-error">The Proforma Invoice cannot be generated yet: {{ piBlockReason }} (<a href="#price-check" data-focus-link>Price check</a>)</p>
       {% endif %}
       {% if stage3 and stage3.status != 'locked' %}
         {% if permissions.generate_documents %}{# QA Round 5, R5-20 #}

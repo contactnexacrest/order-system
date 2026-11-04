@@ -103,13 +103,6 @@ final class ProductController
             }
             unset($product);
         }
-        // Owner decision 2 Nov 2026 (D-240): the reference SELLING price only for people who may see selling prices.
-        if (!\App\Services\MoneyVisibility::can('selling')) {
-            foreach ($products as &$product) {
-                unset($product['reference_price'], $product['reference_currency'], $product['reference_unit']);
-            }
-            unset($product);
-        }
 
         View::render('products/index', [
             'products'       => $products,
@@ -127,7 +120,6 @@ final class ProductController
     {
         View::render('products/create', [
             'product' => null,
-            'referenceCurrencies' => ProductRepository::referenceCurrencies(),
             'referenceUnits' => \App\Repositories\LookupRepository::dropdownOptions('unit'),
         ], 'layout/base');
     }
@@ -135,7 +127,7 @@ final class ProductController
     public function store(array $params): void
     {
         $data = $this->readProductForm();
-        $error = $this->validateProduct($data) ?? $this->applyReferencePrice($data, null);
+        $error = $this->validateProduct($data) ?? $this->applySellingUnit($data);
         if ($error !== null) {
             Flash::set('error', $error);
             header('Location: /products/create');
@@ -192,9 +184,6 @@ final class ProductController
             $details['suppliers'] = [];
             $details['misc_charges'] = [];
         }
-        if (!\App\Services\MoneyVisibility::can('selling')) {
-            unset($details['product']['reference_price'], $details['product']['reference_currency'], $details['product']['reference_unit']);
-        }
 
         View::render('products/show', [
             'product'        => $details['product'],
@@ -220,12 +209,8 @@ final class ProductController
             echo 'Product not found.';
             return;
         }
-        if (!\App\Services\MoneyVisibility::can('selling')) {
-            unset($product['reference_price'], $product['reference_currency'], $product['reference_unit']);
-        }
         View::render('products/edit', [
             'product' => $product,
-            'referenceCurrencies' => ProductRepository::referenceCurrencies(),
             'referenceUnits' => \App\Repositories\LookupRepository::dropdownOptions('unit'),
         ], 'layout/base');
     }
@@ -241,7 +226,7 @@ final class ProductController
         }
 
         $data = $this->readProductForm();
-        $error = $this->validateProduct($data) ?? $this->applyReferencePrice($data, $product);
+        $error = $this->validateProduct($data) ?? $this->applySellingUnit($data);
         if ($error !== null) {
             Flash::set('error', $error);
             header("Location: /products/{$id}/edit");
@@ -251,15 +236,6 @@ final class ProductController
         $user = AuthService::currentUser();
         ProductRepository::update($id, $data, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'PRODUCT_UPDATED', 'products', $id, null, null, $data['name']);
-        $__oldRef = \App\Services\ReferencePrice::label($product) . '';
-        $__newRef = \App\Services\ReferencePrice::label($data);
-        if (($product['reference_price'] ?? null) !== null || ($data['reference_price'] ?? null) !== null) {
-            $__oldRef = ($product['reference_price'] ?? null) === null ? '—' : $__oldRef;
-            $__newRef = ($data['reference_price'] ?? null) === null ? '—' : $__newRef;
-            if ($__oldRef !== $__newRef) {
-                AuditLogRepository::log((int) $user['id'], 'PRODUCT_REFERENCE_PRICE_CHANGED', 'products', $id, 'reference_price', $__oldRef, $__newRef);
-            }
-        }
         Flash::set('success', 'Product updated.');
         header("Location: /products/{$id}");
     }
@@ -575,40 +551,14 @@ final class ProductController
         return null;
     }
 
-    /**
-     * Owner decision 2 Nov 2026 (D-240): the reference selling price (price, currency, unit).
-     * Read and validated only for people who may see selling prices; for anyone else the
-     * product keeps what it had (the fields are not on their form and nothing they post counts).
-     */
-    private function applyReferencePrice(array &$data, ?array $existing): ?string
+    /** Owner decision D-245 P2: the product's selling unit (from the unit list), filled into an order line. */
+    private function applySellingUnit(array &$data): ?string
     {
-        if (!\App\Services\MoneyVisibility::can('selling')) {
-            $data['reference_price'] = $existing['reference_price'] ?? null;
-            $data['reference_currency'] = $existing['reference_currency'] ?? null;
-            $data['reference_unit'] = $existing['reference_unit'] ?? null;
-            return null;
-        }
-        $price = trim((string) ($_POST['reference_price'] ?? ''));
-        $currency = strtoupper(trim((string) ($_POST['reference_currency'] ?? '')));
         $unit = trim((string) ($_POST['reference_unit'] ?? ''));
-        if ($price === '') {
-            $data['reference_price'] = null;
-            $data['reference_currency'] = null;
-            $data['reference_unit'] = null;
-            return null;
-        }
-        if (!is_numeric($price) || (float) $price <= 0 || (float) $price > 999999999999.99 || preg_match('/\.\d{3,}$/', $price)) {
-            return 'Reference selling price must be a number above 0 with at most 2 decimals.';
-        }
-        if (!in_array($currency, ProductRepository::referenceCurrencies(), true)) {
-            return 'Choose the currency of the reference selling price.';
-        }
         $units = array_column(\App\Repositories\LookupRepository::dropdownOptions('unit'), 'option_value');
         if ($unit !== '' && !in_array($unit, $units, true)) {
-            return 'Choose the unit of the reference selling price from the list.';
+            return 'Choose the selling unit from the list.';
         }
-        $data['reference_price'] = number_format((float) $price, 2, '.', '');
-        $data['reference_currency'] = $currency;
         $data['reference_unit'] = $unit !== '' ? $unit : null;
         return null;
     }

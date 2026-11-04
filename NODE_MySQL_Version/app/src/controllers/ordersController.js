@@ -396,8 +396,8 @@ async function create(req, res) {
       cooTypes: await lookupRepository.dropdownOptions('coo_type'),
       containerTypes: await lookupRepository.dropdownOptions('container_type'),
       units: await lookupRepository.dropdownOptions('unit'),
-      // Owner decision 2 Nov 2026 (D-240): "Pick from Products" (the reference price only for selling-visible people).
-      pickerProducts: await require('../services/referencePrice').pickerList(),
+      // Owner decision D-245 P2: "Pick from Products" fills the quote price of whoever sells (selling-visible people only).
+      ...(await pickerViewData(req, true)),
       packageTypes: await lookupRepository.dropdownOptions('package_type'),
       surfaceFinishes: await lookupRepository.dropdownOptions('surface_finish'),
       hsCodes: await hsCodeRepository.active(),
@@ -505,6 +505,26 @@ async function store(req, res) {
         res.redirect(`/orders/create?client_id=${clientId}`);
         return;
       }
+      // Owner decision D-245 P2: on a USD order goods lines come from Products; never below the product's minimum price.
+      const currency = (await lookupRepository.currencies()).find((c) => Number(c.id) === currencyId);
+      const pick = await require('../services/orderLinePricing').pickRefusal(currency ? currency.code : '', await catalogProductInput([].concat(body.product_catalog_id || [])[i]), 'goods');
+      if (pick !== null) {
+        flash.set(req, 'error', `Product line ${i + 1}: ${pick}`);
+        flash.setOld(req, body);
+        res.redirect(`/orders/create?client_id=${clientId}`);
+        return;
+      }
+      const refusal = await require('../services/orderLinePricing').saveRefusal(
+        { client_id: clientId, currency_code: currency ? currency.code : '' },
+        await catalogProductInput([].concat(body.product_catalog_id || [])[i]),
+        'goods', str(unitPricesInput[i]) || null, seesPriceBuildup(req)
+      );
+      if (refusal !== null) {
+        flash.set(req, 'error', `Product line ${i + 1}: ${refusal}`);
+        flash.setOld(req, body);
+        res.redirect(`/orders/create?client_id=${clientId}`);
+        return;
+      }
     }
   }
 
@@ -528,6 +548,7 @@ async function store(req, res) {
   // transaction is what actually guarantees the "no half-created order"
   // property in general: any failure anywhere in this block rolls back the
   // order row itself along with everything else.
+  const createdLineIds = [];
   const { orderId, orderReference } = await db.transaction(async (trx) => {
     // QA-5 CONC-03: sequence-number reservation and the order INSERT now
     // happen atomically inside createWithNextSequence() (a single
@@ -616,6 +637,7 @@ async function store(req, res) {
       // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
       await orderProductRepository.setCatalogProduct(lineId, pickedIds[i] || null, trx);
       if (str(unitPrices[i]) !== '') await orderProductRepository.setPriceSetBy(lineId, user.id, trx);
+      createdLineIds.push(lineId);
     }
 
     return result;
@@ -623,6 +645,8 @@ async function store(req, res) {
 
   // External QA report L-23: order creation was never audit-logged.
   await auditLogRepository.log(user.id, 'ORDER_CREATED', 'orders', orderId, 'order_reference', null, orderReference);
+  // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
+  for (const lineId of createdLineIds) await require('../services/orderLinePricing').afterSave(lineId, null, user.id);
 
   // QA Round 5, R5-03: terms needing MD/ED approval — tell the approvers.
   if (await paymentTermsApprovalService.isPending(orderId)) {
@@ -826,38 +850,47 @@ async function lineTypeInput(body) {
   return { lineType, hsCode, sacCode: null, error: null };
 }
 
-// Owner decision 2 Nov 2026 (D-240): what the order page needs for the reference price.
-async function referencePriceViewData(orderId) {
-  const referencePrice = require('../services/referencePrice');
-  const order = await orderRepository.find(orderId);
-  const lines = await orderProductRepository.forOrder(orderId);
-  const products = await referencePrice.productsFor(lines);
-  const settings = await referencePrice.settings();
-  const refPriceLines = {};
-  for (const line of lines) {
-    const diff = referencePrice.lineDifference(line, products[Number(line.catalog_product_id || 0)] || null, order && order.currency_code);
-    const note = referencePrice.note(diff, settings);
-    refPriceLines[line.id] = {
-      diff, note,
-      cls: note ? ` ref-price-${note.kind === 'note' ? 'below' : note.kind}` : '',
-      ref: diff ? diff.reference.toFixed(2) : '',
-      label: diff ? diff.label : '',
-    };
+// Owner decision D-245 P2: whether the signed-in person sees the full price build-up (MD, ED).
+function seesPriceBuildup(req) {
+  return !!(req.permissions && req.permissions.view_price_buildup);
+}
+
+// Owner decision D-245 P2: "Pick from Products" — each product's quote price and floor per seller,
+// only for people who may see selling prices; on the New Order form also each client's seller key.
+async function pickerViewData(req, withClients = false) {
+  const orderLinePricing = require('../services/orderLinePricing');
+  const pickerProducts = await require('../repositories/productRepository').forPicker();
+  const selling = require('../services/moneyVisibility').can(req.permissions, 'selling');
+  const out = { pickerProducts, pickerPrices: selling ? await orderLinePricing.pickerPrices(pickerProducts) : {} };
+  if (withClients) {
+    out.clientPriceKeys = selling ? await orderLinePricing.clientKeys(await clientRepository.all()) : {};
+    // Owner decision D-245 P2: on a USD order goods lines come from Products (browser rule beside the picker).
+    const usd = (await lookupRepository.currencies()).find((c) => String(c.code).toUpperCase() === 'USD');
+    out.pickRequiredWhen = usd && (await require('../services/pricingService').settings()).require_product_pick ? `currency_id=${usd.id}` : '';
   }
-  const priceCheck = await referencePrice.status(orderId);
-  for (const l of priceCheck.needing) { l.belowText = referencePrice.pct(-l.pct); }
-  for (const l of priceCheck.uncovered) { l.belowText = referencePrice.pct(-l.pct); }
-  if (priceCheck.approval) {
-    const approver = await require('../repositories/userRepository').findById(Number(priceCheck.approval.approved_by));
-    priceCheck.approval.approver_name = approver ? approver.name : '—';
+  return out;
+}
+
+// Owner decision D-245 P2: what the order page needs for each line's price check.
+async function linePricingViewData(req, orderId) {
+  const linePricing = await require('../services/orderLinePricing').forOrder(orderId);
+  const userRepository = require('../repositories/userRepository');
+  for (const check of Object.values(linePricing.lines)) {
+    if (check.approval) {
+      const approver = await userRepository.findById(Number(check.approval.by));
+      check.approval.approver_name = approver ? approver.name : '—';
+    }
   }
+  const pcLines = Object.values(linePricing.lines).filter((c) => ['below', 'below_minimum', 'no_price', 'approved'].includes(c.status));
   return {
-    pickerProducts: await referencePrice.pickerList(),
-    refPriceSettings: settings,
-    refPriceWarningText: referencePrice.pct(settings.warning_pct),
-    refPriceLines,
-    priceCheck,
-    canApprovePriceDiscount: false,
+    ...(await pickerViewData(req)),
+    linePricing,
+    pcLines,
+    piBlockReason: linePricing.blocking.length ? await require('../services/orderLinePricing').documentBlockReason(orderId, 'PI') : null,
+    qtBlockReason: linePricing.blocking.length ? await require('../services/orderLinePricing').documentBlockReason(orderId, 'QT') : null,
+    pickRequiredWhen: (await require('../services/orderLinePricing').productPickRequired((await orderRepository.find(orderId) || {}).currency_code)) ? 'line_type=goods' : '',
+    canManagePricing: !!(req.permissions && req.permissions.manage_pricing),
+    seesPriceBuildup: seesPriceBuildup(req),
   };
 }
 
@@ -869,16 +902,51 @@ async function catalogProductInput(value) {
   return product && Number(product.is_active) === 1 ? id : null;
 }
 
-// Owner decision 2 Nov 2026 (D-240): an MD/ED approves the order's discount below the reference price.
-async function approvePriceDiscount(req, res) {
+// Owner decision D-245 P2: below the floor (or no price) — staff send the line to the MD.
+async function requestLinePriceApproval(req, res) {
   const orderId = parseInt(req.params.id, 10);
-  if (!(await orderRepository.find(orderId))) {
-    res.status(404).send('Order not found.');
+  const error = await require('../services/orderLinePricing').requestApproval(orderId, parseInt(req.params.productId, 10), req.user.id);
+  flash.set(req, error === null ? 'success' : 'error', error ?? 'Sent to the MD for approval — the Proforma Invoice waits for it.');
+  res.redirect(`/orders/${orderId}#price-check`);
+}
+
+// Owner decision D-245 P2: the MD's approval screen for one line.
+async function linePriceApproval(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const view = await require('../services/orderLinePricing').approvalView(orderId, parseInt(req.params.productId, 10));
+  if (!view) { // order access itself is checked for every /orders/:id path (sessionAuth)
+    res.status(404).send('Order line not found.');
     return;
   }
-  const error = await require('../services/referencePrice').approve(orderId, req.user.id, req.body.reason);
-  flash.set(req, error === null ? 'success' : 'error', error ?? 'Discount approved — the Proforma Invoice can now be generated.');
+  const qty = view.line.quantity !== null && view.line.quantity !== undefined ? String(Number(view.line.quantity)) : null;
+  res.renderView('orders/price_approval', { ...view, qtyText: qty }, 'layout/base');
+}
+
+// Owner decision D-245 P2: the MD approves (or refuses) a line price — never below the minimum price.
+async function approveLinePrice(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  const lineId = parseInt(req.params.productId, 10);
+  const orderLinePricing = require('../services/orderLinePricing');
+  const refuse = (req.body.decision || 'approve') === 'refuse';
+  const error = refuse
+    ? await orderLinePricing.refuse(orderId, lineId, req.user.id, req.body.reason)
+    : await orderLinePricing.approve(orderId, lineId, req.user.id, req.body.reason);
+  if (error !== null) {
+    flash.set(req, 'error', error);
+    res.redirect(`/orders/${orderId}/products/${lineId}/price-approval`);
+    return;
+  }
+  flash.set(req, 'success', refuse
+    ? 'Price refused — whoever asked has been told; the line stays below the floor until its price is raised.'
+    : 'Price approved — the line no longer keeps the Proforma Invoice back.');
   res.redirect(`/orders/${orderId}#price-check`);
+}
+
+// The flash after saving a line, saying when it now waits for the MD.
+async function lineSavedMessage(lineId, saved) {
+  const line = await orderProductRepository.find(lineId);
+  if (!line || !line.price_approval_requested_at) return saved;
+  return `${saved} Line ${Number(line.line_no)} is below the lowest price for this order (or its product has no price) — it was sent to the MD for approval; the Proforma Invoice waits for it.`;
 }
 
 async function addProduct(req, res) {
@@ -911,6 +979,17 @@ async function addProduct(req, res) {
     return;
   }
 
+  // Owner decision D-245 P2: on a USD order goods lines come from Products; never below the product's minimum price.
+  const orderLinePricing = require('../services/orderLinePricing');
+  const pickedId = await catalogProductInput(body.catalog_product_id);
+  const refusal = (await orderLinePricing.pickRefusal(order.currency_code, pickedId, lineType))
+    ?? (await orderLinePricing.saveRefusal(order, pickedId, lineType, str(body.unit_price) || null, seesPriceBuildup(req)));
+  if (refusal !== null) {
+    flash.set(req, 'error', `Product line: ${refusal}`);
+    res.redirect(`/orders/${orderId}#step-products`);
+    return;
+  }
+
   const reason = str(body.reason);
   if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'order_products', orderId, 'product_added'))) {
     res.redirect(`/orders/${orderId}`);
@@ -934,7 +1013,9 @@ async function addProduct(req, res) {
   // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
   await orderProductRepository.setCatalogProduct(newLineId, await catalogProductInput(body.catalog_product_id));
   if (str(body.unit_price) !== '') await orderProductRepository.setPriceSetBy(newLineId, req.user.id);
-  flash.set(req, 'success', 'Product line added.');
+  // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
+  await require('../services/orderLinePricing').afterSave(newLineId, null, req.user.id);
+  flash.set(req, 'success', await lineSavedMessage(newLineId, 'Product line added.'));
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -970,6 +1051,22 @@ async function updateProduct(req, res) {
     return;
   }
 
+  // Owner decision D-245 P2: never below the product's minimum price.
+  const catalogId = Object.prototype.hasOwnProperty.call(body, 'catalog_product_id') ? await catalogProductInput(body.catalog_product_id) : (product.catalog_product_id ? Number(product.catalog_product_id) : null);
+  const newPriceIn = str(body.unit_price) || null;
+  const priceUnchanged = newPriceIn !== null && product.unit_price !== null && Math.abs(Number(product.unit_price) - Number(newPriceIn)) < 0.005
+    && Number(product.catalog_product_id || 0) === Number(catalogId || 0);
+  {
+    const orderLinePricing = require('../services/orderLinePricing');
+    const refusal = (await orderLinePricing.pickRefusal(order.currency_code, catalogId, lineType))
+      ?? (priceUnchanged ? null : await orderLinePricing.saveRefusal(order, catalogId, lineType, newPriceIn, seesPriceBuildup(req)));
+    if (refusal !== null) {
+      flash.set(req, 'error', `Product line: ${refusal}`);
+      res.redirect(`/orders/${orderId}#step-products`);
+      return;
+    }
+  }
+
   const reason = str(body.reason);
   if (!(await orderEditGuard.allow(req, order.current_stage_number, !!order.is_locked, reason, 'order_products', productId, 'product_line'))) {
     res.redirect(`/orders/${orderId}`);
@@ -997,7 +1094,9 @@ async function updateProduct(req, res) {
   if (newPrice !== '' && (product.unit_price === null || Math.abs(Number(product.unit_price) - Number(newPrice)) > 0.0001)) {
     await orderProductRepository.setPriceSetBy(productId, req.user.id);
   }
-  flash.set(req, 'success', 'Product line updated.');
+  // Owner decision D-245 P2: a changed price voids its approval; below the floor goes to the MD.
+  await require('../services/orderLinePricing').afterSave(productId, product, req.user.id);
+  flash.set(req, 'success', await lineSavedMessage(productId, 'Product line updated.'));
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -1409,9 +1508,8 @@ async function show(req, res) {
       emailLogByDocument,
       activeUsers,
       fobTotal: await orderProductRepository.totalFobValue(orderId),
-      // Owner decision 2 Nov 2026 (D-240): "Pick from Products", the reference-price note per line and the discount approval.
-      ...(await referencePriceViewData(orderId)),
-      canApprovePriceDiscount: !!(req.permissions && req.permissions.approve_price_discount),
+      // Owner decision D-245 P2: "Pick from Products" fills the quote price; each line's price check and the MD's approval.
+      ...(await linePricingViewData(req, orderId)),
       suppliers: await supplierRepository.all(),
       logisticsPartners: await logisticsPartnerRepository.all(),
       logisticsServiceTypes: logisticsPartnerRepository.SERVICE_TYPES,
@@ -4850,7 +4948,7 @@ module.exports = {
   markOcSentToBuyer,
   recordInspectionResult,
   index, archivedIndex, archive, unarchive, duplicateOrder, create, store, show, addAssignee, removeAssignee, downloadDossier, generatePiFormLink, generateBuyerActionLink, generatePaymentActionLink,
-  editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct, approvePriceDiscount,
+  editDetails, updateDetails, addProduct, updateProduct, deleteProduct, duplicateProduct, requestLinePriceApproval, linePriceApproval, approveLinePrice,
   recordBuyerPo, correctBuyerPoReceivedDate, uploadBuyerPoDocument, recordAdvancePayment, markPaymentReportReviewed, clearAdvancePayment,
   recordLcDetails, confirmLcUsable, saveLcDates, addLcAmendment, updateProductionStatus,
   recordOcAcknowledgment, recordFeedback, setDisputeButtonVisible, saveSupplierPo, skipPiForm, confirmSupplierSigned, uploadSupplierPoDocument, generateSupplierActionLink, skipSupplierPoAck, markSupplierAdvancePaid, markSupplierBalancePaid,

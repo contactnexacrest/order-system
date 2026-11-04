@@ -8,6 +8,9 @@ const portRouteRepository = require('../../src/repositories/portRouteRepository'
 const portRouteController = require('../../src/controllers/portRouteController');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// Owner decision D-245 P2: this file types goods lines by hand on USD orders; it is about something else.
+beforeAll(() => require('../support/fixtures').allowHandTypedGoodsLines());
+
 /**
  * Port of PortRouteAndSailingLeadTimeTest.php. 90-item backlog item 15:
  * a port-to-port sailing-days reference document (`port_routes`), plus a

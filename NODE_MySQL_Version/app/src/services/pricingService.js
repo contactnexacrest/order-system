@@ -23,6 +23,7 @@ const DEFAULTS = {
   incentive_mode: 'pct',
   incentive_value: '15.0000',
   stale_days: '60',
+  require_product_pick: '1',
 };
 
 const LABELS = {
@@ -33,6 +34,7 @@ const LABELS = {
   incentive_mode: 'Team incentive reserve type',
   incentive_value: 'Team incentive reserve value',
   stale_days: 'Supplier price is stale after (days)',
+  require_product_pick: 'Goods lines must be picked from Products',
 };
 
 /** PHP number_format($v, $d) — comma thousands, fixed decimals. */
@@ -67,6 +69,7 @@ async function settings() {
     incentive_mode: raw.incentive_mode === 'usd' ? 'usd' : 'pct',
     incentive_value: Number(raw.incentive_value),
     stale_days: Math.max(1, parseInt(raw.stale_days, 10) || 0),
+    require_product_pick: String(raw.require_product_pick) === '1',
   };
 }
 
@@ -109,6 +112,10 @@ function readSettingsForm(post) {
     values.stale_days = '';
   } else {
     values.stale_days = String(days);
+  }
+  // D-245 P2: only when the form carries it (a form without the field keeps the stored value).
+  if (Object.prototype.hasOwnProperty.call(post, 'require_product_pick')) {
+    values.require_product_pick = String(post.require_product_pick) === '1' ? '1' : '0';
   }
   return [values, errors];
 }

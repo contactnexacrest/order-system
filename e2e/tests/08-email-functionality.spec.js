@@ -4,7 +4,7 @@ const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { login, logout, ROLES } = require('./support/auth');
 const { assignSecondPersonAndApprove } = require('./support/review');
-const { resetClientPassword, getMailSending, setMailSending, lastEmailSentWithDocument } = require('./support/db');
+const { resetClientPassword, getMailSending, setMailSending, lastEmailSentWithDocument, ensurePricedProduct } = require('./support/db');
 const { mark, sinceMark } = require('./support/mail');
 
 const DUMMY_FILE = path.join(__dirname, 'fixtures', 'dummy-signed-copy.pdf');
@@ -246,10 +246,10 @@ test.describe('Email functionality — real attempts, right recipient, right att
       .getAttribute('value');
     await page.locator('select[name="payment_preset_id"]').selectOption(presetValue);
     // FOB: the Indicative Freight / Insurance fields are hidden (buyer's own).
-    await page.locator('input[name="product_description[]"]').first().fill('Granite Memorial Headstone');
+    // D-245 P2: on a USD order the goods line is picked from Products — the picker fills the
+    // description, HS code and the quote price (at or above the floor).
+    await page.locator('select[name="product_catalog_id[]"]').first().selectOption(String(ensurePricedProduct()));
     await page.locator('input[name="product_quantity[]"]').first().fill('50');
-    await page.locator('input[name="product_unit_price[]"]').first().fill('60.00');
-    await page.locator('input[name="product_hs_code[]"]').first().fill('68022310');
     await page.getByRole('button', { name: 'Create Order' }).click();
     await expect(page).toHaveURL(/\/orders\/\d+$/);
     const orderId = Number(page.url().match(/\/orders\/(\d+)$/)[1]);

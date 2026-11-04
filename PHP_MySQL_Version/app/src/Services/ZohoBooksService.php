@@ -1271,18 +1271,9 @@ final class ZohoBooksService
     {
         $description = mb_substr(trim((string) ($product['specifications'] ?? '')), 0, 2000);
         $hs = trim((string) ($product['hs_code'] ?? ''));
-        // Owner decision 2 Nov 2026 (D-240): a Zoho item's rate is in the organisation's base currency (INR),
-        // so only an INR reference selling price becomes its rate; any other currency goes into the
-        // description ("Reference price: USD 45.00 per SQFT"). Costs are never sent.
+        // Owner decision D-245 P2: a product has no fixed selling price any more (each order's price is
+        // built from its cost and the seller), so the item's rate is 0. Costs are never sent.
         $rate = 0;
-        $refPrice = $product['reference_price'] ?? null;
-        if ($refPrice !== null && $refPrice !== '' && (float) $refPrice > 0) {
-            if (strtoupper((string) ($product['reference_currency'] ?? '')) === 'INR') {
-                $rate = round((float) $refPrice, 2);
-            } else {
-                $description = trim($description . ($description !== '' ? '. ' : '') . 'Reference price: ' . ReferencePrice::label($product));
-            }
-        }
         $payload = ['name' => mb_substr((string) $product['name'], 0, 100), 'rate' => $rate, 'item_type' => 'sales', 'product_type' => 'goods'];
         if ($hs !== '') {
             if ($gstRegistered) {

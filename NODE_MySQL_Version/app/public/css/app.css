@@ -833,3 +833,13 @@ fieldset.radio-row label{display:flex;gap:6px;align-items:flex-start;font-weight
 .remit-inr .remit-gap-note{margin:0 0 .5rem;}
 .remit-inr .checkbox-inline{display:flex;gap:.5rem;align-items:center;font-weight:normal;}
 .remit-inr .checkbox-inline input{width:auto;margin:0;}
+
+/* Owner decision D-245 P2: order-line price check. */
+.floor-note{display:block;margin-top:4px;color:#b42318;font-weight:600}
+input.below-floor{border-color:#b42318}
+.price-badge{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:4px}
+.price-badge-ok{background:#e6f4e6;color:#245a24}
+.price-badge-bad{background:#fde8e8;color:#a32020}
+.price-badge-approved{background:#fff1d6;color:#7a5200}
+.price-badge-none{background:#eee;color:#555}
+.price-range{display:block;margin-top:2px}

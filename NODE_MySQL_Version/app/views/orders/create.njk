@@ -13,7 +13,7 @@
         <select name="client_id" required>
           <option value="">— Select —</option>
           {% for c in clients %}
-            <option value="{{ c.id }}" {{ 'selected' if c.id == (old.client_id or preselectedClientId) else '' }}>
+            <option value="{{ c.id }}"{% if clientPriceKeys and clientPriceKeys[c.id] %} data-price-key="{{ clientPriceKeys[c.id] }}"{% endif %} {{ 'selected' if c.id == (old.client_id or preselectedClientId) else '' }}>
               {{ c.company_legal_name }} ({{ c.client_unique_number }})
             </option>
           {% endfor %}

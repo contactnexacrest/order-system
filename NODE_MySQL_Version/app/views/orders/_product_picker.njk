@@ -1,21 +1,24 @@
 {#
-  Owner decision 2 Nov 2026 (D-240): "Pick from Products" on an order line. Fills description,
-  HS code, unit and — when the product's reference price is in the order's currency — the unit
-  price, which stays freely editable. The reference price reaches the browser only for people
-  who may see selling prices. Port of views/orders/_product_picker.php.
-  In: pickerProducts, pickerName, pickerSelected, sees, optional pickerCurrency.
+  "Pick from Products" on an order line (D-240). Owner decision D-245 P2: picking a product
+  fills the description, HS code, unit and — on a USD order, for people who may see selling
+  prices — the quote price of whoever sells the order (staff, or the client's associate at
+  their commission level). The price stays editable; its floor travels with it as data-floor.
+  In: pickerProducts, pickerPrices (empty for people who may not see selling prices),
+      pickerName, pickerSelected, sees, optional pickerCurrency and pickerKey ("staff" /
+      "L<level id>"); on the New Order form the currency and client selects are read instead.
+  Port of views/orders/_product_picker.php.
 #}
-<label class="full">Pick from Products <small class="muted">(optional — fills the line; you can still change anything)</small>
-  <select name="{{ pickerName }}" class="product-picker"{% if pickerCurrency %} data-order-currency="{{ pickerCurrency }}"{% endif %}>
+<label class="full">Pick from Products <small class="muted">{{ '(needed for a goods line on a USD order — fills the line; you can still change anything)' if pickRequiredWhen else '(optional — fills the line; you can still change anything)' }}</small>
+  <select name="{{ pickerName }}" class="product-picker"{% if pickerCurrency %} data-order-currency="{{ pickerCurrency }}"{% endif %}{% if pickerKey %} data-price-key="{{ pickerKey }}"{% endif %}{% if sees.selling %} data-selling="1"{% endif %}{% if pickRequiredWhen %} data-required-when="{{ pickRequiredWhen }}" data-required-when-message="Pick this goods line from Products — on a USD order goods lines cannot be typed by hand (service and charge lines can)."{% endif %}>
     <option value="">— Type the line by hand —</option>
     {% for pp in pickerProducts %}
-      {% set hasRef = sees.selling and pp.reference_price != null %}
+      {% set ppPrices = pickerPrices[pp.id] if pickerPrices else null %}
       <option value="{{ pp.id }}"
         data-name="{{ pp.name }}"
         data-hs="{{ pp.hs_code }}"
         data-specs="{{ (pp.specifications or '') | truncate(200, true, '') }}"
         data-unit="{{ pp.reference_unit or '' }}"
-        {% if hasRef %}data-price="{{ pp.reference_price_fixed }}" data-currency="{{ pp.reference_currency }}" data-label="{{ pp.reference_label }}"{% endif %}
+        {% if ppPrices %}data-prices="{{ ppPrices | dump }}"{% endif %}
         {{ 'selected' if (pickerSelected | int) == pp.id }}>{{ pp.name }} (HS {{ pp.hs_code }})</option>
     {% endfor %}
   </select>

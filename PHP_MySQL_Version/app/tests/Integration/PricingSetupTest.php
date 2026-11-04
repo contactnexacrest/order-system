@@ -265,7 +265,8 @@ final class PricingSetupTest extends DbTestCase
         // A used level can only be deactivated.
         $this->actAs($md);
         $this->render(fn () => (new PricingController())->deleteLevel(['id' => (string) $level2]));
-        self::assertStringContainsString('1 associate(s)', $this->flash());
+        // Other tests may also use the level (shared test DB): only the refusal and the reason matter here.
+        self::assertMatchesRegularExpression('/is in use \(\d+ associate\(s\)/', $this->flash());
     }
 
     public function testThePagesOpen(): void

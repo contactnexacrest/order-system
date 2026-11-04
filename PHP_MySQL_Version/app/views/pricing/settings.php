@@ -44,6 +44,14 @@ $__ro = $canManage ? '' : ' disabled';
         <input type="number" name="stale_days" min="1" max="3650" step="1" required value="<?= View::e($settings['stale_days']) ?>" placeholder="e.g. 60"<?= $__ro ?>></label>
     </fieldset>
 
+    <fieldset><legend>Order lines</legend>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['require_product_pick']) ?> <small class="muted">On: a goods line on a USD order must be picked from Products (so its price is checked against the floor); a goods line typed by hand is refused. Service and charge lines can still be typed. Off: goods lines may be typed by hand and are not price-checked.</small></span>
+        <select name="require_product_pick"<?= $__ro ?>>
+          <option value="1"<?= (string) $settings['require_product_pick'] === '1' ? ' selected' : '' ?>>On — goods lines must come from Products</option>
+          <option value="0"<?= (string) $settings['require_product_pick'] !== '1' ? ' selected' : '' ?>>Off — goods lines may be typed by hand</option>
+        </select></label>
+    </fieldset>
+
     <?php if ($canManage): ?><button type="submit">Save settings</button><?php else: ?><p class="muted small">Only the MD can change these settings.</p><?php endif; ?>
   </form>
 

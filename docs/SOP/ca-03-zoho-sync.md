@@ -275,13 +275,11 @@ default and each saved with a reason (D-238):
   item with exactly the same name and links to it.
 - **A client goes once its first order exists** — the order sets the
   customer's currency, and a Zoho customer's currency can never change.
-- **Products and their rate** (owner decision 2 Nov 2026, D-240). **No
-  cost is ever sent to Zoho.** A product's **reference selling price**
-  becomes the Zoho item's rate when it is in INR (Zoho's base currency);
-  in any other currency the rate stays 0 and the item description ends with
-  "Reference price: USD 45.00 per SQFT". A product without a reference
-  price goes with rate 0, as before. A change to the reference price sends
-  the item again.
+- **Products and their rate** (owner decision D-245 P2, 4 Nov 2026). **No
+  cost is ever sent to Zoho**, and a product has no fixed selling price any
+  more — each order's price is built from its cost and whoever sells it — so
+  every item goes with **rate 0**. Name, specifications and HS code go as
+  before.
 - **Invoice lines link the item.** A Commercial Invoice line picked from a
   product that is already a Zoho item carries that item, so Zoho's item
   reports show it; the line keeps its own description and its own price.

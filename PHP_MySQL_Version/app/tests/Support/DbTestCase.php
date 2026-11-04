@@ -37,6 +37,18 @@ abstract class DbTestCase extends TestCase
         \App\Config\Database::connection()
             ->prepare("UPDATE clients SET email = NULL WHERE email IN ({$placeholders})")
             ->execute(self::FIXED_TEST_CLIENT_EMAILS);
+        // Owner decision D-245 P2: every test starts with the seeded rule (goods lines on a USD order come from Products).
+        \App\Config\Database::connection()->exec("UPDATE pricing_settings SET setting_value = '1' WHERE setting_key = 'require_product_pick'");
+    }
+
+    /**
+     * Owner decision D-245 P2: for a test about something else that types goods lines by
+     * hand on a USD order — switches "Goods lines must be picked from Products" off for
+     * this test only (setUp switches it back on for the next one).
+     */
+    protected function allowHandTypedGoodsLines(): void
+    {
+        \App\Config\Database::connection()->exec("UPDATE pricing_settings SET setting_value = '0' WHERE setting_key = 'require_product_pick'");
     }
 
     public static function rebuildDatabase(): void

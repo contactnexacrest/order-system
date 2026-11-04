@@ -234,7 +234,7 @@ describe('Pricing setup (D-245, P1)', () => {
     const after = await db.queryOne('SELECT commission_mode, commission_level_id FROM associates WHERE id = :id', { id: a.id });
     expect([after.commission_mode, Number(after.commission_level_id)]).toEqual(['fixed', level2]);
 
-    expect(await post(md, '/pricing/commission-levels', `/pricing/commission-levels/${level2}/delete`, {})).toContain('1 associate(s)');
+    expect(await post(md, '/pricing/commission-levels', `/pricing/commission-levels/${level2}/delete`, {})).toMatch(/is in use \(\d+ associate\(s\)/); // other tests may also use the level (shared test DB)
   });
 
   it('the pages open', async () => {

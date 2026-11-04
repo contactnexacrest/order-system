@@ -31,6 +31,7 @@ final class AuditLogCoverageTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->allowHandTypedGoodsLines(); // D-245 P2: this test types goods lines by hand; it is about something else
         $_POST = [];
         $_SESSION = [];
     }

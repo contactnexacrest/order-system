@@ -30,6 +30,7 @@ final class ProductCategoryTest extends DbTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->allowHandTypedGoodsLines(); // D-245 P2: this test types goods lines by hand; it is about something else
         $this->orderId = $this->createTestOrder($this->createTestClient(), 'FOB');
         $this->userId = $this->createTestUser('Admin');
         $_SESSION = ['_auth_user_id' => $this->userId];

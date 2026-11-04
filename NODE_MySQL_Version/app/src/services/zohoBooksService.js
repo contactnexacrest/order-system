@@ -1009,18 +1009,9 @@ async function pushItem(product, itemId) {
 function itemPayload(product, gstRegistered) {
   let description = String(product.specifications || '').trim().slice(0, 2000);
   const hs = String(product.hs_code || '').trim();
-  // Owner decision 2 Nov 2026 (D-240): a Zoho item's rate is in the organisation's base currency (INR), so
-  // only an INR reference selling price becomes its rate; any other currency goes into the description
-  // ("Reference price: USD 45.00 per SQFT"). Costs are never sent.
-  let rate = 0;
-  const refPrice = product.reference_price;
-  if (refPrice !== null && refPrice !== undefined && refPrice !== '' && Number(refPrice) > 0) {
-    if (String(product.reference_currency || '').toUpperCase() === 'INR') {
-      rate = Math.round(Number(refPrice) * 100) / 100;
-    } else {
-      description = `${description}${description !== '' ? '. ' : ''}Reference price: ${require('./referencePrice').label(product)}`.trim();
-    }
-  }
+  // Owner decision D-245 P2: a product has no fixed selling price any more (each order's price is
+  // built from its cost and the seller), so the item's rate is 0. Costs are never sent.
+  const rate = 0;
   const payload = { name: String(product.name).slice(0, 100), rate, item_type: 'sales', product_type: 'goods' };
   if (hs !== '') {
     if (gstRegistered) {

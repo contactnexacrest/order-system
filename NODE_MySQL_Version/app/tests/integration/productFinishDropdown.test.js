@@ -9,6 +9,9 @@ const stageGateService = require('../../src/services/stageGateService');
 const { createTestClient, createTestOrder, createTestClientLogin } = require('../support/fixtures');
 const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetup');
 
+// Owner decision D-245 P2: this file types goods lines by hand on USD orders; it is about something else.
+beforeAll(() => require('../support/fixtures').allowHandTypedGoodsLines());
+
 function extractCsrf(html) {
   const m = html.match(/name="_csrf"\s+value="([^"]+)"/);
   if (!m) throw new Error('CSRF token not found in response HTML');

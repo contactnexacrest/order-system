@@ -23,7 +23,6 @@
         <th>HS Code</th>
         <th>Origin</th>
         <?php if ($canViewPricing): ?><th>Headline FOB</th><?php endif; ?>
-        <?php if (!empty($sees['selling'])): ?><th>Reference Price</th><?php endif; ?>
         <?php // Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote and lowest price for selling-price staff. ?>
         <?php if (!empty($canBuildup)): ?><th class="num">Cost</th><th class="num">Min price</th><th class="num">Staff floor</th><th class="num">Staff quote</th><th class="num">Assoc. floor (lowest level)</th><th>Supplier price date</th><?php endif; ?>
         <?php if (!empty($canStaffPrice)): ?><th class="num">Quote (USD)</th><th class="num">Lowest (USD)</th><?php endif; ?>
@@ -40,9 +39,6 @@
           <td><?= View::e($p['origin'] ?? '—') ?></td>
           <?php if ($canViewPricing): ?>
             <td><?= $p['headline_fob'] === null ? 'To Be Confirmed' : number_format((float) $p['headline_fob'], 2) ?></td>
-          <?php endif; ?>
-          <?php if (!empty($sees['selling'])): ?>
-            <td><?= ($p['reference_price'] ?? null) === null ? '—' : View::e(\App\Services\ReferencePrice::label($p)) ?></td>
           <?php endif; ?>
           <?php if (!empty($canBuildup)): $__b = $p['pricing']['build']; ?>
             <?php if ($__b === null): ?>

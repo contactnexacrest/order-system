@@ -19,14 +19,6 @@
     <p><?= nl2br(View::e($product['specifications'])) ?></p>
   </div>
 
-  <?php // Owner decision 2 Nov 2026 (D-240): reference selling price — only for people who may see selling prices. ?>
-  <?php if (!empty($sees['selling'])): ?>
-  <div class="section">
-    <h2>Reference Selling Price</h2>
-    <p><?= ($product['reference_price'] ?? null) === null ? '<span class="muted">Not set.</span>' : '<strong>' . View::e(\App\Services\ReferencePrice::label($product)) . '</strong>' ?></p>
-    <p class="muted small">A starting point when this product is picked on an order line; each order's own price can differ and is what documents print.</p>
-  </div>
-  <?php endif; ?>
 
   <?php include __DIR__ . '/_pricing.php'; ?>
 

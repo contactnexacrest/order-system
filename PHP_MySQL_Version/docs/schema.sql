@@ -5121,26 +5121,13 @@ CREATE TABLE IF NOT EXISTS zoho_token_cache (
   updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Owner decision 2 Nov 2026 (D-240, migration 2026-11-02zc): reference selling price on the
--- Products menu, the product an order line was picked from, who set its price, and the MD/ED
--- approval of a discount below the warning level.
-ALTER TABLE catalog_products ADD COLUMN reference_price DECIMAL(14,2) NULL AFTER default_cha_cost;
-ALTER TABLE catalog_products ADD COLUMN reference_currency VARCHAR(10) NULL AFTER reference_price;
-ALTER TABLE catalog_products ADD COLUMN reference_unit VARCHAR(30) NULL AFTER reference_currency;
+-- Owner decision 2 Nov 2026 (D-240): the product an order line was picked from, who set
+-- its price, and the product's selling unit. D-245 P2 (4 Nov 2026) removed the reference
+-- selling price and its order-level discount approval (replaced by the price build-up below).
+ALTER TABLE catalog_products ADD COLUMN reference_unit VARCHAR(30) NULL AFTER default_cha_cost;   -- the product's selling unit (filled into the order line)
 ALTER TABLE order_products ADD COLUMN catalog_product_id BIGINT UNSIGNED NULL;
 ALTER TABLE order_products ADD COLUMN price_set_by BIGINT UNSIGNED NULL;
 ALTER TABLE order_products ADD CONSTRAINT fk_order_products_catalog_product FOREIGN KEY (catalog_product_id) REFERENCES catalog_products(id) ON DELETE SET NULL;
-CREATE TABLE order_price_approvals (
-  id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  order_id     BIGINT UNSIGNED NOT NULL,
-  approved_by  BIGINT UNSIGNED NOT NULL,
-  reason       VARCHAR(500) NOT NULL,
-  snapshot     TEXT NOT NULL,          -- JSON: [{line_id, line_no, unit_price, reference_price, pct}]
-  approved_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  lapsed_at    DATETIME NULL,
-  KEY idx_order_price_approvals_order (order_id),
-  CONSTRAINT fk_order_price_approvals_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ================================================================
 -- Owner decision D-245 (4 Nov 2026), phase P1: pricing build-up settings,
@@ -5200,3 +5187,22 @@ CREATE TABLE commission_ladder_steps (
 ALTER TABLE associates ADD COLUMN commission_mode ENUM('fixed','ladder') NOT NULL DEFAULT 'ladder';
 ALTER TABLE associates ADD COLUMN commission_level_id BIGINT UNSIGNED NULL;
 ALTER TABLE associates ADD CONSTRAINT fk_associates_commission_level FOREIGN KEY (commission_level_id) REFERENCES commission_levels(id);
+
+-- ================================================================
+-- Owner decision D-245 (4 Nov 2026), phase P2: prices on order lines. Each goods line
+-- picked from Products is checked against the floor of whoever sells it (staff, or the
+-- client's associate); below the floor it needs the MD's approval (never below the
+-- minimum price), and the Proforma Invoice waits for it. The figures are fixed on the
+-- line when the PI is issued. Go-live installs fresh (D-241): no migration.
+-- ================================================================
+ALTER TABLE order_products ADD COLUMN price_snapshot TEXT NULL;                        -- JSON: figures fixed when the PI was issued
+ALTER TABLE order_products ADD COLUMN price_approval_requested_at DATETIME NULL;
+ALTER TABLE order_products ADD COLUMN price_approval_requested_by BIGINT UNSIGNED NULL;
+ALTER TABLE order_products ADD COLUMN price_approved_by BIGINT UNSIGNED NULL;
+ALTER TABLE order_products ADD COLUMN price_approved_at DATETIME NULL;
+ALTER TABLE order_products ADD COLUMN price_approval_reason VARCHAR(500) NULL;
+ALTER TABLE order_products ADD COLUMN price_approved_unit_price DECIMAL(14,2) NULL;    -- the approval holds only while the line keeps this price
+ALTER TABLE order_products ADD COLUMN price_approval_commission_zero TINYINT(1) NOT NULL DEFAULT 0; -- P3: no associate commission on this line
+ALTER TABLE order_products ADD COLUMN price_approval_incentive_cut DECIMAL(14,2) NULL; -- P4: USD taken off this line's team incentive
+ALTER TABLE order_products ADD CONSTRAINT fk_order_products_price_requested_by FOREIGN KEY (price_approval_requested_by) REFERENCES users(id);
+ALTER TABLE order_products ADD CONSTRAINT fk_order_products_price_approved_by FOREIGN KEY (price_approved_by) REFERENCES users(id);

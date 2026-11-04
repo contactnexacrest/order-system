@@ -528,12 +528,12 @@ final class RouteBehaviourTest extends DbTestCase
         $this->assertPage($this->call('GET', '/associates?view=list'), 'Associates', 'GET /associates');
         $this->assertPage($this->call('GET', '/associates/new'), 'Add an associate', 'GET /associates/new');
         $email = 'route-assoc-' . bin2hex(random_bytes(4)) . '@nexacrest.test';
-        $r = $this->call('POST', '/associates', ['name' => 'Route Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'email' => $email]);
+        $r = $this->call('POST', '/associates', ['name' => 'Route Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'email' => $email, 'commission_mode' => 'ladder']);
         $this->assertDone($r, 'POST /associates', 'Associate "Route Associate" added.');
         $id = (int) $this->value("SELECT id FROM associates WHERE email = '{$email}'");
         $this->assertPage($this->call('GET', "/associates/{$id}"), 'Route Associate', 'GET /associates/{id}');
         $this->assertPage($this->call('GET', "/associates/{$id}/edit"), 'Edit Route Associate', 'GET /associates/{id}/edit');
-        $this->assertDone($this->call('POST', "/associates/{$id}/update", ['name' => 'Route Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'email' => $email, 'rate_1_5' => '1.10']), 'POST /associates/{id}/update');
+        $this->assertDone($this->call('POST', "/associates/{$id}/update", ['name' => 'Route Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'email' => $email, 'rate_1_5' => '1.10', 'commission_mode' => 'ladder']), 'POST /associates/{id}/update');
         self::assertSame('1.10', $this->value("SELECT rate_1_5 FROM associates WHERE id = {$id}"));
         $this->assertPage($this->call('GET', '/associates/ladder'), 'Standard rate', 'GET /associates/ladder');
         $this->assertDone($this->call('POST', '/associates/ladder', ['rate_1_5' => '0.70', 'rate_6_10' => '1.00', 'rate_11_20' => '1.50', 'rate_21_40' => '1.75', 'rate_41_plus' => '2.00',
@@ -631,7 +631,9 @@ final class RouteBehaviourTest extends DbTestCase
         $hs = (string) $this->value('SELECT code FROM hs_codes WHERE is_active = 1 ORDER BY id LIMIT 1');
         $line = $this->insert('order_products', ['order_id' => $order, 'line_no' => 1, 'description' => 'Route line', 'quantity' => 10, 'unit' => 'pcs', 'unit_price' => 12, 'hs_code' => $hs]);
 
-        $r = $this->call('POST', "/orders/{$order}/products/{$line}", ['description' => 'Route edited line', 'hs_code' => $hs, 'quantity' => '12', 'unit' => 'pcs', 'unit_price' => '15', 'reason' => 'Route behaviour test edit']);
+        // D-245 P2: on a USD order a goods line is picked from Products.
+        $picked = \App\Repositories\ProductRepository::create(['name' => 'Route Picked Granite ' . bin2hex(random_bytes(3)), 'specifications' => 'Slab', 'hs_code' => $hs], $this->holder);
+        $r = $this->call('POST', "/orders/{$order}/products/{$line}", ['catalog_product_id' => (string) $picked, 'description' => 'Route edited line', 'hs_code' => $hs, 'quantity' => '12', 'unit' => 'pcs', 'unit_price' => '15', 'reason' => 'Route behaviour test edit']);
         $this->assertDone($r, 'POST /orders/{id}/products/{productId}');
         self::assertSame('Route edited line', $this->value("SELECT description FROM order_products WHERE id = {$line}"));
 
@@ -842,7 +844,7 @@ final class RouteBehaviourTest extends DbTestCase
     {
         $associate = $this->insert('associates', ['name' => 'Route Test Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'status' => 'active']);
         $rates = ['rate_1_5' => '5', 'rate_6_10' => '5', 'rate_11_20' => '4', 'rate_21_40' => '3', 'rate_41_plus' => '2'];
-        $r = $this->call('POST', "/associates/{$associate}/update", ['name' => 'Route Test Associate B', 'based_in' => 'india', 'currency_code' => 'INR', 'status' => 'active'] + $rates);
+        $r = $this->call('POST', "/associates/{$associate}/update", ['name' => 'Route Test Associate B', 'based_in' => 'india', 'currency_code' => 'INR', 'status' => 'active', 'commission_mode' => 'ladder'] + $rates);
         $this->assertDone($r, 'POST /associates/{id}/update');
         self::assertSame('Route Test Associate B', $this->value("SELECT name FROM associates WHERE id = {$associate}"));
         self::assertSame(1, $this->audits('ASSOCIATE_UPDATED', $associate));
@@ -1029,7 +1031,8 @@ final class RouteBehaviourTest extends DbTestCase
         ['POST', '/orders/{id}/payment/balance/inr-actual/delete'], ['POST', '/orders/{id}/payment/freight/firc'],
         ['POST', '/orders/{id}/payment/freight/inr-actual'], ['POST', '/orders/{id}/payment/freight/inr-actual/delete'],
         ['POST', '/orders/{id}/pi-form/skip'], ['POST', '/orders/{id}/products/{id}'], ['POST', '/orders/{id}/products/{id}/delete'],
-        ['POST', '/orders/{id}/products/{id}/duplicate'], ['POST', '/orders/{id}/vendor-bills/{id}/delete'], ['GET', '/orders/{id}/zoho-check'],
+        ['POST', '/orders/{id}/products/{id}/duplicate'], ['POST', '/orders/{id}/products/{id}/price-approval-request'],
+        ['GET', '/orders/{id}/products/{id}/price-approval'], ['POST', '/orders/{id}/products/{id}/price-approval', ['reason' => 'Route behaviour test approval', 'decision' => 'approve']], ['POST', '/orders/{id}/vendor-bills/{id}/delete'], ['GET', '/orders/{id}/zoho-check'],
         ['GET', '/payment-presets/{id}/edit'], ['POST', '/payment-presets/{id}/toggle'], ['POST', '/payment-presets/{id}/update'],
         ['GET', '/port-routes/{id}/edit'], ['POST', '/port-routes/{id}/update'],
         ['GET', '/ports/{id}/edit'], ['POST', '/ports/{id}/set-default'], ['POST', '/ports/{id}/toggle'], ['POST', '/ports/{id}/update'],
@@ -1067,7 +1070,7 @@ final class RouteBehaviourTest extends DbTestCase
             }
         }
         self::assertSame([], $wrong);
-        self::assertSame(92, count(self::ID_ROUTES));
+        self::assertSame(95, count(self::ID_ROUTES));
         self::assertSame($auditBefore, (int) $this->value('SELECT COUNT(*) FROM audit_log'), 'no audit row for a record that does not exist');
     }
 
@@ -1245,16 +1248,25 @@ final class RouteBehaviourTest extends DbTestCase
         $this->assertPage($this->call('GET', '/reports/missing-ebrc'), 'Missing eBRC / FIRC', 'GET /reports/missing-ebrc');
     }
 
-    /** Owner decision 2 Nov 2026 (D-240): MD/ED approval of a discount below the reference price. */
-    public function testPriceApprovalRoute(): void
+    /** Owner decision D-245 P2: a line below its floor goes to the MD, who approves it on its own page. */
+    public function testLinePriceApprovalRoutes(): void
     {
+        $pdo = Database::connection();
+        $pdo->exec("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'"); // staff floor 1,287.50 above the minimum 1,250.00
         $orderId = $this->createTestOrder($this->createTestClient());
-        self::assertSame('error', $this->call('POST', "/orders/{$orderId}/price-approval", ['reason' => 'Nothing to approve here'])['type'], 'no line below the warning level');
-        $productId = \App\Repositories\ProductRepository::create(['name' => 'Route Ref Granite', 'specifications' => 'Slab', 'hs_code' => '68022310', 'reference_price' => '45.00', 'reference_currency' => 'USD', 'reference_unit' => 'SQFT'], $this->holder);
-        $line = \App\Repositories\OrderProductRepository::add($orderId, 1, 'Route Ref Granite', null, null, '10', false, 'SQFT', '36.00', '68022310');
+        $productId = \App\Repositories\ProductRepository::create(['name' => 'Route Priced Granite', 'specifications' => 'Block', 'hs_code' => '68022310', 'reference_unit' => 'CBM'], $this->holder);
+        $supplier = \App\Repositories\ProductSupplierRepository::create(['product_id' => $productId, 'supplier_name' => 'Route Quarry', 'location' => null, 'contact_person' => null, 'contact_phone' => null, 'contact_email' => null,
+            'fob_source' => 'direct', 'fob_value' => 80000, 'factory_cost' => null, 'transportation_cost' => null, 'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null, 'is_primary' => 1, 'notes' => null], $this->holder);
+        \App\Repositories\PricingRepository::setSupplierDates($supplier, date('Y-m-d'), null);
+        $line = \App\Repositories\OrderProductRepository::add($orderId, 1, 'Route Priced Granite', null, null, '10', false, 'CBM', '1300.00', '68022310');
         \App\Repositories\OrderProductRepository::setCatalogProduct($line, $productId);
-        self::assertSame('error', $this->call('POST', "/orders/{$orderId}/price-approval", ['reason' => 'x'])['type'], 'a reason is needed');
-        $this->assertDone($this->call('POST', "/orders/{$orderId}/price-approval", ['reason' => 'Route test — volume order agreed']), 'POST /orders/{id}/price-approval', 'Discount approved');
-        self::assertSame(1, $this->audits('PRICE_DISCOUNT_APPROVED', $orderId));
+        self::assertSame('error', $this->call('POST', "/orders/{$orderId}/products/{$line}/price-approval-request")['type'], 'in range: nothing to ask');
+        $pdo->exec("UPDATE order_products SET unit_price = 1260.00 WHERE id = {$line}");
+        $this->assertDone($this->call('POST', "/orders/{$orderId}/products/{$line}/price-approval-request"), 'POST /orders/{id}/products/{productId}/price-approval-request', 'Sent to the MD');
+        $this->assertPage($this->call('GET', "/orders/{$orderId}/products/{$line}/price-approval"), 'Approve a price below the floor', 'GET /orders/{id}/products/{productId}/price-approval');
+        self::assertSame('error', $this->call('POST', "/orders/{$orderId}/products/{$line}/price-approval", ['reason' => 'x'])['type'], 'a reason is needed');
+        $this->assertDone($this->call('POST', "/orders/{$orderId}/products/{$line}/price-approval", ['reason' => 'Route test — volume order agreed', 'decision' => 'approve']), 'POST /orders/{id}/products/{productId}/price-approval', 'Price approved');
+        self::assertSame(1, $this->audits('LINE_PRICE_APPROVED', $line));
+        $pdo->exec("UPDATE incentive_settings SET setting_value = '0' WHERE setting_key = 'program_enabled'");
     }
 }

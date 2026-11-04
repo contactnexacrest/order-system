@@ -209,4 +209,13 @@ async function createTestDocument(orderId, typeCode, status = 'sent') {
   return result.insertId;
 }
 
-module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument };
+/**
+ * Owner decision D-245 P2: for a test file about something else that types goods lines by hand
+ * on a USD order — switches "Goods lines must be picked from Products" off for this file
+ * (tests/support/pricingRuleReset.js switches it back on for the next file).
+ */
+async function allowHandTypedGoodsLines() {
+  await db.execute("UPDATE pricing_settings SET setting_value = '0' WHERE setting_key = 'require_product_pick'");
+}
+
+module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument, allowHandTypedGoodsLines };

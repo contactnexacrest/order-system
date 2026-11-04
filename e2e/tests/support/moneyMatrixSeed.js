@@ -60,8 +60,9 @@ async function main() {
   const orderId = await createTestOrder(clientId, 'CIF', 'Standard — New Buyer', 'USD', null, null, users.map((u) => u.id));
   await db.execute("UPDATE orders SET order_reference = CONCAT('MM-SENTINEL-', id) WHERE id = :id", { id: orderId });
 
-  // D-240 (2 Nov 2026): a Products-menu product whose reference SELLING price is the selling sentinel,
-  // picked on the sentinel order's line — so the proof covers the product pages and the order-line note.
+  // A Products-menu product picked on the sentinel order's line — so the proof covers the product
+  // pages and the order line (D-240; its reference selling price was removed by D-245 P2, where
+  // prices are built from the supplier price instead).
   let catalogProduct = await db.queryOne("SELECT id FROM catalog_products WHERE name = 'MM Sentinel Product'");
   if (!catalogProduct) {
     const r = await db.execute(
@@ -69,10 +70,7 @@ async function main() {
     );
     catalogProduct = { id: r.insertId };
   }
-  await db.execute(
-    "UPDATE catalog_products SET reference_price = :p, reference_currency = 'USD', reference_unit = 'PCS' WHERE id = :id",
-    { p: SENTINELS.selling, id: catalogProduct.id }
-  );
+  await db.execute("UPDATE catalog_products SET reference_unit = 'PCS' WHERE id = :id", { id: catalogProduct.id });
   await db.execute(
     `INSERT INTO order_products (order_id, line_no, line_type, description, quantity, unit, unit_price, fob_value, is_active, catalog_product_id)
      VALUES (:o, 1, 'goods', 'MM sentinel granite', 1, 'PCS', :p, :p, 1, :cp)`,

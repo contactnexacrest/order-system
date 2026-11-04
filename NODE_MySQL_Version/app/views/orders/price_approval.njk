@@ -1,0 +1,59 @@
+{#
+  Owner decision D-245 P2: the MD approves one order line's price below the floor (never below
+  the minimum price). In: order, line, ctx, check, effect, qtyText. Port of price_approval.php.
+#}
+{% set f = check.figures %}
+{% set ref = order.order_reference or ('#' + order.id) %}
+<div class="container">
+  <p><a href="/orders/{{ order.id }}#price-check" data-focus-link>&larr; Back to order {{ ref }}</a></p>
+  <div class="section">
+    <h1>Approve a price below the floor</h1>
+    <p class="muted">Order {{ ref }} · line {{ line.line_no }} · sold by {{ ctx.label }}</p>
+    <table class="list">
+      <tr><td>Product line</td><td>{{ line.description }}{% if qtyText %} × {{ qtyText }} {{ line.unit or '' }}{% endif %}</td></tr>
+      <tr><td>Asked price</td><td><strong>USD {{ line.unit_price | money }}</strong></td></tr>
+      {% if f %}
+        <tr><td>Lowest price for this order (floor)</td><td>USD {{ f.floor | money }}{% if effect.short_per_unit > 0 %} <span class="muted">(short by USD {{ effect.short_per_unit | money }} per unit)</span>{% endif %}</td></tr>
+        <tr><td>Staff floor</td><td>USD {{ f.staff_floor | money }}</td></tr>
+        <tr><td>Minimum price (never below)</td><td>USD {{ f.minimum | money }}</td></tr>
+        <tr><td>Margin at the asked price</td><td>{{ (effect.margin_pct | fixed1) + '%' if effect.margin_pct != null else '—' }} <span class="muted">(minimum {{ f.margin_pct | qtyTrim }}%)</span></td></tr>
+        <tr><td>Team incentive on this line</td><td>
+          {% if effect.reserve_line != null %}
+            USD {{ effect.reserve_line | money }} → <strong>USD {{ effect.after_line | money }}</strong>
+          {% else %}
+            USD {{ effect.reserve_per_unit | money }} → <strong>USD {{ (effect.reserve_per_unit - effect.cut_per_unit) | money }}</strong> per unit
+          {% endif %}
+        </td></tr>
+        {% if effect.commission_zero %}
+          <tr><td>Associate commission on this line</td><td><strong>0</strong> — {{ ctx.associate.name }} earns nothing on a line approved below their floor.</td></tr>
+        {% endif %}
+      {% else %}
+        <tr><td>Price check</td><td>{{ check.note }}</td></tr>
+      {% endif %}
+    </table>
+
+    {% if check.status == 'below_minimum' %}
+      <p class="notice notice-error">⛔ USD {{ line.unit_price | money }} is below the minimum price of USD {{ f.minimum | money }}. Nobody can approve it, not even the MD. To sell lower, change the product's margin (Products → pricing) — that change is logged.</p>
+    {% elif check.status == 'below' or check.status == 'no_price' %}
+      <form method="post" action="/orders/{{ order.id }}/products/{{ line.id }}/price-approval">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Reason *<textarea name="reason" rows="2" required minlength="10" maxlength="500" placeholder="e.g. Second container for a repeat buyer; matched a competitor offer"></textarea></label>
+        <p class="notice notice-warning">
+          {% if check.status == 'no_price' %}
+            This product has no price set, so there is no floor to check against. Approving lets the line go on the Proforma Invoice at USD {{ line.unit_price | money }}.
+          {% else %}
+            The USD {{ effect.short_per_unit | money }} per unit below the floor comes out of the team incentive first{% if effect.commission_zero %}; the associate's commission on this line becomes 0{% endif %}.
+          {% endif %}
+          The approval holds while the line keeps this price; it is logged with your name, the time and the reason.
+        </p>
+        <button type="submit" name="decision" value="approve">Approve</button>
+        <button type="submit" name="decision" value="refuse" class="btn-secondary">Refuse</button>
+      </form>
+    {% elif check.status == 'approved' %}
+      <p class="notice notice-success">Already approved — {{ check.approval.reason }}</p>
+    {% else %}
+      <p class="muted">This line does not need an approval.</p>
+    {% endif %}
+    <p class="muted small">Only the MD (permission "Manage pricing") sees this page.</p>
+  </div>
+</div>

@@ -140,19 +140,12 @@ roles is ticked here, like everyone else.
 | Approve short payment (`approve_short_payment`) | MD, ED, Admin, Finance Director | Clear a buyer payment that is less than due, with a written reason ([Stage 3](./03-stage3-pi-advance.md), [Stage 8](./08-stage8-ci-balance.md)) |
 | Manage approval limits (`manage_approval_limits`) | MD, ED (and Super Admins) | Change a designation's approval limit or make it 'director' level — never on a designation the person holds ([Chapter 21](./21-departments.md)). Added by QA Round 8 (R8-N10) |
 
-### Products & pricing (owner decision 2 Nov 2026, D-240)
+### Products & pricing (owner decision D-245)
 
-**Settings → Products & pricing** (Manage company settings), each change
-saved with a reason like every setting:
-
-| Setting | Default | What it does |
-|---|---|---|
-| `ref_price_note_enabled` | 1 (on) | Show the reference-price note beside order line prices (off: no note at all; the PI approval below still applies) |
-| `ref_price_note_pct` | 5 | A line this many % or more below its product's reference price shows "X% below reference price (…)" |
-| `ref_price_warning_pct` | 10 | At this many % or more below, the note turns red "⚠ X% below …" and the Proforma Invoice needs an MD/ED approval first ([Stage 3](./03-stage3-pi-advance.md#price-check-before-the-pi-owner-decision-2-nov-2026-d-240)) |
-
-New permission **Approve price discount** (`approve_price_discount`): MD and
-ED. How the reference price works: [Stage 1](./01-stage1-enquiry-quotation.md#reference-selling-price-and-pick-from-products-owner-decision-2-nov-2026-d-240).
+Pricing (margin, buffer, pricing exchange rate, team-incentive reserve, stale days, and
+"Goods lines must be picked from Products" — on by default) is set under **Admin → Pricing**
+(MD only) — see [Pricing](./27-pricing.md). The D-240 reference-price
+note settings and the "Approve price discount" permission were removed by D-245 P2.
 
 ### Scheduled jobs (set up once on the server)
 

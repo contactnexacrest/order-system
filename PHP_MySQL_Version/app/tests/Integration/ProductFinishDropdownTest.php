@@ -23,6 +23,12 @@ use App\Tests\Support\DbTestCase;
  */
 final class ProductFinishDropdownTest extends DbTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->allowHandTypedGoodsLines(); // D-245 P2: this test types goods lines by hand; it is about something else
+    }
+
     private function renderOrderShow(int $orderId): string
     {
         $_SESSION['_auth_user_id'] = $this->createTestUser('Admin');

@@ -175,6 +175,16 @@ njkEnv.addFilter('money', (value) => {
   if (Number.isNaN(num)) return value;
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 });
+// Owner decision D-245 P2: a number with 1 decimal (PHP number_format($v, 1)), e.g. a margin %.
+njkEnv.addFilter('fixed1', (value) => {
+  const num = parseFloat(value);
+  return Number.isNaN(num) ? '' : num.toFixed(1);
+});
+// Owner decision D-245 P2: a number as a plain 2-decimal string (PHP number_format($v, 2, '.', '')), e.g. for data-floor.
+njkEnv.addFilter('fixed2', (value) => {
+  const num = parseFloat(value);
+  return Number.isNaN(num) ? '' : num.toFixed(2);
+});
 // Owner decision 2026-10-29: how a settlement leg is named on the CA pages ('lc' → 'LC payment').
 // Owner decision 2026-10-30: team incentives — whole-rupee amounts (PHP number_format($v, 0)) and month/cycle labels.
 // D-214 phase 3: a quantity without trailing zeros (120.000 -> 120, 12.500 -> 12.5).
@@ -921,8 +931,10 @@ app.post('/orders/:id/duplicate', requireAuth, requirePermission('manage_orders'
 app.post('/orders/:id/products', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.addProduct));
 app.post('/orders/:id/products/:productId', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProduct));
 app.post('/orders/:id/products/:productId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteProduct));
-// Owner decision 2 Nov 2026 (D-240): MD/ED approval of a discount below the reference price.
-app.post('/orders/:id/price-approval', requireAuth, requirePermission('approve_price_discount'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.approvePriceDiscount));
+// Owner decision D-245 P2: a line below the floor goes to the MD; only the MD approves it (never below the minimum price).
+app.post('/orders/:id/products/:productId/price-approval-request', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.requestLinePriceApproval));
+app.get('/orders/:id/products/:productId/price-approval', requireAuth, requirePermission('manage_pricing'), asyncHandler(ordersController.linePriceApproval));
+app.post('/orders/:id/products/:productId/price-approval', requireAuth, requirePermission('manage_pricing'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.approveLinePrice));
 app.post('/orders/:id/products/:productId/duplicate', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.duplicateProduct));
 app.post('/orders/:id/buyer-po', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.recordBuyerPo));
 app.post('/orders/:id/buyer-po/received-date', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.correctBuyerPoReceivedDate));

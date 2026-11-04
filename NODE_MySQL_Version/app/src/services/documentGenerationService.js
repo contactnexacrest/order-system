@@ -185,9 +185,9 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
   // at order creation) but can only be set here, at actual PI-generation
   // time — set (or reset, on a re-issued PI) every time a PI is generated
   // so the validity window always reflects the most recent issue.
-  // Owner decision 2 Nov 2026 (D-240): no PI while a discount at the warning level waits for MD/ED approval.
-  if (documentTypeCode === 'PI') {
-    const priceBlock = await require('./referencePrice').piBlockReason(orderId, generatedByUserId);
+  // Owner decision D-245 P2: no Quotation or PI while a line is below its floor (or has no price) without the MD's approval.
+  if (documentTypeCode === 'QT' || documentTypeCode === 'PI') {
+    const priceBlock = await require('./orderLinePricing').documentBlockReason(orderId, documentTypeCode);
     if (priceBlock !== null) throw new Error(priceBlock);
   }
   if (documentTypeCode === 'PI') {
@@ -349,6 +349,9 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
       }
     }
   }
+
+  // Owner decision D-245 P2: the PI fixes each checked line's price figures.
+  if (documentTypeCode === 'PI') await require('./orderLinePricing').snapshotForPi(orderId);
 
   return {
     document_id: documentId,

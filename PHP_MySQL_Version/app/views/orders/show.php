@@ -1432,7 +1432,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   <div class="order-layout" id="order-layout">
     <div class="step-sequence" id="order-panels">
 
-  <details class="step-card" id="step-products"<?= ($sees['selling'] && !$priceCheck['covered']) ? ' open' : '' ?>>
+  <details class="step-card" id="step-products"<?= ($sees['selling'] && $linePricing['blocking'] !== []) ? ' open' : '' ?>>
     <summary><h2>Products</h2></summary>
     <?php if (!$canEditProducts): ?>
       <table class="list">
@@ -1445,8 +1445,8 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <td><?= htmlspecialchars($p['unit'] ?? '') ?></td>
           <?php if ($sees['selling']): ?>
           <td><?= $p['unit_price'] !== null ? number_format((float) $p['unit_price'], 2) : 'To Be Confirmed' ?>
-            <?php $__refNote = \App\Services\ReferencePrice::note(\App\Services\ReferencePrice::lineDifference($p, $refPriceProducts[(int) ($p['catalog_product_id'] ?? 0)] ?? null, $order['currency_code'] ?? null), $refPriceSettings); ?>
-            <?php if ($__refNote !== null): ?><span class="ref-price-note small ref-price-<?= $__refNote['kind'] === 'note' ? 'below' : $__refNote['kind'] ?>"><?= htmlspecialchars($__refNote['text']) ?></span><?php endif; ?>
+            <?php // Owner decision D-245 P2: the line's price check. ?>
+            <?php $__lc = $linePricing['lines'][(int) $p['id']] ?? null; include __DIR__ . '/_line_price.php'; ?>
           </td>
           <td><?= $p['fob_value'] !== null ? number_format((float) $p['fob_value'], 2) : 'To Be Confirmed' ?></td>
           <?php endif; ?>
@@ -1470,7 +1470,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>">
             <?= Csrf::field() ?>
             <div class="kv-grid">
-              <?php $__pickerName = 'catalog_product_id'; $__pickerSelected = (int) ($p['catalog_product_id'] ?? 0); $__pickerCurrency = (string) ($order['currency_code'] ?? ''); include __DIR__ . '/_product_picker.php'; ?>
+              <?php $__pickerName = 'catalog_product_id'; $__pickerSelected = (int) ($p['catalog_product_id'] ?? 0); $__pickerCurrency = (string) ($order['currency_code'] ?? ''); $__pickerKey = (string) ($linePricing['ctx']['key'] ?? 'staff'); include __DIR__ . '/_product_picker.php'; ?>
               <label>Description *<input type="text" name="description" value="<?= htmlspecialchars($p['description']) ?>" required placeholder="e.g. Granite slabs, polished"></label>
               <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>" placeholder="e.g. 240 x 120 x 2 cm"></label>
               <label>Finish
@@ -1492,14 +1492,10 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                   <?php endforeach; ?>
                 </select>
               </label>
-              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>" placeholder="e.g. 45.00">
-                <?php // Owner decision 2 Nov 2026 (D-240): difference from the reference price — selling-visible people only, never on a document. ?>
-                <?php if ($sees['selling']): ?>
-                  <?php $__refProduct = $refPriceProducts[(int) ($p['catalog_product_id'] ?? 0)] ?? null; $__refDiff = \App\Services\ReferencePrice::lineDifference($p, $__refProduct, $order['currency_code'] ?? null); $__refNote = \App\Services\ReferencePrice::note($__refDiff, $refPriceSettings); ?>
-                  <span class="ref-price-note small<?= $__refNote !== null ? ' ref-price-' . ($__refNote['kind'] === 'note' ? 'below' : $__refNote['kind']) : '' ?>"
-                    data-enabled="<?= $refPriceSettings['enabled'] ? '1' : '0' ?>" data-note="<?= htmlspecialchars((string) $refPriceSettings['note_pct']) ?>" data-warning="<?= htmlspecialchars((string) $refPriceSettings['warning_pct']) ?>"
-                    data-ref="<?= $__refDiff !== null ? htmlspecialchars(number_format($__refDiff['reference'], 2, '.', '')) : '' ?>" data-label="<?= $__refDiff !== null ? htmlspecialchars($__refDiff['label']) : '' ?>"><?= $__refNote !== null ? htmlspecialchars($__refNote['text']) : '' ?></span>
-                <?php endif; ?>
+              <?php $__lc = $linePricing['lines'][(int) $p['id']] ?? null; $__lcFloor = ($sees['selling'] && $__lc !== null && $__lc['figures'] !== null && $__lc['status'] !== \App\Services\OrderLinePricing::APPROVED) ? number_format((float) $__lc['figures']['floor'], 2, '.', '') : null; ?>
+              <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" value="<?= htmlspecialchars((string) ($p['unit_price'] ?? '')) ?>" placeholder="e.g. 45.00"<?= $__lcFloor !== null ? ' data-floor="' . $__lcFloor . '" data-floor-message="Below your lowest price"' : '' ?>>
+                <?php // Owner decision D-245 P2: the line's price check — selling-visible people only, never on a document. ?>
+                <?php if ($sees['selling']): include __DIR__ . '/_line_price.php'; endif; ?>
               </label>
               <label>Line type
                 <select name="line_type">
@@ -1545,7 +1541,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/products">
           <?= Csrf::field() ?>
           <div class="kv-grid">
-            <?php $__pickerName = 'catalog_product_id'; $__pickerSelected = 0; $__pickerCurrency = (string) ($order['currency_code'] ?? ''); include __DIR__ . '/_product_picker.php'; ?>
+            <?php $__pickerName = 'catalog_product_id'; $__pickerSelected = 0; $__pickerCurrency = (string) ($order['currency_code'] ?? ''); $__pickerKey = (string) ($linePricing['ctx']['key'] ?? 'staff'); include __DIR__ . '/_product_picker.php'; ?>
             <label>Description *<input type="text" name="description" required placeholder="e.g. Granite slabs, polished"></label>
             <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 240 x 120 x 2 cm"></label>
             <label>Finish
@@ -1565,9 +1561,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
                 <?php endforeach; ?>
               </select>
             </label>
-            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 45.00">
-              <?php if ($sees['selling']): ?><span class="ref-price-note small" data-enabled="<?= $refPriceSettings['enabled'] ? '1' : '0' ?>" data-note="<?= htmlspecialchars((string) $refPriceSettings['note_pct']) ?>" data-warning="<?= htmlspecialchars((string) $refPriceSettings['warning_pct']) ?>" data-ref="" data-label=""></span><?php endif; ?>
-            </label>
+            <label>Unit Price<input type="text" name="unit_price" data-max-decimals="2" data-max-value="999999999999.99" placeholder="e.g. 45.00" data-floor-message="Below your lowest price"></label>
             <label>Line type
               <select name="line_type">
                 <?php foreach (\App\Repositories\OrderProductRepository::LINE_TYPES as $__lt => $__ltLabel): ?><option value="<?= $__lt ?>"><?= $__ltLabel ?></option><?php endforeach; ?>
@@ -1615,33 +1609,49 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       </div>
     <?php endif; ?>
 
-  <?php // Owner decision 2 Nov 2026 (D-240): Price check — discounts below the reference price at the warning level (inside the Products card). ?>
-  <?php if ($sees['selling'] && ($priceCheck['needing'] !== [] || $priceCheck['approval'] !== null)): ?>
+  <?php // Owner decision D-245 P2: Price check — lines below the floor of whoever sells the order (inside the Products card). ?>
+  <?php $__pcLines = array_values(array_filter($linePricing['lines'], static fn (array $c): bool => in_array($c['status'], [\App\Services\OrderLinePricing::BELOW, \App\Services\OrderLinePricing::BELOW_MINIMUM, \App\Services\OrderLinePricing::NO_PRICE, \App\Services\OrderLinePricing::APPROVED], true))); ?>
+  <?php if ($sees['selling'] && $__pcLines !== []): ?>
   <div class="price-check" id="price-check">
-    <h3>Price check <small class="muted">(reference price)</small></h3>
-    <?php if ($priceCheck['needing'] === []): ?>
-      <p class="muted">No line is below its reference price by <?= htmlspecialchars(\App\Services\ReferencePrice::pct($refPriceSettings['warning_pct'])) ?>% or more.</p>
-    <?php else: ?>
-      <table class="list">
-        <tr><th>Line</th><th>Description</th><th>Price</th><th>Reference</th><th>Below by</th></tr>
-        <?php foreach ($priceCheck['needing'] as $__pc): ?>
-          <tr><td><?= (int) $__pc['line_no'] ?></td><td><?= htmlspecialchars($__pc['description']) ?></td><td><?= number_format($__pc['unit_price'], 2) ?></td><td><?= htmlspecialchars($__pc['label']) ?></td><td class="ref-price-warning">⚠ <?= htmlspecialchars(\App\Services\ReferencePrice::pct(-$__pc['pct'])) ?>%</td></tr>
-        <?php endforeach; ?>
-      </table>
-      <?php if ($priceCheck['covered']): ?>
-        <p class="notice notice-success">Discount approved by <?= htmlspecialchars((string) (\App\Repositories\UserRepository::findById((int) $priceCheck['approval']['approved_by'])['name'] ?? '—')) ?> on <?= htmlspecialchars((string) $priceCheck['approval']['approved_at']) ?> — reason: <?= htmlspecialchars((string) $priceCheck['approval']['reason']) ?></p>
-      <?php else: ?>
-        <p class="notice notice-warning">These lines are <?= htmlspecialchars(\App\Services\ReferencePrice::pct($refPriceSettings['warning_pct'])) ?>% or more below their reference price. The Proforma Invoice can be generated once an MD/ED approves the discount.<?= $priceCheck['approval'] !== null ? ' An earlier approval no longer covers the lines (a price dropped further or a new line was added).' : '' ?></p>
-        <?php if ($canApprovePriceDiscount): ?>
-        <form method="post" action="/orders/<?= (int) $order['id'] ?>/price-approval">
-          <?= Csrf::field() ?>
-          <label>Reason for approving the discount *<textarea name="reason" rows="2" required minlength="10" maxlength="500" placeholder="e.g. Repeat buyer, volume order — agreed by MD on call"></textarea></label>
-          <button type="submit" class="btn-sm">Approve discount</button>
-        </form>
-        <?php else: ?>
-          <p class="muted small">Only an MD or ED (permission "Approve price discounts") can approve it.</p>
-        <?php endif; ?>
-      <?php endif; ?>
+    <h3>Price check <small class="muted">(sold by <?= htmlspecialchars((string) $linePricing['ctx']['label']) ?>)</small></h3>
+    <table class="list">
+      <tr><th>Line</th><th>Description</th><th>Price (USD)</th><th>Quote · lowest</th><th>Check</th><th></th></tr>
+      <?php foreach ($__pcLines as $__pc): $__pl = $__pc['line']; $__pf = $__pc['figures']; ?>
+        <tr>
+          <td><?= (int) $__pl['line_no'] ?></td>
+          <td><?= htmlspecialchars((string) $__pl['description']) ?></td>
+          <td><?= number_format((float) $__pl['unit_price'], 2) ?></td>
+          <td><?= $__pf !== null ? number_format((float) $__pf['quote'], 2) . ' · ' . number_format((float) $__pf['floor'], 2) : '—' ?></td>
+          <td>
+            <?php if ($__pc['status'] === \App\Services\OrderLinePricing::APPROVED): ?>
+              <span class="price-badge price-badge-approved">Approved by <?= htmlspecialchars((string) (\App\Repositories\UserRepository::findById((int) $__pc['approval']['by'])['name'] ?? '—')) ?></span>
+              <div class="muted small"><?= htmlspecialchars((string) $__pc['approval']['at']) ?> — <?= htmlspecialchars((string) $__pc['approval']['reason']) ?></div>
+            <?php elseif ($__pc['status'] === \App\Services\OrderLinePricing::BELOW_MINIMUM): ?>
+              <span class="price-badge price-badge-bad">✗ Below what NexaCrest can accept — raise it</span>
+            <?php elseif ($__pc['status'] === \App\Services\OrderLinePricing::NO_PRICE): ?>
+              <span class="price-badge price-badge-bad">No price set — needs MD approval</span>
+            <?php else: ?>
+              <span class="price-badge price-badge-bad">✗ Below your lowest price</span>
+            <?php endif; ?>
+            <?php if ($__pc['requested'] && $__pc['status'] !== \App\Services\OrderLinePricing::APPROVED): ?><div class="muted small">Sent to the MD for approval.</div><?php endif; ?>
+          </td>
+          <td>
+            <?php if (in_array($__pc['status'], [\App\Services\OrderLinePricing::BELOW, \App\Services\OrderLinePricing::NO_PRICE], true)): ?>
+              <?php if ($canManagePricing): ?>
+                <a class="btn-sm" href="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $__pl['id'] ?>/price-approval">Review and approve line <?= (int) $__pl['line_no'] ?></a>
+              <?php elseif ($canEditProducts && !$__pc['requested']): ?>
+                <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $__pl['id'] ?>/price-approval-request" style="display:inline">
+                  <?= Csrf::field() ?>
+                  <button type="submit" class="btn-sm">Ask MD to approve line <?= (int) $__pl['line_no'] ?></button>
+                </form>
+              <?php endif; ?>
+            <?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    </table>
+    <?php if ($linePricing['blocking'] !== []): ?>
+      <p class="notice notice-error">⛔ The Proforma Invoice cannot be issued until every line is at or above its lowest price, or the MD has approved it. Raise the price, or ask the MD to approve it. Below the minimum price nobody can approve it.</p>
     <?php endif; ?>
   </div>
   <?php endif; ?>
@@ -2240,6 +2250,10 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
 
   <details class="step-card" id="step-1-quotation-prepare"<?= $stepCardOpen('1') ?>>
     <summary><?= $stepStatusIcon($stepStates['1']) ?><span class="step-group-num">STEP 1</span><h2>Prepare Quotation</h2></summary>
+    <?php // Owner decision D-245 P2: a line below its floor (or without a price) needs the MD's approval before the Quotation. ?>
+    <?php if ($linePricing['blocking'] !== []): ?>
+      <p class="notice notice-error">The Quotation cannot be generated yet: <?= htmlspecialchars((string) \App\Services\OrderLinePricing::documentBlockReason((int) $order['id'], 'QT')) ?> (<a href="#price-check" data-focus-link>Price check</a>)</p>
+    <?php endif; ?>
     <?php
       // Batch 3 #5 — differentiate 'not yet generated' vs 'already generated, this regenerates
       // it' document buttons visually, instead of every visible button looking identical.
@@ -2544,9 +2558,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
 
     <details class="step-card" id="step-5c-pi-generate"<?= $subCardOpen('5', '5c') ?>>
       <summary><?= $stepStatusIcon($subStepStatus('5', '5c')) ?><h2>Step 5c &middot; Generate Proforma Invoice</h2></summary>
-      <?php // Owner decision 2 Nov 2026 (D-240): a discount at the warning level needs an MD/ED approval before the PI. ?>
-      <?php if (!$priceCheck['covered']): $__pcFirst = $priceCheck['uncovered'][0]; ?>
-        <p class="notice notice-error">The Proforma Invoice cannot be generated yet: line <?= (int) $__pcFirst['line_no'] ?> is <?= htmlspecialchars(\App\Services\ReferencePrice::pct(-$__pcFirst['pct'])) ?>% below its reference price — an MD/ED must approve the discount first (<a href="#price-check">Price check</a>).</p>
+      <?php // Owner decision D-245 P2: a line below its floor (or without a price) needs the MD's approval before the PI. ?>
+      <?php if ($linePricing['blocking'] !== []): ?>
+        <p class="notice notice-error">The Proforma Invoice cannot be generated yet: <?= htmlspecialchars((string) \App\Services\OrderLinePricing::piBlockReason((int) $order['id'])) ?> (<a href="#price-check" data-focus-link>Price check</a>)</p>
       <?php endif; ?>
       <?php if ($stage3 && $stage3['status'] !== 'locked'): ?>
         <?php if ($canGenerateDocuments): // QA Round 5, R5-20 ?>

@@ -19,7 +19,7 @@
         <select name="client_id" required>
           <option value="">— Select —</option>
           <?php foreach ($clients as $c): ?>
-            <option value="<?= (int) $c['id'] ?>" <?= ((int) $c['id'] === (int) ($old['client_id'] ?? $preselectedClientId)) ? 'selected' : '' ?>>
+            <option value="<?= (int) $c['id'] ?>"<?= isset($clientPriceKeys[(int) $c['id']]) ? ' data-price-key="' . htmlspecialchars($clientPriceKeys[(int) $c['id']]) . '"' : '' ?> <?= ((int) $c['id'] === (int) ($old['client_id'] ?? $preselectedClientId)) ? 'selected' : '' ?>>
               <?= htmlspecialchars($c['company_legal_name']) ?> (<?= htmlspecialchars($c['client_unique_number']) ?>)
             </option>
           <?php endforeach; ?>

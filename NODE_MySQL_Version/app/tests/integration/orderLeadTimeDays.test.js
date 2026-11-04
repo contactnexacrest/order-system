@@ -5,6 +5,9 @@ const orderRepository = require('../../src/repositories/orderRepository');
 const ordersController = require('../../src/controllers/ordersController');
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
+// Owner decision D-245 P2: this file types goods lines by hand on USD orders; it is about something else.
+beforeAll(() => require('../support/fixtures').allowHandTypedGoodsLines());
+
 /**
  * Port of OrderLeadTimeDaysTest.php. 90-item backlog "dual lead-time
  * fields in days": alongside the existing free-text est_lead_time_text

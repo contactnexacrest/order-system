@@ -22,7 +22,6 @@
         <th>HS Code</th>
         <th>Origin</th>
         {% if canViewPricing %}<th>Headline FOB</th>{% endif %}
-        {% if sees.selling %}<th>Reference Price</th>{% endif %}
         {# Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote and lowest price for selling-price staff. #}
         {% if canBuildup %}<th class="num">Cost</th><th class="num">Min price</th><th class="num">Staff floor</th><th class="num">Staff quote</th><th class="num">Assoc. floor (lowest level)</th><th>Supplier price date</th>{% endif %}
         {% if canStaffPrice %}<th class="num">Quote (USD)</th><th class="num">Lowest (USD)</th>{% endif %}
@@ -39,9 +38,6 @@
           <td>{{ p.origin or '—' }}</td>
           {% if canViewPricing %}
             <td>{{ 'To Be Confirmed' if p.headline_fob == null else (p.headline_fob | money) }}</td>
-          {% endif %}
-          {% if sees.selling %}
-            <td>{{ p.reference_label or '—' }}</td>
           {% endif %}
           {% if canBuildup %}{% set b = p.pricing.build %}
             {% if not b %}

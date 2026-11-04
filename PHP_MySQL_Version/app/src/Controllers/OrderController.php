@@ -69,6 +69,7 @@ use App\Services\OrderCommentService;
 use App\Services\OrderDuplicationService;
 use App\Services\OrderEditGuard;
 use App\Services\OrderProfitabilityService;
+use App\Services\MoneyVisibility;
 use App\Services\PermissionService;
 use App\Services\ReferenceNumberService;
 use App\Services\StageGateService;
@@ -359,8 +360,12 @@ final class OrderController
             'cooTypes'        => LookupRepository::dropdownOptions('coo_type'),
             'containerTypes'  => LookupRepository::dropdownOptions('container_type'),
             'units'           => LookupRepository::dropdownOptions('unit'),
-            // Owner decision 2 Nov 2026 (D-240): "Pick from Products" (the reference price only for selling-visible people).
+            // Owner decision D-245 P2: "Pick from Products" fills the quote price of whoever sells (selling-visible people only).
             'pickerProducts'  => \App\Repositories\ProductRepository::forPicker(),
+            'pickerPrices'    => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::pickerPrices(\App\Repositories\ProductRepository::forPicker()) : [],
+            'clientPriceKeys' => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::clientKeys(ClientRepository::all()) : [],
+            // Owner decision D-245 P2: on a USD order goods lines come from Products (browser rule beside the picker).
+            'pickRequiredWhen' => self::createPickRequiredWhen(),
             'packageTypes'    => LookupRepository::dropdownOptions('package_type'),
             'surfaceFinishes' => LookupRepository::dropdownOptions('surface_finish'),
             'preselectedClientId' => $preselectedClientId,
@@ -468,6 +473,33 @@ final class OrderController
             $priceError = OrderLineValidator::checkUnitPrice((string) ($_POST['product_unit_price'][$i] ?? ''));
             if ($priceError !== null) {
                 Flash::set('error', 'Product line ' . ($i + 1) . ": {$priceError}");
+                Flash::setOld($_POST);
+                header('Location: /orders/create?client_id=' . $clientId);
+                return;
+            }
+            // Owner decision D-245 P2: never below the product's minimum price.
+            $__currencyCode = '';
+            foreach (LookupRepository::currencies() as $__cur) {
+                if ((int) $__cur['id'] === $currencyId) {
+                    $__currencyCode = (string) $__cur['code'];
+                }
+            }
+            // Owner decision D-245 P2: on a USD order goods lines come from Products (Admin → Pricing).
+            if (($__pick = \App\Services\OrderLinePricing::pickRefusal($__currencyCode, self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''), 'goods')) !== null) {
+                Flash::set('error', 'Product line ' . ($i + 1) . ": {$__pick}");
+                Flash::setOld($_POST);
+                header('Location: /orders/create?client_id=' . $clientId);
+                return;
+            }
+            $__refusal = \App\Services\OrderLinePricing::saveRefusal(
+                ['client_id' => $clientId, 'currency_code' => $__currencyCode],
+                self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''),
+                'goods',
+                trim((string) ($_POST['product_unit_price'][$i] ?? '')) ?: null,
+                self::seesPriceBuildup()
+            );
+            if ($__refusal !== null) {
+                Flash::set('error', 'Product line ' . ($i + 1) . ": {$__refusal}");
                 Flash::setOld($_POST);
                 header('Location: /orders/create?client_id=' . $clientId);
                 return;
@@ -584,6 +616,8 @@ final class OrderController
                 if (trim((string) ($_POST['product_unit_price'][$i] ?? '')) !== '') {
                     OrderProductRepository::setPriceSetBy($__lineId, (int) $user['id']);
                 }
+                // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
+                \App\Services\OrderLinePricing::afterSave($__lineId, null, (int) $user['id']);
             }
 
             $pdo->commit();
@@ -823,19 +857,77 @@ final class OrderController
         return ($product !== null && (int) $product['is_active'] === 1) ? $id : null;
     }
 
-    /** Owner decision 2 Nov 2026 (D-240): an MD/ED approves the order's discount below the reference price. */
-    public function approvePriceDiscount(array $params): void
+    /** Owner decision D-245 P2: the New Order form's browser rule — the picker is required while the currency is USD. */
+    private static function createPickRequiredWhen(): string
+    {
+        if (!\App\Services\PricingService::settings()['require_product_pick']) {
+            return '';
+        }
+        foreach (LookupRepository::currencies() as $c) {
+            if (strtoupper((string) $c['code']) === 'USD') {
+                return 'currency_id=' . (int) $c['id'];
+            }
+        }
+        return '';
+    }
+
+    /** Owner decision D-245 P2: whether the signed-in person sees the full price build-up (MD, ED). */
+    private static function seesPriceBuildup(): bool
+    {
+        $u = AuthService::currentUser();
+        return $u !== null && PermissionService::can((int) $u['id'], $u['role_id'] !== null ? (int) $u['role_id'] : null, 'view_price_buildup');
+    }
+
+    /** Owner decision D-245 P2: below the floor (or no price) — staff send the line to the MD. */
+    public function requestLinePriceApproval(array $params): void
     {
         $orderId = (int) $params['id'];
-        if (OrderRepository::find($orderId) === null) {
+        $user = AuthService::currentUser();
+        $error = \App\Services\OrderLinePricing::requestApproval($orderId, (int) $params['productId'], (int) $user['id']);
+        Flash::set($error === null ? 'success' : 'error', $error ?? 'Sent to the MD for approval — the Proforma Invoice waits for it.');
+        header("Location: /orders/{$orderId}#price-check");
+    }
+
+    /** Owner decision D-245 P2: the MD's approval screen for one line. */
+    public function linePriceApproval(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $view = \App\Services\OrderLinePricing::approvalView($orderId, (int) $params['productId']);
+        if ($view === null || !\App\Services\OrderAccessService::currentUserMayOpenOrderId($orderId)) {
             http_response_code(404);
-            echo 'Order not found.';
+            echo 'Order line not found.';
             return;
         }
+        View::render('orders/price_approval', $view + ['approver' => null], 'layout/base');
+    }
+
+    /** Owner decision D-245 P2: the MD approves a line price (never below the minimum price). */
+    public function approveLinePrice(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $lineId = (int) $params['productId'];
         $user = AuthService::currentUser();
-        $error = \App\Services\ReferencePrice::approve($orderId, (int) $user['id'], (string) ($_POST['reason'] ?? ''));
-        Flash::set($error === null ? 'success' : 'error', $error ?? 'Discount approved — the Proforma Invoice can now be generated.');
+        $refuse = ($_POST['decision'] ?? 'approve') === 'refuse';
+        $error = $refuse
+            ? \App\Services\OrderLinePricing::refuse($orderId, $lineId, (int) $user['id'], (string) ($_POST['reason'] ?? ''))
+            : \App\Services\OrderLinePricing::approve($orderId, $lineId, (int) $user['id'], (string) ($_POST['reason'] ?? ''));
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header("Location: /orders/{$orderId}/products/{$lineId}/price-approval");
+            return;
+        }
+        Flash::set('success', $refuse ? 'Price refused — whoever asked has been told; the line stays below the floor until its price is raised.' : 'Price approved — the line no longer keeps the Proforma Invoice back.');
         header("Location: /orders/{$orderId}#price-check");
+    }
+
+    /** The flash after saving a line, saying when it now waits for the MD. */
+    private static function lineSavedMessage(int $lineId, string $saved): string
+    {
+        $line = OrderProductRepository::find($lineId);
+        if ($line === null || empty($line['price_approval_requested_at'])) {
+            return $saved;
+        }
+        return $saved . ' Line ' . (int) $line['line_no'] . ' is below the lowest price for this order (or its product has no price) — it was sent to the MD for approval; the Proforma Invoice waits for it.';
     }
 
     public function addProduct(array $params): void
@@ -868,6 +960,15 @@ final class OrderController
             return;
         }
 
+        // Owner decision D-245 P2: on a USD order goods lines come from Products; never below the product's minimum price.
+        $__refusal = \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType)
+            ?? \App\Services\OrderLinePricing::saveRefusal($order, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, trim((string) ($_POST['unit_price'] ?? '')) ?: null, self::seesPriceBuildup());
+        if ($__refusal !== null) {
+            Flash::set('error', 'Product line: ' . $__refusal);
+            header("Location: /orders/{$orderId}#step-products");
+            return;
+        }
+
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
@@ -896,7 +997,9 @@ final class OrderController
         if (trim((string) ($_POST['unit_price'] ?? '')) !== '') {
             OrderProductRepository::setPriceSetBy($newLineId, (int) $user['id']);
         }
-        Flash::set('success', 'Product line added.');
+        // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
+        \App\Services\OrderLinePricing::afterSave($newLineId, null, (int) $user['id']);
+        Flash::set('success', self::lineSavedMessage($newLineId, 'Product line added.'));
         header("Location: /orders/{$orderId}");
     }
 
@@ -932,6 +1035,19 @@ final class OrderController
             return;
         }
 
+        // Owner decision D-245 P2: never below the product's minimum price.
+        $__catalogId = array_key_exists('catalog_product_id', $_POST) ? self::catalogProductInput($_POST['catalog_product_id']) : (isset($product['catalog_product_id']) ? (int) $product['catalog_product_id'] : null);
+        $__newPriceIn = trim((string) ($_POST['unit_price'] ?? '')) ?: null;
+        $__priceUnchanged = $__newPriceIn !== null && $product['unit_price'] !== null && abs((float) $product['unit_price'] - (float) $__newPriceIn) < 0.005
+            && (int) ($product['catalog_product_id'] ?? 0) === (int) ($__catalogId ?? 0);
+        $__refusal = \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, $__catalogId, $lineType)
+            ?? ($__priceUnchanged ? null : \App\Services\OrderLinePricing::saveRefusal($order, $__catalogId, $lineType, $__newPriceIn, self::seesPriceBuildup()));
+        if ($__refusal !== null) {
+            Flash::set('error', 'Product line: ' . $__refusal);
+            header("Location: /orders/{$orderId}#step-products");
+            return;
+        }
+
         $user = AuthService::currentUser();
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
@@ -962,7 +1078,9 @@ final class OrderController
         if ($__newPrice !== '' && ($product['unit_price'] === null || abs((float) $product['unit_price'] - (float) $__newPrice) > 0.0001)) {
             OrderProductRepository::setPriceSetBy($productId, (int) $user['id']);
         }
-        Flash::set('success', 'Product line updated.');
+        // Owner decision D-245 P2: a changed price voids its approval; below the floor goes to the MD.
+        \App\Services\OrderLinePricing::afterSave($productId, $product, (int) $user['id']);
+        Flash::set('success', self::lineSavedMessage($productId, 'Product line updated.'));
         header("Location: /orders/{$orderId}");
     }
 
@@ -1212,12 +1330,13 @@ final class OrderController
             'production' => OrderProductionRepository::find($orderId),
             'units' => LookupRepository::dropdownOptions('unit'),
             'surfaceFinishes' => LookupRepository::dropdownOptions('surface_finish'),
-            // Owner decision 2 Nov 2026 (D-240): "Pick from Products", the reference-price note per line and the discount approval.
+            // Owner decision D-245 P2: "Pick from Products" fills the quote price; each line's price check and the MD's approval.
             'pickerProducts' => \App\Repositories\ProductRepository::forPicker(),
-            'refPriceSettings' => \App\Services\ReferencePrice::settings(),
-            'refPriceProducts' => \App\Services\ReferencePrice::productsFor(OrderProductRepository::forOrder($orderId)),
-            'priceCheck' => \App\Services\ReferencePrice::status($orderId),
-            'canApprovePriceDiscount' => PermissionService::can((int) $actor['id'], $actorRoleId, 'approve_price_discount'),
+            'pickerPrices' => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::pickerPrices(\App\Repositories\ProductRepository::forPicker()) : [],
+            'linePricing' => \App\Services\OrderLinePricing::forOrder($orderId),
+            'pickRequiredWhen' => \App\Services\OrderLinePricing::productPickRequired($order['currency_code'] ?? null) ? 'line_type=goods' : '',
+            'canManagePricing' => PermissionService::can((int) $actor['id'], $actorRoleId, 'manage_pricing'),
+            'seesPriceBuildup' => PermissionService::can((int) $actor['id'], $actorRoleId, 'view_price_buildup'),
             'gstRates' => LookupRepository::dropdownOptions('gst_rate'),
             'dimensionalTolerances' => LookupRepository::dropdownOptions('dimensional_tolerance'),
             'supplierFactoryAddressesBySupplier' => SupplierFactoryAddressRepository::allGroupedBySupplier(),

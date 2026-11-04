@@ -86,8 +86,8 @@ final class DocumentGenerationService
         // can only be set here, at actual PI-generation time — set (or
         // reset, on a re-issued PI) every time a PI is generated so the
         // validity window always reflects the most recent issue.
-        // Owner decision 2 Nov 2026 (D-240): no PI while a discount at the warning level waits for MD/ED approval.
-        if ($documentTypeCode === 'PI' && ($priceBlock = ReferencePrice::piBlockReason($orderId, $generatedByUserId)) !== null) {
+        // Owner decision D-245 P2: no Quotation or PI while a line is below its floor (or has no price) without the MD's approval.
+        if (in_array($documentTypeCode, ['QT', 'PI'], true) && ($priceBlock = OrderLinePricing::documentBlockReason($orderId, $documentTypeCode)) !== null) {
             throw new \RuntimeException($priceBlock);
         }
         if ($documentTypeCode === 'PI') {
@@ -247,6 +247,11 @@ final class DocumentGenerationService
                     );
                 }
             }
+        }
+
+        // Owner decision D-245 P2: the PI fixes each checked line's price figures.
+        if ($documentTypeCode === 'PI') {
+            OrderLinePricing::snapshotForPi($orderId);
         }
 
         return [

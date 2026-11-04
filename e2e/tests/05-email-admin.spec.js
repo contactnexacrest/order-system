@@ -3,7 +3,7 @@
 const { test, expect } = require('@playwright/test');
 const { login, logout, ROLES } = require('./support/auth');
 const { assignSecondPersonAndApprove } = require('./support/review');
-const { getMailSending, setMailSending } = require('./support/db');
+const { getMailSending, setMailSending, ensurePricedProduct } = require('./support/db');
 
 /**
  * Two workflows with zero prior E2E coverage: the Email & Deferred Send
@@ -139,10 +139,10 @@ test.describe.serial('Email Approvals — the Level-1/Level-2 deferred send queu
         .getAttribute('value');
       await page.locator('select[name="payment_preset_id"]').selectOption(presetValue);
       // FOB: the Indicative Freight / Insurance fields are hidden (buyer's own).
-      await page.locator('input[name="product_description[]"]').first().fill('Granite Memorial Headstone');
+      // D-245 P2: on a USD order the goods line is picked from Products — the picker fills the
+      // description, HS code and the quote price (at or above the floor).
+      await page.locator('select[name="product_catalog_id[]"]').first().selectOption(String(ensurePricedProduct()));
       await page.locator('input[name="product_quantity[]"]').first().fill('50');
-      await page.locator('input[name="product_unit_price[]"]').first().fill('60.00');
-      await page.locator('input[name="product_hs_code[]"]').first().fill('68022310');
       await page.getByRole('button', { name: 'Create Order' }).click();
       await expect(page).toHaveURL(/\/orders\/\d+$/);
       orderId = Number(page.url().match(/\/orders\/(\d+)$/)[1]);

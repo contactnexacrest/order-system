@@ -42,27 +42,11 @@ final class ProductRepository
         return $stmt->fetchAll();
     }
 
-    /**
-     * Owner decision 2 Nov 2026 (D-240): the reference selling price's currency list —
-     * the order currencies plus INR (the only currency Zoho items can carry a rate in).
-     *
-     * @return list<string>
-     */
-    public static function referenceCurrencies(): array
-    {
-        $codes = Database::connection()->query('SELECT code FROM currencies WHERE is_active = 1 ORDER BY id')->fetchAll(\PDO::FETCH_COLUMN);
-        $codes = array_map('strval', $codes);
-        if (!in_array('INR', $codes, true)) {
-            $codes[] = 'INR';
-        }
-        return $codes;
-    }
-
-    /** @return array<int, array{id:int,name:string,hs_code:string,specifications:string,reference_price:?string,reference_currency:?string,reference_unit:?string}> active products for the "Pick from Products" list */
+    /** @return array<int, array{id:int,name:string,hs_code:string,specifications:string,reference_unit:?string}> active products for the "Pick from Products" list */
     public static function forPicker(): array
     {
         return Database::connection()->query(
-            'SELECT id, name, hs_code, specifications, reference_price, reference_currency, reference_unit FROM catalog_products WHERE is_active = 1 ORDER BY name'
+            'SELECT id, name, hs_code, specifications, reference_unit FROM catalog_products WHERE is_active = 1 ORDER BY name'
         )->fetchAll();
     }
 
@@ -80,12 +64,12 @@ final class ProductRepository
             'INSERT INTO catalog_products
                 (name, specifications, hs_code, origin,
                  default_factory_cost, default_transportation_cost, default_packing_cost,
-                 default_loading_cost, default_cha_cost, reference_price, reference_currency, reference_unit,
+                 default_loading_cost, default_cha_cost, reference_unit,
                  is_active, created_by, updated_by)
              VALUES
                 (:name, :specifications, :hs_code, :origin,
                  :default_factory_cost, :default_transportation_cost, :default_packing_cost,
-                 :default_loading_cost, :default_cha_cost, :reference_price, :reference_currency, :reference_unit,
+                 :default_loading_cost, :default_cha_cost, :reference_unit,
                  :is_active, :created_by, :updated_by)'
         );
         $stmt->execute([
@@ -98,8 +82,6 @@ final class ProductRepository
             'default_packing_cost'        => $data['default_packing_cost'] ?? null,
             'default_loading_cost'        => $data['default_loading_cost'] ?? null,
             'default_cha_cost'            => $data['default_cha_cost'] ?? null,
-            'reference_price'             => $data['reference_price'] ?? null,
-            'reference_currency'          => $data['reference_currency'] ?? null,
             'reference_unit'              => $data['reference_unit'] ?? null,
             'is_active'                   => isset($data['is_active']) ? (int) $data['is_active'] : 1,
             'created_by'                  => $userId,
@@ -121,8 +103,6 @@ final class ProductRepository
                 default_packing_cost = :default_packing_cost,
                 default_loading_cost = :default_loading_cost,
                 default_cha_cost = :default_cha_cost,
-                reference_price = :reference_price,
-                reference_currency = :reference_currency,
                 reference_unit = :reference_unit,
                 is_active = :is_active,
                 updated_by = :updated_by
@@ -137,8 +117,6 @@ final class ProductRepository
             'default_packing_cost'        => $data['default_packing_cost'] ?? null,
             'default_loading_cost'        => $data['default_loading_cost'] ?? null,
             'default_cha_cost'            => $data['default_cha_cost'] ?? null,
-            'reference_price'             => $data['reference_price'] ?? null,
-            'reference_currency'          => $data['reference_currency'] ?? null,
             'reference_unit'              => $data['reference_unit'] ?? null,
             'is_active'                   => isset($data['is_active']) ? (int) $data['is_active'] : 1,
             'updated_by'                  => $userId,

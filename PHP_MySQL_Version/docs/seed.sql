@@ -2211,16 +2211,8 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('zoho_api_daily_limit', '800', 'number', 'zoho_books', 'Max Zoho calls per day for this app (India time). Every Zoho Books call counts — reads, the login token and sends. When used up, syncing pauses until midnight. Zoho''s own daily limit is per organisation and shared with the company''s other Zoho apps, so keep this below it.', 0),
   ('zoho_api_minute_limit', '30', 'number', 'zoho_books', 'Max Zoho calls per minute for this app. The scheduled sync waits for the next minute; Sync now and the order buttons stop and ask to try again in a minute. Zoho allows about 100 per minute per organisation, shared with the company''s other Zoho apps.', 0);
 
--- Owner decision 2 Nov 2026 (D-240, migration 2026-11-02zc): reference price note + discount approval.
-INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
-  ('ref_price_note_enabled', '1', 'boolean', 'products & pricing', 'Show the difference from the reference price on order lines (only to people who may see selling prices; never on a document or in the client portal).', 0),
-  ('ref_price_note_pct', '5', 'number', 'products & pricing', 'Show "X% below reference price" only when the line price is at least this many % below the product''s reference price.', 0),
-  ('ref_price_warning_pct', '10', 'number', 'products & pricing', 'At this many % below the reference price the note turns red and the Proforma Invoice needs an MD/ED discount approval first.', 0);
-INSERT INTO permissions (permission_key, name, description, category) VALUES
-  ('approve_price_discount', 'Approve price discounts', 'Approve an order whose line price is below the product''s reference price by the warning % or more, so its Proforma Invoice can be generated (D-240).', 'Orders');
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'approve_price_discount'
- WHERE r.name IN ('Managing Director', 'Executive Director');
+-- Owner decision D-245 P2 (4 Nov 2026): Admin → Self-approval rules for an order line price below the floor
+-- set by the approver themselves (only the MD, who holds "Manage pricing", can approve such a price).
 INSERT INTO self_approval_rules (rule_key, role_id)
 SELECT 'price_discount', r.id FROM roles r WHERE r.name IN ('Managing Director', 'Executive Director');
 
@@ -2235,7 +2227,8 @@ INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
   ('buffer_pct', '3.00'),           -- quote price = floor × (1 + buffer %)
   ('incentive_mode', 'pct'),        -- team-incentive reserve: % of (minimum price − cost), or USD per unit
   ('incentive_value', '15.0000'),
-  ('stale_days', '60');             -- a supplier price older than this is marked stale
+  ('stale_days', '60'),             -- a supplier price older than this is marked stale
+  ('require_product_pick', '1');    -- D-245 P2: a goods line on a USD order must be picked from Products
 
 INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
   ('record_market_prices', 'Record supplier / market prices', 'Record supplier and market prices for products (dated, valid until, history) and mark the one used for pricing. Shows no selling prices, margins or floors. D-245: Procurement.', 'catalog'),

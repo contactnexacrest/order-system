@@ -22,6 +22,8 @@ final class PermittedLinks
     public const RULES = [
         '#^/orders/\d+/(?:dossier|edit|annexure|amendments|additional-documents/removed)(?:[/?\#]|$)#' => ['manage_orders'],
         '#^/orders/\d+/zoho-check(?:[/?\#]|$)#'                     => ['ca_module_manage'],
+        // Owner decision D-245 P2: the MD's approval screen for a line price below the floor.
+        '#^/orders/\d+/products/\d+/price-approval(?:[/?\#]|$)#'      => ['manage_pricing'],
         '#^/orders/\d+/comment-attachments/\d+/download(?:[/?\#]|$)#' => ['download_pdf'],
         '#^/orders/\d+/(?:email/compose|documents/\d+/send)(?:[/?\#]|$)#' => ['generate_documents'],
         '#^/orders/\d+/disputes(?:[/?\#]|$)#'                       => ['manage_disputes', 'respond_to_disputes'],
