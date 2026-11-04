@@ -9,6 +9,7 @@
     <?php if ($searched): ?><a class="btn-sm" href="/products">Clear</a><?php endif; ?>
   </form>
 
+  <?php if (!empty($canBuildup)): ?><p class="muted small">Prices in USD per unit, FOB. Yellow badge = this product overrides a global pricing value; a supplier price older than the "stale" setting or past its valid-until date is marked. <a href="/pricing/settings">Pricing settings</a></p><?php endif; ?>
   <?php if ($canManage): ?>
     <p><a class="btn-sm btn-accent" href="/products/create">+ Add Product</a> <a class="btn-sm" href="/products/categories">Categories &amp; attributes</a></p>
   <?php endif; ?>
@@ -23,15 +24,18 @@
         <th>Origin</th>
         <?php if ($canViewPricing): ?><th>Headline FOB</th><?php endif; ?>
         <?php if (!empty($sees['selling'])): ?><th>Reference Price</th><?php endif; ?>
+        <?php // Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote and lowest price for selling-price staff. ?>
+        <?php if (!empty($canBuildup)): ?><th class="num">Cost</th><th class="num">Min price</th><th class="num">Staff floor</th><th class="num">Staff quote</th><th class="num">Assoc. floor (lowest level)</th><th>Supplier price date</th><?php endif; ?>
+        <?php if (!empty($canStaffPrice)): ?><th class="num">Quote (USD)</th><th class="num">Lowest (USD)</th><?php endif; ?>
         <th>Status</th>
         <th></th>
       </tr>
       <?php if (empty($products)): ?>
-        <tr><td colspan="7" class="muted">No products found.</td></tr>
+        <tr><td colspan="14" class="muted">No products found.</td></tr>
       <?php endif; ?>
       <?php foreach ($products as $p): ?>
         <tr>
-          <td><a href="/products/<?= (int) $p['id'] ?>"><?= View::e($p['name']) ?></a></td>
+          <td><a href="/products/<?= (int) $p['id'] ?>"><?= View::e($p['name']) ?></a><?php if (!empty($canBuildup) && $p['pricing']['overrides'] !== []): ?> <span class="badge badge-warning" title="This product overrides a global pricing value"><?= View::e(implode(', ', $p['pricing']['overrides'])) ?></span><?php endif; ?></td>
           <td><?= View::e($p['hs_code']) ?></td>
           <td><?= View::e($p['origin'] ?? '—') ?></td>
           <?php if ($canViewPricing): ?>
@@ -39,6 +43,22 @@
           <?php endif; ?>
           <?php if (!empty($sees['selling'])): ?>
             <td><?= ($p['reference_price'] ?? null) === null ? '—' : View::e(\App\Services\ReferencePrice::label($p)) ?></td>
+          <?php endif; ?>
+          <?php if (!empty($canBuildup)): $__b = $p['pricing']['build']; ?>
+            <?php if ($__b === null): ?>
+              <td colspan="5" class="muted small"><?= View::e($p['pricing']['missing']) ?></td><td>—</td>
+            <?php else: ?>
+              <td class="num"><?= number_format($__b['cost'], 2) ?></td>
+              <td class="num"><?= number_format($__b['minimum'], 2) ?></td>
+              <td class="num"><?= number_format($__b['staff_floor'], 2) ?></td>
+              <td class="num"><?= number_format($__b['staff_quote'], 2) ?></td>
+              <td class="num"><?= $p['pricing']['lowest'] === null ? '—' : number_format($p['pricing']['lowest']['floor'], 2) ?></td>
+              <td><?= View::e($p['pricing']['price_date'] ?? '—') ?><?php if ($p['pricing']['staleness'] !== null): ?> <span class="badge <?= $p['pricing']['staleness'] === 'expired' ? 'badge-danger' : 'badge-warning' ?>"><?= $p['pricing']['staleness'] ?></span><?php endif; ?></td>
+            <?php endif; ?>
+          <?php endif; ?>
+          <?php if (!empty($canStaffPrice)): $__b = $p['pricing']['build']; ?>
+            <td class="num"><?= $__b === null ? '—' : number_format($__b['staff_quote'], 2) ?></td>
+            <td class="num"><?= $__b === null ? '—' : number_format($__b['staff_floor'], 2) ?></td>
           <?php endif; ?>
           <td><span class="badge <?= $p['is_active'] ? 'badge-active' : 'badge-inactive' ?>"><?= $p['is_active'] ? 'Active' : 'Inactive' ?></span></td>
           <td><a class="btn-sm" href="/products/<?= (int) $p['id'] ?>">View</a></td>

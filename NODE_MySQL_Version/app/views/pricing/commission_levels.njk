@@ -1,0 +1,98 @@
+{# Owner decision D-245 (4 Nov 2026), P1: associate commission levels (CRUD) and the ladder. Port of views/pricing/commission_levels.php. #}
+<div class="card page-wide">
+  <h1>Associate Commission Levels</h1>
+  <p class="muted">Commission is built into the associate's price: a higher level raises the buyer's price, never lowers NexaCrest's margin. A level used by an associate or the ladder can only be deactivated, not deleted. A change applies to new quotes only — orders with an issued Proforma Invoice keep their commission. Every change is in the audit log. (Commission is paid on these levels from phase P3.)</p>
+  {% if sample %}
+    <p class="muted small">Floors shown for <strong>{{ sample.product.name }}</strong> (staff floor USD {{ sample.pricing.build.staff_floor | money }}).</p>
+  {% endif %}
+
+  <table class="list">
+    <tr><th>Level</th><th>Commission</th>{% if sample %}<th class="num">Floor (USD)</th><th class="num">Quote price (USD)</th>{% endif %}<th>Associates on it</th><th>Status</th>{% if canManage %}<th>Actions</th>{% endif %}</tr>
+    {% if not levels.length %}<tr><td colspan="7" class="muted">No levels yet.</td></tr>{% endif %}
+    {% for l in levels %}
+      {% set used = (use[l.id] or 0) > 0 or (stepsPerLevel[l.id] or 0) > 0 %}
+      <tr>
+        <td>{{ l.name }}</td>
+        <td>{{ l.label }}</td>
+        {% if sample %}
+          <td class="num">{{ floors[l.id].floor | money }}</td>
+          <td class="num">{{ floors[l.id].quote | money }}</td>
+        {% endif %}
+        <td>{{ use[l.id] or 0 }}{% if (stepsPerLevel[l.id] or 0) > 0 %} <span class="muted small">· in the ladder</span>{% endif %}</td>
+        <td><span class="badge {{ 'badge-active' if l.is_active == 1 else 'badge-inactive' }}">{{ 'Active' if l.is_active == 1 else 'Inactive' }}</span></td>
+        {% if canManage %}
+          <td>
+            <details style="display:inline-block">
+              <summary class="btn-sm" style="display:inline-block;cursor:pointer">Edit</summary>
+              <div class="card-nested">
+                <form method="post" action="/pricing/commission-levels/{{ l.id }}">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <label>Name *<input type="text" name="name" maxlength="60" required value="{{ l.name }}" placeholder="e.g. Level 1"></label>
+                  <label>Type *
+                    <select name="kind" required>
+                      <option value="pct"{{ ' selected' if l.kind == 'pct' }}>% of FOB</option>
+                      <option value="fixed_usd"{{ ' selected' if l.kind == 'fixed_usd' }}>Fixed USD per unit</option>
+                    </select></label>
+                  <label>Value *<input type="number" name="value" min="0.0001" step="0.0001" required value="{{ l.value_trim }}" placeholder="e.g. 2.00"></label>
+                  <button type="submit" class="btn-sm">Save</button>
+                </form>
+              </div>
+            </details>
+            <form method="post" action="/pricing/commission-levels/{{ l.id }}/active" style="display:inline">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="btn-sm">{{ 'Deactivate' if l.is_active == 1 else 'Activate' }}</button>
+            </form>
+            {% if not used %}
+              <form method="post" action="/pricing/commission-levels/{{ l.id }}/delete" style="display:inline" onsubmit="return confirm('Delete this commission level?');">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <button type="submit" class="btn-sm btn-danger">Delete</button>
+              </form>
+            {% else %}<span class="muted small">Delete (in use)</span>{% endif %}
+          </td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+  </table>
+
+  {% if canManage %}
+    <h2>Add a level</h2>
+    <form method="post" action="/pricing/commission-levels" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Name *<input type="text" name="name" maxlength="60" required placeholder="e.g. Level 5"></label>
+      <label>Type *
+        <select name="kind" required>
+          <option value="">Choose…</option>
+          <option value="pct">% of FOB</option>
+          <option value="fixed_usd">Fixed USD per unit</option>
+        </select></label>
+      <label>Value *<input type="number" name="value" min="0.0001" step="0.0001" required placeholder="e.g. 12.00"></label>
+      <div><button type="submit" class="btn-sm btn-accent">Add level</button></div>
+    </form>
+  {% endif %}
+
+  <h2 id="ladder">Ladder</h2>
+  <p class="muted">Used by associates set to "Ladder": the level for each counting order (invoiced FOB of ₹5 lakh or more on in-range lines). Steps start at order 1 and run on without gaps; leave the last step's "to" empty so it runs onward. Leave a blank row empty, or tick "Remove" to drop a step.</p>
+  {% set dis = '' if canManage else ' disabled' %}
+  <form method="post" action="/pricing/commission-ladder">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <table class="list">
+      <tr><th>From order no.</th><th>To order no.</th><th>Level</th>{% if canManage %}<th>Remove</th>{% endif %}</tr>
+      {% for s in ladderRows %}
+        {% set i = loop.index0 %}
+        <tr>
+          <td><input type="number" name="from[{{ i }}]" min="1" step="1" value="{{ s.from_order }}" aria-label="From order number, step {{ loop.index }}" placeholder="e.g. 1"{{ dis }}></td>
+          <td><input type="number" name="to[{{ i }}]" min="1" step="1" value="{{ '' if s.to_order == null else s.to_order }}" aria-label="To order number, step {{ loop.index }} (empty = onward)" placeholder="empty = onward"{{ dis }}></td>
+          <td><select name="level_id[{{ i }}]" aria-label="Level, step {{ loop.index }}"{{ dis }}>
+              <option value="">—</option>
+              {% for l in levels %}
+                <option value="{{ l.id }}"{{ ' selected' if (s.level_id | string) == (l.id | string) }}>{{ l.name }} — {{ l.label }}{{ '' if l.is_active == 1 else ' (inactive)' }}</option>
+              {% endfor %}
+            </select></td>
+          {% if canManage %}<td>{% if s.from_order != '' %}<label class="inline"><input type="checkbox" name="remove[{{ i }}]" value="1"> Remove</label>{% endif %}</td>{% endif %}
+        </tr>
+      {% endfor %}
+    </table>
+    {% if canManage %}<button type="submit" class="btn-sm">Save ladder</button>{% endif %}
+  </form>
+  <p><a class="btn-sm" href="/pricing/settings">Pricing settings</a></p>
+</div>

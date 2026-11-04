@@ -125,7 +125,37 @@ final class AssociateAdminController
             'currencies' => LookupRepository::currencies(),
             'users' => UserRepository::listActive(),
             'ladder' => AssociateRepository::globalLadder(),
+            // Owner decision D-245 (4 Nov 2026): commission level (fixed) or the ladder — MD only.
+            'commissionLevels' => \App\Repositories\PricingRepository::levels(),
+            'canPricing' => self::can('manage_pricing'),
         ], 'layout/base');
+    }
+
+    /**
+     * Owner decision D-245: the associate's commission mode and level, read only for
+     * people with manage_pricing (everyone else keeps what is stored).
+     *
+     * @return array{0: ?array{mode:string,level:?int}, 1: ?string}
+     */
+    private static function readCommissionLevel(?array $existing): array
+    {
+        if (!self::can('manage_pricing')) {
+            return [null, null];
+        }
+        $mode = (string) ($_POST['commission_mode'] ?? '');
+        if (!in_array($mode, ['fixed', 'ladder'], true)) {
+            return [null, 'Choose whether this associate has a fixed commission level or follows the ladder.'];
+        }
+        $level = null;
+        if ($mode === 'fixed') {
+            $l = \App\Repositories\PricingRepository::findLevel((int) ($_POST['commission_level_id'] ?? 0));
+            $keeping = $l !== null && (int) ($existing['commission_level_id'] ?? 0) === (int) $l['id'];
+            if ($l === null || ((int) $l['is_active'] !== 1 && !$keeping)) {
+                return [null, 'Choose an active commission level for a fixed level.'];
+            }
+            $level = (int) $l['id'];
+        }
+        return [['mode' => $mode, 'level' => $level], null];
     }
 
     public function save(array $params): void
@@ -202,6 +232,10 @@ final class AssociateAdminController
         if (($hasUpload || !empty($existing['agreement_file_id'])) && $data['agreement_signed_on'] === null) {
             $errors[] = 'Enter the date the agreement was signed with its signed copy.';
         }
+        [$commission, $commissionError] = self::readCommissionLevel($existing);
+        if ($commissionError !== null) {
+            $errors[] = $commissionError;
+        }
         $back = $id ? "/associates/{$id}/edit" : '/associates/new';
         if ($errors !== []) {
             Flash::set('error', implode(' ', $errors));
@@ -236,6 +270,26 @@ final class AssociateAdminController
                 AssociateEventRepository::add($id, 'rates_changed', 'Commission terms changed by ' . $user['name'] . ' — applies to orders created from now on; existing orders keep the rate fixed on them.', null, null, null, (int) $user['id'], true);
             }
             Flash::set('success', "Associate \"{$data['name']}\" saved.");
+        }
+        if ($commission !== null) {
+            $before = ($existing['commission_mode'] ?? 'ladder') . ':' . ($existing['commission_level_id'] ?? '');
+            $after = $commission['mode'] . ':' . ($commission['level'] ?? '');
+            \App\Repositories\PricingRepository::setAssociateCommission($id, $commission['mode'], $commission['level']);
+            if ($existing === null || $before !== $after) {
+                $describe = static function (string $mode, $levelId): string {
+                    if ($mode !== 'fixed') {
+                        return 'Ladder';
+                    }
+                    $l = \App\Repositories\PricingRepository::findLevel((int) $levelId);
+                    return 'Fixed: ' . ($l === null ? '?' : $l['name'] . ' — ' . \App\Services\PricingService::levelLabel($l));
+                };
+                $old = $existing === null ? null : $describe((string) ($existing['commission_mode'] ?? 'ladder'), $existing['commission_level_id'] ?? null);
+                $new = $describe($commission['mode'], $commission['level']);
+                AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_COMMISSION_LEVEL_CHANGED', 'associates', $id, 'commission_level', $old, $new);
+                if ($existing !== null) {
+                    AssociateEventRepository::add($id, 'rates_changed', 'Commission level changed by ' . $user['name'] . " to {$new} — applies to new quotes only.", null, null, null, (int) $user['id'], false);
+                }
+            }
         }
         if ($fileId !== null) {
             AssociateRepository::setAgreementFile($id, $fileId);

@@ -38,6 +38,29 @@
       </div>
       <label class="checkbox"><input type="checkbox" name="no_commission" value="1"{{ ' checked' if a0.no_commission == 1 else '' }}> No commission for this associate (introductions only)</label>
     </fieldset>
+    {# Owner decision D-245 (4 Nov 2026): a fixed commission level or the ladder (Admin → Pricing → Commission levels). Used for commission from phase P3. #}
+    <fieldset><legend>Commission level (D-245)</legend>
+      {% set cmode = a0.commission_mode or 'ladder' %}{% set clid = (a0.commission_level_id or '') | string %}
+      {% if canPricing %}
+        <div class="field-grid">
+          <label>How the commission is set *
+            <select name="commission_mode" required>
+              <option value="ladder"{{ ' selected' if cmode == 'ladder' }}>Ladder (moves up with counting orders)</option>
+              <option value="fixed"{{ ' selected' if cmode == 'fixed' }}>Fixed level (stays until you change it)</option>
+            </select></label>
+          <label>Level (for a fixed level)
+            <select name="commission_level_id" data-required-if="commission_mode=fixed" data-required-if-message="Choose the commission level.">
+              <option value="">Choose…</option>
+              {% for l in commissionLevels %}{% if l.is_active == 1 or (l.id | string) == clid %}
+                <option value="{{ l.id }}"{{ ' selected' if (l.id | string) == clid }}>{{ l.name }} — {{ l.label }}{{ '' if l.is_active == 1 else ' (inactive)' }}</option>
+              {% endif %}{% endfor %}
+            </select></label>
+        </div>
+        <p class="muted small">Commission is built into this associate's price. A change applies to new quotes only. <a href="/pricing/commission-levels">Commission levels and ladder</a></p>
+      {% else %}
+        <p class="muted small">Set by the MD: {{ 'fixed level' if cmode == 'fixed' else 'ladder' }}.</p>
+      {% endif %}
+    </fieldset>
     <label>Notes<input type="text" name="notes" maxlength="500" value="{{ a0.notes }}" placeholder="Optional notes"></label>
     <div class="btn-row"><button type="submit">{{ 'Save' if editing else 'Add associate' }}</button> <a href="{{ ('/associates/' ~ editing.id) if editing else '/associates' }}">Cancel</a></div>
   </form>

@@ -28,6 +28,8 @@
   </div>
   <?php endif; ?>
 
+  <?php include __DIR__ . '/_pricing.php'; ?>
+
   <?php if ($canViewPricing): ?>
   <div class="section">
     <h2>Default Cost Components</h2>
@@ -69,12 +71,12 @@
     <?php endif; ?>
   </div>
 
-  <?php if ($canViewPricing): ?>
+  <?php if ($canViewPricing && !empty($canSeeSuppliers)): ?>
   <div class="section">
     <h2>Suppliers</h2>
     <table class="list">
       <tr>
-        <th>Supplier</th><th>Location</th><th>Contact</th><th>FOB Source</th><th>Effective FOB</th><th>Primary</th><th></th>
+        <th>Supplier</th><th>Location</th><th>Contact</th><th>FOB Source</th><th>Effective FOB</th><th>Used for pricing</th><th></th>
       </tr>
       <?php if (empty($suppliers)): ?>
         <tr><td colspan="7" class="muted">No suppliers on file yet.</td></tr>
@@ -96,7 +98,7 @@
               <?php if (!$s['is_primary']): ?>
                 <form method="post" action="/products/suppliers/<?= (int) $s['id'] ?>/set-primary" style="display:inline">
                   <?= Csrf::field() ?>
-                  <button type="submit" class="btn-sm">Make Primary</button>
+                  <button type="submit" class="btn-sm">Use for pricing</button>
                 </form>
               <?php endif; ?>
               <details style="display:inline-block">
@@ -122,7 +124,7 @@
                     <label>Loading Cost override<input type="number" step="0.01" min="0" name="loading_cost" value="<?= View::e($s['loading_cost'] !== null ? (string) $s['loading_cost'] : '') ?>" placeholder="e.g. 8000"></label>
                     <label>CHA Cost override<input type="number" step="0.01" min="0" name="cha_cost" value="<?= View::e($s['cha_cost'] !== null ? (string) $s['cha_cost'] : '') ?>" placeholder="e.g. 15000"></label>
                     <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes"><?= View::e($s['notes'] ?? '') ?></textarea></label>
-                    <label><input type="checkbox" name="is_primary" value="1" <?= $s['is_primary'] ? 'checked' : '' ?>> Primary supplier</label>
+                    <label><input type="checkbox" name="is_primary" value="1" <?= $s['is_primary'] ? 'checked' : '' ?>> Used for pricing</label>
                     <button type="submit" class="btn-sm">Save</button>
                   </form>
                 </div>
@@ -161,7 +163,7 @@
             <label>Loading Cost override<input type="number" step="0.01" min="0" name="loading_cost" placeholder="e.g. 8000"></label>
             <label>CHA Cost override<input type="number" step="0.01" min="0" name="cha_cost" placeholder="e.g. 15000"></label>
             <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes"></textarea></label>
-            <label><input type="checkbox" name="is_primary" value="1"> Primary supplier</label>
+            <label><input type="checkbox" name="is_primary" value="1"> Used for pricing</label>
             <button type="submit" class="btn-sm btn-accent">Add Supplier</button>
           </form>
         </div>
@@ -203,6 +205,6 @@
     <?php endif; ?>
   </div>
   <?php else: ?>
-    <p class="muted">You do not have permission to view pricing, supplier, or misc-charge information for this product.</p>
+    <p class="muted">You do not have permission to view supplier prices or misc charges for this product.</p>
   <?php endif; ?>
 </div>

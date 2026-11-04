@@ -8,6 +8,7 @@
     {% if searched %}<a class="btn-sm" href="/products">Clear</a>{% endif %}
   </form>
 
+  {% if canBuildup %}<p class="muted small">Prices in USD per unit, FOB. Yellow badge = this product overrides a global pricing value; a supplier price older than the "stale" setting or past its valid-until date is marked. <a href="/pricing/settings">Pricing settings</a></p>{% endif %}
   {% if canManage %}
     <p><a class="btn-sm btn-accent" href="/products/create">+ Add Product</a> <a class="btn-sm" href="/products/categories">Categories &amp; attributes</a></p>
   {% endif %}
@@ -22,15 +23,18 @@
         <th>Origin</th>
         {% if canViewPricing %}<th>Headline FOB</th>{% endif %}
         {% if sees.selling %}<th>Reference Price</th>{% endif %}
+        {# Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote and lowest price for selling-price staff. #}
+        {% if canBuildup %}<th class="num">Cost</th><th class="num">Min price</th><th class="num">Staff floor</th><th class="num">Staff quote</th><th class="num">Assoc. floor (lowest level)</th><th>Supplier price date</th>{% endif %}
+        {% if canStaffPrice %}<th class="num">Quote (USD)</th><th class="num">Lowest (USD)</th>{% endif %}
         <th>Status</th>
         <th></th>
       </tr>
       {% if not products.length %}
-        <tr><td colspan="7" class="muted">No products found.</td></tr>
+        <tr><td colspan="14" class="muted">No products found.</td></tr>
       {% endif %}
       {% for p in products %}
         <tr>
-          <td><a href="/products/{{ p.id }}">{{ p.name }}</a></td>
+          <td><a href="/products/{{ p.id }}">{{ p.name }}</a>{% if canBuildup and p.pricing.overrides.length %} <span class="badge badge-warning" title="This product overrides a global pricing value">{{ p.pricing.overrides | join(', ') }}</span>{% endif %}</td>
           <td>{{ p.hs_code }}</td>
           <td>{{ p.origin or '—' }}</td>
           {% if canViewPricing %}
@@ -38,6 +42,22 @@
           {% endif %}
           {% if sees.selling %}
             <td>{{ p.reference_label or '—' }}</td>
+          {% endif %}
+          {% if canBuildup %}{% set b = p.pricing.build %}
+            {% if not b %}
+              <td colspan="5" class="muted small">{{ p.pricing.missing }}</td><td>—</td>
+            {% else %}
+              <td class="num">{{ b.cost | money }}</td>
+              <td class="num">{{ b.minimum | money }}</td>
+              <td class="num">{{ b.staff_floor | money }}</td>
+              <td class="num">{{ b.staff_quote | money }}</td>
+              <td class="num">{{ '—' if not p.pricing.lowest else (p.pricing.lowest.floor | money) }}</td>
+              <td>{{ p.pricing.price_date or '—' }}{% if p.pricing.staleness %} <span class="badge {{ 'badge-danger' if p.pricing.staleness == 'expired' else 'badge-warning' }}">{{ p.pricing.staleness }}</span>{% endif %}</td>
+            {% endif %}
+          {% endif %}
+          {% if canStaffPrice %}{% set b = p.pricing.build %}
+            <td class="num">{{ '—' if not b else (b.staff_quote | money) }}</td>
+            <td class="num">{{ '—' if not b else (b.staff_floor | money) }}</td>
           {% endif %}
           <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
           <td><a class="btn-sm" href="/products/{{ p.id }}">View</a></td>

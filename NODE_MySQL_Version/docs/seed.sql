@@ -2224,3 +2224,51 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.permission_key = 'approve
  WHERE r.name IN ('Managing Director', 'Executive Director');
 INSERT INTO self_approval_rules (rule_key, role_id)
 SELECT 'price_discount', r.id FROM roles r WHERE r.name IN ('Managing Director', 'Executive Director');
+
+-- ---------------------------------------------------------------
+-- Owner decision D-245 (4 Nov 2026), phase P1: pricing settings (MD changes them in
+-- Admin → Pricing), the three pricing permissions, and the starting commission
+-- levels and ladder. Example values; the MD sets the real ones before go-live.
+INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
+  ('margin_pct', '20.00'),          -- minimum price = cost ÷ (1 − margin %): margin on the selling price, not markup
+  ('other_cost_pct', '2.50'),       -- other costs to FOB, % of the supplier price
+  ('pricing_fx_rate', '82.0000'),   -- ₹ per USD used to turn supplier prices into USD
+  ('buffer_pct', '3.00'),           -- quote price = floor × (1 + buffer %)
+  ('incentive_mode', 'pct'),        -- team-incentive reserve: % of (minimum price − cost), or USD per unit
+  ('incentive_value', '15.0000'),
+  ('stale_days', '60');             -- a supplier price older than this is marked stale
+
+INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
+  ('record_market_prices', 'Record supplier / market prices', 'Record supplier and market prices for products (dated, valid until, history) and mark the one used for pricing. Shows no selling prices, margins or floors. D-245: Procurement.', 'catalog'),
+  ('view_price_buildup', 'See the full price build-up', 'See a product''s cost, margin, minimum price, team-incentive reserve, every floor and quote price, and the pricing settings. D-245: MD, ED. Never reaches the client.', 'catalog'),
+  ('manage_pricing', 'Manage pricing', 'Change the pricing settings, a product''s pricing overrides, the associate commission levels and ladder, and an associate''s commission level. D-245: MD only.', 'catalog');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'record_market_prices'
+  AND r.name IN ('Admin', 'Managing Director', 'Procurement Executive', 'Procurement Manager', 'Procurement Director');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'view_price_buildup'
+  AND r.name IN ('Admin', 'Managing Director', 'Executive Director');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'manage_pricing'
+  AND r.name IN ('Admin', 'Managing Director');
+
+INSERT IGNORE INTO commission_levels (name, kind, value, is_active, sort_order) VALUES
+  ('Level 1', 'pct', 2.0000, 1, 10),
+  ('Level 2', 'pct', 5.0000, 1, 20),
+  ('Level 3', 'pct', 7.0000, 1, 30),
+  ('Level 4', 'pct', 10.0000, 1, 40);
+
+INSERT IGNORE INTO commission_ladder_steps (from_order, to_order, level_id)
+SELECT 1, 5, id FROM commission_levels WHERE name = 'Level 1';
+INSERT IGNORE INTO commission_ladder_steps (from_order, to_order, level_id)
+SELECT 6, 10, id FROM commission_levels WHERE name = 'Level 2';
+INSERT IGNORE INTO commission_ladder_steps (from_order, to_order, level_id)
+SELECT 11, 20, id FROM commission_levels WHERE name = 'Level 3';
+INSERT IGNORE INTO commission_ladder_steps (from_order, to_order, level_id)
+SELECT 21, NULL, id FROM commission_levels WHERE name = 'Level 4';

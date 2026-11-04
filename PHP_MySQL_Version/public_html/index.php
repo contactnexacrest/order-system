@@ -64,6 +64,7 @@ use App\Controllers\SettingsController;
 use App\Controllers\SignatoryController;
 use App\Controllers\PermissionAdminController;
 use App\Controllers\ProductController;
+use App\Controllers\PricingController;
 use App\Controllers\SuperAdminController;
 use App\Middleware\SuperAdminOnly;
 use App\Middleware\TestModeGate;
@@ -166,6 +167,7 @@ $users = new UserController();
 $sampleData = new SampleDataController();
 $dataExport = new DataExportController();
 $products = new ProductController();
+$pricing = new PricingController();
 $testMode = new TestModeController();
 
 // --- Public (unauthenticated) routes ---
@@ -980,6 +982,20 @@ $router->post('/products/suppliers/{supplierId}/delete', [$products, 'deleteSupp
 $router->post('/products/suppliers/{supplierId}/set-primary', [$products, 'setPrimarySupplier'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/{id}/misc-charges/add', [$products, 'addMiscCharge'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/misc-charges/{chargeId}/delete', [$products, 'deleteMiscCharge'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+// Owner decision D-245 (4 Nov 2026), P1: pricing settings, commission levels and ladder, product pricing overrides, market prices.
+$router->get('/pricing/settings', [$pricing, 'settings'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
+$router->post('/pricing/settings', [$pricing, 'saveSettings'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->get('/pricing/commission-levels', [$pricing, 'levels'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
+$router->post('/pricing/commission-levels', [$pricing, 'addLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/commission-levels/{id}', [$pricing, 'updateLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/commission-levels/{id}/active', [$pricing, 'toggleLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/commission-levels/{id}/delete', [$pricing, 'deleteLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/commission-ladder', [$pricing, 'saveLadder'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/products/{id}/pricing', [$pricing, 'saveProductOverrides'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->get('/products/{id}/market-prices', [$pricing, 'marketPrices'], [SessionAuth::required(), PermissionCheck::requiresAny(['record_market_prices', 'view_price_buildup'])]);
+$router->post('/products/{id}/market-prices', [$pricing, 'addMarketPrice'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
+$router->post('/products/suppliers/{supplierId}/use-for-pricing', [$pricing, 'useForPricing'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
+$router->post('/products/suppliers/{supplierId}/market-price', [$pricing, 'updateMarketDates'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
 
 // Test Mode's two access gates (docs/schema.sql Section V) run before
 // dispatch: the client-facing block must intercept public routes that

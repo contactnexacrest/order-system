@@ -41,6 +41,29 @@ $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'
       </div>
       <label class="checkbox"><input type="checkbox" name="no_commission" value="1"<?= (int) ($__a['no_commission'] ?? 0) === 1 ? ' checked' : '' ?>> No commission for this associate (introductions only)</label>
     </fieldset>
+    <?php // Owner decision D-245 (4 Nov 2026): a fixed commission level or the ladder (Admin → Pricing → Commission levels). Used for commission from phase P3. ?>
+    <fieldset><legend>Commission level (D-245)</legend>
+      <?php $__mode = (string) ($__a['commission_mode'] ?? 'ladder'); $__lid = (string) ($__a['commission_level_id'] ?? ''); ?>
+      <?php if (!empty($canPricing)): ?>
+        <div class="field-grid">
+          <label>How the commission is set *
+            <select name="commission_mode" required>
+              <option value="ladder"<?= $__mode === 'ladder' ? ' selected' : '' ?>>Ladder (moves up with counting orders)</option>
+              <option value="fixed"<?= $__mode === 'fixed' ? ' selected' : '' ?>>Fixed level (stays until you change it)</option>
+            </select></label>
+          <label>Level (for a fixed level)
+            <select name="commission_level_id" data-required-if="commission_mode=fixed" data-required-if-message="Choose the commission level.">
+              <option value="">Choose…</option>
+              <?php foreach ($commissionLevels as $__l): if ((int) $__l['is_active'] !== 1 && (string) $__l['id'] !== $__lid) { continue; } ?>
+                <option value="<?= (int) $__l['id'] ?>"<?= (string) $__l['id'] === $__lid ? ' selected' : '' ?>><?= htmlspecialchars($__l['name'] . ' — ' . \App\Services\PricingService::levelLabel($__l)) ?><?= (int) $__l['is_active'] === 1 ? '' : ' (inactive)' ?></option>
+              <?php endforeach; ?>
+            </select></label>
+        </div>
+        <p class="muted small">Commission is built into this associate's price. A change applies to new quotes only. <a href="/pricing/commission-levels">Commission levels and ladder</a></p>
+      <?php else: ?>
+        <p class="muted small">Set by the MD: <?= $__mode === 'fixed' ? 'fixed level' : 'ladder' ?>.</p>
+      <?php endif; ?>
+    </fieldset>
     <label>Notes<input type="text" name="notes" maxlength="500" value="<?= $__v('notes') ?>" placeholder="Optional notes"></label>
     <div class="btn-row"><button type="submit"><?= $editing ? 'Save' : 'Add associate' ?></button> <a href="<?= $editing ? '/associates/' . (int) $editing['id'] : '/associates' ?>">Cancel</a></div>
   </form>

@@ -60,7 +60,22 @@ final class ProductController
             $products = [];
         }
 
-        if ($canViewPricing) {
+        // Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote price and
+        // lowest price for anyone who may see selling prices. Worked out before anything is stripped.
+        [$canBuildup, $canStaffPrice] = $this->pricingPerms();
+        if ($canBuildup || $canStaffPrice) {
+            $__settings = \App\Services\PricingService::settings();
+            $__program = \App\Services\PricingService::programOn();
+            $__levels = \App\Repositories\PricingRepository::levels(true);
+            foreach ($products as &$product) {
+                $__p = \App\Services\PricingService::forProduct($product, $__levels, $__settings, $__program);
+                $product['pricing'] = $canBuildup ? $__p : ['build' => $__p['build'] === null ? null : ['staff_quote' => $__p['build']['staff_quote'], 'staff_floor' => $__p['build']['staff_floor']]];
+            }
+            unset($product);
+        }
+
+        $canSeeHeadlineFob = $canViewPricing && \App\Services\MoneyVisibility::can('purchase');
+        if ($canSeeHeadlineFob) {
             foreach ($products as &$product) {
                 $suppliers = ProductSupplierRepository::forProduct((int) $product['id']);
                 $primary = null;
@@ -101,8 +116,10 @@ final class ProductController
             'query'          => $query,
             'searched'       => $searched,
             'canBrowse'      => $canBrowse,
-            'canViewPricing' => $canViewPricing,
+            'canViewPricing' => $canSeeHeadlineFob,
             'canManage'      => $canManage,
+            'canBuildup'     => $canBuildup,
+            'canStaffPrice'  => $canStaffPrice,
         ], 'layout/base');
     }
 
@@ -144,6 +161,26 @@ final class ProductController
             return;
         }
 
+        // Owner decision D-245 (4 Nov 2026): see index().
+        [$canBuildup, $canStaffPrice] = $this->pricingPerms();
+        $pricingFull = null;
+        $pricingStaff = null;
+        if ($canBuildup || $canStaffPrice) {
+            $__p = \App\Services\PricingService::forProduct($details['product']);
+            if ($canBuildup) {
+                $pricingFull = $__p;
+            } else {
+                $pricingStaff = ['build' => $__p['build'] === null ? null : ['staff_quote' => $__p['build']['staff_quote'], 'staff_floor' => $__p['build']['staff_floor']]];
+            }
+        }
+
+        // Owner decision D-245: supplier prices are the cost the selling price is built from —
+        // only people who may see purchase prices get the supplier list and misc charges.
+        $canSeeSuppliers = $canViewPricing && \App\Services\MoneyVisibility::can('purchase');
+        if (!$canSeeSuppliers) {
+            $details['suppliers'] = [];
+            $details['misc_charges'] = [];
+        }
         if (!$canViewPricing) {
             unset(
                 $details['product']['default_factory_cost'],
@@ -166,6 +203,11 @@ final class ProductController
             'miscCharges'    => $details['misc_charges'],
             'canViewPricing' => $canViewPricing,
             'canManage'      => $canManage,
+            'canSeeSuppliers' => $canSeeSuppliers,
+            'pricingFull'    => $pricingFull,
+            'pricingStaff'   => $pricingStaff,
+            'canManagePricing' => $this->can('manage_pricing'),
+            'canMarketPrices' => $this->can('record_market_prices') || $canBuildup,
         ], 'layout/base');
     }
 
@@ -467,6 +509,24 @@ final class ProductController
         AuditLogRepository::log((int) $user['id'], 'PRODUCT_MISC_CHARGE_DELETED', 'product_misc_charges', $chargeId, null, $charge['label'] . ': ' . $charge['amount'], null);
         Flash::set('success', 'Misc charge removed.');
         header("Location: /products/{$productId}");
+    }
+
+    private function can(string $key): bool
+    {
+        $user = AuthService::currentUser();
+        return $user !== null && PermissionService::can((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null, $key);
+    }
+
+    /**
+     * Owner decision D-245: [sees the full build-up, sees only the quote and lowest price].
+     * The build-up needs view_price_buildup; the two prices need the selling-price money class.
+     *
+     * @return array{0: bool, 1: bool}
+     */
+    private function pricingPerms(): array
+    {
+        $full = $this->can('view_price_buildup');
+        return [$full, !$full && \App\Services\MoneyVisibility::can('selling')];
     }
 
     /** @return array{0: bool, 1: bool, 2: bool} [canBrowse, canViewPricing, canManage] */

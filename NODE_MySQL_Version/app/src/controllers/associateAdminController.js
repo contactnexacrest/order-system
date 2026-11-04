@@ -25,6 +25,8 @@ const associateService = require('../services/associateService');
 const fileUploadService = require('../services/fileUploadService');
 const incentiveService = require('../services/incentiveService');
 const uiTemplateService = require('../services/uiTemplateService');
+const pricingRepository = require('../repositories/pricingRepository');
+const pricingService = require('../services/pricingService');
 
 /**
  * Port of AssociateAdminController.php. Owner decision 1 Nov 2026 ("AS all
@@ -122,7 +124,32 @@ async function form(req, res, a) {
     users: await userRepository.listActive(),
     ladder,
     ladderText: Object.fromEntries(Object.entries(ladder).map(([k, v]) => [k, trimPct(v)])),
+    // Owner decision D-245 (4 Nov 2026): commission level (fixed) or the ladder — MD only.
+    commissionLevels: (await pricingRepository.levels()).map((l) => ({ ...l, label: pricingService.levelLabel(l) })),
+    canPricing: can(req, 'manage_pricing'),
   }, 'layout/base');
+}
+
+/** Owner decision D-245: the associate's commission mode and level, read only for people with manage_pricing. */
+async function readCommissionLevel(req, existing) {
+  if (!can(req, 'manage_pricing')) return [null, null];
+  const body = req.body || {};
+  const mode = String(body.commission_mode ?? '');
+  if (!['fixed', 'ladder'].includes(mode)) return [null, 'Choose whether this associate has a fixed commission level or follows the ladder.'];
+  let level = null;
+  if (mode === 'fixed') {
+    const l = await pricingRepository.findLevel(parseInt(body.commission_level_id, 10) || 0);
+    const keeping = l && existing && Number(existing.commission_level_id || 0) === Number(l.id);
+    if (!l || (Number(l.is_active) !== 1 && !keeping)) return [null, 'Choose an active commission level for a fixed level.'];
+    level = Number(l.id);
+  }
+  return [{ mode, level }, null];
+}
+
+async function describeCommission(mode, levelId) {
+  if (mode !== 'fixed') return 'Ladder';
+  const l = await pricingRepository.findLevel(levelId);
+  return `Fixed: ${l ? `${l.name} — ${pricingService.levelLabel(l)}` : '?'}`;
 }
 
 async function create(req, res) {
@@ -209,6 +236,8 @@ async function save(req, res) {
   if ((hasUpload || (existing && existing.agreement_file_id)) && data.agreement_signed_on === null) {
     errors.push('Enter the date the agreement was signed with its signed copy.');
   }
+  const [commission, commissionError] = await readCommissionLevel(req, existing);
+  if (commissionError) errors.push(commissionError);
   const backTo = id ? `/associates/${id}/edit` : '/associates/new';
   if (errors.length) {
     flash.set(req, 'error', errors.join(' '));
@@ -245,6 +274,19 @@ async function save(req, res) {
     }
     flash.set(req, 'success', `Associate "${data.name}" saved.`);
   }
+  if (commission !== null) {
+    const before = `${(existing && existing.commission_mode) || 'ladder'}:${(existing && existing.commission_level_id) || ''}`;
+    const after = `${commission.mode}:${commission.level || ''}`;
+    await pricingRepository.setAssociateCommission(savedId, commission.mode, commission.level);
+    if (!existing || before !== after) {
+      const oldText = existing ? await describeCommission((existing.commission_mode) || 'ladder', existing.commission_level_id) : null;
+      const newText = await describeCommission(commission.mode, commission.level);
+      await auditLogRepository.log(user.id, 'ASSOCIATE_COMMISSION_LEVEL_CHANGED', 'associates', savedId, 'commission_level', oldText, newText);
+      if (existing) {
+        await associateEventRepository.add(savedId, 'rates_changed', `Commission level changed by ${user.name} to ${newText} — applies to new quotes only.`, null, null, null, user.id, false);
+      }
+    }
+  }
   if (fileId !== null) {
     await associateRepository.setAgreementFile(savedId, fileId);
     await auditLogRepository.log(user.id, 'ASSOCIATE_AGREEMENT_UPLOADED', 'associates', savedId, 'agreement_file_id', existing && existing.agreement_file_id ? String(existing.agreement_file_id) : null, String(fileId));
@@ -259,8 +301,15 @@ async function show(req, res) {
   const id = Number(a.id);
   const canManage = can(req, 'manage_associates');
   const canBank = can(req, 'manage_associate_bank');
+  // Owner decision D-245: the fixed commission level, when the associate has one.
+  let commissionLevel = null;
+  if ((a.commission_mode || 'ladder') === 'fixed' && a.commission_level_id) {
+    const l = await pricingRepository.findLevel(a.commission_level_id);
+    if (l) commissionLevel = { ...l, label: pricingService.levelLabel(l) };
+  }
   const data = {
     a,
+    commissionLevel,
     canManage,
     canBank,
     canChangeLink: await associateService.canChangeLink(req),

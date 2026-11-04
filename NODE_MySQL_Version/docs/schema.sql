@@ -5139,3 +5139,62 @@ CREATE TABLE order_price_approvals (
   KEY idx_order_price_approvals_order (order_id),
   CONSTRAINT fk_order_price_approvals_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ================================================================
+-- Owner decision D-245 (4 Nov 2026), phase P1: pricing build-up settings,
+-- product pricing overrides, market (supplier) price dates, associate
+-- commission levels and ladder. Go-live installs fresh (D-241): no migration.
+-- ================================================================
+CREATE TABLE pricing_settings (
+  setting_key   VARCHAR(60)  NOT NULL PRIMARY KEY,
+  setting_value VARCHAR(255) NOT NULL,
+  updated_by    BIGINT UNSIGNED NULL,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_pricing_settings_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Product overrides of the global pricing rules (NULL = use the global value).
+ALTER TABLE catalog_products ADD COLUMN pricing_margin_pct DECIMAL(5,2) NULL;
+ALTER TABLE catalog_products ADD COLUMN pricing_other_cost_mode ENUM('pct','usd') NULL;      -- % of the supplier price, or USD per unit
+ALTER TABLE catalog_products ADD COLUMN pricing_other_cost_value DECIMAL(12,4) NULL;
+ALTER TABLE catalog_products ADD COLUMN pricing_incentive_mode ENUM('pct','usd') NULL;       -- % of (minimum price − cost), or USD per unit
+ALTER TABLE catalog_products ADD COLUMN pricing_incentive_value DECIMAL(12,4) NULL;
+ALTER TABLE catalog_products ADD COLUMN pricing_buffer_pct DECIMAL(5,2) NULL;
+
+-- Market prices: when the supplier quoted and until when; the quote it was copied from.
+-- is_primary is shown as "used for pricing".
+ALTER TABLE catalog_product_suppliers ADD COLUMN quoted_on DATE NULL;
+ALTER TABLE catalog_product_suppliers ADD COLUMN valid_until DATE NULL;
+ALTER TABLE catalog_product_suppliers ADD COLUMN purchase_quote_id BIGINT UNSIGNED NULL;
+
+-- Associate commission levels (CRUD; a level in use can only be deactivated).
+CREATE TABLE commission_levels (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name        VARCHAR(60) NOT NULL,
+  kind        ENUM('pct','fixed_usd') NOT NULL,            -- % of FOB, or a fixed USD amount per unit
+  value       DECIMAL(12,4) NOT NULL,
+  is_active   TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order  INT NOT NULL DEFAULT 0,
+  created_by  BIGINT UNSIGNED NULL,
+  updated_by  BIGINT UNSIGNED NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_commission_levels_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Ladder steps by counting-order number (to_order NULL = open-ended last step).
+CREATE TABLE commission_ladder_steps (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  from_order  INT NOT NULL,
+  to_order    INT NULL,
+  level_id    BIGINT UNSIGNED NOT NULL,
+  updated_by  BIGINT UNSIGNED NULL,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_commission_ladder_from (from_order),
+  CONSTRAINT fk_commission_ladder_level FOREIGN KEY (level_id) REFERENCES commission_levels(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Per associate: a fixed level, or the ladder (stored now; used by commission from P3).
+ALTER TABLE associates ADD COLUMN commission_mode ENUM('fixed','ladder') NOT NULL DEFAULT 'ladder';
+ALTER TABLE associates ADD COLUMN commission_level_id BIGINT UNSIGNED NULL;
+ALTER TABLE associates ADD CONSTRAINT fk_associates_commission_level FOREIGN KEY (commission_level_id) REFERENCES commission_levels(id);

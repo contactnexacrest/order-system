@@ -37,6 +37,13 @@
             <span class="badge">clients {{ r.label }}: {{ r.rate | pct2 }}% {{ '(personal)' if r.source == 'personal' else '(standard)' }}</span>
           {% endfor %}
         {% endif %}</td></tr>
+      {# Owner decision D-245 (4 Nov 2026): fixed level or the ladder (used for commission from phase P3). #}
+      <tr><th>Commission level</th><td>
+        {% if commissionLevel %}
+          Fixed level: <b>{{ commissionLevel.name }}</b> — {{ commissionLevel.label }}{% if commissionLevel.is_active != 1 %} <span class="badge badge-inactive">inactive</span>{% endif %}
+        {% else %}
+          Ladder <span class="muted small">(moves up with counting orders — <a href="/pricing/commission-levels#ladder">see the ladder</a>)</span>
+        {% endif %}</td></tr>
     </table>
     <form method="post" action="/associates/{{ id }}/status" class="inline-form">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">

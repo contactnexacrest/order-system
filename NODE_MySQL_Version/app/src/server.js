@@ -103,6 +103,7 @@ const paymentMilestoneController = require('./controllers/paymentMilestoneContro
 const productCategoryController = require('./controllers/productCategoryController');
 const moneyVisibility = require('./services/moneyVisibility');
 const productsController = require('./controllers/productsController');
+const pricingController = require('./controllers/pricingController');
 const testModeController = require('./controllers/testModeController');
 const hsCodeController = require('./controllers/hsCodeController');
 const logisticsPartnerController = require('./controllers/logisticsPartnerController');
@@ -199,6 +200,11 @@ njkEnv.addGlobal('incentive', {
   payDay: (m) => require('./services/incentiveService').payDay(m),
 });
 njkEnv.addFilter('legLabel', (leg) => require('./repositories/caRepository').legLabel(leg));
+// Owner decision D-245 (4 Nov 2026): PricingService::pct()/modeLabel() for the pricing views.
+njkEnv.addGlobal('pricingFmt', {
+  pct: (v) => require('./services/pricingService').pct(v),
+  modeLabel: (m, v) => require('./services/pricingService').modeLabel(m, v),
+});
 // Mirrors PHP's number_format($v, 4) — used for CA exchange rates, which
 // are recorded and displayed to 4 decimal places (e.g. "88.5000"), not
 // the 2-decimal "money" convention used for amounts.
@@ -1176,6 +1182,20 @@ app.post('/products/suppliers/:supplierId/delete', requireAuth, requirePermissio
 app.post('/products/suppliers/:supplierId/set-primary', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.setPrimarySupplier));
 app.post('/products/:id/misc-charges/add', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.addMiscCharge));
 app.post('/products/misc-charges/:chargeId/delete', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.deleteMiscCharge));
+// Owner decision D-245 (4 Nov 2026), P1: pricing settings, commission levels and ladder, product pricing overrides, market prices.
+app.get('/pricing/settings', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(pricingController.settings));
+app.post('/pricing/settings', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.saveSettings));
+app.get('/pricing/commission-levels', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(pricingController.levels));
+app.post('/pricing/commission-levels', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.addLevel));
+app.post('/pricing/commission-levels/:id', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.updateLevel));
+app.post('/pricing/commission-levels/:id/active', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.toggleLevel));
+app.post('/pricing/commission-levels/:id/delete', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.deleteLevel));
+app.post('/pricing/commission-ladder', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.saveLadder));
+app.post('/products/:id/pricing', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(pricingController.saveProductOverrides));
+app.get('/products/:id/market-prices', requireAuth, requirePermissionAny(['record_market_prices', 'view_price_buildup']), asyncHandler(pricingController.marketPrices));
+app.post('/products/:id/market-prices', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.addMarketPrice));
+app.post('/products/suppliers/:supplierId/use-for-pricing', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.useForPricing));
+app.post('/products/suppliers/:supplierId/market-price', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.updateMarketDates));
 
 // --- Phase C: Stages 4-9 ---
 // (routes land here once Phase C's controllers exist)

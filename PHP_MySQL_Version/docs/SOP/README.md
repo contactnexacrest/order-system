@@ -50,6 +50,7 @@ implementation detail.
 - [My tasks, owners & cockpit](./23-coordination.md) — each department's task list built from the orders, one owner per department per order, due and escalation days, the management cockpit, the optional Order Coordinator.
 - [Export Compliance](./25-export-compliance.md) — the department for government and agency work (ECGC, Certificate of Origin, phytosanitary / fumigation / inspection, export benefit claims, eBRC / FIRC): its three roles, its task list, and what it never sees.
 - [Agreements](./26-agreements.md) — the register of agreements with clients, suppliers, logistics partners, associates and staff: signed copies, expiry dates, reminders 30 and 7 days before and on the day, renew and end early.
+- [Pricing](./27-pricing.md) — supplier / market prices, the price build-up (cost → minimum price → floors → quote price), who sees which price, and the associate commission levels and ladder (D-245).
 
 ## Guides to print or share
 

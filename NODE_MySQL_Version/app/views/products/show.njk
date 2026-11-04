@@ -27,6 +27,8 @@
   </div>
   {% endif %}
 
+  {% include 'products/_pricing.njk' %}
+
   {% if canViewPricing %}
   <div class="section">
     <h2>Default Cost Components</h2>
@@ -68,12 +70,12 @@
     {% endif %}
   </div>
 
-  {% if canViewPricing %}
+  {% if canViewPricing and canSeeSuppliers %}
   <div class="section">
     <h2>Suppliers</h2>
     <table class="list">
       <tr>
-        <th>Supplier</th><th>Location</th><th>Contact</th><th>FOB Source</th><th>Effective FOB</th><th>Primary</th><th></th>
+        <th>Supplier</th><th>Location</th><th>Contact</th><th>FOB Source</th><th>Effective FOB</th><th>Used for pricing</th><th></th>
       </tr>
       {% if not suppliers.length %}
         <tr><td colspan="7" class="muted">No suppliers on file yet.</td></tr>
@@ -95,7 +97,7 @@
               {% if not s.is_primary %}
                 <form method="post" action="/products/suppliers/{{ s.id }}/set-primary" style="display:inline">
                   <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                  <button type="submit" class="btn-sm">Make Primary</button>
+                  <button type="submit" class="btn-sm">Use for pricing</button>
                 </form>
               {% endif %}
               <details style="display:inline-block">
@@ -121,7 +123,7 @@
                     <label>Loading Cost override<input type="number" step="0.01" min="0" name="loading_cost" value="{{ s.loading_cost if s.loading_cost != null else '' }}" placeholder="e.g. 8000"></label>
                     <label>CHA Cost override<input type="number" step="0.01" min="0" name="cha_cost" value="{{ s.cha_cost if s.cha_cost != null else '' }}" placeholder="e.g. 15000"></label>
                     <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes">{{ s.notes or '' }}</textarea></label>
-                    <label><input type="checkbox" name="is_primary" value="1" {{ 'checked' if s.is_primary }}> Primary supplier</label>
+                    <label><input type="checkbox" name="is_primary" value="1" {{ 'checked' if s.is_primary }}> Used for pricing</label>
                     <button type="submit" class="btn-sm">Save</button>
                   </form>
                 </div>
@@ -160,7 +162,7 @@
             <label>Loading Cost override<input type="number" step="0.01" min="0" name="loading_cost" placeholder="e.g. 8000"></label>
             <label>CHA Cost override<input type="number" step="0.01" min="0" name="cha_cost" placeholder="e.g. 15000"></label>
             <label>Notes<textarea name="notes" rows="2" placeholder="Optional notes"></textarea></label>
-            <label><input type="checkbox" name="is_primary" value="1"> Primary supplier</label>
+            <label><input type="checkbox" name="is_primary" value="1"> Used for pricing</label>
             <button type="submit" class="btn-sm btn-accent">Add Supplier</button>
           </form>
         </div>
@@ -202,6 +204,6 @@
     {% endif %}
   </div>
   {% else %}
-    <p class="muted">You do not have permission to view pricing, supplier, or misc-charge information for this product.</p>
+    <p class="muted">You do not have permission to view supplier prices or misc charges for this product.</p>
   {% endif %}
 </div>

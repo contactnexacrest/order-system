@@ -12,6 +12,8 @@ const productImageRepository = require('../repositories/productImageRepository')
 const productSupplierRepository = require('../repositories/productSupplierRepository');
 const productMiscChargeRepository = require('../repositories/productMiscChargeRepository');
 const productService = require('../services/productService');
+const pricingService = require('../services/pricingService');
+const pricingRepository = require('../repositories/pricingRepository');
 
 /**
  * Port of App\Controllers\ProductController — Product Interface / internal
@@ -31,6 +33,18 @@ const productService = require('../services/productService');
 
 const ALLOWED_MIME = { 'image/png': 'png', 'image/jpeg': 'jpg' };
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+
+/**
+ * Owner decision D-245: [sees the full build-up, sees only the quote and lowest price].
+ * The build-up needs view_price_buildup; the two prices need the selling-price money class.
+ */
+function pricingPerms(req) {
+  const p = req.permissions || {};
+  const full = !!p.view_price_buildup;
+  return { canBuildup: full, canStaffPrice: !full && !!p.view_selling_prices };
+}
+
+const trimOverride = (v) => (v === null || v === undefined ? '' : String(v).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, ''));
 
 function perms(req) {
   const p = req.permissions || {};
@@ -60,7 +74,21 @@ async function index(req, res) {
     products = [];
   }
 
-  if (canViewPricing) {
+  // Owner decision D-245 (4 Nov 2026): the price build-up for MD/ED; the quote price and
+  // lowest price for anyone who may see selling prices. Worked out before anything is stripped.
+  const { canBuildup, canStaffPrice } = pricingPerms(req);
+  if (canBuildup || canStaffPrice) {
+    const s = await pricingService.settings();
+    const program = await pricingService.programOn();
+    const levels = await pricingRepository.levels(true);
+    for (const product of products) {
+      const pr = await pricingService.forProduct(product, levels, s, program);
+      product.pricing = canBuildup ? pr : { build: pr.build === null ? null : { staff_quote: pr.build.staff_quote, staff_floor: pr.build.staff_floor } };
+    }
+  }
+
+  const canSeeHeadlineFob = canViewPricing && !!(req.permissions || {}).view_purchase_prices;
+  if (canSeeHeadlineFob) {
     for (const product of products) {
       const suppliers = await productSupplierRepository.forProduct(product.id);
       let primary = null;
@@ -96,8 +124,10 @@ async function index(req, res) {
     query,
     searched,
     canBrowse,
-    canViewPricing,
+    canViewPricing: canSeeHeadlineFob,
     canManage,
+    canBuildup,
+    canStaffPrice,
   }, 'layout/base');
 }
 
@@ -135,6 +165,22 @@ async function show(req, res) {
     return;
   }
 
+  // Owner decision D-245 (4 Nov 2026): see index().
+  const { canBuildup, canStaffPrice } = pricingPerms(req);
+  let pricingFull = null;
+  let pricingStaff = null;
+  if (canBuildup || canStaffPrice) {
+    const pr = await pricingService.forProduct(details.product);
+    if (canBuildup) pricingFull = pr;
+    else pricingStaff = { build: pr.build === null ? null : { staff_quote: pr.build.staff_quote, staff_floor: pr.build.staff_floor } };
+  }
+  // Supplier prices are the cost the selling price is built from — only people who may see
+  // purchase prices get the supplier list and misc charges.
+  const canSeeSuppliers = canViewPricing && !!(req.permissions || {}).view_purchase_prices;
+  if (!canSeeSuppliers) {
+    details.suppliers = [];
+    details.misc_charges = [];
+  }
   if (!canViewPricing) {
     delete details.product.default_factory_cost;
     delete details.product.default_transportation_cost;
@@ -154,6 +200,17 @@ async function show(req, res) {
     miscCharges: details.misc_charges,
     canViewPricing,
     canManage,
+    canSeeSuppliers,
+    pricingFull,
+    pricingStaff,
+    canManagePricing: !!(req.permissions || {}).manage_pricing,
+    canMarketPrices: !!(req.permissions || {}).record_market_prices || canBuildup,
+    pricingOverrideValues: {
+      margin: trimOverride(details.product.pricing_margin_pct),
+      buffer: trimOverride(details.product.pricing_buffer_pct),
+      other: trimOverride(details.product.pricing_other_cost_value),
+      incentive: trimOverride(details.product.pricing_incentive_value),
+    },
   }, 'layout/base');
 }
 

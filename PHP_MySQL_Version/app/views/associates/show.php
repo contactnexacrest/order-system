@@ -41,6 +41,13 @@ $__sourceLabel = ['link' => 'own invitation link', 'code' => 'personal code', 's
             <span class="badge">clients <?= $l ?>: <?= $__pct($__r['rate']) ?> <?= $__r['source'] === 'personal' ? '(personal)' : '(standard)' ?></span>
           <?php endforeach; ?>
         <?php endif; ?></td></tr>
+      <?php // Owner decision D-245 (4 Nov 2026): fixed level or the ladder (used for commission from phase P3). ?>
+      <tr><th>Commission level</th><td>
+        <?php if (($a['commission_mode'] ?? 'ladder') === 'fixed' && !empty($a['commission_level_id']) && ($__lvl = \App\Repositories\PricingRepository::findLevel((int) $a['commission_level_id'])) !== null): ?>
+          Fixed level: <b><?= htmlspecialchars($__lvl['name']) ?></b> — <?= htmlspecialchars(\App\Services\PricingService::levelLabel($__lvl)) ?><?= (int) $__lvl['is_active'] === 1 ? '' : ' <span class="badge badge-inactive">inactive</span>' ?>
+        <?php else: ?>
+          Ladder <span class="muted small">(moves up with counting orders — <a href="/pricing/commission-levels#ladder">see the ladder</a>)</span>
+        <?php endif; ?></td></tr>
     </table>
     <form method="post" action="/associates/<?= $id ?>/status" class="inline-form">
       <?= Csrf::field() ?>

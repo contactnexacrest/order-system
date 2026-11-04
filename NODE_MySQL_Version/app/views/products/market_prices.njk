@@ -1,0 +1,90 @@
+{#
+  Owner decision D-245 (4 Nov 2026), P1: Procurement's market prices for one product — supplier
+  prices only (₹), dated, with history. No selling prices, margins or floors are on this page.
+  Port of views/products/market_prices.php.
+#}
+<div class="card page-wide">
+  <p class="muted small"><a href="/products/{{ product.id }}">&larr; Back to {{ product.name }}</a></p>
+  <h1>Market Prices — {{ product.name }}</h1>
+  <p class="muted">Supplier and market prices for this product, newest first, with the one <strong>used for pricing</strong> on top. Record a new price as a new row so the history stays; a price older than {{ staleDays }} days, or past its "valid until" date, is marked. Changing the price used for pricing changes new quotes only — orders with an issued Proforma Invoice keep their prices.</p>
+
+  <table class="list">
+    <tr><th>Used for pricing</th><th>Supplier</th><th class="num">Price (₹)</th><th>Quoted on</th><th>Valid until</th><th>Notes</th>{% if canRecord %}<th></th>{% endif %}</tr>
+    {% if not rows.length %}<tr><td colspan="7" class="muted">No supplier prices recorded yet.</td></tr>{% endif %}
+    {% for r in rows %}
+      <tr>
+        <td>{% if r.is_primary == 1 %}<span class="badge badge-active">● Yes</span>{% else %}<span class="muted">○</span>{% endif %}</td>
+        <td>{{ r.supplier_name }}{% if r.location %}<br><small class="muted">{{ r.location }}</small>{% endif %}</td>
+        <td class="num">{{ 'To Be Confirmed' if r.effective_fob == null else (r.effective_fob | money) }}{% if r.fob_source == 'computed' %}<br><small class="muted">worked out from cost components</small>{% endif %}</td>
+        <td>{{ r.price_date or '—' }}{% if r.staleness == 'stale' %} <span class="badge badge-warning">stale</span>{% endif %}</td>
+        <td>{% if r.valid_until %}{{ r.valid_until }}{% if r.staleness == 'expired' %} <span class="badge badge-danger">expired</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{{ r.notes or '' }}</td>
+        {% if canRecord %}
+          <td>
+            {% if r.is_primary != 1 %}
+              <form method="post" action="/products/suppliers/{{ r.id }}/use-for-pricing" style="display:inline">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <button type="submit" class="btn-sm">Use for pricing</button>
+              </form>
+            {% endif %}
+            {% if r.fob_source == 'direct' %}
+            <details style="display:inline-block">
+              <summary class="btn-sm" style="display:inline-block;cursor:pointer">Correct</summary>
+              <div class="card-nested">
+                <form method="post" action="/products/suppliers/{{ r.id }}/market-price">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <label>Price (₹) *<input type="number" name="price_inr" min="0.01" step="0.01" required value="{{ r.fob_value }}" placeholder="e.g. 80000.00"></label>
+                  <label>Location<input type="text" name="location" maxlength="150" value="{{ r.location or '' }}" placeholder="e.g. Ongole, Andhra Pradesh"></label>
+                  <label>Quoted on *<input type="date" name="quoted_on" required max="{{ today }}" value="{{ r.quoted_on or r.price_date or '' }}"></label>
+                  <label>Valid until<input type="date" name="valid_until" value="{{ r.valid_until or '' }}"></label>
+                  <label>Notes<textarea name="notes" rows="2" maxlength="1000" placeholder="e.g. Ex-works, Grade A, min 2 blocks">{{ r.notes or '' }}</textarea></label>
+                  <button type="submit" class="btn-sm">Save</button>
+                </form>
+              </div>
+            </details>
+            {% endif %}
+          </td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+  </table>
+
+  {% if canRecord %}
+    <h2>Add a price</h2>
+    <form method="post" action="/products/{{ product.id }}/market-prices" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Supplier *<input type="text" name="supplier_name" maxlength="255" required placeholder="e.g. Sri Balaji Granites"></label>
+      <label>Location<input type="text" name="location" maxlength="150" placeholder="e.g. Ongole, Andhra Pradesh"></label>
+      <label>Price (₹ per unit) *<input type="number" name="price_inr" min="0.01" step="0.01" required placeholder="e.g. 80000.00"></label>
+      <label>Quoted on *<input type="date" name="quoted_on" required max="{{ today }}" value="{{ today }}"></label>
+      <label>Valid until<input type="date" name="valid_until"></label>
+      <label class="full">Notes<textarea name="notes" rows="2" maxlength="1000" placeholder="e.g. Ex-works, Grade A, min 2 blocks"></textarea></label>
+      <label class="inline"><input type="checkbox" name="used_for_pricing" value="1"> Use this price for pricing</label>
+      <div><button type="submit" class="btn-sm btn-accent">Add price</button></div>
+    </form>
+
+    {% if quotes.length %}
+      <h2>Copy from a supplier quote</h2>
+      <p class="muted small">Quotes recorded in Procurement for orders of this product.</p>
+      <table class="list">
+        <tr><th>Supplier</th><th class="num">Price (₹)</th><th>Recorded</th><th>Valid until</th><th>Reference</th><th></th></tr>
+        {% for q in quotes %}
+          <tr>
+            <td>{{ q.supplier_legal_name }}</td>
+            <td class="num">{{ q.unit_price_inr | money }}{% if q.unit %} <small class="muted">per {{ q.unit }}</small>{% endif %}</td>
+            <td>{{ q.recorded_on }}</td>
+            <td>{{ q.valid_until or '—' }}</td>
+            <td>{{ q.quote_reference or '' }}</td>
+            <td>
+              <form method="post" action="/products/{{ product.id }}/market-prices" style="display:inline">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="purchase_quote_id" value="{{ q.id }}">
+                <button type="submit" class="btn-sm">Copy as a market price</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+  {% endif %}
+</div>
