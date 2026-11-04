@@ -16,6 +16,12 @@ final class PricingRepository
     /** @return array<string,string> */
     public static function settings(): array
     {
+        // D-245 P5: read once per report run (BatchCache scope only).
+        return \App\Helpers\BatchCache::memo('pricing_settings', static fn () => self::settingsUncached());
+    }
+
+        private static function settingsUncached(): array
+    {
         $out = [];
         foreach (Database::connection()->query('SELECT setting_key, setting_value FROM pricing_settings')->fetchAll() as $row) {
             $out[(string) $row['setting_key']] = (string) $row['setting_value'];

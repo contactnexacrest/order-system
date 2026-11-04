@@ -116,6 +116,11 @@ async function unarchive(orderId) {
  * docblock for why those four stay live.
  */
 async function find(id) {
+  // D-245 P5: read once per report run (batchCache scope only).
+  return require('../helpers/batchCache').memoRead(`order:${id}`, () => findUncached(id));
+}
+
+async function findUncached(id) {
   return db.queryOne(
     `SELECT o.*, c.client_unique_number, c.agreement_footer_text,
             c.agreement_expiry_date, c.agreement_force_expired,

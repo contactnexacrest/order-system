@@ -9,6 +9,11 @@ const db = require('../config/db');
  */
 
 async function settings() {
+  // D-245 P5: read once per report run (batchCache), fresh otherwise.
+  return { ...(await require('../helpers/batchCache').memo('pricing_settings', settingsUncached)) };
+}
+
+async function settingsUncached() {
   const out = {};
   for (const row of await db.query('SELECT setting_key, setting_value FROM pricing_settings')) {
     out[String(row.setting_key)] = String(row.setting_value);

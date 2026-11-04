@@ -132,6 +132,12 @@ final class OrderRepository
      */
     public static function find(int $id): ?array
     {
+        // D-245 P5: read once per report run (BatchCache scope only).
+        return \App\Helpers\BatchCache::memo('order:' . $id, static fn () => self::findUncached($id));
+    }
+
+        private static function findUncached(int $id): ?array
+    {
         $stmt = Database::connection()->prepare(
             'SELECT o.*, c.client_unique_number, c.agreement_footer_text,
                     c.agreement_expiry_date, c.agreement_force_expired,

@@ -138,6 +138,12 @@ final class IncentiveRepository
     /** @return array<string, string> setting_key => setting_value */
     public static function settings(): array
     {
+        // D-245 P5: read once per report run (BatchCache scope only).
+        return \App\Helpers\BatchCache::memo('incentive_settings', static fn () => self::settingsUncached());
+    }
+
+        private static function settingsUncached(): array
+    {
         $out = [];
         foreach (Database::connection()->query('SELECT setting_key, setting_value FROM incentive_settings')->fetchAll() as $row) {
             $out[(string) $row['setting_key']] = (string) ($row['setting_value'] ?? '');
@@ -155,6 +161,12 @@ final class IncentiveRepository
 
     /** @return array<int, list<string>> user_id => roles */
     public static function userRoles(): array
+    {
+        // D-245 P5: read once per report run (BatchCache scope only).
+        return \App\Helpers\BatchCache::memo('user_incentive_roles', static fn () => self::userRolesUncached());
+    }
+
+        private static function userRolesUncached(): array
     {
         $out = [];
         foreach (Database::connection()->query('SELECT user_id, role FROM user_incentive_roles')->fetchAll() as $row) {
@@ -179,6 +191,12 @@ final class IncentiveRepository
     }
 
     public static function forOrder(int $orderId): ?array
+    {
+        // D-245 P5: read once per report run (BatchCache scope only).
+        return \App\Helpers\BatchCache::memo('oi:' . $orderId, static fn () => self::forOrderUncached($orderId));
+    }
+
+        private static function forOrderUncached(int $orderId): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM order_incentives WHERE order_id = :id');
         $stmt->execute(['id' => $orderId]);
@@ -390,6 +408,12 @@ final class IncentiveRepository
 
     /** Incentive cost entries of the order (team / associate), keyed by kind. */
     public static function costEntries(int $orderId): array
+    {
+        // D-245 P5: read once per report run (BatchCache scope only).
+        return \App\Helpers\BatchCache::memo('oce:' . $orderId, static fn () => self::costEntriesUncached($orderId));
+    }
+
+        private static function costEntriesUncached(int $orderId): array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM order_cost_entries WHERE order_id = :id AND incentive_kind IS NOT NULL');
         $stmt->execute(['id' => $orderId]);

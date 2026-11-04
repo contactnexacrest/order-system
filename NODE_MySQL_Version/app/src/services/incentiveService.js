@@ -282,13 +282,14 @@ async function globalAmount(orderId, order, basis) {
  * The order's incentive as it stands. Before the order is locked every
  * figure is an estimate; the locked figures are on order_incentives.
  */
-async function calculate(orderId) {
+/** baseProfit: the order's computeForOrder(id, false) when the caller has it already (D-245 P5: not worked out twice). */
+async function calculate(orderId, baseProfit = null) {
   const orderProfitabilityService = require('./orderProfitabilityService');
   const associateCommission = require('./associateCommission');
   const pricingService = require('./pricingService');
   const order = await orderRepository.find(orderId);
   const row = await incentiveRepository.forOrder(orderId);
-  const profit = await orderProfitabilityService.computeForOrder(orderId, false);
+  const profit = baseProfit || await orderProfitabilityService.computeForOrder(orderId, false);
   const entries = await incentiveRepository.costEntries(orderId);
   const already = Object.values(entries).reduce((sum, c) => sum + Number(c.amount_inr), 0);
   const profitBefore = round2(Number(profit.profit_inr) + already);

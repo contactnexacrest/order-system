@@ -51,6 +51,11 @@ async function setTwoFactor(userId, enabled, method, secret) {
 }
 
 async function listActive() {
+  // D-245 P5: read once per report run (batchCache scope only).
+  return require('../helpers/batchCache').memoRead('users_active', () => listActiveUncached());
+}
+
+async function listActiveUncached() {
   return db.query(
     `SELECT u.id, u.name, u.email, r.name AS role_name
      FROM users u LEFT JOIN roles r ON r.id = u.role_id

@@ -224,7 +224,7 @@ final class OrderProfitabilityService
             $commissionState = null;
             $incentiveState = null;
         } else {
-            $calc = IncentiveService::calculate($orderId);
+            $calc = IncentiveService::calculate($orderId, $base);
             $a = $calc['associate'];
             $commission = ($a !== null && ($a['state'] ?? '') !== 'unpaid') ? round((float) $a['amount_inr'], 2) : 0.0;
             $commissionState = $a !== null ? 'estimated' : null;

@@ -132,7 +132,8 @@ async function estimatedRows(orderId) {
   const order = await orderRepository.find(orderId);
   if (!order) return [];
   const calc = await incentiveService.calculate(orderId);
-  const ready = (await incentiveService.readyReason(orderId)) === null;
+  // calc.state is 'ready' exactly when readyReason() is null for an unlocked order (D-245 P5: not asked twice).
+  const ready = calc.state === 'ready';
   const state = ready ? 'ready' : 'estimated';
   const staffRun = ready ? await associateCommission.payoutRunOn(today()) : null;
   const base = {
@@ -156,10 +157,26 @@ async function estimatedRows(orderId) {
   return rows;
 }
 
+/**
+ * The estimated rows of many open orders, in their order (D-245 P5, performance): settings are read
+ * once for the run (batchCache) and a few orders are worked out at a time on the connection pool.
+ */
+async function estimatedRowsFor(ids) {
+  return require('../helpers/batchCache').within(async () => {
+    const out = [];
+    const CHUNK = 6;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const parts = await Promise.all(ids.slice(i, i + CHUNK).map((id) => estimatedRows(id)));
+      for (const part of parts) out.push(...part);
+    }
+    return out;
+  });
+}
+
 /** Locked rows and estimated rows (before filtering); f limits which open orders are estimated. */
 async function allRows(f = {}) {
   const rows = await lockedRows();
-  for (const id of await openOrderIds(f)) rows.push(...await estimatedRows(id));
+  rows.push(...await estimatedRowsFor(await openOrderIds(f)));
   return rows;
 }
 
@@ -260,9 +277,7 @@ async function owedAt(date, f = {}) {
     }
   }
   if (date >= today()) {
-    for (const id of await openOrderIds(f)) {
-      for (const r of await estimatedRows(id)) if (r.state === 'ready') out.push(r);
-    }
+    for (const r of await estimatedRowsFor(await openOrderIds(f))) if (r.state === 'ready') out.push(r);
   }
   return out;
 }

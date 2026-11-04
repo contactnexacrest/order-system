@@ -417,7 +417,7 @@ async function incentiveLayer(orderId, base) {
   } else if (!order || ['cancelled', 'lost'].includes(order.status)) {
     commission = 0; incentive = 0; commissionState = null; incentiveState = null;
   } else {
-    const calc = await require('./incentiveService').calculate(orderId);
+    const calc = await require('./incentiveService').calculate(orderId, base);
     const a = calc.associate;
     commission = a && a.state !== 'unpaid' ? round2(Number(a.amount_inr)) : 0;
     commissionState = a ? 'estimated' : null;

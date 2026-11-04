@@ -269,11 +269,12 @@ final class IncentiveService
      * The order's incentive as it stands. Before the order is locked every
      * figure is an estimate; the locked figures are on order_incentives.
      */
-    public static function calculate(int $orderId): array
+    /** @param array<string,mixed>|null $baseProfit the order's computeForOrder($id, false) when the caller has it already (D-245 P5: not worked out twice) */
+    public static function calculate(int $orderId, ?array $baseProfit = null): array
     {
         $order = OrderRepository::find($orderId);
         $row = IncentiveRepository::forOrder($orderId);
-        $profit = OrderProfitabilityService::computeForOrder($orderId, false);
+        $profit = $baseProfit ?? OrderProfitabilityService::computeForOrder($orderId, false);
         $already = array_sum(array_map(static fn (array $c): float => (float) $c['amount_inr'], IncentiveRepository::costEntries($orderId)));
         $profitBefore = round((float) $profit['profit_inr'] + $already, 2);
         $revenue = (float) ($profit['revenue_inr'] ?? 0);

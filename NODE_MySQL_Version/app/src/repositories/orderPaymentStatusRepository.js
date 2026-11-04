@@ -26,7 +26,8 @@ function balanceDue(fobTotal, advancePct, payment, milestones = 0) {
 }
 
 async function find(orderId) {
-  return db.queryOne('SELECT * FROM order_payment_status WHERE order_id = :order_id', { order_id: orderId });
+  // D-245 P5: read once per report run (batchCache scope only).
+  return require('../helpers/batchCache').memoRead(`ops:${orderId}`, () => db.queryOne('SELECT * FROM order_payment_status WHERE order_id = :order_id', { order_id: orderId }));
 }
 
 async function recordAdvanceReceived(orderId, amount, receivedAt) {

@@ -51,6 +51,8 @@ final class PermittedLinks
         '#^/associates/\d+/documents/\d+(?:[/?\#]|$)#'             => ['manage_associates', 'manage_associate_bank'],
         '#^/associates/(?:new|ladder|\d+/(?:edit|view-as|agreement))(?:[/?\#]|$)#' => ['manage_associates'],
         '#^/associates(?:[/?\#]|$)#'                               => ['view_associates', 'manage_associates', 'manage_associate_bank'],
+        // Owner decision D-245 P5: incentive & commission reports.
+        '#^/reports/incentives(?:[/?\#]|$)#'                        => ['manage_incentives', 'pay_incentives', 'view_price_buildup'],
         '#^/reports/staff(?:[/?\#]|$)#'                             => ['view_staff_reports'],
         '#^/reports/order-profitability(?:[/?\#]|$)#'               => ['manage_order_financials'],
         // Owner decision 1 Nov 2026 (A-7 / A-9): each needs only the money it shows.

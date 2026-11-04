@@ -134,7 +134,8 @@ final class IncentiveReportService
             return [];
         }
         $calc = IncentiveService::calculate($orderId);
-        $ready = IncentiveService::readyReason($orderId) === null;
+        // $calc['state'] is 'ready' exactly when readyReason() is null for an unlocked order (D-245 P5: not asked twice).
+        $ready = $calc['state'] === 'ready';
         $state = $ready ? 'ready' : 'estimated';
         $staffRun = $ready ? AssociateCommission::payoutRunOn(date('Y-m-d')) : null;
         $base = [
@@ -180,9 +181,12 @@ final class IncentiveReportService
     public static function allRows(array $f = []): array
     {
         $rows = self::lockedRows();
-        foreach (self::openOrderIds($f) as $orderId) {
-            array_push($rows, ...self::estimatedRows($orderId));
-        }
+        // D-245 P5 (performance): settings and per-order rows read once for the whole run.
+        \App\Helpers\BatchCache::within(static function () use (&$rows, $f): void {
+            foreach (self::openOrderIds($f) as $orderId) {
+                array_push($rows, ...self::estimatedRows($orderId));
+            }
+        });
         return $rows;
     }
 
@@ -316,13 +320,15 @@ final class IncentiveReportService
             }
         }
         if ($date >= date('Y-m-d')) {
-            foreach (self::openOrderIds($f) as $orderId) {
-                foreach (self::estimatedRows($orderId) as $r) {
-                    if ($r['state'] === 'ready') {
-                        $out[] = $r;
+            \App\Helpers\BatchCache::within(static function () use (&$out, $f): void {
+                foreach (self::openOrderIds($f) as $orderId) {
+                    foreach (self::estimatedRows($orderId) as $r) {
+                        if ($r['state'] === 'ready') {
+                            $out[] = $r;
+                        }
                     }
                 }
-            }
+            });
         }
         return $out;
     }

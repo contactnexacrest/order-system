@@ -108,6 +108,12 @@ final class UserRepository
      */
     public static function listActive(): array
     {
+        // D-245 P5: read once per report run (BatchCache scope only).
+        return \App\Helpers\BatchCache::memo('users_active', static fn () => self::listActiveUncached());
+    }
+
+        private static function listActiveUncached(): array
+    {
         return Database::connection()->query(
             "SELECT u.id, u.name, u.email, r.name AS role_name
              FROM users u LEFT JOIN roles r ON r.id = u.role_id

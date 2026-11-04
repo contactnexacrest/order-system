@@ -3,7 +3,8 @@
 const db = require('../config/db');
 
 async function forOrder(orderId) {
-  return db.query('SELECT * FROM order_products WHERE order_id = :order_id AND is_active = 1 ORDER BY line_no', { order_id: orderId });
+  // D-245 P5: read once per report run (batchCache scope only).
+  return require('../helpers/batchCache').memoRead(`products:${orderId}`, () => db.query('SELECT * FROM order_products WHERE order_id = :order_id AND is_active = 1 ORDER BY line_no', { order_id: orderId }));
 }
 
 // QA-5 ORD-05: optional executor lets this join the caller's transaction

@@ -1270,6 +1270,10 @@ final class ReportRepository
             $where[] = 'DATE(o.created_at) <= :date_to';
             $params['date_to'] = $dateTo;
         }
+        // D-245 P5 (performance): "Locked orders only" is filtered in SQL, so only those orders are worked out.
+        if ($scope === 'locked') {
+            $where[] = 'EXISTS (SELECT 1 FROM order_incentives oi WHERE oi.order_id = o.id AND oi.locked_at IS NOT NULL)';
+        }
 
         $sql = 'SELECT o.id, o.order_reference, o.created_at, o.company_legal_name
                 FROM orders o
@@ -1286,8 +1290,10 @@ final class ReportRepository
         $rows = [];
         $sum = ['revenue_inr' => 0.0, 'cost_before_incentives_inr' => 0.0, 'profit_before_commission_inr' => 0.0, 'commission_inr' => 0.0,
             'incentive_inr' => 0.0, 'profit_after_incentive_inr' => 0.0];
-        foreach ($orders as $o) {
-            $p = OrderProfitabilityService::computeForOrder((int) $o['id']);
+        // D-245 P5 (performance): settings and per-order rows read once for the whole run.
+        $profits = \App\Helpers\BatchCache::within(static fn (): array => array_map(static fn (array $o): array => OrderProfitabilityService::computeForOrder((int) $o['id']), $orders));
+        foreach ($orders as $idx => $o) {
+            $p = $profits[$idx];
             if ($scope === 'locked' && !$p['incentives_locked']) {
                 continue;
             }

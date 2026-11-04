@@ -11,6 +11,12 @@ final class OrderProductRepository
     /** @return array<int, array<string,mixed>> */
     public static function forOrder(int $orderId): array
     {
+        // D-245 P5: read once per report run (BatchCache scope only).
+        return \App\Helpers\BatchCache::memo('products:' . $orderId, static fn () => self::forOrderUncached($orderId));
+    }
+
+        private static function forOrderUncached(int $orderId): array
+    {
         $stmt = Database::connection()->prepare(
             'SELECT * FROM order_products WHERE order_id = :order_id AND is_active = 1 ORDER BY line_no'
         );

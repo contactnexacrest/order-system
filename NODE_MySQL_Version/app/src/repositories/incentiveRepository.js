@@ -109,6 +109,11 @@ async function history(orderId) {
 
 /** @returns {Promise<Object<string,string>>} setting_key => setting_value */
 async function settings() {
+  // D-245 P5: read once per report run (batchCache), fresh otherwise.
+  return { ...(await require('../helpers/batchCache').memo('incentive_settings', settingsUncached)) };
+}
+
+async function settingsUncached() {
   const out = {};
   for (const row of await db.query('SELECT setting_key, setting_value FROM incentive_settings')) {
     out[String(row.setting_key)] = row.setting_value === null ? '' : String(row.setting_value);
@@ -126,6 +131,12 @@ async function setSetting(key, value, userId) {
 
 /** @returns {Promise<Object<number, string[]>>} user_id => roles */
 async function userRoles() {
+  // D-245 P5: read once per report run (batchCache scope only).
+  const all = await require('../helpers/batchCache').memo('user_incentive_roles', userRolesUncached);
+  return Object.fromEntries(Object.entries(all).map(([k, v]) => [k, [...v]]));
+}
+
+async function userRolesUncached() {
   const out = {};
   for (const row of await db.query('SELECT user_id, role FROM user_incentive_roles ORDER BY user_id, role')) {
     (out[Number(row.user_id)] = out[Number(row.user_id)] || []).push(String(row.role));
@@ -147,7 +158,9 @@ async function replaceUserRoles(rolesByUser) {
 }
 
 async function forOrder(orderId, c = db) {
-  return c.queryOne('SELECT * FROM order_incentives WHERE order_id = :id', { id: orderId });
+  // D-245 P5: read once per report run (batchCache scope only; never inside a transaction).
+  if (c !== db) return c.queryOne('SELECT * FROM order_incentives WHERE order_id = :id', { id: orderId });
+  return require('../helpers/batchCache').memoRead(`oi:${orderId}`, () => db.queryOne('SELECT * FROM order_incentives WHERE order_id = :id', { id: orderId }));
 }
 
 /** Creates the order's incentive row when missing, then updates the given columns. */
@@ -325,6 +338,15 @@ async function deleteOrderPayouts(orderId, c = db) {
 
 /** Incentive cost entries of the order (team / associate), keyed by kind. */
 async function costEntries(orderId, c = db) {
+  // D-245 P5: read once per report run (batchCache scope only; never inside a transaction).
+  if (c === db) {
+    const all = await require('../helpers/batchCache').memo(`oce:${orderId}`, () => costEntriesUncached(orderId, db));
+    return Object.fromEntries(Object.entries(all).map(([k, v]) => [k, { ...v }]));
+  }
+  return costEntriesUncached(orderId, c);
+}
+
+async function costEntriesUncached(orderId, c) {
   const out = {};
   for (const row of await c.query('SELECT * FROM order_cost_entries WHERE order_id = :id AND incentive_kind IS NOT NULL', { id: orderId })) {
     out[String(row.incentive_kind)] = row;

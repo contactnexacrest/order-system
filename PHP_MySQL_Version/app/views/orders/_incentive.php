@@ -117,6 +117,8 @@ $__rule = $__c['rule'];
       <?php // Owner decision D-245 P3: forcing commission on (a repeat order) is the MD's decision, with a written reason. ?>
       <label>Reason for forcing "Yes" <small class="muted">(MD only; at least 10 characters)</small>
         <input type="text" name="associate_mode_reason" minlength="10" maxlength="300" value="<?= htmlspecialchars((string) ($__inc['associate_mode_reason'] ?? '')) ?>" placeholder="e.g. Buyer introduced before the registration was recorded" data-required-when="associate_mode=yes" data-required-when-message="Say why commission is forced on for this order (at least 10 characters)."></label>
+      <?php else: // owner point 10 (2 Nov): no associate select, but Save keeps the saved mode ?>
+      <input type="hidden" name="associate_mode" value="<?= htmlspecialchars((string) ($__inc['associate_mode'] ?? 'auto')) ?>">
       <?php endif; ?>
       <button type="submit" class="btn-sm">Save</button>
     </form>

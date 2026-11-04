@@ -35,6 +35,12 @@ final class OrderPaymentStatusRepository
 
     public static function find(int $orderId): ?array
     {
+        // D-245 P5: read once per report run (BatchCache scope only).
+        return \App\Helpers\BatchCache::memo('ops:' . $orderId, static fn () => self::findUncached($orderId));
+    }
+
+        private static function findUncached(int $orderId): ?array
+    {
         $stmt = Database::connection()->prepare(
             'SELECT * FROM order_payment_status WHERE order_id = :order_id'
         );

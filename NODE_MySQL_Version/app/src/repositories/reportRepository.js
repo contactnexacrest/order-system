@@ -1486,6 +1486,10 @@ async function orderProfitabilityReport(dateFrom, dateTo, visibility = { sql: ''
     where.push('DATE(o.created_at) <= :date_to');
     params.date_to = dateTo;
   }
+  // D-245 P5 (performance): "Locked orders only" is filtered in SQL, so only those orders are worked out.
+  if (scope === 'locked') {
+    where.push('EXISTS (SELECT 1 FROM order_incentives oi WHERE oi.order_id = o.id AND oi.locked_at IS NOT NULL)');
+  }
 
   const orders = await db.query(
     `SELECT o.id, o.order_reference, o.created_at, o.company_legal_name
@@ -1494,6 +1498,18 @@ async function orderProfitabilityReport(dateFrom, dateTo, visibility = { sql: ''
      ORDER BY o.created_at DESC, o.id DESC`,
     params
   );
+  // D-245 P5 (performance): settings read once for the whole run, and a few orders worked out at
+  // a time (the pool has several connections); the rows keep the query's order.
+  const profits = await require('../helpers/batchCache').within(async () => {
+    const out = new Array(orders.length);
+    const CHUNK = 6;
+    for (let i = 0; i < orders.length; i += CHUNK) {
+      const part = orders.slice(i, i + CHUNK);
+      const done = await Promise.all(part.map((o) => orderProfitabilityService.computeForOrder(o.id)));
+      done.forEach((p, j) => { out[i + j] = p; });
+    }
+    return out;
+  });
 
   // Owner decision D-245 P5: profit before commission and incentive, the associate commission
   // and team incentive (estimated until the MD locks the order, then the locked figure), and
@@ -1501,8 +1517,8 @@ async function orderProfitabilityReport(dateFrom, dateTo, visibility = { sql: ''
   const rows = [];
   const keys = ['revenue_inr', 'cost_before_incentives_inr', 'profit_before_commission_inr', 'commission_inr', 'incentive_inr', 'profit_after_incentive_inr'];
   const sum = Object.fromEntries(keys.map((k) => [k, 0]));
-  for (const o of orders) {
-    const p = await orderProfitabilityService.computeForOrder(o.id);
+  for (const [idx, o] of orders.entries()) {
+    const p = profits[idx];
     if (scope === 'locked' && !p.incentives_locked) continue;
     const row = {
       order_id: o.id,
