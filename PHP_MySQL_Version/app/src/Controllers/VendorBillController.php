@@ -75,6 +75,21 @@ final class VendorBillController
     }
 
     /**
+     * Owner decision (3 Nov 2026): Payment "Advance — paid before the service" goes with the bill type
+     * "Proforma / advance request"; "Final — against the completed service" with "Tax invoice / final bill".
+     */
+    public static function paymentKindMismatch(string $paymentKind, string $docKind): ?string
+    {
+        if ($paymentKind === 'advance' && $docKind !== 'proforma') {
+            return 'An Advance bill is a Proforma / advance request — pick that bill type, or choose Payment "Final" for a tax invoice.';
+        }
+        if ($paymentKind === 'final' && $docKind !== 'invoice') {
+            return 'A Final bill is the Tax invoice / final bill — pick that bill type, or choose Payment "Advance" for a proforma.';
+        }
+        return null;
+    }
+
+    /**
      * Owner decision (2026-10-28, Option B): the bill type, a proforma's
      * asked amount, and the earlier proforma a tax invoice replaces.
      * $sameVendor says whether a proforma comes from the same vendor.
@@ -209,6 +224,12 @@ final class VendorBillController
             return;
         }
         $fields += $kind;
+        // Owner decision (3 Nov 2026): an Advance bill is a Proforma / advance request; the Final bill is the tax invoice.
+        $mismatch = self::paymentKindMismatch($paymentKind, (string) $fields['doc_kind']);
+        if ($mismatch !== null) {
+            $this->back($orderId, $anchor, 'error', $mismatch);
+            return;
+        }
         $user = AuthService::currentUser();
         try {
             $fileId = FileUploadService::handleUpload('bill_file', 'vendor_bill', OrderStorage::forReceived($order, 'freight'), (int) $order['client_id'], $orderId, (int) $user['id'], null, (string) $partner['partner_name'], 'Logistics partner bill');

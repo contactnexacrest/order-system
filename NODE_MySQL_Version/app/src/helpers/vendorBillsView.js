@@ -44,17 +44,65 @@ function unpaid(bills) {
   return (bills || []).filter((b) => !b.settled);
 }
 
-/** cost: tax invoices, plus what is paid on a proforma not yet replaced; paid: on the bills themselves; due: what is still owed. */
+/**
+ * Owner request (3 Nov 2026): every payment form shows, read-only, what is to be paid now and how the app
+ * worked it out, e.g. "bill total ₹655,549.00 − advance paid on proforma PI-7 ₹196,664.70". Mirrors PHP
+ * OrderVendorBillRepository::toPayNow (same wording).
+ */
+function toPayNow(b) {
+  const m = (v) => `₹${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const isProforma = (b.doc_kind || 'invoice') === 'proforma';
+  const base = isProforma && b.requested_amount_inr !== null && b.requested_amount_inr !== undefined ? 'asked now on the proforma' : (isProforma ? 'proforma total' : 'bill total');
+  const parts = [`${base} ${m(b.amount_due)}`];
+  if (Number(b.carried_paid || 0) > 0.004) parts.push(`advance paid on proforma ${b.replaces_bill_no} ${m(b.carried_paid)}`);
+  if (Number(b.own_paid || 0) > 0.004) parts.push(`already paid on this bill ${m(b.own_paid)}`);
+  return { amount: Number(b.remaining), working: parts.join(' − ') };
+}
+
+/**
+ * Owner request (3 Nov 2026): the supplier step's own "To pay now". Advance (7e): planned advance − paid on
+ * the advance leg; balance (10a): PO total − advance paid − balance already paid. Null when nothing is
+ * planned. Mirrors PHP OrderVendorBillRepository::supplierLegToPayNow (same wording).
+ */
+function supplierLegToPayNow(bills, supplierPo, leg) {
+  const paid = { advance: 0, balance: 0 };
+  for (const b of supplierBills(bills, supplierPo.id)) {
+    for (const p of b.payments || []) paid[p.leg === 'balance' ? 'balance' : 'advance'] += Number(p.amount_inr);
+  }
+  const m = (v) => `₹${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const r = (v) => Math.round(v * 100) / 100;
+  if (leg === 'advance') {
+    const planned = Number(supplierPo.advance_amount_inr || 0);
+    if (planned <= 0) return null;
+    return { amount: r(Math.max(0, planned - paid.advance)), working: `planned advance ${m(planned)} − already paid ${m(r(paid.advance))}` };
+  }
+  const total = Number(supplierPo.total_payable_inr || 0);
+  if (total <= 0) return null;
+  return {
+    amount: r(Math.max(0, total - paid.advance - paid.balance)),
+    working: `PO total ${m(total)} − advance paid ${m(r(paid.advance))} − balance already paid ${m(r(paid.balance))}`,
+  };
+}
+
+/**
+ * The "Total cost" row. cost: tax invoices, plus what is paid on a proforma not yet replaced; due: what is
+ * still owed. Owner report (3 Nov 2026): paid counts every payment towards the listed bills — each bill's
+ * own payments, plus what was paid on a replaced proforma that is not itself listed (when it is, its own
+ * payments are already counted — never twice). Mirrors PHP OrderVendorBillRepository::totalsFor.
+ */
 function totals(bills) {
+  const listed = new Set((bills || []).map((b) => Number(b.id)));
   let cost = 0;
   let paid = 0;
   let due = 0;
   for (const b of bills || []) {
-    cost += b.cost_inr;
-    paid += b.own_paid;
-    due += b.remaining;
+    cost += Number(b.cost_inr);
+    paid += Number(b.own_paid);
+    if (b.replaces_bill_id && !listed.has(Number(b.replaces_bill_id))) paid += Number(b.carried_paid || 0);
+    due += Number(b.remaining);
   }
-  return { cost, paid, due: due > 0.004 ? due : 0 };
+  const r = (v) => Math.round(v * 100) / 100;
+  return { cost: r(cost), paid: r(paid), due: due > 0.004 ? r(due) : 0 };
 }
 
 /**
@@ -124,4 +172,4 @@ function suggestedForwarderId(freight, orderBills, partners) {
   return forwarders.length === 1 ? forwarders[0] : null;
 }
 
-module.exports = { supplierBills, supplierLeg, supplierCarried, replaceable, ids, logistics, unpaid, totals, supplierPrefill, prefillFigures, suggestedForwarderId };
+module.exports = { toPayNow, supplierLegToPayNow, supplierBills, supplierLeg, supplierCarried, replaceable, ids, logistics, unpaid, totals, supplierPrefill, prefillFigures, suggestedForwarderId };

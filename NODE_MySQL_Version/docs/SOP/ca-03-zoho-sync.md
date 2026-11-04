@@ -160,7 +160,8 @@ What the order pays out goes to Zoho Books too, on the same sync:
   *Insurance Expense*, buyer due diligence to *Consultant Expense*,
   documentation to *Export Documentation Charges*, commission to
   *Commission Expense*, packing / wooden crates to *Packing Material*,
-  the pre-shipment inspection fee to *Inspection Charges* and other to
+  the pre-shipment inspection fee to *Inspection Charges*, courier
+  charges booked at Step 13f to *Postage* (3 Nov 2026) and other to
   *Other Expenses* (the CA adds the accounts that do not exist yet).
   A cost corrected later (for example the inspection fee) is updated in
   Books; a cost removed in the app is removed from Books at the same

@@ -43,6 +43,11 @@ final class OrderStep6bStatusTest extends DbTestCase
         self::assertNotSame('done', $this->icon($html, 'step-6b-buyer-action-link'), 'OC not approved yet');
 
         Database::connection()->prepare("UPDATE documents SET status = 'approved' WHERE id = :id")->execute(['id' => $docId]);
+        // Owner request (3 Nov 2026): approving the OC no longer makes 6b green on its own —
+        // the OC confirmation link must be generated with the 6b button first.
+        self::assertNotSame('done', $this->icon($render(), 'step-6b-buyer-action-link'), 'OC approved but no OC link generated yet');
+
+        Database::connection()->prepare('UPDATE orders SET oc_link_generated_at = NOW() WHERE id = :id')->execute(['id' => $orderId]);
         self::assertSame('done', $this->icon($render(), 'step-6b-buyer-action-link'));
     }
 }

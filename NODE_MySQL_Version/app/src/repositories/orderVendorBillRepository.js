@@ -106,9 +106,11 @@ function enrich(bills, paymentsByBill) {
     const replaces = b.replaces_bill_id ? byId.get(Number(b.replaces_bill_id)) : undefined;
     b.replaces_bill_no = replaces ? String(replaces.bill_no) : null;
     b.carried_payments = [];
+    b.carried_paid = 0;
     let credited = b.own_paid;
     if (b.doc_kind === 'invoice' && replaces) {
       b.carried_payments = replaces.payments;
+      b.carried_paid = Number(replaces.own_paid);
       credited += replaces.own_paid;
     }
     b.credited = round2(credited);

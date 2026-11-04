@@ -322,6 +322,7 @@ final class ZohoBooksService
         'commission'     => 'Commission Expense',
         'packing_crates' => 'Packing Material',
         'inspection_fee' => 'Inspection Charges',
+        'courier'        => 'Postage',
         'other'          => 'Other Expenses',
     ];
 

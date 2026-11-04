@@ -128,7 +128,11 @@ if ($canManageIncentives) {
     $__hasAsStmt = \App\Config\Database::connection()->prepare('SELECT 1 FROM clients WHERE id = :c AND associate_id IS NOT NULL');
     $__hasAsStmt->execute(['c' => (int) $order['client_id']]);
     $incentiveHasAssociate = $__hasAsStmt->fetchColumn() !== false;
+    // Owner request (3 Nov 2026): Step 12d only while the team incentive program is on — or, when it is
+    // off, only for an associate's commission (shown on its own).
+    $incentiveProgramOn = \App\Services\IncentiveService::settings()['enabled'];
 }
+$showIncentiveStep = $canManageIncentives && (($incentiveProgramOn ?? false) || !empty($incentiveHasAssociate) || !empty($incentiveRow['associate_id']));
 // External QA report Q-ROLE-3: split out of manage_order_financials so
 // Accounts can confirm supplier payments without gaining the broader
 // financials permission's access to cost entries/export benefits/the
@@ -667,13 +671,13 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
         }
         return;
     }
-    $cost = $paid = $due = 0.0;
+    // Owner report (3 Nov 2026): the Total row counts every payment towards these bills, incl. an advance paid on a replaced proforma.
+    ['cost' => $cost, 'paid' => $paid, 'due' => $due] = \App\Repositories\OrderVendorBillRepository::totalsFor($bills);
     $money = static fn ($v): string => number_format((float) $v, 2);
     ?>
     <table class="list vendor-bills">
       <tr><?php if ($showPartner): ?><th>Partner</th><?php endif; ?><th>For</th><?php if ($showPartner): ?><th>Payment</th><?php endif; ?><th>Type</th><th>Bill / invoice</th><th style="text-align:right">Taxable &#8377;</th><th style="text-align:right">GST &#8377;</th><th style="text-align:right">Bill total &#8377;</th><th>Paid</th></tr>
       <?php foreach ($bills as $b): ?>
-        <?php $cost += $b['cost_inr']; $paid += $b['own_paid']; $due += $b['remaining']; ?>
         <?php $forLabel = $b['vendor_kind'] === 'supplier' ? (\App\Repositories\OrderVendorBillRepository::SUPPLIER_LEGS[$b['bill_for']] ?? $b['bill_for']) : (\App\Repositories\OrderVendorBillRepository::LOGISTICS_SERVICES[$b['bill_for']] ?? $b['bill_for']); ?>
         <?php $__isProforma = $b['doc_kind'] === 'proforma'; ?>
       <tr id="vendor-bill-<?= (int) $b['id'] ?>">
@@ -714,6 +718,8 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
               <form method="post" action="/orders/<?= (int) $order['id'] ?>/vendor-bills/<?= (int) $b['id'] ?>/pay" class="field-grid">
                 <?= \App\Helpers\Csrf::field() ?>
                 <?php if ($leg !== null): ?><input type="hidden" name="leg" value="<?= htmlspecialchars($leg) ?>"><?php endif; ?>
+                <?php $__tpn = \App\Repositories\OrderVendorBillRepository::toPayNow($b); // Owner request (3 Nov 2026): read-only, system-calculated ?>
+                <p class="full to-pay-now"><strong>To pay now: &#8377;<?= number_format($__tpn['amount'], 2) ?></strong> <small class="muted">(<?= htmlspecialchars($__tpn['working']) ?>)</small></p>
                 <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" max="<?= htmlspecialchars(number_format($b['remaining'], 2, '.', '')) ?>" name="paid_amount_inr" value="<?= htmlspecialchars(number_format($b['remaining'], 2, '.', '')) ?>" required placeholder="e.g. 25000.00"></label>
                 <label>Paid on *<input type="date" name="paid_at" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required></label>
                 <label>Mode *
@@ -856,6 +862,11 @@ $renderSupplierPayment = static function (string $leg) use ($supplierPo, $suppli
     if ($noAdvance && $legBills === []) {
         echo '<p class="review-banner ok">&#10003; <span><strong>No advance on this order</strong> — the Supplier PO terms plan no advance, so there is nothing to pay here. The full amount is paid as the supplier balance in <a href="#step-10a-supplier-balance-paid">Step 10a</a>.</span></p>';
     } else {
+        // Owner request (3 Nov 2026): the step's own read-only "To pay now", from the Supplier PO and what is already paid.
+        $__legTpn = !$paidAt ? \App\Repositories\OrderVendorBillRepository::supplierLegToPayNow($vendorBills, $supplierPo, $leg) : null;
+        if ($__legTpn !== null) {
+            echo '<p class="to-pay-now"><strong>' . $label . ' to pay now: &#8377;' . number_format($__legTpn['amount'], 2) . '</strong> <small class="muted">(' . htmlspecialchars($__legTpn['working']) . ')</small></p>';
+        }
         $renderVendorBills($legBills, false, $canManageSupplierPayments, $payBlocked, static fn (array $b): string => $vendorBillPayTo($supplierBank, $editUrl, $canEditSupplier), $leg, array_map(static fn (array $b): int => (int) $b['id'], $carried));
     }
     if (!$canManageSupplierPayments) {
@@ -955,7 +966,8 @@ $subStepDone = [
         // Owner report (2026-10-27): the link is the one already made in 4b,
         // so it only counts for 6b once the OC itself is issued — otherwise
         // 6b (and, through it, 6a) went green right after the OC draft.
-        '6b' => $docComplete('OC') && !empty($order['buyer_action_token_hash']),
+        // Owner request (3 Nov 2026): done only once the OC confirmation link was generated with the 6b button.
+        '6b' => $docComplete('OC') && !empty($order['oc_link_generated_at']),
         '6c' => $buyerAcknowledged,
     ],
     '7' => [
@@ -2291,30 +2303,35 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
 // buyer downloads the Buyer PO, uploads it signed with their PO number and
 // Step 4 completes) and again at 6b for the OC acknowledgement — one link,
 // rendered by this one widget in both places.
-$renderBuyerActionLink = function (string $badge, string $anchor) use ($order, $canManageOrders, $stepBadge): void {
+$renderBuyerActionLink = function (string $badge, string $anchor, bool $ocMode = false) use ($order, $canManageOrders, $stepBadge): void {
     // QA-5 L-24: buyer_action_token_plain is encrypted at rest
     // (EncryptionService) — decrypt it here, the one place it's ever
     // rendered back to staff.
     $buyerActionTokenPlain = \App\Services\EncryptionService::decrypt($order['buyer_action_token_plain'] ?? null);
     $buyerActionLinkValid = !empty($buyerActionTokenPlain) && !empty($order['buyer_action_token_expires_at']) && strtotime((string) $order['buyer_action_token_expires_at']) > time();
+    // Owner request (3 Nov 2026): in Step 6b the link shows only after the OC confirmation link was generated there.
+    $ocLinkMade = !empty($order['oc_link_generated_at']);
+    if ($ocMode && !$ocLinkMade) {
+        $buyerActionLinkValid = false;
+    }
     ?>
     <?php if ($buyerActionLinkValid): ?>
       <?php $buyerActionFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/buyer-action/' . $buyerActionTokenPlain; ?>
       <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
         <span>Current link (valid until <?= htmlspecialchars(Dates::human($order['buyer_action_token_expires_at'])) ?>) — copy and send however you like, no need to regenerate:</span>
         <div style="display:flex;gap:6px;align-items:center">
-          <input type="text" readonly value="<?= htmlspecialchars($buyerActionFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Buyer Action Link">
+          <input type="text" readonly value="<?= htmlspecialchars($buyerActionFullLink) ?>" onclick="this.select()" data-focus-link style="flex:1;font-family:monospace;font-size:12px" aria-label="Buyer Action Link">
           <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($buyerActionFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
         </div>
       </div>
     <?php else: ?>
-      <p class="muted small">No active link — generate one below.</p>
+      <p class="muted small"><?= $ocMode ? 'No OC confirmation link yet — generate it below, then copy it and send it to the buyer.' : 'No active link — generate one below.' ?></p>
     <?php endif; ?>
     <?php if ($canManageOrders): ?>
     <form method="post" action="/orders/<?= (int) $order['id'] ?>/buyer-action-link" style="display:inline">
       <?= Csrf::field() ?>
       <input type="hidden" name="return_to" value="<?= htmlspecialchars($anchor) ?>">
-      <?= $stepBadge($badge) ?><button type="submit" class="btn-sm"><?= $buyerActionLinkValid ? 'Regenerate Buyer Action Link' : 'Generate Buyer Action Link' ?></button>
+      <?= $stepBadge($badge) ?><button type="submit" class="btn-sm"><?= $ocMode ? ($buyerActionLinkValid ? 'Regenerate OC Confirmation Link' : 'Generate OC Confirmation Link') : ($buyerActionLinkValid ? 'Regenerate Buyer Action Link' : 'Generate Buyer Action Link') ?></button>
     </form>
     <?php endif; ?>
     <?php
@@ -2332,7 +2349,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <?php if ($paymentLinkValid): ?>
         <?php $paymentFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/payment-action/' . $paymentTokenPlain; ?>
         <div style="display:flex;gap:6px;align-items:center">
-          <input type="text" readonly value="<?= htmlspecialchars($paymentFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Payment Action Link">
+          <input type="text" readonly value="<?= htmlspecialchars($paymentFullLink) ?>" onclick="this.select()" data-focus-link style="flex:1;font-family:monospace;font-size:12px" aria-label="Payment Action Link">
           <button type="button" class="btn-sm btn-secondary" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($paymentFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
         </div>
       <?php endif; ?>
@@ -2474,7 +2491,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
             <span>Current link (valid until <?= htmlspecialchars(Dates::human($piIntake['access_token_expires_at'])) ?>) — copy and send however you like, no need to regenerate:</span>
             <div style="display:flex;gap:6px;align-items:center">
-              <input type="text" readonly aria-label="Form link" value="<?= htmlspecialchars($piFormFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
+              <input type="text" readonly aria-label="Form link" value="<?= htmlspecialchars($piFormFullLink) ?>" onclick="this.select()" data-focus-link style="flex:1;font-family:monospace;font-size:12px">
               <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($piFormFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
             </div>
           </div>
@@ -2733,9 +2750,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
   <div class="step-group-connector">send the buyer their action link</div>
 
   <details class="step-card" id="step-6b-buyer-action-link"<?= $subCardOpen('6', '6b') ?>>
-    <summary><?= $stepStatusIcon($subStepStatus('6', '6b')) ?><h2>Step 6b &middot; Send Buyer Action Link (OC acknowledgement)</h2></summary>
-    <p class="muted small">The same Buyer Action Link the buyer used for their PO (Step 4b) also lets them acknowledge this Order Confirmation — send it again, or regenerate it if it has expired.</p>
-    <?php $renderBuyerActionLink('6b', 'step-6b-buyer-action-link'); ?>
+    <summary><?= $stepStatusIcon($subStepStatus('6', '6b')) ?><h2>Step 6b &middot; Generate &amp; Send the OC Confirmation Link</h2></summary>
+    <p class="muted small">Once the Order Confirmation is approved, press <strong>Generate OC Confirmation Link</strong>, then copy the link and send it to the buyer — they acknowledge the Order Confirmation there (it is the same Buyer Action Link they used for their PO). This step turns green, and Step 6c opens, only after the link is generated here.</p>
+    <?php $renderBuyerActionLink('6b', 'step-6b-buyer-action-link', true); ?>
   </details>
 
   <div class="step-group-connector">the buyer acknowledges (link or portal) — or staff record it</div>
@@ -3126,7 +3143,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php if ($supplierActionLinkValid): ?>
           <?php $supplierActionFullLink = rtrim(Env::get('APP_URL', ''), '/') . '/supplier-action/' . $supplierActionTokenPlain; ?>
           <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-            <input type="text" readonly value="<?= htmlspecialchars($supplierActionFullLink) ?>" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Supplier Action Link">
+            <input type="text" readonly value="<?= htmlspecialchars($supplierActionFullLink) ?>" onclick="this.select()" data-focus-link style="flex:1;font-family:monospace;font-size:12px" aria-label="Supplier Action Link">
             <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('<?= htmlspecialchars($supplierActionFullLink, ENT_QUOTES) ?>'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
           </div>
           <p class="muted small">Valid until <?= htmlspecialchars(Dates::human($supplierPo['supplier_action_token_expires_at'])) ?>.</p>
@@ -3322,7 +3339,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <option value="advance">Advance — paid before the service</option>
             <option value="final" selected>Final — against the completed service</option>
           </select>
-          <small class="muted"><?= $isFob ? 'Advance and Final bills can both be paid any time on an FOB order.' : 'An Advance bill can be paid any time; a Final bill waits for Step 9d.' ?></small>
+          <small class="muted"><?= $isFob ? 'Advance and Final bills can both be paid any time on an FOB order.' : 'An Advance bill can be paid any time; a Final bill waits for Step 9d.' ?> Advance = a Proforma / advance request; Final = the Tax invoice / final bill.</small>
         </label>
         <?php // Owner decision 2026-10-29 (CA advice): a road transporter (GTA) that charges no GST is booked under reverse charge. ?>
         <label data-show-when="bill_for=transport">GST on this bill *
@@ -3334,6 +3351,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         </label>
         <?php $vendorBillFields('invoice', array_values(array_filter($__logisticsBills, static fn (array $b): bool => $b['doc_kind'] === 'proforma' && $b['replaced_by'] === null)), null, ['hint' => 'The amount before GST printed on the partner\'s bill (e.g. the CHA, transport or freight charge without GST).']); ?>
         <div><button type="submit" class="btn-sm">Add Bill</button></div>
+        <script>/* Owner decision (3 Nov 2026): Payment Advance => Proforma / advance request; Final => Tax invoice / final bill. */(function(){var f=document.currentScript.parentNode;var s=f.querySelector('select[name="payment_kind"]');if(!s)return;function sync(){var want=s.value==='advance'?'proforma':'invoice';f.querySelectorAll('input[name="doc_kind"]').forEach(function(r){r.disabled=r.value!==want;if(r.value===want&&!r.checked){r.checked=true;r.dispatchEvent(new Event('change',{bubbles:true}));}});}s.addEventListener('change',sync);sync();})();</script>
       </form>
       <?php endif; ?>
     </details>
@@ -4026,9 +4044,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             </label>
             <label>Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="amount_inr" required placeholder="e.g. 25000.00"></label>
             <label>Paid by *
+              <?php // Owner request (3 Nov 2026): Company account is the default. ?>
               <select name="paid_by" required>
-                <option value="">Choose…</option>
-                <?php foreach (\App\Repositories\OrderExpenseRepository::PAID_BY as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+                <?php foreach (\App\Repositories\OrderExpenseRepository::PAID_BY as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__key === 'company_account' ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
             <label>Staff member to reimburse<input type="text" name="staff_name" maxlength="150" data-required-if="paid_by=staff" placeholder="only when staff paid"></label>
@@ -4084,9 +4102,9 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <label>Description * <small class="muted">(who was paid and for what — their invoice / receipt no.)</small><input type="text" name="description" required minlength="10" maxlength="255" placeholder="e.g. Agent commission — Ravi Traders, their invoice RT/45 dated 20 Oct"></label>
             <?php // Owner decision 2026-10-29: real paid costs go to Zoho Books as expenses, paid from here. ?>
             <label>Paid from *
+              <?php // Owner request (3 Nov 2026): Company account is the default. ?>
               <select name="paid_from" required>
-                <option value="">Choose…</option>
-                <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+                <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__key === 'company_account' ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
             <p class="muted small">CHA, inland transport and port charges belong on <a href="#logistics-bills">logistics partner bills</a>; bank charges and loan interest the CA books from the bank statement — those entries here are not sent to Zoho Books.</p>
@@ -4143,8 +4161,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <?php $__feePaidFrom = null; foreach ($orderCostEntries as $__c) { if ($orderInspectionFee && (int) $__c['id'] === (int) ($orderInspectionFee['cost_entry_id'] ?? 0)) { $__feePaidFrom = $__c['paid_from']; } } ?>
             <label data-show-when="fee_payer=nexacrest">Paid from *
               <select name="paid_from" required>
-                <option value="">Choose…</option>
-                <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__feePaidFrom === $__key ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+                <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= ($__feePaidFrom ?? 'company_account') === $__key ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
               </select>
             </label>
             <?php // Owner rule D-212: the cost line is described from the agency and its invoice. ?>
@@ -4335,8 +4352,8 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?php endif; ?>
       </div>
     </details>
-    <?php if ($canManageIncentives): // Owner decision 2026-10-30: Step 12d, manage_incentives only. ?>
-      <div class="step-group-connector">and the team's incentive</div>
+    <?php if ($showIncentiveStep): // Owner decision 2026-10-30: Step 12d, manage_incentives only; 3 Nov 2026: hidden while the program is off (unless an associate is paid). ?>
+      <div class="step-group-connector"><?= ($incentiveProgramOn ?? false) ? 'and the team\'s incentive' : 'and the associate\'s commission' ?></div>
       <?php require __DIR__ . '/_incentive.php'; ?>
     <?php endif; ?>
   </details>
@@ -4479,6 +4496,14 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <?= Csrf::field() ?>
         <input type="hidden" name="override_gate" value="1">
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required placeholder="e.g. DHL 1234567890"></label>
+        <?php // Owner request (3 Nov 2026): the courier charges go in with the tracking number — booked as an order cost at once. ?>
+        <label>Courier company<input type="text" name="courier_company" maxlength="100" placeholder="e.g. DHL Express"></label>
+        <label>Courier charges (&#8377;, incl. GST) <small class="muted">(optional — booked as the order cost "Courier Charges" now; goes to Zoho Books at the next sync)</small><input type="number" step="0.01" min="0" max="<?= number_format(\App\Services\CourierCharges::MAX_INR, 2, '.', '') ?>" name="courier_charges_inr" placeholder="e.g. 3540.00"></label>
+        <label>Paid from
+          <select name="courier_paid_from">
+            <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__key === 'company_account' ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+          </select>
+        </label>
         <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
           <textarea class="override-reason" name="override_reason" rows="2" required minlength="10" placeholder="At least 10 characters — say why"></textarea>
         </label>
@@ -4489,6 +4514,14 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <form method="post" action="/orders/<?= (int) $order['id'] ?>/close">
         <?= Csrf::field() ?>
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required placeholder="e.g. DHL 1234567890"></label>
+        <?php // Owner request (3 Nov 2026): the courier charges go in with the tracking number — booked as an order cost at once. ?>
+        <label>Courier company<input type="text" name="courier_company" maxlength="100" placeholder="e.g. DHL Express"></label>
+        <label>Courier charges (&#8377;, incl. GST) <small class="muted">(optional — booked as the order cost "Courier Charges" now; goes to Zoho Books at the next sync)</small><input type="number" step="0.01" min="0" max="<?= number_format(\App\Services\CourierCharges::MAX_INR, 2, '.', '') ?>" name="courier_charges_inr" placeholder="e.g. 3540.00"></label>
+        <label>Paid from
+          <select name="courier_paid_from">
+            <?php foreach (\App\Repositories\OrderCostEntryRepository::PAID_FROM as $__key => $__label): ?><option value="<?= htmlspecialchars($__key) ?>"<?= $__key === 'company_account' ? ' selected' : '' ?>><?= htmlspecialchars($__label) ?></option><?php endforeach; ?>
+          </select>
+        </label>
         <?= $stepBadge('13f') ?><button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
     <?php endif; ?>

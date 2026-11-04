@@ -63,6 +63,21 @@ async function billFields(req) {
 }
 
 /**
+ * Owner decision (3 Nov 2026): Payment "Advance — paid before the service" goes with the bill type
+ * "Proforma / advance request"; "Final — against the completed service" with "Tax invoice / final bill".
+ * Mirrors PHP VendorBillController::paymentKindMismatch.
+ */
+function paymentKindMismatch(paymentKind, docKind) {
+  if (paymentKind === 'advance' && docKind !== 'proforma') {
+    return 'An Advance bill is a Proforma / advance request — pick that bill type, or choose Payment "Final" for a tax invoice.';
+  }
+  if (paymentKind === 'final' && docKind !== 'invoice') {
+    return 'A Final bill is the Tax invoice / final bill — pick that bill type, or choose Payment "Advance" for a proforma.';
+  }
+  return null;
+}
+
+/**
  * Owner decision (2026-10-28, Option B): the bill type, a proforma's asked
  * amount, and the earlier proforma a tax invoice replaces. sameVendor says
  * whether a proforma comes from the same vendor. The extra fields, or an
@@ -175,6 +190,12 @@ async function addLogisticsBill(req, res) {
     return;
   }
   const fields = { ...base, ...kind };
+  // Owner decision (3 Nov 2026): an Advance bill is a Proforma / advance request; the Final bill is the tax invoice.
+  const mismatch = paymentKindMismatch(paymentKind, fields.doc_kind);
+  if (mismatch !== null) {
+    back(req, res, orderId, anchor, 'error', mismatch);
+    return;
+  }
   let fileId;
   try {
     fileId = await fileUploadService.handleUpload(req, 'bill_file', 'vendor_bill', orderStorage.forReceived(order, 'freight'), order.client_id, orderId, req.user.id, null, partner.partner_name, 'Logistics partner bill');
@@ -308,4 +329,4 @@ async function deleteBill(req, res) {
   back(req, res, orderId, anchor, 'success', `Bill ${bill.bill_no} removed.`);
 }
 
-module.exports = { ANCHORS, addSupplierBill, addLogisticsBill, logisticsPaymentBlockedReason, payBill, deleteBill };
+module.exports = { ANCHORS, addSupplierBill, addLogisticsBill, logisticsPaymentBlockedReason, payBill, deleteBill, paymentKindMismatch };

@@ -91,6 +91,14 @@ as a "Commission" line set by Team Incentive, which cannot be removed
 there), in its profit (Step 12c), in the reports and in the CA Financial
 Annexure. Only management sees how an order's incentive was decided.
 
+On the order page, **Step 12d · Team Incentive** shows only while the team
+incentive program is switched on (Team Incentives → settings; owner
+request 3 Nov 2026). With the program off, Step 12d is hidden — unless the
+client was brought by an associate: then it shows only the associate's
+part, titled **Step 12d · Associate Commission** (the commission and its
+Automatic / Yes / No choice; the team reward, Exclude, who-gets-what and
+people are hidden and keep what was saved).
+
 ## Associates
 
 The full associate system — portal, invitations, bank checks, holds and

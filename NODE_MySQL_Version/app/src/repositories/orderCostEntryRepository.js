@@ -21,6 +21,7 @@ const CATEGORIES = {
   bank_loan_interest: 'Bank Loan Interest (LC order)',
   inspection_fee: 'Pre-Shipment Inspection Fee',
   travel_expenses: 'Travel Expenses (Factory Visits)',
+  courier: 'Courier Charges',
   other: 'Other',
 };
 
@@ -31,7 +32,7 @@ const CATEGORIES = {
  * CHA / inland transport / port charges belong on logistics partner bills
  * (which go to Books themselves).
  */
-const ZOHO_CATEGORIES = ['ecgc_insurance', 'due_diligence', 'documentation', 'commission', 'packing_crates', 'inspection_fee', 'other'];
+const ZOHO_CATEGORIES = ['ecgc_insurance', 'due_diligence', 'documentation', 'commission', 'packing_crates', 'inspection_fee', 'courier', 'other'];
 
 /** Why a category does not go to Zoho Books — shown on the order page. */
 const NOT_IN_ZOHO = {

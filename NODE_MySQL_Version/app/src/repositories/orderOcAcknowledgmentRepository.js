@@ -75,8 +75,22 @@ async function markAcknowledged(orderId, via, note, recordedBy) {
 }
 
 /** Unacknowledged rows past due — for the 48h auto-confirm cron. */
+/**
+ * Unacknowledged rows past due — for the 48h auto-confirm job. Owner request (3 Nov 2026):
+ * only orders whose OC confirmation link was generated (Step 6b button), and only once the
+ * auto-confirm hours have also passed since that link was made.
+ */
 async function dueForAutoConfirm() {
-  return db.query("SELECT * FROM order_oc_acknowledgments WHERE acknowledged_at IS NULL AND due_at <= NOW()");
+  const companySettingsRepository = require('./companySettingsRepository');
+  const hours = Math.max(1, parseInt((await companySettingsRepository.get('oc_ack_auto_confirm_hours')) || '48', 10) || 48);
+  return db.query(
+    `SELECT a.* FROM order_oc_acknowledgments a
+       JOIN orders o ON o.id = a.order_id
+      WHERE a.acknowledged_at IS NULL AND a.due_at <= NOW()
+        AND o.oc_link_generated_at IS NOT NULL
+        AND o.oc_link_generated_at <= NOW() - INTERVAL :hours HOUR`,
+    { hours }
+  );
 }
 
 module.exports = { recordSent, find, ensureRowExists, markAcknowledged, dueForAutoConfirm };

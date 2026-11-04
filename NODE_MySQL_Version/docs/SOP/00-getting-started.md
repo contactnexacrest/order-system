@@ -19,6 +19,14 @@ enquiry to the money being fully settled — one place to track a client,
 an order, every document it needs, every payment against it, and every
 conversation with the buyer, instead of scattered emails and spreadsheets.
 
+## Two small things that save time
+
+- **Dates:** click anywhere in a date box (not only on the small calendar
+  icon) and the calendar opens. You can still type the date if you prefer.
+- **Links for the buyer or supplier:** after you press any **Generate …
+  Link** button on an order, the page comes back to that same card with the
+  new link already selected — just copy it and send it.
+
 ## The big picture: one order, nine stages
 
 Every single order — whatever it is, whoever the buyer is — moves through

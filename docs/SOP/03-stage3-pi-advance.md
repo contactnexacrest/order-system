@@ -204,7 +204,10 @@ with money that's actually landed:
 1. **Record Advance Remittance** (5d) — the card shows the **advance due**
    (e.g. *USD 3,000.00 — 40% of the order value USD 7,500.00*) and fills it
    in. Enter what the bank actually received. An amount above the whole
-   order value is refused. When the amount differs from the advance still
+   order value is refused. The form shows, read-only, **Buyer to pay now**
+   with the working (*advance due USD 3,000.00 − already received USD
+   0.00*; owner request 3 Nov 2026) — the same line is on every buyer
+   remittance form (freight, balance, milestones). When the amount differs from the advance still
    due, choose a reason under **"Why is it different?"** (owner, 2 Nov
    2026) — the first receipt must say why if it is more than 1% off, and
    any amount above what is still due always must, so a typing mistake

@@ -97,7 +97,9 @@ final class OrderPageOwnerPointsNov2Test extends DbTestCase
 
     public function testPoint10NoAssociateSelectWhenTheClientHasNoAssociate(): void
     {
-        $this->signIn('Admin', true);
+        $adminId = $this->signIn('Admin', true);
+        // 3 Nov 2026: Step 12d shows the team part only while the program is on.
+        \App\Repositories\IncentiveRepository::setSetting('program_enabled', '1', $adminId);
         $plain = $this->createTestOrder($this->createTestClient());
         $html = $this->render($plain);
         self::assertStringContainsString('Step 12d &middot; Team Incentive', $html);
@@ -111,6 +113,7 @@ final class OrderPageOwnerPointsNov2Test extends DbTestCase
         $pdo->exec("UPDATE clients SET associate_id = {$associateId} WHERE id = {$client}");
         $html = $this->render($this->createTestOrder($client));
         self::assertStringContainsString('Associate commission on this order', $html);
+        \App\Repositories\IncentiveRepository::setSetting('program_enabled', '0', $adminId);
     }
 
     public function testPoint13SupplierLinkComesBeforeTheAcknowledgment(): void

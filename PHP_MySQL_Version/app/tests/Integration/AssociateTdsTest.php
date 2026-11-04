@@ -73,6 +73,9 @@ final class AssociateTdsTest extends DbTestCase
             'bank_name' => 'HDFC Bank', 'bank_branch_address' => '', 'intermediary_bank' => '', 'account_currency' => 'INR'], true, null);
         AssociateBankRepository::firstCheck($bank, $this->finance1, 'Called back on the known number; ₹1 test credit confirmed.');
         AssociateBankRepository::verify($bank, $this->finance2, 0);
+        // The payouts below are dated 2 Nov 2026: make the account usable from before then,
+        // so this test does not depend on the day it runs.
+        \App\Config\Database::connection()->prepare("UPDATE associate_bank_accounts SET usable_from = '2026-04-01' WHERE id = :id")->execute(['id' => $bank]);
         return AssociateRepository::find($id);
     }
 

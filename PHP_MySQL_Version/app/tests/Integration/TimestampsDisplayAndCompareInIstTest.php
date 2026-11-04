@@ -63,6 +63,10 @@ final class TimestampsDisplayAndCompareInIstTest extends DbTestCase
             $now->modify('-2 hours')->format('Y-m-d H:i:s'),
             $now->modify('-1 minute')->format('Y-m-d H:i:s')
         );
+        // Owner request (3 Nov 2026): only orders whose OC confirmation link was generated
+        // (Step 6b) auto-confirm, counted from that link — here made well before the deadline.
+        \App\Config\Database::connection()->prepare('UPDATE orders SET oc_link_generated_at = :t WHERE id = :id')
+            ->execute(['t' => $now->modify('-3 days')->format('Y-m-d H:i:s'), 'id' => $orderId]);
 
         $due = OrderOcAcknowledgmentRepository::dueForAutoConfirm();
         $orderIds = array_map(static fn (array $row): int => (int) $row['order_id'], $due);

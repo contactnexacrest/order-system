@@ -21,6 +21,9 @@ $__rdGroups = [
     'excess' => 'Buyer paid more',
 ];
 ?>
+<?php if ((float) $rd['due'] > 0): // Owner request (3 Nov 2026): read-only, system-calculated — what the buyer should pay now ?>
+<p class="full to-pay-now"><strong>Buyer to pay now: <?= $__rdCur ?> <?= number_format($__rdRemaining, 2) ?></strong> <small class="muted">(<?= $__rdLabel ?> due <?= $__rdCur ?> <?= number_format((float) $rd['due'], 2) ?> − already received <?= $__rdCur ?> <?= number_format((float) $rd['so_far'], 2) ?>)</small></p>
+<?php endif; ?>
 <fieldset class="remit-diff" data-remit-diff data-due="<?= htmlspecialchars(number_format((float) $rd['due'], 2, '.', '')) ?>" data-remaining="<?= htmlspecialchars(number_format($__rdRemaining, 2, '.', '')) ?>" data-currency="<?= $__rdCur ?>" data-label="<?= $__rdLabel ?>" data-max-pct="<?= htmlspecialchars((string) $rd['max_pct']) ?>">
   <label>Why is it different? <small class="muted">(only when the amount differs from the <?= $__rdLabel ?> still due<?= (float) $rd['due'] > 0 ? ', ' . $__rdCur . ' ' . number_format($__rdRemaining, 2) : '' ?>)</small>
     <select name="difference_reason_choice" data-remit-reason>

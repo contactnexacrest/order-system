@@ -82,7 +82,14 @@ done:
 **Close Order — Complete Document Set Couriered to Buyer**: staff enter
 the courier tracking number for the package containing the buyer's
 originals (final CI, endorsed BL, Certificate of Origin, etc.) and
-submit. **This is the action that passes Stage 9's gate** — but, since
+submit. Optionally, with it (owner request 3 Nov 2026, D-243): the
+**Courier company**, the **Courier charges (₹, incl. GST)** — 0 to
+1,00,000 — and **Paid from** (Company account by default). When charges
+are entered, the order cost **Courier Charges** is booked at once with the
+description *"Courier charges for the original document set of order
+NC/SC/2026/0411001 to Acme GmbH — DHL Express AWB 1234567890, ₹3,540.00
+incl. GST"*; it shows in Step 12a and goes to Zoho Books (Postage) at the
+next sync. **This is the action that passes Stage 9's gate** — but, since
 the business closes an order in two separate phases (see "Closing the
 order — two phases" below), it does **not** by itself mark the order
 complete. It sets the order's status to **"Documents Sent"**

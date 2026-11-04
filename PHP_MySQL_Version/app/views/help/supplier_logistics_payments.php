@@ -66,7 +66,7 @@
   </table>
 
   <h3>A2. Record the payment</h3>
-  <p>After you pay from the bank, click <strong>Mark Paid</strong> on the bill's row. Check the <strong>Pay to</strong> bank details first (they must show ✓ Verified).</p>
+  <p>After you pay from the bank, click <strong>Mark Paid</strong> on the bill's row. Check the <strong>Pay to</strong> bank details first (they must show ✓ Verified). Above the amount the form shows, read-only, <strong>To pay now</strong> and how the app worked it out — e.g. <em>To pay now: ₹14,175.00 (asked now on the proforma ₹14,175.00)</em>; compare it with what the supplier asks for.</p>
   <figure><img src="/assets/img/guide/a2-supplier-advance-payment-form.png" alt="Step 7e: recording the advance payment with its UTR"></figure>
   <table class="list pay-guide-table">
     <tr><th>Field</th><th>What to type</th><th>Where you find it</th></tr>
@@ -114,7 +114,7 @@
     <tr><td>Logistics partner</td><td>Sample CHA &amp; Transport</td><td>Letterhead</td></tr>
     <tr><td>For</td><td>CHA + Transport (one bill) — or CHA charges / Transport / Ocean freight / Other</td><td>What the bill is for</td></tr>
     <tr><td>Payment</td><td><strong>Advance</strong> — paid before the service</td><td>"Advance" / "Proforma"</td></tr>
-    <tr><td>Bill type</td><td><strong>Proforma / advance request</strong></td><td>"Proforma Invoice"</td></tr>
+    <tr><td>Bill type</td><td><strong>Proforma / advance request</strong> — picked for you when Payment is Advance (Final picks Tax invoice / final bill)</td><td>"Proforma Invoice"</td></tr>
     <tr><td>Taxable value (₹) and GST rate</td><td>100,000.00 and 18% (no pre-fill here — the app has no PO for partners)</td><td>The amount before GST, and the GST rate</td></tr>
     <tr><td>Amount asked now (₹)</td><td>25,000.00</td><td>"Advance payable"</td></tr>
     <tr><td>GST on this bill (transport only)</td><td>"Reverse charge — no GST on the bill" when a road transporter charges no GST; then pick GST rate 0%</td><td>Bill shows no GST and says "reverse charge" / GTA</td></tr>

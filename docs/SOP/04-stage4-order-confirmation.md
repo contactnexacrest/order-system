@@ -36,12 +36,25 @@ see [Document Review & Approval](./13-document-review-approval.md) for that
 full workflow. Generating or even approving the OC does **not** pass Stage
 4's gate by itself; only the acknowledgment (by whichever of the three paths
 below) does. On the order page this is **6a** Generate the OC, **6b**
-Send the Buyer Action Link (the same link sent at Step 4b for the Buyer PO
-— send it again, or regenerate it if it has expired), then **6c** Record
-the Buyer's Acknowledgement — completed by the buyer
-(link or portal) or by staff. **6b only ticks green once the OC itself is
-issued** (approved, or sent while email is on) — the link made back in 4b
-does not count for 6b before that.
+Generate & Send the OC Confirmation Link, then **6c** Record the Buyer's
+Acknowledgement — completed by the buyer (link or portal) or by staff.
+
+**6b is a button, never automatic** (owner request 3 Nov 2026). Once the OC
+is approved, press **Generate OC Confirmation Link** in 6b. The page comes
+back to 6b with the new link already selected — copy it and send it to the
+buyer (it is the same Buyer Action Link they used for their PO at Step 4b;
+pressing the button issues a fresh one and, when the buyer has an e-mail on
+file and e-mail sending is on, e-mails it to them). **6b ticks green, and
+6c opens, only after this button has been pressed** — a link made earlier
+at Step 4b does not count, so nobody can move on to 6c without having sent
+the buyer their OC link. The buyer's auto-confirm window (below) also only
+starts counting once the OC link has been generated: the scheduled routine
+never auto-confirms an order whose OC link was never made.
+
+**Every "Generate … Link" button on the order page** (PI form link 5a, Buyer
+Action Link 4b, OC Confirmation Link 6b, Payment Action Link 5d / 9c / 11c,
+Supplier Link 7c) brings you back to the same card, opened, with the new
+link selected and briefly highlighted — ready to copy.
 
 **The OC's money figures** (owner report 2026-10-27): Section 4 shows the
 **Total Order Value (FOB)**; Section 5 shows the **advance due** by the

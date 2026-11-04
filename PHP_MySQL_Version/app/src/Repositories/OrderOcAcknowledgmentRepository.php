@@ -84,11 +84,23 @@ final class OrderOcAcknowledgmentRepository
         return $stmt->rowCount() > 0;
     }
 
-    /** @return array<int, array<string,mixed>> unacknowledged rows past due — for the 48h auto-confirm cron */
+    /**
+     * @return array<int, array<string,mixed>> unacknowledged rows past due — for the 48h auto-confirm cron.
+     * Owner request (3 Nov 2026): only orders whose OC confirmation link was generated (Step 6b
+     * button), and only once the auto-confirm hours have also passed since that link was made —
+     * the buyer cannot be "silent" on a link they never received.
+     */
     public static function dueForAutoConfirm(): array
     {
-        return Database::connection()
-            ->query("SELECT * FROM order_oc_acknowledgments WHERE acknowledged_at IS NULL AND due_at <= NOW()")
-            ->fetchAll();
+        $hours = max(1, (int) (\App\Repositories\CompanySettingsRepository::get('oc_ack_auto_confirm_hours') ?? '48'));
+        $stmt = Database::connection()->prepare(
+            "SELECT a.* FROM order_oc_acknowledgments a
+               JOIN orders o ON o.id = a.order_id
+              WHERE a.acknowledged_at IS NULL AND a.due_at <= NOW()
+                AND o.oc_link_generated_at IS NOT NULL
+                AND o.oc_link_generated_at <= NOW() - INTERVAL :hours HOUR"
+        );
+        $stmt->execute(['hours' => $hours]);
+        return $stmt->fetchAll();
     }
 }

@@ -3489,6 +3489,11 @@ ALTER TABLE orders
   ADD COLUMN buyer_action_token_plain VARCHAR(255) NULL AFTER buyer_action_token_hash,
   ADD COLUMN buyer_action_token_expires_at DATETIME NULL AFTER buyer_action_token_plain;
 
+-- Owner request (3 Nov 2026): the OC confirmation link (Step 6b) is created only by the
+-- "Generate OC Confirmation Link" button, never automatically; Step 6b is done and Step 6c
+-- / the OC auto-confirm job start only once this is set.
+ALTER TABLE orders ADD COLUMN oc_link_generated_at DATETIME NULL AFTER buyer_action_token_expires_at;
+
 CREATE INDEX idx_orders_buyer_action_token_hash ON orders(buyer_action_token_hash);
 
 -- ================================================================
@@ -3819,7 +3824,7 @@ ALTER TABLE orders
 ALTER TABLE order_cost_entries
   MODIFY COLUMN category ENUM('ecgc_insurance','due_diligence','inland_transport','cha_charges',
                                'documentation','port_charges','bank_charges','commission',
-                               'packing_crates','bank_loan_interest','inspection_fee','travel_expenses','other') NOT NULL;
+                               'packing_crates','bank_loan_interest','inspection_fee','travel_expenses','courier','other') NOT NULL;
 
 CREATE TABLE order_inspection_fees (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

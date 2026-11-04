@@ -10,6 +10,8 @@ use App\Repositories\IncentiveRepository;
 use App\Services\IncentiveService;
 
 $__inc = $incentiveRow ?? null;
+// Owner request (3 Nov 2026): with the team incentive program off, this box shows only the associate's commission.
+$__teamOn = $incentiveProgramOn ?? true;
 $__locked = $__inc !== null && !empty($__inc['locked_at']);
 $__oid = (int) $order['id'];
 $__sourceText = [
@@ -22,18 +24,20 @@ $__sourceText = [
 ];
 ?>
 <details class="step-card" id="financials-12d">
-  <summary><h2>Step 12d &middot; Team Incentive</h2>
-    <span class="fin-sub-summary"><?= $__locked
+  <summary><h2>Step 12d &middot; <?= $__teamOn ? 'Team Incentive' : 'Associate Commission' ?></h2>
+    <span class="fin-sub-summary"><?php if ($__teamOn): ?><?= $__locked
         ? '&#8377;' . number_format((float) $__inc['team_total_inr'], 0) . ' · ' . htmlspecialchars(IncentiveService::monthLabel((string) $__inc['incentive_month'])) . ' incentive'
-        : '&#8377;' . number_format($incentiveCalc['team_total'], 0) . ' · pending' ?></span></summary>
-  <p class="muted small">Only you and people with "Manage team incentives" see this box. The team sees only their own amounts, once the buyer has fully paid.</p>
+        : '&#8377;' . number_format($incentiveCalc['team_total'], 0) . ' · pending' ?><?php else: ?><?= $__locked
+        ? '&#8377;' . number_format((float) ($__inc['associate_amount_inr'] ?? 0), 0) . ' · fixed'
+        : '&#8377;' . number_format((float) ($incentiveCalc['associate']['amount_inr'] ?? 0), 0) . ' · pending' ?><?php endif; ?></span></summary>
+  <p class="muted small">Only you and people with "Manage team incentives" see this box.<?= $__teamOn ? ' The team sees only their own amounts, once the buyer has fully paid.' : ' The team incentive program is switched off (Team Incentives settings), so only the associate\'s commission is shown.' ?></p>
 
   <?php if ($__locked): ?>
     <div class="kv-grid">
       <div><span class="k">Buyer fully paid on</span><span class="v"><?= htmlspecialchars(\App\Helpers\Dates::short((string) $__inc['fully_paid_on'])) ?></span></div>
       <div><span class="k">Incentive month</span><span class="v"><?= htmlspecialchars(IncentiveService::monthLabel((string) $__inc['incentive_month'])) ?></span></div>
       <div><span class="k">Profit used for the incentive</span><span class="v"><?= number_format((float) $__inc['profit_basis_inr'], 2) ?></span></div>
-      <div><span class="k">Team incentive</span><span class="v"><?= number_format((float) $__inc['team_total_inr'], 2) ?></span></div>
+      <?php if ($__teamOn): ?><div><span class="k">Team incentive</span><span class="v"><?= number_format((float) $__inc['team_total_inr'], 2) ?></span></div><?php endif; ?>
       <?php if (!empty($__inc['associate_id'])): ?>
         <div><span class="k">Associate commission</span><span class="v"><?= htmlspecialchars((string) $__inc['associate_currency']) ?> <?= number_format((float) $__inc['associate_amount_fc'], 2) ?> (&#8377;<?= number_format((float) $__inc['associate_amount_inr'], 2) ?>)</span></div>
       <?php endif; ?>
@@ -61,16 +65,25 @@ $__sourceText = [
       <?php if ($incentiveCalc['associate'] !== null): $__a = $incentiveCalc['associate']; ?>
         <div><span class="k">&minus; Associate commission (<?= htmlspecialchars($__a['name']) ?>, <?= number_format($__a['rate'], 2) ?>%, client no. <?= (int) $__a['order_number'] ?>)</span><span class="v"><?= number_format($__a['amount_inr'], 2) ?></span></div>
       <?php endif; ?>
+      <?php if ($__teamOn): ?>
       <div><span class="k">Profit used for the incentive</span><span class="v"><?= number_format($incentiveCalc['basis'], 2) ?></span></div>
       <div><span class="k">Team reward</span><span class="v">&#8377;<?= number_format($incentiveCalc['reward'], 0) ?><?= $incentiveCalc['new_client_bonus'] > 0 ? ' + &#8377;' . number_format($incentiveCalc['new_client_bonus'], 0) . ' new client bonus' : '' ?></span></div>
+      <?php endif; ?>
     </div>
+    <?php if ($__teamOn): ?>
     <p class="small">Reward from <?= htmlspecialchars($__sourceText[$incentiveCalc['source']] ?? $incentiveCalc['source']) ?>. Minimum profit: &#8377;<?= number_format($incentiveCalc['min_profit'], 0) ?>.
       <?php if ($incentiveCalc['pct_of_profit'] !== null && $incentiveCalc['team_total'] > 0): ?><span class="muted">Private check: &#8377;<?= number_format($incentiveCalc['team_total'], 0) ?> is <strong><?= number_format($incentiveCalc['pct_of_profit'], 1) ?>%</strong> of this order's profit.</span><?php endif; ?></p>
+    <?php endif; ?>
 
     <form method="post" action="/orders/<?= $__oid ?>/incentive">
       <?= Csrf::field() ?>
+      <?php if ($__teamOn): ?>
       <label>Reward for this order (&#8377;) <input type="number" name="reward_override_inr" min="0" step="1" value="<?= (int) round((float) ($__inc['reward_override_inr'] ?? 0)) ?>" required style="width:10em" placeholder="e.g. 50000"> <small class="muted">0 = use the settings</small></label>
       <label><input type="checkbox" name="is_excluded" value="1"<?= !empty($__inc['is_excluded']) ? ' checked' : '' ?>> Exclude this order (no team reward)</label>
+      <?php else: // Team program off: keep the saved team settings unchanged. ?>
+      <input type="hidden" name="reward_override_inr" value="<?= (int) round((float) ($__inc['reward_override_inr'] ?? 0)) ?>">
+      <?php if (!empty($__inc['is_excluded'])): ?><input type="hidden" name="is_excluded" value="1"><?php endif; ?>
+      <?php endif; ?>
       <?php if (!empty($incentiveHasAssociate) || !empty($__inc['associate_id'])): ?>
       <label>Associate commission on this order
         <select name="associate_mode">
@@ -85,6 +98,7 @@ $__sourceText = [
       <button type="submit" class="btn-sm">Save</button>
     </form>
 
+    <?php if ($__teamOn): ?>
     <h3 style="font-size:.95em">Who gets what</h3>
     <table class="list">
       <tr><th>Role</th><th>People</th><th>Share</th><th>Amount (&#8377;)</th></tr>
@@ -117,6 +131,7 @@ $__sourceText = [
         <button type="submit" class="btn-sm">Save people</button>
       </form>
     </details>
-    <p class="muted small">Pending: fixed and added to the order's costs when the buyer has fully paid, then paid in that incentive month.</p>
+    <?php endif; ?>
+    <p class="muted small">Pending: fixed and added to the order's costs when the buyer has fully paid, then paid in that <?= $__teamOn ? 'incentive' : 'commission' ?> month.</p>
   <?php endif; ?>
 </details>

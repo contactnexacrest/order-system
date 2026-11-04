@@ -970,6 +970,41 @@
     });
   }
 
+  // Owner request (3 Nov 2026): after a link is generated the page comes back to
+  // that card (…?open=<card>#<card>); the order page's own script opens and scrolls
+  // to it. Then the new link is focused, selected (ready to copy) and briefly
+  // highlighted, so staff copy it and send it straight away.
+  function initFocusLink() {
+    var id = (window.location.hash || '').replace('#', '');
+    if (!id) return;
+    var card = document.getElementById(id);
+    if (!card) return;
+    var input = card.querySelector('[data-focus-link]');
+    if (!input) return;
+    window.setTimeout(function () {
+      revealElement(input);
+      input.scrollIntoView({ block: 'center' });
+      try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+      if (typeof input.select === 'function') input.select();
+      var before = input.style.boxShadow;
+      input.style.boxShadow = '0 0 0 3px rgba(46, 125, 86, 0.55)';
+      window.setTimeout(function () { input.style.boxShadow = before; }, 2500);
+    }, 80);
+  }
+
+  // Owner request (3 Nov 2026): a click anywhere in a date box opens the calendar,
+  // not only a click on the small calendar icon. Typing still works; browsers
+  // without showPicker() simply keep their usual behaviour.
+  function initDatePickers() {
+    document.addEventListener('click', function (e) {
+      var input = e.target;
+      if (!(input instanceof HTMLInputElement)) return;
+      if (['date', 'datetime-local', 'month', 'week', 'time'].indexOf(input.type) === -1) return;
+      if (input.readOnly || input.disabled || typeof input.showPicker !== 'function') return;
+      try { input.showPicker(); } catch (err) { /* not allowed here — ignore */ }
+    });
+  }
+
   function init() {
     // Before initConfirmDialogs(): both listen in the capture phase, so
     // registering this first means an invalid form is stopped before any
@@ -1011,6 +1046,8 @@
     initFieldLabels();
     initRequiredLabels();
     initStepStatusClasses();
+    initDatePickers();
+    initFocusLink();
   }
 
   if (document.readyState === 'loading') {

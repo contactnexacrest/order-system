@@ -109,8 +109,6 @@ describe('form labels (QA Round 8, R8-N08)', () => {
     ['cross-verify result', 'orders/show.njk', '<select name="result" required aria-label="Result">'],
     ['logistics bill for', 'orders/show.njk', '<select name="bill_for" required>'],
     ['expense / cost category', 'orders/show.njk', '<select name="category" required>'],
-    ['expense paid by', 'orders/show.njk', '<select name="paid_by" required>'],
-    ['cost / inspection paid from', 'orders/show.njk', '<select name="paid_from" required>'],
     ['travel expense %', 'orders/show.njk', '<select name="expense_pct" required>'],
     ['inspection fee payer', 'orders/show.njk', '<select name="fee_payer" required>'],
     ['export benefit scheme', 'orders/show.njk', '<select name="scheme_name" required>'],

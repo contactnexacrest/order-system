@@ -285,6 +285,7 @@ const COST_ACCOUNTS = {
   commission: 'Commission Expense',
   packing_crates: 'Packing Material',
   inspection_fee: 'Inspection Charges',
+  courier: 'Postage',
   other: 'Other Expenses',
 };
 /** Owner decision 2026-10-29: where an export benefit lands when received. */

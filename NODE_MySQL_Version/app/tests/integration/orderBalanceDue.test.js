@@ -125,6 +125,10 @@ describe('Balance due after the actual advance (owner report 2026-10-27)', () =>
 
     expect(icon((await agent.get(`/orders/${orderId}`)).text)).not.toBe('done');
     await db.execute("UPDATE documents SET status = 'approved' WHERE id = :id", { id: docId });
+    // Owner request (3 Nov 2026): approving the OC no longer makes 6b green on its own —
+    // the OC confirmation link must be generated with the 6b button first.
+    expect(icon((await agent.get(`/orders/${orderId}`)).text)).not.toBe('done');
+    await db.execute('UPDATE orders SET oc_link_generated_at = NOW() WHERE id = :id', { id: orderId });
     expect(icon((await agent.get(`/orders/${orderId}`)).text)).toBe('done');
   });
 });

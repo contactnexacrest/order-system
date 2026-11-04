@@ -954,6 +954,12 @@ final class OrderRepository
         return $stmt->fetch() ?: null;
     }
 
+    /** Owner request (3 Nov 2026): the Step 6b "Generate OC Confirmation Link" button was pressed. */
+    public static function markOcLinkGenerated(int $orderId): void
+    {
+        Database::connection()->prepare('UPDATE orders SET oc_link_generated_at = NOW() WHERE id = :id')->execute(['id' => $orderId]);
+    }
+
     /**
      * Owner request (2026-10-27): the no-login Payment Action Link — the
      * client sends their payment details for the advance, freight or

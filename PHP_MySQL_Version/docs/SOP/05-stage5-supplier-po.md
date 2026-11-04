@@ -191,7 +191,16 @@ Each leg is **bill first, then payment**:
    on its proforma), paid on, mode (NEFT / RTGS, IMPS, UPI, Cheque) and
    UTR / reference. The supplier's bank details show above it, or a
    warning with a link when none are on file. More than is still due is
-   refused. A bill can be paid in parts: after the first payment the
+   refused. Above the amount, read-only, **To pay now** shows what is to be
+   paid and how the app worked it out (owner request 3 Nov 2026), e.g.
+   *To pay now: ₹458,884.30 (bill total ₹655,549.00 − advance paid on
+   proforma PI-7 ₹196,664.70)*; the step itself shows **Advance to pay now**
+   (*planned advance − already paid*) in 7e and **Balance to pay now** (*PO
+   total − advance paid − balance already paid*) in 10a. The bills table's
+   **Total cost** row counts every payment towards the bills listed, the
+   advance paid on a replaced proforma included, once — so a 10a invoice
+   that replaced the 7e proforma shows the full amount paid and **Nothing
+   due** (fixed 3 Nov 2026). A bill can be paid in parts: after the first payment the
    button reads **₹ Record another payment**, and the row lists every
    payment with its UTR and **Due ₹…** until nothing is left. A payment
    counts towards the step it is recorded from (7e advance, 10a balance).

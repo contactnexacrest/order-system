@@ -14,6 +14,9 @@
   ['short', 'Buyer paid less (short payment)'],
   ['excess', 'Buyer paid more']
 ] %}
+{% if (rd.due | float) > 0 %}{# Owner request (3 Nov 2026): read-only, system-calculated — what the buyer should pay now #}
+<p class="full to-pay-now"><strong>Buyer to pay now: {{ rd.currency }} {{ rdRemaining | money }}</strong> <small class="muted">({{ rd.label | lower }} due {{ rd.currency }} {{ rd.due | float | money }} − already received {{ rd.currency }} {{ rd.so_far | float | money }})</small></p>
+{% endif %}
 <fieldset class="remit-diff" data-remit-diff data-due="{{ (rd.due | float).toFixed(2) }}" data-remaining="{{ rdRemaining.toFixed(2) }}" data-currency="{{ rd.currency }}" data-label="{{ rd.label | lower }}" data-max-pct="{{ rd.max_pct }}">
   <label>Why is it different? <small class="muted">(only when the amount differs from the {{ rd.label | lower }} still due{% if (rd.due | float) > 0 %}, {{ rd.currency }} {{ rdRemaining | money }}{% endif %})</small>
     <select name="difference_reason_choice" data-remit-reason>

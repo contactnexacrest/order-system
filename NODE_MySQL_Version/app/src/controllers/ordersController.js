@@ -71,6 +71,7 @@ const orderRepository = require('../repositories/orderRepository');
 const orderCommentService = require('../services/orderCommentService');
 const orderBlEndorsementRepository = require('../repositories/orderBlEndorsementRepository');
 const orderShippingRepository = require('../repositories/orderShippingRepository');
+const courierChargesService = require('../services/courierCharges');
 const orderDraftBlReviewRepository = require('../repositories/orderDraftBlReviewRepository');
 const orderStageRepository = require('../repositories/orderStageRepository');
 const orderSupplierPoRepository = require('../repositories/orderSupplierPoRepository');
@@ -1266,8 +1267,13 @@ async function show(req, res) {
       incentiveUsers: await userRepository.listActive(),
       // Owner 2 Nov 2026 (point 10): nothing associate-related when the client has no associate.
       incentiveHasAssociate: !!(await db.queryOne('SELECT 1 AS x FROM clients WHERE id = :c AND associate_id IS NOT NULL', { c: order.client_id })),
+      // Owner request (3 Nov 2026): Step 12d only while the team incentive program is on — or, when it is
+      // off, only for an associate's commission (shown on its own).
+      incentiveProgramOn: !!(await incentiveService.settings()).enabled,
     };
   }
+  const showIncentiveStep = canManageIncentives && (!!incentiveView.incentiveProgramOn
+    || !!incentiveView.incentiveHasAssociate || !!(incentiveView.incentiveRow && incentiveView.incentiveRow.associate_id));
 
   // Owner decision 2026-10-30: each stage's gating button says, before the
   // click, which of the stage's documents still need generating, approving or
@@ -1323,6 +1329,7 @@ async function show(req, res) {
       stageGateNotice,
       canManageIncentives,
       ...incentiveView,
+      showIncentiveStep,
       vendorBills,
       // Owner decision D-214, phase 3: what the order needs from Procurement.
       purchaseRequirements: await purchasingRepository.forOrder(orderId),
@@ -1623,6 +1630,21 @@ async function skipPiForm(req, res) {
   res.redirect(`/orders/${orderId}`);
 }
 
+/**
+ * Owner request (3 Nov 2026): after any link is generated the page returns to that
+ * card, opened, with the new link focused. ?open= forces a fresh page load (a bare
+ * #hash on the same URL would not reload); the hash opens and scrolls to the card.
+ */
+function linkReturnUrl(orderId, anchor) {
+  return `/orders/${orderId}?open=${encodeURIComponent(anchor)}#${anchor}`;
+}
+
+/** The card a link form came from (its return_to), or the given default. */
+function linkReturnAnchor(req, fallback) {
+  const returnTo = String((req.body && req.body.return_to) || '');
+  return /^step-[a-z0-9-]+$/.test(returnTo) ? returnTo : fallback;
+}
+
 async function generatePiFormLink(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -1653,7 +1675,7 @@ async function generatePiFormLink(req, res) {
 
   await auditLogRepository.log(user.id, 'PI_INTAKE_LINK_GENERATED', 'orders', orderId, null, null, null, 'PI-stage intake link generated' + (order.client_email ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
   flash.set(req, 'success', `PI-stage form link${order.client_email ? ` emailed to ${order.client_email}` : ' generated'}: ${link}`);
-  res.redirect(`/orders/${orderId}`);
+  res.redirect(linkReturnUrl(orderId, 'step-5a-pi-form-link'));
 }
 
 /**
@@ -1675,6 +1697,11 @@ async function generateBuyerActionLink(req, res) {
 
   const user = req.user;
   const rawToken = await orderRepository.generateBuyerActionToken(orderId);
+  const returnAnchor = linkReturnAnchor(req, 'step-4b-buyer-po-link');
+  // Owner request (3 Nov 2026): the OC confirmation link is made only by the Step 6b button.
+  if (returnAnchor === 'step-6b-buyer-action-link') {
+    await orderRepository.markOcLinkGenerated(orderId);
+  }
   const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/buyer-action/${rawToken}`;
 
   if (order.client_email) {
@@ -1694,9 +1721,8 @@ async function generateBuyerActionLink(req, res) {
 
   await auditLogRepository.log(user.id, 'BUYER_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Buyer Action link generated' + (order.client_email ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
   flash.set(req, 'success', `Buyer Action link${order.client_email ? ` emailed to ${order.client_email}` : ' generated'}: ${link}`);
-  // Owner request (2026-10-26): sent from Step 4b or 6b — return to that card.
-  const returnTo = /^step-[a-z0-9-]+$/.test(String(req.body.return_to || '')) ? `#${req.body.return_to}` : '';
-  res.redirect(`/orders/${orderId}${returnTo}`);
+  // Owner request (2026-10-26): sent from Step 4b or 6b — return to that card (3 Nov: opened, link focused).
+  res.redirect(linkReturnUrl(orderId, returnAnchor));
 }
 
 /**
@@ -1731,8 +1757,7 @@ async function generatePaymentActionLink(req, res) {
 
   await auditLogRepository.log(user.id, 'PAYMENT_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Payment Action link generated' + (clientEmail ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
   flash.set(req, 'success', `Payment Action link${clientEmail ? ` emailed to ${clientEmail}` : ' generated'}: ${link}`);
-  const returnTo = /^step-[a-z0-9-]+$/.test(String(req.body.return_to || '')) ? `#${req.body.return_to}` : '';
-  res.redirect(`/orders/${orderId}${returnTo}`);
+  res.redirect(linkReturnUrl(orderId, linkReturnAnchor(req, 'step-5d-payment-record')));
 }
 
 /**
@@ -2990,7 +3015,7 @@ async function generateSupplierActionLink(req, res) {
   }
   await auditLogRepository.log(req.user.id, 'SUPPLIER_ACTION_LINK_GENERATED', 'order_supplier_po', supplierPo.id, null, null, null, 'Supplier Action link generated' + (email !== '' ? ' and emailed to the supplier' : ' — no supplier email on the PO, hand this link over directly'));
   flash.set(req, 'success', `Supplier Action link${email !== '' ? ` emailed to ${email}` : ' generated'}: ${link}`);
-  res.redirect(`/orders/${orderId}#step-7c-supplier-po-attach`);
+  res.redirect(linkReturnUrl(orderId, 'step-7c-supplier-po-attach'));
 }
 
 /** Owner request (2026-10-26, t4): Step 7c — the supplier did not acknowledge the PO; reason required, audit-logged. */
@@ -4302,9 +4327,19 @@ async function closeOrder(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // Owner request (3 Nov 2026): the courier charges go in with the tracking number — booked as an order cost now.
+  const courierCharges = courierChargesService.parse(req.body);
+  if (typeof courierCharges === 'string') {
+    flash.set(req, 'error', courierCharges);
+    res.redirect(`/orders/${orderId}#step-11g-close-order`);
+    return;
+  }
   await orderShippingRepository.recordCourierSent(orderId, trackingNumber);
   await stageGateService.passAndUnlockNext(orderId, 9, user.id);
   await orderRepository.markShippedDocsSent(orderId);
+  if (courierCharges !== null) {
+    await courierChargesService.book((await orderRepository.find(orderId)) || {}, orderId, courierCharges, trackingNumber, user.id);
+  }
   if (allowOverride) {
     await auditLogRepository.log(user.id, 'CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE', 'orders', orderId, 'status', null, 'shipped_docs_sent', overrideReason);
   }

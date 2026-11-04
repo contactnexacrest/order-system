@@ -383,7 +383,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await approveAsAdmin(page, orderId, 'OC', 'exportExecutive');
 
       // 6b: the buyer's action link; 6c: their acknowledgement.
-      await submitStepForm(page, 4, `/orders/${orderId}/buyer-action-link`, {}, /(Generate|Regenerate) Buyer Action Link/, '#step-6b-buyer-action-link');
+      await submitStepForm(page, 4, `/orders/${orderId}/buyer-action-link`, {}, /(Generate|Regenerate) OC Confirmation Link/, '#step-6b-buyer-action-link');
 
       await openStage(page, 4);
       const ackForm = page.locator(`form[action="/orders/${orderId}/oc-acknowledgment"]`);

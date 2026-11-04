@@ -142,8 +142,6 @@ final class FormLabelConventionsTest extends TestCase
             'cross-verify result' => ['orders/show.php', '<select name="result" required aria-label="Result">'],
             'logistics bill for' => ['orders/show.php', '<select name="bill_for" required>'],
             'expense / cost category' => ['orders/show.php', '<select name="category" required>'],
-            'expense paid by' => ['orders/show.php', '<select name="paid_by" required>'],
-            'cost / inspection paid from' => ['orders/show.php', '<select name="paid_from" required>'],
             'travel expense %' => ['orders/show.php', '<select name="expense_pct" required>'],
             'inspection fee payer' => ['orders/show.php', '<select name="fee_payer" required>'],
             'export benefit scheme' => ['orders/show.php', '<select name="scheme_name" required>'],

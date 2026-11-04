@@ -106,6 +106,9 @@ two-step pattern as the advance payment in Stage 3:
    reference** (SWIFT / UTR; rule D-212) once the buyer's
    payment notification comes in, exactly as for the advance. Does not
    pass the gate yet:
+   Above it the form shows, read-only, **Buyer to pay now** with the
+   working (e.g. *Buyer to pay now: USD 8,500.00 (freight due USD 12,500.00
+   − already received USD 4,000.00)*; owner request 3 Nov 2026).
    When the amount differs from what is still due, choose a reason under
    **"Why is it different?"** from the drop-down Admin keeps (or "Other —
    type the reason") — each reason is treated as bank charges deducted by
@@ -155,7 +158,11 @@ CHA and transport can send one combined bill or separate bills):
   **For** — CHA charges, Transport, CHA + Transport (one bill), Ocean
   freight or Other;
 - **Payment** — **Advance** (paid before the service) or **Final**
-  (against the completed service) (owner decision 2026-10-27);
+  (against the completed service) (owner decision 2026-10-27). Since
+  3 Nov 2026 (D-243) the payment decides the bill type: **Advance** is
+  always a **Proforma / advance request** and **Final** always the **Tax
+  invoice / final bill** — the form picks the matching type as you choose
+  (the other is greyed out), and a mismatch sent anyway is refused;
 - **Bill type** (owner decision 2026-10-28, Option B) — **Proforma /
   advance request** (asks for money now — not a cost; enter the full
   charges and, in **Amount asked now**, the part asked for now) or **Tax
@@ -173,7 +180,10 @@ CHA and transport can send one combined bill or separate bills):
 Each bill then gets the green **₹ Mark Paid** button (amount, date, mode,
 UTR), exactly like the supplier bills in Steps 7e / 10a: prefilled with
 what is still due, never more, and a bill can be paid in parts (**₹ Record
-another payment**).
+another payment**). Above the amount the form shows, read-only, **To pay
+now** and how the app worked it out (owner request 3 Nov 2026), e.g.
+*To pay now: ₹458,884.30 (bill total ₹655,549.00 − advance paid on proforma
+CHA-PI ₹196,664.70)* — check it against what the partner asks for.
 
 **When a bill can be paid:**
 
@@ -187,7 +197,10 @@ Advance bills stay payable. Bills recorded before this choice existed
 count as Final, and as tax invoices. The table tags each row **Advance**
 or **Final** and **Proforma** or **Tax invoice**, and totals the cost
 (tax invoices, plus what is paid on a proforma until its tax invoice
-arrives), what is paid and what is still due. Every logistics bill flows into the
+arrives), what is paid and what is still due — **Paid** counts every
+payment towards the listed bills, including what was paid on a proforma
+a tax invoice replaced, once (fixed 3 Nov 2026), and the row says
+**Nothing due** when it is all paid. Every logistics bill flows into the
 order's financials (Step 12) as logistics cost. When the Zoho Books
 integration is on, each tax invoice also goes to Zoho Books as a bill and
 each payment as a vendor payment (see [Zoho Books

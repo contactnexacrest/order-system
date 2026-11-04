@@ -28,7 +28,7 @@ final class CiInvoiceDateTest extends DbTestCase
         $document = DocumentRepository::find((int) $ci['document_id']);
         self::assertSame($date, $document['document_date']);
         self::assertSame($date, DocumentRepository::printedDate($document));
-        $printed = (new \DateTimeImmutable($date))->format('j F Y');
+        $printed = (new \DateTimeImmutable($date))->format('d F Y'); // documents print a two-digit day ("01 November 2026")
         self::assertSame($printed, DocumentDataAssembler::assemble($orderId, 'COOPREP')['order']['ci_date'], 'the COO prep sheet shows the CI date that was picked');
     }
 

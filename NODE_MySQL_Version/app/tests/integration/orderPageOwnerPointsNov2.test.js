@@ -58,6 +58,9 @@ describe('order page — owner points of 2 Nov 2026', () => {
   afterAll(async () => { await db.pool.end(); });
 
   it('10: no associate select when the client has no associate', async () => {
+    // 3 Nov 2026: Step 12d shows the team part only while the program is on.
+    const incentiveRepository = require('../../src/repositories/incentiveRepository');
+    await incentiveRepository.setSetting('program_enabled', '1', admin.id);
     const plain = await createTestOrder(await createTestClient());
     let html = (await admin.agent.get(`/orders/${plain}`)).text;
     expect(html).toContain('Step 12d &middot; Team Incentive');
@@ -69,6 +72,7 @@ describe('order page — owner points of 2 Nov 2026', () => {
     await db.execute('UPDATE clients SET associate_id = :a WHERE id = :c', { a: associateId, c: client });
     html = (await admin.agent.get(`/orders/${await createTestOrder(client)}`)).text;
     expect(html).toContain('Associate commission on this order');
+    await incentiveRepository.setSetting('program_enabled', '0', admin.id);
   });
 
   it('13: the Supplier Link comes before the acknowledgment', async () => {

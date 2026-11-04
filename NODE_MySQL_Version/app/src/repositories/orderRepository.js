@@ -881,6 +881,11 @@ async function findByValidBuyerActionToken(rawToken) {
  * Same hash / encrypted copy / expiry convention as
  * generateBuyerActionToken(); regenerating replaces the old link.
  */
+/** Owner request (3 Nov 2026): the Step 6b "Generate OC Confirmation Link" button was pressed. */
+async function markOcLinkGenerated(orderId) {
+  await db.execute('UPDATE orders SET oc_link_generated_at = NOW() WHERE id = :id', { id: orderId });
+}
+
 async function generatePaymentActionToken(orderId, ttlDays = 180) {
   const rawToken = crypto.randomBytes(32).toString('hex');
   await db.execute(
@@ -969,6 +974,7 @@ const EDIT_DETAIL_FIELDS = [
 ];
 
 module.exports = {
+  markOcLinkGenerated,
   EDIT_DETAIL_FIELDS,
   all, allVisibleTo, allArchived, archive, unarchive, find, findIdByReference, createWithNextSequence, updateDetails, markSample, markTest, setCurrentStage, setPiDates,
   setProductionStatus, setBuyersPoRef, setBuyerPoReceivedOn, setEstShipmentDate, markShippedDocsSent, markComplete, markLost, cancel, applyAmendmentOverride, forClient,

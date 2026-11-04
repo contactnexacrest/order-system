@@ -114,6 +114,9 @@ pattern as every other payment in this pipeline:
    actually been generated — the buyer can't be remitting against an
    invoice they were never sent — and, like every stage-gated action,
    until Stage 8 itself has unlocked.
+   Above it the form shows, read-only, **Buyer to pay now** with the
+   working (e.g. *Buyer to pay now: USD 8,500.00 (balance due USD 12,500.00
+   − already received USD 4,000.00)*; owner request 3 Nov 2026).
    When the amount differs from what is still due, choose a reason under
    **"Why is it different?"** from the drop-down Admin keeps (or "Other —
    type the reason") — each reason is treated as bank charges deducted by

@@ -1354,6 +1354,23 @@ final class OrderController
      * when no SMTP is configured yet (EmailService degrades to a log
      * line in that case, never a thrown error).
      */
+    /**
+     * Owner request (3 Nov 2026): after any link is generated the page returns to that
+     * card, opened, with the new link focused. ?open= forces a fresh page load (a bare
+     * #hash on the same URL would not reload); the hash opens and scrolls to the card.
+     */
+    public static function linkReturnUrl(int $orderId, string $anchor): string
+    {
+        return "/orders/{$orderId}?open=" . rawurlencode($anchor) . '#' . $anchor;
+    }
+
+    /** The card a link form came from (its return_to), or the given default. */
+    private static function linkReturnAnchor(string $default): string
+    {
+        $returnTo = (string) ($_POST['return_to'] ?? '');
+        return preg_match('/^step-[a-z0-9-]+$/', $returnTo) ? $returnTo : $default;
+    }
+
     public function generatePiFormLink(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -1387,7 +1404,7 @@ final class OrderController
 
         AuditLogRepository::log((int) $user['id'], 'PI_INTAKE_LINK_GENERATED', 'orders', $orderId, null, null, null, 'PI-stage intake link generated' . (!empty($order['client_email']) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
         Flash::set('success', "PI-stage form link" . (!empty($order['client_email']) ? " emailed to {$order['client_email']}" : ' generated') . ": {$link}");
-        header("Location: /orders/{$orderId}");
+        header('Location: ' . self::linkReturnUrl($orderId, 'step-5a-pi-form-link'));
     }
 
     /**
@@ -1437,6 +1454,11 @@ final class OrderController
 
         $user = AuthService::currentUser();
         $rawToken = OrderRepository::generateBuyerActionToken($orderId);
+        $returnAnchor = self::linkReturnAnchor('step-4b-buyer-po-link');
+        // Owner request (3 Nov 2026): the OC confirmation link is made only by the Step 6b button.
+        if ($returnAnchor === 'step-6b-buyer-action-link') {
+            OrderRepository::markOcLinkGenerated($orderId);
+        }
         $link = rtrim(Env::get('APP_URL', ''), '/') . '/buyer-action/' . $rawToken;
 
         if (!empty($order['client_email'])) {
@@ -1457,9 +1479,8 @@ final class OrderController
 
         AuditLogRepository::log((int) $user['id'], 'BUYER_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Buyer Action link generated' . (!empty($order['client_email']) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
         Flash::set('success', "Buyer Action link" . (!empty($order['client_email']) ? " emailed to {$order['client_email']}" : ' generated') . ": {$link}");
-        // Owner request (2026-10-26): sent from Step 4b or 6b — return to that card.
-        $returnTo = preg_match('/^step-[a-z0-9-]+$/', (string) ($_POST['return_to'] ?? '')) ? '#' . $_POST['return_to'] : '';
-        header("Location: /orders/{$orderId}{$returnTo}");
+        // Owner request (2026-10-26): sent from Step 4b or 6b — return to that card (3 Nov: opened, link focused).
+        header('Location: ' . self::linkReturnUrl($orderId, $returnAnchor));
     }
 
     /**
@@ -1496,8 +1517,7 @@ final class OrderController
 
         AuditLogRepository::log((int) $user['id'], 'PAYMENT_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Payment Action link generated' . (!empty($clientEmail) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
         Flash::set('success', 'Payment Action link' . (!empty($clientEmail) ? " emailed to {$clientEmail}" : ' generated') . ": {$link}");
-        $returnTo = preg_match('/^step-[a-z0-9-]+$/', (string) ($_POST['return_to'] ?? '')) ? '#' . $_POST['return_to'] : '';
-        header("Location: /orders/{$orderId}{$returnTo}");
+        header('Location: ' . self::linkReturnUrl($orderId, self::linkReturnAnchor('step-5d-payment-record')));
     }
 
     /**
@@ -2796,7 +2816,7 @@ final class OrderController
         }
         AuditLogRepository::log((int) AuthService::currentUserId(), 'SUPPLIER_ACTION_LINK_GENERATED', 'order_supplier_po', (int) $supplierPo['id'], null, null, null, 'Supplier Action link generated' . ($email !== '' ? ' and emailed to the supplier' : ' — no supplier email on the PO, hand this link over directly'));
         Flash::set('success', 'Supplier Action link' . ($email !== '' ? " emailed to {$email}" : ' generated') . ": {$link}");
-        header("Location: /orders/{$orderId}#step-7c-supplier-po-attach");
+        header('Location: ' . self::linkReturnUrl($orderId, 'step-7c-supplier-po-attach'));
     }
 
     /** Owner request (2026-10-26, t4): Step 7c — the supplier did not acknowledge the PO; reason required, audit-logged. */
@@ -4113,9 +4133,19 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // Owner request (3 Nov 2026): the courier charges go in with the tracking number — booked as an order cost now.
+        $courierCharges = \App\Services\CourierCharges::parse($_POST);
+        if (is_string($courierCharges)) {
+            Flash::set('error', $courierCharges);
+            header("Location: /orders/{$orderId}#step-11g-close-order");
+            return;
+        }
         OrderShippingRepository::recordCourierSent($orderId, $trackingNumber);
         StageGateService::passAndUnlockNext($orderId, 9, (int) $user['id']);
         OrderRepository::markShippedDocsSent($orderId);
+        if ($courierCharges !== null) {
+            \App\Services\CourierCharges::book(OrderRepository::find($orderId) ?? [], $orderId, $courierCharges, $trackingNumber, (int) $user['id']);
+        }
         if ($allowOverride) {
             AuditLogRepository::log((int) $user['id'], 'CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE', 'orders', $orderId, 'status', null, 'shipped_docs_sent', $overrideReason);
         }

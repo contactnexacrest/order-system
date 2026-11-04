@@ -159,10 +159,12 @@ final class OrderVendorBillRepository
             $b['replaced_by_id'] = $replacing !== null ? (int) $replacing['id'] : null;
             $b['replaces_bill_no'] = !empty($b['replaces_bill_id']) && isset($byId[(int) $b['replaces_bill_id']]) ? (string) $byId[(int) $b['replaces_bill_id']]['bill_no'] : null;
             $b['carried_payments'] = [];
+            $b['carried_paid'] = 0.0;
             $credited = $b['own_paid'];
             if ($b['doc_kind'] === 'invoice' && $b['replaces_bill_no'] !== null) {
                 $proforma = $byId[(int) $b['replaces_bill_id']];
                 $b['carried_payments'] = $proforma['payments'];
+                $b['carried_paid'] = (float) $proforma['own_paid'];
                 $credited += $proforma['own_paid'];
             }
             $b['credited'] = round($credited, 2);
@@ -173,6 +175,94 @@ final class OrderVendorBillRepository
             $byId[$id] = $b;
         }
         return array_values($byId);
+    }
+
+    /**
+     * Owner request (3 Nov 2026): every payment form shows, read-only, what is to be paid now and how
+     * the app worked it out — "To pay now: ₹458,884.30 (bill ₹655,549.00 − advance paid on proforma
+     * PI-7 ₹196,664.70)" — so staff can cross-check it with what the vendor asks for.
+     *
+     * @param array<string,mixed> $b an enriched bill
+     * @return array{amount:float,working:string}
+     */
+    public static function toPayNow(array $b): array
+    {
+        $m = static fn (float $v): string => '₹' . number_format($v, 2);
+        $isProforma = ($b['doc_kind'] ?? 'invoice') === 'proforma';
+        $base = $isProforma && $b['requested_amount_inr'] !== null ? 'asked now on the proforma' : ($isProforma ? 'proforma total' : 'bill total');
+        $parts = [$base . ' ' . $m((float) $b['amount_due'])];
+        if ((float) ($b['carried_paid'] ?? 0) > 0.004) {
+            $parts[] = 'advance paid on proforma ' . $b['replaces_bill_no'] . ' ' . $m((float) $b['carried_paid']);
+        }
+        if ((float) $b['own_paid'] > 0.004) {
+            $parts[] = 'already paid on this bill ' . $m((float) $b['own_paid']);
+        }
+        return ['amount' => (float) $b['remaining'], 'working' => implode(' − ', $parts)];
+    }
+
+    /**
+     * Owner request (3 Nov 2026): the supplier step's own "To pay now", worked out from the Supplier PO
+     * and what was already paid on its bills. Advance (7e): planned advance − paid on the advance leg.
+     * Balance (10a): PO total − advance paid − balance already paid. Null when there is nothing planned.
+     *
+     * @param array<int,array<string,mixed>> $bills enriched bills of the order
+     * @param array<string,mixed> $supplierPo
+     * @return array{amount:float,working:string}|null
+     */
+    public static function supplierLegToPayNow(array $bills, array $supplierPo, string $leg): ?array
+    {
+        $paid = ['advance' => 0.0, 'balance' => 0.0];
+        foreach ($bills as $b) {
+            if (($b['vendor_kind'] ?? '') !== 'supplier' || (int) $b['supplier_po_id'] !== (int) $supplierPo['id']) {
+                continue;
+            }
+            foreach ($b['payments'] as $p) {
+                $paid[($p['leg'] ?? '') === 'balance' ? 'balance' : 'advance'] += (float) $p['amount_inr'];
+            }
+        }
+        $m = static fn (float $v): string => '₹' . number_format($v, 2);
+        if ($leg === 'advance') {
+            $planned = (float) ($supplierPo['advance_amount_inr'] ?? 0);
+            if ($planned <= 0) {
+                return null;
+            }
+            return ['amount' => round(max(0.0, $planned - $paid['advance']), 2), 'working' => 'planned advance ' . $m($planned) . ' − already paid ' . $m(round($paid['advance'], 2))];
+        }
+        $total = (float) ($supplierPo['total_payable_inr'] ?? 0);
+        if ($total <= 0) {
+            return null;
+        }
+        return ['amount' => round(max(0.0, $total - $paid['advance'] - $paid['balance']), 2),
+            'working' => 'PO total ' . $m($total) . ' − advance paid ' . $m(round($paid['advance'], 2)) . ' − balance already paid ' . $m(round($paid['balance'], 2))];
+    }
+
+    /**
+     * The "Total cost" row under a bills table. Owner report (3 Nov 2026): "Paid" showed only the
+     * payments on the bills listed, so a tax invoice that replaced a proforma listed elsewhere (the
+     * 7e advance proforma, shown in 7e, its invoice in 10a) lost the advance paid on it — ₹4,58,884.30
+     * shown where ₹6,55,549.00 was paid. Paid now counts every payment towards the listed bills: each
+     * bill's own payments, plus what was paid on a replaced proforma that is not itself in the list
+     * (when it is, its own payments are already counted — never twice). Due is what is still owed.
+     *
+     * @param array<int,array<string,mixed>> $bills enriched bills (forOrder)
+     * @return array{cost:float,paid:float,due:float}
+     */
+    public static function totalsFor(array $bills): array
+    {
+        $listed = [];
+        foreach ($bills as $b) {
+            $listed[(int) $b['id']] = true;
+        }
+        $cost = $paid = $due = 0.0;
+        foreach ($bills as $b) {
+            $cost += (float) $b['cost_inr'];
+            $paid += (float) $b['own_paid'];
+            if (!empty($b['replaces_bill_id']) && !isset($listed[(int) $b['replaces_bill_id']])) {
+                $paid += (float) ($b['carried_paid'] ?? 0.0);
+            }
+            $due += (float) $b['remaining'];
+        }
+        return ['cost' => round($cost, 2), 'paid' => round($paid, 2), 'due' => $due > 0.004 ? round($due, 2) : 0.0];
     }
 
     /**

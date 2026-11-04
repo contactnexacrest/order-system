@@ -406,7 +406,7 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await assignSelfAndApprove(page, 'OC');
 
     // 6b: send the buyer their action link; 6c: record their acknowledgement.
-    await submitStepForm(page, 4, `/orders/${orderId}/buyer-action-link`, {}, /(Generate|Regenerate) Buyer Action Link/, '#step-6b-buyer-action-link');
+    await submitStepForm(page, 4, `/orders/${orderId}/buyer-action-link`, {}, /(Generate|Regenerate) OC Confirmation Link/, '#step-6b-buyer-action-link');
 
     await openStage(page, 4);
     const ackForm = page.locator(`form[action="/orders/${orderId}/oc-acknowledgment"]`);

@@ -97,6 +97,9 @@ describe('TDS on associate commission (D-235)', () => {
       bank_name: 'HDFC Bank', bank_branch_address: '', intermediary_bank: '', account_currency: 'INR' }, true, null);
     await associateBankRepository.firstCheck(bank, finance1, 'Called back on the known number; ₹1 test credit confirmed.');
     await associateBankRepository.verify(bank, finance2, 0);
+    // The payouts below are dated 2 Nov 2026: make the account usable from before then,
+    // so this test does not depend on the day it runs.
+    await db.execute("UPDATE associate_bank_accounts SET usable_from = '2026-04-01' WHERE id = :id", { id: bank });
     return associateRepository.find(id);
   }
 

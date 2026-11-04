@@ -283,7 +283,7 @@
   },
   's6': {
     '6a': docComplete(documents, 'OC', mailSendingEnabled),
-    '6b': docComplete(documents, 'OC', mailSendingEnabled) and order.buyer_action_token_hash,
+    '6b': docComplete(documents, 'OC', mailSendingEnabled) and order.oc_link_generated_at,
     '6c': buyerAcknowledged
   },
   's7': {
@@ -409,6 +409,8 @@
             <form method="post" action="/orders/{{ order.id }}/vendor-bills/{{ b.id }}/pay" class="field-grid">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               {% if leg !== null %}<input type="hidden" name="leg" value="{{ leg }}">{% endif %}
+              {% set tpn = vendorBillsView.toPayNow(b) %}{# Owner request (3 Nov 2026): read-only, system-calculated #}
+              <p class="full to-pay-now"><strong>To pay now: &#8377;{{ tpn.amount | money }}</strong> <small class="muted">({{ tpn.working }})</small></p>
               <label>Amount paid (&#8377;) *<input type="number" step="0.01" min="0.01" max="{{ b.remaining.toFixed(2) }}" name="paid_amount_inr" value="{{ b.remaining.toFixed(2) }}" required placeholder="e.g. 25000.00"></label>
               <label>Paid on *<input type="date" name="paid_at" value="{{ today() }}" max="{{ today() }}" required></label>
               <label>Mode *
@@ -508,6 +510,9 @@
       {% if noAdvance and not legBills.length %}
         <p class="review-banner ok">&#10003; <span><strong>No advance on this order</strong> — the Supplier PO terms plan no advance, so there is nothing to pay here. The full amount is paid as the supplier balance in <a href="#step-10a-supplier-balance-paid">Step 10a</a>.</span></p>
       {% else %}
+        {# Owner request (3 Nov 2026): the step's own read-only "To pay now", from the Supplier PO and what is already paid. #}
+        {% set legTpn = vendorBillsView.supplierLegToPayNow(vendorBills, supplierPo, leg) if not supplierPo[leg + '_paid_at'] else null %}
+        {% if legTpn %}<p class="to-pay-now"><strong>{{ label }} to pay now: &#8377;{{ legTpn.amount | money }}</strong> <small class="muted">({{ legTpn.working }})</small></p>{% endif %}
         {{ vendorBillTable(legBills, false, permissions.manage_supplier_payments, payBlocked, leg, carriedIds) }}
       {% endif %}
       {% if not permissions.manage_supplier_payments %}
@@ -1651,23 +1656,25 @@
    buyer downloads the Buyer PO, uploads it signed with their PO number and
    Step 4 completes) and again at 6b for the OC acknowledgement — one link,
    rendered by this one macro in both places. #}
-{% macro buyerActionLinkWidget(badge, anchor) %}
-      {% if buyerActionLinkValid %}
+{% macro buyerActionLinkWidget(badge, anchor, ocMode=false) %}
+      {# Owner request (3 Nov 2026): in Step 6b the link shows only after the OC confirmation link was generated there (6b done only then). #}
+      {% set linkShown = buyerActionLinkValid and (not ocMode or order.oc_link_generated_at) %}
+      {% if linkShown %}
         <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
           <span>Current link (valid until {{ order.buyer_action_token_expires_at | humanDate }}) — copy and send however you like, no need to regenerate:</span>
           <div style="display:flex;gap:6px;align-items:center">
-            <input type="text" readonly value="{{ buyerActionFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Buyer Action Link">
+            <input type="text" readonly value="{{ buyerActionFullLink }}" onclick="this.select()" data-focus-link style="flex:1;font-family:monospace;font-size:12px" aria-label="Buyer Action Link">
             <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('{{ buyerActionFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
           </div>
         </div>
       {% else %}
-        <p class="muted small">No active link — generate one below.</p>
+        <p class="muted small">{{ 'No OC confirmation link yet — generate it below, then copy it and send it to the buyer.' if ocMode else 'No active link — generate one below.' }}</p>
       {% endif %}
       {% if canManageOrders %}
       <form method="post" action="/orders/{{ order.id }}/buyer-action-link" style="display:inline">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="hidden" name="return_to" value="{{ anchor }}">
-        {{ stepBadge(badge) | safe }}<button type="submit" class="btn-sm">{{ 'Regenerate Buyer Action Link' if buyerActionLinkValid else 'Generate Buyer Action Link' }}</button>
+        {{ stepBadge(badge) | safe }}<button type="submit" class="btn-sm">{% if ocMode %}{{ 'Regenerate OC Confirmation Link' if linkShown else 'Generate OC Confirmation Link' }}{% else %}{{ 'Regenerate Buyer Action Link' if linkShown else 'Generate Buyer Action Link' }}{% endif %}</button>
       </form>
       {% endif %}
 {% endmacro %}
@@ -1679,7 +1686,7 @@
       <p class="small"><strong>Payment Action Link</strong> <span class="muted">(optional)</span> — the client uploads the payment screenshot and transaction details there, no login needed. It also goes out automatically inside the {{ documentName }} email.</p>
       {% if paymentActionFullLink %}
         <div style="display:flex;gap:6px;align-items:center">
-          <input type="text" readonly value="{{ paymentActionFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Payment Action Link">
+          <input type="text" readonly value="{{ paymentActionFullLink }}" onclick="this.select()" data-focus-link style="flex:1;font-family:monospace;font-size:12px" aria-label="Payment Action Link">
           <button type="button" class="btn-sm btn-secondary" onclick="navigator.clipboard.writeText('{{ paymentActionFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
         </div>
       {% endif %}
@@ -1814,7 +1821,7 @@
           <div class="review-banner info" style="flex-direction:column;align-items:stretch;gap:6px">
             <span>Current link (valid until {{ piIntake.access_token_expires_at | humanDate }}) — copy and send however you like, no need to regenerate:</span>
             <div style="display:flex;gap:6px;align-items:center">
-              <input type="text" readonly aria-label="Form link" value="{{ piFormFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px">
+              <input type="text" readonly aria-label="Form link" value="{{ piFormFullLink }}" onclick="this.select()" data-focus-link style="flex:1;font-family:monospace;font-size:12px">
               <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('{{ piFormFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
             </div>
           </div>
@@ -2071,9 +2078,9 @@
   <div class="step-group-connector">send the buyer their action link</div>
 
   <details class="step-card" id="step-6b-buyer-action-link"{{ flow.subCardOpen('s6', '6b') }}>
-    <summary>{{ stepStatusIcon(flow.subStepStatus('s6', '6b')) }}<h2>Step 6b &middot; Send Buyer Action Link (OC acknowledgement)</h2></summary>
-      <p class="muted small">The same Buyer Action Link the buyer used for their PO (Step 4b) also lets them acknowledge this Order Confirmation — send it again, or regenerate it if it has expired.</p>
-      {{ buyerActionLinkWidget('6b', 'step-6b-buyer-action-link') }}
+    <summary>{{ stepStatusIcon(flow.subStepStatus('s6', '6b')) }}<h2>Step 6b &middot; Generate &amp; Send the OC Confirmation Link</h2></summary>
+      <p class="muted small">Once the Order Confirmation is approved, press <strong>Generate OC Confirmation Link</strong>, then copy the link and send it to the buyer — they acknowledge the Order Confirmation there (it is the same Buyer Action Link they used for their PO). This step turns green, and Step 6c opens, only after the link is generated here.</p>
+      {{ buyerActionLinkWidget('6b', 'step-6b-buyer-action-link', true) }}
   </details>
 
   <div class="step-group-connector">the buyer acknowledges (link or portal) — or staff record it</div>
@@ -2452,7 +2459,7 @@
           <p class="muted small"><strong>1. Send the Supplier Link first:</strong> a direct link (no login) where the supplier uploads their signed PO / acknowledgment — emailed to them when the PO has their email{% if supplierPo.supplier_email %} ({{ supplierPo.supplier_email }}){% endif %}. You'll be notified when they upload.</p>
           {% if supplierActionFullLink %}
             <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-              <input type="text" readonly value="{{ supplierActionFullLink }}" onclick="this.select()" style="flex:1;font-family:monospace;font-size:12px" aria-label="Supplier Action Link">
+              <input type="text" readonly value="{{ supplierActionFullLink }}" onclick="this.select()" data-focus-link style="flex:1;font-family:monospace;font-size:12px" aria-label="Supplier Action Link">
               <button type="button" class="btn-sm" onclick="navigator.clipboard.writeText('{{ supplierActionFullLink }}'); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Link', 1500);">Copy Link</button>
             </div>
             <p class="muted small">Valid until {{ supplierPo.supplier_action_token_expires_at | humanDate }}.</p>
@@ -2649,7 +2656,7 @@
             <option value="advance">Advance — paid before the service</option>
             <option value="final" selected>Final — against the completed service</option>
           </select>
-          <small class="muted">{{ 'Advance and Final bills can both be paid any time on an FOB order.' if isFob else 'An Advance bill can be paid any time; a Final bill waits for Step 9d.' }}</small>
+          <small class="muted">{{ 'Advance and Final bills can both be paid any time on an FOB order.' if isFob else 'An Advance bill can be paid any time; a Final bill waits for Step 9d.' }} Advance = a Proforma / advance request; Final = the Tax invoice / final bill.</small>
         </label>
         {# Owner decision 2026-10-29 (CA advice): a road transporter (GTA) that charges no GST is booked under reverse charge. #}
         <label data-show-when="bill_for=transport">GST on this bill *
@@ -2661,6 +2668,7 @@
         </label>
         {{ vendorBillFields(gstRates, 'invoice', vendorBillsView.replaceable(logisticsBillsList), null, { hint: "The amount before GST printed on the partner's bill (e.g. the CHA, transport or freight charge without GST)." }) }}
         <div><button type="submit" class="btn-sm">Add Bill</button></div>
+        <script>/* Owner decision (3 Nov 2026): Payment Advance => Proforma / advance request; Final => Tax invoice / final bill. */(function(){var f=document.currentScript.parentNode;var s=f.querySelector('select[name="payment_kind"]');if(!s)return;function sync(){var want=s.value==='advance'?'proforma':'invoice';f.querySelectorAll('input[name="doc_kind"]').forEach(function(r){r.disabled=r.value!==want;if(r.value===want&&!r.checked){r.checked=true;r.dispatchEvent(new Event('change',{bubbles:true}));}});}s.addEventListener('change',sync);sync();})();</script>
       </form>
       {% endif %}
     </details>
@@ -3324,9 +3332,9 @@
             </label>
             <label>Amount (&#8377;) *<input type="number" step="0.01" min="0.01" name="amount_inr" required placeholder="e.g. 25000.00"></label>
             <label>Paid by *
+              {# Owner request (3 Nov 2026): Company account is the default. #}
               <select name="paid_by" required>
-                <option value="">Choose…</option>
-                {% for key, byLabel in expensePaidBy %}<option value="{{ key }}">{{ byLabel }}</option>{% endfor %}
+                {% for key, byLabel in expensePaidBy %}<option value="{{ key }}"{{ ' selected' if key == 'company_account' }}>{{ byLabel }}</option>{% endfor %}
               </select>
             </label>
             <label>Staff member to reimburse<input type="text" name="staff_name" maxlength="150" data-required-if="paid_by=staff" placeholder="only when staff paid"></label>
@@ -3382,9 +3390,9 @@
             <label>Description * <small class="muted">(who was paid and for what — their invoice / receipt no.)</small><input type="text" name="description" required minlength="10" maxlength="255" placeholder="e.g. Agent commission — Ravi Traders, their invoice RT/45 dated 20 Oct"></label>
             {# Owner decision 2026-10-29: real paid costs go to Zoho Books as expenses, paid from here. #}
             <label>Paid from *
+              {# Owner request (3 Nov 2026): Company account is the default. #}
               <select name="paid_from" required>
-                <option value="">Choose…</option>
-                {% for key, label in costEntryPaidFrom %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                {% for key, label in costEntryPaidFrom %}<option value="{{ key }}"{{ ' selected' if key == 'company_account' }}>{{ label }}</option>{% endfor %}
               </select>
             </label>
             <p class="muted small">CHA, inland transport and port charges belong on <a href="#logistics-bills">logistics partner bills</a>; bank charges and loan interest the CA books from the bank statement — those entries here are not sent to Zoho Books.</p>
@@ -3442,8 +3450,7 @@
             {% set feePaidFrom = feeEntry.paid_from if feeEntry else null %}
             <label data-show-when="fee_payer=nexacrest">Paid from *
               <select name="paid_from" required>
-                <option value="">Choose…</option>
-                {% for key, label in costEntryPaidFrom %}<option value="{{ key }}"{{ ' selected' if feePaidFrom == key }}>{{ label }}</option>{% endfor %}
+                {% for key, label in costEntryPaidFrom %}<option value="{{ key }}"{{ ' selected' if (feePaidFrom or 'company_account') == key }}>{{ label }}</option>{% endfor %}
               </select>
             </label>
             {# Owner rule D-212: the cost line is described from the agency and its invoice. #}
@@ -3634,8 +3641,8 @@
         {% endif %}
       </div>
     </details>
-    {% if canManageIncentives %}{# Owner decision 2026-10-30: Step 12d, manage_incentives only. #}
-      <div class="step-group-connector">and the team's incentive</div>
+    {% if showIncentiveStep %}{# Owner decision 2026-10-30: Step 12d, manage_incentives only; 3 Nov 2026: hidden while the program is off (unless an associate is paid). #}
+      <div class="step-group-connector">{% if incentiveProgramOn %}and the team's incentive{% else %}and the associate's commission{% endif %}</div>
       {% include "orders/_incentive.njk" %}
     {% endif %}
   </details>
@@ -3767,6 +3774,14 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="hidden" name="override_gate" value="1">
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required placeholder="e.g. DHL 1234567890"></label>
+        {# Owner request (3 Nov 2026): the courier charges go in with the tracking number — booked as an order cost at once. #}
+        <label>Courier company<input type="text" name="courier_company" maxlength="100" placeholder="e.g. DHL Express"></label>
+        <label>Courier charges (&#8377;, incl. GST) <small class="muted">(optional — booked as the order cost "Courier Charges" now; goes to Zoho Books at the next sync)</small><input type="number" step="0.01" min="0" max="100000.00" name="courier_charges_inr" placeholder="e.g. 3540.00"></label>
+        <label>Paid from
+          <select name="courier_paid_from">
+            {% for key, label in costEntryPaidFrom %}<option value="{{ key }}"{{ ' selected' if key == 'company_account' }}>{{ label }}</option>{% endfor %}
+          </select>
+        </label>
         <label>Reason for this override * <small class="muted">(minimum 10 characters — recorded in the audit log)</small>
           <textarea class="override-reason" name="override_reason" rows="2" required minlength="10" placeholder="At least 10 characters — say why"></textarea>
         </label>
@@ -3777,6 +3792,14 @@
       <form method="post" action="/orders/{{ order.id }}/close">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <label>Courier Tracking Number *<input type="text" name="courier_tracking_number" required placeholder="e.g. DHL 1234567890"></label>
+        {# Owner request (3 Nov 2026): the courier charges go in with the tracking number — booked as an order cost at once. #}
+        <label>Courier company<input type="text" name="courier_company" maxlength="100" placeholder="e.g. DHL Express"></label>
+        <label>Courier charges (&#8377;, incl. GST) <small class="muted">(optional — booked as the order cost "Courier Charges" now; goes to Zoho Books at the next sync)</small><input type="number" step="0.01" min="0" max="100000.00" name="courier_charges_inr" placeholder="e.g. 3540.00"></label>
+        <label>Paid from
+          <select name="courier_paid_from">
+            {% for key, label in costEntryPaidFrom %}<option value="{{ key }}"{{ ' selected' if key == 'company_account' }}>{{ label }}</option>{% endfor %}
+          </select>
+        </label>
         {{ stepBadge('13f') | safe }}<button type="submit" class="btn-sm btn-success">Close Order — Complete Document Set Couriered to Buyer</button>
       </form>
     {% endif %}
