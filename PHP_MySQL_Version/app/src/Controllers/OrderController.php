@@ -1847,14 +1847,15 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        // Owner request (2026-10-26): the day's exchange rate is recorded
-        // together with the remittance itself.
-        $rate = (float) ($_POST['advance_exchange_rate'] ?? 0);
-        if ($rate <= 0) {
-            Flash::set('error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+        // Owner decision D-244 (4 Nov 2026): the INR the bank credited is entered and the rate is worked
+        // out from it; the bank's rate on the advice, when given, checks it (₹1 tolerance).
+        $inr = \App\Services\RemittanceInr::fromPost($_POST, 'advance_', $amount, (string) ((OrderRepository::find($orderId) ?? [])['currency_code'] ?? ''));
+        if (isset($inr['error'])) {
+            Flash::set('error', $inr['error']);
             header("Location: /orders/{$orderId}");
             return;
         }
+        $rate = (float) $inr['rate'];
         $bankRef = trim((string) ($_POST['advance_bank_reference'] ?? ''));
         if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The advance amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate) ?? \App\Helpers\FieldValidator::bankReference($bankRef)) {
             Flash::set('error', $error);
@@ -1877,7 +1878,7 @@ final class OrderController
         }
         // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why —
         // bank charges deducted, the buyer paid less, or the buyer paid more.
-        if (\App\Services\PartPaymentService::receiptExists($orderId, 'advance', null, $amount, $receivedAt, $rate)) {
+        if (\App\Services\PartPaymentService::receiptExists($orderId, 'advance', null, $amount, $receivedAt, $rate, $inr['inr'])) {
             Flash::set('warning', 'Advance remittance already recorded with these details — nothing changed.');
             header("Location: /orders/{$orderId}");
             return;
@@ -1890,13 +1891,13 @@ final class OrderController
         }
         // QA Round 6, R6-N22: the amount, its rate and their audit rows are
         // saved together or not at all.
-        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval): bool {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval, $inr): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
-            if (\App\Services\PartPaymentService::receiptExists($orderId, 'advance', null, $amount, $receivedAt, $rate)) {
+            if (\App\Services\PartPaymentService::receiptExists($orderId, 'advance', null, $amount, $receivedAt, $rate, $inr['inr'])) {
                 return false;
             }
-            $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'advance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges']);
+            $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'advance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges'], $inr);
             \App\Services\RemittanceDifference::afterReceipt($orderId, 'advance', null, $receiptId, $diffEval, $amount, $rate, $receivedAt, $bankRef, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'advance_exchange_rate', null, (string) $rate);
             // External QA report L-23: advance payment recording was never audit-logged.
@@ -1919,7 +1920,7 @@ final class OrderController
             ClientRepository::lockData((int) $order['client_id'], 'Auto-locked: advance remittance recorded before client PI-details consent');
         }
 
-        Flash::set('success', trim($this->remittanceStatement($orderId, $amount, $rate) . ' ' . \App\Services\RemittanceDifference::outcome('advance', 'Advance', $currency, $diffEval, $amount, $rate)) . ' ' . 'Advance remittance recorded. Mark it cleared once your bank confirms receipt.');
+        Flash::set('success', trim($this->remittanceStatement($orderId, $amount, $rate, $inr) . ' ' . \App\Services\RemittanceDifference::outcome('advance', 'Advance', $currency, $diffEval, $amount, $rate)) . ' ' . 'Advance remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
 
@@ -2923,14 +2924,15 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        // Owner request (2026-10-26): the day's exchange rate is recorded
-        // together with the remittance itself.
-        $rate = (float) ($_POST['freight_exchange_rate'] ?? 0);
-        if ($rate <= 0) {
-            Flash::set('error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+        // Owner decision D-244 (4 Nov 2026): the INR the bank credited is entered and the rate is worked
+        // out from it; the bank's rate on the advice, when given, checks it (₹1 tolerance).
+        $inr = \App\Services\RemittanceInr::fromPost($_POST, 'freight_', $amount, (string) ((OrderRepository::find($orderId) ?? [])['currency_code'] ?? ''));
+        if (isset($inr['error'])) {
+            Flash::set('error', $inr['error']);
             header("Location: /orders/{$orderId}");
             return;
         }
+        $rate = (float) $inr['rate'];
         $bankRef = trim((string) ($_POST['freight_bank_reference'] ?? ''));
         if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The freight amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate) ?? \App\Helpers\FieldValidator::bankReference($bankRef)) {
             Flash::set('error', $error);
@@ -2938,7 +2940,7 @@ final class OrderController
             return;
         }
         // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why.
-        if (\App\Services\PartPaymentService::receiptExists($orderId, 'freight', null, $amount, $receivedAt, $rate)) {
+        if (\App\Services\PartPaymentService::receiptExists($orderId, 'freight', null, $amount, $receivedAt, $rate, $inr['inr'])) {
             Flash::set('warning', 'Freight remittance already recorded with these details — nothing changed.');
             header("Location: /orders/{$orderId}");
             return;
@@ -2952,13 +2954,13 @@ final class OrderController
             return;
         }
         // QA Round 6, R6-N22: saved together or not at all.
-        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval): bool {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval, $inr): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
-            if (\App\Services\PartPaymentService::receiptExists($orderId, 'freight', null, $amount, $receivedAt, $rate)) {
+            if (\App\Services\PartPaymentService::receiptExists($orderId, 'freight', null, $amount, $receivedAt, $rate, $inr['inr'])) {
                 return false;
             }
-            $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'freight', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges']);
+            $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'freight', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges'], $inr);
             \App\Services\RemittanceDifference::afterReceipt($orderId, 'freight', null, $receiptId, $diffEval, $amount, $rate, $receivedAt, $bankRef, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'freight_exchange_rate', null, (string) $rate);
             // External QA report N-08: this action never reached the audit
@@ -2971,7 +2973,7 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        Flash::set('success', trim($this->remittanceStatement($orderId, $amount, $rate) . ' ' . \App\Services\RemittanceDifference::outcome('freight', 'Freight', $currency, $diffEval, $amount, $rate)) . ' ' . 'Freight remittance recorded. Mark it cleared once your bank confirms receipt.');
+        Flash::set('success', trim($this->remittanceStatement($orderId, $amount, $rate, $inr) . ' ' . \App\Services\RemittanceDifference::outcome('freight', 'Freight', $currency, $diffEval, $amount, $rate)) . ' ' . 'Freight remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
 
@@ -3522,14 +3524,15 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        // Owner request (2026-10-26): the day's exchange rate is recorded
-        // together with the remittance itself.
-        $rate = (float) ($_POST['balance_exchange_rate'] ?? 0);
-        if ($rate <= 0) {
-            Flash::set('error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+        // Owner decision D-244 (4 Nov 2026): the INR the bank credited is entered and the rate is worked
+        // out from it; the bank's rate on the advice, when given, checks it (₹1 tolerance).
+        $inr = \App\Services\RemittanceInr::fromPost($_POST, 'balance_', $amount, (string) ((OrderRepository::find($orderId) ?? [])['currency_code'] ?? ''));
+        if (isset($inr['error'])) {
+            Flash::set('error', $inr['error']);
             header("Location: /orders/{$orderId}");
             return;
         }
+        $rate = (float) $inr['rate'];
         $bankRef = trim((string) ($_POST['balance_bank_reference'] ?? ''));
         if ($error = \App\Helpers\FieldValidator::moneyAmount($amount, 'The balance amount') ?? \App\Helpers\FieldValidator::exchangeRate($rate) ?? \App\Helpers\FieldValidator::bankReference($bankRef)) {
             Flash::set('error', $error);
@@ -3537,7 +3540,7 @@ final class OrderController
             return;
         }
         // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why.
-        if (\App\Services\PartPaymentService::receiptExists($orderId, 'balance', null, $amount, $receivedAt, $rate)) {
+        if (\App\Services\PartPaymentService::receiptExists($orderId, 'balance', null, $amount, $receivedAt, $rate, $inr['inr'])) {
             Flash::set('warning', 'Balance remittance already recorded with these details — nothing changed.');
             header("Location: /orders/{$orderId}");
             return;
@@ -3551,13 +3554,13 @@ final class OrderController
             return;
         }
         // QA Round 6, R6-N22: saved together or not at all.
-        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval): bool {
+        $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval, $inr): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
-            if (\App\Services\PartPaymentService::receiptExists($orderId, 'balance', null, $amount, $receivedAt, $rate)) {
+            if (\App\Services\PartPaymentService::receiptExists($orderId, 'balance', null, $amount, $receivedAt, $rate, $inr['inr'])) {
                 return false;
             }
-            $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'balance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges']);
+            $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'balance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges'], $inr);
             \App\Services\RemittanceDifference::afterReceipt($orderId, 'balance', null, $receiptId, $diffEval, $amount, $rate, $receivedAt, $bankRef, (int) AuthService::currentUserId());
             AuditLogRepository::log(AuthService::currentUserId(), 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', $orderId, 'balance_exchange_rate', null, (string) $rate);
             // External QA report L-23: balance payment recording was never audit-logged.
@@ -3569,7 +3572,7 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
-        Flash::set('success', trim($this->remittanceStatement($orderId, $amount, $rate) . ' ' . \App\Services\RemittanceDifference::outcome('balance', 'Balance', $currency, $diffEval, $amount, $rate)) . ' ' . 'Balance remittance recorded. Mark it cleared once your bank confirms receipt.');
+        Flash::set('success', trim($this->remittanceStatement($orderId, $amount, $rate, $inr) . ' ' . \App\Services\RemittanceDifference::outcome('balance', 'Balance', $currency, $diffEval, $amount, $rate)) . ' ' . 'Balance remittance recorded. Mark it cleared once your bank confirms receipt.');
         header("Location: /orders/{$orderId}");
     }
 
@@ -4661,15 +4664,9 @@ final class OrderController
     }
 
     /** "Received USD 1,800.00 at today's exchange rate of ₹83.2500 (= ₹149,850.00)." — the remittance + rate just recorded. */
-    private function remittanceStatement(int $orderId, float $amount, float $rate): string
+    private function remittanceStatement(int $orderId, float $amount, float $rate, ?array $inr = null): string
     {
-        $currency = (string) (OrderRepository::find($orderId)['currency_code'] ?? '');
-        return sprintf(
-            'Received %s %s at today\'s exchange rate of ₹%s (= ₹%s).',
-            $currency,
-            number_format($amount, 2),
-            number_format($rate, 4),
-            number_format($amount * $rate, 2)
-        );
+        // D-244: the rupees the bank credited and the rate worked out from them (or the typed rate, as an estimate).
+        return \App\Services\RemittanceInr::statement((string) (OrderRepository::find($orderId)['currency_code'] ?? ''), $amount, $inr, $rate);
     }
 }

@@ -175,7 +175,6 @@
     document.querySelectorAll('[data-remit-diff]').forEach(function (box) {
       var form = box.closest('form');
       var amountEl = form && form.querySelector('[data-remit-amount]');
-      var rateEl = form && form.querySelector('[data-remit-rate]');
       var chargesEl = box.querySelector('[data-remit-charges]');
       var chargesWrap = box.querySelector('[data-remit-charges-wrap]');
       var reasonEl = box.querySelector('[data-remit-reason]');
@@ -240,7 +239,7 @@
       }
       function update() {
         var amount = parseFloat(amountEl.value);
-        var rate = rateEl ? parseFloat(rateEl.value) : NaN;
+        var rate = remitRateOf(form);
         if (!(amount > 0) || !(remaining > 0)) {
           preview.textContent = '';
           filterOptions(0);
@@ -280,27 +279,131 @@
     });
   }
 
+  // D-244 (owner, 4 Nov 2026): the rate a remittance form will save — worked
+  // out from the INR the bank credited (₹ ÷ amount), or the rate typed when
+  // "INR not known yet" is ticked. NaN while it cannot be worked out yet.
+  function remitRateOf(form) {
+    var box = form.querySelector('[data-remit-inr]');
+    if (!box) {
+      var rateEl = form.querySelector('[data-remit-rate]');
+      return rateEl ? parseFloat(rateEl.value) : NaN;
+    }
+    var unknown = box.querySelector('[data-remit-inr-unknown]');
+    if (unknown && unknown.checked) {
+      var typed = box.querySelector('[data-remit-rate-typed]');
+      return typed ? parseFloat(typed.value) : NaN;
+    }
+    var amountEl = form.querySelector('[data-remit-amount]');
+    var inrEl = box.querySelector('[data-remit-inr-credited]');
+    var amount = amountEl ? parseFloat(amountEl.value) : NaN;
+    var inr = inrEl ? parseFloat(inrEl.value) : NaN;
+    return amount > 0 && inr > 0 ? inr / amount : NaN;
+  }
+
   function initRemittanceStatements() {
     document.querySelectorAll('[data-remit-statement]').forEach(function (line) {
       var form = line.closest('form');
       var amountEl = form && form.querySelector('[data-remit-amount]');
-      var rateEl = form && form.querySelector('[data-remit-rate]');
-      if (!amountEl || !rateEl) return;
+      if (!amountEl) return;
       var currency = line.getAttribute('data-currency') || '';
       function money(n, digits) {
         return n.toLocaleString('en-IN', { minimumFractionDigits: digits, maximumFractionDigits: digits });
       }
       function update() {
         var amount = parseFloat(amountEl.value);
-        var rate = parseFloat(rateEl.value);
+        var rate = remitRateOf(form);
+        var unknown = form.querySelector('[data-remit-inr-unknown]');
         if (!(amount > 0) || !(rate > 0)) {
-          line.textContent = 'Enter the amount received and today\'s exchange rate — both are recorded together.';
+          line.textContent = unknown && unknown.checked
+            ? 'Enter the amount received and the exchange rate — the INR credited is entered later.'
+            : 'Enter the amount received and the INR credited by the bank — the exchange rate is worked out from them.';
           return;
         }
-        line.textContent = 'We received ' + currency + ' ' + money(amount, 2) + ' at today\'s exchange rate of \u20B9' + money(rate, 4) + ' = \u20B9' + money(amount * rate, 2) + '.';
+        if (unknown && unknown.checked) {
+          line.textContent = 'We received ' + currency + ' ' + money(amount, 2) + ' at the exchange rate of ₹' + money(rate, 4) + ' ≈ ₹' + money(amount * rate, 2) + ' (an estimate until the INR credited is known).';
+          return;
+        }
+        line.textContent = 'We received ' + currency + ' ' + money(amount, 2) + '; ₹' + money(amount * rate, 2) + ' credited by the bank — exchange rate worked out ₹' + money(rate, 4) + '.';
       }
-      amountEl.addEventListener('input', update);
-      rateEl.addEventListener('input', update);
+      form.addEventListener('input', update);
+      form.addEventListener('change', update);
+      update();
+    });
+  }
+
+  // D-244 (owner, 4 Nov 2026): a buyer remittance is recorded with the INR
+  // the bank credited. The rate is worked out from it and shown live. When
+  // the bank's rate on the advice is typed and amount × that rate differs
+  // from the INR by more than ₹1, the form asks why (the bank deducted its
+  // charges / a figure was typed wrong / another reason) and will not save
+  // without an answer; "I typed something wrong" keeps it from saving and
+  // takes you to the INR. "INR not known yet" brings back the typed rate.
+  function initRemittanceInr() {
+    document.querySelectorAll('[data-remit-inr]').forEach(function (box) {
+      var form = box.closest('form');
+      var amountEl = form && form.querySelector('[data-remit-amount]');
+      var knownBox = box.querySelector('[data-remit-inr-known]');
+      var inrEl = box.querySelector('[data-remit-inr-credited]');
+      var bankEl = box.querySelector('[data-remit-bank-rate]');
+      var derivedEl = box.querySelector('[data-remit-rate-derived]');
+      var gapBox = box.querySelector('[data-remit-gap]');
+      var gapText = box.querySelector('[data-remit-gap-text]');
+      var choiceEl = box.querySelector('[data-remit-gap-choice]');
+      var reasonWrap = box.querySelector('[data-remit-gap-reason-wrap]');
+      var reasonEl = reasonWrap && reasonWrap.querySelector('input');
+      var unknownEl = box.querySelector('[data-remit-inr-unknown]');
+      var typedWrap = box.querySelector('[data-remit-rate-typed-wrap]');
+      var typedEl = box.querySelector('[data-remit-rate-typed]');
+      if (!form || !amountEl || !inrEl || !bankEl || !choiceEl || !unknownEl || !typedEl) return;
+      var currency = box.getAttribute('data-currency') || '';
+      var tolerance = parseFloat(box.getAttribute('data-tolerance')) || 1;
+      function show(el, on) {
+        if (!el) return;
+        el.hidden = !on;
+        el.style.display = on ? '' : 'none';
+      }
+      function money(n, digits) {
+        return n.toLocaleString('en-IN', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+      }
+      function update() {
+        var unknown = unknownEl.checked;
+        show(knownBox, !unknown);
+        show(typedWrap, unknown);
+        typedEl.disabled = !unknown;
+        inrEl.disabled = unknown;
+        bankEl.disabled = unknown;
+        var amount = parseFloat(amountEl.value);
+        var inr = parseFloat(inrEl.value);
+        var bank = parseFloat(bankEl.value);
+        derivedEl.textContent = !unknown && amount > 0 && inr > 0 ? '₹' + money(inr / amount, 4) : '—';
+        var gap = !unknown && amount > 0 && inr > 0 && bank > 0 ? Math.round((amount * bank - inr) * 100) / 100 : 0;
+        var needs = Math.abs(gap) > tolerance;
+        show(gapBox, needs);
+        choiceEl.disabled = !needs;
+        var chargesOption = choiceEl.querySelector('option[value="bank_charges"]');
+        if (chargesOption) {
+          chargesOption.disabled = gap < 0;
+          chargesOption.hidden = gap < 0;
+          if (gap < 0 && choiceEl.value === 'bank_charges') choiceEl.value = '';
+        }
+        if (needs && gapText) {
+          gapText.textContent = 'At the bank\'s rate of ₹' + money(bank, 4) + ', ' + currency + ' ' + money(amount, 2) + ' is ₹' + money(amount * bank, 2)
+            + ', but ₹' + money(inr, 2) + ' was credited — ₹' + money(Math.abs(gap), 2) + (gap > 0 ? ' less' : ' more') + '. More than ₹' + money(tolerance, 0) + ' apart, so say why.'
+            + (choiceEl.value === 'bank_charges' ? ' ₹' + money(gap, 2) + ' will be recorded as an order cost "Bank Charges".' : '');
+        }
+        var other = needs && choiceEl.value === 'other';
+        show(reasonWrap, other);
+        if (reasonEl) reasonEl.disabled = !other;
+        if (inrEl.classList.contains('field-invalid') && !fieldError(inrEl)) clearFieldError(inrEl);
+      }
+      choiceEl.addEventListener('change', function () {
+        if (choiceEl.value === 'typo') {
+          inrEl.focus();
+          if (inrEl.select) inrEl.select();
+        }
+      });
+      form.addEventListener('input', update);
+      form.addEventListener('change', update);
       update();
     });
   }
@@ -586,6 +689,16 @@
     var value = el.value.trim();
     var name = (el.name || '').replace(/\[.*$/, '');
     var type = (el.type || '').toLowerCase();
+    // data-refuse-when="<name>=<value>": the form is not sent while that field
+    // of the same form (enabled) has that value — e.g. D-244's "I typed
+    // something wrong" keeps a remittance from saving until the figures agree.
+    if (el.dataset.refuseWhen && el.form) {
+      var refuse = el.dataset.refuseWhen.split('=');
+      var refuseField = el.form.elements.namedItem(refuse[0]);
+      if (refuseField && !refuseField.disabled && refuseField.value === refuse[1]) {
+        return el.dataset.refuseMessage || 'Correct this field before saving.';
+      }
+    }
     if (el.required && value === '' && (el.tagName === 'TEXTAREA' || type === 'text' || type === 'search' || type === 'email' || type === 'tel' || type === 'url' || type === 'password' || type === 'number')) {
       return 'This field is required.';
     }
@@ -1036,6 +1149,7 @@
     initComplianceRows();
     initCrateHsCodes();
     initFinCostPicker();
+    initRemittanceInr();
     initRemittanceStatements();
     initRemittanceDifference();
     initSchemeRows();

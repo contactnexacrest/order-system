@@ -255,12 +255,52 @@ with money that's actually landed:
    Zoho Books — the CA books bank charges from the bank statement (owner
    decision 29 Oct 2026). Leave it empty when the bank charged nothing or
    the fee is not yet known.
-   Staff type the amount received, the
-   date, and the **@ Exchange Rate** (₹ per 1 unit of the order
-   currency) it was received at, once the buyer's T/T notification comes in. The rate is
-   required and is recorded together with the remittance; the form reads
-   back "Received USD 1,800.00 at today's exchange rate of ₹83.2500
-   (= ₹149,850.00)" as you type. The **Bank reference** (SWIFT / UTR /
+   Staff type the amount received, the date and — from the bank's credit
+   advice — the **INR credited by the bank (₹)**, once the buyer's T/T
+   notification comes in (owner decision D-244, 4 Nov 2026). The exchange
+   rate is no longer typed: the form shows **Exchange rate (worked out: ₹ ÷
+   USD)** live and read-only, and reads back "We received USD 1,800.00;
+   ₹149,850.00 credited by the bank — exchange rate worked out ₹83.2500" as
+   you type. That rupee figure becomes the leg's INR actual at once (the
+   sum of the receipts when the buyer paid in parts), so the CA register,
+   profit, CAFIN and the Zoho Books payment all use what the bank really
+   credited.
+   - **Bank's rate on the advice** (optional): type the rate printed on the
+     advice to check the INR. If amount × that rate and the INR credited
+     are **₹1 or less** apart (rounding), it saves as it is. **More than
+     ₹1** apart, the form asks **"Why is the INR different from the bank's
+     rate?"** and will not save without an answer (the server checks the
+     same):
+     - *The bank deducted its charges — book the difference as Bank
+       Charges*: the difference is booked at once as an order cost **Bank
+       Charges** (company account, linked to the receipt) with the
+       description *"Bank charges deducted in rupees from <buyer>'s advance
+       remittance for order <ref>: USD 1,800.00 at the bank's rate ₹83.2500
+       = ₹149,850.00, credited ₹149,348.00, charges ₹502.00 · bank ref
+       <UTR>"*. The receipt is then valued at the bank's rate, so the
+       charges are counted once — as the cost — and go to Zoho Books with
+       the customer payment as bank charges (the cost itself is not sent to
+       Zoho, as for every Bank Charges cost). Only possible when less
+       arrived than amount × the bank's rate.
+     - *I typed something wrong — let me correct it*: nothing is saved; the
+       form takes you back to the INR credited — correct the amount, the INR
+       or the bank's rate.
+     - *Other reason — type it*: at least 10 characters; kept on the
+       receipt and in the audit log; the rate stays the one worked out from
+       the INR.
+   - **INR not known yet — enter the rate**: tick it when the bank has not
+     told you the rupees yet. The old **Exchange rate** box comes back
+     (required) and the INR stays empty; the CA INR Settlement Register then
+     shows the amount at that rate marked **"estimated at recorded rate"**
+     until someone with "Add/edit INR actual" enters the real INR in the
+     INR actual box.
+   - This is separate from **"Why is it different?"** above (the foreign
+     amount that arrived compared with what was due, e.g. USD charges
+     deducted on the way) and from **"Our bank's charges on this credit"**
+     (a fee our bank debits separately): each is booked once, on its own.
+   The receipts list shows each receipt's **INR credited** (or "not known
+   yet") and, where the bank's rate differed, what was decided.
+   The **Bank reference** (SWIFT / UTR /
    the reference on the bank's credit advice) is required too (rule D-212,
    2026-10-31): the payment's description — here and in Zoho Books — is
    built from it, so the payment can always be matched to the bank

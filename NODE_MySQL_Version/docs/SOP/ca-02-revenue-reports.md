@@ -8,6 +8,33 @@ INR Settlement Register: a forex gain/loss figure per settlement leg, a
 place to record each leg's FIRC/eBRC realization proof, and a revenue
 report you can view by financial year or by calendar year.
 
+## INR credited with the remittance (D-244, 4 Nov 2026)
+
+Since 4 Nov 2026 (owner decision D-244) the person recording a buyer
+remittance — advance, freight, balance or a payment milestone — types the
+**INR credited by the bank** from the credit advice, and the leg's
+exchange rate is **worked out** from it (INR ÷ foreign amount). So:
+
+- The leg's **INR actual** is filled at once — the sum of the receipts'
+  INR when the buyer paid in parts. A receipt recorded with **"INR not
+  known yet — enter the rate"** leaves it empty (and empties a value
+  already there, since it no longer covers the whole leg); enter it in the
+  INR actual box once known.
+- While the INR actual is empty, the **INR Settlement Register**, the
+  revenue report's legs table and the CSV export show the amount at the
+  recorded rate, marked **"estimated at recorded rate"** (CSV column
+  "INR Estimated (at recorded rate)"). Estimates are never added to the
+  INR totals; the summary says how much is estimated.
+- When the bank's own rate was typed and the bank kept rupee charges
+  ("The bank deducted its charges"), the gap is an order cost **Bank
+  Charges** and the leg's rate is the bank's rate; the Zoho Books customer
+  payment carries the gap as bank charges, so the deposit equals the INR
+  credited. Otherwise the Zoho payment's rate is INR credited ÷ foreign
+  amount.
+- Because the rate now comes from the INR itself, the **forex gain/(loss)**
+  of a leg recorded this way is nil (or the bank charges); it still shows
+  a real figure for legs recorded with a typed rate and a later INR actual.
+
 ## Exchange Rate (per settlement leg)
 
 Every order is quoted and settled in a foreign currency, but for

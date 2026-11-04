@@ -766,7 +766,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     const order = await createTestOrder(await createTestClient());
     await db.execute('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)', { o: order });
     await db.execute('UPDATE order_payment_status SET balance_amount = 2000, balance_remittance_received_at = NOW() WHERE order_id = :o', { o: order });
-    expectDone(await holder.call('POST', `/orders/${order}/payment/balance/exchange-rate`, { balance_exchange_rate: '83.25' }), 'POST /orders/:id/payment/balance/exchange-rate');
+    expectDone(await holder.call('POST', `/orders/${order}/payment/balance/exchange-rate`, { balance_inr_unknown: '1', balance_exchange_rate: '83.25' }), 'POST /orders/:id/payment/balance/exchange-rate');
     expect(Number(await value('SELECT balance_exchange_rate FROM order_payment_status WHERE order_id = :o', { o: order }))).toBe(83.25);
     expect(await audits('CA_EXCHANGE_RATE_RECORDED', order)).toBe(1);
 
@@ -856,7 +856,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expect(String(await value('SELECT balance_pct FROM orders WHERE id = :o', { o: order }))).toBe('20.00');
 
     await createTestDocument(order, 'PI', 'approved');
-    expectDone(await holder.call('POST', `/orders/${order}/payment/milestones/${milestone}`, { amount: '2250', exchange_rate: '84.1', bank_reference: 'UTR-RT7', received_on: todayIst() }),
+    expectDone(await holder.call('POST', `/orders/${order}/payment/milestones/${milestone}`, { amount: '2250', inr_unknown: '1', exchange_rate: '84.1', bank_reference: 'UTR-RT7', received_on: todayIst() }),
       'POST /orders/:id/payment/milestones/:milestoneId', 'bank ref UTR-RT7');
     expect(String(await value('SELECT received_amount FROM order_payment_milestones WHERE id = :m', { m: milestone }))).toBe('2250.00');
     expect(await audits('MILESTONE_PAYMENT_RECORDED', milestone)).toBe(1);

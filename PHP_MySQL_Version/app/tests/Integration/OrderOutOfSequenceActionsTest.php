@@ -108,7 +108,7 @@ final class OrderOutOfSequenceActionsTest extends DbTestCase
     {
         $orderId = $this->createTestOrder($this->createTestClient());
         OrderPaymentStatusRepository::initializeForOrder($orderId);
-        $_POST = ['freight_exchange_rate' => '83.25'];
+        $_POST = ['freight_inr_unknown' => '1', 'freight_exchange_rate' => '83.25'];
 
         ob_start();
         (new OrderController())->recordFreightExchangeRate(['id' => (string) $orderId]);
@@ -122,7 +122,7 @@ final class OrderOutOfSequenceActionsTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
         OrderPaymentStatusRepository::initializeForOrder($orderId);
         OrderPaymentStatusRepository::recordFreightReceived($orderId, 800.0, '2026-01-10');
-        $_POST = ['freight_exchange_rate' => '83.25'];
+        $_POST = ['freight_inr_unknown' => '1', 'freight_exchange_rate' => '83.25'];
 
         ob_start();
         (new OrderController())->recordFreightExchangeRate(['id' => (string) $orderId]);

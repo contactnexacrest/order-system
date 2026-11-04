@@ -49,17 +49,17 @@ final class PerLegExchangeRateTest extends DbTestCase
         OrderPaymentStatusRepository::recordBalanceReceived($orderId, 1000.0, '2026-01-10');
         OrderPaymentStatusRepository::recordFreightReceived($orderId, 1000.0, '2026-01-10');
 
-        $_POST = ['advance_exchange_rate' => '88.5'];
+        $_POST = ['advance_inr_unknown' => '1', 'advance_exchange_rate' => '88.5'];
         ob_start();
         (new OrderController())->recordAdvanceExchangeRate(['id' => (string) $orderId]);
         ob_end_clean();
 
-        $_POST = ['balance_exchange_rate' => '90.25'];
+        $_POST = ['balance_inr_unknown' => '1', 'balance_exchange_rate' => '90.25'];
         ob_start();
         (new OrderController())->recordBalanceExchangeRate(['id' => (string) $orderId]);
         ob_end_clean();
 
-        $_POST = ['freight_exchange_rate' => '91.0'];
+        $_POST = ['freight_inr_unknown' => '1', 'freight_exchange_rate' => '91.0'];
         ob_start();
         (new OrderController())->recordFreightExchangeRate(['id' => (string) $orderId]);
         ob_end_clean();
@@ -82,13 +82,13 @@ final class PerLegExchangeRateTest extends DbTestCase
 
         // Owner decision (2026-10-26, t4): changing a recorded rate is a
         // correction and needs a reason — without one nothing changes.
-        $_POST = ['advance_exchange_rate' => '95.0'];
+        $_POST = ['advance_inr_unknown' => '1', 'advance_exchange_rate' => '95.0'];
         ob_start();
         (new OrderController())->recordAdvanceExchangeRate(['id' => (string) $orderId]);
         ob_end_clean();
         self::assertEqualsWithDelta(85.0, (float) OrderPaymentStatusRepository::find($orderId)['advance_exchange_rate'], 0.001, 'a correction without a reason is refused');
 
-        $_POST = ['advance_exchange_rate' => '95.0', 'correction_reason' => 'Typed the wrong day\'s rate'];
+        $_POST = ['advance_inr_unknown' => '1', 'advance_exchange_rate' => '95.0', 'correction_reason' => 'Typed the wrong day\'s rate'];
         ob_start();
         (new OrderController())->recordAdvanceExchangeRate(['id' => (string) $orderId]);
         ob_end_clean();
@@ -105,7 +105,7 @@ final class PerLegExchangeRateTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
         OrderPaymentStatusRepository::initializeForOrder($orderId);
 
-        $_POST = ['advance_exchange_rate' => '0'];
+        $_POST = ['advance_inr_unknown' => '1', 'advance_exchange_rate' => '0'];
         ob_start();
         (new OrderController())->recordAdvanceExchangeRate(['id' => (string) $orderId]);
         ob_end_clean();

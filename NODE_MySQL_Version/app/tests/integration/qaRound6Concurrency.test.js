@@ -90,7 +90,7 @@ describe('QA Round 6 — simultaneous and repeated saves', () => {
     const orderId = await createTestOrder(await createTestClient());
     // Every real order has its payment-status row from creation.
     await db.execute('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)', { o: orderId });
-    const fields = { advance_amount: '1020', advance_exchange_rate: '83.25', advance_bank_reference: 'UTR-TEST-0001', advance_received_at: todayIst() };
+    const fields = { advance_amount: '1020', advance_inr_unknown: '1', advance_exchange_rate: '83.25', advance_bank_reference: 'UTR-TEST-0001', advance_received_at: todayIst() };
     const page = `/orders/${orderId}`;
     expect((await flashAfter(await post(`/orders/${orderId}/payment/advance`, fields, page))).type).toBe('success');
     expect((await flashAfter(await post(`/orders/${orderId}/payment/advance`, fields, page))).message).toContain('already recorded with these details');

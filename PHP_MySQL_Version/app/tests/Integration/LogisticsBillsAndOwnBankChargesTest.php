@@ -229,7 +229,7 @@ final class LogisticsBillsAndOwnBankChargesTest extends DbTestCase
     {
         $orderId = $this->orderAtAdvance();
         $this->signIn($this->createTestUser('Accounts Executive'));
-        $r = $this->recordAdvance($orderId, ['advance_amount' => '1800', 'advance_received_at' => '2026-10-20', 'advance_exchange_rate' => '84', 'advance_bank_reference' => 'UTR778801', 'own_bank_charges_inr' => '590']);
+        $r = $this->recordAdvance($orderId, ['advance_amount' => '1800', 'advance_received_at' => '2026-10-20', 'advance_inr_unknown' => '1', 'advance_exchange_rate' => '84', 'advance_bank_reference' => 'UTR778801', 'own_bank_charges_inr' => '590']);
         self::assertSame('success', $r['type'], $r['message']);
 
         $s = PartPaymentService::summary($orderId, 'advance');
@@ -260,10 +260,10 @@ final class LogisticsBillsAndOwnBankChargesTest extends DbTestCase
 
         $orderId = $this->orderAtAdvance();
         $this->signIn($this->createTestUser('Accounts Executive'));
-        $r = $this->recordAdvance($orderId, ['advance_amount' => '1800', 'advance_received_at' => '2026-10-20', 'advance_exchange_rate' => '84', 'advance_bank_reference' => 'UTR778802']);
+        $r = $this->recordAdvance($orderId, ['advance_amount' => '1800', 'advance_received_at' => '2026-10-20', 'advance_inr_unknown' => '1', 'advance_exchange_rate' => '84', 'advance_bank_reference' => 'UTR778802']);
         self::assertSame('success', $r['type'], $r['message']);
         self::assertSame([], OrderCostEntryRepository::forOrder($orderId), 'left blank: no cost entry');
-        $r = $this->recordAdvance($this->orderAtAdvance(), ['advance_amount' => '1800', 'advance_received_at' => '2026-10-20', 'advance_exchange_rate' => '84', 'advance_bank_reference' => 'UTR778803', 'own_bank_charges_inr' => 'abc']);
+        $r = $this->recordAdvance($this->orderAtAdvance(), ['advance_amount' => '1800', 'advance_received_at' => '2026-10-20', 'advance_inr_unknown' => '1', 'advance_exchange_rate' => '84', 'advance_bank_reference' => 'UTR778803', 'own_bank_charges_inr' => 'abc']);
         self::assertSame('error', $r['type']);
         self::assertSame("Our bank's charges must be an amount in rupees above 0 — or leave the field empty.", $r['message']);
 

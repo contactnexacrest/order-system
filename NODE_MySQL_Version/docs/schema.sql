@@ -4965,6 +4965,14 @@ CREATE TABLE IF NOT EXISTS order_payment_receipts (
   bank_charges_cost_id BIGINT UNSIGNED NULL,
   own_bank_charges_inr DECIMAL(14,2) NULL,      -- our own bank's inward-remittance fee (INR incl. GST), D-227 follow-up
   own_bank_charges_cost_id BIGINT UNSIGNED NULL,
+  -- D-244 (4 Nov 2026): the INR the bank actually credited is typed; the rate is worked out from it
+  -- (inr_credited ÷ amount). NULL = "INR not known yet" (rate typed instead, register shows an estimate).
+  inr_credited DECIMAL(14,2) NULL,
+  bank_rate DECIMAL(12,4) NULL,                  -- optional: the rate printed on the bank's advice
+  rate_gap_inr DECIMAL(14,2) NULL,               -- amount × bank_rate − inr_credited, when bank_rate is given
+  rate_gap_choice VARCHAR(20) NULL,              -- 'bank_charges' | 'other' when |gap| > ₹1
+  rate_gap_reason VARCHAR(255) NULL,             -- the staff reason for 'other'
+  rate_gap_cost_id BIGINT UNSIGNED NULL,         -- Bank Charges order cost booked for 'bank_charges'
   recorded_by BIGINT UNSIGNED NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_payment_receipts_leg (order_id, leg, milestone_id),

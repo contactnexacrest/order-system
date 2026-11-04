@@ -101,7 +101,7 @@ final class GapShipmentGatesTest extends DbTestCase
     }
 
     private const BL = ['bl_number' => 'MSCU7654321', 'bl_date' => '2026-11-01'];
-    private const BALANCE = ['balance_amount' => '2700', 'balance_received_at' => '2026-10-30', 'balance_exchange_rate' => '91.5', 'balance_bank_reference' => 'UTRGAP000001'];
+    private const BALANCE = ['balance_amount' => '2700', 'balance_received_at' => '2026-10-30', 'balance_inr_unknown' => '1', 'balance_exchange_rate' => '91.5', 'balance_bank_reference' => 'UTRGAP000001'];
 
     public function testABeforeShipmentBalanceIsClearedBeforeTheBillOfLadingWhichWaitsForIt(): void
     {

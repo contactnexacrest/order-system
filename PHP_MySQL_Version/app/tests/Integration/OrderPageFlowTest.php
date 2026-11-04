@@ -72,16 +72,17 @@ final class OrderPageFlowTest extends DbTestCase
 
         $_POST = ['advance_amount' => '1800', 'advance_received_at' => '2026-10-26'];
         (new OrderController())->recordAdvancePayment(['id' => (string) $orderId]);
-        self::assertStringContainsString("today's exchange rate", $this->lastFlash());
-        self::assertNull(OrderPaymentStatusRepository::find($orderId)['advance_amount'], 'nothing is recorded without the rate');
+        // D-244 (4 Nov 2026): the INR credited is asked for — or "INR not known yet" with the rate.
+        self::assertStringContainsString('Enter the INR credited by the bank', $this->lastFlash());
+        self::assertNull(OrderPaymentStatusRepository::find($orderId)['advance_amount'], 'nothing is recorded without the INR or the rate');
 
-        $_POST = ['advance_amount' => '1800', 'advance_received_at' => '2026-10-26', 'advance_exchange_rate' => '83.25', 'advance_bank_reference' => 'UTR-TEST-0001'];
+        $_POST = ['advance_amount' => '1800', 'advance_received_at' => '2026-10-26', 'advance_inr_unknown' => '1', 'advance_exchange_rate' => '83.25', 'advance_bank_reference' => 'UTR-TEST-0001'];
         (new OrderController())->recordAdvancePayment(['id' => (string) $orderId]);
         $payment = OrderPaymentStatusRepository::find($orderId);
         self::assertEquals(1800, (float) $payment['advance_amount']);
         self::assertEquals(83.25, (float) $payment['advance_exchange_rate']);
         self::assertSame($this->userId, (int) $payment['advance_exchange_rate_set_by']);
-        self::assertStringContainsString("Received USD 1,800.00 at today's exchange rate of ₹83.2500 (= ₹149,850.00).", $this->lastFlash());
+        self::assertStringContainsString('Received USD 1,800.00 at the exchange rate of ₹83.2500 (≈ ₹149,850.00, estimated until the INR credited is known).', $this->lastFlash());
     }
 
     public function testOneSaveStoresEveryComplianceRowOfTheCard(): void

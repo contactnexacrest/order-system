@@ -359,7 +359,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await openStage(page, 3);
       const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
       await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
-      await recordForm.locator('input[name="advance_exchange_rate"]').fill('90.25');
+      await recordForm.locator('input[name="advance_inr_credited"]').fill('162450.00'); // D-244: the rate is worked out (₹90.25)
       await recordForm.locator('input[name="advance_bank_reference"]').fill('E2E-UTR-ADVANCE-0001');
       await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
       await expect(page.locator('.alert')).toBeVisible();
@@ -467,7 +467,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       await openStage(page, 6);
       const recordForm = page.locator(`form[action="/orders/${orderId}/payment/freight"]`);
       await recordForm.locator('input[name="freight_amount"]').fill('1070.00');
-      await recordForm.locator('input[name="freight_exchange_rate"]').fill('90.5');
+      await recordForm.locator('input[name="freight_inr_credited"]').fill('96835.00');
       await recordForm.locator('input[name="freight_bank_reference"]').fill('E2E-UTR-FREIGHT-0001');
       await recordForm.getByRole('button', { name: 'Record Freight Remittance' }).click();
       await expect(page.locator('.alert')).toBeVisible();
@@ -498,6 +498,7 @@ test.describe.serial('Deep per-role pipeline workflows', () => {
       // before the Bill of Lading — against the PI, no Commercial Invoice yet.
       await page.goto(`/orders/${orderId}?open=balance-record#step-balance-record`);
       const earlyRecord = page.locator(`form[action="/orders/${orderId}/payment/balance"]`);
+      await earlyRecord.locator('input[name="balance_inr_unknown"]').check(); // D-244: INR not known yet — the rate is typed
       await earlyRecord.locator('input[name="balance_exchange_rate"]').fill('91');
       await earlyRecord.locator('input[name="balance_bank_reference"]').fill('E2E-UTR-BALANCE-0001');
       await Promise.all([page.waitForEvent('load'), earlyRecord.getByRole('button', { name: 'Record Balance Remittance' }).click()]);

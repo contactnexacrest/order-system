@@ -69,6 +69,9 @@
                   {{ s.inr_actual_recorded_at }}{% if s.inr_actual_recorded_by %} by {{ usersById[s.inr_actual_recorded_by] or ('User #' ~ s.inr_actual_recorded_by) }}{% endif %}
                 {% endif %}
               </div>
+            {% elif s.inr_estimated != null %}{# D-244: INR not known yet — the amount at the recorded rate #}
+              &#8377;{{ s.inr_estimated | money }}
+              <div class="muted small">estimated at recorded rate — INR credited not recorded yet</div>
             {% else %}
               <span class="muted">Not yet recorded</span>
             {% endif %}

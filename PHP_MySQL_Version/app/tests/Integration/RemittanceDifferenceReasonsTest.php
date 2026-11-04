@@ -81,7 +81,7 @@ final class RemittanceDifferenceReasonsTest extends DbTestCase
 
     private function advance(string $amount, array $extra): array
     {
-        return ['advance_amount' => $amount, 'advance_received_at' => '2026-10-20', 'advance_exchange_rate' => '84', 'advance_bank_reference' => 'UTR990011'] + $extra;
+        return ['advance_amount' => $amount, 'advance_received_at' => '2026-10-20', 'advance_inr_unknown' => '1', 'advance_exchange_rate' => '84', 'advance_bank_reference' => 'UTR990011'] + $extra;
     }
 
     private function idOf(string $label): int

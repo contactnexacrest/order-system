@@ -102,7 +102,7 @@ describe('Gap list G-1 / G-3 / G-6: shipment gates and the OC clock', () => {
   }
 
   const BL = { bl_number: 'MSCU7654321', bl_date: '2026-11-01' };
-  const BALANCE = { balance_amount: '2700', balance_received_at: '2026-10-30', balance_exchange_rate: '91.5', balance_bank_reference: 'UTRGAP000001' };
+  const BALANCE = { balance_amount: '2700', balance_received_at: '2026-10-30', balance_inr_unknown: '1', balance_exchange_rate: '91.5', balance_bank_reference: 'UTRGAP000001' };
 
   beforeAll(async () => {
     admin = await createTestUser('Admin');

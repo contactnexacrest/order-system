@@ -60,7 +60,7 @@ final class PaymentDescriptionRuleTest extends DbTestCase
         $orderId = $this->createTestOrder($this->createTestClient());
         Database::connection()->exec("INSERT INTO order_products (order_id, line_no, description, quantity, unit, unit_price, fob_value) VALUES ({$orderId}, 1, 'Granite slab', 100, 'SQM', 40, 4000)");
         Database::connection()->exec("INSERT IGNORE INTO order_payment_status (order_id) VALUES ({$orderId})");
-        $post = ['advance_amount' => '1600', 'advance_received_at' => date('Y-m-d'), 'advance_exchange_rate' => '84.10'];
+        $post = ['advance_amount' => '1600', 'advance_received_at' => date('Y-m-d'), 'advance_inr_unknown' => '1', 'advance_exchange_rate' => '84.10'];
 
         $_POST = $post;
         (new OrderController())->recordAdvancePayment(['id' => (string) $orderId]);

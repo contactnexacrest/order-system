@@ -63,10 +63,12 @@ final class CaController
             'Foreign Amount' => $r['foreign_amount'],
             'Currency' => $r['currency_code'],
             'INR Actual' => $r['inr_actual'],
+            // D-244: the amount at the recorded rate while the INR credited is not known yet.
+            'INR Estimated (at recorded rate)' => $r['inr_actual'] === null && ($r['inr_estimated'] ?? null) !== null ? round((float) $r['inr_estimated'], 2) : null,
             'Forex Gain/(Loss)' => $r['forex_gain_loss'],
         ], $legRows);
 
-        return ['headers' => ['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'Forex Gain/(Loss)'], 'rows' => $rows];
+        return ['headers' => ['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'INR Estimated (at recorded rate)', 'Forex Gain/(Loss)'], 'rows' => $rows];
     }
 
     /** @return array{headers: string[], rows: array<int, array<string, mixed>>} */

@@ -126,20 +126,23 @@ function joinReferences(rows) {
  * back on order_payment_status, in one transaction. Returns false (nothing
  * recorded) for a second click with the same amount, day and rate.
  */
-async function addLegReceipt(orderId, leg, amount, receivedOn, rate, bankReference, userId, differenceReason = null, bankCharges = 0) {
+async function addLegReceipt(orderId, leg, amount, receivedOn, rate, bankReference, userId, differenceReason = null, bankCharges = 0, inr = null) {
   if (!LEGS.includes(leg)) {
     throw new Error(`Unknown payment leg ${leg}`);
   }
-  return db.transaction(async (c) => {
-    await c.queryOne('SELECT order_id FROM order_payment_status WHERE order_id = :o FOR UPDATE', { o: orderId });
+  const remittanceInr = require('./remittanceInr');
+  const newInr = inr && inr.inr !== null && inr.inr !== undefined ? Number(inr.inr) : null;
+  const result = await db.transaction(async (c) => {
+    const locked = await c.queryOne(`SELECT order_id, ${leg}_inr_actual AS inr_actual FROM order_payment_status WHERE order_id = :o FOR UPDATE`, { o: orderId });
     const dup = await c.queryOne(
       `SELECT 1 AS x FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id IS NULL
-          AND ABS(amount - :a) < 0.005 AND received_on = :d AND ABS(COALESCE(exchange_rate, 0) - :r) < 0.00005 LIMIT 1`,
-      { o: orderId, l: leg, a: round2(amount), d: String(receivedOn).slice(0, 10), r: round4(rate) }
+          AND ABS(amount - :a) < 0.005 AND received_on = :d AND ${duplicateRateClause(newInr)} LIMIT 1`,
+      { o: orderId, l: leg, a: round2(amount), d: String(receivedOn).slice(0, 10), r: newInr !== null ? round2(newInr) : round4(rate) }
     );
     if (dup) {
       return false;
     }
+    const previousInr = locked && locked.inr_actual !== null && locked.inr_actual !== undefined ? Number(locked.inr_actual) : null;
     const existing = await c.queryOne('SELECT COUNT(*) AS n FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id IS NULL', { o: orderId, l: leg });
     const legacy = Number(existing.n) === 0 ? await legacyReceipt(orderId, leg, null, c) : null;
     if (legacy) {
@@ -149,10 +152,11 @@ async function addLegReceipt(orderId, leg, amount, receivedOn, rate, bankReferen
     }
     const charges = Number(bankCharges) > 0 ? round2(bankCharges) : null;
     const inserted = await c.execute(
-      `INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, difference_reason, bank_charges, bank_charges_inr, recorded_by)
-       VALUES (:o, :l, :a, :d, :r, :b, :dr, :bc, :bci, :u)`,
+      `INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, difference_reason, bank_charges, bank_charges_inr,
+         inr_credited, bank_rate, rate_gap_inr, rate_gap_choice, rate_gap_reason, recorded_by)
+       VALUES (:o, :l, :a, :d, :r, :b, :dr, :bc, :bci, :ic, :br, :gi, :gc, :gr, :u)`,
       { o: orderId, l: leg, a: round2(amount), d: String(receivedOn).slice(0, 10), r: round4(rate), b: String(bankReference || '').trim(),
-        dr: differenceReason || null, bc: charges, bci: charges !== null ? round2(charges * rate) : null, u: userId }
+        dr: differenceReason || null, bc: charges, bci: charges !== null ? round2(charges * rate) : null, ...remittanceInr.inrParams(inr), u: userId }
     );
     const rows = await receipts(orderId, leg, null, c);
     // The leg holds what the buyer paid: received plus any bank charges the banks deducted (owner, 2 Nov 2026).
@@ -165,30 +169,61 @@ async function addLegReceipt(orderId, leg, amount, receivedOn, rate, bankReferen
       { amount: total, received_at: latest, ref: joinReferences(rows), o: orderId });
     await c.execute(`UPDATE order_payment_status SET ${leg}_exchange_rate = :rate, ${leg}_exchange_rate_set_at = NOW(), ${leg}_exchange_rate_set_by = :u WHERE order_id = :o`,
       { rate: avgRate, u: userId, o: orderId });
-    return Number(inserted.insertId) || true;
+    // D-244: the leg's INR actual comes from the rupees the bank credited — the sum of the receipts' INR
+    // when every receipt has it (or the INR actual already on the leg plus this receipt's), else not known yet.
+    const legInr = previousInr !== null && newInr !== null ? round2(previousInr + newInr) : remittanceInr.legInrActual(rows);
+    if (legInr !== null) {
+      await c.execute(`UPDATE order_payment_status SET ${leg}_inr_actual = :amount, ${leg}_inr_actual_recorded_at = NOW(), ${leg}_inr_actual_recorded_by = :u WHERE order_id = :o`,
+        { amount: legInr, u: userId, o: orderId });
+    } else if (previousInr !== null) {
+      await c.execute(`UPDATE order_payment_status SET ${leg}_inr_actual = NULL, ${leg}_inr_actual_recorded_at = NULL, ${leg}_inr_actual_recorded_by = NULL WHERE order_id = :o`, { o: orderId });
+    }
+    return { id: Number(inserted.insertId), previousInr, legInr };
   });
+  if (!result) {
+    return false;
+  }
+  const auditLogRepository = require('../repositories/auditLogRepository');
+  if (result.legInr !== null) {
+    await auditLogRepository.log(userId, 'CA_INR_ACTUAL_RECORDED', 'order_payment_status', orderId, `${leg}_inr_actual`, result.previousInr !== null ? String(result.previousInr) : null, String(result.legInr), 'From the INR credited on the receipts (D-244)');
+  } else if (result.previousInr !== null) {
+    await auditLogRepository.log(userId, 'CA_INR_ACTUAL_DELETED', 'order_payment_status', orderId, `${leg}_inr_actual`, String(result.previousInr), null, 'A receipt without the INR credited was added — enter the INR actual again once known (D-244)');
+  }
+  await remittanceInr.afterReceipt(orderId, leg, null, result.id, inr, amount, receivedOn, bankReference, userId);
+  return result.id || true;
+}
+
+/** D-244: a receipt recorded with the INR credited is the same receipt when the INR is the same (its rate is worked out from it). */
+function duplicateRateClause(inrCredited) {
+  return inrCredited !== null && inrCredited !== undefined
+    ? 'ABS(COALESCE(inr_credited, -1) - :r) < 0.005'
+    : 'inr_credited IS NULL AND ABS(COALESCE(exchange_rate, 0) - :r) < 0.00005';
 }
 
 /** A second click of the same form: this exact receipt is already there (checked before the reason is). */
-async function receiptExists(orderId, leg, amount, receivedOn, rate) {
+async function receiptExists(orderId, leg, amount, receivedOn, rate, inrCredited = null) {
   const row = await db.queryOne(
     `SELECT 1 AS x FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id IS NULL
-        AND ABS(amount - :a) < 0.005 AND received_on = :d AND ABS(COALESCE(exchange_rate, 0) - :r) < 0.00005 LIMIT 1`,
-    { o: orderId, l: leg, a: round2(amount), d: String(receivedOn).slice(0, 10), r: round4(rate) }
+        AND ABS(amount - :a) < 0.005 AND received_on = :d AND ${duplicateRateClause(inrCredited)} LIMIT 1`,
+    { o: orderId, l: leg, a: round2(amount), d: String(receivedOn).slice(0, 10), r: inrCredited !== null && inrCredited !== undefined ? round2(inrCredited) : round4(rate) }
   );
   return !!row;
 }
 
 /** Adds a milestone receipt to the history (the milestone row itself holds its one remittance). */
-async function addMilestoneReceipt(milestone, amount, receivedOn, rate, bankReference, note, userId, differenceReason = null, bankCharges = 0) {
+async function addMilestoneReceipt(milestone, amount, receivedOn, rate, bankReference, note, userId, differenceReason = null, bankCharges = 0, inr = null) {
+  const remittanceInr = require('./remittanceInr');
   const charges = Number(bankCharges) > 0 ? round2(bankCharges) : null;
   const result = await db.execute(
-    `INSERT INTO order_payment_receipts (order_id, leg, milestone_id, amount, received_on, exchange_rate, bank_reference, staff_note, difference_reason, bank_charges, bank_charges_inr, recorded_by)
-     VALUES (:o, 'milestone', :m, :a, :d, :r, :b, :n, :dr, :bc, :bci, :u)`,
+    `INSERT INTO order_payment_receipts (order_id, leg, milestone_id, amount, received_on, exchange_rate, bank_reference, staff_note, difference_reason, bank_charges, bank_charges_inr,
+       inr_credited, bank_rate, rate_gap_inr, rate_gap_choice, rate_gap_reason, recorded_by)
+     VALUES (:o, 'milestone', :m, :a, :d, :r, :b, :n, :dr, :bc, :bci, :ic, :br, :gi, :gc, :gr, :u)`,
     { o: milestone.order_id, m: milestone.id, a: round2(amount), d: String(receivedOn).slice(0, 10), r: round4(rate), b: String(bankReference || '').trim(), n: note && String(note).trim() !== '' ? String(note).trim() : null,
-      dr: differenceReason || null, bc: charges, bci: charges !== null ? round2(charges * rate) : null, u: userId }
+      dr: differenceReason || null, bc: charges, bci: charges !== null ? round2(charges * rate) : null, ...remittanceInr.inrParams(inr), u: userId }
   );
-  return Number(result.insertId);
+  const receiptId = Number(result.insertId);
+  await remittanceInr.afterReceipt(Number(milestone.order_id), 'milestone', milestone, receiptId, inr, amount, receivedOn, bankReference, userId);
+  return receiptId;
 }
 
 /**

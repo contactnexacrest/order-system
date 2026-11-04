@@ -48,10 +48,12 @@ function settlementRegisterCsvRows(legRows) {
     'Foreign Amount': r.foreign_amount,
     Currency: r.currency_code,
     'INR Actual': r.inr_actual,
+    // D-244: the amount at the recorded rate while the INR credited is not known yet.
+    'INR Estimated (at recorded rate)': r.inr_actual === null && r.inr_estimated !== null && r.inr_estimated !== undefined ? Math.round(Number(r.inr_estimated) * 100) / 100 : null,
     'Forex Gain/(Loss)': r.forex_gain_loss,
   }));
 
-  return { headers: ['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'Forex Gain/(Loss)'], rows };
+  return { headers: ['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'INR Estimated (at recorded rate)', 'Forex Gain/(Loss)'], rows };
 }
 
 function expensesCsvRows(expenses) {

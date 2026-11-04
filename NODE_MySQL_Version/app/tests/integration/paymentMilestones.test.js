@@ -168,7 +168,7 @@ describe('Payment milestones (D-215, 5a)', () => {
   it('makes each milestone its own payment, cleared before the balance', async () => {
     await schedule();
     const m = (await paymentMilestoneRepository.forOrder(orderId))[0];
-    const body = { amount: '2250', exchange_rate: '84.1', bank_reference: 'UTR778899', received_on: todayIst() };
+    const body = { amount: '2250', inr_unknown: '1', exchange_rate: '84.1', bank_reference: 'UTR778899', received_on: todayIst() };
     expect(await call('record', body, { milestoneId: String(m.id) })).toBe('Generate the Proforma Invoice first — the buyer pays each milestone against it.');
 
     const pi = await documentGenerationService.generate(orderId, 'PI', userId, null, false, true);
@@ -180,7 +180,7 @@ describe('Payment milestones (D-215, 5a)', () => {
     const order = await orderRepository.find(orderId);
     const expected = `Milestone 2 (50% ${DUE}) received from ${order.company_legal_name} for order ${order.buyer_inquiry_ref}`
       + ` · USD 2,250.00 at ₹84.10 · against Proforma Invoice ${piRef} · bank ref UTR778899`;
-    expect(await call('record', body, { milestoneId: String(m.id) })).toBe(`Recorded: ${expected}. Mark it cleared once your bank confirms receipt.`);
+    expect(await call('record', body, { milestoneId: String(m.id) })).toBe(`Recorded: ${expected}. Received USD 2,250.00 at the exchange rate of ₹84.1000 (≈ ₹189,225.00, estimated until the INR credited is known). Mark it cleared once your bank confirms receipt.`);
     expect(await call('record', body, { milestoneId: String(m.id) })).toBe('Milestone 2 remittance is already recorded — nothing changed.');
 
     // The balance waits for every milestone.
@@ -256,7 +256,7 @@ describe('Payment milestones (D-215, 5a)', () => {
     await schedule();
     const m = (await paymentMilestoneRepository.forOrder(orderId))[0];
     await documentGenerationService.generate(orderId, 'PI', userId, null, false, true);
-    const body = { exchange_rate: '84.1', bank_reference: 'UTR778899', received_on: todayIst() };
+    const body = { inr_unknown: '1', exchange_rate: '84.1', bank_reference: 'UTR778899', received_on: todayIst() };
     expect(await call('record', { amount: '999999', ...body }, { milestoneId: String(m.id) }))
       .toBe('USD 999,999.00 is more than the whole order value (USD 4,500.00). Check the amount the bank received.');
     expect(await call('record', { amount: '2000', ...body }, { milestoneId: String(m.id) }))

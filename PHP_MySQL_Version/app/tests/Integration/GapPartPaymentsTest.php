@@ -77,7 +77,7 @@ final class GapPartPaymentsTest extends DbTestCase
 
     private function receipt(string $amount, string $date, string $rate, string $ref, bool $differs = true): array
     {
-        return ['advance_amount' => $amount, 'advance_received_at' => $date, 'advance_exchange_rate' => $rate, 'advance_bank_reference' => $ref] + ($differs ? ['difference_reason_choice' => (string) \App\Services\RemittanceDifference::reasonIdFor((float) $amount > 1800 ? 'excess' : 'short')] : []);
+        return ['advance_amount' => $amount, 'advance_received_at' => $date, 'advance_inr_unknown' => '1', 'advance_exchange_rate' => $rate, 'advance_bank_reference' => $ref] + ($differs ? ['difference_reason_choice' => (string) \App\Services\RemittanceDifference::reasonIdFor((float) $amount > 1800 ? 'excess' : 'short')] : []);
     }
 
     public function testTwoReceiptsAddUpAndTheLegKeepsTheTotal(): void
@@ -144,7 +144,7 @@ final class GapPartPaymentsTest extends DbTestCase
         $orderId = $this->orderAtAdvance();
         PaymentMilestoneRepository::replaceSchedule($orderId, [['pct' => 20.0, 'due_text' => 'when production starts']], 40.0);
         $m = PaymentMilestoneRepository::forOrder($orderId)[0];
-        $rec = $this->call('record', $orderId, ['amount' => '700', 'exchange_rate' => '84', 'bank_reference' => 'UTR0301', 'received_on' => '2026-10-22', 'difference_reason_choice' => (string) \App\Services\RemittanceDifference::reasonIdFor('short')], ['milestoneId' => (string) $m['id']]);
+        $rec = $this->call('record', $orderId, ['amount' => '700', 'inr_unknown' => '1', 'exchange_rate' => '84', 'bank_reference' => 'UTR0301', 'received_on' => '2026-10-22', 'difference_reason_choice' => (string) \App\Services\RemittanceDifference::reasonIdFor('short')], ['milestoneId' => (string) $m['id']]);
         self::assertSame('success', $rec['type'], $rec['message']);
         self::assertCount(1, PartPaymentService::receipts($orderId, 'milestone', (int) $m['id']), 'the milestone receipt is in the history');
 

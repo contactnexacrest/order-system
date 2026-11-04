@@ -114,15 +114,17 @@ final class PartPaymentService
     }
 
     /** A second click of the same form: this exact receipt is already there. Locks the leg's row; call inside the transaction. */
-    public static function receiptExists(int $orderId, string $leg, ?int $milestoneId, float $amount, string $receivedOn, float $rate): bool
+    public static function receiptExists(int $orderId, string $leg, ?int $milestoneId, float $amount, string $receivedOn, float $rate, ?float $inrCredited = null): bool
     {
         $pdo = Database::connection();
         $pdo->prepare('SELECT order_id FROM order_payment_status WHERE order_id = :o FOR UPDATE')->execute(['o' => $orderId]);
+        // D-244: a receipt recorded with the INR credited is the same receipt when the INR is the same (its rate is worked out from it).
         $stmt = $pdo->prepare(
             'SELECT 1 FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id <=> :m
-                AND ABS(amount - :a) < 0.005 AND received_on = :d AND ABS(COALESCE(exchange_rate, 0) - :r) < 0.00005 LIMIT 1'
+                AND ABS(amount - :a) < 0.005 AND received_on = :d AND '
+                . ($inrCredited !== null ? 'ABS(COALESCE(inr_credited, -1) - :r) < 0.005' : 'inr_credited IS NULL AND ABS(COALESCE(exchange_rate, 0) - :r) < 0.00005') . ' LIMIT 1'
         );
-        $stmt->execute(['o' => $orderId, 'l' => $leg, 'm' => $milestoneId, 'a' => round($amount, 2), 'd' => substr($receivedOn, 0, 10), 'r' => round($rate, 4)]);
+        $stmt->execute(['o' => $orderId, 'l' => $leg, 'm' => $milestoneId, 'a' => round($amount, 2), 'd' => substr($receivedOn, 0, 10), 'r' => $inrCredited !== null ? round($inrCredited, 2) : round($rate, 4)]);
         return $stmt->fetchColumn() !== false;
     }
 
@@ -131,7 +133,7 @@ final class PartPaymentService
      * totals back on order_payment_status (amount, latest date, weighted rate,
      * bank references). Call inside the transaction that checked receiptExists().
      */
-    public static function addLegReceipt(int $orderId, string $leg, float $amount, string $receivedOn, float $rate, string $bankReference, int $userId, ?string $differenceReason = null, float $bankCharges = 0.0): int
+    public static function addLegReceipt(int $orderId, string $leg, float $amount, string $receivedOn, float $rate, string $bankReference, int $userId, ?string $differenceReason = null, float $bankCharges = 0.0, ?array $inr = null): int
     {
         if (!in_array($leg, self::LEGS, true)) {
             throw new \InvalidArgumentException("Unknown payment leg {$leg}");
@@ -142,10 +144,13 @@ final class PartPaymentService
             $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, staff_note) VALUES (:o, :l, :a, :d, :r, :b, :n)')
                 ->execute(['o' => $orderId, 'l' => $leg, 'a' => $legacy['amount'], 'd' => $legacy['received_on'], 'r' => $legacy['exchange_rate'], 'b' => $legacy['bank_reference'], 'n' => 'Recorded before part payments were kept separately']);
         }
-        $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, difference_reason, bank_charges, bank_charges_inr, recorded_by) VALUES (:o, :l, :a, :d, :r, :b, :dr, :bc, :bci, :u)')
+        $previousInr = (OrderPaymentStatusRepository::find($orderId) ?? [])[$leg . '_inr_actual'] ?? null;
+        $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, difference_reason, bank_charges, bank_charges_inr, '
+                . 'inr_credited, bank_rate, rate_gap_inr, rate_gap_choice, rate_gap_reason, recorded_by) VALUES (:o, :l, :a, :d, :r, :b, :dr, :bc, :bci, :ic, :br, :gi, :gc, :gr, :u)')
             ->execute(['o' => $orderId, 'l' => $leg, 'a' => round($amount, 2), 'd' => substr($receivedOn, 0, 10), 'r' => round($rate, 4), 'b' => trim($bankReference),
-                'dr' => $differenceReason, 'bc' => $bankCharges > 0 ? round($bankCharges, 2) : null, 'bci' => $bankCharges > 0 ? round($bankCharges * $rate, 2) : null, 'u' => $userId]);
+                'dr' => $differenceReason, 'bc' => $bankCharges > 0 ? round($bankCharges, 2) : null, 'bci' => $bankCharges > 0 ? round($bankCharges * $rate, 2) : null] + self::inrParams($inr) + ['u' => $userId]);
         $receiptId = (int) $pdo->lastInsertId();
+        RemittanceInr::afterReceipt($orderId, $leg, null, $receiptId, $inr, $amount, $receivedOn, $bankReference, $userId);
         $receipts = self::receipts($orderId, $leg);
         // The leg holds what the buyer paid: received plus any bank charges the banks deducted (owner, 2 Nov 2026).
         $total = round(array_sum(array_map(static fn (array $r): float => (float) $r['amount'] + (float) ($r['bank_charges'] ?? 0), $receipts)), 2);
@@ -159,7 +164,26 @@ final class PartPaymentService
         OrderPaymentStatusRepository::$method($orderId, $total, $latest);
         OrderPaymentStatusRepository::setLegBankReference($orderId, $leg, self::joinReferences($receipts));
         OrderPaymentStatusRepository::setLegExchangeRate($orderId, $leg, $avgRate, $userId);
+        // D-244: the leg's INR actual comes from the rupees the bank credited — the sum of the receipts' INR
+        // when every receipt has it (or the INR actual already on the leg plus this receipt's), else not known yet.
+        $newInr = $inr['inr'] ?? null;
+        $legInr = $previousInr !== null && $newInr !== null ? round((float) $previousInr + (float) $newInr, 2) : RemittanceInr::legInrActual($receipts);
+        $setInr = 'set' . ucfirst($leg) . 'InrActual';
+        $clearInr = 'clear' . ucfirst($leg) . 'InrActual';
+        if ($legInr !== null) {
+            OrderPaymentStatusRepository::$setInr($orderId, $legInr, $userId);
+            AuditLogRepository::log($userId, 'CA_INR_ACTUAL_RECORDED', 'order_payment_status', $orderId, $leg . '_inr_actual', $previousInr !== null ? (string) $previousInr : null, (string) $legInr, 'From the INR credited on the receipts (D-244)');
+        } elseif ($previousInr !== null) {
+            OrderPaymentStatusRepository::$clearInr($orderId);
+            AuditLogRepository::log($userId, 'CA_INR_ACTUAL_DELETED', 'order_payment_status', $orderId, $leg . '_inr_actual', (string) $previousInr, null, 'A receipt without the INR credited was added — enter the INR actual again once known (D-244)');
+        }
         return $receiptId;
+    }
+
+    /** @return array{ic:?float, br:?float, gi:?float, gc:?string, gr:?string} the receipt's D-244 INR columns */
+    private static function inrParams(?array $inr): array
+    {
+        return ['ic' => $inr['inr'] ?? null, 'br' => $inr['bank_rate'] ?? null, 'gi' => $inr['gap'] ?? null, 'gc' => $inr['choice'] ?? null, 'gr' => $inr['reason'] ?? null];
     }
 
     /** The receipts' bank references, each once, joined ", " (cut to the column's 100 characters). */
@@ -177,14 +201,17 @@ final class PartPaymentService
     }
 
     /** Adds a milestone receipt to the history (the milestone row itself holds its one remittance). */
-    public static function addMilestoneReceipt(array $milestone, float $amount, string $receivedOn, float $rate, string $bankReference, ?string $note, int $userId, ?string $differenceReason = null, float $bankCharges = 0.0): int
+    public static function addMilestoneReceipt(array $milestone, float $amount, string $receivedOn, float $rate, string $bankReference, ?string $note, int $userId, ?string $differenceReason = null, float $bankCharges = 0.0, ?array $inr = null): int
     {
         $pdo = Database::connection();
-        $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, milestone_id, amount, received_on, exchange_rate, bank_reference, staff_note, difference_reason, bank_charges, bank_charges_inr, recorded_by) VALUES (:o, \'milestone\', :m, :a, :d, :r, :b, :n, :dr, :bc, :bci, :u)')
+        $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, milestone_id, amount, received_on, exchange_rate, bank_reference, staff_note, difference_reason, bank_charges, bank_charges_inr, '
+                . 'inr_credited, bank_rate, rate_gap_inr, rate_gap_choice, rate_gap_reason, recorded_by) VALUES (:o, \'milestone\', :m, :a, :d, :r, :b, :n, :dr, :bc, :bci, :ic, :br, :gi, :gc, :gr, :u)')
             ->execute(['o' => $milestone['order_id'], 'm' => $milestone['id'], 'a' => round($amount, 2), 'd' => substr($receivedOn, 0, 10), 'r' => round($rate, 4), 'b' => trim($bankReference),
                 'n' => $note !== null && trim($note) !== '' ? trim($note) : null, 'dr' => $differenceReason,
-                'bc' => $bankCharges > 0 ? round($bankCharges, 2) : null, 'bci' => $bankCharges > 0 ? round($bankCharges * $rate, 2) : null, 'u' => $userId]);
-        return (int) $pdo->lastInsertId();
+                'bc' => $bankCharges > 0 ? round($bankCharges, 2) : null, 'bci' => $bankCharges > 0 ? round($bankCharges * $rate, 2) : null] + self::inrParams($inr) + ['u' => $userId]);
+        $receiptId = (int) $pdo->lastInsertId();
+        RemittanceInr::afterReceipt((int) $milestone['order_id'], 'milestone', $milestone, $receiptId, $inr, $amount, $receivedOn, $bankReference, $userId);
+        return $receiptId;
     }
 
     public static function money(string $currency, float $amount): string

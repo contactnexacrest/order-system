@@ -66,6 +66,8 @@ async function settlementRegister() {
         inr_actual_recorded_by: ops[legDef.inrByCol],
         exchange_rate: legRate,
         expected_inr: expectedInr,
+        // D-244 (4 Nov 2026): while the INR credited is not known, the amount at the recorded rate — shown as an estimate.
+        inr_estimated: inrActual === null ? expectedInr : null,
         forex_gain_loss: forexGainLoss,
         firc_reference: ops[legDef.fircCol] ?? null,
         firc_received_at: ops[legDef.fircAtCol] ?? null,
@@ -97,6 +99,7 @@ async function settlementRegister() {
       inr_actual_recorded_by: lc.lc_received_by !== null ? Number(lc.lc_received_by) : null,
       exchange_rate: null,
       expected_inr: null,
+      inr_estimated: null,
       forex_gain_loss: null,
       firc_reference: lc.lc_firc_reference ?? null,
       firc_received_at: lc.lc_firc_received_at ?? null,
@@ -204,6 +207,7 @@ async function revenueReport(mode, period) {
   let totalInrActual = 0;
   let totalForexGainLoss = 0;
   let legsMissingInr = 0;
+  let totalInrEstimated = 0;
   for (const r of rows) {
     const cc = r.currency_code;
     if (!byCurrency[cc]) {
@@ -214,6 +218,7 @@ async function revenueReport(mode, period) {
     byCurrency[cc].leg_count += 1;
     if (r.inr_actual === null) {
       legsMissingInr += 1;
+      totalInrEstimated += r.inr_estimated ?? 0;
     } else {
       totalInrActual += r.inr_actual;
     }
@@ -230,6 +235,7 @@ async function revenueReport(mode, period) {
     totalInrActual,
     totalForexGainLoss,
     legsMissingInr,
+    totalInrEstimated,
     legCount: rows.length,
   };
 }

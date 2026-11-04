@@ -84,6 +84,9 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caViewOrdersUser[
                   <?= htmlspecialchars((string) $s['inr_actual_recorded_at']) ?><?php if ($s['inr_actual_recorded_by'] !== null): ?> by <?= htmlspecialchars($usersById[$s['inr_actual_recorded_by']] ?? ('User #' . $s['inr_actual_recorded_by'])) ?><?php endif; ?>
                 <?php endif; ?>
               </div>
+            <?php elseif (($s['inr_estimated'] ?? null) !== null): // D-244: INR not known yet — the amount at the recorded rate ?>
+              &#8377;<?= number_format((float) $s['inr_estimated'], 2) ?>
+              <div class="muted small">estimated at recorded rate — INR credited not recorded yet</div>
             <?php else: ?>
               <span class="muted">Not yet recorded</span>
             <?php endif; ?>

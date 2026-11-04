@@ -388,12 +388,15 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
     await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
-    // The day's exchange rate is recorded together with the remittance.
-    await recordForm.locator('input[name="advance_exchange_rate"]').fill('90.1234');
+    // D-244 (4 Nov 2026): the INR the bank credited is entered; the rate is worked out from it.
+    await recordForm.locator('input[name="advance_inr_credited"]').fill('162222.12');
+    await expect(recordForm.locator('[data-remit-rate-derived]')).toHaveText('₹90.1234');
+    await recordForm.locator('input[name="advance_bank_rate"]').fill('90.1234');
+    await expect(recordForm.locator('[data-remit-gap]')).toBeHidden();
     await recordForm.locator('input[name="advance_bank_reference"]').fill('E2E-UTR-ADVANCE-0001');
-    await expect(recordForm.locator('[data-remit-statement]')).toContainText("at today's exchange rate of");
+    await expect(recordForm.locator('[data-remit-statement]')).toContainText('credited by the bank');
     await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
-    await expect(page.locator('.alert')).toContainText("Received EUR 1,800.00 at today's exchange rate of ₹90.1234");
+    await expect(page.locator('.alert')).toContainText('Received EUR 1,800.00; ₹162,222.12 credited by the bank — exchange rate worked out ₹90.1234');
 
     await openStage(page, 3);
     const clearForm = page.locator(`form[action="/orders/${orderId}/payment/advance/clear"]`);
@@ -479,10 +482,16 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     await openStage(page, 6);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/freight"]`);
     await recordForm.locator('input[name="freight_amount"]').fill('1070.00');
-    await recordForm.locator('input[name="freight_exchange_rate"]').fill('90.5');
+    // D-244: the bank's rate says ₹96,835.00; ₹96,335.00 arrived — more than ₹1 apart, so the form asks why.
+    await recordForm.locator('input[name="freight_inr_credited"]').fill('96335.00');
+    await recordForm.locator('input[name="freight_bank_rate"]').fill('90.5');
     await recordForm.locator('input[name="freight_bank_reference"]').fill('E2E-UTR-FREIGHT-0001');
+    await expect(recordForm.locator('[data-remit-gap]')).toBeVisible();
     await recordForm.getByRole('button', { name: 'Record Freight Remittance' }).click();
-    await expect(page.locator('.alert')).toBeVisible();
+    await expect(recordForm.locator('select[name="rate_gap_choice"]')).toHaveClass(/field-invalid/);
+    await recordForm.locator('select[name="rate_gap_choice"]').selectOption('bank_charges');
+    await recordForm.getByRole('button', { name: 'Record Freight Remittance' }).click();
+    await expect(page.locator('.alert')).toContainText('₹500.00 the bank kept (at its rate of ₹90.5000) is recorded as an order cost "Bank Charges".');
 
     await openStage(page, 6);
     const clearForm = page.locator(`form[action="/orders/${orderId}/payment/freight/clear"]`);
@@ -534,6 +543,8 @@ test('staff can create a CIF order and walk it through all 9 stage gates to comp
     // before the Bill of Lading — against the PI, no Commercial Invoice yet.
     await page.goto(`/orders/${orderId}?open=balance-record#step-balance-record`);
     const earlyRecord = page.locator(`form[action="/orders/${orderId}/payment/balance"]`);
+    // D-244: "INR not known yet" brings back the typed rate.
+    await earlyRecord.locator('input[name="balance_inr_unknown"]').check();
     await earlyRecord.locator('input[name="balance_exchange_rate"]').fill('91');
     await earlyRecord.locator('input[name="balance_bank_reference"]').fill('E2E-UTR-BALANCE-0001');
     await Promise.all([page.waitForEvent('load'), earlyRecord.getByRole('button', { name: 'Record Balance Remittance' }).click()]);

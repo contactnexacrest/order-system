@@ -62,7 +62,7 @@ describe('Rule D-212 — money records need the reference their description is b
     const orderId = await createTestOrder(await createTestClient());
     await db.execute("INSERT INTO order_products (order_id, line_no, description, quantity, unit, unit_price, fob_value) VALUES (:o, 1, 'Granite slab', 100, 'SQM', 40, 4000)", { o: orderId });
     await db.execute('INSERT IGNORE INTO order_payment_status (order_id) VALUES (:o)', { o: orderId });
-    const fields = { advance_amount: '1600', advance_received_at: todayIst(), advance_exchange_rate: '84.10' };
+    const fields = { advance_amount: '1600', advance_received_at: todayIst(), advance_inr_unknown: '1', advance_exchange_rate: '84.10' };
     const page = `/orders/${orderId}`;
 
     expect((await flashAfter(await post(`/orders/${orderId}/payment/advance`, fields, page))).message).toContain('bank reference is required');

@@ -34,7 +34,7 @@ $renderReceipts = static function (string $leg, ?array $milestone = null) use ($
         return;
     }
     $__cur = (string) ($order['currency_code'] ?? '');
-    echo '<div class="part-payments small" data-part-payments="' . htmlspecialchars($leg) . '"><table class="list compact"><tr><th>Received on</th><th>Amount</th><th>Rate</th><th>Bank reference</th><th>Recorded by</th></tr>';
+    echo '<div class="part-payments small" data-part-payments="' . htmlspecialchars($leg) . '"><table class="list compact"><tr><th>Received on</th><th>Amount</th><th>INR credited</th><th>Rate</th><th>Bank reference</th><th>Recorded by</th></tr>';
     foreach ($__s['receipts'] as $__r) {
         // Owner 2 Nov 2026: the reason a receipt differed, and any bank charges the banks deducted.
         $__why = match ($__r['difference_reason'] ?? null) {
@@ -51,7 +51,14 @@ $renderReceipts = static function (string $leg, ?array $milestone = null) use ($
         if (!empty($__r['own_bank_charges_inr'])) {
             $__why .= ' <small class="muted">· our bank\'s charges &#8377;' . number_format((float) $__r['own_bank_charges_inr'], 2) . ' (order cost)</small>';
         }
-        echo '<tr><td>' . htmlspecialchars(Dates::short((string) $__r['received_on'])) . '</td><td>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['amount'])) . $__why . '</td><td>'
+        // D-244 (4 Nov 2026): the rupees the bank credited, and why they differ from the bank's rate when they do.
+        if (($__r['rate_gap_choice'] ?? null) === 'bank_charges') {
+            $__why .= ' <small class="muted">· the bank kept &#8377;' . number_format((float) $__r['rate_gap_inr'], 2) . ' at its rate &#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['bank_rate'], 4), '0'), '.')) . ' (order cost "Bank Charges")</small>';
+        } elseif (($__r['rate_gap_choice'] ?? null) === 'other') {
+            $__why .= ' <small class="muted">· &#8377;' . number_format(abs((float) $__r['rate_gap_inr']), 2) . ' apart from the bank\'s rate &#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['bank_rate'], 4), '0'), '.')) . ' — ' . htmlspecialchars((string) $__r['rate_gap_reason']) . '</small>';
+        }
+        $__inrCell = ($__r['inr_credited'] ?? null) !== null ? '&#8377;' . number_format((float) $__r['inr_credited'], 2) : '<span class="muted">not known yet</span>';
+        echo '<tr><td>' . htmlspecialchars(Dates::short((string) $__r['received_on'])) . '</td><td>' . htmlspecialchars(\App\Services\PartPaymentService::money($__cur, (float) $__r['amount'])) . $__why . '</td><td>' . $__inrCell . '</td><td>'
             . ($__r['exchange_rate'] !== null ? '&#8377;' . htmlspecialchars(rtrim(rtrim(number_format((float) $__r['exchange_rate'], 4), '0'), '.')) : '—') . '</td><td>' . htmlspecialchars((string) ($__r['bank_reference'] ?? '—')) . '</td><td>'
             . htmlspecialchars((string) ($__r['recorded_by_name'] ?? '—')) . '</td></tr>';
     }
@@ -220,9 +227,13 @@ $remittanceRecordedNote = function (string $leg, string $nextStep) use ($payment
     $currency = htmlspecialchars((string) ($order['currency_code'] ?? ''));
     $text = 'Received ' . $currency . ' ' . number_format((float) $amount, 2)
         . ($receivedAt ? ' on ' . htmlspecialchars(date('d M Y', strtotime((string) $receivedAt))) : '');
-    $text .= $rate !== null
+    $inrActual = $payment[$leg . '_inr_actual'] ?? null;
+    // D-244 (4 Nov 2026): the rupees the bank credited, when known, with the rate worked out from them.
+    $text .= $inrActual !== null && $rate !== null
+        ? ' — &#8377;' . number_format((float) $inrActual, 2) . ' credited by the bank (exchange rate &#8377;' . number_format((float) $rate, 4) . ').'
+        : ($rate !== null
         ? ' at today\'s exchange rate of &#8377;' . number_format((float) $rate, 4) . ' (= &#8377;' . number_format((float) $amount * (float) $rate, 2) . ').'
-        : ' — exchange rate not recorded yet (record it below).';
+        : ' — exchange rate not recorded yet (record it below).');
     // Owner rule D-212: the bank reference it was recorded with.
     if (!empty($payment[$leg . '_bank_reference'])) {
         $text .= ' Bank ref ' . htmlspecialchars((string) $payment[$leg . '_bank_reference']) . '.';
@@ -260,7 +271,7 @@ $renderExchangeRateWidget = function (string $leg, string $label) use ($payment,
       <strong style="font-size:0.85em;"><?= htmlspecialchars($label) ?> Exchange Rate</strong><br>
       <?php // Owner decision (2026-10-26, t4): the rate is recorded with the remittance itself, so there is no separate "Record/Update Rate" box any more — only a collapsed, reasoned correction for a mistyped rate, for inr_actual_edit holders. ?>
       <?php if ($rate !== null): ?>
-        <span class="muted small">Received @ &#8377;<?= number_format((float) $rate, 4) ?> per 1 <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?> — set <?= htmlspecialchars((string) ($payment[$leg . '_exchange_rate_set_at'] ?? '')) ?><?= $setByName ? ' by ' . htmlspecialchars($setByName) : '' ?>. Used only to show forex gain/(loss) below once an INR actual is recorded — never to derive the INR actual itself.</span>
+        <span class="muted small">Received @ &#8377;<?= number_format((float) $rate, 4) ?> per 1 <?= htmlspecialchars((string) ($order['currency_code'] ?? '')) ?> — set <?= htmlspecialchars((string) ($payment[$leg . '_exchange_rate_set_at'] ?? '')) ?><?= $setByName ? ' by ' . htmlspecialchars($setByName) : '' ?>. Worked out from the INR credited by the bank (D-244) — or, where the INR was not known yet, the rate typed with the remittance, used for an estimate until the INR actual is recorded.</span>
       <?php else: ?>
         <span class="muted small">No exchange rate on record for this older entry.</span>
       <?php endif; ?>
@@ -1829,7 +1840,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <?= Csrf::field() ?>
           <strong>Milestone <?= (int) $__m['seq'] ?> received</strong>
           <label>Amount received (<?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="amount" data-remit-amount step="0.01" min="0.01" max="<?= $__msFob > 0 ? number_format($__msFob, 2, '.', '') : '999999999999.99' ?>" required value="<?= number_format(round($__msFob * (float) $__m['pct'] / 100, 2), 2, '.', '') ?>" placeholder="e.g. 1500.00"></label>
-          <label>Exchange rate (₹ per 1 <?= htmlspecialchars((string) $order['currency_code']) ?>) *<input type="number" name="exchange_rate" data-remit-rate step="0.0001" min="0.0001" max="999999.9999" required placeholder="e.g. 83.25"></label>
+          <?php $ri = ['prefix' => '', 'currency' => (string) ($order['currency_code'] ?? '')]; require __DIR__ . '/_remittance_inr.php'; ?>
           <label>Bank reference (UTR / SWIFT) *<input type="text" name="bank_reference" minlength="4" maxlength="100" required placeholder="e.g. HDFCN26304123456"></label>
           <label>Received on *<input type="date" name="received_on" required value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>"></label>
           <label>Note <small class="muted">(added to the description)</small><input type="text" name="staff_note" maxlength="255" placeholder="Optional note"></label>
@@ -2617,7 +2628,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
           <label>Advance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="advance_amount" required data-remit-amount value="<?= $advanceDue > 0 ? number_format($advanceDue, 2, '.', '') : '' ?>" placeholder="e.g. 1800.00"></label>
           <?php $rd = ['label' => 'Advance', 'due' => $advanceDue, 'so_far' => \App\Services\PartPaymentService::receivedTotal((int) $order['id'], 'advance'), 'currency' => (string) ($order['currency_code'] ?? ''), 'max_pct' => \App\Services\RemittanceDifference::maxBankChargesPct()]; require __DIR__ . '/_remittance_difference.php'; ?>
           <label>Received On<input type="date" name="advance_received_at" value="<?= date('Y-m-d') ?>"></label>
-          <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="advance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <?php $ri = ['prefix' => 'advance_', 'currency' => (string) ($order['currency_code'] ?? '')]; require __DIR__ . '/_remittance_inr.php'; ?>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="advance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
           <?= $stepBadge('5d') ?><button type="submit" class="btn-sm"><?= $payment && $payment['advance_remittance_received_at'] !== null ? 'Record Another Advance Receipt' : 'Record Advance Remittance' ?></button>
@@ -3450,7 +3461,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label>Freight Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="freight_amount" required data-remit-amount placeholder="e.g. 950.00"></label>
         <?php $rd = ['label' => 'Freight', 'due' => (float) (\App\Services\PartPaymentService::expected((int) $order['id'], 'freight') ?? 0.0), 'so_far' => \App\Services\PartPaymentService::receivedTotal((int) $order['id'], 'freight'), 'currency' => (string) ($order['currency_code'] ?? ''), 'max_pct' => \App\Services\RemittanceDifference::maxBankChargesPct()]; require __DIR__ . '/_remittance_difference.php'; ?>
         <label>Received On<input type="date" name="freight_received_at" value="<?= date('Y-m-d') ?>"></label>
-          <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="freight_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <?php $ri = ['prefix' => 'freight_', 'currency' => (string) ($order['currency_code'] ?? '')]; require __DIR__ . '/_remittance_inr.php'; ?>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="freight_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
         <?= $stepBadge('9c') ?><button type="submit" class="btn-sm"><?= $payment && $payment['freight_remittance_received_at'] !== null ? 'Record Another Freight Receipt' : 'Record Freight Remittance' ?></button>
@@ -3847,7 +3858,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
         <label>Balance Amount Received * <small class="muted">(in <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="text" name="balance_amount" required data-remit-amount value="<?= htmlspecialchars($payment && $payment['balance_remittance_received_at'] !== null ? ($__balOwed !== null && $__balOwed > 0 ? number_format($__balOwed, 2, '.', '') : '') : (string) ($payment['balance_amount'] ?? '')) ?>" placeholder="e.g. 2700.00"></label>
         <?php $rd = ['label' => 'Balance', 'due' => (float) (\App\Services\PartPaymentService::expected((int) $order['id'], 'balance') ?? 0.0), 'so_far' => \App\Services\PartPaymentService::receivedTotal((int) $order['id'], 'balance'), 'currency' => (string) ($order['currency_code'] ?? ''), 'max_pct' => \App\Services\RemittanceDifference::maxBankChargesPct()]; require __DIR__ . '/_remittance_difference.php'; ?>
         <label>Received On<input type="date" name="balance_received_at" value="<?= date('Y-m-d') ?>"></label>
-          <label>@ Exchange Rate * <small class="muted">(&#8377; per 1 <?= htmlspecialchars($order['currency_code'] ?? '') ?>)</small><input type="number" step="0.0001" min="0.0001" name="balance_exchange_rate" data-remit-rate required placeholder="e.g. 83.2500"></label>
+          <?php $ri = ['prefix' => 'balance_', 'currency' => (string) ($order['currency_code'] ?? '')]; require __DIR__ . '/_remittance_inr.php'; ?>
           <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="balance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="<?= htmlspecialchars($order['currency_code'] ?? '') ?>"></p>
         <?= $stepBadge('11c') ?><button type="submit" class="btn-sm"><?= $payment && $payment['balance_remittance_received_at'] !== null ? 'Record Another Balance Receipt' : 'Record Balance Remittance' ?></button>

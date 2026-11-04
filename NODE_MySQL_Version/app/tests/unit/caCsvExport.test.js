@@ -16,7 +16,7 @@ describe('CA CSV export (90-item backlog item #13)', () => {
 
     const result = caController.settlementRegisterCsvRows(legRows);
 
-    expect(result.headers).toEqual(['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'Forex Gain/(Loss)']);
+    expect(result.headers).toEqual(['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'INR Estimated (at recorded rate)', 'Forex Gain/(Loss)']);
     expect(result.rows[0].Leg).toBe('Advance');
     expect(result.rows[0]['Order Ref']).toBe('NC/2026/0042');
     expect(result.rows[0]['Forex Gain/(Loss)']).toBe(250.0);

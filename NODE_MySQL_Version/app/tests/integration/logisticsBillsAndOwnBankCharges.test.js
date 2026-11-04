@@ -168,7 +168,7 @@ describe('Logistics enters logistics bills, Accounts pays; our bank charges on a
     return flashes[flashes.length - 1] || { type: '', message: '' };
   }
 
-  const advance = (extra) => ({ advance_amount: '1800', advance_received_at: '2026-10-20', advance_exchange_rate: '84', advance_bank_reference: 'UTR778801', ...extra });
+  const advance = (extra) => ({ advance_amount: '1800', advance_received_at: '2026-10-20', advance_inr_unknown: '1', advance_exchange_rate: '84', advance_bank_reference: 'UTR778801', ...extra });
 
   it('books our bank charges as an order cost with the receipt', async () => {
     const orderId = await orderAtAdvance();

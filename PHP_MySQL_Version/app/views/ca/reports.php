@@ -49,7 +49,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caReportsUser['id
       <div><span class="k">Settlement Legs</span><span class="v"><?= (int) $report['legCount'] ?></span></div>
       <div><span class="k">Total INR Realized</span><span class="v">&#8377;<?= number_format($report['totalInrActual'], 2) ?></span></div>
       <div><span class="k">Net Forex Gain/(Loss)</span><span class="v">&#8377;<?= number_format(abs($report['totalForexGainLoss']), 2) ?> <?= $report['totalForexGainLoss'] >= 0 ? 'gain' : 'loss' ?></span></div>
-      <div><span class="k">Legs Missing INR Actual</span><span class="v"><?= (int) $report['legsMissingInr'] ?></span></div>
+      <div><span class="k">Legs Missing INR Actual</span><span class="v"><?= (int) $report['legsMissingInr'] ?><?php if ((float) ($report['totalInrEstimated'] ?? 0) > 0): // D-244 ?> <span class="muted small">(&#8377;<?= number_format((float) $report['totalInrEstimated'], 2) ?> estimated at recorded rate, not in the total)</span><?php endif; ?></span></div>
       <?php // Owner decision 2026-10-31: GST refunds under LUT are company-level income, not any one order's. ?>
       <div><span class="k">GST Refunds Credited (LUT)</span><span class="v">&#8377;<?= number_format((float) ($gstRefundsCredited ?? 0), 2) ?> <a class="small" href="/ca/gst-refunds">details</a></span></div>
     </div>
@@ -86,7 +86,7 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caReportsUser['id
           <td><?= htmlspecialchars(\App\Repositories\CaRepository::legLabel($r['leg'])) ?></td>
           <td><?= htmlspecialchars((string) $r['cleared_at']) ?></td>
           <td><?= $r['foreign_amount'] !== null ? number_format((float) $r['foreign_amount'], 2) : '—' ?> <?= htmlspecialchars($r['currency_code']) ?></td>
-          <td><?= $r['inr_actual'] !== null ? '&#8377;' . number_format((float) $r['inr_actual'], 2) : '<span class="muted">—</span>' ?></td>
+          <td><?= $r['inr_actual'] !== null ? '&#8377;' . number_format((float) $r['inr_actual'], 2) : (($r['inr_estimated'] ?? null) !== null ? '&#8377;' . number_format((float) $r['inr_estimated'], 2) . ' <span class="muted small">estimated at recorded rate</span>' : '<span class="muted">—</span>') ?></td>
           <td><?= $r['forex_gain_loss'] !== null ? '&#8377;' . number_format(abs($r['forex_gain_loss']), 2) . ' ' . ($r['forex_gain_loss'] >= 0 ? 'gain' : 'loss') : '<span class="muted">—</span>' ?></td>
         </tr>
         <?php endforeach; ?>

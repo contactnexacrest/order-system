@@ -857,7 +857,7 @@ final class RouteBehaviourTest extends DbTestCase
         $order = $this->createTestOrder($this->createTestClient());
         Database::connection()->exec("INSERT IGNORE INTO order_payment_status (order_id) VALUES ({$order})");
         Database::connection()->exec("UPDATE order_payment_status SET balance_amount = 2000, balance_remittance_received_at = NOW() WHERE order_id = {$order}");
-        $this->assertDone($this->call('POST', "/orders/{$order}/payment/balance/exchange-rate", ['balance_exchange_rate' => '83.25']), 'POST /orders/{id}/payment/balance/exchange-rate');
+        $this->assertDone($this->call('POST', "/orders/{$order}/payment/balance/exchange-rate", ['balance_inr_unknown' => '1', 'balance_exchange_rate' => '83.25']), 'POST /orders/{id}/payment/balance/exchange-rate');
         self::assertSame(83.25, (float) $this->value("SELECT balance_exchange_rate FROM order_payment_status WHERE order_id = {$order}"));
         self::assertSame(1, $this->audits('CA_EXCHANGE_RATE_RECORDED', $order));
 
@@ -1102,7 +1102,7 @@ final class RouteBehaviourTest extends DbTestCase
         self::assertSame('20.00', (string) $this->value("SELECT balance_pct FROM orders WHERE id = {$order}"));
 
         $this->createTestDocument($order, 'PI', 'approved');
-        $r = $this->call('POST', "/orders/{$order}/payment/milestones/{$milestone}", ['amount' => '2250', 'exchange_rate' => '84.1', 'bank_reference' => 'UTR-RT7', 'received_on' => date('Y-m-d')]);
+        $r = $this->call('POST', "/orders/{$order}/payment/milestones/{$milestone}", ['amount' => '2250', 'inr_unknown' => '1', 'exchange_rate' => '84.1', 'bank_reference' => 'UTR-RT7', 'received_on' => date('Y-m-d')]);
         $this->assertDone($r, 'POST /orders/{id}/payment/milestones/{milestoneId}', 'bank ref UTR-RT7');
         self::assertSame('2250.00', (string) $this->value("SELECT received_amount FROM order_payment_milestones WHERE id = {$milestone}"));
         self::assertSame(1, $this->audits('MILESTONE_PAYMENT_RECORDED', $milestone));

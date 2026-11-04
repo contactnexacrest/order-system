@@ -171,7 +171,7 @@ final class QaRound6AccessTest extends DbTestCase
     public function testAnOversizedAdvanceRateSavesNothing(): void
     {
         $this->actAs($this->createTestUser('Admin'));
-        $_POST = ['advance_amount' => '1020', 'advance_exchange_rate' => '100000000000000000000', 'advance_received_at' => date('Y-m-d')];
+        $_POST = ['advance_amount' => '1020', 'advance_inr_unknown' => '1', 'advance_exchange_rate' => '100000000000000000000', 'advance_received_at' => date('Y-m-d')];
         (new OrderController())->recordAdvancePayment(['id' => (string) $this->mine]);
         self::assertSame('error', Flash::pull()[0]['type']);
         $row = Database::connection()->query('SELECT advance_amount, advance_remittance_received_at, advance_exchange_rate FROM order_payment_status WHERE order_id = ' . $this->mine)->fetch(\PDO::FETCH_ASSOC);

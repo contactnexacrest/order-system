@@ -112,7 +112,7 @@ describe('Order out-of-sequence actions (External QA report L-35)', () => {
     const orderId = await createTestOrder(await createTestClient());
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     const req = await baseReq(orderId);
-    req.body = { freight_exchange_rate: '83.25' };
+    req.body = { freight_inr_unknown: '1', freight_exchange_rate: '83.25' };
 
     await ordersController.recordFreightExchangeRate(req, fakeRes());
 
@@ -125,7 +125,7 @@ describe('Order out-of-sequence actions (External QA report L-35)', () => {
     await orderPaymentStatusRepository.initializeForOrder(orderId);
     await orderPaymentStatusRepository.recordFreightReceived(orderId, 800.0, '2026-01-10');
     const req = await baseReq(orderId);
-    req.body = { freight_exchange_rate: '83.25' };
+    req.body = { freight_inr_unknown: '1', freight_exchange_rate: '83.25' };
 
     await ordersController.recordFreightExchangeRate(req, fakeRes());
 

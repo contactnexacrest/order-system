@@ -70,7 +70,7 @@ describe('Remittance difference: bank charges, short, excess', () => {
     return orderId;
   }
 
-  const advance = (amount, extra = {}) => ({ advance_amount: amount, advance_received_at: '2026-10-20', advance_exchange_rate: '84', advance_bank_reference: 'UTR778801', ...extra });
+  const advance = (amount, extra = {}) => ({ advance_amount: amount, advance_received_at: '2026-10-20', advance_inr_unknown: '1', advance_exchange_rate: '84', advance_bank_reference: 'UTR778801', ...extra });
 
   beforeAll(async () => {
     admin = await createTestUser('Admin');

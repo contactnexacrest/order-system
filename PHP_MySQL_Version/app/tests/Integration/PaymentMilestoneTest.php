@@ -164,7 +164,7 @@ final class PaymentMilestoneTest extends DbTestCase
     {
         $this->schedule();
         $m = PaymentMilestoneRepository::forOrder($this->orderId)[0];
-        $post = ['amount' => '2250', 'exchange_rate' => '84.1', 'bank_reference' => 'UTR778899', 'received_on' => date('Y-m-d')];
+        $post = ['amount' => '2250', 'inr_unknown' => '1', 'exchange_rate' => '84.1', 'bank_reference' => 'UTR778899', 'received_on' => date('Y-m-d')];
         self::assertSame('Generate the Proforma Invoice first — the buyer pays each milestone against it.', $this->call('record', $post, ['milestoneId' => (string) $m['id']]));
 
         $pi = DocumentGenerationService::generate($this->orderId, 'PI', $this->userId, null, false, true);
@@ -176,7 +176,7 @@ final class PaymentMilestoneTest extends DbTestCase
         $order = OrderRepository::find($this->orderId);
         $expected = 'Milestone 2 (50% ' . self::DUE . ') received from ' . $order['company_legal_name'] . ' for order ' . $order['buyer_inquiry_ref']
             . " · USD 2,250.00 at ₹84.10 · against Proforma Invoice {$piRef} · bank ref UTR778899";
-        self::assertSame("Recorded: {$expected}. Mark it cleared once your bank confirms receipt.", $this->call('record', $post, ['milestoneId' => (string) $m['id']]));
+        self::assertSame("Recorded: {$expected}. Received USD 2,250.00 at the exchange rate of ₹84.1000 (≈ ₹189,225.00, estimated until the INR credited is known). Mark it cleared once your bank confirms receipt.", $this->call('record', $post, ['milestoneId' => (string) $m['id']]));
         self::assertSame('Milestone 2 remittance is already recorded — nothing changed.', $this->call('record', $post, ['milestoneId' => (string) $m['id']]));
 
         // The balance waits for every milestone.
@@ -259,7 +259,7 @@ final class PaymentMilestoneTest extends DbTestCase
         $this->schedule();
         $m = PaymentMilestoneRepository::forOrder($this->orderId)[0];
         DocumentGenerationService::generate($this->orderId, 'PI', $this->userId, null, false, true);
-        $post = ['exchange_rate' => '84.1', 'bank_reference' => 'UTR778899', 'received_on' => date('Y-m-d')];
+        $post = ['inr_unknown' => '1', 'exchange_rate' => '84.1', 'bank_reference' => 'UTR778899', 'received_on' => date('Y-m-d')];
         self::assertSame('USD 999,999.00 is more than the whole order value (USD 4,500.00). Check the amount the bank received.',
             $this->call('record', ['amount' => '999999'] + $post, ['milestoneId' => (string) $m['id']]));
         self::assertSame('The milestone 2 still due is USD 2,250.00. You entered USD 2,000.00 — a difference of USD 250.00. Choose why it is different in the Reason list and save again.',

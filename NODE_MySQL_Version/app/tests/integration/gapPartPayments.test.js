@@ -74,7 +74,7 @@ describe('Gap list G-5: part payments and short payments', () => {
     return orderId;
   }
 
-  const receipt = (amount, date, rate, ref, differs = true) => ({ advance_amount: amount, advance_received_at: date, advance_exchange_rate: rate, advance_bank_reference: ref, ...(differs ? { difference_reason_choice: RID[Number(amount) > 1800 ? 'excess' : 'short'] } : {}) });
+  const receipt = (amount, date, rate, ref, differs = true) => ({ advance_amount: amount, advance_received_at: date, advance_inr_unknown: '1', advance_exchange_rate: rate, advance_bank_reference: ref, ...(differs ? { difference_reason_choice: RID[Number(amount) > 1800 ? 'excess' : 'short'] } : {}) });
 
   beforeAll(async () => {
     admin = await createTestUser('Admin');
@@ -138,7 +138,7 @@ describe('Gap list G-5: part payments and short payments', () => {
     const orderId = await orderAtAdvance();
     await paymentMilestoneRepository.replaceSchedule(orderId, [{ pct: 20, due_text: 'when production starts' }], 40);
     const m = (await paymentMilestoneRepository.forOrder(orderId))[0];
-    const rec = await call('record', orderId, { amount: '700', exchange_rate: '84', bank_reference: 'UTR0301', received_on: '2026-10-22', difference_reason_choice: RID.short }, admin, { milestoneId: String(m.id) });
+    const rec = await call('record', orderId, { amount: '700', inr_unknown: '1', exchange_rate: '84', bank_reference: 'UTR0301', received_on: '2026-10-22', difference_reason_choice: RID.short }, admin, { milestoneId: String(m.id) });
     expect(rec.type).toBe('success');
     expect((await partPaymentService.receipts(orderId, 'milestone', Number(m.id))).length).toBe(1); // in the history
 

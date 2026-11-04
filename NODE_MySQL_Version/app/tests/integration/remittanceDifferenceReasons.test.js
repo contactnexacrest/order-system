@@ -65,7 +65,7 @@ describe('Remittance difference reasons (admin-managed list + Other)', () => {
     return orderId;
   }
 
-  const advance = (amount, extra) => ({ advance_amount: amount, advance_received_at: '2026-10-20', advance_exchange_rate: '84', advance_bank_reference: 'UTR990011', ...extra });
+  const advance = (amount, extra) => ({ advance_amount: amount, advance_received_at: '2026-10-20', advance_inr_unknown: '1', advance_exchange_rate: '84', advance_bank_reference: 'UTR990011', ...extra });
   const idOf = async (label) => Number((await db.queryOne('SELECT id FROM remittance_difference_reasons WHERE label = :l', { l: label })).id);
 
   beforeAll(async () => {

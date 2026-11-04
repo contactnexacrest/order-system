@@ -101,9 +101,11 @@ text ever reaches a document the buyer actually sees.
 Recording and clearing the payment itself follows the exact same
 two-step pattern as the advance payment in Stage 3:
 
-1. **Record Freight Remittance** (9c) — the amount, the date and the **@
-   Exchange Rate** (₹ per 1 unit of the order currency) and the **Bank
-   reference** (SWIFT / UTR; rule D-212) once the buyer's
+1. **Record Freight Remittance** (9c) — the amount, the date, the **INR
+   credited by the bank (₹)** (the rate is worked out from it; optional
+   **Bank's rate on the advice** with the ₹1 check, or **INR not known yet
+   — enter the rate**; owner decision D-244, 4 Nov 2026 — see Stage 3) and
+   the **Bank reference** (SWIFT / UTR; rule D-212) once the buyer's
    payment notification comes in, exactly as for the advance. Does not
    pass the gate yet:
    Above it the form shows, read-only, **Buyer to pay now** with the

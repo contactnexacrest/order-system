@@ -177,9 +177,13 @@ async function afterReceipt(orderId, leg, milestone, receiptId, ev, amount, rate
   return null;
 }
 
-/** The charges in rupees on a leg's (or milestone's) receipts — sent to Zoho Books with the payment. */
+/**
+ * The charges in rupees on a leg's (or milestone's) receipts — sent to Zoho Books with the payment.
+ * D-244 (4 Nov 2026): includes the rupees the bank kept from the INR credited ("the bank deducted
+ * its charges"), so the payment settles in full and the charges are counted once, as the cost.
+ */
 async function chargesInr(orderId, leg, milestoneId = null) {
-  const row = await db.queryOne('SELECT COALESCE(SUM(bank_charges_inr), 0) AS t FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id <=> :m', { o: orderId, l: leg, m: milestoneId });
+  const row = await db.queryOne("SELECT COALESCE(SUM(COALESCE(bank_charges_inr, 0) + CASE WHEN rate_gap_choice = 'bank_charges' THEN COALESCE(rate_gap_inr, 0) ELSE 0 END), 0) AS t FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id <=> :m", { o: orderId, l: leg, m: milestoneId });
   return round2(row ? row.t : 0);
 }
 

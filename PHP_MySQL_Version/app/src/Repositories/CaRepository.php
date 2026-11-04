@@ -72,6 +72,8 @@ final class CaRepository
                     'inr_actual_recorded_by' => $ops[$legDef['inr_by_col']] !== null ? (int) $ops[$legDef['inr_by_col']] : null,
                     'exchange_rate' => $legRate,
                     'expected_inr' => $expectedInr,
+                    // D-244 (4 Nov 2026): while the INR credited is not known, the amount at the recorded rate — shown as an estimate.
+                    'inr_estimated' => $inrActual === null ? $expectedInr : null,
                     'forex_gain_loss' => $forexGainLoss,
                     'firc_reference' => $ops[$legDef['firc_col']],
                     'firc_received_at' => $ops[$legDef['firc_at_col']],
@@ -103,6 +105,7 @@ final class CaRepository
                 'inr_actual_recorded_by' => $lc['lc_received_by'] !== null ? (int) $lc['lc_received_by'] : null,
                 'exchange_rate' => null,
                 'expected_inr' => null,
+                'inr_estimated' => null,
                 'forex_gain_loss' => null,
                 'firc_reference' => $lc['lc_firc_reference'],
                 'firc_received_at' => $lc['lc_firc_received_at'],
@@ -234,6 +237,7 @@ final class CaRepository
         $totalInrActual = 0.0;
         $totalForexGainLoss = 0.0;
         $legsMissingInr = 0;
+        $totalInrEstimated = 0.0;
         foreach ($rows as $r) {
             $cc = $r['currency_code'];
             $byCurrency[$cc] ??= ['foreign_total' => 0.0, 'inr_actual_total' => 0.0, 'leg_count' => 0];
@@ -242,6 +246,7 @@ final class CaRepository
             $byCurrency[$cc]['leg_count']++;
             if ($r['inr_actual'] === null) {
                 $legsMissingInr++;
+                $totalInrEstimated += (float) ($r['inr_estimated'] ?? 0);
             } else {
                 $totalInrActual += $r['inr_actual'];
             }
@@ -258,6 +263,7 @@ final class CaRepository
             'totalInrActual' => $totalInrActual,
             'totalForexGainLoss' => $totalForexGainLoss,
             'legsMissingInr' => $legsMissingInr,
+            'totalInrEstimated' => $totalInrEstimated,
             'legCount' => count($rows),
         ];
     }

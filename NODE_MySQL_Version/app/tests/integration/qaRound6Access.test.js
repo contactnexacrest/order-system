@@ -148,7 +148,7 @@ describe('QA Round 6 — order access and atomic payments', () => {
     const agent = await loginAs(await createUser('Admin'));
     const csrf = (await agent.get(`/orders/${mine}`)).text.match(/name="_csrf"\s+value="([^"]+)"/)[1];
     const posted = await agent.post(`/orders/${mine}/payment/advance`).type('form')
-      .send({ _csrf: csrf, advance_amount: '1020', advance_exchange_rate: '100000000000000000000', advance_received_at: new Date().toISOString().slice(0, 10) });
+      .send({ _csrf: csrf, advance_amount: '1020', advance_inr_unknown: '1', advance_exchange_rate: '100000000000000000000', advance_received_at: new Date().toISOString().slice(0, 10) });
     expect(posted.status).toBe(302);
     expect((await agent.get(`/orders/${mine}`)).text).toContain('The exchange rate is too large: it can be at most 999999.9999.');
     const row = (await db.queryOne('SELECT advance_amount, advance_remittance_received_at, advance_exchange_rate FROM order_payment_status WHERE order_id = :o', { o: mine })) || {};

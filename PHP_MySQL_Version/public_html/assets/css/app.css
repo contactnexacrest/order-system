@@ -846,3 +846,10 @@ fieldset.radio-row label{display:flex;gap:6px;align-items:flex-start;font-weight
 .kanban-card-actions{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
 .kanban-card-actions form{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0;}
 .kanban-card-actions input[type="text"]{flex:1 1 140px;min-width:0;}
+/* D-244 (4 Nov 2026): INR credited on buyer remittance forms — worked-out rate and the "why different?" question. */
+.remit-inr .remit-derived{margin:.25rem 0 .75rem;}
+.remit-inr .remit-derived strong{font-variant-numeric:tabular-nums;}
+.remit-inr .remit-gap{border-left:3px solid #d97706;padding:.5rem .75rem;margin:.5rem 0;background:rgba(217,119,6,.07);border-radius:6px;}
+.remit-inr .remit-gap-note{margin:0 0 .5rem;}
+.remit-inr .checkbox-inline{display:flex;gap:.5rem;align-items:center;font-weight:normal;}
+.remit-inr .checkbox-inline input{width:auto;margin:0;}

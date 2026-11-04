@@ -63,16 +63,17 @@ describe('Order page flow (owner requests 2026-10-26)', () => {
 
     let req = fakeReq({ id: String(orderId) }, { advance_amount: '1800', advance_received_at: '2026-10-26' });
     await ordersController.recordAdvancePayment(req, fakeRes());
-    expect(lastFlash(req)).toContain("today's exchange rate");
+    // D-244 (4 Nov 2026): the INR credited is asked for — or "INR not known yet" with the rate.
+    expect(lastFlash(req)).toContain('Enter the INR credited by the bank');
     expect((await orderPaymentStatusRepository.find(orderId)).advance_amount).toBeNull();
 
-    req = fakeReq({ id: String(orderId) }, { advance_amount: '1800', advance_received_at: '2026-10-26', advance_exchange_rate: '83.25', advance_bank_reference: 'UTR-TEST-0001' });
+    req = fakeReq({ id: String(orderId) }, { advance_amount: '1800', advance_received_at: '2026-10-26', advance_inr_unknown: '1', advance_exchange_rate: '83.25', advance_bank_reference: 'UTR-TEST-0001' });
     await ordersController.recordAdvancePayment(req, fakeRes());
     const payment = await orderPaymentStatusRepository.find(orderId);
     expect(Number(payment.advance_amount)).toBe(1800);
     expect(Number(payment.advance_exchange_rate)).toBe(83.25);
     expect(Number(payment.advance_exchange_rate_set_by)).toBe(adminId);
-    expect(lastFlash(req)).toContain("Received USD 1,800.00 at today's exchange rate of ₹83.2500 (= ₹149,850.00).");
+    expect(lastFlash(req)).toContain('Received USD 1,800.00 at the exchange rate of ₹83.2500 (≈ ₹149,850.00, estimated until the INR credited is known).');
   });
 
   it('stores every compliance row of a card with one Save', async () => {

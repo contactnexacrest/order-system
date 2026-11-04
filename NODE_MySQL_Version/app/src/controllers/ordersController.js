@@ -17,6 +17,7 @@ const db = require('../config/db');
 const { parseDbDateTime } = require('../helpers/dbDateTime');
 const flash = require('../helpers/flash');
 const fieldValidator = require('../helpers/fieldValidator');
+const remittanceInr = require('../services/remittanceInr');
 const orderLineValidator = require('../helpers/orderLineValidator');
 const reasonValidator = require('../helpers/reasonValidator');
 const adminOverrideRepository = require('../repositories/adminOverrideRepository');
@@ -1349,6 +1350,9 @@ async function show(req, res) {
       // Gap list G-5 (owner, 1 Nov 2026): each leg's receipts, what is still owed, and an approved shortfall.
       partPayments: await partPaymentService.pageData(orderId, await require('../repositories/paymentMilestoneRepository').forOrder(orderId)),
       maxBankChargesPct: await remittanceDifference.maxBankChargesPct(),
+      // D-244 (4 Nov 2026): the INR-credited box — "why is it different?" choices and the ₹1 tolerance.
+      remitInrChoices: remittanceInr.CHOICES,
+      remitInrTolerance: remittanceInr.TOLERANCE_INR.toFixed(2),
       // Follow-up on point 18 (2 Nov 2026): the admin-managed "Why is it different?" reasons.
       remittanceReasons: await remittanceDifference.reasons(),
       canApproveShort: !!(req.permissions && req.permissions.approve_short_payment),
@@ -2058,11 +2062,10 @@ async function showRemovedAdditionalDocuments(req, res) {
   });
 }
 
-/** "Received USD 1,800.00 at today's exchange rate of ₹83.2500 (= ₹149,850.00)." — the remittance + rate just recorded. */
-async function remittanceStatement(orderId, amount, rate) {
+/** D-244: the rupees the bank credited and the rate worked out from them (or the typed rate, as an estimate). */
+async function remittanceStatement(orderId, amount, rate, inr = null) {
   const order = await orderRepository.find(orderId);
-  const fmt = (n, digits) => Number(n).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
-  return `Received ${(order && order.currency_code) || ''} ${fmt(amount, 2)} at today's exchange rate of ₹${fmt(rate, 4)} (= ₹${fmt(amount * rate, 2)}).`;
+  return remittanceInr.statement((order && order.currency_code) || '', amount, inr, rate);
 }
 
 async function recordAdvancePayment(req, res) {
@@ -2079,14 +2082,15 @@ async function recordAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  // Owner request (2026-10-26): the day's exchange rate is recorded
-  // together with the remittance itself.
-  const rate = parseFloat(req.body.advance_exchange_rate || 0);
-  if (!(rate > 0)) {
-    flash.set(req, 'error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+  // Owner decision D-244 (4 Nov 2026): the INR the bank credited is entered and the rate is worked
+  // out from it; the bank's rate on the advice, when given, checks it (₹1 tolerance).
+  const inr = remittanceInr.fromPost(req.body, 'advance_', amount, ((await orderRepository.find(orderId)) || {}).currency_code || '');
+  if (inr.error) {
+    flash.set(req, 'error', inr.error);
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  const rate = Number(inr.rate);
   const bankRef = str(req.body.advance_bank_reference);
   const boundsError = fieldValidator.moneyAmount(amount, 'The advance amount') || fieldValidator.exchangeRate(rate) || fieldValidator.bankReference(bankRef);
   if (boundsError) {
@@ -2111,7 +2115,7 @@ async function recordAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (await partPaymentService.receiptExists(orderId, 'advance', amount, receivedAt, rate)) {
+  if (await partPaymentService.receiptExists(orderId, 'advance', amount, receivedAt, rate, inr.inr)) {
     flash.set(req, 'warning', 'Advance remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -2126,7 +2130,7 @@ async function recordAdvancePayment(req, res) {
   }
   // QA Round 6, R6-N22: saved together or not at all.
   // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-  const advanceReceiptId = await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'advance', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef, diffEval.reason, diffEval.charges);
+  const advanceReceiptId = await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'advance', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef, diffEval.reason, diffEval.charges, inr);
   if (!advanceReceiptId) {
     flash.set(req, 'warning', 'Advance remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
@@ -2149,7 +2153,7 @@ async function recordAdvancePayment(req, res) {
     }
   }
 
-  flash.set(req, 'success', `${`${await remittanceStatement(orderId, amount, rate)} ${remittanceDifference.outcome('advance', 'Advance', currency, diffEval, amount, rate)}`.trim()} ${'Advance remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
+  flash.set(req, 'success', `${`${await remittanceStatement(orderId, amount, rate, inr)} ${remittanceDifference.outcome('advance', 'Advance', currency, diffEval, amount, rate)}`.trim()} ${'Advance remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -3150,14 +3154,15 @@ async function recordFreightPayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  // Owner request (2026-10-26): the day's exchange rate is recorded
-  // together with the remittance itself.
-  const rate = parseFloat(req.body.freight_exchange_rate || 0);
-  if (!(rate > 0)) {
-    flash.set(req, 'error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+  // Owner decision D-244 (4 Nov 2026): the INR the bank credited is entered and the rate is worked
+  // out from it; the bank's rate on the advice, when given, checks it (₹1 tolerance).
+  const inr = remittanceInr.fromPost(req.body, 'freight_', amount, ((await orderRepository.find(orderId)) || {}).currency_code || '');
+  if (inr.error) {
+    flash.set(req, 'error', inr.error);
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  const rate = Number(inr.rate);
   const bankRef = str(req.body.freight_bank_reference);
   const boundsError = fieldValidator.moneyAmount(amount, 'The freight amount') || fieldValidator.exchangeRate(rate) || fieldValidator.bankReference(bankRef);
   if (boundsError) {
@@ -3166,7 +3171,7 @@ async function recordFreightPayment(req, res) {
     return;
   }
 
-  if (await partPaymentService.receiptExists(orderId, 'freight', amount, receivedAt, rate)) {
+  if (await partPaymentService.receiptExists(orderId, 'freight', amount, receivedAt, rate, inr.inr)) {
     flash.set(req, 'warning', 'Freight remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -3182,7 +3187,7 @@ async function recordFreightPayment(req, res) {
   }
   // QA Round 6, R6-N22: saved together or not at all.
   // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-  const freightReceiptId = await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'freight', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef, freightDiff.reason, freightDiff.charges);
+  const freightReceiptId = await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'freight', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef, freightDiff.reason, freightDiff.charges, inr);
   if (!freightReceiptId) {
     flash.set(req, 'warning', 'Freight remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
@@ -3193,7 +3198,7 @@ async function recordFreightPayment(req, res) {
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
   await auditLogRepository.log(req.user.id, 'FREIGHT_PAYMENT_RECORDED', 'order_payment_status', orderId, 'freight_amount', null, String(amount));
-  flash.set(req, 'success', `${`${await remittanceStatement(orderId, amount, rate)} ${remittanceDifference.outcome('freight', 'Freight', freightCurrency, freightDiff, amount, rate)}`.trim()} ${'Freight remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
+  flash.set(req, 'success', `${`${await remittanceStatement(orderId, amount, rate, inr)} ${remittanceDifference.outcome('freight', 'Freight', freightCurrency, freightDiff, amount, rate)}`.trim()} ${'Freight remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
   res.redirect(`/orders/${orderId}`);
 }
 
@@ -3747,14 +3752,15 @@ async function recordBalancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  // Owner request (2026-10-26): the day's exchange rate is recorded
-  // together with the remittance itself.
-  const rate = parseFloat(req.body.balance_exchange_rate || 0);
-  if (!(rate > 0)) {
-    flash.set(req, 'error', "Enter today's exchange rate (₹ per 1 unit of the order currency) — it is recorded together with the remittance.");
+  // Owner decision D-244 (4 Nov 2026): the INR the bank credited is entered and the rate is worked
+  // out from it; the bank's rate on the advice, when given, checks it (₹1 tolerance).
+  const inr = remittanceInr.fromPost(req.body, 'balance_', amount, ((await orderRepository.find(orderId)) || {}).currency_code || '');
+  if (inr.error) {
+    flash.set(req, 'error', inr.error);
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  const rate = Number(inr.rate);
   const bankRef = str(req.body.balance_bank_reference);
   const boundsError = fieldValidator.moneyAmount(amount, 'The balance amount') || fieldValidator.exchangeRate(rate) || fieldValidator.bankReference(bankRef);
   if (boundsError) {
@@ -3763,7 +3769,7 @@ async function recordBalancePayment(req, res) {
     return;
   }
 
-  if (await partPaymentService.receiptExists(orderId, 'balance', amount, receivedAt, rate)) {
+  if (await partPaymentService.receiptExists(orderId, 'balance', amount, receivedAt, rate, inr.inr)) {
     flash.set(req, 'warning', 'Balance remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -3779,7 +3785,7 @@ async function recordBalancePayment(req, res) {
   }
   // QA Round 6, R6-N22: saved together or not at all.
   // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
-  const balanceReceiptId = await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'balance', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef, balanceDiff.reason, balanceDiff.charges);
+  const balanceReceiptId = await orderPaymentStatusRepository.recordLegReceivedWithRate(orderId, 'balance', amount, receivedAt, rate, req.user ? req.user.id : null, bankRef, balanceDiff.reason, balanceDiff.charges, inr);
   if (!balanceReceiptId) {
     flash.set(req, 'warning', 'Balance remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
@@ -3789,7 +3795,7 @@ async function recordBalancePayment(req, res) {
   await auditLogRepository.log(req.user ? req.user.id : null, 'CA_EXCHANGE_RATE_RECORDED', 'order_payment_status', orderId, 'balance_exchange_rate', null, String(rate));
   // External QA report L-23: balance payment recording was never audit-logged.
   await auditLogRepository.log(req.user ? req.user.id : null, 'BALANCE_PAYMENT_RECORDED', 'order_payment_status', orderId, 'balance_amount', null, String(amount));
-  flash.set(req, 'success', `${`${await remittanceStatement(orderId, amount, rate)} ${remittanceDifference.outcome('balance', 'Balance', balanceCurrency, balanceDiff, amount, rate)}`.trim()} ${'Balance remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
+  flash.set(req, 'success', `${`${await remittanceStatement(orderId, amount, rate, inr)} ${remittanceDifference.outcome('balance', 'Balance', balanceCurrency, balanceDiff, amount, rate)}`.trim()} ${'Balance remittance recorded. Mark it cleared once your bank confirms receipt.'}`);
   res.redirect(`/orders/${orderId}`);
 }
 

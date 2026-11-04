@@ -109,8 +109,11 @@ agreed to.
 Recording and clearing the balance payment follows the same two-step
 pattern as every other payment in this pipeline:
 
-1. **Record Balance Remittance** (11c) — amount, date, **@ Exchange
-   Rate** and **Bank reference** (SWIFT / UTR; rule D-212) once the buyer's payment notification arrives. Refused until the Commercial Invoice above has
+1. **Record Balance Remittance** (11c) — amount, date, **INR credited by
+   the bank (₹)** (the rate is worked out from it; optional **Bank's rate
+   on the advice** with the ₹1 check, or **INR not known yet — enter the
+   rate**; owner decision D-244, 4 Nov 2026 — see Stage 3) and **Bank
+   reference** (SWIFT / UTR; rule D-212) once the buyer's payment notification arrives. Refused until the Commercial Invoice above has
    actually been generated — the buyer can't be remitting against an
    invoice they were never sent — and, like every stage-gated action,
    until Stage 8 itself has unlocked.

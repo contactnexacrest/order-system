@@ -125,11 +125,15 @@ async function record(req, res) {
     return;
   }
   const amount = parseFloat(req.body.amount) || 0;
-  const rate = parseFloat(req.body.exchange_rate) || 0;
+  // Owner decision D-244 (4 Nov 2026): the INR the bank credited is entered and the rate worked out from it.
+  const remittanceInr = require('../services/remittanceInr');
+  const inr = amount > 0 ? remittanceInr.fromPost(req.body, '', amount, ((await orderRepository.find(orderId)) || {}).currency_code || '') : { rate: 0 };
+  const rate = Number(inr.rate) || 0;
   const bankRef = String(req.body.bank_reference ?? '').trim();
   const receivedOn = String(req.body.received_on ?? '').trim() || todayIst();
   const note = String(req.body.staff_note ?? '').trim();
   let error = fieldValidator.moneyAmount(amount, `The milestone ${m.seq} amount`)
+    ?? (inr.error || null)
     ?? fieldValidator.exchangeRate(rate)
     ?? fieldValidator.bankReference(bankRef)
     ?? (!isDate(receivedOn) || receivedOn > todayIst() ? 'Enter the date the money was received — today or earlier.' : null)
@@ -164,12 +168,13 @@ async function record(req, res) {
   // The milestone holds what the buyer paid: received plus any bank charges the banks deducted (owner, 2 Nov 2026).
   await paymentMilestoneRepository.recordReceived(Number(m.id), r2(amount + charges), receivedOn, rate, bankRef, note, req.user.id);
   // Gap list G-5: the receipt is kept in the order's receipt history too.
-  const receiptId = await require('../services/partPaymentService').addMilestoneReceipt(m, amount, receivedOn, rate, bankRef, note, req.user.id, diffEval.reason, charges);
+  const receiptId = await require('../services/partPaymentService').addMilestoneReceipt(m, amount, receivedOn, rate, bankRef, note, req.user.id, diffEval.reason, charges, inr);
   await remittanceDifference.afterReceipt(orderId, 'milestone', m, receiptId, diffEval, amount, rate, receivedOn, bankRef, req.user.id);
   const description = await paymentDescription.milestonePayment((await paymentMilestoneRepository.find(Number(m.id))) || m);
   await auditLogRepository.log(req.user.id, 'MILESTONE_PAYMENT_RECORDED', 'order_payment_milestones', Number(m.id), 'received_amount', null, description);
   const outcome = remittanceDifference.outcome('milestone', `Milestone ${Number(m.seq)}`, currencyForOutcome, diffEval, amount, rate);
-  flash.set(req, 'success', `Recorded: ${description}.${outcome ? ` ${outcome}` : ''} Mark it cleared once your bank confirms receipt.`);
+  const inrNote = remittanceInr.statement(((await orderRepository.find(orderId)) || {}).currency_code || '', amount, inr, rate);
+  flash.set(req, 'success', `Recorded: ${description}. ${inrNote}${outcome ? ` ${outcome}` : ''} Mark it cleared once your bank confirms receipt.`);
   back(res, orderId);
 }
 

@@ -97,11 +97,11 @@ describe('Exchange rate before clearing (90-item backlog "exchange-rate-at-clear
     expect(page.text).not.toContain('Record Rate');
     const csrf = extractCsrf(page.text);
 
-    await agent.post(`/orders/${orderId}/payment/advance/exchange-rate`).type('form').send({ _csrf: csrf, advance_exchange_rate: '95' });
+    await agent.post(`/orders/${orderId}/payment/advance/exchange-rate`).type('form').send({ _csrf: csrf, advance_inr_unknown: '1', advance_exchange_rate: '95' });
     expect(Number((await orderPaymentStatusRepository.find(orderId)).advance_exchange_rate)).toBe(85);
 
     await agent.post(`/orders/${orderId}/payment/advance/exchange-rate`).type('form')
-      .send({ _csrf: csrf, advance_exchange_rate: '95', correction_reason: "Typed the wrong day's rate" });
+      .send({ _csrf: csrf, advance_inr_unknown: '1', advance_exchange_rate: '95', correction_reason: "Typed the wrong day's rate" });
     expect(Number((await orderPaymentStatusRepository.find(orderId)).advance_exchange_rate)).toBe(95);
     const logged = await db.queryOne(
       "SELECT old_value, new_value, reason FROM audit_log WHERE entity_type = 'order_payment_status' AND entity_id = :id AND action_type = 'CA_EXCHANGE_RATE_CORRECTED'",

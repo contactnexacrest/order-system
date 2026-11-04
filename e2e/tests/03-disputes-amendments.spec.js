@@ -182,7 +182,7 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
     await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);
     await recordForm.locator('input[name="advance_amount"]').fill('1800.00');
-    await recordForm.locator('input[name="advance_exchange_rate"]').fill('90.25');
+    await recordForm.locator('input[name="advance_inr_credited"]').fill('162450.00'); // D-244: the rate is worked out (₹90.25)
     await recordForm.locator('input[name="advance_bank_reference"]').fill('E2E-UTR-ADVANCE-0001');
     await recordForm.getByRole('button', { name: 'Record Advance Remittance' }).click();
     await expect(page.locator('.alert')).toBeVisible();
