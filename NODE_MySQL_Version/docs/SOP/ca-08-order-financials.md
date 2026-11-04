@@ -524,6 +524,12 @@ the order, then *Locked* or *Paid* — the locked figure replaces the estimate,
 never both), and the **Order Profit after Commission & Incentive** with its
 margin. "Other Costs" no longer includes the locked incentive lines; they are
 shown on their own lines instead. Whoever may see the financials but not the
-incentives sees the profit before commission & incentive only. The CAFIN PDF is
-unchanged (locked figures only); the CAFIN CSV export adds the new columns. See
-SOP 20 for the incentive reports.
+incentives sees the profit before commission & incentive only. The CAFIN PDF
+keeps locked & paid figures only in its totals (ORDER PROFIT is tagged "locked &
+paid figures only"); while the order is not locked, section E adds a box "Not yet
+locked — estimated, NOT included in the totals above" with the estimated
+associate commission, the estimated team incentive and "Profit if these lock as
+estimated". GST on commission and TDS are not costs and are not shown there. Once
+the MD locks the order the amounts move into C3 and the totals and the box
+disappears (owner decision 4 Nov 2026, CAFIN change confirmed twice). The CAFIN
+CSV export adds the new columns. See SOP 20 for the incentive reports.

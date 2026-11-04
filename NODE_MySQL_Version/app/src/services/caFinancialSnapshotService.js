@@ -326,7 +326,8 @@ async function build(orderId) {
     ['line', '− Order expenses (C4)', null, money(profit.expenses_inr)],
     ['line', '− Expenses booked in Zoho Books (C5)', null, money(profit.zoho_expenses_inr)],
     ['sub', 'Total cost', null, money(profit.total_cost_inr)],
-    ['grand', 'ORDER PROFIT', null, money(profit.profit_inr)],
+    // Owner 4 Nov 2026 (D-245, CAFIN change confirmed twice): the totals are locked & paid figures only.
+    ['grand', 'ORDER PROFIT', 'locked & paid figures only', money(profit.profit_inr)],
     ['grand', 'MARGIN', null, profit.margin_pct !== null ? `${money(profit.margin_pct)}%` : '—'],
   ];
   // Owner decision 2026-10-31 (D-213, option A, CAFIN line confirmed twice): the GST on this order's
@@ -334,6 +335,20 @@ async function build(orderId) {
   const purchaseGst = await require('../repositories/gstRefundRepository').gstOnOrderBills(orderId);
   if (purchaseGst.total > 0) {
     pl.push(['line', `For information: GST paid on this order's purchases ₹${money(purchaseGst.total)} (supplier ₹${money(purchaseGst.supplier)} · logistics ₹${money(purchaseGst.logistics)}) is refundable under LUT`, 'claimed for the period, not per order — not added to this profit', '']);
+  }
+  // Owner 4 Nov 2026 (D-245, confirmed twice): while the order is not locked, the estimated associate
+  // commission and team incentive are shown under E in their own box — never added to the totals above.
+  const layer = await orderProfitabilityService.incentiveLayer(orderId, profit);
+  const estCommission = (!layer.incentives_locked && layer.commission_state === 'estimated') ? Number(layer.commission_inr) : 0;
+  const estIncentive = (!layer.incentives_locked && layer.incentive_state === 'estimated') ? Number(layer.incentive_inr) : 0;
+  let plEstimated = null;
+  if (estCommission > 0 || estIncentive > 0) {
+    const after = Math.round((Number(profit.profit_inr) - estCommission - estIncentive) * 100) / 100;
+    plEstimated = {
+      commission: estCommission > 0 ? money(estCommission) : null,
+      incentive: estIncentive > 0 ? money(estIncentive) : null,
+      after: `${after < 0 ? '−' : ''}${money(Math.abs(after))}`,
+    };
   }
   const ledger = (await orderLedgerService.forOrder(orderId, currency, true)).totals;
   const cash = [
@@ -386,6 +401,7 @@ async function build(orderId) {
     benefits_claimed: money(claimed),
     benefits_received: money(received),
     pl,
+    pl_estimated: plEstimated,
     cash,
     open,
   };

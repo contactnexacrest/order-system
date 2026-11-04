@@ -373,7 +373,8 @@ final class CaFinancialSnapshotService
             ['line', '− Order expenses (C4)', null, self::money($profit['expenses_inr'])],
             ['line', '− Expenses booked in Zoho Books (C5)', null, self::money($profit['zoho_expenses_inr'])],
             ['sub', 'Total cost', null, self::money($profit['total_cost_inr'])],
-            ['grand', 'ORDER PROFIT', null, self::money($profit['profit_inr'])],
+            // Owner 4 Nov 2026 (D-245, CAFIN change confirmed twice): the totals are locked & paid figures only.
+            ['grand', 'ORDER PROFIT', 'locked & paid figures only', self::money($profit['profit_inr'])],
             ['grand', 'MARGIN', null, $profit['margin_pct'] !== null ? number_format((float) $profit['margin_pct'], 2) . '%' : '—'],
         ];
         // Owner decision 2026-10-31 (D-213, option A, CAFIN line confirmed twice): the GST on this
@@ -381,6 +382,20 @@ final class CaFinancialSnapshotService
         $purchaseGst = \App\Repositories\GstRefundRepository::gstOnOrderBills($orderId);
         if ($purchaseGst['total'] > 0) {
             $pl[] = ['line', "For information: GST paid on this order's purchases ₹" . self::money($purchaseGst['total']) . ' (supplier ₹' . self::money($purchaseGst['supplier']) . ' · logistics ₹' . self::money($purchaseGst['logistics']) . ') is refundable under LUT', 'claimed for the period, not per order — not added to this profit', ''];
+        }
+        // Owner 4 Nov 2026 (D-245, confirmed twice): while the order is not locked, the estimated associate
+        // commission and team incentive are shown under E in their own box — never added to the totals above.
+        $layer = OrderProfitabilityService::incentiveLayer($orderId, $profit);
+        $estCommission = (!$layer['incentives_locked'] && $layer['commission_state'] === 'estimated') ? (float) $layer['commission_inr'] : 0.0;
+        $estIncentive = (!$layer['incentives_locked'] && $layer['incentive_state'] === 'estimated') ? (float) $layer['incentive_inr'] : 0.0;
+        $plEstimated = null;
+        if ($estCommission > 0 || $estIncentive > 0) {
+            $after = round((float) $profit['profit_inr'] - $estCommission - $estIncentive, 2);
+            $plEstimated = [
+                'commission' => $estCommission > 0 ? self::money($estCommission) : null,
+                'incentive' => $estIncentive > 0 ? self::money($estIncentive) : null,
+                'after' => ($after < 0 ? '−' : '') . self::money(abs($after)),
+            ];
         }
         $ledger = OrderLedgerService::forOrder($orderId, $currency, true)['totals'];
         $cash = [
@@ -444,6 +459,7 @@ final class CaFinancialSnapshotService
             'benefits_claimed' => self::money($claimed),
             'benefits_received' => self::money($received),
             'pl' => $pl,
+            'pl_estimated' => $plEstimated,
             'cash' => $cash,
             'open' => $open,
         ];

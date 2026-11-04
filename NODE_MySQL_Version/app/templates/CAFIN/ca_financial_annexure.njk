@@ -45,6 +45,8 @@
   table.pl td.num { width: 28%; }
   table.pl tr.sub td { font-weight: bold; background: #F2F2F2; }
   table.pl tr.grand td { font-weight: bold; background: #DDDDDD; font-size: 10pt; }
+  table.pl tr.est td { color: #555555; font-style: italic; }
+  .est-note { font-size: 8pt; color: #555555; margin-top: 4pt; }
   .tag { font-size: 7.5pt; border: 1px solid #999999; padding: 0 4px; border-radius: 3px; color: #444444; }
   .warn { color: #8A1F1F; font-weight: bold; }
   ul.flags { margin: 4pt 0 0 14pt; padding: 0; font-size: 8.5pt; }
@@ -211,6 +213,15 @@
   <tr{% if r[0] != 'line' %} class="{{ r[0] }}"{% endif %}><td>{{ r[1] }}{% if r[2] %} <span class="tag">{{ r[2] }}</span>{% endif %}</td><td class="num">{{ r[3] }}</td></tr>
   {% endfor %}
 </table>
+{% if snapshot.pl_estimated %}
+<div class="sub-title">Not yet locked — estimated, NOT included in the totals above</div>
+<table class="pl">
+  {% if snapshot.pl_estimated.commission %}<tr class="est"><td>Associate commission <span class="tag">Estimated</span></td><td class="num">{{ snapshot.pl_estimated.commission }}</td></tr>{% endif %}
+  {% if snapshot.pl_estimated.incentive %}<tr class="est"><td>Team incentive <span class="tag">Estimated</span></td><td class="num">{{ snapshot.pl_estimated.incentive }}</td></tr>{% endif %}
+  <tr class="sub"><td>Profit if these lock as estimated</td><td class="num">{{ snapshot.pl_estimated.after }}</td></tr>
+</table>
+<div class="est-note">GST on commission (input credit) and TDS (paid to the government) are not costs and are not shown here. Once you lock the order, these move into C3 and the totals, and this box disappears.</div>
+{% endif %}
 <div class="sub-title">Cash position so far (money actually in and out)</div>
 <table class="data">
   <tr><th>Received from buyer</th><th>Benefits received</th><th>Paid to supplier</th><th>Paid to logistics</th><th>Expenses</th><th>Net so far</th></tr>
