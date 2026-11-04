@@ -36,11 +36,34 @@ final class CaRepository
      *
      * @return array<int, array<string,mixed>>
      */
+    /**
+     * D-244: per order and leg, the rupees the bank kept from remittances
+     * recorded with "the bank deducted its charges" (amount × bank's rate −
+     * INR credited).
+     *
+     * @return array<int, array<string, float>>
+     */
+    private static function rateGapBankChargesByLeg(): array
+    {
+        $map = [];
+        $rows = \App\Config\Database::connection()->query(
+            "SELECT order_id, leg, SUM(rate_gap_inr) AS charges
+             FROM order_payment_receipts
+             WHERE rate_gap_choice = 'bank_charges' AND rate_gap_inr > 0
+             GROUP BY order_id, leg"
+        )->fetchAll();
+        foreach ($rows as $r) {
+            $map[(int) $r['order_id']][(string) $r['leg']] = round((float) $r['charges'], 2);
+        }
+        return $map;
+    }
+
     public static function settlementRegister(): array
     {
         $alertDays = (int) (CompanySettingsRepository::get('fema_realization_alert_days') ?? '270');
         $todayTs = time();
 
+        $bankChargesByLeg = self::rateGapBankChargesByLeg();
         $rows = [];
         foreach (OrderPaymentStatusRepository::clearedSettlements() as $ops) {
             foreach (self::LEGS as $legDef) {
@@ -53,6 +76,13 @@ final class CaRepository
 
                 $expectedInr = ($foreignAmount !== null && $legRate !== null) ? $foreignAmount * $legRate : null;
                 $forexGainLoss = ($inrActual !== null && $expectedInr !== null) ? $inrActual - $expectedInr : null;
+                // Owner 4 Nov 2026 (D-244): rupees the bank kept from the credit
+                // ("bank deducted its charges") are shown as bank charges, not
+                // as a forex loss — they are already booked as a Bank Charges cost.
+                $bankCharges = $bankChargesByLeg[(int) $ops['order_id']][$legDef['leg']] ?? 0.0;
+                if ($forexGainLoss !== null && $bankCharges > 0) {
+                    $forexGainLoss = round($forexGainLoss + $bankCharges, 2);
+                }
 
                 $clearedAtTs = strtotime((string) $ops[$legDef['cleared_col']]);
                 $daysSinceCleared = $clearedAtTs !== false ? (int) floor(($todayTs - $clearedAtTs) / 86400) : 0;
@@ -75,6 +105,7 @@ final class CaRepository
                     // D-244 (4 Nov 2026): while the INR credited is not known, the amount at the recorded rate — shown as an estimate.
                     'inr_estimated' => $inrActual === null ? $expectedInr : null,
                     'forex_gain_loss' => $forexGainLoss,
+                    'bank_charges_inr' => ($inrActual !== null && $bankCharges > 0) ? $bankCharges : null,
                     'firc_reference' => $ops[$legDef['firc_col']],
                     'firc_received_at' => $ops[$legDef['firc_at_col']],
                     'firc_pending' => $fircPending,
@@ -107,6 +138,7 @@ final class CaRepository
                 'expected_inr' => null,
                 'inr_estimated' => null,
                 'forex_gain_loss' => null,
+                'bank_charges_inr' => null,
                 'firc_reference' => $lc['lc_firc_reference'],
                 'firc_received_at' => $lc['lc_firc_received_at'],
                 'firc_pending' => $lc['lc_firc_reference'] === null && $daysSinceCleared >= $alertDays,
@@ -238,6 +270,7 @@ final class CaRepository
         $totalForexGainLoss = 0.0;
         $legsMissingInr = 0;
         $totalInrEstimated = 0.0;
+        $totalBankCharges = 0.0;
         foreach ($rows as $r) {
             $cc = $r['currency_code'];
             $byCurrency[$cc] ??= ['foreign_total' => 0.0, 'inr_actual_total' => 0.0, 'leg_count' => 0];
@@ -253,6 +286,7 @@ final class CaRepository
             if ($r['forex_gain_loss'] !== null) {
                 $totalForexGainLoss += $r['forex_gain_loss'];
             }
+            $totalBankCharges += (float) ($r['bank_charges_inr'] ?? 0);
         }
 
         return [
@@ -264,6 +298,7 @@ final class CaRepository
             'totalForexGainLoss' => $totalForexGainLoss,
             'legsMissingInr' => $legsMissingInr,
             'totalInrEstimated' => $totalInrEstimated,
+            'totalBankCharges' => $totalBankCharges,
             'legCount' => count($rows),
         ];
     }

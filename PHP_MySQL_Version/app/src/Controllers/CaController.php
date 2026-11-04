@@ -66,9 +66,11 @@ final class CaController
             // D-244: the amount at the recorded rate while the INR credited is not known yet.
             'INR Estimated (at recorded rate)' => $r['inr_actual'] === null && ($r['inr_estimated'] ?? null) !== null ? round((float) $r['inr_estimated'], 2) : null,
             'Forex Gain/(Loss)' => $r['forex_gain_loss'],
+            // D-244 (owner 4 Nov 2026): rupees the bank kept from the credit — shown as bank charges, not forex.
+            'Bank Charges (deducted from credit)' => $r['bank_charges_inr'] ?? null,
         ], $legRows);
 
-        return ['headers' => ['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'INR Estimated (at recorded rate)', 'Forex Gain/(Loss)'], 'rows' => $rows];
+        return ['headers' => ['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'INR Estimated (at recorded rate)', 'Forex Gain/(Loss)', 'Bank Charges (deducted from credit)'], 'rows' => $rows];
     }
 
     /** @return array{headers: string[], rows: array<int, array<string, mixed>>} */

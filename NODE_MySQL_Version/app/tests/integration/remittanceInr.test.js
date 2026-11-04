@@ -142,6 +142,12 @@ describe('D-244: INR credited on buyer remittances', () => {
     expect(Math.round((await orderProfitabilityService.computeForOrder(orderId)).revenue_inr * 100) / 100).toBe(149850);
     const payload = zohoBooksService.paymentPayload({ depositAccountId: 'ACC1' }, 'C1', 'USD', 1800, 149348, '2026-10-21', 'REF-advance', await remittanceDifference.chargesInr(orderId, 'advance'), 'desc');
     expect([payload.amount, payload.exchange_rate, payload.bank_charges]).toEqual([1800, 83.25, 6.03]);
+
+    // Owner 4 Nov 2026: the register labels the ₹502 as bank charges, not as a forex loss.
+    await call('clearAdvancePayment', orderId, { advance_cleared_at: '2026-10-21' });
+    const row = await registerRow(orderId);
+    expect([Number(row.forex_gain_loss), row.bank_charges_inr]).toEqual([0, 502]);
+    expect(caController.settlementRegisterCsvRows([row]).rows[0]['Bank Charges (deducted from credit)']).toBe(502);
   });
 
   it('a typo blocks the save', async () => {

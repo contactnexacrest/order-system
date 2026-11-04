@@ -25,7 +25,7 @@ final class CaCsvExportTest extends TestCase
 
         $result = CaController::settlementRegisterCsvRows($legRows);
 
-        self::assertSame(['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'INR Estimated (at recorded rate)', 'Forex Gain/(Loss)'], $result['headers']);
+        self::assertSame(['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'INR Estimated (at recorded rate)', 'Forex Gain/(Loss)', 'Bank Charges (deducted from credit)'], $result['headers']);
         self::assertSame('Advance', $result['rows'][0]['Leg'], 'leg must be rendered ucfirst, same as the on-screen table');
         self::assertSame('NC/2026/0042', $result['rows'][0]['Order Ref']);
         self::assertSame(250.0, $result['rows'][0]['Forex Gain/(Loss)']);

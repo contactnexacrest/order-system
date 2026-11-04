@@ -1,5 +1,6 @@
 'use strict';
 
+const db = require('../config/db');
 const orderPaymentStatusRepository = require('./orderPaymentStatusRepository');
 const companySettingsRepository = require('./companySettingsRepository');
 const caBankStatementRepository = require('./caBankStatementRepository');
@@ -31,10 +32,32 @@ const LEGS = [
  * at a different market rate) and whether its FIRC/eBRC reference is still
  * missing past the configured alert window.
  */
+/**
+ * D-244: per order and leg, the rupees the bank kept from remittances
+ * recorded with "the bank deducted its charges" (amount × bank's rate −
+ * INR credited).
+ */
+async function rateGapBankChargesByLeg() {
+  const map = {};
+  const rows = await db.query(
+    `SELECT order_id, leg, SUM(rate_gap_inr) AS charges
+     FROM order_payment_receipts
+     WHERE rate_gap_choice = 'bank_charges' AND rate_gap_inr > 0
+     GROUP BY order_id, leg`
+  );
+  for (const r of rows) {
+    const id = Number(r.order_id);
+    if (!map[id]) map[id] = {};
+    map[id][r.leg] = Math.round(parseFloat(r.charges) * 100) / 100;
+  }
+  return map;
+}
+
 async function settlementRegister() {
   const alertDays = parseInt((await companySettingsRepository.get('fema_realization_alert_days')) ?? '270', 10);
   const now = Date.now();
 
+  const bankChargesByLeg = await rateGapBankChargesByLeg();
   const rows = [];
   for (const ops of await orderPaymentStatusRepository.clearedSettlements()) {
     for (const legDef of LEGS) {
@@ -46,7 +69,14 @@ async function settlementRegister() {
       const legRate = ops[legDef.rateCol] !== null && ops[legDef.rateCol] !== undefined ? parseFloat(ops[legDef.rateCol]) : null;
 
       const expectedInr = (foreignAmount !== null && legRate !== null) ? foreignAmount * legRate : null;
-      const forexGainLoss = (inrActual !== null && expectedInr !== null) ? inrActual - expectedInr : null;
+      let forexGainLoss = (inrActual !== null && expectedInr !== null) ? inrActual - expectedInr : null;
+      // Owner 4 Nov 2026 (D-244): rupees the bank kept from the credit
+      // ("bank deducted its charges") are shown as bank charges, not as a
+      // forex loss — they are already booked as a Bank Charges cost.
+      const bankCharges = (bankChargesByLeg[Number(ops.order_id)] || {})[legDef.leg] ?? 0;
+      if (forexGainLoss !== null && bankCharges > 0) {
+        forexGainLoss = Math.round((forexGainLoss + bankCharges) * 100) / 100;
+      }
 
       const clearedAtTs = new Date(ops[legDef.clearedCol]).getTime();
       const daysSinceCleared = Number.isNaN(clearedAtTs) ? 0 : Math.floor((now - clearedAtTs) / 86400000);
@@ -69,6 +99,7 @@ async function settlementRegister() {
         // D-244 (4 Nov 2026): while the INR credited is not known, the amount at the recorded rate — shown as an estimate.
         inr_estimated: inrActual === null ? expectedInr : null,
         forex_gain_loss: forexGainLoss,
+        bank_charges_inr: (inrActual !== null && bankCharges > 0) ? bankCharges : null,
         firc_reference: ops[legDef.fircCol] ?? null,
         firc_received_at: ops[legDef.fircAtCol] ?? null,
         firc_pending: fircPending,
@@ -101,6 +132,7 @@ async function settlementRegister() {
       expected_inr: null,
       inr_estimated: null,
       forex_gain_loss: null,
+      bank_charges_inr: null,
       firc_reference: lc.lc_firc_reference ?? null,
       firc_received_at: lc.lc_firc_received_at ?? null,
       firc_pending: (lc.lc_firc_reference === null || lc.lc_firc_reference === undefined) && daysSinceCleared >= alertDays,
@@ -208,6 +240,7 @@ async function revenueReport(mode, period) {
   let totalForexGainLoss = 0;
   let legsMissingInr = 0;
   let totalInrEstimated = 0;
+  let totalBankCharges = 0;
   for (const r of rows) {
     const cc = r.currency_code;
     if (!byCurrency[cc]) {
@@ -225,6 +258,7 @@ async function revenueReport(mode, period) {
     if (r.forex_gain_loss !== null) {
       totalForexGainLoss += r.forex_gain_loss;
     }
+    totalBankCharges += r.bank_charges_inr ?? 0;
   }
 
   return {
@@ -236,6 +270,7 @@ async function revenueReport(mode, period) {
     totalForexGainLoss,
     legsMissingInr,
     totalInrEstimated,
+    totalBankCharges,
     legCount: rows.length,
   };
 }

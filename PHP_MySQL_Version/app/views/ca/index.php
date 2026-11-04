@@ -92,9 +92,13 @@ $canViewOrders = \App\Services\PermissionService::can((int) $__caViewOrdersUser[
             <?php endif; ?>
           </td>
           <td>
-            <?php if ($s['forex_gain_loss'] !== null): ?>
+            <?php $bankCharges = $s['bank_charges_inr'] ?? null; // D-244: rupees the bank kept, booked as Bank Charges ?>
+            <?php if ($s['forex_gain_loss'] !== null && ($bankCharges === null || abs($s['forex_gain_loss']) >= 0.005)): ?>
               <span class="<?= $s['forex_gain_loss'] >= 0 ? '' : 'muted' ?>">&#8377;<?= number_format(abs($s['forex_gain_loss']), 2) ?> <?= $s['forex_gain_loss'] >= 0 ? 'gain' : 'loss' ?></span>
-            <?php else: ?>
+            <?php endif; ?>
+            <?php if ($bankCharges !== null): ?>
+              <div>&#8377;<?= number_format((float) $bankCharges, 2) ?> bank charges</div>
+            <?php elseif ($s['forex_gain_loss'] === null): ?>
               <span class="muted">—</span>
             <?php endif; ?>
           </td>

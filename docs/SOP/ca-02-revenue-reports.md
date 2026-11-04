@@ -32,8 +32,14 @@ exchange rate is **worked out** from it (INR ÷ foreign amount). So:
   credited. Otherwise the Zoho payment's rate is INR credited ÷ foreign
   amount.
 - Because the rate now comes from the INR itself, the **forex gain/(loss)**
-  of a leg recorded this way is nil (or the bank charges); it still shows
-  a real figure for legs recorded with a typed rate and a later INR actual.
+  of a leg recorded this way is nil; it still shows a real figure for legs
+  recorded with a typed rate and a later INR actual.
+- Rupees the bank kept ("The bank deducted its charges") are **not** shown
+  as a forex loss (owner, 4 Nov 2026): the register and the revenue report
+  label them "₹… bank charges" in the Forex Gain/(Loss) column, the report
+  summary shows "Bank Charges Deducted from Credits", and the CSV has a
+  column "Bank Charges (deducted from credit)". They are counted once, as
+  the order cost Bank Charges.
 
 ## Exchange Rate (per settlement leg)
 

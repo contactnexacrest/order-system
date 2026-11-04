@@ -159,6 +159,13 @@ final class RemittanceInrTest extends DbTestCase
         $payload = (new \ReflectionMethod(\App\Services\ZohoBooksService::class, 'paymentPayload'))
             ->invoke(null, ['depositAccountId' => 'ACC1'], 'C1', 'USD', 1800.0, 149348.0, '2026-10-21', 'REF-advance', RemittanceDifference::chargesInr($orderId, 'advance'), 'desc');
         self::assertSame([1800.0, 83.25, 6.03], [$payload['amount'], $payload['exchange_rate'], $payload['bank_charges']], 'Zoho: deposit = credited, the rest bank charges');
+
+        // Owner 4 Nov 2026: the register labels the ₹502 as bank charges, not as a forex loss.
+        $this->call('clearAdvancePayment', $orderId, ['advance_cleared_at' => '2026-10-21']);
+        $row = $this->registerRow($orderId);
+        self::assertSame([0.0, 502.0], [(float) $row['forex_gain_loss'], $row['bank_charges_inr']]);
+        $csv = CaController::settlementRegisterCsvRows([$row])['rows'][0];
+        self::assertSame(502.0, $csv['Bank Charges (deducted from credit)']);
     }
 
     public function testATypoBlocksTheSave(): void

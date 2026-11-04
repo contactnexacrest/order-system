@@ -77,9 +77,14 @@
             {% endif %}
           </td>
           <td>
-            {% if s.forex_gain_loss != null %}
+            {# D-244: rupees the bank kept, booked as Bank Charges #}
+            {% set bankCharges = s.bank_charges_inr %}
+            {% if s.forex_gain_loss != null and (bankCharges == null or (s.forex_gain_loss | abs) >= 0.005) %}
               <span>&#8377;{{ (s.forex_gain_loss | abs) | money }} {{ 'gain' if s.forex_gain_loss >= 0 else 'loss' }}</span>
-            {% else %}
+            {% endif %}
+            {% if bankCharges != null %}
+              <div>&#8377;{{ bankCharges | money }} bank charges</div>
+            {% elif s.forex_gain_loss == null %}
               <span class="muted">—</span>
             {% endif %}
           </td>

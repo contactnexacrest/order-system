@@ -42,6 +42,9 @@
       <div><span class="k">Settlement Legs</span><span class="v">{{ report.legCount }}</span></div>
       <div><span class="k">Total INR Realized</span><span class="v">&#8377;{{ report.totalInrActual | money }}</span></div>
       <div><span class="k">Net Forex Gain/(Loss)</span><span class="v">&#8377;{{ (report.totalForexGainLoss | abs) | money }} {{ 'gain' if report.totalForexGainLoss >= 0 else 'loss' }}</span></div>
+      {% if report.totalBankCharges > 0 %}{# D-244 #}
+      <div><span class="k">Bank Charges Deducted from Credits</span><span class="v">&#8377;{{ report.totalBankCharges | money }} <span class="muted small">(booked as Bank Charges cost, not forex)</span></span></div>
+      {% endif %}
       <div><span class="k">Legs Missing INR Actual</span><span class="v">{{ report.legsMissingInr }}{% if report.totalInrEstimated > 0 %}{# D-244 #} <span class="muted small">(&#8377;{{ report.totalInrEstimated | money }} estimated at recorded rate, not in the total)</span>{% endif %}</span></div>
       {# Owner decision 2026-10-31: GST refunds under LUT are company-level income, not any one order's. #}
       <div><span class="k">GST Refunds Credited (LUT)</span><span class="v">&#8377;{{ gstRefundsCredited | money }} <a class="small" href="/ca/gst-refunds">details</a></span></div>
@@ -80,7 +83,8 @@
           <td>{{ r.cleared_at }}</td>
           <td>{{ (r.foreign_amount | money) if r.foreign_amount != null else '—' }} {{ r.currency_code }}</td>
           <td>{% if r.inr_actual != null %}&#8377;{{ r.inr_actual | money }}{% elif r.inr_estimated != null %}&#8377;{{ r.inr_estimated | money }} <span class="muted small">estimated at recorded rate</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-          <td>{% if r.forex_gain_loss != null %}&#8377;{{ (r.forex_gain_loss | abs) | money }} {{ 'gain' if r.forex_gain_loss >= 0 else 'loss' }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          {# D-244: rupees the bank kept, booked as Bank Charges #}
+          <td>{% if r.forex_gain_loss != null and (r.bank_charges_inr == null or (r.forex_gain_loss | abs) >= 0.005) %}&#8377;{{ (r.forex_gain_loss | abs) | money }} {{ 'gain' if r.forex_gain_loss >= 0 else 'loss' }}{% endif %}{% if r.bank_charges_inr != null %}<div>&#8377;{{ r.bank_charges_inr | money }} bank charges</div>{% elif r.forex_gain_loss == null %}<span class="muted">—</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </table>

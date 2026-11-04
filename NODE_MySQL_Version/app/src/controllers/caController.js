@@ -51,9 +51,11 @@ function settlementRegisterCsvRows(legRows) {
     // D-244: the amount at the recorded rate while the INR credited is not known yet.
     'INR Estimated (at recorded rate)': r.inr_actual === null && r.inr_estimated !== null && r.inr_estimated !== undefined ? Math.round(Number(r.inr_estimated) * 100) / 100 : null,
     'Forex Gain/(Loss)': r.forex_gain_loss,
+    // D-244 (owner 4 Nov 2026): rupees the bank kept from the credit — shown as bank charges, not forex.
+    'Bank Charges (deducted from credit)': r.bank_charges_inr ?? null,
   }));
 
-  return { headers: ['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'INR Estimated (at recorded rate)', 'Forex Gain/(Loss)'], rows };
+  return { headers: ['Order Ref', 'Client', 'Leg', 'Cleared On', 'Foreign Amount', 'Currency', 'INR Actual', 'INR Estimated (at recorded rate)', 'Forex Gain/(Loss)', 'Bank Charges (deducted from credit)'], rows };
 }
 
 function expensesCsvRows(expenses) {
