@@ -49,7 +49,12 @@ async function show(req, res) {
       name: String(intro.associate.name), code: intro.invitation ? '' : String(intro.associate.personal_code || ''), inv: String((intro.invitation && intro.invitation.token) || ''),
       company: String((intro.invitation && intro.invitation.company_name) || ''), country: String((intro.invitation && intro.invitation.country) || ''),
     } : null,
-    introError: intro.error,
+    // Owner decision 4 Nov 2026 (A6): a buyer never sees an associate-code error; a code/link that
+    // cannot be applied travels on silently so staff see it on the intake review.
+    introGiven: intro.note ? {
+      code: [...String(typeof req.query.code === 'string' ? req.query.code : '').trim()].slice(0, 60).join(''),
+      inv: [...String(typeof req.query.inv === 'string' ? req.query.inv : '').trim()].slice(0, 100).join(''),
+    } : null,
     wrapClass: 'intake-wrap',
     containerTypes: await lookupRepository.dropdownOptions('container_type'),
     cooTypes: await lookupRepository.dropdownOptions('coo_type'),
@@ -77,11 +82,6 @@ async function submit(req, res) {
   // Owner decision 1 Nov 2026 (AS-5): introduced by an associate — their link or personal code.
   const intro = await associateIntakeService.introducer(postedCode, postedInv);
   const website = typeof body.website === 'string' ? body.website.trim() : '';
-  if (intro.error !== null && (postedCode || postedInv)) {
-    flash.set(req, 'error', intro.error);
-    res.redirect('/quotation-details');
-    return;
-  }
   if ([...website].length > 255 || (website !== '' && !/^(https?:\/\/)?[A-Za-z0-9.-]+\.[A-Za-z]{2,}(\/\S*)?$/.test(website))) {
     flash.set(req, 'error', 'Enter your company website as an address (e.g. www.example.com), or leave it empty.');
     res.redirect(backTo);
@@ -90,17 +90,18 @@ async function submit(req, res) {
 
   const id = await clientIntakeRepository.create(data, req.ip || null);
   // QA Round 8, R8-N04: a one-off link registers one company — the first registration through it takes it.
+  // A6: a link another registration just took — the buyer carries on as a direct buyer; staff see why.
+  let introNow = intro;
   if (intro.invitation && !(await associateInvitationRepository.claim(Number(intro.invitation.id), id))) {
-    await db.execute('DELETE FROM client_intake_submissions WHERE id = :id', { id });
-    flash.set(req, 'error', associateIntakeService.LINK_USED);
-    res.redirect('/quotation-details');
-    return;
+    introNow = { associate: null, invitation: null, error: null,
+      note: `Invitation link of associate ${intro.associate.name} given but not applied: another registration used it first.` };
   }
+  await associateIntakeService.recordNote(id, introNow.note || null);
   const link = await issueCorrectionLink(id, data.email);
-  if (intro.associate) {
-    const code = await associateIntakeService.attach(id, intro.associate, intro.invitation, data.company_legal_name, data.country_of_destination, data.email, true, website || null);
+  if (introNow.associate) {
+    const code = await associateIntakeService.attach(id, introNow.associate, introNow.invitation, data.company_legal_name, data.country_of_destination, data.email, true, website || null);
     req.session[associateIntakeService.SESSION_KEY] = id;
-    await auditLogRepository.log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', id, 'associate_id', null, String(intro.associate.id), `Submitted by ${data.company_legal_name} via the public quotation-details form, introduced by associate ${intro.associate.name}.`);
+    await auditLogRepository.log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', id, 'associate_id', null, String(introNow.associate.id), `Submitted by ${data.company_legal_name} via the public quotation-details form, introduced by associate ${introNow.associate.name}.`);
     if (associatePortalService.showCodeOnScreen()) {
       flash.set(req, 'info', `Development only — the e-mail code is ${code}.`);
     }

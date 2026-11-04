@@ -33,12 +33,13 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
     <span>&#9989; Fields marked * are required</span>
   </div>
 
-  <?php if (!empty($introError)): ?><div class="alert alert-warning"><?= htmlspecialchars($introError) ?></div><?php endif; ?>
   <form method="post" action="/quotation-details/submit">
     <?= Csrf::field() ?>
     <?php // Owner decision 1 Nov 2026 (AS-5, revised): the associate's invitation link or code travels only as a hidden field — nothing for the buyer to tick or type. ?>
     <?php if (!empty($introducer)): ?>
       <?php if ($introducer['inv'] !== ''): ?><input type="hidden" name="associate_inv" value="<?= htmlspecialchars($introducer['inv']) ?>"><?php else: ?><input type="hidden" name="associate_code" value="<?= htmlspecialchars($introducer['code']) ?>"><?php endif; ?>
+    <?php elseif (!empty($introGiven)): // A6 (4 Nov 2026): a code/link that cannot be applied still travels, so staff see what was given — the buyer sees nothing ?>
+      <?php if ($introGiven['inv'] !== ''): ?><input type="hidden" name="associate_inv" value="<?= htmlspecialchars($introGiven['inv']) ?>"><?php else: ?><input type="hidden" name="associate_code" value="<?= htmlspecialchars($introGiven['code']) ?>"><?php endif; ?>
     <?php endif; ?>
 
     <fieldset class="intake-step">

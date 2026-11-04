@@ -47,22 +47,16 @@ final class OrderDuplicationService
         }
         $client = ClientRepository::find((int) $source['client_id']);
 
-        $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/ORD/{YY}/{NNN}';
+        // Owner decision 4 Nov 2026 (D1): NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter.
+        $orderReferenceNew = ReferenceNumberService::generateOrderReference();
         $testModeEnabled = TestModeService::isEnabled();
 
         // QA-5 CONC-03: see OrderRepository::createWithNextSequence()'s docblock.
         $result = OrderRepository::createWithNextSequence((int) $source['client_id'], function (int $sequenceNo) use (
-            $orderRefFormat, $testModeEnabled, $source, $client
+            $orderReferenceNew, $source, $client
         ): array {
             return [
-                'order_reference'       => TestModeService::applyReferencePrefix(
-                    strtr($orderRefFormat, [
-                        '{YYYY}' => date('Y'),
-                        '{YY}'   => date('y'),
-                        '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
-                    ]) . '-' . $source['client_id'],
-                    $testModeEnabled
-                ),
+                'order_reference'       => $orderReferenceNew,
                 'buyer_inquiry_ref'     => $client['client_unique_number'] ?? $source['buyer_inquiry_ref'],
                 'payment_preset_id'     => $source['payment_preset_id'],
                 'incoterm_id'           => $source['incoterm_id'],

@@ -22,13 +22,14 @@
     <span>&#9989; Fields marked * are required</span>
   </div>
 
-  {# Owner decision 1 Nov 2026 (AS-5). Also expects: introducer ({name, code, inv, company, country} or null), introError (string or null). #}
-  {% if introError %}<div class="alert alert-warning">{{ introError }}</div>{% endif %}
+  {# Owner decision 1 Nov 2026 (AS-5). Also expects: introducer ({name, code, inv, company, country} or null), introGiven ({code, inv} or null — A6: a code/link not applied, carried silently). #}
   <form method="post" action="/quotation-details/submit">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     {# Owner decision 1 Nov 2026 (AS-5, revised): the associate's invitation link or code travels only as a hidden field — nothing for the buyer to tick or type. #}
     {% if introducer %}
       {% if introducer.inv %}<input type="hidden" name="associate_inv" value="{{ introducer.inv }}">{% else %}<input type="hidden" name="associate_code" value="{{ introducer.code }}">{% endif %}
+    {% elif introGiven %}{# A6 (4 Nov 2026): a code/link that cannot be applied still travels, so staff see what was given — the buyer sees nothing #}
+      {% if introGiven.inv %}<input type="hidden" name="associate_inv" value="{{ introGiven.inv }}">{% else %}<input type="hidden" name="associate_code" value="{{ introGiven.code }}">{% endif %}
     {% endif %}
 
     <fieldset class="intake-step">

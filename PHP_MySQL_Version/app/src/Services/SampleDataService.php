@@ -376,19 +376,16 @@ final class SampleDataService
         bool $includeAnnexureA = false
     ): int {
         $client = ClientRepository::find($clientId);
-        $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/ORD/{YY}/{NNN}';
+        // Owner decision 4 Nov 2026 (D1): NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter (sample data is never TEST-).
+        $orderReferenceNew = ReferenceNumberService::generateOrderReference(false);
 
         // QA-5 CONC-03: see OrderRepository::createWithNextSequence()'s docblock.
         $result = OrderRepository::createWithNextSequence($clientId, function (int $sequenceNo) use (
-            $orderRefFormat, $clientId, $client, $preset, $incoterm, $loadingPort, $portOfDischargeText,
+            $orderReferenceNew, $clientId, $client, $preset, $incoterm, $loadingPort, $portOfDischargeText,
             $currency, $includeAnnexureA
         ): array {
             return [
-                'order_reference'       => strtr($orderRefFormat, [
-                    '{YYYY}' => date('Y'),
-                    '{YY}'   => date('y'),
-                    '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
-                ]) . '-' . $clientId,
+                'order_reference'       => $orderReferenceNew,
                 'buyer_inquiry_ref'     => $client['client_unique_number'],
                 'payment_preset_id'     => (int) $preset['id'],
                 'incoterm_id'           => (int) $incoterm['id'],

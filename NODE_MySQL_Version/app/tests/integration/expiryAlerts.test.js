@@ -53,6 +53,23 @@ describe('Expiry alerts (90-item backlog "expiry alerts")', () => {
     expect(await notificationRepository.existsToday(adminId, 'quotation_expired', orderId)).toBe(true);
   });
 
+  // Owner decision 4 Nov 2026 (alert job speed-up): today's alerts are read once
+  // per run, not once per person and order — the same alerts still go out exactly once a day.
+  it('a second run the same day adds nothing, and a new order is still alerted', async () => {
+    const count = async (o) => Number((await db.queryOne(
+      "SELECT COUNT(*) AS n FROM notifications WHERE user_id = :u AND type = 'quotation_expired' AND related_order_id = :o", { u: adminId, o })).n);
+    const first = await createTestOrder(await createTestClient());
+    await setOrderDates(first, { quotation_valid_until: '2020-01-01' });
+    await run();
+    expect(await count(first)).toBe(1);
+    await run();
+    expect(await count(first)).toBe(1); // no second alert the same day
+    const second = await createTestOrder(await createTestClient());
+    await setOrderDates(second, { quotation_valid_until: '2020-01-01' });
+    await run();
+    expect([await count(first), await count(second)]).toEqual([1, 1]);
+  });
+
   it('does not alert when the quotation is still valid', async () => {
     const orderId = await createTestOrder(await createTestClient());
     // createTestOrder() already sets quotation_valid_until 30 days out.

@@ -353,3 +353,19 @@ challans →** opens `/associates/tds` (D-235).
 6. **Orders** (with the per-order commission statement), **Commission** (statement, invoice upload per payout, tax
    certificates), **Messages**, **Profile** (contact and tax details,
    bank details, documents, agreement download).
+
+## A buyer never sees an error from a code or link (owner decision 4 Nov 2026, A6)
+
+When a buyer opens the quotation form with an associate code or link that
+cannot be used, the form simply opens as for any direct buyer — no message,
+no hint. This covers a mistyped or unknown code, an associate's old code that
+was replaced by a new one, an expired or already-used link, and an associate
+who is suspended or whose agreement has ended. The buyer registers as a
+direct buyer.
+
+On **Quotation Intake Review** the request then carries a warning line such
+as "Associate code NXA-… given but not applied: it is an old code of associate
+…". Decide as usual: accept as a direct client, or — if the associate should
+get the client — link the client to the associate afterwards from the
+associate's page (Link a client already on file).
+

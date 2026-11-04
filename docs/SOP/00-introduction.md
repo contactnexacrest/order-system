@@ -217,10 +217,19 @@ database before applying.
   characters of their own (they're reference numbers, not folder names),
   so each is run through the same sanitizer before being used as a path
   segment: anything that isn't a letter, digit, underscore, or hyphen
-  becomes a hyphen. `SC/ORD/26/003-42` on screen becomes
-  `SC-ORD-26-003-42` as a folder name — same identity, just filesystem-safe.
+  becomes a hyphen. `NC/SC/ORD/26/0411001` on screen becomes
+  `NC-SC-ORD-26-0411001` as a folder name — same identity, just filesystem-safe.
+- **Order references** (owner decision 4 Nov 2026, D1) read `NC/SC/ORD/{YY}/{DDMM}{NNN}` — a
+  daily counter (`NC/SC/ORD/26/0411001` is the first order of 4 Nov 2026), no client suffix.
+  The format is a protected setting; the separate, unused client-number format setting was removed.
+- **"Not saved" pop-up** (owner decision 4 Nov 2026, B): when a form cannot be
+  saved, a box in the top-right corner lists every problem. Click a line (or
+  "Take me to the first one") to jump to that field — a closed step card opens
+  by itself. The message beside each field stays; a line disappears as soon as
+  its field is fixed, and Esc or × closes the box. After the server refuses a
+  form, the same box repeats the server's message.
 - **Reference numbers use a 2-digit year** (2026-10-29): `SC/CI/26/2910001`,
-  `NC/SC/26/2910010`, `SC/ORD/26/003-42`. A GST tax invoice number may have
+  `NC/SC/26/2910010`, `NC/SC/ORD/26/0411001`. A GST tax invoice number may have
   at most 16 characters, and the Commercial Invoice and Debit Note had 17 with
   the full year, so every reference now uses the same short style. Numbers
   issued before that day keep their 4-digit year (`…/2026/…`), and their

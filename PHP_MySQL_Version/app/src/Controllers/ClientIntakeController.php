@@ -35,7 +35,9 @@ final class ClientIntakeController
         View::render('client_intake/form', [
             'introducer' => $intro['associate'] !== null ? ['name' => (string) $intro['associate']['name'], 'code' => $intro['invitation'] === null ? (string) $intro['associate']['personal_code'] : '', 'inv' => (string) ($intro['invitation']['token'] ?? ''),
                 'company' => (string) ($intro['invitation']['company_name'] ?? ''), 'country' => (string) ($intro['invitation']['country'] ?? '')] : null,
-            'introError' => $intro['error'],
+            // Owner decision 4 Nov 2026 (A6): a buyer never sees an associate-code error; a code/link that
+            // cannot be applied travels on silently so staff see it on the intake review.
+            'introGiven' => ($intro['note'] ?? null) !== null ? ['code' => mb_substr(trim((string) ($_GET['code'] ?? '')), 0, 60), 'inv' => mb_substr(trim((string) ($_GET['inv'] ?? '')), 0, 100)] : null,
             'wrapClass' => 'intake-wrap',
             'containerTypes' => LookupRepository::dropdownOptions('container_type'),
             'cooTypes' => LookupRepository::dropdownOptions('coo_type'),
@@ -71,11 +73,6 @@ final class ClientIntakeController
         // Owner decision 1 Nov 2026 (AS-5): introduced by an associate — their link or personal code.
         $intro = \App\Services\AssociateIntakeService::introducer($_POST['associate_code'] ?? null, $_POST['associate_inv'] ?? null);
         $website = trim((string) ($_POST['website'] ?? ''));
-        if ($intro['error'] !== null && (!empty($_POST['associate_code']) || !empty($_POST['associate_inv']))) {
-            Flash::set('error', $intro['error']);
-            header('Location: /quotation-details');
-            return;
-        }
         if (mb_strlen($website) > 255 || ($website !== '' && !preg_match('#^(https?://)?[A-Za-z0-9.-]+\.[A-Za-z]{2,}(/\S*)?$#', $website))) {
             Flash::set('error', 'Enter your company website as an address (e.g. www.example.com), or leave it empty.');
             header('Location: ' . $back);
@@ -84,12 +81,12 @@ final class ClientIntakeController
 
         $id = ClientIntakeRepository::create($data, $_SERVER['REMOTE_ADDR'] ?? null);
         // QA Round 8, R8-N04: a one-off link registers one company — the first registration through it takes it.
+        // A6: a link another registration just took — the buyer carries on as a direct buyer; staff see why.
         if ($intro['invitation'] !== null && !\App\Repositories\AssociateInvitationRepository::claim((int) $intro['invitation']['id'], $id)) {
-            \App\Config\Database::connection()->prepare('DELETE FROM client_intake_submissions WHERE id = :id')->execute(['id' => $id]);
-            Flash::set('error', \App\Services\AssociateIntakeService::LINK_USED);
-            header('Location: /quotation-details');
-            return;
+            $intro = ['associate' => null, 'invitation' => null, 'error' => null,
+                'note' => "Invitation link of associate {$intro['associate']['name']} given but not applied: another registration used it first."];
         }
+        \App\Services\AssociateIntakeService::recordNote($id, $intro['note'] ?? null);
         $link = self::issueCorrectionLink($id, $data['email']);
         if ($intro['associate'] !== null) {
             $code = \App\Services\AssociateIntakeService::attach($id, $intro['associate'], $intro['invitation'], $data['company_legal_name'], $data['country_of_destination'], $data['email'], true, $website ?: null);

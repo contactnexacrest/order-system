@@ -168,4 +168,25 @@ async function generateAmendmentRef() {
   return render(row.ref_format, seq, now);
 }
 
-module.exports = { generateClientUniqueNumber, generateDocumentRef, generateAmendmentRef, nextOrderSequenceForClient, nextDocumentRevisionNumber };
+/**
+ * Owner decision 4 Nov 2026 (D1): the order reference is
+ * NC/SC/ORD/{YY}/{DDMM}{NNN} by default — a daily counter, no client
+ * suffix. The counter's scope follows the format: daily when it has
+ * {DDMM}, yearly when it only has a year, otherwise one running counter —
+ * so a reference can never repeat. Reserved atomically (nextSeq).
+ * testPrefix false: sample data is never marked TEST-.
+ */
+const DEFAULT_ORDER_REF_FORMAT = 'NC/SC/ORD/{YY}/{DDMM}{NNN}';
+
+async function generateOrderReference(testPrefix = true) {
+  const format = (await companySettingsRepository.get('order_ref_format')) || DEFAULT_ORDER_REF_FORMAT;
+  const now = new Date();
+  const scope = format.includes('{DDMM}') ? ymd(now) : ((format.includes('{YY}') || format.includes('{YYYY}')) ? String(now.getFullYear()) : 'all');
+  const seq = await nextSeq('order_ref:' + scope);
+  if (testPrefix) return render(format, seq, now);
+  const yyyy = String(now.getFullYear());
+  return format.replace(/\{YYYY\}/g, yyyy).replace(/\{YY\}/g, yyyy.slice(2))
+    .replace(/\{DDMM\}/g, pad2(now.getDate()) + pad2(now.getMonth() + 1)).replace(/\{NNN\}/g, String(seq).padStart(3, '0'));
+}
+
+module.exports = { generateClientUniqueNumber, generateDocumentRef, generateAmendmentRef, generateOrderReference, DEFAULT_ORDER_REF_FORMAT, nextOrderSequenceForClient, nextDocumentRevisionNumber };

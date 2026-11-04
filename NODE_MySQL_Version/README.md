@@ -623,8 +623,8 @@ viewport).
 
 Everything in `company_settings` marked `PLACEHOLDER` in `docs/seed.sql` —
 `director_name`, `bank_pincode`, `lut_expiry_date` (confirm the real date),
-`client_number_format`/`order_ref_format` (confirm against your actual
-numbering convention), `rcmc_number`/`rcmc_valid_until` — plus the seeded
+`order_ref_format` (D-248: NC/SC/ORD/{YY}/{DDMM}{NNN}; the unused
+`client_number_format` setting was removed), `rcmc_number`/`rcmc_valid_until` — plus the seeded
 Admin login email/password, and all four asset images (logo, MD signature,
 company seal, watermark) currently showing a labeled
 placeholder graphic. Replace assets from `/company-assets`, settings from

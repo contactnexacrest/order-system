@@ -25,37 +25,78 @@ final class AssociateIntakeService
 
     /**
      * Who introduced the buyer, from a link token or a personal code.
-     * @return array{associate: ?array, invitation: ?array, error: ?string}
+     *
+     * Owner decision 4 Nov 2026 (A6): a buyer never sees an error caused by
+     * an associate code or link. When the code or link cannot be applied —
+     * unknown or mistyped, an old (retired) code, a link that expired or
+     * was used, an associate who is suspended or ended —
+     * the buyer carries on as a direct buyer with no hint, and 'note' tells
+     * staff on the intake review what was given and why it was not applied.
+     * 'error' is kept for callers and is always null.
+     * @return array{associate: ?array, invitation: ?array, error: null, note: ?string}
      */
     public static function introducer(?string $code, ?string $token): array
     {
         $code = trim((string) $code);
         $token = trim((string) $token);
+        $none = static fn (string $note): array => ['associate' => null, 'invitation' => null, 'error' => null, 'note' => mb_substr($note, 0, 500)];
         if ($token !== '') {
+            $given = 'Invitation link ' . mb_substr($token, 0, 12) . '…';
             $inv = AssociateInvitationRepository::findByToken($token);
             if ($inv === null || $inv['kind'] !== 'client_link') {
-                return ['associate' => null, 'invitation' => null, 'error' => 'This invitation link is not valid. You can still send your request without it.'];
-            }
-            if (!AssociateInvitationRepository::isUsable($inv)) {
-                return ['associate' => null, 'invitation' => null, 'error' => self::LINK_USED];
+                return $none("{$given} given but not applied: the link is not valid.");
             }
             $a = AssociateRepository::find((int) $inv['associate_id']);
-            if ($a === null || $a['status'] !== 'active') {
-                return ['associate' => null, 'invitation' => null, 'error' => 'This invitation link is no longer active. You can still send your request without it.'];
+            $who = $a !== null ? " (associate {$a['name']})" : '';
+            if (!AssociateInvitationRepository::isUsable($inv)) {
+                return $none("{$given}{$who} given but not applied: the link expired or was already used.");
             }
-            return ['associate' => $a, 'invitation' => $inv, 'error' => null];
+            $why = self::notActiveReason($a);
+            if ($why !== null) {
+                return $none("{$given}{$who} given but not applied: {$why}.");
+            }
+            return ['associate' => $a, 'invitation' => $inv, 'error' => null, 'note' => null];
         }
         if ($code !== '') {
+            $given = 'Associate code ' . mb_substr(AssociateCodeService::normalise($code), 0, 40);
+            if (!AssociateCodeService::isValid($code)) {
+                return $none("{$given} given but not applied: the code is not valid (mistyped?).");
+            }
             $a = AssociateCodeService::resolve($code);
             if ($a === null) {
-                return ['associate' => null, 'invitation' => null, 'error' => 'That associate code is not valid — check it (e.g. NXA-RAJESH-7K), or leave it empty.'];
+                $old = AssociateRepository::findByRetiredCode(AssociateCodeService::normalise($code));
+                return $none($old !== null
+                    ? "{$given} given but not applied: it is an old code of associate {$old['name']}, replaced by a new one."
+                    : "{$given} given but not applied: no associate has this code.");
             }
-            if ($a['status'] !== 'active') {
-                return ['associate' => null, 'invitation' => null, 'error' => 'That associate code is no longer active — leave it empty, or ask the associate.'];
+            $why = self::notActiveReason($a);
+            if ($why !== null) {
+                return $none("{$given} (associate {$a['name']}) given but not applied: {$why}.");
             }
-            return ['associate' => $a, 'invitation' => null, 'error' => null];
+            return ['associate' => $a, 'invitation' => null, 'error' => null, 'note' => null];
         }
-        return ['associate' => null, 'invitation' => null, 'error' => null];
+        return ['associate' => null, 'invitation' => null, 'error' => null, 'note' => null];
+    }
+
+    /** Why an associate cannot bring a new client right now, or null when they can. */
+    private static function notActiveReason(?array $a): ?string
+    {
+        if ($a === null) {
+            return 'the associate no longer exists';
+        }
+        if ($a['status'] !== 'active') {
+            return 'the associate is ' . str_replace('_', ' ', (string) $a['status']);
+        }
+        return null;
+    }
+
+    /** A6: keeps on the submission what code/link the buyer gave and why it was not applied. */
+    public static function recordNote(int $submissionId, ?string $note): void
+    {
+        if ($note === null || $note === '') {
+            return;
+        }
+        Database::connection()->prepare('UPDATE client_intake_submissions SET associate_note = :n WHERE id = :id')->execute(['n' => $note, 'id' => $submissionId]);
     }
 
     /** Ties a new submission to the associate (not yet confirmed) and e-mails the buyer a 6-digit code. Returns the code. */
@@ -169,6 +210,10 @@ final class AssociateIntakeService
         $inv = !empty($s['associate_invitation_id']) ? AssociateInvitationRepository::find((int) $s['associate_invitation_id']) : null;
         if ($inv !== null && $inv['kind'] === 'client_link' && AssociateMatchService::normaliseName((string) $inv['company_name']) !== AssociateMatchService::normaliseName((string) ($s['company_legal_name'] ?? ''))) {
             $flags[] = "The associate made this link for {$inv['company_name']}, but the buyer registered as " . ($s['company_legal_name'] ?? '') . '.';
+        }
+        // A6: a code or link the buyer gave that was not applied — staff decide.
+        if (!empty($s['associate_note'])) {
+            $flags[] = (string) $s['associate_note'];
         }
         $matched = AssociateMatchService::associatedClient($s['company_legal_name'] ?? null, $s['vat_eori_tax_no'] ?? null, $s['email'] ?? null, $s['phone'] ?? null);
         if ($matched !== null) {

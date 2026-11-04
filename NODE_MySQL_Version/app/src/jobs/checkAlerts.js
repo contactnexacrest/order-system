@@ -39,13 +39,48 @@ function daysUntil(dateStr, today) {
   return Math.round(diffMs / 86400000);
 }
 
+/**
+ * Owner decision 4 Nov 2026 (alert job speed-up): the job used to ask the
+ * database once per person and order "already alerted today?" and once per
+ * order for its assignees — slow once there are thousands of orders. It
+ * now reads today's notifications, the LC reminders already sent and every
+ * order's assignees once per run, and keeps those sets up to date as it
+ * adds notifications. The alerts sent are exactly the same.
+ */
+let runCache = { today: null, once: null, assignees: null };
+
+function todayKey(userId, type, orderId) {
+  return `${Number(userId)}|${type}|${orderId === null || orderId === undefined ? 0 : Number(orderId)}`;
+}
+
+async function todaySeen() {
+  if (runCache.today === null) {
+    runCache.today = new Set();
+    const rows = await db.query('SELECT user_id, type, related_order_id FROM notifications WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY');
+    for (const r of rows) runCache.today.add(todayKey(r.user_id, r.type, r.related_order_id));
+  }
+  return runCache.today;
+}
+
+async function onceSent() {
+  if (runCache.once === null) {
+    runCache.once = new Set();
+    const rows = await db.query("SELECT user_id, type, related_order_id, message FROM notifications WHERE type IN ('lc_last_shipment_soon', 'lc_presentation_soon', 'lc_expiry_soon')");
+    for (const r of rows) runCache.once.add(`${Number(r.user_id)}|${r.type}|${Number(r.related_order_id)}|${r.message}`);
+  }
+  return runCache.once;
+}
+
 async function notifyMdAndAdmin(userIds, type, message, relatedOrderId = null) {
   let count = 0;
+  const seen = await todaySeen();
   for (const userId of userIds) {
-    if (await notificationRepository.existsToday(userId, type, relatedOrderId)) {
+    const key = todayKey(userId, type, relatedOrderId);
+    if (seen.has(key)) {
       continue; // already alerted this same condition today — don't spam the bell (or the inbox)
     }
     await notificationRepository.create(userId, null, type, relatedOrderId, message);
+    seen.add(key);
     count++;
   }
   return count;
@@ -58,24 +93,35 @@ async function notifyMdAndAdmin(userIds, type, message, relatedOrderId = null) {
  */
 async function notifyOnce(userIds, type, message, relatedOrderId) {
   let count = 0;
-  for (const userId of [...new Set(userIds)]) {
-    const seen = await db.queryOne('SELECT 1 AS x FROM notifications WHERE user_id = :u AND type = :t AND related_order_id = :o AND message = :m LIMIT 1',
-      { u: userId, t: type, o: relatedOrderId, m: message });
-    if (seen) {
+  const sent = await onceSent();
+  for (const userId of [...new Set(userIds.map(Number))]) {
+    const key = `${userId}|${type}|${Number(relatedOrderId)}|${message}`;
+    if (sent.has(key)) {
       continue;
     }
     await notificationRepository.create(userId, null, type, relatedOrderId, message);
+    sent.add(key);
     count++;
   }
   return count;
 }
 
-/** The order's assignees. */
+/** The order's assignees (read once per run for every order). */
 async function orderAssignees(orderId) {
-  return (await require('../repositories/orderAssigneeRepository').forOrder(orderId)).map((a) => Number(a.user_id));
+  if (runCache.assignees === null) {
+    runCache.assignees = new Map();
+    const rows = await db.query('SELECT oa.order_id, oa.user_id FROM order_assignees oa JOIN users u ON u.id = oa.user_id ORDER BY oa.order_id, oa.assigned_at');
+    for (const r of rows) {
+      const id = Number(r.order_id);
+      if (!runCache.assignees.has(id)) runCache.assignees.set(id, []);
+      runCache.assignees.get(id).push(Number(r.user_id));
+    }
+  }
+  return runCache.assignees.get(Number(orderId)) || [];
 }
 
 async function run() {
+  runCache = { today: null, once: null, assignees: null };
   // 90-item backlog "timezone": todayIst(), not new Date().toISOString()
   // (always UTC) — this "today" drives every escalation threshold and
   // overdue check below, and was a full calendar day behind the IST date

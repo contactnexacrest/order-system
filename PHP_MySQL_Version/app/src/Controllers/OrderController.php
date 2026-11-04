@@ -509,8 +509,6 @@ final class OrderController
         $portOfDischargeId = !empty($_POST['port_of_discharge_id']) ? (int) $_POST['port_of_discharge_id'] : null;
         $portOfDischargeText = trim((string) ($_POST['port_of_discharge_text'] ?? ''));
 
-        $orderRefFormat = CompanySettingsRepository::get('order_ref_format') ?? 'SC/ORD/{YY}/{NNN}';
-        $testModeEnabled = TestModeService::isEnabled();
 
         // QA-5 ORD-05: the order row, its stage/payment-status rows, and
         // every product line used to be inserted as separate, unwrapped
@@ -530,10 +528,13 @@ final class OrderController
         // deadlock detector already guarantees this is always safe to
         // retry: it only ever aborts a transaction that made no visible
         // change (it rolls back everything the aborted side did).
+        $testModeEnabled = TestModeService::isEnabled();
         ['orderId' => $orderId, 'orderReference' => $orderReference] = DeadlockRetry::run(function () use (
-            $orderRefFormat, $testModeEnabled, $clientId, $client, $paymentPresetId, $incotermId,
+            $testModeEnabled, $clientId, $client, $paymentPresetId, $incotermId,
             $portOfDischargeId, $portOfDischargeText, $currencyId, $descriptions, $user
         ): array {
+            // Owner decision 4 Nov 2026 (D1): NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter.
+            $orderReferenceNew = \App\Services\ReferenceNumberService::generateOrderReference();
             $pdo = Database::connection();
             $pdo->beginTransaction();
             try {
@@ -543,18 +544,11 @@ final class OrderController
             // sequence number, so it can only be built once the closure runs
             // with the safely-reserved value.
             $result = OrderRepository::createWithNextSequence($clientId, function (int $sequenceNo) use (
-                $orderRefFormat, $testModeEnabled, $clientId, $client, $paymentPresetId, $incotermId,
+                $orderReferenceNew, $clientId, $client, $paymentPresetId, $incotermId,
                 $portOfDischargeId, $portOfDischargeText, $currencyId
             ): array {
                 return [
-                    'order_reference'       => TestModeService::applyReferencePrefix(
-                        strtr($orderRefFormat, [
-                            '{YYYY}' => date('Y'),
-                            '{YY}'   => date('y'),
-                            '{NNN}'  => str_pad((string) $sequenceNo, 3, '0', STR_PAD_LEFT),
-                        ]) . '-' . $clientId, // client suffix keeps this globally unique even though the format string isn't scoped per-client
-                        $testModeEnabled
-                    ),
+                    'order_reference'       => $orderReferenceNew,
                     'buyer_inquiry_ref'     => $client['client_unique_number'],
                     'payment_preset_id'     => $paymentPresetId,
                     'incoterm_id'           => $incotermId,

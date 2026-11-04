@@ -27,34 +27,68 @@ const SESSION_KEY = '_intake_verify_id';
 const sha256 = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
 
 /** Who introduced the buyer, from a link token or a personal code: {associate, invitation, error}. */
+/**
+ * Owner decision 4 Nov 2026 (A6): a buyer never sees an error caused by an
+ * associate code or link. When the code or link cannot be applied —
+ * unknown or mistyped, an old (retired) code, a link that expired or was
+ * used, an associate who is suspended or ended — the buyer
+ * carries on as a direct buyer with no hint, and `note` tells staff on the
+ * intake review what was given and why it was not applied. `error` is kept
+ * for callers and is always null.
+ */
 async function introducer(code, token) {
   const c = String(code ?? '').trim();
   const t = String(token ?? '').trim();
+  const none = (note) => ({ associate: null, invitation: null, error: null, note: [...note].slice(0, 500).join('') });
   if (t !== '') {
+    const given = `Invitation link ${[...t].slice(0, 12).join('')}…`;
     const inv = await associateInvitationRepository.findByToken(t);
     if (!inv || inv.kind !== 'client_link') {
-      return { associate: null, invitation: null, error: 'This invitation link is not valid. You can still send your request without it.' };
-    }
-    if (!associateInvitationRepository.isUsable(inv)) {
-      return { associate: null, invitation: null, error: LINK_USED };
+      return none(`${given} given but not applied: the link is not valid.`);
     }
     const a = await associateRepository.find(Number(inv.associate_id));
-    if (!a || a.status !== 'active') {
-      return { associate: null, invitation: null, error: 'This invitation link is no longer active. You can still send your request without it.' };
+    const who = a ? ` (associate ${a.name})` : '';
+    if (!associateInvitationRepository.isUsable(inv)) {
+      return none(`${given}${who} given but not applied: the link expired or was already used.`);
     }
-    return { associate: a, invitation: inv, error: null };
+    const why = notActiveReason(a);
+    if (why !== null) {
+      return none(`${given}${who} given but not applied: ${why}.`);
+    }
+    return { associate: a, invitation: inv, error: null, note: null };
   }
   if (c !== '') {
+    const given = `Associate code ${associateCodeService.normalise(c).slice(0, 40)}`;
+    if (!associateCodeService.isValid(c)) {
+      return none(`${given} given but not applied: the code is not valid (mistyped?).`);
+    }
     const a = await associateCodeService.resolve(c);
     if (!a) {
-      return { associate: null, invitation: null, error: 'That associate code is not valid — check it (e.g. NXA-RAJESH-7K), or leave it empty.' };
+      const old = await associateRepository.findByRetiredCode(associateCodeService.normalise(c));
+      return none(old
+        ? `${given} given but not applied: it is an old code of associate ${old.name}, replaced by a new one.`
+        : `${given} given but not applied: no associate has this code.`);
     }
-    if (a.status !== 'active') {
-      return { associate: null, invitation: null, error: 'That associate code is no longer active — leave it empty, or ask the associate.' };
+    const why = notActiveReason(a);
+    if (why !== null) {
+      return none(`${given} (associate ${a.name}) given but not applied: ${why}.`);
     }
-    return { associate: a, invitation: null, error: null };
+    return { associate: a, invitation: null, error: null, note: null };
   }
-  return { associate: null, invitation: null, error: null };
+  return { associate: null, invitation: null, error: null, note: null };
+}
+
+/** Why an associate cannot bring a new client right now, or null when they can. */
+function notActiveReason(a) {
+  if (!a) return 'the associate no longer exists';
+  if (a.status !== 'active') return `the associate is ${String(a.status).replace(/_/g, ' ')}`;
+  return null;
+}
+
+/** A6: keeps on the submission what code/link the buyer gave and why it was not applied. */
+async function recordNote(submissionId, note) {
+  if (!note) return;
+  await db.execute('UPDATE client_intake_submissions SET associate_note = :n WHERE id = :id', { n: note, id: submissionId });
 }
 
 async function sendEmailCode(submissionId, email) {
@@ -160,6 +194,10 @@ async function reviewInfo(s) {
   if (inv && inv.kind === 'client_link' && associateMatchService.normaliseName(String(inv.company_name)) !== associateMatchService.normaliseName(String(s.company_legal_name || ''))) {
     flags.push(`The associate made this link for ${inv.company_name}, but the buyer registered as ${s.company_legal_name || ''}.`);
   }
+  // A6: a code or link the buyer gave that was not applied — staff decide.
+  if (s.associate_note) {
+    flags.push(String(s.associate_note));
+  }
   const matched = await associateMatchService.associatedClient(s.company_legal_name ?? null, s.vat_eori_tax_no ?? null, s.email ?? null, s.phone ?? null);
   if (matched) {
     flags.push(`Same company as ${matched.company_legal_name}, already the client of associate ${matched.associate_name}.`);
@@ -233,4 +271,4 @@ async function onRejected(s, reason, userId) {
   }
 }
 
-module.exports = { SESSION_KEY, LINK_USED, introducer, sendEmailCode, attach, submission, verify, directContactCheck, reviewInfo, acceptBlocker, onAccepted, onRejected };
+module.exports = { SESSION_KEY, LINK_USED, introducer, recordNote, sendEmailCode, attach, submission, verify, directContactCheck, reviewInfo, acceptBlocker, onAccepted, onRejected };

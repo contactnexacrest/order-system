@@ -104,6 +104,16 @@ final class AssociateRepository
         return $stmt->fetch() ?: null;
     }
 
+    /** A6: the associate who used to have this code (a retired code — not their current one), or null. */
+    public static function findByRetiredCode(string $code): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT a.* FROM associate_codes c JOIN associates a ON a.id = c.associate_id WHERE c.code = :c AND (a.personal_code IS NULL OR a.personal_code <> c.code) LIMIT 1'
+        );
+        $stmt->execute(['c' => strtoupper(trim($code))]);
+        return $stmt->fetch() ?: null;
+    }
+
     public static function setFields(int $id, array $fields): void
     {
         if ($fields === []) {

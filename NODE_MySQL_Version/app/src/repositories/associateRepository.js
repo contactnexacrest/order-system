@@ -133,8 +133,16 @@ async function lineForClient(clientId, permissions) {
   );
 }
 
+/** A6: the associate who used to have this code (a retired code — not their current one), or null. */
+async function findByRetiredCode(code) {
+  return db.queryOne(
+    'SELECT a.* FROM associate_codes c JOIN associates a ON a.id = c.associate_id WHERE c.code = :c AND (a.personal_code IS NULL OR a.personal_code <> c.code) LIMIT 1',
+    { c: String(code || '').trim().toUpperCase() }
+  );
+}
+
 module.exports = {
-  lineForClient,
+  lineForClient, findByRetiredCode,
   FIELDS, STATUSES, all, find, create, update, setAgreementFile, isAgreementFile,
   findByEmail, findByCode, setFields, statusCounts, clients, linkClient, unlinkedClients,
 };

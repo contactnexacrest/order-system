@@ -37,14 +37,84 @@ use App\Repositories\CompanySettingsRepository;
 use App\Repositories\NotificationRepository;
 use App\Repositories\PermissionRepository;
 
+/**
+ * Owner decision 4 Nov 2026 (alert job speed-up): the job used to ask the
+ * database once per person and order "already alerted today?" and once
+ * per order for its assignees — slow once there are thousands of orders.
+ * It now reads today's notifications, the LC reminders already sent and
+ * every order's assignees once per run, and keeps those sets up to date as
+ * it adds notifications. The alerts sent are exactly the same.
+ */
+final class AlertRunCache
+{
+    /** @var array<string,true>|null "user|type|order" alerted today */
+    public static ?array $today = null;
+    /** @var array<string,true>|null "user|type|order|message" ever sent (LC reminders) */
+    public static ?array $once = null;
+    /** @var array<int,list<int>>|null order id => assignee user ids */
+    public static ?array $assignees = null;
+
+    public static function reset(): void
+    {
+        self::$today = null;
+        self::$once = null;
+        self::$assignees = null;
+    }
+
+    public static function todayKey(int $userId, string $type, ?int $orderId): string
+    {
+        return $userId . '|' . $type . '|' . ($orderId ?? 0);
+    }
+
+    /** @return array<string,true> */
+    public static function today(): array
+    {
+        if (self::$today === null) {
+            self::$today = [];
+            foreach (Database::connection()->query('SELECT user_id, type, related_order_id FROM notifications WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY')->fetchAll() as $r) {
+                self::$today[self::todayKey((int) $r['user_id'], (string) $r['type'], $r['related_order_id'] !== null ? (int) $r['related_order_id'] : null)] = true;
+            }
+        }
+        return self::$today;
+    }
+
+    /** @return array<string,true> */
+    public static function once(): array
+    {
+        if (self::$once === null) {
+            self::$once = [];
+            foreach (Database::connection()->query("SELECT user_id, type, related_order_id, message FROM notifications WHERE type IN ('lc_last_shipment_soon', 'lc_presentation_soon', 'lc_expiry_soon')")->fetchAll() as $r) {
+                self::$once[$r['user_id'] . '|' . $r['type'] . '|' . (int) $r['related_order_id'] . '|' . $r['message']] = true;
+            }
+        }
+        return self::$once;
+    }
+
+    /** @return list<int> */
+    public static function assignees(int $orderId): array
+    {
+        if (self::$assignees === null) {
+            self::$assignees = [];
+            foreach (Database::connection()->query('SELECT oa.order_id, oa.user_id FROM order_assignees oa JOIN users u ON u.id = oa.user_id ORDER BY oa.order_id, oa.assigned_at')->fetchAll() as $r) {
+                self::$assignees[(int) $r['order_id']][] = (int) $r['user_id'];
+            }
+        }
+        return self::$assignees[$orderId] ?? [];
+    }
+}
+
 function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $relatedOrderId = null): int
 {
     $count = 0;
+    $seen = AlertRunCache::today();
     foreach ($userIds as $userId) {
-        if (NotificationRepository::existsToday($userId, $type, $relatedOrderId)) {
+        $key = AlertRunCache::todayKey((int) $userId, $type, $relatedOrderId);
+        if (isset($seen[$key])) {
             continue; // already alerted this same condition today — don't spam the bell (or the inbox)
         }
         NotificationRepository::create($userId, null, $type, $relatedOrderId, $message);
+        AlertRunCache::$today[$key] = true;
+        $seen[$key] = true;
         $count++;
     }
     return $count;
@@ -58,13 +128,15 @@ function notifyMdAndAdmin(array $userIds, string $type, string $message, ?int $r
 function notifyOnce(array $userIds, string $type, string $message, int $relatedOrderId): int
 {
     $count = 0;
-    $seen = Database::connection()->prepare('SELECT 1 FROM notifications WHERE user_id = :u AND type = :t AND related_order_id = :o AND message = :m LIMIT 1');
+    $sent = AlertRunCache::once();
     foreach (array_unique($userIds) as $userId) {
-        $seen->execute(['u' => $userId, 't' => $type, 'o' => $relatedOrderId, 'm' => $message]);
-        if ($seen->fetchColumn() !== false) {
+        $key = $userId . '|' . $type . '|' . $relatedOrderId . '|' . $message;
+        if (isset($sent[$key])) {
             continue;
         }
         NotificationRepository::create($userId, null, $type, $relatedOrderId, $message);
+        AlertRunCache::$once[$key] = true;
+        $sent[$key] = true;
         $count++;
     }
     return $count;
@@ -73,7 +145,7 @@ function notifyOnce(array $userIds, string $type, string $message, int $relatedO
 /** @return list<int> the order's assignees */
 function orderAssignees(int $orderId): array
 {
-    return array_map(static fn (array $a): int => (int) $a['user_id'], \App\Repositories\OrderAssigneeRepository::forOrder($orderId));
+    return AlertRunCache::assignees($orderId);
 }
 
 function run(): int
@@ -81,6 +153,7 @@ function run(): int
     $pdo = Database::connection();
     $today = new DateTimeImmutable('today');
     $created = 0;
+    AlertRunCache::reset();
 
     // Whoever can manage company settings is who these compliance-deadline
     // escalations are for — checked by permission, not a hardcoded role name,

@@ -46,7 +46,8 @@ async function duplicate(sourceOrderId, createdBy, productLines = null) {
   }
   const client = await clientRepository.find(source.client_id);
 
-  const orderRefFormat = (await companySettingsRepository.get('order_ref_format')) || 'SC/ORD/{YY}/{NNN}';
+  // Owner decision 4 Nov 2026 (D1): NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter.
+  const orderReferenceNew = await referenceNumberService.generateOrderReference();
   const testModeEnabled = await testModeService.isEnabled();
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
   // 90-item backlog "timezone": todayIst() replaces the old
@@ -63,13 +64,7 @@ async function duplicate(sourceOrderId, createdBy, productLines = null) {
   const { orderId: newOrderId } = await orderRepository.createWithNextSequence(
     source.client_id,
     (sequenceNo) => ({
-      order_reference: testModeService.applyReferencePrefix(
-        orderRefFormat
-          .replace(/\{YYYY\}/g, String(new Date().getFullYear()))
-          .replace(/\{YY\}/g, String(new Date().getFullYear()).slice(2))
-          .replace(/\{NNN\}/g, String(sequenceNo).padStart(3, '0')) + `-${source.client_id}`,
-        testModeEnabled
-      ),
+      order_reference: orderReferenceNew,
       buyer_inquiry_ref: (client && client.client_unique_number) || source.buyer_inquiry_ref,
       payment_preset_id: source.payment_preset_id,
       incoterm_id: source.incoterm_id,

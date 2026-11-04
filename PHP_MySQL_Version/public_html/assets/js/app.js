@@ -828,25 +828,178 @@
     if (error) error.remove();
   }
 
+  // Owner decision 4 Nov 2026 (B, mockup approved): when a form cannot be
+  // saved, a pop-up lists every problem — each line a link that opens the
+  // field's step card and puts the cursor in it. The messages beside the
+  // fields stay. The same pop-up repeats a server error message after the
+  // page reloads. It does not block the page (role="alertdialog", not
+  // modal): the cursor goes to the first problem so the user can type at
+  // once; Tab stays inside the pop-up while it has the focus; Esc closes it.
+  // Lines disappear as their fields are fixed; it closes when none are left.
+  var errorPopup = null;
+
+  function fieldLabelText(el) {
+    var text = '';
+    if (el.labels && el.labels.length) {
+      var label = el.labels[0].cloneNode(true);
+      Array.prototype.forEach.call(label.querySelectorAll('input, select, textarea, small, .muted, .form-field-error'), function (n) { n.remove(); });
+      text = label.textContent;
+    }
+    text = (text || el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.name || 'This field').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+    return text.length > 80 ? text.slice(0, 77) + '…' : text;
+  }
+
+  function goToField(el) {
+    revealElement(el);
+    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+    if (typeof el.focus === 'function') el.focus();
+  }
+
+  function closeErrorPopup() {
+    if (errorPopup) {
+      errorPopup.remove();
+      errorPopup = null;
+    }
+  }
+
+  function updateErrorPopupTitle() {
+    if (!errorPopup) return;
+    var left = errorPopup.querySelectorAll('li').length;
+    if (left === 0) { closeErrorPopup(); return; }
+    var title = errorPopup.querySelector('.error-popup-title');
+    title.textContent = '⚠ ' + errorPopup.getAttribute('data-heading') + (errorPopup.getAttribute('data-count') === '1'
+      ? ' — ' + left + (left === 1 ? ' thing' : ' things') + ' to fix' : '');
+  }
+
+  // items: [{ el: <field or element to go to>, label: 'Field name', message: '...' }]
+  function showErrorPopup(items, heading) {
+    closeErrorPopup();
+    if (!items.length) return;
+    var box = document.createElement('div');
+    box.className = 'error-popup';
+    box.setAttribute('role', 'alertdialog');
+    box.setAttribute('aria-modal', 'false');
+    box.setAttribute('aria-labelledby', 'error-popup-title');
+    box.setAttribute('data-heading', heading || 'Not saved');
+    box.setAttribute('data-count', heading ? '0' : '1');
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'error-popup-close';
+    close.setAttribute('aria-label', 'Close');
+    close.textContent = '×';
+    close.addEventListener('click', closeErrorPopup);
+    var title = document.createElement('h4');
+    title.id = 'error-popup-title';
+    title.className = 'error-popup-title';
+    var list = document.createElement('ol');
+    items.forEach(function (item) {
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#';
+      a.textContent = item.label;
+      a.addEventListener('click', function (e) { e.preventDefault(); goToField(item.el); });
+      li.appendChild(a);
+      if (item.message) li.appendChild(document.createTextNode(' — ' + item.message));
+      li._errorField = item.el;
+      list.appendChild(li);
+    });
+    var first = document.createElement('button');
+    first.type = 'button';
+    first.className = 'btn-sm error-popup-first';
+    first.textContent = items.length > 1 ? 'Take me to the first one' : 'Take me there';
+    first.addEventListener('click', function () {
+      var li = list.querySelector('li');
+      if (li) goToField(li._errorField);
+    });
+    var hint = document.createElement('span');
+    hint.className = 'muted small';
+    hint.textContent = items.length > 1 ? ' Click a line to jump to that field.' : '';
+    box.appendChild(close);
+    box.appendChild(title);
+    box.appendChild(list);
+    box.appendChild(first);
+    box.appendChild(hint);
+    box.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab') return;
+      var focusables = box.querySelectorAll('a, button');
+      if (!focusables.length) return;
+      var firstEl = focusables[0];
+      var lastEl = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === firstEl) { e.preventDefault(); lastEl.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); firstEl.focus(); }
+    });
+    document.body.appendChild(box);
+    errorPopup = box;
+    updateErrorPopupTitle();
+  }
+
+  function initErrorPopup() {
+    document.addEventListener('keydown', function (e) {
+      if (errorPopup && (e.key === 'Escape' || e.key === 'Esc')) closeErrorPopup();
+    });
+    // A line goes as soon as its field is fixed.
+    var recheck = function (e) {
+      if (!errorPopup) return;
+      Array.prototype.forEach.call(errorPopup.querySelectorAll('li'), function (li) {
+        var el = li._errorField;
+        if (el === e.target && el.classList && !el.classList.contains('field-invalid')) li.remove();
+      });
+      updateErrorPopupTitle();
+    };
+    document.addEventListener('input', recheck);
+    document.addEventListener('change', recheck);
+    // The browser's own check can stop a submit before the submit listener
+    // runs: gather the fields it flags in this one go and list them too.
+    var pending = [];
+    document.addEventListener('invalid', function (e) {
+      var el = e.target;
+      if (!el || !('value' in el)) return;
+      if (!pending.length) {
+        setTimeout(function () {
+          var items = pending;
+          pending = [];
+          showErrorPopup(items);
+          if (items[0] && document.activeElement !== items[0].el) goToField(items[0].el);
+        }, 0);
+      }
+      pending.push({ el: el, label: fieldLabelText(el), message: el.validationMessage || 'Please check this field.' });
+    }, true);
+    // A server error after the page reloads (a form page): the same pop-up repeats it.
+    var hasForm = Array.prototype.some.call(document.forms, function (f) {
+      return (f.getAttribute('method') || '').toLowerCase() === 'post' && !/\/logout$/.test(f.getAttribute('action') || '');
+    });
+    var alerts = document.querySelectorAll('.alert-error');
+    if (!hasForm || !alerts.length) return;
+    var items = [];
+    Array.prototype.forEach.call(alerts, function (alertEl) {
+      if (!alertEl.hasAttribute('tabindex')) alertEl.setAttribute('tabindex', '-1');
+      items.push({ el: alertEl, label: alertEl.textContent.replace(/\s+/g, ' ').trim(), message: '' });
+    });
+    showErrorPopup(items, 'Not saved — please check');
+  }
+
   function initSubmitValidation() {
     document.addEventListener('submit', function (e) {
       var form = e.target;
       if (!(form instanceof HTMLFormElement) || form.noValidate) return;
       if (e.submitter && e.submitter.formNoValidate) return;
       var firstInvalid = null;
+      var problems = [];
       Array.prototype.forEach.call(form.elements, function (el) {
         if (el.disabled || !('value' in el) || !el.name || (el.type || '').toLowerCase() === 'hidden') return;
         var message = fieldError(el);
         if (message) {
           showFieldError(el, message);
           firstInvalid = firstInvalid || el;
+          problems.push({ el: el, label: fieldLabelText(el), message: message });
         } else {
           clearFieldError(el);
         }
       });
-      if (!firstInvalid) return;
+      if (!firstInvalid) { closeErrorPopup(); return; }
       e.preventDefault();
       e.stopImmediatePropagation();
+      showErrorPopup(problems);
       revealElement(firstInvalid);
       firstInvalid.focus();
     }, true);
@@ -1159,6 +1312,7 @@
     // registering this first means an invalid form is stopped before any
     // confirm() dialog is shown for it.
     initSubmitValidation();
+    initErrorPopup();
     initConfirmDialogs();
 
     // Bound on document, not per-form, so every current and future POST

@@ -71,8 +71,11 @@ describe('Order reference format (90-item backlog "order-ID prefix change to SC/
     const row = await db.queryOne('SELECT MAX(id) AS id FROM orders');
     const order = await orderRepository.find(row.id);
 
-    expect(order.order_reference).toMatch(/^SC\/ORD\/\d{2}\/\d{3}-\d+$/);
-    expect(order.order_reference.startsWith(`SC/ORD/${String(new Date().getFullYear()).slice(2)}/`)).toBe(true);
+    // Owner decision 4 Nov 2026 (D1): NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter, no client suffix.
+    const now = new Date();
+    const ddmm = String(now.getDate()).padStart(2, '0') + String(now.getMonth() + 1).padStart(2, '0');
+    expect(order.order_reference).toMatch(/^NC\/SC\/ORD\/\d{2}\/\d{4}\d{3,}$/);
+    expect(order.order_reference.startsWith(`NC/SC/ORD/${String(now.getFullYear()).slice(2)}/${ddmm}`)).toBe(true);
   });
 
   it('a duplicated order reference also uses the ORD prefix', async () => {
@@ -83,7 +86,26 @@ describe('Order reference format (90-item backlog "order-ID prefix change to SC/
     const newOrderId = await orderDuplicationService.duplicate(sourceOrderId, userId);
     const newOrder = await orderRepository.find(newOrderId);
 
-    expect(newOrder.order_reference).toMatch(/^SC\/ORD\/\d{2}\/\d{3}-\d+$/);
+    expect(newOrder.order_reference).toMatch(/^NC\/SC\/ORD\/\d{2}\/\d{4}\d{3,}$/);
+  });
+
+  it('the daily counter gives every order its own reference', async () => {
+    const companySettingsRepository = require('../../src/repositories/companySettingsRepository');
+    const refs = [];
+    for (let i = 0; i < 3; i++) refs.push(await referenceNumberService.generateOrderReference(false));
+    expect(new Set(refs).size).toBe(3);
+    const n = refs.map((r) => parseInt(r.slice(-3), 10));
+    expect([n[1], n[2]]).toEqual([n[0] + 1, n[0] + 2]);
+    // A format without {DDMM} counts by year instead, so it can never repeat.
+    await companySettingsRepository.set('order_ref_format', 'SC/ORD/{YY}/{NNN}');
+    try {
+      const a = await referenceNumberService.generateOrderReference(false);
+      const b = await referenceNumberService.generateOrderReference(false);
+      expect(a).not.toBe(b);
+      expect(a.startsWith(`SC/ORD/${String(new Date().getFullYear()).slice(2)}/`)).toBe(true);
+    } finally {
+      await companySettingsRepository.set('order_ref_format', 'NC/SC/ORD/{YY}/{DDMM}{NNN}');
+    }
   });
 
   it('every reference format uses the 2-digit year', async () => {

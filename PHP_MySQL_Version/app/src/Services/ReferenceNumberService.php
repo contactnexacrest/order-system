@@ -37,6 +37,27 @@ final class ReferenceNumberService
     }
 
     /**
+     * Owner decision 4 Nov 2026 (D1): the order reference is
+     * NC/SC/ORD/{YY}/{DDMM}{NNN} by default — a daily counter, no client
+     * suffix. The counter's scope follows the format: daily when it has
+     * {DDMM}, yearly when it only has a year, otherwise one running
+     * counter — so a reference can never repeat. Reserved atomically like
+     * every other reference (nextSeq). $testPrefix: sample data is never
+     * marked TEST-.
+     */
+    public const DEFAULT_ORDER_REF_FORMAT = 'NC/SC/ORD/{YY}/{DDMM}{NNN}';
+
+    public static function generateOrderReference(bool $testPrefix = true): string
+    {
+        $format = (string) (CompanySettingsRepository::get('order_ref_format') ?: self::DEFAULT_ORDER_REF_FORMAT);
+        $now = new \DateTimeImmutable();
+        $scope = str_contains($format, '{DDMM}') ? $now->format('Ymd') : ((str_contains($format, '{YY}') || str_contains($format, '{YYYY}')) ? $now->format('Y') : 'all');
+        $seq = self::nextSeq('order_ref:' . $scope);
+        $rendered = strtr($format, ['{YYYY}' => $now->format('Y'), '{YY}' => $now->format('y'), '{DDMM}' => $now->format('dm'), '{NNN}' => str_pad((string) $seq, 3, '0', STR_PAD_LEFT)]);
+        return $testPrefix ? TestModeService::applyReferencePrefix($rendered, TestModeService::isEnabled()) : $rendered;
+    }
+
+    /**
      * Document reference for a given document_type (e.g. QT/PI/OC),
      * using that type's own ref_format. Returns null for document types
      * with no ref_format (internal/no-ref docs).

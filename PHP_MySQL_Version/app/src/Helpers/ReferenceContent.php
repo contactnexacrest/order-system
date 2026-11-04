@@ -75,7 +75,7 @@ final class ReferenceContent
     public static function substitutePlaceholders(string $content): string
     {
         $keys = [
-            'master_tracking_ref_format', 'client_number_format', 'order_ref_format',
+            'master_tracking_ref_format', 'order_ref_format',
             'bl_type_instruction', 'bl_consignee_instruction',
             'quantity_shortfall_tolerance_pct', 'dispute_response_days_n', 'weekly_off_days',
         ];

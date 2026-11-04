@@ -680,8 +680,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   -- Annexure A template with no governance or audit trail.
   ('annexure_product_note', 'Product images and drawings are for reference only and may show optional accessories or decorative elements not included in the quoted price. All binding specifications are as stated in each product section below. Actual product appearance may vary slightly due to the natural characteristics of granite.', 'string', 'documents', 'Printed in the amber "Note:" banner above every Annexure A''s Product Specification section.', 0),
   ('master_tracking_ref_format', 'NC/SC/{YY}/{DDMM}{NNN}', 'string', 'formats', 'Buyer inquiry reference format — matches the format already in use on your existing documents.', 0),
-  ('client_number_format',  'SC-CL-{NNNN}', 'string', 'formats', 'Placeholder client numbering format — confirm against your actual convention.', 0),
-  ('order_ref_format',      'SC/ORD/{YY}/{NNN}', 'string', 'formats', 'Placeholder order reference format — confirm against your actual convention.', 0),
+  ('order_ref_format',      'NC/SC/ORD/{YY}/{DDMM}{NNN}', 'string', 'formats', 'Order reference format (owner decision 4 Nov 2026, D1): a daily counter, e.g. NC/SC/ORD/26/0411001.', 0),
   ('dispute_response_days_n', '10', 'number', 'disputes', 'WORKING days allowed for a dispute response before escalation — must match the "ten (10) working days" figure in the Dispute Resolution & Public Communications clause below verbatim, since that clause is the legally binding promise printed on QT/PI/OC/BUYERPO. (Corrected from an earlier placeholder of 7, which did not match the clause text.) response_due_date is computed via WorkingDaysCalculator, which skips weekly_off_days and company_holidays — plain calendar-day arithmetic would silently undercount the deadline by counting Sundays/holidays as working days.', 0),
   ('weekly_off_days', 'sunday', 'string', 'disputes', 'Comma-separated lowercase weekday name(s) that never count as a working day, used by WorkingDaysCalculator (Addition beyond the spec''s named key list — needed to make dispute_response_days_n''s "working days" figure actually computable; NexaCrest''s standard Mon-Sat working week per this same section''s holiday calendar).', 0),
   ('zoho_mail_enabled',   '0', 'boolean', 'zoho', 'Master on/off switch for sending through the Zoho Mail API. Off by default (no credentials configured yet) — when off, or on any Zoho send failure, mail goes out through the existing SMTP path instead. Never a hard dependency.', 0),
@@ -775,7 +774,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- field_protection_requests, never a direct edit.
 UPDATE company_settings SET is_protected = 1 WHERE is_sensitive = 1;
 UPDATE company_settings SET is_protected = 1
-  WHERE setting_key IN ('master_tracking_ref_format', 'client_number_format', 'order_ref_format',
+  WHERE setting_key IN ('master_tracking_ref_format', 'order_ref_format',
                          'bl_type_instruction', 'bl_consignee_instruction');
 
 -- ================================================================
@@ -1075,7 +1074,6 @@ Pin this page. These are the rules the system enforces automatically — this is
 
 ## Reference Number Formats
 - Master tracking / buyer inquiry ref: {master_tracking_ref_format}
-- Client number: {client_number_format}
 - Order reference: {order_ref_format}
 
 ## Bill of Lading — Non-Negotiable

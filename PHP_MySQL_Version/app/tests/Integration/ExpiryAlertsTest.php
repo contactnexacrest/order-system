@@ -55,6 +55,30 @@ final class ExpiryAlertsTest extends DbTestCase
         self::assertTrue(NotificationRepository::existsToday($adminId, 'quotation_expired', $orderId));
     }
 
+    /**
+     * Owner decision 4 Nov 2026 (alert job speed-up): today's alerts are read
+     * once per run, not once per person and order — the same alerts still go
+     * out exactly once a day.
+     */
+    public function testASecondRunTheSameDayAddsNothingAndANewOrderIsStillAlerted(): void
+    {
+        $adminId = $this->createTestUser('Admin');
+        $first = $this->createTestOrder($this->createTestClient());
+        $this->setOrderDates($first, ['quotation_valid_until' => '2020-01-01']);
+        \run();
+        $count = static fn (int $o): int => (int) \App\Config\Database::connection()->query(
+            "SELECT COUNT(*) FROM notifications WHERE user_id = {$adminId} AND type = 'quotation_expired' AND related_order_id = {$o}")->fetchColumn();
+        self::assertSame(1, $count($first));
+
+        \run();
+        self::assertSame(1, $count($first), 'no second alert the same day');
+
+        $second = $this->createTestOrder($this->createTestClient());
+        $this->setOrderDates($second, ['quotation_valid_until' => '2020-01-01']);
+        \run();
+        self::assertSame([1, 1], [$count($first), $count($second)]);
+    }
+
     public function testDoesNotAlertWhenQuotationIsStillValid(): void
     {
         $orderId = $this->createTestOrder($this->createTestClient());

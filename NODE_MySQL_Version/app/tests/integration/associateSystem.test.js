@@ -418,7 +418,10 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect((await associateInvitationRepository.find(inv.id)).status).toBe('accepted');
     expect(await associateEventRepository.hasEvent(Number(a.id), 'client_accepted', Number(c.id), null)).toBe(true);
 
-    expect((await request(app).get(`/quotation-details?inv=${inv.token}`)).text).toContain('has expired or was already used'); // a link is for one registration
+    // A6 (4 Nov 2026): a used link shows the buyer the normal form, no error; it travels silently so staff see it.
+    const usedForm = (await request(app).get(`/quotation-details?inv=${inv.token}`)).text;
+    expect(usedForm).not.toContain('expired');
+    expect(usedForm).toContain(`<input type="hidden" name="associate_inv" value="${inv.token}">`);
   });
 
   it('the personal code, typed or in the link, and what is refused', async () => {
@@ -433,17 +436,18 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     const inv = (await associateInvitationRepository.forAssociate(Number(a.id)))[0];
     expect([inv.kind, inv.status]).toEqual(['personal_code', 'accepted']); // a code registration shows like any invitation
 
-    const before = Number(await value('SELECT MAX(id) AS id FROM client_intake_submissions'));
+    // Owner decision 4 Nov 2026 (A6): a bad code never stops the buyer — they register as a direct buyer and staff see why.
     const pc = String(a.personal_code);
     const typo = pc.slice(0, -1) + (pc.slice(-1) === 'A' ? 'B' : 'A');
-    session = {};
-    await call(clientIntakeController.submit, { body: intakePost(`Typo Buyer ${tag}`, { associate_code: typo }) });
-    expect(flash().message).toBe('That associate code is not valid — check it (e.g. NXA-RAJESH-7K), or leave it empty.');
-    expect(Number(await value('SELECT MAX(id) AS id FROM client_intake_submissions'))).toBe(before); // nothing is saved
+    const [typoId] = await submit(intakePost(`Typo Buyer ${tag}`, { associate_code: typo }));
+    const typoRow = await associateIntakeService.submission(typoId);
+    expect([typoRow.company_legal_name, typoRow.associate_id]).toEqual([`Typo Buyer ${tag}`, null]); // saved as a direct buyer
+    expect(String(typoRow.associate_note)).toContain('given but not applied: the code is not valid (mistyped?).');
 
     const suspended = await associate({ status: 'suspended' });
-    await call(clientIntakeController.submit, { body: intakePost(`Suspended Code Buyer ${tag}`, { associate_code: String(suspended.personal_code) }) });
-    expect(flash().message).toBe('That associate code is no longer active — leave it empty, or ask the associate.');
+    const [suspId] = await submit(intakePost(`Suspended Code Buyer ${tag}`, { associate_code: String(suspended.personal_code) }));
+    expect((await associateIntakeService.submission(suspId)).associate_id).toBeNull();
+    expect(String((await associateIntakeService.submission(suspId)).associate_note)).toContain('given but not applied: the associate is suspended.');
   });
 
   it('the quotation form has no associate checkbox or code field', async () => {

@@ -67,8 +67,9 @@ final class OrderReferenceFormatTest extends DbTestCase
         $orderId = (int) Database::connection()->query('SELECT MAX(id) FROM orders')->fetchColumn();
         $order = OrderRepository::find($orderId);
 
-        self::assertMatchesRegularExpression('#^SC/ORD/\d{2}/\d{3}-\d+$#', $order['order_reference']);
-        self::assertStringStartsWith('SC/ORD/' . date('y') . '/', $order['order_reference']);
+        // Owner decision 4 Nov 2026 (D1): NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter, no client suffix.
+        self::assertMatchesRegularExpression('#^NC/SC/ORD/\d{2}/\d{4}\d{3,}$#', $order['order_reference']);
+        self::assertStringStartsWith('NC/SC/ORD/' . date('y') . '/' . date('dm'), $order['order_reference']);
     }
 
     public function testDuplicatedOrderReferenceAlsoUsesTheOrdPrefix(): void
@@ -79,7 +80,28 @@ final class OrderReferenceFormatTest extends DbTestCase
         $newOrderId = OrderDuplicationService::duplicate($sourceOrderId, $this->userId);
         $newOrder = OrderRepository::find($newOrderId);
 
-        self::assertMatchesRegularExpression('#^SC/ORD/\d{2}/\d{3}-\d+$#', $newOrder['order_reference']);
+        self::assertMatchesRegularExpression('#^NC/SC/ORD/\d{2}/\d{4}\d{3,}$#', $newOrder['order_reference']);
+    }
+
+    public function testTheDailyCounterGivesEveryOrderItsOwnReference(): void
+    {
+        $refs = [];
+        for ($i = 0; $i < 3; $i++) {
+            $refs[] = \App\Services\ReferenceNumberService::generateOrderReference(false);
+        }
+        self::assertCount(3, array_unique($refs));
+        $n = array_map(static fn (string $r): int => (int) substr($r, -3), $refs);
+        self::assertSame([$n[0] + 1, $n[0] + 2], [$n[1], $n[2]], 'one counter per day, counting up');
+        // A format without {DDMM} counts by year instead, so it can never repeat.
+        \App\Repositories\CompanySettingsRepository::set('order_ref_format', 'SC/ORD/{YY}/{NNN}');
+        try {
+            $a = \App\Services\ReferenceNumberService::generateOrderReference(false);
+            $b = \App\Services\ReferenceNumberService::generateOrderReference(false);
+            self::assertNotSame($a, $b);
+            self::assertStringStartsWith('SC/ORD/' . date('y') . '/', $a);
+        } finally {
+            \App\Repositories\CompanySettingsRepository::set('order_ref_format', 'NC/SC/ORD/{YY}/{DDMM}{NNN}');
+        }
     }
 
     public function testEveryReferenceFormatUsesTheTwoDigitYear(): void

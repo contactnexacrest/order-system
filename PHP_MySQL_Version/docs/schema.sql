@@ -54,7 +54,7 @@ CREATE TABLE company_settings (
 -- rcmc_escalation_days_b, fdn_overdue_days_c, session_timeout_minutes,
 -- failed_login_lockout_count, password_min_length, password_complexity_json,
 -- password_expiry_days, non_usd_price_buffer_pct, revision_start_number,
--- master_tracking_ref_format, client_number_format, order_ref_format,
+-- master_tracking_ref_format, order_ref_format,
 -- dispute_response_days_n, weekly_off_days, show_generated_document_disclaimer,
 -- generated_document_disclaimer_text, wet_signature_required_buyer_po,
 -- wet_signature_required_supplier_po
@@ -5278,3 +5278,5 @@ CREATE TABLE order_incentive_history (
 ) ENGINE=InnoDB;
 -- A staff payout's payout run date (the run after the order was locked).
 ALTER TABLE incentive_payouts ADD COLUMN locked_on DATE NULL;
+-- Owner decision 4 Nov 2026 (A6): an associate code or link the buyer gave that could not be applied, and why — shown to staff on the intake review; the buyer never sees an error.
+ALTER TABLE client_intake_submissions ADD COLUMN associate_note VARCHAR(500) NULL;

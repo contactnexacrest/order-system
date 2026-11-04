@@ -419,7 +419,10 @@ final class AssociateSystemTest extends DbTestCase
 
         $_POST = [];
         $_GET = ['inv' => $inv['token']];
-        self::assertStringContainsString('has expired or was already used', $this->render(fn () => (new ClientIntakeController())->show([])), 'a link is for one registration');
+        // A6: a used link shows the buyer the normal form, no error; it travels silently so staff see it.
+        $usedForm = $this->render(fn () => (new ClientIntakeController())->show([]));
+        self::assertStringNotContainsString('expired', $usedForm);
+        self::assertStringContainsString('<input type="hidden" name="associate_inv" value="' . $inv['token'] . '">', $usedForm);
     }
 
     public function testThePersonalCodeTypedOrInTheLinkAndWhatIsRefused(): void
@@ -435,17 +438,17 @@ final class AssociateSystemTest extends DbTestCase
         $inv = AssociateInvitationRepository::forAssociate((int) $a['id'])[0];
         self::assertSame(['personal_code', 'accepted'], [$inv['kind'], $inv['status']], 'a code registration shows like any invitation');
 
-        $before = (int) Database::connection()->query('SELECT MAX(id) FROM client_intake_submissions')->fetchColumn();
+        // Owner decision 4 Nov 2026 (A6): a bad code never stops the buyer — they register as a direct buyer and staff see why.
         $typo = substr((string) $a['personal_code'], 0, -1) . (substr((string) $a['personal_code'], -1) === 'A' ? 'B' : 'A');
-        $_POST = $this->intakePost('Typo Buyer ' . $this->tag, ['associate_code' => $typo]);
-        $this->render(fn () => (new ClientIntakeController())->submit([]));
-        self::assertSame('That associate code is not valid — check it (e.g. NXA-RAJESH-7K), or leave it empty.', $this->flash()['message']);
-        self::assertSame($before, (int) Database::connection()->query('SELECT MAX(id) FROM client_intake_submissions')->fetchColumn(), 'nothing is saved');
+        [$typoId] = $this->submit($this->intakePost('Typo Buyer ' . $this->tag, ['associate_code' => $typo]));
+        $typoRow = AssociateIntakeService::submission($typoId);
+        self::assertSame(['Typo Buyer ' . $this->tag, null], [$typoRow['company_legal_name'], $typoRow['associate_id']], 'saved as a direct buyer');
+        self::assertStringContainsString('given but not applied: the code is not valid (mistyped?).', (string) $typoRow['associate_note']);
 
         $suspended = $this->associate(['status' => 'suspended']);
-        $_POST = $this->intakePost('Suspended Code Buyer ' . $this->tag, ['associate_code' => (string) $suspended['personal_code']]);
-        $this->render(fn () => (new ClientIntakeController())->submit([]));
-        self::assertSame('That associate code is no longer active — leave it empty, or ask the associate.', $this->flash()['message']);
+        [$suspId] = $this->submit($this->intakePost('Suspended Code Buyer ' . $this->tag, ['associate_code' => (string) $suspended['personal_code']]));
+        self::assertNull(AssociateIntakeService::submission($suspId)['associate_id']);
+        self::assertStringContainsString('given but not applied: the associate is suspended.', (string) AssociateIntakeService::submission($suspId)['associate_note']);
     }
 
     public function testTheQuotationFormHasNoAssociateCheckboxOrCodeField(): void

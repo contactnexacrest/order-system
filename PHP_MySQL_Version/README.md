@@ -910,10 +910,10 @@ in-app **Assets** screen (`/company-assets`) — no code changes needed, just
 upload the real file. Replace settings from the **Company Settings** screen
 (`/settings`).
 
-Also placeholder, specific to Phase B: `client_number_format` and
-`order_ref_format` in `company_settings` — confirm these against your
-actual numbering convention; they're used as-is to generate every new
-client's and order's reference number.
+Reference formats in `company_settings` (protected): `master_tracking_ref_format`
+(the client number, NC/SC/{YY}/{DDMM}{NNN}) and `order_ref_format` (owner decision
+4 Nov 2026, D-248: NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter). The unused
+`client_number_format` setting was removed.
 
 New in Phase C, also placeholder: `rcmc_number` and `rcmc_valid_until` in
 `company_settings` (category `capexil`) — the COO Prep Sheet's Section 4
