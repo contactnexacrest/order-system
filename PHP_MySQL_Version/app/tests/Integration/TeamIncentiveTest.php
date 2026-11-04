@@ -133,32 +133,28 @@ final class TeamIncentiveTest extends DbTestCase
 
     public function testTheAssociatesCommissionIsDeductedFirstOnTheClientsFirstTenDaysOnly(): void
     {
+        // D-245 P3: the associate on the ladder — step 1 (Level 1, 2%) of the invoiced FOB of the goods.
         $associate = AssociateRepository::create(['name' => 'PHPUnit Associate', 'based_in' => 'abroad', 'country' => 'USA', 'currency_code' => 'USD',
-            'email' => null, 'phone' => null, 'tax_id' => null, 'agreement_signed_on' => '2026-09-01', 'rate_1_5' => 0.70, 'rate_6_10' => 1.00,
-            'rate_11_20' => 1.50, 'rate_21_40' => 1.75, 'rate_41_plus' => 2.00, 'status' => 'active', 'notes' => null], $this->admin);
+            'email' => null, 'phone' => null, 'tax_id' => null, 'agreement_signed_on' => '2026-09-01', 'status' => 'active', 'notes' => null], $this->admin);
         $client = $this->createTestClient();
         AssociateRepository::linkClient($client, $associate, '2026-09-05');
 
         $orderId = $this->paidOrder($client);
         $profitBefore = OrderProfitabilityService::computeForOrder($orderId)['profit_inr'];
         $calc = IncentiveService::calculate($orderId);
-        self::assertSame([1, 0.70, 31.5, 'USD'], [$calc['associate']['order_number'], $calc['associate']['rate'], $calc['associate']['amount_fc'], $calc['associate']['currency']]);
-        self::assertEqualsWithDelta(2800.0, $calc['associate']['amount_inr'], 0.01, 'USD 31.50 at the ₹88.89 actually received per dollar');
-        self::assertEqualsWithDelta($profitBefore - 2800, $calc['basis'], 0.01);
+        self::assertSame(['Level 1 — 2%', 2.0, 90.0, 'USD'], [$calc['associate']['level_label'], $calc['associate']['rate'], $calc['associate']['amount_fc'], $calc['associate']['currency']]);
+        self::assertEqualsWithDelta(8000.0, $calc['associate']['amount_inr'], 0.01, 'USD 90.00 at the ₹88.89 actually received per dollar');
+        self::assertEqualsWithDelta($profitBefore - 8000, $calc['basis'], 0.01);
 
         IncentiveService::lockIfDue($orderId, $this->admin);
-        self::assertEqualsWithDelta(2800.0, $this->payouts($orderId)['associate'], 0.01);
-        self::assertSame('2800.00', IncentiveRepository::costEntries($orderId)['associate']['amount_inr']);
+        self::assertEqualsWithDelta(8000.0, $this->payouts($orderId)['associate'], 0.01);
+        self::assertSame('8000.00', IncentiveRepository::costEntries($orderId)['associate']['amount_inr']);
 
         $later = $this->paidOrder($client);
         Database::connection()->prepare('UPDATE orders SET created_at = DATE_ADD(created_at, INTERVAL 15 DAY) WHERE id = :id')->execute(['id' => $later]);
         self::assertNull(IncentiveService::calculate($later)['associate'], 'after day 10 it is a repeat order: no commission');
         IncentiveRepository::saveOrder($later, ['associate_mode' => 'yes'], $this->admin);
-        self::assertSame(1, IncentiveService::calculate($later)['associate']['order_number'], 'still the same client: the same commission order');
-
-        $second = $this->paidOrder($otherClient = $this->createTestClient());
-        AssociateRepository::linkClient($otherClient, $associate, '2026-09-20');
-        self::assertSame(2, IncentiveService::calculate($second)['associate']['order_number']);
+        self::assertSame(90.0, IncentiveService::calculate($later)['associate']['amount_fc'], 'forced on: commission again');
     }
 
     public function testTheIncentiveMonthFollowsTheCutOffDay(): void

@@ -708,9 +708,15 @@ final class ZohoBooksService
             }
         }
         $tdsTaxId = \App\Services\AssociateTds::settings()['zoho_tax_id'];
-        $rate = isset($inc['associate_rate_pct']) ? rtrim(rtrim(number_format((float) $inc['associate_rate_pct'], 2, '.', ''), '0'), '.') . '%' : '';
+        // Owner decision D-245 P3: the level fixed at PI, on the invoiced FOB of the goods.
+        $orderRow = \App\Repositories\OrderRepository::find((int) $cost['order_id']);
+        $fixedLevel = $orderRow !== null ? \App\Services\AssociateCommission::fixedLevel($orderRow) : null;
+        $rate = $fixedLevel !== null ? \App\Services\AssociateCommission::levelLabel($fixedLevel)
+            : (isset($inc['associate_rate_pct']) ? rtrim(rtrim(number_format((float) $inc['associate_rate_pct'], 2, '.', ''), '0'), '.') . '%' : '');
+        $gst = round(array_sum(array_map(static fn (array $p): float => (float) ($p['gst_inr'] ?? 0), $payouts)), 2);
         $what = "Associate commission — {$a['name']} — for order {$cost['buyer_inquiry_ref']} ({$cost['buyer_name']})"
-            . ($rate !== '' ? ", {$rate} of product FOB" : '') . (!empty($inc['associate_order_number']) ? ", client no. {$inc['associate_order_number']}" : '');
+            . ($rate !== '' ? ", {$rate} on the invoiced FOB of the goods" : '') . (!empty($inc['associate_basis_fc']) ? ' (basis ' . ($inc['associate_currency'] ?? '') . ' ' . number_format((float) $inc['associate_basis_fc'], 2, '.', '') . ')' : '')
+            . ($gst > 0 ? ' · GST ' . number_format($gst, 2, '.', '') . ' on the associate\'s tax invoice (input credit)' : '');
         return [
             'associate' => $a,
             'bill_no' => $billNo,

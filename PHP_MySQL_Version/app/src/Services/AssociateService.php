@@ -22,8 +22,9 @@ final class AssociateService
 {
     public static function protectionMonths(): int
     {
-        $v = (int) (IncentiveRepository::settings()['associate_protection_months'] ?? 12);
-        return $v > 0 ? $v : 12;
+        // D-245 P3: a buyer registration lasts this long; with no order from the buyer by then it lapses.
+        $v = (int) (IncentiveRepository::settings()['associate_protection_months'] ?? 6);
+        return $v > 0 ? $v : 6;
     }
 
     /**
@@ -73,7 +74,7 @@ final class AssociateService
             'direct_contact' => 'your client contacted us', 'order_created' => 'new order from your client',
             'commission_earned' => 'commission earned', 'payout_paid' => 'commission paid', 'payout_held' => 'commission on hold',
             'clawback' => 'commission adjustment', 'bank_changed' => 'your bank details changed', 'bank_rejected' => 'your new bank details were not accepted', 'link_changed' => 'a client link changed',
-            'lock_ending' => 'protection ending soon', 'agreement_ending' => 'agreement ending soon', 'portal_invite' => 'your portal access',
+            'lock_ending' => 'protection ending soon', 'registration_lapsed' => 'a buyer registration lapsed', 'agreement_ending' => 'agreement ending soon', 'portal_invite' => 'your portal access',
         ][$event] ?? 'update';
     }
 
@@ -106,12 +107,8 @@ final class AssociateService
     public static function linkClient(int $clientId, int $associateId, string $source, ?int $invitationId, ?string $registeredOn, ?int $userId): void
     {
         $lockUntil = date('Y-m-d', strtotime('+' . self::protectionMonths() . ' months'));
-        // QA Round 8 (R8-N05): the client gets the associate's next client number now, fixed for ever.
-        Database::transaction(static function () use ($clientId, $associateId, $source, $invitationId, $registeredOn, $lockUntil): void {
-            $number = AssociateRepository::clientNumberForLink($clientId, $associateId);
-            Database::connection()->prepare('UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_locked_until = :l, associate_source = :s, associate_invitation_id = :i, associate_client_number = :n WHERE id = :id')
-                ->execute(['a' => $associateId, 'd' => $registeredOn ?? date('Y-m-d'), 'l' => $lockUntil, 's' => $source, 'i' => $invitationId, 'n' => $number, 'id' => $clientId]);
-        });
+        Database::connection()->prepare('UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_locked_until = :l, associate_source = :s, associate_invitation_id = :i WHERE id = :id')
+            ->execute(['a' => $associateId, 'd' => $registeredOn ?? date('Y-m-d'), 'l' => $lockUntil, 's' => $source, 'i' => $invitationId, 'id' => $clientId]);
     }
 
     /**
@@ -131,7 +128,11 @@ final class AssociateService
         return false;
     }
 
-    /** Called when an order is created: fixes the associate's rate on it (AS-17) and tells the associate. */
+    /**
+     * Called when an order is created: links the order to the client's associate and
+     * tells them. D-245 P3: the commission level shown is provisional — it is fixed
+     * on the order when its Proforma Invoice is issued (AssociateCommission::fixLevelAtPi).
+     */
     public static function onOrderCreated(int $orderId): void
     {
         $order = Database::connection()->prepare('SELECT o.id, o.client_id, o.order_reference, o.status, o.is_test_data, o.is_sample_data, c.associate_id, c.company_legal_name FROM orders o JOIN clients c ON c.id = o.client_id WHERE o.id = :id');
@@ -144,15 +145,15 @@ final class AssociateService
         if ($a === null) {
             return;
         }
-        $number = AssociateRepository::orderNumberForClient((int) $a['id'], (int) $o['client_id']);
-        $rate = AssociateRepository::rateWithSource($a, $number);
-        Database::connection()->prepare('UPDATE orders SET associate_id = :a, associate_rate_pct = :r, associate_rate_source = :s, associate_client_number = :n WHERE id = :id')
-            ->execute(['a' => $a['id'], 'r' => $rate['rate'], 's' => $rate['source'], 'n' => $number, 'id' => $orderId]);
+        [$level] = (int) ($a['no_commission'] ?? 0) === 1 ? [null] : AssociateCommission::levelForAssociate($a, $orderId);
+        Database::connection()->prepare('UPDATE orders SET associate_id = :a, associate_rate_pct = :r, associate_rate_source = :s WHERE id = :id')
+            ->execute(['a' => $a['id'], 'r' => $level !== null && $level['kind'] === 'pct' ? $level['value'] : null,
+                's' => $level === null ? 'none' : (($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'fixed' : 'ladder'), 'id' => $orderId]);
         if ((int) $o['is_test_data'] === 1 || (int) $o['is_sample_data'] === 1) {
             return;
         }
-        self::notify($a, 'order_created', "New order {$o['order_reference']} from your client {$o['company_legal_name']}. Commission rate fixed on it: "
-            . number_format($rate['rate'], 2) . '% (' . ($rate['source'] === 'personal' ? 'personal' : ($rate['source'] === 'none' ? 'no commission' : 'standard')) . ').', (int) $o['client_id'], $orderId);
+        self::notify($a, 'order_created', "New order {$o['order_reference']} from your client {$o['company_legal_name']}. "
+            . ($level === null ? 'No commission applies to it.' : 'Your commission level for now: ' . AssociateCommission::levelLabel($level) . ' — fixed on the order when its Proforma Invoice is issued.'), (int) $o['client_id'], $orderId);
     }
 
     /**
@@ -177,6 +178,7 @@ final class AssociateService
             self::notify($a, 'payout_paid', 'Commission paid for order ' . ($order['order_reference'] ?? $p['order_id']) . ': INR ' . number_format((float) $p['paid_inr'], 2)
                 . ((float) ($p['tds_inr'] ?? 0) > 0 ? ' (gross INR ' . number_format((float) $p['paid_inr'] + (float) $p['tds_inr'], 2) . ', TDS deducted INR ' . number_format((float) $p['tds_inr'], 2)
                     . (!empty($p['tds_section']) ? ' u/s ' . $p['tds_section'] : '') . (!empty($p['tds_rate']) ? ' at ' . AssociateTds::pct((float) $p['tds_rate']) : '') . ')' : '')
+                . ((float) ($p['gst_inr'] ?? 0) > 0 ? ' + GST INR ' . number_format((float) $p['gst_inr'], 2) . ' on your tax invoice' : '')
                 . ' on ' . \App\Helpers\Dates::short((string) $p['paid_on']) . (!empty($p['paid_reference']) ? ', bank reference ' . $p['paid_reference'] : '') . '.', null, (int) $p['order_id'], null, $userId);
         }
     }
@@ -186,7 +188,8 @@ final class AssociateService
     {
         $today ??= date('Y-m-d');
         AssociateInvitationRepository::expireOld();
-        $sent = 0;
+        // D-245 P3: registrations past their period with no order from the buyer lapse (unlinked, associate told).
+        $sent = AssociateCommission::lapseRegistrations($today);
         foreach ([30, 7] as $days) {
             $day = date('Y-m-d', strtotime("{$today} +{$days} days"));
             $stmt = Database::connection()->prepare(

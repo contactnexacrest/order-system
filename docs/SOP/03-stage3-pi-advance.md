@@ -323,7 +323,10 @@ with money that's actually landed:
    The shortfall is recorded and shown on the order with the reason and
    who approved it: on the advance it is **carried into the balance** (the
    balance is always the order value less the advance actually received);
-   on the freight, the balance or a milestone it is **written off**.
+   on the freight, the balance or a milestone it is **written off**, and
+   the manager also chooses **what the short is**: an agreed discount, a
+   settled buyer claim, or not paid by the buyer (D-245 P3; this decides an
+   associate's commission, chapter 24).
    A middle milestone keeps one receipt (its line prints on the PI/OC);
    a short one is cleared the same way.
 

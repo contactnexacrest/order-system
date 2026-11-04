@@ -317,7 +317,37 @@ final class AssociatePortalController
     public function profile(array $params): void
     {
         $id = (int) self::me()['id'];
-        self::render('profile', ['banks' => AssociateBankRepository::forAssociate($id), 'documents' => AssociateDocumentRepository::forAssociate($id), 'ladder' => AssociateRepository::globalLadder()]);
+        $me = self::me();
+        [$level] = \App\Services\AssociateCommission::levelForAssociate($me, null);
+        self::render('profile', ['banks' => AssociateBankRepository::forAssociate($id), 'documents' => AssociateDocumentRepository::forAssociate($id),
+            'commissionNow' => (($me['commission_mode'] ?? 'ladder') === 'fixed' ? 'Fixed level: ' : 'Ladder — your next order: ') . \App\Services\AssociateCommission::levelLabel($level),
+            'commissionSettings' => \App\Services\AssociateCommission::settings()]);
+    }
+
+    /**
+     * Owner decision D-245 P3: the associate's price range — per product, the quote price
+     * and the lowest price they may agree, never cost or formula. A dated notice they
+     * acknowledge whenever the prices change.
+     */
+    public function prices(array $params): void
+    {
+        $me = self::me();
+        self::render('prices', ['list' => \App\Services\AssociateCommission::priceList($me)]);
+    }
+
+    public function acknowledgePrices(array $params): void
+    {
+        $me = self::me();
+        $list = \App\Services\AssociateCommission::priceList($me);
+        if (($_POST['hash'] ?? '') !== $list['hash']) {
+            Flash::set('error', 'The prices changed while you were reading them — please look at the new list and acknowledge it again.');
+        } else {
+            \App\Config\Database::connection()->prepare('UPDATE associates SET price_list_ack_hash = :h, price_list_ack_at = NOW() WHERE id = :id')->execute(['h' => $list['hash'], 'id' => $me['id']]);
+            AssociateEventRepository::add((int) $me['id'], 'prices_acknowledged', 'Price list dated ' . \App\Helpers\Dates::short(substr((string) $list['changed_at'], 0, 10)) . ' acknowledged.', null, null, null, null, false);
+            AuditLogRepository::log(null, 'ASSOCIATE_PRICES_ACKNOWLEDGED', 'associates', (int) $me['id'], 'price_list', null, $list['hash']);
+            Flash::set('success', 'Thank you — your acknowledgement of this price list is recorded.');
+        }
+        header('Location: /associate/prices');
     }
 
     public function saveProfile(array $params): void

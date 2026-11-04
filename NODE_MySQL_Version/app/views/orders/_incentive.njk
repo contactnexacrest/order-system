@@ -43,6 +43,9 @@
       {% endfor %}
       {% if incentivePayouts.length == 0 %}<tr><td colspan="4" class="muted">No incentive on this order.</td></tr>{% endif %}
     </table>
+    {% if calc.associate %}{% set c = calc.associate %}
+      <details style="margin-top:8px"><summary class="small">Associate commission statement</summary>{% include "associate_portal/_statement.njk" %}</details>
+    {% endif %}
     <form method="post" action="/orders/{{ order.id }}/incentive/recalculate" data-confirm="Work this order's incentive out again with the current settings and people? Only possible while nothing is paid yet." style="margin-top:8px">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <button type="submit" class="btn-sm btn-secondary">Work it out again</button>
@@ -53,13 +56,16 @@
     <div class="kv-grid">
       <div><span class="k">Order profit before incentives</span><span class="v">{{ calc.profit_before | money }}</span></div>
       {% if calc.associate %}{% set a = calc.associate %}
-        <div><span class="k">&minus; Associate commission ({{ a.name }}, {{ a.rate | money }}%, client no. {{ a.order_number }})</span><span class="v">{{ a.amount_inr | money }}</span></div>
+        <div><span class="k">&minus; Associate commission ({{ a.name }}, {{ a.level_label }}{{ ' — none: not paid in full' if a.state == 'unpaid' }})</span><span class="v">{{ a.amount_inr | money }}</span></div>
       {% endif %}
       {% if teamOn %}
       <div><span class="k">Profit used for the incentive</span><span class="v">{{ calc.basis | money }}</span></div>
       <div><span class="k">Team reward</span><span class="v">&#8377;{{ calc.reward | money0 }}{% if calc.new_client_bonus > 0 %} + &#8377;{{ calc.new_client_bonus | money0 }} new client bonus{% endif %}</span></div>
       {% endif %}
     </div>
+    {% if calc.associate %}{% set c = calc.associate %}
+      <details style="margin-top:8px"><summary class="small">Associate commission statement</summary>{% include "associate_portal/_statement.njk" %}</details>
+    {% endif %}
     {% if teamOn %}
     <p class="small">Reward from {{ sourceText[calc.source] or calc.source }}. Minimum profit: &#8377;{{ calc.min_profit | money0 }}.
       {% if calc.pct_of_profit !== null and calc.team_total > 0 %}<span class="muted">Private check: &#8377;{{ calc.team_total | money0 }} is <strong>{{ calc.pct_of_profit.toFixed(1) }}%</strong> of this order's profit.</span>{% endif %}</p>
@@ -77,11 +83,14 @@
       {% if incentiveHasAssociate or (inc and inc.associate_id) %}
       <label>Associate commission on this order
         <select name="associate_mode">
-          {% for v, l in { 'auto': "Automatic (10 days from the client's first PO)", 'yes': 'Yes', 'no': 'No' } %}
+          {% for v, l in { 'auto': "Automatic (10 days from the client's first PO)", 'yes': 'Yes — MD only, with a reason', 'no': 'No' } %}
             <option value="{{ v }}"{{ ' selected' if ((inc.associate_mode if inc else 'auto') or 'auto') == v else '' }}>{{ l }}</option>
           {% endfor %}
         </select>
       </label>
+      {# Owner decision D-245 P3: forcing commission on (a repeat order) is the MD's decision, with a written reason. #}
+      <label>Reason for forcing "Yes" <small class="muted">(MD only; at least 10 characters)</small>
+        <input type="text" name="associate_mode_reason" minlength="10" maxlength="300" value="{{ (inc.associate_mode_reason if inc else '') or '' }}" placeholder="e.g. Buyer introduced before the registration was recorded" data-required-when="associate_mode=yes" data-required-when-message="Say why commission is forced on for this order (at least 10 characters)."></label>
       {% else %}{# Owner 2 Nov 2026 (point 10): no associate on this client — keep the saved mode, show nothing. #}
       <input type="hidden" name="associate_mode" value="{{ (inc.associate_mode if inc else 'auto') or 'auto' }}">
       {% endif %}

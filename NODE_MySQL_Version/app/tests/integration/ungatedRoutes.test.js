@@ -25,6 +25,7 @@ const EXPECTED = [
   'GET /associate/messages associate',
   'GET /associate/orders associate',
   'GET /associate/orders/{} associate',
+  'GET /associate/prices associate',
   'GET /associate/profile associate',
   'GET /associate/set-password/{} public',
   'GET /invite/{} public',
@@ -39,6 +40,7 @@ const EXPECTED = [
   'POST /associate/login/code public +csrf',
   'POST /associate/logout public +csrf',
   'POST /associate/messages associate +csrf',
+  'POST /associate/prices/acknowledge associate +csrf',
   'POST /associate/profile associate +csrf',
   'POST /associate/set-password/{} public +csrf',
   'POST /quotation-details/verify public +csrf',
@@ -361,7 +363,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(18);
+    expect(checked).toBe(20);
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -395,7 +397,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(61);
+    expect(checked).toBe(62);
     expect(wrong).toEqual([]);
   }, 120000);
 
@@ -424,7 +426,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(35);
+    expect(checked).toBe(36);
     expect(failed).toEqual([]);
   }, 120000);
 

@@ -2099,7 +2099,7 @@ final class OrderController
             return;
         }
         // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
-        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'advance', null, $user, (string) ($_POST['short_reason'] ?? ''));
+        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'advance', null, $user, (string) ($_POST['short_reason'] ?? ''), (string) ($_POST['short_kind'] ?? ''));
         if (isset($partCheck['error'])) {
             Flash::set('error', $partCheck['error']);
             header("Location: /orders/{$orderId}");
@@ -3114,7 +3114,7 @@ final class OrderController
             return;
         }
         // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
-        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'freight', null, $user, (string) ($_POST['short_reason'] ?? ''));
+        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'freight', null, $user, (string) ($_POST['short_reason'] ?? ''), (string) ($_POST['short_kind'] ?? ''));
         if (isset($partCheck['error'])) {
             Flash::set('error', $partCheck['error']);
             header("Location: /orders/{$orderId}");
@@ -3760,7 +3760,7 @@ final class OrderController
             return;
         }
         // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
-        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'balance', null, $user, (string) ($_POST['short_reason'] ?? ''));
+        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'balance', null, $user, (string) ($_POST['short_reason'] ?? ''), (string) ($_POST['short_kind'] ?? ''));
         if (isset($partCheck['error'])) {
             Flash::set('error', $partCheck['error']);
             header("Location: /orders/{$orderId}");

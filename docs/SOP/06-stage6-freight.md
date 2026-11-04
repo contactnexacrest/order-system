@@ -243,6 +243,6 @@ If the buyer pays in more than one wire, record each one at Step 9c
 received so far · still owed**. A payment cannot be cleared while money is
 still owed, except by a manager with **Approve short payment**, who writes
 the reason; the shortfall is then recorded as written off and shown on the
-order. See chapter 03, "Paid in parts", for the details.
+order. When it is written off, the manager also says **what the short is** — an agreed discount, a settled buyer claim, or not paid by the buyer (D-245 P3); this decides an associate's commission (chapter 24). See chapter 03, "Paid in parts", for the details.
 
 To print or share it, the full **Supplier & Logistics Payments Guide** ([PDF](./guides/Supplier_and_Logistics_Payments_Guide.pdf) · [Word](./guides/Supplier_and_Logistics_Payments_Guide.docx)) is also in the app's Reference Library.

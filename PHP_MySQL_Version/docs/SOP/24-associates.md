@@ -22,7 +22,7 @@ clients and those clients' orders.
 
 | Permission | Who has it | What it allows |
 |---|---|---|
-| Manage associates (`manage_associates`) | MD, ED, Admin | The register, rates, status, portal access, personal codes, linking a client already on file, documents, messages, holds and claw-backs, standard rates, the report |
+| Manage associates (`manage_associates`) | MD, ED, Admin | The register, rates, status, portal access, personal codes, linking a client already on file, documents, messages, holds and take-backs, TDS and bank wait (commission settings: MD only, `manage_pricing`), the report |
 | View associates (`view_associates`) | Export Executive, Sales/Export Manager, Sales Director (and MD, ED, Admin) | Who introduced which client — no rates, amounts, bank details or agreements |
 | Associate bank & tax details (`manage_associate_bank`) | Finance Manager, Finance Director, MD, Admin | Bank details: enter, first check, verify, reject, see the full number (every view is in the audit log) |
 | Pay incentives (`pay_incentives`) | Accounts | Pay due commission on Incentive Payouts (chapter 20) |
@@ -46,16 +46,14 @@ the same links, filters and actions, and switch to each other.
 
 1. **Add an associate**: name, India / abroad, country, currency, the e-mail
    (their portal login — one associate per e-mail), phone, PAN / GSTIN or
-   foreign tax ID, address, relationship manager, agreement dates and the
+   foreign tax ID, address, **Reports to** (the staff member the associate
+   reports to — for visibility only; it changes no commission), agreement dates and the
    signed agreement (PDF, with its signing date).
-2. **Commission.** Enter a rate only for an agreed personal rate. A rung
-   left **empty** (or 0) carries on the **last personal rate set below it**;
-   rungs below the first personal rate use the **standard rate** (owner
-   decision D-221). Example: 1–5 = 1.25 % and 6–10 = 1.5 % gives 1.5 % from
-   the 11th client on; only 6–10 = 1.5 % gives the standard 0.7 % for
-   clients 1–5 and 1.5 % from the 6th; nothing filled in gives the standard
-   ladder. Tick **No commission** for an associate who introduces without
-   commission.
+2. **Commission** (owner decision D-245 P3). Choose **Ladder** (the
+   level follows the associate's counting orders) or **Fixed level** (one
+   of the levels in Admin → Pricing → Commission levels, e.g. 5 %). There
+   are no per-associate rates any more. Tick **No commission** for an
+   associate who introduces without commission.
 3. The associate starts as **Invited**. Upload their KYC (PAN card, ID,
    address proof, GST certificate; abroad: passport / company registration,
    tax residency certificate, Form 10F, no-PE declaration) under
@@ -84,17 +82,29 @@ the same links, filters and actions, and switch to each other.
 - **Agreement ended**: the portal closes. Commission already earned is
   still paid; no new clients.
 
-### Standard rates (Admin)
+### Commission settings (Admin)
 
-**Associates → Standard rates**: the standard ladder by the associate's Nth
-client (default 0.70 / 1.00 / 1.50 / 1.75 / 2.00 % for clients 1–5 / 6–10 /
-11–20 / 21–40 / 41+), the TDS % for India (section 194H, default 2 %, the CA
-confirms), the protection period (default 12 months) and the waiting days
-before a new bank account is used (default 7).
+**Associates → Commission settings** (`/associates/ladder`). The MD
+(permission `manage_pricing`) sets, and every change is in the audit log:
+- **Days after full payment** before commission is due (default 30).
+- **Payout run**: monthly on day 1–28, or weekly on a weekday (default
+  monthly on the 5th). Commission due on or before a run date is paid in
+  that run.
+- **Hold while a buyer claim is open** (default on): a claim raised on or
+  before the due date holds the payout until it is settled.
+- **Counting order threshold** (default ₹5,00,000 of invoiced FOB).
+- **Buyer registration valid** for N months with no order (default 6).
+- **GST on commission** % (default 18 %), added for GST-registered
+  associates once their tax invoice is on file.
 
-**The rate is fixed on the order when the order is created** (the order shows
-the rate and whether it is personal or standard). Changing a personal or
-standard rate applies to orders created afterwards.
+Staff with Manage associates set the TDS % (section 194H, default 2 %) and
+the waiting days before a new bank account is used (default 7); the other
+fields are shown to them read-only. The levels themselves and the ladder
+steps are in **Admin → Pricing → Commission levels**.
+
+**The level is fixed on the order when its Proforma Invoice is issued**
+(the order shows "Level 2 — 5%" and "fixed at PI on …"). Until then the
+order shows the level the associate would get today.
 
 ## How a buyer becomes an associate's client
 
@@ -139,7 +149,7 @@ Then:
    the website, the same company as another associate's client, or the
    e-mail not yet verified.
 5. **Accept** creates the client and links it to the associate: the
-   **protection** starts (12 months) and the associate is told, with a
+   **protection** starts (default 6 months; it lapses if the buyer places no order in that time) and the associate is told, with a
    printable **registration certificate** in the portal.
    - Not verified yet: Accept is refused until the buyer has entered the code.
    - **First completed registration wins**: if another associate's
@@ -162,32 +172,53 @@ change it.
 
 ## Commission
 
-- **Client no.** (QA Round 8, R8-N05, AS-17): each client is numbered for
-  its associate **when it is linked** — 1 for the first client they
-  brought, 2 for the second, and so on. The number never changes. If the MD
-  moves a client to another associate, it becomes that associate's next
-  client; removing the link clears it. The rate ladder (1–5, 6–10, …) uses
-  this number, and the rate is fixed on each order when it is created.
-- Earned on the client's first orders — everything ordered in the **10 days
-  from the client's first PO received** (chapter 20) — at the rate fixed on
-  each order, on the **product FOB value** (services excluded).
-- Earned only when the **buyer has paid the order in full** — never on the
-  advance alone. It is then paid in the **next incentive month** against the
-  associate's **invoice** (uploaded per payout in the portal).
-- **Short pay**: pro rata on the share of the order value received (e.g.
-  90 % received → 90 % of the commission); the order's Commission cost line
-  says "— pro rata 90% of the order value received".
+Owner decision D-245 P3 (4 Nov 2026) replaces the client numbering
+(R8-N05), the per-associate rung rates and pro rata (AS-9).
+
+- **Which orders**: the client's first orders — everything ordered in the
+  **10 days from the client's first PO received** (chapter 20). After that
+  only the MD can force "associate: yes" on an order, with a written reason
+  (10–300 characters); it is recorded in the audit log.
+- **Basis**: the **final invoiced FOB of the goods**, line by line
+  (services and charges excluded). A line the MD approved **below the
+  floor** earns **0**. Only an **agreed discount** or a **settled buyer
+  claim** lowers the basis; bank charges never do.
+- **Level**: the level fixed on the order at the PI. On the ladder the step
+  is set by the associate's **counting orders**: fully paid orders whose
+  invoiced FOB on in-range lines is at least the threshold (default
+  ₹5 lakh). An order below the threshold earns the current step but does
+  not count towards the next.
+- **Full payment only**: earned only when the buyer has paid the order in
+  full. A shortfall cleared as "not paid by the buyer" means **no
+  commission**; there is no pro rata. When a manager clears a short payment
+  (chapter 8) they must say what the short is: an agreed discount, a
+  settled buyer claim, or not paid by the buyer.
+- **Rupees**: worked out in the order currency and converted at the rate
+  actually realised on the order's receipts (bank charges added back).
+- **When**: due the set number of days after full payment, then paid in the
+  next payout run against the associate's **invoice** (uploaded per payout
+  in the portal). Before the due date, or while a buyer claim is open, the
+  payout cannot be marked paid ("Not due until …" / "On hold: a buyer claim
+  is open").
+- **GST**: added on top for a GST-registered associate (GSTIN on file) once
+  their tax invoice is uploaded. TDS is worked out on the commission before
+  GST, as before.
+- **Registration lapses**: a buyer registered by an associate with no
+  order within the set months (default 6) is unlinked by the daily job and
+  the associate is told.
 - **Cancelled** or not-proceeding orders: no commission.
 - **No commission** associates: none, the portal says so.
-- **Refund after payment — claw-back**: on the associate's page, under
-  Payouts, **Claw back** an amount (at most what is left of what was paid)
-  with what was refunded. Two claw-backs saved at the same moment are
-  checked one after the other, so together they never exceed what was paid
-  (QA Round 8, R8-N12). It becomes a negative line in the current incentive month and
-  is deducted from the associate's next payment (the line is marked "Deducted
-  from payout no. …").
-- Amounts are worked out in the **order currency** and paid in rupees at
-  the rate actually received.
+- **Take-back after payment**: only for the associate's **fraud** or
+  **breach of the agreement**. On the associate's page, under Payouts,
+  **Take back** an amount (at most what is left of what was paid), choose
+  fraud or breach and write the reason. Two take-backs saved at the same
+  moment are checked one after the other (QA Round 8, R8-N12). It becomes a
+  negative line deducted from the associate's next payment ("Deducted from
+  payout no. …"). A buyer refund alone is not a reason.
+- **Statement**: the order page (Incentive card) and the associate's
+  portal order page show the commission statement: each goods line, its
+  basis, any reduction, the level, the rate realised, the amount, the state
+  (estimated / earned / paid), due date and payout run.
 
 ## Paying (Accounts)
 
@@ -250,8 +281,8 @@ a vendor; the bill numbered with their invoice, account Commission Expense,
 the gross commission) and a **vendor payment** from the bank with the UTR,
 applied to it. Wording (rule D-212):
 - Bill: "Associate commission — <associate> — for order <ref> (<buyer>),
-  0.7% of product FOB, client no. 1 · associate invoice <no.> · TDS 56.00
-  deducted"
+  2% on the invoiced FOB of the goods (basis USD 4500.00) · associate
+  invoice <no.> · TDS 160.00 deducted · GST 1440.00 on the associate's tax invoice (input credit)" (the GST part only for a GST-registered associate)
 - Payment (D-235): "Associate commission for <associate> — order <ref> —
   gross ₹25,000.00, TDS u/s 194H ₹500.00 (2%), net paid ₹24,500.00 · UTR
   <UTR> · against bill <no.>"
@@ -262,7 +293,7 @@ blank (the default), the bill is the gross, the payment the net, and the
 TDS stays open on the bill for the CA to book against TDS payable — the
 Sync Log says so ("TDS INR … left on the bill for the CA to book"). Turning
 on TDS in Zoho Books is a change the CA makes in Zoho (and logs in the Zoho
-change log); then its tax id goes into the setting. A claw-back is not sent to Zoho automatically: the CA books the
+change log); then its tax id goes into the setting. A take-back is not sent to Zoho automatically: the CA books the
 recovery (vendor credit) from the associate's statement.
 
 ## Bank details (two people, a wait, an e-mail)
@@ -291,7 +322,7 @@ Profile and agreement · Change status · Portal and personal code (send /
 resend access, switch off, set a new code) · **View their portal
 (read-only)** — staff see exactly what the associate sees; nothing can be
 submitted · Clients introduced · Invitation links · Orders and commission ·
-Payouts (hold with reason, release, claw back) · Bank details · Documents ·
+Payouts (due date, payout run, GST; hold with reason, release, take back for fraud or breach) · Bank details · Documents ·
 Messages (the associate writes to their relationship manager; replies are
 e-mailed) · History (nobody can edit it).
 
@@ -315,6 +346,10 @@ challans →** opens `/associates/tds` (D-235).
 4. **My clients**: create one-off links, see and copy the personal code
    (the readable part can be chosen once), registered clients with their
    protection and certificate, invitations and their status.
-5. **Orders**, **Commission** (statement, invoice upload per payout, tax
+5. **Prices** (D-245 P3): "Your price range" — each product's quote price
+   and the lowest price they may offer, at their own level. When the list
+   changes they are asked to read it again and press **I have read this
+   price range** (recorded with the date).
+6. **Orders** (with the per-order commission statement), **Commission** (statement, invoice upload per payout, tax
    certificates), **Messages**, **Profile** (contact and tax details,
    bank details, documents, agreement download).

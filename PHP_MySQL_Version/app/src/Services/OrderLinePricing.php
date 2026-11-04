@@ -94,44 +94,24 @@ final class OrderLinePricing
     }
 
     /**
-     * The associate's commission level: their fixed level, or the ladder step
-     * for their next order.
+     * The associate's commission level: the level fixed on the order when its PI was
+     * issued, else their fixed level, or the ladder step for their next counting
+     * order (D-245 P3: counting orders replace the P2 stand-in).
      *
-     * @return array{0: ?array, 1: ?int} [level, previous orders counted (ladder only)]
+     * @return array{0: ?array, 1: ?int} [level, counting orders so far (ladder only)]
      */
     public static function levelForAssociate(array $associate, ?int $excludeOrderId): array
     {
-        if (($associate['commission_mode'] ?? 'ladder') === 'fixed') {
-            $level = !empty($associate['commission_level_id']) ? PricingRepository::findLevel((int) $associate['commission_level_id']) : null;
-            return [$level, null];
-        }
-        $count = self::associatePiOrderCount((int) $associate['id'], $excludeOrderId);
-        $next = $count + 1;
-        foreach (PricingRepository::ladder() as $step) {
-            if ($next >= (int) $step['from_order'] && ($step['to_order'] === null || $next <= (int) $step['to_order'])) {
-                return [PricingRepository::findLevel((int) $step['level_id']), $count];
+        if ($excludeOrderId !== null) {
+            $order = OrderRepository::find($excludeOrderId);
+            $fixed = $order !== null && (int) ($order['associate_id'] ?? 0) === (int) $associate['id'] ? AssociateCommission::fixedLevel($order) : null;
+            if ($fixed !== null) {
+                $level = $fixed['id'] !== null ? PricingRepository::findLevel((int) $fixed['id']) : null;
+                // The level as fixed (its value then), even if the level was changed or deactivated since.
+                return [array_merge($level ?? [], ['id' => $fixed['id'], 'name' => $fixed['name'], 'kind' => $fixed['kind'], 'value' => $fixed['value']]), null];
             }
         }
-        return [null, $count];
-    }
-
-    /**
-     * How many of the associate's earlier orders already had their Proforma
-     * Invoice issued. Phase P2 stand-in for "counting orders": phase P3
-     * replaces it with the counting-order rule (invoiced FOB ≥ ₹5 lakh on
-     * in-range lines, fully paid).
-     */
-    public static function associatePiOrderCount(int $associateId, ?int $excludeOrderId): int
-    {
-        $stmt = Database::connection()->prepare(
-            "SELECT COUNT(*) FROM orders o
-             WHERE o.associate_id = :a AND o.id <> :x AND o.is_test_data = 0 AND o.is_sample_data = 0
-               AND o.status NOT IN ('cancelled','lost')
-               AND EXISTS (SELECT 1 FROM documents d JOIN document_types t ON t.id = d.document_type_id
-                           WHERE d.order_id = o.id AND t.code = 'PI')"
-        );
-        $stmt->execute(['a' => $associateId, 'x' => $excludeOrderId ?? 0]);
-        return (int) $stmt->fetchColumn();
+        return AssociateCommission::levelForAssociate($associate, $excludeOrderId);
     }
 
     /**
@@ -516,6 +496,9 @@ final class OrderLinePricing
      */
     public static function snapshotForPi(int $orderId): void
     {
+        // D-245 P3: the associate's commission level is fixed on the order with the PI, first,
+        // so the line figures fixed below use that same level.
+        AssociateCommission::fixLevelAtPi($orderId);
         $order = OrderRepository::find($orderId);
         if ($order === null) {
             return;

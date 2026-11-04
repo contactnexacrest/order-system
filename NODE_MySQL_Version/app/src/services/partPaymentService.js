@@ -230,7 +230,7 @@ async function addMilestoneReceipt(milestone, amount, receivedOn, rate, bankRefe
  * Before a leg is marked cleared. Returns { error } to refuse, or { short } —
  * the shortfall to record once cleared (null when nothing is owed).
  */
-async function clearCheck(orderId, leg, milestone, canApprove, reason, userId = null) {
+async function clearCheck(orderId, leg, milestone, canApprove, reason, userId = null, kind = '') {
   const s = await summary(orderId, leg, milestone);
   if (s.owed === null || s.owed <= TOLERANCE) {
     return { short: null };
@@ -251,22 +251,29 @@ async function clearCheck(orderId, leg, milestone, canApprove, reason, userId = 
   if ([...why].length < 10 || [...why].length > 500) {
     return { error: `${money(currency, s.owed)} of the ${lbl.toLowerCase()} is still owed. To clear it short, give the reason (10 to 500 characters) — it is recorded and shown on the order.` };
   }
-  return { short: { expected: Number(s.expected), received: s.received, owed: s.owed, reason: why, currency, label: lbl } };
+  // Owner decision D-245 P3: say what the shortfall is — an agreed discount or a settled claim
+  // lowers the associate's commission basis; an unpaid amount means no commission on the order.
+  const { SETTLEMENT_KINDS } = require('./associateCommission');
+  if (leg !== 'advance' && !Object.prototype.hasOwnProperty.call(SETTLEMENT_KINDS, String(kind || ''))) {
+    return { error: `Say what the ${money(currency, s.owed)} short is: an agreed discount, a settled buyer claim, or not paid by the buyer.` };
+  }
+  return { short: { expected: Number(s.expected), received: s.received, owed: s.owed, reason: why, currency, label: lbl, kind: leg !== 'advance' ? String(kind) : null } };
 }
 
 /** Records the approved shortfall after the leg is cleared; returns the sentence for the flash message. */
 async function recordShortfall(orderId, leg, milestone, short, user) {
   const treatment = leg === 'advance' ? 'carried_to_balance' : 'written_off';
   await db.execute(
-    `INSERT INTO order_payment_shortfalls (order_id, leg, milestone_id, expected_amount, received_amount, shortfall_amount, treatment, reason, approved_by)
-     VALUES (:o, :l, :m, :e, :r, :s, :t, :reason, :u)`,
-    { o: orderId, l: leg, m: milestone ? milestone.id : null, e: short.expected, r: short.received, s: short.owed, t: treatment, reason: short.reason, u: user.id }
+    `INSERT INTO order_payment_shortfalls (order_id, leg, milestone_id, expected_amount, received_amount, shortfall_amount, treatment, reason, approved_by, settlement_kind)
+     VALUES (:o, :l, :m, :e, :r, :s, :t, :reason, :u, :k)`,
+    { o: orderId, l: leg, m: milestone ? milestone.id : null, e: short.expected, r: short.received, s: short.owed, t: treatment, reason: short.reason, u: user.id,
+      k: treatment === 'written_off' ? (short.kind || null) : null }
   );
   await require('../repositories/auditLogRepository').log(user.id, 'PAYMENT_SHORTFALL_APPROVED', 'orders', orderId, leg + (milestone ? `:${milestone.seq}` : ''), String(short.expected), String(short.received), short.reason);
   if (await recordedBy(orderId, leg, milestone ? milestone.id : null, user.id)) {
     await require('../repositories/auditLogRepository').log(user.id, 'SHORT_PAYMENT_SELF_APPROVED', 'orders', orderId, leg + (milestone ? `:${milestone.seq}` : ''), null, null, 'Cleared short a payment whose receipts they recorded themselves (Admin → Self-approval rules).');
   }
-  return `Short by ${money(short.currency, short.owed)}: approved by ${user.name} — ${treatment === 'carried_to_balance' ? 'carried into the balance.' : 'written off.'}`;
+  return `Short by ${money(short.currency, short.owed)}: approved by ${user.name} — ${treatment === 'carried_to_balance' ? 'carried into the balance.' : `written off${short.kind ? ` (${require('./associateCommission').SETTLEMENT_KINDS[short.kind].split('—')[0].trim().toLowerCase()})` : ''}.`}`;
 }
 
 /** Whether this person recorded any receipt of the leg (QA Round 8, R8-N09). */

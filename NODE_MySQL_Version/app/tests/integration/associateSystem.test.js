@@ -18,6 +18,7 @@ const associateInvitationRepository = require('../../src/repositories/associateI
 const associatePortalRepository = require('../../src/repositories/associatePortalRepository');
 const associateRepository = require('../../src/repositories/associateRepository');
 const incentiveRepository = require('../../src/repositories/incentiveRepository');
+const pricingRepository = require('../../src/repositories/pricingRepository');
 const userRepository = require('../../src/repositories/userRepository');
 const associateCodeService = require('../../src/services/associateCodeService');
 const associateIntakeService = require('../../src/services/associateIntakeService');
@@ -82,8 +83,8 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     tag = crypto.randomBytes(3).toString('hex');
     session = {};
     const values = {
-      associate_rate_1_5: '0.70', associate_rate_6_10: '1.00', associate_rate_11_20: '1.50', associate_rate_21_40: '1.75', associate_rate_41_plus: '2.00',
       associate_bank_wait_days: '7', associate_protection_months: '12', associate_tds_pct: '2.00', cutoff_day: '20',
+      associate_commission_due_days: '30', associate_claim_hold: '1', associate_payout_run: 'monthly', associate_payout_day: '5',
     };
     for (const [k, v] of Object.entries(values)) {
       await incentiveRepository.setSetting(k, v, admin);
@@ -193,48 +194,49 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
   // ---------------------------------------------------------------- rates (AS-17)
 
   // Owner decision 1 Nov 2026 (D-221): an empty rung carries on the last personal rate below it, else the standard ladder.
-  it('the personal rate carries upward, else the standard ladder, and no commission', async () => {
-    const ladder = async (a) => Promise.all([1, 6, 11, 21, 41].map((n) => associateRepository.rateWithSource(a, n)));
-    const p = (rate) => ({ rate, source: 'personal' });
-    const g = (rate) => ({ rate, source: 'global' });
-    expect(await ladder(await associate({ rate_1_5: '1.25', rate_6_10: '1.50' }))).toEqual([p(1.25), p(1.5), p(1.5), p(1.5), p(1.5)]); // 11 onward carries 6-10
-    expect(await ladder(await associate({ rate_6_10: '1.50' }))).toEqual([g(0.7), p(1.5), p(1.5), p(1.5), p(1.5)]); // 1-5 standard, 11 onward carries 6-10
-    expect(await ladder(await associate({ rate_1_5: '1.00', rate_21_40: '2.50' }))).toEqual([p(1), p(1), p(1), p(2.5), p(2.5)]); // 6-20 carry 1-5, 41+ carries 21-40
-    expect(await ladder(await associate({}))).toEqual([g(0.7), g(1), g(1.5), g(1.75), g(2)]); // nothing set: the standard ladder
-    const zero = await associate({ rate_1_5: '1.25', rate_6_10: '0' });
-    expect(await associateRepository.rateWithSource(zero, 6)).toEqual(p(1.25)); // 0 counts as empty: carries 1-5
+  const level = async (name) => Number(await value('SELECT id FROM commission_levels WHERE name = :n', { n: name }));
 
-    const std = await associate({});
-    await incentiveRepository.setSetting('associate_rate_11_20', '1.60', admin);
-    expect((await associateRepository.rateWithSource(std, 15)).rate).toBe(1.6); // the standard ladder is set in Admin
-    await associateRepository.setFields(Number(zero.id), { no_commission: 1 });
-    expect(await associateRepository.rateWithSource(await associateRepository.find(Number(zero.id)), 1)).toEqual({ rate: 0, source: 'none' });
+  // Owner decision D-245 P3: the commission level is the associate's fixed level or the ladder step; none when marked "no commission".
+  it('the commission level is the fixed level or the ladder, and no commission', async () => {
+    const associateCommission = require('../../src/services/associateCommission');
+    const ladderA = await associate();
+    expect(associateCommission.levelLabel((await associateCommission.levelForAssociate(ladderA, null))[0])).toBe('Level 1 — 2%');
+    const fixed = await associate();
+    await pricingRepository.setAssociateCommission(Number(fixed.id), 'fixed', await level('Level 3'));
+    expect(associateCommission.levelLabel((await associateCommission.levelForAssociate(await associateRepository.find(Number(fixed.id)), null))[0])).toBe('Level 3 — 7%');
+    const none = await associate({ no_commission: 1 });
+    const c = await client('No Level Buyer');
+    await associateService.linkClient(c, Number(none.id), 'code', null, '2026-10-01', admin);
+    expect((await incentiveService.calculate(await order(c))).associate).toBeNull();
   });
 
-  it('the rate is fixed on the order when it is created and earned only when the buyer has paid everything', async () => {
-    const a = await associate({ rate_1_5: '1.25' });
+  it('the level is fixed at the PI and earned only when the buyer has paid everything', async () => {
+    const associateCommission = require('../../src/services/associateCommission');
+    const a = await associate();
+    await pricingRepository.setAssociateCommission(Number(a.id), 'fixed', await level('Level 2'));
     const c = await client('Rate Fixed Buyer');
     await associateService.linkClient(c, Number(a.id), 'code', null, '2026-10-01', admin);
     const orderId = await order(c, 2700, false);
-    const row = await db.queryOne('SELECT associate_id, associate_rate_pct, associate_rate_source, associate_client_number FROM orders WHERE id = :id', { id: orderId });
-    expect([String(row.associate_id), row.associate_rate_pct, row.associate_rate_source, String(row.associate_client_number)]).toEqual([String(a.id), '1.25', 'personal', '1']);
+    const row = await db.queryOne('SELECT associate_id, associate_rate_pct, associate_rate_source FROM orders WHERE id = :id', { id: orderId });
+    expect([String(row.associate_id), row.associate_rate_pct, row.associate_rate_source]).toEqual([String(a.id), '5.00', 'fixed']);
     expect(await associateEventRepository.hasEvent(Number(a.id), 'order_created', c, orderId)).toBe(true); // the associate is told of the new order
 
-    await associateRepository.setFields(Number(a.id), { rate_1_5: '2.50' });
+    await associateCommission.fixLevelAtPi(orderId);
+    await pricingRepository.setAssociateCommission(Number(a.id), 'fixed', await level('Level 4'));
     await incentiveService.lockIfDue(orderId, admin);
     expect(await incentiveRepository.forOrder(orderId)).toBeNull(); // advance alone: nothing earned
     const line = (await associatePortalRepository.orders(Number(a.id), orderId))[0].commission;
-    expect([line.state, line.rate, line.source, line.amount]).toEqual(['expected', 1.25, 'personal', 56.25]); // the order keeps the rate fixed when it was created
+    expect([line.state, line.rate, line.amount, line.level]).toEqual(['expected', 5, 225, 'Level 2 — 5%']); // the order keeps the level fixed at its PI
 
     await db.execute("UPDATE order_payment_status SET balance_cleared_at = '2026-10-25 11:00:00', balance_inr_actual = 250000 WHERE order_id = :o", { o: orderId });
     await incentiveService.lockIfDue(orderId, admin);
     const p = await associatePayout(orderId);
-    expect([p.amount_fc, p.currency_code, p.status, p.incentive_month]).toEqual(['56.25', 'USD', 'due', '2026-11']);
+    expect([p.amount_fc, p.currency_code, p.status, p.incentive_month, p.due_on, p.payout_run_on]).toEqual(['225.00', 'USD', 'due', '2026-12', '2026-11-24', '2026-12-05']);
     expect(await associateEventRepository.hasEvent(Number(a.id), 'commission_earned', c, orderId)).toBe(true);
     expect((await associatePortalRepository.orders(Number(a.id), orderId))[0].commission.state).toBe('earned');
   });
 
-  it('no-commission associate, a cancelled order, and short pay pro rata', async () => {
+  it('no-commission associate, a cancelled order, and an unpaid shortfall earns nothing', async () => {
     const none = await associate({ no_commission: 1 });
     const c1 = await client('No Commission Buyer');
     await associateService.linkClient(c1, Number(none.id), 'code', null, '2026-10-01', admin);
@@ -242,14 +244,18 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect((await incentiveService.calculate(o1)).associate).toBeNull(); // no commission under the agreement
     expect((await associatePortalRepository.orders(Number(none.id), o1))[0].commission.label).toBe('No commission under your agreement');
 
+    // D-245 P3: no pro rata — a buyer who did not pay in full earns the associate nothing.
     const a = await associate();
     const c2 = await client('Short Pay Buyer');
     await associateService.linkClient(c2, Number(a.id), 'code', null, '2026-10-01', admin);
     const o2 = await order(c2, 2250);
+    await db.execute(`INSERT INTO order_payment_shortfalls (order_id, leg, expected_amount, received_amount, shortfall_amount, treatment, reason, approved_by, settlement_kind)
+                      VALUES (:o, 'balance', 2700, 2250, 450, 'written_off', 'The buyer did not pay the rest', :u, 'unpaid')`, { o: o2, u: admin });
     const calc = (await incentiveService.calculate(o2)).associate;
-    expect([calc.paid_ratio, calc.amount_fc]).toEqual([0.9, 28.35]); // USD 4,050 of 4,500 received: 90% of 0.70% of 4,500
+    expect([calc.state, calc.amount_fc]).toEqual(['unpaid', 0]); // USD 4,050 of 4,500 received: nothing
     await incentiveService.lockIfDue(o2, admin);
-    expect(String((await incentiveRepository.costEntries(o2)).associate.description)).toContain('— pro rata 90% of the order value received');
+    expect(await associatePayout(o2)).toBeUndefined();
+    expect((await associatePortalRepository.orders(Number(a.id), o2))[0].commission.label).toBe('No commission — the buyer did not pay this order in full');
 
     await db.execute("UPDATE orders SET status = 'cancelled' WHERE id = :o", { o: o1 });
     expect((await associatePortalRepository.orders(Number(none.id), o1))[0].commission.label).toBe('No commission — order cancelled');
@@ -301,6 +307,10 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     await call(incentiveController.markPaid, { as: admin, params: { payoutId: String(p1.id) }, body: pay });
     expect(flash().message).toMatch(/^This associate has no verified bank account usable on /);
     await verifiedBank(a);
+    // D-245 P3: paid only from its due date (30 days after full payment).
+    await call(incentiveController.markPaid, { as: admin, params: { payoutId: String(p1.id) }, body: { ...pay, month: p1.incentive_month } });
+    expect(flash().message).toMatch(/^This commission is due on 24 Nov 2026/);
+    await db.execute("UPDATE incentive_payouts SET due_on = '2026-10-30', incentive_month = '2026-11' WHERE order_id = :o", { o: o1 });
     await call(incentiveController.markPaid, { as: admin, params: { payoutId: String(p1.id) },
       // D-235: below the ₹20,000 threshold the app works out no TDS; a different figure needs a reason.
       body: { ...pay, paid_inr: String(Math.round(Number(p1.amount_inr) * 98) / 100), tds_inr: String(Math.round(Number(p1.amount_inr) * 2) / 100), tds_override_reason: 'CA advised deducting from the first payment.' } });
@@ -308,17 +318,21 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect(await associateEventRepository.hasEvent(Number(a.id), 'payout_paid', null, o1)).toBe(true);
 
     const paid = await incentiveRepository.findPayout(Number(p1.id));
+    // D-245 P3: a later refund to the buyer does not take commission back — only fraud or breach does.
     await call(associateAdminController.clawback, { as: admin, params: { payoutId: String(p1.id) }, body: { amount_inr: '1000', reason: 'Buyer refunded 20% for a damaged crate.' } });
+    expect(flash().message).toContain('only for the associate\'s fraud or breach');
+    await call(associateAdminController.clawback, { as: admin, params: { payoutId: String(p1.id) }, body: { amount_inr: '1000', reason: 'Invented a second buyer quote to inflate the order.', takeback_kind: 'fraud' } });
     expect(flash().type).toBe('success');
     let claw = await db.queryOne('SELECT * FROM incentive_payouts WHERE clawback_of_payout_id = :id', { id: p1.id });
-    expect([claw.amount_inr, claw.status]).toEqual(['-1000.00', 'due']);
-    expect(String(claw.note)).toMatch(/^Claw-back of commission paid on order /);
-    await call(associateAdminController.clawback, { as: admin, params: { payoutId: String(p1.id) }, body: { amount_inr: String(Number(paid.paid_inr)), reason: 'Buyer refunded everything later.' } });
+    expect([claw.amount_inr, claw.status, claw.takeback_kind]).toEqual(['-1000.00', 'due', 'fraud']);
+    expect(String(claw.note)).toMatch(/^Taken back for fraud: commission paid on order /);
+    await call(associateAdminController.clawback, { as: admin, params: { payoutId: String(p1.id) }, body: { amount_inr: String(Number(paid.paid_inr)), reason: 'Breach found later as well.', takeback_kind: 'breach' } });
     expect(flash().message).toMatch(/^Enter the amount to claw back, above 0 and at most what is left/); // never more than was paid
 
     await db.execute('UPDATE incentive_payouts SET incentive_month = :m WHERE id = :id', { m: '2026-11', id: claw.id });
     const o2 = await order(c2);
     await incentiveService.lockIfDue(o2, admin);
+    await db.execute("UPDATE incentive_payouts SET due_on = '2026-10-30', incentive_month = '2026-11' WHERE order_id = :o", { o: o2 });
     const p2 = await associatePayout(o2);
     await call(incentiveController.markPaid, { as: admin, params: { payoutId: String(p2.id) },
       body: { month: '2026-11', paid_on: todayIst(), paid_via: 'bank_transfer', paid_reference: `UTR${tag.toUpperCase()}02`, paid_inr: String(Number(p2.amount_inr) - 1000) } });
@@ -585,7 +599,8 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
   // ---------------------------------------------------------------- staff pages, permissions, Zoho wording
 
   it('who sees what on the staff side', async () => {
-    const a = await associate({ rate_1_5: '1.25' });
+    const a = await associate();
+    await pricingRepository.setAssociateCommission(Number(a.id), 'fixed', await level('Level 3'));
     const c = await client('Visible Buyer');
     await associateService.linkClient(c, Number(a.id), 'code', null, '2026-10-01', admin);
     const sales = await createTestUser('Export Executive');
@@ -595,11 +610,11 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect(list).not.toContain('Commission terms'); // Sales: who introduced whom, no amounts
     let show = (await salesAgent.get(`/associates/${a.id}`)).text;
     expect(show).toContain('Visible Buyer');
-    for (const never of ['1.25%', 'Bank details', 'Payouts', 'Show full number']) {
+    for (const never of ['Level 3', 'Bank details', 'Payouts', 'Show full number']) {
       expect([never, show.includes(never)]).toEqual([never, false]); // Sales never sees it
     }
     show = (await (await staffAgent(ed)).get(`/associates/${a.id}`)).text;
-    expect(show).toContain('1.25% (personal)');
+    expect(show).toContain('Fixed level: <b>Level 3</b>');
     expect(show).not.toContain('Show full number'); // the full bank number is Finance / MD only
     const role = async (name) => Number(await value('SELECT id FROM roles WHERE name = :n', { n: name }));
     expect(!!(await permissionService.load(sales, await role('Export Executive'))).manage_associates).toBe(false);
@@ -620,7 +635,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     await associateDocumentRepository.add(Number(a.id), 'invoice', fileId, Number(p.id), 'RK/24-25/017', true, null);
     const ref = await value('SELECT buyer_inquiry_ref FROM orders WHERE id = :id', { id: o });
     const z = await zohoBooksService.associateCommission({ order_id: o, buyer_inquiry_ref: ref, buyer_name: `Zoho Buyer ${tag}` });
-    expect(z.bill_description).toBe(`Associate commission — ${a.name} — for order ${ref} (Zoho Buyer ${tag}), 0.7% of product FOB, client no. 1 · associate invoice RK/24-25/017 · TDS 56.00 deducted`);
+    expect(z.bill_description).toBe(`Associate commission — ${a.name} — for order ${ref} (Zoho Buyer ${tag}), 2% on the invoiced FOB of the goods (basis USD 4500.00) · associate invoice RK/24-25/017 · TDS 56.00 deducted`);
     expect(z.payment_description).toBe(`Associate commission for ${a.name} — order ${ref} — gross ₹2,800.00, TDS u/s 194H ₹56.00, net paid ₹2,744.00 · UTR UTR777888 · against bill RK/24-25/017`);
     expect([z.bill_no, z.gross_inr, z.paid_inr, z.tds_inr, z.reference]).toEqual(['RK/24-25/017', 2800, 2744, 56, 'UTR777888']);
   });
@@ -629,13 +644,19 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     const a = await associate();
     const agent = await staffAgent(md);
     expect((await agent.get('/associates?view=list')).text).toContain('Add an associate');
-    expect((await agent.get('/associates/ladder')).text).toContain('Standard rate (% of product FOB value)');
+    expect((await agent.get('/associates/ladder')).text).toContain('When commission is paid');
     expect((await agent.get('/reports/associates')).text).toContain('TDS register');
     expect((await agent.get(`/associates/${a.id}`)).text).toContain('Change status');
-    const body = { rate_1_5: '0.80', rate_6_10: '1.00', rate_11_20: '1.50', rate_21_40: '1.75', rate_41_plus: '25', associate_tds_pct: '2', associate_protection_months: '12', associate_bank_wait_days: '7' };
-    await call(associateAdminController.saveLadder, { as: md, body });
-    expect(flash().message).toBe('Enter every standard rate as a % from 0 to 20.');
-    await call(associateAdminController.saveLadder, { as: md, body: { ...body, rate_41_plus: '2.00' } });
-    expect((await associateRepository.globalLadder()).rate_1_5).toBe(0.8);
+    const base = { associate_tds_pct: '2', associate_bank_wait_days: '7', associate_commission_due_days: '30', associate_payout_run: 'monthly', associate_payout_day: '40',
+      associate_counting_threshold_inr: '500000', associate_protection_months: '6', associate_gst_pct: '18', associate_claim_hold: '1' };
+    const associateCommission = require('../../src/services/associateCommission');
+    await call(associateAdminController.saveLadder, { as: md, body: base });
+    expect(flash().message).toBe('Choose the payout day: 1 to 28 for a monthly run, a weekday for a weekly run.');
+    await call(associateAdminController.saveLadder, { as: md, body: { ...base, associate_payout_day: '10' } });
+    expect([(await associateCommission.settings()).day, (await associateCommission.settings()).run]).toEqual([10, 'monthly']);
+    // The ED may save TDS but not the commission rules (MD only).
+    await call(associateAdminController.saveLadder, { as: ed, body: { ...base, associate_payout_day: '20' } });
+    expect((await associateCommission.settings()).day).toBe(10);
+    await incentiveRepository.setSetting('associate_payout_day', '5', admin);
   });
 });

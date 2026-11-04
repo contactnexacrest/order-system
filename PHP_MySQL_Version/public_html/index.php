@@ -924,6 +924,8 @@ $router->post('/associate/invitations/{id}/cancel', [$associatePortal, 'cancelIn
 $router->post('/associate/code', [$associatePortal, 'chooseCode'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->get('/associate/orders', [$associatePortal, 'orders'], [AssociateAuth::required()]);
 $router->get('/associate/orders/{id}', [$associatePortal, 'order'], [AssociateAuth::required()]);
+$router->get('/associate/prices', [$associatePortal, 'prices'], [AssociateAuth::required()]);
+$router->post('/associate/prices/acknowledge', [$associatePortal, 'acknowledgePrices'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->get('/associate/commission', [$associatePortal, 'commission'], [AssociateAuth::required()]);
 $router->post('/associate/commission/{id}/invoice', [$associatePortal, 'uploadInvoice'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->get('/associate/profile', [$associatePortal, 'profile'], [AssociateAuth::required()]);

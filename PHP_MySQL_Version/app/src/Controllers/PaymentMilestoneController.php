@@ -228,7 +228,7 @@ final class PaymentMilestoneController
         $userId = (int) AuthService::currentUserId();
         // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
         $user = AuthService::currentUser() ?? [];
-        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'milestone', $m, $user, (string) ($_POST['short_reason'] ?? ''));
+        $partCheck = \App\Services\PartPaymentService::clearCheck($orderId, 'milestone', $m, $user, (string) ($_POST['short_reason'] ?? ''), (string) ($_POST['short_kind'] ?? ''));
         if (isset($partCheck['error'])) {
             Flash::set('error', $partCheck['error']);
             self::back($orderId);

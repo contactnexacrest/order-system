@@ -1,5 +1,6 @@
 'use strict';
 
+const db = require('../config/db');
 const csv = require('../helpers/csv');
 const dates = require('../helpers/dates');
 const flash = require('../helpers/flash');
@@ -187,6 +188,28 @@ async function saveOrder(req, res) {
     return;
   }
   const fields = { reward_override_inr: override, is_excluded: body.is_excluded ? 1 : 0, associate_mode: mode };
+  // Owner decision D-245 P3: forcing an associate's commission on ("Yes", e.g. on a repeat order)
+  // is the MD's decision alone, with a written reason; it is audited.
+  const wasYes = ((row && row.associate_mode) || 'auto') === 'yes';
+  const modeReason = String(body.associate_mode_reason || '').trim();
+  if (mode === 'yes' && (!wasYes || modeReason !== String((row && row.associate_mode_reason) || ''))) {
+    if (!(await require('../services/associateService').canChangeLink(req))) {
+      flash.set(req, 'error', 'Only the MD can force the associate\'s commission on for an order.');
+      res.redirect(`/orders/${orderId}#financials-12d`);
+      return;
+    }
+    if ([...modeReason].length < 10 || [...modeReason].length > 300) {
+      flash.set(req, 'error', 'Say why the associate\'s commission is forced on for this order (10 to 300 characters).');
+      res.redirect(`/orders/${orderId}#financials-12d`);
+      return;
+    }
+    fields.associate_mode_reason = modeReason;
+    fields.associate_mode_set_by = req.user.id;
+    await auditLogRepository.log(req.user.id, 'ASSOCIATE_COMMISSION_FORCED', 'orders', orderId, 'associate_mode', String((row && row.associate_mode) || 'auto'), 'yes', modeReason);
+  } else if (mode !== 'yes' && wasYes) {
+    fields.associate_mode_reason = null;
+    fields.associate_mode_set_by = null;
+  }
   await incentiveRepository.saveOrder(orderId, fields, req.user.id);
   const oldFields = row ? { reward_override_inr: row.reward_override_inr, is_excluded: row.is_excluded, associate_mode: row.associate_mode } : null;
   await auditLogRepository.log(req.user.id, 'ORDER_INCENTIVE_SET', 'orders', orderId, 'incentive', oldFields ? JSON.stringify(oldFields) : null, JSON.stringify(fields));
@@ -342,6 +365,7 @@ async function markPaid(req, res) {
   let count = 0;
   let skipped = 0;
   let skippedDocs = 0;
+  let skippedDue = 0;
   for (const id of ids) {
     const payout = await incentiveRepository.findPayout(id);
     if (!payout || payout.status !== 'due' || Number(payout.amount_inr) < 0) {
@@ -356,6 +380,17 @@ async function markPaid(req, res) {
         return;
       }
       skipped++;
+      continue;
+    }
+    // Owner decision D-245 P3: an associate's commission is paid only from its due date, and not while a buyer claim holds it.
+    const block = await require('../services/associateCommission').payBlockReason(payout, paidOn);
+    if (block !== null) {
+      if (single) {
+        flash.set(req, 'error', block);
+        res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+        return;
+      }
+      skippedDue++;
       continue;
     }
     // Owner decision 2 Nov 2026 (D-235): the app works out the TDS on an associate's commission.
@@ -431,14 +466,21 @@ async function markPaid(req, res) {
       }
     }
     if (payout.payee_kind === 'associate') {
+      // D-245 P3: GST on top for a GST-registered associate whose tax invoice for this payout is on file.
+      const associateCommission = require('../services/associateCommission');
+      const gst = await associateCommission.gstFor(payout);
+      if (gst > 0) {
+        await db.execute('UPDATE incentive_payouts SET gst_pct = :p, gst_inr = :g WHERE id = :id', { p: (await associateCommission.settings()).gst_pct, g: gst, id });
+      }
       await associateService.onPayoutPaid(id, req.user.id);
     }
     count++;
   }
   // QA Round 6, R6-N11: nothing selected (or all already paid) is not a success.
+  const dueNote = skippedDue ? ` ${skippedDue} associate payout(s) skipped: not due yet, or held while a buyer claim is open.` : '';
   const docsNote = skippedDocs ? ` ${skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA${(await associateTds.settings()).cb_required ? '/15CB' : ''} not yet on file — pay them one by one.` : '';
   if (count === 0) {
-    flash.set(req, 'warning', `Nothing was recorded — no payout due for payment was selected.${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}${docsNote}`);
+    flash.set(req, 'warning', `Nothing was recorded — no payout due for payment was selected.${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}${dueNote}${docsNote}`);
   } else {
     flash.set(req, 'success', `${count === 1 ? 'Payment recorded.' : `${count} payments recorded.`}${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}${docsNote}`);
   }

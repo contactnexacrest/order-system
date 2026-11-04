@@ -22,8 +22,9 @@ use App\Repositories\UserRepository;
  *   every buyer payment it has (advance or LC, balance, freight) cleared.
  * - Associate commission: the client's associate, on the client's first
  *   orders (Day 1 = the client's first PO received, plus 9 days: the
- *   agreement's 10 days), at the ladder rate for the associate's Nth client, on the
- *   product (FOB) value. It is deducted from the profit first.
+ *   agreement's 10 days). D-245 P3: on the final invoiced FOB of the goods,
+ *   line by line, at the level fixed at PI, full payment only — see
+ *   AssociateCommission. It is deducted from the profit first.
  * - Team reward: the amount set on the order (above 0), else the reward
  *   table for the profit left after the associate, if it reaches the
  *   minimum and the program is on. Plus the new client bonus on a client's
@@ -172,32 +173,8 @@ final class IncentiveService
         return substr((string) (($order['buyer_po_received_on'] ?? null) ?: $order['created_at']), 0, 10);
     }
 
-    /**
-     * Owner decision 1 Nov 2026 (AS-9): the share of the order's product
-     * value the buyer actually paid (advance, middle milestones, balance or
-     * LC), at most 1. 1 when no receipt amounts are recorded.
-     */
-    public static function receivedRatio(array $order): float
-    {
-        $orderId = (int) $order['id'];
-        $value = OrderProductRepository::totalFobValue($orderId) + OrderProductRepository::totalServiceValue($orderId);
-        $payment = OrderPaymentStatusRepository::find($orderId) ?? [];
-        $received = (float) ($payment['advance_amount'] ?? 0) + (float) ($payment['balance_amount'] ?? 0);
-        $stmt = Database::connection()->prepare('SELECT COALESCE(SUM(received_amount), 0) FROM order_payment_milestones WHERE order_id = :o');
-        $stmt->execute(['o' => $orderId]);
-        $received += (float) $stmt->fetchColumn();
-        if (($order['payment_method'] ?? '') === 'LC') {
-            $lc = OrderLcDetailRepository::find($orderId);
-            $received += (float) ($lc['lc_received_amount'] ?? 0);
-        }
-        if ($value <= 0 || $received <= 0) {
-            return 1.0;
-        }
-        return round(min(1.0, $received / $value), 4);
-    }
-
-    /** Rupees per unit of the order currency actually received for the products (advance or LC, and balance). */
-    private static function productRate(array $order): float
+    /** Rupees per unit of the order currency actually received for the products (advance or LC, and balance) — the fallback when no receipt is recorded. */
+    public static function productRate(array $order): float
     {
         if (strtoupper((string) ($order['currency_code'] ?? 'INR')) === 'INR') {
             return 1.0;
@@ -272,36 +249,9 @@ final class IncentiveService
         $already = array_sum(array_map(static fn (array $c): float => (float) $c['amount_inr'], IncentiveRepository::costEntries($orderId)));
         $profitBefore = round((float) $profit['profit_inr'] + $already, 2);
 
-        $associate = null;
-        $client = \App\Repositories\ClientRepository::find((int) $order['client_id']);
-        if ($client !== null && !empty($client['associate_id']) && $row['associate_mode'] !== 'no'
-            && ($row['associate_mode'] === 'yes' || self::withinFirstTenDays($order))) {
-            $a = AssociateRepository::find((int) $client['associate_id']);
-            if ($a !== null) {
-                // QA Round 8 (R8-N05): the client number fixed on the order when it was created (the client's number for the associate).
-                $number = (($order['associate_client_number'] ?? null) !== null && (int) ($order['associate_id'] ?? 0) === (int) $a['id'])
-                    ? (int) $order['associate_client_number']
-                    : (!empty($row['associate_order_number']) && !empty($row['locked_at']) ? (int) $row['associate_order_number'] : AssociateRepository::orderNumberForClient((int) $a['id'], (int) $order['client_id']));
-                // Owner decision 1 Nov 2026 (AS-17): the rate fixed on the order when it was created; older orders work it out now.
-                if (($order['associate_rate_pct'] ?? null) !== null && (int) ($order['associate_id'] ?? 0) === (int) $a['id']) {
-                    $rate = (float) $order['associate_rate_pct'];
-                    $rateSource = (string) ($order['associate_rate_source'] ?? 'global');
-                } else {
-                    ['rate' => $rate, 'source' => $rateSource] = AssociateRepository::rateWithSource($a, $number);
-                }
-                if ($rateSource !== 'none' && $rate > 0) {
-                    // AS-9: pro rata when the buyer paid less than the order value.
-                    $ratio = self::receivedRatio($order);
-                    $fc = round(OrderProductRepository::totalFobValue($orderId) * $rate / 100 * $ratio, 2);
-                    $associate = [
-                        'id' => (int) $a['id'], 'name' => (string) $a['name'], 'order_number' => $number, 'rate' => $rate, 'rate_source' => $rateSource,
-                        'paid_ratio' => $ratio, 'status' => (string) $a['status'],
-                        'amount_fc' => $fc, 'currency' => (string) ($order['currency_code'] ?? 'INR'),
-                        'amount_inr' => round($fc * self::productRate($order), 2),
-                    ];
-                }
-            }
-        }
+        // Owner decision D-245 P3: the associate's commission on the final invoiced FOB of the goods,
+        // line by line, at the level fixed at PI, full payment only (AssociateCommission).
+        $associate = AssociateCommission::forOrder($orderId, $order, $row);
         $basis = round($profitBefore - ($associate['amount_inr'] ?? 0.0), 2);
 
         $source = 'table';
@@ -419,16 +369,20 @@ final class IncentiveService
             }
             $associateEntryId = null;
             $a = $calc['associate'];
-            if ($a !== null && $a['amount_fc'] > 0) {
+            // Owner decision D-245 P3: due N days after full payment, paid in the payout run that follows.
+            $commissionSet = AssociateCommission::settings();
+            $dueOn = $a !== null ? AssociateCommission::dueOn($paidOn, $commissionSet) : null;
+            $runOn = $dueOn !== null ? AssociateCommission::payoutRunOn($dueOn, $commissionSet) : null;
+            $earned = $a !== null && $a['state'] !== 'unpaid' && $a['amount_fc'] > 0;
+            if ($earned) {
                 $payoutId = IncentiveRepository::addPayout(['order_id' => $orderId, 'payee_kind' => 'associate', 'associate_id' => $a['id'], 'role' => 'associate',
-                    'amount_inr' => $a['amount_inr'], 'amount_fc' => $a['amount_fc'], 'currency_code' => $a['currency'], 'incentive_month' => $month]);
+                    'amount_inr' => $a['amount_inr'], 'amount_fc' => $a['amount_fc'], 'currency_code' => $a['currency'], 'incentive_month' => substr((string) $runOn, 0, 7)]);
+                Database::connection()->prepare('UPDATE incentive_payouts SET due_on = :d, payout_run_on = :r WHERE id = :id')->execute(['d' => $dueOn, 'r' => $runOn, 'id' => $payoutId]);
                 // AS-3: a suspended associate's commission is held until the MD releases it.
                 if ($a['status'] === 'suspended') {
                     IncentiveRepository::holdPayout($payoutId, 'The associate is suspended.');
                 }
-                $associateEntryId = IncentiveRepository::addCostEntry($orderId, 'associate',
-                    'Associate commission — ' . $a['name'] . ' (' . number_format($a['rate'], 2) . '%, client no. ' . $a['order_number'] . ')'
-                    . ($a['paid_ratio'] < 1 ? ' — pro rata ' . rtrim(rtrim(number_format($a['paid_ratio'] * 100, 2), '0'), '.') . '% of the order value received' : ''), $a['amount_inr'], $paidOn, $userId);
+                $associateEntryId = IncentiveRepository::addCostEntry($orderId, 'associate', self::associateCostDescription($a), $a['amount_inr'], $paidOn, $userId);
             }
             IncentiveRepository::saveOrder($orderId, [
                 'locked_at' => date('Y-m-d H:i:s'),
@@ -438,11 +392,15 @@ final class IncentiveService
                 'team_total_inr' => $calc['team_total'],
                 'new_client_bonus_inr' => $calc['new_client_bonus'],
                 'associate_id' => $a['id'] ?? null,
-                'associate_order_number' => $a['order_number'] ?? null,
+                'associate_order_number' => $a !== null && $a['counts'] ? $a['counting_number'] : null,
                 'associate_rate_pct' => $a['rate'] ?? null,
-                'associate_amount_fc' => $a['amount_fc'] ?? null,
+                'associate_amount_fc' => $a !== null ? $a['amount_fc'] : null,
                 'associate_currency' => $a['currency'] ?? null,
-                'associate_amount_inr' => $a['amount_inr'] ?? null,
+                'associate_amount_inr' => $a !== null ? $a['amount_inr'] : null,
+                'associate_basis_fc' => $a['basis_fc'] ?? null,
+                'associate_basis_inr' => $a['basis_inr'] ?? null,
+                'associate_counts' => $a !== null ? ($a['counts'] ? 1 : 0) : null,
+                'associate_due_on' => $earned ? $dueOn : null,
                 'team_cost_entry_id' => $teamEntryId,
                 'associate_cost_entry_id' => $associateEntryId,
             ], $userId);
@@ -451,17 +409,32 @@ final class IncentiveService
             $pdo->rollBack();
             throw $e;
         }
-        if ($a !== null && $a['amount_fc'] > 0) {
+        if ($a !== null) {
             $associate = AssociateRepository::find((int) $a['id']);
             $order = OrderRepository::find($orderId);
             if ($associate !== null && $order !== null) {
-                AssociateService::notify($associate, $a['status'] === 'suspended' ? 'payout_held' : 'commission_earned',
-                    "Your client paid order {$order['order_reference']} in full. Commission earned: {$a['currency']} " . number_format($a['amount_fc'], 2)
-                    . ' (' . number_format($a['rate'], 2) . '%' . ($a['paid_ratio'] < 1 ? ', pro rata on the amount the buyer paid' : '') . ').'
-                    . ($a['status'] === 'suspended' ? ' It is on hold while your account is suspended.' : ' It is paid in the ' . self::monthLabel($month) . ' payout, against your invoice.'),
-                    (int) $order['client_id'], $orderId);
+                if (!$earned) {
+                    AssociateService::notify($associate, 'commission_earned', "Order {$order['order_reference']} is closed for commission: "
+                        . ($a['state'] === 'unpaid' ? 'the buyer did not pay the order in full, so no commission is due on it.' : 'no commission is due on it.'), (int) $order['client_id'], $orderId);
+                } else {
+                    AssociateService::notify($associate, $a['status'] === 'suspended' ? 'payout_held' : 'commission_earned',
+                        "Your client paid order {$order['order_reference']} in full. Commission earned: {$a['currency']} " . number_format($a['amount_fc'], 2)
+                        . ' (' . $a['level_label'] . ' on the invoiced FOB of the goods, ' . $a['currency'] . ' ' . number_format($a['basis_fc'], 2) . ').'
+                        . ($a['status'] === 'suspended' ? ' It is on hold while your account is suspended.'
+                            : ' It is due on ' . \App\Helpers\Dates::short((string) $dueOn) . ' and paid in the ' . \App\Helpers\Dates::short((string) $runOn) . ' payout run, against your invoice'
+                              . (trim((string) ($associate['gstin'] ?? '')) !== '' ? ' (GST is added on top once your tax invoice is on file)' : '') . '.'),
+                        (int) $order['client_id'], $orderId);
+                }
             }
         }
+    }
+
+    /** Owner rule D-212: the commission cost line says what it is, for whom, at which level and on what basis. */
+    public static function associateCostDescription(array $a): string
+    {
+        return 'Associate commission — ' . $a['name'] . ' (' . $a['level_label'] . ') on the invoiced FOB of the goods, ' . $a['currency'] . ' ' . number_format((float) $a['basis_fc'], 2)
+            . ((float) $a['reduction_fc'] > 0 ? ' (after agreed discount / settled claim of ' . $a['currency'] . ' ' . number_format((float) $a['reduction_fc'], 2) . ')' : '')
+            . ((float) $a['in_range_fc'] < (float) $a['goods_fc'] ? '; lines the MD approved below the floor earn nothing' : '');
     }
 
     /** Undoes a lock so the incentive can be worked out again; refused once anything is paid. Returns an error or null. */
@@ -480,6 +453,7 @@ final class IncentiveService
             'locked_at' => null, 'fully_paid_on' => null, 'incentive_month' => null, 'profit_basis_inr' => null, 'team_total_inr' => null,
             'new_client_bonus_inr' => null, 'associate_id' => null, 'associate_order_number' => null, 'associate_rate_pct' => null,
             'associate_amount_fc' => null, 'associate_currency' => null, 'associate_amount_inr' => null,
+            'associate_basis_fc' => null, 'associate_basis_inr' => null, 'associate_counts' => null, 'associate_due_on' => null,
             'team_cost_entry_id' => null, 'associate_cost_entry_id' => null,
         ], $userId);
         $pdo->commit();

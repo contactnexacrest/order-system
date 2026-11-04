@@ -203,7 +203,7 @@ async function clear(req, res) {
   }
   // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
   const partPaymentService = require('../services/partPaymentService');
-  const partCheck = await partPaymentService.clearCheck(orderId, 'milestone', m, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason, req.user.id);
+  const partCheck = await partPaymentService.clearCheck(orderId, 'milestone', m, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason, req.user.id, (req.body || {}).short_kind);
   if (partCheck.error) {
     flash.set(req, 'error', partCheck.error);
     back(res, orderId);

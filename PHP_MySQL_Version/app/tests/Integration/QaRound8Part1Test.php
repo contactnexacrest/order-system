@@ -50,8 +50,7 @@ final class QaRound8Part1Test extends DbTestCase
         $this->md = $this->createTestUser('Managing Director');
         $this->finance = $this->createTestUser('Finance Manager');
         $this->as($this->admin);
-        foreach (['associate_rate_1_5' => '0.70', 'associate_rate_6_10' => '1.00', 'associate_rate_11_20' => '1.50', 'associate_rate_21_40' => '1.75',
-            'associate_rate_41_plus' => '2.00', 'associate_bank_wait_days' => '7', 'associate_protection_months' => '12', 'associate_tds_pct' => '2.00', 'cutoff_day' => '20'] as $k => $v) {
+        foreach (['associate_bank_wait_days' => '7', 'associate_protection_months' => '12', 'associate_tds_pct' => '2.00', 'cutoff_day' => '20'] as $k => $v) {
             IncentiveRepository::setSetting($k, $v, $this->admin);
         }
     }
@@ -197,10 +196,10 @@ final class QaRound8Part1Test extends DbTestCase
         self::assertSame(600.0, $total);
 
         $this->as($this->admin);
-        $_POST = ['amount_inr' => '600', 'reason' => 'Buyer refunded part of the order.'];
+        $_POST = ['amount_inr' => '600', 'reason' => 'Breach: dealt with a competitor for this buyer.', 'takeback_kind' => 'breach'];
         (new AssociateAdminController())->clawback(['payoutId' => (string) $pid]);
         self::assertSame('Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹400.00).', $this->flash()['message']);
-        $_POST = ['amount_inr' => '400', 'reason' => 'Buyer refunded the rest of the order.'];
+        $_POST = ['amount_inr' => '400', 'reason' => 'Breach: dealt with a competitor for this buyer.', 'takeback_kind' => 'breach'];
         (new AssociateAdminController())->clawback(['payoutId' => (string) $pid]);
         self::assertSame('success', $this->flash()['type']);
         self::assertSame(1000.0, (float) Database::connection()->query("SELECT -SUM(amount_inr) FROM incentive_payouts WHERE clawback_of_payout_id = {$pid}")->fetchColumn());
@@ -287,62 +286,33 @@ final class QaRound8Part1Test extends DbTestCase
         self::assertNull(Database::connection()->query("SELECT associate_id FROM clients WHERE id = {$client}")->fetchColumn() ?: null);
     }
 
-    // ---------------------------------------------------------------- R8-N05: client no. N, in the order they were brought
+    // ---------------------------------------------------------------- R8-N05 replaced (D-245 P3): no client numbers; the ladder counts orders
 
-    public function testClientsAreNumberedWhenLinkedAndOrdersTakeTheRateForThatNumber(): void
+    public function testClientsAreNotNumberedAndEveryOrderTakesTheLadderStepForCountingOrders(): void
     {
         $a = $this->associate();
-        $rates = [];
-        $numbers = [];
         for ($i = 1; $i <= 7; $i++) {
             $c = $this->client("R8 Numbered {$i} {$this->tag}");
             AssociateService::linkClient($c, (int) $a['id'], 'code', null, '2026-10-0' . $i, $this->admin);
             $o = $this->order($c);
-            $row = Database::connection()->query("SELECT associate_client_number, associate_rate_pct, associate_rate_source FROM orders WHERE id = {$o}")->fetch();
-            $numbers[] = (int) $row['associate_client_number'];
-            $rates[] = $row['associate_rate_pct'];
-            self::assertSame('global', $row['associate_rate_source']);
+            $row = Database::connection()->query("SELECT associate_rate_pct, associate_rate_source FROM orders WHERE id = {$o}")->fetch();
+            self::assertSame(['2.00', 'ladder'], [$row['associate_rate_pct'], $row['associate_rate_source']], 'no counting order yet: step 1 for every client');
         }
-        self::assertSame([1, 2, 3, 4, 5, 6, 7], $numbers, 'numbered when linked, not when paid');
-        self::assertSame(['0.70', '0.70', '0.70', '0.70', '0.70', '1.00', '1.00'], $rates);
-        $calc = IncentiveService::calculate($o);
-        self::assertSame(7, $calc['associate']['order_number']);
+        self::assertSame('Level 1 — 2%', IncentiveService::calculate($o)['associate']['level_label']);
+        self::assertSame(0, (int) Database::connection()->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'associate_client_number'")->fetchColumn());
 
-        // A second order of client 3 keeps number 3; re-linking the same associate never renumbers.
+        // The MD moves a client to another associate, then removes the link.
         $c3 = (int) Database::connection()->query("SELECT id FROM clients WHERE company_legal_name = 'R8 Numbered 3 {$this->tag}'")->fetchColumn();
-        AssociateService::linkClient($c3, (int) $a['id'], 'staff', null, '2026-10-03', $this->admin);
-        self::assertSame(3, AssociateRepository::orderNumberForClient((int) $a['id'], $c3));
-        $o3b = $this->order($c3);
-        self::assertSame('3', (string) Database::connection()->query("SELECT associate_client_number FROM orders WHERE id = {$o3b}")->fetchColumn());
-
-        // The MD moves client 3 to another associate: it becomes that associate's next client.
         $b = $this->associate();
-        $bFirst = $this->client('R8 B First ' . $this->tag);
-        AssociateService::linkClient($bFirst, (int) $b['id'], 'code', null, '2026-10-01', $this->admin);
         $this->as($this->md);
         $_POST = ['reason' => 'The buyer says another agent introduced them.', 'move_to' => (string) $b['id']];
         (new AssociateAdminController())->unlinkClient(['id' => (string) $a['id'], 'clientId' => (string) $c3]);
         self::assertSame('success', $this->flash()['type']);
-        $moved = Database::connection()->query("SELECT associate_id, associate_client_number FROM clients WHERE id = {$c3}")->fetch(\PDO::FETCH_ASSOC);
-        self::assertSame([(int) $b['id'], 2], [(int) $moved['associate_id'], (int) $moved['associate_client_number']]);
-        // Removing the link clears the number; the old associate's other clients keep theirs.
+        self::assertSame((int) $b['id'], (int) Database::connection()->query("SELECT associate_id FROM clients WHERE id = {$c3}")->fetchColumn());
         $_POST = ['reason' => 'The agreement with this buyer was cancelled.', 'move_to' => ''];
         (new AssociateAdminController())->unlinkClient(['id' => (string) $b['id'], 'clientId' => (string) $c3]);
-        self::assertNull(Database::connection()->query("SELECT associate_client_number FROM clients WHERE id = {$c3}")->fetchColumn());
-        self::assertSame('7', (string) Database::connection()->query("SELECT associate_client_number FROM clients WHERE company_legal_name = 'R8 Numbered 7 {$this->tag}'")->fetchColumn());
+        self::assertNull(Database::connection()->query("SELECT associate_id FROM clients WHERE id = {$c3}")->fetchColumn() ?: null);
     }
-
-    public function testTwoLinksAtOnceNeverShareANumber(): void
-    {
-        $a = $this->associate();
-        $c1 = $this->client('R8 Twin One ' . $this->tag);
-        $c2 = $this->client('R8 Twin Two ' . $this->tag);
-        AssociateRepository::linkClient($c1, (int) $a['id'], '2026-10-01');
-        AssociateRepository::linkClient($c2, (int) $a['id'], '2026-10-01');
-        $n = Database::connection()->query("SELECT associate_client_number FROM clients WHERE id IN ({$c1}, {$c2}) ORDER BY id")->fetchAll(\PDO::FETCH_COLUMN);
-        self::assertSame(['1', '2'], array_map('strval', $n));
-    }
-
 
     // ---------------------------------------------------------------- Q-R8-2: a suspended associate's portal is read-only
 

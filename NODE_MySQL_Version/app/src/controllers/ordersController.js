@@ -2311,7 +2311,7 @@ async function clearAdvancePayment(req, res) {
     return;
   }
   // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
-  const partCheck = await partPaymentService.clearCheck(orderId, 'advance', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason, req.user.id);
+  const partCheck = await partPaymentService.clearCheck(orderId, 'advance', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason, req.user.id, (req.body || {}).short_kind);
   if (partCheck.error) {
     flash.set(req, 'error', partCheck.error);
     res.redirect(`/orders/${orderId}`);
@@ -3318,7 +3318,7 @@ async function clearFreightPayment(req, res) {
     return;
   }
   // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
-  const partCheck = await partPaymentService.clearCheck(orderId, 'freight', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason, req.user.id);
+  const partCheck = await partPaymentService.clearCheck(orderId, 'freight', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason, req.user.id, (req.body || {}).short_kind);
   if (partCheck.error) {
     flash.set(req, 'error', partCheck.error);
     res.redirect(`/orders/${orderId}`);
@@ -3963,7 +3963,7 @@ async function clearBalancePayment(req, res) {
     return;
   }
   // Gap list G-5 (owner, 1 Nov 2026): not cleared while money is still owed, unless a manager approves it with a reason.
-  const partCheck = await partPaymentService.clearCheck(orderId, 'balance', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason, req.user.id);
+  const partCheck = await partPaymentService.clearCheck(orderId, 'balance', null, !!(req.permissions && req.permissions.approve_short_payment), (req.body || {}).short_reason, req.user.id, (req.body || {}).short_kind);
   if (partCheck.error) {
     flash.set(req, 'error', partCheck.error);
     res.redirect(`/orders/${orderId}`);

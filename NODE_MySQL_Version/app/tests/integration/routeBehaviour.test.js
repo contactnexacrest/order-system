@@ -467,11 +467,11 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     const id = Number(await value('SELECT id FROM associates WHERE email = :e', { e: email }));
     expectPage(await holder.call('GET', `/associates/${id}`), 'Route Associate', 'GET /associates/:id');
     expectPage(await holder.call('GET', `/associates/${id}/edit`), 'Edit Route Associate', 'GET /associates/:id/edit');
-    expectDone(await holder.call('POST', `/associates/${id}/update`, { name: 'Route Associate', based_in: 'india', currency_code: 'INR', email, rate_1_5: '1.10', commission_mode: 'ladder' }), 'POST /associates/:id/update');
-    expect(await value('SELECT rate_1_5 FROM associates WHERE id = :id', { id })).toBe('1.10');
-    expectPage(await holder.call('GET', '/associates/ladder'), 'Standard rate', 'GET /associates/ladder');
-    expectDone(await holder.call('POST', '/associates/ladder', { rate_1_5: '0.70', rate_6_10: '1.00', rate_11_20: '1.50', rate_21_40: '1.75', rate_41_plus: '2.00',
-      associate_tds_pct: '2.00', associate_protection_months: '12', associate_bank_wait_days: '7' }), 'POST /associates/ladder');
+    expectDone(await holder.call('POST', `/associates/${id}/update`, { name: 'Route Associate', based_in: 'india', currency_code: 'INR', email, notes: 'Route notes', commission_mode: 'ladder' }), 'POST /associates/:id/update');
+    expect(await value('SELECT notes FROM associates WHERE id = :id', { id })).toBe('Route notes');
+    expectPage(await holder.call('GET', '/associates/ladder'), 'When commission is paid', 'GET /associates/ladder');
+    expectDone(await holder.call('POST', '/associates/ladder', { associate_tds_pct: '2.00', associate_bank_wait_days: '7', associate_commission_due_days: '30', associate_claim_hold: '1',
+      associate_payout_run: 'monthly', associate_payout_day: '5', associate_counting_threshold_inr: '500000', associate_protection_months: '6', associate_gst_pct: '18' }), 'POST /associates/ladder');
     expectPage(await holder.call('GET', '/reports/associates'), 'TDS register', 'GET /reports/associates');
 
     let r = await holder.call('POST', `/associates/${id}/status`, { status: 'active', reason: 'Route test activation' });
@@ -509,7 +509,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expectDone(await holder.call('POST', `/associates/payouts/${payout}/hold`, { reason: 'Waiting for the invoice.' }), 'POST /associates/payouts/:payoutId/hold');
     expectDone(await holder.call('POST', `/associates/payouts/${payout}/release`), 'POST /associates/payouts/:payoutId/release');
     await db.execute("UPDATE incentive_payouts SET status = 'paid', paid_inr = 1000, paid_on = CURDATE(), paid_reference = 'UTR1' WHERE id = :id", { id: payout });
-    expectDone(await holder.call('POST', `/associates/payouts/${payout}/clawback`, { amount_inr: '250', reason: 'Buyer refunded a damaged crate.' }), 'POST /associates/payouts/:payoutId/clawback');
+    expectDone(await holder.call('POST', `/associates/payouts/${payout}/clawback`, { amount_inr: '250', reason: 'Breach: dealt with a competitor.', takeback_kind: 'breach' }), 'POST /associates/payouts/:payoutId/clawback');
     expect(await value('SELECT amount_inr FROM incentive_payouts WHERE clawback_of_payout_id = :id', { id: payout })).toBe('-250.00');
 
     await associateRepository.setFields(id, { portal_enabled: 1 });
@@ -753,7 +753,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
 
   it('associate and partner edits, the balance exchange rate and a review rejection', async () => {
     const associate = await insert('associates', { name: 'Route Test Associate', based_in: 'india', currency_code: 'INR', status: 'active' });
-    const rates = { rate_1_5: '5', rate_6_10: '5', rate_11_20: '4', rate_21_40: '3', rate_41_plus: '2' };
+    const rates = {};
     expectDone(await holder.call('POST', `/associates/${associate}/update`, { name: 'Route Test Associate B', based_in: 'india', currency_code: 'INR', status: 'active', commission_mode: 'ladder', ...rates }), 'POST /associates/:id/update');
     expect(await value('SELECT name FROM associates WHERE id = :id', { id: associate })).toBe('Route Test Associate B');
     expect(await audits('ASSOCIATE_UPDATED', associate)).toBe(1);
@@ -784,7 +784,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
   // ---------------------------------------------------------------- missing ids
 
   /** A complete associate form, so the missing record is what gets refused, not a blank field. */
-  const VALID_ASSOCIATE = { name: 'Route Ghost Associate', based_in: 'india', currency_code: 'INR', status: 'active', rate_1_5: '5', rate_6_10: '5', rate_11_20: '4', rate_21_40: '3', rate_41_plus: '2' };
+  const VALID_ASSOCIATE = { name: 'Route Ghost Associate', based_in: 'india', currency_code: 'INR', status: 'active', commission_mode: 'ladder' };
 
   /** The routes QA listed (plus five found since) whose path carries a record id. */
   const ID_ROUTES = [

@@ -225,7 +225,7 @@ final class PartPaymentService
      *
      * @return array{error?: string, short?: ?array<string,mixed>}
      */
-    public static function clearCheck(int $orderId, string $leg, ?array $milestone, array $user, string $reason): array
+    public static function clearCheck(int $orderId, string $leg, ?array $milestone, array $user, string $reason, string $kind = ''): array
     {
         $s = self::summary($orderId, $leg, $milestone);
         if ($s['owed'] === null || $s['owed'] <= self::TOLERANCE) {
@@ -248,7 +248,13 @@ final class PartPaymentService
         if (mb_strlen($reason) < 10 || mb_strlen($reason) > 500) {
             return ['error' => self::money($currency, $s['owed']) . ' of the ' . strtolower($label) . ' is still owed. To clear it short, give the reason (10 to 500 characters) — it is recorded and shown on the order.'];
         }
-        return ['short' => ['expected' => (float) $s['expected'], 'received' => $s['received'], 'owed' => $s['owed'], 'reason' => $reason, 'currency' => $currency, 'label' => $label]];
+        // Owner decision D-245 P3: say what the shortfall is — an agreed discount or a settled claim
+        // lowers the associate's commission basis; an unpaid amount means no commission on the order.
+        if ($leg !== 'advance' && !array_key_exists($kind, AssociateCommission::SETTLEMENT_KINDS)) {
+            return ['error' => 'Say what the ' . self::money($currency, $s['owed']) . ' short is: an agreed discount, a settled buyer claim, or not paid by the buyer.'];
+        }
+        return ['short' => ['expected' => (float) $s['expected'], 'received' => $s['received'], 'owed' => $s['owed'], 'reason' => $reason, 'currency' => $currency, 'label' => $label,
+            'kind' => $leg !== 'advance' ? $kind : null]];
     }
 
     /** Records the approved shortfall after the leg is cleared; returns the sentence for the flash message. */
@@ -256,15 +262,16 @@ final class PartPaymentService
     {
         $treatment = $leg === 'advance' ? 'carried_to_balance' : 'written_off';
         Database::connection()->prepare(
-            'INSERT INTO order_payment_shortfalls (order_id, leg, milestone_id, expected_amount, received_amount, shortfall_amount, treatment, reason, approved_by)
-             VALUES (:o, :l, :m, :e, :r, :s, :t, :reason, :u)'
-        )->execute(['o' => $orderId, 'l' => $leg, 'm' => $milestone['id'] ?? null, 'e' => $short['expected'], 'r' => $short['received'], 's' => $short['owed'], 't' => $treatment, 'reason' => $short['reason'], 'u' => $user['id']]);
+            'INSERT INTO order_payment_shortfalls (order_id, leg, milestone_id, expected_amount, received_amount, shortfall_amount, treatment, reason, approved_by, settlement_kind)
+             VALUES (:o, :l, :m, :e, :r, :s, :t, :reason, :u, :k)'
+        )->execute(['o' => $orderId, 'l' => $leg, 'm' => $milestone['id'] ?? null, 'e' => $short['expected'], 'r' => $short['received'], 's' => $short['owed'], 't' => $treatment, 'reason' => $short['reason'], 'u' => $user['id'],
+            'k' => $treatment === 'written_off' ? ($short['kind'] ?? null) : null]);
         AuditLogRepository::log((int) $user['id'], 'PAYMENT_SHORTFALL_APPROVED', 'orders', $orderId, $leg . ($milestone !== null ? ':' . $milestone['seq'] : ''), (string) $short['expected'], (string) $short['received'], $short['reason']);
         if (self::recordedBy($orderId, $leg, $milestone !== null ? (int) $milestone['id'] : null, (int) $user['id'])) {
             AuditLogRepository::log((int) $user['id'], 'SHORT_PAYMENT_SELF_APPROVED', 'orders', $orderId, $leg . ($milestone !== null ? ':' . $milestone['seq'] : ''), null, null, 'Cleared short a payment whose receipts they recorded themselves (Admin → Self-approval rules).');
         }
         return 'Short by ' . self::money($short['currency'], $short['owed']) . ': approved by ' . $user['name'] . ' — '
-            . ($treatment === 'carried_to_balance' ? 'carried into the balance.' : 'written off.');
+            . ($treatment === 'carried_to_balance' ? 'carried into the balance.' : 'written off' . (!empty($short['kind']) ? ' (' . strtolower(trim((string) strtok(AssociateCommission::SETTLEMENT_KINDS[$short['kind']], '—'))) . ')' : '') . '.');
     }
 
     /** Whether this person recorded any receipt of the leg (QA Round 8, R8-N09). */

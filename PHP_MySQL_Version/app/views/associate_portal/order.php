@@ -9,6 +9,10 @@
     <tr><th>Buyer paid in full</th><td><?= $o['buyer_paid_in_full'] ? 'Yes' : 'Not yet' ?></td></tr>
     <tr><th>Commission</th><td><?php require __DIR__ . '/_commission_cell.php'; ?></td></tr>
   </table>
+  <?php if (!empty($o['commission']['detail'])): $c = $o['commission']['detail']; ?>
+  <h2>Commission statement</h2>
+  <?php require __DIR__ . '/_statement.php'; ?>
+  <?php endif; ?>
   <h2>What happened</h2>
   <table class="list">
     <?php foreach ($events as $e): ?><tr><td><?= htmlspecialchars(\App\Helpers\Dates::short(substr((string) $e['created_at'], 0, 10))) ?></td><td><?= htmlspecialchars((string) $e['message']) ?></td></tr><?php endforeach; ?>

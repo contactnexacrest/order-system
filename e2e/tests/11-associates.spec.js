@@ -33,7 +33,8 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await page.goto('/associates/new');
     await page.getByLabel('Name *').fill(ASSOCIATE_NAME);
     await page.getByLabel('E-mail (portal login)').fill(ASSOCIATE_EMAIL);
-    await page.getByLabel('Clients 1–5').fill('1.25');
+    // D-245 P3: no per-associate rung rates; the associate follows the ladder (levels in Admin → Pricing).
+    await page.locator('select[name="commission_mode"]').selectOption('ladder');
     await page.getByRole('button', { name: 'Add associate' }).click();
     await expect(page.locator('.alert-success')).toContainText(`Associate "${ASSOCIATE_NAME}" added.`);
     associatePath = new URL(page.url()).pathname;

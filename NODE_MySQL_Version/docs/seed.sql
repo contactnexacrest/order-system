@@ -1959,13 +1959,18 @@ UPDATE payment_presets SET allow_zero_advance = 1 WHERE payment_method = 'LC';
 
 -- Owner decision 1 Nov 2026 (associate system): standard ladder, TDS, protection, permissions, upload context
 -- (same as docs/migrations/2026-11-02a-associate-system.sql, data part).
--- ---------------------------------------------------------------- settings: the global ladder (AS-17), TDS, protection
+-- ---------------------------------------------------------------- settings: TDS, buyer registration, bank wait, and when commission is paid
+-- D-245 P3 (4 Nov 2026): the old rung rates are gone (commission levels and ladder replace them); a buyer
+-- registration lapses after 6 months with no first PO; commission is due 30 days after full payment, held
+-- while a buyer claim is open, paid in the monthly run on the 5th; a counting order is invoiced FOB of
+-- ₹5 lakh or more; GST 18% on top for GST-registered associates with a tax invoice.
 INSERT INTO incentive_settings (setting_key, setting_value)
 SELECT k, v FROM (
-  SELECT 'associate_rate_1_5' AS k, '0.70' AS v UNION ALL SELECT 'associate_rate_6_10', '1.00' UNION ALL SELECT 'associate_rate_11_20', '1.50'
-  UNION ALL SELECT 'associate_rate_21_40', '1.75' UNION ALL SELECT 'associate_rate_41_plus', '2.00'
-  UNION ALL SELECT 'associate_tds_pct', '2.00' UNION ALL SELECT 'associate_protection_months', '12'
-  UNION ALL SELECT 'associate_bank_wait_days', '7') d
+  SELECT 'associate_tds_pct' AS k, '2.00' AS v UNION ALL SELECT 'associate_protection_months', '6'
+  UNION ALL SELECT 'associate_bank_wait_days', '7'
+  UNION ALL SELECT 'associate_commission_due_days', '30' UNION ALL SELECT 'associate_claim_hold', '1'
+  UNION ALL SELECT 'associate_payout_run', 'monthly' UNION ALL SELECT 'associate_payout_day', '5'
+  UNION ALL SELECT 'associate_counting_threshold_inr', '500000' UNION ALL SELECT 'associate_gst_pct', '18.00') d
 WHERE NOT EXISTS (SELECT 1 FROM incentive_settings s WHERE s.setting_key = d.k);
 
 -- ---------------------------------------------------------------- staff permissions (AS-11)

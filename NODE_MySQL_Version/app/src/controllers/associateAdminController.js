@@ -44,7 +44,6 @@ const pricingService = require('../services/pricingService');
  */
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const RUNGS = [['rate_1_5', '1–5', 1], ['rate_6_10', '6–10', 6], ['rate_11_20', '11–20', 11], ['rate_21_40', '21–40', 21], ['rate_41_plus', '41+', 41]];
 const len = (v) => [...String(v ?? '')].length;
 const isNum = (v) => v !== undefined && v !== null && String(v).trim() !== '' && Number.isFinite(Number(v));
 const fmt2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -66,20 +65,10 @@ async function found(req, res) {
   return a;
 }
 
-/** {label, rate, source, rate_text} per rung — the view shows "clients 1–5: 1.25% (personal)". */
-async function ratesFor(a) {
-  const ladder = await associateRepository.globalLadder();
-  const out = [];
-  for (const [, label, n] of RUNGS) {
-    const r = await associateRepository.rateWithSource(a, n, ladder);
-    out.push({ label, rate: r.rate, source: r.source, rate_text: trimPct(r.rate) });
-  }
-  return out;
-}
-
+/** D-245 P3: "Fixed: Level 2" or "Ladder" (or no commission) — the register's terms column. */
 function termsText(a) {
   if (Number(a.no_commission) === 1) return 'No commission';
-  return [a.rate_1_5, a.rate_6_10, a.rate_11_20, a.rate_21_40, a.rate_41_plus].some((r) => r !== null && Number(r) > 0) ? 'Personal rates' : 'Standard rates';
+  return (a.commission_mode || 'ladder') === 'fixed' ? `Fixed: ${a.commission_level_name || '?'}` : 'Ladder';
 }
 
 // ------------------------------------------------------------ register
@@ -117,13 +106,10 @@ async function index(req, res) {
 }
 
 async function form(req, res, a) {
-  const ladder = await associateRepository.globalLadder();
   res.renderView('associates/form', {
     editing: a,
     currencies: await lookupRepository.currencies(),
     users: await userRepository.listActive(),
-    ladder,
-    ladderText: Object.fromEntries(Object.entries(ladder).map(([k, v]) => [k, trimPct(v)])),
     // Owner decision D-245 (4 Nov 2026): commission level (fixed) or the ladder — MD only.
     commissionLevels: (await pricingRepository.levels()).map((l) => ({ ...l, label: pricingService.levelLabel(l) })),
     canPricing: can(req, 'manage_pricing'),
@@ -204,16 +190,6 @@ async function save(req, res) {
   if (data.agreement_signed_on !== null && data.agreement_ends_on !== null && data.agreement_ends_on <= data.agreement_signed_on) {
     errors.push('The agreement must end after it was signed.');
   }
-  // Owner decision 1 Nov 2026 (AS-17): a personal rate per rung; empty or 0 uses the global ladder.
-  for (const [r] of RUNGS) {
-    if (data[r] !== null && (!isNum(data[r]) || Number(data[r]) < 0 || Number(data[r]) > 20)) {
-      errors.push('Enter each personal rate as a % from 0 to 20, or leave it empty for the standard rate.');
-      break;
-    }
-    if (data[r] !== null && Number(data[r]) === 0) {
-      data[r] = null;
-    }
-  }
   if (data.pan !== null && data.based_in === 'india' && !/^[A-Z]{5}\d{4}[A-Z]$/.test(data.pan)) {
     errors.push('Enter the PAN as on the card (e.g. ABCDE1234F).');
   }
@@ -221,7 +197,7 @@ async function save(req, res) {
     errors.push('Enter the 15-character GSTIN, or leave it empty.');
   }
   if (data.relationship_manager_id !== null && (!/^\d+$/.test(data.relationship_manager_id) || !(await userRepository.findById(parseInt(data.relationship_manager_id, 10))))) {
-    errors.push('Choose the relationship manager from the list.');
+    errors.push('Choose who the associate reports to from the list.');
   }
   for (const [f, max] of [['country', 80], ['phone', 40], ['tax_id', 50], ['notes', 500], ['address', 1000]]) {
     if (data[f] !== null && len(data[f]) > max) {
@@ -263,14 +239,8 @@ async function save(req, res) {
   } else {
     await associateRepository.update(id, data);
     await auditLogRepository.log(user.id, 'ASSOCIATE_UPDATED', 'associates', id, null, null, JSON.stringify(data));
-    const changed = [...RUNGS.map(([r]) => r), 'no_commission'].filter((r) => {
-      const before = existing[r] ?? '';
-      const after = data[r] ?? '';
-      if (String(before) === String(after)) return false;
-      return !(r !== 'no_commission' && Number(before || 0) === Number(after || 0));
-    });
-    if (changed.length) {
-      await associateEventRepository.add(id, 'rates_changed', `Commission terms changed by ${user.name} — applies to orders created from now on; existing orders keep the rate fixed on them.`, null, null, null, user.id, true);
+    if (Number(existing.no_commission || 0) !== Number(data.no_commission || 0)) {
+      await associateEventRepository.add(id, 'rates_changed', `Commission terms changed by ${user.name} — applies to new quotes; orders with a Proforma Invoice keep the level fixed on them.`, null, null, null, user.id, true);
     }
     flash.set(req, 'success', `Associate "${data.name}" saved.`);
   }
@@ -322,6 +292,8 @@ async function show(req, res) {
     const invoiceByPayout = {};
     for (const p of payouts) {
       p.month_label = incentiveService.monthLabel(String(p.incentive_month));
+      // D-245 P3: why a due commission cannot be paid yet (due date, buyer claim).
+      p.block = p.status === 'due' ? await require('../services/associateCommission').payBlockReason(p, associateService.todayIst()) : null;
       const inv = await associateDocumentRepository.invoiceForPayout(Number(p.id));
       if (inv) invoiceByPayout[p.id] = { id: Number(inv.id), reference: inv.reference };
     }
@@ -345,8 +317,14 @@ async function show(req, res) {
       messages: await associateEventRepository.messages(id),
       unlinkedClients: await associateRepository.unlinkedClients(),
       allAssociates: (await associateRepository.all()).filter((o) => Number(o.id) !== id),
-      ladder: await associateRepository.globalLadder(),
-      rates: await ratesFor(a),
+      // D-245 P3: commission level or ladder, counting orders so far, when commission is paid.
+      commissionNow: await (async () => {
+        const associateCommission = require('../services/associateCommission');
+        const [lvl, count] = await associateCommission.levelForAssociate(a, null);
+        const set = await associateCommission.settings();
+        return { label: associateCommission.levelLabel(lvl), count: count || 0, set, runLabel: associateCommission.runLabel(set),
+          gstText: String(set.gst_pct.toFixed(2)).replace(/0+$/, '').replace(/\.$/, ''), threshold: set.threshold_inr.toLocaleString('en-US', { maximumFractionDigits: 0 }) };
+      })(),
       rm: a.relationship_manager_id ? await userRepository.findById(Number(a.relationship_manager_id)) : null,
       codeLink: a.personal_code ? `${associateService.appUrl()}/quotation-details?code=${encodeURIComponent(a.personal_code)}` : null,
       tdsPct: await associateService.tdsPct(),
@@ -512,7 +490,7 @@ async function unlinkClient(req, res) {
       await associateService.linkClient(clientId, Number(target.id), 'md_change', null, associateService.todayIst(), req.user.id);
       await associateService.notify(target, 'link_changed', `${client.company_legal_name} is now registered as your client (decided by the Managing Director: ${reason}).`, clientId, null, null, req.user.id);
     } else {
-      await db.execute('UPDATE clients SET associate_id = NULL, associate_registered_on = NULL, associate_locked_until = NULL, associate_source = NULL, associate_invitation_id = NULL, associate_client_number = NULL WHERE id = :id', { id: clientId });
+      await db.execute('UPDATE clients SET associate_id = NULL, associate_registered_on = NULL, associate_locked_until = NULL, associate_source = NULL, associate_invitation_id = NULL WHERE id = :id', { id: clientId });
     }
     await auditLogRepository.log(req.user.id, 'ASSOCIATE_CLIENT_UNLINKED', 'clients', clientId, 'associate_id', String(a.id), target ? String(target.id) : null);
     await associateService.notify(a, 'link_changed', `${client.company_legal_name} is no longer registered as your client. Decided by the Managing Director. Reason: ${reason}`, clientId, null, null, req.user.id);
@@ -753,76 +731,110 @@ async function releasePayout(req, res) {
   back(res, p.associate_id, 'commission');
 }
 
-/** After a refund to the buyer: the paid commission's share is deducted from the associate's next payout. */
+/**
+ * Owner decision D-245 P3: a paid commission is taken back only for the associate's
+ * fraud or breach of the agreement — never for a later buyer claim or refund — with
+ * a written reason. The amount is deducted from the associate's next payout.
+ */
 async function clawback(req, res) {
   const p = await associatePayout(req, res);
   if (!p) return;
   const body = req.body || {};
   const amount = isNum(body.amount_inr) ? Number(body.amount_inr) : null;
   const reason = String(body.reason || '').trim();
+  const kind = String(body.takeback_kind || '');
+  if (!['fraud', 'breach'].includes(kind)) {
+    flash.set(req, 'error', 'A paid commission is taken back only for the associate\'s fraud or breach of the agreement — choose which, and say what happened. A later buyer claim or refund does not take it back.');
+    back(res, p.associate_id, 'commission');
+    return;
+  }
   const already = Number((await db.queryOne('SELECT COALESCE(-SUM(amount_inr), 0) AS s FROM incentive_payouts WHERE clawback_of_payout_id = :id', { id: p.id })).s);
   if (p.status !== 'paid' || Number(p.amount_inr) <= 0) {
     flash.set(req, 'error', 'Only a paid commission can be clawed back.');
   } else if (amount === null || amount <= 0 || amount > Number(p.paid_inr) - already + 0.005) {
     flash.set(req, 'error', `Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹${fmt2(Number(p.paid_inr) - already)}).`);
   } else if (len(reason) < 10 || len(reason) > 300) {
-    flash.set(req, 'error', 'Say what was refunded to the buyer (10 to 300 characters) — the associate is shown it.');
+    flash.set(req, 'error', `Say what the ${kind} was (10 to 300 characters) — the associate is shown it.`);
   } else {
     const month = incentiveService.incentiveMonth(associateService.todayIst(), (await incentiveService.settings()).cutoff);
     const order = await orderRepository.find(Number(p.order_id));
     // QA Round 8, R8-N12: re-checked with the paid payout locked, so simultaneous claw-backs cannot exceed what was paid.
-    const saved = await incentiveRepository.addClawbackWithinPaid(Number(p.id), amount, month, `Claw-back of commission paid on order ${order ? order.order_reference : p.order_id} (payout no. ${p.id}, ref ${p.paid_reference || '—'}): ${reason}`);
+    const saved = await incentiveRepository.addClawbackWithinPaid(Number(p.id), amount, month, `Taken back for ${kind}: commission paid on order ${order ? order.order_reference : p.order_id} (payout no. ${p.id}, ref ${p.paid_reference || '—'}): ${reason}`);
     if (saved.id === null) {
       flash.set(req, 'error', `Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹${fmt2(Math.max(0, saved.left))}).`);
     } else {
       const id = saved.id;
-      await auditLogRepository.log(req.user.id, 'ASSOCIATE_CLAWBACK', 'incentive_payouts', id, null, null, String(amount));
+      await db.execute('UPDATE incentive_payouts SET takeback_kind = :k WHERE id = :id', { k: kind, id });
+      await auditLogRepository.log(req.user.id, 'ASSOCIATE_CLAWBACK', 'incentive_payouts', id, 'takeback_kind', null, String(amount), `${kind}: ${reason}`);
       const a = await associateRepository.find(Number(p.associate_id));
-      await associateService.notify(a, 'clawback', `INR ${fmt2(amount)} of the commission paid on order ${order ? order.order_reference : ''} will be deducted from your ${incentiveService.monthLabel(month)} payout: ${reason}`, null, Number(p.order_id), null, req.user.id);
-      flash.set(req, 'success', 'Claw-back recorded; it is deducted from the associate\'s next payout.');
+      await associateService.notify(a, 'clawback', `INR ${fmt2(amount)} of the commission paid on order ${order ? order.order_reference : ''} is taken back (${kind === 'fraud' ? 'fraud' : 'breach of the agreement'}) and deducted from your ${incentiveService.monthLabel(month)} payout: ${reason}`, null, Number(p.order_id), null, req.user.id);
+      flash.set(req, 'success', `Take-back recorded (${kind}); it is deducted from the associate's next payout.`);
     }
   }
   back(res, p.associate_id, 'commission');
 }
 
-// ------------------------------------------------------------ global ladder (AS-17) and settings
+// ------------------------------------------------------------ commission settings (D-245 P3)
 
+/**
+ * Owner decision D-245 P3: when an associate's commission is paid, the counting-order
+ * threshold, buyer registration, GST — the MD changes these (manage_pricing); TDS and
+ * the bank waiting days as before. Commission levels and the ladder: Admin → Pricing.
+ */
 async function ladder(req, res) {
-  const l = await associateRepository.globalLadder();
+  const associateCommission = require('../services/associateCommission');
+  const commission = await associateCommission.settings();
   res.renderView('associates/ladder', {
-    ladder: l,
-    ladderValues: Object.fromEntries(Object.entries(l).map(([k, v]) => [k, v.toFixed(2)])),
-    tds: await associateService.tdsPct(),
     tdsValue: (await associateService.tdsPct()).toFixed(2),
-    protection: await associateService.protectionMonths(),
     wait: await associateService.bankWaitDays(),
-    settings: await incentiveRepository.settings(),
+    commission,
+    thresholdValue: commission.threshold_inr.toFixed(0),
+    gstValue: commission.gst_pct.toFixed(2),
+    canPricing: can(req, 'manage_pricing'),
   }, 'layout/base');
 }
 
 async function saveLadder(req, res) {
   const body = req.body || {};
   const values = {};
-  for (const col of Object.keys(await associateRepository.globalLadder())) {
-    const v = isNum(body[col]) ? Number(body[col]) : null;
-    if (v === null || v < 0 || v > 20) {
-      flash.set(req, 'error', 'Enter every standard rate as a % from 0 to 20.');
-      res.redirect('/associates/ladder');
-      return;
-    }
-    values[`associate_${col}`] = v.toFixed(2);
-  }
+  const int = (v) => (/^-?\d+$/.test(String(v ?? '').trim()) ? parseInt(v, 10) : null);
   const tds = isNum(body.associate_tds_pct) ? Number(body.associate_tds_pct) : null;
-  const months = /^-?\d+$/.test(String(body.associate_protection_months ?? '').trim()) ? parseInt(body.associate_protection_months, 10) : null;
-  const wait = /^-?\d+$/.test(String(body.associate_bank_wait_days ?? '').trim()) ? parseInt(body.associate_bank_wait_days, 10) : null;
-  if (tds === null || tds < 0 || tds > 30 || months === null || months < 1 || months > 60 || wait === null || wait < 0 || wait > 60) {
-    flash.set(req, 'error', 'Enter TDS as 0–30 %, the protection as 1–60 months and the bank waiting days as 0–60.');
+  const wait = int(body.associate_bank_wait_days);
+  if (tds === null || tds < 0 || tds > 30 || wait === null || wait < 0 || wait > 60) {
+    flash.set(req, 'error', 'Enter TDS as 0–30 % and the bank waiting days as 0–60.');
     res.redirect('/associates/ladder');
     return;
   }
   values.associate_tds_pct = tds.toFixed(2);
-  values.associate_protection_months = String(months);
   values.associate_bank_wait_days = String(wait);
+  // The commission rules: the MD only (fields posted by others are ignored).
+  if (can(req, 'manage_pricing')) {
+    const days = int(body.associate_commission_due_days);
+    const run = String(body.associate_payout_run || '');
+    const day = int(body.associate_payout_day);
+    const threshold = isNum(body.associate_counting_threshold_inr) ? Number(body.associate_counting_threshold_inr) : null;
+    const months = int(body.associate_protection_months);
+    const gst = isNum(body.associate_gst_pct) ? Number(body.associate_gst_pct) : null;
+    let error = null;
+    if (days === null || days < 0 || days > 365) error = 'Enter the days after full payment as 0 to 365.';
+    else if (!['monthly', 'weekly'].includes(run)) error = 'Choose a monthly or a weekly payout run.';
+    else if (day === null || (run === 'monthly' && (day < 1 || day > 28)) || (run === 'weekly' && (day < 1 || day > 7))) error = 'Choose the payout day: 1 to 28 for a monthly run, a weekday for a weekly run.';
+    else if (threshold === null || threshold < 0 || threshold > 1000000000) error = 'Enter the counting-order threshold in rupees (0 or more).';
+    else if (months === null || months < 1 || months > 60) error = 'Enter the buyer registration period as 1 to 60 months.';
+    else if (gst === null || gst < 0 || gst > 28) error = 'Enter the GST on commission as 0 to 28 %.';
+    if (error) {
+      flash.set(req, 'error', error);
+      res.redirect('/associates/ladder');
+      return;
+    }
+    values.associate_commission_due_days = String(days);
+    values.associate_claim_hold = body.associate_claim_hold ? '1' : '0';
+    values.associate_payout_run = run;
+    values.associate_payout_day = String(day);
+    values.associate_counting_threshold_inr = threshold.toFixed(2);
+    values.associate_protection_months = String(months);
+    values.associate_gst_pct = gst.toFixed(2);
+  }
   const before = await incentiveRepository.settings();
   for (const [k, v] of Object.entries(values)) {
     if (String(before[k] ?? '') !== v) {
@@ -830,7 +842,7 @@ async function saveLadder(req, res) {
       await auditLogRepository.log(req.user.id, 'ASSOCIATE_SETTING_CHANGED', 'incentive_settings', null, k, before[k] ?? null, v);
     }
   }
-  flash.set(req, 'success', 'Saved. New rates apply to orders created from now on; existing orders keep the rate fixed on them.');
+  flash.set(req, 'success', 'Saved. The commission rules apply to orders whose buyer pays in full from now on; payouts already worked out keep their dates.');
   res.redirect('/associates/ladder');
 }
 

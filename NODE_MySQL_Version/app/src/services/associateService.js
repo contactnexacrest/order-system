@@ -49,8 +49,9 @@ function appUrl() {
 }
 
 async function protectionMonths() {
-  const v = parseInt((await incentiveRepository.settings()).associate_protection_months ?? 12, 10);
-  return v > 0 ? v : 12;
+  // D-245 P3: a buyer registration lasts this long; with no order from the buyer by then it lapses.
+  const v = parseInt((await incentiveRepository.settings()).associate_protection_months ?? 6, 10);
+  return v > 0 ? v : 6;
 }
 
 /**
@@ -84,7 +85,7 @@ const SUBJECTS = {
   direct_contact: 'your client contacted us', order_created: 'new order from your client',
   commission_earned: 'commission earned', payout_paid: 'commission paid', payout_held: 'commission on hold',
   clawback: 'commission adjustment', bank_changed: 'your bank details changed', bank_rejected: 'your new bank details were not accepted', link_changed: 'a client link changed',
-  lock_ending: 'protection ending soon', agreement_ending: 'agreement ending soon', portal_invite: 'your portal access',
+  lock_ending: 'protection ending soon', registration_lapsed: 'a buyer registration lapsed', agreement_ending: 'agreement ending soon', portal_invite: 'your portal access',
 };
 
 /** A notice in the associate's portal and, where useful, an e-mail. */
@@ -132,14 +133,10 @@ async function invitePortal(associateId, userId) {
  */
 async function linkClient(clientId, associateId, source, invitationId, registeredOn, userId) {
   const lockUntil = addMonths(todayIst(), await protectionMonths());
-  // QA Round 8 (R8-N05): the client gets the associate's next client number now, fixed for ever.
-  await db.transaction(async (conn) => {
-    const number = await associateRepository.clientNumberForLink(clientId, associateId, conn);
-    await conn.execute(
-      'UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_locked_until = :l, associate_source = :s, associate_invitation_id = :i, associate_client_number = :n WHERE id = :id',
-      { a: associateId, d: registeredOn || todayIst(), l: lockUntil, s: source, i: invitationId ?? null, n: number, id: clientId }
-    );
-  });
+  await db.execute(
+    'UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_locked_until = :l, associate_source = :s, associate_invitation_id = :i WHERE id = :id',
+    { a: associateId, d: registeredOn || todayIst(), l: lockUntil, s: source, i: invitationId ?? null, id: clientId }
+  );
 }
 
 /**
@@ -163,7 +160,7 @@ async function canChangeLink(req) {
   return false;
 }
 
-/** Called when an order is created: fixes the associate's rate on it (AS-17) and tells the associate. */
+/** Called when an order is created (D-245 P3: the level shown is provisional; fixed at PI): fixes the associate's rate on it (AS-17) and tells the associate. */
 async function onOrderCreated(orderId, executor = db) {
   const o = await executor.queryOne(
     `SELECT o.id, o.client_id, o.order_reference, o.status, o.is_test_data, o.is_sample_data, c.associate_id, c.company_legal_name
@@ -173,15 +170,15 @@ async function onOrderCreated(orderId, executor = db) {
   if (!o || !o.associate_id) return;
   const a = await associateRepository.find(Number(o.associate_id));
   if (!a) return;
-  const number = await associateRepository.orderNumberForClient(Number(a.id), Number(o.client_id));
-  const rate = await associateRepository.rateWithSource(a, number);
+  const associateCommission = require('./associateCommission');
+  const [level] = Number(a.no_commission || 0) === 1 ? [null] : await associateCommission.levelForAssociate(a, orderId);
   await executor.execute(
-    'UPDATE orders SET associate_id = :a, associate_rate_pct = :r, associate_rate_source = :s, associate_client_number = :n WHERE id = :id',
-    { a: a.id, r: rate.rate, s: rate.source, n: number, id: orderId }
+    'UPDATE orders SET associate_id = :a, associate_rate_pct = :r, associate_rate_source = :s WHERE id = :id',
+    { a: a.id, r: level && level.kind === 'pct' ? level.value : null, s: !level ? 'none' : ((a.commission_mode || 'ladder') === 'fixed' ? 'fixed' : 'ladder'), id: orderId }
   );
   if (Number(o.is_test_data) === 1 || Number(o.is_sample_data) === 1) return;
-  await notify(a, 'order_created', `New order ${o.order_reference} from your client ${o.company_legal_name}. Commission rate fixed on it: `
-    + `${rate.rate.toFixed(2)}% (${rate.source === 'personal' ? 'personal' : (rate.source === 'none' ? 'no commission' : 'standard')}).`, Number(o.client_id), orderId);
+  await notify(a, 'order_created', `New order ${o.order_reference} from your client ${o.company_legal_name}. `
+    + (!level ? 'No commission applies to it.' : `Your commission level for now: ${associateCommission.levelLabel(level)} — fixed on the order when its Proforma Invoice is issued.`), Number(o.client_id), orderId);
 }
 
 /**
@@ -206,6 +203,7 @@ async function onPayoutPaid(payoutId, userId) {
       // Owner decision 2 Nov 2026 (D-235): gross, TDS (section and rate) and net.
       + (Number(p.tds_inr || 0) > 0 ? ` (gross INR ${fmt(Number(p.paid_inr) + Number(p.tds_inr))}, TDS deducted INR ${fmt(p.tds_inr)}`
         + (p.tds_section ? ` u/s ${p.tds_section}` : '') + (Number(p.tds_rate || 0) > 0 ? ` at ${require('./associateTds').pct(Number(p.tds_rate))}` : '') + ')' : '')
+      + (Number(p.gst_inr || 0) > 0 ? ` + GST INR ${Number(p.gst_inr).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} on your tax invoice` : '')
       + ` on ${dates.short(String(p.paid_on))}${p.paid_reference ? `, bank reference ${p.paid_reference}` : ''}.`, null, Number(p.order_id), null, userId);
   }
 }
@@ -214,7 +212,8 @@ async function onPayoutPaid(payoutId, userId) {
 async function dailyReminders(today = null) {
   const day0 = today || todayIst();
   await associateInvitationRepository.expireOld();
-  let sent = 0;
+  // D-245 P3: registrations past their period with no order from the buyer lapse (unlinked, associate told).
+  let sent = await require('./associateCommission').lapseRegistrations(day0);
   for (const days of [30, 7]) {
     const day = addDays(day0, days);
     const clientRows = await db.query(

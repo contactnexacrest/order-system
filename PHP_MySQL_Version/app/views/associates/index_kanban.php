@@ -8,7 +8,7 @@ $renderKanbanCard = static function (array $a) use ($canManage, $canBank): strin
       <?php if (!empty($a['email'])): ?><div class="muted small"><?= htmlspecialchars((string) $a['email']) ?></div><?php endif; ?>
       <div class="entity-card-sub"><?= $a['based_in'] === 'india' ? 'India' : htmlspecialchars('Abroad' . ($a['country'] ? ' — ' . $a['country'] : '')) ?> · Code <?= htmlspecialchars((string) ($a['personal_code'] ?? '—')) ?></div>
       <div class="small">Clients: <?= count($a['clients']) ?><?php foreach (array_slice($a['clients'], 0, 3) as $c): ?><br><a href="/clients/<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['company_legal_name']) ?></a><?php endforeach; ?></div>
-      <?php if ($canManage): ?><div class="muted small"><?= (int) $a['no_commission'] === 1 ? 'No commission' : (array_filter([$a['rate_1_5'], $a['rate_6_10'], $a['rate_11_20'], $a['rate_21_40'], $a['rate_41_plus']]) ? 'Personal rates' : 'Standard rates') ?></div><?php endif; ?>
+      <?php if ($canManage): ?><div class="muted small"><?= (int) $a['no_commission'] === 1 ? 'No commission' : (($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'Fixed: ' . htmlspecialchars((string) ($a['commission_level_name'] ?? '?')) : 'Ladder') ?></div><?php endif; ?>
       <?php if (($canManage || $canBank) && $a['pending_bank'] > 0): ?><span class="badge badge-pending">Change to check</span><?php endif; ?>
       <div class="entity-card-footer"><a class="btn-sm" href="/associates/<?= (int) $a['id'] ?>">Open</a></div>
     </div>
@@ -25,7 +25,7 @@ $columns = $status === 'all' ? array_diff_key(\App\Repositories\AssociateReposit
     </div>
     <div class="btn-row" style="margin-top:0">
       <a class="btn-sm btn-secondary" href="/associates?view=list">Switch to list view</a>
-      <?php if ($canManage): ?><a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/ladder">Standard rates</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a><?php endif; ?>
+      <?php if ($canManage): ?><a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/ladder">Commission settings</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a><?php endif; ?>
     </div>
   </div>
   <?php require __DIR__ . '/_filters.php'; ?>

@@ -1,4 +1,4 @@
-{# Expects: o (order row with currency_code and commission {state, label, rate, source, amount}). #}
+{# Expects: o (order row with currency_code and commission {state, label, amount, level}). D-245 P3: the level, not a rung rate. #}
 {% set cm = o.commission %}
-{% if cm.amount !== null and cm.amount !== undefined %}{{ o.currency_code }} {{ cm.amount | money }}{% if cm.rate !== null and cm.rate !== undefined %} <small class="muted">({{ cm.rate | pct2 }}%{{ ' personal' if cm.source == 'personal' else (' standard' if cm.source == 'global' else '') }})</small>{% endif %}<br>{% endif %}
+{% if cm.amount !== null and cm.amount !== undefined %}{{ o.currency_code }} {{ cm.amount | money }}{% if cm.level %} <small class="muted">({{ cm.level }})</small>{% endif %}<br>{% endif %}
 <span class="badge {{ {'paid': 'badge-active', 'earned': 'badge-active', 'held': 'badge-lost', 'expected': 'badge-pending'}[cm.state] or 'badge-inactive' }}">{{ cm.label }}</span>

@@ -1637,10 +1637,18 @@ async function associateCommission(cost) {
   const taxed = payouts.find((p) => Number(p.tds_inr || 0) > 0);
   const tdsRate = taxed && taxed.tds_rate !== null && taxed.tds_rate !== undefined ? Number(taxed.tds_rate) : null;
   const tdsSection = taxed ? (taxed.tds_section || null) : null;
-  const rate = inc.associate_rate_pct !== null && inc.associate_rate_pct !== undefined
-    ? `${Number(inc.associate_rate_pct).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : '';
+  // Owner decision D-245 P3: the level fixed at PI, on the invoiced FOB of the goods.
+  const associateCommission = require('./associateCommission');
+  const orderRow = await require('../repositories/orderRepository').find(Number(cost.order_id));
+  const fixedLevel = orderRow ? associateCommission.fixedLevel(orderRow) : null;
+  const rate = fixedLevel ? associateCommission.levelLabel(fixedLevel)
+    : (inc.associate_rate_pct !== null && inc.associate_rate_pct !== undefined
+      ? `${Number(inc.associate_rate_pct).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : '');
+  const gst = Math.round(payouts.reduce((sum, p) => sum + Number(p.gst_inr || 0), 0) * 100) / 100;
   const what = `Associate commission — ${a.name} — for order ${cost.buyer_inquiry_ref} (${cost.buyer_name})`
-    + (rate !== '' ? `, ${rate} of product FOB` : '') + (inc.associate_order_number ? `, client no. ${inc.associate_order_number}` : '');
+    + (rate !== '' ? `, ${rate} on the invoiced FOB of the goods` : '')
+    + (inc.associate_basis_fc ? ` (basis ${inc.associate_currency || ''} ${Number(inc.associate_basis_fc).toFixed(2)})` : '')
+    + (gst > 0 ? ` · GST ${gst.toFixed(2)} on the associate's tax invoice (input credit)` : '');
   return {
     associate: a,
     bill_no: billNo,

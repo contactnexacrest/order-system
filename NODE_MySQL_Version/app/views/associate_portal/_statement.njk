@@ -1,0 +1,25 @@
+{# Owner decision D-245 P3: the commission statement of one order — the invoiced FOB of the goods line by
+   line, the level, the rupee basis at the realised rate, GST, and when it is due and paid. Shown to the
+   associate (portal) and to staff with "Manage associates". PHP twin: _statement.php. Expects c = associateCommission.forOrder(). #}
+<div class="statement">
+  <table class="list">
+    <tr><th>Line</th><th class="r">Invoiced FOB ({{ c.currency }})</th><th>Price check</th><th class="r">Commission ({{ c.currency }})</th></tr>
+    {% for l in c.lines %}
+      <tr><td>{{ l.line_no }} · {{ l.description | truncate(60, true, '') }}</td><td class="r">{{ l.fob | money }}</td>
+        <td>{% if l.in_range %}<span class="badge badge-active">In range</span>{% else %}<span class="badge badge-pending">Below floor, approved — no commission</span>{% endif %}</td><td class="r">{{ l.commission | money }}</td></tr>
+    {% endfor %}
+    {% if c.lines.length == 0 %}<tr><td colspan="4" class="muted">No goods lines yet.</td></tr>{% endif %}
+    <tr><td><b>Total</b></td><td class="r"><b>{{ c.goods_fc | money }}</b></td><td></td><td class="r"><b>{{ c.amount_fc | money }}</b></td></tr>
+  </table>
+  <table class="kv" style="margin-top:8px">
+    <tr><th>Commission level</th><td>{{ c.level_label }}{{ ' — fixed when the Proforma Invoice was issued' if c.level_fixed else ' — for now; fixed when the Proforma Invoice is issued' }}</td></tr>
+    {% if (c.reduction_fc | float) > 0 %}<tr><th>Agreed discount / settled claim</th><td>− {{ c.currency }} {{ c.reduction_fc | money }} (lowers the basis)</td></tr>{% endif %}
+    <tr><th>Basis</th><td>{{ c.currency }} {{ c.basis_fc | money }} × ₹{{ c.rate_inr | fixed4 }}{{ ' (estimated — rupees credited not recorded yet)' if c.rate_estimated else ' realised' }} = ₹{{ c.basis_inr | money }}</td></tr>
+    <tr><th>Commission</th><td><b>{{ c.currency }} {{ c.amount_fc | money }} · ₹{{ c.amount_inr | money }}</b>{{ ' — none: the buyer did not pay the order in full' if c.state == 'unpaid' }}</td></tr>
+    <tr><th>GST</th><td>{% if c.gstin %}GST {{ c.gst_pct | pct2 }}% added on top once your tax invoice is on file{% else %}none (not GST-registered){% endif %}</td></tr>
+    <tr><th>Full payment</th><td>{{ ((c.fully_paid_on | shortDate) + ' ✓') if c.fully_paid_on else 'not yet' }}</td></tr>
+    <tr><th>Due / payout run</th><td>{% if c.due_on %}due {{ c.due_on | shortDate }} · paid in the {{ c.payout_run_on | shortDate }} payout run{% else %}once the buyer has paid in full{% endif %}{% if c.claim_hold %} — <b>held while a buyer claim is open</b>{% endif %}</td></tr>
+    <tr><th>Counts toward the ladder</th><td>{% if c.state != 'paid' %}decided when the buyer has paid in full{% elif c.counts %}yes (counting order no. {{ c.counting_number }}){% else %}no — under ₹{{ c.threshold_inr | money0 }} within range{% endif %}</td></tr>
+  </table>
+  <p class="muted small">Basis is the final invoiced FOB of the goods only — no freight, insurance or services. Bank charges never reduce it; an agreed discount or settled claim does; an order not paid in full earns nothing.</p>
+</div>

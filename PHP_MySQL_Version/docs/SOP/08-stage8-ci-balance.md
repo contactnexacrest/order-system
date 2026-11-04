@@ -177,4 +177,4 @@ received so far · still owed**. A payment cannot be cleared while money is
 still owed, except by a manager with **Approve short payment**, who writes
 the reason (not the person who recorded the receipts, unless their role is
 ticked in Admin → Self-approval rules); the shortfall is then recorded as written off and shown on the
-order. See chapter 03, "Paid in parts", for the details.
+order. When it is written off, the manager also says **what the short is** — an agreed discount, a settled buyer claim, or not paid by the buyer (D-245 P3); this decides an associate's commission (chapter 24). See chapter 03, "Paid in parts", for the details.

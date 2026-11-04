@@ -124,7 +124,6 @@ final class AssociateAdminController
             'editing' => $a,
             'currencies' => LookupRepository::currencies(),
             'users' => UserRepository::listActive(),
-            'ladder' => AssociateRepository::globalLadder(),
             // Owner decision D-245 (4 Nov 2026): commission level (fixed) or the ladder — MD only.
             'commissionLevels' => \App\Repositories\PricingRepository::levels(),
             'canPricing' => self::can('manage_pricing'),
@@ -200,16 +199,6 @@ final class AssociateAdminController
         if ($data['agreement_signed_on'] !== null && $data['agreement_ends_on'] !== null && $data['agreement_ends_on'] <= $data['agreement_signed_on']) {
             $errors[] = 'The agreement must end after it was signed.';
         }
-        // Owner decision 1 Nov 2026 (AS-17): a personal rate per rung; empty or 0 uses the global ladder.
-        foreach (['rate_1_5', 'rate_6_10', 'rate_11_20', 'rate_21_40', 'rate_41_plus'] as $r) {
-            if ($data[$r] !== null && (!is_numeric($data[$r]) || (float) $data[$r] < 0 || (float) $data[$r] > 20)) {
-                $errors[] = 'Enter each personal rate as a % from 0 to 20, or leave it empty for the standard rate.';
-                break;
-            }
-            if ($data[$r] !== null && (float) $data[$r] == 0.0) {
-                $data[$r] = null;
-            }
-        }
         if ($data['pan'] !== null && $data['based_in'] === 'india' && !preg_match('/^[A-Z]{5}\d{4}[A-Z]$/', (string) $data['pan'])) {
             $errors[] = 'Enter the PAN as on the card (e.g. ABCDE1234F).';
         }
@@ -217,7 +206,7 @@ final class AssociateAdminController
             $errors[] = 'Enter the 15-character GSTIN, or leave it empty.';
         }
         if ($data['relationship_manager_id'] !== null && (!ctype_digit((string) $data['relationship_manager_id']) || UserRepository::findById((int) $data['relationship_manager_id']) === null)) {
-            $errors[] = 'Choose the relationship manager from the list.';
+            $errors[] = 'Choose who the associate reports to from the list.';
         }
         foreach (['country' => 80, 'phone' => 40, 'tax_id' => 50, 'notes' => 500, 'address' => 1000] as $f => $max) {
             if ($data[$f] !== null && mb_strlen((string) $data[$f]) > $max) {
@@ -261,13 +250,11 @@ final class AssociateAdminController
             AssociateRepository::update($id, $data);
             AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_UPDATED', 'associates', $id, null, null, (string) json_encode($data));
             $changed = [];
-            foreach (['rate_1_5', 'rate_6_10', 'rate_11_20', 'rate_21_40', 'rate_41_plus', 'no_commission'] as $r) {
-                if ((string) ($existing[$r] ?? '') !== (string) ($data[$r] ?? '') && !((float) ($existing[$r] ?? 0) == (float) ($data[$r] ?? 0) && $r !== 'no_commission')) {
-                    $changed[] = $r;
-                }
+            if ((int) ($existing['no_commission'] ?? 0) !== (int) $data['no_commission']) {
+                $changed[] = 'no_commission';
             }
             if ($changed !== []) {
-                AssociateEventRepository::add($id, 'rates_changed', 'Commission terms changed by ' . $user['name'] . ' — applies to orders created from now on; existing orders keep the rate fixed on them.', null, null, null, (int) $user['id'], true);
+                AssociateEventRepository::add($id, 'rates_changed', 'Commission terms changed by ' . $user['name'] . ' — applies to new quotes; orders with a Proforma Invoice keep the level fixed on them.', null, null, null, (int) $user['id'], true);
             }
             Flash::set('success', "Associate \"{$data['name']}\" saved.");
         }
@@ -327,7 +314,9 @@ final class AssociateAdminController
                 'events' => AssociateEventRepository::forAssociate($id, null, 200),
                 'messages' => AssociateEventRepository::messages($id),
                 'unlinkedClients' => AssociateRepository::unlinkedClients(),
-                'ladder' => AssociateRepository::globalLadder(),
+                // D-245 P3: commission level or ladder, counting orders so far, when commission is paid.
+                'commissionNow' => \App\Services\AssociateCommission::levelForAssociate($a, null),
+                'commissionSettings' => \App\Services\AssociateCommission::settings(),
                 'rm' => !empty($a['relationship_manager_id']) ? UserRepository::findById((int) $a['relationship_manager_id']) : null,
                 'codeLink' => AssociatePortalController::codeLink($a),
                 'tdsPct' => AssociateService::tdsPct(),
@@ -521,7 +510,7 @@ final class AssociateAdminController
                 AssociateService::linkClient($clientId, (int) $target['id'], 'md_change', null, date('Y-m-d'), (int) $user['id']);
                 AssociateService::notify($target, 'link_changed', "{$client['company_legal_name']} is now registered as your client (decided by the Managing Director: {$reason}).", $clientId, null, null, (int) $user['id']);
             } else {
-                Database::connection()->prepare('UPDATE clients SET associate_id = NULL, associate_registered_on = NULL, associate_locked_until = NULL, associate_source = NULL, associate_invitation_id = NULL, associate_client_number = NULL WHERE id = :id')->execute(['id' => $clientId]);
+                Database::connection()->prepare('UPDATE clients SET associate_id = NULL, associate_registered_on = NULL, associate_locked_until = NULL, associate_source = NULL, associate_invitation_id = NULL WHERE id = :id')->execute(['id' => $clientId]);
             }
             AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_CLIENT_UNLINKED', 'clients', $clientId, 'associate_id', (string) $a['id'], $target !== null ? (string) $target['id'] : null);
             AssociateService::notify($a, 'link_changed', "{$client['company_legal_name']} is no longer registered as your client" . ($target !== null ? '' : '') . ". Decided by the Managing Director. Reason: {$reason}", $clientId, null, null, (int) $user['id']);
@@ -800,7 +789,11 @@ final class AssociateAdminController
         self::back((int) $p['associate_id'], 'commission');
     }
 
-    /** After a refund to the buyer: the paid commission's share is deducted from the associate's next payout. */
+    /**
+     * Owner decision D-245 P3: a paid commission is taken back only for the associate's
+     * fraud or breach of the agreement — never for a later buyer claim or refund — with
+     * a written reason. The amount is deducted from the associate's next payout.
+     */
     public function clawback(array $params): void
     {
         $p = self::associatePayout($params);
@@ -809,6 +802,12 @@ final class AssociateAdminController
         }
         $amount = filter_var($_POST['amount_inr'] ?? '', FILTER_VALIDATE_FLOAT);
         $reason = trim((string) ($_POST['reason'] ?? ''));
+        $kind = (string) ($_POST['takeback_kind'] ?? '');
+        if (!in_array($kind, ['fraud', 'breach'], true)) {
+            Flash::set('error', 'A paid commission is taken back only for the associate\'s fraud or breach of the agreement — choose which, and say what happened. A later buyer claim or refund does not take it back.');
+            self::back((int) $p['associate_id'], 'commission');
+            return;
+        }
         $already = (float) Database::connection()->query('SELECT COALESCE(-SUM(amount_inr), 0) FROM incentive_payouts WHERE clawback_of_payout_id = ' . (int) $p['id'])->fetchColumn();
         $leftMessage = static fn (float $left): string => 'Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹' . number_format($left, 2) . ').';
         if ($p['status'] !== 'paid' || (float) $p['amount_inr'] <= 0) {
@@ -816,36 +815,40 @@ final class AssociateAdminController
         } elseif ($amount === false || $amount <= 0 || $amount > (float) $p['paid_inr'] - $already + 0.005) {
             Flash::set('error', $leftMessage((float) $p['paid_inr'] - $already));
         } elseif (mb_strlen($reason) < 10 || mb_strlen($reason) > 300) {
-            Flash::set('error', 'Say what was refunded to the buyer (10 to 300 characters) — the associate is shown it.');
+            Flash::set('error', 'Say what the ' . $kind . ' was (10 to 300 characters) — the associate is shown it.');
         } else {
             $month = IncentiveService::incentiveMonth(date('Y-m-d'), IncentiveService::settings()['cutoff']);
             $order = \App\Repositories\OrderRepository::find((int) $p['order_id']);
             // QA Round 8, R8-N12: re-checked with the paid payout locked, so simultaneous claw-backs cannot exceed what was paid.
-            $saved = IncentiveRepository::addClawbackWithinPaid((int) $p['id'], (float) $amount, $month, 'Claw-back of commission paid on order ' . ($order['order_reference'] ?? $p['order_id']) . " (payout no. {$p['id']}, ref " . ($p['paid_reference'] ?? '—') . "): {$reason}");
+            $saved = IncentiveRepository::addClawbackWithinPaid((int) $p['id'], (float) $amount, $month, 'Taken back for ' . $kind . ': commission paid on order ' . ($order['order_reference'] ?? $p['order_id']) . " (payout no. {$p['id']}, ref " . ($p['paid_reference'] ?? '—') . "): {$reason}");
             if ($saved['id'] === null) {
                 Flash::set('error', $leftMessage(max(0.0, $saved['left'])));
             } else {
                 $id = (int) $saved['id'];
-                AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_CLAWBACK', 'incentive_payouts', $id, null, null, (string) $amount);
+                \App\Config\Database::connection()->prepare('UPDATE incentive_payouts SET takeback_kind = :k WHERE id = :id')->execute(['k' => $kind, 'id' => $id]);
+                AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_CLAWBACK', 'incentive_payouts', $id, 'takeback_kind', null, (string) $amount, $kind . ': ' . $reason);
                 $a = AssociateRepository::find((int) $p['associate_id']);
-                AssociateService::notify($a, 'clawback', 'INR ' . number_format((float) $amount, 2) . ' of the commission paid on order ' . ($order['order_reference'] ?? '') . " will be deducted from your " . IncentiveService::monthLabel($month) . " payout: {$reason}", null, (int) $p['order_id'], null, (int) self::user()['id']);
-                Flash::set('success', 'Claw-back recorded; it is deducted from the associate\'s next payout.');
+                AssociateService::notify($a, 'clawback', 'INR ' . number_format((float) $amount, 2) . ' of the commission paid on order ' . ($order['order_reference'] ?? '') . " is taken back (" . ($kind === 'fraud' ? 'fraud' : 'breach of the agreement') . ") and deducted from your " . IncentiveService::monthLabel($month) . " payout: {$reason}", null, (int) $p['order_id'], null, (int) self::user()['id']);
+                Flash::set('success', 'Take-back recorded (' . $kind . '); it is deducted from the associate\'s next payout.');
             }
         }
         self::back((int) $p['associate_id'], 'commission');
     }
 
-    // ------------------------------------------------------------ global ladder (AS-17) and settings
+    // ------------------------------------------------------------ commission settings (D-245 P3)
 
+    /**
+     * Owner decision D-245 P3: when an associate's commission is paid, the counting-order
+     * threshold, buyer registration, GST — the MD changes these (manage_pricing); TDS and
+     * the bank waiting days as before. Commission levels and the ladder: Admin → Pricing.
+     */
     public function ladder(array $params): void
     {
-        $s = IncentiveRepository::settings();
         View::render('associates/ladder', [
-            'ladder' => AssociateRepository::globalLadder(),
             'tds' => AssociateService::tdsPct(),
-            'protection' => AssociateService::protectionMonths(),
             'wait' => AssociateService::bankWaitDays(),
-            'settings' => $s,
+            'commission' => \App\Services\AssociateCommission::settings(),
+            'canPricing' => self::can('manage_pricing'),
         ], 'layout/base');
     }
 
@@ -853,26 +856,45 @@ final class AssociateAdminController
     {
         $user = self::user();
         $values = [];
-        foreach (array_keys(AssociateRepository::globalLadder()) as $col) {
-            $v = filter_var($_POST[$col] ?? '', FILTER_VALIDATE_FLOAT);
-            if ($v === false || $v < 0 || $v > 20) {
-                Flash::set('error', 'Enter every standard rate as a % from 0 to 20.');
-                header('Location: /associates/ladder');
-                return;
-            }
-            $values['associate_' . $col] = number_format($v, 2, '.', '');
-        }
         $tds = filter_var($_POST['associate_tds_pct'] ?? '', FILTER_VALIDATE_FLOAT);
-        $months = filter_var($_POST['associate_protection_months'] ?? '', FILTER_VALIDATE_INT);
         $wait = filter_var($_POST['associate_bank_wait_days'] ?? '', FILTER_VALIDATE_INT);
-        if ($tds === false || $tds < 0 || $tds > 30 || $months === false || $months < 1 || $months > 60 || $wait === false || $wait < 0 || $wait > 60) {
-            Flash::set('error', 'Enter TDS as 0–30 %, the protection as 1–60 months and the bank waiting days as 0–60.');
+        if ($tds === false || $tds < 0 || $tds > 30 || $wait === false || $wait < 0 || $wait > 60) {
+            Flash::set('error', 'Enter TDS as 0–30 % and the bank waiting days as 0–60.');
             header('Location: /associates/ladder');
             return;
         }
         $values['associate_tds_pct'] = number_format($tds, 2, '.', '');
-        $values['associate_protection_months'] = (string) $months;
         $values['associate_bank_wait_days'] = (string) $wait;
+        // The commission rules: the MD only (fields posted by others are ignored).
+        if (self::can('manage_pricing')) {
+            $days = filter_var($_POST['associate_commission_due_days'] ?? '', FILTER_VALIDATE_INT);
+            $run = (string) ($_POST['associate_payout_run'] ?? '');
+            $day = filter_var($_POST['associate_payout_day'] ?? '', FILTER_VALIDATE_INT);
+            $threshold = filter_var($_POST['associate_counting_threshold_inr'] ?? '', FILTER_VALIDATE_FLOAT);
+            $months = filter_var($_POST['associate_protection_months'] ?? '', FILTER_VALIDATE_INT);
+            $gst = filter_var($_POST['associate_gst_pct'] ?? '', FILTER_VALIDATE_FLOAT);
+            $error = match (true) {
+                $days === false || $days < 0 || $days > 365 => 'Enter the days after full payment as 0 to 365.',
+                !in_array($run, ['monthly', 'weekly'], true) => 'Choose a monthly or a weekly payout run.',
+                $day === false || ($run === 'monthly' && ($day < 1 || $day > 28)) || ($run === 'weekly' && ($day < 1 || $day > 7)) => 'Choose the payout day: 1 to 28 for a monthly run, a weekday for a weekly run.',
+                $threshold === false || $threshold < 0 || $threshold > 1000000000 => 'Enter the counting-order threshold in rupees (0 or more).',
+                $months === false || $months < 1 || $months > 60 => 'Enter the buyer registration period as 1 to 60 months.',
+                $gst === false || $gst < 0 || $gst > 28 => 'Enter the GST on commission as 0 to 28 %.',
+                default => null,
+            };
+            if ($error !== null) {
+                Flash::set('error', $error);
+                header('Location: /associates/ladder');
+                return;
+            }
+            $values['associate_commission_due_days'] = (string) $days;
+            $values['associate_claim_hold'] = !empty($_POST['associate_claim_hold']) ? '1' : '0';
+            $values['associate_payout_run'] = $run;
+            $values['associate_payout_day'] = (string) $day;
+            $values['associate_counting_threshold_inr'] = number_format($threshold, 2, '.', '');
+            $values['associate_protection_months'] = (string) $months;
+            $values['associate_gst_pct'] = number_format($gst, 2, '.', '');
+        }
         $before = IncentiveRepository::settings();
         foreach ($values as $k => $v) {
             if ((string) ($before[$k] ?? '') !== $v) {
@@ -880,7 +902,7 @@ final class AssociateAdminController
                 AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_SETTING_CHANGED', 'incentive_settings', null, $k, $before[$k] ?? null, $v);
             }
         }
-        Flash::set('success', 'Saved. New rates apply to orders created from now on; existing orders keep the rate fixed on them.');
+        Flash::set('success', 'Saved. The commission rules apply to orders whose buyer pays in full from now on; payouts already worked out keep their dates.');
         header('Location: /associates/ladder');
     }
 

@@ -86,43 +86,47 @@ async function productSummary(orderId) {
 
 const NONE_REPEAT = 'No commission — repeat order (outside the 10 days from the first Buyer PO)';
 
-/** The commission line for one order: {state, label, rate, source, amount}. */
+/**
+ * The commission line for one order (owner decision D-245 P3: on the invoiced FOB of
+ * the goods, line by line, at the level fixed at PI, full payment only).
+ */
 async function commission(associateId, o) {
-  const rate = o.associate_rate_pct !== null && o.associate_rate_pct !== undefined ? Number(o.associate_rate_pct) : null;
-  const source = o.associate_rate_source ?? null;
-  if (['cancelled', 'lost'].includes(o.status)) {
-    return { state: 'none', label: 'No commission — order cancelled', rate: null, source: null, amount: null };
-  }
-  if (o.locked_at) {
-    if (Number(o.paid_associate_id || 0) === Number(associateId) && Number(o.associate_amount_fc) > 0) {
-      const p = (await db.queryOne(
-        "SELECT status, paid_on FROM incentive_payouts WHERE order_id = :o AND payee_kind = 'associate' AND associate_id = :a AND clawback_of_payout_id IS NULL ORDER BY id LIMIT 1",
-        { o: o.id, a: associateId }
-      )) || { status: 'due', paid_on: null };
-      let label;
-      if (p.status === 'paid') label = `Paid on ${dates.short(String(p.paid_on))}`;
-      else if (p.status === 'held') label = 'On hold';
-      else label = `Earned — to be paid in the ${incentive().monthLabel(String(o.incentive_month))} payout`;
-      return { state: p.status === 'paid' ? 'paid' : (p.status === 'held' ? 'held' : 'earned'), label, rate: Number(o.locked_rate), source, amount: Number(o.associate_amount_fc) };
-    }
-    return { state: 'none', label: NONE_REPEAT, rate: null, source: null, amount: null };
-  }
-  if ((o.associate_mode || 'auto') === 'no') {
-    return { state: 'none', label: 'No commission on this order (decided by NexaCrest)', rate: null, source: null, amount: null };
-  }
-  if (source === 'none') {
-    return { state: 'none', label: 'No commission under your agreement', rate: 0, source: 'none', amount: null };
-  }
+  const associateCommission = require('../services/associateCommission');
   const orderRepository = require('./orderRepository');
-  const within = (o.associate_mode || 'auto') === 'yes' || await incentive().withinFirstTenDays((await orderRepository.find(Number(o.id))) || {});
-  if (!within) {
-    return { state: 'none', label: NONE_REPEAT, rate: null, source: null, amount: null };
+  const none = (label) => ({ state: 'none', label, rate: null, source: null, amount: null, level: null, detail: null });
+  if (['cancelled', 'lost'].includes(o.status)) return none('No commission — order cancelled');
+  if (o.locked_at) {
+    if (Number(o.paid_associate_id || 0) !== Number(associateId)) return none(NONE_REPEAT);
+    if (Number(o.associate_amount_fc) <= 0) return none('No commission — the buyer did not pay this order in full');
+    const p = (await db.queryOne(
+      "SELECT * FROM incentive_payouts WHERE order_id = :o AND payee_kind = 'associate' AND associate_id = :a AND clawback_of_payout_id IS NULL ORDER BY id LIMIT 1",
+      { o: o.id, a: associateId }
+    )) || { status: 'due', paid_on: null, due_on: null, payout_run_on: null };
+    const claim = !!p.due_on && (await associateCommission.settings()).claim_hold && await associateCommission.claimOpen(Number(o.id), p.due_on);
+    let label;
+    if (p.status === 'paid') label = `Paid on ${dates.short(String(p.paid_on))}`;
+    else if (p.status === 'held') label = 'On hold';
+    else if (claim) label = 'Earned — waiting while a buyer claim on the order is open';
+    else if (p.due_on) label = `Earned — due ${dates.short(String(p.due_on))}, paid in the ${dates.short(String(p.payout_run_on))} payout run`;
+    else label = `Earned — to be paid in the ${incentive().monthLabel(String(o.incentive_month))} payout`;
+    const order = await orderRepository.find(Number(o.id));
+    const fixed = order ? associateCommission.fixedLevel(order) : null;
+    const level = fixed ? associateCommission.levelLabel(fixed)
+      : (o.locked_rate !== null && o.locked_rate !== undefined ? `${Number(o.locked_rate).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : null);
+    return { state: p.status === 'paid' ? 'paid' : (p.status === 'held' || claim ? 'held' : 'earned'), label,
+      rate: o.locked_rate !== null && o.locked_rate !== undefined ? Number(o.locked_rate) : null, source: o.associate_rate_source ?? null,
+      amount: Number(o.associate_amount_fc), level, detail: await associateCommission.forOrder(Number(o.id)) };
   }
-  const expected = rate !== null ? Math.round(Number(o.fob_value) * rate) / 100 : null;
-  if ((await incentive().fullyPaidOn(Number(o.id))) !== null) {
-    return { state: 'expected', label: 'Buyer has paid in full — NexaCrest is confirming your commission', rate, source, amount: expected };
-  }
-  return { state: 'expected', label: 'Not yet earned — waiting for the buyer\'s full payment', rate, source, amount: expected };
+  if ((o.associate_mode || 'auto') === 'no') return none('No commission on this order (decided by NexaCrest)');
+  if ((o.associate_rate_source ?? null) === 'none') return none('No commission under your agreement');
+  const order = (await orderRepository.find(Number(o.id))) || {};
+  const c = await associateCommission.forOrder(Number(o.id), order);
+  if (!c) return none(NONE_REPEAT);
+  const label = (await incentive().fullyPaidOn(Number(o.id))) !== null
+    ? 'Buyer has paid in full — NexaCrest is confirming your commission'
+    : 'Not yet earned — waiting for the buyer\'s full payment';
+  return { state: 'expected', label, rate: c.rate, source: o.associate_rate_source ?? null, amount: c.amount_fc,
+    level: c.level_label + (c.level_fixed ? '' : ' (for now — fixed when the Proforma Invoice is issued)'), detail: c };
 }
 
 /** The associate's payouts (commission lines), newest first. */

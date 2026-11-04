@@ -148,6 +148,28 @@ final class IncentiveController
             return;
         }
         $fields = ['reward_override_inr' => $override, 'is_excluded' => !empty($_POST['is_excluded']) ? 1 : 0, 'associate_mode' => $mode];
+        // Owner decision D-245 P3: forcing an associate's commission on ("Yes", e.g. on a repeat order)
+        // is the MD's decision alone, with a written reason; it is audited.
+        $wasYes = ($row['associate_mode'] ?? 'auto') === 'yes';
+        $modeReason = trim((string) ($_POST['associate_mode_reason'] ?? ''));
+        if ($mode === 'yes' && (!$wasYes || $modeReason !== (string) ($row['associate_mode_reason'] ?? ''))) {
+            if (!\App\Services\AssociateService::canChangeLink($user)) {
+                Flash::set('error', 'Only the MD can force the associate\'s commission on for an order.');
+                header("Location: /orders/{$orderId}#financials-12d");
+                return;
+            }
+            if (mb_strlen($modeReason) < 10 || mb_strlen($modeReason) > 300) {
+                Flash::set('error', 'Say why the associate\'s commission is forced on for this order (10 to 300 characters).');
+                header("Location: /orders/{$orderId}#financials-12d");
+                return;
+            }
+            $fields['associate_mode_reason'] = $modeReason;
+            $fields['associate_mode_set_by'] = (int) $user['id'];
+            AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_COMMISSION_FORCED', 'orders', $orderId, 'associate_mode', (string) ($row['associate_mode'] ?? 'auto'), 'yes', $modeReason);
+        } elseif ($mode !== 'yes' && $wasYes) {
+            $fields['associate_mode_reason'] = null;
+            $fields['associate_mode_set_by'] = null;
+        }
         IncentiveRepository::saveOrder($orderId, $fields, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'ORDER_INCENTIVE_SET', 'orders', $orderId, 'incentive', $row !== null ? (string) json_encode(array_intersect_key($row, $fields)) : null, (string) json_encode($fields));
         Flash::set('success', 'Team incentive for this order saved.');
@@ -282,6 +304,16 @@ final class IncentiveController
                 $skipped = ($skipped ?? 0) + 1;
                 continue;
             }
+            // Owner decision D-245 P3: an associate's commission is paid only from its due date, and not while a buyer claim holds it.
+            if (($block = \App\Services\AssociateCommission::payBlockReason($payout, $paidOn)) !== null) {
+                if (isset($params['payoutId'])) {
+                    Flash::set('error', $block);
+                    header('Location: /incentives/payouts?month=' . rawurlencode($month));
+                    return;
+                }
+                $skippedDue = ($skippedDue ?? 0) + 1;
+                continue;
+            }
             // Owner decision 2 Nov 2026 (D-235): the app works out the TDS on an associate's commission.
             $tdsCalc = null;
             $overrideReason = null;
@@ -355,6 +387,12 @@ final class IncentiveController
                 }
             }
             if ($payout['payee_kind'] === 'associate') {
+                // D-245 P3: GST on top for a GST-registered associate whose tax invoice for this payout is on file.
+                $gst = \App\Services\AssociateCommission::gstFor($payout);
+                if ($gst > 0) {
+                    \App\Config\Database::connection()->prepare('UPDATE incentive_payouts SET gst_pct = :p, gst_inr = :g WHERE id = :id')
+                        ->execute(['p' => \App\Services\AssociateCommission::settings()['gst_pct'], 'g' => $gst, 'id' => $id]);
+                }
                 \App\Services\AssociateService::onPayoutPaid($id, (int) $user['id']);
             }
             $count++;
@@ -362,9 +400,11 @@ final class IncentiveController
         // QA Round 6, R6-N11: nothing selected (or all already paid) is not a success.
         if ($count === 0) {
             Flash::set('warning', 'Nothing was recorded — no payout due for payment was selected.' . (!empty($skipped) ? " {$skipped} associate payout(s) skipped: no verified bank account yet." : '')
+                . (!empty($skippedDue) ? " {$skippedDue} associate payout(s) skipped: not due yet, or held while a buyer claim is open." : '')
                 . (!empty($skippedDocs) ? " {$skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA" . (\App\Services\AssociateTds::settings()['cb_required'] ? '/15CB' : '') . ' not yet on file — pay them one by one.' : ''));
         } else {
             Flash::set('success', ($count === 1 ? 'Payment recorded.' : "{$count} payments recorded.") . (!empty($skipped) ? " {$skipped} associate payout(s) skipped: no verified bank account yet." : '')
+                . (!empty($skippedDue) ? " {$skippedDue} associate payout(s) skipped: not due yet, or held while a buyer claim is open." : '')
                 . (!empty($skippedDocs) ? " {$skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA" . (\App\Services\AssociateTds::settings()['cb_required'] ? '/15CB' : '') . ' not yet on file — pay them one by one.' : ''));
         }
         header('Location: /incentives/payouts?month=' . rawurlencode($month));

@@ -54,6 +54,9 @@ $__sourceText = [
       <?php endforeach; ?>
       <?php if ($incentivePayouts === []): ?><tr><td colspan="4" class="muted">No incentive on this order.</td></tr><?php endif; ?>
     </table>
+    <?php if (!empty($incentiveCalc['associate'])): $c = $incentiveCalc['associate']; ?>
+      <details style="margin-top:8px"><summary class="small">Associate commission statement</summary><?php require __DIR__ . '/../associate_portal/_statement.php'; ?></details>
+    <?php endif; ?>
     <form method="post" action="/orders/<?= $__oid ?>/incentive/recalculate" data-confirm="Work this order's incentive out again with the current settings and people? Only possible while nothing is paid yet." style="margin-top:8px">
       <?= Csrf::field() ?>
       <button type="submit" class="btn-sm btn-secondary">Work it out again</button>
@@ -63,13 +66,16 @@ $__sourceText = [
     <div class="kv-grid">
       <div><span class="k">Order profit before incentives</span><span class="v"><?= number_format($incentiveCalc['profit_before'], 2) ?></span></div>
       <?php if ($incentiveCalc['associate'] !== null): $__a = $incentiveCalc['associate']; ?>
-        <div><span class="k">&minus; Associate commission (<?= htmlspecialchars($__a['name']) ?>, <?= number_format($__a['rate'], 2) ?>%, client no. <?= (int) $__a['order_number'] ?>)</span><span class="v"><?= number_format($__a['amount_inr'], 2) ?></span></div>
+        <div><span class="k">&minus; Associate commission (<?= htmlspecialchars($__a['name']) ?>, <?= htmlspecialchars($__a['level_label']) ?><?= $__a['state'] === 'unpaid' ? ' — none: not paid in full' : '' ?>)</span><span class="v"><?= number_format($__a['amount_inr'], 2) ?></span></div>
       <?php endif; ?>
       <?php if ($__teamOn): ?>
       <div><span class="k">Profit used for the incentive</span><span class="v"><?= number_format($incentiveCalc['basis'], 2) ?></span></div>
       <div><span class="k">Team reward</span><span class="v">&#8377;<?= number_format($incentiveCalc['reward'], 0) ?><?= $incentiveCalc['new_client_bonus'] > 0 ? ' + &#8377;' . number_format($incentiveCalc['new_client_bonus'], 0) . ' new client bonus' : '' ?></span></div>
       <?php endif; ?>
     </div>
+    <?php if ($incentiveCalc['associate'] !== null): $c = $incentiveCalc['associate']; ?>
+      <details style="margin-top:8px"><summary class="small">Associate commission statement</summary><?php require __DIR__ . '/../associate_portal/_statement.php'; ?></details>
+    <?php endif; ?>
     <?php if ($__teamOn): ?>
     <p class="small">Reward from <?= htmlspecialchars($__sourceText[$incentiveCalc['source']] ?? $incentiveCalc['source']) ?>. Minimum profit: &#8377;<?= number_format($incentiveCalc['min_profit'], 0) ?>.
       <?php if ($incentiveCalc['pct_of_profit'] !== null && $incentiveCalc['team_total'] > 0): ?><span class="muted">Private check: &#8377;<?= number_format($incentiveCalc['team_total'], 0) ?> is <strong><?= number_format($incentiveCalc['pct_of_profit'], 1) ?>%</strong> of this order's profit.</span><?php endif; ?></p>
@@ -87,11 +93,14 @@ $__sourceText = [
       <?php if (!empty($incentiveHasAssociate) || !empty($__inc['associate_id'])): ?>
       <label>Associate commission on this order
         <select name="associate_mode">
-          <?php foreach (['auto' => 'Automatic (10 days from the client\'s first PO)', 'yes' => 'Yes', 'no' => 'No'] as $__v => $__l): ?>
+          <?php foreach (['auto' => 'Automatic (10 days from the client\'s first PO)', 'yes' => 'Yes — MD only, with a reason', 'no' => 'No'] as $__v => $__l): ?>
             <option value="<?= $__v ?>"<?= ($__inc['associate_mode'] ?? 'auto') === $__v ? ' selected' : '' ?>><?= $__l ?></option>
           <?php endforeach; ?>
         </select>
       </label>
+      <?php // Owner decision D-245 P3: forcing commission on (a repeat order) is the MD's decision, with a written reason. ?>
+      <label>Reason for forcing "Yes" <small class="muted">(MD only; at least 10 characters)</small>
+        <input type="text" name="associate_mode_reason" minlength="10" maxlength="300" value="<?= htmlspecialchars((string) ($__inc['associate_mode_reason'] ?? '')) ?>" placeholder="e.g. Buyer introduced before the registration was recorded" data-required-when="associate_mode=yes" data-required-when-message="Say why commission is forced on for this order (at least 10 characters)."></label>
       <?php else: // Owner 2 Nov 2026 (point 10): no associate on this client — keep the saved mode, show nothing. ?>
       <input type="hidden" name="associate_mode" value="<?= htmlspecialchars((string) ($__inc['associate_mode'] ?? 'auto')) ?>">
       <?php endif; ?>

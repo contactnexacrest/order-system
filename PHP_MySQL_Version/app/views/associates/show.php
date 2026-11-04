@@ -33,20 +33,21 @@ $__sourceLabel = ['link' => 'own invitation link', 'code' => 'personal code', 's
       <tr><th>E-mail / phone</th><td><?= htmlspecialchars((string) ($a['email'] ?? '—')) ?> · <?= htmlspecialchars((string) ($a['phone'] ?? '—')) ?></td></tr>
       <tr><th>PAN / GSTIN / tax ID</th><td><?= htmlspecialchars(implode(' · ', array_filter([(string) $a['pan'], (string) $a['gstin'], (string) $a['tax_id']])) ?: '—') ?></td></tr>
       <tr><th>Address</th><td><?= nl2br(htmlspecialchars((string) ($a['address'] ?? '—'))) ?></td></tr>
-      <tr><th>Relationship manager</th><td><?= htmlspecialchars((string) ($rm['name'] ?? '—')) ?></td></tr>
+      <tr><th>Reports to</th><td><?= htmlspecialchars((string) ($rm['name'] ?? '—')) ?></td></tr>
+      <tr><th>GST on commission</th><td><?= trim((string) ($a['gstin'] ?? '')) !== '' ? 'GST-registered — GST ' . htmlspecialchars(rtrim(rtrim(number_format((float) $commissionSettings['gst_pct'], 2), '0'), '.')) . '% is added on top of each commission once their tax invoice is on file' : 'Not GST-registered — no GST on commission' ?></td></tr>
       <tr><th>Agreement</th><td>signed <?= $__d($a['agreement_signed_on']) ?>, ends <?= $__d($a['agreement_ends_on']) ?><?php if (!empty($a['agreement_file_id'])): ?> · <a href="/associates/<?= $id ?>/agreement" class="small">Signed copy</a><?php endif; ?></td></tr>
       <tr><th>Commission</th><td>
         <?php if ((int) $a['no_commission'] === 1): ?><b>No commission</b> (introductions only)<?php else: ?>
-          <?php foreach (['rate_1_5' => '1–5', 'rate_6_10' => '6–10', 'rate_11_20' => '11–20', 'rate_21_40' => '21–40', 'rate_41_plus' => '41+'] as $f => $l): $__r = AssociateRepository::rateWithSource($a, ['rate_1_5' => 1, 'rate_6_10' => 6, 'rate_11_20' => 11, 'rate_21_40' => 21, 'rate_41_plus' => 41][$f]); ?>
-            <span class="badge">clients <?= $l ?>: <?= $__pct($__r['rate']) ?> <?= $__r['source'] === 'personal' ? '(personal)' : '(standard)' ?></span>
-          <?php endforeach; ?>
+          On the invoiced FOB of the goods, line by line, at the level fixed on each order when its Proforma Invoice is issued; earned once the buyer has paid in full,
+          due <?= (int) $commissionSettings['due_days'] ?> days later and paid in the payout run (<?= htmlspecialchars(\App\Services\AssociateCommission::runLabel($commissionSettings)) ?>).
         <?php endif; ?></td></tr>
       <?php // Owner decision D-245 (4 Nov 2026): fixed level or the ladder (used for commission from phase P3). ?>
       <tr><th>Commission level</th><td>
         <?php if (($a['commission_mode'] ?? 'ladder') === 'fixed' && !empty($a['commission_level_id']) && ($__lvl = \App\Repositories\PricingRepository::findLevel((int) $a['commission_level_id'])) !== null): ?>
           Fixed level: <b><?= htmlspecialchars($__lvl['name']) ?></b> — <?= htmlspecialchars(\App\Services\PricingService::levelLabel($__lvl)) ?><?= (int) $__lvl['is_active'] === 1 ? '' : ' <span class="badge badge-inactive">inactive</span>' ?>
         <?php else: ?>
-          Ladder <span class="muted small">(moves up with counting orders — <a href="/pricing/commission-levels#ladder">see the ladder</a>)</span>
+          Ladder: <?= (int) ($commissionNow[1] ?? 0) ?> counting order(s) so far — next order <?= $commissionNow[0] !== null ? '<b>' . htmlspecialchars(\App\Services\AssociateCommission::levelLabel($commissionNow[0])) . '</b>' : 'no level' ?>
+          <span class="muted small">(a counting order has invoiced FOB of ₹<?= number_format((float) $commissionSettings['threshold_inr'], 0) ?> or more on lines within range — <a href="/pricing/commission-levels#ladder">see the ladder</a>)</span>
         <?php endif; ?></td></tr>
     </table>
     <form method="post" action="/associates/<?= $id ?>/status" class="inline-form">
@@ -132,21 +133,21 @@ $__sourceLabel = ['link' => 'own invitation link', 'code' => 'personal code', 's
   <div class="section" id="commission">
     <h2>Orders and commission</h2>
     <table class="list">
-      <tr><th>Order</th><th>Client</th><th>Stage</th><th>FOB value</th><th>Buyer paid in full</th><th>Rate</th><th>Commission</th></tr>
+      <tr><th>Order</th><th>Client</th><th>Stage</th><th>FOB value</th><th>Buyer paid in full</th><th>Level</th><th>Commission</th></tr>
       <?php foreach ($orders as $o): $cm = $o['commission']; ?>
         <tr><td><a href="/orders/<?= (int) $o['id'] ?>"><?= htmlspecialchars((string) $o['order_reference']) ?></a></td><td><?= htmlspecialchars((string) $o['company_legal_name']) ?></td><td><?= htmlspecialchars((string) $o['stage']) ?></td>
           <td><?= htmlspecialchars((string) $o['currency_code']) ?> <?= $__money($o['fob_value']) ?></td><td><?= $o['buyer_paid_in_full'] ? 'Yes' : 'No' ?></td>
-          <td><?= $cm['rate'] !== null ? $__pct($cm['rate']) . ($cm['source'] === 'personal' ? ' (personal)' : ($cm['source'] === 'global' ? ' (standard)' : '')) : '—' ?></td>
+          <td><?= htmlspecialchars((string) ($cm['level'] ?? '—')) ?></td>
           <td><?= $cm['amount'] !== null ? htmlspecialchars((string) $o['currency_code']) . ' ' . $__money($cm['amount']) . '<br>' : '' ?><small><?= htmlspecialchars($cm['label']) ?></small></td></tr>
       <?php endforeach; ?>
       <?php if ($orders === []): ?><tr><td colspan="7" class="muted">No orders yet.</td></tr><?php endif; ?>
     </table>
     <h3>Payouts</h3>
     <table class="list">
-      <tr><th>Month</th><th>Order</th><th>Amount INR</th><th>Status</th><th>Paid</th><th>Invoice</th><th>Action</th></tr>
+      <tr><th>Due / payout run</th><th>Order</th><th>Amount INR</th><th>Status</th><th>Paid</th><th>Invoice</th><th>Action</th></tr>
       <?php foreach ($payouts as $p): $inv = AssociateDocumentRepository::invoiceForPayout((int) $p['id']); ?>
-        <tr><td><?= htmlspecialchars((string) $p['incentive_month']) ?></td><td><?= htmlspecialchars((string) $p['order_reference']) ?><?= $p['note'] ? '<br><small class="muted">' . htmlspecialchars((string) $p['note']) . '</small>' : '' ?></td>
-          <td><?= $__money($p['amount_inr']) ?></td><td><?= htmlspecialchars(ucfirst((string) $p['status'])) ?><?= $p['hold_reason'] ? '<br><small>' . htmlspecialchars((string) $p['hold_reason']) . '</small>' : '' ?></td>
+        <tr><td><?= !empty($p['due_on']) ? 'due ' . $__d($p['due_on']) . '<br><small class="muted">run ' . $__d($p['payout_run_on']) . '</small>' : htmlspecialchars((string) $p['incentive_month']) ?></td><td><?= htmlspecialchars((string) $p['order_reference']) ?><?= $p['note'] ? '<br><small class="muted">' . htmlspecialchars((string) $p['note']) . '</small>' : '' ?></td>
+          <td><?= $__money($p['amount_inr']) ?><?= (float) ($p['gst_inr'] ?? 0) > 0 ? '<br><small class="muted">+ GST ₹' . $__money($p['gst_inr']) . '</small>' : '' ?></td><td><?= htmlspecialchars(ucfirst((string) $p['status'])) ?><?= $p['status'] === 'due' && ($__blk = \App\Services\AssociateCommission::payBlockReason($p, date('Y-m-d'))) !== null ? '<br><small class="muted">' . htmlspecialchars($__blk) . '</small>' : '' ?><?= $p['hold_reason'] ? '<br><small>' . htmlspecialchars((string) $p['hold_reason']) . '</small>' : '' ?></td>
           <td><?= $p['status'] === 'paid' ? $__d($p['paid_on']) . ' · ₹' . $__money($p['paid_inr']) . ((float) $p['tds_inr'] > 0 ? ' (TDS ₹' . $__money($p['tds_inr']) . ')' : '') . ($p['paid_reference'] ? '<br><small>' . htmlspecialchars((string) $p['paid_reference']) . '</small>' : '') : '—' ?></td>
           <td><?= $inv ? '<a href="/associates/' . $id . '/documents/' . (int) $inv['id'] . '">' . htmlspecialchars((string) ($inv['reference'] ?? 'Invoice')) . '</a>' : '—' ?></td>
           <td>
@@ -155,9 +156,11 @@ $__sourceLabel = ['link' => 'own invitation link', 'code' => 'personal code', 's
             <?php elseif ($p['status'] === 'held'): ?>
               <form method="post" action="/associates/payouts/<?= (int) $p['id'] ?>/release" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm">Release</button></form>
             <?php elseif ($p['status'] === 'paid' && (float) $p['amount_inr'] > 0): ?>
-              <form method="post" action="/associates/payouts/<?= (int) $p['id'] ?>/clawback" class="inline-form" data-confirm="Deduct this amount from the associate's next payout?"><?= Csrf::field() ?>
-                <input type="number" name="amount_inr" required min="0.01" step="0.01" max="<?= htmlspecialchars((string) $p['paid_inr']) ?>" placeholder="₹" aria-label="Amount to claw back">
-                <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="What was refunded" aria-label="What was refunded to the buyer"><button type="submit" class="btn-sm btn-secondary">Claw back</button></form>
+              <?php // Owner decision D-245 P3: taken back only for the associate's fraud or breach, with a reason — never for a later buyer claim or refund. ?>
+              <form method="post" action="/associates/payouts/<?= (int) $p['id'] ?>/clawback" class="inline-form" data-confirm="Take this amount back from the associate's next payout?"><?= Csrf::field() ?>
+                <select name="takeback_kind" required aria-label="Why it is taken back"><option value="">Choose…</option><option value="fraud">Fraud</option><option value="breach">Breach of the agreement</option></select>
+                <input type="number" name="amount_inr" required min="0.01" step="0.01" max="<?= htmlspecialchars((string) $p['paid_inr']) ?>" placeholder="₹" aria-label="Amount to take back">
+                <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="What happened" aria-label="What the fraud or breach was"><button type="submit" class="btn-sm btn-secondary">Take back</button></form>
             <?php endif; ?>
           </td></tr>
       <?php endforeach; ?>

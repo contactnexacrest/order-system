@@ -1,4 +1,4 @@
-{# Expects: me, rates (list of {label, rate, source}), banks (each with b.masked, b.usable_later = usable_from after today), usableBankMasked (string|null),
+{# Expects: me, commissionNow, commissionSettings, runLabel, banks (each with b.masked, b.usable_later = usable_from after today), usableBankMasked (string|null),
    documents, docKinds (KINDS map), associateKinds (list of kinds the associate may upload), bankWaitDays, csrfToken. #}
 {% set __india = me.based_in == 'india' %}
 <div class="card page-wide">
@@ -9,9 +9,7 @@
     <tr><th>Agreement</th><td>signed {{ (me.agreement_signed_on | shortDate) if me.agreement_signed_on else '—' }}, ends {{ (me.agreement_ends_on | shortDate) if me.agreement_ends_on else '—' }}{% if me.agreement_file_id %} · <a href="/associate/agreement">Download my agreement</a>{% endif %}</td></tr>
     <tr><th>My commission</th><td>
       {% if me.no_commission == 1 %}No commission under your agreement.{% else %}
-      {% for r in rates %}
-        <span class="badge">clients {{ r.label }}: {{ r.rate | pct2 }}%</span>
-      {% endfor %}<br><small class="muted">% of the product FOB value of a client's first orders, earned when the buyer has paid in full.</small>{% endif %}</td></tr>
+      {{ commissionNow }}<br><small class="muted">On the invoiced FOB of the goods of a client's first orders, at the level fixed on each order when its Proforma Invoice is issued; earned when the buyer has paid in full, due {{ commissionSettings.due_days }} days later and paid in the payout run ({{ runLabel }}).{{ ' GST is added on top once your tax invoice is on file.' if me.gstin }}</small>{% endif %}</td></tr>
   </table>
 
   <div class="section">

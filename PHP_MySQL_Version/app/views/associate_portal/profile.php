@@ -16,9 +16,7 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
     <tr><th>Agreement</th><td>signed <?= $__d($me['agreement_signed_on']) ?>, ends <?= $__d($me['agreement_ends_on']) ?><?php if (!empty($me['agreement_file_id'])): ?> · <a href="/associate/agreement">Download my agreement</a><?php endif; ?></td></tr>
     <tr><th>My commission</th><td>
       <?php if ((int) $me['no_commission'] === 1): ?>No commission under your agreement.<?php else: ?>
-      <?php foreach (['rate_1_5' => [1, '1–5'], 'rate_6_10' => [6, '6–10'], 'rate_11_20' => [11, '11–20'], 'rate_21_40' => [21, '21–40'], 'rate_41_plus' => [41, '41+']] as $f => [$n, $l]): $r = \App\Repositories\AssociateRepository::rateWithSource($me, $n); ?>
-        <span class="badge">clients <?= $l ?>: <?= $__pct($r['rate']) ?></span>
-      <?php endforeach; ?><br><small class="muted">% of the product FOB value of a client's first orders, earned when the buyer has paid in full.</small><?php endif; ?></td></tr>
+      <?= htmlspecialchars($commissionNow) ?><br><small class="muted">On the invoiced FOB of the goods of a client's first orders, at the level fixed on each order when its Proforma Invoice is issued; earned when the buyer has paid in full, due <?= (int) $commissionSettings['due_days'] ?> days later and paid in the payout run (<?= htmlspecialchars(\App\Services\AssociateCommission::runLabel($commissionSettings)) ?>).<?= trim((string) ($me['gstin'] ?? '')) !== '' ? ' GST is added on top once your tax invoice is on file.' : '' ?></small><?php endif; ?></td></tr>
   </table>
 
   <div class="section">

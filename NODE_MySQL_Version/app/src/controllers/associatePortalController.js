@@ -1,5 +1,7 @@
 'use strict';
 
+const db = require('../config/db');
+const dates = require('../helpers/dates');
 const flash = require('../helpers/flash');
 const associateBankRepository = require('../repositories/associateBankRepository');
 const associateDocumentRepository = require('../repositories/associateDocumentRepository');
@@ -326,12 +328,10 @@ async function certificate(req, res) {
 async function profile(req, res) {
   const a = await me(req);
   const id = Number(a.id);
-  const ladder = await associateRepository.globalLadder();
-  const rates = [];
-  for (const [label, n] of [['1–5', 1], ['6–10', 6], ['11–20', 11], ['21–40', 21], ['41+', 41]]) {
-    const r = await associateRepository.rateWithSource(a, n, ladder);
-    rates.push({ label, rate: r.rate, source: r.source, rate_text: `${r.rate.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` });
-  }
+  const associateCommission = require('../services/associateCommission');
+  const [level] = await associateCommission.levelForAssociate(a, null);
+  const commissionSettings = await associateCommission.settings();
+  const commissionNow = `${(a.commission_mode || 'ladder') === 'fixed' ? 'Fixed level: ' : 'Ladder — your next order: '}${associateCommission.levelLabel(level)}`;
   const today = associateService.todayIst();
   const banks = await associateBankRepository.forAssociate(id);
   for (const b of banks) {
@@ -340,14 +340,15 @@ async function profile(req, res) {
   }
   const usable = await associateBankRepository.usable(id);
   await render(req, res, 'profile', {
-    rates,
+    commissionNow,
+    commissionSettings,
+    runLabel: associateCommission.runLabel(commissionSettings),
     banks,
     usableBankMasked: usable ? associateBankRepository.masked(usable) : null,
     documents: await associateDocumentRepository.forAssociate(id),
     docKinds: associateDocumentRepository.KINDS,
     associateKinds: associateDocumentRepository.ASSOCIATE_KINDS.filter((k) => k !== 'invoice'),
     bankWaitDays: await associateService.bankWaitDays(),
-    ladder,
   });
 }
 
@@ -473,8 +474,34 @@ async function sendMessage(req, res) {
   res.redirect('/associate/messages');
 }
 
+/**
+ * Owner decision D-245 P3: the associate's price range — per product, the quote price and
+ * the lowest price they may agree, never cost or formula. A dated notice they acknowledge
+ * whenever the prices change.
+ */
+async function prices(req, res) {
+  const a = await me(req);
+  const associateCommission = require('../services/associateCommission');
+  const list = await associateCommission.priceList(a);
+  await render(req, res, 'prices', { list, levelText: associateCommission.levelLabel(list.level) });
+}
+
+async function acknowledgePrices(req, res) {
+  const a = await me(req);
+  const list = await require('../services/associateCommission').priceList(a);
+  if (String((req.body || {}).hash || '') !== list.hash) {
+    flash.set(req, 'error', 'The prices changed while you were reading them — please look at the new list and acknowledge it again.');
+  } else {
+    await db.execute('UPDATE associates SET price_list_ack_hash = :h, price_list_ack_at = NOW() WHERE id = :id', { h: list.hash, id: a.id });
+    await associateEventRepository.add(Number(a.id), 'prices_acknowledged', `Price list dated ${dates.short(String(list.changed_at || '').slice(0, 10))} acknowledged.`, null, null, null, null, false);
+    await auditLogRepository.log(null, 'ASSOCIATE_PRICES_ACKNOWLEDGED', 'associates', Number(a.id), 'price_list', null, list.hash);
+    flash.set(req, 'success', 'Thank you — your acknowledgement of this price list is recorded.');
+  }
+  res.redirect('/associate/prices');
+}
+
 module.exports = {
   codeLink, showLogin, login, showCode, verifyCode, logout, showSetPassword, setPassword, home, clients, createInvitation, cancelInvitation, chooseCode,
   orders, order, commission, uploadInvoice, certificate, profile, saveProfile, uploadDocument, requestBank, downloadDocument, downloadAgreement,
-  messages, sendMessage,
+  messages, sendMessage, prices, acknowledgePrices,
 };

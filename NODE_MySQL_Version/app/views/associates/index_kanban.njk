@@ -6,7 +6,7 @@
       {% if a.email %}<div class="muted small">{{ a.email }}</div>{% endif %}
       <div class="entity-card-sub">{% if a.based_in == 'india' %}India{% else %}Abroad{% if a.country %} — {{ a.country }}{% endif %}{% endif %} · Code {{ a.personal_code or '—' }}</div>
       <div class="small">Clients: {{ a.clients.length }}{% for c in a.clients.slice(0, 3) %}<br><a href="/clients/{{ c.id }}">{{ c.company_legal_name }}</a>{% endfor %}</div>
-      {% if canManage %}<div class="muted small">{% if a.no_commission == 1 %}No commission{% elif (a.rate_1_5 | float) > 0 or (a.rate_6_10 | float) > 0 or (a.rate_11_20 | float) > 0 or (a.rate_21_40 | float) > 0 or (a.rate_41_plus | float) > 0 %}Personal rates{% else %}Standard rates{% endif %}</div>{% endif %}
+      {% if canManage %}<div class="muted small">{% if a.no_commission == 1 %}No commission{% elif a.commission_mode == 'fixed' %}Fixed: {{ a.commission_level_name or '?' }}{% else %}Ladder{% endif %}</div>{% endif %}
       {% if (canManage or canBank) and a.pending_bank > 0 %}<span class="badge badge-pending">Change to check</span>{% endif %}
       <div class="entity-card-footer"><a class="btn-sm" href="/associates/{{ a.id }}">Open</a></div>
     </div>
@@ -20,7 +20,7 @@
     </div>
     <div class="btn-row" style="margin-top:0">
       <a class="btn-sm btn-secondary" href="/associates?view=list">Switch to list view</a>
-      {% if canManage %}<a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/ladder">Standard rates</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a>{% endif %}
+      {% if canManage %}<a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/ladder">Commission settings</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a>{% endif %}
     </div>
   </div>
   {% include "associates/_filters.njk" %}

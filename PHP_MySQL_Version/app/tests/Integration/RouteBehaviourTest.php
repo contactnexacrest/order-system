@@ -533,11 +533,11 @@ final class RouteBehaviourTest extends DbTestCase
         $id = (int) $this->value("SELECT id FROM associates WHERE email = '{$email}'");
         $this->assertPage($this->call('GET', "/associates/{$id}"), 'Route Associate', 'GET /associates/{id}');
         $this->assertPage($this->call('GET', "/associates/{$id}/edit"), 'Edit Route Associate', 'GET /associates/{id}/edit');
-        $this->assertDone($this->call('POST', "/associates/{$id}/update", ['name' => 'Route Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'email' => $email, 'rate_1_5' => '1.10', 'commission_mode' => 'ladder']), 'POST /associates/{id}/update');
-        self::assertSame('1.10', $this->value("SELECT rate_1_5 FROM associates WHERE id = {$id}"));
-        $this->assertPage($this->call('GET', '/associates/ladder'), 'Standard rate', 'GET /associates/ladder');
-        $this->assertDone($this->call('POST', '/associates/ladder', ['rate_1_5' => '0.70', 'rate_6_10' => '1.00', 'rate_11_20' => '1.50', 'rate_21_40' => '1.75', 'rate_41_plus' => '2.00',
-            'associate_tds_pct' => '2.00', 'associate_protection_months' => '12', 'associate_bank_wait_days' => '7']), 'POST /associates/ladder');
+        $this->assertDone($this->call('POST', "/associates/{$id}/update", ['name' => 'Route Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'email' => $email, 'notes' => 'Route notes', 'commission_mode' => 'ladder']), 'POST /associates/{id}/update');
+        self::assertSame('Route notes', $this->value("SELECT notes FROM associates WHERE id = {$id}"));
+        $this->assertPage($this->call('GET', '/associates/ladder'), 'When commission is paid', 'GET /associates/ladder');
+        $this->assertDone($this->call('POST', '/associates/ladder', ['associate_tds_pct' => '2.00', 'associate_bank_wait_days' => '7', 'associate_commission_due_days' => '30', 'associate_claim_hold' => '1',
+            'associate_payout_run' => 'monthly', 'associate_payout_day' => '5', 'associate_counting_threshold_inr' => '500000', 'associate_protection_months' => '6', 'associate_gst_pct' => '18']), 'POST /associates/ladder');
         $this->assertPage($this->call('GET', '/reports/associates'), 'TDS register', 'GET /reports/associates');
 
         $r = $this->call('POST', "/associates/{$id}/status", ['status' => 'active', 'reason' => 'Route test activation']);
@@ -579,7 +579,7 @@ final class RouteBehaviourTest extends DbTestCase
         $this->assertDone($this->call('POST', "/associates/payouts/{$payout}/hold", ['reason' => 'Waiting for the invoice.']), 'POST /associates/payouts/{payoutId}/hold');
         $this->assertDone($this->call('POST', "/associates/payouts/{$payout}/release"), 'POST /associates/payouts/{payoutId}/release');
         Database::connection()->exec("UPDATE incentive_payouts SET status = 'paid', paid_inr = 1000, paid_on = CURDATE(), paid_reference = 'UTR1' WHERE id = {$payout}");
-        $this->assertDone($this->call('POST', "/associates/payouts/{$payout}/clawback", ['amount_inr' => '250', 'reason' => 'Buyer refunded a damaged crate.']), 'POST /associates/payouts/{payoutId}/clawback');
+        $this->assertDone($this->call('POST', "/associates/payouts/{$payout}/clawback", ['amount_inr' => '250', 'reason' => 'Breach: dealt with a competitor.', 'takeback_kind' => 'breach']), 'POST /associates/payouts/{payoutId}/clawback');
         self::assertSame('-250.00', $this->value("SELECT amount_inr FROM incentive_payouts WHERE clawback_of_payout_id = {$payout}"));
 
         \App\Repositories\AssociateRepository::setFields($id, ['portal_enabled' => 1]);
@@ -843,7 +843,7 @@ final class RouteBehaviourTest extends DbTestCase
     public function testAssociateAndPartnerEditsExchangeRateAndReviewRejection(): void
     {
         $associate = $this->insert('associates', ['name' => 'Route Test Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'status' => 'active']);
-        $rates = ['rate_1_5' => '5', 'rate_6_10' => '5', 'rate_11_20' => '4', 'rate_21_40' => '3', 'rate_41_plus' => '2'];
+        $rates = [];
         $r = $this->call('POST', "/associates/{$associate}/update", ['name' => 'Route Test Associate B', 'based_in' => 'india', 'currency_code' => 'INR', 'status' => 'active', 'commission_mode' => 'ladder'] + $rates);
         $this->assertDone($r, 'POST /associates/{id}/update');
         self::assertSame('Route Test Associate B', $this->value("SELECT name FROM associates WHERE id = {$associate}"));
@@ -1049,7 +1049,7 @@ final class RouteBehaviourTest extends DbTestCase
     ];
 
     /** A complete associate form, so the missing record is what gets refused, not a blank field. */
-    private const VALID_ASSOCIATE = ['name' => 'Route Ghost Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'status' => 'active', 'rate_1_5' => '5', 'rate_6_10' => '5', 'rate_11_20' => '4', 'rate_21_40' => '3', 'rate_41_plus' => '2'];
+    private const VALID_ASSOCIATE = ['name' => 'Route Ghost Associate', 'based_in' => 'india', 'currency_code' => 'INR', 'status' => 'active', 'commission_mode' => 'ladder'];
 
     public function testEveryRouteAnswersAMissingIdAsNotFoundAndWritesNothing(): void
     {

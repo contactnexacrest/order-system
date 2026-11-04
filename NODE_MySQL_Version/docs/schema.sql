@@ -4348,11 +4348,6 @@ CREATE TABLE associates (
   tax_id              VARCHAR(50) NULL,
   agreement_signed_on DATE NULL,
   agreement_file_id   BIGINT UNSIGNED NULL,            -- the signed agreement (file_store, context associate_agreement) — docs/migrations/2026-10-30d
-  rate_1_5            DECIMAL(5,2) NOT NULL DEFAULT 0.70,
-  rate_6_10           DECIMAL(5,2) NOT NULL DEFAULT 1.00,
-  rate_11_20          DECIMAL(5,2) NOT NULL DEFAULT 1.50,
-  rate_21_40          DECIMAL(5,2) NOT NULL DEFAULT 1.75,
-  rate_41_plus        DECIMAL(5,2) NOT NULL DEFAULT 2.00,
   status              ENUM('active','inactive') NOT NULL DEFAULT 'active',
   notes               VARCHAR(500) NULL,
   created_by          BIGINT UNSIGNED NULL,
@@ -4688,18 +4683,6 @@ CREATE TABLE daily_digest_log (
 -- Status life cycle: invited → active → suspended / ended ('inactive' kept for old rows).
 ALTER TABLE associates MODIFY COLUMN status ENUM('invited','active','suspended','ended','inactive') NOT NULL DEFAULT 'invited';
 
--- AS-17: a personal rate per rung is optional; NULL (or 0) means "use the global ladder".
-ALTER TABLE associates MODIFY COLUMN rate_1_5 DECIMAL(5,2) NULL DEFAULT NULL;
-ALTER TABLE associates MODIFY COLUMN rate_6_10 DECIMAL(5,2) NULL DEFAULT NULL;
-ALTER TABLE associates MODIFY COLUMN rate_11_20 DECIMAL(5,2) NULL DEFAULT NULL;
-ALTER TABLE associates MODIFY COLUMN rate_21_40 DECIMAL(5,2) NULL DEFAULT NULL;
-ALTER TABLE associates MODIFY COLUMN rate_41_plus DECIMAL(5,2) NULL DEFAULT NULL;
--- Existing associates carried a copy of the standard ladder: a rung equal to it now follows the global ladder.
-UPDATE associates SET rate_1_5 = NULL WHERE rate_1_5 = 0.70;
-UPDATE associates SET rate_6_10 = NULL WHERE rate_6_10 = 1.00;
-UPDATE associates SET rate_11_20 = NULL WHERE rate_11_20 = 1.50;
-UPDATE associates SET rate_21_40 = NULL WHERE rate_21_40 = 1.75;
-UPDATE associates SET rate_41_plus = NULL WHERE rate_41_plus = 2.00;
 
 SET @t := 'associates';
 SET @c := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @t AND COLUMN_NAME = 'personal_code');
@@ -4866,8 +4849,7 @@ SET @c := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 
 SET @s := IF(@c = 0, 'ALTER TABLE orders
   ADD COLUMN associate_id BIGINT UNSIGNED NULL,
   ADD COLUMN associate_rate_pct DECIMAL(5,2) NULL,
-  ADD COLUMN associate_rate_source VARCHAR(10) NULL,
-  ADD COLUMN associate_client_number INT NULL', 'SELECT 1');
+  ADD COLUMN associate_rate_source VARCHAR(10) NULL', 'SELECT 1');
 PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ---------------------------------------------------------------- payouts: hold, claw-back, invoice
@@ -5017,10 +4999,6 @@ CREATE TABLE IF NOT EXISTS self_approval_rules (
 ) ENGINE=InnoDB;
 
 
--- QA Round 8 (R8-N05, AS-17): the client's number for its associate, fixed when linked (docs/migrations/2026-11-02g-qa-r8-associates.sql).
-SET @c := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'associate_client_number');
-SET @s := IF(@c = 0, 'ALTER TABLE clients ADD COLUMN associate_client_number INT NULL', 'SELECT 1');
-PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Owner decision 2 Nov 2026 (point 4): Agreements register (docs/migrations/2026-11-02s-agreements-register.sql).
 CREATE TABLE IF NOT EXISTS agreements (
@@ -5204,3 +5182,43 @@ ALTER TABLE order_products ADD COLUMN price_approval_commission_zero TINYINT(1) 
 ALTER TABLE order_products ADD COLUMN price_approval_incentive_cut DECIMAL(14,2) NULL; -- P4: USD taken off this line's team incentive
 ALTER TABLE order_products ADD CONSTRAINT fk_order_products_price_requested_by FOREIGN KEY (price_approval_requested_by) REFERENCES users(id);
 ALTER TABLE order_products ADD CONSTRAINT fk_order_products_price_approved_by FOREIGN KEY (price_approved_by) REFERENCES users(id);
+
+-- ================================================================
+-- Owner decision D-245 (4 Nov 2026), phase P3: associate commission.
+-- Commission on the final invoiced FOB of the goods, line by line, at the
+-- commission level fixed on the order when the PI is issued; full payment only;
+-- due N days after full payment, held while a buyer claim is open, paid in the
+-- payout run; GST on top for GST-registered associates with a tax invoice;
+-- taken back after payment only for fraud or breach. The client-number ladder
+-- and the per-associate rung rates are gone (levels and ladder replace them).
+-- Go-live installs fresh (D-241): no migration.
+-- ================================================================
+-- The commission level fixed on the order when its PI was issued.
+ALTER TABLE orders ADD COLUMN associate_level_id BIGINT UNSIGNED NULL;
+ALTER TABLE orders ADD COLUMN associate_level_name VARCHAR(60) NULL;
+ALTER TABLE orders ADD COLUMN associate_level_kind ENUM('pct','fixed_usd') NULL;
+ALTER TABLE orders ADD COLUMN associate_level_value DECIMAL(12,4) NULL;
+ALTER TABLE orders ADD COLUMN associate_level_fixed_at DATETIME NULL;
+-- Why a client's associate is forced on ("yes") for an order: MD only, with a reason.
+ALTER TABLE order_incentives ADD COLUMN associate_mode_reason VARCHAR(300) NULL;
+ALTER TABLE order_incentives ADD COLUMN associate_mode_set_by BIGINT UNSIGNED NULL;
+-- What the commission was worked out on when the order was fixed (locked).
+ALTER TABLE order_incentives ADD COLUMN associate_basis_fc DECIMAL(14,2) NULL;      -- in-range goods FOB after agreed reductions, order currency
+ALTER TABLE order_incentives ADD COLUMN associate_basis_inr DECIMAL(14,2) NULL;
+ALTER TABLE order_incentives ADD COLUMN associate_counts TINYINT(1) NULL;           -- a counting order for the ladder
+ALTER TABLE order_incentives ADD COLUMN associate_due_on DATE NULL;
+-- A commission payout's due date, payout run, GST and why it was taken back.
+ALTER TABLE incentive_payouts ADD COLUMN due_on DATE NULL;
+ALTER TABLE incentive_payouts ADD COLUMN payout_run_on DATE NULL;
+ALTER TABLE incentive_payouts ADD COLUMN gst_pct DECIMAL(5,2) NULL;
+ALTER TABLE incentive_payouts ADD COLUMN gst_inr DECIMAL(14,2) NULL;
+ALTER TABLE incentive_payouts ADD COLUMN takeback_kind ENUM('fraud','breach') NULL;
+-- An approved shortfall says what it is: an agreed discount or a settled claim lowers the
+-- commission basis; an unpaid amount means the order was not paid in full (no commission).
+ALTER TABLE order_payment_shortfalls ADD COLUMN settlement_kind ENUM('agreed_discount','claim_settled','unpaid') NULL;
+-- The associate's price list (their quote price and lowest price per product, never cost or
+-- formula): when it last changed, and when they acknowledged it.
+ALTER TABLE associates ADD COLUMN price_list_hash CHAR(64) NULL;
+ALTER TABLE associates ADD COLUMN price_list_changed_at DATETIME NULL;
+ALTER TABLE associates ADD COLUMN price_list_ack_hash CHAR(64) NULL;
+ALTER TABLE associates ADD COLUMN price_list_ack_at DATETIME NULL;

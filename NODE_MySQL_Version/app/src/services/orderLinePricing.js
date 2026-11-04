@@ -49,37 +49,22 @@ async function associateEarnsOn(order) {
 }
 
 /**
- * How many of the associate's earlier orders already had their Proforma
- * Invoice issued. Phase P2 stand-in for "counting orders": phase P3 replaces
- * it with the counting-order rule (invoiced FOB ≥ ₹5 lakh on in-range lines,
- * fully paid).
+ * The associate's commission level: the level fixed on the order when its PI was
+ * issued, else their fixed level, or the ladder step for their next counting order
+ * (D-245 P3: counting orders replace the P2 stand-in). Returns [level, count].
  */
-async function associatePiOrderCount(associateId, excludeOrderId) {
-  const row = await db.queryOne(
-    `SELECT COUNT(*) AS n FROM orders o
-     WHERE o.associate_id = :a AND o.id <> :x AND o.is_test_data = 0 AND o.is_sample_data = 0
-       AND o.status NOT IN ('cancelled','lost')
-       AND EXISTS (SELECT 1 FROM documents d JOIN document_types t ON t.id = d.document_type_id
-                   WHERE d.order_id = o.id AND t.code = 'PI')`,
-    { a: associateId, x: excludeOrderId || 0 }
-  );
-  return Number(row.n);
-}
-
-/** The associate's commission level: their fixed level, or the ladder step for their next order. Returns [level, count]. */
 async function levelForAssociate(associate, excludeOrderId) {
-  if ((associate.commission_mode || 'ladder') === 'fixed') {
-    const level = associate.commission_level_id ? await pricingRepository.findLevel(Number(associate.commission_level_id)) : null;
-    return [level, null];
-  }
-  const count = await associatePiOrderCount(Number(associate.id), excludeOrderId);
-  const next = count + 1;
-  for (const step of await pricingRepository.ladder()) {
-    if (next >= Number(step.from_order) && (step.to_order === null || next <= Number(step.to_order))) {
-      return [await pricingRepository.findLevel(Number(step.level_id)), count];
+  const associateCommission = require('./associateCommission');
+  if (excludeOrderId) {
+    const order = await require('../repositories/orderRepository').find(excludeOrderId);
+    const fixed = order && Number(order.associate_id || 0) === Number(associate.id) ? associateCommission.fixedLevel(order) : null;
+    if (fixed) {
+      const level = fixed.id !== null ? await pricingRepository.findLevel(fixed.id) : null;
+      // The level as fixed (its value then), even if the level was changed or deactivated since.
+      return [{ ...(level || {}), id: fixed.id, name: fixed.name, kind: fixed.kind, value: fixed.value }, null];
     }
   }
-  return [null, count];
+  return associateCommission.levelForAssociate(associate, excludeOrderId);
 }
 
 /** Who sells this order: the client's associate at their level (when the order is one they earn on), else staff. */
@@ -392,6 +377,9 @@ async function refuse(orderId, lineId, userId, reason) {
 
 /** Fixes the figures on every checked line that has none yet — called when the PI is issued. */
 async function snapshotForPi(orderId) {
+  // D-245 P3: the associate's commission level is fixed on the order with the PI, first,
+  // so the line figures fixed below use that same level.
+  await require('./associateCommission').fixLevelAtPi(orderId);
   const order = await require('../repositories/orderRepository').find(orderId);
   if (!order) return;
   const ctx = await context(order);
@@ -451,6 +439,6 @@ async function clientKeys(clients) {
 module.exports = {
   OK, BELOW, BELOW_MINIMUM, NO_PRICE, APPROVED, UNCHECKED, BLOCKING,
   PICK_MESSAGE, productPickRequired, pickRefusal, documentBlockReason,
-  context, levelForAssociate, associatePiOrderCount, liveFigures, scope, approvalHolds, checkLine, forOrder, piBlockReason,
+  context, levelForAssociate, liveFigures, scope, approvalHolds, checkLine, forOrder, piBlockReason,
   saveRefusal, afterSave, requestApproval, approvalView, approve, refuse, snapshotForPi, pickerPrices, clientKeys,
 };

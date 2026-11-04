@@ -95,7 +95,16 @@ $shortReasonField = static function (string $leg, ?array $milestone = null) use 
     if (!$canApproveShort) {
         return '<p class="notice notice-warning small">' . $__owed . ' is still owed — record the rest when it arrives. Only a manager with "Approve short payment" can clear it short.</p>';
     }
-    return '<label>Reason for clearing it short * <small class="muted">(' . $__owed . ' still owed — recorded and shown on the order)</small><textarea name="short_reason" required minlength="10" maxlength="500" rows="2" placeholder="At least 10 characters — say why"></textarea></label>';
+    // Owner decision D-245 P3: what the shortfall is decides the associate's commission (not asked for the advance — it is carried into the balance).
+    $__kind = '';
+    if ($leg !== 'advance') {
+        $__kind = '<label>What is this shortfall? * <select name="short_kind" required><option value="">Choose…</option>';
+        foreach (\App\Services\AssociateCommission::SETTLEMENT_KINDS as $__k => $__l) {
+            $__kind .= '<option value="' . $__k . '">' . htmlspecialchars($__l) . '</option>';
+        }
+        $__kind .= '</select></label>';
+    }
+    return $__kind . '<label>Reason for clearing it short * <small class="muted">(' . $__owed . ' still owed — recorded and shown on the order)</small><textarea name="short_reason" required minlength="10" maxlength="500" rows="2" placeholder="At least 10 characters — say why"></textarea></label>';
 };
 // Owner decision 2026-10-30: each stage's gating button says, before the
 // click, which of the stage's documents still need generating, approving or

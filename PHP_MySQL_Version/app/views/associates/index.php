@@ -7,7 +7,7 @@
     </div>
     <div class="btn-row" style="margin-top:0">
       <?php if (!empty($kanbanUser)): ?><a class="btn-sm btn-secondary" href="/associates">Switch to board view</a><?php endif; ?>
-      <?php if ($canManage): ?><a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/ladder">Standard rates</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a><?php endif; ?>
+      <?php if ($canManage): ?><a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/ladder">Commission settings</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a><?php endif; ?>
     </div>
   </div>
   <?php require __DIR__ . '/_filters.php'; ?>
@@ -20,7 +20,7 @@
         <td><?= $a['based_in'] === 'india' ? 'India' : htmlspecialchars('Abroad' . ($a['country'] ? ' — ' . $a['country'] : '')) ?></td>
         <td><?= htmlspecialchars((string) ($a['personal_code'] ?? '—')) ?></td>
         <td><?= count($a['clients']) ?><?php foreach (array_slice($a['clients'], 0, 3) as $c): ?><br><small><a href="/clients/<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['company_legal_name']) ?></a></small><?php endforeach; ?></td>
-        <?php if ($canManage): ?><td><?= (int) $a['no_commission'] === 1 ? 'No commission' : (array_filter([$a['rate_1_5'], $a['rate_6_10'], $a['rate_11_20'], $a['rate_21_40'], $a['rate_41_plus']]) ? 'Personal rates' : 'Standard rates') ?></td><?php endif; ?>
+        <?php if ($canManage): ?><td><?= (int) $a['no_commission'] === 1 ? 'No commission' : (($a['commission_mode'] ?? 'ladder') === 'fixed' ? 'Fixed: ' . htmlspecialchars((string) ($a['commission_level_name'] ?? '?')) : 'Ladder') ?></td><?php endif; ?>
         <?php if ($canManage || $canBank): ?><td><?= $a['pending_bank'] > 0 ? '<span class="badge badge-pending">Change to check</span>' : '' ?></td><?php endif; ?>
         <td><a class="btn-sm" href="/associates/<?= (int) $a['id'] ?>">Open</a></td>
       </tr>

@@ -147,6 +147,7 @@ final class UngatedRoutesTest extends DbTestCase
         'GET /associate/messages associate',
         'GET /associate/orders associate',
         'GET /associate/orders/{} associate',
+        'GET /associate/prices associate',
         'GET /associate/profile associate',
         'GET /associate/set-password/{} public',
         'GET /invite/{} public',
@@ -161,6 +162,7 @@ final class UngatedRoutesTest extends DbTestCase
         'POST /associate/login/code public +csrf',
         'POST /associate/logout public +csrf',
         'POST /associate/messages associate +csrf',
+        'POST /associate/prices/acknowledge associate +csrf',
         'POST /associate/profile associate +csrf',
         'POST /associate/set-password/{} public +csrf',
         'POST /quotation-details/verify public +csrf',
@@ -466,7 +468,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(18, $checked);
+        self::assertSame(20, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -534,7 +536,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(61, $checked);
+        self::assertSame(62, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -584,7 +586,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(35, $checked);
+        self::assertSame(36, $checked);
         self::assertSame([], $failed);
     }
 

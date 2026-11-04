@@ -144,8 +144,12 @@ describe('Gap list G-5: part payments and short payments', () => {
 
     const refused = await call('clear', orderId, { cleared_on: '2026-10-23' }, accounts, { milestoneId: String(m.id) });
     expect(refused.message).toBe('Milestone 2 received so far: USD 700.00 of USD 900.00 due — USD 200.00 is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.');
-    const ok = await call('clear', orderId, { cleared_on: '2026-10-23', short_reason: 'Bank charges taken by the buyer\'s bank, agreed.' }, md, { milestoneId: String(m.id) });
-    expect(ok.message).toBe('Milestone 2 cleared. It goes to Zoho Books with the next revenue sync. Short by USD 200.00: approved by Jest Part Pay User — written off.');
+    // D-245 P3: the manager says what the shortfall is (an agreed discount here).
+    const noKind = await call('clear', orderId, { cleared_on: '2026-10-23', short_reason: 'Bank charges taken by the buyer\'s bank, agreed.' }, md, { milestoneId: String(m.id) });
+    expect(noKind.message).toBe('Say what the USD 200.00 short is: an agreed discount, a settled buyer claim, or not paid by the buyer.');
+    const ok = await call('clear', orderId, { cleared_on: '2026-10-23', short_reason: 'Bank charges taken by the buyer\'s bank, agreed.', short_kind: 'agreed_discount' }, md, { milestoneId: String(m.id) });
+    expect(ok.message).toBe('Milestone 2 cleared. It goes to Zoho Books with the next revenue sync. Short by USD 200.00: approved by Jest Part Pay User — written off (agreed discount).');
+    expect((await db.queryOne("SELECT settlement_kind FROM order_payment_shortfalls WHERE order_id = :o AND leg = 'milestone'", { o: orderId })).settlement_kind).toBe('agreed_discount');
     expect((await db.queryOne("SELECT treatment FROM order_payment_shortfalls WHERE order_id = :o AND leg = 'milestone'", { o: orderId })).treatment).toBe('written_off');
   });
 

@@ -29,7 +29,7 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  * Port of QaRound8Part1Test.php. QA Round 8, part 1 (1 Nov 2026): money
  * saved twice at once (R8-N11 GST refund credits, R8-N12 associate
  * claw-backs), the commission CSV (R8-N03), one-off invitation links
- * (R8-N04), the associate's client numbering (R8-N05, AS-17), a suspended
+ * (R8-N04), the associate ladder without client numbers (R8-N05 replaced by D-245 P3), a suspended
  * associate's read-only portal (Q-R8-2, AS-3) and the bank e-mails (R8-N01).
  */
 const PASSWORD = 'JestQaRound8!';
@@ -66,7 +66,6 @@ describe('QA Round 8, part 1', () => {
     tag = crypto.randomBytes(3).toString('hex');
     session = {};
     const values = {
-      associate_rate_1_5: '0.70', associate_rate_6_10: '1.00', associate_rate_11_20: '1.50', associate_rate_21_40: '1.75', associate_rate_41_plus: '2.00',
       associate_bank_wait_days: '7', associate_protection_months: '12', associate_tds_pct: '2.00', cutoff_day: '20',
     };
     for (const [k, v] of Object.entries(values)) {
@@ -182,9 +181,9 @@ describe('QA Round 8, part 1', () => {
     expect(out.filter((r) => r.id !== null)).toHaveLength(1);
     expect(Number(await value('SELECT -SUM(amount_inr) AS t FROM incentive_payouts WHERE clawback_of_payout_id = :p', { p: pid }))).toBe(600);
 
-    await call(associateAdminController.clawback, { as: admin, params: { payoutId: String(pid) }, body: { amount_inr: '600', reason: 'Buyer refunded part of the order.' } });
+    await call(associateAdminController.clawback, { as: admin, params: { payoutId: String(pid) }, body: { amount_inr: '600', reason: 'Breach: dealt with a competitor for this buyer.', takeback_kind: 'breach' } });
     expect(flash().message).toBe('Enter the amount to claw back, above 0 and at most what is left of the paid commission (₹400.00).');
-    await call(associateAdminController.clawback, { as: admin, params: { payoutId: String(pid) }, body: { amount_inr: '400', reason: 'Buyer refunded the rest of the order.' } });
+    await call(associateAdminController.clawback, { as: admin, params: { payoutId: String(pid) }, body: { amount_inr: '400', reason: 'Breach: dealt with a competitor for this buyer.', takeback_kind: 'breach' } });
     expect(flash().type).toBe('success');
     expect(Number(await value('SELECT -SUM(amount_inr) AS t FROM incentive_payouts WHERE clawback_of_payout_id = :p', { p: pid }))).toBe(1000);
   });
@@ -255,51 +254,29 @@ describe('QA Round 8, part 1', () => {
     expect(await value('SELECT associate_id FROM clients WHERE id = :id', { id: c })).toBeNull();
   });
 
-  // ---------------------------------------------------------------- R8-N05: client no. N, in the order they were brought
+  // ---------------------------------------------------------------- R8-N05 replaced (D-245 P3): no client numbers; the ladder counts orders
 
-  it('clients are numbered when linked and orders take the rate for that number', async () => {
+  it('clients are not numbered and every order takes the ladder step for counting orders', async () => {
     const a = await associate();
-    const numbers = [];
-    const rates = [];
     let o;
     for (let i = 1; i <= 7; i++) {
       const c = await client(`R8 Numbered ${i} ${tag}`);
       await associateService.linkClient(c, Number(a.id), 'code', null, `2026-10-0${i}`, admin);
       o = await order(c);
-      const row = await db.queryOne('SELECT associate_client_number, associate_rate_pct, associate_rate_source FROM orders WHERE id = :id', { id: o });
-      numbers.push(Number(row.associate_client_number));
-      rates.push(String(row.associate_rate_pct));
-      expect(row.associate_rate_source).toBe('global');
+      const row = await db.queryOne('SELECT associate_rate_pct, associate_rate_source FROM orders WHERE id = :id', { id: o });
+      expect([String(row.associate_rate_pct), row.associate_rate_source]).toEqual(['2.00', 'ladder']); // no counting order yet: step 1 for every client
     }
-    expect(numbers).toEqual([1, 2, 3, 4, 5, 6, 7]); // numbered when linked, not when paid
-    expect(rates).toEqual(['0.70', '0.70', '0.70', '0.70', '0.70', '1.00', '1.00']);
-    expect((await incentiveService.calculate(o)).associate.order_number).toBe(7);
+    expect((await incentiveService.calculate(o)).associate.level_label).toBe('Level 1 — 2%');
+    expect(Number(await value("SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'associate_client_number'"))).toBe(0);
 
+    // The MD moves a client to another associate, then removes the link.
     const c3 = Number(await value('SELECT id FROM clients WHERE company_legal_name = :n', { n: `R8 Numbered 3 ${tag}` }));
-    await associateService.linkClient(c3, Number(a.id), 'staff', null, '2026-10-03', admin);
-    expect(await associateRepository.orderNumberForClient(Number(a.id), c3)).toBe(3);
-    const o3b = await order(c3);
-    expect(Number(await value('SELECT associate_client_number FROM orders WHERE id = :id', { id: o3b }))).toBe(3);
-
     const b = await associate();
-    const bFirst = await client(`R8 B First ${tag}`);
-    await associateService.linkClient(bFirst, Number(b.id), 'code', null, '2026-10-01', admin);
     await call(associateAdminController.unlinkClient, { as: md, params: { id: String(a.id), clientId: String(c3) }, body: { reason: 'The buyer says another agent introduced them.', move_to: String(b.id) } });
     expect(flash().type).toBe('success');
-    const moved = await db.queryOne('SELECT associate_id, associate_client_number FROM clients WHERE id = :id', { id: c3 });
-    expect([Number(moved.associate_id), Number(moved.associate_client_number)]).toEqual([Number(b.id), 2]);
+    expect(Number(await value('SELECT associate_id FROM clients WHERE id = :id', { id: c3 }))).toBe(Number(b.id));
     await call(associateAdminController.unlinkClient, { as: md, params: { id: String(b.id), clientId: String(c3) }, body: { reason: 'The agreement with this buyer was cancelled.', move_to: '' } });
-    expect(await value('SELECT associate_client_number FROM clients WHERE id = :id', { id: c3 })).toBeNull();
-    expect(Number(await value('SELECT associate_client_number FROM clients WHERE company_legal_name = :n', { n: `R8 Numbered 7 ${tag}` }))).toBe(7);
-  });
-
-  it('two links at once never share a number', async () => {
-    const a = await associate();
-    const c1 = await client(`R8 Twin One ${tag}`);
-    const c2 = await client(`R8 Twin Two ${tag}`);
-    await Promise.all([associateRepository.linkClient(c1, Number(a.id), '2026-10-01'), associateRepository.linkClient(c2, Number(a.id), '2026-10-01')]);
-    const n = (await db.query('SELECT associate_client_number AS n FROM clients WHERE id IN (:a, :b) ORDER BY n', { a: c1, b: c2 })).map((r) => Number(r.n));
-    expect(n).toEqual([1, 2]);
+    expect(await value('SELECT associate_id FROM clients WHERE id = :id', { id: c3 })).toBeNull();
   });
 
   // ---------------------------------------------------------------- Q-R8-2: a suspended associate's portal is read-only

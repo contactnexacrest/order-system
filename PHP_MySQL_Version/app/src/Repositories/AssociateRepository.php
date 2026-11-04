@@ -15,11 +15,9 @@ use App\Config\Database;
  */
 final class AssociateRepository
 {
-    /** The agreement's ladder: [upper bound of the associate's order count => rate column]. */
-    public const TIERS = [5 => 'rate_1_5', 10 => 'rate_6_10', 20 => 'rate_11_20', 40 => 'rate_21_40', PHP_INT_MAX => 'rate_41_plus'];
-
+    // D-245 P3 (4 Nov 2026): the per-rung rates are gone — commission levels and the ladder (Admin → Pricing) replace them.
     public const FIELDS = ['name', 'based_in', 'country', 'currency_code', 'email', 'phone', 'tax_id', 'agreement_signed_on',
-        'rate_1_5', 'rate_6_10', 'rate_11_20', 'rate_21_40', 'rate_41_plus', 'status', 'notes',
+        'status', 'notes',
         'no_commission', 'agreement_ends_on', 'relationship_manager_id', 'pan', 'gstin', 'address'];
 
     /** Owner decision 1 Nov 2026 (AS-1 … AS-17): the associate's life cycle. 'inactive' is kept for older rows. */
@@ -29,8 +27,9 @@ final class AssociateRepository
     public static function all(): array
     {
         return Database::connection()->query(
-            'SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.associate_id = a.id) AS client_count, f.original_filename AS agreement_file_name
-             FROM associates a LEFT JOIN file_store f ON f.id = a.agreement_file_id ORDER BY a.status, a.name'
+            'SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.associate_id = a.id) AS client_count, f.original_filename AS agreement_file_name,
+                    cl.name AS commission_level_name
+             FROM associates a LEFT JOIN file_store f ON f.id = a.agreement_file_id LEFT JOIN commission_levels cl ON cl.id = a.commission_level_id ORDER BY a.status, a.name'
         )->fetchAll();
     }
 
@@ -91,55 +90,6 @@ final class AssociateRepository
         return $stmt->fetchColumn() !== false;
     }
 
-    /**
-     * The rate (%) for the associate's Nth client — owner decisions 1 Nov 2026
-     * (AS-17, D-221): the associate's personal rate for that rung when it is
-     * set (above 0), else the last personal rate set on a lower rung, else the
-     * global ladder; none at all when the associate is marked "no commission".
-     */
-    public static function rateFor(array $associate, int $orderNumber): float
-    {
-        return self::rateWithSource($associate, $orderNumber)['rate'];
-    }
-
-    /** @return array{rate: float, source: string} source 'personal' | 'global' | 'none' */
-    public static function rateWithSource(array $associate, int $orderNumber): array
-    {
-        if ((int) ($associate['no_commission'] ?? 0) === 1) {
-            return ['rate' => 0.0, 'source' => 'none'];
-        }
-        $column = 'rate_41_plus';
-        foreach (self::TIERS as $upTo => $col) {
-            if ($orderNumber <= $upTo) {
-                $column = $col;
-                break;
-            }
-        }
-        // Owner decision 1 Nov 2026 (D-221): an empty (or 0) rung carries on the last personal rate set below it;
-        // rungs below the first personal rate use the standard ladder.
-        $columns = array_values(self::TIERS);
-        for ($i = array_search($column, $columns, true); $i >= 0; $i--) {
-            $personal = $associate[$columns[$i]] ?? null;
-            if ($personal !== null && $personal !== '' && (float) $personal > 0) {
-                return ['rate' => (float) $personal, 'source' => 'personal'];
-            }
-        }
-        return ['rate' => (float) (self::globalLadder()[$column] ?? 0), 'source' => 'global'];
-    }
-
-    /** @return array<string, float> the global ladder, rung column => rate (owner decision 1 Nov 2026, AS-17) */
-    public static function globalLadder(): array
-    {
-        $settings = IncentiveRepository::settings();
-        $defaults = ['rate_1_5' => 0.70, 'rate_6_10' => 1.00, 'rate_11_20' => 1.50, 'rate_21_40' => 1.75, 'rate_41_plus' => 2.00];
-        $out = [];
-        foreach ($defaults as $column => $default) {
-            $v = $settings['associate_' . $column] ?? '';
-            $out[$column] = $v !== '' ? (float) $v : $default;
-        }
-        return $out;
-    }
-
     public static function findByEmail(string $email): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM associates WHERE LOWER(email) = LOWER(:e)');
@@ -185,34 +135,8 @@ final class AssociateRepository
 
     public static function linkClient(int $clientId, ?int $associateId, ?string $registeredOn): void
     {
-        Database::transaction(static function () use ($clientId, $associateId, $registeredOn): void {
-            $number = $associateId === null ? null : self::clientNumberForLink($clientId, $associateId);
-            Database::connection()->prepare('UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_client_number = :n WHERE id = :id')
-                ->execute(['a' => $associateId, 'd' => $associateId === null ? null : $registeredOn, 'n' => $number, 'id' => $clientId]);
-        });
-    }
-
-    /**
-     * QA Round 8 (R8-N05, owner decision AS-17): the client's number for this
-     * associate — 1 for the first client they brought, 2 for the second, in
-     * the order they were linked. A client already numbered for this
-     * associate keeps its number for ever; a client moving to a new associate
-     * gets that associate's next number. Call inside a transaction: the
-     * associate's row is locked so two links at once never share a number.
-     */
-    public static function clientNumberForLink(int $clientId, int $associateId): int
-    {
-        $pdo = Database::connection();
-        $pdo->prepare('SELECT id FROM associates WHERE id = :a FOR UPDATE')->execute(['a' => $associateId]);
-        $cur = $pdo->prepare('SELECT associate_id, associate_client_number FROM clients WHERE id = :id FOR UPDATE');
-        $cur->execute(['id' => $clientId]);
-        $c = $cur->fetch();
-        if ($c && (int) ($c['associate_id'] ?? 0) === $associateId && $c['associate_client_number'] !== null) {
-            return (int) $c['associate_client_number'];
-        }
-        $next = $pdo->prepare('SELECT COALESCE(MAX(associate_client_number), 0) + 1 FROM clients WHERE associate_id = :a AND id <> :id');
-        $next->execute(['a' => $associateId, 'id' => $clientId]);
-        return (int) $next->fetchColumn();
+        Database::connection()->prepare('UPDATE clients SET associate_id = :a, associate_registered_on = :d WHERE id = :id')
+            ->execute(['a' => $associateId, 'd' => $associateId === null ? null : $registeredOn, 'id' => $clientId]);
     }
 
     /** @return list<array<string,mixed>> clients not yet linked to any associate, for the link picker */
@@ -221,30 +145,5 @@ final class AssociateRepository
         return Database::connection()->query(
             'SELECT id, company_legal_name, client_unique_number FROM clients WHERE associate_id IS NULL AND is_test_data = 0 ORDER BY company_legal_name'
         )->fetchAll();
-    }
-
-    /**
-     * The associate's client number for this client (QA Round 8, R8-N05):
-     * the number stored on the client when it was linked. A client linked
-     * before numbering existed is numbered now, as the associate's next.
-     */
-    public static function orderNumberForClient(int $associateId, int $clientId): int
-    {
-        $stmt = Database::connection()->prepare('SELECT associate_id, associate_client_number FROM clients WHERE id = :id');
-        $stmt->execute(['id' => $clientId]);
-        $c = $stmt->fetch();
-        if ($c && (int) ($c['associate_id'] ?? 0) === $associateId && $c['associate_client_number'] !== null) {
-            return (int) $c['associate_client_number'];
-        }
-        if (!$c || (int) ($c['associate_id'] ?? 0) !== $associateId) {
-            $next = Database::connection()->prepare('SELECT COALESCE(MAX(associate_client_number), 0) + 1 FROM clients WHERE associate_id = :a');
-            $next->execute(['a' => $associateId]);
-            return (int) $next->fetchColumn();
-        }
-        return (int) Database::transaction(static function () use ($associateId, $clientId): int {
-            $number = self::clientNumberForLink($clientId, $associateId);
-            Database::connection()->prepare('UPDATE clients SET associate_client_number = :n WHERE id = :id')->execute(['n' => $number, 'id' => $clientId]);
-            return $number;
-        });
     }
 }

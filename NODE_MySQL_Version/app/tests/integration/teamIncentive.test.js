@@ -138,9 +138,10 @@ describe('Team incentive program and associates', () => {
   });
 
   it('the associate\'s commission is deducted first, on the client\'s first ten days only', async () => {
+    // D-245 P3: the associate on the ladder — step 1 (Level 1, 2%) of the invoiced FOB of the goods.
     const associate = await associateRepository.create({
       name: 'Jest Associate', based_in: 'abroad', country: 'USA', currency_code: 'USD', email: null, phone: null, tax_id: null,
-      agreement_signed_on: '2026-09-01', rate_1_5: 0.70, rate_6_10: 1.00, rate_11_20: 1.50, rate_21_40: 1.75, rate_41_plus: 2.00, status: 'active', notes: null,
+      agreement_signed_on: '2026-09-01', status: 'active', notes: null,
     }, admin);
     const client = await createTestClient();
     await associateRepository.linkClient(client, associate, '2026-09-05');
@@ -148,24 +149,19 @@ describe('Team incentive program and associates', () => {
     const orderId = await paidOrder(client);
     const profitBefore = (await orderProfitabilityService.computeForOrder(orderId)).profit_inr;
     const calc = await incentiveService.calculate(orderId);
-    expect([calc.associate.order_number, calc.associate.rate, calc.associate.amount_fc, calc.associate.currency]).toEqual([1, 0.70, 31.5, 'USD']);
-    expect(calc.associate.amount_inr).toBeCloseTo(2800, 2); // USD 31.50 at the ₹88.89 actually received per dollar
-    expect(calc.basis).toBeCloseTo(profitBefore - 2800, 2);
+    expect([calc.associate.level_label, calc.associate.rate, calc.associate.amount_fc, calc.associate.currency]).toEqual(['Level 1 — 2%', 2, 90, 'USD']);
+    expect(calc.associate.amount_inr).toBeCloseTo(8000, 2); // USD 90.00 at the ₹88.89 actually received per dollar
+    expect(calc.basis).toBeCloseTo(profitBefore - 8000, 2);
 
     await incentiveService.lockIfDue(orderId, admin);
-    expect((await payouts(orderId)).associate).toBeCloseTo(2800, 2);
-    expect((await incentiveRepository.costEntries(orderId)).associate.amount_inr).toBe('2800.00');
+    expect((await payouts(orderId)).associate).toBeCloseTo(8000, 2);
+    expect((await incentiveRepository.costEntries(orderId)).associate.amount_inr).toBe('8000.00');
 
     const later = await paidOrder(client);
     await db.execute('UPDATE orders SET created_at = DATE_ADD(created_at, INTERVAL 15 DAY) WHERE id = :id', { id: later });
     expect((await incentiveService.calculate(later)).associate).toBeNull(); // after day 10 it is a repeat order: no commission
     await incentiveRepository.saveOrder(later, { associate_mode: 'yes' }, admin);
-    expect((await incentiveService.calculate(later)).associate.order_number).toBe(1); // still the same client: the same commission order
-
-    const otherClient = await createTestClient();
-    const second = await paidOrder(otherClient);
-    await associateRepository.linkClient(otherClient, associate, '2026-09-20');
-    expect((await incentiveService.calculate(second)).associate.order_number).toBe(2);
+    expect((await incentiveService.calculate(later)).associate.amount_fc).toBe(90); // forced on: commission again
   });
 
   it('the incentive month follows the cut-off day', () => {

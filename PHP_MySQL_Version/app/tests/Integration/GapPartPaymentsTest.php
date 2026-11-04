@@ -152,8 +152,12 @@ final class GapPartPaymentsTest extends DbTestCase
         $refused = $this->call('clear', $orderId, ['cleared_on' => '2026-10-23'], ['milestoneId' => (string) $m['id']]);
         self::assertSame('Milestone 2 received so far: USD 700.00 of USD 900.00 due — USD 200.00 is still owed. Record the rest when it arrives, or ask a manager with "Approve short payment" to clear it with a written reason.', $refused['message']);
         $this->as($this->md);
-        $ok = $this->call('clear', $orderId, ['cleared_on' => '2026-10-23', 'short_reason' => 'Bank charges taken by the buyer\'s bank, agreed.'], ['milestoneId' => (string) $m['id']]);
-        self::assertSame('Milestone 2 cleared. It goes to Zoho Books with the next revenue sync. Short by USD 200.00: approved by PHPUnit Test User — written off.', $ok['message']);
+        // D-245 P3: the manager says what the shortfall is (an agreed discount here).
+        $noKind = $this->call('clear', $orderId, ['cleared_on' => '2026-10-23', 'short_reason' => 'Bank charges taken by the buyer\'s bank, agreed.'], ['milestoneId' => (string) $m['id']]);
+        self::assertSame('Say what the USD 200.00 short is: an agreed discount, a settled buyer claim, or not paid by the buyer.', $noKind['message']);
+        $ok = $this->call('clear', $orderId, ['cleared_on' => '2026-10-23', 'short_reason' => 'Bank charges taken by the buyer\'s bank, agreed.', 'short_kind' => 'agreed_discount'], ['milestoneId' => (string) $m['id']]);
+        self::assertSame('Milestone 2 cleared. It goes to Zoho Books with the next revenue sync. Short by USD 200.00: approved by PHPUnit Test User — written off (agreed discount).', $ok['message']);
+        self::assertSame('agreed_discount', Database::connection()->query("SELECT settlement_kind FROM order_payment_shortfalls WHERE order_id = {$orderId} AND leg = 'milestone'")->fetchColumn());
         self::assertSame('written_off', Database::connection()->query("SELECT treatment FROM order_payment_shortfalls WHERE order_id = {$orderId} AND leg = 'milestone'")->fetchColumn());
     }
 

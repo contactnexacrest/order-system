@@ -61,8 +61,8 @@ final class AssociateSystemTest extends DbTestCase
         $this->finance1 = $this->createTestUser('Finance Manager');
         $this->finance2 = $this->createTestUser('Finance Director');
         $this->as($this->admin);
-        foreach (['associate_rate_1_5' => '0.70', 'associate_rate_6_10' => '1.00', 'associate_rate_11_20' => '1.50', 'associate_rate_21_40' => '1.75',
-            'associate_rate_41_plus' => '2.00', 'associate_bank_wait_days' => '7', 'associate_protection_months' => '12', 'associate_tds_pct' => '2.00', 'cutoff_day' => '20'] as $k => $v) {
+        foreach (['associate_bank_wait_days' => '7', 'associate_protection_months' => '12', 'associate_tds_pct' => '2.00', 'cutoff_day' => '20',
+            'associate_commission_due_days' => '30', 'associate_claim_hold' => '1', 'associate_payout_run' => 'monthly', 'associate_payout_day' => '5'] as $k => $v) {
             IncentiveRepository::setSetting($k, $v, $this->admin);
         }
     }
@@ -164,52 +164,52 @@ final class AssociateSystemTest extends DbTestCase
 
     // ---------------------------------------------------------------- rates (AS-17)
 
-    /** Owner decision 1 Nov 2026 (D-221): an empty rung carries on the last personal rate below it, else the standard ladder. */
-    public function testThePersonalRateCarriesUpwardElseTheStandardLadderAndNoCommission(): void
+    private function level(string $name): int
     {
-        $ladder = static fn (array $a): array => array_map(static fn (int $n): array => AssociateRepository::rateWithSource($a, $n), [1, 6, 11, 21, 41]);
-        $p = static fn (float $r): array => ['rate' => $r, 'source' => 'personal'];
-        $g = static fn (float $r): array => ['rate' => $r, 'source' => 'global'];
-
-        self::assertSame([$p(1.25), $p(1.5), $p(1.5), $p(1.5), $p(1.5)], $ladder($this->associate(['rate_1_5' => '1.25', 'rate_6_10' => '1.50'])), '1-5 and 6-10 set: 11 onward carries 6-10');
-        self::assertSame([$g(0.7), $p(1.5), $p(1.5), $p(1.5), $p(1.5)], $ladder($this->associate(['rate_6_10' => '1.50'])), 'only 6-10 set: 1-5 standard, 11 onward carries 6-10');
-        self::assertSame([$p(1.0), $p(1.0), $p(1.0), $p(2.5), $p(2.5)], $ladder($this->associate(['rate_1_5' => '1.00', 'rate_21_40' => '2.50'])), '1-5 and 21-40 set: 6-20 carry 1-5, 41+ carries 21-40');
-        self::assertSame([$g(0.7), $g(1.0), $g(1.5), $g(1.75), $g(2.0)], $ladder($this->associate([])), 'nothing set: the standard ladder');
-        $zero = $this->associate(['rate_1_5' => '1.25', 'rate_6_10' => '0']);
-        self::assertSame($p(1.25), AssociateRepository::rateWithSource($zero, 6), '0 counts as empty: carries 1-5');
-
-        $std = $this->associate([]);
-        IncentiveRepository::setSetting('associate_rate_11_20', '1.60', $this->admin);
-        self::assertSame(1.6, AssociateRepository::rateWithSource($std, 15)['rate'], 'the standard ladder is set in Admin');
-        AssociateRepository::setFields((int) $zero['id'], ['no_commission' => 1]);
-        self::assertSame(['rate' => 0.0, 'source' => 'none'], AssociateRepository::rateWithSource(AssociateRepository::find((int) $zero['id']), 1));
+        return (int) Database::connection()->query('SELECT id FROM commission_levels WHERE name = ' . Database::connection()->quote($name))->fetchColumn();
     }
 
-    public function testTheRateIsFixedOnTheOrderWhenItIsCreatedAndEarnedOnlyWhenTheBuyerHasPaidEverything(): void
+    /** Owner decision D-245 P3: the commission level is the associate's fixed level or the ladder step; none when marked "no commission". */
+    public function testTheCommissionLevelIsTheFixedLevelOrTheLadderAndNoCommission(): void
     {
-        $a = $this->associate(['rate_1_5' => '1.25']);
+        $ladder = $this->associate();
+        self::assertSame('Level 1 — 2%', \App\Services\AssociateCommission::levelLabel(\App\Services\AssociateCommission::levelForAssociate($ladder, null)[0]), 'first order on the ladder: step 1');
+        $fixed = $this->associate();
+        \App\Repositories\PricingRepository::setAssociateCommission((int) $fixed['id'], 'fixed', $this->level('Level 3'));
+        self::assertSame('Level 3 — 7%', \App\Services\AssociateCommission::levelLabel(\App\Services\AssociateCommission::levelForAssociate(AssociateRepository::find((int) $fixed['id']), null)[0]));
+        $none = $this->associate(['no_commission' => 1]);
+        $client = $this->client('No Level Buyer');
+        AssociateService::linkClient($client, (int) $none['id'], 'code', null, '2026-10-01', $this->admin);
+        self::assertNull(IncentiveService::calculate($this->order($client))['associate'], 'no commission under the agreement');
+    }
+
+    public function testTheLevelIsFixedAtThePiAndEarnedOnlyWhenTheBuyerHasPaidEverything(): void
+    {
+        $a = $this->associate();
+        \App\Repositories\PricingRepository::setAssociateCommission((int) $a['id'], 'fixed', $this->level('Level 2'));
         $client = $this->client('Rate Fixed Buyer');
         AssociateService::linkClient($client, (int) $a['id'], 'code', null, '2026-10-01', $this->admin);
         $orderId = $this->order($client, 2700, false);
-        $row = Database::connection()->query("SELECT associate_id, associate_rate_pct, associate_rate_source, associate_client_number FROM orders WHERE id = {$orderId}")->fetch();
-        self::assertSame([(string) $a['id'], '1.25', 'personal', '1'], [(string) $row['associate_id'], $row['associate_rate_pct'], $row['associate_rate_source'], (string) $row['associate_client_number']]);
+        $row = Database::connection()->query("SELECT associate_id, associate_rate_pct, associate_rate_source FROM orders WHERE id = {$orderId}")->fetch();
+        self::assertSame([(string) $a['id'], '5.00', 'fixed'], [(string) $row['associate_id'], $row['associate_rate_pct'], $row['associate_rate_source']]);
         self::assertTrue(AssociateEventRepository::hasEvent((int) $a['id'], 'order_created', $client, $orderId), 'the associate is told of the new order');
 
-        AssociateRepository::setFields((int) $a['id'], ['rate_1_5' => '2.50']);
+        \App\Services\AssociateCommission::fixLevelAtPi($orderId);
+        \App\Repositories\PricingRepository::setAssociateCommission((int) $a['id'], 'fixed', $this->level('Level 4'));
         IncentiveService::lockIfDue($orderId, $this->admin);
         self::assertNull(IncentiveRepository::forOrder($orderId), 'advance alone: nothing earned');
         $line = AssociatePortalRepository::orders((int) $a['id'], $orderId)[0]['commission'];
-        self::assertSame(['expected', 1.25, 'personal', 56.25], [$line['state'], $line['rate'], $line['source'], $line['amount']], 'the order keeps the rate fixed when it was created');
+        self::assertSame(['expected', 5.0, 225.0, 'Level 2 — 5%'], [$line['state'], $line['rate'], $line['amount'], $line['level']], 'the order keeps the level fixed at its PI');
 
         Database::connection()->prepare("UPDATE order_payment_status SET balance_cleared_at = '2026-10-25 11:00:00', balance_inr_actual = 250000 WHERE order_id = :o")->execute(['o' => $orderId]);
         IncentiveService::lockIfDue($orderId, $this->admin);
         $p = array_values(array_filter(IncentiveRepository::payoutsForOrder($orderId), static fn (array $p): bool => $p['payee_kind'] === 'associate'))[0];
-        self::assertSame(['56.25', 'USD', 'due', '2026-11'], [$p['amount_fc'], $p['currency_code'], $p['status'], $p['incentive_month']]);
+        self::assertSame(['225.00', 'USD', 'due', '2026-12', '2026-11-24', '2026-12-05'], [$p['amount_fc'], $p['currency_code'], $p['status'], $p['incentive_month'], $p['due_on'], $p['payout_run_on']]);
         self::assertTrue(AssociateEventRepository::hasEvent((int) $a['id'], 'commission_earned', $client, $orderId));
         self::assertSame('earned', AssociatePortalRepository::orders((int) $a['id'], $orderId)[0]['commission']['state']);
     }
 
-    public function testNoCommissionAssociateCancelledOrderAndShortPayProRata(): void
+    public function testNoCommissionAssociateCancelledOrderAndAnUnpaidShortfallEarnsNothing(): void
     {
         $none = $this->associate(['no_commission' => 1]);
         $c1 = $this->client('No Commission Buyer');
@@ -218,14 +218,18 @@ final class AssociateSystemTest extends DbTestCase
         self::assertNull(IncentiveService::calculate($o1)['associate'], 'no commission under the agreement');
         self::assertSame('No commission under your agreement', AssociatePortalRepository::orders((int) $none['id'], $o1)[0]['commission']['label']);
 
+        // D-245 P3: no pro rata — a buyer who did not pay in full earns the associate nothing.
         $a = $this->associate();
         $c2 = $this->client('Short Pay Buyer');
         AssociateService::linkClient($c2, (int) $a['id'], 'code', null, '2026-10-01', $this->admin);
         $o2 = $this->order($c2, 2250);
+        Database::connection()->prepare("INSERT INTO order_payment_shortfalls (order_id, leg, expected_amount, received_amount, shortfall_amount, treatment, reason, approved_by, settlement_kind)
+                                          VALUES (:o, 'balance', 2700, 2250, 450, 'written_off', 'The buyer did not pay the rest', :u, 'unpaid')")->execute(['o' => $o2, 'u' => $this->admin]);
         $calc = IncentiveService::calculate($o2)['associate'];
-        self::assertSame([0.9, 28.35], [$calc['paid_ratio'], $calc['amount_fc']], 'USD 4,050 of 4,500 received: 90% of 0.70% of 4,500');
+        self::assertSame(['unpaid', 0.0], [$calc['state'], $calc['amount_fc']], 'USD 4,050 of 4,500 received: nothing');
         IncentiveService::lockIfDue($o2, $this->admin);
-        self::assertStringContainsString('— pro rata 90% of the order value received', (string) IncentiveRepository::costEntries($o2)['associate']['description']);
+        self::assertSame([], array_values(array_filter(IncentiveRepository::payoutsForOrder($o2), static fn (array $p): bool => $p['payee_kind'] === 'associate')));
+        self::assertSame('No commission — the buyer did not pay this order in full', AssociatePortalRepository::orders((int) $a['id'], $o2)[0]['commission']['label']);
 
         Database::connection()->prepare("UPDATE orders SET status = 'cancelled' WHERE id = :o")->execute(['o' => $o1]);
         self::assertSame('No commission — order cancelled', AssociatePortalRepository::orders((int) $none['id'], $o1)[0]['commission']['label']);
@@ -278,11 +282,16 @@ final class AssociateSystemTest extends DbTestCase
         IncentiveService::lockIfDue($o1, $this->admin);
         $p1 = array_values(array_filter(IncentiveRepository::payoutsForOrder($o1), static fn (array $p): bool => $p['payee_kind'] === 'associate'))[0];
 
-        $this->as($this->admin);
         $_POST = ['month' => '2026-11', 'paid_on' => date('Y-m-d'), 'paid_via' => 'bank_transfer', 'paid_reference' => 'UTR' . strtoupper($this->tag) . '01'];
         (new IncentiveController())->markPaid(['payoutId' => (string) $p1['id']]);
         self::assertStringStartsWith('This associate has no verified bank account usable on ', $this->flash()['message']);
         $this->verifiedBank($a);
+        // D-245 P3: paid only from its due date (30 days after full payment).
+        $_POST['month'] = $p1['incentive_month'];
+        (new IncentiveController())->markPaid(['payoutId' => (string) $p1['id']]);
+        self::assertStringStartsWith('This commission is due on 24 Nov 2026', $this->flash()['message']);
+        Database::connection()->prepare("UPDATE incentive_payouts SET due_on = '2026-10-30', incentive_month = '2026-11' WHERE order_id = :o")->execute(['o' => $o1]);
+        $_POST['month'] = '2026-11';
         $_POST['paid_inr'] = (string) round((float) $p1['amount_inr'] * 0.98, 2);
         $_POST['tds_inr'] = (string) round((float) $p1['amount_inr'] * 0.02, 2);
         // D-235: below the ₹20,000 threshold the app works out no TDS; a different figure needs a reason.
@@ -292,19 +301,24 @@ final class AssociateSystemTest extends DbTestCase
         self::assertTrue(AssociateEventRepository::hasEvent((int) $a['id'], 'payout_paid', null, $o1));
 
         $paid = IncentiveRepository::findPayout((int) $p1['id']);
+        // D-245 P3: a later refund to the buyer does not take commission back — only fraud or breach does.
         $_POST = ['amount_inr' => '1000', 'reason' => 'Buyer refunded 20% for a damaged crate.'];
+        (new AssociateAdminController())->clawback(['payoutId' => (string) $p1['id']]);
+        self::assertStringContainsString('only for the associate\'s fraud or breach', $this->flash()['message']);
+        $_POST = ['amount_inr' => '1000', 'reason' => 'Invented a second buyer quote to inflate the order.', 'takeback_kind' => 'fraud'];
         (new AssociateAdminController())->clawback(['payoutId' => (string) $p1['id']]);
         self::assertSame('success', $this->flash()['type']);
         $claw = Database::connection()->query("SELECT * FROM incentive_payouts WHERE clawback_of_payout_id = {$p1['id']}")->fetch();
-        self::assertSame(['-1000.00', 'due'], [$claw['amount_inr'], $claw['status']]);
-        self::assertStringStartsWith('Claw-back of commission paid on order ', (string) $claw['note']);
-        $_POST = ['amount_inr' => (string) ((float) $paid['paid_inr']), 'reason' => 'Buyer refunded everything later.'];
+        self::assertSame(['-1000.00', 'due', 'fraud'], [$claw['amount_inr'], $claw['status'], $claw['takeback_kind']]);
+        self::assertStringStartsWith('Taken back for fraud: commission paid on order ', (string) $claw['note']);
+        $_POST = ['amount_inr' => (string) ((float) $paid['paid_inr']), 'reason' => 'Breach found later as well.', 'takeback_kind' => 'breach'];
         (new AssociateAdminController())->clawback(['payoutId' => (string) $p1['id']]);
         self::assertStringStartsWith('Enter the amount to claw back, above 0 and at most what is left', $this->flash()['message'], 'never more than was paid');
 
         Database::connection()->prepare('UPDATE incentive_payouts SET incentive_month = :m WHERE id = :id')->execute(['m' => '2026-11', 'id' => $claw['id']]);
         $o2 = $this->order($c2);
         IncentiveService::lockIfDue($o2, $this->admin);
+        Database::connection()->prepare("UPDATE incentive_payouts SET due_on = '2026-10-30', incentive_month = '2026-11' WHERE order_id = :o")->execute(['o' => $o2]);
         $p2 = array_values(array_filter(IncentiveRepository::payoutsForOrder($o2), static fn (array $p): bool => $p['payee_kind'] === 'associate'))[0];
         $_POST = ['month' => '2026-11', 'paid_on' => date('Y-m-d'), 'paid_via' => 'bank_transfer', 'paid_reference' => 'UTR' . strtoupper($this->tag) . '02', 'paid_inr' => (string) ((float) $p2['amount_inr'] - 1000)];
         (new IncentiveController())->markPaid(['payoutId' => (string) $p2['id']]);
@@ -598,7 +612,8 @@ final class AssociateSystemTest extends DbTestCase
 
     public function testWhoSeesWhatOnTheStaffSide(): void
     {
-        $a = $this->associate(['rate_1_5' => '1.25']);
+        $a = $this->associate();
+        \App\Repositories\PricingRepository::setAssociateCommission((int) $a['id'], 'fixed', $this->level('Level 3'));
         $client = $this->client('Visible Buyer');
         AssociateService::linkClient($client, (int) $a['id'], 'code', null, '2026-10-01', $this->admin);
         $sales = $this->createTestUser('Export Executive');
@@ -609,12 +624,12 @@ final class AssociateSystemTest extends DbTestCase
         self::assertStringNotContainsString('Commission terms', $list, 'Sales: who introduced whom, no amounts');
         $show = $this->render(fn () => (new AssociateAdminController())->show(['id' => (string) $a['id']]));
         self::assertStringContainsString('Visible Buyer', $show);
-        foreach (['1.25%', 'Bank details', 'Payouts', 'Show full number'] as $never) {
+        foreach (['Level 3', 'Bank details', 'Payouts', 'Show full number'] as $never) {
             self::assertStringNotContainsString($never, $show, "Sales never sees: {$never}");
         }
         $this->as($this->ed);
         $show = $this->render(fn () => (new AssociateAdminController())->show(['id' => (string) $a['id']]));
-        self::assertStringContainsString('1.25% (personal)', $show);
+        self::assertStringContainsString('Fixed level: <b>Level 3</b>', $show);
         self::assertStringNotContainsString('Show full number', $show, 'the full bank number is Finance / MD only');
         $role = static fn (string $name): int => (int) Database::connection()->query('SELECT id FROM roles WHERE name = ' . Database::connection()->quote($name))->fetchColumn();
         self::assertFalse(\App\Services\PermissionService::can($sales, $role('Export Executive'), 'manage_associates'));
@@ -636,7 +651,7 @@ final class AssociateSystemTest extends DbTestCase
         \App\Repositories\AssociateDocumentRepository::add((int) $a['id'], 'invoice', $fileId, (int) $p['id'], 'RK/24-25/017', true, null);
         $ref = (string) Database::connection()->query("SELECT buyer_inquiry_ref FROM orders WHERE id = {$o}")->fetchColumn();
         $c = ZohoBooksService::associateCommission(['order_id' => $o, 'buyer_inquiry_ref' => $ref, 'buyer_name' => 'Zoho Buyer ' . $this->tag]);
-        self::assertSame("Associate commission — {$a['name']} — for order {$ref} (Zoho Buyer {$this->tag}), 0.7% of product FOB, client no. 1 · associate invoice RK/24-25/017 · TDS 56.00 deducted", $c['bill_description']);
+        self::assertSame("Associate commission — {$a['name']} — for order {$ref} (Zoho Buyer {$this->tag}), 2% on the invoiced FOB of the goods (basis USD 4500.00) · associate invoice RK/24-25/017 · TDS 56.00 deducted", $c['bill_description']);
         self::assertSame("Associate commission for {$a['name']} — order {$ref} — gross ₹2,800.00, TDS u/s 194H ₹56.00, net paid ₹2,744.00 · UTR UTR777888 · against bill RK/24-25/017", $c['payment_description']);
         self::assertSame(['RK/24-25/017', 2800.0, 2744.0, 56.0, 'UTR777888'], [$c['bill_no'], $c['gross_inr'], $c['paid_inr'], $c['tds_inr'], $c['reference']]);
     }
@@ -648,14 +663,22 @@ final class AssociateSystemTest extends DbTestCase
         $_GET = ['view' => 'list'];
         self::assertStringContainsString('Add an associate', $this->render(fn () => (new AssociateAdminController())->index([])));
         $_GET = [];
-        self::assertStringContainsString('Standard rate (% of product FOB value)', $this->render(fn () => (new AssociateAdminController())->ladder([])));
+        self::assertStringContainsString('When commission is paid', $this->render(fn () => (new AssociateAdminController())->ladder([])));
         self::assertStringContainsString('TDS register', $this->render(fn () => (new AssociateAdminController())->report([])));
         self::assertStringContainsString('Change status', $this->render(fn () => (new AssociateAdminController())->show(['id' => (string) $a['id']])));
-        $_POST = ['rate_1_5' => '0.80', 'rate_6_10' => '1.00', 'rate_11_20' => '1.50', 'rate_21_40' => '1.75', 'rate_41_plus' => '25', 'associate_tds_pct' => '2', 'associate_protection_months' => '12', 'associate_bank_wait_days' => '7'];
+        $base = ['associate_tds_pct' => '2', 'associate_bank_wait_days' => '7', 'associate_commission_due_days' => '30', 'associate_payout_run' => 'monthly', 'associate_payout_day' => '40',
+            'associate_counting_threshold_inr' => '500000', 'associate_protection_months' => '6', 'associate_gst_pct' => '18', 'associate_claim_hold' => '1'];
+        $_POST = $base;
         (new AssociateAdminController())->saveLadder([]);
-        self::assertSame('Enter every standard rate as a % from 0 to 20.', $this->flash()['message']);
-        $_POST['rate_41_plus'] = '2.00';
+        self::assertSame('Choose the payout day: 1 to 28 for a monthly run, a weekday for a weekly run.', $this->flash()['message']);
+        $_POST = ['associate_payout_day' => '10'] + $base;
         (new AssociateAdminController())->saveLadder([]);
-        self::assertSame(0.8, AssociateRepository::globalLadder()['rate_1_5']);
+        self::assertSame([10, 'monthly'], [\App\Services\AssociateCommission::settings()['day'], \App\Services\AssociateCommission::settings()['run']]);
+        // The ED may save TDS but not the commission rules (MD only).
+        $this->as($this->ed);
+        $_POST = ['associate_payout_day' => '20'] + $base;
+        (new AssociateAdminController())->saveLadder([]);
+        self::assertSame(10, \App\Services\AssociateCommission::settings()['day']);
+        IncentiveRepository::setSetting('associate_payout_day', '5', $this->admin);
     }
 }

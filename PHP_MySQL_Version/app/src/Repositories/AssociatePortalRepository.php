@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
+use App\Services\AssociateCommission;
 use App\Services\IncentiveService;
 
 /**
@@ -101,46 +102,66 @@ final class AssociatePortalRepository
     }
 
     /**
-     * The commission line for one order.
-     * @return array{state:string, label:string, rate:?float, source:?string, amount:?float}
+     * The commission line for one order (owner decision D-245 P3: on the invoiced FOB
+     * of the goods, line by line, at the level fixed at PI, full payment only).
+     * @return array{state:string, label:string, rate:?float, source:?string, amount:?float, level:?string, detail:?array}
      */
     public static function commission(int $associateId, array $o): array
     {
-        $rate = $o['associate_rate_pct'] !== null ? (float) $o['associate_rate_pct'] : null;
-        $source = $o['associate_rate_source'] ?? null;
+        $none = static fn (string $label): array => ['state' => 'none', 'label' => $label, 'rate' => null, 'source' => null, 'amount' => null, 'level' => null, 'detail' => null];
         if (in_array($o['status'], ['cancelled', 'lost'], true)) {
-            return ['state' => 'none', 'label' => 'No commission — order cancelled', 'rate' => null, 'source' => null, 'amount' => null];
+            return $none('No commission — order cancelled');
         }
+        $repeat = 'No commission — repeat order (outside the 10 days from the first Buyer PO)';
         if (!empty($o['locked_at'])) {
-            if ((int) ($o['paid_associate_id'] ?? 0) === $associateId && (float) $o['associate_amount_fc'] > 0) {
-                $payout = Database::connection()->prepare("SELECT status, paid_on FROM incentive_payouts WHERE order_id = :o AND payee_kind = 'associate' AND associate_id = :a AND clawback_of_payout_id IS NULL ORDER BY id LIMIT 1");
-                $payout->execute(['o' => $o['id'], 'a' => $associateId]);
-                $p = $payout->fetch() ?: ['status' => 'due', 'paid_on' => null];
-                $label = match ($p['status']) {
-                    'paid' => 'Paid on ' . \App\Helpers\Dates::short((string) $p['paid_on']),
-                    'held' => 'On hold',
-                    default => 'Earned — to be paid in the ' . IncentiveService::monthLabel((string) $o['incentive_month']) . ' payout',
-                };
-                return ['state' => $p['status'] === 'paid' ? 'paid' : ($p['status'] === 'held' ? 'held' : 'earned'), 'label' => $label,
-                    'rate' => (float) $o['locked_rate'], 'source' => $source, 'amount' => (float) $o['associate_amount_fc']];
+            if ((int) ($o['paid_associate_id'] ?? 0) !== $associateId) {
+                return $none($repeat);
             }
-            return ['state' => 'none', 'label' => 'No commission — repeat order (outside the 10 days from the first Buyer PO)', 'rate' => null, 'source' => null, 'amount' => null];
+            if ((float) $o['associate_amount_fc'] <= 0) {
+                return $none('No commission — the buyer did not pay this order in full');
+            }
+            $payout = Database::connection()->prepare("SELECT * FROM incentive_payouts WHERE order_id = :o AND payee_kind = 'associate' AND associate_id = :a AND clawback_of_payout_id IS NULL ORDER BY id LIMIT 1");
+            $payout->execute(['o' => $o['id'], 'a' => $associateId]);
+            $p = $payout->fetch() ?: ['status' => 'due', 'paid_on' => null, 'due_on' => null, 'payout_run_on' => null, 'order_id' => $o['id'], 'payee_kind' => 'associate', 'amount_inr' => 0];
+            $claim = !empty($p['due_on']) && AssociateCommission::settings()['claim_hold'] && AssociateCommission::claimOpen((int) $o['id'], (string) $p['due_on']);
+            $label = match (true) {
+                $p['status'] === 'paid' => 'Paid on ' . \App\Helpers\Dates::short((string) $p['paid_on']),
+                $p['status'] === 'held' => 'On hold',
+                $claim => 'Earned — waiting while a buyer claim on the order is open',
+                !empty($p['due_on']) => 'Earned — due ' . \App\Helpers\Dates::short((string) $p['due_on']) . ', paid in the ' . \App\Helpers\Dates::short((string) $p['payout_run_on']) . ' payout run',
+                default => 'Earned — to be paid in the ' . IncentiveService::monthLabel((string) $o['incentive_month']) . ' payout',
+            };
+            return ['state' => $p['status'] === 'paid' ? 'paid' : ($p['status'] === 'held' || $claim ? 'held' : 'earned'), 'label' => $label,
+                'rate' => $o['locked_rate'] !== null ? (float) $o['locked_rate'] : null, 'source' => $o['associate_rate_source'] ?? null, 'amount' => (float) $o['associate_amount_fc'],
+                'level' => self::levelText($o), 'detail' => AssociateCommission::forOrder((int) $o['id'])];
         }
         if (($o['associate_mode'] ?? 'auto') === 'no') {
-            return ['state' => 'none', 'label' => 'No commission on this order (decided by NexaCrest)', 'rate' => null, 'source' => null, 'amount' => null];
+            return $none('No commission on this order (decided by NexaCrest)');
         }
-        if ($source === 'none') {
-            return ['state' => 'none', 'label' => 'No commission under your agreement', 'rate' => 0.0, 'source' => 'none', 'amount' => null];
+        if (($o['associate_rate_source'] ?? null) === 'none') {
+            return $none('No commission under your agreement');
         }
-        $within = ($o['associate_mode'] ?? 'auto') === 'yes' || IncentiveService::withinFirstTenDays(OrderRepository::find((int) $o['id']) ?? []);
-        if (!$within) {
-            return ['state' => 'none', 'label' => 'No commission — repeat order (outside the 10 days from the first Buyer PO)', 'rate' => null, 'source' => null, 'amount' => null];
+        $order = OrderRepository::find((int) $o['id']) ?? [];
+        $c = AssociateCommission::forOrder((int) $o['id'], $order);
+        if ($c === null) {
+            return $none($repeat);
         }
-        $expected = $rate !== null ? round((float) $o['fob_value'] * $rate / 100, 2) : null;
-        if (IncentiveService::fullyPaidOn((int) $o['id']) !== null) {
-            return ['state' => 'expected', 'label' => 'Buyer has paid in full — NexaCrest is confirming your commission', 'rate' => $rate, 'source' => $source, 'amount' => $expected];
+        $label = IncentiveService::fullyPaidOn((int) $o['id']) !== null
+            ? 'Buyer has paid in full — NexaCrest is confirming your commission'
+            : 'Not yet earned — waiting for the buyer\'s full payment';
+        return ['state' => 'expected', 'label' => $label, 'rate' => $c['rate'], 'source' => $o['associate_rate_source'] ?? null, 'amount' => $c['amount_fc'],
+            'level' => $c['level_label'] . ($c['level_fixed'] ? '' : ' (for now — fixed when the Proforma Invoice is issued)'), 'detail' => $c];
+    }
+
+    /** "Level 2 — 5%", as fixed on the order (or the rate kept on it). */
+    private static function levelText(array $o): ?string
+    {
+        $order = OrderRepository::find((int) $o['id']);
+        $fixed = $order !== null ? AssociateCommission::fixedLevel($order) : null;
+        if ($fixed !== null) {
+            return AssociateCommission::levelLabel($fixed);
         }
-        return ['state' => 'expected', 'label' => 'Not yet earned — waiting for the buyer\'s full payment', 'rate' => $rate, 'source' => $source, 'amount' => $expected];
+        return $o['locked_rate'] !== null ? rtrim(rtrim(number_format((float) $o['locked_rate'], 2), '0'), '.') . '%' : null;
     }
 
     /** @return list<array<string,mixed>> the associate's payouts (commission lines), newest first */

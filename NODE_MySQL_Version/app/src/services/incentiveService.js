@@ -220,27 +220,6 @@ function poDate(order) {
 }
 
 /** Rupees per unit of the order currency actually received for the products (advance or LC, and balance). */
-/**
- * Owner decision 1 Nov 2026 (AS-9): the share of the order's product value
- * the buyer actually paid (advance, middle milestones, balance or LC), at
- * most 1. 1 when no receipt amounts are recorded.
- */
-async function receivedRatio(order) {
-  const orderId = Number(order.id);
-  const value = (await orderProductRepository.totalFobValue(orderId)) + (await orderProductRepository.totalServiceValue(orderId));
-  const payment = (await orderPaymentStatusRepository.find(orderId)) || {};
-  let received = Number(payment.advance_amount || 0) + Number(payment.balance_amount || 0);
-  received += Number((await db.queryOne('SELECT COALESCE(SUM(received_amount), 0) AS s FROM order_payment_milestones WHERE order_id = :o', { o: orderId })).s);
-  if ((order.payment_method || '') === 'LC') {
-    const lc = await orderLcDetailRepository.find(orderId);
-    received += Number((lc && lc.lc_received_amount) || 0);
-  }
-  if (value <= 0 || received <= 0) {
-    return 1;
-  }
-  return Math.round(Math.min(1, received / value) * 10000) / 10000;
-}
-
 async function productRate(order) {
   if (String(order.currency_code || 'INR').toUpperCase() === 'INR') {
     return 1;
@@ -313,44 +292,9 @@ async function calculate(orderId, paidOn = null) {
   const already = Object.values(entries).reduce((sum, c) => sum + Number(c.amount_inr), 0);
   const profitBefore = round2(Number(profit.profit_inr) + already);
 
-  let associate = null;
-  const client = await clientRepository.find(Number(order.client_id));
-  if (client && client.associate_id && row.associate_mode !== 'no'
-    && (row.associate_mode === 'yes' || await withinFirstTenDays(order))) {
-    const a = await associateRepository.find(Number(client.associate_id));
-    if (a) {
-      // QA Round 8 (R8-N05): the client number fixed on the order when it was created (the client's number for the associate).
-      const number = (order.associate_client_number !== null && order.associate_client_number !== undefined && Number(order.associate_id || 0) === Number(a.id))
-        ? Number(order.associate_client_number)
-        : (row.associate_order_number && row.locked_at ? Number(row.associate_order_number) : await associateRepository.orderNumberForClient(Number(a.id), Number(order.client_id)));
-      // Owner decision 1 Nov 2026 (AS-17): the rate fixed on the order when it was created; older orders work it out now.
-      let rate;
-      let rateSource;
-      if (order.associate_rate_pct !== null && order.associate_rate_pct !== undefined && Number(order.associate_id || 0) === Number(a.id)) {
-        rate = Number(order.associate_rate_pct);
-        rateSource = String(order.associate_rate_source || 'global');
-      } else {
-        ({ rate, source: rateSource } = await associateRepository.rateWithSource(a, number));
-      }
-      if (rateSource !== 'none' && rate > 0) {
-        // AS-9: pro rata when the buyer paid less than the order value.
-        const ratio = await receivedRatio(order);
-        const fc = round2((await orderProductRepository.totalFobValue(orderId)) * rate / 100 * ratio);
-        associate = {
-          id: Number(a.id),
-          name: String(a.name),
-          order_number: number,
-          rate,
-          rate_source: rateSource,
-          paid_ratio: ratio,
-          status: String(a.status),
-          amount_fc: fc,
-          currency: String(order.currency_code || 'INR'),
-          amount_inr: round2(fc * (await productRate(order))),
-        };
-      }
-    }
-  }
+  // Owner decision D-245 P3: the associate's commission on the final invoiced FOB of the goods,
+  // line by line, at the level fixed at PI, full payment only (associateCommission).
+  const associate = await require('./associateCommission').forOrder(orderId, order, row);
   const basis = round2(profitBefore - (associate ? associate.amount_inr : 0));
 
   let source = 'table';
@@ -425,6 +369,12 @@ async function lock(orderId, paidOn, userId) {
   const calc = await calculate(orderId, paidOn);
   const s = await settings();
   const month = incentiveMonth(paidOn, s.cutoff);
+  // Owner decision D-245 P3: due N days after full payment, paid in the payout run that follows.
+  const associateCommission = require('./associateCommission');
+  const commissionSet = await associateCommission.settings();
+  const due = calc.associate ? await associateCommission.dueOn(paidOn, commissionSet) : null;
+  const runOn = due ? await associateCommission.payoutRunOn(due, commissionSet) : null;
+  const earned = !!(calc.associate && calc.associate.state !== 'unpaid' && calc.associate.amount_fc > 0);
   await db.transaction(async (c) => {
     let teamEntryId = null;
     if (calc.team_total > 0) {
@@ -439,18 +389,17 @@ async function lock(orderId, paidOn, userId) {
     }
     let associateEntryId = null;
     const a = calc.associate;
-    if (a && a.amount_fc > 0) {
+    if (earned) {
       const payoutId = await incentiveRepository.addPayout({
         order_id: orderId, payee_kind: 'associate', associate_id: a.id, role: 'associate',
-        amount_inr: a.amount_inr, amount_fc: a.amount_fc, currency_code: a.currency, incentive_month: month,
+        amount_inr: a.amount_inr, amount_fc: a.amount_fc, currency_code: a.currency, incentive_month: String(runOn).slice(0, 7),
       }, c);
+      await c.execute('UPDATE incentive_payouts SET due_on = :d, payout_run_on = :r WHERE id = :id', { d: due, r: runOn, id: payoutId });
       // AS-3: a suspended associate's commission is held until the MD releases it.
       if (a.status === 'suspended') {
         await incentiveRepository.holdPayout(payoutId, 'The associate is suspended.', c);
       }
-      associateEntryId = await incentiveRepository.addCostEntry(orderId, 'associate',
-        `Associate commission — ${a.name} (${a.rate.toFixed(2)}%, client no. ${a.order_number})`
-        + (a.paid_ratio < 1 ? ` — pro rata ${trimNum(a.paid_ratio * 100)}% of the order value received` : ''), a.amount_inr, paidOn, userId, c);
+      associateEntryId = await incentiveRepository.addCostEntry(orderId, 'associate', associateCostDescription(a), a.amount_inr, paidOn, userId, c);
     }
     await incentiveRepository.saveOrder(orderId, {
       locked_at: nowSql(),
@@ -460,29 +409,49 @@ async function lock(orderId, paidOn, userId) {
       team_total_inr: calc.team_total,
       new_client_bonus_inr: calc.new_client_bonus,
       associate_id: a ? a.id : null,
-      associate_order_number: a ? a.order_number : null,
+      associate_order_number: a && a.counts ? a.counting_number : null,
       associate_rate_pct: a ? a.rate : null,
       associate_amount_fc: a ? a.amount_fc : null,
       associate_currency: a ? a.currency : null,
       associate_amount_inr: a ? a.amount_inr : null,
+      associate_basis_fc: a ? a.basis_fc : null,
+      associate_basis_inr: a ? a.basis_inr : null,
+      associate_counts: a ? (a.counts ? 1 : 0) : null,
+      associate_due_on: earned ? due : null,
       team_cost_entry_id: teamEntryId,
       associate_cost_entry_id: associateEntryId,
     }, userId, c);
   });
   const a = calc.associate;
-  if (a && a.amount_fc > 0) {
+  if (a) {
     const associateService = require('./associateService');
     const associate = await associateRepository.find(a.id);
     const order = await orderRepository.find(orderId);
     if (associate && order) {
-      const amount = a.amount_fc.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      await associateService.notify(associate, a.status === 'suspended' ? 'payout_held' : 'commission_earned',
-        `Your client paid order ${order.order_reference} in full. Commission earned: ${a.currency} ${amount}`
-        + ` (${a.rate.toFixed(2)}%${a.paid_ratio < 1 ? ', pro rata on the amount the buyer paid' : ''}).`
-        + (a.status === 'suspended' ? ' It is on hold while your account is suspended.' : ` It is paid in the ${monthLabel(month)} payout, against your invoice.`),
-        Number(order.client_id), orderId);
+      if (!earned) {
+        await associateService.notify(associate, 'commission_earned', `Order ${order.order_reference} is closed for commission: `
+          + (a.state === 'unpaid' ? 'the buyer did not pay the order in full, so no commission is due on it.' : 'no commission is due on it.'), Number(order.client_id), orderId);
+      } else {
+        const { short } = require('../helpers/dates');
+        const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        await associateService.notify(associate, a.status === 'suspended' ? 'payout_held' : 'commission_earned',
+          `Your client paid order ${order.order_reference} in full. Commission earned: ${a.currency} ${money(a.amount_fc)}`
+          + ` (${a.level_label} on the invoiced FOB of the goods, ${a.currency} ${money(a.basis_fc)}).`
+          + (a.status === 'suspended' ? ' It is on hold while your account is suspended.'
+            : ` It is due on ${short(due)} and paid in the ${short(runOn)} payout run, against your invoice`
+              + (String(associate.gstin || '').trim() !== '' ? ' (GST is added on top once your tax invoice is on file)' : '') + '.'),
+          Number(order.client_id), orderId);
+      }
     }
   }
+}
+
+/** Owner rule D-212: the commission cost line says what it is, for whom, at which level and on what basis. */
+function associateCostDescription(a) {
+  const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `Associate commission — ${a.name} (${a.level_label}) on the invoiced FOB of the goods, ${a.currency} ${money(a.basis_fc)}`
+    + (Number(a.reduction_fc) > 0 ? ` (after agreed discount / settled claim of ${a.currency} ${money(a.reduction_fc)})` : '')
+    + (Number(a.in_range_fc) < Number(a.goods_fc) ? '; lines the MD approved below the floor earn nothing' : '');
 }
 
 /** PHP rtrim(rtrim(number_format($v, 2), '0'), '.') */
@@ -533,6 +502,7 @@ async function unlock(orderId, userId) {
       locked_at: null, fully_paid_on: null, incentive_month: null, profit_basis_inr: null, team_total_inr: null,
       new_client_bonus_inr: null, associate_id: null, associate_order_number: null, associate_rate_pct: null,
       associate_amount_fc: null, associate_currency: null, associate_amount_inr: null,
+      associate_basis_fc: null, associate_basis_inr: null, associate_counts: null, associate_due_on: null,
       team_cost_entry_id: null, associate_cost_entry_id: null,
     }, userId, c);
   });
@@ -588,7 +558,8 @@ function paidNote(rows) {
 }
 
 module.exports = {
-  receivedRatio,
+  productRate,
+  associateCostDescription,
   round2,
   fmt2,
   settings,

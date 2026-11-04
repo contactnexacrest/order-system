@@ -11,11 +11,9 @@ const db = require('../config/db');
  * registered.
  */
 
-/** The agreement's ladder: [upper bound of the associate's order count, rate column]. */
-const TIERS = [[5, 'rate_1_5'], [10, 'rate_6_10'], [20, 'rate_11_20'], [40, 'rate_21_40'], [Infinity, 'rate_41_plus']];
-
+// D-245 P3 (4 Nov 2026): the per-rung rates are gone — commission levels and the ladder (Admin → Pricing) replace them.
 const FIELDS = ['name', 'based_in', 'country', 'currency_code', 'email', 'phone', 'tax_id', 'agreement_signed_on',
-  'rate_1_5', 'rate_6_10', 'rate_11_20', 'rate_21_40', 'rate_41_plus', 'status', 'notes',
+  'status', 'notes',
   'no_commission', 'agreement_ends_on', 'relationship_manager_id', 'pan', 'gstin', 'address'];
 
 /** Owner decision 1 Nov 2026 (AS-1 … AS-17): the associate's life cycle. 'inactive' is kept for older rows. */
@@ -34,8 +32,9 @@ function pick(data) {
 /** With the number of clients each introduced. */
 async function all() {
   return db.query(
-    `SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.associate_id = a.id) AS client_count, f.original_filename AS agreement_file_name
-     FROM associates a LEFT JOIN file_store f ON f.id = a.agreement_file_id ORDER BY a.status, a.name`
+    `SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.associate_id = a.id) AS client_count, f.original_filename AS agreement_file_name,
+            cl.name AS commission_level_name
+     FROM associates a LEFT JOIN file_store f ON f.id = a.agreement_file_id LEFT JOIN commission_levels cl ON cl.id = a.commission_level_id ORDER BY a.status, a.name`
   );
 }
 
@@ -53,57 +52,6 @@ async function create(data, userId) {
 async function update(id, data) {
   const sets = FIELDS.map((f) => `${f} = :${f}`).join(', ');
   await db.execute(`UPDATE associates SET ${sets} WHERE id = :id`, { ...pick(data), id });
-}
-
-/**
- * The rate (%) for the associate's Nth client — owner decision 1 Nov 2026
- * (AS-17): the associate's personal rate for that rung when it is set
- * (above 0), else the global ladder; none at all when the associate is
- * marked "no commission".
- */
-async function rateFor(associate, orderNumber) {
-  return (await rateWithSource(associate, orderNumber)).rate;
-}
-
-function columnFor(orderNumber) {
-  for (const [upTo, column] of TIERS) {
-    if (orderNumber <= upTo) {
-      return column;
-    }
-  }
-  return 'rate_41_plus';
-}
-
-/** @returns {Promise<{rate:number, source:string}>} source 'personal' | 'global' | 'none' */
-async function rateWithSource(associate, orderNumber, ladder = null) {
-  if (Number(associate.no_commission || 0) === 1) {
-    return { rate: 0, source: 'none' };
-  }
-  const column = columnFor(orderNumber);
-  // Owner decision 1 Nov 2026 (D-221): an empty (or 0) rung carries on the last personal rate set below it;
-  // rungs below the first personal rate use the standard ladder.
-  const columns = TIERS.map(([, col]) => col);
-  for (let i = columns.indexOf(column); i >= 0; i -= 1) {
-    const personal = associate[columns[i]];
-    if (personal !== null && personal !== undefined && personal !== '' && Number(personal) > 0) {
-      return { rate: Number(personal), source: 'personal' };
-    }
-  }
-  const global = ladder || await globalLadder();
-  return { rate: Number(global[column] ?? 0), source: 'global' };
-}
-
-/** The global ladder, rung column => rate (owner decision 1 Nov 2026, AS-17). */
-async function globalLadder() {
-  const incentiveRepository = require('./incentiveRepository');
-  const settings = await incentiveRepository.settings();
-  const defaults = { rate_1_5: 0.70, rate_6_10: 1.00, rate_11_20: 1.50, rate_21_40: 1.75, rate_41_plus: 2.00 };
-  const out = {};
-  for (const [column, def] of Object.entries(defaults)) {
-    const v = settings[`associate_${column}`] ?? '';
-    out[column] = v !== '' && v !== null ? Number(v) : def;
-  }
-  return out;
 }
 
 async function findByEmail(email) {
@@ -142,56 +90,14 @@ async function clients(associateId) {
 }
 
 async function linkClient(clientId, associateId, registeredOn) {
-  await db.transaction(async (conn) => {
-    const number = associateId === null ? null : await clientNumberForLink(clientId, associateId, conn);
-    await conn.execute('UPDATE clients SET associate_id = :a, associate_registered_on = :d, associate_client_number = :n WHERE id = :id', {
-      a: associateId, d: associateId === null ? null : registeredOn, n: number, id: clientId,
-    });
+  await db.execute('UPDATE clients SET associate_id = :a, associate_registered_on = :d WHERE id = :id', {
+    a: associateId, d: associateId === null ? null : registeredOn, id: clientId,
   });
-}
-
-/**
- * QA Round 8 (R8-N05, owner decision AS-17): the client's number for this
- * associate — 1 for the first client they brought, 2 for the second, in the
- * order they were linked. A client already numbered for this associate keeps
- * its number for ever; a client moving to a new associate gets that
- * associate's next number. Pass a transaction connection: the associate's
- * row is locked so two links at once never share a number.
- */
-async function clientNumberForLink(clientId, associateId, conn) {
-  await conn.query('SELECT id FROM associates WHERE id = :a FOR UPDATE', { a: associateId });
-  const c = await conn.queryOne('SELECT associate_id, associate_client_number FROM clients WHERE id = :id FOR UPDATE', { id: clientId });
-  if (c && Number(c.associate_id || 0) === Number(associateId) && c.associate_client_number !== null) {
-    return Number(c.associate_client_number);
-  }
-  const next = await conn.queryOne('SELECT COALESCE(MAX(associate_client_number), 0) + 1 AS n FROM clients WHERE associate_id = :a AND id <> :id', { a: associateId, id: clientId });
-  return Number(next.n);
 }
 
 /** Clients not yet linked to any associate, for the link picker. */
 async function unlinkedClients() {
   return db.query('SELECT id, company_legal_name, client_unique_number FROM clients WHERE associate_id IS NULL AND is_test_data = 0 ORDER BY company_legal_name');
-}
-
-/**
- * The associate's client number for this client (QA Round 8, R8-N05): the
- * number stored on the client when it was linked. A client linked before
- * numbering existed is numbered now, as the associate's next.
- */
-async function orderNumberForClient(associateId, clientId) {
-  const c = await db.queryOne('SELECT associate_id, associate_client_number FROM clients WHERE id = :id', { id: clientId });
-  if (c && Number(c.associate_id || 0) === Number(associateId) && c.associate_client_number !== null) {
-    return Number(c.associate_client_number);
-  }
-  if (!c || Number(c.associate_id || 0) !== Number(associateId)) {
-    const next = await db.queryOne('SELECT COALESCE(MAX(associate_client_number), 0) + 1 AS n FROM clients WHERE associate_id = :a', { a: associateId });
-    return Number(next.n);
-  }
-  return db.transaction(async (conn) => {
-    const number = await clientNumberForLink(clientId, associateId, conn);
-    await conn.execute('UPDATE clients SET associate_client_number = :n WHERE id = :id', { n: number, id: clientId });
-    return number;
-  });
 }
 
 /** The signed agreement (owner decision 2026-10-30): a file_store row, replaced by a newer upload. */
@@ -229,6 +135,6 @@ async function lineForClient(clientId, permissions) {
 
 module.exports = {
   lineForClient,
-  TIERS, FIELDS, STATUSES, all, find, create, update, setAgreementFile, isAgreementFile, rateFor, rateWithSource, globalLadder,
-  findByEmail, findByCode, setFields, statusCounts, clients, linkClient, clientNumberForLink, unlinkedClients, orderNumberForClient,
+  FIELDS, STATUSES, all, find, create, update, setAgreementFile, isAgreementFile,
+  findByEmail, findByCode, setFields, statusCounts, clients, linkClient, unlinkedClients,
 };

@@ -10,6 +10,10 @@
     <tr><th>Buyer paid in full</th><td>{{ 'Yes' if o.buyer_paid_in_full else 'Not yet' }}</td></tr>
     <tr><th>Commission</th><td>{% include "associate_portal/_commission_cell.njk" %}</td></tr>
   </table>
+  {% if o.commission.detail %}{% set c = o.commission.detail %}
+  <h2>Commission statement</h2>
+  {% include "associate_portal/_statement.njk" %}
+  {% endif %}
   <h2>What happened</h2>
   <table class="list">
     {% for e in events %}<tr><td>{{ e.created_at | shortDate }}</td><td>{{ e.message }}</td></tr>{% endfor %}

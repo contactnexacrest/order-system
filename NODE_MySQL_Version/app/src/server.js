@@ -185,6 +185,11 @@ njkEnv.addFilter('fixed2', (value) => {
   const num = parseFloat(value);
   return Number.isNaN(num) ? '' : num.toFixed(2);
 });
+// D-245 P3: a rate with 4 decimals (PHP number_format($v, 4)), e.g. the realised ₹ per USD on a commission statement.
+njkEnv.addFilter('fixed4', (value) => {
+  const num = parseFloat(value);
+  return Number.isNaN(num) ? '' : num.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+});
 // Owner decision 2026-10-29: how a settlement leg is named on the CA pages ('lc' → 'LC payment').
 // Owner decision 2026-10-30: team incentives — whole-rupee amounts (PHP number_format($v, 0)) and month/cycle labels.
 // D-214 phase 3: a quantity without trailing zeros (120.000 -> 120, 12.500 -> 12.5).
@@ -1348,6 +1353,8 @@ app.post('/associate/invitations/:id/cancel', requireAssociateAuth, verifyCsrf, 
 app.post('/associate/code', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.chooseCode));
 app.get('/associate/orders', requireAssociateAuth, asyncHandler(associatePortalController.orders));
 app.get('/associate/orders/:id', requireAssociateAuth, asyncHandler(associatePortalController.order));
+app.get('/associate/prices', requireAssociateAuth, asyncHandler(associatePortalController.prices));
+app.post('/associate/prices/acknowledge', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.acknowledgePrices));
 app.get('/associate/commission', requireAssociateAuth, asyncHandler(associatePortalController.commission));
 app.post('/associate/commission/:id/invoice', requireAssociateAuth, uploadLarge.single('invoice_file'), verifyCsrf, asyncHandler(associatePortalController.uploadInvoice));
 app.get('/associate/profile', requireAssociateAuth, asyncHandler(associatePortalController.profile));

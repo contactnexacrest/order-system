@@ -86,7 +86,7 @@ sync (chapter [CA-03](./ca-03-zoho-sync.md)).
 ## In the order's figures
 
 The team incentive and an associate's commission are costs of the order.
-Once the buyer has fully paid, each appears in the order's costs (Step 12a,
+An associate's commission is worked out on the invoiced FOB of the goods at the level fixed on the order at the PI (chapter 24, D-245 P3); the team's basis is the order profit after it. Once the buyer has fully paid, each appears in the order's costs (Step 12a,
 as a "Commission" line set by Team Incentive, which cannot be removed
 there), in its profit (Step 12c), in the reports and in the CA Financial
 Annexure. Only management sees how an order's incentive was decided.
@@ -102,7 +102,7 @@ people are hidden and keep what was saved).
 ## Associates
 
 The full associate system — portal, invitations, bank checks, holds and
-claw-backs, Zoho bills — is chapter [24 Associates](./24-associates.md).
+take-backs, Zoho bills — is chapter [24 Associates](./24-associates.md).
 
 Associates are outside people, in India or abroad, who introduce new
 clients under a signed Associate Agreement. Management keeps their register
