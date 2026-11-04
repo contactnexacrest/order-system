@@ -667,7 +667,7 @@ final class ZohoBooksService
 
     /**
      * Owner rule D-212: what the associate commission bill and payment say —
-     * the associate, the order, the rate and client number, their invoice,
+     * the associate, the order (and buyer), their invoice,
      * the TDS, and the bank reference. Built from the facts.
      *
      * @return array{associate: array<string,mixed>, bill_no: string, paid_on: string, gross_inr: float, paid_inr: float, tds_inr: float, reference: string, bill_description: string, payment_description: string}

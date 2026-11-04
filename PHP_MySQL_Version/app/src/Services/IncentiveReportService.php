@@ -31,6 +31,9 @@ final class IncentiveReportService
         'paid' => 'Paid',
     ];
 
+    /** D-245 P6: rows per page on the register (totals are always over the whole filtered set). */
+    public const PER_PAGE = 100;
+
     public const HEADERS = ['Order', 'Client', 'Order date', 'Payee', 'Payee type', 'Role', 'Amount (INR)', 'GST (INR)', 'TDS (INR)', 'State', 'Due on', 'Payout run', 'Paid on'];
 
     private static function testFlag(): int
@@ -80,9 +83,35 @@ final class IncentiveReportService
         return $rows;
     }
 
-    /** @return list<int> open orders that carry an estimate: not locked, not cancelled/lost, with a PI or a buyer payment */
-    public static function openOrderIds(): array
+    /**
+     * @param array<string,mixed> $f the register filters: only the open orders that can match them are estimated
+     *        (order date from/to, associate, order ids) — D-245 P6: the register no longer works out every open order.
+     * @return list<int> open orders that carry an estimate: not locked, not cancelled/lost, with a PI or a buyer payment
+     */
+    public static function openOrderIds(array $f = []): array
     {
+        $state = (string) ($f['state'] ?? '');
+        if (in_array($state, ['locked', 'held', 'paid'], true)) {
+            return [];
+        }
+        $where = '';
+        $params = ['t' => self::testFlag()];
+        if (($f['from'] ?? '') !== '') {
+            $where .= ' AND DATE(o.created_at) >= :from';
+            $params['from'] = (string) $f['from'];
+        }
+        if (($f['to'] ?? '') !== '') {
+            $where .= ' AND DATE(o.created_at) <= :to';
+            $params['to'] = (string) $f['to'];
+        }
+        if ((int) ($f['associate_id'] ?? 0) > 0) {
+            $where .= ' AND EXISTS (SELECT 1 FROM clients c WHERE c.id = o.client_id AND c.associate_id = :aid)';
+            $params['aid'] = (int) $f['associate_id'];
+        }
+        if (!empty($f['order_ids'])) {
+            $ids = array_map('intval', (array) $f['order_ids']);
+            $where .= ' AND o.id IN (' . implode(',', $ids ?: [0]) . ')';
+        }
         $stmt = Database::connection()->prepare(
             "SELECT o.id FROM orders o
              LEFT JOIN order_incentives oi ON oi.order_id = o.id
@@ -90,10 +119,10 @@ final class IncentiveReportService
              WHERE oi.locked_at IS NULL AND o.is_test_data = :t AND o.is_sample_data = 0
                AND o.status NOT IN ('cancelled','lost')
                AND (ps.advance_cleared_at IS NOT NULL OR ps.balance_cleared_at IS NOT NULL OR ps.freight_cleared_at IS NOT NULL
-                    OR EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE d.order_id = o.id AND dt.code = 'PI'))
-             ORDER BY o.id"
+                    OR EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE d.order_id = o.id AND dt.code = 'PI'))"
+            . $where . ' ORDER BY o.id'
         );
-        $stmt->execute(['t' => self::testFlag()]);
+        $stmt->execute($params);
         return array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
     }
 
@@ -141,17 +170,53 @@ final class IncentiveReportService
      */
     public static function rows(array $f = []): array
     {
-        return self::filter(self::allRows(), $f);
+        return self::filter(self::allRows($f), $f);
     }
 
-    /** @return list<array<string,mixed>> every row, locked and estimated */
-    public static function allRows(): array
+    /**
+     * @param array<string,mixed> $f optional filters: only open orders that can match them are estimated
+     * @return list<array<string,mixed>> locked rows and estimated rows (before filtering)
+     */
+    public static function allRows(array $f = []): array
     {
         $rows = self::lockedRows();
-        foreach (self::openOrderIds() as $orderId) {
+        foreach (self::openOrderIds($f) as $orderId) {
             array_push($rows, ...self::estimatedRows($orderId));
         }
         return $rows;
+    }
+
+    /**
+     * One page of the filtered rows (D-245 P6). Totals stay over the whole set.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return array{rows: list<array<string,mixed>>, page: int, pages: int}
+     */
+    public static function page(array $rows, int $page, int $perPage = self::PER_PAGE): array
+    {
+        $pages = max(1, (int) ceil(count($rows) / $perPage));
+        $page = min(max(1, $page), $pages);
+        return ['rows' => array_slice($rows, ($page - 1) * $perPage, $perPage), 'page' => $page, 'pages' => $pages];
+    }
+
+    /**
+     * People and associates to choose from on the register and statement — from the incentive roles,
+     * the payouts and the associates table, without working out any estimate.
+     *
+     * @return array{people: array<int,string>, associates: array<int,string>}
+     */
+    public static function payeeOptions(): array
+    {
+        $pdo = Database::connection();
+        $people = [];
+        foreach ($pdo->query('SELECT u.id, u.name FROM users u WHERE u.id IN (SELECT user_id FROM user_incentive_roles) OR u.id IN (SELECT user_id FROM incentive_payouts WHERE user_id IS NOT NULL) OR u.id IN (SELECT user_id FROM order_incentive_people) ORDER BY u.name')->fetchAll() as $r) {
+            $people[(int) $r['id']] = (string) $r['name'];
+        }
+        $associates = [];
+        foreach ($pdo->query('SELECT id, name FROM associates ORDER BY name')->fetchAll() as $r) {
+            $associates[(int) $r['id']] = (string) $r['name'];
+        }
+        return ['people' => $people, 'associates' => $associates];
     }
 
     /**
@@ -167,8 +232,10 @@ final class IncentiveReportService
         $associateId = (int) ($f['associate_id'] ?? 0);
         $from = (string) ($f['from'] ?? '');
         $to = (string) ($f['to'] ?? '');
-        $rows = array_values(array_filter($rows, static function (array $r) use ($state, $month, $userId, $associateId, $from, $to): bool {
-            return ($state === '' || $r['state'] === $state)
+        $orderIds = array_map('intval', (array) ($f['order_ids'] ?? []));
+        $rows = array_values(array_filter($rows, static function (array $r) use ($state, $month, $userId, $associateId, $from, $to, $orderIds): bool {
+            return ($orderIds === [] || in_array($r['order_id'], $orderIds, true))
+                && ($state === '' || $r['state'] === $state)
                 && ($month === '' || substr((string) ($r['payout_run_on'] ?? ''), 0, 7) === $month)
                 && ($userId === 0 || $r['user_id'] === $userId)
                 && ($associateId === 0 || $r['associate_id'] === $associateId)
@@ -197,12 +264,12 @@ final class IncentiveReportService
      *
      * @return array<string, array{label: string, rows: list<array<string,mixed>>, totals: array<string,float|int>}>
      */
-    public static function toPay(string $payeeKind = '', ?string $today = null): array
+    public static function toPay(string $payeeKind = '', ?string $today = null, array $f = []): array
     {
         $today ??= date('Y-m-d');
         $thisMonth = substr($today, 0, 7);
         $nextMonth = date('Y-m', (int) strtotime(substr($today, 0, 7) . '-01 +1 month'));
-        $all = array_values(array_filter(self::rows(), static fn (array $r): bool => $payeeKind === '' || $r['payee_kind'] === $payeeKind));
+        $all = array_values(array_filter(self::rows($f), static fn (array $r): bool => $payeeKind === '' || $r['payee_kind'] === $payeeKind));
         $groups = [
             'this' => ['label' => 'This month\'s payout run (' . IncentiveService::monthLabel($thisMonth) . ')', 'rows' => []],
             'next' => ['label' => 'Next month\'s payout run (' . IncentiveService::monthLabel($nextMonth) . ')', 'rows' => []],
@@ -233,10 +300,14 @@ final class IncentiveReportService
      *
      * @return list<array<string,mixed>>
      */
-    public static function owedAt(string $date): array
+    public static function owedAt(string $date, array $f = []): array
     {
         $out = [];
+        $orderIds = array_map('intval', (array) ($f['order_ids'] ?? []));
         foreach (self::lockedRows() as $r) {
+            if ($orderIds !== [] && !in_array($r['order_id'], $orderIds, true)) {
+                continue;
+            }
             $lockedBy = $r['locked_on'] === null || $r['locked_on'] <= $date;
             $unpaidThen = $r['paid_on'] === null || $r['paid_on'] > $date;
             if ($lockedBy && $unpaidThen && (float) $r['amount_inr'] > 0) {
@@ -245,7 +316,7 @@ final class IncentiveReportService
             }
         }
         if ($date >= date('Y-m-d')) {
-            foreach (self::openOrderIds() as $orderId) {
+            foreach (self::openOrderIds($f) as $orderId) {
                 foreach (self::estimatedRows($orderId) as $r) {
                     if ($r['state'] === 'ready') {
                         $out[] = $r;

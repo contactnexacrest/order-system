@@ -900,6 +900,8 @@ Accounts Executive), `view_own_incentives`. Both stacks now stand at
 (164 GET, 323 POST). Tests: `TeamIncentiveTest` / `teamIncentive.test.js`.
 SOP: chapter 20 (Incentives).
 
+> **Replaced by D-245 (4 Nov 2026):** the reward table, minimum profit, new-client bonus, cut-off day and automatic lock are gone — the team incentive is a % of profit after the associate's commission or a fixed amount (global, product or per order), shared over editable roles and locked by the MD (P4). Associate commission is on the invoiced FOB of the goods, full payment only (no pro rata), at the level fixed at the PI, due N days after full payment and paid in the payout run (P3). See SOP 20 and 24.
+
 ## Follow-up (added 2026-10-30): CAFIN export (CSV) for all orders
 
 `CafinExportService` (Node: `cafinExportService`) and `GET /ca/cafin-export`
@@ -1240,6 +1242,8 @@ Zoho Books, built from the facts and including the bank reference.
 - **Reminders:** in the daily digest job.
 - **Tests:** `tests/integration/associateSystem.test.js`, the route, ungated-route and
   Kanban parity tests, `e2e/tests/11-associates.spec.js`. SOP chapter 24.
+
+> **Replaced by D-245 (4 Nov 2026):** the reward table, minimum profit, new-client bonus, cut-off day and automatic lock are gone — the team incentive is a % of profit after the associate's commission or a fixed amount (global, product or per order), shared over editable roles and locked by the MD (P4). Associate commission is on the invoiced FOB of the goods, full payment only (no pro rata), at the level fixed at the PI, due N days after full payment and paid in the payout run (P3). See SOP 20 and 24.
 
 ## Follow-up (added 2026-11-01): gap list G-1 … G-6 (owner decision D-218)
 

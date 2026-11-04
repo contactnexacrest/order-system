@@ -175,7 +175,7 @@ What the order pays out goes to Zoho Books too, on the same sync:
   bill numbered with their invoice, account *Commission Expense*, the
   gross commission) and a **vendor payment** from the bank with the UTR,
   applied to it. The bill's description names the associate, the order,
-  the rate, the client number, their invoice and the TDS; the payment's
+  the commission level, their invoice and the TDS; the payment's
   gives the gross, the TDS (section and rate), the net and the UTR, and
   names the bill (D-235). With a Zoho TDS tax id set in Settings →
   Associate TDS the bill carries the TDS and the payment is the net;

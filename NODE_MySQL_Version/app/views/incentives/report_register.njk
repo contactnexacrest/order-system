@@ -28,5 +28,11 @@
       <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/incentives?{{ csvQuery }}&format=csv">Export CSV</a>
     </div>
   </form>
-  <div class="section">{% include "incentives/_report_table.njk" %}</div>
+  <div class="section">{% include "incentives/_report_table.njk" %}
+    {% if pages and pages > 1 %}
+    <p class="pager">Page {{ page }} of {{ pages }} (the totals are for every row) ·
+      {% if page > 1 %}<a href="/reports/incentives?{{ csvQuery }}{{ '&' if csvQuery else '' }}page={{ page - 1 }}">← Previous</a>{% endif %}
+      {% if page < pages %}<a href="/reports/incentives?{{ csvQuery }}{{ '&' if csvQuery else '' }}page={{ page + 1 }}">Next →</a>{% endif %}
+    </p>
+    {% endif %}</div>
 </div>

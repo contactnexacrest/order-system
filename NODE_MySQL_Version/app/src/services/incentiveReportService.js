@@ -89,8 +89,28 @@ async function lockedRows() {
   return out;
 }
 
-/** Open orders that carry an estimate: not locked, not cancelled/lost, with a PI or a buyer payment. */
-async function openOrderIds() {
+/** D-245 P6: rows per page on the register (totals are always over the whole filtered set). */
+const PER_PAGE = 100;
+
+/**
+ * Open orders that carry an estimate: not locked, not cancelled/lost, with a PI or a buyer payment.
+ * f: the register filters — only open orders that can match them are estimated (order date from/to,
+ * associate, order ids); D-245 P6: the register no longer works out every open order.
+ */
+async function openOrderIds(f = {}) {
+  if (['locked', 'held', 'paid'].includes(String(f.state || ''))) return [];
+  let where = '';
+  const params = { t: await testFlag() };
+  if (f.from) { where += ' AND DATE(o.created_at) >= :from'; params.from = String(f.from); }
+  if (f.to) { where += ' AND DATE(o.created_at) <= :to'; params.to = String(f.to); }
+  if (Number(f.associate_id || 0) > 0) {
+    where += ' AND EXISTS (SELECT 1 FROM clients c WHERE c.id = o.client_id AND c.associate_id = :aid)';
+    params.aid = Number(f.associate_id);
+  }
+  if (Array.isArray(f.order_ids) && f.order_ids.length > 0) {
+    const ids = f.order_ids.map((v) => parseInt(v, 10) || 0);
+    where += ` AND o.id IN (${ids.join(',')})`;
+  }
   const rows = await db.query(
     `SELECT o.id FROM orders o
      LEFT JOIN order_incentives oi ON oi.order_id = o.id
@@ -98,9 +118,9 @@ async function openOrderIds() {
      WHERE oi.locked_at IS NULL AND o.is_test_data = :t AND o.is_sample_data = 0
        AND o.status NOT IN ('cancelled','lost')
        AND (ps.advance_cleared_at IS NOT NULL OR ps.balance_cleared_at IS NOT NULL OR ps.freight_cleared_at IS NOT NULL
-            OR EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE d.order_id = o.id AND dt.code = 'PI'))
+            OR EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE d.order_id = o.id AND dt.code = 'PI'))${where}
      ORDER BY o.id`,
-    { t: await testFlag() }
+    params
   );
   return rows.map((r) => Number(r.id));
 }
@@ -136,11 +156,28 @@ async function estimatedRows(orderId) {
   return rows;
 }
 
-/** Every row, locked and estimated. */
-async function allRows() {
+/** Locked rows and estimated rows (before filtering); f limits which open orders are estimated. */
+async function allRows(f = {}) {
   const rows = await lockedRows();
-  for (const id of await openOrderIds()) rows.push(...await estimatedRows(id));
+  for (const id of await openOrderIds(f)) rows.push(...await estimatedRows(id));
   return rows;
+}
+
+/** One page of the filtered rows (D-245 P6). Totals stay over the whole set. */
+function page(rows, pageNo, perPage = PER_PAGE) {
+  const pages = Math.max(1, Math.ceil(rows.length / perPage));
+  const p = Math.min(Math.max(1, Number(pageNo) || 1), pages);
+  return { rows: rows.slice((p - 1) * perPage, p * perPage), page: p, pages };
+}
+
+/** People and associates to choose from — without working out any estimate. */
+async function payeeOptions() {
+  const people = (await db.query(
+    `SELECT u.id, u.name FROM users u WHERE u.id IN (SELECT user_id FROM user_incentive_roles)
+       OR u.id IN (SELECT user_id FROM incentive_payouts WHERE user_id IS NOT NULL) OR u.id IN (SELECT user_id FROM order_incentive_people) ORDER BY u.name`
+  )).map((r) => ({ id: Number(r.id), name: String(r.name) }));
+  const associates = (await db.query('SELECT id, name FROM associates ORDER BY name')).map((r) => ({ id: Number(r.id), name: String(r.name) }));
+  return { people, associates };
 }
 
 /** Filters: state, month (YYYY-MM of the payout run), user_id, associate_id, from / to (order date). */
@@ -151,7 +188,9 @@ function filter(rows, f = {}) {
   const associateId = Number(f.associate_id || 0);
   const from = String(f.from || '');
   const to = String(f.to || '');
-  const out = rows.filter((r) => (state === '' || r.state === state)
+  const orderIds = Array.isArray(f.order_ids) ? f.order_ids.map(Number) : [];
+  const out = rows.filter((r) => (orderIds.length === 0 || orderIds.includes(r.order_id))
+    && (state === '' || r.state === state)
     && (month === '' || String(r.payout_run_on || '').slice(0, 7) === month)
     && (userId === 0 || r.user_id === userId)
     && (associateId === 0 || r.associate_id === associateId)
@@ -170,7 +209,7 @@ function filter(rows, f = {}) {
 }
 
 async function rows(f = {}) {
-  return filter(await allRows(), f);
+  return filter(await allRows(f), f);
 }
 
 function totals(list) {
@@ -184,13 +223,13 @@ function totals(list) {
 }
 
 /** "To pay": this month's payout run, next month's, and not locked yet (estimated). payeeKind: '' | staff | associate. */
-async function toPay(payeeKind = '', on = null) {
+async function toPay(payeeKind = '', on = null, f = {}) {
   const incentiveService = require('./incentiveService');
   const d = on || today();
   const thisMonth = d.slice(0, 7);
   const [y, m] = thisMonth.split('-').map(Number);
   const nextMonth = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
-  const all = (await rows()).filter((r) => payeeKind === '' || r.payee_kind === payeeKind);
+  const all = (await rows(f)).filter((r) => payeeKind === '' || r.payee_kind === payeeKind);
   const groups = {
     this: { label: `This month's payout run (${incentiveService.monthLabel(thisMonth)})`, rows: [] },
     next: { label: `Next month's payout run (${incentiveService.monthLabel(nextMonth)})`, rows: [] },
@@ -209,9 +248,11 @@ async function toPay(payeeKind = '', on = null) {
 }
 
 /** Owed at a date: locked on or before it and not paid by it; for today or later also orders ready to lock. */
-async function owedAt(date) {
+async function owedAt(date, f = {}) {
   const out = [];
+  const orderIds = Array.isArray(f.order_ids) ? f.order_ids.map(Number) : [];
   for (const r of await lockedRows()) {
+    if (orderIds.length > 0 && !orderIds.includes(r.order_id)) continue;
     const lockedBy = r.locked_on === null || r.locked_on <= date;
     const unpaidThen = r.paid_on === null || r.paid_on > date;
     if (lockedBy && unpaidThen && Number(r.amount_inr) > 0) {
@@ -219,7 +260,7 @@ async function owedAt(date) {
     }
   }
   if (date >= today()) {
-    for (const id of await openOrderIds()) {
+    for (const id of await openOrderIds(f)) {
       for (const r of await estimatedRows(id)) if (r.state === 'ready') out.push(r);
     }
   }
@@ -250,4 +291,4 @@ function csvRows(list) {
   }));
 }
 
-module.exports = { STATES, HEADERS, openOrderIds, estimatedRows, allRows, filter, rows, totals, toPay, owedAt, statement, csvRows };
+module.exports = { STATES, HEADERS, PER_PAGE, openOrderIds, estimatedRows, allRows, page, payeeOptions, filter, rows, totals, toPay, owedAt, statement, csvRows };

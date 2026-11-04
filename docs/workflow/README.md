@@ -32,8 +32,9 @@ wording, associates, self-approval rules, QA Round 8, document layout and
 wording, freight in rupees, Export Compliance, remittance differences,
 Agreements register, money safety, document copies clean-up, associate TDS,
 ECGC / eBRC tracking, Logistics entering logistics bills, Zoho client / product
-sync and call limits, the reference price with discount approval, and go-live
-without migrations) — are in `docs/decisions/owner-decisions-register.md`
+sync and call limits, the reference price with discount approval (since
+replaced by D-245 pricing), go-live without migrations, and D-245 pricing,
+commission and team incentive) — are in `docs/decisions/owner-decisions-register.md`
 and in the guide and the SOP; where they differ from the specification,
 the register wins.
 

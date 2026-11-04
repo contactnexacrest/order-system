@@ -1601,7 +1601,7 @@ async function pushAssociateCommission(cost) {
 
 /**
  * Owner rule D-212: what the associate commission bill and payment say —
- * the associate, the order, the rate and client number, their invoice, the
+ * the associate, the order (and buyer), their invoice, the
  * TDS, and the bank reference. Built from the facts.
  */
 async function associateCommission(cost) {

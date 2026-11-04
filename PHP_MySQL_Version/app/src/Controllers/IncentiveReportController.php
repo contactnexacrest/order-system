@@ -33,33 +33,18 @@ final class IncentiveReportController
         ];
     }
 
-    /** @param list<array<string,mixed>> $rows @return array{people: array<int,string>, associates: array<int,string>} */
-    private static function payees(array $rows): array
-    {
-        $people = [];
-        $associates = [];
-        foreach ($rows as $r) {
-            if ($r['user_id'] !== null) {
-                $people[$r['user_id']] = $r['payee'];
-            }
-            if ($r['associate_id'] !== null) {
-                $associates[$r['associate_id']] = $r['payee'];
-            }
-        }
-        asort($people);
-        asort($associates);
-        return ['people' => $people, 'associates' => $associates];
-    }
 
     public function register(array $params): void
     {
         $f = self::filters();
-        $all = IncentiveReportService::allRows();
-        $rows = IncentiveReportService::filter($all, $f);
+        $rows = IncentiveReportService::rows($f);
         if (($_GET['format'] ?? '') === 'csv') {
             Csv::stream('incentive_commission_register.csv', IncentiveReportService::HEADERS, IncentiveReportService::csvRows($rows));
         }
-        View::render('incentives/report_register', ['rows' => $rows, 'totals' => IncentiveReportService::totals($rows), 'filters' => $f] + self::payees($all), 'layout/base');
+        // D-245 P6: one page on screen; the totals (and the CSV) are over the whole filtered set.
+        $page = IncentiveReportService::page($rows, max(1, (int) ($_GET['page'] ?? 1)));
+        View::render('incentives/report_register', ['rows' => $page['rows'], 'page' => $page['page'], 'pages' => $page['pages'],
+            'totals' => IncentiveReportService::totals($rows), 'filters' => $f] + IncentiveReportService::payeeOptions(), 'layout/base');
     }
 
     public function toPay(array $params): void
@@ -93,14 +78,13 @@ final class IncentiveReportController
 
     public function statement(array $params): void
     {
-        $all = IncentiveReportService::allRows();
         $userId = max(0, (int) ($_GET['user_id'] ?? 0));
         $associateId = $userId > 0 ? 0 : max(0, (int) ($_GET['associate_id'] ?? 0));
-        $rows = ($userId || $associateId) ? IncentiveReportService::filter($all, ['user_id' => $userId, 'associate_id' => $associateId]) : [];
+        $rows = IncentiveReportService::statement($userId ?: null, $associateId ?: null);
         if (($_GET['format'] ?? '') === 'csv' && $rows !== []) {
             Csv::stream('incentive_statement.csv', IncentiveReportService::HEADERS, IncentiveReportService::csvRows($rows));
         }
-        $payees = self::payees($all);
+        $payees = IncentiveReportService::payeeOptions();
         $name = $userId ? ($payees['people'][$userId] ?? '') : ($associateId ? ($payees['associates'][$associateId] ?? '') : '');
         View::render('incentives/report_statement', ['rows' => $rows, 'totals' => IncentiveReportService::totals($rows), 'userId' => $userId, 'associateId' => $associateId, 'name' => $name] + $payees, 'layout/base');
     }

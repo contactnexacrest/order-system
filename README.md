@@ -36,8 +36,12 @@ What the app does at go-live (2 Nov 2026), in brief — details in the SOP:
 - Procurement, logistics partner bills (Logistics enters, Accounts pays),
   coordination queues, Export Compliance (ECGC, COO, eBRC, export benefits),
   the Agreements register, associates with commission and TDS (chapters 22–26).
-- Products with a reference selling price; a discount beyond the warning
-  level needs MD/ED approval before the Proforma Invoice (chapters 01, 03, 15).
+- Pricing from the supplier price (D-245): minimum price, staff and associate
+  floors and quote prices; below the floor the MD approves, below the minimum
+  nobody does; the Quotation and Proforma Invoice wait for it (chapters 01, 27).
+- Associate commission on the invoiced FOB, full payment only; the team
+  incentive per order, locked by the MD; profit shown estimated / locked / paid
+  (chapters 20, 24).
 - Remittances with "why is it different?" reasons and bank charges booked at
   receipt (chapters 03, 06, 08).
 - Zoho Books: hourly sync (with optional client and product sync), a

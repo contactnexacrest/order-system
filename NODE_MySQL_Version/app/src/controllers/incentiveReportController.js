@@ -30,16 +30,6 @@ function filters(q) {
   };
 }
 
-function payees(rows) {
-  const people = new Map();
-  const associates = new Map();
-  for (const r of rows) {
-    if (r.user_id !== null) people.set(r.user_id, r.payee);
-    if (r.associate_id !== null) associates.set(r.associate_id, r.payee);
-  }
-  const sorted = (m) => [...m.entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]))).map(([id, name]) => ({ id, name }));
-  return { people: sorted(people), associates: sorted(associates) };
-}
 
 function query(obj) {
   return Object.entries(obj).filter(([, v]) => v !== '' && v !== 0 && v !== null && v !== undefined)
@@ -48,13 +38,14 @@ function query(obj) {
 
 async function register(req, res) {
   const f = filters(req.query || {});
-  const all = await svc.allRows();
-  const rows = svc.filter(all, f);
+  const rows = await svc.rows(f);
   if (req.query.format === 'csv') {
     csv.stream(res, 'incentive_commission_register.csv', svc.HEADERS, svc.csvRows(rows));
     return;
   }
-  res.renderView('incentives/report_register', { rows, totals: svc.totals(rows), filters: f, csvQuery: query(f), ...payees(all) }, 'layout/base');
+  // D-245 P6: one page on screen; the totals (and the CSV) are over the whole filtered set.
+  const pg = svc.page(rows, parseInt(req.query.page, 10) || 1);
+  res.renderView('incentives/report_register', { rows: pg.rows, page: pg.page, pages: pg.pages, totals: svc.totals(rows), filters: f, csvQuery: query(f), ...(await svc.payeeOptions()) }, 'layout/base');
 }
 
 async function toPay(req, res) {
@@ -85,15 +76,14 @@ async function owed(req, res) {
 }
 
 async function statement(req, res) {
-  const all = await svc.allRows();
   const userId = Math.max(0, parseInt(req.query.user_id, 10) || 0);
   const associateId = userId > 0 ? 0 : Math.max(0, parseInt(req.query.associate_id, 10) || 0);
-  const rows = (userId || associateId) ? svc.filter(all, { user_id: userId, associate_id: associateId }) : [];
+  const rows = await svc.statement(userId || null, associateId || null);
   if (req.query.format === 'csv' && rows.length > 0) {
     csv.stream(res, 'incentive_statement.csv', svc.HEADERS, svc.csvRows(rows));
     return;
   }
-  const p = payees(all);
+  const p = await svc.payeeOptions();
   const find = (list, id) => (list.find((x) => x.id === id) || {}).name || '';
   const name = userId ? find(p.people, userId) : (associateId ? find(p.associates, associateId) : '');
   res.renderView('incentives/report_statement', { rows, totals: svc.totals(rows), userId, associateId, name, csvQuery: query({ user_id: userId, associate_id: associateId }), ...p }, 'layout/base');

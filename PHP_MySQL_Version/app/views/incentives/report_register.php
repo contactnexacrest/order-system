@@ -29,5 +29,11 @@
       <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/incentives?<?= htmlspecialchars(http_build_query(array_filter($filters))) ?>&format=csv">Export CSV</a>
     </div>
   </form>
-  <div class="section"><?php require __DIR__ . '/_report_table.php'; ?></div>
+  <div class="section"><?php require __DIR__ . '/_report_table.php'; ?>
+    <?php if (($pages ?? 1) > 1): $__q = array_filter($filters); ?>
+    <p class="pager">Page <?= (int) $page ?> of <?= (int) $pages ?> (the totals are for every row) ·
+      <?php if ($page > 1): ?><a href="/reports/incentives?<?= htmlspecialchars(http_build_query($__q + ['page' => $page - 1])) ?>">← Previous</a><?php endif; ?>
+      <?php if ($page < $pages): ?><a href="/reports/incentives?<?= htmlspecialchars(http_build_query($__q + ['page' => $page + 1])) ?>">Next →</a><?php endif; ?>
+    </p>
+    <?php endif; ?></div>
 </div>
