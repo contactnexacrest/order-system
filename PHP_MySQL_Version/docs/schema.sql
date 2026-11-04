@@ -4372,14 +4372,12 @@ CREATE TABLE incentive_settings (
 ) ENGINE=InnoDB;
 CREATE TABLE user_incentive_roles (
   user_id BIGINT UNSIGNED NOT NULL,
-  role    ENUM('sales','export','marketing','logistics','accounts') NOT NULL,
+  role    VARCHAR(40) NOT NULL,                       -- incentive_roles.role_key (D-245 P4: an editable list)
   PRIMARY KEY (user_id, role),
   FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB;
 CREATE TABLE order_incentives (
   order_id                BIGINT UNSIGNED NOT NULL PRIMARY KEY,
-  reward_override_inr     DECIMAL(14,2) NOT NULL DEFAULT 0,
-  is_excluded             TINYINT(1) NOT NULL DEFAULT 0,
   associate_mode          ENUM('auto','yes','no') NOT NULL DEFAULT 'auto',
   people_customised       TINYINT(1) NOT NULL DEFAULT 0,
   locked_at               TIMESTAMP NULL,
@@ -4387,7 +4385,6 @@ CREATE TABLE order_incentives (
   incentive_month         CHAR(7) NULL,
   profit_basis_inr        DECIMAL(14,2) NULL,
   team_total_inr          DECIMAL(14,2) NULL,
-  new_client_bonus_inr    DECIMAL(14,2) NULL,
   associate_id            BIGINT UNSIGNED NULL,
   associate_order_number  INT NULL,
   associate_rate_pct      DECIMAL(5,2) NULL,
@@ -4404,7 +4401,7 @@ CREATE TABLE order_incentives (
 ) ENGINE=InnoDB;
 CREATE TABLE order_incentive_people (
   order_id BIGINT UNSIGNED NOT NULL,
-  role     ENUM('sales','export','marketing','logistics','accounts') NOT NULL,
+  role     VARCHAR(40) NOT NULL,                      -- incentive_roles.role_key
   user_id  BIGINT UNSIGNED NOT NULL,
   PRIMARY KEY (order_id, role, user_id),
   FOREIGN KEY (order_id) REFERENCES orders(id),
@@ -4416,7 +4413,7 @@ CREATE TABLE incentive_payouts (
   payee_kind      ENUM('staff','associate') NOT NULL,
   user_id         BIGINT UNSIGNED NULL,
   associate_id    BIGINT UNSIGNED NULL,
-  role            VARCHAR(20) NOT NULL,
+  role            VARCHAR(40) NOT NULL,              -- incentive_roles.role_key, or 'associate'
   amount_inr      DECIMAL(14,2) NOT NULL,
   amount_fc       DECIMAL(14,2) NULL,
   currency_code   CHAR(3) NULL,
@@ -5224,3 +5221,60 @@ ALTER TABLE associates ADD COLUMN price_list_hash CHAR(64) NULL;
 ALTER TABLE associates ADD COLUMN price_list_changed_at DATETIME NULL;
 ALTER TABLE associates ADD COLUMN price_list_ack_hash CHAR(64) NULL;
 ALTER TABLE associates ADD COLUMN price_list_ack_at DATETIME NULL;
+
+-- ================================================================
+-- Owner decision D-245 (4 Nov 2026), phase P4: the team incentive.
+-- The incentive roles are an editable list (shares of the active roles add up to 100%).
+-- An order's team incentive is a % of its profit after the associate's commission (never
+-- below 0) or a fixed amount — the global rule (Pricing settings), a product's own rule, or
+-- the MD's amount for this one order, with a reason. The MD ticks who gets it and may set
+-- the shares on the order. Nothing locks by itself: the order becomes "ready to lock" when
+-- the buyer has fully paid and no claim is open, and the MD locks it (one or all). Every
+-- change is kept in the order's incentive history. The old reward table, minimum profit,
+-- new-client bonus and incentive cut-off day are gone. Go-live installs fresh (D-241).
+-- ================================================================
+CREATE TABLE incentive_roles (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  role_key    VARCHAR(40) NOT NULL UNIQUE,            -- stable key kept on payouts and people when the label changes
+  label       VARCHAR(80) NOT NULL,
+  share_pct   DECIMAL(6,2) NOT NULL DEFAULT 0,
+  is_active   TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order  INT NOT NULL DEFAULT 0,
+  updated_by  BIGINT UNSIGNED NULL,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+-- The order's own amount: 'global' = the rule from the settings / product; 'pct' = % of the
+-- order's profit; 'fixed' = a rupee amount. Set by the MD with a reason.
+ALTER TABLE order_incentives ADD COLUMN incentive_mode ENUM('global','pct','fixed') NOT NULL DEFAULT 'global';
+ALTER TABLE order_incentives ADD COLUMN incentive_value DECIMAL(14,4) NULL;
+ALTER TABLE order_incentives ADD COLUMN incentive_reason VARCHAR(500) NULL;
+ALTER TABLE order_incentives ADD COLUMN shares_customised TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE order_incentives ADD COLUMN locked_by BIGINT UNSIGNED NULL;
+ALTER TABLE order_incentives ADD COLUMN unlock_reason VARCHAR(500) NULL;
+ALTER TABLE order_incentives ADD CONSTRAINT fk_order_incentives_locked_by FOREIGN KEY (locked_by) REFERENCES users(id);
+-- Who gets it on this order: a tick per role, and the role's share on this order when the MD sets the shares.
+CREATE TABLE order_incentive_roles (
+  order_id  BIGINT UNSIGNED NOT NULL,
+  role_key  VARCHAR(40) NOT NULL,
+  gets_it   TINYINT(1) NOT NULL DEFAULT 1,
+  share_pct DECIMAL(6,2) NULL,
+  PRIMARY KEY (order_id, role_key),
+  FOREIGN KEY (order_id) REFERENCES orders(id)
+) ENGINE=InnoDB;
+-- Every change to an order's incentive: amount, who gets it, shares, lock, unlock.
+CREATE TABLE order_incentive_history (
+  id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id     BIGINT UNSIGNED NOT NULL,
+  action       VARCHAR(40) NOT NULL,
+  before_value TEXT NULL,
+  after_value  TEXT NULL,
+  reason       VARCHAR(500) NULL,
+  changed_by   BIGINT UNSIGNED NOT NULL,
+  changed_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_oih_order (order_id, changed_at),
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (changed_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+-- A staff payout's payout run date (the run after the order was locked).
+ALTER TABLE incentive_payouts ADD COLUMN locked_on DATE NULL;

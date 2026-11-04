@@ -196,13 +196,13 @@ final class AssociateSystemTest extends DbTestCase
 
         \App\Services\AssociateCommission::fixLevelAtPi($orderId);
         \App\Repositories\PricingRepository::setAssociateCommission((int) $a['id'], 'fixed', $this->level('Level 4'));
-        IncentiveService::lockIfDue($orderId, $this->admin);
+        IncentiveService::lockIfReady($orderId, $this->admin);
         self::assertNull(IncentiveRepository::forOrder($orderId), 'advance alone: nothing earned');
         $line = AssociatePortalRepository::orders((int) $a['id'], $orderId)[0]['commission'];
         self::assertSame(['expected', 5.0, 225.0, 'Level 2 — 5%'], [$line['state'], $line['rate'], $line['amount'], $line['level']], 'the order keeps the level fixed at its PI');
 
         Database::connection()->prepare("UPDATE order_payment_status SET balance_cleared_at = '2026-10-25 11:00:00', balance_inr_actual = 250000 WHERE order_id = :o")->execute(['o' => $orderId]);
-        IncentiveService::lockIfDue($orderId, $this->admin);
+        IncentiveService::lockIfReady($orderId, $this->admin);
         $p = array_values(array_filter(IncentiveRepository::payoutsForOrder($orderId), static fn (array $p): bool => $p['payee_kind'] === 'associate'))[0];
         self::assertSame(['225.00', 'USD', 'due', '2026-12', '2026-11-24', '2026-12-05'], [$p['amount_fc'], $p['currency_code'], $p['status'], $p['incentive_month'], $p['due_on'], $p['payout_run_on']]);
         self::assertTrue(AssociateEventRepository::hasEvent((int) $a['id'], 'commission_earned', $client, $orderId));
@@ -227,7 +227,7 @@ final class AssociateSystemTest extends DbTestCase
                                           VALUES (:o, 'balance', 2700, 2250, 450, 'written_off', 'The buyer did not pay the rest', :u, 'unpaid')")->execute(['o' => $o2, 'u' => $this->admin]);
         $calc = IncentiveService::calculate($o2)['associate'];
         self::assertSame(['unpaid', 0.0], [$calc['state'], $calc['amount_fc']], 'USD 4,050 of 4,500 received: nothing');
-        IncentiveService::lockIfDue($o2, $this->admin);
+        IncentiveService::lockIfReady($o2, $this->admin);
         self::assertSame([], array_values(array_filter(IncentiveRepository::payoutsForOrder($o2), static fn (array $p): bool => $p['payee_kind'] === 'associate')));
         self::assertSame('No commission — the buyer did not pay this order in full', AssociatePortalRepository::orders((int) $a['id'], $o2)[0]['commission']['label']);
 
@@ -279,7 +279,7 @@ final class AssociateSystemTest extends DbTestCase
         AssociateService::linkClient($c1, (int) $a['id'], 'code', null, '2026-10-01', $this->admin);
         AssociateService::linkClient($c2, (int) $a['id'], 'code', null, '2026-10-01', $this->admin);
         $o1 = $this->order($c1);
-        IncentiveService::lockIfDue($o1, $this->admin);
+        IncentiveService::lockIfReady($o1, $this->admin);
         $p1 = array_values(array_filter(IncentiveRepository::payoutsForOrder($o1), static fn (array $p): bool => $p['payee_kind'] === 'associate'))[0];
 
         $_POST = ['month' => '2026-11', 'paid_on' => date('Y-m-d'), 'paid_via' => 'bank_transfer', 'paid_reference' => 'UTR' . strtoupper($this->tag) . '01'];
@@ -317,7 +317,7 @@ final class AssociateSystemTest extends DbTestCase
 
         Database::connection()->prepare('UPDATE incentive_payouts SET incentive_month = :m WHERE id = :id')->execute(['m' => '2026-11', 'id' => $claw['id']]);
         $o2 = $this->order($c2);
-        IncentiveService::lockIfDue($o2, $this->admin);
+        IncentiveService::lockIfReady($o2, $this->admin);
         Database::connection()->prepare("UPDATE incentive_payouts SET due_on = '2026-10-30', incentive_month = '2026-11' WHERE order_id = :o")->execute(['o' => $o2]);
         $p2 = array_values(array_filter(IncentiveRepository::payoutsForOrder($o2), static fn (array $p): bool => $p['payee_kind'] === 'associate'))[0];
         $_POST = ['month' => '2026-11', 'paid_on' => date('Y-m-d'), 'paid_via' => 'bank_transfer', 'paid_reference' => 'UTR' . strtoupper($this->tag) . '02', 'paid_inr' => (string) ((float) $p2['amount_inr'] - 1000)];
@@ -337,7 +337,7 @@ final class AssociateSystemTest extends DbTestCase
         (new AssociateAdminController())->changeStatus(['id' => (string) $a['id']]);
         self::assertSame('Status changed to Suspended.', $this->flash()['message']);
         $o = $this->order($c);
-        IncentiveService::lockIfDue($o, $this->admin);
+        IncentiveService::lockIfReady($o, $this->admin);
         $p = array_values(array_filter(IncentiveRepository::payoutsForOrder($o), static fn (array $p): bool => $p['payee_kind'] === 'associate'))[0];
         self::assertSame(['held', 'The associate is suspended.'], [$p['status'], $p['hold_reason']]);
         self::assertSame('held', AssociatePortalRepository::orders((int) $a['id'], $o)[0]['commission']['state']);
@@ -644,7 +644,7 @@ final class AssociateSystemTest extends DbTestCase
         AssociateService::linkClient($client, (int) $a['id'], 'code', null, '2026-10-01', $this->admin);
         $this->verifiedBank($a);
         $o = $this->order($client);
-        IncentiveService::lockIfDue($o, $this->admin);
+        IncentiveService::lockIfReady($o, $this->admin);
         $p = array_values(array_filter(IncentiveRepository::payoutsForOrder($o), static fn (array $p): bool => $p['payee_kind'] === 'associate'))[0];
         IncentiveService::markPaid((int) $p['id'], date('Y-m-d'), 2744.0, 56.0, $this->admin, 'bank_transfer', 'UTR777888');
         $fileId = $this->createTestFile();

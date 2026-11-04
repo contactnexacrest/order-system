@@ -632,6 +632,11 @@ $router->get('/agreements/{id}/file', [$agreements, 'download'], [SessionAuth::r
 $router->post('/orders/{id}/incentive', [$incentives, 'saveOrder'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/incentive/people', [$incentives, 'saveOrderPeople'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
 $router->post('/orders/{id}/incentive/recalculate', [$incentives, 'recalculate'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
+// Owner decision D-245 P4: the MD locks an order's incentive (nothing locks by itself), one or all ready; unlock (above) needs a reason.
+$router->post('/orders/{id}/incentive/lock', [$incentives, 'lock'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
+$router->get('/incentives/ready', [$incentives, 'ready'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives')]);
+$router->post('/incentives/ready/lock-all', [$incentives, 'lockAll'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
+$router->post('/incentives/roles/{key}/delete', [$incentives, 'deleteRole'], [SessionAuth::required(), PermissionCheck::requires('manage_incentives'), CsrfCheck::verify()]);
 $router->get('/my-incentives', [$incentives, 'mine'], [SessionAuth::required(), PermissionCheck::requires('view_own_incentives')]);
 $router->get('/incentives/payouts', [$incentives, 'payouts'], [SessionAuth::required(), PermissionCheck::requires('pay_incentives')]);
 $router->post('/incentives/payouts/paid-all', [$incentives, 'markPaid'], [SessionAuth::required(), PermissionCheck::requires('pay_incentives'), CsrfCheck::verify()]);

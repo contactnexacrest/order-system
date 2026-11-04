@@ -756,7 +756,7 @@ async function clawback(req, res) {
   } else if (len(reason) < 10 || len(reason) > 300) {
     flash.set(req, 'error', `Say what the ${kind} was (10 to 300 characters) — the associate is shown it.`);
   } else {
-    const month = incentiveService.incentiveMonth(associateService.todayIst(), (await incentiveService.settings()).cutoff);
+    const month = await incentiveService.incentiveMonth(associateService.todayIst());
     const order = await orderRepository.find(Number(p.order_id));
     // QA Round 8, R8-N12: re-checked with the paid payout locked, so simultaneous claw-backs cannot exceed what was paid.
     const saved = await incentiveRepository.addClawbackWithinPaid(Number(p.id), amount, month, `Taken back for ${kind}: commission paid on order ${order ? order.order_reference : p.order_id} (payout no. ${p.id}, ref ${p.paid_reference || '—'}): ${reason}`);

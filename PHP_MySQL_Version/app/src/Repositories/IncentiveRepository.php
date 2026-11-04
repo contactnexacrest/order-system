@@ -16,14 +16,124 @@ use App\Config\Database;
  */
 final class IncentiveRepository
 {
-    /** Incentive roles, in the order the screens list them. */
-    public const ROLES = [
-        'sales'     => 'Sales',
-        'export'    => 'Export Executive',
-        'marketing' => 'Marketing',
-        'logistics' => 'Logistics',
-        'accounts'  => 'Accounts',
-    ];
+    /** @var array<string, array<string,mixed>>|null cache of incentive_roles by key, for one request */
+    private static ?array $roleCache = null;
+
+    /**
+     * Owner decision D-245 P4: the incentive roles are an editable list
+     * (incentive_roles). Every role, active and not, by key, in screen order.
+     *
+     * @return array<string, array{id:int,role_key:string,label:string,share_pct:float,is_active:bool,sort_order:int}>
+     */
+    public static function allRoles(): array
+    {
+        if (self::$roleCache === null) {
+            self::$roleCache = [];
+            foreach (Database::connection()->query('SELECT * FROM incentive_roles ORDER BY sort_order, id')->fetchAll() as $r) {
+                self::$roleCache[(string) $r['role_key']] = ['id' => (int) $r['id'], 'role_key' => (string) $r['role_key'], 'label' => (string) $r['label'],
+                    'share_pct' => (float) $r['share_pct'], 'is_active' => (int) $r['is_active'] === 1, 'sort_order' => (int) $r['sort_order']];
+            }
+        }
+        return self::$roleCache;
+    }
+
+    /** Active roles: key => label, in screen order. @return array<string, string> */
+    public static function roles(): array
+    {
+        $out = [];
+        foreach (self::allRoles() as $k => $r) {
+            if ($r['is_active']) {
+                $out[$k] = $r['label'];
+            }
+        }
+        return $out;
+    }
+
+    /** The label of a role key (also of a deactivated role, as payouts keep their key). */
+    public static function roleLabel(string $key): string
+    {
+        return self::allRoles()[$key]['label'] ?? ($key === 'associate' ? 'Associate (agreement)' : $key);
+    }
+
+    public static function forgetRoles(): void
+    {
+        self::$roleCache = null;
+    }
+
+    /** Whether a role key is used anywhere (people, payouts, an order's ticks) — then it can only be deactivated. */
+    public static function roleInUse(string $key): bool
+    {
+        foreach (['user_incentive_roles' => 'role', 'order_incentive_people' => 'role', 'incentive_payouts' => 'role', 'order_incentive_roles' => 'role_key'] as $table => $col) {
+            $stmt = Database::connection()->prepare("SELECT 1 FROM {$table} WHERE {$col} = :k LIMIT 1");
+            $stmt->execute(['k' => $key]);
+            if ($stmt->fetchColumn() !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** @param list<array{role_key:string,label:string,share_pct:float,is_active:bool,sort_order:int}> $rows */
+    public static function saveRoles(array $rows, int $userId): void
+    {
+        $pdo = Database::connection();
+        $upd = $pdo->prepare('UPDATE incentive_roles SET label = :l, share_pct = :p, is_active = :a, sort_order = :o, updated_by = :u WHERE role_key = :k');
+        $ins = $pdo->prepare('INSERT INTO incentive_roles (role_key, label, share_pct, is_active, sort_order, updated_by) VALUES (:k, :l, :p, :a, :o, :u)');
+        $existing = self::allRoles();
+        foreach ($rows as $r) {
+            $params = ['k' => $r['role_key'], 'l' => $r['label'], 'p' => $r['share_pct'], 'a' => $r['is_active'] ? 1 : 0, 'o' => $r['sort_order'], 'u' => $userId];
+            isset($existing[$r['role_key']]) ? $upd->execute($params) : $ins->execute($params);
+        }
+        self::forgetRoles();
+    }
+
+    public static function deleteRole(string $key): void
+    {
+        Database::connection()->prepare('DELETE FROM incentive_roles WHERE role_key = :k')->execute(['k' => $key]);
+        self::forgetRoles();
+    }
+
+    /** @return array<string, array{gets_it:bool,share_pct:?float}> the order's ticks and shares by role key */
+    public static function orderRoles(int $orderId): array
+    {
+        $stmt = Database::connection()->prepare('SELECT role_key, gets_it, share_pct FROM order_incentive_roles WHERE order_id = :id');
+        $stmt->execute(['id' => $orderId]);
+        $out = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $out[(string) $r['role_key']] = ['gets_it' => (int) $r['gets_it'] === 1, 'share_pct' => $r['share_pct'] !== null ? (float) $r['share_pct'] : null];
+        }
+        return $out;
+    }
+
+    /** @param array<string, array{gets_it:bool,share_pct:?float}> $roles */
+    public static function replaceOrderRoles(int $orderId, array $roles): void
+    {
+        $pdo = Database::connection();
+        $pdo->prepare('DELETE FROM order_incentive_roles WHERE order_id = :id')->execute(['id' => $orderId]);
+        $stmt = $pdo->prepare('INSERT INTO order_incentive_roles (order_id, role_key, gets_it, share_pct) VALUES (:o, :k, :g, :s)');
+        foreach ($roles as $key => $r) {
+            $stmt->execute(['o' => $orderId, 'k' => $key, 'g' => $r['gets_it'] ? 1 : 0, 's' => $r['share_pct']]);
+        }
+    }
+
+    /** Owner decision D-245 P4: every change to an order's incentive is kept. */
+    public static function addHistory(int $orderId, string $action, ?string $before, ?string $after, ?string $reason, int $userId): void
+    {
+        Database::connection()->prepare(
+            'INSERT INTO order_incentive_history (order_id, action, before_value, after_value, reason, changed_by) VALUES (:o, :a, :b, :v, :r, :u)'
+        )->execute(['o' => $orderId, 'a' => $action, 'b' => $before, 'v' => $after, 'r' => $reason, 'u' => $userId]);
+    }
+
+    /** @return list<array<string,mixed>> newest first, with the name of who changed it */
+    public static function history(int $orderId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT h.*, u.name AS changed_by_name FROM order_incentive_history h LEFT JOIN users u ON u.id = h.changed_by
+              WHERE h.order_id = :id ORDER BY h.changed_at DESC, h.id DESC'
+        );
+        $stmt->execute(['id' => $orderId]);
+        return $stmt->fetchAll();
+    }
 
     /** @return array<string, string> setting_key => setting_value */
     public static function settings(): array
@@ -61,7 +171,7 @@ final class IncentiveRepository
         $stmt = $pdo->prepare('INSERT INTO user_incentive_roles (user_id, role) VALUES (:u, :r)');
         foreach ($rolesByUser as $userId => $roles) {
             foreach (array_unique($roles) as $role) {
-                if (isset(self::ROLES[$role])) {
+                if (isset(self::roles()[$role])) {
                     $stmt->execute(['u' => $userId, 'r' => $role]);
                 }
             }
@@ -121,9 +231,10 @@ final class IncentiveRepository
     {
         $pdo = Database::connection();
         $pdo->prepare(
-            'INSERT INTO incentive_payouts (order_id, payee_kind, user_id, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month)
-             VALUES (:order_id, :payee_kind, :user_id, :associate_id, :role, :amount_inr, :amount_fc, :currency_code, :incentive_month)'
+            'INSERT INTO incentive_payouts (order_id, payee_kind, user_id, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month, payout_run_on, locked_on)
+             VALUES (:order_id, :payee_kind, :user_id, :associate_id, :role, :amount_inr, :amount_fc, :currency_code, :incentive_month, :payout_run_on, :locked_on)'
         )->execute([
+            'payout_run_on' => $row['payout_run_on'] ?? null, 'locked_on' => $row['locked_on'] ?? null,
             'order_id' => $row['order_id'], 'payee_kind' => $row['payee_kind'], 'user_id' => $row['user_id'] ?? null,
             'associate_id' => $row['associate_id'] ?? null, 'role' => $row['role'], 'amount_inr' => $row['amount_inr'],
             'amount_fc' => $row['amount_fc'] ?? null, 'currency_code' => $row['currency_code'] ?? null, 'incentive_month' => $row['incentive_month'],
@@ -313,7 +424,7 @@ final class IncentiveRepository
     /** Owner rule D-212: how a payout was paid. */
     public const PAID_VIA = ['salary' => 'with the salary (payroll)', 'bank_transfer' => 'by bank transfer', 'cheque' => 'by cheque'];
 
-    /** Order ids whose buyer may have fully paid and whose incentive is not fixed yet. */
+    /** Order ids whose buyer may have fully paid and whose incentive is not locked yet (candidates for "ready to lock"). */
     public static function unlockedOrderIdsWithPayments(): array
     {
         return array_map('intval', Database::connection()->query(

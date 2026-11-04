@@ -39,8 +39,9 @@ function allowed(perms, cls) {
     case 'purchase': return perms.has('view_purchase_prices');
     case 'logistics': return perms.has('view_logistics_costs');
     case 'financials': return perms.has('manage_order_financials') || perms.has('ca_module_view');
-    // D-172: amounts and profit basis for owner/MD (manage_incentives); Accounts sees what to pay (pay_incentives).
-    case 'incentives': return perms.has('manage_incentives') || perms.has('pay_incentives');
+    // D-172: amounts and profit basis for owner/MD (manage_incentives); Accounts sees what to pay (pay_incentives);
+    // D-245 P4: the ED (view_price_buildup) sees the order's team incentive card, read-only.
+    case 'incentives': return perms.has('manage_incentives') || perms.has('pay_incentives') || perms.has('view_price_buildup');
     case 'cafin': return perms.has('view_cafin');
     default: return true;
   }

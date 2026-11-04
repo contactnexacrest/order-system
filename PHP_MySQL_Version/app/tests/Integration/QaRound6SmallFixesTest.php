@@ -132,18 +132,15 @@ final class QaRound6SmallFixesTest extends DbTestCase
         self::assertStringContainsString('Nothing was recorded', (string) $flash['message']);
     }
 
-    /** R6-N12: two reward table rows may not start at the same profit. */
-    public function testTheRewardTableRefusesTwoRowsWithTheSameProfit(): void
+    /** R6-N12 (D-245 P4: the reward table is gone): two incentive roles may not have the same name. */
+    public function testTwoIncentiveRolesMayNotHaveTheSameName(): void
     {
-        $before = \App\Services\IncentiveService::settings()['table'];
-        $_POST = [
-            'min_profit_inr' => '100000', 'new_client_bonus_inr' => '0', 'cutoff_day' => '20',
-            'table_from' => ['300000', '300000'], 'table_reward' => ['40000', '90000'],
-            'split' => ['sales' => '40', 'export' => '20', 'marketing' => '15', 'logistics' => '15', 'accounts' => '10'],
-        ];
+        $before = \App\Repositories\IncentiveRepository::allRoles();
+        $_POST = ['lock_reminder_days' => '3', 'new_role_label' => 'Sales', 'new_role_share' => '0'];
         (new IncentiveController())->saveSettings([]);
-        self::assertStringContainsString('same order profit', (string) $this->flash()['message']);
-        self::assertSame($before, \App\Services\IncentiveService::settings()['table'], 'nothing saved');
+        self::assertStringContainsString('already exists', (string) $this->flash()['message']);
+        \App\Repositories\IncentiveRepository::forgetRoles();
+        self::assertSame($before, \App\Repositories\IncentiveRepository::allRoles(), 'nothing saved');
     }
 
     /** R6-N24: no payment report on a cancelled order, nor before the Proforma Invoice. */

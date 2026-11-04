@@ -817,7 +817,7 @@ final class AssociateAdminController
         } elseif (mb_strlen($reason) < 10 || mb_strlen($reason) > 300) {
             Flash::set('error', 'Say what the ' . $kind . ' was (10 to 300 characters) — the associate is shown it.');
         } else {
-            $month = IncentiveService::incentiveMonth(date('Y-m-d'), IncentiveService::settings()['cutoff']);
+            $month = IncentiveService::incentiveMonth(date('Y-m-d'));
             $order = \App\Repositories\OrderRepository::find((int) $p['order_id']);
             // QA Round 8, R8-N12: re-checked with the paid payout locked, so simultaneous claw-backs cannot exceed what was paid.
             $saved = IncentiveRepository::addClawbackWithinPaid((int) $p['id'], (float) $amount, $month, 'Taken back for ' . $kind . ': commission paid on order ' . ($order['order_reference'] ?? $p['order_id']) . " (payout no. {$p['id']}, ref " . ($p['paid_reference'] ?? '—') . "): {$reason}");

@@ -13,21 +13,29 @@ const userRepository = require('../repositories/userRepository');
 
 /**
  * Port of IncentiveService.php. Team incentive program and associate
- * commission (owner decision 2026-10-30, mockups approved).
+ * commission.
  *
- * - An order's figures are fixed ("locked") when the buyer has fully paid:
- *   every buyer payment it has (advance or LC, balance, freight) cleared.
- * - Associate commission: the client's associate, on the client's first
- *   orders (Day 1 = the client's first PO received, plus 9 days: the
- *   agreement's 10 days), at the ladder rate for the associate's Nth client, on the
- *   product (FOB) value. It is deducted from the profit first.
- * - Team reward: the amount set on the order (above 0), else the reward
- *   table for the profit left after the associate, if it reaches the
- *   minimum and the program is on. Plus the new client bonus on a client's
- *   first order. Split by role, equally between the people in a role.
- * - Both become the order's cost (a commission cost entry) when locked,
- *   and are paid in the incentive month: cut-off day C means the 21st of
- *   last month to the 20th of this month for C = 20.
+ * Owner decision D-245 P4 (4 Nov 2026):
+ * - The team incentive is a % of the order's profit after the associate's
+ *   commission (never below 0) or a fixed amount: the global rule (Pricing
+ *   settings), a product's own rule, or the MD's amount for this one order,
+ *   with a reason. With the program off there is no global incentive, but the
+ *   MD may still set one by hand on one order.
+ * - The roles are an editable list with usual shares adding up to 100%; on
+ *   an order the MD ticks who gets it (unticked shares spread proportionally
+ *   over the ticked roles) or sets the shares; equal split inside a role.
+ * - Nothing locks by itself: an order is "ready to lock" once the buyer has
+ *   fully paid and no claim is open; the MD locks it (one or all ready) and
+ *   may unlock it with a reason until anything is paid. Every change is kept
+ *   in the order's incentive history.
+ * - Associate commission (D-245 P3, associateCommission) is deducted first
+ *   and locks together with the order.
+ * - Staff payouts go into the payout run after the lock date; associate
+ *   commission keeps its due date and the run after it.
+ * - The price check's "incentive cut" on a line the MD approved below the
+ *   floor is shown only as an explanation: the incentive is a % of the
+ *   order's actual profit, which that lower price already reduced, so it is
+ *   never subtracted a second time.
  */
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -52,35 +60,9 @@ function fmt2(x) {
 
 async function settings() {
   const raw = await incentiveRepository.settings();
-  let table = [];
-  try {
-    table = JSON.parse(raw.reward_table || '[]');
-  } catch (e) {
-    table = [];
-  }
-  table = (Array.isArray(table) ? table : [])
-    .filter((row) => row && Number(row.from || 0) > 0 && Number(row.reward || 0) > 0)
-    .map((row) => ({ from: Number(row.from), reward: Number(row.reward) }))
-    .sort((a, b) => a.from - b.from);
-  let savedSplit = {};
-  try {
-    savedSplit = JSON.parse(raw.role_split || '{}') || {};
-  } catch (e) {
-    savedSplit = {};
-  }
-  const split = {};
-  for (const role of Object.keys(incentiveRepository.ROLES)) {
-    split[role] = Number(savedSplit[role] || 0);
-  }
-  const cutoff = String(raw.cutoff_day ?? '20');
   return {
     enabled: (raw.program_enabled ?? '0') === '1',
-    start_date: String(raw.program_start_date ?? ''),
-    min_profit: Number(raw.min_profit_inr || 0),
-    table,
-    bonus: Number(raw.new_client_bonus_inr || 0),
-    split,
-    cutoff: cutoff === 'last' ? 'last' : String(Math.max(1, Math.min(28, parseInt(cutoff, 10) || 0))),
+    reminder_days: Math.max(0, Math.min(28, parseInt(raw.lock_reminder_days ?? '3', 10) || 0)),
   };
 }
 
@@ -104,50 +86,18 @@ function earliestPaidOn(month) {
   return `${y}-${String(m).padStart(2, '0')}-01`;
 }
 
-function incentiveMonth(date, cutoff) {
-  const [y, m, d] = String(date).slice(0, 10).split('-').map(Number);
-  if (cutoff === 'last' || d <= parseInt(cutoff, 10)) {
-    return `${y}-${pad(m)}`;
-  }
-  return m === 12 ? `${y + 1}-01` : `${y}-${pad(m + 1)}`;
-}
-
-/** "21 Oct to 20 Nov" for the incentive month. */
-function cycleLabel(month, cutoff) {
-  const [y, m] = month.split('-').map(Number);
-  const short = (mm) => MONTHS[mm - 1].slice(0, 3);
-  if (cutoff === 'last') {
-    return `1 ${short(m)} to ${lastDayOf(y, m)} ${short(m)}`;
-  }
-  const prev = m === 1 ? 12 : m - 1;
-  return `${parseInt(cutoff, 10) + 1} ${short(prev)} to ${parseInt(cutoff, 10)} ${short(m)}`;
-}
-
-/** PHP date('S'): the English ordinal suffix of a day number. */
-function ordinal(n) {
-  const v = n % 100;
-  if (v >= 11 && v <= 13) return `${n}th`;
-  return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' })[n % 10] || 'th'}`;
-}
-
-/** "the 21st of last month to the 20th of this month" for the settings and My Incentives pages. */
-function cycleSentence(cutoff) {
-  if (cutoff === 'last') {
-    return null;
-  }
-  const c = parseInt(cutoff, 10);
-  return `the ${ordinal(c + 1)} of last month to the ${ordinal(c)} of this month`;
+/**
+ * D-245 P4: the payout month (YYYY-MM) of something locked on `date` — the
+ * month of the first payout run on or after it (Associates › Commission
+ * settings: monthly on day N, or weekly).
+ */
+async function incentiveMonth(date) {
+  return String(await require('./associateCommission').payoutRunOn(String(date).slice(0, 10))).slice(0, 7);
 }
 
 /** "November" for 2026-11. */
 function monthName(month) {
   return MONTHS[Number(String(month).split('-')[1]) - 1];
-}
-
-/** "30 Nov": the last day of the incentive month, when it is paid with the salary. */
-function payDay(month) {
-  const [y, m] = String(month).split('-').map(Number);
-  return `${lastDayOf(y, m)} ${MONTHS[m - 1].slice(0, 3)}`;
 }
 
 function monthLabel(month) {
@@ -263,14 +213,14 @@ async function peopleFor(orderId) {
     const rolesByUser = await incentiveRepository.userRoles();
     const assigned = (await orderAssigneeRepository.forOrder(orderId)).map((a) => Number(a.user_id));
     chosen = {};
-    for (const role of Object.keys(incentiveRepository.ROLES)) {
+    for (const role of Object.keys(await incentiveRepository.roles())) {
       const holders = Object.keys(rolesByUser).map(Number).filter((uid) => rolesByUser[uid].includes(role)).sort((a, b) => a - b);
       const onOrder = holders.filter((uid) => assigned.includes(uid));
       chosen[role] = onOrder.length ? onOrder : holders;
     }
   }
   const out = {};
-  for (const role of Object.keys(incentiveRepository.ROLES)) {
+  for (const role of Object.keys(await incentiveRepository.roles())) {
     out[role] = [];
     for (const userId of chosen[role] || []) {
       if (names[userId] !== undefined) {
@@ -281,83 +231,245 @@ async function peopleFor(orderId) {
   return out;
 }
 
-/** The order's incentive as it stands (or would stand, if the buyer had fully paid on paidOn). */
-async function calculate(orderId, paidOn = null) {
+/** The order's own amount: global / pct / fixed. */
+function orderRule(row) {
+  const mode = String((row && row.incentive_mode) || 'global');
+  return {
+    mode: ['pct', 'fixed'].includes(mode) ? mode : 'global',
+    value: row && row.incentive_value !== null && row.incentive_value !== undefined ? Number(row.incentive_value) : null,
+    reason: (row && row.incentive_reason) || null,
+  };
+}
+
+/**
+ * The global (or product) rule's amount for the order: % of the profit
+ * basis, or a fixed USD amount per unit converted at the order's rate. A line
+ * whose product has its own rule uses it, weighted by its share of the goods
+ * FOB; other lines use the global rule.
+ */
+async function globalAmount(orderId, order, basis) {
+  const pricingService = require('./pricingService');
+  const associateCommission = require('./associateCommission');
+  const s = await pricingService.settings();
+  const lines = await associateCommission.goodsLines(orderId);
+  const total = lines.reduce((sum, l) => sum + Number(l.fob_value), 0);
+  const rate = (await associateCommission.realisedRate(order)).rate;
+  const describe = (mode, value) => (mode === 'usd' ? `USD ${fmt2(value)} per unit` : `${pricingService.pct(value)} of profit`);
+  if (lines.length === 0 || total <= 0) {
+    const amount = s.incentive_mode === 'usd' ? 0 : basis * s.incentive_value / 100;
+    return { amount: round2(amount), text: describe(s.incentive_mode, s.incentive_value) };
+  }
+  let amount = 0;
+  let own = false;
+  const productRepository = require('../repositories/productRepository');
+  for (const l of lines) {
+    let mode = s.incentive_mode;
+    let value = s.incentive_value;
+    if (l.catalog_product_id) {
+      const product = await productRepository.find(Number(l.catalog_product_id));
+      if (product && product.pricing_incentive_mode !== null && product.pricing_incentive_mode !== undefined) {
+        mode = String(product.pricing_incentive_mode);
+        value = Number(product.pricing_incentive_value);
+        own = true;
+      }
+    }
+    amount += mode === 'usd' ? value * Number(l.quantity || 0) * rate : basis * value / 100 * (Number(l.fob_value) / total);
+  }
+  return { amount: round2(amount), text: describe(s.incentive_mode, s.incentive_value) + (own ? ' (some products have their own rule)' : '') };
+}
+
+/**
+ * The order's incentive as it stands. Before the order is locked every
+ * figure is an estimate; the locked figures are on order_incentives.
+ */
+async function calculate(orderId) {
   const orderProfitabilityService = require('./orderProfitabilityService');
+  const associateCommission = require('./associateCommission');
+  const pricingService = require('./pricingService');
   const order = await orderRepository.find(orderId);
-  const s = await settings();
-  const row = (await incentiveRepository.forOrder(orderId)) || { reward_override_inr: 0, is_excluded: 0, associate_mode: 'auto', locked_at: null };
+  const row = await incentiveRepository.forOrder(orderId);
   const profit = await orderProfitabilityService.computeForOrder(orderId);
   const entries = await incentiveRepository.costEntries(orderId);
   const already = Object.values(entries).reduce((sum, c) => sum + Number(c.amount_inr), 0);
   const profitBefore = round2(Number(profit.profit_inr) + already);
+  const revenue = Number(profit.revenue_inr || 0);
 
-  // Owner decision D-245 P3: the associate's commission on the final invoiced FOB of the goods,
-  // line by line, at the level fixed at PI, full payment only (associateCommission).
-  const associate = await require('./associateCommission').forOrder(orderId, order, row);
-  const basis = round2(profitBefore - (associate ? associate.amount_inr : 0));
-
-  let source = 'table';
-  let reward = 0;
-  if (Number(row.is_excluded) === 1) {
-    source = 'excluded';
-  } else if (Number(row.reward_override_inr) > 0) {
-    source = 'override';
-    reward = Number(row.reward_override_inr);
-  } else if (!s.enabled) {
+  // Owner decision D-245 P3: the associate's commission comes off first.
+  const associate = await associateCommission.forOrder(orderId, order, row || { associate_mode: 'auto' });
+  const assocInr = associate ? Number(associate.amount_inr) : 0;
+  const basisRaw = round2(profitBefore - assocInr);
+  // P4: the profit used for the incentive never goes below 0.
+  const basis = Math.max(0, basisRaw);
+  const programOn = (await settings()).enabled;
+  const rule = orderRule(row);
+  const global = await globalAmount(orderId, order, basis);
+  let amount;
+  let source;
+  if (rule.mode === 'fixed') {
+    amount = round2(rule.value);
+    source = 'order_fixed';
+  } else if (rule.mode === 'pct') {
+    amount = round2(basis * rule.value / 100);
+    source = 'order_pct';
+  } else if (!programOn) {
+    amount = 0;
     source = 'off';
-  } else if (paidOn !== null && s.start_date !== '' && paidOn < s.start_date) {
-    source = 'before_start';
-  } else if (basis < s.min_profit) {
-    source = 'below_min';
   } else {
-    for (const t of s.table) {
-      if (basis >= t.from) {
-        reward = t.reward;
-      }
-    }
-    if (reward <= 0) {
-      source = 'below_min';
+    amount = global.amount;
+    source = 'global';
+  }
+  const sp = await split(orderId, amount);
+  const minMargin = Number((await pricingService.settings()).margin_pct);
+  const marginAfter = revenue > 0 ? round2((profitBefore - assocInr - sp.team_total) / revenue * 100) : null;
+  let cutUsd = 0;
+  for (const l of await associateCommission.goodsLines(orderId)) {
+    if (l.price_approved_by && l.price_approval_incentive_cut !== null && l.price_approval_incentive_cut !== undefined) {
+      cutUsd += Number(l.price_approval_incentive_cut);
     }
   }
-  const bonus = (reward > 0 && s.bonus > 0 && await isClientsFirstOrder(order)) ? s.bonus : 0;
-
-  const people = await peopleFor(orderId);
-  const roles = {};
-  const bonusRoles = ['sales', 'marketing'].filter((r) => people[r].length > 0 && s.split[r] > 0);
-  const bonusWeight = bonusRoles.reduce((sum, r) => sum + s.split[r], 0);
-  let allocated = 0;
-  let unallocated = 0;
-  for (const [role, label] of Object.entries(incentiveRepository.ROLES)) {
-    let amount = round2(reward * s.split[role] / 100);
-    if (bonusRoles.includes(role) && bonusWeight > 0) {
-      amount = round2(amount + bonus * s.split[role] / bonusWeight);
-    }
-    const each = people[role].length ? round2(amount / people[role].length) : 0;
-    if (people[role].length === 0) {
-      unallocated += amount;
-    } else {
-      allocated += each * people[role].length;
-    }
-    roles[role] = { label, pct: s.split[role], amount, each, people: people[role] };
-  }
-  if (bonus > 0 && bonusRoles.length === 0) {
-    unallocated += bonus;
-  }
-
   return {
     profit_before: profitBefore,
+    revenue,
     associate,
+    basis_raw: basisRaw,
     basis,
+    estimated: (await fullyPaidOn(orderId)) === null,
+    program_on: programOn,
+    rule,
+    global_amount: global.amount,
+    global_text: global.text,
     source,
-    reward,
-    new_client_bonus: bonus,
-    team_total: round2(allocated),
-    unallocated: round2(unallocated),
-    roles,
-    pct_of_profit: basis > 0 ? Math.round(allocated / basis * 1000) / 10 : null,
-    min_profit: s.min_profit,
+    amount,
+    team_total: sp.team_total,
+    unallocated: sp.unallocated,
+    roles: sp.roles,
+    per_person: sp.per_person,
+    shares_customised: sp.customised,
+    left_for_company: round2(basis - sp.team_total),
+    margin_after_pct: marginAfter,
+    min_margin_pct: minMargin,
+    margin_warning: marginAfter !== null && sp.team_total > 0 && marginAfter < minMargin,
+    over_profit: amount > basis + 0.005,
+    incentive_cut_usd: round2(cutUsd),
+    state: await state(orderId, row),
   };
+}
+
+/**
+ * Who gets what: each active role with its tick, people and share on this
+ * order. Unticked roles (or roles with nobody) give their share to the ticked
+ * ones in proportion; custom shares (they add up to 100%) win.
+ */
+async function split(orderId, amount) {
+  const row = await incentiveRepository.forOrder(orderId);
+  const customised = Number((row && row.shares_customised) || 0) === 1;
+  const ticks = await incentiveRepository.orderRoles(orderId);
+  const people = await peopleFor(orderId);
+  const all = await incentiveRepository.allRoles();
+  const roles = {};
+  for (const [key, label] of Object.entries(await incentiveRepository.roles())) {
+    const hasPeople = (people[key] || []).length > 0;
+    const ticked = ticks[key] ? ticks[key].gets_it : true;
+    roles[key] = { key, label, usual_pct: all[key].share_pct, ticked, gets_it: ticked && hasPeople, has_people: hasPeople,
+      people: people[key] || [], custom_pct: ticks[key] ? ticks[key].share_pct : null, pct: 0, amount: 0, each: 0 };
+  }
+  const weights = {};
+  for (const [key, r] of Object.entries(roles)) {
+    if (r.gets_it) weights[key] = customised ? Number(r.custom_pct || 0) : r.usual_pct;
+  }
+  const sum = Object.values(weights).reduce((a, b) => a + b, 0);
+  let teamTotal = 0;
+  const perPerson = new Map();
+  if (sum > 0 && amount > 0) {
+    const keys = Object.keys(weights);
+    let allocated = 0;
+    keys.forEach((key, i) => {
+      const pct = weights[key] / sum * 100;
+      // The last ticked role takes the rounding, so the shares add up to the amount exactly.
+      const roleAmount = i === keys.length - 1 ? round2(amount - allocated) : round2(amount * pct / 100);
+      allocated += roleAmount;
+      const n = roles[key].people.length;
+      const each = round2(roleAmount / n);
+      roles[key].pct = round2(pct);
+      roles[key].amount = roleAmount;
+      roles[key].each = each;
+      roles[key].people.forEach((p, j) => {
+        const share = j === n - 1 ? round2(roleAmount - each * (n - 1)) : each;
+        if (!perPerson.has(p.id)) perPerson.set(p.id, { id: p.id, name: p.name, amount: 0, roles: [] });
+        const pp = perPerson.get(p.id);
+        pp.amount = round2(pp.amount + share);
+        pp.roles.push(roles[key].label);
+      });
+    });
+    teamTotal = round2(allocated);
+  } else if (sum > 0) {
+    for (const [key, w] of Object.entries(weights)) roles[key].pct = round2(w / sum * 100);
+  }
+  return { roles, team_total: teamTotal, unallocated: round2(Math.max(0, amount - teamTotal)), per_person: [...perPerson.values()], customised };
+}
+
+/** open | ready | locked | paid */
+async function state(orderId, row = undefined) {
+  const r = row === undefined ? await incentiveRepository.forOrder(orderId) : row;
+  if (r && r.locked_at) {
+    for (const p of await incentiveRepository.payoutsForOrder(orderId)) {
+      if (p.status === 'paid') return 'paid';
+    }
+    return 'locked';
+  }
+  return (await readyReason(orderId)) === null ? 'ready' : 'open';
+}
+
+function todayIst() {
+  return new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+/** Why the order is not ready to lock yet, or null when it is (buyer fully paid, no claim open). */
+async function readyReason(orderId) {
+  const order = await orderRepository.find(orderId);
+  if (!order || ['cancelled', 'lost'].includes(order.status)) return 'The order is cancelled or lost.';
+  if ((await fullyPaidOn(orderId)) === null) return 'The buyer has not paid in full yet.';
+  if (await require('./associateCommission').claimOpen(orderId, todayIst())) return 'A buyer claim on this order is still open.';
+  return null;
+}
+
+/** Order ids ready to lock (fully paid, no open claim, not locked). */
+async function readyToLock() {
+  const out = [];
+  for (const orderId of await incentiveRepository.unlockedOrderIdsWithPayments()) {
+    if ((await readyReason(orderId)) === null) out.push(orderId);
+  }
+  return out;
+}
+
+/** Locks the order if it is ready. Resolves null on success, else why not. */
+async function lockIfReady(orderId, userId, note = null) {
+  const row = await incentiveRepository.forOrder(orderId);
+  if (row && row.locked_at) return 'This order\'s incentive is already locked.';
+  const reason = await readyReason(orderId);
+  if (reason !== null) return reason;
+  const calc = await calculate(orderId);
+  if (calc.over_profit) {
+    return `The team incentive (₹${fmt2(calc.amount)}) is more than the order's profit (₹${fmt2(calc.basis)}) — lower it before locking.`;
+  }
+  await lock(orderId, String(await fullyPaidOn(orderId)), userId, calc, note);
+  return null;
+}
+
+/** Locks every order that is ready. */
+async function lockAllReady(userId) {
+  let locked = 0;
+  const skipped = [];
+  for (const orderId of await readyToLock()) {
+    const error = await lockIfReady(orderId, userId, 'Locked with "Lock all ready".');
+    if (error === null) {
+      locked++;
+    } else {
+      const o = await orderRepository.find(orderId);
+      skipped.push(`${(o && (o.buyer_inquiry_ref || o.order_reference)) || orderId}: ${error}`);
+    }
+  }
+  return { locked, skipped };
 }
 
 function nowSql() {
@@ -365,36 +477,56 @@ function nowSql() {
   return d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-async function lock(orderId, paidOn, userId) {
-  const calc = await calculate(orderId, paidOn);
-  const s = await settings();
-  const month = incentiveMonth(paidOn, s.cutoff);
-  // Owner decision D-245 P3: due N days after full payment, paid in the payout run that follows.
+/** "15% of profit (global rule)", "fixed ₹1,00,000 set for this order" … */
+function ruleText(calc) {
+  const pricingService = require('./pricingService');
+  if (calc.source === 'order_fixed') return `fixed ₹${fmt2(calc.amount)} set for this order`;
+  if (calc.source === 'order_pct') return `${pricingService.pct(calc.rule.value)} of profit set for this order`;
+  if (calc.source === 'off') return 'program off — none';
+  return `${calc.global_text} (global rule)`;
+}
+
+async function lock(orderId, paidOn, userId, calc = null, note = null) {
+  calc = calc || await calculate(orderId);
   const associateCommission = require('./associateCommission');
+  const { short } = require('../helpers/dates');
+  const today = todayIst();
+  // P4: staff are paid in the payout run after the lock date.
+  const staffRun = await associateCommission.payoutRunOn(today);
+  const month = String(staffRun).slice(0, 7);
+  // Owner decision D-245 P3: due N days after full payment, paid in the payout run that follows.
   const commissionSet = await associateCommission.settings();
   const due = calc.associate ? await associateCommission.dueOn(paidOn, commissionSet) : null;
   const runOn = due ? await associateCommission.payoutRunOn(due, commissionSet) : null;
-  const earned = !!(calc.associate && calc.associate.state !== 'unpaid' && calc.associate.amount_fc > 0);
+  const a = calc.associate;
+  const earned = !!(a && a.state !== 'unpaid' && a.amount_fc > 0);
+  const order = await orderRepository.find(orderId);
   await db.transaction(async (c) => {
     let teamEntryId = null;
     if (calc.team_total > 0) {
       for (const [role, r] of Object.entries(calc.roles)) {
-        for (const p of r.people) {
-          if (r.each > 0) {
-            await incentiveRepository.addPayout({ order_id: orderId, payee_kind: 'staff', user_id: p.id, role, amount_inr: r.each, incentive_month: month }, c);
+        if (!r.gets_it || r.amount <= 0) continue;
+        const n = r.people.length;
+        for (let j = 0; j < n; j++) {
+          const p = r.people[j];
+          const share = j === n - 1 ? round2(r.amount - r.each * (n - 1)) : r.each;
+          if (share > 0) {
+            await incentiveRepository.addPayout({ order_id: orderId, payee_kind: 'staff', user_id: p.id, role, amount_inr: share,
+              incentive_month: month, payout_run_on: staffRun, locked_on: today }, c);
           }
         }
       }
-      teamEntryId = await incentiveRepository.addCostEntry(orderId, 'team', `Team incentive — ${monthLabel(month)} incentive`, calc.team_total, paidOn, userId, c);
+      teamEntryId = await incentiveRepository.addCostEntry(orderId, 'team', `Team incentive for order ${(order && (order.buyer_inquiry_ref || order.order_reference)) || orderId}`
+        + ` — ${ruleText(calc)}, locked ${short(today)}, paid in the ${short(staffRun)} payout run`, calc.team_total, paidOn, userId, c);
     }
     let associateEntryId = null;
-    const a = calc.associate;
     if (earned) {
       const payoutId = await incentiveRepository.addPayout({
         order_id: orderId, payee_kind: 'associate', associate_id: a.id, role: 'associate',
         amount_inr: a.amount_inr, amount_fc: a.amount_fc, currency_code: a.currency, incentive_month: String(runOn).slice(0, 7),
+        payout_run_on: runOn, locked_on: today,
       }, c);
-      await c.execute('UPDATE incentive_payouts SET due_on = :d, payout_run_on = :r WHERE id = :id', { d: due, r: runOn, id: payoutId });
+      await c.execute('UPDATE incentive_payouts SET due_on = :d WHERE id = :id', { d: due, id: payoutId });
       // AS-3: a suspended associate's commission is held until the MD releases it.
       if (a.status === 'suspended') {
         await incentiveRepository.holdPayout(payoutId, 'The associate is suspended.', c);
@@ -403,11 +535,12 @@ async function lock(orderId, paidOn, userId) {
     }
     await incentiveRepository.saveOrder(orderId, {
       locked_at: nowSql(),
+      locked_by: userId,
+      unlock_reason: null,
       fully_paid_on: paidOn,
       incentive_month: month,
       profit_basis_inr: calc.basis,
       team_total_inr: calc.team_total,
-      new_client_bonus_inr: calc.new_client_bonus,
       associate_id: a ? a.id : null,
       associate_order_number: a && a.counts ? a.counting_number : null,
       associate_rate_pct: a ? a.rate : null,
@@ -421,22 +554,20 @@ async function lock(orderId, paidOn, userId) {
       team_cost_entry_id: teamEntryId,
       associate_cost_entry_id: associateEntryId,
     }, userId, c);
+    await incentiveRepository.addHistory(orderId, 'lock', null, `Team ₹${fmt2(calc.team_total)}`
+      + (a ? `; associate ${earned ? `₹${fmt2(a.amount_inr)}` : 'none'}` : '') + `; staff payout run ${staffRun}`, note, userId, c);
   });
-  const a = calc.associate;
   if (a) {
     const associateService = require('./associateService');
     const associate = await associateRepository.find(a.id);
-    const order = await orderRepository.find(orderId);
     if (associate && order) {
       if (!earned) {
         await associateService.notify(associate, 'commission_earned', `Order ${order.order_reference} is closed for commission: `
           + (a.state === 'unpaid' ? 'the buyer did not pay the order in full, so no commission is due on it.' : 'no commission is due on it.'), Number(order.client_id), orderId);
       } else {
-        const { short } = require('../helpers/dates');
-        const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         await associateService.notify(associate, a.status === 'suspended' ? 'payout_held' : 'commission_earned',
-          `Your client paid order ${order.order_reference} in full. Commission earned: ${a.currency} ${money(a.amount_fc)}`
-          + ` (${a.level_label} on the invoiced FOB of the goods, ${a.currency} ${money(a.basis_fc)}).`
+          `Your client paid order ${order.order_reference} in full. Commission earned: ${a.currency} ${fmt2(a.amount_fc)}`
+          + ` (${a.level_label} on the invoiced FOB of the goods, ${a.currency} ${fmt2(a.basis_fc)}).`
           + (a.status === 'suspended' ? ' It is on hold while your account is suspended.'
             : ` It is due on ${short(due)} and paid in the ${short(runOn)} payout run, against your invoice`
               + (String(associate.gstin || '').trim() !== '' ? ' (GST is added on top once your tax invoice is on file)' : '') + '.'),
@@ -448,9 +579,8 @@ async function lock(orderId, paidOn, userId) {
 
 /** Owner rule D-212: the commission cost line says what it is, for whom, at which level and on what basis. */
 function associateCostDescription(a) {
-  const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `Associate commission — ${a.name} (${a.level_label}) on the invoiced FOB of the goods, ${a.currency} ${money(a.basis_fc)}`
-    + (Number(a.reduction_fc) > 0 ? ` (after agreed discount / settled claim of ${a.currency} ${money(a.reduction_fc)})` : '')
+  return `Associate commission — ${a.name} (${a.level_label}) on the invoiced FOB of the goods, ${a.currency} ${fmt2(a.basis_fc)}`
+    + (Number(a.reduction_fc) > 0 ? ` (after agreed discount / settled claim of ${a.currency} ${fmt2(a.reduction_fc)})` : '')
     + (Number(a.in_range_fc) < Number(a.goods_fc) ? '; lines the MD approved below the floor earn nothing' : '');
 }
 
@@ -459,54 +589,63 @@ function trimNum(v) {
   return Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/0+$/, '').replace(/\.$/, '');
 }
 
-/** Fixes the incentive of every order whose buyer has fully paid since the last look. */
-async function lockDue(userId) {
-  let locked = 0;
-  for (const orderId of await incentiveRepository.unlockedOrderIdsWithPayments()) {
-    const paidOn = await fullyPaidOn(orderId);
-    if (paidOn !== null) {
-      await lock(orderId, paidOn, userId);
-      locked++;
-    }
-  }
-  return locked;
-}
-
-/** Fixes this one order's incentive if its buyer has fully paid and it is not fixed yet. */
-async function lockIfDue(orderId, userId) {
+/** Unlocks the order so its incentive can change again; needs a reason; refused once anything is paid. Resolves an error or null. */
+async function unlock(orderId, userId, reason = '') {
+  const { short } = require('../helpers/dates');
+  const why = String(reason || '').trim();
+  if ([...why].length < 10 || [...why].length > 500) return 'Say why the incentive is unlocked (10 to 500 characters).';
   const row = await incentiveRepository.forOrder(orderId);
-  if (row && row.locked_at) {
-    return;
-  }
-  const order = await orderRepository.find(orderId);
-  if (!order || Number(order.is_test_data) === 1 || Number(order.is_sample_data) === 1 || ['cancelled', 'lost'].includes(order.status)) {
-    return;
-  }
-  const paidOn = await fullyPaidOn(orderId);
-  if (paidOn !== null) {
-    await lock(orderId, paidOn, userId);
-  }
-}
-
-/** Undoes a lock so the incentive can be worked out again; refused once anything is paid. Returns an error or null. */
-async function unlock(orderId, userId) {
+  if (!row || !row.locked_at) return 'This order\'s incentive is not locked.';
   for (const p of await incentiveRepository.payoutsForOrder(orderId)) {
     if (p.status === 'paid') {
-      return 'Part of this order\'s incentive is already paid, so its figures can no longer be worked out again.';
+      return 'Part of this order\'s incentive is already paid, so it can no longer be unlocked.';
     }
   }
   await db.transaction(async (c) => {
     await incentiveRepository.deleteOrderPayouts(orderId, c);
     await c.execute('DELETE FROM order_cost_entries WHERE order_id = :id AND incentive_kind IS NOT NULL', { id: orderId });
     await incentiveRepository.saveOrder(orderId, {
-      locked_at: null, fully_paid_on: null, incentive_month: null, profit_basis_inr: null, team_total_inr: null,
-      new_client_bonus_inr: null, associate_id: null, associate_order_number: null, associate_rate_pct: null,
+      locked_at: null, locked_by: null, unlock_reason: why, fully_paid_on: null, incentive_month: null, profit_basis_inr: null, team_total_inr: null,
+      associate_id: null, associate_order_number: null, associate_rate_pct: null,
       associate_amount_fc: null, associate_currency: null, associate_amount_inr: null,
       associate_basis_fc: null, associate_basis_inr: null, associate_counts: null, associate_due_on: null,
       team_cost_entry_id: null, associate_cost_entry_id: null,
     }, userId, c);
+    await incentiveRepository.addHistory(orderId, 'unlock', `Locked ${short(String(row.locked_at).slice(0, 10))}, team ₹${fmt2(row.team_total_inr)}`, 'Open', why, userId, c);
   });
   return null;
+}
+
+/**
+ * Daily: N days (setting) before the next payout run, remind the MD of orders
+ * ready to lock but not locked. Resolves the reminders sent.
+ */
+async function lockReminders(today = null) {
+  const associateCommission = require('./associateCommission');
+  const notificationRepository = require('../repositories/notificationRepository');
+  const { short } = require('../helpers/dates');
+  const day = today || todayIst();
+  const days = (await settings()).reminder_days;
+  const run = await associateCommission.payoutRunOn(day);
+  const remindOn = new Date(`${run}T00:00:00Z`);
+  remindOn.setUTCDate(remindOn.getUTCDate() - days);
+  if (days <= 0 || remindOn.toISOString().slice(0, 10) !== day) return 0;
+  const raw = await incentiveRepository.settings();
+  if ((raw.lock_reminder_sent_for || '') === run) return 0;
+  const ready = await readyToLock();
+  if (ready.length === 0) return 0;
+  const users = await db.query(
+    `SELECT DISTINCT u.id FROM users u JOIN role_permissions rp ON rp.role_id = u.role_id JOIN permissions p ON p.id = rp.permission_id
+      WHERE p.permission_key = 'manage_pricing' AND u.is_active = 1`
+  );
+  let sent = 0;
+  for (const u of users) {
+    await notificationRepository.createInAppOnly(Number(u.id), 'incentive_lock_reminder', null,
+      `${ready.length} order(s) are ready to lock before the ${short(run)} payout run (Team incentives › Ready to lock) — lock them so the team is paid in that run.`);
+    sent++;
+  }
+  if (users.length) await incentiveRepository.setSetting('lock_reminder_sent_for', run, Number(users[0].id));
+  return sent;
 }
 
 /**
@@ -566,20 +705,25 @@ module.exports = {
   incentiveMonth,
   isMonth,
   earliestPaidOn,
-  cycleLabel,
   monthLabel,
   monthName,
-  payDay,
-  cycleSentence,
   fullyPaidOn,
   isClientsFirstOrder,
   withinFirstTenDays,
   poDate,
   peopleFor,
   calculate,
+  orderRule,
+  globalAmount,
+  split,
+  state,
+  readyReason,
+  readyToLock,
+  lockIfReady,
+  lockAllReady,
+  ruleText,
+  lockReminders,
   lock,
-  lockDue,
-  lockIfDue,
   unlock,
   markPaid,
 };

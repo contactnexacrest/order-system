@@ -1756,7 +1756,7 @@ final class OrderController
         AuditLogRepository::log((int) $user['id'], 'BUYER_PO_RECEIVED_DATE_CORRECTED', 'orders', $orderId, 'buyer_po_received_on', $old, $receivedOn, $reason);
         $locked = !empty(\App\Repositories\IncentiveRepository::forOrder($orderId)['locked_at']);
         Flash::set('success', 'Date the buyer\'s PO was received corrected to ' . \App\Helpers\Dates::short($receivedOn) . '.'
-            . ($locked ? ' This order\'s incentive is already fixed; use "Work it out again" on its incentive card for the new date to count.' : ''));
+            . ($locked ? ' This order\'s incentive is already locked; unlock it (with a reason) on its incentive card for the new date to count.' : ''));
         header("Location: /orders/{$orderId}");
     }
 

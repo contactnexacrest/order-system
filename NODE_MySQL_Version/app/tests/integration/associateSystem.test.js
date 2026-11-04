@@ -223,13 +223,13 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
 
     await associateCommission.fixLevelAtPi(orderId);
     await pricingRepository.setAssociateCommission(Number(a.id), 'fixed', await level('Level 4'));
-    await incentiveService.lockIfDue(orderId, admin);
+    await incentiveService.lockIfReady(orderId, admin);
     expect(await incentiveRepository.forOrder(orderId)).toBeNull(); // advance alone: nothing earned
     const line = (await associatePortalRepository.orders(Number(a.id), orderId))[0].commission;
     expect([line.state, line.rate, line.amount, line.level]).toEqual(['expected', 5, 225, 'Level 2 — 5%']); // the order keeps the level fixed at its PI
 
     await db.execute("UPDATE order_payment_status SET balance_cleared_at = '2026-10-25 11:00:00', balance_inr_actual = 250000 WHERE order_id = :o", { o: orderId });
-    await incentiveService.lockIfDue(orderId, admin);
+    await incentiveService.lockIfReady(orderId, admin);
     const p = await associatePayout(orderId);
     expect([p.amount_fc, p.currency_code, p.status, p.incentive_month, p.due_on, p.payout_run_on]).toEqual(['225.00', 'USD', 'due', '2026-12', '2026-11-24', '2026-12-05']);
     expect(await associateEventRepository.hasEvent(Number(a.id), 'commission_earned', c, orderId)).toBe(true);
@@ -253,7 +253,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
                       VALUES (:o, 'balance', 2700, 2250, 450, 'written_off', 'The buyer did not pay the rest', :u, 'unpaid')`, { o: o2, u: admin });
     const calc = (await incentiveService.calculate(o2)).associate;
     expect([calc.state, calc.amount_fc]).toEqual(['unpaid', 0]); // USD 4,050 of 4,500 received: nothing
-    await incentiveService.lockIfDue(o2, admin);
+    await incentiveService.lockIfReady(o2, admin);
     expect(await associatePayout(o2)).toBeUndefined();
     expect((await associatePortalRepository.orders(Number(a.id), o2))[0].commission.label).toBe('No commission — the buyer did not pay this order in full');
 
@@ -300,7 +300,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     await associateService.linkClient(c1, Number(a.id), 'code', null, '2026-10-01', admin);
     await associateService.linkClient(c2, Number(a.id), 'code', null, '2026-10-01', admin);
     const o1 = await order(c1);
-    await incentiveService.lockIfDue(o1, admin);
+    await incentiveService.lockIfReady(o1, admin);
     const p1 = await associatePayout(o1);
 
     const pay = { month: '2026-11', paid_on: todayIst(), paid_via: 'bank_transfer', paid_reference: `UTR${tag.toUpperCase()}01` };
@@ -331,7 +331,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
 
     await db.execute('UPDATE incentive_payouts SET incentive_month = :m WHERE id = :id', { m: '2026-11', id: claw.id });
     const o2 = await order(c2);
-    await incentiveService.lockIfDue(o2, admin);
+    await incentiveService.lockIfReady(o2, admin);
     await db.execute("UPDATE incentive_payouts SET due_on = '2026-10-30', incentive_month = '2026-11' WHERE order_id = :o", { o: o2 });
     const p2 = await associatePayout(o2);
     await call(incentiveController.markPaid, { as: admin, params: { payoutId: String(p2.id) },
@@ -348,7 +348,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     await call(associateAdminController.changeStatus, { as: md, params: { id: String(a.id) }, body: { status: 'suspended', reason: 'Agreement under review.' } });
     expect(flash().message).toBe('Status changed to Suspended.');
     const o = await order(c);
-    await incentiveService.lockIfDue(o, admin);
+    await incentiveService.lockIfReady(o, admin);
     const p = await associatePayout(o);
     expect([p.status, p.hold_reason]).toEqual(['held', 'The associate is suspended.']);
     expect((await associatePortalRepository.orders(Number(a.id), o))[0].commission.state).toBe('held');
@@ -628,7 +628,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     await associateService.linkClient(c, Number(a.id), 'code', null, '2026-10-01', admin);
     await verifiedBank(a);
     const o = await order(c);
-    await incentiveService.lockIfDue(o, admin);
+    await incentiveService.lockIfReady(o, admin);
     const p = await associatePayout(o);
     await incentiveService.markPaid(Number(p.id), todayIst(), 2744.0, 56.0, admin, 'bank_transfer', 'UTR777888');
     const fileId = await createTestFile(null, null);

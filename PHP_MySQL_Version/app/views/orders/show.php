@@ -132,23 +132,28 @@ $stageGateNotice = static function (int $stage, string $action) use ($stageGate)
     return '<p class="review-banner info stage-gate">&#8505; <span>Before you can ' . htmlspecialchars($action) . ': ' . implode('; ', $items)
         . '. <a href="/reviews">Open Document Review &amp; Approval</a></span></p>';
 };
-// Owner decision 2026-10-30: the team incentive box (Step 12d) — manage_incentives only.
-$canManageIncentives = PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_incentives');
-if ($canManageIncentives) {
-    \App\Services\IncentiveService::lockIfDue((int) $order['id'], (int) $currentUser['id']);
+// Owner decision 2026-10-30: the team incentive box (Step 12d) — manage_incentives; D-245 P4: the ED
+// (view_price_buildup) sees it read-only, and only manage_pricing (the MD) changes or locks it.
+$__incRole = $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null;
+$canManageIncentives = PermissionService::can((int) $currentUser['id'], $__incRole, 'manage_incentives');
+$incentiveCanEdit = PermissionService::can((int) $currentUser['id'], $__incRole, 'manage_pricing');
+$__incSee = $canManageIncentives || PermissionService::can((int) $currentUser['id'], $__incRole, 'view_price_buildup');
+if ($__incSee) {
     $incentiveRow = \App\Repositories\IncentiveRepository::forOrder((int) $order['id']);
     $incentiveCalc = \App\Services\IncentiveService::calculate((int) $order['id']);
     $incentivePayouts = \App\Repositories\IncentiveRepository::payoutsForOrder((int) $order['id']);
     $incentiveUsers = \App\Repositories\UserRepository::listActive();
+    $incentiveHistory = \App\Repositories\IncentiveRepository::history((int) $order['id']);
     // Owner 2 Nov 2026 (point 10): nothing associate-related when the client has no associate.
     $__hasAsStmt = \App\Config\Database::connection()->prepare('SELECT 1 FROM clients WHERE id = :c AND associate_id IS NOT NULL');
     $__hasAsStmt->execute(['c' => (int) $order['client_id']]);
     $incentiveHasAssociate = $__hasAsStmt->fetchColumn() !== false;
     // Owner request (3 Nov 2026): Step 12d only while the team incentive program is on — or, when it is
-    // off, only for an associate's commission (shown on its own).
+    // off, for an associate's commission; D-245 P4: also for the MD, who may set an incentive by hand.
     $incentiveProgramOn = \App\Services\IncentiveService::settings()['enabled'];
 }
-$showIncentiveStep = $canManageIncentives && (($incentiveProgramOn ?? false) || !empty($incentiveHasAssociate) || !empty($incentiveRow['associate_id']));
+$showIncentiveStep = $__incSee && (($incentiveProgramOn ?? false) || !empty($incentiveHasAssociate) || !empty($incentiveRow['associate_id'])
+    || $incentiveCanEdit || ($incentiveRow['incentive_mode'] ?? 'global') !== 'global' || !empty($incentiveRow['locked_at']));
 // External QA report Q-ROLE-3: split out of manage_order_financials so
 // Accounts can confirm supplier payments without gaining the broader
 // financials permission's access to cost entries/export benefits/the

@@ -254,17 +254,24 @@ final class OwnerPointsNov3PartBTest extends DbTestCase
             CourierCharges::description(['buyer_inquiry_ref' => 'NC/SC/2026/0411001', 'company_legal_name' => 'Acme GmbH'], 1, '', 'X1', 10.5));
     }
 
+    /**
+     * Point 9 (3 Nov), revised by D-245 P4: with the program off there is no global team
+     * incentive, but the MD may still set one by hand on one order — so the MD (manage_pricing)
+     * still sees Step 12d, marked "program off"; others see it only for an associate's commission.
+     */
     public function testPoint9Step12dFollowsTheIncentiveProgram(): void
     {
         $plain = $this->createTestOrder($this->createTestClient());
         IncentiveRepository::setSetting('program_enabled', '0', $this->userId);
         $html = $this->render($plain);
-        self::assertStringNotContainsString('id="financials-12d"', $html, 'program off, no associate: no Step 12d');
+        self::assertStringContainsString('Step 12d &middot; Team Incentive', $html, 'program off: the MD still sees it, to set an incentive by hand');
+        self::assertStringContainsString('The team incentive program is off', $html);
+        self::assertStringContainsString('program off — none', $html);
 
         IncentiveRepository::setSetting('program_enabled', '1', $this->userId);
         $html = $this->render($plain);
         self::assertStringContainsString('Step 12d &middot; Team Incentive', $html);
-        self::assertStringContainsString('Who gets what', $html);
+        self::assertStringContainsString('Who gets it', $html);
         self::assertStringContainsString("and the team's incentive", $html);
 
         $pdo = Database::connection();
@@ -275,12 +282,9 @@ final class OwnerPointsNov3PartBTest extends DbTestCase
         $withAssociate = $this->createTestOrder($client);
         IncentiveRepository::setSetting('program_enabled', '0', $this->userId);
         $html = $this->render($withAssociate);
-        self::assertStringContainsString('Step 12d &middot; Associate Commission', $html, 'program off: only the associate part');
         self::assertStringContainsString("and the associate's commission", $html);
         self::assertStringContainsString('Associate commission on this order', $html);
-        self::assertStringNotContainsString('Who gets what', $html);
         self::assertStringNotContainsString('Team reward', $html);
         self::assertStringNotContainsString('Exclude this order (no team reward)', $html);
-        self::assertStringContainsString('<input type="hidden" name="reward_override_inr" value="0">', $html, 'saving keeps the team settings');
     }
 }

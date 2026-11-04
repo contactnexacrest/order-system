@@ -15,51 +15,40 @@ use App\Repositories\OrderRepository;
 use App\Repositories\UserRepository;
 
 /**
- * Team incentive program and associate commission (owner decision
- * 2026-10-30, mockups approved).
+ * Team incentive program and associate commission.
  *
- * - An order's figures are fixed ("locked") when the buyer has fully paid:
- *   every buyer payment it has (advance or LC, balance, freight) cleared.
- * - Associate commission: the client's associate, on the client's first
- *   orders (Day 1 = the client's first PO received, plus 9 days: the
- *   agreement's 10 days). D-245 P3: on the final invoiced FOB of the goods,
- *   line by line, at the level fixed at PI, full payment only — see
- *   AssociateCommission. It is deducted from the profit first.
- * - Team reward: the amount set on the order (above 0), else the reward
- *   table for the profit left after the associate, if it reaches the
- *   minimum and the program is on. Plus the new client bonus on a client's
- *   first order. Split by role, equally between the people in a role.
- * - Both become the order's cost (a commission cost entry) when locked,
- *   and are paid in the incentive month: cut-off day C means the 21st of
- *   last month to the 20th of this month for C = 20.
+ * Owner decision D-245 P4 (4 Nov 2026):
+ * - The team incentive is a % of the order's profit after the associate's
+ *   commission (never below 0) or a fixed amount: the global rule (Pricing
+ *   settings), a product's own rule, or the MD's amount for this one order,
+ *   with a reason. With the program off there is no global incentive, but the
+ *   MD may still set one by hand on one order.
+ * - The roles are an editable list with usual shares adding up to 100%; on
+ *   an order the MD ticks who gets it (unticked shares spread proportionally
+ *   over the ticked roles) or sets the shares; equal split inside a role.
+ * - Nothing locks by itself: an order is "ready to lock" once the buyer has
+ *   fully paid and no claim is open; the MD locks it (one or all ready) and
+ *   may unlock it with a reason until anything is paid. Every change is kept
+ *   in the order's incentive history.
+ * - Associate commission (D-245 P3, AssociateCommission) is deducted first
+ *   and locks together with the order.
+ * - Staff payouts go into the payout run after the lock date (the same run
+ *   settings as associate commission); associate commission keeps its due
+ *   date and the run after it.
+ * - The price check's "incentive cut" on a line the MD approved below the
+ *   floor is shown only as an explanation: the incentive is a % of the
+ *   order's actual profit, which that lower price already reduced, so it is
+ *   never subtracted a second time.
  */
 final class IncentiveService
 {
-    /** @return array{enabled:bool,start_date:string,min_profit:float,table:list<array{from:float,reward:float}>,bonus:float,split:array<string,float>,cutoff:string} */
+    /** @return array{enabled:bool,reminder_days:int} */
     public static function settings(): array
     {
         $raw = IncentiveRepository::settings();
-        $table = [];
-        foreach ((array) json_decode($raw['reward_table'] ?? '[]', true) as $row) {
-            if (is_array($row) && (float) ($row['from'] ?? 0) > 0 && (float) ($row['reward'] ?? 0) > 0) {
-                $table[] = ['from' => (float) $row['from'], 'reward' => (float) $row['reward']];
-            }
-        }
-        usort($table, static fn (array $a, array $b): int => $a['from'] <=> $b['from']);
-        $split = [];
-        $savedSplit = (array) json_decode($raw['role_split'] ?? '{}', true);
-        foreach (array_keys(IncentiveRepository::ROLES) as $role) {
-            $split[$role] = (float) ($savedSplit[$role] ?? 0);
-        }
-        $cutoff = (string) ($raw['cutoff_day'] ?? '20');
         return [
             'enabled' => ($raw['program_enabled'] ?? '0') === '1',
-            'start_date' => (string) ($raw['program_start_date'] ?? ''),
-            'min_profit' => (float) ($raw['min_profit_inr'] ?? 0),
-            'table' => $table,
-            'bonus' => (float) ($raw['new_client_bonus_inr'] ?? 0),
-            'split' => $split,
-            'cutoff' => $cutoff === 'last' ? 'last' : (string) max(1, min(28, (int) $cutoff)),
+            'reminder_days' => max(0, min(28, (int) ($raw['lock_reminder_days'] ?? 3))),
         ];
     }
 
@@ -79,25 +68,14 @@ final class IncentiveService
         return self::isMonth($month) ? date('Y-m-01', (int) strtotime($month . '-01 -1 month')) : '2000-01-01';
     }
 
-    /** The incentive month (YYYY-MM) a full payment on $date belongs to. */
-    public static function incentiveMonth(string $date, string $cutoff): string
+    /**
+     * D-245 P4: the payout month (YYYY-MM) of something locked on $date — the
+     * month of the first payout run on or after it (Associates › Commission
+     * settings: monthly on day N, or weekly).
+     */
+    public static function incentiveMonth(string $date, mixed $unused = null): string
     {
-        $ts = strtotime($date);
-        if ($cutoff === 'last' || (int) date('j', $ts) <= (int) $cutoff) {
-            return date('Y-m', $ts);
-        }
-        return date('Y-m', strtotime(date('Y-m-01', $ts) . ' +1 month'));
-    }
-
-    /** "21 Oct to 20 Nov" for the incentive month. */
-    public static function cycleLabel(string $month, string $cutoff): string
-    {
-        $first = strtotime($month . '-01');
-        if ($cutoff === 'last') {
-            return date('j M', $first) . ' to ' . date('j M', strtotime(date('Y-m-t', $first)));
-        }
-        $start = strtotime(date('Y-m-', strtotime('-1 month', $first)) . sprintf('%02d', (int) $cutoff + 1));
-        return date('j M', $start) . ' to ' . date('j M', strtotime($month . '-' . sprintf('%02d', (int) $cutoff)));
+        return substr(AssociateCommission::payoutRunOn(substr($date, 0, 10)), 0, 7);
     }
 
     public static function monthLabel(string $month): string
@@ -218,14 +196,14 @@ final class IncentiveService
             $rolesByUser = IncentiveRepository::userRoles();
             $assigned = array_map(static fn (array $a): int => (int) $a['user_id'], OrderAssigneeRepository::forOrder($orderId));
             $chosen = [];
-            foreach (array_keys(IncentiveRepository::ROLES) as $role) {
+            foreach (array_keys(IncentiveRepository::roles()) as $role) {
                 $holders = array_keys(array_filter($rolesByUser, static fn (array $roles): bool => in_array($role, $roles, true)));
                 $onOrder = array_values(array_intersect($holders, $assigned));
                 $chosen[$role] = $onOrder !== [] ? $onOrder : $holders;
             }
         }
         $out = [];
-        foreach (array_keys(IncentiveRepository::ROLES) as $role) {
+        foreach (array_keys(IncentiveRepository::roles()) as $role) {
             $out[$role] = [];
             foreach ($chosen[$role] ?? [] as $userId) {
                 if (isset($names[$userId])) {
@@ -236,136 +214,300 @@ final class IncentiveService
         return $out;
     }
 
+    /** The order's own amount: global / pct / fixed. @return array{mode:string,value:?float,reason:?string} */
+    public static function orderRule(?array $row): array
+    {
+        $mode = (string) ($row['incentive_mode'] ?? 'global');
+        return ['mode' => in_array($mode, ['pct', 'fixed'], true) ? $mode : 'global',
+            'value' => isset($row['incentive_value']) && $row['incentive_value'] !== null ? (float) $row['incentive_value'] : null,
+            'reason' => $row['incentive_reason'] ?? null];
+    }
+
     /**
-     * The order's incentive as it stands (or would stand, if the buyer had
-     * fully paid on $paidOn).
+     * The global (or product) rule's amount for the order: % of the profit
+     * basis, or a fixed USD amount per unit converted at the order's rate.
+     * A line whose product has its own rule uses it, weighted by its share
+     * of the goods FOB; other lines use the global rule.
+     *
+     * @return array{amount: float, text: string}
      */
-    public static function calculate(int $orderId, ?string $paidOn = null): array
+    public static function globalAmount(int $orderId, array $order, float $basis): array
+    {
+        $settings = PricingService::settings();
+        $lines = AssociateCommission::goodsLines($orderId);
+        $total = 0.0;
+        foreach ($lines as $l) {
+            $total += (float) $l['fob_value'];
+        }
+        $rate = AssociateCommission::realisedRate($order)['rate'];
+        $describe = static fn (string $mode, float $value): string => $mode === 'usd' ? 'USD ' . number_format($value, 2) . ' per unit' : PricingService::pct($value) . ' of profit';
+        if ($lines === [] || $total <= 0) {
+            $amount = $settings['incentive_mode'] === 'usd' ? 0.0 : $basis * $settings['incentive_value'] / 100;
+            return ['amount' => round($amount, 2), 'text' => $describe($settings['incentive_mode'], $settings['incentive_value'])];
+        }
+        $amount = 0.0;
+        $own = false;
+        foreach ($lines as $l) {
+            $mode = $settings['incentive_mode'];
+            $value = $settings['incentive_value'];
+            if (!empty($l['catalog_product_id'])) {
+                $product = \App\Repositories\ProductRepository::find((int) $l['catalog_product_id']);
+                if ($product !== null && ($product['pricing_incentive_mode'] ?? null) !== null) {
+                    $mode = (string) $product['pricing_incentive_mode'];
+                    $value = (float) $product['pricing_incentive_value'];
+                    $own = true;
+                }
+            }
+            $amount += $mode === 'usd'
+                ? $value * (float) ($l['quantity'] ?? 0) * $rate
+                : $basis * $value / 100 * ((float) $l['fob_value'] / $total);
+        }
+        return ['amount' => round($amount, 2), 'text' => $describe($settings['incentive_mode'], $settings['incentive_value']) . ($own ? ' (some products have their own rule)' : '')];
+    }
+
+    /**
+     * The order's incentive as it stands. Before the order is locked every
+     * figure is an estimate; the locked figures are on order_incentives.
+     */
+    public static function calculate(int $orderId): array
     {
         $order = OrderRepository::find($orderId);
-        $settings = self::settings();
-        $row = IncentiveRepository::forOrder($orderId) ?? ['reward_override_inr' => 0, 'is_excluded' => 0, 'associate_mode' => 'auto', 'locked_at' => null];
+        $row = IncentiveRepository::forOrder($orderId);
         $profit = OrderProfitabilityService::computeForOrder($orderId);
         $already = array_sum(array_map(static fn (array $c): float => (float) $c['amount_inr'], IncentiveRepository::costEntries($orderId)));
         $profitBefore = round((float) $profit['profit_inr'] + $already, 2);
+        $revenue = (float) ($profit['revenue_inr'] ?? 0);
 
-        // Owner decision D-245 P3: the associate's commission on the final invoiced FOB of the goods,
-        // line by line, at the level fixed at PI, full payment only (AssociateCommission).
-        $associate = AssociateCommission::forOrder($orderId, $order, $row);
-        $basis = round($profitBefore - ($associate['amount_inr'] ?? 0.0), 2);
-
-        $source = 'table';
-        $reward = 0.0;
-        if ((int) $row['is_excluded'] === 1) {
-            $source = 'excluded';
-        } elseif ((float) $row['reward_override_inr'] > 0) {
-            $source = 'override';
-            $reward = (float) $row['reward_override_inr'];
-        } elseif (!$settings['enabled']) {
+        // Owner decision D-245 P3: the associate's commission comes off first.
+        $associate = AssociateCommission::forOrder($orderId, $order, $row ?? ['associate_mode' => 'auto']);
+        $basisRaw = round($profitBefore - ($associate['amount_inr'] ?? 0.0), 2);
+        // P4: the profit used for the incentive never goes below 0.
+        $basis = max(0.0, $basisRaw);
+        $programOn = self::settings()['enabled'];
+        $rule = self::orderRule($row);
+        $global = self::globalAmount($orderId, $order, $basis);
+        if ($rule['mode'] === 'fixed') {
+            $amount = round((float) $rule['value'], 2);
+            $source = 'order_fixed';
+        } elseif ($rule['mode'] === 'pct') {
+            $amount = round($basis * (float) $rule['value'] / 100, 2);
+            $source = 'order_pct';
+        } elseif (!$programOn) {
+            $amount = 0.0;
             $source = 'off';
-        } elseif ($paidOn !== null && $settings['start_date'] !== '' && $paidOn < $settings['start_date']) {
-            $source = 'before_start';
-        } elseif ($basis < $settings['min_profit']) {
-            $source = 'below_min';
         } else {
-            foreach ($settings['table'] as $t) {
-                if ($basis >= $t['from']) {
-                    $reward = $t['reward'];
-                }
-            }
-            if ($reward <= 0) {
-                $source = 'below_min';
-            }
+            $amount = $global['amount'];
+            $source = 'global';
         }
-        $bonus = ($reward > 0 && $settings['bonus'] > 0 && self::isClientsFirstOrder($order)) ? $settings['bonus'] : 0.0;
 
-        $people = self::peopleFor($orderId);
-        $roles = [];
-        $bonusRoles = array_filter(['sales', 'marketing'], static fn (string $r): bool => $people[$r] !== [] && $settings['split'][$r] > 0);
-        $bonusWeight = array_sum(array_map(static fn (string $r): float => $settings['split'][$r], $bonusRoles));
-        $allocated = 0.0;
-        $unallocated = 0.0;
-        foreach (IncentiveRepository::ROLES as $role => $label) {
-            $amount = round($reward * $settings['split'][$role] / 100, 2);
-            if (in_array($role, $bonusRoles, true) && $bonusWeight > 0) {
-                $amount = round($amount + $bonus * $settings['split'][$role] / $bonusWeight, 2);
+        $split = self::split($orderId, $amount);
+        $minMargin = (float) PricingService::settings()['margin_pct'];
+        $left = round($basis - $split['team_total'], 2);
+        $marginAfter = $revenue > 0 ? round(($profitBefore - ($associate['amount_inr'] ?? 0.0) - $split['team_total']) / $revenue * 100, 2) : null;
+        $cutUsd = 0.0;
+        foreach (AssociateCommission::goodsLines($orderId) as $l) {
+            if (!empty($l['price_approved_by']) && $l['price_approval_incentive_cut'] !== null) {
+                $cutUsd += (float) $l['price_approval_incentive_cut'];
             }
-            $each = $people[$role] !== [] ? round($amount / count($people[$role]), 2) : 0.0;
-            if ($people[$role] === []) {
-                $unallocated += $amount;
-            } else {
-                $allocated += $each * count($people[$role]);
-            }
-            $roles[$role] = ['label' => $label, 'pct' => $settings['split'][$role], 'amount' => $amount, 'each' => $each, 'people' => $people[$role]];
-        }
-        if ($bonus > 0 && $bonusRoles === []) {
-            $unallocated += $bonus;
         }
 
         return [
             'profit_before' => $profitBefore,
+            'revenue' => $revenue,
             'associate' => $associate,
+            'basis_raw' => $basisRaw,
             'basis' => $basis,
+            'estimated' => self::fullyPaidOn($orderId) === null,
+            'program_on' => $programOn,
+            'rule' => $rule,
+            'global_amount' => $global['amount'],
+            'global_text' => $global['text'],
             'source' => $source,
-            'reward' => $reward,
-            'new_client_bonus' => $bonus,
-            'team_total' => round($allocated, 2),
-            'unallocated' => round($unallocated, 2),
-            'roles' => $roles,
-            'pct_of_profit' => $basis > 0 ? round(($allocated) / $basis * 100, 1) : null,
-            'min_profit' => $settings['min_profit'],
+            'amount' => $amount,
+            'team_total' => $split['team_total'],
+            'unallocated' => $split['unallocated'],
+            'roles' => $split['roles'],
+            'per_person' => $split['per_person'],
+            'shares_customised' => $split['customised'],
+            'left_for_company' => $left,
+            'margin_after_pct' => $marginAfter,
+            'min_margin_pct' => $minMargin,
+            'margin_warning' => $marginAfter !== null && $split['team_total'] > 0 && $marginAfter < $minMargin,
+            'over_profit' => $amount > $basis + 0.005,
+            'incentive_cut_usd' => round($cutUsd, 2),
+            'state' => self::state($orderId, $row),
         ];
     }
 
-    /** Fixes the incentive of every order whose buyer has fully paid since the last look. */
-    public static function lockDue(int $userId): int
+    /**
+     * Who gets what: each active role with its tick, people and share on this
+     * order. Unticked roles (or roles with nobody) give their share to the
+     * ticked ones in proportion; custom shares (they add up to 100%) win.
+     *
+     * @return array{roles: array<string, array<string,mixed>>, team_total: float, unallocated: float, per_person: list<array{id:int,name:string,amount:float,roles:list<string>}>, customised: bool}
+     */
+    public static function split(int $orderId, float $amount): array
     {
-        $locked = 0;
-        foreach (IncentiveRepository::unlockedOrderIdsWithPayments() as $orderId) {
-            $paidOn = self::fullyPaidOn($orderId);
-            if ($paidOn !== null) {
-                self::lock($orderId, $paidOn, $userId);
-                $locked++;
+        $row = IncentiveRepository::forOrder($orderId);
+        $customised = (int) ($row['shares_customised'] ?? 0) === 1;
+        $ticks = IncentiveRepository::orderRoles($orderId);
+        $people = self::peopleFor($orderId);
+        $all = IncentiveRepository::allRoles();
+        $roles = [];
+        foreach (IncentiveRepository::roles() as $key => $label) {
+            $hasPeople = ($people[$key] ?? []) !== [];
+            $gets = ($ticks[$key]['gets_it'] ?? true) && $hasPeople;
+            $roles[$key] = ['key' => $key, 'label' => $label, 'usual_pct' => $all[$key]['share_pct'], 'ticked' => $ticks[$key]['gets_it'] ?? true,
+                'gets_it' => $gets, 'has_people' => $hasPeople, 'people' => $people[$key] ?? [], 'custom_pct' => $ticks[$key]['share_pct'] ?? null,
+                'pct' => 0.0, 'amount' => 0.0, 'each' => 0.0];
+        }
+        $weights = [];
+        foreach ($roles as $key => $r) {
+            if ($r['gets_it']) {
+                $weights[$key] = $customised ? (float) ($r['custom_pct'] ?? 0) : $r['usual_pct'];
             }
         }
-        return $locked;
+        $sum = array_sum($weights);
+        $teamTotal = 0.0;
+        $perPerson = [];
+        if ($sum > 0 && $amount > 0) {
+            $keys = array_keys($weights);
+            $allocated = 0.0;
+            foreach ($keys as $i => $key) {
+                $pct = $weights[$key] / $sum * 100;
+                // The last ticked role takes the rounding, so the shares add up to the amount exactly.
+                $roleAmount = $i === count($keys) - 1 ? round($amount - $allocated, 2) : round($amount * $pct / 100, 2);
+                $allocated += $roleAmount;
+                $n = count($roles[$key]['people']);
+                $each = round($roleAmount / $n, 2);
+                $roles[$key]['pct'] = round($pct, 2);
+                $roles[$key]['amount'] = $roleAmount;
+                $roles[$key]['each'] = $each;
+                foreach ($roles[$key]['people'] as $j => $p) {
+                    // The last person in a role takes the rounding too.
+                    $share = $j === $n - 1 ? round($roleAmount - $each * ($n - 1), 2) : $each;
+                    $perPerson[$p['id']] ??= ['id' => $p['id'], 'name' => $p['name'], 'amount' => 0.0, 'roles' => []];
+                    $perPerson[$p['id']]['amount'] = round($perPerson[$p['id']]['amount'] + $share, 2);
+                    $perPerson[$p['id']]['roles'][] = $roles[$key]['label'];
+                }
+            }
+            $teamTotal = round($allocated, 2);
+        } elseif ($sum > 0) {
+            foreach ($weights as $key => $w) {
+                $roles[$key]['pct'] = round($w / $sum * 100, 2);
+            }
+        }
+        return ['roles' => $roles, 'team_total' => $teamTotal, 'unallocated' => round(max(0.0, $amount - $teamTotal), 2),
+            'per_person' => array_values($perPerson), 'customised' => $customised];
     }
 
-    /** Fixes this one order's incentive if its buyer has fully paid and it is not fixed yet. */
-    public static function lockIfDue(int $orderId, int $userId): void
+    /** open | ready | locked | paid */
+    public static function state(int $orderId, ?array $row = null): string
+    {
+        $row ??= IncentiveRepository::forOrder($orderId);
+        if ($row !== null && !empty($row['locked_at'])) {
+            foreach (IncentiveRepository::payoutsForOrder($orderId) as $p) {
+                if ($p['status'] === 'paid') {
+                    return 'paid';
+                }
+            }
+            return 'locked';
+        }
+        return self::readyReason($orderId) === null ? 'ready' : 'open';
+    }
+
+    /** Why the order is not ready to lock yet, or null when it is (buyer fully paid, no claim open). */
+    public static function readyReason(int $orderId): ?string
+    {
+        $order = OrderRepository::find($orderId);
+        if ($order === null || in_array($order['status'], ['cancelled', 'lost'], true)) {
+            return 'The order is cancelled or lost.';
+        }
+        $paidOn = self::fullyPaidOn($orderId);
+        if ($paidOn === null) {
+            return 'The buyer has not paid in full yet.';
+        }
+        if (AssociateCommission::claimOpen($orderId, date('Y-m-d'))) {
+            return 'A buyer claim on this order is still open.';
+        }
+        return null;
+    }
+
+    /** @return list<int> order ids ready to lock (fully paid, no open claim, not locked) */
+    public static function readyToLock(): array
+    {
+        $out = [];
+        foreach (IncentiveRepository::unlockedOrderIdsWithPayments() as $orderId) {
+            if (self::readyReason($orderId) === null) {
+                $out[] = $orderId;
+            }
+        }
+        return $out;
+    }
+
+    /** Locks the order if it is ready. Returns null on success, else why not. */
+    public static function lockIfReady(int $orderId, int $userId, ?string $note = null): ?string
     {
         $row = IncentiveRepository::forOrder($orderId);
         if ($row !== null && !empty($row['locked_at'])) {
-            return;
+            return 'This order\'s incentive is already locked.';
         }
-        $order = OrderRepository::find($orderId);
-        if ($order === null || (int) $order['is_test_data'] === 1 || (int) $order['is_sample_data'] === 1 || in_array($order['status'], ['cancelled', 'lost'], true)) {
-            return;
+        if (($reason = self::readyReason($orderId)) !== null) {
+            return $reason;
         }
-        $paidOn = self::fullyPaidOn($orderId);
-        if ($paidOn !== null) {
-            self::lock($orderId, $paidOn, $userId);
+        $calc = self::calculate($orderId);
+        if ($calc['over_profit']) {
+            return 'The team incentive (₹' . number_format($calc['amount'], 2) . ') is more than the order\'s profit (₹' . number_format($calc['basis'], 2) . ') — lower it before locking.';
         }
+        self::lock($orderId, (string) self::fullyPaidOn($orderId), $userId, $calc, $note);
+        return null;
     }
 
-    public static function lock(int $orderId, string $paidOn, int $userId): void
+    /** Locks every order that is ready. @return array{locked:int, skipped:list<string>} */
+    public static function lockAllReady(int $userId): array
     {
-        $calc = self::calculate($orderId, $paidOn);
-        $settings = self::settings();
-        $month = self::incentiveMonth($paidOn, $settings['cutoff']);
+        $locked = 0;
+        $skipped = [];
+        foreach (self::readyToLock() as $orderId) {
+            $error = self::lockIfReady($orderId, $userId, 'Locked with "Lock all ready".');
+            if ($error === null) {
+                $locked++;
+            } else {
+                $o = OrderRepository::find($orderId);
+                $skipped[] = (string) (($o['buyer_inquiry_ref'] ?? '') ?: ($o['order_reference'] ?? $orderId)) . ': ' . $error;
+            }
+        }
+        return ['locked' => $locked, 'skipped' => $skipped];
+    }
+
+    public static function lock(int $orderId, string $paidOn, int $userId, ?array $calc = null, ?string $note = null): void
+    {
+        $calc ??= self::calculate($orderId);
+        $today = date('Y-m-d');
+        // P4: staff are paid in the payout run after the lock date.
+        $staffRun = AssociateCommission::payoutRunOn($today);
+        $month = substr($staffRun, 0, 7);
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
             $teamEntryId = null;
             if ($calc['team_total'] > 0) {
                 foreach ($calc['roles'] as $role => $r) {
-                    foreach ($r['people'] as $p) {
-                        if ($r['each'] > 0) {
-                            IncentiveRepository::addPayout(['order_id' => $orderId, 'payee_kind' => 'staff', 'user_id' => $p['id'], 'role' => $role, 'amount_inr' => $r['each'], 'incentive_month' => $month]);
+                    if (!$r['gets_it'] || $r['amount'] <= 0) {
+                        continue;
+                    }
+                    $n = count($r['people']);
+                    foreach ($r['people'] as $j => $p) {
+                        $share = $j === $n - 1 ? round($r['amount'] - $r['each'] * ($n - 1), 2) : $r['each'];
+                        if ($share > 0) {
+                            IncentiveRepository::addPayout(['order_id' => $orderId, 'payee_kind' => 'staff', 'user_id' => $p['id'], 'role' => $role, 'amount_inr' => $share,
+                                'incentive_month' => $month, 'payout_run_on' => $staffRun, 'locked_on' => $today]);
                         }
                     }
                 }
-                $teamEntryId = IncentiveRepository::addCostEntry($orderId, 'team', 'Team incentive — ' . self::monthLabel($month) . ' incentive', $calc['team_total'], $paidOn, $userId);
+                $order = OrderRepository::find($orderId);
+                $teamEntryId = IncentiveRepository::addCostEntry($orderId, 'team', 'Team incentive for order ' . (($order['buyer_inquiry_ref'] ?? '') ?: ($order['order_reference'] ?? $orderId))
+                    . ' — ' . self::ruleText($calc) . ', locked ' . \App\Helpers\Dates::short($today) . ', paid in the ' . \App\Helpers\Dates::short($staffRun) . ' payout run', $calc['team_total'], $paidOn, $userId);
             }
             $associateEntryId = null;
             $a = $calc['associate'];
@@ -376,8 +518,9 @@ final class IncentiveService
             $earned = $a !== null && $a['state'] !== 'unpaid' && $a['amount_fc'] > 0;
             if ($earned) {
                 $payoutId = IncentiveRepository::addPayout(['order_id' => $orderId, 'payee_kind' => 'associate', 'associate_id' => $a['id'], 'role' => 'associate',
-                    'amount_inr' => $a['amount_inr'], 'amount_fc' => $a['amount_fc'], 'currency_code' => $a['currency'], 'incentive_month' => substr((string) $runOn, 0, 7)]);
-                Database::connection()->prepare('UPDATE incentive_payouts SET due_on = :d, payout_run_on = :r WHERE id = :id')->execute(['d' => $dueOn, 'r' => $runOn, 'id' => $payoutId]);
+                    'amount_inr' => $a['amount_inr'], 'amount_fc' => $a['amount_fc'], 'currency_code' => $a['currency'], 'incentive_month' => substr((string) $runOn, 0, 7),
+                    'payout_run_on' => $runOn, 'locked_on' => $today]);
+                Database::connection()->prepare('UPDATE incentive_payouts SET due_on = :d WHERE id = :id')->execute(['d' => $dueOn, 'id' => $payoutId]);
                 // AS-3: a suspended associate's commission is held until the MD releases it.
                 if ($a['status'] === 'suspended') {
                     IncentiveRepository::holdPayout($payoutId, 'The associate is suspended.');
@@ -386,11 +529,12 @@ final class IncentiveService
             }
             IncentiveRepository::saveOrder($orderId, [
                 'locked_at' => date('Y-m-d H:i:s'),
+                'locked_by' => $userId,
+                'unlock_reason' => null,
                 'fully_paid_on' => $paidOn,
                 'incentive_month' => $month,
                 'profit_basis_inr' => $calc['basis'],
                 'team_total_inr' => $calc['team_total'],
-                'new_client_bonus_inr' => $calc['new_client_bonus'],
                 'associate_id' => $a['id'] ?? null,
                 'associate_order_number' => $a !== null && $a['counts'] ? $a['counting_number'] : null,
                 'associate_rate_pct' => $a['rate'] ?? null,
@@ -404,6 +548,8 @@ final class IncentiveService
                 'team_cost_entry_id' => $teamEntryId,
                 'associate_cost_entry_id' => $associateEntryId,
             ], $userId);
+            IncentiveRepository::addHistory($orderId, 'lock', null, 'Team ₹' . number_format($calc['team_total'], 2)
+                . ($a !== null ? '; associate ' . ($earned ? '₹' . number_format((float) $a['amount_inr'], 2) : 'none') : '') . '; staff payout run ' . $staffRun, $note, $userId);
             $pdo->commit();
         } catch (\Throwable $e) {
             $pdo->rollBack();
@@ -429,6 +575,17 @@ final class IncentiveService
         }
     }
 
+    /** "15% of profit (global rule)", "fixed ₹1,00,000 set for this order" … */
+    public static function ruleText(array $calc): string
+    {
+        return match ($calc['source']) {
+            'order_fixed' => 'fixed ₹' . number_format($calc['amount'], 2) . ' set for this order',
+            'order_pct' => PricingService::pct((float) $calc['rule']['value']) . ' of profit set for this order',
+            'off' => 'program off — none',
+            default => $calc['global_text'] . ' (global rule)',
+        };
+    }
+
     /** Owner rule D-212: the commission cost line says what it is, for whom, at which level and on what basis. */
     public static function associateCostDescription(array $a): string
     {
@@ -437,12 +594,20 @@ final class IncentiveService
             . ((float) $a['in_range_fc'] < (float) $a['goods_fc'] ? '; lines the MD approved below the floor earn nothing' : '');
     }
 
-    /** Undoes a lock so the incentive can be worked out again; refused once anything is paid. Returns an error or null. */
-    public static function unlock(int $orderId, int $userId): ?string
+    /** Unlocks the order so its incentive can change again; needs a reason; refused once anything is paid. Returns an error or null. */
+    public static function unlock(int $orderId, int $userId, string $reason): ?string
     {
+        $reason = trim($reason);
+        if (mb_strlen($reason) < 10 || mb_strlen($reason) > 500) {
+            return 'Say why the incentive is unlocked (10 to 500 characters).';
+        }
+        $row = IncentiveRepository::forOrder($orderId);
+        if ($row === null || empty($row['locked_at'])) {
+            return 'This order\'s incentive is not locked.';
+        }
         foreach (IncentiveRepository::payoutsForOrder($orderId) as $p) {
             if ($p['status'] === 'paid') {
-                return 'Part of this order\'s incentive is already paid, so its figures can no longer be worked out again.';
+                return 'Part of this order\'s incentive is already paid, so it can no longer be unlocked.';
             }
         }
         $pdo = Database::connection();
@@ -450,14 +615,51 @@ final class IncentiveService
         IncentiveRepository::deleteOrderPayouts($orderId);
         $pdo->prepare('DELETE FROM order_cost_entries WHERE order_id = :id AND incentive_kind IS NOT NULL')->execute(['id' => $orderId]);
         IncentiveRepository::saveOrder($orderId, [
-            'locked_at' => null, 'fully_paid_on' => null, 'incentive_month' => null, 'profit_basis_inr' => null, 'team_total_inr' => null,
-            'new_client_bonus_inr' => null, 'associate_id' => null, 'associate_order_number' => null, 'associate_rate_pct' => null,
+            'locked_at' => null, 'locked_by' => null, 'unlock_reason' => $reason, 'fully_paid_on' => null, 'incentive_month' => null, 'profit_basis_inr' => null, 'team_total_inr' => null,
+            'associate_id' => null, 'associate_order_number' => null, 'associate_rate_pct' => null,
             'associate_amount_fc' => null, 'associate_currency' => null, 'associate_amount_inr' => null,
             'associate_basis_fc' => null, 'associate_basis_inr' => null, 'associate_counts' => null, 'associate_due_on' => null,
             'team_cost_entry_id' => null, 'associate_cost_entry_id' => null,
         ], $userId);
+        IncentiveRepository::addHistory($orderId, 'unlock', 'Locked ' . \App\Helpers\Dates::short(substr((string) $row['locked_at'], 0, 10)) . ', team ₹' . number_format((float) $row['team_total_inr'], 2), 'Open', $reason, $userId);
         $pdo->commit();
         return null;
+    }
+
+    /**
+     * Daily: N days (setting) before the next payout run, remind the MD of
+     * orders ready to lock but not locked. Returns the reminders sent.
+     */
+    public static function lockReminders(?string $today = null): int
+    {
+        $today ??= date('Y-m-d');
+        $days = self::settings()['reminder_days'];
+        $run = AssociateCommission::payoutRunOn($today);
+        if ($days <= 0 || date('Y-m-d', (int) strtotime($run . ' -' . $days . ' days')) !== $today) {
+            return 0;
+        }
+        $settings = IncentiveRepository::settings();
+        if (($settings['lock_reminder_sent_for'] ?? '') === $run) {
+            return 0;
+        }
+        $ready = self::readyToLock();
+        if ($ready === []) {
+            return 0;
+        }
+        $sent = 0;
+        $users = Database::connection()->query(
+            "SELECT DISTINCT u.id FROM users u JOIN role_permissions rp ON rp.role_id = u.role_id JOIN permissions p ON p.id = rp.permission_id
+              WHERE p.permission_key = 'manage_pricing' AND u.is_active = 1"
+        )->fetchAll(\PDO::FETCH_COLUMN);
+        foreach ($users as $uid) {
+            \App\Repositories\NotificationRepository::createInAppOnly((int) $uid, 'incentive_lock_reminder', null,
+                count($ready) . ' order(s) are ready to lock before the ' . \App\Helpers\Dates::short($run) . ' payout run (Team incentives › Ready to lock) — lock them so the team is paid in that run.');
+            $sent++;
+        }
+        if ($users !== []) {
+            IncentiveRepository::setSetting('lock_reminder_sent_for', $run, (int) $users[0]);
+        }
+        return $sent;
     }
 
     /**

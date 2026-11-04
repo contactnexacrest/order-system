@@ -1351,29 +1351,37 @@ async function show(req, res) {
   }
   const canManageOrderFinancialsForBills = !!req.permissions.manage_order_financials;
 
-  // Owner decision 2026-10-30: the team incentive box (Step 12d) — manage_incentives only.
+  // Owner decision 2026-10-30: the team incentive box (Step 12d) — manage_incentives; D-245 P4: the ED
+  // (view_price_buildup) sees it read-only, and only manage_pricing (the MD) changes or locks it.
   const canManageIncentives = !!req.permissions.manage_incentives;
-  let incentiveView = {};
-  if (canManageIncentives) {
+  const incentiveCanEdit = !!req.permissions.manage_pricing;
+  const incentiveSee = canManageIncentives || !!req.permissions.view_price_buildup;
+  let incentiveView = { incentiveCanEdit };
+  if (incentiveSee) {
     const incentiveService = require('../services/incentiveService');
     const incentiveRepository = require('../repositories/incentiveRepository');
-    if (req.user) {
-      await incentiveService.lockIfDue(orderId, req.user.id);
-    }
+    const incentiveCalc = await incentiveService.calculate(orderId);
     incentiveView = {
+      incentiveCanEdit,
       incentiveRow: await incentiveRepository.forOrder(orderId),
-      incentiveCalc: await incentiveService.calculate(orderId),
+      incentiveCalc,
+      incentiveRoleList: Object.values(incentiveCalc.roles),
+      incentiveReadyReason: incentiveCalc.state === 'open' ? await incentiveService.readyReason(orderId) : null,
+      incentiveRuleText: incentiveService.ruleText(incentiveCalc),
       incentivePayouts: await incentiveRepository.payoutsForOrder(orderId),
       incentiveUsers: await userRepository.listActive(),
+      incentiveHistory: await incentiveRepository.history(orderId),
       // Owner 2 Nov 2026 (point 10): nothing associate-related when the client has no associate.
       incentiveHasAssociate: !!(await db.queryOne('SELECT 1 AS x FROM clients WHERE id = :c AND associate_id IS NOT NULL', { c: order.client_id })),
       // Owner request (3 Nov 2026): Step 12d only while the team incentive program is on — or, when it is
-      // off, only for an associate's commission (shown on its own).
+      // off, for an associate's commission; D-245 P4: also for the MD, who may set an incentive by hand.
       incentiveProgramOn: !!(await incentiveService.settings()).enabled,
     };
   }
-  const showIncentiveStep = canManageIncentives && (!!incentiveView.incentiveProgramOn
-    || !!incentiveView.incentiveHasAssociate || !!(incentiveView.incentiveRow && incentiveView.incentiveRow.associate_id));
+  const incRow = incentiveView.incentiveRow;
+  const showIncentiveStep = incentiveSee && (!!incentiveView.incentiveProgramOn
+    || !!incentiveView.incentiveHasAssociate || !!(incRow && incRow.associate_id) || incentiveCanEdit
+    || ((incRow && incRow.incentive_mode) || 'global') !== 'global' || !!(incRow && incRow.locked_at));
 
   // Owner decision 2026-10-30: each stage's gating button says, before the
   // click, which of the stage's documents still need generating, approving or
@@ -1971,7 +1979,7 @@ async function correctBuyerPoReceivedDate(req, res) {
   await auditLogRepository.log(req.user.id, 'BUYER_PO_RECEIVED_DATE_CORRECTED', 'orders', orderId, 'buyer_po_received_on', old, receivedOn, reason);
   const incentive = await require('../repositories/incentiveRepository').forOrder(orderId);
   flash.set(req, 'success', `Date the buyer's PO was received corrected to ${dates.short(receivedOn)}.`
-    + (incentive && incentive.locked_at ? ' This order\'s incentive is already fixed; use "Work it out again" on its incentive card for the new date to count.' : ''));
+    + (incentive && incentive.locked_at ? ' This order\'s incentive is already locked; unlock it (with a reason) on its incentive card for the new date to count.' : ''));
   res.redirect(`/orders/${orderId}`);
 }
 

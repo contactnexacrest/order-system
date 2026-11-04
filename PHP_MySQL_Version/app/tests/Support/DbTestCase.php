@@ -33,6 +33,8 @@ abstract class DbTestCase extends TestCase
         // Each test is a new "request": no permission or department state carried over from the last one.
         \App\Services\PermissionService::resetCache();
         \App\Services\ActiveDepartmentService::resetCache();
+        // D-245 P4: the incentive roles are a table cached per request.
+        \App\Repositories\IncentiveRepository::forgetRoles();
         $placeholders = implode(',', array_fill(0, count(self::FIXED_TEST_CLIENT_EMAILS), '?'));
         \App\Config\Database::connection()
             ->prepare("UPDATE clients SET email = NULL WHERE email IN ({$placeholders})")

@@ -51,6 +51,13 @@ async function index(req, res) {
     }
   }
 
+  // Owner decision D-245 P4: the MD sees how many orders are ready to lock (nothing locks by itself).
+  data.incentiveReadyCount = (permissions.manage_pricing && permissions.manage_incentives)
+    ? (await require('../services/incentiveService').readyToLock()).length : null;
+  if (data.incentiveReadyCount) {
+    data.incentiveNextRun = await require('../services/associateCommission').payoutRunOn(new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10));
+  }
+
   if (canViewReports) {
     data.recentActivity = await auditMoneyMask.maskAll(req.permissions, await auditLogRepository.search({ limit: 15, offset: 0 }));
   }

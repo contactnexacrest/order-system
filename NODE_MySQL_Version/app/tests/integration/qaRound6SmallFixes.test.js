@@ -113,16 +113,16 @@ describe('QA Round 6 — smaller fixes', () => {
     expect(flash.message).toContain('Nothing was recorded');
   });
 
-  it('the reward table refuses two rows with the same profit (R6-N12)', async () => {
+  // R6-N12 (D-245 P4: the reward table is gone): two incentive roles may not have the same name.
+  it('two incentive roles may not have the same name (R6-N12)', async () => {
     const admin = await staff('Admin');
-    const before = (await incentiveService.settings()).table;
-    const res = await post(admin, '/incentives/settings', {
-      min_profit_inr: '100000', new_client_bonus_inr: '0', cutoff_day: '20',
-      table_from: ['300000', '300000'], table_reward: ['40000', '90000'],
-      split: { sales: '40', export: '20', marketing: '15', logistics: '15', accounts: '10' },
-    }, '/incentives/settings');
-    expect((await flashAfter(admin, res)).message).toContain('same order profit');
-    expect((await incentiveService.settings()).table).toEqual(before);
+    const incentiveRepository = require('../../src/repositories/incentiveRepository');
+    incentiveRepository.forgetRoles();
+    const before = JSON.stringify(await incentiveRepository.allRoles());
+    const res = await post(admin, '/incentives/settings', { lock_reminder_days: '3', new_role_label: 'Sales', new_role_share: '0' }, '/incentives/settings');
+    expect((await flashAfter(admin, res)).message).toContain('already exists');
+    incentiveRepository.forgetRoles();
+    expect(JSON.stringify(await incentiveRepository.allRoles())).toBe(before);
   });
 
   it('the payment report waits for the PI and closes on a cancelled order (R6-N24)', async () => {

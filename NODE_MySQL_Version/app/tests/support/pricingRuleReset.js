@@ -11,3 +11,12 @@ beforeAll(async () => {
     // A unit test without the database: nothing to reset.
   }
 });
+
+// D-245 P4: the incentive roles are a table cached per process — each test starts from the stored list.
+beforeEach(() => {
+  try {
+    require('../../src/repositories/incentiveRepository').forgetRoles();
+  } catch (e) {
+    // Not loaded: nothing to forget.
+  }
+});

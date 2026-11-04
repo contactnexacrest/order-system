@@ -157,14 +157,12 @@ FROM roles r CROSS JOIN permissions p
 WHERE p.permission_key = 'view_own_incentives'
   AND r.name IN ('Admin', 'Managing Director', 'Executive Director', 'Export Executive', 'Accounts Executive', 'Logistics Executive');
 
+-- D-245 P4 (4 Nov 2026): the reward table, minimum profit, new-client bonus, role split and
+-- cut-off day are gone; the amount is a % of profit or a fixed amount (Pricing settings), the
+-- roles are an editable list (incentive_roles), and the MD is reminded N days before a payout run.
 INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES
   ('program_enabled', '0'),
-  ('program_start_date', ''),
-  ('min_profit_inr', '300000'),
-  ('reward_table', '[{"from":300000,"reward":40000},{"from":500000,"reward":60000}]'),
-  ('new_client_bonus_inr', '10000'),
-  ('role_split', '{"sales":40,"export":20,"marketing":15,"logistics":15,"accounts":10}'),
-  ('cutoff_day', '20');
+  ('lock_reminder_days', '3');
 
 -- ================================================================
 -- USERS — one seeded account to get in the door.
@@ -2269,3 +2267,15 @@ INSERT IGNORE INTO commission_ladder_steps (from_order, to_order, level_id)
 SELECT 11, 20, id FROM commission_levels WHERE name = 'Level 3';
 INSERT IGNORE INTO commission_ladder_steps (from_order, to_order, level_id)
 SELECT 21, NULL, id FROM commission_levels WHERE name = 'Level 4';
+
+-- Owner decision D-245 P4 (4 Nov 2026): the team incentive roles and their usual shares (add up to 100%).
+INSERT INTO incentive_roles (role_key, label, share_pct, is_active, sort_order)
+SELECT k, l, p, 1, o FROM (
+  SELECT 'sales' AS k, 'Sales' AS l, 30.00 AS p, 1 AS o UNION ALL
+  SELECT 'sales_manager', 'Sales Manager', 10.00, 2 UNION ALL
+  SELECT 'export', 'Export Documentation', 15.00, 3 UNION ALL
+  SELECT 'export_compliance', 'Export Compliance', 5.00, 4 UNION ALL
+  SELECT 'marketing', 'Marketing', 15.00, 5 UNION ALL
+  SELECT 'logistics', 'Logistics', 15.00, 6 UNION ALL
+  SELECT 'accounts', 'Accounts', 10.00, 7
+) d WHERE NOT EXISTS (SELECT 1 FROM incentive_roles r WHERE r.role_key = d.k);

@@ -128,7 +128,7 @@ describe('Associate commission (D-245, P3)', () => {
     await pricingRepository.setAssociateCommission(a, 'fixed', await level('Level 4'));
     expect((await associateCommission.forOrder(orderId)).level_label).toBe('Level 2 — 5%');
 
-    await incentiveService.lockIfDue(orderId, admin.id);
+    await incentiveService.lockIfReady(orderId, admin.id);
     const p = await payoutOf(orderId);
     expect([p.amount_inr, p.amount_fc, p.due_on, p.payout_run_on, p.incentive_month]).toEqual(['49405.75', '595.25', '2026-11-24', '2026-12-05', '2026-12']);
     const name = (await associateRepository.find(a)).name;
@@ -162,7 +162,7 @@ describe('Associate commission (D-245, P3)', () => {
     await associateCommission.fixLevelAtPi(big);
     const fixed = await db.queryOne('SELECT associate_level_name, associate_level_kind, associate_level_value FROM orders WHERE id = :id', { id: big });
     expect([fixed.associate_level_name, fixed.associate_level_kind, fixed.associate_level_value]).toEqual(['Level 2', 'pct', '5.0000']);
-    await incentiveService.lockIfDue(big, admin.id);
+    await incentiveService.lockIfReady(big, admin.id);
     const bigRow = await incentiveRepository.forOrder(big);
     expect([String(bigRow.associate_counts), String(bigRow.associate_order_number)]).toEqual(['1', '6']);
 
@@ -172,7 +172,7 @@ describe('Associate commission (D-245, P3)', () => {
     await associateCommission.fixLevelAtPi(small);
     const c = await associateCommission.forOrder(small);
     expect([c.level_label, c.amount_fc, c.counts]).toEqual(['Level 2 — 5%', 50, false]);
-    await incentiveService.lockIfDue(small, admin.id);
+    await incentiveService.lockIfReady(small, admin.id);
     expect([String((await incentiveRepository.forOrder(small)).associate_counts), await associateCommission.countingOrders(a)]).toEqual(['0', 6]);
   });
 
@@ -190,7 +190,7 @@ describe('Associate commission (D-245, P3)', () => {
                       VALUES (:o, 'balance', 6000, 5000, 1000, 'written_off', 'Buyer stopped paying', :u, 'unpaid')`, { o: unpaid, u: admin.id });
     const u = await associateCommission.forOrder(unpaid);
     expect([u.state, u.amount_fc, u.amount_inr]).toEqual(['unpaid', 0, 0]);
-    await incentiveService.lockIfDue(unpaid, admin.id);
+    await incentiveService.lockIfReady(unpaid, admin.id);
     expect(await payoutOf(unpaid)).toBeNull();
     expect(String((await incentiveRepository.forOrder(unpaid)).associate_counts)).toBe('0');
     expect(await associateCommission.countingOrders(a2)).toBe(0);
@@ -201,7 +201,7 @@ describe('Associate commission (D-245, P3)', () => {
     const orderId = await order(client, [[1000, 1]], null);
     const c = await associateCommission.forOrder(orderId);
     expect([c.state, c.due_on, c.amount_fc]).toEqual(['awaiting', null, 50]);
-    await incentiveService.lockIfDue(orderId, admin.id);
+    await incentiveService.lockIfReady(orderId, admin.id);
     expect(await incentiveRepository.forOrder(orderId)).toBeNull();
     expect(Object.keys(associateCommission.SETTLEMENT_KINDS)).toEqual(['agreed_discount', 'claim_settled', 'unpaid']);
 
@@ -226,7 +226,7 @@ describe('Associate commission (D-245, P3)', () => {
 
     const [, client] = await associate();
     const orderId = await order(client, [[1000, 1]]);
-    await incentiveService.lockIfDue(orderId, admin.id);
+    await incentiveService.lockIfReady(orderId, admin.id);
     const p = await payoutOf(orderId);
     expect(await associateCommission.payBlockReason(p, '2026-11-20')).toContain('due on 24 Nov 2026');
     expect(await associateCommission.payBlockReason(p, '2026-12-05')).toBeNull();
@@ -241,7 +241,7 @@ describe('Associate commission (D-245, P3)', () => {
   it('GST on top only for a GST-registered associate with a tax invoice', async () => {
     const [a, client] = await associate('fixed', 'Level 2', '29ABCDE1234F1Z5');
     const orderId = await order(client, [[10000, 10]]);
-    await incentiveService.lockIfDue(orderId, admin.id);
+    await incentiveService.lockIfReady(orderId, admin.id);
     const p = await payoutOf(orderId);
     expect(p.amount_inr).toBe('41500.00');
     expect(await associateCommission.gstFor(p)).toBe(0);
@@ -250,7 +250,7 @@ describe('Associate commission (D-245, P3)', () => {
 
     const [b, client2] = await associate();
     const order2 = await order(client2, [[10000, 10]]);
-    await incentiveService.lockIfDue(order2, admin.id);
+    await incentiveService.lockIfReady(order2, admin.id);
     const p2 = await payoutOf(order2);
     await associateDocumentRepository.add(b, 'invoice', await createTestFile(null, null), Number(p2.id), 'INV-P3-2', true, null);
     expect(await associateCommission.gstFor(p2)).toBe(0);
@@ -262,7 +262,7 @@ describe('Associate commission (D-245, P3)', () => {
   it('take-back only for fraud or breach, with a reason', async () => {
     const [a, client] = await associate();
     const orderId = await order(client, [[1000, 1]]);
-    await incentiveService.lockIfDue(orderId, admin.id);
+    await incentiveService.lockIfReady(orderId, admin.id);
     const p = await payoutOf(orderId);
     await db.execute("UPDATE incentive_payouts SET status = 'paid', paid_on = '2026-12-05', paid_inr = amount_inr, paid_reference = 'UTR-PAID-1' WHERE id = :id", { id: p.id });
     const md = await user('Managing Director');
@@ -281,13 +281,13 @@ describe('Associate commission (D-245, P3)', () => {
     const reason = 'Buyer introduced before the registration was recorded';
     // An Admin may manage incentives but is not the MD.
     const ed = await login(await user('Admin'));
-    expect(await post(ed, `/orders/${orderId}`, `/orders/${orderId}/incentive`, { reward_override_inr: '0', associate_mode: 'yes', associate_mode_reason: reason }))
+    expect(await post(ed, `/orders/${orderId}`, `/orders/${orderId}/incentive`, { associate_mode: 'yes', associate_mode_reason: reason }))
       .toBe('Only the MD can force the associate\'s commission on for an order.');
     const mdUser = await user('Managing Director');
     const md = await login(mdUser);
-    expect(await post(md, `/orders/${orderId}`, `/orders/${orderId}/incentive`, { reward_override_inr: '0', associate_mode: 'yes', associate_mode_reason: 'short' }))
+    expect(await post(md, `/orders/${orderId}`, `/orders/${orderId}/incentive`, { associate_mode: 'yes', associate_mode_reason: 'short' }))
       .toContain('10 to 300 characters');
-    await post(md, `/orders/${orderId}`, `/orders/${orderId}/incentive`, { reward_override_inr: '0', associate_mode: 'yes', associate_mode_reason: reason });
+    await post(md, `/orders/${orderId}`, `/orders/${orderId}/incentive`, { associate_mode: 'yes', associate_mode_reason: reason });
     const row = await incentiveRepository.forOrder(orderId);
     expect([row.associate_mode, row.associate_mode_reason, Number(row.associate_mode_set_by)]).toEqual(['yes', reason, mdUser.id]);
     expect((await db.queryOne("SELECT reason FROM audit_log WHERE action_type = 'ASSOCIATE_COMMISSION_FORCED' AND entity_id = :id", { id: orderId })).reason).toBe(reason);

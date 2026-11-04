@@ -3,6 +3,14 @@
   <p>Signed in as <strong><?= htmlspecialchars($user['name']) ?></strong> (<?= htmlspecialchars($user['email']) ?>).</p>
 </div>
 
+<?php if (($incentiveReadyCount ?? null) !== null && $incentiveReadyCount > 0): // Owner decision D-245 P4 ?>
+<div class="card page-wide" id="incentives-ready">
+  <h2 style="margin-top:0;">Team incentives ready to lock (<?= (int) $incentiveReadyCount ?>)</h2>
+  <p>These orders are fully paid by the buyer with no claim open. Lock them so the team is paid in the next payout run (<?= htmlspecialchars(\App\Helpers\Dates::short(\App\Services\AssociateCommission::payoutRunOn(date('Y-m-d')))) ?>).</p>
+  <p><a href="/incentives/ready">Open Ready to lock →</a></p>
+</div>
+<?php endif; ?>
+
 <?php
 // Owner decision 2 Nov 2026 (point 4): agreements expiring within 30 days, for whoever may see the register.
 $__agCanManage = \App\Controllers\AgreementController::can('manage_agreements');

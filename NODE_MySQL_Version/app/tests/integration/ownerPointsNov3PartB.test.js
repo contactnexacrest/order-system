@@ -225,15 +225,20 @@ describe('owner points of 3 Nov 2026 — part B', () => {
       .toBe('Courier charges for the original document set of order NC/SC/2026/0411001 to Acme GmbH — AWB X1, ₹10.50 incl. GST');
   });
 
+  // Point 9 (3 Nov), revised by D-245 P4: with the program off there is no global team incentive, but the MD
+  // may still set one by hand on one order — so the MD (manage_pricing) still sees Step 12d, marked "program off".
   it('9: Step 12d follows the incentive program', async () => {
     const plain = await createTestOrder(await createTestClient());
     await incentiveRepository.setSetting('program_enabled', '0', adminId);
-    expect(await page(plain)).not.toContain('id="financials-12d"'); // program off, no associate
-
-    await incentiveRepository.setSetting('program_enabled', '1', adminId);
     let html = await page(plain);
     expect(html).toContain('Step 12d &middot; Team Incentive');
-    expect(html).toContain('Who gets what');
+    expect(html).toContain('The team incentive program is off');
+    expect(html).toContain('program off — none');
+
+    await incentiveRepository.setSetting('program_enabled', '1', adminId);
+    html = await page(plain);
+    expect(html).toContain('Step 12d &middot; Team Incentive');
+    expect(html).toContain('Who gets it');
     expect(html).toContain("and the team's incentive");
 
     const associateId = (await db.execute("INSERT INTO associates (name) VALUES ('TEST-Associate Nov3')")).insertId;
@@ -242,12 +247,9 @@ describe('owner points of 3 Nov 2026 — part B', () => {
     const withAssociate = await createTestOrder(client);
     await incentiveRepository.setSetting('program_enabled', '0', adminId);
     html = await page(withAssociate);
-    expect(html).toContain('Step 12d &middot; Associate Commission');
     expect(html).toContain("and the associate's commission");
     expect(html).toContain('Associate commission on this order');
-    expect(html).not.toContain('Who gets what');
     expect(html).not.toContain('Team reward');
     expect(html).not.toContain('Exclude this order (no team reward)');
-    expect(html).toContain('<input type="hidden" name="reward_override_inr" value="0">');
   });
 });

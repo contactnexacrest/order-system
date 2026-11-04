@@ -22,102 +22,85 @@ use App\Services\IncentiveService;
  */
 final class IncentiveController
 {
+    private static function canManagePricing(): bool
+    {
+        $u = AuthService::currentUser();
+        return $u !== null && \App\Services\PermissionService::can((int) $u['id'], $u['role_id'] !== null ? (int) $u['role_id'] : null, 'manage_pricing');
+    }
+
+    private static function back(int $orderId, string $type, string $message): void
+    {
+        Flash::set($type, $message);
+        header("Location: /orders/{$orderId}#financials-12d");
+    }
+
     public function settings(array $params): void
     {
         View::render('incentives/settings', [
             'settings' => IncentiveService::settings(),
+            'roles' => IncentiveRepository::allRoles(),
+            'activeRoles' => IncentiveRepository::roles(),
             'users' => UserRepository::listActive(),
             'userRoles' => IncentiveRepository::userRoles(),
+            'canManagePricing' => self::canManagePricing(),
+            'readyCount' => count(IncentiveService::readyToLock()),
         ], 'layout/base');
     }
 
+    /**
+     * Owner decision D-245 P4: the program switch, the reminder days, the
+     * roles (an editable list whose active shares add up to 100%; changing
+     * them is the MD's — manage_pricing) and each person's roles.
+     */
     public function saveSettings(array $params): void
     {
         $user = AuthService::currentUser();
         $userId = (int) $user['id'];
-        $before = IncentiveService::settings();
-
-        $minProfit = filter_var($_POST['min_profit_inr'] ?? '', FILTER_VALIDATE_FLOAT);
-        $bonus = filter_var($_POST['new_client_bonus_inr'] ?? '', FILTER_VALIDATE_FLOAT);
-        $cutoff = (string) ($_POST['cutoff_day'] ?? '');
         $errors = [];
-        if ($minProfit === false || $minProfit < 0) {
-            $errors[] = 'Enter the minimum order profit as an amount of 0 or more.';
+        $reminder = (string) ($_POST['lock_reminder_days'] ?? '3');
+        if (!ctype_digit($reminder) || (int) $reminder > 28) {
+            $errors[] = 'Enter the reminder before a payout run as 0 to 28 days (0 = no reminder).';
         }
-        if ($bonus === false || $bonus < 0) {
-            $errors[] = 'Enter the new client bonus as an amount of 0 or more (0 = off).';
-        }
-        if ($cutoff !== 'last' && (!ctype_digit($cutoff) || (int) $cutoff < 1 || (int) $cutoff > 28)) {
-            $errors[] = 'Choose an incentive cut-off day from 1 to 28, or the last day of the month.';
-        }
-        $table = [];
-        foreach ((array) ($_POST['table_from'] ?? []) as $i => $from) {
-            $reward = $_POST['table_reward'][$i] ?? '';
-            if (trim((string) $from) === '' && trim((string) $reward) === '') {
-                continue;
+        $roleRows = null;
+        if (isset($_POST['roles']) || trim((string) ($_POST['new_role_label'] ?? '')) !== '') {
+            if (!self::canManagePricing()) {
+                $errors[] = 'Only the MD can change the incentive roles and their shares.';
+            } else {
+                [$roleRows, $roleErrors] = self::parseRoles();
+                $errors = array_merge($errors, $roleErrors);
             }
-            if (!is_numeric($from) || !is_numeric($reward) || (float) $from <= 0 || (float) $reward <= 0) {
-                $errors[] = 'Each reward table row needs a profit and a reward above 0 (leave both empty to drop the row).';
-                break;
-            }
-            $table[] = ['from' => (float) $from, 'reward' => (float) $reward];
-        }
-        // QA Round 6, R6-N12: two rows with one profit threshold — which reward applies would be undefined.
-        $froms = array_column($table, 'from');
-        if (count($froms) !== count(array_unique($froms, SORT_REGULAR))) {
-            $errors[] = 'Two reward table rows have the same order profit — each row needs its own.';
-        }
-        $split = [];
-        foreach (array_keys(IncentiveRepository::ROLES) as $role) {
-            $v = $_POST['split'][$role] ?? '';
-            if (!is_numeric($v) || (float) $v < 0) {
-                $errors[] = 'Enter every role\'s share as a % of 0 or more.';
-                break;
-            }
-            $split[$role] = (float) $v;
-        }
-        if (count($split) === count(IncentiveRepository::ROLES) && abs(array_sum($split) - 100) > 0.001) {
-            $errors[] = 'The role shares must add up to 100% (they add up to ' . rtrim(rtrim(number_format(array_sum($split), 2), '0'), '.') . '%).';
         }
         if ($errors !== []) {
             Flash::set('error', implode(' ', $errors));
             header('Location: /incentives/settings');
             return;
         }
-
-        // Orders already fully paid keep the settings they were paid under.
-        IncentiveService::lockDue($userId);
-
-        $enabled = !empty($_POST['program_enabled']);
-        usort($table, static fn (array $a, array $b): int => $a['from'] <=> $b['from']);
-        $values = [
-            'program_enabled' => $enabled ? '1' : '0',
-            'min_profit_inr' => (string) $minProfit,
-            'reward_table' => (string) json_encode($table),
-            'new_client_bonus_inr' => (string) $bonus,
-            'role_split' => (string) json_encode($split),
-            'cutoff_day' => $cutoff,
-        ];
-        if ($enabled && $before['start_date'] === '') {
-            $values['program_start_date'] = date('Y-m-d');
-        }
         $old = IncentiveRepository::settings();
+        $values = ['program_enabled' => !empty($_POST['program_enabled']) ? '1' : '0', 'lock_reminder_days' => (string) (int) $reminder];
         foreach ($values as $key => $value) {
             if (($old[$key] ?? null) !== $value) {
                 IncentiveRepository::setSetting($key, $value, $userId);
                 AuditLogRepository::log($userId, 'INCENTIVE_SETTING_CHANGED', 'incentive_settings', null, $key, $old[$key] ?? null, $value);
             }
         }
-
+        if ($roleRows !== null) {
+            $before = array_map(static fn (array $r): string => $r['label'] . ' ' . $r['share_pct'] . '%' . ($r['is_active'] ? '' : ' (inactive)'), IncentiveRepository::allRoles());
+            IncentiveRepository::saveRoles($roleRows, $userId);
+            $after = array_map(static fn (array $r): string => $r['label'] . ' ' . $r['share_pct'] . '%' . ($r['is_active'] ? '' : ' (inactive)'), IncentiveRepository::allRoles());
+            if ($before !== $after) {
+                AuditLogRepository::log($userId, 'INCENTIVE_ROLES_EDITED', 'incentive_roles', null, 'roles', (string) json_encode($before), (string) json_encode($after));
+            }
+        }
         $rolesByUser = [];
         // Keys are "u<user id>", the same form as the Node stack (whose form parser would read bare numbers as a list).
+        $active = IncentiveRepository::roles();
         foreach ((array) ($_POST['user_roles'] ?? []) as $key => $roles) {
             $uid = (int) ltrim((string) $key, 'u');
             if ($uid > 0) {
-                $rolesByUser[$uid] = array_values(array_filter((array) $roles, static fn ($r): bool => isset(IncentiveRepository::ROLES[$r])));
+                $rolesByUser[$uid] = array_values(array_filter((array) $roles, static fn ($r): bool => isset($active[$r])));
             }
         }
-        if ($rolesByUser != IncentiveRepository::userRoles()) {
+        if (isset($_POST['user_roles_present']) && $rolesByUser != IncentiveRepository::userRoles()) {
             IncentiveRepository::replaceUserRoles($rolesByUser);
             AuditLogRepository::log($userId, 'INCENTIVE_ROLES_CHANGED', 'user_incentive_roles', null, null, null, (string) json_encode($rolesByUser));
         }
@@ -125,6 +108,80 @@ final class IncentiveController
         header('Location: /incentives/settings');
     }
 
+    /**
+     * The roles table from the form: label, share %, active; a new role from
+     * new_role_label / new_role_share. Active shares must add up to 100%.
+     *
+     * @return array{0: list<array<string,mixed>>, 1: list<string>}
+     */
+    private static function parseRoles(): array
+    {
+        $errors = [];
+        $rows = [];
+        $all = IncentiveRepository::allRoles();
+        $order = 0;
+        foreach ($all as $key => $r) {
+            $in = (array) ($_POST['roles'][$key] ?? []);
+            $label = trim((string) ($in['label'] ?? $r['label']));
+            $share = (string) ($in['share_pct'] ?? $r['share_pct']);
+            if ($label === '' || mb_strlen($label) > 80) {
+                $errors[] = 'Every role needs a name (up to 80 characters).';
+                break;
+            }
+            if (!is_numeric($share) || (float) $share < 0 || (float) $share > 100) {
+                $errors[] = 'Enter every role\'s usual share as a % from 0 to 100.';
+                break;
+            }
+            $rows[] = ['role_key' => $key, 'label' => $label, 'share_pct' => round((float) $share, 2), 'is_active' => isset($_POST['roles']) ? !empty($in['is_active']) : $r['is_active'], 'sort_order' => ++$order];
+        }
+        $newLabel = trim((string) ($_POST['new_role_label'] ?? ''));
+        if ($newLabel !== '') {
+            $newShare = (string) ($_POST['new_role_share'] ?? '');
+            $key = trim((string) preg_replace('/[^a-z0-9]+/', '_', strtolower($newLabel)), '_');
+            if ($key === '' || mb_strlen($newLabel) > 80) {
+                $errors[] = 'Give the new role a name (letters or numbers, up to 80 characters).';
+            } elseif (isset($all[$key]) || $key === 'associate') {
+                $errors[] = 'A role named "' . $newLabel . '" already exists.';
+            } elseif (!is_numeric($newShare) || (float) $newShare < 0 || (float) $newShare > 100) {
+                $errors[] = 'Enter the new role\'s usual share as a % from 0 to 100.';
+            } else {
+                $rows[] = ['role_key' => substr($key, 0, 40), 'label' => $newLabel, 'share_pct' => round((float) $newShare, 2), 'is_active' => true, 'sort_order' => ++$order];
+            }
+        }
+        $total = array_sum(array_map(static fn (array $r): float => $r['is_active'] ? $r['share_pct'] : 0.0, $rows));
+        if ($errors === [] && abs($total - 100) > 0.001) {
+            $errors[] = 'The usual shares of the active roles must add up to 100% (they add up to ' . rtrim(rtrim(number_format($total, 2), '0'), '.') . '%).';
+        }
+        return [$rows, $errors];
+    }
+
+    /** Deletes an incentive role that was never used; a used role can only be deactivated. */
+    public function deleteRole(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $key = (string) ($params['key'] ?? '');
+        $all = IncentiveRepository::allRoles();
+        if (!self::canManagePricing()) {
+            Flash::set('error', 'Only the MD can change the incentive roles.');
+        } elseif (!isset($all[$key])) {
+            Flash::set('error', 'That role does not exist.');
+        } elseif (IncentiveRepository::roleInUse($key)) {
+            Flash::set('error', 'The role "' . $all[$key]['label'] . '" is in use (people, orders or payouts) — deactivate it instead.');
+        } elseif ($all[$key]['is_active'] && $all[$key]['share_pct'] > 0) {
+            Flash::set('error', 'Set the role "' . $all[$key]['label'] . '" to 0% or deactivate it first, so the active shares still add up to 100%.');
+        } else {
+            IncentiveRepository::deleteRole($key);
+            AuditLogRepository::log((int) $user['id'], 'INCENTIVE_ROLE_DELETED', 'incentive_roles', $all[$key]['id'], 'label', $all[$key]['label'], null);
+            Flash::set('success', 'Role "' . $all[$key]['label'] . '" deleted.');
+        }
+        header('Location: /incentives/settings');
+    }
+
+    /**
+     * Owner decision D-245 P4: the order's own team incentive (MD only, with a
+     * reason) — the global rule, a % of the order's profit or a fixed amount —
+     * and, D-245 P3, the associate's commission mode.
+     */
     public function saveOrder(array $params): void
     {
         $user = AuthService::currentUser();
@@ -134,115 +191,251 @@ final class IncentiveController
             echo 'Order not found.';
             return;
         }
+        if (!self::canManagePricing()) {
+            self::back($orderId, 'error', 'Only the MD can change an order\'s incentive.');
+            return;
+        }
         $row = IncentiveRepository::forOrder($orderId);
         if ($row !== null && !empty($row['locked_at'])) {
-            Flash::set('error', 'This order\'s incentive is already fixed (the buyer has fully paid). Use "Work it out again" first.');
-            header("Location: /orders/{$orderId}#financials-12d");
+            self::back($orderId, 'error', 'This order\'s incentive is locked. Unlock it (with a reason) to change it.');
             return;
         }
-        $override = filter_var($_POST['reward_override_inr'] ?? '', FILTER_VALIDATE_FLOAT);
-        $mode = (string) ($_POST['associate_mode'] ?? 'auto');
-        if ($override === false || $override < 0 || !in_array($mode, ['auto', 'yes', 'no'], true)) {
-            Flash::set('error', 'Enter the reward for this order as an amount of 0 or more (0 = use the settings).');
-            header("Location: /orders/{$orderId}#financials-12d");
+        $fields = [];
+        $mode = (string) ($_POST['incentive_mode'] ?? ($row['incentive_mode'] ?? 'global'));
+        $rawValue = trim((string) ($_POST['incentive_value'] ?? ''));
+        $reason = trim((string) ($_POST['incentive_reason'] ?? ''));
+        if (!in_array($mode, ['global', 'pct', 'fixed'], true)) {
+            self::back($orderId, 'error', 'Choose how the team incentive is set for this order.');
             return;
         }
-        $fields = ['reward_override_inr' => $override, 'is_excluded' => !empty($_POST['is_excluded']) ? 1 : 0, 'associate_mode' => $mode];
+        $value = null;
+        if ($mode !== 'global') {
+            if (!is_numeric($rawValue) || (float) $rawValue < 0 || ($mode === 'pct' && (float) $rawValue > 100) || (float) $rawValue > 100000000) {
+                self::back($orderId, 'error', $mode === 'pct' ? 'Enter the % of the order\'s profit (0 to 100).' : 'Enter the incentive for this order as an amount of 0 or more.');
+                return;
+            }
+            $value = round((float) $rawValue, $mode === 'pct' ? 4 : 2);
+        }
+        $old = IncentiveService::orderRule($row);
+        $amountChanged = $mode !== $old['mode'] || ($value !== null && abs($value - (float) $old['value']) > 0.00001);
+        if ($amountChanged) {
+            if (mb_strlen($reason) < 10 || mb_strlen($reason) > 500) {
+                self::back($orderId, 'error', 'Say why the team incentive is set this way for this order (10 to 500 characters).');
+                return;
+            }
+            if ($mode !== 'global') {
+                $calc = IncentiveService::calculate($orderId);
+                $amount = $mode === 'fixed' ? (float) $value : round($calc['basis'] * (float) $value / 100, 2);
+                if ($amount > $calc['basis'] + 0.005) {
+                    self::back($orderId, 'error', 'The team incentive (₹' . number_format($amount, 2) . ') cannot be more than the order\'s profit after the associate\'s commission (₹' . number_format($calc['basis'], 2) . ').');
+                    return;
+                }
+            }
+            $fields += ['incentive_mode' => $mode, 'incentive_value' => $value, 'incentive_reason' => $mode === 'global' ? null : $reason];
+        }
         // Owner decision D-245 P3: forcing an associate's commission on ("Yes", e.g. on a repeat order)
         // is the MD's decision alone, with a written reason; it is audited.
-        $wasYes = ($row['associate_mode'] ?? 'auto') === 'yes';
-        $modeReason = trim((string) ($_POST['associate_mode_reason'] ?? ''));
-        if ($mode === 'yes' && (!$wasYes || $modeReason !== (string) ($row['associate_mode_reason'] ?? ''))) {
-            if (!\App\Services\AssociateService::canChangeLink($user)) {
-                Flash::set('error', 'Only the MD can force the associate\'s commission on for an order.');
-                header("Location: /orders/{$orderId}#financials-12d");
+        if (isset($_POST['associate_mode'])) {
+            $aMode = (string) $_POST['associate_mode'];
+            if (!in_array($aMode, ['auto', 'yes', 'no'], true)) {
+                self::back($orderId, 'error', 'Choose whether the associate earns commission on this order.');
                 return;
             }
-            if (mb_strlen($modeReason) < 10 || mb_strlen($modeReason) > 300) {
-                Flash::set('error', 'Say why the associate\'s commission is forced on for this order (10 to 300 characters).');
-                header("Location: /orders/{$orderId}#financials-12d");
-                return;
+            $wasYes = ($row['associate_mode'] ?? 'auto') === 'yes';
+            $modeReason = trim((string) ($_POST['associate_mode_reason'] ?? ''));
+            if ($aMode === 'yes' && (!$wasYes || $modeReason !== (string) ($row['associate_mode_reason'] ?? ''))) {
+                if (!\App\Services\AssociateService::canChangeLink($user)) {
+                    self::back($orderId, 'error', 'Only the MD can force the associate\'s commission on for an order.');
+                    return;
+                }
+                if (mb_strlen($modeReason) < 10 || mb_strlen($modeReason) > 300) {
+                    self::back($orderId, 'error', 'Say why the associate\'s commission is forced on for this order (10 to 300 characters).');
+                    return;
+                }
+                $fields['associate_mode_reason'] = $modeReason;
+                $fields['associate_mode_set_by'] = (int) $user['id'];
+                AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_COMMISSION_FORCED', 'orders', $orderId, 'associate_mode', (string) ($row['associate_mode'] ?? 'auto'), 'yes', $modeReason);
+            } elseif ($aMode !== 'yes' && $wasYes) {
+                $fields['associate_mode_reason'] = null;
+                $fields['associate_mode_set_by'] = null;
             }
-            $fields['associate_mode_reason'] = $modeReason;
-            $fields['associate_mode_set_by'] = (int) $user['id'];
-            AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_COMMISSION_FORCED', 'orders', $orderId, 'associate_mode', (string) ($row['associate_mode'] ?? 'auto'), 'yes', $modeReason);
-        } elseif ($mode !== 'yes' && $wasYes) {
-            $fields['associate_mode_reason'] = null;
-            $fields['associate_mode_set_by'] = null;
+            if ($aMode !== ($row['associate_mode'] ?? 'auto')) {
+                $fields['associate_mode'] = $aMode;
+                IncentiveRepository::addHistory($orderId, 'associate_mode', (string) ($row['associate_mode'] ?? 'auto'), $aMode, $aMode === 'yes' ? $modeReason : null, (int) $user['id']);
+            }
+        }
+        if ($fields === []) {
+            self::back($orderId, 'warning', 'Nothing changed.');
+            return;
         }
         IncentiveRepository::saveOrder($orderId, $fields, (int) $user['id']);
+        if ($amountChanged) {
+            $describe = static fn (array $r): string => match ($r['mode']) {
+                'fixed' => 'fixed ₹' . number_format((float) $r['value'], 2),
+                'pct' => rtrim(rtrim(number_format((float) $r['value'], 4), '0'), '.') . '% of profit',
+                default => 'global rule',
+            };
+            IncentiveRepository::addHistory($orderId, 'amount', $describe($old), $describe(['mode' => $mode, 'value' => $value]), $reason, (int) $user['id']);
+        }
         AuditLogRepository::log((int) $user['id'], 'ORDER_INCENTIVE_SET', 'orders', $orderId, 'incentive', $row !== null ? (string) json_encode(array_intersect_key($row, $fields)) : null, (string) json_encode($fields));
-        Flash::set('success', 'Team incentive for this order saved.');
-        header("Location: /orders/{$orderId}#financials-12d");
+        self::back($orderId, 'success', 'Team incentive for this order saved.');
     }
 
+    /**
+     * Owner decision D-245 P4: who gets it on this order — a tick per role,
+     * the people on each role and, optionally, the shares on this order
+     * (they must add up to 100% across the ticked roles).
+     */
     public function saveOrderPeople(array $params): void
     {
         $user = AuthService::currentUser();
         $orderId = (int) $params['id'];
-        $row = IncentiveRepository::forOrder($orderId);
-        if ($row !== null && !empty($row['locked_at'])) {
-            Flash::set('error', 'This order\'s incentive is already fixed. Use "Work it out again" first.');
-            header("Location: /orders/{$orderId}#financials-12d");
+        if (!self::canManagePricing()) {
+            self::back($orderId, 'error', 'Only the MD can change who gets an order\'s incentive.');
             return;
         }
+        $row = IncentiveRepository::forOrder($orderId);
+        if ($row !== null && !empty($row['locked_at'])) {
+            self::back($orderId, 'error', 'This order\'s incentive is locked. Unlock it (with a reason) to change it.');
+            return;
+        }
+        $before = IncentiveService::split($orderId, 100.0);
+        $describe = static function (array $split): string {
+            $parts = [];
+            foreach ($split['roles'] as $r) {
+                $parts[] = $r['label'] . ': ' . ($r['gets_it'] ? rtrim(rtrim(number_format($r['pct'], 2), '0'), '.') . '% ' . implode(', ', array_column($r['people'], 'name')) : 'no');
+            }
+            return implode('; ', $parts);
+        };
         if (!empty($_POST['reset'])) {
             IncentiveRepository::replaceOrderPeople($orderId, []);
-            IncentiveRepository::saveOrder($orderId, ['people_customised' => 0], (int) $user['id']);
+            IncentiveRepository::replaceOrderRoles($orderId, []);
+            IncentiveRepository::saveOrder($orderId, ['people_customised' => 0, 'shares_customised' => 0], (int) $user['id']);
         } else {
             $active = array_map(static fn (array $u): int => (int) $u['id'], UserRepository::listActive());
+            $custom = !empty($_POST['shares_customised']);
+            $roles = [];
             $people = [];
-            foreach (array_keys(IncentiveRepository::ROLES) as $role) {
+            $total = 0.0;
+            foreach (array_keys(IncentiveRepository::roles()) as $role) {
                 $people[$role] = array_values(array_intersect(array_map('intval', (array) ($_POST['people'][$role] ?? [])), $active));
+                $gets = !empty($_POST['gets_it'][$role]);
+                $share = null;
+                if ($custom && $gets) {
+                    $raw = (string) ($_POST['share_pct'][$role] ?? '');
+                    if (!is_numeric($raw) || (float) $raw < 0 || (float) $raw > 100) {
+                        self::back($orderId, 'error', 'Enter the share of every ticked role as a % from 0 to 100.');
+                        return;
+                    }
+                    $share = round((float) $raw, 2);
+                    $total += $share;
+                }
+                $roles[$role] = ['gets_it' => $gets, 'share_pct' => $share];
+            }
+            if ($custom && abs($total - 100) > 0.001) {
+                self::back($orderId, 'error', 'The shares on this order must add up to 100% (they add up to ' . rtrim(rtrim(number_format($total, 2), '0'), '.') . '%).');
+                return;
             }
             IncentiveRepository::replaceOrderPeople($orderId, $people);
-            IncentiveRepository::saveOrder($orderId, ['people_customised' => 1], (int) $user['id']);
-            AuditLogRepository::log((int) $user['id'], 'ORDER_INCENTIVE_PEOPLE_SET', 'orders', $orderId, 'incentive_people', null, (string) json_encode($people));
+            IncentiveRepository::replaceOrderRoles($orderId, $roles);
+            IncentiveRepository::saveOrder($orderId, ['people_customised' => 1, 'shares_customised' => $custom ? 1 : 0], (int) $user['id']);
         }
-        Flash::set('success', 'People on this order saved.');
-        header("Location: /orders/{$orderId}#financials-12d");
+        $after = IncentiveService::split($orderId, 100.0);
+        IncentiveRepository::addHistory($orderId, 'people', $describe($before), $describe($after), trim((string) ($_POST['people_note'] ?? '')) ?: null, (int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_INCENTIVE_PEOPLE_SET', 'orders', $orderId, 'incentive_people', null, $describe($after));
+        self::back($orderId, 'success', 'Who gets the incentive on this order saved.');
     }
 
+    /** Owner decision D-245 P4: the MD locks a ready order (nothing locks by itself). */
+    public function lock(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $orderId = (int) $params['id'];
+        if (!self::canManagePricing()) {
+            self::back($orderId, 'error', 'Only the MD can lock an order\'s incentive.');
+            return;
+        }
+        $error = IncentiveService::lockIfReady($orderId, (int) $user['id']);
+        if ($error !== null) {
+            self::back($orderId, 'error', $error);
+            return;
+        }
+        AuditLogRepository::log((int) $user['id'], 'ORDER_INCENTIVE_LOCKED', 'orders', $orderId);
+        self::back($orderId, 'success', 'Incentive locked. The team is paid in the next payout run; the associate on their due date.');
+    }
+
+    /** The MD unlocks a locked order with a reason, until anything is paid. */
     public function recalculate(array $params): void
     {
         $user = AuthService::currentUser();
         $orderId = (int) $params['id'];
-        $error = IncentiveService::unlock($orderId, (int) $user['id']);
-        if ($error !== null) {
-            Flash::set('error', $error);
-        } else {
-            IncentiveService::lockIfDue($orderId, (int) $user['id']);
-            AuditLogRepository::log((int) $user['id'], 'ORDER_INCENTIVE_RECALCULATED', 'orders', $orderId);
-            Flash::set('success', 'Incentive worked out again.');
+        if (!self::canManagePricing()) {
+            self::back($orderId, 'error', 'Only the MD can unlock an order\'s incentive.');
+            return;
         }
-        header("Location: /orders/{$orderId}#financials-12d");
+        $reason = (string) ($_POST['unlock_reason'] ?? '');
+        $error = IncentiveService::unlock($orderId, (int) $user['id'], $reason);
+        if ($error !== null) {
+            self::back($orderId, 'error', $error);
+            return;
+        }
+        AuditLogRepository::log((int) $user['id'], 'ORDER_INCENTIVE_UNLOCKED', 'orders', $orderId, 'locked', 'yes', 'no', trim($reason));
+        self::back($orderId, 'success', 'Incentive unlocked. Change it, then lock it again.');
+    }
+
+    /** Owner decision D-245 P4: the orders ready to lock (buyer fully paid, no claim open). */
+    public function ready(array $params): void
+    {
+        $rows = [];
+        foreach (IncentiveService::readyToLock() as $orderId) {
+            $order = OrderRepository::find($orderId);
+            $calc = IncentiveService::calculate($orderId);
+            $rows[] = ['order' => $order, 'calc' => $calc, 'paid_on' => IncentiveService::fullyPaidOn($orderId)];
+        }
+        View::render('incentives/ready', [
+            'rows' => $rows,
+            'canManagePricing' => self::canManagePricing(),
+            'nextRun' => \App\Services\AssociateCommission::payoutRunOn(date('Y-m-d')),
+        ], 'layout/base');
+    }
+
+    /** Locks every ready order at once. */
+    public function lockAll(array $params): void
+    {
+        $user = AuthService::currentUser();
+        if (!self::canManagePricing()) {
+            Flash::set('error', 'Only the MD can lock incentives.');
+            header('Location: /incentives/ready');
+            return;
+        }
+        $result = IncentiveService::lockAllReady((int) $user['id']);
+        AuditLogRepository::log((int) $user['id'], 'ORDER_INCENTIVES_LOCKED_ALL', 'order_incentives', null, 'locked', null, (string) $result['locked']);
+        Flash::set($result['locked'] > 0 ? 'success' : 'warning', ($result['locked'] === 1 ? '1 order locked.' : $result['locked'] . ' orders locked.')
+            . ($result['skipped'] !== [] ? ' Not locked: ' . implode(' ', $result['skipped']) : ''));
+        header('Location: /incentives/ready');
     }
 
     public function mine(array $params): void
     {
         $user = AuthService::currentUser();
-        IncentiveService::lockDue((int) $user['id']);
         View::render('incentives/mine', [
             'payouts' => IncentiveRepository::payoutsForUser((int) $user['id']),
-            'cutoff' => IncentiveService::settings()['cutoff'],
         ], 'layout/base');
     }
 
     public function payouts(array $params): void
     {
-        $user = AuthService::currentUser();
-        IncentiveService::lockDue((int) $user['id']);
         $months = IncentiveRepository::payoutMonths();
         $month = (string) ($_GET['month'] ?? '');
         if (!IncentiveService::isMonth($month)) {
-            $month = $months[0] ?? IncentiveService::incentiveMonth(date('Y-m-d'), IncentiveService::settings()['cutoff']);
+            $month = $months[0] ?? IncentiveService::incentiveMonth(date('Y-m-d'));
         }
         $rows = IncentiveRepository::payoutsForMonth($month);
         if (($_GET['format'] ?? '') === 'csv') {
             \App\Helpers\Csv::stream('incentives-' . $month . '.csv',
                 ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)', 'TDS section', 'TDS rate %', 'TDS reason'],
                 array_map(static fn (array $r): array => [$r['user_name'] ?? $r['associate_name'], $r['payee_kind'], $r['buyer_inquiry_ref'] ?: $r['order_reference'],
-                    $r['payee_kind'] === 'associate' ? 'Associate (agreement)' : (IncentiveRepository::ROLES[$r['role']] ?? $r['role']),
+                    $r['payee_kind'] === 'associate' ? 'Associate (agreement)' : IncentiveRepository::roleLabel((string) $r['role']),
                     $r['amount_inr'], $r['amount_fc'], $r['currency_code'], $r['status'], $r['paid_on'], $r['paid_inr'], $r['tds_inr'],
                     $r['tds_section'] ?? null, $r['tds_rate'] ?? null, $r['tds_reason'] ?? null], $rows));
         }
@@ -258,7 +451,6 @@ final class IncentiveController
             'month' => $month,
             'months' => array_values(array_unique(array_merge([$month], $months))),
             'rows' => $rows,
-            'cutoff' => IncentiveService::settings()['cutoff'],
         ], 'layout/base');
     }
 

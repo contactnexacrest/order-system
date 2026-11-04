@@ -3,6 +3,14 @@
   <p>Signed in as <strong>{{ user.name }}</strong> ({{ user.email }}).</p>
 </div>
 
+{% if incentiveReadyCount %}{# Owner decision D-245 P4 #}
+<div class="card page-wide" id="incentives-ready">
+  <h2 style="margin-top:0;">Team incentives ready to lock ({{ incentiveReadyCount }})</h2>
+  <p>These orders are fully paid by the buyer with no claim open. Lock them so the team is paid in the next payout run ({{ incentiveNextRun | shortDate }}).</p>
+  <p><a href="/incentives/ready">Open Ready to lock →</a></p>
+</div>
+{% endif %}
+
 {# Owner decision 2 Nov 2026 (point 4): agreements expiring within 30 days, for whoever may see the register. #}
 {% if agreementsExpiring and agreementsExpiring.length %}
 <div class="card page-wide" id="agreements-expiring">

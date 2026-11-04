@@ -46,79 +46,95 @@ function trimPct(v) {
   return Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/0+$/, '').replace(/\.$/, '');
 }
 
+const canManagePricing = (req) => !!(req.user && req.permissions && req.permissions.manage_pricing);
+
+function back(req, res, orderId, type, message) {
+  flash.set(req, type, message);
+  res.redirect(`/orders/${orderId}#financials-12d`);
+}
+
 async function settings(req, res) {
-  const s = await incentiveService.settings();
-  const tableRows = s.table.map((t) => ({ from: String(Math.round(t.from)), reward: String(Math.round(t.reward)) }));
-  while (tableRows.length < 5) {
-    tableRows.push({ from: '', reward: '' });
-  }
-  const splitText = {};
-  for (const role of Object.keys(incentiveRepository.ROLES)) {
-    splitText[role] = s.split[role].toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-  }
+  const roles = await incentiveRepository.allRoles();
+  const roleTotal = Object.values(roles).reduce((sum, r) => sum + (r.is_active ? r.share_pct : 0), 0);
   res.renderView('incentives/settings', {
-    settings: s,
-    tableRows,
-    splitText,
-    minProfitText: String(Math.round(s.min_profit)),
-    bonusText: String(Math.round(s.bonus)),
+    settings: await incentiveService.settings(),
+    roles: Object.values(roles).map((r) => ({ ...r, shareText: trimPct(r.share_pct) })),
+    activeRoles: Object.entries(await incentiveRepository.roles()).map(([key, label]) => ({ key, label })),
+    roleTotalText: trimPct(roleTotal),
+    runLabel: require('../services/associateCommission').runLabel(await require('../services/associateCommission').settings()),
     users: await userRepository.listActive(),
     userRoles: await incentiveRepository.userRoles(),
+    canManagePricing: canManagePricing(req),
+    readyCount: (await incentiveService.readyToLock()).length,
   }, 'layout/base');
 }
 
+/**
+ * The roles table from the form: label, share %, active; a new role from
+ * new_role_label / new_role_share. Active shares must add up to 100%.
+ */
+async function parseRoles(body) {
+  const errors = [];
+  const rows = [];
+  const all = await incentiveRepository.allRoles();
+  const posted = body.roles || {};
+  let order = 0;
+  for (const [key, r] of Object.entries(all)) {
+    const input = posted[key] || {};
+    const label = String(input.label ?? r.label).trim();
+    const share = input.share_pct ?? String(r.share_pct);
+    if (label === '' || [...label].length > 80) {
+      errors.push('Every role needs a name (up to 80 characters).');
+      break;
+    }
+    if (!isNum(share) || Number(share) < 0 || Number(share) > 100) {
+      errors.push('Enter every role\'s usual share as a % from 0 to 100.');
+      break;
+    }
+    rows.push({ role_key: key, label, share_pct: Math.round(Number(share) * 100) / 100, is_active: body.roles ? !!input.is_active : r.is_active, sort_order: ++order });
+  }
+  const newLabel = String(body.new_role_label || '').trim();
+  if (newLabel !== '') {
+    const newShare = body.new_role_share;
+    const key = newLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (key === '' || [...newLabel].length > 80) {
+      errors.push('Give the new role a name (letters or numbers, up to 80 characters).');
+    } else if (all[key] || key === 'associate') {
+      errors.push(`A role named "${newLabel}" already exists.`);
+    } else if (!isNum(newShare) || Number(newShare) < 0 || Number(newShare) > 100) {
+      errors.push('Enter the new role\'s usual share as a % from 0 to 100.');
+    } else {
+      rows.push({ role_key: key.slice(0, 40), label: newLabel, share_pct: Math.round(Number(newShare) * 100) / 100, is_active: true, sort_order: ++order });
+    }
+  }
+  const total = rows.reduce((sum, r) => sum + (r.is_active ? r.share_pct : 0), 0);
+  if (errors.length === 0 && Math.abs(total - 100) > 0.001) {
+    errors.push(`The usual shares of the active roles must add up to 100% (they add up to ${trimPct(total)}%).`);
+  }
+  return [rows, errors];
+}
+
+/**
+ * Owner decision D-245 P4: the program switch, the reminder days, the roles
+ * (an editable list whose active shares add up to 100%; changing them is the
+ * MD's — manage_pricing) and each person's roles.
+ */
 async function saveSettings(req, res) {
   const userId = req.user.id;
-  const before = await incentiveService.settings();
   const body = req.body || {};
-
-  const minProfit = isNum(body.min_profit_inr) ? Number(body.min_profit_inr) : false;
-  const bonus = isNum(body.new_client_bonus_inr) ? Number(body.new_client_bonus_inr) : false;
-  const cutoff = String(body.cutoff_day ?? '');
-  const errors = [];
-  if (minProfit === false || minProfit < 0) {
-    errors.push('Enter the minimum order profit as an amount of 0 or more.');
+  let errors = [];
+  const reminder = String(body.lock_reminder_days ?? '3');
+  if (!/^\d+$/.test(reminder) || Number(reminder) > 28) {
+    errors.push('Enter the reminder before a payout run as 0 to 28 days (0 = no reminder).');
   }
-  if (bonus === false || bonus < 0) {
-    errors.push('Enter the new client bonus as an amount of 0 or more (0 = off).');
-  }
-  if (cutoff !== 'last' && (!/^\d+$/.test(cutoff) || Number(cutoff) < 1 || Number(cutoff) > 28)) {
-    errors.push('Choose an incentive cut-off day from 1 to 28, or the last day of the month.');
-  }
-  const table = [];
-  const froms = body.table_from || {};
-  const rewards = body.table_reward || {};
-  for (const i of Object.keys(froms)) {
-    const from = froms[i];
-    const reward = rewards[i] ?? '';
-    if (String(from).trim() === '' && String(reward).trim() === '') {
-      continue;
-    }
-    if (!isNum(from) || !isNum(reward) || Number(from) <= 0 || Number(reward) <= 0) {
-      errors.push('Each reward table row needs a profit and a reward above 0 (leave both empty to drop the row).');
-      break;
-    }
-    table.push({ from: Number(from), reward: Number(reward) });
-  }
-  // QA Round 6, R6-N12: two rows with one profit threshold — which reward applies would be undefined.
-  const thresholds = table.map((t) => t.from);
-  if (new Set(thresholds).size !== thresholds.length) {
-    errors.push('Two reward table rows have the same order profit — each row needs its own.');
-  }
-  const split = {};
-  const postedSplit = body.split || {};
-  for (const role of Object.keys(incentiveRepository.ROLES)) {
-    const v = postedSplit[role];
-    if (!isNum(v) || Number(v) < 0) {
-      errors.push('Enter every role\'s share as a % of 0 or more.');
-      break;
-    }
-    split[role] = Number(v);
-  }
-  if (Object.keys(split).length === Object.keys(incentiveRepository.ROLES).length) {
-    const sum = Object.values(split).reduce((a, b) => a + b, 0);
-    if (Math.abs(sum - 100) > 0.001) {
-      errors.push(`The role shares must add up to 100% (they add up to ${trimPct(sum)}%).`);
+  let roleRows = null;
+  if (body.roles || String(body.new_role_label || '').trim() !== '') {
+    if (!canManagePricing(req)) {
+      errors.push('Only the MD can change the incentive roles and their shares.');
+    } else {
+      const [rows, roleErrors] = await parseRoles(body);
+      roleRows = rows;
+      errors = errors.concat(roleErrors);
     }
   }
   if (errors.length) {
@@ -126,139 +142,241 @@ async function saveSettings(req, res) {
     res.redirect('/incentives/settings');
     return;
   }
-
-  // Orders already fully paid keep the settings they were paid under.
-  await incentiveService.lockDue(userId);
-
-  const enabled = !!body.program_enabled;
-  table.sort((a, b) => a.from - b.from);
-  const values = {
-    program_enabled: enabled ? '1' : '0',
-    min_profit_inr: String(minProfit),
-    reward_table: JSON.stringify(table),
-    new_client_bonus_inr: String(bonus),
-    role_split: JSON.stringify(split),
-    cutoff_day: cutoff,
-  };
-  if (enabled && before.start_date === '') {
-    values.program_start_date = todayIso();
-  }
   const old = await incentiveRepository.settings();
+  const values = { program_enabled: body.program_enabled ? '1' : '0', lock_reminder_days: String(Number(reminder)) };
   for (const [key, value] of Object.entries(values)) {
     if ((old[key] ?? null) !== value) {
       await incentiveRepository.setSetting(key, value, userId);
       await auditLogRepository.log(userId, 'INCENTIVE_SETTING_CHANGED', 'incentive_settings', null, key, old[key] ?? null, value);
     }
   }
-
-  const rolesByUser = {};
-  // Keys are "u<user id>": a bare number would make the form parser read the field as a (compacted) list.
-  for (const [key, roles] of Object.entries(body.user_roles || {})) {
-    const uid = Number(String(key).replace(/^u/, ''));
-    if (Number.isInteger(uid) && uid > 0) rolesByUser[uid] = asArray(roles).filter((r) => incentiveRepository.ROLES[r]);
+  if (roleRows !== null) {
+    const describe = (all) => Object.values(all).map((r) => `${r.label} ${r.share_pct}%${r.is_active ? '' : ' (inactive)'}`);
+    const before = describe(await incentiveRepository.allRoles());
+    await incentiveRepository.saveRoles(roleRows, userId);
+    const after = describe(await incentiveRepository.allRoles());
+    if (JSON.stringify(before) !== JSON.stringify(after)) {
+      await auditLogRepository.log(userId, 'INCENTIVE_ROLES_EDITED', 'incentive_roles', null, 'roles', JSON.stringify(before), JSON.stringify(after));
+    }
   }
-  const current = await incentiveRepository.userRoles();
-  const norm = (m) => JSON.stringify(Object.keys(m).filter((k) => (m[k] || []).length).sort().map((k) => [Number(k), [...m[k]].sort()]));
-  if (norm(rolesByUser) !== norm(current)) {
-    await incentiveRepository.replaceUserRoles(rolesByUser);
-    await auditLogRepository.log(userId, 'INCENTIVE_ROLES_CHANGED', 'user_incentive_roles', null, null, null, JSON.stringify(rolesByUser));
+  if (body.user_roles_present) {
+    const active = await incentiveRepository.roles();
+    const rolesByUser = {};
+    // Keys are "u<user id>": a bare number would make the form parser read the field as a (compacted) list.
+    for (const [key, list] of Object.entries(body.user_roles || {})) {
+      const uid = Number(String(key).replace(/^u/, ''));
+      if (Number.isInteger(uid) && uid > 0) rolesByUser[uid] = asArray(list).filter((r) => active[r]);
+    }
+    const current = await incentiveRepository.userRoles();
+    const norm = (m) => JSON.stringify(Object.keys(m).filter((k) => (m[k] || []).length).sort().map((k) => [Number(k), [...m[k]].sort()]));
+    if (norm(rolesByUser) !== norm(current)) {
+      await incentiveRepository.replaceUserRoles(rolesByUser);
+      await auditLogRepository.log(userId, 'INCENTIVE_ROLES_CHANGED', 'user_incentive_roles', null, null, null, JSON.stringify(rolesByUser));
+    }
   }
   flash.set(req, 'success', 'Team incentive settings saved.');
   res.redirect('/incentives/settings');
 }
 
+/** Deletes an incentive role that was never used; a used role can only be deactivated. */
+async function deleteRole(req, res) {
+  const key = String(req.params.key || '');
+  const all = await incentiveRepository.allRoles();
+  if (!canManagePricing(req)) {
+    flash.set(req, 'error', 'Only the MD can change the incentive roles.');
+  } else if (!all[key]) {
+    flash.set(req, 'error', 'That role does not exist.');
+  } else if (await incentiveRepository.roleInUse(key)) {
+    flash.set(req, 'error', `The role "${all[key].label}" is in use (people, orders or payouts) — deactivate it instead.`);
+  } else if (all[key].is_active && all[key].share_pct > 0) {
+    flash.set(req, 'error', `Set the role "${all[key].label}" to 0% or deactivate it first, so the active shares still add up to 100%.`);
+  } else {
+    await incentiveRepository.deleteRole(key);
+    await auditLogRepository.log(req.user.id, 'INCENTIVE_ROLE_DELETED', 'incentive_roles', all[key].id, 'label', all[key].label, null);
+    flash.set(req, 'success', `Role "${all[key].label}" deleted.`);
+  }
+  res.redirect('/incentives/settings');
+}
+
+/**
+ * Owner decision D-245 P4: the order's own team incentive (MD only, with a
+ * reason) — the global rule, a % of the order's profit or a fixed amount —
+ * and, D-245 P3, the associate's commission mode.
+ */
 async function saveOrder(req, res) {
   const orderId = parseInt(req.params.id, 10);
   if (!(await orderRepository.find(orderId))) {
     res.status(404).send('Order not found.');
     return;
   }
+  if (!canManagePricing(req)) return back(req, res, orderId, 'error', 'Only the MD can change an order\'s incentive.');
   const row = await incentiveRepository.forOrder(orderId);
-  if (row && row.locked_at) {
-    flash.set(req, 'error', 'This order\'s incentive is already fixed (the buyer has fully paid). Use "Work it out again" first.');
-    res.redirect(`/orders/${orderId}#financials-12d`);
-    return;
-  }
+  if (row && row.locked_at) return back(req, res, orderId, 'error', 'This order\'s incentive is locked. Unlock it (with a reason) to change it.');
   const body = req.body || {};
-  const override = isNum(body.reward_override_inr) ? Number(body.reward_override_inr) : false;
-  const mode = String(body.associate_mode ?? 'auto');
-  if (override === false || override < 0 || !['auto', 'yes', 'no'].includes(mode)) {
-    flash.set(req, 'error', 'Enter the reward for this order as an amount of 0 or more (0 = use the settings).');
-    res.redirect(`/orders/${orderId}#financials-12d`);
-    return;
+  const fields = {};
+  const mode = String(body.incentive_mode ?? ((row && row.incentive_mode) || 'global'));
+  const rawValue = String(body.incentive_value ?? '').trim();
+  const reason = String(body.incentive_reason || '').trim();
+  if (!['global', 'pct', 'fixed'].includes(mode)) return back(req, res, orderId, 'error', 'Choose how the team incentive is set for this order.');
+  let value = null;
+  if (mode !== 'global') {
+    if (!isNum(rawValue) || Number(rawValue) < 0 || (mode === 'pct' && Number(rawValue) > 100) || Number(rawValue) > 100000000) {
+      return back(req, res, orderId, 'error', mode === 'pct' ? 'Enter the % of the order\'s profit (0 to 100).' : 'Enter the incentive for this order as an amount of 0 or more.');
+    }
+    value = mode === 'pct' ? Math.round(Number(rawValue) * 10000) / 10000 : Math.round(Number(rawValue) * 100) / 100;
   }
-  const fields = { reward_override_inr: override, is_excluded: body.is_excluded ? 1 : 0, associate_mode: mode };
+  const old = incentiveService.orderRule(row);
+  const amountChanged = mode !== old.mode || (value !== null && Math.abs(value - Number(old.value || 0)) > 0.00001);
+  if (amountChanged) {
+    if ([...reason].length < 10 || [...reason].length > 500) {
+      return back(req, res, orderId, 'error', 'Say why the team incentive is set this way for this order (10 to 500 characters).');
+    }
+    if (mode !== 'global') {
+      const calc = await incentiveService.calculate(orderId);
+      const amount = mode === 'fixed' ? value : incentiveService.round2(calc.basis * value / 100);
+      if (amount > calc.basis + 0.005) {
+        return back(req, res, orderId, 'error', `The team incentive (₹${incentiveService.fmt2(amount)}) cannot be more than the order's profit after the associate's commission (₹${incentiveService.fmt2(calc.basis)}).`);
+      }
+    }
+    Object.assign(fields, { incentive_mode: mode, incentive_value: value, incentive_reason: mode === 'global' ? null : reason });
+  }
   // Owner decision D-245 P3: forcing an associate's commission on ("Yes", e.g. on a repeat order)
   // is the MD's decision alone, with a written reason; it is audited.
-  const wasYes = ((row && row.associate_mode) || 'auto') === 'yes';
-  const modeReason = String(body.associate_mode_reason || '').trim();
-  if (mode === 'yes' && (!wasYes || modeReason !== String((row && row.associate_mode_reason) || ''))) {
-    if (!(await require('../services/associateService').canChangeLink(req))) {
-      flash.set(req, 'error', 'Only the MD can force the associate\'s commission on for an order.');
-      res.redirect(`/orders/${orderId}#financials-12d`);
-      return;
+  if (body.associate_mode !== undefined) {
+    const aMode = String(body.associate_mode);
+    if (!['auto', 'yes', 'no'].includes(aMode)) return back(req, res, orderId, 'error', 'Choose whether the associate earns commission on this order.');
+    const wasYes = ((row && row.associate_mode) || 'auto') === 'yes';
+    const modeReason = String(body.associate_mode_reason || '').trim();
+    if (aMode === 'yes' && (!wasYes || modeReason !== String((row && row.associate_mode_reason) || ''))) {
+      if (!(await associateService.canChangeLink(req))) return back(req, res, orderId, 'error', 'Only the MD can force the associate\'s commission on for an order.');
+      if ([...modeReason].length < 10 || [...modeReason].length > 300) {
+        return back(req, res, orderId, 'error', 'Say why the associate\'s commission is forced on for this order (10 to 300 characters).');
+      }
+      fields.associate_mode_reason = modeReason;
+      fields.associate_mode_set_by = req.user.id;
+      await auditLogRepository.log(req.user.id, 'ASSOCIATE_COMMISSION_FORCED', 'orders', orderId, 'associate_mode', String((row && row.associate_mode) || 'auto'), 'yes', modeReason);
+    } else if (aMode !== 'yes' && wasYes) {
+      fields.associate_mode_reason = null;
+      fields.associate_mode_set_by = null;
     }
-    if ([...modeReason].length < 10 || [...modeReason].length > 300) {
-      flash.set(req, 'error', 'Say why the associate\'s commission is forced on for this order (10 to 300 characters).');
-      res.redirect(`/orders/${orderId}#financials-12d`);
-      return;
+    if (aMode !== ((row && row.associate_mode) || 'auto')) {
+      fields.associate_mode = aMode;
+      await incentiveRepository.addHistory(orderId, 'associate_mode', String((row && row.associate_mode) || 'auto'), aMode, aMode === 'yes' ? modeReason : null, req.user.id);
     }
-    fields.associate_mode_reason = modeReason;
-    fields.associate_mode_set_by = req.user.id;
-    await auditLogRepository.log(req.user.id, 'ASSOCIATE_COMMISSION_FORCED', 'orders', orderId, 'associate_mode', String((row && row.associate_mode) || 'auto'), 'yes', modeReason);
-  } else if (mode !== 'yes' && wasYes) {
-    fields.associate_mode_reason = null;
-    fields.associate_mode_set_by = null;
   }
+  if (Object.keys(fields).length === 0) return back(req, res, orderId, 'warning', 'Nothing changed.');
   await incentiveRepository.saveOrder(orderId, fields, req.user.id);
-  const oldFields = row ? { reward_override_inr: row.reward_override_inr, is_excluded: row.is_excluded, associate_mode: row.associate_mode } : null;
-  await auditLogRepository.log(req.user.id, 'ORDER_INCENTIVE_SET', 'orders', orderId, 'incentive', oldFields ? JSON.stringify(oldFields) : null, JSON.stringify(fields));
-  flash.set(req, 'success', 'Team incentive for this order saved.');
-  res.redirect(`/orders/${orderId}#financials-12d`);
+  if (amountChanged) {
+    const describe = (r) => (r.mode === 'fixed' ? `fixed ₹${incentiveService.fmt2(r.value)}`
+      : r.mode === 'pct' ? `${String(Number(r.value).toFixed(4)).replace(/0+$/, '').replace(/\.$/, '')}% of profit` : 'global rule');
+    await incentiveRepository.addHistory(orderId, 'amount', describe(old), describe({ mode, value }), reason, req.user.id);
+  }
+  const before = row ? Object.fromEntries(Object.keys(fields).map((k) => [k, row[k] ?? null])) : null;
+  await auditLogRepository.log(req.user.id, 'ORDER_INCENTIVE_SET', 'orders', orderId, 'incentive', before ? JSON.stringify(before) : null, JSON.stringify(fields));
+  return back(req, res, orderId, 'success', 'Team incentive for this order saved.');
 }
 
+/**
+ * Owner decision D-245 P4: who gets it on this order — a tick per role, the
+ * people on each role and, optionally, the shares on this order (they must
+ * add up to 100% across the ticked roles).
+ */
 async function saveOrderPeople(req, res) {
   const orderId = parseInt(req.params.id, 10);
+  if (!canManagePricing(req)) return back(req, res, orderId, 'error', 'Only the MD can change who gets an order\'s incentive.');
   const row = await incentiveRepository.forOrder(orderId);
-  if (row && row.locked_at) {
-    flash.set(req, 'error', 'This order\'s incentive is already fixed. Use "Work it out again" first.');
-    res.redirect(`/orders/${orderId}#financials-12d`);
-    return;
-  }
+  if (row && row.locked_at) return back(req, res, orderId, 'error', 'This order\'s incentive is locked. Unlock it (with a reason) to change it.');
   const body = req.body || {};
+  const describe = (sp) => Object.values(sp.roles).map((r) => `${r.label}: ${r.gets_it ? `${trimPct(r.pct)}% ${r.people.map((p) => p.name).join(', ')}` : 'no'}`).join('; ');
+  const before = describe(await incentiveService.split(orderId, 100));
   if (body.reset) {
     await incentiveRepository.replaceOrderPeople(orderId, {});
-    await incentiveRepository.saveOrder(orderId, { people_customised: 0 }, req.user.id);
+    await incentiveRepository.replaceOrderRoles(orderId, {});
+    await incentiveRepository.saveOrder(orderId, { people_customised: 0, shares_customised: 0 }, req.user.id);
   } else {
     const active = (await userRepository.listActive()).map((u) => Number(u.id));
+    const custom = !!body.shares_customised;
+    const roleMap = {};
     const people = {};
-    const posted = body.people || {};
-    for (const role of Object.keys(incentiveRepository.ROLES)) {
-      people[role] = asArray(posted[role]).map((v) => parseInt(v, 10)).filter((v) => active.includes(v));
+    let total = 0;
+    const postedPeople = body.people || {};
+    const gets = body.gets_it || {};
+    const shares = body.share_pct || {};
+    for (const role of Object.keys(await incentiveRepository.roles())) {
+      people[role] = asArray(postedPeople[role]).map((v) => parseInt(v, 10)).filter((v) => active.includes(v));
+      const ticked = !!gets[role];
+      let share = null;
+      if (custom && ticked) {
+        const raw = shares[role];
+        if (!isNum(raw) || Number(raw) < 0 || Number(raw) > 100) return back(req, res, orderId, 'error', 'Enter the share of every ticked role as a % from 0 to 100.');
+        share = Math.round(Number(raw) * 100) / 100;
+        total += share;
+      }
+      roleMap[role] = { gets_it: ticked, share_pct: share };
+    }
+    if (custom && Math.abs(total - 100) > 0.001) {
+      return back(req, res, orderId, 'error', `The shares on this order must add up to 100% (they add up to ${trimPct(total)}%).`);
     }
     await incentiveRepository.replaceOrderPeople(orderId, people);
-    await incentiveRepository.saveOrder(orderId, { people_customised: 1 }, req.user.id);
-    await auditLogRepository.log(req.user.id, 'ORDER_INCENTIVE_PEOPLE_SET', 'orders', orderId, 'incentive_people', null, JSON.stringify(people));
+    await incentiveRepository.replaceOrderRoles(orderId, roleMap);
+    await incentiveRepository.saveOrder(orderId, { people_customised: 1, shares_customised: custom ? 1 : 0 }, req.user.id);
   }
-  flash.set(req, 'success', 'People on this order saved.');
-  res.redirect(`/orders/${orderId}#financials-12d`);
+  const after = describe(await incentiveService.split(orderId, 100));
+  await incentiveRepository.addHistory(orderId, 'people', before, after, String(body.people_note || '').trim() || null, req.user.id);
+  await auditLogRepository.log(req.user.id, 'ORDER_INCENTIVE_PEOPLE_SET', 'orders', orderId, 'incentive_people', null, after);
+  return back(req, res, orderId, 'success', 'Who gets the incentive on this order saved.');
 }
 
+/** Owner decision D-245 P4: the MD locks a ready order (nothing locks by itself). */
+async function lock(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  if (!canManagePricing(req)) return back(req, res, orderId, 'error', 'Only the MD can lock an order\'s incentive.');
+  const error = await incentiveService.lockIfReady(orderId, req.user.id);
+  if (error !== null) return back(req, res, orderId, 'error', error);
+  await auditLogRepository.log(req.user.id, 'ORDER_INCENTIVE_LOCKED', 'orders', orderId);
+  return back(req, res, orderId, 'success', 'Incentive locked. The team is paid in the next payout run; the associate on their due date.');
+}
+
+/** The MD unlocks a locked order with a reason, until anything is paid. */
 async function recalculate(req, res) {
   const orderId = parseInt(req.params.id, 10);
-  const error = await incentiveService.unlock(orderId, req.user.id);
-  if (error !== null) {
-    flash.set(req, 'error', error);
-  } else {
-    await incentiveService.lockIfDue(orderId, req.user.id);
-    await auditLogRepository.log(req.user.id, 'ORDER_INCENTIVE_RECALCULATED', 'orders', orderId);
-    flash.set(req, 'success', 'Incentive worked out again.');
+  if (!canManagePricing(req)) return back(req, res, orderId, 'error', 'Only the MD can unlock an order\'s incentive.');
+  const reason = String((req.body || {}).unlock_reason || '');
+  const error = await incentiveService.unlock(orderId, req.user.id, reason);
+  if (error !== null) return back(req, res, orderId, 'error', error);
+  await auditLogRepository.log(req.user.id, 'ORDER_INCENTIVE_UNLOCKED', 'orders', orderId, 'locked', 'yes', 'no', reason.trim());
+  return back(req, res, orderId, 'success', 'Incentive unlocked. Change it, then lock it again.');
+}
+
+/** Owner decision D-245 P4: the orders ready to lock (buyer fully paid, no claim open). */
+async function ready(req, res) {
+  const rows = [];
+  for (const orderId of await incentiveService.readyToLock()) {
+    rows.push({ order: await orderRepository.find(orderId), calc: await incentiveService.calculate(orderId), paidOn: await incentiveService.fullyPaidOn(orderId) });
   }
-  res.redirect(`/orders/${orderId}#financials-12d`);
+  res.renderView('incentives/ready', {
+    rows,
+    canManagePricing: canManagePricing(req),
+    nextRun: await require('../services/associateCommission').payoutRunOn(todayIso()),
+  }, 'layout/base');
+}
+
+/** Locks every ready order at once. */
+async function lockAll(req, res) {
+  if (!canManagePricing(req)) {
+    flash.set(req, 'error', 'Only the MD can lock incentives.');
+    res.redirect('/incentives/ready');
+    return;
+  }
+  const result = await incentiveService.lockAllReady(req.user.id);
+  await auditLogRepository.log(req.user.id, 'ORDER_INCENTIVES_LOCKED_ALL', 'order_incentives', null, 'locked', null, String(result.locked));
+  flash.set(req, result.locked > 0 ? 'success' : 'warning', (result.locked === 1 ? '1 order locked.' : `${result.locked} orders locked.`)
+    + (result.skipped.length ? ` Not locked: ${result.skipped.join(' ')}` : ''));
+  res.redirect('/incentives/ready');
 }
 
 async function mine(req, res) {
-  await incentiveService.lockDue(req.user.id);
+  await incentiveRepository.allRoles();
   const list = await incentiveRepository.payoutsForUser(req.user.id);
   const year = String(new Date().getFullYear());
   let paidThisYear = 0;
@@ -276,24 +394,23 @@ async function mine(req, res) {
     paidThisYear,
     dueByMonth: Object.entries(due).map(([month, amount]) => ({ month, amount })),
     payouts: list,
-    cutoff: (await incentiveService.settings()).cutoff,
+    runLabel: require('../services/associateCommission').runLabel(await require('../services/associateCommission').settings()),
   }, 'layout/base');
 }
 
 async function payouts(req, res) {
-  await incentiveService.lockDue(req.user.id);
+  await incentiveRepository.allRoles();
   const months = await incentiveRepository.payoutMonths();
-  const s = await incentiveService.settings();
   let month = String((req.query || {}).month || '');
   if (!incentiveService.isMonth(month)) {
-    month = months[0] || incentiveService.incentiveMonth(todayIso(), s.cutoff);
+    month = months[0] || await incentiveService.incentiveMonth(todayIso());
   }
   const rows = await incentiveRepository.payoutsForMonth(month);
   if ((req.query || {}).format === 'csv') {
     csv.stream(res, `incentives-${month}.csv`,
       ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)', 'TDS section', 'TDS rate %', 'TDS reason'],
       rows.map((r) => [r.user_name ?? r.associate_name, r.payee_kind, r.buyer_inquiry_ref || r.order_reference,
-        r.payee_kind === 'associate' ? 'Associate (agreement)' : (incentiveRepository.ROLES[r.role] ?? r.role),
+        r.payee_kind === 'associate' ? 'Associate (agreement)' : incentiveRepository.roleLabel(r.role),
         r.amount_inr, r.amount_fc, r.currency_code, r.status, r.paid_on, r.paid_inr, r.tds_inr, r.tds_section ?? null, r.tds_rate ?? null, r.tds_reason ?? null]));
     return;
   }
@@ -331,7 +448,7 @@ async function payouts(req, res) {
     months: [...new Set([month, ...months])],
     rows,
     earliestPaidOn: incentiveService.earliestPaidOn(month),
-    cutoff: s.cutoff,
+    runLabel: require('../services/associateCommission').runLabel(await require('../services/associateCommission').settings()),
     tdsSettings,
     tdsRatePct: associateTds.pct(tdsSettings.rate),
   }, 'layout/base');
@@ -520,8 +637,12 @@ async function storeRemittanceForms(req, payout) {
 module.exports = {
   settings,
   saveSettings,
+  deleteRole,
   saveOrder,
   saveOrderPeople,
+  lock,
+  ready,
+  lockAll,
   recalculate,
   mine,
   payouts,

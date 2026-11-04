@@ -59,6 +59,10 @@ final class DashboardController
             }
         }
 
+        // Owner decision D-245 P4: the MD sees how many orders are ready to lock (nothing locks by itself).
+        $data['incentiveReadyCount'] = PermissionService::can($userId, $roleId, 'manage_pricing') && PermissionService::can($userId, $roleId, 'manage_incentives')
+            ? count(\App\Services\IncentiveService::readyToLock()) : null;
+
         if ($canViewReports) {
             $data['recentActivity'] = \App\Services\AuditMoneyMask::maskAll(AuditLogRepository::search(null, null, null, null, null, null, 15, 0));
         }

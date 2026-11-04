@@ -18,3 +18,7 @@ echo \App\Services\DailyDigestService::summary($result) . "\n";
 // Owner decision 1 Nov 2026 (AS-5, guarantee 7): associates' protection and agreement reminders (30 and 7 days), expired links.
 $reminders = \App\Services\AssociateService::dailyReminders();
 echo "Associate reminders: {$reminders} sent.\n";
+
+// Owner decision D-245 P4: N days before each payout run, remind the MD of orders ready to lock but not locked.
+$lockReminders = \App\Services\IncentiveService::lockReminders();
+echo "Incentive lock reminders: {$lockReminders} sent.\n";

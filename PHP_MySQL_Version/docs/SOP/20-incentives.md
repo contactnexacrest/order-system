@@ -2,55 +2,85 @@
 
 ## What this is
 
-NexaCrest rewards the team for orders that are won, delivered and paid for.
-Management decides each order's incentive. It is fixed once the buyer has
-**fully paid** for the order, and it is paid together with your salary
-(owner decision 2026-10-30).
+NexaCrest rewards the team for orders that are won, delivered and paid for
+(owner decision 2026-10-30; reworked by D-245 P4, 4 Nov 2026).
 
-Two kinds of pay are kept apart:
+**How much.** An order's team incentive is a share of its profit after the
+associate's commission (if the client came through an associate). That
+profit never counts below ₹0.
 
-- **Salary (fixed pay)** covers the 1st to the last day of the month and is
-  paid on the last day of the month.
-- **Incentive (Incentive pay)** follows its own cycle, from the **21st of
-  last month to the 20th of this month**. Orders the buyer fully pays in
-  that cycle make up this month's incentive, paid together with this
-  month's salary. Management can change the cut-off day (the 20th); the
-  page shows the current cycle.
+- The **global rule** (Admin → Pricing settings) is a % of that profit
+  (15% to start) or a fixed amount per unit; a product may have its own.
+- On one order, the MD may set **a % of this order's profit** or **a fixed
+  amount** instead, with a written reason.
+- With the incentive program **off**, there is no global incentive; the MD
+  may still set one by hand on a single order.
+- The app warns when the margin left after the incentive falls below the
+  minimum margin, and refuses an incentive larger than the profit.
 
-"Fully paid" means every payment the buyer owes on the order has reached
-the bank: the advance (or the payment under a Letter of Credit), the balance
-and, on CFR/CIF orders, the freight. The date the last of them cleared
-decides the incentive month.
+**When it is fixed.** Nothing locks by itself.
+
+| State | Meaning |
+|---|---|
+| **Open** | Estimated; the MD can change it any time. |
+| **Ready to lock** | The buyer has fully paid every payment (advance or LC, balance, freight on CFR/CIF) and no buyer claim is open. |
+| **Locked** | The MD locked it, one order at a time or "Lock all ready" (Team Incentives → Ready to lock). It is added to the order's costs. The MD may unlock it, with a reason, until anything is paid. |
+| **Paid** | Accounts paid it. It never changes again. |
+
+The dashboard shows the MD how many orders are ready to lock, and the MD is
+reminded a few days (setting, 3 to start) before each payout run.
+
+**When it is paid.** Staff are paid in the **payout run after the order was
+locked** — the same run as associate commission (Associates → Commission
+settings: monthly on a day, or weekly). The old 21st-to-20th cycle, the
+reward table, the minimum profit and the new-client bonus are gone.
+
+Every change — amount, who gets it, shares, lock, unlock — is kept in the
+order's incentive **history** with who, when, before → after and the reason.
 
 ## Roles
 
-An order's incentive is shared by role:
+The roles are an **editable list** (Team Incentives → settings; only the MD
+changes it). The usual shares of the active roles must add up to 100%. To
+start with:
 
-| Role | Usually |
-|---|---|
-| Sales | wins the order and agrees the price |
-| Export Executive | PI, OC, CI and the buyer's paperwork |
-| Marketing | brings the enquiry in |
-| Logistics | factory dispatch, CHA and freight |
-| Accounts | collection, FIRC and the books |
+| Role | Usual share | Usually |
+|---|---|---|
+| Sales | 30% | wins the order and agrees the price |
+| Sales Manager | 10% | oversees and helps close |
+| Export Documentation | 15% | PI, OC, CI and the buyer's paperwork |
+| Export Compliance | 5% | screening, licences, export benefit claims |
+| Marketing | 15% | brings the enquiry in |
+| Logistics | 15% | factory dispatch, CHA and freight |
+| Accounts | 10% | collection, FIRC and the books |
 
-Each person has their usual role(s); management can change who did which
-role on a particular order. When two people share a role on an order, they
-share that role's amount equally.
+A role can be added, renamed, deactivated, or deleted if it was never used.
+The Sales Manager is an employee and is paid only through this incentive.
+
+Each person has their usual role(s). On each order the MD can:
+
+- **untick** a role (or a role with nobody on it simply drops out): its
+  share spreads over the ticked roles in proportion;
+- **type the shares** for this order (they must add up to 100%), for example
+  100% to one person who handled everything;
+- change **who did each role**. One person may hold several roles and gets
+  each role's amount.
+
+People sharing a role on an order share that role's amount equally.
 
 ## My Incentives (everyone with an incentive role)
 
 **My Incentives** (left menu) lists your own incentive on each order once
-its buyer has fully paid: the order, the client, your role, the amount and
+the MD has locked it: the order, the client, your role, the amount and
 its status:
 
-- **"November 2026 incentive"**: fixed, to be paid with the November
-  salary;
+- **"November 2026 incentive"**: locked, to be paid in the November payout
+  run;
 - **"November 2026 incentive — paid"**: paid.
 
-At the top: what you have been paid this year, and what is coming with the
-next salary. You see only your own amounts. Nothing else about the order's
-incentive is shown, and nothing appears before the buyer has fully paid.
+At the top: what you have been paid this year, and what is coming in each
+payout run. You see only your own amounts. Nothing else about the order's
+incentive is shown, and nothing appears before the order is locked.
 
 ## Incentive Payouts (Accounts)
 
@@ -58,8 +88,8 @@ incentive is shown, and nothing appears before the buyer has fully paid.
 incentive month, who is to be paid how much for which order, including the
 associates (outside people who introduced a client; see below).
 
-1. Choose the **incentive month**. The list shows its cycle, e.g. "orders
-   fully paid 21 Oct to 20 Nov · paid with the November salary".
+1. Choose the **payout run** (month). The list shows e.g. "November 2026
+   payout run — orders locked before it".
 2. Pay staff incentives together with the month's salary, through payroll
    (salary TDS). Pay an associate against their invoice; the app works out
    the associate's TDS (194H, threshold, catch-up, no-PAN rate, abroad
@@ -86,18 +116,24 @@ sync (chapter [CA-03](./ca-03-zoho-sync.md)).
 ## In the order's figures
 
 The team incentive and an associate's commission are costs of the order.
-An associate's commission is worked out on the invoiced FOB of the goods at the level fixed on the order at the PI (chapter 24, D-245 P3); the team's basis is the order profit after it. Once the buyer has fully paid, each appears in the order's costs (Step 12a,
-as a "Commission" line set by Team Incentive, which cannot be removed
-there), in its profit (Step 12c), in the reports and in the CA Financial
-Annexure. Only management sees how an order's incentive was decided.
+An associate's commission is worked out on the invoiced FOB of the goods at
+the level fixed on the order at the PI (chapter 24, D-245 P3); the team's
+basis is the order profit after it. Once the MD locks the order, each
+appears in the order's costs (Step 12a, as a "Commission" line set by Team
+Incentive, which cannot be removed there), in its profit (Step 12c), in the
+reports and in the CA Financial Annexure.
 
-On the order page, **Step 12d · Team Incentive** shows only while the team
-incentive program is switched on (Team Incentives → settings; owner
-request 3 Nov 2026). With the program off, Step 12d is hidden — unless the
-client was brought by an associate: then it shows only the associate's
-part, titled **Step 12d · Associate Commission** (the commission and its
-Automatic / Yes / No choice; the team reward, Exclude, who-gets-what and
-people are hidden and keep what was saved).
+A line the MD approved below its floor (chapter 27) already lowered the
+order's profit, so the incentive — a % of the actual profit — is already
+lower; the price check's "incentive cut" is shown on the card as an
+explanation and never taken off a second time.
+
+On the order page, **Step 12d · Team Incentive** is for the MD, the ED
+(read-only) and people with "Manage team incentives". It shows the profit,
+the associate's commission, the global rule, the amount for this order, the
+profit left for NexaCrest, who gets it, the state and the history. With the
+program off it still shows for the MD (to set an incentive by hand), and for
+an order whose client came through an associate.
 
 ## Associates
 

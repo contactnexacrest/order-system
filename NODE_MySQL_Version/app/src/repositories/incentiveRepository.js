@@ -12,14 +12,100 @@ const db = require('../config/db');
  * used while fixing an order take an optional `c` (a transaction scope).
  */
 
-/** Incentive roles, in the order the screens list them. */
-const ROLES = {
-  sales: 'Sales',
-  export: 'Export Executive',
-  marketing: 'Marketing',
-  logistics: 'Logistics',
-  accounts: 'Accounts',
-};
+/** Cache of incentive_roles by key (kept for the synchronous roleLabel used by the views). */
+let roleCache = null;
+
+/**
+ * Owner decision D-245 P4: the incentive roles are an editable list
+ * (incentive_roles). Every role, active and not, by key, in screen order.
+ */
+async function allRoles() {
+  if (roleCache === null) {
+    const out = {};
+    for (const r of await db.query('SELECT * FROM incentive_roles ORDER BY sort_order, id')) {
+      out[String(r.role_key)] = { id: Number(r.id), role_key: String(r.role_key), label: String(r.label), share_pct: Number(r.share_pct),
+        is_active: Number(r.is_active) === 1, sort_order: Number(r.sort_order) };
+    }
+    roleCache = out;
+  }
+  return roleCache;
+}
+
+/** Active roles: key => label, in screen order. */
+async function roles() {
+  const out = {};
+  for (const [k, r] of Object.entries(await allRoles())) {
+    if (r.is_active) out[k] = r.label;
+  }
+  return out;
+}
+
+/** The label of a role key (also of a deactivated role, as payouts keep their key). Uses the loaded list. */
+function roleLabel(key) {
+  if (roleCache && roleCache[key]) return roleCache[key].label;
+  return key === 'associate' ? 'Associate (agreement)' : key;
+}
+
+function forgetRoles() {
+  roleCache = null;
+}
+
+/** Whether a role key is used anywhere (people, payouts, an order's ticks) — then it can only be deactivated. */
+async function roleInUse(key) {
+  for (const [table, col] of [['user_incentive_roles', 'role'], ['order_incentive_people', 'role'], ['incentive_payouts', 'role'], ['order_incentive_roles', 'role_key']]) {
+    if (await db.queryOne(`SELECT 1 AS x FROM ${table} WHERE ${col} = :k LIMIT 1`, { k: key })) return true;
+  }
+  return false;
+}
+
+async function saveRoles(rows, userId) {
+  const existing = await allRoles();
+  for (const r of rows) {
+    const params = { k: r.role_key, l: r.label, p: r.share_pct, a: r.is_active ? 1 : 0, o: r.sort_order, u: userId };
+    if (existing[r.role_key]) {
+      await db.execute('UPDATE incentive_roles SET label = :l, share_pct = :p, is_active = :a, sort_order = :o, updated_by = :u WHERE role_key = :k', params);
+    } else {
+      await db.execute('INSERT INTO incentive_roles (role_key, label, share_pct, is_active, sort_order, updated_by) VALUES (:k, :l, :p, :a, :o, :u)', params);
+    }
+  }
+  forgetRoles();
+}
+
+async function deleteRole(key) {
+  await db.execute('DELETE FROM incentive_roles WHERE role_key = :k', { k: key });
+  forgetRoles();
+}
+
+/** The order's ticks and shares by role key. */
+async function orderRoles(orderId) {
+  const out = {};
+  for (const r of await db.query('SELECT role_key, gets_it, share_pct FROM order_incentive_roles WHERE order_id = :id', { id: orderId })) {
+    out[String(r.role_key)] = { gets_it: Number(r.gets_it) === 1, share_pct: r.share_pct !== null ? Number(r.share_pct) : null };
+  }
+  return out;
+}
+
+async function replaceOrderRoles(orderId, roleMap) {
+  await db.execute('DELETE FROM order_incentive_roles WHERE order_id = :id', { id: orderId });
+  for (const [key, r] of Object.entries(roleMap)) {
+    await db.execute('INSERT INTO order_incentive_roles (order_id, role_key, gets_it, share_pct) VALUES (:o, :k, :g, :s)',
+      { o: orderId, k: key, g: r.gets_it ? 1 : 0, s: r.share_pct });
+  }
+}
+
+/** Owner decision D-245 P4: every change to an order's incentive is kept. */
+async function addHistory(orderId, action, before, after, reason, userId, c = db) {
+  await c.execute('INSERT INTO order_incentive_history (order_id, action, before_value, after_value, reason, changed_by) VALUES (:o, :a, :b, :v, :r, :u)',
+    { o: orderId, a: action, b: before ?? null, v: after ?? null, r: reason ?? null, u: userId });
+}
+
+/** Newest first, with the name of who changed it. */
+async function history(orderId) {
+  return db.query(
+    `SELECT h.*, u.name AS changed_by_name FROM order_incentive_history h LEFT JOIN users u ON u.id = h.changed_by
+      WHERE h.order_id = :id ORDER BY h.changed_at DESC, h.id DESC`, { id: orderId }
+  );
+}
 
 /** @returns {Promise<Object<string,string>>} setting_key => setting_value */
 async function settings() {
@@ -50,9 +136,10 @@ async function userRoles() {
 /** @param {Object<number, string[]>} rolesByUser */
 async function replaceUserRoles(rolesByUser) {
   await db.execute('DELETE FROM user_incentive_roles');
-  for (const [userId, roles] of Object.entries(rolesByUser)) {
-    for (const role of [...new Set(roles)]) {
-      if (ROLES[role]) {
+  const active = await roles();
+  for (const [userId, list] of Object.entries(rolesByUser)) {
+    for (const role of [...new Set(list)]) {
+      if (active[role]) {
         await db.execute('INSERT INTO user_incentive_roles (user_id, role) VALUES (:u, :r)', { u: Number(userId), r: role });
       }
     }
@@ -98,9 +185,11 @@ async function replaceOrderPeople(orderId, people) {
 
 async function addPayout(row, c = db) {
   const result = await c.execute(
-    `INSERT INTO incentive_payouts (order_id, payee_kind, user_id, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month)
-     VALUES (:order_id, :payee_kind, :user_id, :associate_id, :role, :amount_inr, :amount_fc, :currency_code, :incentive_month)`,
+    `INSERT INTO incentive_payouts (order_id, payee_kind, user_id, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month, payout_run_on, locked_on)
+     VALUES (:order_id, :payee_kind, :user_id, :associate_id, :role, :amount_inr, :amount_fc, :currency_code, :incentive_month, :payout_run_on, :locked_on)`,
     {
+      payout_run_on: row.payout_run_on ?? null,
+      locked_on: row.locked_on ?? null,
       order_id: row.order_id,
       payee_kind: row.payee_kind,
       user_id: row.user_id ?? null,
@@ -266,7 +355,7 @@ async function settleCostEntry(entryId, amountInr, paidOn, paidNote = null) {
 /** Owner rule D-212: how a payout was paid. */
 const PAID_VIA = { salary: 'with the salary (payroll)', bank_transfer: 'by bank transfer', cheque: 'by cheque' };
 
-/** Order ids whose buyer may have fully paid and whose incentive is not fixed yet. */
+/** Order ids whose buyer may have fully paid and whose incentive is not locked yet (candidates for "ready to lock"). */
 async function unlockedOrderIdsWithPayments() {
   return (await db.query(
     `SELECT o.id FROM orders o
@@ -282,7 +371,17 @@ module.exports = {
   setPayoutTds,
   setPayoutChallan,
   addClawbackWithinPaid,
-  ROLES,
+  allRoles,
+  roles,
+  roleLabel,
+  forgetRoles,
+  roleInUse,
+  saveRoles,
+  deleteRole,
+  orderRoles,
+  replaceOrderRoles,
+  addHistory,
+  history,
   PAID_VIA,
   settings,
   setSetting,

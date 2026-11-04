@@ -4,12 +4,12 @@
     <label>Incentive month
       <select name="month" onchange="this.form.submit()">
         {% for m in months %}
-          <option value="{{ m }}"{{ ' selected' if m == month else '' }}>{{ incentive.monthLabel(m) }} incentive — orders fully paid {{ incentive.cycleLabel(m, cutoff) }} · paid with the {{ incentive.monthName(m) }} salary</option>
+          <option value="{{ m }}"{{ ' selected' if m == month else '' }}>{{ incentive.monthLabel(m) }} payout run — orders locked before it</option>
         {% endfor %}
       </select></label>
     <noscript><button type="submit" class="btn-sm">Show</button></noscript>
   </form>
-  <p class="muted">Pay these together with the {{ incentive.monthName(month) }} salary on {{ incentive.payDay(month) }} (associates: against their invoice), then mark them paid. Each order's incentive then goes to Zoho Books as Commission Expense. Staff incentives go through payroll (salary TDS). For associates the app works out the TDS (Settings &rarr; Associate TDS: section {{ tdsSettings.section }} at {{ tdsRatePct }} once the financial year passes &#8377;{{ tdsSettings.threshold | money0 }}) — pay the net amount and deposit the TDS by the 7th of next month.</p>
+  <p class="muted">Pay these in the {{ incentive.monthLabel(month) }} payout run ({{ runLabel }}; staff with the salary, associates against their invoice on or after their due date), then mark them paid. Each order's incentive then goes to Zoho Books as Commission Expense. Staff incentives go through payroll (salary TDS). For associates the app works out the TDS (Settings &rarr; Associate TDS: section {{ tdsSettings.section }} at {{ tdsRatePct }} once the financial year passes &#8377;{{ tdsSettings.threshold | money0 }}) — pay the net amount and deposit the TDS by the 7th of next month.</p>
 
   <table class="list">
     <tr><th>Person</th><th>Order</th><th>Role</th><th>Amount</th><th>Status</th><th>Paid on · amount paid · TDS</th></tr>
@@ -17,7 +17,7 @@
       <tr>
         <td>{{ r.user_name or r.associate_name }}{% if r.payee_kind == 'associate' %} <small class="muted">(associate, {{ 'India' if r.based_in == 'india' else (r.country or 'abroad') }})</small>{% endif %}</td>
         <td>{{ r.buyer_inquiry_ref or r.order_reference }}</td>
-        <td>{{ 'Associate (agreement)' if r.payee_kind == 'associate' else (incentive.roles[r.role] or r.role) }}</td>
+        <td>{{ 'Associate (agreement)' if r.payee_kind == 'associate' else incentive.roleLabel(r.role) }}</td>
         <td>&#8377;{{ r.amount_inr | money }}{% if r.payee_kind == 'associate' and r.currency_code and r.currency_code != 'INR' %}<br><small class="muted">{{ r.currency_code }} {{ r.amount_fc | money }} (order currency)</small>{% endif %}</td>
         <td>{% if r.status == 'paid' %}<span class="badge badge-success">Paid {{ r.paid_on | shortDate }}</span><br><small class="muted">&#8377;{{ r.paid_inr | money }}{% if r.tds_inr !== null %} · TDS &#8377;{{ r.tds_inr | money }}{% endif %}</small>{% else %}<span class="badge badge-warning">Due</span>{% endif %}</td>
         <td>

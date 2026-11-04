@@ -133,7 +133,7 @@ final class AssociateCommissionTest extends DbTestCase
         PricingRepository::setAssociateCommission($a, 'fixed', $this->level('Level 4'));
         self::assertSame('Level 2 — 5%', AssociateCommission::forOrder($orderId)['level_label']);
 
-        IncentiveService::lockIfDue($orderId, $this->admin);
+        IncentiveService::lockIfReady($orderId, $this->admin);
         $p = $this->associatePayout($orderId);
         self::assertSame(['49405.75', '595.25', '2026-11-24', '2026-12-05', '2026-12'], [$p['amount_inr'], $p['amount_fc'], $p['due_on'], $p['payout_run_on'], $p['incentive_month']]);
         self::assertSame('Associate commission — ' . AssociateRepository::find($a)['name'] . ' (Level 2 — 5%) on the invoiced FOB of the goods, USD 11,905.00; lines the MD approved below the floor earn nothing',
@@ -170,7 +170,7 @@ final class AssociateCommissionTest extends DbTestCase
         $big = $this->order($client, [[10000.0, 10.0]]);
         AssociateCommission::fixLevelAtPi($big);
         self::assertSame(['Level 2', 'pct', '5.0000'], array_values(Database::connection()->query("SELECT associate_level_name, associate_level_kind, associate_level_value FROM orders WHERE id = {$big}")->fetch(\PDO::FETCH_NUM)));
-        IncentiveService::lockIfDue($big, $this->admin);
+        IncentiveService::lockIfReady($big, $this->admin);
         self::assertSame(['1', '6'], [(string) IncentiveRepository::forOrder($big)['associate_counts'], (string) IncentiveRepository::forOrder($big)['associate_order_number']]);
 
         // A small order (USD 1,000 = ₹83,000): the current step after six counting orders is Level 2; it does not count.
@@ -180,7 +180,7 @@ final class AssociateCommissionTest extends DbTestCase
         AssociateCommission::fixLevelAtPi($small);
         $c = AssociateCommission::forOrder($small);
         self::assertSame(['Level 2 — 5%', 50.0, false], [$c['level_label'], $c['amount_fc'], $c['counts']]);
-        IncentiveService::lockIfDue($small, $this->admin);
+        IncentiveService::lockIfReady($small, $this->admin);
         self::assertSame(['0', 6], [(string) IncentiveRepository::forOrder($small)['associate_counts'], AssociateCommission::countingOrders($a)]);
     }
 
@@ -199,7 +199,7 @@ final class AssociateCommissionTest extends DbTestCase
                                           VALUES (:o, 'balance', 6000, 5000, 1000, 'written_off', 'Buyer stopped paying', :u, 'unpaid')")->execute(['o' => $unpaid, 'u' => $this->admin]);
         $c = AssociateCommission::forOrder($unpaid);
         self::assertSame(['unpaid', 0.0, 0.0], [$c['state'], $c['amount_fc'], $c['amount_inr']], 'no pro rata: nothing unless paid in full');
-        IncentiveService::lockIfDue($unpaid, $this->admin);
+        IncentiveService::lockIfReady($unpaid, $this->admin);
         self::assertNull($this->associatePayout($unpaid));
         self::assertSame('0', (string) IncentiveRepository::forOrder($unpaid)['associate_counts']);
         self::assertSame(0, AssociateCommission::countingOrders($a2));
@@ -211,7 +211,7 @@ final class AssociateCommissionTest extends DbTestCase
         $orderId = $this->order($client, [[1000.0, 1.0]], null);
         $c = AssociateCommission::forOrder($orderId);
         self::assertSame(['awaiting', null, 50.0], [$c['state'], $c['due_on'], $c['amount_fc']], 'an estimate until the buyer has paid in full');
-        IncentiveService::lockIfDue($orderId, $this->admin);
+        IncentiveService::lockIfReady($orderId, $this->admin);
         self::assertNull(IncentiveRepository::forOrder($orderId));
         self::assertSame(['agreed_discount', 'claim_settled', 'unpaid'], array_keys(AssociateCommission::SETTLEMENT_KINDS));
 
@@ -237,7 +237,7 @@ final class AssociateCommissionTest extends DbTestCase
 
         [, $client] = $this->associate();
         $orderId = $this->order($client, [[1000.0, 1.0]]);
-        IncentiveService::lockIfDue($orderId, $this->admin);
+        IncentiveService::lockIfReady($orderId, $this->admin);
         $p = $this->associatePayout($orderId);
         self::assertStringContainsString('due on 24 Nov 2026', (string) AssociateCommission::payBlockReason($p, '2026-11-20'));
         self::assertNull(AssociateCommission::payBlockReason($p, '2026-12-05'));
@@ -257,7 +257,7 @@ final class AssociateCommissionTest extends DbTestCase
     {
         [$a, $client] = $this->associate('fixed', 'Level 2', '29ABCDE1234F1Z5');
         $orderId = $this->order($client, [[10000.0, 10.0]]);
-        IncentiveService::lockIfDue($orderId, $this->admin);
+        IncentiveService::lockIfReady($orderId, $this->admin);
         $p = $this->associatePayout($orderId);
         self::assertSame('41500.00', $p['amount_inr']);
         self::assertSame(0.0, AssociateCommission::gstFor($p), 'no tax invoice yet');
@@ -266,7 +266,7 @@ final class AssociateCommissionTest extends DbTestCase
 
         [$b, $client2] = $this->associate();
         $order2 = $this->order($client2, [[10000.0, 10.0]]);
-        IncentiveService::lockIfDue($order2, $this->admin);
+        IncentiveService::lockIfReady($order2, $this->admin);
         $p2 = $this->associatePayout($order2);
         AssociateDocumentRepository::add($b, 'invoice', $this->createTestFile(), (int) $p2['id'], 'INV-P3-2', true, null);
         self::assertSame(0.0, AssociateCommission::gstFor($p2), 'not GST-registered: no GST');
@@ -278,7 +278,7 @@ final class AssociateCommissionTest extends DbTestCase
     {
         [, $client] = $this->associate();
         $orderId = $this->order($client, [[1000.0, 1.0]]);
-        IncentiveService::lockIfDue($orderId, $this->admin);
+        IncentiveService::lockIfReady($orderId, $this->admin);
         $p = $this->associatePayout($orderId);
         Database::connection()->prepare("UPDATE incentive_payouts SET status = 'paid', paid_on = '2026-12-05', paid_inr = amount_inr, paid_reference = 'UTR-PAID-1' WHERE id = :id")->execute(['id' => $p['id']]);
         $_POST = ['amount_inr' => '1000', 'reason' => 'Buyer was refunded for damage'];
@@ -297,16 +297,17 @@ final class AssociateCommissionTest extends DbTestCase
         [, $client] = $this->associate();
         $orderId = $this->order($client, [[1000.0, 1.0]], null);
         $this->actAs($this->createTestUser('Export Executive'));
-        $_POST = ['reward_override_inr' => '0', 'associate_mode' => 'yes', 'associate_mode_reason' => 'Buyer introduced before the registration was recorded'];
+        $_POST = ['associate_mode' => 'yes', 'associate_mode_reason' => 'Buyer introduced before the registration was recorded'];
         (new IncentiveController())->saveOrder(['id' => (string) $orderId]);
-        self::assertSame('Only the MD can force the associate\'s commission on for an order.', $this->flash());
+        // D-245 P4: every change to an order's incentive is the MD's (manage_pricing).
+        self::assertStringContainsString('Only the MD', $this->flash());
 
         $md = $this->createTestUser('Managing Director');
         $this->actAs($md);
-        $_POST = ['reward_override_inr' => '0', 'associate_mode' => 'yes', 'associate_mode_reason' => 'short'];
+        $_POST = ['associate_mode' => 'yes', 'associate_mode_reason' => 'short'];
         (new IncentiveController())->saveOrder(['id' => (string) $orderId]);
         self::assertStringContainsString('10 to 300 characters', $this->flash());
-        $_POST = ['reward_override_inr' => '0', 'associate_mode' => 'yes', 'associate_mode_reason' => 'Buyer introduced before the registration was recorded'];
+        $_POST = ['associate_mode' => 'yes', 'associate_mode_reason' => 'Buyer introduced before the registration was recorded'];
         (new IncentiveController())->saveOrder(['id' => (string) $orderId]);
         $row = IncentiveRepository::forOrder($orderId);
         self::assertSame(['yes', 'Buyer introduced before the registration was recorded', (string) $md], [$row['associate_mode'], $row['associate_mode_reason'], (string) $row['associate_mode_set_by']]);

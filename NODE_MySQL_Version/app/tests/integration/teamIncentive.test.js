@@ -16,8 +16,13 @@ const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = require('../support/globalSetu
 const { createTestClient, createTestOrder } = require('../support/fixtures');
 
 /**
- * Port of TeamIncentiveTest.php. Owner decision 2026-10-30 (mockups
- * approved): the team incentive program and associate commission.
+ * Port of TeamIncentiveTest.php. Owner decision 2026-10-30, reworked by
+ * D-245 P4 (4 Nov 2026): the team incentive is a % of the order's profit
+ * after the associate's commission (never below 0) or a fixed amount — global
+ * rule, product rule or the MD's amount for one order with a reason; editable
+ * roles whose shares add up to 100%; the MD ticks who gets it or sets the
+ * shares; nothing locks by itself (the MD locks a ready order, one or all;
+ * unlock with a reason until paid); every change in the order's history.
  */
 describe('Team incentive program and associates', () => {
   let admin;
@@ -48,19 +53,21 @@ describe('Team incentive program and associates', () => {
       [people.sales]: ['sales'], [people.export]: ['export'], [people.marketing]: ['marketing'],
       [people.logistics1]: ['logistics'], [people.logistics2]: ['logistics'], [people.accounts]: ['accounts'],
     });
-    const values = {
-      program_enabled: '1', program_start_date: '2026-01-01', min_profit_inr: '300000',
-      reward_table: '[{"from":300000,"reward":40000},{"from":500000,"reward":60000}]', new_client_bonus_inr: '10000',
-      role_split: '{"sales":40,"export":20,"marketing":15,"logistics":15,"accounts":10}', cutoff_day: '20',
-    };
-    for (const [k, v] of Object.entries(values)) {
-      await incentiveRepository.setSetting(k, v, admin);
-    }
+    await incentiveRepository.setSetting('program_enabled', '1', admin);
+    incentiveRepository.forgetRoles();
+    rolesBefore = JSON.parse(JSON.stringify(await incentiveRepository.allRoles()));
   });
+
+  let rolesBefore = {};
 
   afterEach(async () => {
     await incentiveRepository.replaceUserRoles({});
     await incentiveRepository.setSetting('program_enabled', '0', admin);
+    // The roles are shared by every test: put them back as they were.
+    for (const key of Object.keys(await incentiveRepository.allRoles())) {
+      if (!rolesBefore[key]) await incentiveRepository.deleteRole(key);
+    }
+    await incentiveRepository.saveRoles(Object.values(rolesBefore), admin);
   });
 
   afterAll(async () => {
@@ -87,62 +94,186 @@ describe('Team incentive program and associates', () => {
     const out = {};
     for (const p of await incentiveRepository.payoutsForOrder(orderId)) {
       const key = p.payee_kind === 'staff' ? Object.keys(people).find((k) => people[k] === Number(p.user_id)) : 'associate';
-      out[key] = Number(p.amount_inr);
+      out[key] = Math.round(((out[key] || 0) + Number(p.amount_inr)) * 100) / 100;
     }
     return out;
   }
 
-  it('the reward is split by role with the new client bonus and becomes the order\'s cost', async () => {
+  /** Calls an incentive controller action as the given user (default: the admin, who holds manage_pricing). */
+  async function call(action, orderId, body, as = null, permissions = { manage_pricing: true, manage_incentives: true }) {
+    const controller = require('../../src/controllers/incentiveController');
+    const req = { params: { id: String(orderId) }, body, query: {}, session: {}, user: { id: as || admin }, permissions };
+    const res = { redirect() {}, status() { return this; }, send() {}, renderView() {} };
+    await controller[action](req, res);
+    return flash.pull(req)[0] || { type: 'none', message: '' };
+  }
+
+  async function history(orderId) {
+    return (await incentiveRepository.history(orderId)).map((h) => h.action);
+  }
+
+  it('the global rule is a % of profit shared over the roles with people, and nothing locks by itself', async () => {
     const orderId = await paidOrder(await createTestClient());
-    const profitBefore = (await orderProfitabilityService.computeForOrder(orderId)).profit_inr;
-    expect(profitBefore).toBeGreaterThanOrEqual(300000);
-    expect(profitBefore).toBeLessThan(500000);
+    const calc = await incentiveService.calculate(orderId);
+    const expected = Math.round(calc.basis * 0.15 * 100) / 100;
+    expect([calc.source, calc.state, calc.amount, calc.team_total, calc.unallocated]).toEqual(['global', 'ready', expected, expected, 0]);
+    // Sales Manager and Export Compliance have nobody on this order: their shares go to the others in proportion (30:15:15:15:10).
+    expect(calc.roles.sales_manager.gets_it).toBe(false);
+    expect(calc.roles.sales.pct).toBe(Math.round(30 / 85 * 10000) / 100);
+    expect(await incentiveRepository.forOrder(orderId)).toBeNull(); // nothing locks by itself, even fully paid
+    expect(await incentiveService.readyToLock()).toContain(orderId);
 
-    await incentiveService.lockIfDue(orderId, admin);
-
-    // Sales 40% + 40/55 of the ₹10,000 new client bonus; Logistics shared
-    expect(await payouts(orderId)).toEqual({ sales: 23272.73, export: 8000, marketing: 8727.27, logistics1: 3000, logistics2: 3000, accounts: 4000 });
+    expect(await incentiveService.lockIfReady(orderId, admin)).toBeNull();
     const row = await incentiveRepository.forOrder(orderId);
-    expect([String(row.fully_paid_on).slice(0, 10), row.incentive_month, row.team_total_inr, row.new_client_bonus_inr]).toEqual(['2026-10-25', '2026-11', '50000.00', '10000.00']);
-
-    const entry = (await incentiveRepository.costEntries(orderId)).team;
-    expect([entry.category, entry.amount_inr, entry.paid_from]).toEqual(['commission', '50000.00', null]);
-    const after = await orderProfitabilityService.computeForOrder(orderId);
-    expect(after.profit_inr).toBeCloseTo(profitBefore - 50000, 2); // the team incentive is the order's cost
-    expect(after.team_incentive_inr).toBe(50000);
+    const run = await require('../../src/services/associateCommission').payoutRunOn(new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10));
+    expect([row.team_total_inr, row.incentive_month, Number(row.locked_by)]).toEqual([expected.toFixed(2), String(run).slice(0, 7), admin]);
+    const sum = Object.values(await payouts(orderId)).reduce((a, b) => a + b, 0);
+    expect(Math.round(sum * 100) / 100).toBe(expected); // the payouts add up to the incentive exactly
+    expect((await incentiveRepository.costEntries(orderId)).team.amount_inr).toBe(expected.toFixed(2));
+    expect(await history(orderId)).toEqual(['lock']);
+    expect(await incentiveService.state(orderId)).toBe('locked');
   });
 
-  it('the amount set on the order, the exclusion, the minimum and the switch', async () => {
-    const client = await createTestClient();
-    const first = await paidOrder(client);
-    await incentiveService.lockIfDue(first, admin);
+  it('the MD sets the order\'s amount with a reason and chooses who gets it', async () => {
+    const orderId = await paidOrder(await createTestClient());
+    expect((await call('saveOrder', orderId, { incentive_mode: 'fixed', incentive_value: '100000' })).message).toContain('Say why');
+    expect((await call('saveOrder', orderId, { incentive_mode: 'fixed', incentive_value: '100000', incentive_reason: 'Large first order, weekend work' })).type).toBe('success');
+    let calc = await incentiveService.calculate(orderId);
+    expect([calc.source, calc.amount, calc.team_total]).toEqual(['order_fixed', 100000, 100000]);
+    expect([calc.roles.sales.amount, calc.roles.export.amount, calc.roles.marketing.amount, calc.roles.logistics.amount, calc.roles.logistics.each, calc.roles.accounts.amount])
+      .toEqual([35294.12, 17647.06, 17647.06, 17647.06, 8823.53, 11764.7]);
 
-    const repeat = await paidOrder(client);
-    await incentiveRepository.saveOrder(repeat, { reward_override_inr: 70000 }, admin);
-    let calc = await incentiveService.calculate(repeat, '2026-10-25');
-    expect([calc.source, calc.reward, calc.new_client_bonus, calc.team_total]).toEqual(['override', 70000, 0, 70000]); // a repeat order gets no new client bonus
+    // One person does Sales and Export; Marketing and Accounts are unticked: 30:15:15 over Sales, Export, Logistics.
+    const flashOk = await call('saveOrderPeople', orderId, { gets_it: { sales: '1', export: '1', logistics: '1' },
+      people: { sales: [String(people.sales)], export: [String(people.sales)], logistics: [String(people.logistics1), String(people.logistics2)] },
+      people_note: 'Priya did sales and documents' });
+    expect(flashOk.type).toBe('success');
+    calc = await incentiveService.calculate(orderId);
+    expect([calc.roles.sales.amount, calc.roles.export.amount, calc.roles.logistics.amount, calc.roles.logistics.each, calc.roles.marketing.gets_it]).toEqual([50000, 25000, 25000, 12500, false]);
+    expect(calc.per_person.find((p) => p.id === people.sales).amount).toBe(75000); // one person, two roles
 
-    await incentiveRepository.saveOrder(repeat, { reward_override_inr: 0, is_excluded: 1 }, admin);
-    calc = await incentiveService.calculate(repeat);
-    expect([calc.source, calc.team_total]).toEqual(['excluded', 0]);
+    // Custom shares must add up to 100%; one person may get it all.
+    const post = { gets_it: { sales: '1', export: '1', logistics: '1' }, shares_customised: '1',
+      people: { sales: [String(people.sales)], export: [String(people.sales)], logistics: [String(people.logistics1)] } };
+    expect((await call('saveOrderPeople', orderId, { ...post, share_pct: { sales: '50', export: '20', logistics: '20' } })).message).toContain('add up to 100%');
+    expect((await call('saveOrderPeople', orderId, { ...post, share_pct: { sales: '100', export: '0', logistics: '0' } })).type).toBe('success');
+    calc = await incentiveService.calculate(orderId);
+    expect([calc.roles.sales.amount, calc.per_person.find((p) => p.id === people.sales).amount]).toEqual([100000, 100000]);
 
-    await incentiveRepository.saveOrder(repeat, { is_excluded: 0 }, admin);
-    await incentiveRepository.setSetting('min_profit_inr', '900000', admin);
-    expect((await incentiveService.calculate(repeat)).source).toBe('below_min');
-    await incentiveRepository.setSetting('min_profit_inr', '300000', admin);
+    // A % of this order's profit; more than the profit is refused.
+    expect((await call('saveOrder', orderId, { incentive_mode: 'pct', incentive_value: '25', incentive_reason: 'Quarter of the profit this time' })).type).toBe('success');
+    expect((await incentiveService.calculate(orderId)).amount).toBe(Math.round(calc.basis * 0.25 * 100) / 100);
+    expect((await call('saveOrder', orderId, { incentive_mode: 'fixed', incentive_value: '99999999', incentive_reason: 'Far too much on purpose' })).message).toContain('cannot be more than');
+    expect(await history(orderId)).toEqual(['amount', 'people', 'people', 'amount']); // every change is kept (newest first); refused ones are not
+  });
+
+  it('the profit used never goes below zero and an unpaid order is only estimated', async () => {
+    const orderId = await paidOrder(await createTestClient(), null);
+    await db.execute("INSERT INTO order_cost_entries (order_id, category, description, amount_inr, incurred_at, recorded_by) VALUES (:o, 'other', 'Jest big cost', 9000000, '2026-10-01', :u)", { o: orderId, u: admin });
+    const calc = await incentiveService.calculate(orderId);
+    expect(calc.basis_raw).toBeLessThan(0);
+    expect([calc.basis, calc.amount, calc.estimated, calc.state]).toEqual([0, 0, true, 'open']);
+    expect(await incentiveService.lockIfReady(orderId, admin)).toBe('The buyer has not paid in full yet.');
+    expect(await incentiveRepository.forOrder(orderId)).toBeNull();
+  });
+
+  it('with the program off the MD may still set an incentive by hand', async () => {
     await incentiveRepository.setSetting('program_enabled', '0', admin);
-    calc = await incentiveService.calculate(repeat);
-    expect([calc.source, calc.team_total]).toEqual(['off', 0]);
-    await incentiveRepository.setSetting('program_enabled', '1', admin);
-    expect((await incentiveService.calculate(repeat, '2025-12-31')).source).toBe('before_start');
+    const orderId = await paidOrder(await createTestClient());
+    let calc = await incentiveService.calculate(orderId);
+    expect([calc.source, calc.amount]).toEqual(['off', 0]);
+    expect((await call('saveOrder', orderId, { incentive_mode: 'fixed', incentive_value: '20000', incentive_reason: 'Special effort on this order' })).type).toBe('success');
+    calc = await incentiveService.calculate(orderId);
+    expect([calc.source, calc.amount, calc.team_total]).toEqual(['order_fixed', 20000, 20000]);
+    expect(calc.left_for_company).toBeCloseTo(calc.basis - 20000, 2);
   });
 
-  it('the associate\'s commission is deducted first, on the client\'s first ten days only', async () => {
+  it('below the minimum margin warns and more than the profit cannot be locked', async () => {
+    const orderId = await paidOrder(await createTestClient());
+    const { basis } = await incentiveService.calculate(orderId);
+    await incentiveRepository.saveOrder(orderId, { incentive_mode: 'fixed', incentive_value: basis - 1000 }, admin);
+    const calc = await incentiveService.calculate(orderId);
+    expect([calc.margin_warning, calc.over_profit]).toEqual([true, false]);
+    await incentiveRepository.saveOrder(orderId, { incentive_mode: 'fixed', incentive_value: basis + 100 }, admin);
+    expect((await incentiveService.calculate(orderId)).over_profit).toBe(true);
+    expect(await incentiveService.lockIfReady(orderId, admin)).toContain('more than the order');
+    expect((await incentiveRepository.forOrder(orderId)).locked_at).toBeNull();
+  });
+
+  it('lock all, unlock with a reason, and a paid order never changes', async () => {
+    const a = await paidOrder(await createTestClient());
+    const b = await paidOrder(await createTestClient());
+    const result = await incentiveService.lockAllReady(admin);
+    expect(result.locked).toBeGreaterThanOrEqual(2);
+    expect([await incentiveService.state(a), await incentiveService.state(b)]).toEqual(['locked', 'locked']);
+    expect(await incentiveService.readyToLock()).not.toContain(a);
+
+    expect(await incentiveService.unlock(a, admin, 'short')).toContain('Say why');
+    expect(await incentiveService.unlock(a, admin, 'A claim came in after locking')).toBeNull();
+    expect([await incentiveRepository.payoutsForOrder(a), await incentiveService.state(a)]).toEqual([[], 'ready']);
+    expect(await incentiveRepository.costEntries(a)).not.toHaveProperty('team');
+    expect(await history(a)).toEqual(['unlock', 'lock']);
+    expect((await incentiveRepository.history(a))[0].reason).toBe('A claim came in after locking');
+
+    const rows = await incentiveRepository.payoutsForOrder(b);
+    const today = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+    await incentiveService.markPaid(Number(rows[0].id), today, Number(rows[0].amount_inr), null, admin);
+    expect(await incentiveService.state(b)).toBe('paid');
+    expect(await incentiveService.unlock(b, admin, 'Trying to change a paid order')).toContain('already paid');
+    expect((await call('saveOrder', b, { incentive_mode: 'fixed', incentive_value: '1', incentive_reason: 'Trying to change it' })).message).toContain('locked');
+  });
+
+  it('only the MD changes or locks an order\'s incentive', async () => {
+    const orderId = await paidOrder(await createTestClient());
+    const ed = (await createTestUser('Executive Director')).id;
+    const edPerms = { view_price_buildup: true };
+    expect((await call('saveOrder', orderId, { incentive_mode: 'fixed', incentive_value: '5000', incentive_reason: 'ED trying to change' }, ed, edPerms)).message).toContain('Only the MD');
+    expect((await call('lock', orderId, {}, ed, edPerms)).message).toContain('Only the MD');
+    expect((await call('saveOrderPeople', orderId, { gets_it: { sales: '1' } }, ed, edPerms)).message).toContain('Only the MD');
+    expect(await incentiveRepository.forOrder(orderId)).toBeNull();
+    expect((await call('lock', orderId, {})).type).toBe('success');
+  });
+
+  it('the roles are an editable list whose shares add up to 100', async () => {
+    const controller = require('../../src/controllers/incentiveController');
+    const roles = async (changes) => {
+      const out = {};
+      for (const [k, r] of Object.entries(await incentiveRepository.allRoles())) {
+        out[k] = { label: r.label, share_pct: String(r.share_pct), ...(r.is_active ? { is_active: '1' } : {}) };
+      }
+      for (const [k, c] of Object.entries(changes)) {
+        out[k] = { ...out[k], ...c };
+        if (c.is_active === null) delete out[k].is_active;
+      }
+      return out;
+    };
+    const save = async (body) => {
+      const req = { params: {}, body: { lock_reminder_days: '3', ...body }, query: {}, session: {}, user: { id: admin }, permissions: { manage_pricing: true, manage_incentives: true } };
+      await controller.saveSettings(req, { redirect() {} });
+      incentiveRepository.forgetRoles();
+      return flash.pull(req)[0];
+    };
+    const del = async (key) => {
+      const req = { params: { key }, body: {}, query: {}, session: {}, user: { id: admin }, permissions: { manage_pricing: true, manage_incentives: true } };
+      await controller.deleteRole(req, { redirect() {} });
+      incentiveRepository.forgetRoles();
+      return flash.pull(req)[0];
+    };
+    expect((await save({ roles: await roles({ sales: { share_pct: '35' } }) })).message).toContain('add up to 100%');
+    expect((await save({ roles: await roles({ sales: { share_pct: '25' } }), new_role_label: 'Quality Check', new_role_share: '5' })).type).toBe('success');
+    const all = await incentiveRepository.allRoles();
+    expect([(await incentiveRepository.roles()).quality_check, all.quality_check.share_pct, all.sales.share_pct]).toEqual(['Quality Check', 5, 25]);
+    expect((await del('sales')).message).toContain('in use'); // used by people: only deactivate
+    expect((await del('quality_check')).message).toContain('Set the role');
+    expect((await save({ roles: await roles({ sales: { share_pct: '30' }, quality_check: { share_pct: '0', is_active: null } }) })).type).toBe('success');
+    expect((await del('quality_check')).type).toBe('success');
+    expect(await incentiveRepository.allRoles()).not.toHaveProperty('quality_check');
+  });
+
+  it('the associate\'s commission is deducted first and locks with the order', async () => {
     // D-245 P3: the associate on the ladder — step 1 (Level 1, 2%) of the invoiced FOB of the goods.
-    const associate = await associateRepository.create({
-      name: 'Jest Associate', based_in: 'abroad', country: 'USA', currency_code: 'USD', email: null, phone: null, tax_id: null,
-      agreement_signed_on: '2026-09-01', status: 'active', notes: null,
-    }, admin);
+    const associate = await associateRepository.create({ name: 'Jest Associate', based_in: 'abroad', country: 'USA', currency_code: 'USD',
+      email: null, phone: null, tax_id: null, agreement_signed_on: '2026-09-01', status: 'active', notes: null }, admin);
     const client = await createTestClient();
     await associateRepository.linkClient(client, associate, '2026-09-05');
 
@@ -151,10 +282,11 @@ describe('Team incentive program and associates', () => {
     const calc = await incentiveService.calculate(orderId);
     expect([calc.associate.level_label, calc.associate.rate, calc.associate.amount_fc, calc.associate.currency]).toEqual(['Level 1 — 2%', 2, 90, 'USD']);
     expect(calc.associate.amount_inr).toBeCloseTo(8000, 2); // USD 90.00 at the ₹88.89 actually received per dollar
-    expect(calc.basis).toBeCloseTo(profitBefore - 8000, 2);
+    expect(calc.basis).toBeCloseTo(profitBefore - 8000, 2); // the team incentive is worked out after the commission
+    expect(calc.amount).toBeCloseTo((profitBefore - 8000) * 0.15, 2);
 
-    await incentiveService.lockIfDue(orderId, admin);
-    expect((await payouts(orderId)).associate).toBeCloseTo(8000, 2);
+    await incentiveService.lockIfReady(orderId, admin);
+    expect((await payouts(orderId)).associate).toBeCloseTo(8000, 2); // the commission locks together with the order
     expect((await incentiveRepository.costEntries(orderId)).associate.amount_inr).toBe('8000.00');
 
     const later = await paidOrder(client);
@@ -164,19 +296,32 @@ describe('Team incentive program and associates', () => {
     expect((await incentiveService.calculate(later)).associate.amount_fc).toBe(90); // forced on: commission again
   });
 
-  it('the incentive month follows the cut-off day', () => {
-    expect(incentiveService.incentiveMonth('2026-10-20', '20')).toBe('2026-10');
-    expect(incentiveService.incentiveMonth('2026-10-21', '20')).toBe('2026-11');
-    expect(incentiveService.incentiveMonth('2026-12-25', '20')).toBe('2027-01');
-    expect(incentiveService.incentiveMonth('2026-10-31', 'last')).toBe('2026-10');
-    expect(incentiveService.cycleLabel('2026-11', '20')).toBe('21 Oct to 20 Nov');
-    expect(incentiveService.cycleLabel('2026-11', 'last')).toBe('1 Nov to 30 Nov');
+  it('the payout month is the payout run after the date', async () => {
+    await incentiveRepository.setSetting('associate_payout_run', 'monthly', admin);
+    await incentiveRepository.setSetting('associate_payout_day', '5', admin);
+    expect(await incentiveService.incentiveMonth('2026-10-05')).toBe('2026-10');
+    expect(await incentiveService.incentiveMonth('2026-10-06')).toBe('2026-11');
+    expect(await incentiveService.incentiveMonth('2026-12-25')).toBe('2027-01');
   });
 
-  it('nothing is fixed until the buyer has fully paid', async () => {
+  it('the MD is reminded before the payout run of orders ready to lock', async () => {
+    await incentiveRepository.setSetting('associate_payout_run', 'monthly', admin);
+    await incentiveRepository.setSetting('associate_payout_day', '5', admin);
+    await incentiveRepository.setSetting('lock_reminder_days', '3', admin);
+    await incentiveRepository.setSetting('lock_reminder_sent_for', '', admin);
+    await paidOrder(await createTestClient());
+    expect(await incentiveService.lockReminders('2026-11-01')).toBe(0); // not 3 days before the run
+    expect(await incentiveService.lockReminders('2026-11-02')).toBeGreaterThanOrEqual(1);
+    expect(await incentiveService.lockReminders('2026-11-02')).toBe(0); // once per run
+    const count = await db.queryOne("SELECT COUNT(*) AS n FROM notifications WHERE user_id = :u AND type = 'incentive_lock_reminder'", { u: admin });
+    expect(Number(count.n)).toBe(1);
+    await incentiveRepository.setSetting('lock_reminder_sent_for', '', admin);
+  });
+
+  it('nothing is ready until the buyer has fully paid', async () => {
     const orderId = await paidOrder(await createTestClient(), null);
     expect(await incentiveService.fullyPaidOn(orderId)).toBeNull();
-    await incentiveService.lockIfDue(orderId, admin);
+    expect(await incentiveService.lockIfReady(orderId, admin)).not.toBeNull();
     expect(await incentiveRepository.forOrder(orderId)).toBeNull();
     expect(await incentiveRepository.payoutsForOrder(orderId)).toEqual([]);
   });
@@ -185,24 +330,25 @@ describe('Team incentive program and associates', () => {
     const orderId = await paidOrder(await createTestClient());
     await db.execute("UPDATE orders SET company_legal_name = 'TEST-Incentive Sync Buyer' WHERE id = :o", { o: orderId });
     const toSync = async () => (await zohoPurchaseRepository.costEntriesToSync(null)).map((r) => Number(r.id));
-    await incentiveService.lockIfDue(orderId, admin);
-    expect(await toSync()).not.toContain(Number((await incentiveRepository.costEntries(orderId)).team.id)); // fixed but not paid: not picked up by the Zoho sync
+    await incentiveService.lockIfReady(orderId, admin);
+    const total = (await incentiveRepository.forOrder(orderId)).team_total_inr;
+    expect(await toSync()).not.toContain(Number((await incentiveRepository.costEntries(orderId)).team.id)); // locked but not paid: not picked up by the Zoho sync
     const rows = await incentiveRepository.payoutsForOrder(orderId);
-    await incentiveService.markPaid(Number(rows[0].id), '2026-11-30', Number(rows[0].amount_inr), null, admin);
+    const today = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+    await incentiveService.markPaid(Number(rows[0].id), today, Number(rows[0].amount_inr), null, admin);
     expect((await incentiveRepository.costEntries(orderId)).team.paid_from).toBeNull(); // not all paid yet: not sent
-    expect(await toSync()).not.toContain(Number((await incentiveRepository.costEntries(orderId)).team.id));
     for (const r of rows.slice(1)) {
-      await incentiveService.markPaid(Number(r.id), '2026-11-30', Number(r.amount_inr), null, admin);
+      await incentiveService.markPaid(Number(r.id), today, Number(r.amount_inr), null, admin);
     }
     const entry = (await incentiveRepository.costEntries(orderId)).team;
-    expect([entry.paid_from, String(entry.incurred_at).slice(0, 10), entry.amount_inr]).toEqual(['company_account', '2026-11-30', '50000.00']);
+    expect([entry.paid_from, String(entry.incurred_at).slice(0, 10), entry.amount_inr]).toEqual(['company_account', today, total]);
+    expect(String(entry.description)).toMatch(/^Team incentive for order/); // D-212: says what it is and for which order
     expect(await toSync()).toContain(Number(entry.id)); // all paid: the sync sends it as a Books expense
-    expect(await incentiveService.unlock(orderId, admin)).toBe('Part of this order\'s incentive is already paid, so its figures can no longer be worked out again.');
   });
 
   it('the incentive cost line cannot be removed by hand', async () => {
     const orderId = await paidOrder(await createTestClient());
-    await incentiveService.lockIfDue(orderId, admin);
+    await incentiveService.lockIfReady(orderId, admin);
     const entryId = Number((await incentiveRepository.costEntries(orderId)).team.id);
     const req = { params: { id: String(orderId), entryId: String(entryId) }, body: {}, query: {}, session: {}, user: { id: admin }, permissions: {} };
     const res = { redirect() {}, status() { return this; }, send() {} };
@@ -213,24 +359,27 @@ describe('Team incentive program and associates', () => {
 
   it('every page opens and staff see only their own amounts', async () => {
     const orderId = await paidOrder(await createTestClient());
-    await incentiveService.lockIfDue(orderId, admin);
+    await incentiveService.lockIfReady(orderId, admin);
+    const month = (await incentiveRepository.forOrder(orderId)).incentive_month;
     const agent = request.agent(app);
     let login = await agent.get('/login');
     await agent.post('/login').type('form').send({ _csrf: login.text.match(/name="_csrf"\s+value="([^"]+)"/)[1], email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD });
-    expect((await agent.get('/incentives/settings')).text).toContain('Incentive cut-off day');
+    expect((await agent.get('/incentives/settings')).text).toContain('Incentive roles and their usual shares');
+    expect((await agent.get('/incentives/ready')).text).toContain('Ready to lock');
     expect((await agent.get('/associates')).text).toContain('Add an associate');
-    const payoutsPage = (await agent.get('/incentives/payouts?month=2026-11')).text;
-    expect(payoutsPage).toContain('November 2026 incentive');
-    expect(payoutsPage).toContain('23,272.73');
+    const payoutsPage = (await agent.get(`/incentives/payouts?month=${month}`)).text;
+    expect(payoutsPage).toContain(`${incentiveService.monthLabel(month)} payout run`);
     expect(payoutsPage.replace(/<[^>]*>/g, '').toLowerCase()).not.toContain('profit'); // Accounts never sees profit
 
+    const own = (await payouts(orderId));
+    const fmt0 = (v) => Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 });
     const staff = request.agent(app);
     const staffEmail = (await db.queryOne('SELECT email FROM users WHERE id = :id', { id: people.logistics1 })).email;
     login = await staff.get('/login');
     await staff.post('/login').type('form').send({ _csrf: login.text.match(/name="_csrf"\s+value="([^"]+)"/)[1], email: staffEmail, password: 'JestIncentive1!' });
     const mine = (await staff.get('/my-incentives')).text;
-    expect(mine).toContain('3,000');
-    expect(mine).not.toContain('23,273'); // only their own amount
+    expect(mine).toContain(fmt0(own.logistics1));
+    expect(mine).not.toContain(fmt0(own.sales)); // only their own amount
     expect(mine.replace(/<[^>]*>/g, '').toLowerCase()).not.toContain('profit');
   });
 
@@ -241,19 +390,16 @@ describe('Team incentive program and associates', () => {
     const page = await agent.get('/incentives/settings');
     const csrf = page.text.match(/name="_csrf"\s+value="([^"]+)"/)[1];
     // Sent exactly as a browser sends it, through the real form parser.
-    const form = (salesShare) => [
-      `_csrf=${encodeURIComponent(csrf)}`, 'program_enabled=1', 'min_profit_inr=300000', 'cutoff_day=20', 'new_client_bonus_inr=10000',
-      'table_from%5B0%5D=300000', 'table_reward%5B0%5D=40000', 'table_from%5B1%5D=500000', 'table_reward%5B1%5D=60000',
-      'table_from%5B2%5D=', 'table_reward%5B2%5D=', 'table_from%5B3%5D=', 'table_reward%5B3%5D=', 'table_from%5B4%5D=', 'table_reward%5B4%5D=',
-      `split%5Bsales%5D=${salesShare}`, 'split%5Bexport%5D=20', 'split%5Bmarketing%5D=15', 'split%5Blogistics%5D=15', 'split%5Baccounts%5D=10',
+    const form = (days) => [
+      `_csrf=${encodeURIComponent(csrf)}`, 'program_enabled=1', `lock_reminder_days=${days}`, 'user_roles_present=1',
       `user_roles%5Bu${people.sales}%5D%5B%5D=sales`, `user_roles%5Bu${people.sales}%5D%5B%5D=marketing`, `user_roles%5Bu${people.accounts}%5D%5B%5D=accounts`,
     ].join('&');
-    await agent.post('/incentives/settings').type('form').send(form(40));
+    await agent.post('/incentives/settings').type('form').send(form(3));
     const roles = await incentiveRepository.userRoles();
     expect(Object.fromEntries(Object.entries(roles).map(([k, v]) => [k, [...v].sort()]))).toEqual({ [people.sales]: ['marketing', 'sales'], [people.accounts]: ['accounts'] });
 
-    await agent.post('/incentives/settings').type('form').send(form(45));
-    expect((await agent.get('/incentives/settings')).text).toContain('The role shares must add up to 100%'); // refused
+    await agent.post('/incentives/settings').type('form').send(form(40));
+    expect((await agent.get('/incentives/settings')).text).toContain('0 to 28 days'); // refused
   });
 
   it('only you and the MD manage incentives, Accounts pays and staff see their own', async () => {
@@ -262,7 +408,9 @@ describe('Team incentive program and associates', () => {
       return !!(await permissionRepository.effectivePermissions(u.id, u.roleId))[perm];
     };
     expect(await can('Managing Director', 'manage_incentives')).toBe(true);
+    expect(await can('Managing Director', 'manage_pricing')).toBe(true);
     expect(await can('Executive Director', 'manage_incentives')).toBe(false);
+    expect(await can('Executive Director', 'manage_pricing')).toBe(false);
     expect(await can('Accounts Executive', 'manage_incentives')).toBe(false);
     expect(await can('Accounts Executive', 'pay_incentives')).toBe(true);
     expect(await can('Export Executive', 'pay_incentives')).toBe(false);

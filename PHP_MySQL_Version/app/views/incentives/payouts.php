@@ -20,7 +20,6 @@ foreach ($rows as $r) {
         $__dueIds[] = (int) $r['id'];
     }
 }
-$__payDay = date('j M', strtotime(date('Y-m-t', strtotime($month . '-01'))));
 ?>
 <div class="card">
   <h1>Incentive Payouts</h1>
@@ -28,12 +27,12 @@ $__payDay = date('j M', strtotime(date('Y-m-t', strtotime($month . '-01'))));
     <label>Incentive month
       <select name="month" onchange="this.form.submit()">
         <?php foreach ($months as $m): ?>
-          <option value="<?= htmlspecialchars($m) ?>"<?= $m === $month ? ' selected' : '' ?>><?= htmlspecialchars(IncentiveService::monthLabel($m)) ?> incentive — orders fully paid <?= htmlspecialchars(IncentiveService::cycleLabel($m, $cutoff)) ?> · paid with the <?= htmlspecialchars(date('F', strtotime($m . '-01'))) ?> salary</option>
+          <option value="<?= htmlspecialchars($m) ?>"<?= $m === $month ? ' selected' : '' ?>><?= htmlspecialchars(IncentiveService::monthLabel($m)) ?> payout run — orders locked before it</option>
         <?php endforeach; ?>
       </select></label>
     <noscript><button type="submit" class="btn-sm">Show</button></noscript>
   </form>
-  <p class="muted">Pay these together with the <?= htmlspecialchars(date('F', strtotime($month . '-01'))) ?> salary on <?= htmlspecialchars($__payDay) ?> (associates: against their invoice), then mark them paid. Each order's incentive then goes to Zoho Books as Commission Expense. Staff incentives go through payroll (salary TDS). For associates the app works out the TDS (Settings &rarr; Associate TDS: section <?= htmlspecialchars(\App\Services\AssociateTds::settings()['section']) ?> at <?= htmlspecialchars(\App\Services\AssociateTds::pct(\App\Services\AssociateTds::settings()['rate'])) ?> once the financial year passes &#8377;<?= number_format(\App\Services\AssociateTds::settings()['threshold'], 0) ?>) — pay the net amount and deposit the TDS by the 7th of next month.</p>
+  <p class="muted">Pay these in the <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?> payout run (<?= htmlspecialchars(\App\Services\AssociateCommission::runLabel()) ?>; staff with the salary, associates against their invoice on or after their due date), then mark them paid. Each order's incentive then goes to Zoho Books as Commission Expense. Staff incentives go through payroll (salary TDS). For associates the app works out the TDS (Settings &rarr; Associate TDS: section <?= htmlspecialchars(\App\Services\AssociateTds::settings()['section']) ?> at <?= htmlspecialchars(\App\Services\AssociateTds::pct(\App\Services\AssociateTds::settings()['rate'])) ?> once the financial year passes &#8377;<?= number_format(\App\Services\AssociateTds::settings()['threshold'], 0) ?>) — pay the net amount and deposit the TDS by the 7th of next month.</p>
 
   <table class="list">
     <tr><th>Person</th><th>Order</th><th>Role</th><th>Amount</th><th>Status</th><th>Paid on · amount paid · TDS</th></tr>
@@ -41,7 +40,7 @@ $__payDay = date('j M', strtotime(date('Y-m-t', strtotime($month . '-01'))));
       <tr>
         <td><?= htmlspecialchars((string) ($r['user_name'] ?? $r['associate_name'])) ?><?= $r['payee_kind'] === 'associate' ? ' <small class="muted">(associate, ' . htmlspecialchars($r['based_in'] === 'india' ? 'India' : ((string) ($r['country'] ?: 'abroad'))) . ')</small>' : '' ?></td>
         <td><?= htmlspecialchars((string) ($r['buyer_inquiry_ref'] ?: $r['order_reference'])) ?></td>
-        <td><?= htmlspecialchars($r['payee_kind'] === 'associate' ? 'Associate (agreement)' : (IncentiveRepository::ROLES[$r['role']] ?? (string) $r['role'])) ?></td>
+        <td><?= htmlspecialchars($r['payee_kind'] === 'associate' ? 'Associate (agreement)' : IncentiveRepository::roleLabel((string) $r['role'])) ?></td>
         <td>&#8377;<?= number_format((float) $r['amount_inr'], 2) ?><?= $r['payee_kind'] === 'associate' && $r['currency_code'] !== null && $r['currency_code'] !== 'INR' ? '<br><small class="muted">' . htmlspecialchars((string) $r['currency_code']) . ' ' . number_format((float) $r['amount_fc'], 2) . ' (order currency)</small>' : '' ?></td>
         <td><?= $r['status'] === 'paid' ? '<span class="badge badge-success">Paid ' . htmlspecialchars(\App\Helpers\Dates::short((string) $r['paid_on'])) . '</span><br><small class="muted">&#8377;' . number_format((float) $r['paid_inr'], 2) . ($r['tds_inr'] !== null ? ' · TDS &#8377;' . number_format((float) $r['tds_inr'], 2) : '') . '</small>' : '<span class="badge badge-warning">Due</span>' ?></td>
         <td>

@@ -1,0 +1,24 @@
+<div class="card">
+  <h1>Ready to lock</h1>
+  <p class="muted">Owner decision D-245: nothing locks by itself. These orders are fully paid by the buyer with no claim open. Locking fixes the team incentive and the associate's commission; the team is paid in the next payout run ({{ nextRun | shortDate }} if locked today), the associate on their due date.</p>
+  <table class="list">
+    <tr><th>Order</th><th>Client</th><th>Fully paid</th><th>Profit for the incentive (&#8377;)</th><th>Team incentive (&#8377;)</th><th>Associate (&#8377;)</th><th></th></tr>
+    {% for r in rows %}
+      <tr>
+        <td><a href="/orders/{{ r.order.id }}#financials-12d">{{ r.order.buyer_inquiry_ref or r.order.order_reference }}</a></td>
+        <td>{{ r.order.company_legal_name }}</td>
+        <td>{{ r.paidOn | shortDate }}</td>
+        <td>{{ r.calc.basis | money }}</td>
+        <td>{{ r.calc.team_total | money }}{% if r.calc.over_profit %} <span class="badge badge-danger">more than the profit</span>{% elif r.calc.margin_warning %} <span class="badge badge-warning">below minimum margin</span>{% endif %}</td>
+        <td>{% if r.calc.associate %}{{ r.calc.associate.amount_inr | money }}{% else %}—{% endif %}</td>
+        <td>{% if canManagePricing %}<form method="post" action="/orders/{{ r.order.id }}/incentive/lock" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">Lock</button></form>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    {% if rows.length == 0 %}<tr><td colspan="7" class="muted">Nothing is ready to lock.</td></tr>{% endif %}
+  </table>
+  {% if canManagePricing and rows.length %}
+    <form method="post" action="/incentives/ready/lock-all" data-confirm="Lock all {{ rows.length }} ready orders?" style="margin-top:10px">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit">Lock all ready ({{ rows.length }})</button>
+    </form>
+  {% endif %}
+</div>

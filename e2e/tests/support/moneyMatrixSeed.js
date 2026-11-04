@@ -138,9 +138,10 @@ async function main() {
     );
   });
   await db.execute(
-    `INSERT INTO order_incentives (order_id, reward_override_inr, team_total_inr, associate_amount_inr)
-     VALUES (:o, :v, :v, :v)
-     ON DUPLICATE KEY UPDATE reward_override_inr = :v, team_total_inr = :v, associate_amount_inr = :v`,
+    // D-245 P4: the order's own team incentive (a fixed amount set by the MD).
+    `INSERT INTO order_incentives (order_id, incentive_mode, incentive_value, team_total_inr, associate_amount_inr)
+     VALUES (:o, 'fixed', :v, :v, :v)
+     ON DUPLICATE KEY UPDATE incentive_mode = 'fixed', incentive_value = :v, team_total_inr = :v, associate_amount_inr = :v`,
     { o: orderId, v: SENTINELS.incentives }
   );
   // A staff incentive payout for this order (Incentives → Payouts, My incentives, the order's 12d).
@@ -162,7 +163,7 @@ async function main() {
     ['SUPPLIER_BILL_ADDED', 'taxable_inr', SENTINELS.purchase],
     ['LOGISTICS_BILL_ADDED', 'taxable_inr', SENTINELS.logistics],
     ['ORDER_EXPENSE_ADDED', 'amount_inr', SENTINELS.financials],
-    ['ORDER_INCENTIVE_SET', 'reward_override_inr', SENTINELS.incentives],
+    ['ORDER_INCENTIVE_SET', 'incentive', SENTINELS.incentives],
   ];
   for (const [action, field, value] of auditRows) {
     await db.execute(

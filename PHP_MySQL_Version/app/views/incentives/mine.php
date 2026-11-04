@@ -19,7 +19,7 @@ foreach ($payouts as $p) {
   <div class="kv-grid">
     <div><span class="k">Paid in <?= $__year ?></span><span class="v">&#8377;<?= number_format($__paidThisYear, 0) ?></span></div>
     <?php foreach ($__due as $month => $amount): ?>
-      <div><span class="k">Your <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?> incentive (paid with the <?= htmlspecialchars(date('F', strtotime($month . '-01'))) ?> salary)</span><span class="v">&#8377;<?= number_format($amount, 0) ?></span></div>
+      <div><span class="k">Your <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?> payout run</span><span class="v">&#8377;<?= number_format($amount, 0) ?></span></div>
     <?php endforeach; ?>
   </div>
   <table class="list" style="margin-top:12px">
@@ -28,14 +28,14 @@ foreach ($payouts as $p) {
       <tr>
         <td><?= htmlspecialchars((string) ($p['buyer_inquiry_ref'] ?: $p['order_reference'])) ?></td>
         <td><?= htmlspecialchars((string) $p['company_legal_name']) ?></td>
-        <td><?= htmlspecialchars(IncentiveRepository::ROLES[$p['role']] ?? (string) $p['role']) ?></td>
+        <td><?= htmlspecialchars(IncentiveRepository::roleLabel((string) $p['role'])) ?></td>
         <td><?= number_format((float) ($p['status'] === 'paid' ? $p['paid_inr'] : $p['amount_inr']), 0) ?></td>
         <td><?= $p['status'] === 'paid'
             ? '<span class="badge badge-success">' . htmlspecialchars(IncentiveService::monthLabel((string) $p['incentive_month'])) . ' incentive — paid</span>'
             : '<span class="badge badge-warning">' . htmlspecialchars(IncentiveService::monthLabel((string) $p['incentive_month'])) . ' incentive</span>' ?></td>
       </tr>
     <?php endforeach; ?>
-    <?php if ($payouts === []): ?><tr><td colspan="5" class="muted">Nothing yet. Your incentives appear here once the buyer of an order you worked on has fully paid.</td></tr><?php endif; ?>
+    <?php if ($payouts === []): ?><tr><td colspan="5" class="muted">Nothing yet. Your incentives appear here once an order you worked on is locked by the MD.</td></tr><?php endif; ?>
   </table>
-  <p class="muted small">An order appears here once the buyer has fully paid. Incentive cycle: <?= $cutoff === 'last' ? 'the 1st to the last day of the month' : 'the ' . ((int) $cutoff + 1) . date('S', mktime(0, 0, 0, 1, (int) $cutoff + 1)) . ' of last month to the ' . (int) $cutoff . date('S', mktime(0, 0, 0, 1, (int) $cutoff)) . ' of this month' ?>. Your incentive for the cycle is paid together with your salary on the last day of the month.</p>
+  <p class="muted small">An order appears here once the MD has locked it (after the buyer has fully paid). Each incentive is paid in the payout run after the lock (<?= htmlspecialchars(\App\Services\AssociateCommission::runLabel()) ?>).</p>
 </div>

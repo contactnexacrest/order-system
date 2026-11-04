@@ -149,6 +149,8 @@ njkEnv.addFilter('humanDate', dates.human);
 // D-215 (5a): an order line's stored attribute values (JSON) as an object for the line forms.
 njkEnv.addFilter('fromJson', (v) => { try { return v ? JSON.parse(v) : {}; } catch (e) { return {}; } });
 njkEnv.addFilter('shortDate', dates.short);
+// D-245 P4: the time (HH:MM) of a 'YYYY-MM-DD HH:MM:SS' value, for the incentive history.
+njkEnv.addFilter('timeHm', (v) => String(v || '').slice(11, 16));
 // Nunjucks 3's selectattr/rejectattr only test truthiness — these filter a
 // list of objects by an attribute's exact value instead.
 njkEnv.addFilter('whereEq', (list, attr, value) => (list || []).filter((item) => item && item[attr] === value));
@@ -207,12 +209,10 @@ njkEnv.addFilter('pct2', (value) => {
 });
 njkEnv.addFilter('pluck', (list, attr) => (list || []).map((item) => item && item[attr]));
 njkEnv.addGlobal('incentive', {
-  roles: require('./repositories/incentiveRepository').ROLES,
+  // D-245 P4: the roles are an editable list; the label of a role key (the list is loaded by the controller).
+  roleLabel: (k) => require('./repositories/incentiveRepository').roleLabel(k),
   monthLabel: (m) => require('./services/incentiveService').monthLabel(m),
   monthName: (m) => require('./services/incentiveService').monthName(m),
-  cycleLabel: (m, c) => require('./services/incentiveService').cycleLabel(m, c),
-  cycleSentence: (c) => require('./services/incentiveService').cycleSentence(c),
-  payDay: (m) => require('./services/incentiveService').payDay(m),
 });
 njkEnv.addFilter('legLabel', (leg) => require('./repositories/caRepository').legLabel(leg));
 // Owner decision D-245 (4 Nov 2026): PricingService::pct()/modeLabel() for the pricing views.
@@ -1031,6 +1031,11 @@ app.post('/associates/payouts/:payoutId/clawback', requireAuth, requirePermissio
 app.post('/orders/:id/incentive', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveOrder));
 app.post('/orders/:id/incentive/people', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.saveOrderPeople));
 app.post('/orders/:id/incentive/recalculate', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.recalculate));
+// Owner decision D-245 P4: the MD locks an order's incentive (nothing locks by itself), one or all ready; unlock (above) needs a reason.
+app.post('/orders/:id/incentive/lock', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.lock));
+app.get('/incentives/ready', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.ready));
+app.post('/incentives/ready/lock-all', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.lockAll));
+app.post('/incentives/roles/:key/delete', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.deleteRole));
 app.get('/my-incentives', requireAuth, requirePermission('view_own_incentives'), asyncHandler(incentiveController.mine));
 app.get('/incentives/payouts', requireAuth, requirePermission('pay_incentives'), asyncHandler(incentiveController.payouts));
 app.post('/incentives/payouts/paid-all', requireAuth, requirePermission('pay_incentives'), verifyCsrf, asyncHandler(incentiveController.markPaid));
