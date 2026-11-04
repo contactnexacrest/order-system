@@ -758,28 +758,51 @@ async function suppliers(req, res) {
  * manage_order_financials (not the general view_reports), same reasoning
  * as the order-page panel this mirrors: it surfaces per-order margin data.
  */
+const PROFITABILITY_HEADERS = ['Order Ref', 'Client', 'Created', 'Revenue (INR)', 'Revenue estimated', 'Cost before commission & incentive (INR)',
+  'Profit before commission & incentive (INR)', 'Associate commission (INR)', 'Commission state', 'Team incentive (INR)', 'Incentive state',
+  'Profit after commission & incentive (INR)', 'Margin after %'];
+
+/** Money separation: these columns only for whoever manages or pays incentives or sees the price build-up. */
+const INCENTIVE_COLUMNS = ['Associate commission (INR)', 'Commission state', 'Team incentive (INR)', 'Incentive state', 'Profit after commission & incentive (INR)', 'Margin after %'];
+
+/** D-245 P5: the on-screen columns of the profitability report. */
+function profitabilityCsvRows(rows) {
+  const { stateLabel } = require('../services/orderProfitabilityService');
+  return rows.map((r) => ({
+    'Order Ref': r.order_reference,
+    Client: r.company_legal_name,
+    Created: r.created_at,
+    'Revenue (INR)': r.revenue_inr,
+    'Revenue estimated': r.revenue_is_estimated ? 'Yes' : 'No',
+    'Cost before commission & incentive (INR)': r.cost_before_incentives_inr,
+    'Profit before commission & incentive (INR)': r.profit_before_commission_inr,
+    'Associate commission (INR)': r.commission_inr,
+    'Commission state': r.commission_state !== null ? stateLabel(r.commission_state) : 'No associate',
+    'Team incentive (INR)': r.incentive_inr,
+    'Incentive state': stateLabel(r.incentive_state),
+    'Profit after commission & incentive (INR)': r.profit_after_incentive_inr,
+    'Margin after %': r.margin_after_pct,
+  }));
+}
+
 async function profitability(req, res) {
   const dateFrom = str(req.query.date_from) || null;
   const dateTo = str(req.query.date_to) || null;
+  // Owner decision D-245 P5: "Include open orders (estimated)" (default) or "Locked orders only".
+  const scope = req.query.scope === 'locked' ? 'locked' : 'all';
 
-  const data = await reportRepository.orderProfitabilityReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions));
+  const data = await reportRepository.orderProfitabilityReport(dateFrom, dateTo, orderAccessService.visibilitySql(req.user.id, req.permissions), scope);
 
+  const p = req.permissions || {};
+  const seeIncentives = !!(p.manage_incentives || p.pay_incentives || p.view_price_buildup);
   if (req.query.format === 'csv') {
-    const rows = data.rows.map((r) => ({
-      'Order Ref': r.order_reference,
-      Client: r.company_legal_name,
-      Created: r.created_at,
-      'Revenue (INR)': r.revenue_inr,
-      Estimated: r.revenue_is_estimated ? 'Yes' : 'No',
-      'Total Cost (INR)': r.total_cost_inr,
-      'Profit (INR)': r.profit_inr,
-      'Margin %': r.margin_pct,
-    }));
-    csv.stream(res, 'order_profitability_report.csv', ['Order Ref', 'Client', 'Created', 'Revenue (INR)', 'Estimated', 'Total Cost (INR)', 'Profit (INR)', 'Margin %'], rows);
+    const headers = seeIncentives ? PROFITABILITY_HEADERS : PROFITABILITY_HEADERS.filter((h) => !INCENTIVE_COLUMNS.includes(h));
+    const rows = profitabilityCsvRows(data.rows).map((r) => (seeIncentives ? r : Object.fromEntries(Object.entries(r).filter(([k]) => !INCENTIVE_COLUMNS.includes(k)))));
+    csv.stream(res, 'order_profitability_report.csv', headers, rows);
     return;
   }
 
-  res.renderView('reports/profitability', { rows: data.rows, totals: data.totals, filters: { dateFrom, dateTo } }, 'layout/base');
+  res.renderView('reports/profitability', { seeIncentives, rows: data.rows, totals: data.totals, filters: { dateFrom, dateTo, scope } }, 'layout/base');
 }
 
 /**
@@ -899,6 +922,6 @@ async function performance(req, res) {
 module.exports = {
   index, client, order, aggregate, queues, saveDefinition, runDefinition, updateDefinition, deleteDefinition,
   payments, todaysPayments, disputes, amendments, trends, staff, ageing, freightCost, products, suppliers, conversion,
-  profitability, performance, presetRange,
+  profitability, profitabilityCsvRows, PROFITABILITY_HEADERS, performance, presetRange,
   trendsCsvRows, staffCsvRows, suppliersCsvRows, conversionCsvRows, performanceCsvRows, orderAuditCsvRows,
 };

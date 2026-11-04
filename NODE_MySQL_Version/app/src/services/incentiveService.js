@@ -288,7 +288,7 @@ async function calculate(orderId) {
   const pricingService = require('./pricingService');
   const order = await orderRepository.find(orderId);
   const row = await incentiveRepository.forOrder(orderId);
-  const profit = await orderProfitabilityService.computeForOrder(orderId);
+  const profit = await orderProfitabilityService.computeForOrder(orderId, false);
   const entries = await incentiveRepository.costEntries(orderId);
   const already = Object.values(entries).reduce((sum, c) => sum + Number(c.amount_inr), 0);
   const profitBefore = round2(Number(profit.profit_inr) + already);

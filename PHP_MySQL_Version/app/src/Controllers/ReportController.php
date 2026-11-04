@@ -747,28 +747,54 @@ final class ReportController
     {
         $dateFrom = trim((string) ($_GET['date_from'] ?? '')) ?: null;
         $dateTo = trim((string) ($_GET['date_to'] ?? '')) ?: null;
+        // Owner decision D-245 P5: "Include open orders (estimated)" (default) or "Locked orders only".
+        $scope = ($_GET['scope'] ?? '') === 'locked' ? 'locked' : 'all';
 
-        $data = ReportRepository::orderProfitabilityReport($dateFrom, $dateTo);
+        $data = ReportRepository::orderProfitabilityReport($dateFrom, $dateTo, $scope);
 
+        $seeIncentives = \App\Services\OrderProfitabilityService::viewerSeesIncentives();
         if (($_GET['format'] ?? '') === 'csv') {
-            $rows = array_map(static fn(array $r): array => [
-                'Order Ref' => $r['order_reference'],
-                'Client' => $r['company_legal_name'],
-                'Created' => $r['created_at'],
-                'Revenue (INR)' => $r['revenue_inr'],
-                'Estimated' => $r['revenue_is_estimated'] ? 'Yes' : 'No',
-                'Total Cost (INR)' => $r['total_cost_inr'],
-                'Profit (INR)' => $r['profit_inr'],
-                'Margin %' => $r['margin_pct'],
-            ], $data['rows']);
-            Csv::stream('order_profitability_report.csv', ['Order Ref', 'Client', 'Created', 'Revenue (INR)', 'Estimated', 'Total Cost (INR)', 'Profit (INR)', 'Margin %'], $rows);
+            $headers = $seeIncentives ? self::PROFITABILITY_HEADERS : array_values(array_diff(self::PROFITABILITY_HEADERS, self::INCENTIVE_COLUMNS));
+            $rows = self::profitabilityCsvRows($data['rows']);
+            if (!$seeIncentives) {
+                $rows = array_map(static fn (array $r): array => array_diff_key($r, array_flip(self::INCENTIVE_COLUMNS)), $rows);
+            }
+            Csv::stream('order_profitability_report.csv', $headers, $rows);
         }
 
         View::render('reports/profitability', [
+            'seeIncentives' => $seeIncentives,
             'rows' => $data['rows'],
             'totals' => $data['totals'],
-            'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo],
+            'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'scope' => $scope],
         ], 'layout/base');
+    }
+
+    public const PROFITABILITY_HEADERS = ['Order Ref', 'Client', 'Created', 'Revenue (INR)', 'Revenue estimated', 'Cost before commission & incentive (INR)',
+        'Profit before commission & incentive (INR)', 'Associate commission (INR)', 'Commission state', 'Team incentive (INR)', 'Incentive state',
+        'Profit after commission & incentive (INR)', 'Margin after %'];
+
+    /** Money separation: these columns only for whoever manages or pays incentives or sees the price build-up. */
+    public const INCENTIVE_COLUMNS = ['Associate commission (INR)', 'Commission state', 'Team incentive (INR)', 'Incentive state', 'Profit after commission & incentive (INR)', 'Margin after %'];
+
+    /** @param list<array<string,mixed>> $rows @return list<array<string,mixed>> the on-screen columns */
+    public static function profitabilityCsvRows(array $rows): array
+    {
+        return array_map(static fn (array $r): array => [
+            'Order Ref' => $r['order_reference'],
+            'Client' => $r['company_legal_name'],
+            'Created' => $r['created_at'],
+            'Revenue (INR)' => $r['revenue_inr'],
+            'Revenue estimated' => $r['revenue_is_estimated'] ? 'Yes' : 'No',
+            'Cost before commission & incentive (INR)' => $r['cost_before_incentives_inr'],
+            'Profit before commission & incentive (INR)' => $r['profit_before_commission_inr'],
+            'Associate commission (INR)' => $r['commission_inr'],
+            'Commission state' => $r['commission_state'] !== null ? \App\Services\OrderProfitabilityService::stateLabel($r['commission_state']) : 'No associate',
+            'Team incentive (INR)' => $r['incentive_inr'],
+            'Incentive state' => \App\Services\OrderProfitabilityService::stateLabel($r['incentive_state']),
+            'Profit after commission & incentive (INR)' => $r['profit_after_incentive_inr'],
+            'Margin after %' => $r['margin_after_pct'],
+        ], $rows);
     }
 
     /**

@@ -61,7 +61,7 @@ function pages(seed) {
     '/reports/aggregate', '/reports/aggregate?format=csv', '/reports/queues', '/reports/payments', '/reports/payments?format=csv',
     '/reports/todays-payments', '/reports/disputes', '/reports/amendments', '/reports/trends', '/reports/staff', '/reports/ageing',
     '/reports/freight-cost', '/reports/products', '/reports/suppliers', '/reports/order-profitability', '/reports/order-profitability?format=csv',
-    '/reports/conversion', '/reports/performance', '/audit-log', '/audit-log?entity_type=order_vendor_bills', '/audit-log?entity_type=order_payment_status',
+    '/reports/conversion', '/reports/performance', '/reports/incentives', '/reports/incentives?format=csv', '/reports/incentives/to-pay', '/reports/incentives/owed', '/reports/incentives/statement', '/audit-log', '/audit-log?entity_type=order_vendor_bills', '/audit-log?entity_type=order_payment_status',
     '/ca', '/ca/expenses', '/ca/export-benefits', '/ca/reconciliation', '/ca/reports', '/ca/tds-summary', '/ca/gst-refunds', '/ca/bank-statement',
     '/ca/cafin-export', '/ca/zoho-sync', '/help/supplier-logistics-payments', '/getting-started',
   ];

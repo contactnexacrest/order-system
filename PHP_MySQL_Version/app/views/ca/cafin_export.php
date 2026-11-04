@@ -14,6 +14,11 @@ use App\Services\CafinExportService;
       <select name="status" required>
         <?php foreach ($statuses as $k => $label): ?><option value="<?= htmlspecialchars($k) ?>"<?= $k === $status ? ' selected' : '' ?>><?= htmlspecialchars($label) ?></option><?php endforeach; ?>
       </select></label>
+    <label>Commission &amp; incentive
+      <select name="scope" required>
+        <option value="all"<?= ($scope ?? 'all') === 'all' ? ' selected' : '' ?>>Include open orders (estimated)</option>
+        <option value="locked"<?= ($scope ?? '') === 'locked' ? ' selected' : '' ?>>Locked orders only</option>
+      </select></label>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-secondary">Show count</button>
       <button type="submit" name="format" value="summary" class="btn-sm">Download summary (one row per order)</button>
@@ -22,7 +27,7 @@ use App\Services\CafinExportService;
   </form>
   <p><strong><?= (int) $orderCount ?></strong> order<?= $orderCount === 1 ? '' : 's' ?> in FY <?= htmlspecialchars($fy) ?> (<?= htmlspecialchars(strtolower(CafinExportService::STATUSES[$status])) ?>).</p>
   <ul class="muted small">
-    <li><b>Summary</b>: order, client, status, currency and FOB value; revenue, benefits, supplier cost, C1–C5 expenses (with the team incentive and associate commission inside C3), total cost, profit and margin; and the cash position so far. All amounts in rupees, as plain numbers.</li>
+    <li><b>Summary</b>: order, client, status, currency and FOB value; revenue, benefits, supplier cost, C1–C5 expenses (with the team incentive and associate commission inside C3), total cost, profit and margin (locked figures only, as on the CAFIN PDF); then the profit before commission and incentive, the associate commission and team incentive each with its state (estimated until the MD locks the order, then locked or paid — never both), the profit after them, and the GST on commission (not a cost) and TDS on it (a liability) apart; and the cash position so far. All amounts in rupees, as plain numbers.</li>
     <li><b>Detail</b>: every line of every order's CAFIN, sections A to F, with the order and the section on each row.</li>
   </ul>
 </div>

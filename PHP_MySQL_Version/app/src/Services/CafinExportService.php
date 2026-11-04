@@ -67,6 +67,8 @@ final class CafinExportService
         'C1 Freight & insurance (INR)', 'C2 Logistics partner bills (INR)', 'C3 Other order costs (INR)', 'of which team incentive (INR)',
         'of which associate commission (INR)', 'C4 Order expenses (INR)', 'C5 Expenses booked in Zoho Books (INR)', 'Total expenses excl. supplier (INR)',
         'Total cost (INR)', 'Order profit (INR)', 'Margin %',
+        'Profit before commission & incentive (INR)', 'Associate commission (INR)', 'Commission state', 'Team incentive (INR)', 'Incentive state',
+        'Profit after commission & incentive (INR)', 'GST on commission (INR, not a cost)', 'TDS on commission (INR, a liability)',
         'Cash: received from buyer (INR)', 'Cash: benefits received (INR)', 'Cash: paid to supplier (INR)', 'Cash: paid to logistics (INR)',
         'Cash: expenses paid (INR)', 'Cash: net so far (INR)',
     ];
@@ -78,6 +80,7 @@ final class CafinExportService
         foreach ($orderIds as $orderId) {
             $o = \App\Repositories\OrderRepository::find($orderId);
             $p = OrderProfitabilityService::computeForOrder($orderId);
+            [$gst, $tds] = self::commissionTaxes($orderId);
             $cash = OrderLedgerService::forOrder($orderId, (string) ($o['currency_code'] ?? 'INR'), true)['totals'];
             $c1 = $p['freight_cost_inr'] + $p['insurance_cost_inr'];
             $rows[] = [
@@ -90,11 +93,43 @@ final class CafinExportService
                 self::num($p['associate_commission_inr']), self::num($p['expenses_inr']), self::num($p['zoho_expenses_inr']),
                 self::num($c1 + $p['logistics_cost_inr'] + $p['other_costs_inr'] + $p['expenses_inr'] + $p['zoho_expenses_inr']),
                 self::num($p['total_cost_inr']), self::num($p['profit_inr']), $p['margin_pct'] !== null ? number_format((float) $p['margin_pct'], 2, '.', '') : '',
+                self::num($p['profit_before_commission_inr']), self::num($p['commission_inr']), $p['commission_state'] !== null ? OrderProfitabilityService::stateLabel($p['commission_state']) : 'No associate',
+                self::num($p['incentive_inr']), OrderProfitabilityService::stateLabel($p['incentive_state']), self::num($p['profit_after_incentive_inr']), self::num($gst), self::num($tds),
                 self::num($cash['buyer_inr']), self::num($cash['benefits_inr']), self::num($cash['supplier_inr']), self::num($cash['logistics_inr']),
                 self::num($cash['expenses_inr']), self::num($cash['net_inr']),
             ];
         }
         return $rows;
+    }
+
+    /**
+     * D-245 P5: GST on the associate's commission (input credit — not a cost) and the TDS
+     * deducted from it (owed to the government — a liability, not a cost), from the order's
+     * associate payouts: the stored figure once paid, else what is due on it now.
+     *
+     * @return array{0: float, 1: float}
+     */
+    public static function commissionTaxes(int $orderId): array
+    {
+        $gst = 0.0;
+        $tds = 0.0;
+        foreach (\App\Repositories\IncentiveRepository::payoutsForOrder($orderId) as $po) {
+            if ($po['payee_kind'] !== 'associate') {
+                continue;
+            }
+            $gst += $po['status'] === 'paid' ? (float) ($po['gst_inr'] ?? 0) : AssociateCommission::gstFor($po);
+            $tds += (float) ($po['tds_inr'] ?? 0);
+        }
+        return [round($gst, 2), round($tds, 2)];
+    }
+
+    /** @param list<int> $orderIds @return list<int> only the orders whose incentive the MD has locked */
+    public static function lockedOnly(array $orderIds): array
+    {
+        return array_values(array_filter($orderIds, static function (int $id): bool {
+            $row = \App\Repositories\IncentiveRepository::forOrder($id);
+            return $row !== null && !empty($row['locked_at']);
+        }));
     }
 
     public const DETAIL_HEADERS = ['Order reference', 'Client', 'Section', 'Item', 'Description', 'Date', 'Amount', 'Currency', 'Amount (INR)', 'Note'];

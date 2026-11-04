@@ -1470,7 +1470,7 @@ async function salesPerformanceReport(dateFrom, dateTo) {
  * (an export business's order volume), not meant for a dataset large
  * enough to need real aggregation.
  */
-async function orderProfitabilityReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
+async function orderProfitabilityReport(dateFrom, dateTo, visibility = { sql: '', params: {} }, scope = 'all') {
   const isTestMode = await isTestModeFlag();
   const where = ['o.is_test_data = :is_test_data'];
   const params = { is_test_data: isTestMode };
@@ -1495,37 +1495,38 @@ async function orderProfitabilityReport(dateFrom, dateTo, visibility = { sql: ''
     params
   );
 
+  // Owner decision D-245 P5: profit before commission and incentive, the associate commission
+  // and team incentive (estimated until the MD locks the order, then the locked figure), and
+  // the profit after. scope 'locked' keeps only locked orders.
   const rows = [];
-  let totalRevenue = 0;
-  let totalCost = 0;
-  let totalProfit = 0;
+  const keys = ['revenue_inr', 'cost_before_incentives_inr', 'profit_before_commission_inr', 'commission_inr', 'incentive_inr', 'profit_after_incentive_inr'];
+  const sum = Object.fromEntries(keys.map((k) => [k, 0]));
   for (const o of orders) {
     const p = await orderProfitabilityService.computeForOrder(o.id);
-    rows.push({
+    if (scope === 'locked' && !p.incentives_locked) continue;
+    const row = {
       order_id: o.id,
       order_reference: o.order_reference,
       company_legal_name: o.company_legal_name,
       created_at: o.created_at,
       revenue_inr: p.revenue_inr,
       revenue_is_estimated: p.revenue_is_estimated,
-      total_cost_inr: p.total_cost_inr,
-      profit_inr: p.profit_inr,
-      margin_pct: p.margin_pct,
-    });
-    totalRevenue += p.revenue_inr;
-    totalCost += p.total_cost_inr;
-    totalProfit += p.profit_inr;
+      cost_before_incentives_inr: p.cost_before_incentives_inr,
+      profit_before_commission_inr: p.profit_before_commission_inr,
+      commission_inr: p.commission_inr,
+      commission_state: p.commission_state,
+      incentive_inr: p.incentive_inr,
+      incentive_state: p.incentive_state,
+      profit_after_incentive_inr: p.profit_after_incentive_inr,
+      margin_after_pct: p.margin_after_pct,
+      locked: p.incentives_locked,
+    };
+    rows.push(row);
+    for (const k of keys) sum[k] += Number(row[k]);
   }
-
-  return {
-    rows,
-    totals: {
-      revenue_inr: totalRevenue,
-      total_cost_inr: totalCost,
-      profit_inr: totalProfit,
-      margin_pct: totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100 * 100) / 100 : null,
-    },
-  };
+  const totals = Object.fromEntries(keys.map((k) => [k, Math.round((sum[k] + Number.EPSILON) * 100) / 100]));
+  totals.margin_after_pct = totals.revenue_inr > 0 ? Math.round((totals.profit_after_incentive_inr / totals.revenue_inr) * 100 * 100) / 100 : null;
+  return { rows, totals };
 }
 
 module.exports = {

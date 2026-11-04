@@ -500,17 +500,23 @@ describe('Order Financials (Section AP)', () => {
     expect(rowsById[orderA]).toBeDefined();
     expect(rowsById[orderB]).toBeDefined();
     expect(rowsById[orderA].revenue_inr).toBe(80000);
-    expect(rowsById[orderA].profit_inr).toBe(80000);
-    expect(rowsById[orderB].profit_inr).toBe(70000);
+    // D-245 P5: profit before commission and incentive; the (estimated) team incentive comes after.
+    expect(rowsById[orderA].profit_before_commission_inr).toBe(80000);
+    expect(rowsById[orderB].profit_before_commission_inr).toBe(70000);
+    expect(rowsById[orderA].incentive_state).toBe('estimated');
+    expect(rowsById[orderB].profit_after_incentive_inr).toBe(Math.round((rowsById[orderB].profit_before_commission_inr - rowsById[orderB].commission_inr - rowsById[orderB].incentive_inr) * 100) / 100);
 
     // The report's own totals row must equal the sum of every row it
     // lists (checked directly rather than against a fixed constant — other
     // tests share this same disposable database and may add their own
     // orders in today's date range).
     const sumRevenue = data.rows.reduce((s, r) => s + r.revenue_inr, 0);
-    const sumProfit = data.rows.reduce((s, r) => s + r.profit_inr, 0);
+    const sumProfit = data.rows.reduce((s, r) => s + r.profit_after_incentive_inr, 0);
     expect(Math.round(data.totals.revenue_inr * 100) / 100).toBeCloseTo(Math.round(sumRevenue * 100) / 100, 2);
-    expect(Math.round(data.totals.profit_inr * 100) / 100).toBeCloseTo(Math.round(sumProfit * 100) / 100, 2);
+    expect(data.totals.profit_after_incentive_inr).toBeCloseTo(Math.round(sumProfit * 100) / 100, 2);
+    for (const k of ['cost_before_incentives_inr', 'profit_before_commission_inr', 'commission_inr', 'incentive_inr']) {
+      expect([k, data.totals[k]]).toEqual([k, Math.round(data.rows.reduce((s, r) => s + Number(r[k]), 0) * 100) / 100]);
+    }
   });
 
   it('orderProfitabilityReport respects the date range filter', async () => {

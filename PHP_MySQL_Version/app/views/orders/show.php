@@ -3994,7 +3994,12 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
       <div class="fin-kpi"><span class="l">Received from buyer<?= $profitability && $profitability['revenue_is_estimated'] ? ' (estimated)' : '' ?></span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['revenue_inr'], 2) : '—' ?></span></div>
       <div class="fin-kpi"><span class="l">Total costs</span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['total_cost_inr'], 2) : '—' ?></span></div>
       <div class="fin-kpi"><span class="l">Govt benefits received</span><span class="v">&#8377;<?= number_format($__receivedBenefits, 2) ?><?php if ($__claimedBenefits > $__receivedBenefits): ?> <small class="muted">of &#8377;<?= number_format($__claimedBenefits, 2) ?> claimed</small><?php endif; ?></span></div>
-      <div class="fin-kpi good"><span class="l">Net profit</span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['profit_inr'], 2) . ($profitability['margin_pct'] !== null ? ' · ' . number_format($profitability['margin_pct'], 1) . '%' : '') : '—' ?></span></div>
+      <?php $__seeInc = \App\Services\OrderProfitabilityService::viewerSeesIncentives(); ?>
+      <?php if ($__seeInc): ?>
+      <div class="fin-kpi good"><span class="l">Net profit<?= $profitability && !$profitability['incentives_locked'] ? ' (estimated)' : '' ?></span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['profit_after_incentive_inr'], 2) . ($profitability['margin_after_pct'] !== null ? ' · ' . number_format($profitability['margin_after_pct'], 1) . '%' : '') : '—' ?></span></div>
+      <?php else: ?>
+      <div class="fin-kpi good"><span class="l">Profit before incentives</span><span class="v"><?= $profitability ? '&#8377;' . number_format($profitability['profit_before_commission_inr'], 2) : '—' ?></span></div>
+      <?php endif; ?>
     </div>
 
     <details class="step-card" id="financials-12a"<?= $__finOpen('12a') ?>>
@@ -4328,7 +4333,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <div class="step-group-connector">then review the profit and complete Step 12</div>
 
     <details class="step-card" id="financials-12c"<?= $__finOpen('12c') ?>>
-      <summary><?= $stepStatusIcon($__finIcon('12c')) ?><h2>Step 12c &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary"><?= $profitability ? 'Net profit &#8377;' . number_format($profitability['profit_inr'], 2) : '' ?></span></summary>
+      <summary><?= $stepStatusIcon($__finIcon('12c')) ?><h2>Step 12c &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary"><?php if ($profitability): ?><?= \App\Services\OrderProfitabilityService::viewerSeesIncentives() ? 'Net profit &#8377;' . number_format($profitability['profit_after_incentive_inr'], 2) . ($profitability['incentives_locked'] ? '' : ' (estimated)') : 'Profit before incentives &#8377;' . number_format($profitability['profit_before_commission_inr'], 2) ?><?php endif; ?></span></summary>
         <?php if ($profitability): ?>
           <h3 style="font-size:0.95em; margin-top:0;">Profitability Summary</h3>
           <div class="kv-grid">
@@ -4340,14 +4345,19 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <div><span class="k">Logistics Bills — CHA / Transport (INR)</span><span class="v"><?= number_format($profitability['logistics_cost_inr'], 2) ?></span></div>
             <div><span class="k">Order Expenses (INR)</span><span class="v"><?= number_format($profitability['expenses_inr'], 2) ?></span></div>
             <div><span class="k">Expenses Booked in Zoho Books (INR)</span><span class="v"><?= number_format($profitability['zoho_expenses_inr'], 2) ?></span></div>
-            <div><span class="k">Other Costs (INR)<?= $profitability['travel_is_provisional'] ? '' : ' — travel % replaced by actual travel' ?></span><span class="v"><?= number_format($profitability['other_costs_inr'], 2) ?></span></div>
-            <?php if ($profitability['team_incentive_inr'] > 0 || $profitability['associate_commission_inr'] > 0): ?>
-            <div><span class="k">of which Team Incentive (INR)</span><span class="v"><?= number_format($profitability['team_incentive_inr'], 2) ?></span></div>
-            <div><span class="k">of which Associate Commission (INR)</span><span class="v"><?= number_format($profitability['associate_commission_inr'], 2) ?></span></div>
+            <div><span class="k">Other Costs (INR)<?= $profitability['travel_is_provisional'] ? '' : ' — travel % replaced by actual travel' ?></span><span class="v"><?= number_format($profitability['other_costs_excl_incentives_inr'], 2) ?></span></div>
+            <?php // Owner decision D-245 P5: commission and incentive shown apart, estimated until the MD locks the order (the locked figure then replaces the estimate). ?>
+            <?php $__st = static fn (?string $s): string => \App\Services\OrderProfitabilityService::stateLabel($s); ?>
+            <div><span class="k">Cost before Commission &amp; Incentive (INR)</span><span class="v"><?= number_format($profitability['cost_before_incentives_inr'], 2) ?></span></div>
+            <div><span class="k">Profit before Commission &amp; Incentive (INR)</span><span class="v"><?= number_format($profitability['profit_before_commission_inr'], 2) ?></span></div>
+            <?php if (\App\Services\OrderProfitabilityService::viewerSeesIncentives()): ?>
+            <div><span class="k">Associate Commission (INR)<?= $profitability['commission_state'] !== null ? ' — ' . $__st($profitability['commission_state']) : '' ?></span><span class="v"><?= $profitability['commission_state'] !== null ? number_format($profitability['commission_inr'], 2) : '— (no associate)' ?></span></div>
+            <div><span class="k">Team Incentive (INR) — <?= $__st($profitability['incentive_state']) ?></span><span class="v"><?= number_format($profitability['incentive_inr'], 2) ?></span></div>
+            <div><span class="k">Order Profit after Commission &amp; Incentive (INR)<?= $profitability['incentives_locked'] ? '' : ' — estimated' ?></span><span class="v"><?= number_format($profitability['profit_after_incentive_inr'], 2) ?></span></div>
+            <div><span class="k">Order Margin % (after)</span><span class="v"><?= $profitability['margin_after_pct'] !== null ? number_format($profitability['margin_after_pct'], 2) . '%' : '—' ?></span></div>
+            <?php else: ?>
+            <div style="grid-column:1 / -1"><span class="k">Associate commission &amp; team incentive</span><span class="v muted small">Shown to whoever manages or pays incentives — the profit above is before them.</span></div>
             <?php endif; ?>
-            <div><span class="k">Total Order Cost (INR)</span><span class="v"><?= number_format($profitability['total_cost_inr'], 2) ?></span></div>
-            <div><span class="k">Order Profit (INR)</span><span class="v"><?= number_format($profitability['profit_inr'], 2) ?></span></div>
-            <div><span class="k">Order Margin %</span><span class="v"><?= $profitability['margin_pct'] !== null ? number_format($profitability['margin_pct'], 2) . '%' : '—' ?></span></div>
             <?php // Owner decision 2026-10-31 (option A): the GST on this order's purchases comes back through the period's LUT refund claim — information only, it stays in the cost. ?>
             <?php if (!empty($orderPurchaseGst) && $orderPurchaseGst['total'] > 0): ?>
             <div style="grid-column:1 / -1"><span class="k">For information — GST paid on this order's purchases (INR)</span><span class="v"><?= number_format($orderPurchaseGst['total'], 2) ?></span>

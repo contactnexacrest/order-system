@@ -3262,7 +3262,11 @@
       <div class="fin-kpi"><span class="l">Received from buyer{{ ' (estimated)' if profitability and profitability.revenue_is_estimated else '' }}</span><span class="v">{% if profitability %}&#8377;{{ profitability.revenue_inr | money }}{% else %}—{% endif %}</span></div>
       <div class="fin-kpi"><span class="l">Total costs</span><span class="v">{% if profitability %}&#8377;{{ profitability.total_cost_inr | money }}{% else %}—{% endif %}</span></div>
       <div class="fin-kpi"><span class="l">Govt benefits received</span><span class="v">&#8377;{{ fin.receivedBenefits | money }}{% if fin.claimedBenefits > fin.receivedBenefits %} <small class="muted">of &#8377;{{ fin.claimedBenefits | money }} claimed</small>{% endif %}</span></div>
-      <div class="fin-kpi good"><span class="l">Net profit</span><span class="v">{% if profitability %}&#8377;{{ profitability.profit_inr | money }}{% if profitability.margin_pct != null %} · {{ profitability.margin_pct | round(1) }}%{% endif %}{% else %}—{% endif %}</span></div>
+      {% if (permissions.manage_incentives or permissions.pay_incentives or permissions.view_price_buildup) %}
+      <div class="fin-kpi good"><span class="l">Net profit{% if profitability and not profitability.incentives_locked %} (estimated){% endif %}</span><span class="v">{% if profitability %}&#8377;{{ profitability.profit_after_incentive_inr | money }}{% if profitability.margin_after_pct != null %} · {{ profitability.margin_after_pct | round(1) }}%{% endif %}{% else %}—{% endif %}</span></div>
+      {% else %}
+      <div class="fin-kpi good"><span class="l">Profit before incentives</span><span class="v">{% if profitability %}&#8377;{{ profitability.profit_before_commission_inr | money }}{% else %}—{% endif %}</span></div>
+      {% endif %}
     </div>
 
     <details class="step-card" id="financials-12a"{{ fin.open('12a') }}>
@@ -3592,7 +3596,7 @@
     <div class="step-group-connector">then review the profit and complete Step 12</div>
 
     <details class="step-card" id="financials-12c"{{ fin.open('12c') }}>
-      <summary>{{ stepStatusIcon(fin.icon('12c')) }}<h2>Step 12c &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary">{% if profitability %}Net profit &#8377;{{ profitability.profit_inr | money }}{% endif %}</span></summary>
+      <summary>{{ stepStatusIcon(fin.icon('12c')) }}<h2>Step 12c &middot; Review Profit &amp; Complete Step 12</h2><span class="fin-sub-summary">{% if profitability %}{% if (permissions.manage_incentives or permissions.pay_incentives or permissions.view_price_buildup) %}Net profit &#8377;{{ profitability.profit_after_incentive_inr | money }}{% if not profitability.incentives_locked %} (estimated){% endif %}{% else %}Profit before incentives &#8377;{{ profitability.profit_before_commission_inr | money }}{% endif %}{% endif %}</span></summary>
         {% if profitability %}
           <h3 style="font-size:0.95em; margin-top:0;">Profitability Summary</h3>
           <div class="kv-grid">
@@ -3604,14 +3608,18 @@
             <div><span class="k">Logistics Bills — CHA / Transport (INR)</span><span class="v">{{ profitability.logistics_cost_inr | money }}</span></div>
             <div><span class="k">Order Expenses (INR)</span><span class="v">{{ profitability.expenses_inr | money }}</span></div>
             <div><span class="k">Expenses Booked in Zoho Books (INR)</span><span class="v">{{ profitability.zoho_expenses_inr | money }}</span></div>
-            <div><span class="k">Other Costs (INR){{ '' if profitability.travel_is_provisional else ' — travel % replaced by actual travel' }}</span><span class="v">{{ profitability.other_costs_inr | money }}</span></div>
-            {% if profitability.team_incentive_inr > 0 or profitability.associate_commission_inr > 0 %}
-            <div><span class="k">of which Team Incentive (INR)</span><span class="v">{{ profitability.team_incentive_inr | money }}</span></div>
-            <div><span class="k">of which Associate Commission (INR)</span><span class="v">{{ profitability.associate_commission_inr | money }}</span></div>
+            <div><span class="k">Other Costs (INR){{ '' if profitability.travel_is_provisional else ' — travel % replaced by actual travel' }}</span><span class="v">{{ profitability.other_costs_excl_incentives_inr | money }}</span></div>
+            {# Owner decision D-245 P5: commission and incentive shown apart, estimated until the MD locks the order (the locked figure then replaces the estimate). #}
+            <div><span class="k">Cost before Commission &amp; Incentive (INR)</span><span class="v">{{ profitability.cost_before_incentives_inr | money }}</span></div>
+            <div><span class="k">Profit before Commission &amp; Incentive (INR)</span><span class="v">{{ profitability.profit_before_commission_inr | money }}</span></div>
+            {% if (permissions.manage_incentives or permissions.pay_incentives or permissions.view_price_buildup) %}
+            <div><span class="k">Associate Commission (INR){% if profitability.commission_state %} — {{ profitStateLabel(profitability.commission_state) }}{% endif %}</span><span class="v">{% if profitability.commission_state %}{{ profitability.commission_inr | money }}{% else %}— (no associate){% endif %}</span></div>
+            <div><span class="k">Team Incentive (INR) — {{ profitStateLabel(profitability.incentive_state) }}</span><span class="v">{{ profitability.incentive_inr | money }}</span></div>
+            <div><span class="k">Order Profit after Commission &amp; Incentive (INR){% if not profitability.incentives_locked %} — estimated{% endif %}</span><span class="v">{{ profitability.profit_after_incentive_inr | money }}</span></div>
+            <div><span class="k">Order Margin % (after)</span><span class="v">{% if profitability.margin_after_pct != null %}{{ profitability.margin_after_pct | money }}%{% else %}—{% endif %}</span></div>
+            {% else %}
+            <div style="grid-column:1 / -1"><span class="k">Associate commission &amp; team incentive</span><span class="v muted small">Shown to whoever manages or pays incentives — the profit above is before them.</span></div>
             {% endif %}
-            <div><span class="k">Total Order Cost (INR)</span><span class="v">{{ profitability.total_cost_inr | money }}</span></div>
-            <div><span class="k">Order Profit (INR)</span><span class="v">{{ profitability.profit_inr | money }}</span></div>
-            <div><span class="k">Order Margin %</span><span class="v">{% if profitability.margin_pct != null %}{{ profitability.margin_pct | money }}%{% else %}—{% endif %}</span></div>
             {# Owner decision 2026-10-31 (option A): the GST on this order's purchases comes back through the period's LUT refund claim — information only, it stays in the cost. #}
             {% if orderPurchaseGst and orderPurchaseGst.total > 0 %}
             <div style="grid-column:1 / -1"><span class="k">For information — GST paid on this order's purchases (INR)</span><span class="v">{{ orderPurchaseGst.total | money }}</span>

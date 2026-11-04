@@ -162,3 +162,48 @@ one is refused without the other. The associate's page then shows a
 **Signed copy** link. Choosing a new file on Edit replaces the copy on file
 (the earlier one stays in storage). Only people with "Manage associates" can open the copy; the general file link refuses everyone
 else, and every upload and download is recorded in the audit log.
+
+## Reports and profit (owner decision D-245 P5, 4 Nov 2026)
+
+**One profit calculation everywhere.** The order page (Step 12c and the Net
+profit box), the Order Profitability report and the CAFIN CSV export all show:
+
+1. **Profit before commission & incentive** — revenue (rupees credited, or
+   estimated at the recorded rate) plus export benefits, minus supplier,
+   freight/insurance, logistics bills, other costs, order expenses and
+   expenses booked in Zoho Books.
+2. **Associate commission** and **Team incentive**, each with its state:
+   - **Estimated** — the order is not locked yet; the figure is worked out
+     from the order as it stands (the same calculation as the Team Incentive
+     card), so profit is never shown higher than it will be;
+   - **Locked** — the MD has locked the order; the locked figure *replaces*
+     the estimate (it is never added on top);
+   - **Paid** / **Held** — the payouts are paid / held.
+3. **Profit after commission & incentive** — what NexaCrest keeps.
+
+GST on an associate's commission is paid on top against their tax invoice and
+comes back as input credit — **not a cost**. TDS deducted from a payout is owed
+to the government — **a liability, not a cost**. Both are shown apart.
+
+Who sees what: the commission and incentive amounts (and the profit after
+them, which would reveal their sum) are shown only to whoever manages or pays
+incentives or sees the price build-up (MD, ED, Accounts). Others who may see
+the order's financials see the profit **before** commission & incentive.
+
+**Switch on the reports.** The Order Profitability report and the CAFIN CSV
+export have **Include open orders (estimated)** (the default) or **Locked
+orders only**. The CAFIN PDF itself is unchanged: it still shows locked
+figures only.
+
+**Reports → Incentives & Commission** (MD / ED / Accounts):
+
+| Report | What it shows |
+|---|---|
+| **Register** | One row per order and payee (each staff member's share, each associate's commission): amount, GST, TDS, state, due date, payout run, paid on. Filters: state, payout month, person, associate, order date range. |
+| **To pay** | This month's payout run (including anything locked for an earlier run and still unpaid), next month's run, and not locked yet (estimated) — each with its total. Filter staff / associates. |
+| **Owed at month end** | Everything locked on or before the date and not paid by it; for today or later also the orders ready to lock. |
+| **Person statement** | Every order of one staff member or one associate, in every state. |
+
+Every report has **Export CSV** with exactly the columns on screen, and every
+total is the plain sum of its rows. Staff see only their own amounts on **My
+incentives**; associates on their portal (Commission).

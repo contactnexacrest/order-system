@@ -213,7 +213,8 @@ async function build(orderId) {
     };
   }
 
-  const profit = await orderProfitabilityService.computeForOrder(orderId);
+  // D-245 P5: the CAFIN document keeps its figures (locked cost entries only); no estimates here.
+  const profit = await orderProfitabilityService.computeForOrder(orderId, false);
   const expenseSummary = await orderExpenseRepository.summary(orderId);
 
   // C1 — freight & insurance as counted in the profit.

@@ -252,7 +252,8 @@ final class CaFinancialSnapshotService
             ];
         }
 
-        $profit = OrderProfitabilityService::computeForOrder($orderId);
+        // D-245 P5: the CAFIN document keeps its figures (locked cost entries only); no estimates here.
+        $profit = OrderProfitabilityService::computeForOrder($orderId, false);
         $expenseSummary = OrderExpenseRepository::summary($orderId);
 
         // C1 — freight & insurance as counted in the profit.

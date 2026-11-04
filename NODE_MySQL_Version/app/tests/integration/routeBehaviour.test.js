@@ -735,6 +735,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     const pages = [
       '/reports/ageing', '/reports/aggregate', '/reports/amendments', '/reports/conversion', '/reports/disputes',
       '/reports/order-profitability', '/reports/payments', '/reports/performance', '/reports/products', '/reports/queues',
+      '/reports/incentives', '/reports/incentives/to-pay', '/reports/incentives/owed', '/reports/incentives/statement',
       '/reports/staff', '/reports/suppliers', '/reports/trends',
       '/ca/bank-statement', '/ca/export-benefits', '/ca/fy-locks', '/ca/reconciliation', '/ca/reports', '/ca/tds-summary',
       '/email-approvals', '/admin/permissions',

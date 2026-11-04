@@ -1,0 +1,1 @@
+<p class="muted small"><a href="/reports">&larr; Reports</a> · <a href="/reports/incentives">Register</a> · <a href="/reports/incentives/to-pay">To pay</a> · <a href="/reports/incentives/owed">Owed at month end</a> · <a href="/reports/incentives/statement">Person statement</a></p>

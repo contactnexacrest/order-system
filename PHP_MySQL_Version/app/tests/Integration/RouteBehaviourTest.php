@@ -823,6 +823,7 @@ final class RouteBehaviourTest extends DbTestCase
             '/reports/ageing', '/reports/aggregate', '/reports/amendments', '/reports/conversion', '/reports/disputes',
             '/reports/order-profitability', '/reports/payments', '/reports/performance', '/reports/products', '/reports/queues',
             '/reports/staff', '/reports/suppliers', '/reports/trends',
+            '/reports/incentives', '/reports/incentives/to-pay', '/reports/incentives/owed', '/reports/incentives/statement',
             '/ca/bank-statement', '/ca/export-benefits', '/ca/fy-locks', '/ca/reconciliation', '/ca/reports', '/ca/tds-summary',
             '/email-approvals', '/admin/permissions',
         ];

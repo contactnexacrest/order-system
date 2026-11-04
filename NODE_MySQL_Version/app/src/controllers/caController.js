@@ -110,9 +110,12 @@ async function cafinExport(req, res) {
   const fy = years.includes(String(q.fy || '')) ? String(q.fy) : financialYear.current();
   const status = cafinExportService.STATUSES[String(q.status || 'all')] ? String(q.status || 'all') : 'all';
   const format = String(q.format || '');
-  const ids = await cafinExportService.orderIds(fy, status);
+  let ids = await cafinExportService.orderIds(fy, status);
+  // Owner decision D-245 P5: "Include open orders (estimated)" (default) or "Locked orders only".
+  const scope = q.scope === 'locked' ? 'locked' : 'all';
+  if (scope === 'locked') ids = await cafinExportService.lockedOnly(ids);
   if (format === 'summary' || format === 'detail') {
-    await auditLogRepository.log(req.user.id, 'CAFIN_CSV_EXPORTED', 'orders', null, 'cafin_csv', null, `${format} · FY ${fy} · ${status} · ${ids.length} orders`);
+    await auditLogRepository.log(req.user.id, 'CAFIN_CSV_EXPORTED', 'orders', null, 'cafin_csv', null, `${format} · FY ${fy} · ${status} · ${scope} · ${ids.length} orders`);
     const name = `CAFIN_${format}_FY${fy}${status !== 'all' ? `_${status}` : ''}_INTERNAL.csv`;
     if (format === 'summary') {
       csv.stream(res, name, cafinExportService.SUMMARY_HEADERS, await cafinExportService.summaryRows(ids));
@@ -126,6 +129,7 @@ async function cafinExport(req, res) {
     fy,
     status,
     statuses: cafinExportService.STATUSES,
+    scope,
     orderCount: ids.length,
   });
 }

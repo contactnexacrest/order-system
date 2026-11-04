@@ -1,0 +1,26 @@
+{# D-245 P5: one row per order × payee. Expects rows, totals. #}
+<table class="list">
+  <tr><th>Order</th><th>Client</th><th>Order date</th><th>Payee</th><th>Payee type</th><th>Role</th><th>Amount (INR)</th><th>GST (INR)</th><th>TDS (INR)</th><th>State</th><th>Due on</th><th>Payout run</th><th>Paid on</th></tr>
+  {% for r in rows %}
+  <tr>
+    <td><a href="/orders/{{ r.order_id }}">{{ r.order_reference }}</a></td>
+    <td>{{ r.client }}</td>
+    <td>{{ r.order_date | shortDate if r.order_date else '—' }}</td>
+    <td>{{ r.payee }}</td>
+    <td>{{ 'Associate' if r.payee_kind == 'associate' else 'Staff' }}</td>
+    <td>{{ r.role }}</td>
+    <td>{{ r.amount_inr | money }}</td>
+    <td>{{ r.gst_inr | money }}</td>
+    <td>{{ r.tds_inr | money }}</td>
+    <td>{{ incentiveReportStates[r.state] or r.state }}</td>
+    <td>{{ r.due_on | shortDate if r.due_on else '—' }}</td>
+    <td>{{ r.payout_run_on | shortDate if r.payout_run_on else '—' }}</td>
+    <td>{{ r.paid_on | shortDate if r.paid_on else '—' }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="13" class="muted">Nothing to show.</td></tr>
+  {% endfor %}
+  <tr class="totals-row"><td colspan="6"><strong>Total ({{ totals.count }} row{{ '' if totals.count == 1 else 's' }})</strong></td>
+    <td><strong>{{ totals.amount_inr | money }}</strong></td><td><strong>{{ totals.gst_inr | money }}</strong></td><td><strong>{{ totals.tds_inr | money }}</strong></td><td colspan="4"></td></tr>
+</table>
+<p class="muted small">GST on an associate's commission is paid on top against their tax invoice and comes back as input credit — not a cost. TDS is deducted from the payout and owed to the government — a liability, not a cost. Estimated rows are worked out from the order as it stands and change until the MD locks the order.</p>

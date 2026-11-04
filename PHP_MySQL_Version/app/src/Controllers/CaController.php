@@ -123,9 +123,14 @@ final class CaController
         $status = isset(\App\Services\CafinExportService::STATUSES[$status]) ? $status : 'all';
         $format = (string) ($_GET['format'] ?? '');
         $orderIds = \App\Services\CafinExportService::orderIds($fy, $status);
+        // Owner decision D-245 P5: "Include open orders (estimated)" (default) or "Locked orders only".
+        $scope = ($_GET['scope'] ?? '') === 'locked' ? 'locked' : 'all';
+        if ($scope === 'locked') {
+            $orderIds = \App\Services\CafinExportService::lockedOnly($orderIds);
+        }
         if ($format === 'summary' || $format === 'detail') {
             $user = AuthService::currentUser();
-            AuditLogRepository::log((int) $user['id'], 'CAFIN_CSV_EXPORTED', 'orders', null, 'cafin_csv', null, "{$format} · FY {$fy} · {$status} · " . count($orderIds) . ' orders');
+            AuditLogRepository::log((int) $user['id'], 'CAFIN_CSV_EXPORTED', 'orders', null, 'cafin_csv', null, "{$format} · FY {$fy} · {$status} · {$scope} · " . count($orderIds) . ' orders');
             $name = 'CAFIN_' . $format . '_FY' . $fy . ($status !== 'all' ? '_' . $status : '') . '_INTERNAL.csv';
             if ($format === 'summary') {
                 Csv::stream($name, \App\Services\CafinExportService::SUMMARY_HEADERS, \App\Services\CafinExportService::summaryRows($orderIds));
@@ -137,6 +142,7 @@ final class CaController
             'fy' => $fy,
             'status' => $status,
             'statuses' => \App\Services\CafinExportService::STATUSES,
+            'scope' => $scope,
             'orderCount' => count($orderIds),
         ], 'layout/base');
     }

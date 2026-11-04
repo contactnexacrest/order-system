@@ -1251,7 +1251,7 @@ final class ReportRepository
      * this report's realistic scale (an export business's order volume),
      * not meant for a dataset large enough to need real aggregation.
      */
-    public static function orderProfitabilityReport(?string $dateFrom, ?string $dateTo): array
+    public static function orderProfitabilityReport(?string $dateFrom, ?string $dateTo, string $scope = 'all'): array
     {
         $isTestMode = self::isTestModeFlag();
         $where = ['o.is_test_data = :is_test_data'];
@@ -1280,37 +1280,43 @@ final class ReportRepository
         $stmt->execute($params);
         $orders = $stmt->fetchAll();
 
+        // Owner decision D-245 P5: profit before commission and incentive, the associate
+        // commission and team incentive (estimated until the MD locks the order, then the
+        // locked figure), and the profit after. $scope 'locked' keeps only locked orders.
         $rows = [];
-        $totalRevenue = 0.0;
-        $totalCost = 0.0;
-        $totalProfit = 0.0;
+        $sum = ['revenue_inr' => 0.0, 'cost_before_incentives_inr' => 0.0, 'profit_before_commission_inr' => 0.0, 'commission_inr' => 0.0,
+            'incentive_inr' => 0.0, 'profit_after_incentive_inr' => 0.0];
         foreach ($orders as $o) {
             $p = OrderProfitabilityService::computeForOrder((int) $o['id']);
-            $rows[] = [
+            if ($scope === 'locked' && !$p['incentives_locked']) {
+                continue;
+            }
+            $row = [
                 'order_id'        => (int) $o['id'],
                 'order_reference' => $o['order_reference'],
                 'company_legal_name' => $o['company_legal_name'],
                 'created_at'      => $o['created_at'],
                 'revenue_inr'     => $p['revenue_inr'],
                 'revenue_is_estimated' => $p['revenue_is_estimated'],
-                'total_cost_inr'  => $p['total_cost_inr'],
-                'profit_inr'      => $p['profit_inr'],
-                'margin_pct'      => $p['margin_pct'],
+                'cost_before_incentives_inr' => $p['cost_before_incentives_inr'],
+                'profit_before_commission_inr' => $p['profit_before_commission_inr'],
+                'commission_inr'  => $p['commission_inr'],
+                'commission_state' => $p['commission_state'],
+                'incentive_inr'   => $p['incentive_inr'],
+                'incentive_state' => $p['incentive_state'],
+                'profit_after_incentive_inr' => $p['profit_after_incentive_inr'],
+                'margin_after_pct' => $p['margin_after_pct'],
+                'locked'          => $p['incentives_locked'],
             ];
-            $totalRevenue += $p['revenue_inr'];
-            $totalCost += $p['total_cost_inr'];
-            $totalProfit += $p['profit_inr'];
+            $rows[] = $row;
+            foreach ($sum as $k => $v) {
+                $sum[$k] = $v + (float) $row[$k];
+            }
         }
+        $sum = array_map(static fn (float $v): float => round($v, 2), $sum);
+        $sum['margin_after_pct'] = $sum['revenue_inr'] > 0 ? round($sum['profit_after_incentive_inr'] / $sum['revenue_inr'] * 100, 2) : null;
 
-        return [
-            'rows' => $rows,
-            'totals' => [
-                'revenue_inr' => $totalRevenue,
-                'total_cost_inr' => $totalCost,
-                'profit_inr' => $totalProfit,
-                'margin_pct' => $totalRevenue > 0 ? round($totalProfit / $totalRevenue * 100, 2) : null,
-            ],
-        ];
+        return ['rows' => $rows, 'totals' => $sum];
     }
 
     // ================================================================

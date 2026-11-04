@@ -874,6 +874,13 @@ $router->get('/reports/freight-cost', [$reports, 'freightCost'], [SessionAuth::r
 $router->get('/reports/products', [$reports, 'products'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/suppliers', [$reports, 'suppliers'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices')]);
 $router->get('/reports/order-profitability', [$reports, 'profitability'], [SessionAuth::required(), PermissionCheck::requires('manage_order_financials')]);
+// Owner decision D-245 P5: incentive & commission reports (MD / ED / Accounts — whoever manages or pays incentives or sees the price build-up).
+$incentiveReports = new \App\Controllers\IncentiveReportController();
+$incentiveReportGate = [SessionAuth::required(), PermissionCheck::requiresAny(['manage_incentives', 'pay_incentives', 'view_price_buildup'])];
+$router->get('/reports/incentives', [$incentiveReports, 'register'], $incentiveReportGate);
+$router->get('/reports/incentives/to-pay', [$incentiveReports, 'toPay'], $incentiveReportGate);
+$router->get('/reports/incentives/owed', [$incentiveReports, 'owed'], $incentiveReportGate);
+$router->get('/reports/incentives/statement', [$incentiveReports, 'statement'], $incentiveReportGate);
 $router->get('/reports/conversion', [$reports, 'conversion'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->get('/reports/performance', [$reports, 'performance'], [SessionAuth::required(), PermissionCheck::requires('view_reports')]);
 $router->post('/reports/save', [$reports, 'saveDefinition'], [SessionAuth::required(), PermissionCheck::requires('manage_report_definitions'), CsrfCheck::verify()]);

@@ -1,0 +1,26 @@
+<div class="card page-wide">
+  {% include "incentives/_report_nav.njk" %}
+  <h1>To Pay</h1>
+  <p class="muted">What falls in this month's payout run (including anything locked for an earlier run and still unpaid), what falls in next month's, and what is not locked yet (estimated — the MD locks it first).</p>
+  <form method="get" action="/reports/incentives/to-pay" class="section">
+    <div class="kv-grid">
+      <label>Payee type
+        <select name="payee">
+          <option value="">Staff and associates</option>
+          <option value="staff"{{ ' selected' if payee == 'staff' else '' }}>Staff only</option>
+          <option value="associate"{{ ' selected' if payee == 'associate' else '' }}>Associates only</option>
+        </select></label>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm">Run</button>
+      <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/incentives/to-pay?{% if payee %}payee={{ payee }}&{% endif %}format=csv">Export CSV</a>
+    </div>
+  </form>
+  {% for key, g in groups %}
+  <div class="section" id="to-pay-{{ key }}">
+    <h2>{{ g.label }} — &#8377;{{ g.totals.amount_inr | money }}</h2>
+    {% set rows = g.rows %}{% set totals = g.totals %}
+    {% include "incentives/_report_table.njk" %}
+  </div>
+  {% endfor %}
+</div>

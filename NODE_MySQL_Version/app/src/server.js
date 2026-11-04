@@ -216,6 +216,9 @@ njkEnv.addGlobal('incentive', {
 });
 njkEnv.addFilter('legLabel', (leg) => require('./repositories/caRepository').legLabel(leg));
 // Owner decision D-245 (4 Nov 2026): PricingService::pct()/modeLabel() for the pricing views.
+// Owner decision D-245 P5: "Estimated" / "Locked" / "Paid" / "Held" beside a commission or incentive amount.
+njkEnv.addGlobal('profitStateLabel', (st) => require('./services/orderProfitabilityService').stateLabel(st));
+njkEnv.addGlobal('incentiveReportStates', require('./services/incentiveReportService').STATES);
 njkEnv.addGlobal('pricingFmt', {
   pct: (v) => require('./services/pricingService').pct(v),
   modeLabel: (m, v) => require('./services/pricingService').modeLabel(m, v),
@@ -1307,6 +1310,12 @@ app.get('/reports/suppliers', requireAuth, requirePermission('view_purchase_pric
 app.get('/reports/conversion', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.conversion));
 app.get('/reports/performance', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.performance));
 app.get('/reports/order-profitability', requireAuth, requirePermission('manage_order_financials'), asyncHandler(reportController.profitability));
+// Owner decision D-245 P5: incentive & commission reports (MD / ED / Accounts — whoever manages or pays incentives or sees the price build-up).
+const incentiveReportController = require('./controllers/incentiveReportController');
+app.get('/reports/incentives', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), asyncHandler(incentiveReportController.register));
+app.get('/reports/incentives/to-pay', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), asyncHandler(incentiveReportController.toPay));
+app.get('/reports/incentives/owed', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), asyncHandler(incentiveReportController.owed));
+app.get('/reports/incentives/statement', requireAuth, requirePermissionAny(['manage_incentives', 'pay_incentives', 'view_price_buildup']), asyncHandler(incentiveReportController.statement));
 app.post('/reports/save', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.saveDefinition));
 app.get('/reports/saved/:reportId/run', requireAuth, requirePermission('view_reports'), asyncHandler(reportController.runDefinition));
 app.post('/reports/saved/:reportId/update', requireAuth, requirePermission('manage_report_definitions'), verifyCsrf, asyncHandler(reportController.updateDefinition));

@@ -1,0 +1,32 @@
+<div class="card page-wide">
+  {% include "incentives/_report_nav.njk" %}
+  <h1>Incentive &amp; Commission Register</h1>
+  <p class="muted">One row per order and payee: each staff member's share of the team incentive and each associate's commission. Locked orders show what was locked (locked, held or paid); open orders show the estimate the order page shows today.</p>
+  <form method="get" action="/reports/incentives" class="section">
+    <div class="kv-grid">
+      <label>State
+        <select name="state">
+          <option value="">All states</option>
+          {% for k, label in incentiveReportStates %}<option value="{{ k }}"{{ ' selected' if filters.state == k else '' }}>{{ label }}</option>{% endfor %}
+        </select></label>
+      <label>Payout month<input type="month" name="month" value="{{ filters.month }}" placeholder="e.g. 2026-12"></label>
+      <label>Person
+        <select name="user_id">
+          <option value="0">Everyone</option>
+          {% for p in people %}<option value="{{ p.id }}"{{ ' selected' if filters.user_id == p.id else '' }}>{{ p.name }}</option>{% endfor %}
+        </select></label>
+      <label>Associate
+        <select name="associate_id">
+          <option value="0">Every associate</option>
+          {% for a in associates %}<option value="{{ a.id }}"{{ ' selected' if filters.associate_id == a.id else '' }}>{{ a.name }}</option>{% endfor %}
+        </select></label>
+      <label>Order date from<input type="date" name="from" value="{{ filters.from }}"></label>
+      <label>Order date to<input type="date" name="to" value="{{ filters.to }}"></label>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn-sm">Run</button>
+      <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/incentives?{{ csvQuery }}&format=csv">Export CSV</a>
+    </div>
+  </form>
+  <div class="section">{% include "incentives/_report_table.njk" %}</div>
+</div>

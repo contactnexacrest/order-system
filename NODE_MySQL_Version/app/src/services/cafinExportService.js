@@ -62,6 +62,8 @@ const SUMMARY_HEADERS = [
   'C1 Freight & insurance (INR)', 'C2 Logistics partner bills (INR)', 'C3 Other order costs (INR)', 'of which team incentive (INR)',
   'of which associate commission (INR)', 'C4 Order expenses (INR)', 'C5 Expenses booked in Zoho Books (INR)', 'Total expenses excl. supplier (INR)',
   'Total cost (INR)', 'Order profit (INR)', 'Margin %',
+  'Profit before commission & incentive (INR)', 'Associate commission (INR)', 'Commission state', 'Team incentive (INR)', 'Incentive state',
+  'Profit after commission & incentive (INR)', 'GST on commission (INR, not a cost)', 'TDS on commission (INR, a liability)',
   'Cash: received from buyer (INR)', 'Cash: benefits received (INR)', 'Cash: paid to supplier (INR)', 'Cash: paid to logistics (INR)',
   'Cash: expenses paid (INR)', 'Cash: net so far (INR)',
 ];
@@ -86,6 +88,7 @@ async function summaryRows(ids) {
   for (const orderId of ids) {
     const o = await orderRepository.find(orderId);
     const p = await orderProfitabilityService.computeForOrder(orderId);
+    const [gst, tds] = await commissionTaxes(orderId);
     const cash = (await orderLedgerService.forOrder(orderId, String(o.currency_code || 'INR'), true)).totals;
     const c1 = p.freight_cost_inr + p.insurance_cost_inr;
     rows.push([
@@ -98,11 +101,41 @@ async function summaryRows(ids) {
       num(p.associate_commission_inr), num(p.expenses_inr), num(p.zoho_expenses_inr),
       num(c1 + p.logistics_cost_inr + p.other_costs_inr + p.expenses_inr + p.zoho_expenses_inr),
       num(p.total_cost_inr), num(p.profit_inr), p.margin_pct !== null && p.margin_pct !== undefined ? Number(p.margin_pct).toFixed(2) : '',
+      num(p.profit_before_commission_inr), num(p.commission_inr), p.commission_state !== null ? orderProfitabilityService.stateLabel(p.commission_state) : 'No associate',
+      num(p.incentive_inr), orderProfitabilityService.stateLabel(p.incentive_state), num(p.profit_after_incentive_inr), num(gst), num(tds),
       num(cash.buyer_inr), num(cash.benefits_inr), num(cash.supplier_inr), num(cash.logistics_inr),
       num(cash.expenses_inr), num(cash.net_inr),
     ]);
   }
   return rows;
+}
+
+/**
+ * D-245 P5: GST on the associate's commission (input credit — not a cost) and the TDS deducted
+ * from it (owed to the government — a liability, not a cost), from the order's associate
+ * payouts: the stored figure once paid, else what is due on it now.
+ */
+async function commissionTaxes(orderId) {
+  const associateCommission = require('./associateCommission');
+  let gst = 0;
+  let tds = 0;
+  for (const po of await require('../repositories/incentiveRepository').payoutsForOrder(orderId)) {
+    if (po.payee_kind !== 'associate') continue;
+    gst += po.status === 'paid' ? Number(po.gst_inr || 0) : Number(await associateCommission.gstFor(po));
+    tds += Number(po.tds_inr || 0);
+  }
+  return [Math.round(gst * 100) / 100, Math.round(tds * 100) / 100];
+}
+
+/** Only the orders whose incentive the MD has locked. */
+async function lockedOnly(ids) {
+  const incentiveRepository = require('../repositories/incentiveRepository');
+  const out = [];
+  for (const id of ids) {
+    const row = await incentiveRepository.forOrder(id);
+    if (row && row.locked_at) out.push(id);
+  }
+  return out;
 }
 
 const DETAIL_HEADERS = ['Order reference', 'Client', 'Section', 'Item', 'Description', 'Date', 'Amount', 'Currency', 'Amount (INR)', 'Note'];
@@ -178,4 +211,4 @@ async function detailRows(ids) {
   return rows;
 }
 
-module.exports = { STATUSES, orderIds, financialYears, SUMMARY_HEADERS, summaryRows, DETAIL_HEADERS, detailRows, plain };
+module.exports = { STATUSES, orderIds, financialYears, SUMMARY_HEADERS, summaryRows, DETAIL_HEADERS, detailRows, plain, commissionTaxes, lockedOnly };

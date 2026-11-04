@@ -514,3 +514,16 @@ on record at the moment it's viewed.
   re-sent to the supplier, generated as a document, or notified anywhere
   — it's a data carry-forward only, reviewed and confirmed by staff
   through the normal Stage 5 flow.
+
+## Commission and incentive in the profit (D-245 P5, 4 Nov 2026)
+
+Step 12c's Profitability Summary now ends with **Cost before Commission &
+Incentive**, **Profit before Commission & Incentive**, the **Associate
+Commission** and **Team Incentive** (each marked *Estimated* until the MD locks
+the order, then *Locked* or *Paid* — the locked figure replaces the estimate,
+never both), and the **Order Profit after Commission & Incentive** with its
+margin. "Other Costs" no longer includes the locked incentive lines; they are
+shown on their own lines instead. Whoever may see the financials but not the
+incentives sees the profit before commission & incentive only. The CAFIN PDF is
+unchanged (locked figures only); the CAFIN CSV export adds the new columns. See
+SOP 20 for the incentive reports.

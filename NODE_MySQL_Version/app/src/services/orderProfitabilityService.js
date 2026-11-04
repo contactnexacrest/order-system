@@ -55,7 +55,14 @@ const orderSupplierPoRepository = require('../repositories/orderSupplierPoReposi
  * explicitly Number()/parseFloat()'d before arithmetic, never relying on
  * JS's implicit coercion (which concatenates rather than adds for `+`).
  */
-async function computeForOrder(orderId) {
+/**
+ * Owner decision D-245 P5: with withIncentives (the default) the result also carries the
+ * associate commission and the team incentive — LOCKED figures once the MD has locked the
+ * order, ESTIMATED ones before (so profit is never overstated) — and the profit before and
+ * after them. The existing keys keep their meaning (locked cost entries only) so the CAFIN
+ * document is unchanged. incentiveService.calculate() asks without, to avoid a circle.
+ */
+async function computeForOrder(orderId, withIncentives = true) {
   const order = await orderRepository.find(orderId);
   const fobValue = await orderProductRepository.totalFobValue(orderId);
   const currencyCode = (order && order.currency_code) || null;
@@ -177,6 +184,7 @@ async function computeForOrder(orderId) {
   };
   result.freight_conversion_text = result.freight_from_bills ? null : conversionText(result, 'freight');
   result.insurance_conversion_text = conversionText(result, 'insurance');
+  if (withIncentives) Object.assign(result, await incentiveLayer(orderId, result));
   return result;
 }
 
@@ -383,4 +391,69 @@ function round2(value) {
   return Math.round(value * 100) / 100;
 }
 
-module.exports = { computeForOrder, conversionText };
+/**
+ * D-245 P5: profit before commission and incentive → − associate commission → profit for the
+ * incentive → − team incentive → profit after. Each amount says whether it is estimated,
+ * locked, paid or held. A locked figure replaces the estimate; it is never added on top (the
+ * locked amounts are the incentive cost entries already inside other_costs_inr, taken back out
+ * here first).
+ */
+async function incentiveLayer(orderId, base) {
+  const incentiveRepository = require('../repositories/incentiveRepository');
+  const entries = await incentiveRepository.costEntries(orderId);
+  const lockedTeam = round2(Number((entries.team || {}).amount_inr || 0));
+  const lockedAssoc = round2(Number((entries.associate || {}).amount_inr || 0));
+  const costBefore = round2(Number(base.total_cost_inr) - lockedTeam - lockedAssoc);
+  const profitBefore = round2(Number(base.profit_inr) + lockedTeam + lockedAssoc);
+  const row = await incentiveRepository.forOrder(orderId);
+  const order = await orderRepository.find(orderId);
+  const locked = !!(row && row.locked_at);
+  let commission; let incentive; let commissionState; let incentiveState;
+  if (locked) {
+    commission = lockedAssoc;
+    incentive = lockedTeam;
+    commissionState = await payoutState(orderId, 'associate', lockedAssoc > 0 || !!row.associate_id);
+    incentiveState = await payoutState(orderId, 'staff', true);
+  } else if (!order || ['cancelled', 'lost'].includes(order.status)) {
+    commission = 0; incentive = 0; commissionState = null; incentiveState = null;
+  } else {
+    const calc = await require('./incentiveService').calculate(orderId);
+    const a = calc.associate;
+    commission = a && a.state !== 'unpaid' ? round2(Number(a.amount_inr)) : 0;
+    commissionState = a ? 'estimated' : null;
+    incentive = round2(Number(calc.team_total));
+    incentiveState = 'estimated';
+  }
+  const forIncentive = round2(profitBefore - commission);
+  const after = round2(forIncentive - incentive);
+  const revenue = Number(base.revenue_inr);
+  return {
+    cost_before_incentives_inr: costBefore,
+    other_costs_excl_incentives_inr: round2(Number(base.other_costs_inr) - lockedTeam - lockedAssoc),
+    profit_before_commission_inr: profitBefore,
+    commission_inr: commission,
+    commission_state: commissionState,
+    profit_for_incentive_inr: forIncentive,
+    incentive_inr: incentive,
+    incentive_state: incentiveState,
+    profit_after_incentive_inr: after,
+    margin_after_pct: revenue > 0 ? round2(after / revenue * 100) : null,
+    incentives_locked: locked,
+  };
+}
+
+/** locked | paid (every payout of that kind paid) | held (any held); null when there is nothing for that payee kind. */
+async function payoutState(orderId, kind, expected) {
+  const payouts = (await require('../repositories/incentiveRepository').payoutsForOrder(orderId)).filter((p) => p.payee_kind === kind);
+  if (payouts.length === 0) return expected ? 'locked' : null;
+  const statuses = payouts.map((p) => p.status);
+  if (statuses.includes('held')) return 'held';
+  return statuses.every((st) => st === 'paid') ? 'paid' : 'locked';
+}
+
+/** "estimated" / "locked" / "paid" / "held" as shown beside an amount. */
+function stateLabel(state) {
+  return { estimated: 'Estimated', locked: 'Locked', paid: 'Paid', held: 'Held', ready: 'Ready to lock' }[state] || '—';
+}
+
+module.exports = { computeForOrder, conversionText, incentiveLayer, stateLabel };

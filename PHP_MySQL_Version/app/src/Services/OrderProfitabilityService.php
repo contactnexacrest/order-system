@@ -61,7 +61,15 @@ use App\Repositories\OrderVendorBillRepository;
 final class OrderProfitabilityService
 {
     /** @return array<string,mixed> */
-    public static function computeForOrder(int $orderId): array
+    /**
+     * Owner decision D-245 P5: with $withIncentives (the default) the result also carries
+     * the associate commission and the team incentive — LOCKED figures once the MD has
+     * locked the order, ESTIMATED ones before (so profit is never overstated) — and the
+     * profit before and after them. The existing keys keep their meaning (locked cost
+     * entries only) so the CAFIN document is unchanged. IncentiveService::calculate()
+     * asks without, to avoid going round in a circle.
+     */
+    public static function computeForOrder(int $orderId, bool $withIncentives = true): array
     {
         $order = OrderRepository::find($orderId);
         $fobValue = OrderProductRepository::totalFobValue($orderId);
@@ -179,7 +187,113 @@ final class OrderProfitabilityService
         ];
         $result['freight_conversion_text'] = $result['freight_from_bills'] ? null : self::conversionText($result, 'freight');
         $result['insurance_conversion_text'] = self::conversionText($result, 'insurance');
+        if ($withIncentives) {
+            $result += self::incentiveLayer($orderId, $result);
+        }
         return $result;
+    }
+
+    /**
+     * D-245 P5: profit before commission and incentive → − associate commission →
+     * profit for the incentive → − team incentive → profit after. Each amount says
+     * whether it is estimated, locked, paid or held. A locked figure replaces the
+     * estimate; it is never added on top (the locked amounts are the incentive cost
+     * entries already inside other_costs_inr, taken back out here first).
+     *
+     * @param array<string,mixed> $base
+     * @return array<string,mixed>
+     */
+    public static function incentiveLayer(int $orderId, array $base): array
+    {
+        $entries = \App\Repositories\IncentiveRepository::costEntries($orderId);
+        $lockedTeam = round((float) ($entries['team']['amount_inr'] ?? 0), 2);
+        $lockedAssoc = round((float) ($entries['associate']['amount_inr'] ?? 0), 2);
+        $costBefore = round((float) $base['total_cost_inr'] - $lockedTeam - $lockedAssoc, 2);
+        $profitBefore = round((float) $base['profit_inr'] + $lockedTeam + $lockedAssoc, 2);
+        $row = \App\Repositories\IncentiveRepository::forOrder($orderId);
+        $order = OrderRepository::find($orderId);
+        $locked = $row !== null && !empty($row['locked_at']);
+        if ($locked) {
+            $commission = $lockedAssoc;
+            $incentive = $lockedTeam;
+            $commissionState = self::payoutState($orderId, 'associate', $lockedAssoc > 0 || !empty($row['associate_id']));
+            $incentiveState = self::payoutState($orderId, 'staff', true);
+        } elseif ($order === null || in_array($order['status'] ?? '', ['cancelled', 'lost'], true)) {
+            $commission = 0.0;
+            $incentive = 0.0;
+            $commissionState = null;
+            $incentiveState = null;
+        } else {
+            $calc = IncentiveService::calculate($orderId);
+            $a = $calc['associate'];
+            $commission = ($a !== null && ($a['state'] ?? '') !== 'unpaid') ? round((float) $a['amount_inr'], 2) : 0.0;
+            $commissionState = $a !== null ? 'estimated' : null;
+            $incentive = round((float) $calc['team_total'], 2);
+            $incentiveState = 'estimated';
+        }
+        $forIncentive = round($profitBefore - $commission, 2);
+        $after = round($forIncentive - $incentive, 2);
+        $revenue = (float) $base['revenue_inr'];
+        return [
+            'cost_before_incentives_inr' => $costBefore,
+            'other_costs_excl_incentives_inr' => round((float) $base['other_costs_inr'] - $lockedTeam - $lockedAssoc, 2),
+            'profit_before_commission_inr' => $profitBefore,
+            'commission_inr' => $commission,
+            'commission_state' => $commissionState,
+            'profit_for_incentive_inr' => $forIncentive,
+            'incentive_inr' => $incentive,
+            'incentive_state' => $incentiveState,
+            'profit_after_incentive_inr' => $after,
+            'margin_after_pct' => $revenue > 0 ? round($after / $revenue * 100, 2) : null,
+            'incentives_locked' => $locked,
+        ];
+    }
+
+    /** locked | paid (every payout of that kind paid) | held (any held); null when there is nothing for that payee kind. */
+    private static function payoutState(int $orderId, string $kind, bool $expected): ?string
+    {
+        $payouts = array_values(array_filter(\App\Repositories\IncentiveRepository::payoutsForOrder($orderId), static fn (array $p): bool => $p['payee_kind'] === $kind));
+        if ($payouts === []) {
+            return $expected ? 'locked' : null;
+        }
+        $statuses = array_column($payouts, 'status');
+        if (in_array('held', $statuses, true)) {
+            return 'held';
+        }
+        return count(array_filter($statuses, static fn ($st): bool => $st !== 'paid')) === 0 ? 'paid' : 'locked';
+    }
+
+    /**
+     * D-245 P5 + money separation: commission and incentive amounts (and the profit after
+     * them, which would reveal their sum) are shown only to whoever manages or pays
+     * incentives or sees the price build-up. Others see profit before commission & incentive.
+     */
+    public static function viewerSeesIncentives(): bool
+    {
+        $u = AuthService::currentUser();
+        if ($u === null) {
+            return false;
+        }
+        $roleId = $u['role_id'] !== null ? (int) $u['role_id'] : null;
+        foreach (['manage_incentives', 'pay_incentives', 'view_price_buildup'] as $perm) {
+            if (PermissionService::can((int) $u['id'], $roleId, $perm)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** "estimated" / "locked" / "paid" / "held" as shown beside an amount. */
+    public static function stateLabel(?string $state): string
+    {
+        return match ($state) {
+            'estimated' => 'Estimated',
+            'locked' => 'Locked',
+            'paid' => 'Paid',
+            'held' => 'Held',
+            'ready' => 'Ready to lock',
+            default => '—',
+        };
     }
 
     /**

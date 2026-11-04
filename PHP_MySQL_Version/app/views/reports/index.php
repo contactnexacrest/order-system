@@ -89,6 +89,15 @@ $__uid = $__u ? (int) $__u['id'] : 0;
   </div>
   <?php endif; ?>
 
+  <?php // Owner decision D-245 P5: incentive & commission reports. ?>
+  <?php if ($__u && (\App\Services\PermissionService::can($__uid, $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'manage_incentives') || \App\Services\PermissionService::can($__uid, $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'pay_incentives') || \App\Services\PermissionService::can($__uid, $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_price_buildup'))): ?>
+  <div class="section">
+    <h2>Incentives &amp; Commission</h2>
+    <p class="muted">Every staff share and associate commission per order — estimated until the MD locks the order, then locked, held or paid. What falls in this month's and next month's payout run, what is owed at a date, and one person's statement.</p>
+    <a class="btn-sm" href="/reports/incentives">Register</a> <a class="btn-sm" href="/reports/incentives/to-pay">To pay</a> <a class="btn-sm" href="/reports/incentives/owed">Owed at month end</a> <a class="btn-sm" href="/reports/incentives/statement">Person statement</a>
+  </div>
+  <?php endif; ?>
+
   <?php if ($__u && \App\Services\PermissionService::can($__uid, $__u['role_id'] !== null ? (int) $__u['role_id'] : null, 'view_cafin')): ?>
   <div class="section">
     <h2>CAFIN export</h2>

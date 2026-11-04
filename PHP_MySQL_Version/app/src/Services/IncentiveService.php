@@ -273,7 +273,7 @@ final class IncentiveService
     {
         $order = OrderRepository::find($orderId);
         $row = IncentiveRepository::forOrder($orderId);
-        $profit = OrderProfitabilityService::computeForOrder($orderId);
+        $profit = OrderProfitabilityService::computeForOrder($orderId, false);
         $already = array_sum(array_map(static fn (array $c): float => (float) $c['amount_inr'], IncentiveRepository::costEntries($orderId)));
         $profitBefore = round((float) $profit['profit_inr'] + $already, 2);
         $revenue = (float) ($profit['revenue_inr'] ?? 0);

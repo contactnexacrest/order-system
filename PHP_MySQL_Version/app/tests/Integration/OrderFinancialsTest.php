@@ -527,18 +527,24 @@ final class OrderFinancialsTest extends DbTestCase
         self::assertArrayHasKey($orderA, $rowsById);
         self::assertArrayHasKey($orderB, $rowsById);
         self::assertSame(80000.0, $rowsById[$orderA]['revenue_inr']);
-        self::assertSame(80000.0, $rowsById[$orderA]['profit_inr']);
-        self::assertSame(70000.0, $rowsById[$orderB]['profit_inr']);
+        // D-245 P5: profit before commission and incentive; the (estimated) team incentive comes after.
+        self::assertSame(80000.0, $rowsById[$orderA]['profit_before_commission_inr']);
+        self::assertSame(70000.0, $rowsById[$orderB]['profit_before_commission_inr']);
+        self::assertSame('estimated', $rowsById[$orderA]['incentive_state']);
+        self::assertSame(round($rowsById[$orderB]['profit_before_commission_inr'] - $rowsById[$orderB]['commission_inr'] - $rowsById[$orderB]['incentive_inr'], 2), $rowsById[$orderB]['profit_after_incentive_inr']);
 
         // The report's own totals row must equal the sum of every row it
         // lists (asserted directly, rather than against a fixed constant —
         // other tests in this process share the same disposable database
         // and may have their own orders in today's date range).
         $sumRevenue = array_sum(array_column($data['rows'], 'revenue_inr'));
-        $sumProfit = array_sum(array_column($data['rows'], 'profit_inr'));
+        $sumProfit = array_sum(array_column($data['rows'], 'profit_after_incentive_inr'));
         self::assertSame(round($sumRevenue, 2), round($data['totals']['revenue_inr'], 2));
-        self::assertSame(round($sumProfit, 2), round($data['totals']['profit_inr'], 2));
-        self::assertSame(round($sumProfit / $sumRevenue * 100, 2), $data['totals']['margin_pct']);
+        self::assertSame(round($sumProfit, 2), round($data['totals']['profit_after_incentive_inr'], 2));
+        foreach (['cost_before_incentives_inr', 'profit_before_commission_inr', 'commission_inr', 'incentive_inr'] as $k) {
+            self::assertSame(round(array_sum(array_column($data['rows'], $k)), 2), round($data['totals'][$k], 2), $k);
+        }
+        self::assertSame(round($sumProfit / $sumRevenue * 100, 2), $data['totals']['margin_after_pct']);
     }
 
     public function testOrderProfitabilityReportRespectsDateRangeFilter(): void

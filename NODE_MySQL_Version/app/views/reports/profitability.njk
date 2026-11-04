@@ -1,44 +1,63 @@
 <div class="card page-wide">
   <p class="muted small"><a href="/reports">&larr; Back to Reports</a></p>
   <h1>Order Profitability Report</h1>
-  <p class="muted">Revenue, total cost, profit, and margin % per order — filtered by order creation date. Pick a date range to view any period (a month, a quarter, six months, a financial year) with a totals row for that range. See each order's own page for the full cost breakdown behind these figures.</p>
+  <p class="muted">Revenue, cost, the associate commission and team incentive, and the profit left per order — filtered by order creation date. Commission and incentive are <strong>estimated</strong> until the MD locks the order, then the locked figure replaces the estimate (never both). See each order's own page for the full cost breakdown behind these figures.</p>
 
   <form method="get" action="/reports/order-profitability" class="section">
     <div class="kv-grid">
       <label>Created From<input type="date" name="date_from" value="{{ filters.dateFrom or '' }}"></label>
       <label>Created To<input type="date" name="date_to" value="{{ filters.dateTo or '' }}"></label>
+      <label>Orders
+        <select name="scope">
+          <option value="all"{% if (filters.scope or 'all') == 'all' %} selected{% endif %}>Include open orders (estimated)</option>
+          <option value="locked"{% if filters.scope == 'locked' %} selected{% endif %}>Locked orders only</option>
+        </select>
+      </label>
     </div>
     <div class="btn-row">
       <button type="submit" class="btn-sm">Run</button>
-      <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/order-profitability?date_from={{ filters.dateFrom or '' }}&date_to={{ filters.dateTo or '' }}&format=csv">Export CSV</a>
+      <a class="btn-sm btn-secondary js-slow-download" data-loading-text="Exporting…" href="/reports/order-profitability?date_from={{ filters.dateFrom or '' }}&date_to={{ filters.dateTo or '' }}&scope={{ filters.scope or 'all' }}&format=csv">Export CSV</a>
     </div>
   </form>
 
   <div class="section">
-    <h2>Totals for This Period</h2>
+    <h2>Totals for This Period <span class="muted small">({% if filters.scope == 'locked' %}locked orders only{% else %}open orders included — their commission and incentive are estimates{% endif %})</span></h2>
     <div class="kv-grid">
       <div><span class="k">Total Revenue (INR)</span><span class="v">{{ totals.revenue_inr | money }}</span></div>
-      <div><span class="k">Total Cost (INR)</span><span class="v">{{ totals.total_cost_inr | money }}</span></div>
-      <div><span class="k">Total Profit (INR)</span><span class="v">{{ totals.profit_inr | money }}</span></div>
-      <div><span class="k">Overall Margin %</span><span class="v">{% if totals.margin_pct != null %}{{ totals.margin_pct | money }}%{% else %}—{% endif %}</span></div>
+      <div><span class="k">Cost before commission &amp; incentive (INR)</span><span class="v">{{ totals.cost_before_incentives_inr | money }}</span></div>
+      <div><span class="k">Profit before commission &amp; incentive (INR)</span><span class="v">{{ totals.profit_before_commission_inr | money }}</span></div>
+      {% if seeIncentives %}
+      <div><span class="k">Associate commission (INR)</span><span class="v">{{ totals.commission_inr | money }}</span></div>
+      <div><span class="k">Team incentive (INR)</span><span class="v">{{ totals.incentive_inr | money }}</span></div>
+      <div><span class="k">Profit after commission &amp; incentive (INR)</span><span class="v">{{ totals.profit_after_incentive_inr | money }}</span></div>
+      <div><span class="k">Overall margin after %</span><span class="v">{% if totals.margin_after_pct != null %}{{ totals.margin_after_pct | money }}%{% else %}—{% endif %}</span></div>
+      {% else %}
+      <div><span class="k">Associate commission &amp; team incentive</span><span class="v muted small">Shown to whoever manages or pays incentives.</span></div>
+      {% endif %}
     </div>
   </div>
 
   <div class="section">
     <table class="list">
-      <tr><th>Order</th><th>Client</th><th>Created</th><th>Revenue (INR)</th><th>Total Cost (INR)</th><th>Profit (INR)</th><th>Margin %</th></tr>
+      <tr><th>Order</th><th>Client</th><th>Created</th><th>Revenue (INR)</th><th>Cost before commission &amp; incentive (INR)</th><th>Profit before (INR)</th>{% if seeIncentives %}<th>Associate commission (INR)</th><th>Team incentive (INR)</th><th>Profit after (INR)</th><th>Margin after %</th>{% endif %}</tr>
       {% for r in rows %}
       <tr>
         <td><a href="/orders/{{ r.order_id }}">{{ r.order_reference }}</a></td>
         <td>{{ r.company_legal_name }}</td>
         <td>{{ r.created_at }}</td>
         <td>{{ r.revenue_inr | money }}{% if r.revenue_is_estimated %} <span class="muted small">(est.)</span>{% endif %}</td>
-        <td>{{ r.total_cost_inr | money }}</td>
-        <td>{{ r.profit_inr | money }}</td>
-        <td>{% if r.margin_pct != null %}{{ r.margin_pct | money }}%{% else %}—{% endif %}</td>
+        <td>{{ r.cost_before_incentives_inr | money }}</td>
+        <td>{{ r.profit_before_commission_inr | money }}</td>
+        {% if seeIncentives %}
+        <td>{% if r.commission_state %}{{ r.commission_inr | money }} <span class="muted small">({{ profitStateLabel(r.commission_state) }})</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{{ r.incentive_inr | money }} <span class="muted small">({{ profitStateLabel(r.incentive_state) }})</span></td>
+        <td>{{ r.profit_after_incentive_inr | money }}</td>
+        <td>{% if r.margin_after_pct != null %}{{ r.margin_after_pct | money }}%{% else %}—{% endif %}</td>
+        {% endif %}
       </tr>
+      {% else %}
+      <tr><td colspan="{{ 10 if seeIncentives else 6 }}" class="muted">No orders in this period.</td></tr>
       {% endfor %}
-      {% if rows.length == 0 %}<tr><td colspan="7" class="muted">No orders in this period.</td></tr>{% endif %}
     </table>
   </div>
 </div>
