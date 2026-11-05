@@ -81,6 +81,7 @@
     <p style="margin:0;">&#8226; Certificate of Origin (CAPEXIL / Chamber of Commerce)</p>
     <p style="margin:0;">&#8226; Bill of Lading</p>
     <p style="margin:0;">&#8226; Fumigation Certificate — provided as standard with every shipment</p>
+    {% for q in category_documents.quality_documents %}<p style="margin:0;">&#8226; {{ q.name }} — required for {{ q.category }}</p>{% endfor %}
   </td></tr>
 </table>
 

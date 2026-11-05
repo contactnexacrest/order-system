@@ -1480,7 +1480,7 @@ function termsSectionTitleFor(code) {
 
 /** @returns {Promise<string[]>} fully-substituted clause text, in order */
 async function resolveTerms(documentTypeCode, data, balanceTriggerOption = null) {
-  const clauses = await termsClauseRepository.forDocumentTypeCodeAndGroup(documentTypeCode, 'standard', balanceTriggerOption);
+  const clauses = await termsClauseRepository.forDocumentTypeCodeAndGroup(documentTypeCode, 'standard', balanceTriggerOption, (data.category_documents && data.category_documents.clause_sets) || null);
   const replacements = await clauseTextReplacements(data, documentTypeCode);
   return clauses.map((c) => applyReplacements(c.text, replacements));
 }
@@ -1495,7 +1495,7 @@ async function resolveTerms(documentTypeCode, data, balanceTriggerOption = null)
  * @returns {Promise<Array<{title:string,text:string}>>}
  */
 async function resolveClauseGroup(documentTypeCode, clauseGroup, data, balanceTriggerOption = null) {
-  const clauses = await termsClauseRepository.forDocumentTypeCodeAndGroup(documentTypeCode, clauseGroup, balanceTriggerOption);
+  const clauses = await termsClauseRepository.forDocumentTypeCodeAndGroup(documentTypeCode, clauseGroup, balanceTriggerOption, (data.category_documents && data.category_documents.clause_sets) || null);
   const replacements = await clauseTextReplacements(data, documentTypeCode);
   return clauses.map((c) => ({ title: c.title, text: applyReplacements(c.text, replacements) }));
 }

@@ -113,6 +113,16 @@ function bankDetailsRows(context, paymentRefLabel, rbiCode) {
   ];
 }
 
+// D-257 Phase 1: the order's category words (stone = today's), from the assembler.
+function cd(context) {
+  return (context && context.category_documents) || require('../categoryDocumentProfile').stone();
+}
+
+// D-257 Phase 1: the quality documents the order's categories ask for, numbered after `after`.
+function qualityLines(context, after) {
+  return cd(context).quality_documents.map((q, i) => `${after + i + 1}.  ${q.name} — required for ${q.category}`);
+}
+
 function documentsProvidedParagraphs(heading, lines) {
   return [C.rich([[heading, { bold: true }]]), ...lines.map((line) => C.plain(line))];
 }
@@ -186,13 +196,13 @@ function buildProductRows(products) {
   });
 }
 
-function weightTable(order) {
+function weightTable(order, context = {}) {
   const out = [C.plain('Weight & Volume (Estimated — actuals confirmed on Packing List after production)', { bold: true, size: 21, color: C.NAVY })];
   const rows = [
     ['Total CBM (m³)', g(order, 'estimated_total_cbm', 'To Be Confirmed'), 'm³'],
     ['Gross Weight (incl. packing)', g(order, 'estimated_gross_weight_kg', 'To Be Confirmed'), 'kg'],
-    ['Net Weight (stone only)', g(order, 'estimated_net_weight_kg', 'To Be Confirmed'), 'kg'],
-    ['No. of Packages / Crates', g(order, 'estimated_package_count', 'To Be Confirmed'), 'Crates'],
+    [cd(context).net_weight_label, g(order, 'estimated_net_weight_kg', 'To Be Confirmed'), 'kg'],
+    [cd(context).package_count_label, g(order, 'estimated_package_count', 'To Be Confirmed'), cd(context).package_nouns],
     ['Package Type', g(order, 'estimated_package_type', 'To Be Confirmed'), '—'],
   ];
   out.push(...C.checklistTable(['Parameter', 'Estimated Value *', 'Unit'], [50, 35, 15], rows.map((r) => ({ cells: r.map(String) }))));
@@ -311,7 +321,7 @@ function renderQt(context) {
     ])
   );
 
-  children.push(...weightTable(order));
+  children.push(...weightTable(order, context));
 
   children.push(...C.sectionTitle('4. SHIPPING / COMMERCIAL TERMS'));
   children.push(
@@ -336,6 +346,7 @@ function renderQt(context) {
       `3.  Certificate of Origin — ${g(order, 'coo_type')} — Issued by CAPEXIL`,
       `4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ${g(financial, 'balance_pct')}% balance T/T is received and cleared`,
       '5.  Fumigation Certificate — provided as standard with every shipment',
+      ...qualityLines(context, 5),
     ])
   );
 
@@ -479,7 +490,7 @@ function renderPi(context) {
     )
   );
 
-  children.push(...weightTable(order));
+  children.push(...weightTable(order, context));
 
   children.push(...C.sectionTitle('4. SHIPPING / COMMERCIAL TERMS'));
   children.push(
@@ -539,6 +550,7 @@ function renderPi(context) {
       `3.  Certificate of Origin — ${g(order, 'coo_type')} — Issued by CAPEXIL`,
       `4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ${g(financial, 'balance_pct')}% balance T/T is received and cleared in NexaCrest bank account`,
       '5.  Fumigation Certificate — provided as standard with every shipment',
+      ...qualityLines(context, 5),
     ])
   );
 
@@ -672,7 +684,8 @@ function renderOc(context) {
         full: true,
         value: [
           C.plain('Upon shipment, the following documents will be provided:', { bold: true }),
-          ...['Commercial Invoice', 'Packing List', 'Certificate of Origin (CAPEXIL / Chamber of Commerce)', 'Bill of Lading', 'Fumigation Certificate — provided as standard with every shipment'].map((item) =>
+          ...['Commercial Invoice', 'Packing List', 'Certificate of Origin (CAPEXIL / Chamber of Commerce)', 'Bill of Lading', 'Fumigation Certificate — provided as standard with every shipment',
+            ...cd(context).quality_documents.map((q) => `${q.name} — required for ${q.category}`)].map((item) =>
             C.plain(`•  ${item}`)
           ),
         ],
@@ -1031,14 +1044,15 @@ function renderSupPo(context) {
   );
   children.push(
     ...C.kvTable([
-      { label: 'Material / Stone Type *', value: g(sp, 'material_stone_type', 'To Be Confirmed') },
+      { label: `${cd(context).material_label} *`, value: g(sp, 'material_stone_type', 'To Be Confirmed') },
       { label: 'Grade *', value: `${g(sp, 'grade')} only — no mixed grades, no seconds` },
       { label: 'Surface Finish *', value: g(sp, 'surface_finish', 'To Be Confirmed') },
       { label: 'Dimensions *', value: g(sp, 'dimensions', 'To Be Confirmed') },
-      { label: 'Dimensional Tolerance', value: g(sp, 'dimensional_tolerance', '±2 mm on L and W · ±0.5 mm on thickness') },
+      { label: 'Dimensional Tolerance', value: g(sp, 'dimensional_tolerance', cd(context).tolerance_default) },
       { label: 'Quantity *', value: g(sp, 'quantity') },
       { label: 'Unit *', value: g(sp, 'unit', 'To Be Confirmed') },
       { label: 'Colour Reference', value: g(sp, 'colour_reference') },
+      ...(cd(context).quality_documents.length ? [{ label: 'Quality Documents Required *', value: `${cd(context).quality_documents.map((q) => q.name).join('; ')} — to be supplied with the goods` }] : []),
     ])
   );
 
@@ -1283,15 +1297,15 @@ function renderPl(context) {
       { label: 'HS Code *', value: hsCodeList },
       { label: 'Country of Origin *', value: 'India' },
       { label: 'Total Quantity *', value: g(packing, 'actual_quantity_packed') !== '—' ? `${g(packing, 'actual_quantity_packed')}${g(packing, 'actual_quantity_unit') !== '—' ? ` ${g(packing, 'actual_quantity_unit')}` : ''}` : 'To Be Confirmed' },
-      { label: 'Total No. of Crates *', value: g(packing, 'crate_count', 'To Be Confirmed') },
+      { label: `Total No. of ${cd(context).package_nouns} *`, value: g(packing, 'crate_count', 'To Be Confirmed') },
       { label: 'Total Net Weight *', value: g(packing, 'total_net_weight_kg') !== '—' ? `${g(packing, 'total_net_weight_kg')} kg` : 'To Be Confirmed' },
       { label: 'Total Gross Weight *', value: g(packing, 'total_gross_weight_kg') !== '—' ? `${g(packing, 'total_gross_weight_kg')} kg` : 'To Be Confirmed' },
       { label: 'Total CBM *', value: g(packing, 'total_cbm') !== '—' ? `${g(packing, 'total_cbm')} m³` : 'To Be Confirmed' },
     ])
   );
 
-  children.push(...C.sectionTitle('4. CRATE-LEVEL BREAKDOWN  (from factory packing data)'));
-  children.push(C.plain("Filled from the factory packing supervisor's actual measurements. Each row = one physical crate.", { italics: true, size: 17, color: C.MUTED }));
+  children.push(...C.sectionTitle(`4. ${cd(context).package_upper}-LEVEL BREAKDOWN  (from factory packing data)`));
+  children.push(C.plain(`Filled from the factory packing supervisor's actual measurements. Each row = one physical ${cd(context).package_lower}.`, { italics: true, size: 17, color: C.MUTED }));
   children.push(
     C.rich([
       ['Marks & Numbers format: ', { bold: true, color: C.NAVY }],
@@ -1323,9 +1337,9 @@ function renderPl(context) {
         ],
       };
     });
-    children.push(...C.productsTable(['Crate No. *', 'Marks & Numbers *', 'Product Description & Finish *', 'Crate Size  L×W×H (cm) *'], [12, 33, 35, 20], rows));
+    children.push(...C.productsTable([`${cd(context).package_noun} No. *`, 'Marks & Numbers *', 'Product Description & Finish *', `${cd(context).package_noun} Size  L×W×H (cm) *`], [12, 33, 35, 20], rows));
   } else {
-    children.push(C.plain('Crate-level breakdown not yet recorded.', { italics: true, size: 17, color: '5b6774' }));
+    children.push(C.plain(`${cd(context).package_noun}-level breakdown not yet recorded.`, { italics: true, size: 17, color: '5b6774' }));
   }
 
   children.push(...C.sectionTitle('5. DECLARATION'));
@@ -1437,7 +1451,7 @@ function renderBli(context) {
         { label: 'Container Size *', value: containerType.includes('LCL') ? 'N/A — LCL shipment' : (containerType || 'To Be Confirmed') },
         { label: 'Container No. *', value: g(shipping, 'container_no', 'TBC — to be confirmed by shipping line after stuffing') },
         { label: 'Seal No. *', value: g(shipping, 'seal_no', 'TBC — to be confirmed after stuffing') },
-        { label: 'No. of Packages *', value: `${g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} Wooden Crates` : 'To Be Confirmed'} — must match Packing List exactly` },
+        { label: 'No. of Packages *', value: `${g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} ${cd(context).packing_label}` : 'To Be Confirmed'} — must match Packing List exactly` },
         { label: 'Gross Weight *', value: g(packing, 'total_gross_weight_kg') !== '—' ? `${g(packing, 'total_gross_weight_kg')} kg` : 'To Be Confirmed' },
         { label: 'Net Weight *', value: g(packing, 'total_net_weight_kg') !== '—' ? `${g(packing, 'total_net_weight_kg')} kg` : 'To Be Confirmed' },
         { label: 'Total CBM *', value: g(packing, 'total_cbm') !== '—' ? `${g(packing, 'total_cbm')} m³` : 'To Be Confirmed' },
@@ -1586,7 +1600,7 @@ function renderCi(context) {
       { label: 'Bill of Lading No. *', value: g(shipping, 'bl_number', 'To Be Confirmed') },
       { label: 'Bill of Lading Date *', value: g(shipping, 'bl_date', 'TBC — must match this invoice date') },
       { label: 'Vessel / Voyage *', value: `${g(shipping, 'vessel_name', 'To Be Confirmed')}${g(shipping, 'voyage_number') !== '—' ? ` / ${g(shipping, 'voyage_number')}` : ''}` },
-      { label: 'No. of Packages *', value: `${g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} Wooden Crates` : 'To Be Confirmed'} — must match Packing List` },
+      { label: 'No. of Packages *', value: `${g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} ${cd(context).packing_label}` : 'To Be Confirmed'} — must match Packing List` },
     ])
   );
 
@@ -1595,7 +1609,7 @@ function renderCi(context) {
   children.push(...C.productsTable(productTableHeaders(currency), [6, 34, 10, 10, 20, 20], buildProductRows(products)));
   let plRefLine = `PL Reference: ${g(order, 'pl_ref', 'To Be Confirmed')}`;
   if (crates.length) {
-    plRefLine += crates.length > 1 ? ` — Crates ${crates[0].crate_no || ''} to ${crates[crates.length - 1].crate_no || ''}` : ` — Crate ${crates[0].crate_no || ''}`;
+    plRefLine += crates.length > 1 ? ` — ${cd(context).package_nouns} ${crates[0].crate_no || ''} to ${crates[crates.length - 1].crate_no || ''}` : ` — ${cd(context).package_noun} ${crates[0].crate_no || ''}`;
   }
   children.push(C.plain(`${plRefLine}.`, { size: 17, color: C.MUTED }));
 
@@ -1698,6 +1712,7 @@ function renderCi(context) {
       `3.  Certificate of Origin — ${g(order, 'coo_type')} — Issued by CAPEXIL`,
       '4.  Bill of Lading — Original Negotiable, 3 originals — couriered to buyer after balance T/T is received and cleared',
       '5.  Fumigation Certificate — provided as standard with every shipment',
+      ...qualityLines(context, 5),
     ])
   );
 
@@ -1823,7 +1838,7 @@ function renderCooprep(context) {
   children.push(C.plain('Tick each item once collected and ready. Do not apply for COO until all mandatory items are ticked.', { italics: true, size: 17, color: C.MUTED }));
   const docItems = [
     ['Commercial Invoice (signed copy)', 'Must be signed and stamped. Values, HS code, buyer/seller details must be final — no estimates.', g(order, 'ci_ref', 'NexaCrest_05_CommercialInvoice.docx')],
-    ['Packing List (signed copy)', 'Crate count, weights, CBM must be actuals — not estimates from PI.', 'NexaCrest_04_PackingList.docx'],
+    ['Packing List (signed copy)', `${cd(context).package_noun} count, weights, CBM must be actuals — not estimates from PI.`, 'NexaCrest_04_PackingList.docx'],
     ['Fumigation Certificate (copy)', 'Provided as standard with every NexaCrest shipment — collect from fumigation agency and include with COO application.', 'Fumigation agency — standard every shipment'],
     ['Shipping Bill (copy)', 'Filed by CHA with Indian customs. Do not apply for COO before Shipping Bill is filed.', 'CHA provides after filing'],
     ['Bill of Lading (copy)', 'BL number, date, vessel name, port of loading/discharge must match CI and PL exactly.', 'Shipping line / CHA provides'],
@@ -1860,7 +1875,7 @@ function renderCooprep(context) {
     ['Product Description *', productList, 'Commercial Invoice Section 4'],
     ['HS Code *', hsCodeList, 'Hardcoded — verify against CI'],
     ['Country of Origin *', 'India', hardcoded],
-    ['No. of Packages *', g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} Wooden Crates` : 'To Be Confirmed', 'Packing List Section 3 / BL'],
+    ['No. of Packages *', g(packing, 'crate_count') !== '—' ? `${g(packing, 'crate_count')} ${cd(context).packing_label}` : 'To Be Confirmed', 'Packing List Section 3 / BL'],
     ['Gross Weight *', g(packing, 'total_gross_weight_kg') !== '—' ? `${g(packing, 'total_gross_weight_kg')} kg` : 'To Be Confirmed', 'Packing List Section 3'],
     ['Net Weight *', g(packing, 'total_net_weight_kg') !== '—' ? `${g(packing, 'total_net_weight_kg')} kg` : 'To Be Confirmed', 'Packing List Section 3'],
     ['Total CBM *', g(packing, 'total_cbm') !== '—' ? `${g(packing, 'total_cbm')} m³` : 'To Be Confirmed', 'Packing List Section 3'],

@@ -35,7 +35,7 @@
   <tr><td class="k">Bill of Lading No. *</td><td class="v">{{ shipping.bl_number ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Bill of Lading Date *</td><td class="v">{{ shipping.bl_date ?: 'To Be Confirmed — must match this invoice date' }}</td></tr>
   <tr><td class="k">Vessel / Voyage *</td><td class="v">{{ shipping.vessel_name ?: 'To Be Confirmed' }}{{ shipping.voyage_number ? ' / ' ~ shipping.voyage_number : '' }}</td></tr>
-  <tr><td class="k">No. of Packages *</td><td class="v">{{ packing.crate_count ? packing.crate_count ~ ' Wooden Crates' : 'To Be Confirmed' }} — must match Packing List</td></tr>
+  <tr><td class="k">No. of Packages *</td><td class="v">{{ packing.crate_count ? packing.crate_count ~ ' ' ~ category_documents.packing_label : 'To Be Confirmed' }} — must match Packing List</td></tr>
 </table>
 
 <div class="section-title">{{ section_numbers.product }}. PRODUCT / ORDER DETAILS</div>
@@ -85,7 +85,7 @@
    was actually typed into the packing form. #}
 <p style="font-size:9pt; color:#5B6573; margin:2pt 0 0;">PL Reference: {{ order.pl_ref ?: 'To Be Confirmed' }}
 {%- if crates is not empty %}
-  {%- if crates|length > 1 %} — Crates {{ (crates|first).crate_no }} to {{ (crates|last).crate_no }}{% else %} — Crate {{ (crates|first).crate_no }}{% endif -%}
+  {%- if crates|length > 1 %} — {{ category_documents.package_nouns }} {{ (crates|first).crate_no }} to {{ (crates|last).crate_no }}{% else %} — {{ category_documents.package_noun }} {{ (crates|first).crate_no }}{% endif -%}
 {%- endif -%}.</p>
 
 <div class="section-title">{{ section_numbers.invoice_value }}. INVOICE VALUE &amp; PAYMENT SETTLEMENT</div>
@@ -169,6 +169,7 @@
   <p>3.&nbsp;&nbsp;Certificate of Origin — {{ order.coo_type }} — Issued by CAPEXIL</p>
   <p>4.&nbsp;&nbsp;Bill of Lading — 3 originals issued by the shipping line | 2 originals couriered to Buyer within 3 Working Days of Balance Payment being confirmed as Payment Cleared | 1 original retained by NexaCrest</p>
   <p>5.&nbsp;&nbsp;Fumigation Certificate — provided as standard with every shipment</p>
+  {% for q in category_documents.quality_documents %}<p>{{ loop.index + 5 }}.&nbsp;&nbsp;{{ q.name }} — required for {{ q.category }}</p>{% endfor %}
 </div>
 
 <div class="section-title">{{ section_numbers.declaration }}. DECLARATION</div>

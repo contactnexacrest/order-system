@@ -26,7 +26,7 @@ async function updateDocumentTypeRefFormat(id, refFormat, minReviewers) {
 // actual reach can be seen and changed — without a second round trip per
 // clause.
 async function tcClauses() {
-  const clauses = await db.query('SELECT id, clause_number, clause_order, clause_title, clause_text, clause_group, status, is_locked, is_protected FROM tc_clauses ORDER BY clause_order');
+  const clauses = await db.query('SELECT id, clause_number, clause_order, clause_title, clause_text, clause_group, status, is_locked, is_protected, clause_set FROM tc_clauses ORDER BY clause_order');
   const links = await db.query('SELECT clause_id, document_type_id FROM tc_clause_documents');
   const documentTypeIdsByClause = {};
   for (const link of links) {

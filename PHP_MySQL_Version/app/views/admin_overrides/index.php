@@ -39,6 +39,7 @@
             <?= htmlspecialchars($c['clause_number'] ?? '—') ?>
             <?= $c['is_locked'] ? '<span class="badge badge-sensitive">mandatory clause</span>' : '' ?>
             <?php if ($c['is_protected']): ?><span class="badge badge-protected">protected</span><?php endif; ?>
+            <?php if (!empty($c['clause_set'])): ?><span class="badge" title="D-257: prints only on orders whose product category uses this clause set">only for: <?= htmlspecialchars(implode(', ', array_map(static fn ($k) => \App\Repositories\ProductCategoryRepository::TC_CLAUSE_SETS[trim($k)] ?? trim($k), explode(',', (string) $c['clause_set'])))) ?></span><?php endif; ?>
           </legend>
           <div class="field-grid">
             <label>Title

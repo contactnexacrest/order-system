@@ -38,6 +38,7 @@
             {{ c.clause_number or '—' }}
             {% if c.is_locked %}<span class="badge badge-sensitive">mandatory clause</span>{% endif %}
             {% if c.is_protected %}<span class="badge badge-protected">protected</span>{% endif %}
+            {% if c.clause_set %}<span class="badge" title="D-257: prints only on orders whose product category uses this clause set">only for: {{ c.clause_set_label }}</span>{% endif %}
           </legend>
           <div class="field-grid">
             <label>Title

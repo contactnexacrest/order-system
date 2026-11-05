@@ -285,12 +285,12 @@ product category now has its own **settings**. Open **Products › Categories**,
 | Default HS code | A goods line of this category starts with this HS code (from the HS Code master list). A code typed on the line always wins. | 730791 |
 | Packing type | From the Package Types list. | Wooden Crates |
 | Quality documents | One per line, at most 10. Each order with a line of this category gets a **Quality documents** checklist on the order page. | Mill test certificate 3.1, Drawing approval |
-| T&C clause set | Which terms the documents of this category print. Stored now; the documents start printing it in Phase 1 (after document samples and your double confirmation). | Engineering goods clauses |
+| T&C clause set | Which terms the documents of this category print (since Phase 1, see below). | Engineering goods clauses |
 
 **Natural Stone keeps today's behaviour:** any unit, HS 680293, Wooden Crates, the
 natural-stone clauses and no extra quality documents. Its Dimensions and Finish stay
-locked; its settings can be edited but change nothing on a stone order line or document
-in this phase.
+locked; its settings can be edited but never change a stone order line or document
+(changing a stone document needs before/after samples and your double confirmation).
 
 **Order lines.** When you choose a category on the order line, its default HS code and
 unit are filled in (the HS code only if the field is empty). If you leave them empty, the
@@ -315,3 +315,38 @@ awaited. A deleted line no longer asks for its category's documents.
 **New list values.** Units MTR, LTR, HOUR and DAY (PCS, SET, KG and MT were already there);
 supplier types Manufacturer, Machine Shop and Forging / Casting Unit (Trader was already
 there). Admin › Dropdowns can rename or hide them.
+
+## Documents follow the category (D-257 Phase 1, 5 Nov 2026)
+
+The quotation, proforma invoice, order confirmation, commercial invoice, packing list,
+BL instruction, COO preparation sheet and supplier purchase order now take these from the
+categories of the order's goods lines, in PDF and in Word:
+
+| On the document | Natural Stone order | Order of another category |
+|---|---|---|
+| Product lines | Dimensions, Finish and HS Code, as today | The category's own attributes (e.g. Material, Size) and the line's HS code |
+| Packages | "12 Wooden Crates", "Crate No.", "CRATE-LEVEL BREAKDOWN", "Net Weight (stone only)" | The category's packing type (e.g. "8 Wooden Boxes"), "Package No.", "PACKAGE-LEVEL BREAKDOWN", "Net Weight (goods only)". Two categories with different packing: "Packages". |
+| Documents to be provided | The 5 standard documents | The same 5, then each quality document the category needs, numbered on (e.g. "6. Mill Test Certificate 3.1 — required for Engineering Products") |
+| Supplier PO, section 3 | "Material / Stone Type", tolerance ±2 mm / ±0.5 mm | "Material / Product Type", tolerance "As per the approved drawing / specification", plus "Quality Documents Required" |
+| Terms & conditions | Today's clauses | The clauses of the category's clause set (below) |
+
+**Clause sets.** Most clauses print on every order. A few belong to a set and print only
+when one of the order's categories uses that set (Admin › Overrides shows it as
+"only for: …" beside the clause; the wording is edited there as before):
+
+| Set | Clauses (starting wording) |
+|---|---|
+| Natural stone clauses | Natural Stone Characteristics; Quantity Tolerance; on the supplier PO, Grade A Only and Colour Consistency |
+| General goods clauses | Product Characteristics; Quantity Tolerance (Goods); on the supplier PO, Conformity to Specification |
+| Engineering goods clauses | Specification & Drawings; Quantity Tolerance (Goods); Quality Documents; on the supplier PO, Conformity to Specification and Traceability & Test Certificates |
+
+The general-goods and engineering wording is a starting text: **have the lawyer review it
+before the first non-stone sale.** An order with lines of two categories prints both sets.
+
+**Natural Stone never changes.** The system category Natural Stone always prints exactly
+today's documents, whatever its settings say. Tests compare every stone document (PDF and
+Word, FOB and CIF) with copies captured before this change.
+
+Not changed in Phase 1: the Certificate of Origin issuer printed on the documents
+(CAPEXIL) and the fumigation certificate line stay as today for every category.
+

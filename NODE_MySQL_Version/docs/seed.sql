@@ -2417,6 +2417,27 @@ WHERE u.is_super_admin = 1
 -- HS 680293, wooden crates, the natural-stone clauses, no extra quality documents.
 UPDATE product_categories SET default_hs_code = '680293', packing_type = 'Wooden Crates', tc_clause_set = 'natural_stone'
 WHERE is_system = 1 AND default_hs_code IS NULL;
+
+-- Owner decision D-257 Phase 1 (5 Nov 2026): T&C clause sets on the documents. The
+-- stone-only clauses print only for stone orders (as today: every order so far is
+-- stone); other categories get their own starting clauses, to be reviewed by the
+-- lawyer before the first non-stone sale. Admin › Overrides edits their wording.
+UPDATE tc_clauses SET clause_set = 'natural_stone'
+WHERE clause_group = 'standard' AND clause_title IN ('Natural Stone Characteristics', 'Quantity Tolerance', 'Grade A Only', 'Colour Consistency');
+INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked, is_protected, clause_set) VALUES
+  (10, 'Product Characteristics', 'Product Characteristics: Goods are supplied to the specification agreed in this document. Minor variation within the manufacturer''s stated tolerances is not a defect. Products will conform to the agreed specification.', 'active', 1, 1, 'general_goods'),
+  (10, 'Specification & Drawings', 'Specification & Drawings: Goods are made to the buyer-approved drawing and the specification in this document. Dimensions and tolerances are as per the approved drawing. Any change after approval needs the written agreement of both parties and may change the price and the delivery date.', 'active', 1, 1, 'engineering'),
+  (20, 'Quantity Tolerance (Goods)', 'Quantity Tolerance: Actual quantity shipped will not exceed the ordered quantity. A shortfall of up to {tolerance}% may occur due to production yield and will be invoiced at actual quantity shipped. Buyer will be notified in writing before shipment of any shortfall exceeding {tolerance}%, and shipment will require buyer''s written approval.', 'active', 1, 1, 'general_goods,engineering'),
+  (25, 'Quality Documents', 'Quality Documents: The quality documents listed in this document (for example a Mill Test Certificate EN 10204 3.1) are supplied with the shipment, and each item can be traced to them by its heat or serial number.', 'active', 1, 1, 'engineering');
+INSERT INTO tc_clause_documents (clause_id, document_type_id)
+SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
+WHERE c.clause_title IN ('Product Characteristics', 'Specification & Drawings', 'Quantity Tolerance (Goods)', 'Quality Documents') AND dt.code IN ('QT','PI','OC');
+INSERT INTO tc_clauses (clause_order, clause_title, clause_text, status, is_locked, is_protected, clause_set) VALUES
+  (10, 'Conformity to Specification', 'All items must conform exactly to the specification and drawing given in Section 3. No substitution of material or grade without NexaCrest''s written approval.', 'active', 1, 1, 'general_goods,engineering'),
+  (40, 'Traceability & Test Certificates', 'Each item must be traceable by its heat or serial number to the quality documents supplied with it (for example a Mill Test Certificate EN 10204 3.1). Goods without the required documents will not be accepted.', 'active', 1, 1, 'engineering');
+INSERT INTO tc_clause_documents (clause_id, document_type_id)
+SELECT c.id, dt.id FROM tc_clauses c CROSS JOIN document_types dt
+WHERE c.clause_title IN ('Conformity to Specification', 'Traceability & Test Certificates') AND dt.code = 'SUPPO';
 -- More units and supplier types for products other than stone (only those missing).
 INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
 SELECT 'unit', d.v, d.s, 0, 1 FROM (

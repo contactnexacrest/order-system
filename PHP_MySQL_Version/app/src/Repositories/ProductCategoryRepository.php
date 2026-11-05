@@ -118,8 +118,9 @@ final class ProductCategoryRepository
 
     /**
      * Owner decision D-257 Phase 0B (5 Nov 2026): the T&C clause sets a
-     * category can name. The documents print them from Phase 1; until then
-     * the choice is only stored (Natural Stone = today's stone clauses).
+     * category can name. Since Phase 1 the documents print a clause tagged
+     * with a set only for orders whose categories use it (Natural Stone =
+     * today's stone clauses); see TermsClauseRepository::inClauseSets().
      */
     public const TC_CLAUSE_SETS = [
         'natural_stone' => 'Natural stone clauses (today\'s)',

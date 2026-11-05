@@ -1629,7 +1629,7 @@ final class DocumentGenerationService
     /** @return string[] fully-substituted clause text, in order */
     private static function resolveTerms(string $documentTypeCode, array $data, ?string $balanceTriggerOption = null): array
     {
-        $clauses = TermsClauseRepository::forDocumentTypeCodeAndGroup($documentTypeCode, 'standard', $balanceTriggerOption);
+        $clauses = TermsClauseRepository::forDocumentTypeCodeAndGroup($documentTypeCode, 'standard', $balanceTriggerOption, $data['category_documents']['clause_sets'] ?? null);
         return array_map(
             static fn(array $c) => strtr($c['text'], self::clauseTextReplacements($data, $documentTypeCode)),
             $clauses
@@ -1648,7 +1648,7 @@ final class DocumentGenerationService
      */
     private static function resolveClauseGroup(string $documentTypeCode, string $clauseGroup, array $data, ?string $balanceTriggerOption): array
     {
-        $clauses = TermsClauseRepository::forDocumentTypeCodeAndGroup($documentTypeCode, $clauseGroup, $balanceTriggerOption);
+        $clauses = TermsClauseRepository::forDocumentTypeCodeAndGroup($documentTypeCode, $clauseGroup, $balanceTriggerOption, $data['category_documents']['clause_sets'] ?? null);
         $replacements = self::clauseTextReplacements($data, $documentTypeCode);
         return array_map(
             static fn(array $c) => ['title' => $c['title'], 'text' => strtr($c['text'], $replacements)],

@@ -28,7 +28,7 @@
 <table class="checklist">
   <tr><th style="width:6%;">&#8730;</th><th>Document</th><th>What to check before submitting</th><th>Where it comes from</th></tr>
   <tr><td class="chk checkbox-row"><span class="cbx"></span></td><td><strong>Commercial Invoice (signed copy)</strong></td><td>Must be signed and stamped. Values, HS code, buyer/seller details must be final — no estimates.</td><td>{{ order.ci_ref or 'NexaCrest_05_CommercialInvoice.docx' }}</td></tr>
-  <tr><td class="chk checkbox-row"><span class="cbx"></span></td><td><strong>Packing List (signed copy)</strong></td><td>Crate count, weights, CBM must be actuals — not estimates from PI.</td><td>NexaCrest_04_PackingList.docx</td></tr>
+  <tr><td class="chk checkbox-row"><span class="cbx"></span></td><td><strong>Packing List (signed copy)</strong></td><td>{{ category_documents.package_noun }} count, weights, CBM must be actuals — not estimates from PI.</td><td>NexaCrest_04_PackingList.docx</td></tr>
   <tr><td class="chk checkbox-row"><span class="cbx"></span></td><td><strong>Fumigation Certificate (copy)</strong></td><td>Provided as standard with every NexaCrest shipment — collect from fumigation agency and include with COO application.</td><td>Fumigation agency — standard every shipment</td></tr>
   <tr><td class="chk checkbox-row"><span class="cbx"></span></td><td><strong>Shipping Bill (copy)</strong></td><td>Filed by CHA with Indian customs. Do not apply for COO before Shipping Bill is filed.</td><td>CHA provides after filing</td></tr>
   <tr><td class="chk checkbox-row"><span class="cbx"></span></td><td><strong>Bill of Lading (copy)</strong></td><td>BL number, date, vessel name, port of loading/discharge must match CI and PL exactly.</td><td>Shipping line / CHA provides</td></tr>
@@ -62,7 +62,7 @@
   <tr><td><strong>Product Description *</strong></td><td>{{ productList|join('; ') }}</td><td class="placeholder-italic">Commercial Invoice Section 4</td></tr>
   <tr><td><strong>HS Code *</strong></td><td>{{ hsCodeList|join(', ') }}</td><td class="placeholder-italic">Hardcoded — verify against CI</td></tr>
   <tr><td><strong>Country of Origin *</strong></td><td>India</td><td class="placeholder-italic">Hardcoded — never changes</td></tr>
-  <tr><td><strong>No. of Packages *</strong></td><td>{{ (packing.crate_count ~ ' Wooden Crates') if packing.crate_count else 'To Be Confirmed' }}</td><td class="placeholder-italic">Packing List Section 3 / BL</td></tr>
+  <tr><td><strong>No. of Packages *</strong></td><td>{{ (packing.crate_count ~ ' ' ~ category_documents.packing_label) if packing.crate_count else 'To Be Confirmed' }}</td><td class="placeholder-italic">Packing List Section 3 / BL</td></tr>
   <tr><td><strong>Gross Weight *</strong></td><td>{{ (packing.total_gross_weight_kg ~ ' kg') if packing.total_gross_weight_kg else 'To Be Confirmed' }}</td><td class="placeholder-italic">Packing List Section 3</td></tr>
   <tr><td><strong>Net Weight *</strong></td><td>{{ (packing.total_net_weight_kg ~ ' kg') if packing.total_net_weight_kg else 'To Be Confirmed' }}</td><td class="placeholder-italic">Packing List Section 3</td></tr>
   <tr><td><strong>Total CBM *</strong></td><td>{{ (packing.total_cbm ~ ' m³') if packing.total_cbm else 'To Be Confirmed' }}</td><td class="placeholder-italic">Packing List Section 3</td></tr>

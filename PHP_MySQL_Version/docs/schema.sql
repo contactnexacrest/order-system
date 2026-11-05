@@ -5567,6 +5567,12 @@ ALTER TABLE product_categories ADD COLUMN packing_type VARCHAR(80) NULL;
 ALTER TABLE product_categories ADD COLUMN quality_documents TEXT NULL;
 ALTER TABLE product_categories ADD COLUMN tc_clause_set VARCHAR(40) NULL;
 
+-- Owner decision D-257 Phase 1 (5 Nov 2026): a T&C clause can belong to one or more
+-- clause sets (comma list, e.g. 'natural_stone' or 'general_goods,engineering'). It then
+-- prints only on orders whose goods lines' categories use one of those sets. Empty =
+-- prints on every order, as every clause did before.
+ALTER TABLE tc_clauses ADD COLUMN clause_set VARCHAR(120) NULL;
+
 -- One row per quality document a category asks for on an order (e.g. "Mill test
 -- certificate 3.1"): its status and, once received, the file.
 CREATE TABLE order_quality_documents (

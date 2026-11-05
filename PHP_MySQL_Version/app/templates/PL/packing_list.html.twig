@@ -40,23 +40,23 @@
   <tr><td class="k">HS Code *</td><td class="v">{{ hsCodeList|join(', ') }}</td></tr>
   <tr><td class="k">Country of Origin *</td><td class="v">India</td></tr>
   <tr><td class="k">Total Quantity *</td><td class="v">{{ packing.actual_quantity_packed ?: 'To Be Confirmed' }}{{ packing.actual_quantity_unit ? ' ' ~ packing.actual_quantity_unit : '' }}</td></tr>
-  <tr><td class="k">Total No. of Crates *</td><td class="v">{{ packing.crate_count ?: 'To Be Confirmed' }}</td></tr>
+  <tr><td class="k">Total No. of {{ category_documents.package_nouns }} *</td><td class="v">{{ packing.crate_count ?: 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Total Net Weight *</td><td class="v">{{ packing.total_net_weight_kg ? packing.total_net_weight_kg ~ ' kg' : 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Total Gross Weight *</td><td class="v">{{ packing.total_gross_weight_kg ? packing.total_gross_weight_kg ~ ' kg' : 'To Be Confirmed' }}</td></tr>
   <tr><td class="k">Total CBM *</td><td class="v">{{ packing.total_cbm ? packing.total_cbm ~ ' m³' : 'To Be Confirmed' }}</td></tr>
 </table>
 
-<div class="section-title">{{ section_numbers.crate_breakdown }}. CRATE-LEVEL BREAKDOWN &nbsp;(from factory packing data)</div>
-<p class="placeholder-italic" style="font-size:9pt; margin:0 0 3pt;">Filled from the factory packing supervisor's actual measurements. Each row = one physical crate.</p>
+<div class="section-title">{{ section_numbers.crate_breakdown }}. {{ category_documents.package_upper }}-LEVEL BREAKDOWN &nbsp;(from factory packing data)</div>
+<p class="placeholder-italic" style="font-size:9pt; margin:0 0 3pt;">Filled from the factory packing supervisor's actual measurements. Each row = one physical {{ category_documents.package_lower }}.</p>
 <p style="font-size:9pt; margin:0 0 6pt;"><strong style="color:#17233A;">Marks &amp; Numbers format:</strong> <span style="color:#5B6573;">NEXACREST &nbsp;/&nbsp; {{ buyer.company_legal_name|upper }} &nbsp;/&nbsp; {{ order.port_of_discharge|upper }} &nbsp;/&nbsp; C-NNN/TOTAL &nbsp;/&nbsp; {{ order.pi_ref ?: 'PI NUMBER' }} &nbsp;/&nbsp; MADE IN INDIA</span></p>
 
 {% if crates is not empty %}
 <table class="products">
   <tr>
-    <th>Crate No. *</th>
+    <th>{{ category_documents.package_noun }} No. *</th>
     <th>Marks &amp; Numbers *</th>
     <th>Product Description &amp; Finish *</th>
-    <th>Crate Size &nbsp;L&times;W&times;H (cm) *</th>
+    <th>{{ category_documents.package_noun }} Size &nbsp;L&times;W&times;H (cm) *</th>
   </tr>
   {% for c in crates %}
   {% set lineColor = loop.index is odd ? '#1D6FA8' : '#2D7D56' %}
@@ -79,7 +79,7 @@
   {% endfor %}
 </table>
 {% else %}
-<p style="font-size:8.7px; color:#5b6774; font-style:italic;">Crate-level breakdown not yet recorded.</p>
+<p style="font-size:8.7px; color:#5b6774; font-style:italic;">{{ category_documents.package_noun }}-level breakdown not yet recorded.</p>
 {% endif %}
 
 <div class="section-title">{{ section_numbers.declaration }}. DECLARATION</div>

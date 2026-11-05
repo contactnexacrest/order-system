@@ -262,6 +262,8 @@ final class DocumentDataAssembler
             'notify_party_block' => $resolvedNotifyParty,
             'show_consignee_section' => $showConsigneeSection,
             'show_notify_party_section' => $showNotifyPartySection,
+            // D-257 Phase 1: packing words, quality documents and T&C clause sets from the goods lines' categories (stone = today's).
+            'category_documents' => CategoryDocumentProfile::forOrder($orderId),
             'products' => array_map(static function (array $p): array {
                 return [
                     'description'    => $p['description'],

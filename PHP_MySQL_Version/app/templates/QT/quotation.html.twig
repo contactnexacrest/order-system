@@ -86,8 +86,8 @@
   <tr><th>Parameter</th><th>Estimated Value *</th><th>Unit</th></tr>
   <tr><td>Total CBM (m&sup3;)</td><td>{{ order.estimated_total_cbm ?: 'To Be Confirmed' }}</td><td>m&sup3;</td></tr>
   <tr><td>Gross Weight (incl. packing)</td><td>{{ order.estimated_gross_weight_kg ?: 'To Be Confirmed' }}</td><td>kg</td></tr>
-  <tr><td>Net Weight (stone only)</td><td>{{ order.estimated_net_weight_kg ?: 'To Be Confirmed' }}</td><td>kg</td></tr>
-  <tr><td>No. of Packages / Crates</td><td>{{ order.estimated_package_count }}</td><td>Crates</td></tr>
+  <tr><td>{{ category_documents.net_weight_label }}</td><td>{{ order.estimated_net_weight_kg ?: 'To Be Confirmed' }}</td><td>kg</td></tr>
+  <tr><td>{{ category_documents.package_count_label }}</td><td>{{ order.estimated_package_count }}</td><td>{{ category_documents.package_nouns }}</td></tr>
   <tr><td>Package Type</td><td>{{ order.estimated_package_type }}</td><td>—</td></tr>
 </table>
 
@@ -127,6 +127,7 @@
   <p>3.&nbsp;&nbsp;Certificate of Origin — {{ order.coo_type }} — Issued by CAPEXIL</p>
   <p>4.&nbsp;&nbsp;Bill of Lading — 3 originals issued by the shipping line | 2 originals couriered to Buyer within 3 Working Days of Balance Payment being confirmed as Payment Cleared | 1 original retained by NexaCrest</p>
   <p>5.&nbsp;&nbsp;Fumigation Certificate — provided as standard with every shipment</p>
+  {% for q in category_documents.quality_documents %}<p>{{ loop.index + 5 }}.&nbsp;&nbsp;{{ q.name }} — required for {{ q.category }}</p>{% endfor %}
 </div>
 
 {% if order.special_requirements %}

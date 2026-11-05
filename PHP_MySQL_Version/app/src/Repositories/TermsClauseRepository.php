@@ -30,10 +30,10 @@ final class TermsClauseRepository
      *
      * @return array<int, array{title:string, text:string, is_locked:bool}>
      */
-    public static function forDocumentTypeCodeAndGroup(string $documentTypeCode, string $clauseGroup, ?string $balanceTriggerOption): array
+    public static function forDocumentTypeCodeAndGroup(string $documentTypeCode, string $clauseGroup, ?string $balanceTriggerOption, ?array $clauseSets = null): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT c.clause_title, c.clause_text, c.is_locked, c.visibility_rule
+            'SELECT c.clause_title, c.clause_text, c.is_locked, c.visibility_rule, c.clause_set
              FROM tc_clauses c
              JOIN tc_clause_documents cd ON cd.clause_id = c.id
              JOIN document_types dt ON dt.id = cd.document_type_id
@@ -43,7 +43,14 @@ final class TermsClauseRepository
         $stmt->execute(['code' => $documentTypeCode, 'clause_group' => $clauseGroup]);
         $rows = $stmt->fetchAll();
 
-        $visible = array_filter($rows, static function (array $row) use ($balanceTriggerOption): bool {
+        // D-257 Phase 1: a clause with a clause set prints only when one of the
+        // order's categories uses that set; an empty set = every order (today's
+        // clauses). No order context = Natural Stone, as before.
+        $sets = $clauseSets ?? ['natural_stone'];
+        $visible = array_filter($rows, static function (array $row) use ($balanceTriggerOption, $sets): bool {
+            if (!self::inClauseSets($row['clause_set'] ?? null, $sets)) {
+                return false;
+            }
             return match ($row['visibility_rule']) {
                 'balance_trigger_before_shipment' => $balanceTriggerOption === 'A_BEFORE_SHIPMENT',
                 'balance_trigger_against_bl'       => $balanceTriggerOption === 'B_AGAINST_BL',
@@ -58,5 +65,12 @@ final class TermsClauseRepository
                 'is_locked' => (bool) $row['is_locked'],
             ];
         }, array_values($visible));
+    }
+
+    /** @param list<string> $orderSets */
+    public static function inClauseSets(?string $clauseSet, array $orderSets): bool
+    {
+        $own = array_filter(array_map('trim', explode(',', (string) $clauseSet)), static fn ($v) => $v !== '');
+        return $own === [] || array_intersect($own, $orderSets) !== [];
     }
 }

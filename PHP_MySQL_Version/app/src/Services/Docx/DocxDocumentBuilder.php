@@ -181,6 +181,22 @@ final class DocxDocumentBuilder
         ];
     }
 
+    /** D-257 Phase 1: the order's category words (stone = today's), from the assembler. */
+    private static function cd(array $context): array
+    {
+        return $context['category_documents'] ?? \App\Services\CategoryDocumentProfile::stone();
+    }
+
+    /** D-257 Phase 1: the quality documents the order's categories ask for, numbered after $after. */
+    private static function qualityLines(array $context, int $after): array
+    {
+        $out = [];
+        foreach (self::cd($context)['quality_documents'] as $i => $q) {
+            $out[] = ($after + $i + 1) . '.  ' . $q['name'] . ' — required for ' . $q['category'];
+        }
+        return $out;
+    }
+
     private static function documentsProvidedParagraphs(Section $section, string $heading, array $lines): void
     {
         DocxComponents::addRichParagraph($section, [[$heading, ['bold' => true]]]);
@@ -251,14 +267,14 @@ final class DocxDocumentBuilder
         return $rows;
     }
 
-    private static function weightTable(Section $section, array $order): void
+    private static function weightTable(Section $section, array $order, array $context = []): void
     {
         DocxComponents::addPlainParagraph($section, 'Weight & Volume (Estimated — actuals confirmed on Packing List after production)', ['bold' => true, 'size' => 10.5, 'color' => DocxComponents::NAVY]);
         $rows = [
             ['Total CBM (m³)', self::g($order, 'estimated_total_cbm', 'To Be Confirmed'), 'm³'],
             ['Gross Weight (incl. packing)', self::g($order, 'estimated_gross_weight_kg', 'To Be Confirmed'), 'kg'],
-            ['Net Weight (stone only)', self::g($order, 'estimated_net_weight_kg', 'To Be Confirmed'), 'kg'],
-            ['No. of Packages / Crates', self::g($order, 'estimated_package_count', 'To Be Confirmed'), 'Crates'],
+            [self::cd($context)['net_weight_label'], self::g($order, 'estimated_net_weight_kg', 'To Be Confirmed'), 'kg'],
+            [self::cd($context)['package_count_label'], self::g($order, 'estimated_package_count', 'To Be Confirmed'), self::cd($context)['package_nouns']],
             ['Package Type', self::g($order, 'estimated_package_type', 'To Be Confirmed'), '—'],
         ];
         DocxComponents::addChecklistTable($section, ['Parameter', 'Estimated Value *', 'Unit'], [50, 35, 15], array_map(
@@ -385,7 +401,7 @@ final class DocxDocumentBuilder
             ['label' => "TOTAL QUOTED VALUE ({$currency})", 'value' => self::g($financial, 'total_value'), 'highlight' => true],
         ]);
 
-        self::weightTable($section, $order);
+        self::weightTable($section, $order, $context);
 
         DocxComponents::addSectionTitle($section, '4. SHIPPING / COMMERCIAL TERMS');
         DocxComponents::addKvTable($section, [
@@ -407,6 +423,7 @@ final class DocxDocumentBuilder
             '3.  Certificate of Origin — ' . self::g($order, 'coo_type') . ' — Issued by CAPEXIL',
             '4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ' . self::g($financial, 'balance_pct') . '% balance T/T is received and cleared',
             '5.  Fumigation Certificate — provided as standard with every shipment',
+            ...self::qualityLines($context, 5),
         ]);
 
         if (!empty($order['special_requirements'])) {
@@ -526,7 +543,7 @@ final class DocxDocumentBuilder
             $bank->addText(self::g($financial, 'bank_charges_text', ''), ['bold' => true, 'size' => 8.5, 'color' => DocxComponents::AMBER_NOTE]);
         }, 10);
 
-        self::weightTable($section, $order);
+        self::weightTable($section, $order, $context);
 
         DocxComponents::addSectionTitle($section, '4. SHIPPING / COMMERCIAL TERMS');
         DocxComponents::addKvTable($section, [
@@ -575,6 +592,7 @@ final class DocxDocumentBuilder
             '3.  Certificate of Origin — ' . self::g($order, 'coo_type') . ' — Issued by CAPEXIL',
             '4.  Bill of Lading — Original Negotiable, 3 originals — Released to buyer only after ' . self::g($financial, 'balance_pct') . '% balance T/T is received and cleared in NexaCrest bank account',
             '5.  Fumigation Certificate — provided as standard with every shipment',
+            ...self::qualityLines($context, 5),
         ]);
 
         DocxComponents::addTermsSection($section, $context, (int) ($context['terms_section_number'] ?? 9), (string) ($context['terms_section_title'] ?? 'TERMS & CONDITIONS'));
@@ -689,9 +707,9 @@ final class DocxDocumentBuilder
         DocxComponents::addSectionTitle($section, '6. DOCUMENTS TO BE PROVIDED');
         DocxComponents::addKvTable($section, [[
             'full' => true,
-            'value' => function (AbstractContainer $cell) {
+            'value' => function (AbstractContainer $cell) use ($context) {
                 $cell->addText('Upon shipment, the following documents will be provided:', ['bold' => true]);
-                foreach (['Commercial Invoice', 'Packing List', 'Certificate of Origin (CAPEXIL / Chamber of Commerce)', 'Bill of Lading', 'Fumigation Certificate — provided as standard with every shipment'] as $item) {
+                foreach (array_merge(['Commercial Invoice', 'Packing List', 'Certificate of Origin (CAPEXIL / Chamber of Commerce)', 'Bill of Lading', 'Fumigation Certificate — provided as standard with every shipment'], array_map(static fn (array $q): string => $q['name'] . ' — required for ' . $q['category'], self::cd($context)['quality_documents'])) as $item) {
                     $cell->addText('•  ' . $item);
                 }
             },
@@ -1021,16 +1039,18 @@ final class DocxDocumentBuilder
             $run->addText("\u{203C}  All specifications below are binding. ", ['bold' => true, 'color' => DocxComponents::RED_TEXT, 'size' => 9]);
             $run->addText("Material that does not conform exactly to the specifications below will be rejected at NexaCrest's discretion. Replacement is at supplier's cost.", ['color' => DocxComponents::RED_SUB, 'size' => 9]);
         });
-        DocxComponents::addKvTable($section, [
-            ['label' => 'Material / Stone Type *', 'value' => self::g($sp, 'material_stone_type', 'To Be Confirmed')],
+        DocxComponents::addKvTable($section, array_merge([
+            ['label' => self::cd($context)['material_label'] . ' *', 'value' => self::g($sp, 'material_stone_type', 'To Be Confirmed')],
             ['label' => 'Grade *', 'value' => self::g($sp, 'grade') . ' only — no mixed grades, no seconds'],
             ['label' => 'Surface Finish *', 'value' => self::g($sp, 'surface_finish', 'To Be Confirmed')],
             ['label' => 'Dimensions *', 'value' => self::g($sp, 'dimensions', 'To Be Confirmed')],
-            ['label' => 'Dimensional Tolerance', 'value' => self::g($sp, 'dimensional_tolerance', '±2 mm on L and W · ±0.5 mm on thickness')],
+            ['label' => 'Dimensional Tolerance', 'value' => self::g($sp, 'dimensional_tolerance', self::cd($context)['tolerance_default'])],
             ['label' => 'Quantity *', 'value' => self::g($sp, 'quantity')],
             ['label' => 'Unit *', 'value' => self::g($sp, 'unit', 'To Be Confirmed')],
             ['label' => 'Colour Reference', 'value' => self::g($sp, 'colour_reference')],
-        ]);
+        ], self::cd($context)['quality_documents'] === [] ? [] : [
+            ['label' => 'Quality Documents Required *', 'value' => implode('; ', array_map(static fn (array $q): string => $q['name'], self::cd($context)['quality_documents'])) . ' — to be supplied with the goods'],
+        ]));
 
         if (!empty($sp['special_requirements'])) {
             // Point 7 — its own amber-highlighted callout instead of just
@@ -1264,14 +1284,14 @@ final class DocxDocumentBuilder
             ['label' => 'HS Code *', 'value' => $hsCodeList],
             ['label' => 'Country of Origin *', 'value' => 'India'],
             ['label' => 'Total Quantity *', 'value' => self::g($packing, 'actual_quantity_packed') !== '—' ? self::g($packing, 'actual_quantity_packed') . (self::g($packing, 'actual_quantity_unit') !== '—' ? ' ' . self::g($packing, 'actual_quantity_unit') : '') : 'To Be Confirmed'],
-            ['label' => 'Total No. of Crates *', 'value' => self::g($packing, 'crate_count', 'To Be Confirmed')],
+            ['label' => 'Total No. of ' . self::cd($context)['package_nouns'] . ' *', 'value' => self::g($packing, 'crate_count', 'To Be Confirmed')],
             ['label' => 'Total Net Weight *', 'value' => self::g($packing, 'total_net_weight_kg') !== '—' ? self::g($packing, 'total_net_weight_kg') . ' kg' : 'To Be Confirmed'],
             ['label' => 'Total Gross Weight *', 'value' => self::g($packing, 'total_gross_weight_kg') !== '—' ? self::g($packing, 'total_gross_weight_kg') . ' kg' : 'To Be Confirmed'],
             ['label' => 'Total CBM *', 'value' => self::g($packing, 'total_cbm') !== '—' ? self::g($packing, 'total_cbm') . ' m³' : 'To Be Confirmed'],
         ]);
 
-        DocxComponents::addSectionTitle($section, '4. CRATE-LEVEL BREAKDOWN  (from factory packing data)');
-        DocxComponents::addPlainParagraph($section, "Filled from the factory packing supervisor's actual measurements. Each row = one physical crate.", ['italic' => true, 'size' => 9, 'color' => DocxComponents::MUTED]);
+        DocxComponents::addSectionTitle($section, '4. ' . self::cd($context)['package_upper'] . '-LEVEL BREAKDOWN  (from factory packing data)');
+        DocxComponents::addPlainParagraph($section, "Filled from the factory packing supervisor's actual measurements. Each row = one physical " . self::cd($context)['package_lower'] . '.', ['italic' => true, 'size' => 9, 'color' => DocxComponents::MUTED]);
         DocxComponents::addRichParagraph($section, [
             ['Marks & Numbers format: ', ['bold' => true, 'color' => DocxComponents::NAVY]],
             ['NEXACREST / ' . strtoupper((string) self::g($buyer, 'company_legal_name', '')) . ' / ' . strtoupper((string) self::g($order, 'port_of_discharge', '')) . ' / C-NNN/TOTAL / ' . self::g($order, 'pi_ref', 'PI NUMBER') . ' / MADE IN INDIA', ['color' => DocxComponents::MUTED]],
@@ -1299,9 +1319,9 @@ final class DocxDocumentBuilder
                     ],
                 ];
             }
-            DocxComponents::addProductsTable($section, ['Crate No. *', 'Marks & Numbers *', 'Product Description & Finish *', 'Crate Size  L×W×H (cm) *'], [12, 33, 35, 20], $rows);
+            DocxComponents::addProductsTable($section, [self::cd($context)['package_noun'] . ' No. *', 'Marks & Numbers *', 'Product Description & Finish *', self::cd($context)['package_noun'] . ' Size  L×W×H (cm) *'], [12, 33, 35, 20], $rows);
         } else {
-            DocxComponents::addPlainParagraph($section, 'Crate-level breakdown not yet recorded.', ['italic' => true, 'size' => 8.7, 'color' => '5b6774']);
+            DocxComponents::addPlainParagraph($section, self::cd($context)['package_noun'] . '-level breakdown not yet recorded.', ['italic' => true, 'size' => 8.7, 'color' => '5b6774']);
         }
 
         DocxComponents::addSectionTitle($section, '5. DECLARATION');
@@ -1389,7 +1409,7 @@ final class DocxDocumentBuilder
             ['label' => 'Container Size *', 'value' => str_contains($containerType, 'LCL') ? 'N/A — LCL shipment' : ($containerType !== '' ? $containerType : 'To Be Confirmed')],
             ['label' => 'Container No. *', 'value' => self::g($shipping, 'container_no', 'TBC — to be confirmed by shipping line after stuffing')],
             ['label' => 'Seal No. *', 'value' => self::g($shipping, 'seal_no', 'TBC — to be confirmed after stuffing')],
-            ['label' => 'No. of Packages *', 'value' => (self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' Wooden Crates' : 'To Be Confirmed') . ' — must match Packing List exactly'],
+            ['label' => 'No. of Packages *', 'value' => (self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' ' . self::cd($context)['packing_label'] : 'To Be Confirmed') . ' — must match Packing List exactly'],
             ['label' => 'Gross Weight *', 'value' => self::g($packing, 'total_gross_weight_kg') !== '—' ? self::g($packing, 'total_gross_weight_kg') . ' kg' : 'To Be Confirmed'],
             ['label' => 'Net Weight *', 'value' => self::g($packing, 'total_net_weight_kg') !== '—' ? self::g($packing, 'total_net_weight_kg') . ' kg' : 'To Be Confirmed'],
             ['label' => 'Total CBM *', 'value' => self::g($packing, 'total_cbm') !== '—' ? self::g($packing, 'total_cbm') . ' m³' : 'To Be Confirmed'],
@@ -1507,7 +1527,7 @@ final class DocxDocumentBuilder
             ['label' => 'Bill of Lading No. *', 'value' => self::g($shipping, 'bl_number', 'To Be Confirmed')],
             ['label' => 'Bill of Lading Date *', 'value' => self::g($shipping, 'bl_date', 'TBC — must match this invoice date')],
             ['label' => 'Vessel / Voyage *', 'value' => self::g($shipping, 'vessel_name', 'To Be Confirmed') . (self::g($shipping, 'voyage_number') !== '—' ? ' / ' . self::g($shipping, 'voyage_number') : '')],
-            ['label' => 'No. of Packages *', 'value' => (self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' Wooden Crates' : 'To Be Confirmed') . ' — must match Packing List'],
+            ['label' => 'No. of Packages *', 'value' => (self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' ' . self::cd($context)['packing_label'] : 'To Be Confirmed') . ' — must match Packing List'],
         ]);
 
         DocxComponents::addSectionTitle($section, '4. PRODUCT / ORDER DETAILS');
@@ -1516,8 +1536,8 @@ final class DocxDocumentBuilder
         $plRefLine = 'PL Reference: ' . self::g($order, 'pl_ref', 'To Be Confirmed');
         if (!empty($crates)) {
             $plRefLine .= count($crates) > 1
-                ? ' — Crates ' . ($crates[0]['crate_no'] ?? '') . ' to ' . ($crates[count($crates) - 1]['crate_no'] ?? '')
-                : ' — Crate ' . ($crates[0]['crate_no'] ?? '');
+                ? ' — ' . self::cd($context)['package_nouns'] . ' ' . ($crates[0]['crate_no'] ?? '') . ' to ' . ($crates[count($crates) - 1]['crate_no'] ?? '')
+                : ' — ' . self::cd($context)['package_noun'] . ' ' . ($crates[0]['crate_no'] ?? '');
         }
         DocxComponents::addPlainParagraph($section, $plRefLine . '.', ['size' => 9, 'color' => DocxComponents::MUTED]);
 
@@ -1591,6 +1611,7 @@ final class DocxDocumentBuilder
             '3.  Certificate of Origin — ' . self::g($order, 'coo_type') . ' — Issued by CAPEXIL',
             '4.  Bill of Lading — Original Negotiable, 3 originals — couriered to buyer after balance T/T is received and cleared',
             '5.  Fumigation Certificate — provided as standard with every shipment',
+            ...self::qualityLines($context, 5),
         ]);
 
         DocxComponents::addSectionTitle($section, '8. DECLARATION');
@@ -1708,7 +1729,7 @@ final class DocxDocumentBuilder
         DocxComponents::addPlainParagraph($section, 'Tick each item once collected and ready. Do not apply for COO until all mandatory items are ticked.', ['italic' => true, 'size' => 9, 'color' => DocxComponents::MUTED]);
         $docItems = [
             ['Commercial Invoice (signed copy)', 'Must be signed and stamped. Values, HS code, buyer/seller details must be final — no estimates.', self::g($order, 'ci_ref', 'NexaCrest_05_CommercialInvoice.docx')],
-            ['Packing List (signed copy)', 'Crate count, weights, CBM must be actuals — not estimates from PI.', 'NexaCrest_04_PackingList.docx'],
+            ['Packing List (signed copy)', self::cd($context)['package_noun'] . ' count, weights, CBM must be actuals — not estimates from PI.', 'NexaCrest_04_PackingList.docx'],
             ['Fumigation Certificate (copy)', 'Provided as standard with every NexaCrest shipment — collect from fumigation agency and include with COO application.', 'Fumigation agency — standard every shipment'],
             ['Shipping Bill (copy)', 'Filed by CHA with Indian customs. Do not apply for COO before Shipping Bill is filed.', 'CHA provides after filing'],
             ['Bill of Lading (copy)', 'BL number, date, vessel name, port of loading/discharge must match CI and PL exactly.', 'Shipping line / CHA provides'],
@@ -1742,7 +1763,7 @@ final class DocxDocumentBuilder
             ['Product Description *', $productList, 'Commercial Invoice Section 4'],
             ['HS Code *', $hsCodeList, 'Hardcoded — verify against CI'],
             ['Country of Origin *', 'India', $hardcoded],
-            ['No. of Packages *', self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' Wooden Crates' : 'To Be Confirmed', 'Packing List Section 3 / BL'],
+            ['No. of Packages *', self::g($packing, 'crate_count') !== '—' ? self::g($packing, 'crate_count') . ' ' . self::cd($context)['packing_label'] : 'To Be Confirmed', 'Packing List Section 3 / BL'],
             ['Gross Weight *', self::g($packing, 'total_gross_weight_kg') !== '—' ? self::g($packing, 'total_gross_weight_kg') . ' kg' : 'To Be Confirmed', 'Packing List Section 3'],
             ['Net Weight *', self::g($packing, 'total_net_weight_kg') !== '—' ? self::g($packing, 'total_net_weight_kg') . ' kg' : 'To Be Confirmed', 'Packing List Section 3'],
             ['Total CBM *', self::g($packing, 'total_cbm') !== '—' ? self::g($packing, 'total_cbm') . ' m³' : 'To Be Confirmed', 'Packing List Section 3'],

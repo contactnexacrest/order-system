@@ -27,7 +27,10 @@ async function index(req, res) {
     adminOverrideRepository.paymentPresets(),
   ]);
   const byGroup = { standard: [], legal_terms: [], definitions: [] };
+  const { TC_CLAUSE_SETS } = require('../repositories/productCategoryRepository');
   for (const c of tcClauses) {
+    // D-257 Phase 1: which clause sets a clause prints for (empty = every order).
+    c.clause_set_label = String(c.clause_set || '').split(',').map((k) => k.trim()).filter(Boolean).map((k) => TC_CLAUSE_SETS[k] || k).join(', ');
     (byGroup[c.clause_group || 'standard'] || byGroup.standard).push(c);
   }
   res.renderView('admin_overrides/index', {

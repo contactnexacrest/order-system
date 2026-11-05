@@ -251,6 +251,8 @@ async function assemble(orderId, documentTypeCode = null) {
     notify_party_block: resolvedNotifyParty,
     show_consignee_section: showConsigneeSection,
     show_notify_party_section: showNotifyPartySection,
+    // D-257 Phase 1: packing words, quality documents and T&C clause sets from the goods lines' categories (stone = today's).
+    category_documents: await require('./categoryDocumentProfile').forOrder(orderId),
     products: products.map((p) => ({
       description: p.description,
       dimensions: p.dimensions,
