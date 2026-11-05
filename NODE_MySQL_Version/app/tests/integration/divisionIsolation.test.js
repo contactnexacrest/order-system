@@ -101,7 +101,7 @@ describe('D-257 divisions — isolation', () => {
     await db.execute('UPDATE orders SET division_id = 1 WHERE division_id <> 1');
     await db.execute('UPDATE users SET division_id = 1 WHERE division_id IS NOT NULL AND division_id <> 1');
     await db.execute('DELETE FROM client_divisions WHERE division_id <> 1');
-    await db.execute('DELETE FROM division_settings');
+    await db.execute("DELETE FROM division_settings WHERE setting_key IN ('fdn_overdue_days_c', 'require_product_pick')"); // only this test's rows: the seed holds DOM, IMP and MTT settings
     await db.execute("UPDATE division_modules SET is_enabled = 1 WHERE module_key = 'supplier_purchase' AND division_id IN (1, :d)", { d: DOM });
   });
 

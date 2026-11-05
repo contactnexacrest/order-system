@@ -78,7 +78,7 @@ final class DivisionIsolationTest extends DbTestCase
         $pdo->exec('UPDATE orders SET division_id = 1 WHERE division_id <> 1');
         $pdo->exec('UPDATE users SET division_id = 1 WHERE division_id IS NOT NULL AND division_id <> 1');
         $pdo->exec('DELETE FROM client_divisions WHERE division_id <> 1');
-        $pdo->exec('DELETE FROM division_settings');
+        $pdo->exec("DELETE FROM division_settings WHERE setting_key IN ('fdn_overdue_days_c', 'require_product_pick')"); // only this test's rows: the seed holds DOM, IMP and MTT settings
         $pdo->exec("UPDATE division_modules SET is_enabled = 1 WHERE division_id = 1");
         $pdo->prepare("UPDATE division_modules SET is_enabled = 1 WHERE division_id = :d AND module_key = 'supplier_purchase'")->execute(['d' => self::DOM]);
         DivisionService::resetCache();
