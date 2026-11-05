@@ -864,6 +864,14 @@ async function saveLadder(req, res) {
     values.associate_counting_threshold_inr = threshold.toFixed(2);
     values.associate_protection_months = String(months);
     values.associate_gst_pct = gst.toFixed(2);
+    // D-256: the Zoho Books GST tax booked on an associate's commission bill when GST is paid on top.
+    const gstTax = String(body.zoho_gst_commission_tax_id ?? '').trim();
+    if (gstTax !== '' && !/^[0-9A-Za-z_-]{1,40}$/.test(gstTax)) {
+      flash.set(req, 'error', 'Zoho GST tax for commission: enter the tax id from Zoho Books (letters, digits, - and _ only), or leave it empty.');
+      res.redirect('/associates/ladder');
+      return;
+    }
+    values.zoho_gst_commission_tax_id = gstTax;
   }
   const before = await incentiveRepository.settings();
   for (const [k, v] of Object.entries(values)) {

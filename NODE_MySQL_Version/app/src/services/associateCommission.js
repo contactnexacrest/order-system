@@ -58,6 +58,7 @@ async function settings() {
     day: run === 'weekly' ? Math.max(1, Math.min(7, day)) : Math.max(1, Math.min(28, day)),
     threshold_inr: Number(s.associate_counting_threshold_inr ?? 500000),
     gst_pct: Number(s.associate_gst_pct ?? 18),
+    zoho_gst_tax_id: String(s.zoho_gst_commission_tax_id ?? '').trim(),
     registration_months: months > 0 ? months : 6,
   };
 }

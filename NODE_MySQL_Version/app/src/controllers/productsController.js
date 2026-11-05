@@ -84,6 +84,8 @@ async function index(req, res) {
     for (const product of products) {
       const pr = await pricingService.forProduct(product, levels, s, program);
       product.pricing = canBuildup ? pr : { build: pr.build === null ? null : { staff_quote: pr.build.staff_quote, staff_floor: pr.build.staff_floor } };
+      // D-256: products with something to fix before they can be priced are flagged.
+      product.ready_to_fix = canBuildup ? (await pricingService.readiness(product, s)).to_fix : 0;
     }
   }
 
@@ -184,7 +186,56 @@ async function show(req, res) {
     details.misc_charges = [];
   }
 
+  // Owner decision D-256 (5 Nov 2026): "Pricing ready?" (Procurement sees only the
+  // supplier-price lines) and "Try a price" (people who may see the build-up).
+  const perm = req.permissions || {};
+  const canTry = canBuildup || !!perm.manage_pricing;
+  let readiness = null;
+  if (canTry || perm.record_market_prices) {
+    readiness = await pricingService.readiness(details.product);
+    if (!canTry) {
+      readiness.items = readiness.items.filter((i) => i.supplier);
+      readiness.to_fix = readiness.items.filter((i) => !i.ok).length;
+    }
+  }
+  let tryPrice = null;
+  if (canTry) {
+    const productSpecs = require('../services/productSpecs');
+    const offered = await productSpecs.offered(details.product);
+    // try[specId]=optionId, read from the raw query string: Express's qs would squash
+    // numeric keys such as try[3] into a gap-less list and lose which specification they belong to.
+    const sel = {};
+    const rawQuery = String(req.originalUrl || '').split('?')[1] || '';
+    for (const [k, v] of new URLSearchParams(rawQuery)) {
+      const m = /^try\[(\d+)\]$/.exec(k);
+      if (m) sel[m[1]] = String(v);
+    }
+    const p = offered.length ? await pricingService.forProduct(details.product, null, null, null, sel) : null;
+    if (p !== null) {
+      const map = p.spec ? p.spec.map : {};
+      const specs = offered.map((sp) => ({
+        id: sp.id, name: sp.name,
+        options: sp.options.map((o) => ({ id: o.id, name: o.name, selected: map[sp.id] !== undefined && Number(map[sp.id]) === o.id,
+          change: o.change_type === 'none' ? 'base' : productSpecs.changeLabel(String(o.change_type), o.value !== null ? Number(o.value) : null) })),
+      }));
+      let opts = [];
+      let charges = [];
+      let basis = 'unit';
+      if (p.build !== null) {
+        const adj = p.spec.adj;
+        basis = adj.basis;
+        charges = adj.charges;
+        opts = adj.lines.map((l) => `${l.option} ${l.kind === 'exact' ? '(in the exact price)' : l.kind === 'included' ? '(included in base price)'
+          : l.kind === 'pct' ? productSpecs.changeLabel('pct', Number(l.value)) : `+USD ${Number(l.usd_effect).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${l.converted ? ' per CBM' : ''}`}`);
+      }
+      tryPrice = { specs, p, opts, charges, basis, otherLabel: pricingService.modeLabel(p.effective.other_mode, p.effective.other_value),
+        marginLabel: pricingService.pct(p.effective.margin_pct), bufferLabel: pricingService.pct(p.effective.buffer_pct) };
+    }
+  }
+
   res.renderView('products/show', {
+    readiness,
+    tryPrice,
     product: details.product,
     images: details.images,
     suppliers: details.suppliers,

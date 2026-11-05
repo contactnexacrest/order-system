@@ -34,7 +34,7 @@
       <?php endif; ?>
       <?php foreach ($products as $p): ?>
         <tr>
-          <td><a href="/products/<?= (int) $p['id'] ?>"><?= View::e($p['name']) ?></a><?php if (!empty($canBuildup) && $p['pricing']['overrides'] !== []): ?> <span class="badge badge-warning" title="This product overrides a global pricing value"><?= View::e(implode(', ', $p['pricing']['overrides'])) ?></span><?php endif; ?></td>
+          <td><a href="/products/<?= (int) $p['id'] ?>"><?= View::e($p['name']) ?></a><?php if (!empty($canBuildup) && ($p['ready_to_fix'] ?? 0) > 0): ?> <a class="badge badge-danger" href="/products/<?= (int) $p['id'] ?>#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: <?= (int) $p['ready_to_fix'] ?> to fix</a><?php endif; ?><?php if (!empty($canBuildup) && $p['pricing']['overrides'] !== []): ?> <span class="badge badge-warning" title="This product overrides a global pricing value"><?= View::e(implode(', ', $p['pricing']['overrides'])) ?></span><?php endif; ?></td>
           <td><?= View::e($p['hs_code']) ?></td>
           <td><?= View::e($p['origin'] ?? '—') ?></td>
           <?php if ($canViewPricing): ?>

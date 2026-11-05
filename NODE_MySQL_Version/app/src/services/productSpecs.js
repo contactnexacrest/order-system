@@ -176,7 +176,7 @@ function describe(offeredSpecs, map, includeBase = false) {
 }
 
 /** What the chosen options do to the cost (same shape as PHP). */
-function adjustments(product, offeredSpecs, map, cbmFrom) {
+function adjustments(product, offeredSpecs, map, cbmFrom, exactSpecIds = []) {
   const out = {
     basis: 'unit', unit: String(product.reference_unit ?? '') || 'unit', thickness_mm: null,
     pct: [], usd: 0, qty_pct: 0, lines: [], charges: [], manual: null,
@@ -198,9 +198,20 @@ function adjustments(product, offeredSpecs, map, cbmFrom) {
     }
   }
   const isRm = RM_UNITS.includes(String(product.reference_unit ?? '').trim().toUpperCase());
+  const exactIds = exactSpecIds.map(Number);
   for (const [s, o] of chosen) {
     const v = Number(o.value ?? 0);
     const type = o.change_type;
+    // D-256: an exact supplier price already covers the options it names.
+    if (exactIds.includes(Number(s.id))) {
+      if (type !== 'none' || !o.is_base) out.lines.push({ spec: s.name, option: o.name, kind: 'exact', value: 0, usd_effect: null });
+      continue;
+    }
+    // D-256: an option worth 0 is included in the base price.
+    if (['pct', 'usd_m2', 'usd_rm', 'usd_container'].includes(type) && v === 0) {
+      out.lines.push({ spec: s.name, option: o.name, kind: 'included', value: 0, usd_effect: null });
+      continue;
+    }
     if (type === 'none' || type === 'cbm' || v === 0) continue;
     // On a CBM price, a thickness % (a per-m² rule) no longer applies.
     if (type === 'pct' && s.kind === 'thickness' && out.basis === 'cbm') continue;
@@ -244,6 +255,7 @@ function changeLabel(type, value) {
   if (type === 'none') return 'base';
   if (type === 'cbm') return 'priced per CBM';
   const v = Number(value || 0);
+  if (v === 0) return 'Included in base price'; // D-256
   const sign = v < 0 ? '−' : '+';
   if (type === 'pct') return `${sign}${trim2(v)}%`;
   const per = { usd_m2: '/m²', usd_rm: '/rm', usd_container: '/container' }[type] || '';

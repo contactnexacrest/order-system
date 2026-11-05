@@ -6,27 +6,27 @@
 <div class="card page-wide">
   <p class="muted small"><a href="/products/{{ product.id }}">&larr; Back to {{ product.name }}</a></p>
   <h1>Market Prices — {{ product.name }}</h1>
-  <p class="muted">Supplier and market prices for this product, newest first, with the ones <strong>used for pricing</strong> on top. A price is per the product's unit, or <strong>per CBM for thick stone ({{ cbmFrom or 50 }} mm and above)</strong> — each kind has its own price used for pricing (D-255). Record a new price as a new row so the history stays; a price older than {{ staleDays }} days, or past its "valid until" date, is marked. Changing the price used for pricing changes new quotes only — orders with an issued Proforma Invoice keep their prices.</p>
+  <p class="muted">Supplier and market prices for this product, newest first, with the ones <strong>used for pricing</strong> on top. A price is the <strong>base</strong> per the product's unit, <strong>per CBM for thick stone ({{ cbmFrom or 50 }} mm and above)</strong>, or an <strong>exact price for a specific combination</strong> of options (D-256) — when a quote matches an exact price, that price is the cost for the options it names; the options it leaves as "any" still apply. Record a new price as a new row so the history stays; a price older than {{ staleDays }} days, or past its "valid until" date, is marked. Changing the price used for pricing changes new quotes only — orders with an issued Proforma Invoice keep their prices.</p>
 
   <table class="list">
     <tr><th>Used for pricing</th><th>Supplier</th><th>Per</th><th class="num">Price (₹)</th><th>Quoted on</th><th>Valid until</th><th>Notes</th>{% if canRecord %}<th></th>{% endif %}</tr>
     {% if not rows.length %}<tr><td colspan="8" class="muted">No supplier prices recorded yet.</td></tr>{% endif %}
     {% for r in rows %}
       <tr>
-        {% set isCbm = (r.price_basis or 'unit') == 'cbm' %}{% set used = (r.is_cbm_primary == 1) if isCbm else (r.is_primary == 1) %}
-        <td>{% if used %}<span class="badge badge-active">● Yes</span>{% else %}<span class="muted">○</span>{% endif %}</td>
+        {% set isCbm = (r.price_basis or 'unit') == 'cbm' %}{% set isCombo = (r.price_basis or 'unit') == 'combo' %}{% set used = (r.combo_in_use == 1) if isCombo else ((r.is_cbm_primary == 1) if isCbm else (r.is_primary == 1)) %}
+        <td>{% if used %}<span class="badge badge-active">● {{ 'Exact' if isCombo else 'Base' }}</span>{% else %}<span class="muted">○</span>{% endif %}</td>
         <td>{{ r.supplier_name }}{% if r.location %}<br><small class="muted">{{ r.location }}</small>{% endif %}</td>
-        <td>{% if isCbm %}<span class="badge">CBM — thick stone</span>{% else %}{{ product.reference_unit or 'unit' }}{% endif %}</td>
+        <td>{% if isCombo %}<span class="badge badge-purple">Exact: {{ r.combo_text }}</span> <small class="muted">per {{ 'CBM' if r.combo_per == 'cbm' else (product.reference_unit or 'unit') }}</small>{% elif isCbm %}<span class="badge">CBM — thick stone</span>{% else %}{{ product.reference_unit or 'unit' }}{% endif %}</td>
         <td class="num">{{ 'To Be Confirmed' if r.effective_fob == null else (r.effective_fob | money) }}{% if r.fob_source == 'computed' %}<br><small class="muted">worked out from cost components</small>{% endif %}</td>
         <td>{{ r.price_date or '—' }}{% if r.staleness == 'stale' %} <span class="badge badge-warning">stale</span>{% endif %}</td>
         <td>{% if r.valid_until %}{{ r.valid_until }}{% if r.staleness == 'expired' %} <span class="badge badge-danger">expired</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{{ r.notes or '' }}</td>
         {% if canRecord %}
           <td>
-            {% if not used %}
+            {% if not used or isCombo %}
               <form method="post" action="/products/suppliers/{{ r.id }}/use-for-pricing" style="display:inline">
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                <button type="submit" class="btn-sm">Use for pricing</button>
+                <button type="submit" class="btn-sm">{{ 'Stop using' if (isCombo and used) else 'Use for pricing' }}</button>
               </form>
             {% endif %}
             {% if r.fob_source == 'direct' %}
@@ -52,19 +52,36 @@
   </table>
 
   {% if canRecord %}
-    <h2>Add a price</h2>
+    <h2 id="add-price">Add a price</h2>
+    {% if prefill %}<p class="small muted">Filled in from the supplier quote — choose what the price is for, then add it.</p>{% endif %}
     <form method="post" action="/products/{{ product.id }}/market-prices" class="field-grid">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>Supplier *<input type="text" name="supplier_name" maxlength="255" required placeholder="e.g. Sri Balaji Granites"></label>
+      {% if prefill %}<input type="hidden" name="purchase_quote_id" value="{{ prefill.purchase_quote_id }}">{% endif %}
+      <label>Supplier *<input type="text" name="supplier_name" maxlength="255" required placeholder="e.g. Sri Balaji Granites" value="{{ prefill.supplier_name if prefill else '' }}"></label>
       <label>Location<input type="text" name="location" maxlength="150" placeholder="e.g. Ongole, Andhra Pradesh"></label>
-      <label>Price (₹) *<input type="number" name="price_inr" min="0.01" step="0.01" required placeholder="e.g. 80000.00"></label>
-      <label>Price per *
+      <label>Price (₹) *<input type="number" name="price_inr" min="0.01" step="0.01" required placeholder="e.g. 80000.00" value="{{ prefill.price_inr if prefill else '' }}"></label>
+      <label>Price for *
         <select name="price_basis" required>
-          <option value="unit">The product's unit ({{ product.reference_unit or 'unit' }}) — below {{ cbmFrom or 50 }} mm</option>
-          <option value="cbm">CBM — thick stone, {{ cbmFrom or 50 }} mm and above</option>
-        </select></label>
-      <label>Quoted on *<input type="date" name="quoted_on" required max="{{ today }}" value="{{ today }}"></label>
-      <label>Valid until<input type="date" name="valid_until"></label>
+          <option value="unit">Base — the product's unit ({{ product.reference_unit or 'unit' }}), below {{ cbmFrom or 50 }} mm</option>
+          <option value="cbm">Thick stone, {{ cbmFrom or 50 }} mm and above (per CBM)</option>
+          {% if offered and offered.length %}<option value="combo">A specific combination (exact price)</option>{% endif %}
+        </select>
+        <small class="muted">Base: the price the options change. An exact price is what the supplier quoted for one combination, e.g. "30 mm · Leather" — it is used as it is for the options it names.</small></label>
+      <label>Quoted on *<input type="date" name="quoted_on" required max="{{ today }}" value="{{ prefill.quoted_on if prefill else today }}"></label>
+      <label>Valid until<input type="date" name="valid_until" value="{{ prefill.valid_until if prefill else '' }}"></label>
+      {% if offered and offered.length %}
+      <fieldset class="full"><legend>For a specific combination <small class="muted">(only when "Price for" is a specific combination — leave "any" for what the price does not fix)</small></legend>
+        <div class="field-grid">
+        {% for sp in offered %}
+          <label>{{ sp.name }}
+            <select name="combo[{{ sp.id }}]">
+              <option value="">any</option>
+              {% for o in sp.options %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}
+            </select></label>
+        {% endfor %}
+        </div>
+      </fieldset>
+      {% endif %}
       <label class="full">Notes<textarea name="notes" rows="2" maxlength="1000" placeholder="e.g. Ex-works, Grade A, min 2 blocks"></textarea></label>
       <label class="inline"><input type="checkbox" name="used_for_pricing" value="1"> Use this price for pricing</label>
       <div><button type="submit" class="btn-sm btn-accent">Add price</button></div>
@@ -88,6 +105,7 @@
                 <input type="hidden" name="purchase_quote_id" value="{{ q.id }}">
                 <button type="submit" class="btn-sm">Copy as a market price</button>
               </form>
+              <a class="btn-sm" href="/products/{{ product.id }}/market-prices?from_quote={{ q.id }}#add-price">Copy for a specific combination</a>
             </td>
           </tr>
         {% endfor %}

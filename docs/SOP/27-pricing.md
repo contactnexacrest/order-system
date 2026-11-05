@@ -198,3 +198,69 @@ existing fields (description, dimensions, finish, unit); documents are unchanged
 | Price per CBM from (mm) | 50 | Pricing › Settings |
 | Associate price requests per day | 10 | Pricing › Settings (per associate: Associates › Price access) |
 | An associate's price stays valid for (days) | 7 | Pricing › Settings (per associate: Associates › Price access) |
+
+## Pricing a new product in 5 steps (D-256, 5 Nov 2026)
+
+The product page shows **Pricing ready?** (MD, ED and Procurement) — a checklist of what
+the product still needs before it can be priced, each line with a link to fix it. The
+product list shows a red **Pricing: N to fix** badge on any product with something left.
+
+1. **Supplier price per unit** — Products › the product › **Market prices** › Add a price,
+   "Price for: Base", tick **Use this price for pricing**.
+2. **Supplier price per CBM** (only when the product is sold at 50 mm or more) — the same
+   form, "Price for: Thick stone … (per CBM)".
+3. **Specifications** — check the product's options (Products › the product › Price options);
+   most products simply follow their category.
+4. **Prices current** — both prices quoted within the stale setting (60 days) and not past
+   their "valid until" date.
+5. **Open to associates** — Associates › an associate › Price access: tick the product's
+   category and forms.
+
+Until every line is ✓ staff can still quote, but an associate's **Get price** for the missing
+part goes to staff for a manual price. Procurement sees only the supplier-price lines; Sales
+and associates never see the checklist.
+
+**An option worth 0** now reads **"Included in base price"** everywhere (the option lists,
+Try a price, the associate's price breakdown) instead of "+0%" or "+USD 0.00".
+
+## Try a price (D-256)
+
+Beside the checklist, **Try a price** (MD and ED — anyone who may see the build-up) lets you
+pick any combination of the product's options and click **Work it out**. Nothing is saved.
+It shows the supplier price used, the options, the cost, minimum price, staff floor, staff
+quote and every associate level's floor and quote — worked out on the server by the same
+engine as an associate's **Get price** and the order page, so the figures always agree.
+
+Example (₹3,200 per m², ₹82 = USD 1, other costs 2.5%, margin 20%, incentive 15% on,
+buffer 3%): ₹3,200 ÷ 82 + 2.5% = **USD 40.00**; Standard · 30 mm · Leather · 2–4 containers →
+staff quote **USD 69.76**; associate Level 2 (5%) floor **USD 71.30**, quote **USD 73.43**.
+
+## Exact supplier prices for a specific combination (D-256)
+
+Sometimes a supplier quotes one figure for a particular combination (e.g. "30 mm leather,
+₹4,900 per m²") rather than a base price plus changes. Record it in **Market prices** ›
+Add a price › **Price for: A specific combination (exact price)**, then under "For a
+specific combination" choose the option for each specification the price fixes and leave the
+rest as **any**. A supplier quote from Procurement can be copied in with **Copy for a
+specific combination**.
+
+- The price is used **as it is** for the options it names; the options it does not name
+  still apply as usual (e.g. Standard −8%, 2–4 containers −2%).
+- When several exact prices match, the one naming **the most options** wins; on a tie, the
+  **most recently quoted**. A **stale** or **expired** exact price is ignored (the ordinary
+  price is used) until it is renewed — Pricing ready? flags it.
+- It is per unit, or per CBM when a named thickness is 50 mm or more; a per-unit exact price
+  is never used for a per-CBM request.
+- **Stop using** turns one off without deleting it; **Use for pricing** turns it back on.
+- The associate sees only "Exact price for 30 mm · Leather — used" in their breakdown, never
+  the supplier or the cost.
+
+Example: exact ₹4,900 for "30 mm · Leather"; Premium · 30 mm · Leather · 2–4 containers →
+cost ₹4,900 ÷ 82 + 2.5% − 2% = **USD 60.03** (60.025); staff floor **USD 77.28**, staff
+quote **USD 79.60**; associate Level 2 floor **USD 81.35**, quote **USD 83.79**.
+
+## Help beside every setting (D-256)
+
+Every pricing setting, option type, the CBM threshold, every commission setting and every
+price-request setting has a short line beneath it with a worked example (e.g. "Example: cost
+USD 1,000 at 20% → minimum price USD 1,250 (1,000 ÷ 0.80). Nobody can sell below it.").

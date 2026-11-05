@@ -56,6 +56,7 @@ final class AssociateCommission
             'day' => $run === 'weekly' ? max(1, min(7, $day > 0 ? $day : 5)) : max(1, min(28, $day > 0 ? $day : 5)),
             'threshold_inr' => (float) ($s['associate_counting_threshold_inr'] ?? 500000),
             'gst_pct' => (float) ($s['associate_gst_pct'] ?? 18),
+            'zoho_gst_tax_id' => trim((string) ($s['zoho_gst_commission_tax_id'] ?? '')),
             'registration_months' => AssociateService::protectionMonths(),
         ];
     }

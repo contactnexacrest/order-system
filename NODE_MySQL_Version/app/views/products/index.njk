@@ -33,7 +33,7 @@
       {% endif %}
       {% for p in products %}
         <tr>
-          <td><a href="/products/{{ p.id }}">{{ p.name }}</a>{% if canBuildup and p.pricing.overrides.length %} <span class="badge badge-warning" title="This product overrides a global pricing value">{{ p.pricing.overrides | join(', ') }}</span>{% endif %}</td>
+          <td><a href="/products/{{ p.id }}">{{ p.name }}</a>{% if canBuildup and p.ready_to_fix > 0 %} <a class="badge badge-danger" href="/products/{{ p.id }}#pricing-ready" title="Pricing ready? — something to fix before this product can be priced">Pricing: {{ p.ready_to_fix }} to fix</a>{% endif %}{% if canBuildup and p.pricing.overrides.length %} <span class="badge badge-warning" title="This product overrides a global pricing value">{{ p.pricing.overrides | join(', ') }}</span>{% endif %}</td>
           <td>{{ p.hs_code }}</td>
           <td>{{ p.origin or '—' }}</td>
           {% if canViewPricing %}

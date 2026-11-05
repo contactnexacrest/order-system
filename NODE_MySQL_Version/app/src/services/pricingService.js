@@ -220,7 +220,17 @@ async function forProduct(product, levels = null, s = null, program = null, sele
     const adj = productSpecs.adjustments(product, offered, map, s.cbm_from_mm);
     spec = { map, offered, adj, text: productSpecs.describe(offered, map), errors: specErrors };
   }
-  const supplier = spec !== null && spec.adj.basis === 'cbm' ? await cbmSupplier(product.id) : await pricingSupplier(product.id);
+  // D-256: an exact supplier price for the chosen combination is the cost for the options it names.
+  let exact = null;
+  if (spec !== null && !spec.errors.length && spec.adj.manual === null) {
+    exact = await exactPrice(product, spec.map, spec.adj.basis, s, spec.offered);
+    if (exact !== null) {
+      spec.adj = productSpecs.adjustments(product, spec.offered, spec.map, s.cbm_from_mm, Object.keys(exact.named).map(Number));
+      spec.exact = exact.text;
+    }
+  }
+  const supplier = exact !== null ? exact.supplier
+    : (spec !== null && spec.adj.basis === 'cbm' ? await cbmSupplier(product.id) : await pricingSupplier(product.id));
   const has = (k) => product[k] !== null && product[k] !== undefined;
   const effective = {
     margin_pct: has('pricing_margin_pct') ? Number(product.pricing_margin_pct) : s.margin_pct,
@@ -237,6 +247,7 @@ async function forProduct(product, levels = null, s = null, program = null, sele
   if (has('pricing_buffer_pct')) overrides.push(`buffer ${pct(effective.buffer_pct)}`);
   const out = {
     supplier, effective, overrides, settings: s, program_on: program,
+    exact: exact !== null ? exact.text : null,
     build: null, levels: [], lowest: null, staleness: null, price_date: null, missing: null,
     spec, manual: false, unit: spec !== null ? spec.adj.unit : (String(product.reference_unit || '') || null),
   };
@@ -282,6 +293,158 @@ async function forProduct(product, levels = null, s = null, program = null, sele
     if (out.lowest === null || a.floor < out.lowest.floor) out.lowest = row;
   }
   return out;
+}
+
+/**
+ * D-256: the exact supplier price that matches a choice of options — the most specific one
+ * (most named options), then the most recently quoted. Stale or expired ones are ignored.
+ */
+async function exactPrice(product, map, basis, s = null, offeredSpecs = null) {
+  s = s || (await settings());
+  const rows = (await productSupplierRepository.forProduct(product.id))
+    .filter((r) => (r.price_basis || '') === 'combo' && Number(r.combo_in_use || 0) === 1 && String(r.combo_per || 'unit') === basis);
+  if (!rows.length) return null;
+  const named = await pricingRepository.comboOptions(rows.map((r) => Number(r.id)));
+  let best = null;
+  const cmp = (a, b) => {
+    for (let i = 0; i < 3; i++) {
+      if (a[i] < b[i]) return -1;
+      if (a[i] > b[i]) return 1;
+    }
+    return 0;
+  };
+  for (const r of rows) {
+    const n = named[Number(r.id)] || {};
+    const ids = Object.keys(n);
+    if (!ids.length || staleness(r, s.stale_days) !== null) continue;
+    if (!ids.every((specId) => map[specId] !== undefined && Number(map[specId]) === n[specId])) continue;
+    const key = [ids.length, String(priceDate(r) || ''), Number(r.id)];
+    if (best === null || cmp(key, best.key) > 0) best = { supplier: r, named: n, key };
+  }
+  if (best === null) return null;
+  const productSpecs = require('./productSpecs');
+  offeredSpecs = offeredSpecs || (await productSpecs.offered(product));
+  return { supplier: best.supplier, named: best.named, text: await comboText(offeredSpecs, best.named) };
+}
+
+/** "30 mm · Leather" for named options (in the product's specification order). */
+async function comboText(offeredSpecs, named) {
+  const parts = [];
+  for (const sp of offeredSpecs) {
+    for (const o of sp.options) {
+      if (named[sp.id] !== undefined && Number(named[sp.id]) === o.id) parts.push(o.name);
+    }
+  }
+  if (parts.length < Object.keys(named).length) {
+    // An option no longer offered for this product: name it from the option table.
+    const specRepository = require('../repositories/specRepository');
+    for (const optionId of Object.values(named)) {
+      const opt = await specRepository.findOption(optionId);
+      if (opt && !parts.includes(String(opt.name))) parts.push(String(opt.name));
+    }
+  }
+  return parts.join(' · ');
+}
+
+const shortDay = (d) => {
+  const dt = new Date(`${String(d).slice(0, 10)}T00:00:00`);
+  return `${String(dt.getDate()).padStart(2, '0')} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][dt.getMonth()]}`;
+};
+
+/**
+ * D-256: "Pricing ready?" — what a product still needs before it can be priced.
+ * Each item: key, ok, label, detail, link, link_text, supplier (a supplier-price line Procurement may see).
+ */
+async function readiness(product, s = null) {
+  s = s || (await settings());
+  const db = require('../config/db');
+  const productSpecs = require('./productSpecs');
+  const id = Number(product.id);
+  const market = `/products/${id}/market-prices`;
+  const items = [];
+  const unit = await pricingSupplier(id);
+  const unitInr = unit !== null ? productService.effectiveFobForSupplier(unit, product) : null;
+  items.push({
+    key: 'unit', ok: unit !== null && unitInr !== null && unitInr > 0, supplier: true,
+    label: `Supplier price per ${String(product.reference_unit || '') || 'unit'} entered and "used for pricing"`,
+    detail: unit !== null && unitInr !== null ? `₹${numberFormat(unitInr)}${priceDate(unit) !== null ? ` · ${shortDay(priceDate(unit))}` : ''}` : 'none yet',
+    link: market, link_text: unit === null ? 'Add in Market prices' : 'Market prices',
+  });
+  const offeredSpecs = await productSpecs.offered(product);
+  const cbmFrom = (parseInt(product.cbm_from_mm, 10) || 0) > 0 ? parseInt(product.cbm_from_mm, 10) : s.cbm_from_mm;
+  let needsCbm = false;
+  for (const sp of offeredSpecs) {
+    if (sp.kind !== 'thickness') continue;
+    for (const o of sp.options) {
+      if (o.change_type === 'cbm' || (o.thickness_mm !== null && o.thickness_mm >= cbmFrom)) needsCbm = true;
+    }
+  }
+  const cbm = await cbmSupplier(id);
+  if (needsCbm) {
+    items.push({
+      key: 'cbm', ok: cbm !== null, supplier: true,
+      label: `Supplier price per CBM (needed: sold at ${cbmFrom} mm and above)`,
+      detail: cbm !== null ? `₹${numberFormat(productService.effectiveFobForSupplier(cbm, product))} per CBM` : 'none yet',
+      link: market, link_text: cbm === null ? 'Add in Market prices' : 'Market prices',
+    });
+  }
+  const count = async (sql) => Number((await db.queryOne(sql, { p: id })).n);
+  const changes = await count('SELECT COUNT(*) AS n FROM product_spec_hidden WHERE product_id = :p')
+    + await count('SELECT COUNT(*) AS n FROM product_option_overrides WHERE product_id = :p')
+    + await count('SELECT COUNT(*) AS n FROM spec_definitions WHERE product_id = :p')
+    + await count('SELECT COUNT(*) AS n FROM spec_options WHERE product_id = :p');
+  const categoryId = await productSpecs.categoryIdFor(product);
+  let categoryName = null;
+  if (categoryId !== null) {
+    const c = await db.queryOne('SELECT name FROM product_categories WHERE id = :c', { c: categoryId });
+    categoryName = c ? c.name : null;
+  }
+  items.push({
+    key: 'specs', ok: offeredSpecs.length > 0, supplier: false,
+    label: offeredSpecs.length ? `Specifications checked (follows ${categoryName || 'its category'}, ${changes} change${changes === 1 ? '' : 's'})` : 'Specifications: none offered for this product',
+    detail: `${offeredSpecs.length} specification${offeredSpecs.length === 1 ? '' : 's'}`,
+    link: `/products/${id}/specifications`, link_text: 'View',
+  });
+  const stale = [];
+  for (const [label, sup] of [['m²/unit', unit], ['CBM', needsCbm ? cbm : null]]) {
+    if (sup === null) continue;
+    const st = staleness(sup, s.stale_days);
+    if (st !== null) stale.push(`${label} price ${st}`);
+  }
+  items.push({
+    key: 'current', ok: unit !== null && !stale.length, supplier: true,
+    label: `Supplier price is current (under ${s.stale_days} days old)`,
+    detail: unit === null ? 'no price yet' : (stale.length ? stale.join(', ') : (unit.valid_until ? `valid until ${shortDay(unit.valid_until instanceof Date ? ymd(unit.valid_until) : unit.valid_until)}` : 'no valid-until date')),
+    link: market, link_text: 'Market prices',
+  });
+  const combos = (await productSupplierRepository.forProduct(id)).filter((r) => (r.price_basis || '') === 'combo' && Number(r.combo_in_use || 0) === 1);
+  if (combos.length) {
+    const ignored = combos.filter((r) => staleness(r, s.stale_days) !== null).length;
+    items.push({
+      key: 'exact', ok: ignored === 0, supplier: true,
+      label: 'Exact supplier prices for specific combinations are current',
+      detail: `${combos.length} in use${ignored > 0 ? `, ${ignored} stale or expired — ignored until renewed` : ''}`,
+      link: market, link_text: 'Market prices',
+    });
+  }
+  const forms = productSpecs.productForms(product);
+  const open = new Set();
+  if (categoryId !== null) {
+    const rows = await db.query('SELECT apa.forms FROM associate_price_access apa JOIN associates a ON a.id = apa.associate_id WHERE apa.category_id = :c AND a.status = \'active\'', { c: categoryId });
+    for (const r of rows) {
+      const allowed = productSpecs.splitForms(r.forms);
+      const hit = !allowed.length ? (!forms.length ? ['all forms'] : forms) : (!forms.length ? allowed : forms.filter((f) => allowed.includes(f)));
+      for (const h of hit) open.add(h);
+    }
+  }
+  const openList = [...open].map((f) => f.charAt(0).toUpperCase() + f.slice(1));
+  items.push({
+    key: 'associates', ok: open.size > 0, supplier: false,
+    label: `Product open to associates${open.size ? ` (${openList.join(', ')})` : ''}`,
+    detail: open.size ? '' : 'no associate may price it yet',
+    link: '/associates', link_text: 'Change',
+  });
+  return { items, to_fix: items.filter((i) => !i.ok).length };
 }
 
 /**
@@ -340,6 +503,7 @@ function readLadderForm(post, levelsById) {
 }
 
 module.exports = {
+  exactPrice, comboText, readiness,
   DEFAULTS, LABELS, settings, settingsRaw, programOn, readSettingsForm, readOverridesForm, pricingSupplier, cbmSupplier, staleness, priceDate,
   forProduct, levelLabel, pct, modeLabel, numberFormat, readLadderForm,
 };

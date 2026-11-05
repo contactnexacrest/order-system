@@ -5445,3 +5445,20 @@ CREATE TABLE price_requests (
 ALTER TABLE order_products ADD COLUMN spec_selection TEXT NULL;
 ALTER TABLE order_products ADD COLUMN price_request_id BIGINT UNSIGNED NULL;
 ALTER TABLE order_products ADD CONSTRAINT fk_order_products_price_request FOREIGN KEY (price_request_id) REFERENCES price_requests(id);
+
+-- Owner decision D-256 (5 Nov 2026): an exact supplier price for a specific combination of
+-- specification options (e.g. "30 mm · Leather = ₹4,900 per m²"). When a request matches, that
+-- price is the cost for the options it names; the options it leaves as "any" still apply.
+ALTER TABLE catalog_product_suppliers MODIFY COLUMN price_basis ENUM('unit','cbm','combo') NOT NULL DEFAULT 'unit';
+ALTER TABLE catalog_product_suppliers ADD COLUMN combo_per ENUM('unit','cbm') NULL;      -- combo: per the product's unit, or per CBM (thick stone)
+ALTER TABLE catalog_product_suppliers ADD COLUMN combo_in_use TINYINT(1) NOT NULL DEFAULT 0; -- combo: used for pricing
+CREATE TABLE catalog_product_supplier_options (
+  supplier_id BIGINT UNSIGNED NOT NULL,
+  spec_id     BIGINT UNSIGNED NOT NULL,
+  option_id   BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (supplier_id, spec_id),
+  KEY idx_cpso_option (option_id),
+  CONSTRAINT fk_cpso_supplier FOREIGN KEY (supplier_id) REFERENCES catalog_product_suppliers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_cpso_spec FOREIGN KEY (spec_id) REFERENCES spec_definitions(id),
+  CONSTRAINT fk_cpso_option FOREIGN KEY (option_id) REFERENCES spec_options(id)
+) ENGINE=InnoDB;

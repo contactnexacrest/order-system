@@ -163,8 +163,15 @@ final class PriceRequestService
         $prices = self::priceFrom($p['build'], $level);
         $adj = $p['spec']['adj'];
         $breakdown = [['label' => 'Base: ' . (ProductSpecs::describe($p['spec']['offered'], self::baseMap($p['spec']['offered']), true) ?: 'standard specification'), 'change' => '—']];
+        if (!empty($p['exact'])) {
+            $breakdown[] = ['label' => 'Exact price for ' . $p['exact'], 'change' => 'used'];
+        }
         foreach ($adj['lines'] as $l) {
-            if ($l['kind'] === 'pct') {
+            if ($l['kind'] === 'exact') {
+                $breakdown[] = ['label' => $l['option'] . ' (' . strtolower($l['spec']) . ')', 'change' => 'Included (in the exact price)'];
+            } elseif ($l['kind'] === 'included') {
+                $breakdown[] = ['label' => $l['option'] . ' (' . strtolower($l['spec']) . ')', 'change' => 'Included in base price'];
+            } elseif ($l['kind'] === 'pct') {
                 $breakdown[] = ['label' => $l['option'] . ' (' . strtolower($l['spec']) . ')', 'change' => ($l['value'] < 0 ? '−' : '+') . rtrim(rtrim(number_format(abs($l['value']), 2, '.', ''), '0'), '.') . '%'];
             } else {
                 // The effect of this amount on the associate's quote price: worked out with and without it.

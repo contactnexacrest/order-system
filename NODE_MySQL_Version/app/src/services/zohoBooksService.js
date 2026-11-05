@@ -1521,6 +1521,43 @@ function safeJson(text) {
 }
 
 /**
+ * The Zoho bill for an associate's commission: the gross commission, with the TDS tax when one
+ * is chosen and (D-256) the GST tax for commission when GST was paid on their tax invoice.
+ */
+function associateBillPayload(c, cost, vendorId, accountIdValue) {
+  return {
+    vendor_id: vendorId,
+    bill_number: c.bill_no,
+    date: c.paid_on,
+    reference_number: String(cost.buyer_inquiry_ref),
+    line_items: [{
+      account_id: accountIdValue,
+      name: 'Associate commission',
+      description: c.bill_description,
+      rate: c.gross_inr,
+      quantity: 1,
+      ...(c.gst_inr > 0 ? { tax_id: c.gst_tax_id } : {}),
+    }],
+    ...(c.tds_tax_id !== null ? { tds_tax_id: c.tds_tax_id } : {}),
+  };
+}
+
+/** D-256: the payment is what was paid — the commission after TDS plus the GST paid on top. */
+function associatePaymentPayload(c, vendorId, billId, paidThroughAccountId) {
+  const amount = round(c.paid_inr + c.gst_inr, 2);
+  return {
+    vendor_id: vendorId,
+    amount,
+    date: c.paid_on,
+    payment_mode: 'Bank Transfer',
+    reference_number: c.reference,
+    description: c.payment_description,
+    paid_through_account_id: paidThroughAccountId,
+    bills: [{ bill_id: billId, amount_applied: amount }],
+  };
+}
+
+/**
  * Port of ZohoBooksService::pushAssociateCommission(). Owner decision 1 Nov
  * 2026 (AS-12): an associate's paid commission goes to Books as the
  * associate's own bill (the associate a vendor, the bill numbered with
@@ -1533,6 +1570,11 @@ async function pushAssociateCommission(cost) {
   const associateRepository = require('../repositories/associateRepository');
   zohoGuard.assertCustomerAllowed(String(cost.buyer_name));
   const c = await associateCommission(cost);
+  // Owner decision D-256 (5 Nov 2026): GST on the associate's tax invoice goes on the bill as a GST tax,
+  // so the bill total equals what was paid and the input credit is booked — never a bill without it.
+  if (c.gst_inr > 0 && c.gst_tax_id === null) {
+    throw new Error(`Associate commission on order ${cost.buyer_inquiry_ref} not sent: GST of INR ${c.gst_inr.toFixed(2)} was paid on the associate's tax invoice, but no Zoho GST tax is chosen for commission (Associates → Commission settings → Zoho GST tax for commission). Choose it, then sync again.`);
+  }
   assertVendorAllowed(String(c.associate.name));
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
@@ -1560,37 +1602,17 @@ async function pushAssociateCommission(cost) {
   }
   let bill = await findBill(config, accessToken, c.bill_no, vendorId);
   if (!bill) {
-    const res = await request('POST', `https://${config.apiDomain}/books/v3/bills?organization_id=${encodeURIComponent(config.organizationId)}`, {
-      vendor_id: vendorId,
-      bill_number: c.bill_no,
-      date: c.paid_on,
-      reference_number: String(cost.buyer_inquiry_ref),
-      line_items: [{
-        account_id: await accountId(config, accessToken, COST_ACCOUNTS.commission),
-        name: 'Associate commission',
-        description: c.bill_description,
-        rate: c.gross_inr,
-        quantity: 1,
-      }],
-      ...(c.tds_tax_id !== null ? { tds_tax_id: c.tds_tax_id } : {}),
-    }, authHeaders(accessToken));
+    const res = await request('POST', `https://${config.apiDomain}/books/v3/bills?organization_id=${encodeURIComponent(config.organizationId)}`,
+      associateBillPayload(c, cost, vendorId, await accountId(config, accessToken, COST_ACCOUNTS.commission)), authHeaders(accessToken));
     bill = await findBill(config, accessToken, c.bill_no, vendorId);
     if (!bill) {
       throw new Error(`Zoho Books bill for the associate commission on order ${cost.buyer_inquiry_ref} failed (HTTP ${res.status}): ${String(res.body).slice(0, 500)}`);
     }
   }
-  const openBalance = c.tds_tax_id !== null ? c.paid_inr : c.gross_inr;
+  const openBalance = (c.tds_tax_id !== null ? c.paid_inr : c.gross_inr) + c.gst_inr;
   if (c.paid_inr > 0 && Number(bill.balance ?? openBalance) >= openBalance - 0.005) {
-    const res = await request('POST', `https://${config.apiDomain}/books/v3/vendorpayments?organization_id=${encodeURIComponent(config.organizationId)}`, {
-      vendor_id: vendorId,
-      amount: c.paid_inr,
-      date: c.paid_on,
-      payment_mode: 'Bank Transfer',
-      reference_number: c.reference,
-      description: c.payment_description,
-      paid_through_account_id: config.depositAccountId,
-      bills: [{ bill_id: String(bill.bill_id), amount_applied: c.paid_inr }],
-    }, authHeaders(accessToken));
+    const res = await request('POST', `https://${config.apiDomain}/books/v3/vendorpayments?organization_id=${encodeURIComponent(config.organizationId)}`,
+      associatePaymentPayload(c, vendorId, String(bill.bill_id), config.depositAccountId), authHeaders(accessToken));
     const decoded = safeJson(res.body);
     if (!res.ok || !(decoded && decoded.vendorpayment && typeof decoded.vendorpayment.payment_id === 'string')) {
       throw new Error(`Zoho Books vendor payment for the associate commission on order ${cost.buyer_inquiry_ref} failed (HTTP ${res.status}): ${String(res.body).slice(0, 500)}`);
@@ -1645,6 +1667,7 @@ async function associateCommission(cost) {
     : (inc.associate_rate_pct !== null && inc.associate_rate_pct !== undefined
       ? `${Number(inc.associate_rate_pct).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : '');
   const gst = Math.round(payouts.reduce((sum, p) => sum + Number(p.gst_inr || 0), 0) * 100) / 100;
+  const gstTaxId = String((await require('../repositories/incentiveRepository').settings()).zoho_gst_commission_tax_id || '').trim();
   const what = `Associate commission — ${a.name} — for order ${cost.buyer_inquiry_ref} (${cost.buyer_name})`
     + (rate !== '' ? `, ${rate} on the invoiced FOB of the goods` : '')
     + (inc.associate_basis_fc ? ` (basis ${inc.associate_currency || ''} ${Number(inc.associate_basis_fc).toFixed(2)})` : '')
@@ -1663,10 +1686,15 @@ async function associateCommission(cost) {
     // bill is the gross, the payment the net, and the TDS is left on the bill for the CA to book.
     tds_tax_id: tds > 0 && tdsSettings.zoho_tax_id !== '' ? tdsSettings.zoho_tax_id : null,
     tds_left_for_ca: tds > 0 && tdsSettings.zoho_tax_id === '',
+    // D-256: GST paid on top on the associate's tax invoice, booked on the bill with this Zoho tax.
+    gst_inr: gst,
+    gst_tax_id: gst > 0 && gstTaxId !== '' ? gstTaxId : null,
   };
 }
 
 module.exports = {
+  associateBillPayload,
+  associatePaymentPayload,
   // Owner 2 Nov 2026: exported for the bank-charges payload test (remittanceDifference.test.js).
   paymentPayload,
   BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS, COST_ACCOUNTS, BENEFIT_INCOME_ACCOUNT, BENEFIT_SCRIP_ACCOUNT, GST_REFUND_ACCOUNT, pushGstRefundJournal,

@@ -2204,6 +2204,12 @@ SELECT k, v FROM (
   SELECT 'zoho_tds_tax_id', ''
 ) d WHERE NOT EXISTS (SELECT 1 FROM incentive_settings s WHERE s.setting_key = d.k);
 
+-- Owner decision D-256 (5 Nov 2026): the Zoho Books GST tax booked on an associate's commission bill
+-- when GST is paid on top on their tax invoice (empty = the sync refuses such a bill with a clear error).
+INSERT INTO incentive_settings (setting_key, setting_value)
+SELECT 'zoho_gst_commission_tax_id', '' FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM incentive_settings s WHERE s.setting_key = 'zoho_gst_commission_tax_id');
+
 -- Owner decision 2 Nov 2026 (D-238, migration 2026-11-02za): client / product sync to Zoho Books, both off by default.
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
   ('zoho_sync_clients', '0', 'boolean', 'zoho_books', 'Send clients to Zoho Books as customers on their own (one way, app → Zoho, at the hourly sync / Sync now): new and changed clients are created or updated, inactive ones marked inactive. A client goes once its first order has set its currency. Off by default.', 0),

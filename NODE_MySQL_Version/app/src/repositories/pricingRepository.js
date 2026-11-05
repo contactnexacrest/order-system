@@ -148,7 +148,41 @@ async function purchaseQuote(quoteId, productId) {
   return (await purchaseQuotesForProduct(productId)).find((q) => Number(q.id) === Number(quoteId)) || null;
 }
 
+// ------------------------------------------------------------ D-256: exact prices for a combination
+
+/** supplier id => { spec id => option id } for these exact-price rows. */
+async function comboOptions(supplierIds) {
+  const ids = [...new Set(supplierIds.map(Number))];
+  if (!ids.length) return {};
+  const params = {};
+  const marks = ids.map((id, i) => { params[`s${i}`] = id; return `:s${i}`; }).join(',');
+  const rows = await db.query(`SELECT supplier_id, spec_id, option_id FROM catalog_product_supplier_options WHERE supplier_id IN (${marks}) ORDER BY supplier_id, spec_id`, params);
+  const out = {};
+  for (const r of rows) {
+    const sid = Number(r.supplier_id);
+    if (!out[sid]) out[sid] = {};
+    out[sid][Number(r.spec_id)] = Number(r.option_id);
+  }
+  return out;
+}
+
+async function setCombo(supplierId, named, per, inUse) {
+  await db.execute(
+    "UPDATE catalog_product_suppliers SET price_basis = 'combo', combo_per = :per, combo_in_use = :u, is_primary = 0, is_cbm_primary = 0 WHERE id = :id",
+    { per: per === 'cbm' ? 'cbm' : 'unit', u: inUse ? 1 : 0, id: supplierId }
+  );
+  await db.execute('DELETE FROM catalog_product_supplier_options WHERE supplier_id = :id', { id: supplierId });
+  for (const [specId, optionId] of Object.entries(named)) {
+    await db.execute('INSERT INTO catalog_product_supplier_options (supplier_id, spec_id, option_id) VALUES (:s, :sp, :o)', { s: supplierId, sp: Number(specId), o: Number(optionId) });
+  }
+}
+
+async function setComboInUse(supplierId, inUse) {
+  await db.execute('UPDATE catalog_product_suppliers SET combo_in_use = :u WHERE id = :id', { u: inUse ? 1 : 0, id: supplierId });
+}
+
 module.exports = {
+  comboOptions, setCombo, setComboInUse,
   settings, setSetting, saveProductOverrides, levels, findLevel, levelNameTaken, createLevel, updateLevel, setLevelActive, deleteLevel,
   levelUse, associatesPerLevel, ladder, replaceLadder, setAssociateCommission, setSupplierBasis, setCbmPrimary, setSupplierDates, purchaseQuotesForProduct, purchaseQuote,
 };

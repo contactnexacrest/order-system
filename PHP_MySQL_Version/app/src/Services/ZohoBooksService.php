@@ -600,6 +600,12 @@ final class ZohoBooksService
     {
         ZohoGuard::assertCustomerAllowed((string) $cost['buyer_name']);
         $c = self::associateCommission($cost);
+        // Owner decision D-256 (5 Nov 2026): GST on the associate's tax invoice goes on the bill as a GST tax,
+        // so the bill total equals what was paid and the input credit is booked — never a bill without it.
+        if ($c['gst_inr'] > 0 && $c['gst_tax_id'] === null) {
+            throw new \RuntimeException("Associate commission on order {$cost['buyer_inquiry_ref']} not sent: GST of INR " . number_format($c['gst_inr'], 2, '.', '')
+                . ' was paid on the associate\'s tax invoice, but no Zoho GST tax is chosen for commission (Associates → Commission settings → Zoho GST tax for commission). Choose it, then sync again.');
+        }
         self::assertVendorAllowed((string) $c['associate']['name']);
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
@@ -628,41 +634,59 @@ final class ZohoBooksService
         }
         $bill = self::findBill($config, $accessToken, $c['bill_no'], $vendorId);
         if ($bill === null) {
-            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/bills?organization_id=" . rawurlencode($config['organizationId']), [
-                'vendor_id' => $vendorId,
-                'bill_number' => $c['bill_no'],
-                'date' => $c['paid_on'],
-                'reference_number' => (string) $cost['buyer_inquiry_ref'],
-                'line_items' => [[
-                    'account_id' => self::accountId($config, $accessToken, self::COST_ACCOUNTS['commission']),
-                    'name' => 'Associate commission',
-                    'description' => $c['bill_description'],
-                    'rate' => $c['gross_inr'],
-                    'quantity' => 1,
-                ]],
-            ] + ($c['tds_tax_id'] !== null ? ['tds_tax_id' => $c['tds_tax_id']] : []), self::authHeaders($accessToken));
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/bills?organization_id=" . rawurlencode($config['organizationId']),
+                self::associateBillPayload($c, $cost, $vendorId, self::accountId($config, $accessToken, self::COST_ACCOUNTS['commission'])), self::authHeaders($accessToken));
             $bill = self::findBill($config, $accessToken, $c['bill_no'], $vendorId);
             if ($bill === null) {
                 throw new \RuntimeException("Zoho Books bill for the associate commission on order {$cost['buyer_inquiry_ref']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
             }
         }
-        $openBalance = $c['tds_tax_id'] !== null ? $c['paid_inr'] : $c['gross_inr'];
+        $openBalance = ($c['tds_tax_id'] !== null ? $c['paid_inr'] : $c['gross_inr']) + $c['gst_inr'];
         if ($c['paid_inr'] > 0 && (float) ($bill['balance'] ?? $openBalance) >= $openBalance - 0.005) {
-            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/vendorpayments?organization_id=" . rawurlencode($config['organizationId']), [
-                'vendor_id' => $vendorId,
-                'amount' => $c['paid_inr'],
-                'date' => $c['paid_on'],
-                'payment_mode' => 'Bank Transfer',
-                'reference_number' => $c['reference'],
-                'description' => $c['payment_description'],
-                'paid_through_account_id' => $config['depositAccountId'],
-                'bills' => [['bill_id' => (string) $bill['bill_id'], 'amount_applied' => $c['paid_inr']]],
-            ], self::authHeaders($accessToken));
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/vendorpayments?organization_id=" . rawurlencode($config['organizationId']),
+                self::associatePaymentPayload($c, $vendorId, (string) $bill['bill_id'], $config['depositAccountId']), self::authHeaders($accessToken));
             if ($response['status'] < 200 || $response['status'] >= 300 || !is_string(json_decode($response['body'], true)['vendorpayment']['payment_id'] ?? null)) {
                 throw new \RuntimeException("Zoho Books vendor payment for the associate commission on order {$cost['buyer_inquiry_ref']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
             }
         }
         return (string) $bill['bill_id'];
+    }
+
+    /**
+     * The Zoho bill for an associate's commission: the gross commission, with the TDS tax when one
+     * is chosen and (D-256) the GST tax for commission when GST was paid on their tax invoice.
+     */
+    public static function associateBillPayload(array $c, array $cost, string $vendorId, string $accountId): array
+    {
+        return [
+            'vendor_id' => $vendorId,
+            'bill_number' => $c['bill_no'],
+            'date' => $c['paid_on'],
+            'reference_number' => (string) $cost['buyer_inquiry_ref'],
+            'line_items' => [[
+                'account_id' => $accountId,
+                'name' => 'Associate commission',
+                'description' => $c['bill_description'],
+                'rate' => $c['gross_inr'],
+                'quantity' => 1,
+            ] + ($c['gst_inr'] > 0 ? ['tax_id' => $c['gst_tax_id']] : [])],
+        ] + ($c['tds_tax_id'] !== null ? ['tds_tax_id' => $c['tds_tax_id']] : []);
+    }
+
+    /** D-256: the payment is what was paid — the commission after TDS plus the GST paid on top. */
+    public static function associatePaymentPayload(array $c, string $vendorId, string $billId, mixed $paidThroughAccountId): array
+    {
+        $amount = round($c['paid_inr'] + $c['gst_inr'], 2);
+        return [
+            'vendor_id' => $vendorId,
+            'amount' => $amount,
+            'date' => $c['paid_on'],
+            'payment_mode' => 'Bank Transfer',
+            'reference_number' => $c['reference'],
+            'description' => $c['payment_description'],
+            'paid_through_account_id' => $paidThroughAccountId,
+            'bills' => [['bill_id' => $billId, 'amount_applied' => $amount]],
+        ];
     }
 
     /**
@@ -731,6 +755,9 @@ final class ZohoBooksService
             // bill is the gross, the payment the net, and the TDS is left on the bill for the CA to book.
             'tds_tax_id' => $tds > 0 && $tdsTaxId !== '' ? $tdsTaxId : null,
             'tds_left_for_ca' => $tds > 0 && $tdsTaxId === '',
+            // D-256: GST paid on top on the associate's tax invoice, booked on the bill with this Zoho tax.
+            'gst_inr' => $gst,
+            'gst_tax_id' => $gst > 0 && ($gstTaxId = trim((string) (\App\Repositories\IncentiveRepository::settings()['zoho_gst_commission_tax_id'] ?? ''))) !== '' ? $gstTaxId : null,
         ];
     }
 

@@ -874,3 +874,11 @@ input.below-floor{border-color:#b42318}
 .error-popup a { color: #0b2a6f; font-weight: 600; }
 .error-popup-close { position: absolute; top: 6px; right: 10px; background: none; border: 0; font-size: 20px; line-height: 1; color: #666; cursor: pointer; }
 @media (max-width: 600px) { .error-popup { top: 12px; right: 12px; left: 12px; width: auto; } }
+
+/* D-256: exact supplier price badge; "Pricing ready?" checklist */
+.badge-purple { background: #ecdff7; color: #5b2a86; }
+.ready-list td.ok { color: #245a24; font-weight: 700; }
+.ready-list td.no { color: #a32020; font-weight: 700; }
+.help-line { display: block; font-size: .85em; color: #555; background: #f7f4ec; border-left: 3px solid #c9b98a; padding: 3px 8px; margin-top: 3px; border-radius: 3px; font-weight: normal; }
+.pricing-two { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+.pricing-two > .section { flex: 1 1 380px; min-width: 0; }

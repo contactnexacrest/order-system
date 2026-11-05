@@ -219,7 +219,7 @@ final class ProductSpecs
      * @return array{basis: string, unit: string, thickness_mm: ?int, pct: list<float>, usd: float, qty_pct: float,
      *               lines: list<array{spec:string, option:string, kind:string, value:float, usd_effect: ?float}>, charges: list<string>, manual: ?string}
      */
-    public static function adjustments(array $product, array $offered, array $map, int $cbmFrom): array
+    public static function adjustments(array $product, array $offered, array $map, int $cbmFrom, array $exactSpecIds = []): array
     {
         $out = ['basis' => 'unit', 'unit' => (string) ($product['reference_unit'] ?? '') ?: 'unit', 'thickness_mm' => null,
             'pct' => [], 'usd' => 0.0, 'qty_pct' => 0.0, 'lines' => [], 'charges' => [], 'manual' => null];
@@ -249,6 +249,18 @@ final class ProductSpecs
         foreach ($chosen as [$s, $o]) {
             $v = (float) ($o['value'] ?? 0);
             $type = $o['change_type'];
+            // D-256: an exact supplier price already covers the options it names.
+            if (in_array((int) $s['id'], array_map('intval', $exactSpecIds), true)) {
+                if ($type !== 'none' || !$o['is_base']) {
+                    $out['lines'][] = ['spec' => $s['name'], 'option' => $o['name'], 'kind' => 'exact', 'value' => 0.0, 'usd_effect' => null];
+                }
+                continue;
+            }
+            // D-256: an option worth 0 is included in the base price.
+            if (in_array($type, ['pct', 'usd_m2', 'usd_rm', 'usd_container'], true) && $v == 0.0) {
+                $out['lines'][] = ['spec' => $s['name'], 'option' => $o['name'], 'kind' => 'included', 'value' => 0.0, 'usd_effect' => null];
+                continue;
+            }
             if ($type === 'none' || $type === 'cbm' || $v == 0.0) {
                 continue;
             }
@@ -304,6 +316,9 @@ final class ProductSpecs
             return 'priced per CBM';
         }
         $v = (float) $value;
+        if ($v == 0.0) {
+            return 'Included in base price'; // D-256
+        }
         $sign = $v < 0 ? '−' : '+';
         if ($type === 'pct') {
             return $sign . rtrim(rtrim(number_format(abs($v), 2, '.', ''), '0'), '.') . '%';

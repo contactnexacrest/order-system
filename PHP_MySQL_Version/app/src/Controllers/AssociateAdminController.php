@@ -920,6 +920,14 @@ final class AssociateAdminController
             $values['associate_counting_threshold_inr'] = number_format($threshold, 2, '.', '');
             $values['associate_protection_months'] = (string) $months;
             $values['associate_gst_pct'] = number_format($gst, 2, '.', '');
+            // D-256: the Zoho Books GST tax booked on an associate's commission bill when GST is paid on top.
+            $gstTax = trim((string) ($_POST['zoho_gst_commission_tax_id'] ?? ''));
+            if ($gstTax !== '' && preg_match('/^[0-9A-Za-z_\-]{1,40}$/', $gstTax) !== 1) {
+                Flash::set('error', 'Zoho GST tax for commission: enter the tax id from Zoho Books (letters, digits, - and _ only), or leave it empty.');
+                header('Location: /associates/ladder');
+                return;
+            }
+            $values['zoho_gst_commission_tax_id'] = $gstTax;
         }
         $before = IncentiveRepository::settings();
         foreach ($values as $k => $v) {

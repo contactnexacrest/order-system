@@ -205,4 +205,40 @@ final class PricingRepository
         }
         return null;
     }
+    // ------------------------------------------------------------ D-256: exact prices for a combination
+
+    /** @return array<int, array<int,int>> supplier id => [spec id => option id] for these exact-price rows */
+    public static function comboOptions(array $supplierIds): array
+    {
+        $supplierIds = array_values(array_unique(array_map('intval', $supplierIds)));
+        if ($supplierIds === []) {
+            return [];
+        }
+        $in = implode(',', array_fill(0, count($supplierIds), '?'));
+        $stmt = Database::connection()->prepare("SELECT supplier_id, spec_id, option_id FROM catalog_product_supplier_options WHERE supplier_id IN ({$in}) ORDER BY supplier_id, spec_id");
+        $stmt->execute($supplierIds);
+        $out = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $out[(int) $r['supplier_id']][(int) $r['spec_id']] = (int) $r['option_id'];
+        }
+        return $out;
+    }
+
+    /** @param array<int,int> $named spec id => option id */
+    public static function setCombo(int $supplierId, array $named, string $per, bool $inUse): void
+    {
+        $pdo = Database::connection();
+        $pdo->prepare("UPDATE catalog_product_suppliers SET price_basis = 'combo', combo_per = :per, combo_in_use = :u, is_primary = 0, is_cbm_primary = 0 WHERE id = :id")
+            ->execute(['per' => $per === 'cbm' ? 'cbm' : 'unit', 'u' => $inUse ? 1 : 0, 'id' => $supplierId]);
+        $pdo->prepare('DELETE FROM catalog_product_supplier_options WHERE supplier_id = :id')->execute(['id' => $supplierId]);
+        $ins = $pdo->prepare('INSERT INTO catalog_product_supplier_options (supplier_id, spec_id, option_id) VALUES (:s, :sp, :o)');
+        foreach ($named as $specId => $optionId) {
+            $ins->execute(['s' => $supplierId, 'sp' => (int) $specId, 'o' => (int) $optionId]);
+        }
+    }
+
+    public static function setComboInUse(int $supplierId, bool $inUse): void
+    {
+        Database::connection()->prepare('UPDATE catalog_product_suppliers SET combo_in_use = :u WHERE id = :id')->execute(['u' => $inUse ? 1 : 0, 'id' => $supplierId]);
+    }
 }

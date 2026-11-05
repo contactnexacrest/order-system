@@ -24,6 +24,8 @@
   </div>
 
 
+  <?php include __DIR__ . '/_pricing_ready.php'; ?>
+
   <?php include __DIR__ . '/_pricing.php'; ?>
 
   <?php if ($canViewPricing): ?>

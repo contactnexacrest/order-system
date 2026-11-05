@@ -183,6 +183,19 @@ What the order pays out goes to Zoho Books too, on the same sync:
   against TDS payable, and the Sync Log says so. A claw-back is not sent:
   the CA books the recovery (vendor credit). In test mode only associates
   named `TEST-…` are sent. See [Chapter 24](./24-associates.md).
+- **GST on associate commission (owner decision D-256, 5 Nov 2026).** When
+  a GST-registered associate's tax invoice adds GST on top (e.g. 18 % of
+  ₹10,000 = ₹1,800), the commission line of their bill carries the Zoho
+  GST tax chosen in **Associates → Commission settings → Zoho GST tax for
+  commission** (the Zoho Books tax id, e.g. `460000000067890`), so the
+  input credit is booked and the bill totals ₹11,800; the vendor payment is
+  what was paid — the commission after TDS plus the GST (₹11,800 with no
+  TDS). If GST was paid and **no Zoho GST tax is chosen**, the sync refuses
+  that bill and the Sync Log says: "Associate commission on order … not
+  sent: GST of INR 1800.00 was paid on the associate's tax invoice, but no
+  Zoho GST tax is chosen for commission (Associates → Commission settings →
+  Zoho GST tax for commission). Choose it, then sync again." Commission
+  without GST is unchanged.
 
 **What stops a bill, payment or expense, with a message in the Sync Log**
 (retried on every sync until fixed):

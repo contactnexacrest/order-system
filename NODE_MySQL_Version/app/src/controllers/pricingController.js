@@ -246,12 +246,30 @@ async function marketPrices(req, res) {
       valid_until: r.valid_until ? String(r.valid_until).slice(0, 10) : null,
     });
   }
-  rows.sort((a, b) => (Math.max(Number(b.is_primary), Number(b.is_cbm_primary || 0)) - Math.max(Number(a.is_primary), Number(a.is_cbm_primary || 0))) || String(b.price_date || '').localeCompare(String(a.price_date || '')));
+  // Newest first; the ones used for pricing on top.
+  const used = (r) => Math.max(Number(r.is_primary), Number(r.is_cbm_primary || 0), Number(r.combo_in_use || 0));
+  rows.sort((a, b) => (used(b) - used(a)) || String(b.price_date || '').localeCompare(String(a.price_date || '')));
+  // D-256: exact prices name a combination of options.
+  const productSpecs = require('../services/productSpecs');
+  const offered = await productSpecs.offered(product);
+  const named = await pricingRepository.comboOptions(rows.filter((r) => (r.price_basis || '') === 'combo').map((r) => Number(r.id)));
+  for (const r of rows) r.combo_text = (r.price_basis || '') === 'combo' ? await pricingService.comboText(offered, named[Number(r.id)] || {}) : null;
   const quotes = (await pricingRepository.purchaseQuotesForProduct(id)).map((q) => ({
     ...q, recorded_on: String(q.recorded_at).slice(0, 10), valid_until: q.valid_until ? String(q.valid_until).slice(0, 10) : null,
   }));
+  let prefill = null;
+  if (String(req.query.from_quote ?? '') !== '') {
+    const q = await pricingRepository.purchaseQuote(req.query.from_quote, id);
+    if (q) {
+      prefill = {
+        purchase_quote_id: Number(q.id), supplier_name: String(q.supplier_legal_name), price_inr: Number(q.unit_price_inr).toFixed(2),
+        quoted_on: String(q.recorded_at).slice(0, 10), valid_until: q.valid_until ? String(q.valid_until).slice(0, 10) : '',
+      };
+    }
+  }
   res.renderView('products/market_prices', {
     product, rows, staleDays: s.stale_days, cbmFrom: s.cbm_from_mm, quotes, canRecord: can(req, 'record_market_prices'), today: todayYmd(),
+    offered, prefill,
   }, 'layout/base');
 }
 
@@ -279,7 +297,7 @@ function readMarketPrice(body) {
     quoted_on: date('quoted_on'),
     valid_until: date('valid_until'),
     // D-255: per unit, or per CBM for thick stone (50 mm and above).
-    price_basis: body.price_basis === 'cbm' ? 'cbm' : 'unit',
+    price_basis: ['cbm', 'combo'].includes(body.price_basis) ? body.price_basis : 'unit',
   };
   if (data.supplier_name === '' || [...data.supplier_name].length > 255) return [data, 'Enter the supplier\'s name.'];
   const raw = String(body.price_inr ?? '').trim();
@@ -291,6 +309,27 @@ function readMarketPrice(body) {
   if (String(body.valid_until ?? '').trim() !== '' && data.valid_until === null) return [data, 'Enter a valid "valid until" date, or leave it empty.'];
   if (data.valid_until !== null && data.valid_until < data.quoted_on) return [data, '"Valid until" cannot be before the quoted date.'];
   return [data, null];
+}
+
+/** D-256: the options an exact price names (combo[spec id] = option id; empty = any): [named, per, error]. */
+async function readCombo(product, body) {
+  const productSpecs = require('../services/productSpecs');
+  const offered = await productSpecs.offered(product);
+  const raw = body.combo && typeof body.combo === 'object' ? body.combo : {};
+  const named = {};
+  let per = 'unit';
+  const s = await pricingService.settings();
+  const cbmFrom = (parseInt(product.cbm_from_mm, 10) || 0) > 0 ? parseInt(product.cbm_from_mm, 10) : s.cbm_from_mm;
+  for (const sp of offered) {
+    const v = String(raw[sp.id] ?? body[`combo[${sp.id}]`] ?? '');
+    if (v === '') continue;
+    const found = sp.options.find((o) => String(o.id) === v);
+    if (!found) return [{}, 'unit', `${sp.name}: that option is not offered for this product.`];
+    named[sp.id] = found.id;
+    if (sp.kind === 'thickness' && (found.change_type === 'cbm' || (found.thickness_mm !== null && found.thickness_mm >= cbmFrom))) per = 'cbm';
+  }
+  if (!Object.keys(named).length) return [{}, 'unit', 'Choose at least one option the exact price is for (e.g. thickness and finish) — or record it as the base price.'];
+  return [named, per, null];
 }
 
 async function addMarketPrice(req, res) {
@@ -324,15 +363,34 @@ async function addMarketPrice(req, res) {
   }
   data.product_id = productId;
   const usedForPricing = data.is_primary === 1;
-  if (data.price_basis === 'cbm') data.is_primary = 0;
+  // D-256: an exact price for a specific combination names one option for some specifications.
+  let named = {};
+  let per = 'unit';
+  const product = (await productRepository.find(productId)) || {};
+  if (data.price_basis === 'combo') {
+    let comboError;
+    [named, per, comboError] = await readCombo(product, body);
+    if (comboError) {
+      flash.set(req, 'error', comboError);
+      res.redirect(`/products/${productId}/market-prices`);
+      return;
+    }
+  }
+  if (data.price_basis !== 'unit') data.is_primary = 0;
   const id = await productSupplierRepository.create(data, req.user.id);
   await pricingRepository.setSupplierDates(id, data.quoted_on, data.valid_until, quoteId);
-  await pricingRepository.setSupplierBasis(id, data.price_basis);
-  if (usedForPricing && data.price_basis === 'cbm') await pricingRepository.setCbmPrimary(productId, id);
-  else if (usedForPricing) await productService.setPrimarySupplier(productId, id, req.user.id);
+  if (data.price_basis === 'combo') {
+    // An exact price is in use (or not) by itself: it never replaces the ordinary price.
+    await pricingRepository.setCombo(id, named, per, usedForPricing);
+  } else {
+    await pricingRepository.setSupplierBasis(id, data.price_basis);
+    if (usedForPricing && data.price_basis === 'cbm') await pricingRepository.setCbmPrimary(productId, id);
+    else if (usedForPricing) await productService.setPrimarySupplier(productId, id, req.user.id);
+  }
   data.is_primary = usedForPricing ? 1 : 0;
+  const comboText = data.price_basis === 'combo' ? await pricingService.comboText(await require('../services/productSpecs').offered(product), named) : null;
   await auditLogRepository.log(req.user.id, 'MARKET_PRICE_ADDED', 'product_suppliers', id, null, null,
-    `${data.supplier_name}: ₹${fmt2(data.fob_value)} quoted ${data.quoted_on}${data.is_primary ? ' (used for pricing)' : ''}`);
+    `${data.supplier_name}: ₹${fmt2(data.fob_value)}${comboText !== null ? ` for ${comboText}${per === 'cbm' ? ' per CBM' : ''}` : ''} quoted ${data.quoted_on}${data.is_primary ? ' (used for pricing)' : ''}`);
   flash.set(req, 'success', `Supplier price recorded${data.is_primary ? ' and used for pricing.' : '.'}`);
   res.redirect(`/products/${productId}/market-prices`);
 }
@@ -346,6 +404,15 @@ async function useForPricing(req, res) {
     return;
   }
   const productId = Number(s.product_id);
+  if ((s.price_basis || 'unit') === 'combo') {
+    // D-256: an exact price is switched on or off by itself.
+    const now = Number(s.combo_in_use || 0) !== 1;
+    await pricingRepository.setComboInUse(supplierId, now);
+    await auditLogRepository.log(req.user.id, 'MARKET_PRICE_USED_FOR_PRICING', 'product_suppliers', supplierId, 'combo_in_use', now ? '0' : '1', now ? '1' : '0');
+    flash.set(req, 'success', now ? `${s.supplier_name}'s exact price is now used for matching quotes.` : `${s.supplier_name}'s exact price is no longer used.`);
+    res.redirect(`/products/${productId}/market-prices`);
+    return;
+  }
   if ((s.price_basis || 'unit') === 'cbm') {
     // D-255: the per-CBM price used for thick stone (50 mm and above).
     const oldCbm = await pricingService.cbmSupplier(productId);

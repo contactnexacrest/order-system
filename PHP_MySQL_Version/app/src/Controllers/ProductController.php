@@ -70,6 +70,8 @@ final class ProductController
             foreach ($products as &$product) {
                 $__p = \App\Services\PricingService::forProduct($product, $__levels, $__settings, $__program);
                 $product['pricing'] = $canBuildup ? $__p : ['build' => $__p['build'] === null ? null : ['staff_quote' => $__p['build']['staff_quote'], 'staff_floor' => $__p['build']['staff_floor']]];
+                // D-256: products with something to fix before they can be priced are flagged.
+                $product['ready_to_fix'] = $canBuildup ? \App\Services\PricingService::readiness($product, $__settings)['to_fix'] : 0;
             }
             unset($product);
         }
@@ -185,7 +187,27 @@ final class ProductController
             $details['misc_charges'] = [];
         }
 
+        // Owner decision D-256 (5 Nov 2026): "Pricing ready?" (Procurement sees only the
+        // supplier-price lines) and "Try a price" (people who may see the build-up).
+        $readiness = null;
+        $canTry = $canBuildup || $this->can('manage_pricing');
+        if ($canTry || $this->can('record_market_prices')) {
+            $readiness = \App\Services\PricingService::readiness($details['product']);
+            if (!$canTry) {
+                $readiness['items'] = array_values(array_filter($readiness['items'], static fn (array $i): bool => $i['supplier']));
+                $readiness['to_fix'] = count(array_filter($readiness['items'], static fn (array $i): bool => !$i['ok']));
+            }
+        }
+        $tryPrice = null;
+        if ($canTry) {
+            $__offered = \App\Services\ProductSpecs::offered($details['product']);
+            $__sel = is_array($_GET['try'] ?? null) ? array_map('strval', $_GET['try']) : [];
+            $tryPrice = ['offered' => $__offered, 'p' => $__offered !== [] ? \App\Services\PricingService::forProduct($details['product'], null, null, null, $__sel) : null];
+        }
+
         View::render('products/show', [
+            'readiness'      => $readiness,
+            'tryPrice'       => $tryPrice,
             'product'        => $details['product'],
             'images'         => $details['images'],
             'suppliers'      => $details['suppliers'],

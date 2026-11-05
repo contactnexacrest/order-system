@@ -1,0 +1,54 @@
+{#
+  Owner decision D-256 (5 Nov 2026): "Pricing ready?" — what this product still needs before it can
+  be priced, each with a link to fix it — and "Try a price", a calculator for any combination of this
+  product's options (nothing is saved). Only for people who may see the price build-up; Procurement
+  sees the supplier-price lines of the checklist only. Port of views/products/_pricing_ready.php.
+#}
+{% if readiness or tryPrice %}
+<div class="pricing-two">
+{% if readiness %}
+<div class="section" id="pricing-ready">
+  <h2>Pricing ready? {% if readiness.to_fix > 0 %}<span class="badge badge-warning">{{ readiness.to_fix }} to fix</span>{% else %}<span class="badge badge-success">ready</span>{% endif %}</h2>
+  <table class="list ready-list">
+    {% for i in readiness.items %}
+      <tr>
+        <td class="{{ 'ok' if i.ok else 'no' }}" aria-label="{{ 'done' if i.ok else 'to fix' }}">{{ '✓' if i.ok else '✗' }}</td>
+        <td>{{ i.label }}{% if i.detail %}<br><small class="muted">{{ i.detail }}</small>{% endif %}</td>
+        <td><a href="{{ i.link }}">{{ i.link_text }}</a></td>
+      </tr>
+    {% endfor %}
+  </table>
+  <p class="small muted">Until every line is ✓, staff can still quote, but an associate's "Get price" for the missing part goes to staff for a manual price.</p>
+</div>
+{% endif %}
+{% if tryPrice %}{% set tp = tryPrice.p %}{% set b = tp.build %}
+<div class="section" id="try-price">
+  <h2>Try a price <small class="muted">(nothing is saved)</small></h2>
+  <form method="get" action="/products/{{ product.id }}#try-price" class="field-grid">
+    {% for sp in tryPrice.specs %}
+      <label>{{ sp.name }}
+        <select name="try[{{ sp.id }}]">
+          {% for o in sp.options %}<option value="{{ o.id }}"{% if o.selected %} selected{% endif %}>{{ o.name }} — {{ o.change }}</option>{% endfor %}
+        </select></label>
+    {% endfor %}
+    <div><button type="submit" class="btn-sm">Work it out</button></div>
+  </form>
+  {% if b === null %}
+    <p class="muted">{{ tp.missing }}</p>
+  {% else %}
+    <table class="list">
+      <tr><td>{% if tp.exact %}Exact supplier price "{{ tp.exact }}"{% else %}Supplier price{% endif %} &#8377;{{ tp.supplier_inr | money }} ÷ {{ tp.settings.pricing_fx_rate | money }} + other costs {{ tryPrice.otherLabel }}</td><td class="num">USD {{ (b.supplier_usd + b.other_costs) | money }}</td></tr>
+      <tr><td>{% if tryPrice.opts.length %}{{ tryPrice.opts | join(' · ') }}{% else %}Base options — no changes{% endif %}{% if tryPrice.charges.length %}<br><small class="muted">{{ tryPrice.charges | join('; ') }}</small>{% endif %}</td><td class="num">cost USD {{ b.cost | money }}{{ ' / CBM' if tryPrice.basis == 'cbm' else '' }}</td></tr>
+      <tr><td>Minimum price ({{ tryPrice.marginLabel }} margin)</td><td class="num">USD {{ b.minimum | money }}</td></tr>
+      <tr><td>Staff floor (+ team incentive)</td><td class="num">USD {{ b.staff_floor | money }}</td></tr>
+      <tr><td>Staff quote (+{{ tryPrice.bufferLabel }})</td><td class="num"><strong>USD {{ b.staff_quote | money }}</strong></td></tr>
+      {% for l in tp.levels %}
+        <tr><td>Associate {{ l.name }} ({{ l.label }}): floor · quote</td><td class="num">{{ l.floor | money }} · <strong>{{ l.quote | money }}</strong></td></tr>
+      {% endfor %}
+    </table>
+    <p class="small muted">Per {{ tp.unit }}, FOB, USD. The same working as an associate's "Get price" and the order page.</p>
+  {% endif %}
+</div>
+{% endif %}
+</div>
+{% endif %}

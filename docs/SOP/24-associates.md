@@ -96,6 +96,14 @@ the same links, filters and actions, and switch to each other.
 - **Buyer registration valid** for N months with no order (default 6).
 - **GST on commission** % (default 18 %), added for GST-registered
   associates once their tax invoice is on file.
+- **Zoho GST tax for commission** (D-256, 5 Nov 2026): the Zoho Books tax
+  id put on the associate's commission bill when GST is paid on top (find
+  it in Zoho Books → Settings → Taxes; e.g. `460000000067890`). Empty is
+  allowed, but then a commission with GST is not sent to Zoho until it is
+  chosen — see [CA-03](./ca-03-zoho-sync.md).
+
+Every setting on this page has a line beneath it with a worked example
+(D-256), e.g. "Example: 30 → buyer pays in full on 4 Nov, commission due on 4 Dec."
 
 Staff with Manage associates set the TDS % (section 194H, default 2 %) and
 the waiting days before a new bank account is used (default 7); the other

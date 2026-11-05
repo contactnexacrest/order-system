@@ -243,7 +243,17 @@ final class PricingService
             $spec = ['map' => $map, 'offered' => $offered, 'adj' => $adj, 'text' => ProductSpecs::describe($offered, $map),
                 'errors' => $specErrors];
         }
-        $supplier = $spec !== null && $spec['adj']['basis'] === 'cbm' ? self::cbmSupplier((int) $product['id']) : self::pricingSupplier((int) $product['id']);
+        // D-256: an exact supplier price for the chosen combination is the cost for the options it names.
+        $exact = null;
+        if ($spec !== null && $spec['errors'] === [] && $spec['adj']['manual'] === null) {
+            $exact = self::exactPrice($product, $spec['map'], $spec['adj']['basis'], $settings, $spec['offered']);
+            if ($exact !== null) {
+                $spec['adj'] = ProductSpecs::adjustments($product, $spec['offered'], $spec['map'], $settings['cbm_from_mm'], array_keys($exact['named']));
+                $spec['exact'] = $exact['text'];
+            }
+        }
+        $supplier = $exact !== null ? $exact['supplier']
+            : ($spec !== null && $spec['adj']['basis'] === 'cbm' ? self::cbmSupplier((int) $product['id']) : self::pricingSupplier((int) $product['id']));
         $effective = [
             'margin_pct' => $product['pricing_margin_pct'] !== null ? (float) $product['pricing_margin_pct'] : $settings['margin_pct'],
             'other_mode' => $product['pricing_other_cost_mode'] ?? 'pct',
@@ -266,6 +276,7 @@ final class PricingService
             $overrides[] = 'buffer ' . self::pct($effective['buffer_pct']);
         }
         $out = ['supplier' => $supplier, 'effective' => $effective, 'overrides' => $overrides, 'settings' => $settings, 'program_on' => $programOn,
+            'exact' => $exact !== null ? $exact['text'] : null,
             'build' => null, 'levels' => [], 'lowest' => null, 'staleness' => null, 'price_date' => null, 'missing' => null,
             'spec' => $spec, 'manual' => false, 'unit' => $spec['adj']['unit'] ?? ((string) ($product['reference_unit'] ?? '') ?: null)];
         if ($spec !== null && $spec['errors'] !== []) {
@@ -311,6 +322,167 @@ final class PricingService
             }
         }
         return $out;
+    }
+
+    /**
+     * D-256: the exact supplier price that matches a choice of options — the most specific one
+     * (most named options), then the most recently quoted. Stale or expired ones are ignored.
+     *
+     * @param array<int,int> $map spec id => chosen option id
+     * @return array{supplier: array<string,mixed>, named: array<int,int>, text: string}|null
+     */
+    public static function exactPrice(array $product, array $map, string $basis, ?array $settings = null, ?array $offered = null): ?array
+    {
+        $settings ??= self::settings();
+        $rows = array_values(array_filter(ProductSupplierRepository::forProduct((int) $product['id']),
+            static fn (array $s): bool => ($s['price_basis'] ?? '') === 'combo' && (int) ($s['combo_in_use'] ?? 0) === 1 && (string) ($s['combo_per'] ?? 'unit') === $basis));
+        if ($rows === []) {
+            return null;
+        }
+        $named = PricingRepository::comboOptions(array_map(static fn (array $s): int => (int) $s['id'], $rows));
+        $best = null;
+        foreach ($rows as $s) {
+            $n = $named[(int) $s['id']] ?? [];
+            if ($n === [] || self::staleness($s, $settings['stale_days']) !== null) {
+                continue;
+            }
+            foreach ($n as $specId => $optionId) {
+                if (($map[$specId] ?? null) !== $optionId) {
+                    continue 2;
+                }
+            }
+            $key = [count($n), (string) (self::priceDate($s) ?? ''), (int) $s['id']];
+            if ($best === null || $key > $best['key']) {
+                $best = ['supplier' => $s, 'named' => $n, 'key' => $key];
+            }
+        }
+        if ($best === null) {
+            return null;
+        }
+        $offered ??= ProductSpecs::offered($product);
+        return ['supplier' => $best['supplier'], 'named' => $best['named'], 'text' => self::comboText($offered, $best['named'])];
+    }
+
+    /** "30 mm · Leather" for named options (in the product's specification order). */
+    public static function comboText(array $offered, array $named): string
+    {
+        $parts = [];
+        foreach ($offered as $sp) {
+            foreach ($sp['options'] as $o) {
+                if (($named[$sp['id']] ?? null) === $o['id']) {
+                    $parts[] = $o['name'];
+                }
+            }
+        }
+        if (count($parts) < count($named)) {
+            // An option no longer offered for this product: name it from the option table.
+            foreach ($named as $specId => $optionId) {
+                $opt = \App\Repositories\SpecRepository::findOption($optionId);
+                if ($opt !== null && !in_array((string) $opt['name'], $parts, true)) {
+                    $parts[] = (string) $opt['name'];
+                }
+            }
+        }
+        return implode(' · ', $parts);
+    }
+
+    /**
+     * D-256: "Pricing ready?" — what a product still needs before it can be priced.
+     * Each item: key, ok, label, detail, link, supplier (a supplier-price line Procurement may see).
+     *
+     * @return array{items: list<array<string,mixed>>, to_fix: int}
+     */
+    public static function readiness(array $product, ?array $settings = null): array
+    {
+        $settings ??= self::settings();
+        $id = (int) $product['id'];
+        $market = "/products/{$id}/market-prices";
+        $items = [];
+        $service = new ProductService();
+        $unit = self::pricingSupplier($id);
+        $unitInr = $unit !== null ? $service->effectiveFobForSupplier($unit, $product) : null;
+        $items[] = ['key' => 'unit', 'ok' => $unit !== null && $unitInr !== null && $unitInr > 0, 'supplier' => true,
+            'label' => 'Supplier price per ' . ((string) ($product['reference_unit'] ?? '') ?: 'unit') . ' entered and "used for pricing"',
+            'detail' => $unit !== null && $unitInr !== null ? '₹' . number_format($unitInr, 2) . (self::priceDate($unit) !== null ? ' · ' . date('d M', (int) strtotime((string) self::priceDate($unit))) : '') : 'none yet',
+            'link' => $market, 'link_text' => $unit === null ? 'Add in Market prices' : 'Market prices'];
+        $offered = ProductSpecs::offered($product);
+        $cbmFrom = (int) ($product['cbm_from_mm'] ?? 0) > 0 ? (int) $product['cbm_from_mm'] : $settings['cbm_from_mm'];
+        $needsCbm = false;
+        foreach ($offered as $sp) {
+            if ($sp['kind'] !== 'thickness') {
+                continue;
+            }
+            foreach ($sp['options'] as $o) {
+                if ($o['change_type'] === 'cbm' || ($o['thickness_mm'] !== null && $o['thickness_mm'] >= $cbmFrom)) {
+                    $needsCbm = true;
+                }
+            }
+        }
+        $cbm = self::cbmSupplier($id);
+        if ($needsCbm) {
+            $items[] = ['key' => 'cbm', 'ok' => $cbm !== null, 'supplier' => true,
+                'label' => "Supplier price per CBM (needed: sold at {$cbmFrom} mm and above)",
+                'detail' => $cbm !== null ? '₹' . number_format((float) $service->effectiveFobForSupplier($cbm, $product), 2) . ' per CBM' : 'none yet',
+                'link' => $market, 'link_text' => $cbm === null ? 'Add in Market prices' : 'Market prices'];
+        }
+        $pdo = \App\Config\Database::connection();
+        $count = static function (string $sql) use ($pdo, $id): int {
+            $st = $pdo->prepare($sql);
+            $st->execute(['p' => $id]);
+            return (int) $st->fetchColumn();
+        };
+        $changes = $count('SELECT COUNT(*) FROM product_spec_hidden WHERE product_id = :p')
+            + $count('SELECT COUNT(*) FROM product_option_overrides WHERE product_id = :p')
+            + $count('SELECT COUNT(*) FROM spec_definitions WHERE product_id = :p')
+            + $count('SELECT COUNT(*) FROM spec_options WHERE product_id = :p');
+        $categoryId = ProductSpecs::categoryIdFor($product);
+        $categoryName = null;
+        if ($categoryId !== null) {
+            $st = $pdo->prepare('SELECT name FROM product_categories WHERE id = :c');
+            $st->execute(['c' => $categoryId]);
+            $categoryName = $st->fetchColumn() ?: null;
+        }
+        $items[] = ['key' => 'specs', 'ok' => $offered !== [], 'supplier' => false,
+            'label' => $offered !== [] ? 'Specifications checked (follows ' . ($categoryName ?? 'its category') . ', ' . $changes . ' change' . ($changes === 1 ? '' : 's') . ')' : 'Specifications: none offered for this product',
+            'detail' => count($offered) . ' specification' . (count($offered) === 1 ? '' : 's'),
+            'link' => "/products/{$id}/specifications", 'link_text' => 'View'];
+        $stale = [];
+        foreach (['m²/unit' => $unit, 'CBM' => $needsCbm ? $cbm : null] as $label => $s) {
+            if ($s !== null && ($st = self::staleness($s, $settings['stale_days'])) !== null) {
+                $stale[] = "{$label} price {$st}";
+            }
+        }
+        $current = $unit !== null && $stale === [];
+        $items[] = ['key' => 'current', 'ok' => $current, 'supplier' => true,
+            'label' => 'Supplier price is current (under ' . $settings['stale_days'] . ' days old)',
+            'detail' => $unit === null ? 'no price yet' : ($stale !== [] ? implode(', ', $stale) : (!empty($unit['valid_until']) ? 'valid until ' . date('d M', (int) strtotime((string) $unit['valid_until'])) : 'no valid-until date')),
+            'link' => $market, 'link_text' => 'Market prices'];
+        $combos = array_values(array_filter(ProductSupplierRepository::forProduct($id), static fn (array $s): bool => ($s['price_basis'] ?? '') === 'combo' && (int) ($s['combo_in_use'] ?? 0) === 1));
+        if ($combos !== []) {
+            $ignored = count(array_filter($combos, fn (array $s): bool => self::staleness($s, $settings['stale_days']) !== null));
+            $items[] = ['key' => 'exact', 'ok' => $ignored === 0, 'supplier' => true,
+                'label' => 'Exact supplier prices for specific combinations are current',
+                'detail' => count($combos) . ' in use' . ($ignored > 0 ? ", {$ignored} stale or expired — ignored until renewed" : ''),
+                'link' => $market, 'link_text' => 'Market prices'];
+        }
+        $forms = ProductSpecs::productForms($product);
+        $open = [];
+        if ($categoryId !== null) {
+            $st = $pdo->prepare('SELECT apa.forms FROM associate_price_access apa JOIN associates a ON a.id = apa.associate_id WHERE apa.category_id = :c AND a.status = \'active\'');
+            $st->execute(['c' => $categoryId]);
+            foreach ($st->fetchAll(\PDO::FETCH_COLUMN) as $f) {
+                $allowed = ProductSpecs::splitForms($f);
+                $hit = $allowed === [] ? ($forms === [] ? ['all forms'] : $forms) : ($forms === [] ? $allowed : array_values(array_intersect($forms, $allowed)));
+                foreach ($hit as $h) {
+                    $open[$h] = true;
+                }
+            }
+        }
+        $items[] = ['key' => 'associates', 'ok' => $open !== [], 'supplier' => false,
+            'label' => 'Product open to associates' . ($open !== [] ? ' (' . implode(', ', array_map('ucfirst', array_keys($open))) . ')' : ''),
+            'detail' => $open !== [] ? '' : 'no associate may price it yet',
+            'link' => '/associates', 'link_text' => 'Change'];
+        return ['items' => $items, 'to_fix' => count(array_filter($items, static fn (array $i): bool => !$i['ok']))];
     }
 
     public static function levelLabel(array $level): string

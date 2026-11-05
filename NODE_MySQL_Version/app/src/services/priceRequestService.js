@@ -162,8 +162,13 @@ async function work(associate, product, selection) {
   const prices = priceFrom(p.build, level);
   const adj = p.spec.adj;
   const breakdown = [{ label: `Base: ${productSpecs.describe(p.spec.offered, baseMap(p.spec.offered), true) || 'standard specification'}`, change: '—' }];
+  if (p.exact) breakdown.push({ label: `Exact price for ${p.exact}`, change: 'used' });
   for (const l of adj.lines) {
-    if (l.kind === 'pct') {
+    if (l.kind === 'exact') {
+      breakdown.push({ label: `${l.option} (${l.spec.toLowerCase()})`, change: 'Included (in the exact price)' });
+    } else if (l.kind === 'included') {
+      breakdown.push({ label: `${l.option} (${l.spec.toLowerCase()})`, change: 'Included in base price' });
+    } else if (l.kind === 'pct') {
       breakdown.push({ label: `${l.option} (${l.spec.toLowerCase()})`, change: pctText(l.value) });
     } else {
       // The effect of this amount on the associate's quote price: worked out with and without it.

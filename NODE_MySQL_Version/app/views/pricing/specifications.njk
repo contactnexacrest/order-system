@@ -87,6 +87,14 @@
   <p class="small muted">Not here on purpose: the destination port, CFR or CIF (freight is a separate charge; prices stay FOB) and the colour (each stone is its own product). Changes apply to every product in the category that has not changed that option itself; an option already used on an order or a price request can only be deactivated. Every change is logged; prices already issued do not change.</p>
 
   {% if canManage %}
+    <div class="note small" id="option-types-help"><strong>How each kind of option changes the price</strong> (the change is made to the cost, so your margin is always kept):
+  <span class="help-line">% — e.g. Standard grade −8%: cost USD 40.00 → USD 36.80. 0 = "Included in base price".</span>
+  <span class="help-line">USD per m² — e.g. Leather +4.00: cost USD 40.00 → USD 44.00. At 50 mm and above it is converted per CBM (× 1,000 ÷ thickness).</span>
+  <span class="help-line">USD per running metre — e.g. Bullnose edge +4.00: added to the price of products sold per running metre; otherwise shown as a separate charge.</span>
+  <span class="help-line">USD per container — e.g. A-frame +150: shown as a separate charge per container.</span>
+  <span class="help-line">Priced per CBM — e.g. 80 mm: the price comes from the product's per-CBM supplier price instead.</span>
+  <span class="help-line">Quantity options (e.g. 2–4 containers −2%) are applied last, after all the others.</span>
+</div>
     <h2>Add a specification</h2>
     <form method="post" action="/pricing/specifications" class="field-grid">
       {{ csrf() }}

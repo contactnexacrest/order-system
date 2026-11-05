@@ -277,8 +277,21 @@ final class PricingController
             $s['price_date'] = PricingService::priceDate($s);
             $rows[] = $s;
         }
-        // Newest first; the one used for pricing on top.
-        usort($rows, static fn (array $a, array $b): int => [max((int) $b['is_primary'], (int) ($b['is_cbm_primary'] ?? 0)), (string) $b['price_date']] <=> [max((int) $a['is_primary'], (int) ($a['is_cbm_primary'] ?? 0)), (string) $a['price_date']]);
+        // Newest first; the ones used for pricing on top.
+        $used = static fn (array $r): int => max((int) $r['is_primary'], (int) ($r['is_cbm_primary'] ?? 0), (int) ($r['combo_in_use'] ?? 0));
+        usort($rows, static fn (array $a, array $b): int => [$used($b), (string) $b['price_date']] <=> [$used($a), (string) $a['price_date']]);
+        // D-256: exact prices name a combination of options.
+        $offered = \App\Services\ProductSpecs::offered($product);
+        $named = PricingRepository::comboOptions(array_map(static fn (array $r): int => (int) $r['id'], array_filter($rows, static fn (array $r): bool => ($r['price_basis'] ?? '') === 'combo')));
+        foreach ($rows as &$r) {
+            $r['combo_text'] = ($r['price_basis'] ?? '') === 'combo' ? PricingService::comboText($offered, $named[(int) $r['id']] ?? []) : null;
+        }
+        unset($r);
+        $prefill = null;
+        if (($_GET['from_quote'] ?? '') !== '' && ($q = PricingRepository::purchaseQuote((int) $_GET['from_quote'], $id)) !== null) {
+            $prefill = ['purchase_quote_id' => (int) $q['id'], 'supplier_name' => (string) $q['supplier_legal_name'], 'price_inr' => number_format((float) $q['unit_price_inr'], 2, '.', ''),
+                'quoted_on' => substr((string) $q['recorded_at'], 0, 10), 'valid_until' => (string) ($q['valid_until'] ?? '')];
+        }
         View::render('products/market_prices', [
             'product' => $product,
             'rows' => $rows,
@@ -286,6 +299,8 @@ final class PricingController
             'cbmFrom' => $settings['cbm_from_mm'],
             'quotes' => PricingRepository::purchaseQuotesForProduct($id),
             'canRecord' => self::can('record_market_prices'),
+            'offered' => $offered,
+            'prefill' => $prefill,
         ], 'layout/base');
     }
 
@@ -313,7 +328,7 @@ final class PricingController
             'quoted_on' => $date('quoted_on'),
             'valid_until' => $date('valid_until'),
             // D-255: per unit, or per CBM for thick stone (50 mm and above).
-            'price_basis' => ($_POST['price_basis'] ?? 'unit') === 'cbm' ? 'cbm' : 'unit',
+            'price_basis' => in_array($_POST['price_basis'] ?? 'unit', ['cbm', 'combo'], true) ? (string) $_POST['price_basis'] : 'unit',
         ];
         if ($data['supplier_name'] === '' || mb_strlen($data['supplier_name']) > 255) {
             return [$data, 'Enter the supplier\'s name.'];
@@ -335,6 +350,44 @@ final class PricingController
             return [$data, '"Valid until" cannot be before the quoted date.'];
         }
         return [$data, null];
+    }
+
+    /**
+     * D-256: the options an exact price names (combo[spec id] = option id; empty = any).
+     *
+     * @return array{0: array<int,int>, 1: string, 2: ?string} [named, per (unit|cbm), error]
+     */
+    private static function readCombo(array $product): array
+    {
+        $offered = \App\Services\ProductSpecs::offered($product);
+        $raw = is_array($_POST['combo'] ?? null) ? $_POST['combo'] : [];
+        $named = [];
+        $per = 'unit';
+        $settings = PricingService::settings();
+        $cbmFrom = (int) ($product['cbm_from_mm'] ?? 0) > 0 ? (int) $product['cbm_from_mm'] : $settings['cbm_from_mm'];
+        foreach ($offered as $sp) {
+            $v = (string) ($raw[$sp['id']] ?? '');
+            if ($v === '') {
+                continue;
+            }
+            $found = null;
+            foreach ($sp['options'] as $o) {
+                if ((string) $o['id'] === $v) {
+                    $found = $o;
+                }
+            }
+            if ($found === null) {
+                return [[], 'unit', "{$sp['name']}: that option is not offered for this product."];
+            }
+            $named[(int) $sp['id']] = (int) $found['id'];
+            if ($sp['kind'] === 'thickness' && ($found['change_type'] === 'cbm' || ($found['thickness_mm'] !== null && $found['thickness_mm'] >= $cbmFrom))) {
+                $per = 'cbm';
+            }
+        }
+        if ($named === []) {
+            return [[], 'unit', 'Choose at least one option the exact price is for (e.g. thickness and finish) — or record it as the base price.'];
+        }
+        return [$named, $per, null];
     }
 
     public function addMarketPrice(array $params): void
@@ -369,20 +422,37 @@ final class PricingController
         $data['product_id'] = $productId;
         $userId = (int) self::user()['id'];
         $usedForPricing = $data['is_primary'] === 1;
-        if ($data['price_basis'] === 'cbm') {
+        // D-256: an exact price for a specific combination names one option for some specifications.
+        $named = [];
+        $per = 'unit';
+        if ($data['price_basis'] === 'combo') {
+            [$named, $per, $comboError] = self::readCombo(ProductRepository::find($productId) ?? []);
+            if ($comboError !== null) {
+                Flash::set('error', $comboError);
+                header("Location: /products/{$productId}/market-prices");
+                return;
+            }
+        }
+        if ($data['price_basis'] !== 'unit') {
             $data['is_primary'] = 0;
         }
         $id = ProductSupplierRepository::create($data, $userId);
         PricingRepository::setSupplierDates($id, $data['quoted_on'], $data['valid_until'], $quoteId);
-        PricingRepository::setSupplierBasis($id, $data['price_basis']);
-        if ($usedForPricing && $data['price_basis'] === 'cbm') {
-            PricingRepository::setCbmPrimary($productId, $id);
-        } elseif ($usedForPricing) {
-            (new ProductService())->setPrimarySupplier($productId, $id, $userId);
+        if ($data['price_basis'] === 'combo') {
+            // An exact price is in use (or not) by itself: it never replaces the ordinary price.
+            PricingRepository::setCombo($id, $named, $per, $usedForPricing);
+        } else {
+            PricingRepository::setSupplierBasis($id, $data['price_basis']);
+            if ($usedForPricing && $data['price_basis'] === 'cbm') {
+                PricingRepository::setCbmPrimary($productId, $id);
+            } elseif ($usedForPricing) {
+                (new ProductService())->setPrimarySupplier($productId, $id, $userId);
+            }
         }
         $data['is_primary'] = $usedForPricing ? 1 : 0;
+        $comboText = $data['price_basis'] === 'combo' ? PricingService::comboText(\App\Services\ProductSpecs::offered(ProductRepository::find($productId) ?? []), $named) : null;
         AuditLogRepository::log($userId, 'MARKET_PRICE_ADDED', 'product_suppliers', $id, null, null,
-            $data['supplier_name'] . ': ₹' . number_format((float) $data['fob_value'], 2) . ' quoted ' . $data['quoted_on'] . ($data['is_primary'] ? ' (used for pricing)' : ''));
+            $data['supplier_name'] . ': ₹' . number_format((float) $data['fob_value'], 2) . ($comboText !== null ? ' for ' . $comboText . ($per === 'cbm' ? ' per CBM' : '') : '') . ' quoted ' . $data['quoted_on'] . ($data['is_primary'] ? ' (used for pricing)' : ''));
         Flash::set('success', 'Supplier price recorded' . ($data['is_primary'] ? ' and used for pricing.' : '.'));
         header("Location: /products/{$productId}/market-prices");
     }
@@ -398,6 +468,15 @@ final class PricingController
         }
         $userId = (int) self::user()['id'];
         $productId = (int) $s['product_id'];
+        if (($s['price_basis'] ?? 'unit') === 'combo') {
+            // D-256: an exact price is switched on or off by itself.
+            $now = (int) ($s['combo_in_use'] ?? 0) !== 1;
+            PricingRepository::setComboInUse($supplierId, $now);
+            AuditLogRepository::log($userId, 'MARKET_PRICE_USED_FOR_PRICING', 'product_suppliers', $supplierId, 'combo_in_use', $now ? '0' : '1', $now ? '1' : '0');
+            Flash::set('success', $now ? "{$s['supplier_name']}'s exact price is now used for matching quotes." : "{$s['supplier_name']}'s exact price is no longer used.");
+            header("Location: /products/{$productId}/market-prices");
+            return;
+        }
         if (($s['price_basis'] ?? 'unit') === 'cbm') {
             // D-255: the per-CBM price used for thick stone (50 mm and above).
             $old = PricingService::cbmSupplier($productId);
