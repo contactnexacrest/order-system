@@ -333,8 +333,9 @@ async function addClawbackWithinPaid(payoutId, amountInr, month, note) {
   });
 }
 
+/** The order's unpaid payouts (unlock); a paid payout is never deleted (fresh-eyes review M1). */
 async function deleteOrderPayouts(orderId, c = db) {
-  await c.execute('DELETE FROM incentive_payouts WHERE order_id = :id', { id: orderId });
+  await c.execute("DELETE FROM incentive_payouts WHERE order_id = :id AND status <> 'paid'", { id: orderId });
 }
 
 /** Incentive cost entries of the order (team / associate), keyed by kind. */
@@ -387,6 +388,8 @@ async function unlockedOrderIdsWithPayments() {
      WHERE (oi.locked_at IS NULL) AND o.is_test_data = 0 AND o.is_sample_data = 0
        AND o.status NOT IN ('cancelled','lost')
        AND (ps.balance_cleared_at IS NOT NULL OR ps.advance_cleared_at IS NOT NULL OR ps.freight_cleared_at IS NOT NULL)`
+    // D-257 (fresh-eyes review L1): "Ready to lock" / "Lock all ready" stay within the request's division(s).
+    + require('../services/divisionService').sql('o.division_id')
   )).map((r) => Number(r.id));
 }
 

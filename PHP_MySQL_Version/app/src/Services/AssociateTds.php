@@ -174,17 +174,19 @@ final class AssociateTds
 
     /**
      * Owner rule D-212: the description of an associate commission payment,
-     * built from the facts — gross, TDS (section and rate), net and the UTR.
+     * built from the facts — gross, TDS (section and rate), net, the GST paid on top
+     * (fresh-eyes review M5: the Zoho payment amount includes it) and the UTR.
      *
      * @param list<string> $orderRefs
      */
-    public static function paymentDescription(string $associateName, array $orderRefs, float $gross, float $tds, ?float $rate, ?string $section, float $net, string $reference): string
+    public static function paymentDescription(string $associateName, array $orderRefs, float $gross, float $tds, ?float $rate, ?string $section, float $net, string $reference, float $gst = 0.0): string
     {
         $tdsPart = $tds > 0
             ? 'TDS u/s ' . ($section ?? self::settings()['section']) . ' ₹' . number_format($tds, 2) . ($rate !== null && $rate > 0 ? ' (' . self::pct($rate) . ')' : '')
             : 'no TDS';
         return 'Associate commission for ' . $associateName . ' — order' . (count($orderRefs) > 1 ? 's ' : ' ') . implode(', ', $orderRefs)
             . ' — gross ₹' . number_format($gross, 2) . ', ' . $tdsPart . ', net paid ₹' . number_format($net, 2)
+            . ($gst > 0 ? ' + GST ₹' . number_format($gst, 2) . " on the associate's tax invoice (input credit), total paid ₹" . number_format(round($net + $gst, 2), 2) : '')
             . ($reference !== '' ? ' · UTR ' . $reference : '');
     }
 

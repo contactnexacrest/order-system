@@ -192,6 +192,25 @@ final class D255PriceRequestsTest extends DbTestCase
         self::assertSame('expired', PriceRequestService::displayStatus(PriceRequestService::find($id)));
     }
 
+    /**
+     * Fresh-eyes review L4 (5 Nov 2026): the count and the insert run in one transaction that locks
+     * the associate's row, so the limit holds. (PHP serves one request per process; the Node twin
+     * fires the requests at the same moment.)
+     */
+    public function testTheDailyLimitIsCheckedUnderALockOnTheAssociate(): void
+    {
+        Database::connection()->prepare('UPDATE associates SET price_request_daily_limit = 2 WHERE id = :a')->execute(['a' => $this->associate]);
+        $product = ProductRepository::find($this->product);
+        $errors = [];
+        for ($i = 0; $i < 4; $i++) {
+            $errors[] = PriceRequestService::create($this->me(), $product, $this->sel(self::SQM), false, null)[1];
+        }
+        self::assertSame([null, null], array_slice($errors, 0, 2));
+        self::assertSame(["You have used today's 2 price requests. Ask NexaCrest if you need more today.", "You have used today's 2 price requests. Ask NexaCrest if you need more today."], array_slice($errors, 2));
+        self::assertSame(2, PriceRequestService::requestsToday($this->associate));
+        self::assertFalse(Database::connection()->inTransaction(), 'the transaction is always closed');
+    }
+
     public function testManualFlowStaffAreToldAndTheAssociateIsToldWhenPriced(): void
     {
         $pdo = Database::connection();

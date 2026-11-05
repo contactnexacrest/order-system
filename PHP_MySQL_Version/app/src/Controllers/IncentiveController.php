@@ -580,7 +580,8 @@ final class IncentiveController
             }
             if ($payout['payee_kind'] === 'associate') {
                 // D-245 P3: GST on top for a GST-registered associate whose tax invoice for this payout is on file.
-                $gst = \App\Services\AssociateCommission::gstFor($payout);
+                // Fresh-eyes review L2: on the gross billed (paid + TDS), as recorded just now.
+                $gst = \App\Services\AssociateCommission::gstFor(['paid_inr' => $paidInr, 'tds_inr' => (float) ($tds ?? 0)] + $payout);
                 if ($gst > 0) {
                     \App\Config\Database::connection()->prepare('UPDATE incentive_payouts SET gst_pct = :p, gst_inr = :g WHERE id = :id')
                         ->execute(['p' => \App\Services\AssociateCommission::settings()['gst_pct'], 'g' => $gst, 'id' => $id]);

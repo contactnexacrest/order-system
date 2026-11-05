@@ -125,7 +125,7 @@ async function commission(associateId, o) {
     else if (p.due_on) label = `Earned — due ${dates.short(String(p.due_on))}, paid in the ${dates.short(String(p.payout_run_on))} payout run`;
     else label = `Earned — to be paid in the ${incentive().monthLabel(String(o.incentive_month))} payout`;
     const order = await orderRepository.find(Number(o.id));
-    const fixed = order ? associateCommission.fixedLevel(order) : null;
+    const fixed = order ? associateCommission.fixedLevel(order, associateId) : null;
     const level = fixed ? associateCommission.levelLabel(fixed)
       : (o.locked_rate !== null && o.locked_rate !== undefined ? `${Number(o.locked_rate).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : null);
     return { state: p.status === 'paid' ? 'paid' : (p.status === 'held' || claim ? 'held' : 'earned'), label,

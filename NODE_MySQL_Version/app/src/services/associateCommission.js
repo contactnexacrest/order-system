@@ -32,10 +32,8 @@ const SETTLEMENT_KINDS = {
 };
 const WEEKDAYS = { 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday' };
 
-/** PHP round(x, 2). */
-function round2(x) {
-  return Math.round((Number(x) + Number.EPSILON) * 100) / 100;
-}
+/** PHP round(x, 2) — the shared money helper (fresh-eyes review M3). */
+const { round2 } = require('../helpers/money');
 const money = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const ymd = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v || '').slice(0, 10));
 
@@ -165,11 +163,36 @@ function levelLabel(level) {
   return `${level.name} — ${(level.kind || 'pct') === 'pct' ? `${v}%` : `USD ${money(level.value)} per unit`}`;
 }
 
-/** The level fixed on the order at PI, or null when not fixed yet. */
-function fixedLevel(order) {
+/**
+ * The level fixed on the order at PI, or null when not fixed yet.
+ *
+ * Fresh-eyes review M2 (5 Nov 2026): given an associate, the fixed level
+ * applies only when it was fixed for that associate (orders.associate_id).
+ * After the MD moves the client to another associate, the new associate
+ * earns at their own live level — the same rule the order-line price
+ * check (orderLinePricing.levelForAssociate) already uses.
+ */
+function fixedLevel(order, associateId = null) {
   if (!order.associate_level_fixed_at || order.associate_level_kind === null || order.associate_level_kind === undefined) return null;
+  if (associateId !== null && associateId !== undefined && Number(order.associate_id || 0) !== Number(associateId)) return null;
   return { id: order.associate_level_id !== null ? Number(order.associate_level_id) : null, name: String(order.associate_level_name),
     kind: String(order.associate_level_kind), value: Number(order.associate_level_value), fixed: true };
+}
+
+/**
+ * The order's in-range goods value in rupees as estimated at PI, for the ladder's counting threshold.
+ * Fresh-eyes review H1: the pricing exchange rate is a USD rate, so it converts a USD order only;
+ * another currency uses the rate expected on its receipts (unknown → null, treated as an order that counts).
+ */
+async function estimateInr(order, inRange) {
+  const currency = String(order.currency_code || '').toUpperCase();
+  if (currency === 'INR') return inRange;
+  if (currency === 'USD') {
+    const fx = Number((await pricingRepository.settings()).pricing_fx_rate || 0);
+    return fx > 0 ? inRange * fx : null;
+  }
+  const orderRate = await require('./incentiveService').productRate(order);
+  return orderRate > 0 ? inRange * orderRate : null;
 }
 
 /** Whether the MD approved this line below the floor (no commission, not in range). */
@@ -197,10 +220,7 @@ async function fixLevelAtPi(orderId) {
   if (!order || order.associate_level_fixed_at) return;
   const a = await earningAssociate(order);
   if (!a) return;
-  const fx = Number((await pricingRepository.settings()).pricing_fx_rate || 0);
-  const inRange = await inRangeValue(orderId);
-  const estimate = String(order.currency_code || '').toUpperCase() === 'INR' ? inRange : (fx > 0 ? inRange * fx : null);
-  const [level] = await levelForAssociate(a, orderId, estimate);
+  const [level] = await levelForAssociate(a, orderId, await estimateInr(order, await inRangeValue(orderId)));
   if (!level) return;
   await db.execute(
     `UPDATE orders SET associate_id = :a, associate_level_id = :l, associate_level_name = :n, associate_level_kind = :k, associate_level_value = :v,
@@ -260,6 +280,16 @@ async function realisedRate(order) {
   return { rate, estimated: true };
 }
 
+/**
+ * Rupees per US dollar for a fixed USD amount (fresh-eyes review H1): on a USD order
+ * the rate its receipts realised (estimated until received); on any other order the
+ * Admin pricing exchange rate, which is the company's USD rate.
+ */
+async function usdRate(order) {
+  if (String(order.currency_code || '').toUpperCase() === 'USD') return (await realisedRate(order)).rate;
+  return Number((await pricingRepository.settings()).pricing_fx_rate || 0);
+}
+
 /** The order's associate commission as it stands, or null when no associate earns on it. */
 async function forOrder(orderId, order = null, incentiveRow = null) {
   order = order || await require('../repositories/orderRepository').find(orderId);
@@ -267,10 +297,18 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
   const a = await earningAssociate(order, incentiveRow);
   if (!a) return null;
   const set = await settings();
-  let level = fixedLevel(order);
+  let level = fixedLevel(order, Number(a.id));
   const fixed = level !== null;
   if (!level) [level] = await levelForAssociate(a, orderId);
   const currency = String(order.currency_code || 'INR');
+  const realised = await realisedRate(order);
+  // Fresh-eyes review H1: a "USD x per unit" level is in US dollars whatever the order
+  // currency. On a non-USD order it is converted at the USD rate (usdRate) to rupees,
+  // and from there to the order currency for the figures shown in it.
+  const usdLevel = !!level && (level.kind || 'pct') !== 'pct';
+  const convertUsd = usdLevel && currency.toUpperCase() !== 'USD';
+  const usdRateValue = convertUsd ? await usdRate(order) : null;
+  const usdToFc = convertUsd ? (realised.rate > 0 ? usdRateValue / realised.rate : 0) : 1;
   const lines = [];
   let inRange = 0;
   let linesCommission = 0;
@@ -282,7 +320,7 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
     let commission = 0;
     if (!zero) {
       inRange += value;
-      if (level) commission = level.kind === 'pct' ? value * Number(level.value) / 100 : Number(l.quantity) * Number(level.value);
+      if (level) commission = level.kind === 'pct' ? value * Number(level.value) / 100 : Number(l.quantity) * Number(level.value) * usdToFc;
     }
     linesCommission += commission;
     lines.push({ line_no: Number(l.line_no), description: String(l.description), fob: round2(value), in_range: !zero, commission: round2(commission) });
@@ -290,7 +328,9 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
   const settle = await settlements(orderId);
   const basis = Math.max(0, inRange - settle.reduction);
   const commissionFc = inRange > 0 ? round2(linesCommission * basis / inRange) : 0;
-  const realised = await realisedRate(order);
+  const commissionInr = convertUsd
+    ? (inRange > 0 && usdToFc > 0 ? round2(linesCommission / usdToFc * basis / inRange * usdRateValue) : 0)
+    : round2(commissionFc * realised.rate);
   const fullyPaidOn = await require('./incentiveService').fullyPaidOn(orderId);
   const state = settle.unpaid ? 'unpaid' : (fullyPaidOn !== null ? 'paid' : 'awaiting');
   const due = fullyPaidOn !== null ? await dueOn(fullyPaidOn, set) : null;
@@ -304,7 +344,8 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
     goods_fc: round2(total), in_range_fc: round2(inRange), reduction_fc: settle.reduction, basis_fc: round2(basis),
     rate_inr: realised.rate, rate_estimated: realised.estimated, basis_inr: basisInr,
     amount_fc: state === 'unpaid' ? 0 : commissionFc,
-    amount_inr: state === 'unpaid' ? 0 : round2(commissionFc * realised.rate),
+    amount_inr: state === 'unpaid' ? 0 : commissionInr,
+    usd_rate: usdRateValue,
     state, fully_paid_on: fullyPaidOn,
     due_on: due, payout_run_on: due !== null ? await payoutRunOn(due, set) : null,
     claim_hold: due !== null && set.claim_hold && await claimOpen(orderId, due),
@@ -314,12 +355,19 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
   };
 }
 
-/** The rupees of GST on top of a payout: only for a GST-registered associate whose tax invoice for it is on file. */
+/**
+ * The rupees of GST on top of a payout: only for a GST-registered associate whose tax invoice for it is on file.
+ * Fresh-eyes review L2: once paid, on the gross actually billed (paid + TDS) — the bill line Zoho taxes — so the
+ * GST paid equals the GST on the Zoho bill and the payment never exceeds the bill.
+ */
 async function gstFor(payout) {
   if ((payout.payee_kind || '') !== 'associate' || Number(payout.amount_inr) <= 0) return 0;
   const a = await require('../repositories/associateRepository').find(Number(payout.associate_id));
   if (!a || String(a.gstin || '').trim() === '' || !(await require('../repositories/associateDocumentRepository').invoiceForPayout(Number(payout.id)))) return 0;
-  return round2(Number(payout.amount_inr) * (await settings()).gst_pct / 100);
+  const base = payout.paid_inr !== null && payout.paid_inr !== undefined
+    ? Number(payout.paid_inr) + Number(payout.tds_inr || 0)
+    : Number(payout.amount_inr);
+  return round2(base * (await settings()).gst_pct / 100);
 }
 
 /** Owner rule D-212: what a commission payout is — for which order and associate, what it settles, and the bank reference once paid. */
@@ -364,5 +412,5 @@ async function lapseRegistrations(today = null) {
 module.exports = {
   SETTLEMENT_KINDS, WEEKDAYS, round2, addDays, settings, dueOn, payoutRunOn, runLabel, claimOpen, payBlockReason,
   earningAssociate, countingOrders, levelForAssociate, levelLabel, fixedLevel, fixLevelAtPi, belowFloorApproved, goodsLines, inRangeValue,
-  settlements, realisedRate, forOrder, gstFor, payoutDescription, lapseRegistrations,
+  settlements, realisedRate, usdRate, estimateInr, forOrder, gstFor, payoutDescription, lapseRegistrations,
 };

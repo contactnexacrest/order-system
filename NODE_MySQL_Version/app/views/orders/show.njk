@@ -814,7 +814,8 @@
   <div class="order-layout" id="order-layout">
     <div class="step-sequence" id="order-panels">
 
-  <details class="step-card" id="step-products"{{ ' open' if (sees.selling and linePricing.blocking.length) else '' }}>
+  {# D-257 Phase 0B: the quality documents sit inside the Products card; it opens while one is still awaited. #}
+  <details class="step-card" id="step-products"{{ ' open' if ((sees.selling and linePricing.blocking.length) or qualityOpen) else '' }}>
     <summary><h2>Products</h2></summary>
     {% set canEditProducts = permissions.manage_orders and sees.selling and (not isLockedOrder or canOverrideLockEdit) and (not isPostConfirmationOrder or canOverrideOrderEdit) %}
     {% if not canEditProducts %}
@@ -1041,13 +1042,10 @@
     {% endif %}
   </div>
   {% endif %}
-  </details>
-  {% include "orders/_product_picker_js.njk" %}
-
   {# Owner decision D-257 Phase 0B (5 Nov 2026): the quality documents the lines' categories ask for. Natural Stone asks for none, so a stone order shows nothing here. #}
   {% if qualityDocs and qualityDocs.length > 0 %}{% set canQuality = permissions.manage_orders or permissions.manage_purchasing %}
-  <details class="step-card" id="quality-documents" open>
-    <summary><h2>Quality documents <small class="muted">(asked for by the product category)</small></h2></summary>
+  <div class="quality-documents" id="quality-documents">
+    <h3>Quality documents <small class="muted">(asked for by the product category)</small></h3>
     <p class="muted small">Each document the category of a line on this order asks for — collect it from the supplier, attach it, and mark it received, then approved once checked. Internal only: never shown to the client.</p>
     <table class="list">
       <tr><th>Category</th><th>Document</th><th>Status</th><th>File</th><th>Last change</th>{% if canQuality %}<th>Update</th>{% endif %}</tr>
@@ -1078,8 +1076,10 @@
       </tr>
       {% endfor %}
     </table>
-  </details>
+  </div>
   {% endif %}
+  </details>
+  {% include "orders/_product_picker_js.njk" %}
 
   <details class="step-card step-card-reference" id="payment-overview">
     <summary><h2>Payment Overview <small class="muted">(reference — every leg, always current)</small></h2></summary>

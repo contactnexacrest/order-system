@@ -20,7 +20,7 @@ const incentiveRepository = require('../repositories/incentiveRepository');
 
 const FOREIGN_DOCS = { tax_residency: 'Tax Residency Certificate (TRC)', form_10f: 'Form 10F', no_pe: 'No-PE declaration' };
 
-const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const { round2 } = require('../helpers/money'); // PHP round(x, 2) (fresh-eyes review M3)
 const money = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const iso = (d) => (d instanceof Date ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : String(d).slice(0, 10));
 
@@ -128,13 +128,15 @@ async function compute(payout, paidOn) {
   return result;
 }
 
-/** Owner rule D-212: the description of an associate commission payment, from the facts. */
-function paymentDescription(associateName, orderRefs, gross, tds, rate, section, net, reference, defaultSection = '194H') {
+/** Owner rule D-212: the description of an associate commission payment, from the facts; fresh-eyes review M5: the GST paid on top is named too (the Zoho payment amount includes it). */
+function paymentDescription(associateName, orderRefs, gross, tds, rate, section, net, reference, defaultSection = '194H', gst = 0) {
   const tdsPart = tds > 0
     ? `TDS u/s ${section || defaultSection} ₹${money(tds)}${rate !== null && rate !== undefined && Number(rate) > 0 ? ` (${pct(rate)})` : ''}`
     : 'no TDS';
   return `Associate commission for ${associateName} — order${orderRefs.length > 1 ? 's ' : ' '}${orderRefs.join(', ')}`
-    + ` — gross ₹${money(gross)}, ${tdsPart}, net paid ₹${money(net)}${reference !== '' ? ` · UTR ${reference}` : ''}`;
+    + ` — gross ₹${money(gross)}, ${tdsPart}, net paid ₹${money(net)}`
+    + (Number(gst) > 0 ? ` + GST ₹${money(gst)} on the associate's tax invoice (input credit), total paid ₹${money(round2(Number(net) + Number(gst)))}` : '')
+    + `${reference !== '' ? ` · UTR ${reference}` : ''}`;
 }
 
 async function register(fyStart, q = null) {

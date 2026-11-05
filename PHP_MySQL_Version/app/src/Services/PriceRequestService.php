@@ -314,8 +314,10 @@ final class PriceRequestService
             AuditLogRepository::log(null, 'PRICE_REQUEST_MANUAL', 'price_requests', $id, null, null, "{$number}: {$product['name']} — {$row['selection_text']}");
             return [$id, null];
         }
+        $limit = self::dailyLimit($associate);
+        $refusal = 'You have used today\'s ' . $limit . ' price requests. Ask NexaCrest if you need more today.';
         if (self::leftToday($associate) <= 0) {
-            return [null, 'You have used today\'s ' . self::dailyLimit($associate) . ' price requests. Ask NexaCrest if you need more today.'];
+            return [null, $refusal];
         }
         $row['kind'] = 'auto';
         $row['status'] = 'valid';
@@ -324,7 +326,26 @@ final class PriceRequestService
         $row['figures'] = json_encode($work['figures'], JSON_PRESERVE_ZERO_FRACTION);
         $row['breakdown'] = json_encode(['lines' => $work['breakdown'], 'charges' => $work['charges'], 'per_m2' => $work['per_m2'], 'm2_per_cbm' => $work['m2_per_cbm']], JSON_PRESERVE_ZERO_FRACTION);
         $row['valid_until'] = date('Y-m-d', strtotime($now . ' +' . self::validDays($associate) . ' days'));
-        $id = self::insert($row);
+        // Fresh-eyes review L4: the count and the insert run under a lock on the associate's row,
+        // so requests fired at the same moment cannot pass the daily limit together.
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+        try {
+            $claim = $pdo->prepare('SELECT id FROM associates WHERE id = :a FOR UPDATE');
+            $claim->execute(['a' => (int) $associate['id']]);
+            $claim->fetchColumn();
+            if ($limit - self::requestsToday((int) $associate['id']) <= 0) {
+                $pdo->rollBack();
+                return [null, $refusal];
+            }
+            $id = self::insert($row);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
         AuditLogRepository::log(null, 'PRICE_REQUEST_AUTO', 'price_requests', $id, null, null, self::find($id)['number'] . ": {$product['name']} — {$row['selection_text']} → {$row['quote']} / {$row['lowest']} per {$row['unit']}");
         return [$id, null];
     }
@@ -403,9 +424,11 @@ final class PriceRequestService
             'SELECT a.id, a.name,
                     (SELECT COUNT(*) FROM price_requests r WHERE r.associate_id = a.id AND r.requested_at >= :f1) AS requests,
                     (SELECT COUNT(*) FROM orders o JOIN clients c ON c.id = o.client_id
-                      WHERE c.associate_id = a.id AND o.created_at >= :f2 AND o.is_test_data = 0) AS orders_count
+                      WHERE c.associate_id = a.id AND o.created_at >= :f2 AND o.is_test_data = 0' . DivisionService::sql('o.division_id') . ') AS orders_count
                FROM associates a
-              WHERE EXISTS (SELECT 1 FROM price_requests r WHERE r.associate_id = a.id AND r.requested_at >= :f3)
+              WHERE EXISTS (SELECT 1 FROM price_requests r WHERE r.associate_id = a.id AND r.requested_at >= :f3)'
+            // D-257 (fresh-eyes review L1): the associates of the request's division(s).
+            . DivisionService::sql('a.division_id') . '
               ORDER BY requests DESC, a.name'
         );
         $stmt->execute(['f1' => $from, 'f2' => $from, 'f3' => $from]);

@@ -51,7 +51,9 @@ final class IncentiveReportService
              JOIN orders o ON o.id = p.order_id
              LEFT JOIN users u ON u.id = p.user_id
              LEFT JOIN associates a ON a.id = p.associate_id
-             WHERE o.is_test_data = :t AND o.is_sample_data = 0
+             WHERE o.is_test_data = :t AND o.is_sample_data = 0'
+            // D-257 (fresh-eyes review L1): only the orders of the request's division(s).
+            . \App\Services\DivisionService::sql('o.division_id') . '
              ORDER BY o.id, p.payee_kind DESC, p.id'
         );
         $stmt->execute(['t' => self::testFlag()]);
@@ -94,7 +96,8 @@ final class IncentiveReportService
         if (in_array($state, ['locked', 'held', 'paid'], true)) {
             return [];
         }
-        $where = '';
+        // D-257 (fresh-eyes review L1): only the orders of the request's division(s).
+        $where = \App\Services\DivisionService::sql('o.division_id');
         $params = ['t' => self::testFlag()];
         if (($f['from'] ?? '') !== '') {
             $where .= ' AND DATE(o.created_at) >= :from';

@@ -179,10 +179,21 @@ final class AssociateCommission
         return $level['name'] . ' — ' . (($level['kind'] ?? 'pct') === 'pct' ? $v . '%' : 'USD ' . number_format((float) $level['value'], 2) . ' per unit');
     }
 
-    /** The level fixed on the order at PI, or null when not fixed yet. */
-    public static function fixedLevel(array $order): ?array
+    /**
+     * The level fixed on the order at PI, or null when not fixed yet.
+     *
+     * Fresh-eyes review M2 (5 Nov 2026): given an associate, the fixed level
+     * applies only when it was fixed for that associate (orders.associate_id).
+     * After the MD moves the client to another associate, the new associate
+     * earns at their own live level — the same rule the order-line price
+     * check (OrderLinePricing::levelForAssociate) already uses.
+     */
+    public static function fixedLevel(array $order, ?int $associateId = null): ?array
     {
         if (empty($order['associate_level_fixed_at']) || $order['associate_level_kind'] === null) {
+            return null;
+        }
+        if ($associateId !== null && (int) ($order['associate_id'] ?? 0) !== $associateId) {
             return null;
         }
         return ['id' => $order['associate_level_id'] !== null ? (int) $order['associate_level_id'] : null, 'name' => (string) $order['associate_level_name'],
@@ -200,10 +211,7 @@ final class AssociateCommission
         if ($a === null) {
             return;
         }
-        $fx = (float) (PricingRepository::settings()['pricing_fx_rate'] ?? 0);
-        $inRange = self::inRangeValue($orderId);
-        $estimateInr = strtoupper((string) ($order['currency_code'] ?? '')) === 'INR' ? $inRange : ($fx > 0 ? $inRange * $fx : null);
-        [$level] = self::levelForAssociate($a, $orderId, $estimateInr);
+        [$level] = self::levelForAssociate($a, $orderId, self::estimateInr($order, self::inRangeValue($orderId)));
         if ($level === null) {
             return;
         }
@@ -216,6 +224,25 @@ final class AssociateCommission
             AssociateService::notify($a, 'order_created', "The Proforma Invoice for order {$order['order_reference']} was issued. Commission level fixed on it: " . self::levelLabel($level) . '.',
                 (int) $order['client_id'], $orderId);
         }
+    }
+
+    /**
+     * The order's in-range goods value in rupees as estimated at PI, for the ladder's counting threshold.
+     * Fresh-eyes review H1: the pricing exchange rate is a USD rate, so it converts a USD order only;
+     * another currency uses the rate expected on its receipts (unknown → null, treated as an order that counts).
+     */
+    public static function estimateInr(array $order, float $inRange): ?float
+    {
+        $currency = strtoupper((string) ($order['currency_code'] ?? ''));
+        if ($currency === 'INR') {
+            return $inRange;
+        }
+        if ($currency === 'USD') {
+            $fx = (float) (PricingRepository::settings()['pricing_fx_rate'] ?? 0);
+            return $fx > 0 ? $inRange * $fx : null;
+        }
+        $orderRate = IncentiveService::productRate($order);
+        return $orderRate > 0 ? $inRange * $orderRate : null;
     }
 
     /** Whether the MD approved this line below the floor (no commission, not in range). */
@@ -333,12 +360,20 @@ final class AssociateCommission
             return null;
         }
         $set = self::settings();
-        $level = self::fixedLevel($order);
+        $level = self::fixedLevel($order, (int) $a['id']);
         $fixed = $level !== null;
         if ($level === null) {
             [$level] = self::levelForAssociate($a, $orderId);
         }
         $currency = (string) ($order['currency_code'] ?? 'INR');
+        $realised = self::realisedRate($order);
+        // Fresh-eyes review H1: a "USD x per unit" level is in US dollars whatever the order
+        // currency. On a non-USD order it is converted at the USD rate (usdRate) to rupees,
+        // and from there to the order currency for the figures shown in it.
+        $usdLevel = $level !== null && ($level['kind'] ?? 'pct') !== 'pct';
+        $convertUsd = $usdLevel && strtoupper($currency) !== 'USD';
+        $usdRate = $convertUsd ? self::usdRate($order) : null;
+        $usdToFc = $convertUsd ? ($realised['rate'] > 0 ? $usdRate / $realised['rate'] : 0.0) : 1.0;
         $lines = [];
         $inRange = 0.0;
         $linesCommission = 0.0;
@@ -349,7 +384,7 @@ final class AssociateCommission
             $zero = self::belowFloorApproved($l);
             $commission = 0.0;
             if (!$zero && $level !== null) {
-                $commission = $level['kind'] === 'pct' ? $value * (float) $level['value'] / 100 : (float) $l['quantity'] * (float) $level['value'];
+                $commission = $level['kind'] === 'pct' ? $value * (float) $level['value'] / 100 : (float) $l['quantity'] * (float) $level['value'] * $usdToFc;
                 $inRange += $value;
             } elseif (!$zero) {
                 $inRange += $value;
@@ -360,7 +395,9 @@ final class AssociateCommission
         $settle = self::settlements($orderId);
         $basis = max(0.0, $inRange - $settle['reduction']);
         $commissionFc = $inRange > 0 ? round($linesCommission * $basis / $inRange, 2) : 0.0;
-        $realised = self::realisedRate($order);
+        $commissionInr = $convertUsd
+            ? ($inRange > 0 && $usdToFc > 0 ? round($linesCommission / $usdToFc * $basis / $inRange * $usdRate, 2) : 0.0)
+            : round($commissionFc * $realised['rate'], 2);
         $fullyPaidOn = IncentiveService::fullyPaidOn($orderId);
         $state = $settle['unpaid'] ? 'unpaid' : ($fullyPaidOn !== null ? 'paid' : 'awaiting');
         $dueOn = $fullyPaidOn !== null ? self::dueOn($fullyPaidOn, $set) : null;
@@ -375,7 +412,8 @@ final class AssociateCommission
             'goods_fc' => round($total, 2), 'in_range_fc' => round($inRange, 2), 'reduction_fc' => $settle['reduction'], 'basis_fc' => round($basis, 2),
             'rate_inr' => $realised['rate'], 'rate_estimated' => $realised['estimated'], 'basis_inr' => $basisInr,
             'amount_fc' => $state === 'unpaid' ? 0.0 : $commissionFc,
-            'amount_inr' => $state === 'unpaid' ? 0.0 : round($commissionFc * $realised['rate'], 2),
+            'amount_inr' => $state === 'unpaid' ? 0.0 : $commissionInr,
+            'usd_rate' => $usdRate,
             'state' => $state, 'fully_paid_on' => $fullyPaidOn,
             'due_on' => $dueOn, 'payout_run_on' => $dueOn !== null ? self::payoutRunOn($dueOn, $set) : null,
             'claim_hold' => $dueOn !== null && $set['claim_hold'] && self::claimOpen($orderId, $dueOn),
@@ -385,7 +423,24 @@ final class AssociateCommission
         ];
     }
 
-    /** The rupees of GST on top of a payout: only for a GST-registered associate whose tax invoice for it is on file. */
+    /**
+     * Rupees per US dollar for a fixed USD amount (fresh-eyes review H1): on a USD order
+     * the rate its receipts realised (estimated until received); on any other order the
+     * Admin pricing exchange rate, which is the company's USD rate.
+     */
+    public static function usdRate(array $order): float
+    {
+        if (strtoupper((string) ($order['currency_code'] ?? '')) === 'USD') {
+            return self::realisedRate($order)['rate'];
+        }
+        return (float) (PricingRepository::settings()['pricing_fx_rate'] ?? 0);
+    }
+
+    /**
+     * The rupees of GST on top of a payout: only for a GST-registered associate whose tax invoice for it is on file.
+     * Fresh-eyes review L2: once paid, on the gross actually billed (paid + TDS) — the bill line Zoho taxes — so the
+     * GST paid equals the GST on the Zoho bill and the payment never exceeds the bill.
+     */
     public static function gstFor(array $payout): float
     {
         if (($payout['payee_kind'] ?? '') !== 'associate' || (float) $payout['amount_inr'] <= 0) {
@@ -395,7 +450,10 @@ final class AssociateCommission
         if ($a === null || trim((string) ($a['gstin'] ?? '')) === '' || \App\Repositories\AssociateDocumentRepository::invoiceForPayout((int) $payout['id']) === null) {
             return 0.0;
         }
-        return round((float) $payout['amount_inr'] * self::settings()['gst_pct'] / 100, 2);
+        $base = isset($payout['paid_inr']) && $payout['paid_inr'] !== null
+            ? (float) $payout['paid_inr'] + (float) ($payout['tds_inr'] ?? 0)
+            : (float) $payout['amount_inr'];
+        return round($base * self::settings()['gst_pct'] / 100, 2);
     }
 
     /**

@@ -221,17 +221,19 @@ function required() {
       }
 
       // D-257: a module switched off for the request's division(s) refuses its addresses.
-      if (req.divisionUi.isDisabledPath(req.path)) {
+      // (A request without a path, e.g. a bare internal call, is treated as the empty path.)
+      const reqPath = req.path || String(req.originalUrl || '').split('?')[0] || '';
+      if (req.divisionUi && req.divisionUi.isDisabledPath(reqPath)) {
         res.status(403).send('This part of the system is not in use here.');
         return;
       }
       // D-257: a client or an associate outside the request's division(s) is not available.
-      const clientMatch = /^\/clients\/(\d+)(?:\/|$)/.exec(req.path);
+      const clientMatch = /^\/clients\/(\d+)(?:\/|$)/.exec(reqPath);
       if (clientMatch && !(await divisionService.allowsClient(parseInt(clientMatch[1], 10)))) {
         res.status(403).send('This client is not available to you.');
         return;
       }
-      const associateMatch = /^\/associates\/(\d+)(?:\/|$)/.exec(req.path);
+      const associateMatch = /^\/associates\/(\d+)(?:\/|$)/.exec(reqPath);
       if (associateMatch) {
         const associateRow = await db.queryOne('SELECT division_id FROM associates WHERE id = :id', { id: parseInt(associateMatch[1], 10) });
         if (associateRow && !divisionService.allows(associateRow.division_id)) {
@@ -240,12 +242,12 @@ function required() {
         }
       }
       // D-257: the report Division filter (company level, two or more active divisions).
-      if (req.path.startsWith('/reports') && req.query && req.query.division && req.divisionUi.showSwitcher) {
+      if (reqPath.startsWith('/reports') && req.query && req.query.division && req.divisionUi && req.divisionUi.showSwitcher) {
         const reportDivision = await divisionService.find(parseInt(req.query.division, 10));
         if (reportDivision && reportDivision.status === 'active' && divisionService.allows(reportDivision.id)) ctxStore.forcedDivision = Number(reportDivision.id);
       }
       // D-257: an order's pages work in the order's own division (its numbering and settings).
-      const orderIdForPath = await orderAccessService.orderIdForPath(req.path);
+      const orderIdForPath = await orderAccessService.orderIdForPath(reqPath);
       if (orderIdForPath !== null) {
         const orderForPath = await db.queryOne('SELECT division_id FROM orders WHERE id = :id', { id: orderIdForPath });
         if (orderForPath) ctxStore.forcedDivision = Number(orderForPath.division_id);

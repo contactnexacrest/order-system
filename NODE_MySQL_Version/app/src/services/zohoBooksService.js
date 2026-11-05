@@ -1662,7 +1662,7 @@ async function associateCommission(cost) {
   // Owner decision D-245 P3: the level fixed at PI, on the invoiced FOB of the goods.
   const associateCommission = require('./associateCommission');
   const orderRow = await require('../repositories/orderRepository').find(Number(cost.order_id));
-  const fixedLevel = orderRow ? associateCommission.fixedLevel(orderRow) : null;
+  const fixedLevel = orderRow ? associateCommission.fixedLevel(orderRow, Number(a.id)) : null;
   const rate = fixedLevel ? associateCommission.levelLabel(fixedLevel)
     : (inc.associate_rate_pct !== null && inc.associate_rate_pct !== undefined
       ? `${Number(inc.associate_rate_pct).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : '');
@@ -1681,7 +1681,7 @@ async function associateCommission(cost) {
     tds_inr: tds,
     reference: refs.join(', '),
     bill_description: what + (invoices.length ? ` · associate invoice ${invoices.join(', ')}` : ' · no associate invoice on file') + (tds > 0 ? ` · TDS ${tds.toFixed(2)} deducted` : ''),
-    payment_description: `${associateTds.paymentDescription(a.name, [String(cost.buyer_inquiry_ref)], round(paid + tds, 2), tds, tdsRate, tdsSection, paid, refs.join(', '), tdsSettings.section)} · against bill ${billNo}`,
+    payment_description: `${associateTds.paymentDescription(a.name, [String(cost.buyer_inquiry_ref)], round(paid + tds, 2), tds, tdsRate, tdsSection, paid, refs.join(', '), tdsSettings.section, gst)} · against bill ${billNo}`,
     // With a Zoho TDS tax set in Settings the bill carries the TDS (Zoho's TDS feature) and its balance is the net; otherwise the
     // bill is the gross, the payment the net, and the TDS is left on the bill for the CA to book.
     tds_tax_id: tds > 0 && tdsSettings.zoho_tax_id !== '' ? tdsSettings.zoho_tax_id : null,

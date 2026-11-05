@@ -734,7 +734,7 @@ final class ZohoBooksService
         $tdsTaxId = \App\Services\AssociateTds::settings()['zoho_tax_id'];
         // Owner decision D-245 P3: the level fixed at PI, on the invoiced FOB of the goods.
         $orderRow = \App\Repositories\OrderRepository::find((int) $cost['order_id']);
-        $fixedLevel = $orderRow !== null ? \App\Services\AssociateCommission::fixedLevel($orderRow) : null;
+        $fixedLevel = $orderRow !== null ? \App\Services\AssociateCommission::fixedLevel($orderRow, (int) $a['id']) : null;
         $rate = $fixedLevel !== null ? \App\Services\AssociateCommission::levelLabel($fixedLevel)
             : (isset($inc['associate_rate_pct']) ? rtrim(rtrim(number_format((float) $inc['associate_rate_pct'], 2, '.', ''), '0'), '.') . '%' : '');
         $gst = round(array_sum(array_map(static fn (array $p): float => (float) ($p['gst_inr'] ?? 0), $payouts)), 2);
@@ -750,7 +750,7 @@ final class ZohoBooksService
             'tds_inr' => $tds,
             'reference' => implode(', ', $refs),
             'bill_description' => $what . ($invoices !== [] ? ' · associate invoice ' . implode(', ', $invoices) : ' · no associate invoice on file') . ($tds > 0 ? ' · TDS ' . number_format($tds, 2, '.', '') . ' deducted' : ''),
-            'payment_description' => \App\Services\AssociateTds::paymentDescription((string) $a['name'], [(string) $cost['buyer_inquiry_ref']], round($paid + $tds, 2), $tds, $tdsRate, $tdsSection, $paid, implode(', ', $refs)) . ' · against bill ' . $billNo,
+            'payment_description' => \App\Services\AssociateTds::paymentDescription((string) $a['name'], [(string) $cost['buyer_inquiry_ref']], round($paid + $tds, 2), $tds, $tdsRate, $tdsSection, $paid, implode(', ', $refs), $gst) . ' · against bill ' . $billNo,
             // With a Zoho TDS tax set in Settings the bill carries the TDS (Zoho's TDS feature) and its balance is the net; otherwise the
             // bill is the gross, the payment the net, and the TDS is left on the bill for the CA to book.
             'tds_tax_id' => $tds > 0 && $tdsTaxId !== '' ? $tdsTaxId : null,

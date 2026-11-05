@@ -40,10 +40,8 @@ const userRepository = require('../repositories/userRepository');
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-/** PHP round(x, 2). */
-function round2(x) {
-  return Math.round((Number(x) + Number.EPSILON) * 100) / 100;
-}
+/** PHP round(x, 2) — the shared money helper (fresh-eyes review M3). */
+const { round2 } = require('../helpers/money');
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -253,7 +251,8 @@ async function globalAmount(orderId, order, basis) {
   const s = await pricingService.settings();
   const lines = await associateCommission.goodsLines(orderId);
   const total = lines.reduce((sum, l) => sum + Number(l.fob_value), 0);
-  const rate = (await associateCommission.realisedRate(order)).rate;
+  // Fresh-eyes review H1: a "USD x per unit" rule is converted at the USD rate, not the order currency's.
+  const rate = await associateCommission.usdRate(order);
   const describe = (mode, value) => (mode === 'usd' ? `USD ${fmt2(value)} per unit` : `${pricingService.pct(value)} of profit`);
   if (lines.length === 0 || total <= 0) {
     const amount = s.incentive_mode === 'usd' ? 0 : basis * s.incentive_value / 100;
@@ -453,7 +452,7 @@ async function lockIfReady(orderId, userId, note = null) {
   if (calc.over_profit) {
     return `The team incentive (₹${fmt2(calc.amount)}) is more than the order's profit (₹${fmt2(calc.basis)}) — lower it before locking.`;
   }
-  await lock(orderId, String(await fullyPaidOn(orderId)), userId, calc, note);
+  if (!(await lock(orderId, String(await fullyPaidOn(orderId)), userId, calc, note))) return 'This order\'s incentive is already locked.';
   return null;
 }
 
@@ -487,6 +486,12 @@ function ruleText(calc) {
   return `${calc.global_text} (global rule)`;
 }
 
+/**
+ * Locks the order's incentive: writes the payouts and cost entries. Resolves false (and
+ * writes nothing) when the order is already locked — fresh-eyes review M1: the order's
+ * row is claimed with SELECT … FOR UPDATE inside the transaction, so two lock requests
+ * at the same moment ("Lock all ready" in one tab, the order in another) write once.
+ */
 async function lock(orderId, paidOn, userId, calc = null, note = null) {
   calc = calc || await calculate(orderId);
   const associateCommission = require('./associateCommission');
@@ -502,7 +507,12 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
   const a = calc.associate;
   const earned = !!(a && a.state !== 'unpaid' && a.amount_fc > 0);
   const order = await orderRepository.find(orderId);
-  await db.transaction(async (c) => {
+  const claimed = await db.transaction(async (c) => {
+    await c.execute('INSERT IGNORE INTO order_incentives (order_id, updated_by) VALUES (:id, :u)', { id: orderId, u: userId });
+    const claim = await c.queryOne('SELECT locked_at FROM order_incentives WHERE order_id = :id FOR UPDATE', { id: orderId });
+    // The same guard on the payouts: an order never gets a second set (one per order, payee and role).
+    const existing = await c.queryOne('SELECT COUNT(*) AS n FROM incentive_payouts WHERE order_id = :id AND clawback_of_payout_id IS NULL', { id: orderId });
+    if ((claim && claim.locked_at) || Number(existing.n) > 0) return false;
     let teamEntryId = null;
     if (calc.team_total > 0) {
       for (const [role, r] of Object.entries(calc.roles)) {
@@ -557,7 +567,9 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
     }, userId, c);
     await incentiveRepository.addHistory(orderId, 'lock', null, `Team ₹${fmt2(calc.team_total)}`
       + (a ? `; associate ${earned ? `₹${fmt2(a.amount_inr)}` : 'none'}` : '') + `; staff payout run ${staffRun}`, note, userId, c);
+    return true;
   });
+  if (!claimed) return false;
   if (a) {
     const associateService = require('./associateService');
     const associate = await associateRepository.find(a.id);
@@ -576,6 +588,7 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
       }
     }
   }
+  return true;
 }
 
 /** Owner rule D-212: the commission cost line says what it is, for whom, at which level and on what basis. */
@@ -602,7 +615,13 @@ async function unlock(orderId, userId, reason = '') {
       return 'Part of this order\'s incentive is already paid, so it can no longer be unlocked.';
     }
   }
-  await db.transaction(async (c) => {
+  // Fresh-eyes review M1: checked again inside the transaction, with the rows locked, so a
+  // payout marked paid at the same moment is never deleted (only unpaid ones are).
+  const refused = await db.transaction(async (c) => {
+    const relock = await c.queryOne('SELECT locked_at FROM order_incentives WHERE order_id = :id FOR UPDATE', { id: orderId });
+    const paidNow = await c.queryOne("SELECT COUNT(*) AS n FROM incentive_payouts WHERE order_id = :id AND status = 'paid' FOR UPDATE", { id: orderId });
+    if (!relock || !relock.locked_at) return 'This order\'s incentive is not locked.';
+    if (Number(paidNow.n) > 0) return 'Part of this order\'s incentive is already paid, so it can no longer be unlocked.';
     await incentiveRepository.deleteOrderPayouts(orderId, c);
     await c.execute('DELETE FROM order_cost_entries WHERE order_id = :id AND incentive_kind IS NOT NULL', { id: orderId });
     await incentiveRepository.saveOrder(orderId, {
@@ -613,8 +632,9 @@ async function unlock(orderId, userId, reason = '') {
       team_cost_entry_id: null, associate_cost_entry_id: null,
     }, userId, c);
     await incentiveRepository.addHistory(orderId, 'unlock', `Locked ${short(String(row.locked_at).slice(0, 10))}, team ₹${fmt2(row.team_total_inr)}`, 'Open', why, userId, c);
+    return null;
   });
-  return null;
+  return refused;
 }
 
 /**

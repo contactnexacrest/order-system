@@ -1446,7 +1446,9 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   <div class="order-layout" id="order-layout">
     <div class="step-sequence" id="order-panels">
 
-  <details class="step-card" id="step-products"<?= ($sees['selling'] && $linePricing['blocking'] !== []) ? ' open' : '' ?>>
+  <?php // D-257 Phase 0B: the quality documents sit inside the Products card; it opens while one is still awaited. ?>
+  <?php $__qualityDocs = \App\Repositories\OrderQualityDocumentRepository::forOrder((int) $order['id']); $__qualityOpen = array_filter($__qualityDocs, static fn ($qd) => $qd['status'] !== 'approved') !== []; ?>
+  <details class="step-card" id="step-products"<?= (($sees['selling'] && $linePricing['blocking'] !== []) || $__qualityOpen) ? ' open' : '' ?>>
     <summary><h2>Products</h2></summary>
     <?php if (!$canEditProducts): ?>
       <table class="list">
@@ -1673,14 +1675,10 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
     <?php endif; ?>
   </div>
   <?php endif; ?>
-  </details>
-  <?php include __DIR__ . '/_product_picker_js.php'; ?>
-
   <?php // Owner decision D-257 Phase 0B (5 Nov 2026): the quality documents the lines' categories ask for. Natural Stone asks for none, so a stone order shows nothing here. ?>
-  <?php $__qualityDocs = \App\Repositories\OrderQualityDocumentRepository::forOrder((int) $order['id']); ?>
   <?php if ($__qualityDocs !== []): $__canQuality = $canManageOrders || PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_purchasing'); ?>
-  <details class="step-card" id="quality-documents" open>
-    <summary><h2>Quality documents <small class="muted">(asked for by the product category)</small></h2></summary>
+  <div class="quality-documents" id="quality-documents">
+    <h3>Quality documents <small class="muted">(asked for by the product category)</small></h3>
     <p class="muted small">Each document the category of a line on this order asks for — collect it from the supplier, attach it, and mark it received, then approved once checked. Internal only: never shown to the client.</p>
     <table class="list">
       <tr><th>Category</th><th>Document</th><th>Status</th><th>File</th><th>Last change</th><?php if ($__canQuality): ?><th>Update</th><?php endif; ?></tr>
@@ -1711,8 +1709,10 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       </tr>
       <?php endforeach; ?>
     </table>
-  </details>
+  </div>
   <?php endif; ?>
+  </details>
+  <?php include __DIR__ . '/_product_picker_js.php'; ?>
 
   <details class="step-card step-card-reference" id="payment-overview">
     <summary><h2>Payment Overview <small class="muted">(reference — every leg, always current)</small></h2></summary>

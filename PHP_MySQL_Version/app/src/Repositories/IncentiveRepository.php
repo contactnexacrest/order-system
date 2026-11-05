@@ -402,9 +402,10 @@ final class IncentiveRepository
         });
     }
 
+    /** The order's unpaid payouts (unlock); a paid payout is never deleted (fresh-eyes review M1). */
     public static function deleteOrderPayouts(int $orderId): void
     {
-        Database::connection()->prepare('DELETE FROM incentive_payouts WHERE order_id = :id')->execute(['id' => $orderId]);
+        Database::connection()->prepare("DELETE FROM incentive_payouts WHERE order_id = :id AND status <> 'paid'")->execute(['id' => $orderId]);
     }
 
     /** Incentive cost entries of the order (team / associate), keyed by kind. */
@@ -459,6 +460,8 @@ final class IncentiveRepository
              WHERE (oi.locked_at IS NULL) AND o.is_test_data = 0 AND o.is_sample_data = 0
                AND o.status NOT IN ('cancelled','lost')
                AND (ps.balance_cleared_at IS NOT NULL OR ps.advance_cleared_at IS NOT NULL OR ps.freight_cleared_at IS NOT NULL)"
+            // D-257 (fresh-eyes review L1): "Ready to lock" / "Lock all ready" stay within the request's division(s).
+            . \App\Services\DivisionService::sql('o.division_id')
         )->fetchAll(\PDO::FETCH_COLUMN));
     }
 }

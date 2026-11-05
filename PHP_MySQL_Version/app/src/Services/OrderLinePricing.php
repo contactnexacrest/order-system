@@ -244,7 +244,15 @@ final class OrderLinePricing
     public static function approvalHolds(array $line): bool
     {
         return !empty($line['price_approved_at']) && $line['price_approved_unit_price'] !== null
-            && $line['unit_price'] !== null && abs((float) $line['unit_price'] - (float) $line['price_approved_unit_price']) < 0.005;
+            && $line['unit_price'] !== null && abs((float) $line['unit_price'] - (float) $line['price_approved_unit_price']) < 0.005
+            // Fresh-eyes review M4: and only for the options and unit it was given for.
+            && (($line['price_approved_selection'] ?? null) === null || $line['price_approved_selection'] === self::approvalSelectionKey($line));
+    }
+
+    /** The line's options and unit as one text, kept with the MD's approval (fresh-eyes review M4). */
+    public static function approvalSelectionKey(array $line): string
+    {
+        return trim((string) ($line['spec_selection'] ?? '')) . '|' . trim((string) ($line['unit'] ?? ''));
     }
 
     /**
@@ -426,16 +434,21 @@ final class OrderLinePricing
         }
         $pdo = Database::connection();
         $orderId = (int) $line['order_id'];
-        if ($before !== null && (int) ($before['catalog_product_id'] ?? 0) !== (int) ($line['catalog_product_id'] ?? 0) && !empty($line['price_snapshot'])) {
+        // Fresh-eyes review M4: a change of the line's options or unit is a different product for
+        // pricing — like a product change it clears the fixed figures and voids the approval.
+        $optionsChanged = $before !== null && self::approvalSelectionKey($before) !== self::approvalSelectionKey($line);
+        if ($before !== null && ((int) ($before['catalog_product_id'] ?? 0) !== (int) ($line['catalog_product_id'] ?? 0) || $optionsChanged) && !empty($line['price_snapshot'])) {
             $pdo->prepare('UPDATE order_products SET price_snapshot = NULL WHERE id = :id')->execute(['id' => $lineId]);
             $line['price_snapshot'] = null;
         }
-        if (!empty($line['price_approved_at']) && !self::approvalHolds($line)) {
-            $pdo->prepare('UPDATE order_products SET price_approved_by = NULL, price_approved_at = NULL, price_approval_reason = NULL, price_approved_unit_price = NULL,
+        if (!empty($line['price_approved_at']) && (!self::approvalHolds($line) || $optionsChanged)) {
+            $pdo->prepare('UPDATE order_products SET price_approved_by = NULL, price_approved_at = NULL, price_approval_reason = NULL, price_approved_unit_price = NULL, price_approved_selection = NULL,
                                   price_approval_commission_zero = 0, price_approval_incentive_cut = NULL WHERE id = :id')->execute(['id' => $lineId]);
             AuditLogRepository::log($userId, 'LINE_PRICE_APPROVAL_VOIDED', 'order_products', $lineId, 'unit_price',
                 number_format((float) $line['price_approved_unit_price'], 2, '.', ''), (string) $line['unit_price'],
-                "Order line {$line['line_no']}: the price changed after the MD approved it — the approval no longer holds.");
+                $optionsChanged && $line['unit_price'] !== null && abs((float) $line['unit_price'] - (float) $line['price_approved_unit_price']) < 0.005
+                    ? "Order line {$line['line_no']}: the options or unit changed after the MD approved it — the approval no longer holds."
+                    : "Order line {$line['line_no']}: the price changed after the MD approved it — the approval no longer holds.");
             $line = OrderProductRepository::find($lineId) ?? $line;
         }
         $order = OrderRepository::find($orderId);
@@ -547,11 +560,11 @@ final class OrderLinePricing
         }
         $effect = $view['effect'];
         Database::connection()->prepare(
-            'UPDATE order_products SET price_approved_by = :u, price_approved_at = NOW(), price_approval_reason = :r, price_approved_unit_price = :p,
+            'UPDATE order_products SET price_approved_by = :u, price_approved_at = NOW(), price_approval_reason = :r, price_approved_unit_price = :p, price_approved_selection = :sel,
                     price_approval_commission_zero = :cz, price_approval_incentive_cut = :ic, price_approval_requested_at = NULL, price_approval_requested_by = NULL
              WHERE id = :id'
         )->execute([
-            'u' => $userId, 'r' => $reason, 'p' => number_format((float) $line['unit_price'], 2, '.', ''),
+            'u' => $userId, 'r' => $reason, 'p' => number_format((float) $line['unit_price'], 2, '.', ''), 'sel' => self::approvalSelectionKey($line),
             'cz' => ($effect['commission_zero'] ?? false) ? 1 : 0,
             'ic' => isset($effect['cut_line']) ? number_format((float) $effect['cut_line'], 2, '.', '') : null,
             'id' => $lineId,

@@ -180,7 +180,14 @@ function scope(line, ctx) {
 
 function approvalHolds(line) {
   return Boolean(line.price_approved_at) && line.price_approved_unit_price !== null && line.price_approved_unit_price !== undefined
-    && line.unit_price !== null && line.unit_price !== undefined && Math.abs(Number(line.unit_price) - Number(line.price_approved_unit_price)) < 0.005;
+    && line.unit_price !== null && line.unit_price !== undefined && Math.abs(Number(line.unit_price) - Number(line.price_approved_unit_price)) < 0.005
+    // Fresh-eyes review M4: and only for the options and unit it was given for.
+    && (line.price_approved_selection === null || line.price_approved_selection === undefined || line.price_approved_selection === approvalSelectionKey(line));
+}
+
+/** The line's options and unit as one text, kept with the MD's approval (fresh-eyes review M4). */
+function approvalSelectionKey(line) {
+  return `${String(line.spec_selection ?? '').trim()}|${String(line.unit ?? '').trim()}`;
 }
 
 /** The check of one line: { status, figures, fixed, note, approval, requested }. */
@@ -349,18 +356,23 @@ async function afterSave(lineId, before, userId) {
   let line = await orderProductRepository.find(lineId);
   if (!line) return;
   const orderId = Number(line.order_id);
-  if (before && Number(before.catalog_product_id || 0) !== Number(line.catalog_product_id || 0) && line.price_snapshot) {
+  // Fresh-eyes review M4: a change of the line's options or unit is a different product for
+  // pricing — like a product change it clears the fixed figures and voids the approval.
+  const optionsChanged = !!before && approvalSelectionKey(before) !== approvalSelectionKey(line);
+  if (before && (Number(before.catalog_product_id || 0) !== Number(line.catalog_product_id || 0) || optionsChanged) && line.price_snapshot) {
     await db.execute('UPDATE order_products SET price_snapshot = NULL WHERE id = :id', { id: lineId });
     line.price_snapshot = null;
   }
-  if (line.price_approved_at && !approvalHolds(line)) {
+  if (line.price_approved_at && (!approvalHolds(line) || optionsChanged)) {
     await db.execute(
-      `UPDATE order_products SET price_approved_by = NULL, price_approved_at = NULL, price_approval_reason = NULL, price_approved_unit_price = NULL,
+      `UPDATE order_products SET price_approved_by = NULL, price_approved_at = NULL, price_approval_reason = NULL, price_approved_unit_price = NULL, price_approved_selection = NULL,
               price_approval_commission_zero = 0, price_approval_incentive_cut = NULL WHERE id = :id`, { id: lineId }
     );
     await auditLog(userId, 'LINE_PRICE_APPROVAL_VOIDED', 'order_products', lineId, 'unit_price',
       n2(line.price_approved_unit_price), String(line.unit_price),
-      `Order line ${line.line_no}: the price changed after the MD approved it — the approval no longer holds.`);
+      optionsChanged && line.unit_price !== null && line.unit_price !== undefined && Math.abs(Number(line.unit_price) - Number(line.price_approved_unit_price)) < 0.005
+        ? `Order line ${line.line_no}: the options or unit changed after the MD approved it — the approval no longer holds.`
+        : `Order line ${line.line_no}: the price changed after the MD approved it — the approval no longer holds.`);
     line = (await orderProductRepository.find(lineId)) || line;
   }
   const order = await require('../repositories/orderRepository').find(orderId);
@@ -424,10 +436,10 @@ async function approve(orderId, lineId, userId, reason) {
   }
   const effect = view.effect || {};
   await db.execute(
-    `UPDATE order_products SET price_approved_by = :u, price_approved_at = NOW(), price_approval_reason = :r, price_approved_unit_price = :p,
+    `UPDATE order_products SET price_approved_by = :u, price_approved_at = NOW(), price_approval_reason = :r, price_approved_unit_price = :p, price_approved_selection = :sel,
             price_approval_commission_zero = :cz, price_approval_incentive_cut = :ic, price_approval_requested_at = NULL, price_approval_requested_by = NULL
      WHERE id = :id`,
-    { u: userId, r: reason, p: n2(line.unit_price), cz: effect.commission_zero ? 1 : 0, ic: effect.cut_line !== undefined && effect.cut_line !== null ? n2(effect.cut_line) : null, id: lineId }
+    { u: userId, r: reason, p: n2(line.unit_price), sel: approvalSelectionKey(line), cz: effect.commission_zero ? 1 : 0, ic: effect.cut_line !== undefined && effect.cut_line !== null ? n2(effect.cut_line) : null, id: lineId }
   );
   const what = status === NO_PRICE ? 'no price set for its product' : `USD ${money(line.unit_price)} below the floor USD ${money(view.check.figures.floor)}`;
   await auditLog(userId, 'LINE_PRICE_APPROVED', 'order_products', lineId, 'unit_price', null, String(line.unit_price), `Order line ${no}: ${what} — reason: ${reason}`);
@@ -544,5 +556,5 @@ module.exports = {
   PICK_MESSAGE, productPickRequired, pickRefusal, documentBlockReason,
   context, levelForAssociate, liveFigures, scope, approvalHolds, checkLine, forOrder, piBlockReason,
   saveRefusal, afterSave, requestApproval, approvalView, approve, refuse, snapshotForPi, pickerPrices, pickerSpecs, clientKeys,
-  selectionInput, saveSelection, lineSelection, priceRequestFigures, lineQuote,
+  selectionInput, saveSelection, lineSelection, priceRequestFigures, lineQuote, approvalSelectionKey,
 };

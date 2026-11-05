@@ -151,7 +151,7 @@ final class AssociatePortalRepository
             };
             return ['state' => $p['status'] === 'paid' ? 'paid' : ($p['status'] === 'held' || $claim ? 'held' : 'earned'), 'label' => $label,
                 'rate' => $o['locked_rate'] !== null ? (float) $o['locked_rate'] : null, 'source' => $o['associate_rate_source'] ?? null, 'amount' => (float) $o['associate_amount_fc'],
-                'level' => self::levelText($o), 'detail' => AssociateCommission::forOrder((int) $o['id'])];
+                'level' => self::levelText($o, $associateId), 'detail' => AssociateCommission::forOrder((int) $o['id'])];
         }
         if (($o['associate_mode'] ?? 'auto') === 'no') {
             return $none('No commission on this order (decided by NexaCrest)');
@@ -172,10 +172,10 @@ final class AssociatePortalRepository
     }
 
     /** "Level 2 — 5%", as fixed on the order (or the rate kept on it). */
-    private static function levelText(array $o): ?string
+    private static function levelText(array $o, int $associateId): ?string
     {
         $order = OrderRepository::find((int) $o['id']);
-        $fixed = $order !== null ? AssociateCommission::fixedLevel($order) : null;
+        $fixed = $order !== null ? AssociateCommission::fixedLevel($order, $associateId) : null;
         if ($fixed !== null) {
             return AssociateCommission::levelLabel($fixed);
         }

@@ -1521,6 +1521,8 @@ async function show(req, res) {
       productCategories: await require('../repositories/productCategoryRepository').all(),
       // Owner decision D-257 0B: the quality documents the lines' categories ask for (none for Natural Stone).
       qualityDocs: await require('../repositories/orderQualityDocumentRepository').forOrder(orderId),
+      // D-257 Phase 0B: the Products card (which holds the quality documents) opens while one is still awaited.
+      qualityOpen: (await require('../repositories/orderQualityDocumentRepository').forOrder(orderId)).some((qd) => qd.status !== 'approved'),
       qualityStatuses: require('../repositories/orderQualityDocumentRepository').STATUSES,
       // Owner decision D-215 (5a): the order's own payment schedule (advance, milestones, balance).
       paymentSchedule: await require('./paymentMilestoneController').scheduleView(orderId, order),

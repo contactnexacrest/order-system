@@ -5443,6 +5443,9 @@ CREATE TABLE price_requests (
 ) ENGINE=InnoDB;
 -- The options chosen on an order line, and the price request it came from.
 ALTER TABLE order_products ADD COLUMN spec_selection TEXT NULL;
+-- Fresh-eyes review M4 (5 Nov 2026): the options and unit the MD's price approval was given for;
+-- the approval holds only while the line keeps them (and its price).
+ALTER TABLE order_products ADD COLUMN price_approved_selection TEXT NULL;
 ALTER TABLE order_products ADD COLUMN price_request_id BIGINT UNSIGNED NULL;
 ALTER TABLE order_products ADD CONSTRAINT fk_order_products_price_request FOREIGN KEY (price_request_id) REFERENCES price_requests(id);
 

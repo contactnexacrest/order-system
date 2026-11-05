@@ -239,7 +239,8 @@ final class IncentiveService
         foreach ($lines as $l) {
             $total += (float) $l['fob_value'];
         }
-        $rate = AssociateCommission::realisedRate($order)['rate'];
+        // Fresh-eyes review H1: a "USD x per unit" rule is converted at the USD rate, not the order currency's.
+        $rate = AssociateCommission::usdRate($order);
         $describe = static fn (string $mode, float $value): string => $mode === 'usd' ? 'USD ' . number_format($value, 2) . ' per unit' : PricingService::pct($value) . ' of profit';
         if ($lines === [] || $total <= 0) {
             $amount = $settings['incentive_mode'] === 'usd' ? 0.0 : $basis * $settings['incentive_value'] / 100;
@@ -460,7 +461,9 @@ final class IncentiveService
         if ($calc['over_profit']) {
             return 'The team incentive (₹' . number_format($calc['amount'], 2) . ') is more than the order\'s profit (₹' . number_format($calc['basis'], 2) . ') — lower it before locking.';
         }
-        self::lock($orderId, (string) self::fullyPaidOn($orderId), $userId, $calc, $note);
+        if (!self::lock($orderId, (string) self::fullyPaidOn($orderId), $userId, $calc, $note)) {
+            return 'This order\'s incentive is already locked.';
+        }
         return null;
     }
 
@@ -481,7 +484,13 @@ final class IncentiveService
         return ['locked' => $locked, 'skipped' => $skipped];
     }
 
-    public static function lock(int $orderId, string $paidOn, int $userId, ?array $calc = null, ?string $note = null): void
+    /**
+     * Locks the order's incentive: writes the payouts and cost entries. Returns false (and
+     * writes nothing) when the order is already locked — fresh-eyes review M1: the order's
+     * row is claimed with SELECT … FOR UPDATE inside the transaction, so two lock requests
+     * at the same moment ("Lock all ready" in one tab, the order in another) write once.
+     */
+    public static function lock(int $orderId, string $paidOn, int $userId, ?array $calc = null, ?string $note = null): bool
     {
         $calc ??= self::calculate($orderId);
         $today = date('Y-m-d');
@@ -491,6 +500,16 @@ final class IncentiveService
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
+            $pdo->prepare('INSERT IGNORE INTO order_incentives (order_id, updated_by) VALUES (:id, :u)')->execute(['id' => $orderId, 'u' => $userId]);
+            $claim = $pdo->prepare('SELECT locked_at FROM order_incentives WHERE order_id = :id FOR UPDATE');
+            $claim->execute(['id' => $orderId]);
+            // The same guard on the payouts: an order never gets a second set (one per order, payee and role).
+            $existing = $pdo->prepare('SELECT COUNT(*) FROM incentive_payouts WHERE order_id = :id AND clawback_of_payout_id IS NULL');
+            $existing->execute(['id' => $orderId]);
+            if (!empty($claim->fetchColumn()) || (int) $existing->fetchColumn() > 0) {
+                $pdo->rollBack();
+                return false;
+            }
             $teamEntryId = null;
             if ($calc['team_total'] > 0) {
                 foreach ($calc['roles'] as $role => $r) {
@@ -574,6 +593,7 @@ final class IncentiveService
                 }
             }
         }
+        return true;
     }
 
     /** "15% of profit (global rule)", "fixed ₹1,00,000 set for this order" … */
@@ -613,6 +633,20 @@ final class IncentiveService
         }
         $pdo = Database::connection();
         $pdo->beginTransaction();
+        // Fresh-eyes review M1: checked again inside the transaction, with the rows locked, so a
+        // payout marked paid at the same moment is never deleted (only unpaid ones are).
+        $relock = $pdo->prepare('SELECT locked_at FROM order_incentives WHERE order_id = :id FOR UPDATE');
+        $relock->execute(['id' => $orderId]);
+        $paidNow = $pdo->prepare("SELECT COUNT(*) FROM incentive_payouts WHERE order_id = :id AND status = 'paid' FOR UPDATE");
+        $paidNow->execute(['id' => $orderId]);
+        if (empty($relock->fetchColumn())) {
+            $pdo->rollBack();
+            return 'This order\'s incentive is not locked.';
+        }
+        if ((int) $paidNow->fetchColumn() > 0) {
+            $pdo->rollBack();
+            return 'Part of this order\'s incentive is already paid, so it can no longer be unlocked.';
+        }
         IncentiveRepository::deleteOrderPayouts($orderId);
         $pdo->prepare('DELETE FROM order_cost_entries WHERE order_id = :id AND incentive_kind IS NOT NULL')->execute(['id' => $orderId]);
         IncentiveRepository::saveOrder($orderId, [

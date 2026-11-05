@@ -106,8 +106,8 @@ async function catalogue(associate) {
   return out;
 }
 
-async function requestsToday(associateId) {
-  const r = await db.queryOne("SELECT COUNT(*) AS n FROM price_requests WHERE associate_id = :a AND kind = 'auto' AND requested_at >= :d",
+async function requestsToday(associateId, c = db) {
+  const r = await c.queryOne("SELECT COUNT(*) AS n FROM price_requests WHERE associate_id = :a AND kind = 'auto' AND requested_at >= :d",
     { a: associateId, d: `${ymd()} 00:00:00` });
   return Number(r.n);
 }
@@ -196,10 +196,10 @@ async function work(associate, product, selection) {
 }
 
 /** The next request number: PR-YY-DD-NNNN (NNNN counts through the year). */
-async function nextNumber() {
+async function nextNumber(c = db) {
   const now = new Date();
   const year = now.getFullYear();
-  const r = await db.queryOne('SELECT COUNT(*) AS n FROM price_requests WHERE requested_at >= :a AND requested_at < :b',
+  const r = await c.queryOne('SELECT COUNT(*) AS n FROM price_requests WHERE requested_at >= :a AND requested_at < :b',
     { a: `${year}-01-01 00:00:00`, b: `${year + 1}-01-01 00:00:00` });
   return `PR-${String(year).slice(-2)}-${p2(now.getDate())}-${String(Number(r.n) + 1).padStart(4, '0')}`;
 }
@@ -207,17 +207,17 @@ async function nextNumber() {
 const INSERT_KEYS = ['number', 'associate_id', 'product_id', 'selection', 'selection_text', 'other_note', 'kind', 'status', 'unit', 'quote', 'lowest',
   'figures', 'breakdown', 'level_name', 'valid_until', 'requested_at', 'due_at'];
 
-async function insert(row) {
+async function insert(row, c = db) {
   for (let attempt = 0; attempt < 5; attempt++) {
-    row.number = await nextNumber();
+    row.number = await nextNumber(c);
     if (attempt > 0) row.number = row.number.slice(0, 9) + String(parseInt(row.number.slice(9), 10) + attempt).padStart(4, '0');
     try {
       const params = {};
       for (const k of INSERT_KEYS) params[k] = row[k] ?? null;
-      const r = await db.execute(
+      const r = await c.execute(
         `INSERT INTO price_requests (${INSERT_KEYS.join(', ')}) VALUES (${INSERT_KEYS.map((k) => `:${k}`).join(', ')})`, params);
       // D-257: a price request belongs to its associate's division.
-      await db.execute('UPDATE price_requests r JOIN associates a ON a.id = r.associate_id SET r.division_id = a.division_id WHERE r.id = :id AND r.division_id <> a.division_id', { id: r.insertId });
+      await c.execute('UPDATE price_requests r JOIN associates a ON a.id = r.associate_id SET r.division_id = a.division_id WHERE r.id = :id AND r.division_id <> a.division_id', { id: r.insertId });
       return Number(r.insertId);
     } catch (e) {
       if (!String(e.message).includes('Duplicate') || attempt === 4) throw e;
@@ -256,9 +256,9 @@ async function create(associate, product, selection, other, note) {
     await auditLogRepository.log(null, 'PRICE_REQUEST_MANUAL', 'price_requests', id, null, null, `${number}: ${product.name} — ${row.selection_text}`);
     return [id, null];
   }
-  if ((await leftToday(associate)) <= 0) {
-    return [null, `You have used today's ${await dailyLimit(associate)} price requests. Ask NexaCrest if you need more today.`];
-  }
+  const limit = await dailyLimit(associate);
+  const refusal = `You have used today's ${limit} price requests. Ask NexaCrest if you need more today.`;
+  if ((await leftToday(associate)) <= 0) return [null, refusal];
   row.kind = 'auto';
   row.status = 'valid';
   row.quote = Number(w.quote).toFixed(2);
@@ -266,7 +266,14 @@ async function create(associate, product, selection, other, note) {
   row.figures = JSON.stringify(w.figures);
   row.breakdown = JSON.stringify({ lines: w.breakdown, charges: w.charges, per_m2: w.per_m2, m2_per_cbm: w.m2_per_cbm });
   row.valid_until = addDays(ymd(now), await validDays(associate));
-  const id = await insert(row);
+  // Fresh-eyes review L4: the count and the insert run under a lock on the associate's row,
+  // so requests fired at the same moment cannot pass the daily limit together.
+  const id = await db.transaction(async (c) => {
+    await c.queryOne('SELECT id FROM associates WHERE id = :a FOR UPDATE', { a: Number(associate.id) });
+    if (limit - (await requestsToday(Number(associate.id), c)) <= 0) return null;
+    return insert(row, c);
+  });
+  if (id === null) return [null, refusal];
   await auditLogRepository.log(null, 'PRICE_REQUEST_AUTO', 'price_requests', id, null, null,
     `${(await find(id)).number}: ${product.name} — ${row.selection_text} → ${row.quote} / ${row.lowest} per ${row.unit}`);
   return [id, null];
@@ -318,10 +325,10 @@ async function report(today = null) {
     `SELECT a.id, a.name,
             (SELECT COUNT(*) FROM price_requests r WHERE r.associate_id = a.id AND r.requested_at >= :f1) AS requests,
             (SELECT COUNT(*) FROM orders o JOIN clients c ON c.id = o.client_id
-              WHERE c.associate_id = a.id AND o.created_at >= :f2 AND o.is_test_data = 0) AS orders_count
+              WHERE c.associate_id = a.id AND o.created_at >= :f2 AND o.is_test_data = 0${require('./divisionService').sql('o.division_id')}) AS orders_count
        FROM associates a
-      WHERE EXISTS (SELECT 1 FROM price_requests r WHERE r.associate_id = a.id AND r.requested_at >= :f3)
-      ORDER BY requests DESC, a.name`, { f1: from, f2: from, f3: from });
+      WHERE EXISTS (SELECT 1 FROM price_requests r WHERE r.associate_id = a.id AND r.requested_at >= :f3)${require('./divisionService').sql('a.division_id')}
+      ORDER BY requests DESC, a.name`, { f1: from, f2: from, f3: from }); // D-257 (fresh-eyes review L1): the associates of the request's division(s)
   return rows.map((r) => {
     const req = Number(r.requests);
     const ord = Number(r.orders_count);

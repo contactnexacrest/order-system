@@ -28,7 +28,7 @@ final class OrderQualityDocumentRepository
         $stmt = $pdo->prepare(
             "SELECT DISTINCT COALESCE(op.category_id, (SELECT pc.id FROM product_categories pc WHERE pc.is_system = 1 ORDER BY pc.id LIMIT 1)) AS cid
                FROM order_products op
-              WHERE op.order_id = :o AND op.line_type = 'goods'"
+              WHERE op.order_id = :o AND op.line_type = 'goods' AND op.is_active = 1"  // fresh-eyes review L3: deleted lines ask for nothing
         );
         $stmt->execute(['o' => $orderId]);
         $categoryIds = array_values(array_filter(array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN))));

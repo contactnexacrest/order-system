@@ -40,6 +40,10 @@ product page are shown only to people who may see purchase prices.
    quotes use the new values; orders with an issued Proforma Invoice keep their prices.
 2. **Commission levels:** add, edit, deactivate or delete (2%, 5%, 7%, 10%, or a fixed USD
    amount per unit). A level used by an associate or the ladder can only be deactivated.
+   A fixed USD amount is always in US dollars: on an order in another currency it is
+   converted at the pricing exchange rate (e.g. USD 1.00 × 2,000 units = ₹1,67,000 at
+   ₹83.50, whatever the buyer's currency). The same holds for a team incentive reserve in
+   USD per unit.
 3. **Ladder:** steps by counting-order number (1–5, 6–10, 11–20, 21 onward), each pointing
    to a level. Steps start at 1, run on without gaps, and the last runs "onward".
 4. **Associate → Edit → Commission level:** **Ladder** or **Fixed level** (choose the level).
@@ -92,7 +96,10 @@ asked price and the team incentive on the line before → after (the amount belo
 floor comes out of the line's team incentive first; on an associate's order the associate
 earns **no commission on that line**). The MD writes a reason (at least 10 characters) and
 clicks **Approve** or **Refuse** (whoever asked is told). The approval holds while the line
-keeps that price — **any later price change voids it** and the line goes back to the MD.
+keeps that price and the same options and unit — **any later change of the price, the
+specification options or the unit voids it** and the line goes back to the MD. A change of
+options or unit after the Proforma Invoice also drops the figures fixed at the PI, so the
+line is checked against the floor of its new options.
 Audit: LINE_PRICE_APPROVAL_REQUESTED, LINE_PRICE_APPROVED, LINE_PRICE_APPROVAL_REFUSED,
 LINE_PRICE_APPROVAL_VOIDED. Admin → Self-approval rules ("price discount") decide whether the
 MD may approve a price they set themselves.
@@ -302,6 +309,8 @@ USD 24.84; + 3 % buffer = quote USD 25.59.
 documents. For each document: the status (Pending → Received → Approved), the file and a
 note (e.g. heat number). Received or Approved needs the file attached. Only people who can
 manage orders or purchasing can update it; it is internal and never shown to the client.
+It sits inside the **Products** card, which opens by itself while a document is still
+awaited. A deleted line no longer asks for its category's documents.
 
 **New list values.** Units MTR, LTR, HOUR and DAY (PCS, SET, KG and MT were already there);
 supplier types Manufacturer, Machine Shop and Forging / Casting Unit (Trader was already

@@ -28,7 +28,7 @@ const STATES = {
 
 const HEADERS = ['Order', 'Client', 'Order date', 'Payee', 'Payee type', 'Role', 'Amount (INR)', 'GST (INR)', 'TDS (INR)', 'State', 'Due on', 'Payout run', 'Paid on'];
 
-const round2 = (v) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
+const { round2 } = require('../helpers/money'); // PHP round(x, 2) (fresh-eyes review M3)
 
 function ymd(v) {
   if (v === null || v === undefined || v === '') return null;
@@ -57,8 +57,8 @@ async function lockedRows() {
      JOIN orders o ON o.id = p.order_id
      LEFT JOIN users u ON u.id = p.user_id
      LEFT JOIN associates a ON a.id = p.associate_id
-     WHERE o.is_test_data = :t AND o.is_sample_data = 0
-     ORDER BY o.id, p.payee_kind DESC, p.id`,
+     WHERE o.is_test_data = :t AND o.is_sample_data = 0${require('./divisionService').sql('o.division_id')}
+     ORDER BY o.id, p.payee_kind DESC, p.id`, // D-257 (fresh-eyes review L1): only the orders of the request's division(s)
     { t: await testFlag() }
   );
   const out = [];
@@ -99,7 +99,8 @@ const PER_PAGE = 100;
  */
 async function openOrderIds(f = {}) {
   if (['locked', 'held', 'paid'].includes(String(f.state || ''))) return [];
-  let where = '';
+  // D-257 (fresh-eyes review L1): only the orders of the request's division(s).
+  let where = require('./divisionService').sql('o.division_id');
   const params = { t: await testFlag() };
   if (f.from) { where += ' AND DATE(o.created_at) >= :from'; params.from = String(f.from); }
   if (f.to) { where += ' AND DATE(o.created_at) <= :to'; params.to = String(f.to); }

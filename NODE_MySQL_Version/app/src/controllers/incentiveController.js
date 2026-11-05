@@ -585,7 +585,8 @@ async function markPaid(req, res) {
     if (payout.payee_kind === 'associate') {
       // D-245 P3: GST on top for a GST-registered associate whose tax invoice for this payout is on file.
       const associateCommission = require('../services/associateCommission');
-      const gst = await associateCommission.gstFor(payout);
+      // Fresh-eyes review L2: on the gross billed (paid + TDS), as recorded just now.
+      const gst = await associateCommission.gstFor({ ...payout, paid_inr: paidInr, tds_inr: Number(tds || 0) });
       if (gst > 0) {
         await db.execute('UPDATE incentive_payouts SET gst_pct = :p, gst_inr = :g WHERE id = :id', { p: (await associateCommission.settings()).gst_pct, g: gst, id });
       }

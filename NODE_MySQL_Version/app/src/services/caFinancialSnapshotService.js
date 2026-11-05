@@ -113,7 +113,7 @@ async function build(orderId) {
     { o: orderId }
   );
   for (const c of chargeRows) legCharges[c.leg] = { fx: Number(c.fx), inr: Number(c.inr), own: Number(c.own) };
-  const round2 = (v) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
+  const { round2 } = require('../helpers/money');
   for (const [leg, label] of [['advance', 'Advance'], ['freight', 'Freight & insurance (Debit Note)'], ['balance', 'Balance']]) {
     if (!payment[`${leg}_remittance_received_at`]) continue;
     const amount = Number(payment[`${leg}_amount`] || 0);

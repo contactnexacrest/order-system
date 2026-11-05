@@ -17,7 +17,7 @@ async function forOrder(orderId) {
   const ids = (await db.query(
     `SELECT DISTINCT COALESCE(op.category_id, (SELECT pc.id FROM product_categories pc WHERE pc.is_system = 1 ORDER BY pc.id LIMIT 1)) AS cid
        FROM order_products op
-      WHERE op.order_id = :o AND op.line_type = 'goods'`,
+      WHERE op.order_id = :o AND op.line_type = 'goods' AND op.is_active = 1`, // fresh-eyes review L3: deleted lines ask for nothing
     { o: orderId },
   )).map((r) => Number(r.cid)).filter((n) => n > 0);
   if (ids.length === 0) return [];

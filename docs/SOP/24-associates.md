@@ -113,6 +113,11 @@ steps are in **Admin → Pricing → Commission levels**.
 **The level is fixed on the order when its Proforma Invoice is issued**
 (the order shows "Level 2 — 5%" and "fixed at PI on …"). Until then the
 order shows the level the associate would get today.
+If the MD later moves the client to another associate, the level fixed at
+the PI stays with the associate it was fixed for: the new associate earns on
+the order at their own level, the same level the order's price check uses.
+A fixed USD amount per unit is converted at the pricing exchange rate when
+the buyer's order is in another currency.
 
 ## How a buyer becomes an associate's client
 

@@ -126,6 +126,18 @@ describe('D-255 specifications and associate price requests', () => {
     expect(rows.map((r) => r.name)).toEqual(['Admin', 'Managing Director']);
   });
 
+  // Fresh-eyes review L4 (5 Nov 2026): the count and the insert run in one transaction that locks the associate's row.
+  it('the daily limit holds when requests are fired at the same moment', async () => {
+    await db.execute('UPDATE associates SET price_request_daily_limit = 2 WHERE id = :a', { a: associate });
+    const product_ = await p();
+    const selection = await sel(SQM);
+    const results = await Promise.all([0, 1, 2, 3].map(async () => priceRequestService.create(await me(), product_, selection, false, null)));
+    const errors = results.map((r) => r[1]);
+    expect(errors.filter((e) => e === null)).toHaveLength(2);
+    expect(errors.filter((e) => e !== null)).toEqual(Array(2).fill("You have used today's 2 price requests. Ask NexaCrest if you need more today."));
+    expect(await priceRequestService.requestsToday(associate)).toBe(2);
+  });
+
   it('an automatic request is numbered, valid for seven days and counts toward the daily limit', async () => {
     await db.execute('UPDATE associates SET price_request_daily_limit = 1 WHERE id = :a', { a: associate });
     const [id, err] = await priceRequestService.create(await me(), await p(), await sel(SQM), false, null);
