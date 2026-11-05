@@ -491,7 +491,7 @@ describe('Route behaviour (QA Round 6, R5-14)', () => {
     expectDone(await holder.call('POST', `/associates/${id}/bank/${second}/reject`, { reason: 'Name does not match the PAN.' }), 'POST /associates/:id/bank/:bankId/reject');
     expectDone(await holder.call('POST', `/associates/${id}/status`, { status: 'active', reason: 'Route test activation' }), 'POST /associates/:id/status');
 
-    expectDone(await holder.call('POST', `/associates/${id}/portal/invite`), 'POST /associates/:id/portal/invite', `Portal access e-mailed to ${email}.`);
+    expectDone(await holder.call('POST', `/associates/${id}/portal/invite`), 'POST /associates/:id/portal/invite', `Portal login link e-mailed to ${email}.`);
     expectDone(await holder.call('POST', `/associates/${id}/code`, { readable: 'ROUTE' }), 'POST /associates/:id/code', 'Personal code set to NXA-ROUTE-');
     expectDone(await holder.call('POST', `/associates/${id}/portal/disable`), 'POST /associates/:id/portal/disable');
     expectDone(await holder.call('POST', `/associates/${id}/messages`, { body: 'Route test message.' }), 'POST /associates/:id/messages');

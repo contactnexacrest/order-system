@@ -2,13 +2,17 @@
 <div class="card page-wide">
   <h1>Welcome, <?= htmlspecialchars((string) $me['name']) ?></h1>
   <?php if ($me['status'] !== 'active'): ?><div class="alert alert-warning">Your account is <?= htmlspecialchars(strtolower(\App\Repositories\AssociateRepository::STATUSES[$me['status']] ?? $me['status'])) ?>. <?= $me['status'] === 'invited' ? 'It becomes active once NexaCrest has checked your documents and bank details — add them under Profile.' : 'Contact your relationship manager.' ?></div><?php endif; ?>
+  <?php $__kycMissing = \App\Services\AssociateKyc::missing($me); if ($__kycMissing !== [] || empty($me['address'])): ?>
+    <?php // Owner decision D-253 / D-252: after the first login the associate completes the profile and the KYC documents. ?>
+    <div class="alert alert-warning">Please complete <a href="/associate/profile#kyc">your profile and documents</a><?= $__kycMissing !== [] ? ' — still needed or being checked: ' . htmlspecialchars(implode(', ', $__kycMissing)) : '' ?><?= empty($me['address']) ? ($__kycMissing !== [] ? '; ' : ' — ') . 'your address' : '' ?>. Commission is paid once your documents are accepted.</div>
+  <?php endif; ?>
   <div class="stat-row">
     <div class="stat"><div class="stat-label">Earned this year</div><div class="stat-value"><?= $__m($totals['earned_year']) ?></div></div>
     <div class="stat"><div class="stat-label">Waiting to be paid</div><div class="stat-value"><?= $__m($totals['waiting']) ?></div></div>
     <div class="stat"><div class="stat-label">Paid this year</div><div class="stat-value"><?= $__m($totals['paid_year']) ?></div></div>
     <?php if ($totals['held'] > 0): ?><div class="stat"><div class="stat-label">On hold</div><div class="stat-value"><?= $__m($totals['held']) ?></div></div><?php endif; ?>
   </div>
-  <p>Clients: <b><?= count($clients) ?></b> · Invitations open: <b><?= count(array_filter($invitations, static fn (array $i): bool => in_array($i['status'], ['created', 'opened', 'registered'], true))) ?></b>
+  <p>Clients: <b><?= count($clients) ?></b> · Buyer registration links open: <b><?= count(array_filter($invitations, static fn (array $i): bool => in_array($i['status'], ['created', 'opened', 'registered'], true))) ?></b>
     <?php if (!empty($me['personal_code'])): ?> · Your personal code: <b><?= htmlspecialchars((string) $me['personal_code']) ?></b><?php endif; ?></p>
   <p><a class="btn-sm" href="/associate/clients">Invite a client</a></p>
 

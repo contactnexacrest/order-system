@@ -3,13 +3,17 @@
 <div class="card page-wide">
   <h1>Welcome, {{ me.name }}</h1>
   {% if me.status != 'active' %}<div class="alert alert-warning">Your account is {{ (statuses[me.status] or me.status) | lower }}. {{ 'It becomes active once NexaCrest has checked your documents and bank details — add them under Profile.' if me.status == 'invited' else 'Contact your relationship manager.' }}</div>{% endif %}
+  {% if kycMissing.length or not me.address %}
+    {# Owner decision D-253 / D-252: after the first login the associate completes the profile and the KYC documents. #}
+    <div class="alert alert-warning">Please complete <a href="/associate/profile#kyc">your profile and documents</a>{% if kycMissing.length %} — still needed or being checked: {{ kycMissing | join(', ') }}{% endif %}{% if not me.address %}{{ '; ' if kycMissing.length else ' — ' }}your address{% endif %}. Commission is paid once your documents are accepted.</div>
+  {% endif %}
   <div class="stat-row">
     <div class="stat"><div class="stat-label">Earned this year</div><div class="stat-value">₹{{ totals.earned_year | money }}</div></div>
     <div class="stat"><div class="stat-label">Waiting to be paid</div><div class="stat-value">₹{{ totals.waiting | money }}</div></div>
     <div class="stat"><div class="stat-label">Paid this year</div><div class="stat-value">₹{{ totals.paid_year | money }}</div></div>
     {% if totals.held > 0 %}<div class="stat"><div class="stat-label">On hold</div><div class="stat-value">₹{{ totals.held | money }}</div></div>{% endif %}
   </div>
-  <p>Clients: <b>{{ clients.length }}</b> · Invitations open: <b>{{ openInvitations }}</b>
+  <p>Clients: <b>{{ clients.length }}</b> · Buyer registration links open: <b>{{ openInvitations }}</b>
     {% if me.personal_code %} · Your personal code: <b>{{ me.personal_code }}</b>{% endif %}</p>
   <p><a class="btn-sm" href="/associate/clients">Invite a client</a></p>
 

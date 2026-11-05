@@ -54,9 +54,27 @@ final class AssociatePortalRepository
             $po->execute(['c' => $c['id']]);
             $first = $po->fetchColumn();
             $c['window_ends_on'] = $first ? date('Y-m-d', strtotime($first . ' +9 days')) : null;
+            $c['came_via'] = self::cameVia($c);
+            $ord = Database::connection()->prepare("SELECT order_reference FROM orders WHERE client_id = :c AND status NOT IN ('cancelled','lost') AND is_test_data = 0 ORDER BY id");
+            $ord->execute(['c' => $c['id']]);
+            $c['order_refs'] = array_map('strval', $ord->fetchAll(\PDO::FETCH_COLUMN));
             $out[] = $c;
         }
         return $out;
+    }
+
+    /** D-254: how a client came to the associate — which code, a buyer registration link, or linked by NexaCrest. */
+    public static function cameVia(array $client): string
+    {
+        $source = (string) ($client['associate_source'] ?? '');
+        $inv = !empty($client['associate_invitation_id']) ? AssociateInvitationRepository::find((int) $client['associate_invitation_id']) : null;
+        if ($source === 'code' || ($inv['kind'] ?? '') === 'personal_code') {
+            return !empty($inv['code_used']) ? 'Code ' . $inv['code_used'] : 'Personal code';
+        }
+        if ($source === 'link' || ($inv['kind'] ?? '') === 'client_link') {
+            return 'Buyer registration link';
+        }
+        return ['staff' => 'Linked by NexaCrest', 'md_change' => 'Changed by the MD'][$source] ?? ($source !== '' ? $source : '—');
     }
 
     /** @return list<array<string,mixed>> every order of the associate's clients, newest first */

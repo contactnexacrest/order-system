@@ -107,6 +107,22 @@ abstract class DbTestCase extends TestCase
     }
 
     /** Minimal valid client row, returns its id. */
+    /**
+     * Owner decision D-252 (4 Nov 2026): commission is paid only once the associate's KYC
+     * is complete. Tests about something else mark every required document accepted.
+     */
+    protected function completeAssociateKyc(int $associateId): void
+    {
+        $pdo = \App\Config\Database::connection();
+        $a = \App\Repositories\AssociateRepository::find($associateId);
+        foreach (\App\Services\AssociateKyc::requiredItems((array) $a) as $item) {
+            $pdo->prepare("INSERT INTO file_store (file_origin, server_path, uuid_filename, original_filename, file_size_bytes, mime_type) VALUES ('RECEIVED', '/tmp/none.pdf', :u, 'kyc.pdf', 10, 'application/pdf')")
+                ->execute(['u' => 'kyc-' . bin2hex(random_bytes(6)) . '.pdf']);
+            $pdo->prepare("INSERT INTO associate_documents (associate_id, kind, file_id, uploaded_by_associate, status) VALUES (:a, :k, :f, 1, 'accepted')")
+                ->execute(['a' => $associateId, 'k' => $item['kinds'][0], 'f' => (int) $pdo->lastInsertId()]);
+        }
+    }
+
     protected function createTestClient(?string $email = null): int
     {
         $pdo = \App\Config\Database::connection();

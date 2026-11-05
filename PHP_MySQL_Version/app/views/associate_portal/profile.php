@@ -51,20 +51,31 @@ $__usable = AssociateBankRepository::usable((int) $me['id']);
     </details>
   </div>
 
-  <div class="section">
-    <h2>My documents</h2>
-    <table class="list"><tr><th>Added</th><th>Document</th><th>Reference</th></tr>
-      <?php foreach ($documents as $d): ?><tr><td><?= $__d($d['created_at']) ?></td><td><a href="/associate/documents/<?= (int) $d['id'] ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$d['kind']] ?? $d['kind']) ?></a></td><td><?= htmlspecialchars((string) ($d['reference'] ?? '')) ?></td></tr><?php endforeach; ?>
-      <?php if ($documents === []): ?><tr><td colspan="3" class="muted">None yet.</td></tr><?php endif; ?>
+  <div class="section" id="kyc">
+    <h2>My documents and KYC</h2>
+    <?php // Owner decision D-252 (A3): the KYC checklist — NexaCrest checks each document; commission is paid once all are accepted. ?>
+    <table class="list"><tr><th>Needed</th><th>Status</th><th>Document</th></tr>
+      <?php foreach ($kyc as $__i): ?>
+        <tr><td><?= htmlspecialchars($__i['label']) ?></td>
+          <td><span class="badge <?= ['accepted' => 'badge-success', 'rejected' => 'badge-danger', 'pending' => 'badge-warning'][$__i['status']] ?? '' ?>"><?= htmlspecialchars(\App\Services\AssociateKyc::STATUS_LABELS[$__i['status']]) ?></span>
+            <?php if ($__i['status'] === 'rejected' && !empty($__i['doc']['review_reason'])): ?><br><small><?= htmlspecialchars((string) $__i['doc']['review_reason']) ?> — please upload it again.</small><?php endif; ?></td>
+          <td><?= $__i['doc'] !== null ? htmlspecialchars(AssociateDocumentRepository::KINDS[$__i['doc']['kind']] ?? $__i['doc']['kind']) . (!empty($__i['doc']['reference']) ? ' · ' . htmlspecialchars((string) $__i['doc']['reference']) : '') : ($__i['by_nexacrest'] ? 'On file at NexaCrest' : '—') ?></td></tr>
+      <?php endforeach; ?>
     </table>
-    <form method="post" action="/associate/documents" enctype="multipart/form-data" class="inline-form">
+    <p class="muted small">Commission is paid once every document above is accepted.</p>
+    <h3>All documents</h3>
+    <table class="list"><tr><th>Added</th><th>Document</th><th>Number / reference</th><th>Status</th></tr>
+      <?php foreach ($documents as $d): ?><tr><td><?= $__d($d['created_at']) ?></td><td><a href="/associate/documents/<?= (int) $d['id'] ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$d['kind']] ?? $d['kind']) ?></a></td><td><?= htmlspecialchars((string) ($d['reference'] ?? '')) ?></td>
+        <td><?= htmlspecialchars(['accepted' => 'Accepted', 'rejected' => 'Rejected', 'received' => 'Being checked'][$d['status']] ?? (string) $d['status']) ?></td></tr><?php endforeach; ?>
+      <?php if ($documents === []): ?><tr><td colspan="4" class="muted">None yet.</td></tr><?php endif; ?>
+    </table>
+    <form method="post" action="/associate/documents" enctype="multipart/form-data">
       <?= Csrf::field() ?>
-      <select name="kind" required aria-label="Document kind"><option value="">What is it?</option>
-        <?php foreach (AssociateDocumentRepository::ASSOCIATE_KINDS as $k): if ($k === 'invoice') { continue; } ?><option value="<?= $k ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$k]) ?></option><?php endforeach; ?>
-      </select>
-      <input type="file" name="document_file" required accept=".pdf,.jpg,.jpeg,.png" aria-label="File">
+      <div class="field-grid">
+        <?php $__docKinds = array_values(array_filter(AssociateDocumentRepository::ASSOCIATE_KINDS, static fn (string $k): bool => $k !== 'invoice')); require dirname(__DIR__) . '/associates/_doc_upload_fields.php'; ?>
+      </div>
       <button type="submit" class="btn-sm">Upload</button>
     </form>
-    <p class="muted small"><?= $__india ? 'India: PAN card, address proof, GST certificate if registered.' : 'Abroad: passport or company registration, tax residency certificate, Form 10F, no-PE declaration.' ?></p>
+    <p class="muted small"><?= $__india ? 'India: PAN card, Aadhaar card (we keep only its last 4 digits) or passport, bank proof, the signed agreement, GST certificate if registered.' : 'Abroad: passport or company registration, bank proof, the signed agreement, tax residency certificate, Form 10F, no-PE declaration.' ?></p>
   </div>
 </div>

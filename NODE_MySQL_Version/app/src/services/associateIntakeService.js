@@ -30,7 +30,7 @@ const sha256 = (v) => crypto.createHash('sha256').update(String(v)).digest('hex'
 /**
  * Owner decision 4 Nov 2026 (A6): a buyer never sees an error caused by an
  * associate code or link. When the code or link cannot be applied —
- * unknown or mistyped, an old (retired) code, a link that expired or was
+ * unknown or mistyped, an old code staff blocked, a link that expired or was
  * used, an associate who is suspended or ended — the buyer
  * carries on as a direct buyer with no hint, and `note` tells staff on the
  * intake review what was given and why it was not applied. `error` is kept
@@ -66,14 +66,14 @@ async function introducer(code, token) {
     if (!a) {
       const old = await associateRepository.findByRetiredCode(associateCodeService.normalise(c));
       return none(old
-        ? `${given} given but not applied: it is an old code of associate ${old.name}, replaced by a new one.`
+        ? `${given} given but not applied: it is an old code of associate ${old.name} that NexaCrest blocked.`
         : `${given} given but not applied: no associate has this code.`);
     }
     const why = notActiveReason(a);
     if (why !== null) {
       return none(`${given} (associate ${a.name}) given but not applied: ${why}.`);
     }
-    return { associate: a, invitation: null, error: null, note: null };
+    return { associate: a, invitation: null, error: null, note: null, code: associateCodeService.normalise(c) };
   }
   return { associate: null, invitation: null, error: null, note: null };
 }
@@ -107,8 +107,9 @@ async function sendEmailCode(submissionId, email) {
 /** QA Round 8, R8-N04: the message when a one-off link was already used by another registration. */
 const LINK_USED = 'This invitation link has expired or was already used. Ask the person who sent it for a new one, or send your request without it.';
 
-async function attach(submissionId, associate, invitation, company, country, email, confirmed, website) {
-  const invId = invitation ? Number(invitation.id) : await associateInvitationRepository.createForCode(Number(associate.id), company, country);
+async function attach(submissionId, associate, invitation, company, country, email, confirmed, website, code = null) {
+  // A buyer registration link was already taken (claim); a personal code gets a row of its own, remembering the code used ("came via", D-254).
+  const invId = invitation ? Number(invitation.id) : await associateInvitationRepository.createForCode(Number(associate.id), company, country, code);
   await db.execute(
     'UPDATE client_intake_submissions SET associate_id = :a, associate_invitation_id = :i, introduction_confirmed = :c, website = :w WHERE id = :id',
     { a: associate.id, i: invId, c: confirmed ? 1 : 0, w: website || null, id: submissionId }

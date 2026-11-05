@@ -601,6 +601,9 @@ app.get('/quotation-details', asyncHandler(clientIntakeController.show));
 app.post('/quotation-details/submit', verifyCsrf, asyncHandler(clientIntakeController.submit));
 // Owner decision 1 Nov 2026 (AS-5): an associate's one-off link, and the buyer's e-mail code + "X introduced us".
 app.get('/invite/:token', asyncHandler(clientIntakeController.invite));
+// Owner decision D-253: the public associate registration form (one-use link from the MD).
+app.get('/associate-register/:token', asyncHandler(require('./controllers/associateRegistrationController').show));
+app.post('/associate-register/:token', verifyCsrf, asyncHandler(require('./controllers/associateRegistrationController').submit));
 app.get('/quotation-details/verify', asyncHandler(clientIntakeController.showVerify));
 app.post('/quotation-details/verify', verifyCsrf, asyncHandler(clientIntakeController.verify));
 app.get('/quotation-details/edit/:token', asyncHandler(clientIntakeController.showEdit));
@@ -1005,6 +1008,14 @@ app.get('/agreements/:id/file', requireAuth, requirePermissionAny(['view_agreeme
 app.get('/associates', requireAuth, requirePermissionAny(['view_associates', 'manage_associates', 'manage_associate_bank']), asyncHandler(associateAdminController.index));
 app.get('/associates/new', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.create));
 app.post('/associates', requireAuth, requirePermission('manage_associates'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(associateAdminController.save));
+// Owner decision D-253 (4 Nov 2026, A1): associate self-registration through the MD's one-use link.
+const associateRegistrationController = require('./controllers/associateRegistrationController');
+app.get('/associates/registrations', requireAuth, requirePermission('manage_associates'), asyncHandler(associateRegistrationController.index));
+app.post('/associates/registrations/links', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateRegistrationController.createLink));
+app.post('/associates/registrations/links/:id/cancel', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateRegistrationController.cancelLink));
+app.post('/associates/registrations/settings', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateRegistrationController.saveSettings));
+app.post('/associates/registrations/:id/accept', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateRegistrationController.accept));
+app.post('/associates/registrations/:id/reject', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateRegistrationController.reject));
 app.get('/associates/ladder', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.ladder));
 app.post('/associates/ladder', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.saveLadder));
 app.get('/reports/associates', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.report));
@@ -1025,6 +1036,8 @@ app.post('/associates/:id/bank/:bankId/verify', requireAuth, requirePermission('
 app.post('/associates/:id/bank/:bankId/reject', requireAuth, requirePermission('manage_associate_bank'), verifyCsrf, asyncHandler(associateAdminController.rejectBank));
 app.get('/associates/:id/bank/:bankId/number', requireAuth, requirePermission('manage_associate_bank'), asyncHandler(associateAdminController.bankNumber));
 app.post('/associates/:id/documents', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_bank']), uploadLarge.single('document_file'), verifyCsrf, asyncHandler(associateAdminController.uploadDocument));
+// Owner decision D-252 (A3): accept / reject one KYC document.
+app.post('/associates/:id/documents/:docId/review', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.reviewDocument));
 app.get('/associates/:id/documents/:docId', requireAuth, requirePermissionAny(['manage_associates', 'manage_associate_bank']), asyncHandler(associateAdminController.downloadDocument));
 app.post('/associates/:id/messages', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.reply));
 app.post('/associates/payouts/:payoutId/hold', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.holdPayout));
@@ -1364,6 +1377,7 @@ app.get('/associate/clients', requireAssociateAuth, asyncHandler(associatePortal
 app.get('/associate/clients/:id/certificate', requireAssociateAuth, asyncHandler(associatePortalController.certificate));
 app.post('/associate/invitations', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.createInvitation));
 app.post('/associate/invitations/:id/cancel', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.cancelInvitation));
+app.post('/associate/code/propose', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.proposeCode));
 app.post('/associate/code', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.chooseCode));
 app.get('/associate/orders', requireAssociateAuth, asyncHandler(associatePortalController.orders));
 app.get('/associate/orders/:id', requireAssociateAuth, asyncHandler(associatePortalController.order));

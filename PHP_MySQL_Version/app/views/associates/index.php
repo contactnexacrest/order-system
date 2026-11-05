@@ -7,7 +7,7 @@
     </div>
     <div class="btn-row" style="margin-top:0">
       <?php if (!empty($kanbanUser)): ?><a class="btn-sm btn-secondary" href="/associates">Switch to board view</a><?php endif; ?>
-      <?php if ($canManage): ?><a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/ladder">Commission settings</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a><?php endif; ?>
+      <?php if ($canManage): ?><a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/registrations">Registrations<?php $__pendingReg = \App\Repositories\AssociateRegistrationRepository::pendingCount(); if ($__pendingReg > 0): ?> (<?= $__pendingReg ?> waiting)<?php endif; ?></a> <a class="btn-sm btn-secondary" href="/associates/ladder">Commission settings</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a><?php endif; ?>
     </div>
   </div>
   <?php require __DIR__ . '/_filters.php'; ?>

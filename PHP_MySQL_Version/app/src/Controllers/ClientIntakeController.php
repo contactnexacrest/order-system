@@ -89,7 +89,7 @@ final class ClientIntakeController
         \App\Services\AssociateIntakeService::recordNote($id, $intro['note'] ?? null);
         $link = self::issueCorrectionLink($id, $data['email']);
         if ($intro['associate'] !== null) {
-            $code = \App\Services\AssociateIntakeService::attach($id, $intro['associate'], $intro['invitation'], $data['company_legal_name'], $data['country_of_destination'], $data['email'], true, $website ?: null);
+            $code = \App\Services\AssociateIntakeService::attach($id, $intro['associate'], $intro['invitation'], $data['company_legal_name'], $data['country_of_destination'], $data['email'], true, $website ?: null, $intro['code'] ?? null);
             $_SESSION[\App\Services\AssociateIntakeService::SESSION_KEY] = $id;
             \App\Repositories\AuditLogRepository::log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', $id, 'associate_id', null, (string) $intro['associate']['id'], "Submitted by {$data['company_legal_name']} via the public quotation-details form, introduced by associate {$intro['associate']['name']}.");
             if (\App\Services\AssociatePortalService::showCodeOnScreen()) {

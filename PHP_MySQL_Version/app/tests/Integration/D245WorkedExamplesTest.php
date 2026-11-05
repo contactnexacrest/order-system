@@ -282,6 +282,7 @@ final class D245WorkedExamplesTest extends DbTestCase
         self::assertSame(0.0, AssociateCommission::gstFor($assoc), 'no tax invoice yet');
         AssociateDocumentRepository::add($a, 'invoice', $this->createTestFile(), (int) $assoc['id'], 'INV-P6-1', true, null);
         self::assertSame(20855.04, AssociateCommission::gstFor($assoc), 'GST 18% on top, not a cost');
+        $this->completeAssociateKyc($a); // D-252: KYC complete, so only the claim hold applies
         $pdo = Database::connection();
         $pdo->prepare("INSERT INTO order_complaints (order_id, client_id, description, status, created_at) VALUES (:o, :c, 'Two blocks cracked', 'open', '2026-11-20 09:00:00')")->execute(['o' => $orderId, 'c' => $client]);
         self::assertSame('A buyer claim on this order is open — the commission waits until it is resolved.', AssociateCommission::payBlockReason($assoc, '2026-12-05'));

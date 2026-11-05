@@ -49,9 +49,9 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await page.getByRole('button', { name: 'Change status' }).click();
     await expect(page.locator('.alert-success')).toContainText('Status changed to Active.');
 
-    await page.getByRole('button', { name: 'Send portal access' }).click();
+    await page.getByRole('button', { name: 'Send portal login link' }).click();
     const flash = await page.locator('.alert-success').innerText();
-    expect(flash).toContain(`Portal access e-mailed to ${ASSOCIATE_EMAIL}.`);
+    expect(flash).toContain(`Portal login link e-mailed to ${ASSOCIATE_EMAIL}.`);
     const m = flash.match(/link: (\S+)/);
     expect(m).not.toBeNull();
     await page.goto(new URL(m[1]).pathname);
@@ -74,7 +74,7 @@ test.describe.serial('Associate: invite → buyer registers → accepted → por
     await page.getByRole('link', { name: 'My clients' }).click();
     await page.getByLabel('Company name *').fill(BUYER);
     await page.getByLabel('Country *').fill('Netherlands');
-    await page.getByRole('button', { name: 'Create link' }).click();
+    await page.getByRole('button', { name: 'Create buyer registration link' }).click();
     inviteLink = (await page.locator('.alert-success code').innerText()).trim();
     expect(inviteLink).toMatch(/\/invite\/[0-9a-f]{32}$/);
     await expect(page.locator('body')).toContainText('Link created');

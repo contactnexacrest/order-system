@@ -186,17 +186,18 @@ final class AssociatePortalRoutesTest extends DbTestCase
         $this->asAssociate($a);
         self::assertStringContainsString((string) $a['personal_code'], $this->call('GET', '/associate/clients')['body']);
 
+        // D-254: a new code is proposed ("New ending"), then confirmed ("Use this code"); the old code keeps working.
         $this->asAssociate($a);
-        self::assertSame('Use 3 to 12 letters or digits.', $this->call('POST', '/associate/code', ['readable' => 'x!'])['flash']);
+        self::assertSame('Use 3 to 12 letters or digits.', $this->call('POST', '/associate/code/propose', ['readable' => 'x!'])['flash']);
         $this->asAssociate($a);
-        $chosen = $this->call('POST', '/associate/code', ['readable' => 'Mine' . $this->tag]);
+        $this->call('POST', '/associate/code/propose', ['readable' => 'Mine' . $this->tag]);
+        $proposed = (string) $_SESSION['associate_code_proposal']['code'];
+        $chosen = $this->call('POST', '/associate/code', ['code' => $proposed]);
         $now = AssociateRepository::find((int) $a['id'])['personal_code'];
-        self::assertSame(['success', "Your personal code is now {$now}."], [$chosen['type'], $chosen['flash']]);
+        self::assertSame([$proposed, 'success', "Your personal code is now {$now}. Your old code keeps working."], [$now, $chosen['type'], $chosen['flash']]);
         self::assertNotSame($a['personal_code'], $now);
         self::assertSame(1, (int) $this->value("SELECT COUNT(*) FROM audit_log WHERE action_type = 'ASSOCIATE_CODE_CHOSEN' AND entity_id = {$a['id']}"));
-        $this->asAssociate($a);
-        self::assertSame('You have already chosen your code. Ask your relationship manager if it must change.', $this->call('POST', '/associate/code', ['readable' => 'Again' . $this->tag])['flash']);
-        self::assertSame($now, AssociateRepository::find((int) $a['id'])['personal_code'], 'chosen once only');
+        self::assertSame((int) $a['id'], (int) \App\Services\AssociateCodeService::resolve((string) $a['personal_code'])['id'], 'the old code still brings buyers');
 
         $mineInv = AssociateInvitationRepository::createLink((int) $a['id'], "Invited {$this->tag}", 'Netherlands');
         $theirsInv = AssociateInvitationRepository::createLink((int) $b['id'], "Other {$this->tag}", 'Germany');

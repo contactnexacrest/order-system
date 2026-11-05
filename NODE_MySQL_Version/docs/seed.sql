@@ -1966,7 +1966,9 @@ SELECT k, v FROM (
   UNION ALL SELECT 'associate_bank_wait_days', '7'
   UNION ALL SELECT 'associate_commission_due_days', '30' UNION ALL SELECT 'associate_claim_hold', '1'
   UNION ALL SELECT 'associate_payout_run', 'monthly' UNION ALL SELECT 'associate_payout_day', '5'
-  UNION ALL SELECT 'associate_counting_threshold_inr', '500000' UNION ALL SELECT 'associate_gst_pct', '18.00') d
+  UNION ALL SELECT 'associate_counting_threshold_inr', '500000' UNION ALL SELECT 'associate_gst_pct', '18.00'
+  -- Owner 4 Nov 2026: associate registration links last 7 days (D-253); a personal code may change 3 times a year (D-254).
+  UNION ALL SELECT 'associate_registration_link_days', '7' UNION ALL SELECT 'associate_code_changes_per_year', '3') d
 WHERE NOT EXISTS (SELECT 1 FROM incentive_settings s WHERE s.setting_key = d.k);
 
 -- ---------------------------------------------------------------- staff permissions (AS-11)

@@ -154,6 +154,10 @@ final class UngatedRoutesTest extends DbTestCase
         'GET /quotation-details/verify public',
         'POST /associate/bank associate +csrf',
         'POST /associate/code associate +csrf',
+        // Owner decisions 4 Nov 2026: the associate's code change (D-254) and the public associate registration form (D-253).
+        'POST /associate/code/propose associate +csrf',
+        'GET /associate-register/{} public',
+        'POST /associate-register/{} public +csrf',
         'POST /associate/commission/{}/invoice associate +csrf',
         'POST /associate/documents associate +csrf',
         'POST /associate/invitations associate +csrf',
@@ -468,7 +472,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(20, $checked);
+        self::assertSame(21, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -536,7 +540,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(62, $checked);
+        self::assertSame(64, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -560,7 +564,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(54, $checked);
+        self::assertSame(56, $checked);
         self::assertSame([], $failed);
     }
 

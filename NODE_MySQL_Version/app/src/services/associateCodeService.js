@@ -49,16 +49,44 @@ async function generate(readable) {
 }
 
 /**
- * Gives the associate a new personal code: the old one is retired (it no
- * longer brings new clients; clients it brought stay theirs) and no code
- * is ever given to anyone else.
+ * Gives the associate a new personal code. Owner rule (4 Nov 2026, D-254):
+ * the old code keeps bringing buyers to the same associate (links already
+ * shared keep working) unless staff block it, e.g. after a leak. No code is
+ * ever given to anyone else.
  */
-async function issue(associateId, readable) {
-  const code = await generate(readable);
-  await db.execute('UPDATE associate_codes SET retired_at = NOW() WHERE associate_id = :a AND retired_at IS NULL', { a: associateId });
-  await db.execute('INSERT INTO associate_codes (code, associate_id) VALUES (:c, :a)', { c: code, a: associateId });
-  await db.execute('UPDATE associates SET personal_code = :c WHERE id = :a', { c: code, a: associateId });
-  return code;
+async function issue(associateId, readable, blockOld = false, blockReason = null, code = null) {
+  const c = code || await generate(readable);
+  // The new code first: if someone took it in the meantime (unique), nothing else has changed.
+  await db.execute('INSERT INTO associate_codes (code, associate_id) VALUES (:c, :a)', { c, a: associateId });
+  if (blockOld) {
+    await db.execute('UPDATE associate_codes SET retired_at = NOW(), blocked_at = NOW(), blocked_reason = :r WHERE associate_id = :a AND retired_at IS NULL AND code <> :c',
+      { a: associateId, c, r: [...String(blockReason || '')].slice(0, 300).join('') });
+  } else {
+    await db.execute('UPDATE associate_codes SET retired_at = NOW() WHERE associate_id = :a AND retired_at IS NULL AND code <> :c', { a: associateId, c });
+  }
+  await db.execute('UPDATE associates SET personal_code = :c WHERE id = :a', { c, a: associateId });
+  return c;
+}
+
+/** D-254: a proposed new code for the associate to look at (nothing saved) — "like a captcha refresh". */
+async function propose(readable) {
+  return generate(readable);
+}
+
+/** D-254: how many times the associate changed their own code in the last 365 days. */
+async function changesInLastYear(associateId) {
+  const row = await db.queryOne("SELECT COUNT(*) AS n FROM associate_events WHERE associate_id = :a AND event IN ('code_chosen', 'code_changed') AND created_at >= (NOW() - INTERVAL 365 DAY)", { a: associateId });
+  return Number(row ? row.n : 0);
+}
+
+async function changesPerYear() {
+  const v = parseInt((await require('../repositories/incentiveRepository').settings()).associate_code_changes_per_year ?? '3', 10);
+  return Number.isNaN(v) || v < 0 ? 3 : v;
+}
+
+/** Every code the associate has had, newest first. */
+async function codes(associateId) {
+  return db.query('SELECT * FROM associate_codes WHERE associate_id = :a ORDER BY issued_at DESC, code', { a: associateId });
 }
 
 /** Whether the code is well-formed and its check letter matches (typo protection). */
@@ -75,8 +103,8 @@ async function resolve(code) {
   if (!isValid(code)) {
     return null;
   }
-  // Only the associate's current code brings new clients; a retired code resolves to nobody.
-  return require('../repositories/associateRepository').findByCode(normalise(code));
+  // Owner rule D-254: the current code and every old one (not blocked by staff) bring the buyer to the associate.
+  return require('../repositories/associateRepository').findByAnyCode(normalise(code));
 }
 
-module.exports = { ALPHABET, normalise, readablePart, checkChar, generate, issue, isValid, resolve };
+module.exports = { ALPHABET, normalise, readablePart, checkChar, generate, issue, propose, changesInLastYear, changesPerYear, codes, isValid, resolve };

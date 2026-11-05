@@ -9,7 +9,7 @@
     </div>
     <div class="btn-row" style="margin-top:0">
       {% if kanbanUser %}<a class="btn-sm btn-secondary" href="/associates">Switch to board view</a>{% endif %}
-      {% if canManage %}<a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/ladder">Commission settings</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a>{% endif %}
+      {% if canManage %}<a class="btn-sm" href="/associates/new">Add an associate</a> <a class="btn-sm btn-secondary" href="/associates/registrations">Registrations{% if pendingRegistrations %} ({{ pendingRegistrations }} waiting){% endif %}</a> <a class="btn-sm btn-secondary" href="/associates/ladder">Commission settings</a> <a class="btn-sm btn-secondary" href="/reports/associates">Report</a>{% endif %}
     </div>
   </div>
   {% include "associates/_filters.njk" %}

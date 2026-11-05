@@ -1,0 +1,62 @@
+{# Owner decision D-253 (4 Nov 2026, A1): associate registration links and the review queue.
+   Expects: status, registrations, links, linkDays, statuses, newLink, csrfToken. #}
+{% macro linkState(l) %}{% if l.used_at %}Used{% elif l.cancelled_at %}Cancelled{% elif l.expired %}Expired{% else %}Open{% endif %}{% endmacro %}
+<div class="card page-wide">
+  <h1>Associate registrations</h1>
+  <p class="muted">Owner decision D-253: send a one-use <b>associate registration link</b> to a person who wants to become an associate. They fill in a short form; you accept (they become an associate, status Invited, and get their portal login link) or reject with a reason (e-mailed to them).</p>
+
+  {% if newLink %}
+    <div class="alert alert-success">Associate registration link — copy it and send it to the person (valid {{ linkDays }} days, one registration):<br><code style="user-select:all">{{ newLink }}</code></div>
+  {% endif %}
+
+  <div class="section">
+    <h2>Create an associate registration link</h2>
+    <form method="post" action="/associates/registrations/links" class="inline-form">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>For whom (note, optional)<input type="text" name="note" maxlength="200" placeholder="e.g. Rajesh, met at Stona 2026"></label>
+      <button type="submit" class="btn-sm">Create link</button>
+    </form>
+    <form method="post" action="/associates/registrations/settings" class="inline-form">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>New links are valid for (days) *<input type="number" name="link_days" required min="1" max="90" step="1" value="{{ linkDays }}" placeholder="e.g. 7"></label>
+      <button type="submit" class="btn-sm btn-secondary">Save</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Registrations</h2>
+    <p>{% for s, l in {'pending': 'Waiting', 'accepted': 'Accepted', 'rejected': 'Rejected', 'all': 'All'} %}<a class="btn-sm {{ '' if status == s else 'btn-secondary' }}" href="/associates/registrations?status={{ s }}">{{ l }}</a> {% endfor %}</p>
+    <table class="list">
+      <tr><th>Received</th><th>Name</th><th>E-mail · phone</th><th>Based in · city</th><th>Status</th><th>Review</th></tr>
+      {% for r in registrations %}
+        <tr><td>{{ r.created_at | shortDate }}</td><td>{{ r.name }}</td>
+          <td>{{ r.email }}<br><small>{{ r.phone }}</small></td>
+          <td>{{ 'India' if r.based_in == 'india' else 'Abroad' }} · {{ r.city }}, {{ r.country }}</td>
+          <td>{{ statuses[r.status] or r.status }}
+            {% if r.reviewed_at %}<br><small class="muted">{{ r.reviewed_by_name or '' }}, {{ r.reviewed_at | shortDate }}{% if r.reject_reason %} — {{ r.reject_reason }}{% endif %}</small>{% endif %}
+            {% if r.associate_id %}<br><a href="/associates/{{ r.associate_id }}">Open the associate</a>{% endif %}</td>
+          <td>{% if r.status == 'pending' %}
+            <form method="post" action="/associates/registrations/{{ r.id }}/accept" data-confirm="Accept {{ r.name }} as an associate and e-mail the portal login link?" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">Accept</button></form>
+            <form method="post" action="/associates/registrations/{{ r.id }}/reject" class="inline-form">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="Reason (e-mailed to them)" aria-label="Reason for rejecting">
+              <button type="submit" class="btn-sm btn-secondary">Reject</button>
+            </form>
+          {% endif %}</td></tr>
+      {% endfor %}
+      {% if registrations.length == 0 %}<tr><td colspan="6" class="muted">None.</td></tr>{% endif %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Links</h2>
+    <table class="list">
+      <tr><th>Created</th><th>By</th><th>For</th><th>Expires</th><th>State</th><th></th></tr>
+      {% for l in links %}
+        <tr><td>{{ l.created_at | shortDate }}</td><td>{{ l.created_by_name }}</td><td>{{ l.note or '' }}</td><td>{{ l.expires_at | shortDate }}</td><td>{{ linkState(l) }}</td>
+          <td>{% if not l.used_at and not l.cancelled_at and not l.expired %}<form method="post" action="/associates/registrations/links/{{ l.id }}/cancel" data-confirm="Cancel this link?"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-secondary">Cancel</button></form>{% endif %}</td></tr>
+      {% endfor %}
+      {% if links.length == 0 %}<tr><td colspan="6" class="muted">None yet.</td></tr>{% endif %}
+    </table>
+  </div>
+</div>

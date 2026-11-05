@@ -105,6 +105,12 @@ async function payBlockReason(payout, on) {
   if (set.claim_hold && await claimOpen(Number(payout.order_id), payout.due_on)) {
     return 'A buyer claim on this order is open — the commission waits until it is resolved.';
   }
+  // Owner decision D-252 (A3): no commission is paid until the associate's KYC is complete.
+  const a = payout.associate_id ? await require('../repositories/associateRepository').find(Number(payout.associate_id)) : null;
+  if (a) {
+    const miss = await require('./associateKyc').missing(a);
+    if (miss.length) return `The associate's KYC is not complete — still to be accepted: ${miss.join(', ')}.`;
+  }
   return null;
 }
 

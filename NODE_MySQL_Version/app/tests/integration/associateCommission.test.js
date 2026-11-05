@@ -18,7 +18,7 @@ const productRepository = require('../../src/repositories/productRepository');
 const productSupplierRepository = require('../../src/repositories/productSupplierRepository');
 const associateCommission = require('../../src/services/associateCommission');
 const incentiveService = require('../../src/services/incentiveService');
-const { createTestClient, createTestOrder, createTestFile } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestFile, completeAssociateKyc } = require('../support/fixtures');
 
 /**
  * Port of AssociateCommissionTest.php — owner decision D-245, phase P3 (4 Nov 2026):
@@ -224,7 +224,8 @@ describe('Associate commission (D-245, P3)', () => {
     await incentiveRepository.setSetting('associate_payout_run', 'monthly', admin.id);
     await incentiveRepository.setSetting('associate_payout_day', '5', admin.id);
 
-    const [, client] = await associate();
+    const [kycA, client] = await associate();
+    await completeAssociateKyc(typeof kycA === 'object' ? kycA.id : kycA); // D-252: KYC complete, so only the due date and claim hold apply
     const orderId = await order(client, [[1000, 1]]);
     await incentiveService.lockIfReady(orderId, admin.id);
     const p = await payoutOf(orderId);

@@ -32,6 +32,10 @@ const EXPECTED = [
   'GET /quotation-details/verify public',
   'POST /associate/bank associate +csrf',
   'POST /associate/code associate +csrf',
+  // Owner decisions 4 Nov 2026: the associate's code change (D-254) and the public associate registration form (D-253).
+  'POST /associate/code/propose associate +csrf',
+  'GET /associate-register/{} public',
+  'POST /associate-register/{} public +csrf',
   'POST /associate/commission/{}/invoice associate +csrf',
   'POST /associate/documents associate +csrf',
   'POST /associate/invitations associate +csrf',
@@ -363,7 +367,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(20);
+    expect(checked).toBe(21);
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -397,7 +401,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(62);
+    expect(checked).toBe(64);
     expect(wrong).toEqual([]);
   }, 120000);
 
@@ -410,7 +414,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status >= 500) failed.push(`${label(route)} → ${res.status}`);
       checked++;
     }
-    expect(checked).toBe(54);
+    expect(checked).toBe(56);
     expect(failed).toEqual([]);
   }, 120000);
 

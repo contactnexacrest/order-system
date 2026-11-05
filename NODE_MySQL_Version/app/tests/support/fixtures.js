@@ -218,4 +218,17 @@ async function allowHandTypedGoodsLines() {
   await db.execute("UPDATE pricing_settings SET setting_value = '0' WHERE setting_key = 'require_product_pick'");
 }
 
-module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument, allowHandTypedGoodsLines };
+/**
+ * Owner decision D-252 (4 Nov 2026): commission is paid only once the associate's KYC
+ * is complete. Tests about something else mark every required document accepted.
+ */
+async function completeAssociateKyc(associateId) {
+  const a = await require('../../src/repositories/associateRepository').find(Number(associateId));
+  for (const item of require('../../src/services/associateKyc').requiredItems(a)) {
+    const fileId = await createTestFile(null, null);
+    await db.execute("INSERT INTO associate_documents (associate_id, kind, file_id, uploaded_by_associate, status) VALUES (:a, :k, :f, 1, 'accepted')",
+      { a: Number(associateId), k: item.kinds[0], f: fileId });
+  }
+}
+
+module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument, allowHandTypedGoodsLines, completeAssociateKyc };

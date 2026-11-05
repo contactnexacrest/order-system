@@ -34,8 +34,14 @@ describe('A buyer never sees an associate-code error (A6)', () => {
     const pc = String(a.personal_code);
     cases.mistyped = [await associateIntakeService.introducer(pc.slice(0, -1) + (pc.slice(-1) === 'A' ? 'B' : 'A'), null), 'the code is not valid (mistyped?)'];
     cases.unknown = [await associateIntakeService.introducer(await associateCodeService.generate(`NOBODY${tag}`), null), 'no associate has this code'];
+    // D-254 (owner, 4 Nov 2026): an old code still brings the buyer to the associate…
     await associateCodeService.issue(Number(a.id), `N${tag}`);
-    cases.old = [await associateIntakeService.introducer(pc, null), `it is an old code of associate ${a.name}, replaced by a new one`];
+    const old = await associateIntakeService.introducer(pc, null);
+    expect([Number(old.associate.id), old.note]).toEqual([Number(a.id), null]);
+    // …unless staff blocked it (e.g. after a leak).
+    const mid = (await associateRepository.find(Number(a.id))).personal_code;
+    await associateCodeService.issue(Number(a.id), `B${tag}`, true, 'The code was posted on a public forum');
+    cases['blocked old'] = [await associateIntakeService.introducer(mid, null), `it is an old code of associate ${a.name} that NexaCrest blocked`];
     const s = await associate({ status: 'suspended' });
     cases.suspended = [await associateIntakeService.introducer(String(s.personal_code), null), 'the associate is suspended'];
     const e = await associate({ status: 'ended' });

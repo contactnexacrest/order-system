@@ -27,7 +27,7 @@ const associateService = require('../../src/services/associateService');
 const incentiveService = require('../../src/services/incentiveService');
 const permissionService = require('../../src/services/permissionService');
 const zohoBooksService = require('../../src/services/zohoBooksService');
-const { createTestClient, createTestOrder, createTestFile } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestFile, completeAssociateKyc } = require('../support/fixtures');
 
 /**
  * Port of AssociateSystemTest.php. Owner decision 1 Nov 2026 ("AS all as
@@ -186,8 +186,12 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     expect(await associateCodeService.resolve(typo)).toBeNull(); // a mistyped check letter is caught
 
     const fresh = await associateCodeService.issue(Number(a.id), 'NEWNAME');
-    expect(await associateCodeService.resolve(code)).toBeNull(); // the old code no longer brings new clients
+    // D-254 (owner, 4 Nov 2026): the old code keeps bringing buyers to the same associate…
+    expect(Number((await associateCodeService.resolve(code)).id)).toBe(Number(a.id));
     expect(Number((await associateCodeService.resolve(fresh)).id)).toBe(Number(a.id));
+    // …until staff block it.
+    await associateCodeService.issue(Number(a.id), 'NEWER', true, 'Leaked in a public post');
+    expect(await associateCodeService.resolve(fresh)).toBeNull(); // a blocked code no longer brings new clients
     expect(Number(await value('SELECT COUNT(*) AS n FROM associate_codes WHERE code = :c', { c: code }))).toBe(1); // the retired code is kept, never given to anyone else
   });
 
@@ -307,6 +311,7 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     await call(incentiveController.markPaid, { as: admin, params: { payoutId: String(p1.id) }, body: pay });
     expect(flash().message).toMatch(/^This associate has no verified bank account usable on /);
     await verifiedBank(a);
+    await completeAssociateKyc(a.id); // D-252: paid only once the KYC is complete
     // D-245 P3: paid only from its due date (30 days after full payment).
     await call(incentiveController.markPaid, { as: admin, params: { payoutId: String(p1.id) }, body: { ...pay, month: p1.incentive_month } });
     expect(flash().message).toMatch(/^This commission is due on 24 Nov 2026/);

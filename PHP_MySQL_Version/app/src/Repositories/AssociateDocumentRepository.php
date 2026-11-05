@@ -10,13 +10,13 @@ use App\Config\Database;
 final class AssociateDocumentRepository
 {
     public const KINDS = [
-        'pan' => 'PAN card', 'identity' => 'Passport / ID', 'address' => 'Address proof', 'gst' => 'GST certificate',
+        'pan' => 'PAN card', 'aadhaar' => 'Aadhaar card', 'identity' => 'Passport / ID', 'bank_proof' => 'Bank proof (cancelled cheque / statement)', 'agreement' => 'Signed agreement', 'address' => 'Address proof', 'gst' => 'GST certificate',
         'company' => 'Company registration', 'tax_residency' => 'Tax residency certificate', 'form_10f' => 'Form 10F',
         'no_pe' => 'No-PE declaration', 'invoice' => 'Commission invoice', 'form_16a' => 'Form 16A (TDS certificate)',
         'form_15ca' => 'Form 15CA', 'form_15cb' => 'Form 15CB', 'other' => 'Other',
     ];
     /** What an associate may upload themselves; the rest come from Accounts. */
-    public const ASSOCIATE_KINDS = ['pan', 'identity', 'address', 'gst', 'company', 'tax_residency', 'form_10f', 'no_pe', 'invoice', 'other'];
+    public const ASSOCIATE_KINDS = ['pan', 'aadhaar', 'identity', 'bank_proof', 'agreement', 'address', 'gst', 'company', 'tax_residency', 'form_10f', 'no_pe', 'invoice', 'other'];
 
     public static function add(int $associateId, string $kind, int $fileId, ?int $payoutId, ?string $reference, bool $byAssociate, ?int $userId): int
     {
@@ -31,7 +31,8 @@ final class AssociateDocumentRepository
     public static function forAssociate(int $associateId): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT d.*, f.original_filename FROM associate_documents d JOIN file_store f ON f.id = d.file_id WHERE d.associate_id = :a ORDER BY d.id DESC'
+            'SELECT d.*, f.original_filename, u.name AS reviewed_by_name FROM associate_documents d JOIN file_store f ON f.id = d.file_id
+               LEFT JOIN users u ON u.id = d.reviewed_by WHERE d.associate_id = :a ORDER BY d.id DESC'
         );
         $stmt->execute(['a' => $associateId]);
         return $stmt->fetchAll();

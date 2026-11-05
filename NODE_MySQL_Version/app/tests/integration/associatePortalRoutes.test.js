@@ -155,14 +155,16 @@ describe('Associate portal and other QA Round 8 routes, through the real app', (
     expect(page.text).toContain(a.personal_code);
 
     const clients = '/associate/clients';
-    expect((await post(agent, clients, '/associate/code', { readable: 'x!' })).message).toBe('Use 3 to 12 letters or digits.');
-    const chosen = await post(agent, clients, '/associate/code', { readable: `Mine${tag}` });
+    // D-254: a new code is proposed ("New ending"), then confirmed ("Use this code"); the old code keeps working.
+    expect((await post(agent, clients, '/associate/code/propose', { readable: 'x!' })).message).toBe('Use 3 to 12 letters or digits.');
+    await post(agent, clients, '/associate/code/propose', { readable: `Mine${tag}` });
+    const proposed = (await agent.get(clients)).text.match(/Proposed code: <b[^>]*>([^<]+)<\/b>/)[1];
+    const chosen = await post(agent, clients, '/associate/code', { code: proposed });
     const now = (await associateRepository.find(a.id)).personal_code;
-    expect([chosen.type, chosen.message]).toEqual(['success', `Your personal code is now ${now}.`]);
+    expect([now, chosen.type, chosen.message]).toEqual([proposed, 'success', `Your personal code is now ${now}. Your old code keeps working.`]);
     expect(now).not.toBe(a.personal_code);
     expect(await count("SELECT COUNT(*) AS n FROM audit_log WHERE action_type = 'ASSOCIATE_CODE_CHOSEN' AND entity_id = :id", { id: a.id })).toBe(1);
-    expect((await post(agent, clients, '/associate/code', { readable: `Again${tag}` })).message).toBe('You have already chosen your code. Ask your relationship manager if it must change.');
-    expect((await associateRepository.find(a.id)).personal_code).toBe(now); // chosen once only
+    expect(Number((await associateCodeService.resolve(a.personal_code)).id)).toBe(Number(a.id)); // the old code still brings buyers
 
     const mineInv = await associateInvitationRepository.createLink(Number(a.id), `Invited ${tag}`, 'Netherlands');
     const theirsInv = await associateInvitationRepository.createLink(Number(b.id), `Other ${tag}`, 'Germany');

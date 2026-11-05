@@ -104,11 +104,24 @@ final class AssociateRepository
         return $stmt->fetch() ?: null;
     }
 
-    /** A6: the associate who used to have this code (a retired code — not their current one), or null. */
+    /** D-254: the associate whose current code this is, or one of whose old codes it is (not blocked). */
+    public static function findByAnyCode(string $code): ?array
+    {
+        $c = strtoupper(trim($code));
+        $a = self::findByCode($c);
+        if ($a !== null) {
+            return $a;
+        }
+        $stmt = Database::connection()->prepare('SELECT a.* FROM associate_codes c JOIN associates a ON a.id = c.associate_id WHERE c.code = :c AND c.blocked_at IS NULL LIMIT 1');
+        $stmt->execute(['c' => $c]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /** A6 / D-254: the associate an old code belonged to when staff blocked that code, or null. */
     public static function findByRetiredCode(string $code): ?array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT a.* FROM associate_codes c JOIN associates a ON a.id = c.associate_id WHERE c.code = :c AND (a.personal_code IS NULL OR a.personal_code <> c.code) LIMIT 1'
+            'SELECT a.* FROM associate_codes c JOIN associates a ON a.id = c.associate_id WHERE c.code = :c AND c.blocked_at IS NOT NULL LIMIT 1'
         );
         $stmt->execute(['c' => strtoupper(trim($code))]);
         return $stmt->fetch() ?: null;
@@ -137,7 +150,7 @@ final class AssociateRepository
     public static function clients(int $associateId): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT id, company_legal_name, client_unique_number, country_of_destination, associate_registered_on, associate_locked_until, associate_source FROM clients WHERE associate_id = :id ORDER BY associate_registered_on, company_legal_name'
+            'SELECT id, company_legal_name, client_unique_number, country_of_destination, associate_registered_on, associate_locked_until, associate_source, associate_invitation_id FROM clients WHERE associate_id = :id ORDER BY associate_registered_on, company_legal_name'
         );
         $stmt->execute(['id' => $associateId]);
         return $stmt->fetchAll();

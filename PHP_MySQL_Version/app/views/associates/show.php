@@ -10,7 +10,7 @@ $full = $canManage || $canBank;
 $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'), '.') . '%';
 $__money = static fn ($v): string => number_format((float) $v, 2);
 $__d = static fn ($v): string => $v ? Dates::short(substr((string) $v, 0, 10)) : '—';
-$__sourceLabel = ['link' => 'own invitation link', 'code' => 'personal code', 'staff' => 'linked by NexaCrest', 'md_change' => 'changed by the MD'];
+$__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code', 'staff' => 'linked by NexaCrest', 'md_change' => 'changed by the MD'];
 ?>
 <div class="card page-wide">
   <div class="page-header-row">
@@ -61,33 +61,42 @@ $__sourceLabel = ['link' => 'own invitation link', 'code' => 'personal code', 's
   </div>
 
   <div class="section" id="portal">
-    <h2>Portal and personal code</h2>
+    <h2>Portal login link and personal code</h2>
     <p>Portal: <b><?= (int) $a['portal_enabled'] === 1 ? 'on' : 'off' ?></b><?php if (!empty($a['last_login_at'])): ?> · last login <?= $__d($a['last_login_at']) ?><?php endif; ?>
-      <?php if ($codeLink): ?><br>Personal code link: <code><?= htmlspecialchars($codeLink) ?></code><?php endif; ?></p>
+      <?php if ($codeLink): ?><br>Quotation link (with their code): <code><?= htmlspecialchars($codeLink) ?></code><?php endif; ?></p>
     <div class="btn-row">
-      <form method="post" action="/associates/<?= $id ?>/portal/invite" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm"><?= (int) $a['portal_enabled'] === 1 ? 'Resend portal access' : 'Send portal access' ?></button></form>
+      <form method="post" action="/associates/<?= $id ?>/portal/invite" style="display:inline"><?= Csrf::field() ?><button type="submit" class="btn-sm"><?= (int) $a['portal_enabled'] === 1 ? 'Resend portal login link' : 'Send portal login link' ?></button></form>
       <?php if ((int) $a['portal_enabled'] === 1): ?><form method="post" action="/associates/<?= $id ?>/portal/disable" style="display:inline" data-confirm="Switch off this associate's portal?"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-secondary">Switch portal off</button></form><?php endif; ?>
     </div>
-    <form method="post" action="/associates/<?= $id ?>/code" class="inline-form" data-confirm="Set a new personal code? The old code stops bringing new clients.">
+    <?php // Owner decision D-254: old codes keep bringing buyers to the associate unless blocked here (e.g. after a leak). ?>
+    <form method="post" action="/associates/<?= $id ?>/code" class="inline-form" data-confirm="Set a new personal code for this associate?">
       <?= Csrf::field() ?>
-      <label>New personal code — readable part <input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" placeholder="e.g. RAJESH"></label>
+      <label>New personal code — readable part *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" placeholder="e.g. RAJESH"></label>
+      <label class="checkbox-label"><input type="checkbox" name="block_old" value="1"> Block the old code (e.g. it leaked)</label>
+      <input type="text" name="block_reason" maxlength="300" minlength="10" placeholder="Why it is blocked (needed when blocking)" aria-label="Why the old code is blocked" data-required-when="block_old=1" data-required-when-message="Say why the old code is blocked (at least 10 characters).">
       <button type="submit" class="btn-sm btn-secondary">Set code</button>
     </form>
+    <?php if (!empty($codes)): ?>
+      <table class="list"><tr><th>Code</th><th>From</th><th>To</th><th>Status</th></tr>
+        <?php foreach ($codes as $__c): ?><tr><td style="font-family:monospace"><?= htmlspecialchars((string) $__c['code']) ?></td><td><?= $__d($__c['issued_at']) ?></td><td><?= $__d($__c['retired_at']) ?></td>
+          <td><?= !empty($__c['blocked_at']) ? 'Blocked — ' . htmlspecialchars((string) $__c['blocked_reason']) : ($__c['code'] === ($a['personal_code'] ?? '') ? 'Current' : 'Still accepted (old links)') ?></td></tr><?php endforeach; ?>
+      </table>
+    <?php endif; ?>
   </div>
   <?php endif; ?>
 
   <div class="section" id="clients">
     <h2>Clients introduced (<?= count($clients) ?>)</h2>
     <table class="list">
-      <tr><th>Client</th><th>Country</th><th>Registered</th><th>How</th><th>Protected until</th><th>First order</th><?php if ($canChangeLink): ?><th>Change (MD only)</th><?php endif; ?></tr>
+      <tr><th>Client</th><th>Country</th><th>Registered</th><th>Came via</th><th>Protected until</th><th>Orders</th><?php if ($canChangeLink): ?><th>Change (MD only)</th><?php endif; ?></tr>
       <?php foreach ($clients as $c): ?>
         <tr>
           <td><a href="/clients/<?= (int) $c['id'] ?>"><?= htmlspecialchars((string) $c['company_legal_name']) ?></a> <small class="muted"><?= htmlspecialchars((string) $c['client_unique_number']) ?></small></td>
           <td><?= htmlspecialchars((string) ($c['country_of_destination'] ?? '')) ?></td>
           <td><?= $__d($c['associate_registered_on']) ?></td>
-          <td><?= htmlspecialchars($__sourceLabel[$c['associate_source'] ?? ''] ?? 'linked earlier') ?></td>
+          <td><?= htmlspecialchars((string) ($c['came_via'] ?? ($__sourceLabel[$c['associate_source'] ?? ''] ?? 'linked earlier'))) ?></td>
           <td><?= $__d($c['associate_locked_until']) ?></td>
-          <td><?= $__d($c['first_order_on']) ?></td>
+          <td><?= $c['order_refs'] !== [] ? htmlspecialchars(implode(', ', $c['order_refs'])) : '<span class="muted">none yet</span>' ?></td>
           <?php if ($canChangeLink): ?><td>
             <form method="post" action="/associates/<?= $id ?>/clients/<?= (int) $c['id'] ?>/unlink" class="inline-form" data-confirm="Change this client's associate? The associate is told at once.">
               <?= Csrf::field() ?>
@@ -112,19 +121,19 @@ $__sourceLabel = ['link' => 'own invitation link', 'code' => 'personal code', 's
         <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="How they introduced the client" aria-label="How they introduced the client">
         <button type="submit" class="btn-sm">Link</button>
       </form>
-      <p class="muted small">Normally the buyer registers through the associate's link or personal code and confirms the introduction themselves; this is for clients already on file. Once linked, only the MD can change it.</p>
+      <p class="muted small">Normally the buyer registers through the associate's buyer registration link or quotation link (personal code) and confirms the introduction themselves; this is for clients already on file. Once linked, only the MD can change it.</p>
     <?php endif; ?>
   </div>
 
   <?php if ($full): ?>
   <?php if ($canManage): ?>
   <div class="section" id="invitations">
-    <h2>Invitation links</h2>
+    <h2>Buyer registration links and codes used</h2>
     <table class="list">
       <tr><th>Created</th><th>For</th><th>Kind</th><th>Status</th><th>Expires</th></tr>
       <?php foreach ($invitations as $i): ?>
         <tr><td><?= $__d($i['created_at']) ?></td><td><?= htmlspecialchars(trim($i['company_name'] . ' ' . ($i['country'] ? '(' . $i['country'] . ')' : ''))) ?></td>
-          <td><?= $i['kind'] === 'personal_code' ? 'Personal code' : 'One-off link' ?></td><td><?= htmlspecialchars(\App\Repositories\AssociateInvitationRepository::STATUSES[$i['status']] ?? $i['status']) ?></td><td><?= $__d($i['expires_at']) ?></td></tr>
+          <td><?= $i['kind'] === 'personal_code' ? 'Personal code' . (!empty($i['code_used']) ? ' ' . htmlspecialchars((string) $i['code_used']) : '') : 'Buyer registration link (one buyer)' ?></td><td><?= htmlspecialchars(\App\Repositories\AssociateInvitationRepository::STATUSES[$i['status']] ?? $i['status']) ?></td><td><?= $__d($i['expires_at']) ?></td></tr>
       <?php endforeach; ?>
       <?php if ($invitations === []): ?><tr><td colspan="5" class="muted">None yet.</td></tr><?php endif; ?>
     </table>
@@ -204,19 +213,37 @@ $__sourceLabel = ['link' => 'own invitation link', 'code' => 'personal code', 's
   </div>
 
   <div class="section" id="documents">
-    <h2>Documents</h2>
-    <table class="list">
-      <tr><th>Added</th><th>Document</th><th>Reference</th><th>From</th></tr>
-      <?php foreach ($documents as $d): ?>
-        <tr><td><?= $__d($d['created_at']) ?></td><td><a href="/associates/<?= $id ?>/documents/<?= (int) $d['id'] ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$d['kind']] ?? $d['kind']) ?></a></td><td><?= htmlspecialchars((string) ($d['reference'] ?? '')) ?></td><td><?= (int) $d['uploaded_by_associate'] === 1 ? 'Associate' : 'NexaCrest' ?></td></tr>
+    <h2>KYC and documents</h2>
+    <?php // Owner decision D-252 (A3): the KYC checklist; commission cannot be marked paid until every item is accepted. ?>
+    <table class="list"><tr><th>KYC item</th><th>Status</th><th>Document</th></tr>
+      <?php foreach ($kyc as $__i): ?>
+        <tr><td><?= htmlspecialchars($__i['label']) ?></td>
+          <td><span class="badge <?= ['accepted' => 'badge-success', 'rejected' => 'badge-danger', 'pending' => 'badge-warning'][$__i['status']] ?? '' ?>"><?= htmlspecialchars(\App\Services\AssociateKyc::STATUS_LABELS[$__i['status']]) ?></span></td>
+          <td><?= $__i['doc'] !== null ? htmlspecialchars(AssociateDocumentRepository::KINDS[$__i['doc']['kind']] ?? $__i['doc']['kind']) . (!empty($__i['doc']['reference']) ? ' · ' . htmlspecialchars((string) $__i['doc']['reference']) : '') : ($__i['by_nexacrest'] ? 'Agreement on the associate record' : '—') ?></td></tr>
       <?php endforeach; ?>
-      <?php if ($documents === []): ?><tr><td colspan="4" class="muted">None yet.</td></tr><?php endif; ?>
     </table>
-    <form method="post" action="/associates/<?= $id ?>/documents" enctype="multipart/form-data" class="inline-form">
+    <?php $__missing = array_filter($kyc, static fn (array $i): bool => $i['status'] !== 'accepted'); ?>
+    <p class="<?= $__missing === [] ? 'muted' : 'review-banner bad' ?> small"><?= $__missing === [] ? 'KYC complete — commission can be paid.' : 'KYC not complete — commission cannot be marked paid until every item is accepted.' ?></p>
+    <table class="list">
+      <tr><th>Added</th><th>Document</th><th>Number / reference</th><th>From</th><th>Status</th><?php if ($canManage): ?><th>Check</th><?php endif; ?></tr>
+      <?php foreach ($documents as $d): ?>
+        <tr><td><?= $__d($d['created_at']) ?></td><td><a href="/associates/<?= $id ?>/documents/<?= (int) $d['id'] ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$d['kind']] ?? $d['kind']) ?></a></td><td><?= htmlspecialchars((string) ($d['reference'] ?? '')) ?></td><td><?= (int) $d['uploaded_by_associate'] === 1 ? 'Associate' : 'NexaCrest' ?></td>
+          <td><?= htmlspecialchars(['accepted' => 'Accepted', 'rejected' => 'Rejected', 'received' => 'Not checked yet'][$d['status']] ?? (string) $d['status']) ?><?php if (!empty($d['reviewed_at'])): ?><br><small class="muted"><?= htmlspecialchars((string) ($d['reviewed_by_name'] ?? '')) ?>, <?= $__d($d['reviewed_at']) ?><?= !empty($d['review_reason']) ? ' — ' . htmlspecialchars((string) $d['review_reason']) : '' ?></small><?php endif; ?></td>
+          <?php if ($canManage): ?><td>
+            <form method="post" action="/associates/<?= $id ?>/documents/<?= (int) $d['id'] ?>/review" class="inline-form">
+              <?= Csrf::field() ?>
+              <select name="decision" required aria-label="Accept or reject"><option value="">Choose…</option><option value="accept">Accept</option><option value="reject">Reject</option></select>
+              <input type="text" name="reason" maxlength="300" placeholder="Reason (needed to reject)" aria-label="Reason" data-required-when="decision=reject" data-required-when-message="Say why it is rejected (at least 10 characters) — the associate sees it." minlength="10">
+              <button type="submit" class="btn-sm btn-secondary">Save</button>
+            </form></td><?php endif; ?></tr>
+      <?php endforeach; ?>
+      <?php if ($documents === []): ?><tr><td colspan="6" class="muted">None yet.</td></tr><?php endif; ?>
+    </table>
+    <form method="post" action="/associates/<?= $id ?>/documents" enctype="multipart/form-data">
       <?= Csrf::field() ?>
-      <select name="kind" required aria-label="Document kind"><option value="">What is it?</option><?php foreach (AssociateDocumentRepository::KINDS as $k => $l): ?><option value="<?= $k ?>"><?= htmlspecialchars($l) ?></option><?php endforeach; ?></select>
-      <input type="text" name="reference" maxlength="100" placeholder="Reference (e.g. certificate no.)" aria-label="Reference">
-      <input type="file" name="document_file" required accept=".pdf,.jpg,.jpeg,.png" aria-label="File">
+      <div class="field-grid">
+        <?php $__docKinds = array_keys(AssociateDocumentRepository::KINDS); require __DIR__ . '/_doc_upload_fields.php'; ?>
+      </div>
       <button type="submit" class="btn-sm">Upload</button>
     </form>
   </div>

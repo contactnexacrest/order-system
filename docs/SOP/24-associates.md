@@ -112,7 +112,7 @@ The buyer always registers **themselves**, with their own company's
 details, on the quotation form — the associate never types the buyer's
 details. Two ways, in any mix:
 
-- **One-off link**: in the portal, **My clients → A link for one buyer**
+- **Buyer registration link** (one buyer): in the portal, **My clients → Buyer registration link — for one buyer**
   (company name and country). The link `…/invite/<token>` is valid for 30
   days and for **one registration**: the first registration sent through it
   takes it, and anyone opening or sending it again is told "This invitation
@@ -343,9 +343,10 @@ challans →** opens `/associates/tds` (D-235).
    minutes.
 3. **Home**: totals (earned this year, waiting, paid this year, on hold),
    latest orders and notices.
-4. **My clients**: create one-off links, see and copy the personal code
-   (the readable part can be chosen once), registered clients with their
-   protection and certificate, invitations and their status.
+4. **My clients**: create buyer registration links, see and copy the
+   personal code and the quotation link (with the code), change the code
+   (D-254, below), registered clients with how they came ("came via"),
+   their orders, protection and certificate, links and codes used.
 5. **Prices** (D-245 P3): "Your price range" — each product's quote price
    and the lowest price they may offer, at their own level. When the list
    changes they are asked to read it again and press **I have read this
@@ -359,13 +360,82 @@ challans →** opens `/associates/tds` (D-235).
 When a buyer opens the quotation form with an associate code or link that
 cannot be used, the form simply opens as for any direct buyer — no message,
 no hint. This covers a mistyped or unknown code, an associate's old code that
-was replaced by a new one, an expired or already-used link, and an associate
+NexaCrest **blocked** (an old code that was simply replaced keeps working —
+D-254), an expired or already-used link, and an associate
 who is suspended or whose agreement has ended. The buyer registers as a
 direct buyer.
 
 On **Quotation Intake Review** the request then carries a warning line such
 as "Associate code NXA-… given but not applied: it is an old code of associate
-…". Decide as usual: accept as a direct client, or — if the associate should
+… that NexaCrest blocked". Decide as usual: accept as a direct client, or — if the associate should
 get the client — link the client to the associate afterwards from the
 associate's page (Link a client already on file).
+
+## Names used for the links (owner decision 4 Nov 2026, D-250)
+
+To end the "portal link" confusion the screens, e-mails and messages use:
+
+- **Portal login link** — the associate's own link to set the password of
+  their portal (staff button: *Send / Resend portal login link*).
+- **Quotation link (with your code)** — `…/quotation-details?code=NXA-…`, for
+  any buyer; the buyer registers with the associate's personal code.
+- **Buyer registration link** — `…/invite/<token>`, made by the associate for
+  one buyer (one registration, 30 days).
+- **Associate registration link** — `…/associate-register/<token>`, made by
+  NexaCrest for a person who wants to become an associate (D-253).
+
+## Documents, numbers and KYC (owner decisions 4 Nov 2026, D-251 and D-252)
+
+Every associate document has a **document number / reference**, checked by
+kind in the browser and on the server: PAN `ABCDE1234F`; **Aadhaar card —
+only the last 4 digits are kept, shown as "XXXX XXXX 1234"; a full Aadhaar
+number is refused**; passport / ID 6–9 letters or digits; GSTIN 15
+characters; anything else up to 50 characters.
+
+The **KYC checklist** on the associate's page (staff) and in the portal
+(My profile): India — PAN card, Aadhaar card or passport, bank proof
+(cancelled cheque or statement), signed agreement, and the GST certificate
+when they have a GSTIN; abroad — passport / ID, bank proof, signed agreement.
+Each item is *Not uploaded yet*, *Pending*, *Accepted* or *Rejected* (with the
+reason). Staff with **Manage associates** accept or reject each document
+(a reason of at least 10 characters is needed to reject; the associate is
+told and uploads it again). Staff are notified of every upload. Every review
+is in the audit log.
+
+**Commission cannot be marked paid until every KYC item is accepted** — the
+payout shows "The associate's KYC is not complete — still to be accepted: …".
+Activation of the associate stays as before.
+
+## Associate self-registration (owner decision 4 Nov 2026, D-253)
+
+1. **Associates → Registrations → Create link** (Manage associates). The
+   associate registration link is valid for 7 days (setting on the same
+   page) and for one registration. Copy it and send it.
+2. The person fills in a short form: name, e-mail (their future login),
+   phone, based in India or abroad, country, city, and a consent tick. An
+   expired, used or cancelled link shows "This link is no longer open" —
+   never an error code. Too many tries from one connection are slowed down.
+3. Staff are notified; the registration waits under **Registrations**.
+   **Accept** creates the associate (status *Invited*, INR for India, USD
+   abroad) and e-mails the portal login link. **Reject** needs a reason
+   (10–300 characters), which is e-mailed to the person.
+4. After the first login the associate completes the profile (address, PAN,
+   GSTIN), bank details and KYC documents; the portal home reminds them
+   until everything is in and accepted.
+
+## Changing the personal code (owner decision 4 Nov 2026, D-254)
+
+In the portal, **My clients → Change my code**: type the readable part and
+press **⟳ New ending** to see a proposed code (press again for another one,
+like a captcha refresh), then **Use this code**. Up to 3 changes a year
+(setting `associate_code_changes_per_year`).
+
+**Old codes keep working**: a buyer who uses any of the associate's previous
+codes is still linked to that associate, and links already shared keep
+working. "My codes" lists every code with its dates and status. Clients
+show "Came via" — the code or link they used.
+
+Staff can set a new code on the associate's page; ticking **Block the old
+code** (with a reason, e.g. it leaked) stops that old code from bringing new
+clients — such a code then counts as "not applied" (A6).
 

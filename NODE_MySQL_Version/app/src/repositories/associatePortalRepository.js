@@ -45,9 +45,24 @@ async function clients(associateId) {
     c.first_order_on = first && first.d ? String(first.d).slice(0, 10) : null;
     const po = await db.queryOne('SELECT MIN(buyer_po_received_on) AS d FROM orders WHERE client_id = :c AND buyer_po_received_on IS NOT NULL', { c: c.id });
     c.window_ends_on = po && po.d ? addDays(po.d, 9) : null;
+    c.came_via = await cameVia(c);
+    c.order_refs = (await db.query("SELECT order_reference FROM orders WHERE client_id = :c AND status NOT IN ('cancelled','lost') AND is_test_data = 0 ORDER BY id", { c: c.id })).map((r) => String(r.order_reference));
     out.push(c);
   }
   return out;
+}
+
+/** D-254: how a client came to the associate — which code, a buyer registration link, or linked by NexaCrest. */
+async function cameVia(client) {
+  const source = String(client.associate_source || '');
+  const inv = client.associate_invitation_id ? await require('./associateInvitationRepository').find(Number(client.associate_invitation_id)) : null;
+  if (source === 'code' || (inv && inv.kind === 'personal_code')) {
+    return inv && inv.code_used ? `Code ${inv.code_used}` : 'Personal code';
+  }
+  if (source === 'link' || (inv && inv.kind === 'client_link')) {
+    return 'Buyer registration link';
+  }
+  return ({ staff: 'Linked by NexaCrest', md_change: 'Changed by the MD' })[source] || (source !== '' ? source : '—');
 }
 
 /** Every order of the associate's clients, newest first. */
@@ -153,4 +168,5 @@ async function totals(associateId) {
   return t;
 }
 
-module.exports = { stageLabel, clients, orders, commission, payouts, totals };
+module.exports = {
+  cameVia, stageLabel, clients, orders, commission, payouts, totals };

@@ -53,9 +53,14 @@ final class BuyerNeverSeesCodeErrorsTest extends DbTestCase
         $cases['mistyped'] = [$this->intro(substr($pc, 0, -1) . (substr($pc, -1) === 'A' ? 'B' : 'A')), 'the code is not valid (mistyped?)'];
         // Unknown: a valid-looking code nobody has.
         $cases['unknown'] = [$this->intro(AssociateCodeService::generate('NOBODY' . $this->tag)), 'no associate has this code'];
-        // Old code: replaced by a new one.
+        // D-254 (owner, 4 Nov 2026): an old code still brings the buyer to the associate…
         AssociateCodeService::issue((int) $a['id'], 'N' . $this->tag);
-        $cases['old'] = [$this->intro($pc), "it is an old code of associate {$a['name']}, replaced by a new one"];
+        $old = $this->intro($pc);
+        self::assertSame([(int) $a['id'], null], [(int) $old['associate']['id'], $old['note']], 'an old code keeps working');
+        // …unless staff blocked it (e.g. after a leak).
+        $mid = (string) AssociateRepository::find((int) $a['id'])['personal_code'];
+        AssociateCodeService::issue((int) $a['id'], 'B' . $this->tag, true, 'The code was posted on a public forum');
+        $cases['blocked old'] = [$this->intro($mid), "it is an old code of associate {$a['name']} that NexaCrest blocked"];
         // Suspended and ended associates.
         $s = $this->associate(['status' => 'suspended']);
         $cases['suspended'] = [$this->intro((string) $s['personal_code']), 'the associate is suspended'];

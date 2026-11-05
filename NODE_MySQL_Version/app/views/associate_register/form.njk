@@ -1,0 +1,22 @@
+{% macro err(f) %}{% if errors[f] %}<small class="form-field-error">{{ errors[f] }}</small>{% endif %}{% endmacro %}
+<div class="card card-narrow">
+  <h1>Register as a NexaCrest associate</h1>
+  <p class="muted">A few details to start. Once NexaCrest accepts your registration you get your own portal, where you add the rest (address, PAN, bank details and documents).</p>
+  {% if errors.form %}<div class="alert alert-error">{{ errors.form }}</div>{% endif %}
+  <form method="post" action="/associate-register/{{ token }}">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label>Full name *<input type="text" name="name" required minlength="2" maxlength="150" value="{{ old.name or '' }}" placeholder="e.g. Rajesh Kumar" autocomplete="name">{{ err('name') }}</label>
+    <label>E-mail * <small class="muted">(your portal login)</small><input type="email" name="email" required maxlength="190" value="{{ old.email or '' }}" placeholder="e.g. rajesh@example.com" autocomplete="email">{{ err('email') }}</label>
+    <label>Phone *<input type="tel" name="phone" required minlength="6" maxlength="40" pattern="[0-9 +()\-]{6,40}" value="{{ old.phone or '' }}" placeholder="e.g. +91 98765 43210" autocomplete="tel">{{ err('phone') }}</label>
+    <label>Based in *
+      <select name="based_in" required>
+        <option value="">Choose…</option>
+        <option value="india"{% if old.based_in == 'india' %} selected{% endif %}>India</option>
+        <option value="abroad"{% if old.based_in == 'abroad' %} selected{% endif %}>Outside India</option>
+      </select>{{ err('based_in') }}</label>
+    <label>Country *<input type="text" name="country" required minlength="2" maxlength="80" value="{{ old.country or '' }}" placeholder="e.g. India" autocomplete="country-name">{{ err('country') }}</label>
+    <label>City *<input type="text" name="city" required minlength="2" maxlength="100" value="{{ old.city or '' }}" placeholder="e.g. Bengaluru" autocomplete="address-level2">{{ err('city') }}</label>
+    <label class="checkbox-label"><input type="checkbox" name="consent" value="1" required{% if old.consent == '1' %} checked{% endif %}> I agree that NexaCrest may use these details to review my registration and contact me. *{{ err('consent') }}</label>
+    <button type="submit" class="btn">Send my registration</button>
+  </form>
+</div>

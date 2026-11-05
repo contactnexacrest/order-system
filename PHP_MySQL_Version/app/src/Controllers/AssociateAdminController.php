@@ -310,7 +310,9 @@ final class AssociateAdminController
                 'invitations' => AssociateInvitationRepository::forAssociate($id),
                 'banks' => AssociateBankRepository::forAssociate($id),
                 'usableBank' => AssociateBankRepository::usable($id),
-                'documents' => AssociateDocumentRepository::forAssociate($id),
+                'documents' => ($__docs = AssociateDocumentRepository::forAssociate($id)),
+                'kyc' => \App\Services\AssociateKyc::checklist($a, $__docs),
+                'codes' => AssociateCodeService::codes($id),
                 'events' => AssociateEventRepository::forAssociate($id, null, 200),
                 'messages' => AssociateEventRepository::messages($id),
                 'unlinkedClients' => AssociateRepository::unlinkedClients(),
@@ -365,7 +367,7 @@ final class AssociateAdminController
         }
         try {
             $link = AssociateService::invitePortal((int) $a['id'], (int) self::user()['id']);
-            Flash::set('success', 'Portal access e-mailed to ' . $a['email'] . '.' . (AssociatePortalService::showCodeOnScreen() ? " Development only — link: {$link}" : ''));
+            Flash::set('success', 'Portal login link e-mailed to ' . $a['email'] . '.' . (AssociatePortalService::showCodeOnScreen() ? " Development only — link: {$link}" : ''));
         } catch (\RuntimeException $e) {
             Flash::set('error', $e->getMessage());
         }
@@ -380,12 +382,12 @@ final class AssociateAdminController
         }
         AssociateRepository::setFields((int) $a['id'], ['portal_enabled' => 0]);
         AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_PORTAL_DISABLED', 'associates', (int) $a['id']);
-        AssociateEventRepository::add((int) $a['id'], 'portal_disabled', 'Portal access switched off by ' . self::user()['name'] . '.', null, null, null, (int) self::user()['id'], false);
-        Flash::set('success', 'Portal access switched off. Their personal code and client links stay as they are.');
+        AssociateEventRepository::add((int) $a['id'], 'portal_disabled', 'Portal switched off by ' . self::user()['name'] . '.', null, null, null, (int) self::user()['id'], false);
+        Flash::set('success', 'Portal switched off. Their personal code, quotation link and clients stay as they are.');
         self::back((int) $a['id'], 'portal');
     }
 
-    /** A new personal code (e.g. after a leak). The old code no longer brings new clients; existing links stay. */
+    /** A new personal code. D-254: the old code keeps working unless staff tick "block it" (e.g. after a leak). */
     public function setCode(array $params): void
     {
         $a = self::found($params);
@@ -396,10 +398,19 @@ final class AssociateAdminController
         if (strlen($part) < 3) {
             Flash::set('error', 'Use 3 to 12 letters or digits for the readable part of the code.');
         } else {
-            $code = AssociateCodeService::issue((int) $a['id'], $part);
-            AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_CODE_SET', 'associates', (int) $a['id'], 'personal_code', $a['personal_code'] ?? null, $code);
-            AssociateService::notify($a, 'code_changed', "Your personal code is now {$code}" . (!empty($a['personal_code']) ? "; {$a['personal_code']} no longer brings new clients (clients already registered stay yours)" : '') . '.', null, null, null, (int) self::user()['id']);
-            Flash::set('success', "Personal code set to {$code}.");
+            // Owner rule D-254: the old code keeps working unless staff block it (e.g. after a leak), with a reason.
+            $block = ($_POST['block_old'] ?? '') === '1';
+            $reason = trim((string) ($_POST['block_reason'] ?? ''));
+            if ($block && mb_strlen($reason) < 10) {
+                Flash::set('error', 'Say why the old code is blocked (at least 10 characters).');
+                self::back((int) $a['id'], 'portal');
+                return;
+            }
+            $code = AssociateCodeService::issue((int) $a['id'], $part, $block, $block ? $reason : null);
+            AuditLogRepository::log((int) self::user()['id'], 'ASSOCIATE_CODE_SET', 'associates', (int) $a['id'], 'personal_code', $a['personal_code'] ?? null, $code . ($block ? ' (old code blocked: ' . $reason . ')' : ''));
+            AssociateService::notify($a, 'code_changed', "Your personal code is now {$code}." . (!empty($a['personal_code'])
+                ? ($block ? " Your old code {$a['personal_code']} no longer brings new clients." : " Your old code {$a['personal_code']} still brings buyers to you — links you already shared keep working.") . ' Clients already registered stay yours.' : ''), null, null, null, (int) self::user()['id']);
+            Flash::set('success', "Personal code set to {$code}." . ($block ? ' The old code is blocked.' : ' The old code keeps working.'));
         }
         self::back((int) $a['id'], 'portal');
     }
@@ -685,11 +696,14 @@ final class AssociateAdminController
             self::back((int) $a['id'], 'documents');
             return;
         }
-        if (mb_strlen($reference) > 100) {
-            Flash::set('error', 'The reference is too long (up to 100 characters).');
+        // Owner decision D-251 (A4): checked per kind; an Aadhaar card keeps only its last 4 digits.
+        [$reference, $refError] = \App\Services\AssociateKyc::normaliseReference($kind, $reference);
+        if ($refError !== null) {
+            Flash::set('error', $refError);
             self::back((int) $a['id'], 'documents');
             return;
         }
+        $reference = (string) $reference;
         try {
             $fileId = FileUploadService::handleUpload('document_file', 'associate_document', 'associates/documents', null, null, (int) self::user()['id'], null, (string) $a['name'], AssociateDocumentRepository::KINDS[$kind]);
         } catch (\Throwable $e) {
@@ -703,6 +717,18 @@ final class AssociateAdminController
             AssociateService::notify($a, 'document_added', AssociateDocumentRepository::KINDS[$kind] . ($reference !== '' ? " ({$reference})" : '') . ' is in your portal.', null, null, null, (int) self::user()['id']);
         }
         Flash::set('success', AssociateDocumentRepository::KINDS[$kind] . ' saved.');
+        self::back((int) $a['id'], 'documents');
+    }
+
+    /** Owner decision D-252 (A3): accept or reject one KYC document (reason required to reject). */
+    public function reviewDocument(array $params): void
+    {
+        $a = self::found($params);
+        if ($a === null) {
+            return;
+        }
+        $error = \App\Services\AssociateKyc::review($a, (int) $params['docId'], (string) ($_POST['decision'] ?? ''), (string) ($_POST['reason'] ?? ''), (int) self::user()['id']);
+        Flash::set($error === null ? 'success' : 'error', $error ?? (($_POST['decision'] ?? '') === 'accept' ? 'Document accepted.' : 'Document rejected — the associate is asked to upload it again.'));
         self::back((int) $a['id'], 'documents');
     }
 

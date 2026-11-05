@@ -194,6 +194,9 @@ $router->get('/quotation-details', [$clientIntake, 'show']);
 $router->post('/quotation-details/submit', [$clientIntake, 'submit'], [CsrfCheck::verify()]);
 // Owner decision 1 Nov 2026 (AS-5): an associate's one-off link, and the buyer's e-mail code + "X introduced us".
 $router->get('/invite/{token}', [$clientIntake, 'invite']);
+// Owner decision D-253: the public associate registration form (one-use link from the MD).
+$router->get('/associate-register/{token}', [new \App\Controllers\AssociateRegistrationController(), 'show']);
+$router->post('/associate-register/{token}', [new \App\Controllers\AssociateRegistrationController(), 'submit'], [CsrfCheck::verify()]);
 $router->get('/quotation-details/verify', [$clientIntake, 'showVerify']);
 $router->post('/quotation-details/verify', [$clientIntake, 'verify'], [CsrfCheck::verify()]);
 $router->get('/quotation-details/edit/{token}', [$clientIntake, 'showEdit']);
@@ -595,6 +598,14 @@ $router->post('/incentives/settings', [$incentives, 'saveSettings'], [SessionAut
 $router->get('/associates', [$associateAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_associates', 'manage_associates', 'manage_associate_bank'])]);
 $router->get('/associates/new', [$associateAdmin, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
 $router->post('/associates', [$associateAdmin, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+// Owner decision D-253 (4 Nov 2026, A1): associate self-registration through the MD's one-use link.
+$associateRegistration = new \App\Controllers\AssociateRegistrationController();
+$router->get('/associates/registrations', [$associateRegistration, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
+$router->post('/associates/registrations/links', [$associateRegistration, 'createLink'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/registrations/links/{id}/cancel', [$associateRegistration, 'cancelLink'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/registrations/settings', [$associateRegistration, 'saveSettings'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/registrations/{id}/accept', [$associateRegistration, 'accept'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/registrations/{id}/reject', [$associateRegistration, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->get('/associates/ladder', [$associateAdmin, 'ladder'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
 $router->post('/associates/ladder', [$associateAdmin, 'saveLadder'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->get('/reports/associates', [$associateAdmin, 'report'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
@@ -615,6 +626,8 @@ $router->post('/associates/{id}/bank/{bankId}/verify', [$associateAdmin, 'verify
 $router->post('/associates/{id}/bank/{bankId}/reject', [$associateAdmin, 'rejectBank'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank'), CsrfCheck::verify()]);
 $router->get('/associates/{id}/bank/{bankId}/number', [$associateAdmin, 'bankNumber'], [SessionAuth::required(), PermissionCheck::requires('manage_associate_bank')]);
 $router->post('/associates/{id}/documents', [$associateAdmin, 'uploadDocument'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_bank']), CsrfCheck::verify()]);
+// Owner decision D-252 (A3): accept / reject one KYC document.
+$router->post('/associates/{id}/documents/{docId}/review', [$associateAdmin, 'reviewDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->get('/associates/{id}/documents/{docId}', [$associateAdmin, 'downloadDocument'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_associates', 'manage_associate_bank'])]);
 $router->post('/associates/{id}/messages', [$associateAdmin, 'reply'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->post('/associates/payouts/{payoutId}/hold', [$associateAdmin, 'holdPayout'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
@@ -933,6 +946,7 @@ $router->get('/associate/clients', [$associatePortal, 'clients'], [AssociateAuth
 $router->get('/associate/clients/{id}/certificate', [$associatePortal, 'certificate'], [AssociateAuth::required()]);
 $router->post('/associate/invitations', [$associatePortal, 'createInvitation'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->post('/associate/invitations/{id}/cancel', [$associatePortal, 'cancelInvitation'], [AssociateAuth::required(), CsrfCheck::verify()]);
+$router->post('/associate/code/propose', [$associatePortal, 'proposeCode'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->post('/associate/code', [$associatePortal, 'chooseCode'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->get('/associate/orders', [$associatePortal, 'orders'], [AssociateAuth::required()]);
 $router->get('/associate/orders/{id}', [$associatePortal, 'order'], [AssociateAuth::required()]);

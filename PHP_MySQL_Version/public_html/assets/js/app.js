@@ -803,6 +803,8 @@
     // max, minlength, pattern, email...) — so every form, present and
     // future, is checked before it is sent, with the message beside the field.
     if (el.willValidate && el.validity && !el.validity.valid) {
+      // D-251: a pattern set from a chosen option carries its own plain message.
+      if (el.validity.patternMismatch && el.getAttribute('data-pattern-message')) return el.getAttribute('data-pattern-message');
       return el.validationMessage || 'Please check this field.';
     }
     return null;
@@ -962,7 +964,7 @@
           if (items[0] && document.activeElement !== items[0].el) goToField(items[0].el);
         }, 0);
       }
-      pending.push({ el: el, label: fieldLabelText(el), message: el.validationMessage || 'Please check this field.' });
+      pending.push({ el: el, label: fieldLabelText(el), message: fieldError(el) || el.validationMessage || 'Please check this field.' });
     }, true);
     // A server error after the page reloads (a form page): the same pop-up repeats it.
     var hasForm = Array.prototype.some.call(document.forms, function (f) {
@@ -1030,7 +1032,7 @@
       var el = e.target;
       if (!el || !('value' in el)) return;
       revealElement(el);
-      showFieldError(el, el.validationMessage || 'Please check this field.');
+      showFieldError(el, fieldError(el) || el.validationMessage || 'Please check this field.');
     }, true);
   }
 
@@ -1297,6 +1299,30 @@
     document.querySelectorAll('[data-floor]').forEach(floorNote);
   }
 
+  // Owner decision D-251 (4 Nov 2026): a select whose options carry data-pattern / data-placeholder /
+  // data-title sets those on the input named by data-pattern-target (e.g. the document number of an
+  // associate document: a PAN, the last 4 Aadhaar digits, a GSTIN). The usual submit check then
+  // shows the option's title beside the field when the value does not match.
+  function applyPatternFrom(select) {
+    var target = select.form ? select.form.querySelector(select.getAttribute('data-pattern-target')) : null;
+    var opt = select.options[select.selectedIndex];
+    if (!target || !opt) return;
+    var pattern = opt.getAttribute('data-pattern');
+    if (pattern) target.setAttribute('pattern', pattern); else target.removeAttribute('pattern');
+    var title = opt.getAttribute('data-title');
+    // title: the browser's own pop-up shows it under its generic "match the format" line.
+    if (title) { target.setAttribute('data-pattern-message', title); target.setAttribute('title', title); } else { target.removeAttribute('data-pattern-message'); target.removeAttribute('title'); }
+    var placeholder = opt.getAttribute('data-placeholder');
+    if (placeholder) target.setAttribute('placeholder', placeholder);
+  }
+
+  function initPatternFromSelect() {
+    document.addEventListener('change', function (e) {
+      if (e.target.matches && e.target.matches('select[data-pattern-target]')) applyPatternFrom(e.target);
+    });
+    document.querySelectorAll('select[data-pattern-target]').forEach(applyPatternFrom);
+  }
+
   function initDatePickers() {
     document.addEventListener('click', function (e) {
       var input = e.target;
@@ -1353,6 +1379,7 @@
     initDatePickers();
     initFocusLink();
     initFloorNotes();
+    initPatternFromSelect();
   }
 
   if (document.readyState === 'loading') {

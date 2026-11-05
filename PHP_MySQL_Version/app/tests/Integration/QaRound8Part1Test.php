@@ -250,14 +250,20 @@ final class QaRound8Part1Test extends DbTestCase
             $_SESSION = [];
             $this->render(fn () => (new ClientIntakeController())->submit([]));
         }
-        self::assertSame(AssociateIntakeService::LINK_USED, $this->flash()['message']);
+        // Owner decision A6 (D-246): the buyer sees no error; the second request is saved as a direct buyer with a note for staff.
+        self::assertNotSame(AssociateIntakeService::LINK_USED, $this->flash()['message'] ?? null);
         $subs = $this->submissionsFor((int) $a['id']);
-        self::assertCount(1, $subs, 'the second registration through the same link is not saved');
+        self::assertCount(1, $subs, 'only the first registration through the same link is the associate\'s');
         self::assertSame('Link One BV ' . $this->tag, $subs[0]['company_legal_name']);
         self::assertSame((int) $subs[0]['id'], (int) AssociateInvitationRepository::find($inv['id'])['submission_id']);
+        $direct = Database::connection()->prepare('SELECT associate_id, associate_note FROM client_intake_submissions WHERE company_legal_name = :c');
+        $direct->execute(['c' => 'Someone Else GmbH ' . $this->tag]);
+        $row = $direct->fetch();
+        self::assertNull($row['associate_id']);
+        self::assertStringContainsString('given but not applied', (string) $row['associate_note']);
         $_GET = ['inv' => $inv['token']];
         $_POST = [];
-        self::assertStringContainsString('has expired or was already used', $this->render(fn () => (new ClientIntakeController())->show([])));
+        self::assertStringNotContainsString('has expired or was already used', $this->render(fn () => (new ClientIntakeController())->show([])), 'A6: the form opens normally');
 
         // At the same moment: the claim is atomic — only one submission takes the link.
         $inv2 = AssociateInvitationRepository::createLink((int) $a['id'], 'Race BV ' . $this->tag, 'Netherlands');

@@ -99,7 +99,7 @@ async function submit(req, res) {
   await associateIntakeService.recordNote(id, introNow.note || null);
   const link = await issueCorrectionLink(id, data.email);
   if (introNow.associate) {
-    const code = await associateIntakeService.attach(id, introNow.associate, introNow.invitation, data.company_legal_name, data.country_of_destination, data.email, true, website || null);
+    const code = await associateIntakeService.attach(id, introNow.associate, introNow.invitation, data.company_legal_name, data.country_of_destination, data.email, true, website || null, introNow.code || null);
     req.session[associateIntakeService.SESSION_KEY] = id;
     await auditLogRepository.log(null, 'CLIENT_INTAKE_SUBMITTED', 'client_intake_submissions', id, 'associate_id', null, String(introNow.associate.id), `Submitted by ${data.company_legal_name} via the public quotation-details form, introduced by associate ${introNow.associate.name}.`);
     if (associatePortalService.showCodeOnScreen()) {

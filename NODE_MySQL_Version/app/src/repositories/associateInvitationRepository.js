@@ -21,10 +21,10 @@ async function createLink(associateId, company, country) {
 }
 
 /** A buyer who registered through the personal code gets a row of their own, so it shows like any invitation. */
-async function createForCode(associateId, company, country) {
+async function createForCode(associateId, company, country, code = null) {
   const r = await db.execute(
-    "INSERT INTO associate_invitations (associate_id, kind, company_name, country, status) VALUES (:a, 'personal_code', :c, :k, 'opened')",
-    { a: associateId, c: company, k: country }
+    "INSERT INTO associate_invitations (associate_id, kind, company_name, country, status, code_used) VALUES (:a, 'personal_code', :c, :k, 'opened', :code)",
+    { a: associateId, c: company, k: country, code: code || null }
   );
   return r.insertId;
 }

@@ -235,7 +235,8 @@ final class AssociateCommissionTest extends DbTestCase
         IncentiveRepository::setSetting('associate_payout_run', 'monthly', $this->admin);
         IncentiveRepository::setSetting('associate_payout_day', '5', $this->admin);
 
-        [, $client] = $this->associate();
+        [$kycA, $client] = $this->associate();
+        $this->completeAssociateKyc(is_array($kycA) ? (int) $kycA['id'] : (int) $kycA); // D-252: KYC complete, so only the due date and claim hold apply
         $orderId = $this->order($client, [[1000.0, 1.0]]);
         IncentiveService::lockIfReady($orderId, $this->admin);
         $p = $this->associatePayout($orderId);

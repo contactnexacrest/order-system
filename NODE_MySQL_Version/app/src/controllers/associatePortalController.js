@@ -17,6 +17,7 @@ const permissionRepository = require('../repositories/permissionRepository');
 const userRepository = require('../repositories/userRepository');
 const csv = require('../helpers/csv');
 const associateCodeService = require('../services/associateCodeService');
+const associateKyc = require('../services/associateKyc');
 const associatePortalService = require('../services/associatePortalService');
 const associateService = require('../services/associateService');
 const fileUploadService = require('../services/fileUploadService');
@@ -152,6 +153,8 @@ async function home(req, res) {
     events: await associateEventRepository.forAssociate(id, null, 10),
     invitations,
     openInvitations: invitations.filter((i) => ['created', 'opened', 'registered'].includes(i.status)).length,
+    // D-252 / D-253: after the first login the associate completes the profile and the KYC documents.
+    kycMissing: await associateKyc.missing(a),
   });
   await associateEventRepository.markNoticesRead(id);
 }
@@ -174,6 +177,11 @@ async function clients(req, res) {
     newLink,
     codeLink: codeLink(a),
     protectionMonths: await associateService.protectionMonths(),
+    // D-254: the code change "like a captcha refresh" and every code the associate has had.
+    proposal: req.session.associate_code_proposal && Number(req.session.associate_code_proposal.associate_id) === id ? req.session.associate_code_proposal : null,
+    codes: await associateCodeService.codes(id),
+    codeChangesPerYear: await associateCodeService.changesPerYear(),
+    codeChangesUsed: await associateCodeService.changesInLastYear(id),
   });
 }
 
@@ -191,8 +199,8 @@ async function createInvitation(req, res) {
   } else {
     const inv = await associateInvitationRepository.createLink(Number(a.id), company, country);
     req.session._associate_new_link = `${associateService.appUrl()}/invite/${inv.token}`;
-    await associateEventRepository.add(Number(a.id), 'link_created', `Invitation link created for ${company} (${country}).`, null, null, inv.id, null, false);
-    flash.set(req, 'success', `Invitation link for ${company} is ready — copy it below and send it to your buyer.`);
+    await associateEventRepository.add(Number(a.id), 'link_created', `Buyer registration link created for ${company} (${country}).`, null, null, inv.id, null, false);
+    flash.set(req, 'success', `Buyer registration link for ${company} is ready — copy it below and send it to your buyer.`);
   }
   res.redirect('/associate/clients');
 }
@@ -211,31 +219,61 @@ async function cancelInvitation(req, res) {
     flash.set(req, 'error', 'This invitation can no longer be cancelled.');
   } else {
     await associateInvitationRepository.setStatus(Number(inv.id), 'cancelled');
-    await associateEventRepository.add(Number(a.id), 'link_cancelled', `Invitation link for ${inv.company_name} cancelled.`, null, null, Number(inv.id), null, false);
+    await associateEventRepository.add(Number(a.id), 'link_cancelled', `Buyer registration link for ${inv.company_name} cancelled.`, null, null, Number(inv.id), null, false);
     flash.set(req, 'success', 'Invitation cancelled.');
   }
   res.redirect('/associate/clients');
 }
 
 /** The associate may choose the readable part of their code once (part 4.4-A2). */
-async function chooseCode(req, res) {
+/**
+ * Owner decision D-254 (A5): the associate changes their personal code like a captcha refresh —
+ * "New ending" proposes a code (nothing saved), "Use this code" switches to it. Old codes keep
+ * bringing buyers to them. At most N changes a year (setting, default 3).
+ */
+async function proposeCode(req, res) {
   const a = await me(req);
   if (refuseWhenSuspended(req, res, a, '/associate/clients')) {
     return;
   }
   const part = associateCodeService.readablePart(String((req.body || {}).readable || ''));
-  const chosen = (await associateEventRepository.forAssociate(Number(a.id))).some((e) => e.event === 'code_chosen');
-  if (chosen) {
-    flash.set(req, 'error', 'You have already chosen your code. Ask your relationship manager if it must change.');
-  } else if (part.length < 3) {
+  if (part.length < 3) {
     flash.set(req, 'error', 'Use 3 to 12 letters or digits.');
   } else {
-    const code = await associateCodeService.issue(Number(a.id), part);
-    await associateEventRepository.add(Number(a.id), 'code_chosen', `Personal code set to ${code}${a.personal_code ? ` (was ${a.personal_code}; the old code no longer brings new clients)` : ''}.`, null, null, null, null, false);
-    await auditLogRepository.log(null, 'ASSOCIATE_CODE_CHOSEN', 'associates', Number(a.id), 'personal_code', a.personal_code || null, code);
-    flash.set(req, 'success', `Your personal code is now ${code}.`);
+    req.session.associate_code_proposal = { associate_id: Number(a.id), code: await associateCodeService.propose(part), readable: part };
   }
-  res.redirect('/associate/clients');
+  res.redirect('/associate/clients#code');
+}
+
+async function chooseCode(req, res) {
+  const a = await me(req);
+  if (refuseWhenSuspended(req, res, a, '/associate/clients')) {
+    return;
+  }
+  const proposal = req.session.associate_code_proposal;
+  const proposed = proposal && Number(proposal.associate_id) === Number(a.id) ? String(proposal.code) : '';
+  const limit = await associateCodeService.changesPerYear();
+  if (proposed === '' || String((req.body || {}).code || '') !== proposed) {
+    flash.set(req, 'error', 'Press "New ending" to get a code first, then "Use this code".');
+  } else if (a.personal_code && await associateCodeService.changesInLastYear(Number(a.id)) >= limit) {
+    flash.set(req, 'error', `You can change your code ${limit} times a year — you have used them. Ask your relationship manager if it must change.`);
+  } else {
+    let code;
+    try {
+      code = await associateCodeService.issue(Number(a.id), proposal.readable, false, null, associateCodeService.isValid(proposed) ? proposed : null);
+    } catch (e) {
+      // Someone took this code in the meantime (unique): propose again.
+      delete req.session.associate_code_proposal;
+      flash.set(req, 'error', 'That code was just taken — press "New ending" for another one.');
+      res.redirect('/associate/clients#code');
+      return;
+    }
+    delete req.session.associate_code_proposal;
+    await associateEventRepository.add(Number(a.id), 'code_changed', `Personal code set to ${code}${a.personal_code ? ` (was ${a.personal_code}; the old code still brings buyers to you)` : ''}.`, null, null, null, null, false);
+    await auditLogRepository.log(null, 'ASSOCIATE_CODE_CHOSEN', 'associates', Number(a.id), 'personal_code', a.personal_code || null, code);
+    flash.set(req, 'success', `Your personal code is now ${code}.${a.personal_code ? ' Your old code keeps working.' : ''}`);
+  }
+  res.redirect('/associate/clients#code');
 }
 
 async function orders(req, res) {
@@ -339,15 +377,19 @@ async function profile(req, res) {
     b.usable_later = !!b.usable_from && String(b.usable_from).slice(0, 10) > today;
   }
   const usable = await associateBankRepository.usable(id);
+  const docs = await associateDocumentRepository.forAssociate(id);
   await render(req, res, 'profile', {
     commissionNow,
     commissionSettings,
     runLabel: associateCommission.runLabel(commissionSettings),
     banks,
     usableBankMasked: usable ? associateBankRepository.masked(usable) : null,
-    documents: await associateDocumentRepository.forAssociate(id),
+    documents: docs,
     docKinds: associateDocumentRepository.KINDS,
     associateKinds: associateDocumentRepository.ASSOCIATE_KINDS.filter((k) => k !== 'invoice'),
+    kyc: await associateKyc.checklist(a, docs),
+    kycLabels: associateKyc.STATUS_LABELS,
+    docRules: associateKyc.REFERENCE_RULES, docOtherRule: associateKyc.OTHER_RULE,
     bankWaitDays: await associateService.bankWaitDays(),
   });
 }
@@ -388,6 +430,13 @@ async function uploadDocument(req, res) {
     res.redirect('/associate/profile');
     return;
   }
+  // Owner decision D-251 (A4): the document's number / reference, checked per kind (Aadhaar: last 4 digits only).
+  const [reference, refError] = associateKyc.normaliseReference(kind, (req.body || {}).reference);
+  if (refError) {
+    flash.set(req, 'error', refError);
+    res.redirect('/associate/profile');
+    return;
+  }
   let fileId;
   try {
     fileId = await fileUploadService.handleUpload(req, 'document_file', 'associate_document', 'associates/documents', null, null, null, null, a.name, KINDS[kind]);
@@ -396,9 +445,10 @@ async function uploadDocument(req, res) {
     res.redirect('/associate/profile');
     return;
   }
-  await associateDocumentRepository.add(Number(a.id), kind, fileId, null, null, true, null);
+  await associateDocumentRepository.add(Number(a.id), kind, fileId, null, reference, true, null);
   await auditLogRepository.log(null, 'ASSOCIATE_DOCUMENT_UPLOADED', 'associates', Number(a.id), 'kind', null, kind);
-  flash.set(req, 'success', `${KINDS[kind]} received.`);
+  await associateKyc.notifyStaffOfUpload(a, kind);
+  flash.set(req, 'success', `${KINDS[kind]} received — NexaCrest will check it.`);
   res.redirect('/associate/profile');
 }
 
@@ -501,6 +551,7 @@ async function acknowledgePrices(req, res) {
 }
 
 module.exports = {
+  proposeCode,
   codeLink, showLogin, login, showCode, verifyCode, logout, showSetPassword, setPassword, home, clients, createInvitation, cancelInvitation, chooseCode,
   orders, order, commission, uploadInvoice, certificate, profile, saveProfile, uploadDocument, requestBank, downloadDocument, downloadAgreement,
   messages, sendMessage, prices, acknowledgePrices,

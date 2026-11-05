@@ -24,11 +24,11 @@ final class AssociateInvitationRepository
     }
 
     /** A buyer who registered through the personal code gets a row of their own, so it shows like any invitation. */
-    public static function createForCode(int $associateId, string $company, string $country): int
+    public static function createForCode(int $associateId, string $company, string $country, ?string $code = null): int
     {
         $pdo = Database::connection();
-        $pdo->prepare("INSERT INTO associate_invitations (associate_id, kind, company_name, country, status) VALUES (:a, 'personal_code', :c, :k, 'opened')")
-            ->execute(['a' => $associateId, 'c' => $company, 'k' => $country]);
+        $pdo->prepare("INSERT INTO associate_invitations (associate_id, kind, company_name, country, status, code_used) VALUES (:a, 'personal_code', :c, :k, 'opened', :code)")
+            ->execute(['a' => $associateId, 'c' => $company, 'k' => $country, 'code' => $code]);
         return (int) $pdo->lastInsertId();
     }
 

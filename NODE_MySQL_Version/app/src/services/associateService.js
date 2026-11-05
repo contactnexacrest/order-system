@@ -85,7 +85,8 @@ const SUBJECTS = {
   direct_contact: 'your client contacted us', order_created: 'new order from your client',
   commission_earned: 'commission earned', payout_paid: 'commission paid', payout_held: 'commission on hold',
   clawback: 'commission adjustment', bank_changed: 'your bank details changed', bank_rejected: 'your new bank details were not accepted', link_changed: 'a client link changed',
-  lock_ending: 'protection ending soon', registration_lapsed: 'a buyer registration lapsed', agreement_ending: 'agreement ending soon', portal_invite: 'your portal access',
+  lock_ending: 'protection ending soon', registration_lapsed: 'a buyer registration lapsed', agreement_ending: 'agreement ending soon', portal_invite: 'your portal login link',
+  document_accepted: 'your document was accepted', document_rejected: 'please upload a document again', code_changed: 'your personal code changed',
 };
 
 /** A notice in the associate's portal and, where useful, an e-mail. */
@@ -122,7 +123,7 @@ async function invitePortal(associateId, userId) {
     // shown on screen in development; staff can resend
   }
   await auditLogRepository.log(userId, 'ASSOCIATE_PORTAL_INVITED', 'associates', associateId, null, null, String(a.email));
-  await associateEventRepository.add(associateId, 'portal_invite', `Portal access sent to ${a.email}.`, null, null, null, userId, false);
+  await associateEventRepository.add(associateId, 'portal_invite', `Portal login link sent to ${a.email}.`, null, null, null, userId, false);
   return link;
 }
 

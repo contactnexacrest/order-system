@@ -44,20 +44,31 @@
     </details>
   </div>
 
-  <div class="section">
-    <h2>My documents</h2>
-    <table class="list"><tr><th>Added</th><th>Document</th><th>Reference</th></tr>
-      {% for d in documents %}<tr><td>{{ d.created_at | shortDate }}</td><td><a href="/associate/documents/{{ d.id }}">{{ docKinds[d.kind] or d.kind }}</a></td><td>{{ d.reference or '' }}</td></tr>{% endfor %}
-      {% if documents.length == 0 %}<tr><td colspan="3" class="muted">None yet.</td></tr>{% endif %}
+  <div class="section" id="kyc">
+    <h2>My documents and KYC</h2>
+    {# Owner decision D-252 (A3): the KYC checklist — NexaCrest checks each document; commission is paid once all are accepted. #}
+    <table class="list"><tr><th>Needed</th><th>Status</th><th>Document</th></tr>
+      {% for i in kyc %}
+        <tr><td>{{ i.label }}</td>
+          <td><span class="badge {{ {'accepted': 'badge-success', 'rejected': 'badge-danger', 'pending': 'badge-warning'}[i.status] or '' }}">{{ kycLabels[i.status] }}</span>
+            {% if i.status == 'rejected' and i.doc and i.doc.review_reason %}<br><small>{{ i.doc.review_reason }} — please upload it again.</small>{% endif %}</td>
+          <td>{% if i.doc %}{{ docKinds[i.doc.kind] or i.doc.kind }}{% if i.doc.reference %} · {{ i.doc.reference }}{% endif %}{% elif i.by_nexacrest %}On file at NexaCrest{% else %}—{% endif %}</td></tr>
+      {% endfor %}
     </table>
-    <form method="post" action="/associate/documents" enctype="multipart/form-data" class="inline-form">
+    <p class="muted small">Commission is paid once every document above is accepted.</p>
+    <h3>All documents</h3>
+    <table class="list"><tr><th>Added</th><th>Document</th><th>Number / reference</th><th>Status</th></tr>
+      {% for d in documents %}<tr><td>{{ d.created_at | shortDate }}</td><td><a href="/associate/documents/{{ d.id }}">{{ docKinds[d.kind] or d.kind }}</a></td><td>{{ d.reference or '' }}</td>
+        <td>{{ {'accepted': 'Accepted', 'rejected': 'Rejected', 'received': 'Being checked'}[d.status] or d.status }}</td></tr>{% endfor %}
+      {% if documents.length == 0 %}<tr><td colspan="4" class="muted">None yet.</td></tr>{% endif %}
+    </table>
+    <form method="post" action="/associate/documents" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <select name="kind" required aria-label="Document kind"><option value="">What is it?</option>
-        {% for k in associateKinds %}{% if k != 'invoice' %}<option value="{{ k }}">{{ docKinds[k] }}</option>{% endif %}{% endfor %}
-      </select>
-      <input type="file" name="document_file" required accept=".pdf,.jpg,.jpeg,.png" aria-label="File">
+      <div class="field-grid">
+        {% set docUploadKinds = associateKinds %}{% include "associates/_doc_upload_fields.njk" %}
+      </div>
       <button type="submit" class="btn-sm">Upload</button>
     </form>
-    <p class="muted small">{{ 'India: PAN card, address proof, GST certificate if registered.' if __india else 'Abroad: passport or company registration, tax residency certificate, Form 10F, no-PE declaration.' }}</p>
+    <p class="muted small">{{ 'India: PAN card, Aadhaar card (we keep only its last 4 digits) or passport, bank proof, the signed agreement, GST certificate if registered.' if __india else 'Abroad: passport or company registration, bank proof, the signed agreement, tax residency certificate, Form 10F, no-PE declaration.' }}</p>
   </div>
 </div>

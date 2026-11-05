@@ -1,0 +1,13 @@
+{# Owner decision D-251 (4 Nov 2026): document kind + its number / reference (checked per kind;
+   Aadhaar: last 4 digits only) + file. Shared by the staff page and the associate portal.
+   Expects: docUploadKinds (list of kind keys), docKinds (labels), docRules, docOtherRule. #}
+<label>Document *
+  <select name="kind" required data-pattern-target="input[name=reference]">
+    <option value="">Choose…</option>
+    {% for k in docUploadKinds %}{% set __rule = docRules[k] or docOtherRule %}
+      <option value="{{ k }}" data-pattern="{{ __rule[0] }}" data-placeholder="{{ __rule[1] }}" data-title="{{ __rule[2] }}">{{ docKinds[k] }}</option>
+    {% endfor %}
+  </select></label>
+<label>Document number / reference
+  <input type="text" name="reference" maxlength="50" placeholder="e.g. ABCDE1234F (PAN) or the last 4 Aadhaar digits" autocomplete="off"></label>
+<label>File *<input type="file" name="document_file" required accept=".pdf,.jpg,.jpeg,.png"></label>

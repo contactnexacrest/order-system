@@ -49,7 +49,7 @@ final class PermittedLinks
         '#^/associates/tds(?:[/?\#]|$)#'                           => ['manage_incentives', 'pay_incentives', 'ca_module_view'],
         '#^/associates/\d+/bank/\d+/number(?:[/?\#]|$)#'           => ['manage_associate_bank'],
         '#^/associates/\d+/documents/\d+(?:[/?\#]|$)#'             => ['manage_associates', 'manage_associate_bank'],
-        '#^/associates/(?:new|ladder|\d+/(?:edit|view-as|agreement))(?:[/?\#]|$)#' => ['manage_associates'],
+        '#^/associates/(?:new|ladder|registrations|\d+/(?:edit|view-as|agreement))(?:[/?\#]|$)#' => ['manage_associates'],
         '#^/associates(?:[/?\#]|$)#'                               => ['view_associates', 'manage_associates', 'manage_associate_bank'],
         // Owner decision D-245 P5: incentive & commission reports.
         '#^/reports/incentives(?:[/?\#]|$)#'                        => ['manage_incentives', 'pay_incentives', 'view_price_buildup'],

@@ -6,7 +6,7 @@
    docKinds (KINDS map), invitationStatuses (map), allAssociates (all associates, for the MD move-to select), csrfToken. #}
 {% set id = a.id %}
 {% set full = canManage or canBank %}
-{% set __sourceLabel = {'link': 'own invitation link', 'code': 'personal code', 'staff': 'linked by NexaCrest', 'md_change': 'changed by the MD'} %}
+{% set __sourceLabel = {'link': 'buyer registration link', 'code': 'personal code', 'staff': 'linked by NexaCrest', 'md_change': 'changed by the MD'} %}
 <div class="card page-wide">
   <div class="page-header-row">
     <div>
@@ -57,33 +57,42 @@
   </div>
 
   <div class="section" id="portal">
-    <h2>Portal and personal code</h2>
+    <h2>Portal login link and personal code</h2>
     <p>Portal: <b>{{ 'on' if a.portal_enabled == 1 else 'off' }}</b>{% if a.last_login_at %} · last login {{ a.last_login_at | shortDate }}{% endif %}
-      {% if codeLink %}<br>Personal code link: <code>{{ codeLink }}</code>{% endif %}</p>
+      {% if codeLink %}<br>Quotation link (with their code): <code>{{ codeLink }}</code>{% endif %}</p>
     <div class="btn-row">
-      <form method="post" action="/associates/{{ id }}/portal/invite" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">{{ 'Resend portal access' if a.portal_enabled == 1 else 'Send portal access' }}</button></form>
+      <form method="post" action="/associates/{{ id }}/portal/invite" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm">{{ 'Resend portal login link' if a.portal_enabled == 1 else 'Send portal login link' }}</button></form>
       {% if a.portal_enabled == 1 %}<form method="post" action="/associates/{{ id }}/portal/disable" style="display:inline" data-confirm="Switch off this associate's portal?"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-secondary">Switch portal off</button></form>{% endif %}
     </div>
-    <form method="post" action="/associates/{{ id }}/code" class="inline-form" data-confirm="Set a new personal code? The old code stops bringing new clients.">
+    {# Owner decision D-254: old codes keep bringing buyers to the associate unless blocked here (e.g. after a leak). #}
+    <form method="post" action="/associates/{{ id }}/code" class="inline-form" data-confirm="Set a new personal code for this associate?">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>New personal code — readable part <input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" placeholder="e.g. RAJESH"></label>
+      <label>New personal code — readable part *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" placeholder="e.g. RAJESH"></label>
+      <label class="checkbox-label"><input type="checkbox" name="block_old" value="1"> Block the old code (e.g. it leaked)</label>
+      <input type="text" name="block_reason" maxlength="300" minlength="10" placeholder="Why it is blocked (needed when blocking)" aria-label="Why the old code is blocked" data-required-when="block_old=1" data-required-when-message="Say why the old code is blocked (at least 10 characters).">
       <button type="submit" class="btn-sm btn-secondary">Set code</button>
     </form>
+    {% if codes and codes.length %}
+      <table class="list"><tr><th>Code</th><th>From</th><th>To</th><th>Status</th></tr>
+        {% for c in codes %}<tr><td style="font-family:monospace">{{ c.code }}</td><td>{{ (c.issued_at | shortDate) if c.issued_at else '—' }}</td><td>{{ (c.retired_at | shortDate) if c.retired_at else '—' }}</td>
+          <td>{% if c.blocked_at %}Blocked — {{ c.blocked_reason }}{% elif c.code == a.personal_code %}Current{% else %}Still accepted (old links){% endif %}</td></tr>{% endfor %}
+      </table>
+    {% endif %}
   </div>
   {% endif %}
 
   <div class="section" id="clients">
     <h2>Clients introduced ({{ clients.length }})</h2>
     <table class="list">
-      <tr><th>Client</th><th>Country</th><th>Registered</th><th>How</th><th>Protected until</th><th>First order</th>{% if canChangeLink %}<th>Change (MD only)</th>{% endif %}</tr>
+      <tr><th>Client</th><th>Country</th><th>Registered</th><th>Came via</th><th>Protected until</th><th>Orders</th>{% if canChangeLink %}<th>Change (MD only)</th>{% endif %}</tr>
       {% for c in clients %}
         <tr>
           <td><a href="/clients/{{ c.id }}">{{ c.company_legal_name }}</a> <small class="muted">{{ c.client_unique_number }}</small></td>
           <td>{{ c.country_of_destination or '' }}</td>
           <td>{{ (c.associate_registered_on | shortDate) if c.associate_registered_on else '—' }}</td>
-          <td>{{ __sourceLabel[c.associate_source] or 'linked earlier' }}</td>
+          <td>{{ c.came_via or __sourceLabel[c.associate_source] or 'linked earlier' }}</td>
           <td>{{ (c.associate_locked_until | shortDate) if c.associate_locked_until else '—' }}</td>
-          <td>{{ (c.first_order_on | shortDate) if c.first_order_on else '—' }}</td>
+          <td>{% if c.order_refs and c.order_refs.length %}{{ c.order_refs | join(', ') }}{% else %}<span class="muted">none yet</span>{% endif %}</td>
           {% if canChangeLink %}<td>
             <form method="post" action="/associates/{{ id }}/clients/{{ c.id }}/unlink" class="inline-form" data-confirm="Change this client's associate? The associate is told at once.">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
@@ -108,19 +117,19 @@
         <input type="text" name="reason" required minlength="10" maxlength="300" placeholder="How they introduced the client" aria-label="How they introduced the client">
         <button type="submit" class="btn-sm">Link</button>
       </form>
-      <p class="muted small">Normally the buyer registers through the associate's link or personal code and confirms the introduction themselves; this is for clients already on file. Once linked, only the MD can change it.</p>
+      <p class="muted small">Normally the buyer registers through the associate's buyer registration link or quotation link (personal code) and confirms the introduction themselves; this is for clients already on file. Once linked, only the MD can change it.</p>
     {% endif %}
   </div>
 
   {% if full %}
   {% if canManage %}
   <div class="section" id="invitations">
-    <h2>Invitation links</h2>
+    <h2>Buyer registration links and codes used</h2>
     <table class="list">
       <tr><th>Created</th><th>For</th><th>Kind</th><th>Status</th><th>Expires</th></tr>
       {% for i in invitations %}
         <tr><td>{{ (i.created_at | shortDate) if i.created_at else '—' }}</td><td>{{ i.company_name }}{% if i.country %} ({{ i.country }}){% endif %}</td>
-          <td>{{ 'Personal code' if i.kind == 'personal_code' else 'One-off link' }}</td><td>{{ invitationStatuses[i.status] or i.status }}</td><td>{{ (i.expires_at | shortDate) if i.expires_at else '—' }}</td></tr>
+          <td>{% if i.kind == 'personal_code' %}Personal code{% if i.code_used %} {{ i.code_used }}{% endif %}{% else %}Buyer registration link (one buyer){% endif %}</td><td>{{ invitationStatuses[i.status] or i.status }}</td><td>{{ (i.expires_at | shortDate) if i.expires_at else '—' }}</td></tr>
       {% endfor %}
       {% if invitations.length == 0 %}<tr><td colspan="5" class="muted">None yet.</td></tr>{% endif %}
     </table>
@@ -200,19 +209,37 @@
   </div>
 
   <div class="section" id="documents">
-    <h2>Documents</h2>
-    <table class="list">
-      <tr><th>Added</th><th>Document</th><th>Reference</th><th>From</th></tr>
-      {% for d in documents %}
-        <tr><td>{{ d.created_at | shortDate }}</td><td><a href="/associates/{{ id }}/documents/{{ d.id }}">{{ docKinds[d.kind] or d.kind }}</a></td><td>{{ d.reference or '' }}</td><td>{{ 'Associate' if d.uploaded_by_associate == 1 else 'NexaCrest' }}</td></tr>
+    <h2>KYC and documents</h2>
+    {# Owner decision D-252 (A3): the KYC checklist; commission cannot be marked paid until every item is accepted. #}
+    <table class="list"><tr><th>KYC item</th><th>Status</th><th>Document</th></tr>
+      {% for i in kyc %}
+        <tr><td>{{ i.label }}</td>
+          <td><span class="badge {{ {'accepted': 'badge-success', 'rejected': 'badge-danger', 'pending': 'badge-warning'}[i.status] or '' }}">{{ kycLabels[i.status] }}</span></td>
+          <td>{% if i.doc %}{{ docKinds[i.doc.kind] or i.doc.kind }}{% if i.doc.reference %} · {{ i.doc.reference }}{% endif %}{% elif i.by_nexacrest %}Agreement on the associate record{% else %}—{% endif %}</td></tr>
       {% endfor %}
-      {% if documents.length == 0 %}<tr><td colspan="4" class="muted">None yet.</td></tr>{% endif %}
     </table>
-    <form method="post" action="/associates/{{ id }}/documents" enctype="multipart/form-data" class="inline-form">
+    {% set __kycOk = true %}{% for i in kyc %}{% if i.status != 'accepted' %}{% set __kycOk = false %}{% endif %}{% endfor %}
+    <p class="{{ 'muted' if __kycOk else 'review-banner bad' }} small">{{ 'KYC complete — commission can be paid.' if __kycOk else 'KYC not complete — commission cannot be marked paid until every item is accepted.' }}</p>
+    <table class="list">
+      <tr><th>Added</th><th>Document</th><th>Number / reference</th><th>From</th><th>Status</th>{% if canManage %}<th>Check</th>{% endif %}</tr>
+      {% for d in documents %}
+        <tr><td>{{ d.created_at | shortDate }}</td><td><a href="/associates/{{ id }}/documents/{{ d.id }}">{{ docKinds[d.kind] or d.kind }}</a></td><td>{{ d.reference or '' }}</td><td>{{ 'Associate' if d.uploaded_by_associate == 1 else 'NexaCrest' }}</td>
+          <td>{{ {'accepted': 'Accepted', 'rejected': 'Rejected', 'received': 'Not checked yet'}[d.status] or d.status }}{% if d.reviewed_at %}<br><small class="muted">{{ d.reviewed_by_name or '' }}, {{ d.reviewed_at | shortDate }}{% if d.review_reason %} — {{ d.review_reason }}{% endif %}</small>{% endif %}</td>
+          {% if canManage %}<td>
+            <form method="post" action="/associates/{{ id }}/documents/{{ d.id }}/review" class="inline-form">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <select name="decision" required aria-label="Accept or reject"><option value="">Choose…</option><option value="accept">Accept</option><option value="reject">Reject</option></select>
+              <input type="text" name="reason" maxlength="300" placeholder="Reason (needed to reject)" aria-label="Reason" data-required-when="decision=reject" data-required-when-message="Say why it is rejected (at least 10 characters) — the associate sees it." minlength="10">
+              <button type="submit" class="btn-sm btn-secondary">Save</button>
+            </form></td>{% endif %}</tr>
+      {% endfor %}
+      {% if documents.length == 0 %}<tr><td colspan="6" class="muted">None yet.</td></tr>{% endif %}
+    </table>
+    <form method="post" action="/associates/{{ id }}/documents" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <select name="kind" required aria-label="Document kind"><option value="">What is it?</option>{% for k, l in docKinds %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select>
-      <input type="text" name="reference" maxlength="100" placeholder="Reference (e.g. certificate no.)" aria-label="Reference">
-      <input type="file" name="document_file" required accept=".pdf,.jpg,.jpeg,.png" aria-label="File">
+      <div class="field-grid">
+        {% set docUploadKinds = allDocKinds %}{% include "associates/_doc_upload_fields.njk" %}
+      </div>
       <button type="submit" class="btn-sm">Upload</button>
     </form>
   </div>

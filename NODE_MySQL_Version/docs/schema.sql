@@ -5278,3 +5278,51 @@ CREATE TABLE order_incentive_history (
 ALTER TABLE incentive_payouts ADD COLUMN locked_on DATE NULL;
 -- Owner decision 4 Nov 2026 (A6): an associate code or link the buyer gave that could not be applied, and why — shown to staff on the intake review; the buyer never sees an error.
 ALTER TABLE client_intake_submissions ADD COLUMN associate_note VARCHAR(500) NULL;
+-- Owner decisions 4 Nov 2026, Batch 2 (D-250..D-254).
+-- D-251 (A4) / D-252 (A3): an associate document's number / reference (Aadhaar: last 4 digits only, "XXXX XXXX 1234")
+-- and the KYC review — accepted or rejected (with the reason), by whom and when.
+ALTER TABLE associate_documents ADD COLUMN reviewed_by BIGINT UNSIGNED NULL;
+ALTER TABLE associate_documents ADD COLUMN reviewed_at DATETIME NULL;
+ALTER TABLE associate_documents ADD COLUMN review_reason VARCHAR(300) NULL;
+-- D-253 (A1): the MD's one-use, time-limited associate registration links, and the registrations they bring.
+CREATE TABLE associate_registration_links (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  token_hash CHAR(64) NOT NULL,
+  note VARCHAR(200) NULL,
+  created_by BIGINT UNSIGNED NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL,
+  cancelled_at DATETIME NULL,
+  UNIQUE KEY uq_associate_registration_links_token (token_hash),
+  CONSTRAINT fk_associate_registration_links_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE associate_registrations (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  link_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(150) NOT NULL,
+  email VARCHAR(190) NOT NULL,
+  phone VARCHAR(40) NOT NULL,
+  country VARCHAR(80) NOT NULL,
+  based_in ENUM('india','abroad') NOT NULL,
+  city VARCHAR(100) NOT NULL,
+  consent_at DATETIME NOT NULL,
+  ip_address VARCHAR(45) NULL,
+  status ENUM('pending','accepted','rejected') NOT NULL DEFAULT 'pending',
+  reject_reason VARCHAR(300) NULL,
+  reviewed_by BIGINT UNSIGNED NULL,
+  reviewed_at DATETIME NULL,
+  associate_id BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_associate_registrations_status (status),
+  UNIQUE KEY uq_associate_registrations_link (link_id),
+  CONSTRAINT fk_associate_registrations_link FOREIGN KEY (link_id) REFERENCES associate_registration_links(id),
+  CONSTRAINT fk_associate_registrations_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(id),
+  CONSTRAINT fk_associate_registrations_associate FOREIGN KEY (associate_id) REFERENCES associates(id)
+) ENGINE=InnoDB;
+ALTER TABLE associates ADD COLUMN city VARCHAR(100) NULL;
+-- D-254 (A5): old personal codes keep bringing buyers to their associate; staff may block one (e.g. after a leak).
+ALTER TABLE associate_codes ADD COLUMN blocked_at DATETIME NULL;
+ALTER TABLE associate_codes ADD COLUMN blocked_reason VARCHAR(300) NULL;
+-- The code a buyer registered with ("came via").
+ALTER TABLE associate_invitations ADD COLUMN code_used VARCHAR(30) NULL;

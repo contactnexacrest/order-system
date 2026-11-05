@@ -560,7 +560,7 @@ final class RouteBehaviourTest extends DbTestCase
         $this->assertDone($this->call('POST', "/associates/{$id}/bank/{$second}/reject", ['reason' => 'Name does not match the PAN.']), 'POST /associates/{id}/bank/{bankId}/reject');
         $this->assertDone($this->call('POST', "/associates/{$id}/status", ['status' => 'active', 'reason' => 'Route test activation']), 'POST /associates/{id}/status');
 
-        $this->assertDone($this->call('POST', "/associates/{$id}/portal/invite"), 'POST /associates/{id}/portal/invite', "Portal access e-mailed to {$email}.");
+        $this->assertDone($this->call('POST', "/associates/{$id}/portal/invite"), 'POST /associates/{id}/portal/invite', "Portal login link e-mailed to {$email}.");
         $this->assertDone($this->call('POST', "/associates/{$id}/code", ['readable' => 'ROUTE']), 'POST /associates/{id}/code', 'Personal code set to NXA-ROUTE-');
         $this->assertDone($this->call('POST', "/associates/{$id}/portal/disable"), 'POST /associates/{id}/portal/disable');
         $this->assertDone($this->call('POST', "/associates/{$id}/messages", ['body' => 'Route test message.']), 'POST /associates/{id}/messages');

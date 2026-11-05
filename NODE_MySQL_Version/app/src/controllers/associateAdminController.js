@@ -20,6 +20,7 @@ const lookupRepository = require('../repositories/lookupRepository');
 const orderRepository = require('../repositories/orderRepository');
 const userRepository = require('../repositories/userRepository');
 const associateCodeService = require('../services/associateCodeService');
+const associateKyc = require('../services/associateKyc');
 const associatePortalService = require('../services/associatePortalService');
 const associateService = require('../services/associateService');
 const fileUploadService = require('../services/fileUploadService');
@@ -96,6 +97,7 @@ async function index(req, res) {
     canManage: can(req, 'manage_associates'),
     canBank: can(req, 'manage_associate_bank'),
     pendingBank: await associateBankRepository.pendingCount(),
+    pendingRegistrations: await require('../repositories/associateRegistrationRepository').pendingCount(),
     kanbanUser: (await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban',
   };
   if (await uiTemplateService.showsBoard(req)) {
@@ -277,6 +279,7 @@ async function show(req, res) {
     const l = await pricingRepository.findLevel(a.commission_level_id);
     if (l) commissionLevel = { ...l, label: pricingService.levelLabel(l) };
   }
+  const docs = await associateDocumentRepository.forAssociate(id);
   const data = {
     a,
     commissionLevel,
@@ -311,8 +314,12 @@ async function show(req, res) {
       banks,
       usableBank,
       usableBankMasked: usableBank ? associateBankRepository.masked(usableBank) : null,
-      documents: await associateDocumentRepository.forAssociate(id),
+      documents: docs,
       docKinds: associateDocumentRepository.KINDS,
+      kyc: await associateKyc.checklist(a, docs),
+      kycLabels: associateKyc.STATUS_LABELS,
+      codes: await associateCodeService.codes(id),
+      docRules: associateKyc.REFERENCE_RULES, docOtherRule: associateKyc.OTHER_RULE, allDocKinds: Object.keys(associateDocumentRepository.KINDS),
       events: await associateEventRepository.forAssociate(id, null, 200),
       messages: await associateEventRepository.messages(id),
       unlinkedClients: await associateRepository.unlinkedClients(),
@@ -370,7 +377,7 @@ async function invitePortal(req, res) {
   if (!a) return;
   try {
     const link = await associateService.invitePortal(Number(a.id), req.user.id);
-    flash.set(req, 'success', `Portal access e-mailed to ${a.email}.${associatePortalService.showCodeOnScreen() ? ` Development only — link: ${link}` : ''}`);
+    flash.set(req, 'success', `Portal login link e-mailed to ${a.email}.${associatePortalService.showCodeOnScreen() ? ` Development only — link: ${link}` : ''}`);
   } catch (e) {
     flash.set(req, 'error', e.message);
   }
@@ -382,8 +389,8 @@ async function disablePortal(req, res) {
   if (!a) return;
   await associateRepository.setFields(Number(a.id), { portal_enabled: 0 });
   await auditLogRepository.log(req.user.id, 'ASSOCIATE_PORTAL_DISABLED', 'associates', Number(a.id));
-  await associateEventRepository.add(Number(a.id), 'portal_disabled', `Portal access switched off by ${req.user.name}.`, null, null, null, req.user.id, false);
-  flash.set(req, 'success', 'Portal access switched off. Their personal code and client links stay as they are.');
+  await associateEventRepository.add(Number(a.id), 'portal_disabled', `Portal switched off by ${req.user.name}.`, null, null, null, req.user.id, false);
+  flash.set(req, 'success', 'Portal switched off. Their personal code, quotation link and clients stay as they are.');
   back(res, a.id, 'portal');
 }
 
@@ -395,10 +402,20 @@ async function setCode(req, res) {
   if (part.length < 3) {
     flash.set(req, 'error', 'Use 3 to 12 letters or digits for the readable part of the code.');
   } else {
-    const code = await associateCodeService.issue(Number(a.id), part);
-    await auditLogRepository.log(req.user.id, 'ASSOCIATE_CODE_SET', 'associates', Number(a.id), 'personal_code', a.personal_code || null, code);
-    await associateService.notify(a, 'code_changed', `Your personal code is now ${code}${a.personal_code ? `; ${a.personal_code} no longer brings new clients (clients already registered stay yours)` : ''}.`, null, null, null, req.user.id);
-    flash.set(req, 'success', `Personal code set to ${code}.`);
+    // Owner rule D-254: the old code keeps working unless staff block it (e.g. after a leak), with a reason.
+    const body = req.body || {};
+    const block = String(body.block_old || '') === '1';
+    const reason = String(body.block_reason || '').trim();
+    if (block && [...reason].length < 10) {
+      flash.set(req, 'error', 'Say why the old code is blocked (at least 10 characters).');
+      back(res, a.id, 'portal');
+      return;
+    }
+    const code = await associateCodeService.issue(Number(a.id), part, block, block ? reason : null);
+    await auditLogRepository.log(req.user.id, 'ASSOCIATE_CODE_SET', 'associates', Number(a.id), 'personal_code', a.personal_code || null, code + (block ? ` (old code blocked: ${reason})` : ''));
+    await associateService.notify(a, 'code_changed', `Your personal code is now ${code}.${a.personal_code
+      ? `${block ? ` Your old code ${a.personal_code} no longer brings new clients.` : ` Your old code ${a.personal_code} still brings buyers to you — links you already shared keep working.`} Clients already registered stay yours.` : ''}`, null, null, null, req.user.id);
+    flash.set(req, 'success', `Personal code set to ${code}.${block ? ' The old code is blocked.' : ' The old code keeps working.'}`);
   }
   back(res, a.id, 'portal');
 }
@@ -641,8 +658,10 @@ async function uploadDocument(req, res) {
     back(res, a.id, 'documents');
     return;
   }
-  if (len(reference) > 100) {
-    flash.set(req, 'error', 'The reference is too long (up to 100 characters).');
+  // Owner decision D-251 (A4): checked per kind; an Aadhaar card keeps only its last 4 digits.
+  const [refValue, refError] = associateKyc.normaliseReference(kind, reference);
+  if (refError) {
+    flash.set(req, 'error', refError);
     back(res, a.id, 'documents');
     return;
   }
@@ -654,12 +673,22 @@ async function uploadDocument(req, res) {
     back(res, a.id, 'documents');
     return;
   }
-  await associateDocumentRepository.add(Number(a.id), kind, fileId, null, reference || null, false, req.user.id);
+  await associateDocumentRepository.add(Number(a.id), kind, fileId, null, refValue, false, req.user.id);
   await auditLogRepository.log(req.user.id, 'ASSOCIATE_DOCUMENT_UPLOADED', 'associates', Number(a.id), 'kind', null, kind);
   if (['form_16a', 'form_15ca', 'form_15cb'].includes(kind)) {
-    await associateService.notify(a, 'document_added', `${KINDS[kind]}${reference !== '' ? ` (${reference})` : ''} is in your portal.`, null, null, null, req.user.id);
+    await associateService.notify(a, 'document_added', `${KINDS[kind]}${refValue ? ` (${refValue})` : ''} is in your portal.`, null, null, null, req.user.id);
   }
   flash.set(req, 'success', `${KINDS[kind]} saved.`);
+  back(res, a.id, 'documents');
+}
+
+/** Owner decision D-252 (A3): accept or reject one KYC document (reason required to reject). */
+async function reviewDocument(req, res) {
+  const a = await found(req, res);
+  if (!a) return;
+  const body = req.body || {};
+  const error = await associateKyc.review(a, parseInt(req.params.docId, 10) || 0, String(body.decision || ''), String(body.reason || ''), req.user.id);
+  flash.set(req, error ? 'error' : 'success', error || (body.decision === 'accept' ? 'Document accepted.' : 'Document rejected — the associate is asked to upload it again.'));
   back(res, a.id, 'documents');
 }
 
@@ -906,6 +935,7 @@ async function report(req, res) {
 }
 
 module.exports = {
+  reviewDocument,
   can, validateBank, sendFile, index, create, edit, save, show, changeStatus, invitePortal, disablePortal, setCode, viewAs, downloadAgreement,
   linkClient, unlinkClient, addBank, firstCheck, verifyBank, rejectBank, bankNumber, uploadDocument, downloadDocument, reply,
   holdPayout, releasePayout, clawback, ladder, saveLadder, report,

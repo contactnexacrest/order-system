@@ -156,7 +156,12 @@ final class AssociateSystemTest extends DbTestCase
         self::assertNull(AssociateCodeService::resolve($typo), 'a mistyped check letter is caught');
 
         $new = AssociateCodeService::issue((int) $a['id'], 'NEWNAME');
-        self::assertNull(AssociateCodeService::resolve($code), 'the old code no longer brings new clients');
+        // D-254 (owner, 4 Nov 2026): the old code keeps bringing buyers to the same associate…
+        self::assertSame((int) $a['id'], (int) AssociateCodeService::resolve($code)['id'], 'the old code keeps working');
+        // …until staff block it.
+        $newer = AssociateCodeService::issue((int) $a['id'], 'NEWER', true, 'Leaked in a public post');
+        self::assertNull(AssociateCodeService::resolve($new), 'a blocked code no longer brings new clients');
+        $new = $newer;
         self::assertSame((int) $a['id'], (int) AssociateCodeService::resolve($new)['id']);
         $count = (int) Database::connection()->query("SELECT COUNT(*) FROM associate_codes WHERE code = " . Database::connection()->quote($code))->fetchColumn();
         self::assertSame(1, $count, 'the retired code is kept, so it is never given to anyone else');
@@ -286,6 +291,7 @@ final class AssociateSystemTest extends DbTestCase
         (new IncentiveController())->markPaid(['payoutId' => (string) $p1['id']]);
         self::assertStringStartsWith('This associate has no verified bank account usable on ', $this->flash()['message']);
         $this->verifiedBank($a);
+        $this->completeAssociateKyc((int) $a['id']); // D-252: paid only once the KYC is complete
         // D-245 P3: paid only from its due date (30 days after full payment).
         $_POST['month'] = $p1['incentive_month'];
         (new IncentiveController())->markPaid(['payoutId' => (string) $p1['id']]);

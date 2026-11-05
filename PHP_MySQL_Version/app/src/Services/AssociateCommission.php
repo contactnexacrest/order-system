@@ -108,6 +108,11 @@ final class AssociateCommission
         if (self::settings()['claim_hold'] && self::claimOpen((int) $payout['order_id'], (string) $payout['due_on'])) {
             return 'A buyer claim on this order is open — the commission waits until it is resolved.';
         }
+        // Owner decision D-252 (A3): no commission is paid until the associate's KYC is complete.
+        $a = !empty($payout['associate_id']) ? AssociateRepository::find((int) $payout['associate_id']) : null;
+        if ($a !== null && ($missing = AssociateKyc::missing($a)) !== []) {
+            return "The associate's KYC is not complete — still to be accepted: " . implode(', ', $missing) . '.';
+        }
         return null;
     }
 

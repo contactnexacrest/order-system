@@ -228,11 +228,15 @@ describe('QA Round 8, part 1', () => {
       session = {};
       await call(clientIntakeController.submit, { body: intakePost(company, inv.token) });
     }
-    expect(flash().message).toBe(associateIntakeService.LINK_USED);
+    // Owner decision A6 (D-246): the buyer sees no error; the second request is saved as a direct buyer with a note for staff.
+    expect(flash().message).not.toBe(associateIntakeService.LINK_USED);
     const subs = await submissionsFor(Number(a.id));
     expect(subs.map((s) => s.company_legal_name)).toEqual([`Link One BV ${tag}`]);
     expect(Number((await associateInvitationRepository.find(inv.id)).submission_id)).toBe(Number(subs[0].id));
-    expect((await request(app).get(`/quotation-details?inv=${inv.token}`)).text).toContain('has expired or was already used');
+    const direct = await db.queryOne('SELECT associate_id, associate_note FROM client_intake_submissions WHERE company_legal_name = :c', { c: `Someone Else GmbH ${tag}` });
+    expect(direct.associate_id).toBeNull();
+    expect(direct.associate_note).toContain('given but not applied');
+    expect((await request(app).get(`/quotation-details?inv=${inv.token}`)).text).not.toContain('has expired or was already used'); // A6: the form opens normally
 
     const inv2 = await associateInvitationRepository.createLink(Number(a.id), `Race BV ${tag}`, 'Netherlands');
     const claims = await Promise.all([associateInvitationRepository.claim(inv2.id, Number(subs[0].id)), associateInvitationRepository.claim(inv2.id, Number(subs[0].id) + 1)]);

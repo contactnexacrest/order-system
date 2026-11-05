@@ -16,7 +16,7 @@ const incentiveService = require('../../src/services/incentiveService');
 const orderLinePricing = require('../../src/services/orderLinePricing');
 const orderProfitabilityService = require('../../src/services/orderProfitabilityService');
 const pricingService = require('../../src/services/pricingService');
-const { createTestClient, createTestOrder, createTestFile } = require('../support/fixtures');
+const { createTestClient, createTestOrder, createTestFile, completeAssociateKyc } = require('../support/fixtures');
 
 /**
  * Port of D245WorkedExamplesTest.php. Owner decision D-245, phase P6: five worked
@@ -244,6 +244,7 @@ describe('D-245 worked examples (P6)', () => {
     expect(await associateCommission.gstFor(assoc)).toBe(0); // no tax invoice yet
     await associateDocumentRepository.add(a, 'invoice', await createTestFile(null, null), Number(assoc.id), 'INV-P6-1', true, null);
     expect(await associateCommission.gstFor(assoc)).toBe(20855.04); // GST 18% on top, not a cost
+    await completeAssociateKyc(a); // D-252: KYC complete, so only the claim hold applies
     await db.execute("INSERT INTO order_complaints (order_id, client_id, description, status, created_at) VALUES (:o, :c, 'Two blocks cracked', 'open', '2026-11-20 09:00:00')", { o: orderId, c: client });
     expect(await associateCommission.payBlockReason(assoc, '2026-12-05')).toBe('A buyer claim on this order is open — the commission waits until it is resolved.');
     await db.execute("UPDATE order_complaints SET status = 'resolved' WHERE order_id = :o", { o: orderId });

@@ -4,12 +4,12 @@ const db = require('../config/db');
 
 /** Port of AssociateDocumentRepository.php — an associate's KYC, tax papers, invoices and NexaCrest's certificates. */
 const KINDS = {
-  pan: 'PAN card', identity: 'Passport / ID', address: 'Address proof', gst: 'GST certificate',
+  pan: 'PAN card', aadhaar: 'Aadhaar card', identity: 'Passport / ID', bank_proof: 'Bank proof (cancelled cheque / statement)', agreement: 'Signed agreement', address: 'Address proof', gst: 'GST certificate',
   company: 'Company registration', tax_residency: 'Tax residency certificate', form_10f: 'Form 10F',
   no_pe: 'No-PE declaration', invoice: 'Commission invoice', form_16a: 'Form 16A (TDS certificate)',
   form_15ca: 'Form 15CA', form_15cb: 'Form 15CB', other: 'Other',
 };
-const ASSOCIATE_KINDS = ['pan', 'identity', 'address', 'gst', 'company', 'tax_residency', 'form_10f', 'no_pe', 'invoice', 'other'];
+const ASSOCIATE_KINDS = ['pan', 'aadhaar', 'identity', 'bank_proof', 'agreement', 'address', 'gst', 'company', 'tax_residency', 'form_10f', 'no_pe', 'invoice', 'other'];
 
 async function add(associateId, kind, fileId, payoutId, reference, byAssociate, userId) {
   const r = await db.execute(
@@ -21,7 +21,8 @@ async function add(associateId, kind, fileId, payoutId, reference, byAssociate, 
 
 async function forAssociate(associateId) {
   return db.query(
-    'SELECT d.*, f.original_filename FROM associate_documents d JOIN file_store f ON f.id = d.file_id WHERE d.associate_id = :a ORDER BY d.id DESC',
+    `SELECT d.*, f.original_filename, u.name AS reviewed_by_name FROM associate_documents d JOIN file_store f ON f.id = d.file_id
+       LEFT JOIN users u ON u.id = d.reviewed_by WHERE d.associate_id = :a ORDER BY d.id DESC`,
     { a: associateId }
   );
 }

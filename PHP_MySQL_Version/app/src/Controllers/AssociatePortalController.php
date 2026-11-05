@@ -160,6 +160,11 @@ final class AssociatePortalController
             'invitations' => AssociateInvitationRepository::forAssociate($id),
             'newLink' => $_SESSION['_associate_new_link'] ?? null,
             'codeLink' => self::codeLink(self::me()),
+            // D-254: the code change "like a captcha refresh" and every code the associate has had.
+            'proposal' => ($p = $_SESSION['associate_code_proposal'] ?? null) && (int) ($p['associate_id'] ?? 0) === $id ? $p : null,
+            'codes' => AssociateCodeService::codes($id),
+            'codeChangesPerYear' => AssociateCodeService::changesPerYear(),
+            'codeChangesUsed' => AssociateCodeService::changesInLastYear($id),
         ]);
         unset($_SESSION['_associate_new_link']);
     }
@@ -184,8 +189,8 @@ final class AssociatePortalController
         } else {
             $inv = AssociateInvitationRepository::createLink((int) $a['id'], $company, $country);
             $_SESSION['_associate_new_link'] = rtrim((string) Env::get('APP_URL', ''), '/') . '/invite/' . $inv['token'];
-            AssociateEventRepository::add((int) $a['id'], 'link_created', "Invitation link created for {$company} ({$country}).", null, null, $inv['id'], null, false);
-            Flash::set('success', "Invitation link for {$company} is ready — copy it below and send it to your buyer.");
+            AssociateEventRepository::add((int) $a['id'], 'link_created', "Buyer registration link created for {$company} ({$country}).", null, null, $inv['id'], null, false);
+            Flash::set('success', "Buyer registration link for {$company} is ready — copy it below and send it to your buyer.");
         }
         header('Location: /associate/clients');
     }
@@ -206,32 +211,62 @@ final class AssociatePortalController
             Flash::set('error', 'This invitation can no longer be cancelled.');
         } else {
             AssociateInvitationRepository::setStatus((int) $inv['id'], 'cancelled');
-            AssociateEventRepository::add((int) $a['id'], 'link_cancelled', "Invitation link for {$inv['company_name']} cancelled.", null, null, (int) $inv['id'], null, false);
+            AssociateEventRepository::add((int) $a['id'], 'link_cancelled', "Buyer registration link for {$inv['company_name']} cancelled.", null, null, (int) $inv['id'], null, false);
             Flash::set('success', 'Invitation cancelled.');
         }
         header('Location: /associate/clients');
     }
 
     /** The associate may choose the readable part of their code once (part 4.4-A2). */
-    public function chooseCode(array $params): void
+    /**
+     * Owner decision D-254 (A5): the associate changes their personal code like a captcha refresh —
+     * "New ending" proposes a code (nothing saved), "Use this code" switches to it. Old codes keep
+     * bringing buyers to them. At most N changes a year (setting, default 3).
+     */
+    public function proposeCode(array $params): void
     {
         $a = self::me();
         if (self::refuseWhenSuspended($a, '/associate/clients')) {
             return;
         }
         $part = AssociateCodeService::readablePart((string) ($_POST['readable'] ?? ''));
-        $events = array_filter(AssociateEventRepository::forAssociate((int) $a['id']), static fn (array $e): bool => $e['event'] === 'code_chosen');
-        if ($events !== []) {
-            Flash::set('error', 'You have already chosen your code. Ask your relationship manager if it must change.');
-        } elseif (strlen($part) < 3) {
+        if (strlen($part) < 3) {
             Flash::set('error', 'Use 3 to 12 letters or digits.');
         } else {
-            $code = AssociateCodeService::issue((int) $a['id'], $part);
-            AssociateEventRepository::add((int) $a['id'], 'code_chosen', "Personal code set to {$code}" . (!empty($a['personal_code']) ? " (was {$a['personal_code']}; the old code no longer brings new clients)" : '') . '.', null, null, null, null, false);
-            AuditLogRepository::log(null, 'ASSOCIATE_CODE_CHOSEN', 'associates', (int) $a['id'], 'personal_code', $a['personal_code'] ?? null, $code);
-            Flash::set('success', "Your personal code is now {$code}.");
+            $_SESSION['associate_code_proposal'] = ['associate_id' => (int) $a['id'], 'code' => AssociateCodeService::propose($part), 'readable' => $part];
         }
-        header('Location: /associate/clients');
+        header('Location: /associate/clients#code');
+    }
+
+    public function chooseCode(array $params): void
+    {
+        $a = self::me();
+        if (self::refuseWhenSuspended($a, '/associate/clients')) {
+            return;
+        }
+        $proposal = $_SESSION['associate_code_proposal'] ?? null;
+        $code = is_array($proposal) && (int) ($proposal['associate_id'] ?? 0) === (int) $a['id'] ? (string) $proposal['code'] : '';
+        $limit = AssociateCodeService::changesPerYear();
+        if ($code === '' || ($_POST['code'] ?? '') !== $code) {
+            Flash::set('error', 'Press "New ending" to get a code first, then "Use this code".');
+        } elseif (!empty($a['personal_code']) && AssociateCodeService::changesInLastYear((int) $a['id']) >= $limit) {
+            Flash::set('error', "You can change your code {$limit} times a year — you have used them. Ask your relationship manager if it must change.");
+        } else {
+            try {
+                $code = AssociateCodeService::issue((int) $a['id'], (string) $proposal['readable'], false, null, AssociateCodeService::isValid($code) ? $code : null);
+            } catch (\PDOException $e) {
+                // Someone took this code in the meantime (unique): propose again.
+                unset($_SESSION['associate_code_proposal']);
+                Flash::set('error', 'That code was just taken — press "New ending" for another one.');
+                header('Location: /associate/clients#code');
+                return;
+            }
+            unset($_SESSION['associate_code_proposal']);
+            AssociateEventRepository::add((int) $a['id'], 'code_changed', "Personal code set to {$code}" . (!empty($a['personal_code']) ? " (was {$a['personal_code']}; the old code still brings buyers to you)" : '') . '.', null, null, null, null, false);
+            AuditLogRepository::log(null, 'ASSOCIATE_CODE_CHOSEN', 'associates', (int) $a['id'], 'personal_code', $a['personal_code'] ?? null, $code);
+            Flash::set('success', "Your personal code is now {$code}." . (!empty($a['personal_code']) ? ' Your old code keeps working.' : ''));
+        }
+        header('Location: /associate/clients#code');
     }
 
     public function orders(array $params): void
@@ -319,7 +354,9 @@ final class AssociatePortalController
         $id = (int) self::me()['id'];
         $me = self::me();
         [$level] = \App\Services\AssociateCommission::levelForAssociate($me, null);
-        self::render('profile', ['banks' => AssociateBankRepository::forAssociate($id), 'documents' => AssociateDocumentRepository::forAssociate($id),
+        $documents = AssociateDocumentRepository::forAssociate($id);
+        self::render('profile', ['banks' => AssociateBankRepository::forAssociate($id), 'documents' => $documents, 'kyc' => \App\Services\AssociateKyc::checklist($me, $documents),
+            'codes' => AssociateCodeService::codes($id),
             'commissionNow' => (($me['commission_mode'] ?? 'ladder') === 'fixed' ? 'Fixed level: ' : 'Ladder — your next order: ') . \App\Services\AssociateCommission::levelLabel($level),
             'commissionSettings' => \App\Services\AssociateCommission::settings()]);
     }
@@ -388,6 +425,13 @@ final class AssociatePortalController
             header('Location: /associate/profile');
             return;
         }
+        // Owner decision D-251 (A4): the document's number / reference, checked per kind (Aadhaar: last 4 digits only).
+        [$reference, $refError] = \App\Services\AssociateKyc::normaliseReference($kind, (string) ($_POST['reference'] ?? ''));
+        if ($refError !== null) {
+            Flash::set('error', $refError);
+            header('Location: /associate/profile');
+            return;
+        }
         try {
             $fileId = FileUploadService::handleUpload('document_file', 'associate_document', 'associates/documents', null, null, null, null, (string) $a['name'], AssociateDocumentRepository::KINDS[$kind]);
         } catch (\Throwable $e) {
@@ -395,9 +439,10 @@ final class AssociatePortalController
             header('Location: /associate/profile');
             return;
         }
-        AssociateDocumentRepository::add((int) $a['id'], $kind, $fileId, null, null, true, null);
+        AssociateDocumentRepository::add((int) $a['id'], $kind, $fileId, null, $reference, true, null);
         AuditLogRepository::log(null, 'ASSOCIATE_DOCUMENT_UPLOADED', 'associates', (int) $a['id'], 'kind', null, $kind);
-        Flash::set('success', AssociateDocumentRepository::KINDS[$kind] . ' received.');
+        \App\Services\AssociateKyc::notifyStaffOfUpload($a, $kind);
+        Flash::set('success', AssociateDocumentRepository::KINDS[$kind] . ' received — NexaCrest will check it.');
         header('Location: /associate/profile');
     }
 

@@ -60,18 +60,49 @@ final class AssociateCodeService
     }
 
     /**
-     * Gives the associate a new personal code: the old one is retired (it no
-     * longer brings new clients; clients it brought stay theirs) and no code
-     * is ever given to anyone else.
+     * Gives the associate a new personal code. Owner rule (4 Nov 2026, D-254):
+     * the old code keeps bringing buyers to the same associate (links already
+     * shared keep working) unless staff block it, e.g. after a leak. No code is
+     * ever given to anyone else.
      */
-    public static function issue(int $associateId, string $readable): string
+    public static function issue(int $associateId, string $readable, bool $blockOld = false, ?string $blockReason = null, ?string $code = null): string
     {
-        $code = self::generate($readable);
+        $code ??= self::generate($readable);
         $pdo = Database::connection();
-        $pdo->prepare('UPDATE associate_codes SET retired_at = NOW() WHERE associate_id = :a AND retired_at IS NULL')->execute(['a' => $associateId]);
+        // The new code first: if someone took it in the meantime (unique), nothing else has changed.
         $pdo->prepare('INSERT INTO associate_codes (code, associate_id) VALUES (:c, :a)')->execute(['c' => $code, 'a' => $associateId]);
+        $pdo->prepare('UPDATE associate_codes SET retired_at = NOW()' . ($blockOld ? ', blocked_at = NOW(), blocked_reason = :r' : '') . ' WHERE associate_id = :a AND retired_at IS NULL AND code <> :c')
+            ->execute($blockOld ? ['a' => $associateId, 'c' => $code, 'r' => mb_substr((string) $blockReason, 0, 300)] : ['a' => $associateId, 'c' => $code]);
         $pdo->prepare('UPDATE associates SET personal_code = :c WHERE id = :a')->execute(['c' => $code, 'a' => $associateId]);
         return $code;
+    }
+
+    /** D-254: a proposed new code for the associate to look at (nothing saved) — "like a captcha refresh". */
+    public static function propose(string $readable): string
+    {
+        return self::generate($readable);
+    }
+
+    /** D-254: how many times the associate changed their own code in the last 365 days. */
+    public static function changesInLastYear(int $associateId): int
+    {
+        $stmt = Database::connection()->prepare("SELECT COUNT(*) FROM associate_events WHERE associate_id = :a AND event IN ('code_chosen', 'code_changed') AND created_at >= (NOW() - INTERVAL 365 DAY)");
+        $stmt->execute(['a' => $associateId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public static function changesPerYear(): int
+    {
+        $v = (int) (\App\Repositories\IncentiveRepository::settings()['associate_code_changes_per_year'] ?? 3);
+        return $v >= 0 ? $v : 3;
+    }
+
+    /** Every code the associate has had, newest first. @return list<array<string,mixed>> */
+    public static function codes(int $associateId): array
+    {
+        $stmt = Database::connection()->prepare('SELECT * FROM associate_codes WHERE associate_id = :a ORDER BY issued_at DESC, code');
+        $stmt->execute(['a' => $associateId]);
+        return $stmt->fetchAll();
     }
 
     /** Whether the code is well-formed and its check letter matches (typo protection). */
@@ -84,13 +115,13 @@ final class AssociateCodeService
         return self::checkChar($m[1]) === $m[2];
     }
 
-    /** The associate who owns the code, if the code is valid and the associate may bring new clients. */
+    /** The associate who owns the code (current or old, not blocked), if the code is valid. */
     public static function resolve(string $code): ?array
     {
         if (!self::isValid($code)) {
             return null;
         }
-        // Only the associate's current code brings new clients; a retired code resolves to nobody.
-        return \App\Repositories\AssociateRepository::findByCode(self::normalise($code));
+        // Owner rule D-254: the current code and every old one (not blocked by staff) bring the buyer to the associate.
+        return \App\Repositories\AssociateRepository::findByAnyCode(self::normalise($code));
     }
 }

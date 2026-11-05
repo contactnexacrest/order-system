@@ -28,7 +28,7 @@ final class AssociateIntakeService
      *
      * Owner decision 4 Nov 2026 (A6): a buyer never sees an error caused by
      * an associate code or link. When the code or link cannot be applied —
-     * unknown or mistyped, an old (retired) code, a link that expired or
+     * unknown or mistyped, an old code staff blocked, a link that expired or
      * was used, an associate who is suspended or ended —
      * the buyer carries on as a direct buyer with no hint, and 'note' tells
      * staff on the intake review what was given and why it was not applied.
@@ -66,14 +66,14 @@ final class AssociateIntakeService
             if ($a === null) {
                 $old = AssociateRepository::findByRetiredCode(AssociateCodeService::normalise($code));
                 return $none($old !== null
-                    ? "{$given} given but not applied: it is an old code of associate {$old['name']}, replaced by a new one."
+                    ? "{$given} given but not applied: it is an old code of associate {$old['name']} that NexaCrest blocked."
                     : "{$given} given but not applied: no associate has this code.");
             }
             $why = self::notActiveReason($a);
             if ($why !== null) {
                 return $none("{$given} (associate {$a['name']}) given but not applied: {$why}.");
             }
-            return ['associate' => $a, 'invitation' => null, 'error' => null, 'note' => null];
+            return ['associate' => $a, 'invitation' => null, 'error' => null, 'note' => null, 'code' => AssociateCodeService::normalise($code)];
         }
         return ['associate' => null, 'invitation' => null, 'error' => null, 'note' => null];
     }
@@ -100,10 +100,11 @@ final class AssociateIntakeService
     }
 
     /** Ties a new submission to the associate (not yet confirmed) and e-mails the buyer a 6-digit code. Returns the code. */
-    public static function attach(int $submissionId, array $associate, ?array $invitation, string $company, string $country, string $email, bool $confirmed, ?string $website): string
+    public static function attach(int $submissionId, array $associate, ?array $invitation, string $company, string $country, string $email, bool $confirmed, ?string $website, ?string $code = null): string
     {
-        // A one-off link was already taken for this registration (claimLink); a personal code gets a row of its own.
-        $invId = $invitation !== null ? (int) $invitation['id'] : AssociateInvitationRepository::createForCode((int) $associate['id'], $company, $country);
+        // A buyer registration link was already taken for this registration (claimLink); a personal code gets a row of its own,
+        // remembering which code the buyer used ("came via", D-254).
+        $invId = $invitation !== null ? (int) $invitation['id'] : AssociateInvitationRepository::createForCode((int) $associate['id'], $company, $country, $code);
         Database::connection()->prepare(
             'UPDATE client_intake_submissions SET associate_id = :a, associate_invitation_id = :i, introduction_confirmed = :c, website = :w WHERE id = :id'
         )->execute(['a' => $associate['id'], 'i' => $invId, 'c' => $confirmed ? 1 : 0, 'w' => $website, 'id' => $submissionId]);
