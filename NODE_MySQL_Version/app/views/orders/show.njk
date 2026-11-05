@@ -867,7 +867,7 @@
               <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="{{ p.quantity or '' }}" placeholder="e.g. 100"></label>
               <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
               <label>Unit
-                <select name="unit">
+                <select name="unit" data-allowed-from="category_id">
                   {% for o in units %}
                     <option value="{{ o.option_value }}" {% if p.unit == o.option_value %}selected{% endif %}>{{ o.option_value }}</option>
                   {% endfor %}
@@ -890,7 +890,7 @@
               {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
               <label>Category
                 <select name="category_id">
-                  {% for c in productCategories %}<option value="{{ '' if c.is_system == 1 else c.id }}" {{ 'selected' if (c.is_system != 1 and catLine.category_id == c.id) else '' }}>{{ c.name }}</option>{% endfor %}
+                  {% for c in productCategories %}<option value="{{ '' if c.is_system == 1 else c.id }}" {{ 'selected' if (c.is_system != 1 and catLine.category_id == c.id) else '' }}{{ c | categoryLineAttrs }}>{{ c.name }}</option>{% endfor %}
                 </select>
               </label>
               {% for c in productCategories %}{% if c.is_system != 1 %}
@@ -942,7 +942,7 @@
             <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" placeholder="e.g. 100"></label>
             <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
             <label>Unit
-              <select name="unit">
+              <select name="unit" data-allowed-from="category_id">
                 {% for o in units %}
                   <option value="{{ o.option_value }}" {% if o.is_default %}selected{% endif %}>{{ o.option_value }}</option>
                 {% endfor %}
@@ -960,7 +960,7 @@
             {# Owner decision D-215 (5a): the line's product category; another category's own attributes. #}
             <label>Category
               <select name="category_id">
-                {% for c in productCategories %}<option value="{{ '' if c.is_system == 1 else c.id }}" {{ 'selected' if (c.is_system != 1 and catLine.category_id == c.id) else '' }}>{{ c.name }}</option>{% endfor %}
+                {% for c in productCategories %}<option value="{{ '' if c.is_system == 1 else c.id }}" {{ 'selected' if (c.is_system != 1 and catLine.category_id == c.id) else '' }}{{ c | categoryLineAttrs }}>{{ c.name }}</option>{% endfor %}
               </select>
             </label>
             {% for c in productCategories %}{% if c.is_system != 1 %}
@@ -1043,6 +1043,43 @@
   {% endif %}
   </details>
   {% include "orders/_product_picker_js.njk" %}
+
+  {# Owner decision D-257 Phase 0B (5 Nov 2026): the quality documents the lines' categories ask for. Natural Stone asks for none, so a stone order shows nothing here. #}
+  {% if qualityDocs and qualityDocs.length > 0 %}{% set canQuality = permissions.manage_orders or permissions.manage_purchasing %}
+  <details class="step-card" id="quality-documents" open>
+    <summary><h2>Quality documents <small class="muted">(asked for by the product category)</small></h2></summary>
+    <p class="muted small">Each document the category of a line on this order asks for — collect it from the supplier, attach it, and mark it received, then approved once checked. Internal only: never shown to the client.</p>
+    <table class="list">
+      <tr><th>Category</th><th>Document</th><th>Status</th><th>File</th><th>Last change</th>{% if canQuality %}<th>Update</th>{% endif %}</tr>
+      {% for qd in qualityDocs %}
+      <tr>
+        <td>{{ qd.category_name }}</td>
+        <td>{{ qd.document_name }}{% if qd.note %}<br><small class="muted">{{ qd.note }}</small>{% endif %}</td>
+        <td><span class="badge badge-{{ 'success' if qd.status == 'approved' else ('purple' if qd.status == 'received' else 'warning') }}">{{ qualityStatuses[qd.status] }}</span></td>
+        <td>{% if qd.file_store_id !== null %}<a href="/file-store/{{ qd.file_store_id }}/download">{{ qd.original_filename }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if qd.updated_at %}{{ qd.updated_by_name }}<br><small class="muted">{{ qd.updated_at }}</small>{% else %}<span class="muted">—</span>{% endif %}</td>
+        {% if canQuality %}
+        <td>
+          <form method="post" action="/orders/{{ order.id }}/quality-documents" enctype="multipart/form-data" class="inline-form">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="category_id" value="{{ qd.category_id }}">
+            <input type="hidden" name="document_name" value="{{ qd.document_name }}">
+            <label>Status *
+              <select name="status" required>
+                {% for k, l in qualityStatuses %}<option value="{{ k }}" {{ 'selected' if k == qd.status else '' }}>{{ l }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>File<input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"{% if qd.file_store_id === null %} data-required-if="status=received" data-required-if-message="Attach the document before marking it received."{% endif %}></label>
+            <label>Note<input type="text" name="note" maxlength="255" value="{{ qd.note or '' }}" placeholder="e.g. Heat no. H2311, checked by QA"></label>
+            <button type="submit" class="btn-sm btn-success">Save</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </table>
+  </details>
+  {% endif %}
 
   <details class="step-card step-card-reference" id="payment-overview">
     <summary><h2>Payment Overview <small class="muted">(reference — every leg, always current)</small></h2></summary>

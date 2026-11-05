@@ -1003,6 +1003,13 @@ async function addProduct(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // D-257 0B: a category other than Natural Stone fills its default HS code and unit, and allows only its units.
+  const unitError = await require('../repositories/productCategoryRepository').applyLineDefaults(body);
+  if (unitError !== null) {
+    flash.set(req, 'error', `Product line: ${unitError}`);
+    res.redirect(`/orders/${orderId}#step-products`);
+    return;
+  }
   const { lineType, hsCode, sacCode, error: lineTypeError } = await lineTypeInput(body);
   const { categoryId, values: attributeValues, error: categoryError } = await categoryInput(body, lineType);
   if ((lineTypeError ?? categoryError) !== null) {
@@ -1077,6 +1084,13 @@ async function updateProduct(req, res) {
   if (description === '') {
     flash.set(req, 'error', 'Description is required.');
     res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  // D-257 0B: a category other than Natural Stone fills its default HS code and unit, and allows only its units.
+  const unitError = await require('../repositories/productCategoryRepository').applyLineDefaults(body);
+  if (unitError !== null) {
+    flash.set(req, 'error', `Product line: ${unitError}`);
+    res.redirect(`/orders/${orderId}#step-products`);
     return;
   }
   const { lineType, hsCode, sacCode, error: lineTypeError } = await lineTypeInput(body);
@@ -1505,6 +1519,9 @@ async function show(req, res) {
       })(),
       // Owner decision D-215 (5a): product categories for the order line forms.
       productCategories: await require('../repositories/productCategoryRepository').all(),
+      // Owner decision D-257 0B: the quality documents the lines' categories ask for (none for Natural Stone).
+      qualityDocs: await require('../repositories/orderQualityDocumentRepository').forOrder(orderId),
+      qualityStatuses: require('../repositories/orderQualityDocumentRepository').STATUSES,
       // Owner decision D-215 (5a): the order's own payment schedule (advance, milestones, balance).
       paymentSchedule: await require('./paymentMilestoneController').scheduleView(orderId, order),
       // Gap list G-5 (owner, 1 Nov 2026): each leg's receipts, what is still owed, and an approved shortfall.

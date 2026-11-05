@@ -264,3 +264,45 @@ quote **USD 79.60**; associate Level 2 floor **USD 81.35**, quote **USD 83.79**.
 Every pricing setting, option type, the CBM threshold, every commission setting and every
 price-request setting has a short line beneath it with a worked example (e.g. "Example: cost
 USD 1,000 at 20% → minimum price USD 1,250 (1,000 ÷ 0.80). Nobody can sell below it.").
+
+## Product categories: units, HS code, packing, quality documents (D-257 Phase 0B, 5 Nov 2026)
+
+So the system can sell products other than stone (for example engineering goods), each
+product category now has its own **settings**. Open **Products › Categories**, then
+**Settings: <category>** (needs *Manage product catalogue*):
+
+| Setting | What it does | Example |
+|---|---|---|
+| Default unit | A new order line of this category starts with this unit. | PCS |
+| Allowed units | Tick the only units its lines may use; none ticked = any unit. A line with another unit is refused, in the browser and on save. | PCS, NOS, SET |
+| Default HS code | A goods line of this category starts with this HS code (from the HS Code master list). A code typed on the line always wins. | 730791 |
+| Packing type | From the Package Types list. | Wooden Crates |
+| Quality documents | One per line, at most 10. Each order with a line of this category gets a **Quality documents** checklist on the order page. | Mill test certificate 3.1, Drawing approval |
+| T&C clause set | Which terms the documents of this category print. Stored now; the documents start printing it in Phase 1 (after document samples and your double confirmation). | Engineering goods clauses |
+
+**Natural Stone keeps today's behaviour:** any unit, HS 680293, Wooden Crates, the
+natural-stone clauses and no extra quality documents. Its Dimensions and Finish stay
+locked; its settings can be edited but change nothing on a stone order line or document
+in this phase.
+
+**Order lines.** When you choose a category on the order line, its default HS code and
+unit are filled in (the HS code only if the field is empty). If you leave them empty, the
+category's values are used on save. Supplier purchase orders and purchase requirements
+take the HS code and unit from the order line, as before.
+
+**Prices per piece, per kg, per set.** A specification option can now change the price by
+*USD per piece*, *USD per kg* or *USD per set*. It is added to the cost only when the
+product's selling unit matches (PCS/NOS for a piece, KG for kg, SET for a set); otherwise
+the price build-up shows it as "charged separately". As for every option, the margin,
+incentive and buffer are added on top. Example: supplier ₹1,230 ÷ 82 = USD 15.00 + 2.5 %
+other costs = 15.375; "Machined" +USD 4.50 per piece → 19.875; ÷ (1 − 20 %) = minimum
+USD 24.84; + 3 % buffer = quote USD 25.59.
+
+**Quality documents card (order page).** Shown only when a line's category asks for
+documents. For each document: the status (Pending → Received → Approved), the file and a
+note (e.g. heat number). Received or Approved needs the file attached. Only people who can
+manage orders or purchasing can update it; it is internal and never shown to the client.
+
+**New list values.** Units MTR, LTR, HOUR and DAY (PCS, SET, KG and MT were already there);
+supplier types Manufacturer, Machine Shop and Forging / Casting Unit (Trader was already
+there). Admin › Dropdowns can rename or hide them.

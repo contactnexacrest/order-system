@@ -558,6 +558,7 @@ $router->post('/orders/{id}/additional-documents', [$orders, 'uploadAdditionalDo
 $router->post('/orders/{id}/additional-documents/{fileId}/delete', [$orders, 'deleteAdditionalDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->get('/orders/{id}/additional-documents/removed', [$orders, 'showRemovedAdditionalDocuments'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
 $router->post('/orders/{id}/products', [$orders, 'addProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
+$router->post('/orders/{id}/quality-documents', [new \App\Controllers\OrderQualityDocumentController(), 'save'], [SessionAuth::required(), PermissionCheck::requiresAny(['manage_orders', 'manage_purchasing']), OrderLockGuard::check(), CsrfCheck::verify()]); // D-257 0B
 $router->post('/orders/{id}/products/{productId}', [$orders, 'updateProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/products/{productId}/delete', [$orders, 'deleteProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), OrderLockGuard::check(), CsrfCheck::verify()]);
 // Owner decision D-245 P2: a line below the floor goes to the MD; only the MD approves it (never below the minimum price).
@@ -1020,6 +1021,7 @@ $router->post('/products/create', [$products, 'store'], [SessionAuth::required()
 $router->get('/products/categories', [$productCategories, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
 $router->post('/products/categories', [$productCategories, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->post('/products/categories/{id}', [$productCategories, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
+$router->post('/products/categories/{id}/settings', [$productCategories, 'settings'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);
 $router->get('/products/{id}', [$products, 'show'], [SessionAuth::required(), PermissionCheck::requires('view_product_catalog')]);
 $router->get('/products/{id}/edit', [$products, 'edit'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog')]);
 $router->post('/products/{id}/update', [$products, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_product_catalog'), CsrfCheck::verify()]);

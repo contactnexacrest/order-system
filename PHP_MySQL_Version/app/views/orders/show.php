@@ -1499,7 +1499,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
               <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>" placeholder="e.g. 100"></label>
               <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;" <?= $p['quantity_is_tbc'] ? 'checked' : '' ?>> Qty To Be Confirmed</label>
               <label>Unit
-                <select name="unit">
+                <select name="unit" data-allowed-from="category_id">
                   <?php $__unitVal = (string) ($p['unit'] ?? ''); ?>
                   <?php foreach ($units as $o): ?>
                     <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__unitVal === $o['option_value']) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
@@ -1522,7 +1522,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
               <?php // Owner decision D-215 (5a): the line's product category; another category's own attributes. ?>
               <label>Category
                 <select name="category_id">
-                  <?php foreach ($__productCategories as $__c): ?><option value="<?= (int) $__c['is_system'] === 1 ? '' : (int) $__c['id'] ?>" <?= (int) $__c['is_system'] !== 1 && (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $__c['name']) ?></option><?php endforeach; ?>
+                  <?php foreach ($__productCategories as $__c): ?><option value="<?= (int) $__c['is_system'] === 1 ? '' : (int) $__c['id'] ?>" <?= (int) $__c['is_system'] !== 1 && (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? 'selected' : '' ?><?= \App\Repositories\ProductCategoryRepository::lineOptionAttributes($__c) ?>><?= htmlspecialchars((string) $__c['name']) ?></option><?php endforeach; ?>
                 </select>
               </label>
               <?php foreach ($__productCategories as $__c): if ((int) $__c['is_system'] === 1) { continue; } $__vals = (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? (json_decode((string) ($__catLine['attribute_values'] ?? ''), true) ?: []) : []; ?>
@@ -1573,7 +1573,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
             <label>Qty<input type="text" name="quantity" data-max-decimals="3" data-max-value="99999999999.999" placeholder="e.g. 100"></label>
             <label><input type="checkbox" name="quantity_is_tbc" value="1" style="display:inline-block;width:auto;"> Qty To Be Confirmed</label>
             <label>Unit
-              <select name="unit">
+              <select name="unit" data-allowed-from="category_id">
                 <?php foreach ($units as $o): ?>
                   <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= $o['is_default'] ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
                 <?php endforeach; ?>
@@ -1591,7 +1591,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
             <?php // Owner decision D-215 (5a): the line's product category; another category's own attributes. ?>
             <label>Category
               <select name="category_id">
-                <?php foreach ($__productCategories as $__c): ?><option value="<?= (int) $__c['is_system'] === 1 ? '' : (int) $__c['id'] ?>" <?= (int) $__c['is_system'] !== 1 && (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $__c['name']) ?></option><?php endforeach; ?>
+                <?php foreach ($__productCategories as $__c): ?><option value="<?= (int) $__c['is_system'] === 1 ? '' : (int) $__c['id'] ?>" <?= (int) $__c['is_system'] !== 1 && (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? 'selected' : '' ?><?= \App\Repositories\ProductCategoryRepository::lineOptionAttributes($__c) ?>><?= htmlspecialchars((string) $__c['name']) ?></option><?php endforeach; ?>
               </select>
             </label>
             <?php foreach ($__productCategories as $__c): if ((int) $__c['is_system'] === 1) { continue; } $__vals = (int) ($__catLine['category_id'] ?? 0) === (int) $__c['id'] ? (json_decode((string) ($__catLine['attribute_values'] ?? ''), true) ?: []) : []; ?>
@@ -1675,6 +1675,44 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
   <?php endif; ?>
   </details>
   <?php include __DIR__ . '/_product_picker_js.php'; ?>
+
+  <?php // Owner decision D-257 Phase 0B (5 Nov 2026): the quality documents the lines' categories ask for. Natural Stone asks for none, so a stone order shows nothing here. ?>
+  <?php $__qualityDocs = \App\Repositories\OrderQualityDocumentRepository::forOrder((int) $order['id']); ?>
+  <?php if ($__qualityDocs !== []): $__canQuality = $canManageOrders || PermissionService::can((int) $currentUser['id'], $currentUser['role_id'] !== null ? (int) $currentUser['role_id'] : null, 'manage_purchasing'); ?>
+  <details class="step-card" id="quality-documents" open>
+    <summary><h2>Quality documents <small class="muted">(asked for by the product category)</small></h2></summary>
+    <p class="muted small">Each document the category of a line on this order asks for — collect it from the supplier, attach it, and mark it received, then approved once checked. Internal only: never shown to the client.</p>
+    <table class="list">
+      <tr><th>Category</th><th>Document</th><th>Status</th><th>File</th><th>Last change</th><?php if ($__canQuality): ?><th>Update</th><?php endif; ?></tr>
+      <?php foreach ($__qualityDocs as $__qd): ?>
+      <tr>
+        <td><?= htmlspecialchars($__qd['category_name']) ?></td>
+        <td><?= htmlspecialchars($__qd['document_name']) ?><?= $__qd['note'] ? '<br><small class="muted">' . htmlspecialchars((string) $__qd['note']) . '</small>' : '' ?></td>
+        <td><span class="badge badge-<?= $__qd['status'] === 'approved' ? 'success' : ($__qd['status'] === 'received' ? 'purple' : 'warning') ?>"><?= htmlspecialchars(\App\Repositories\OrderQualityDocumentRepository::STATUSES[$__qd['status']]) ?></span></td>
+        <td><?= $__qd['file_store_id'] !== null ? '<a href="/file-store/' . (int) $__qd['file_store_id'] . '/download">' . htmlspecialchars((string) $__qd['original_filename']) . '</a>' : '<span class="muted">—</span>' ?></td>
+        <td><?= $__qd['updated_at'] ? htmlspecialchars((string) $__qd['updated_by_name']) . '<br><small class="muted">' . htmlspecialchars((string) $__qd['updated_at']) . '</small>' : '<span class="muted">—</span>' ?></td>
+        <?php if ($__canQuality): ?>
+        <td>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/quality-documents" enctype="multipart/form-data" class="inline-form">
+            <?= Csrf::field() ?>
+            <input type="hidden" name="category_id" value="<?= (int) $__qd['category_id'] ?>">
+            <input type="hidden" name="document_name" value="<?= htmlspecialchars($__qd['document_name']) ?>">
+            <label>Status *
+              <select name="status" required>
+                <?php foreach (\App\Repositories\OrderQualityDocumentRepository::STATUSES as $__k => $__l): ?><option value="<?= $__k ?>" <?= $__k === $__qd['status'] ? 'selected' : '' ?>><?= $__l ?></option><?php endforeach; ?>
+              </select>
+            </label>
+            <label>File<input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"<?= $__qd['file_store_id'] === null ? ' data-required-if="status=received" data-required-if-message="Attach the document before marking it received."' : '' ?>></label>
+            <label>Note<input type="text" name="note" maxlength="255" value="<?= htmlspecialchars((string) ($__qd['note'] ?? '')) ?>" placeholder="e.g. Heat no. H2311, checked by QA"></label>
+            <button type="submit" class="btn-sm btn-success">Save</button>
+          </form>
+        </td>
+        <?php endif; ?>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+  </details>
+  <?php endif; ?>
 
   <details class="step-card step-card-reference" id="payment-overview">
     <summary><h2>Payment Overview <small class="muted">(reference — every leg, always current)</small></h2></summary>

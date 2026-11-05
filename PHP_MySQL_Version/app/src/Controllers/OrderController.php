@@ -987,6 +987,12 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // D-257 0B: a category other than Natural Stone fills its default HS code and unit, and allows only its units.
+        if (($__unitError = \App\Repositories\ProductCategoryRepository::applyLineDefaults($_POST)) !== null) {
+            Flash::set('error', 'Product line: ' . $__unitError);
+            header("Location: /orders/{$orderId}#step-products");
+            return;
+        }
         [$lineType, $hsCode, $sacCode, $lineTypeError] = self::lineTypeInput();
         [$categoryId, $attributeValues, $categoryError] = self::categoryInput($lineType);
         if (($lineTypeError ?? $categoryError) !== null) {
@@ -1068,6 +1074,12 @@ final class OrderController
         if ($description === '') {
             Flash::set('error', 'Description is required.');
             header("Location: /orders/{$orderId}");
+            return;
+        }
+        // D-257 0B: a category other than Natural Stone fills its default HS code and unit, and allows only its units.
+        if (($__unitError = \App\Repositories\ProductCategoryRepository::applyLineDefaults($_POST)) !== null) {
+            Flash::set('error', 'Product line: ' . $__unitError);
+            header("Location: /orders/{$orderId}#step-products");
             return;
         }
         [$lineType, $hsCode, $sacCode, $lineTypeError] = self::lineTypeInput();

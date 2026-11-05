@@ -37,6 +37,10 @@ final class ProductSpecs
         'usd_m2' => 'USD per m²',
         'usd_rm' => 'USD per running metre',
         'usd_container' => 'USD per container',
+        // D-257 Phase 0B: price options for products sold per piece, per kg or per set.
+        'usd_piece' => 'USD per piece',
+        'usd_kg' => 'USD per kg',
+        'usd_set' => 'USD per set',
         'cbm' => 'Priced per CBM',
     ];
 
@@ -44,6 +48,17 @@ final class ProductSpecs
 
     /** Units that count as "per running metre" for per-rm amounts. */
     private const RM_UNITS = ['RM', 'RMT', 'LM', 'RUNNING METRE', 'RUNNING METER'];
+
+    /**
+     * D-257 Phase 0B: the units a per-piece / per-kg / per-set amount belongs
+     * to. On a product sold in that unit the amount goes into the unit price;
+     * otherwise it is listed as a separate charge, like per-rm amounts.
+     */
+    public const UNIT_TYPES = [
+        'usd_piece' => ['label' => 'piece', 'units' => ['PCS', 'NOS', 'PC', 'PIECE', 'PIECES']],
+        'usd_kg' => ['label' => 'kg', 'units' => ['KG', 'KGS']],
+        'usd_set' => ['label' => 'set', 'units' => ['SET', 'SETS']],
+    ];
 
     public static function categoryIdFor(array $product): ?int
     {
@@ -257,7 +272,7 @@ final class ProductSpecs
                 continue;
             }
             // D-256: an option worth 0 is included in the base price.
-            if (in_array($type, ['pct', 'usd_m2', 'usd_rm', 'usd_container'], true) && $v == 0.0) {
+            if (in_array($type, ['pct', 'usd_m2', 'usd_rm', 'usd_container', 'usd_piece', 'usd_kg', 'usd_set'], true) && $v == 0.0) {
                 $out['lines'][] = ['spec' => $s['name'], 'option' => $o['name'], 'kind' => 'included', 'value' => 0.0, 'usd_effect' => null];
                 continue;
             }
@@ -300,6 +315,15 @@ final class ProductSpecs
             } elseif ($type === 'usd_container') {
                 $out['charges'][] = $o['name'] . ': USD ' . number_format($v, 2) . ' per container, charged separately';
                 continue;
+            } elseif (isset(self::UNIT_TYPES[$type])) {
+                $unitType = self::UNIT_TYPES[$type];
+                if (in_array(strtoupper(trim((string) ($product['reference_unit'] ?? ''))), $unitType['units'], true)) {
+                    $line['usd_effect'] = $v;
+                    $out['usd'] += $v;
+                } else {
+                    $out['charges'][] = $o['name'] . ': USD ' . number_format($v, 2) . ' per ' . $unitType['label'] . ', charged separately';
+                    continue;
+                }
             }
             $out['lines'][] = $line;
         }
@@ -323,7 +347,7 @@ final class ProductSpecs
         if ($type === 'pct') {
             return $sign . rtrim(rtrim(number_format(abs($v), 2, '.', ''), '0'), '.') . '%';
         }
-        $per = ['usd_m2' => '/m²', 'usd_rm' => '/rm', 'usd_container' => '/container'][$type] ?? '';
+        $per = ['usd_m2' => '/m²', 'usd_rm' => '/rm', 'usd_container' => '/container', 'usd_piece' => '/piece', 'usd_kg' => '/kg', 'usd_set' => '/set'][$type] ?? '';
         return $sign . '$' . rtrim(rtrim(number_format(abs($v), 2, '.', ''), '0'), '.') . $per;
     }
 

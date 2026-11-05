@@ -2409,3 +2409,23 @@ UPDATE users u JOIN roles r ON r.id = u.role_id SET u.division_id = NULL
 WHERE u.is_super_admin = 1
    OR r.name IN ('Admin', 'Managing Director', 'Executive Director', 'CA / Chartered Accountant', 'Viewer / Auditor',
                  'Accounts Executive', 'Finance Manager', 'Finance Director', 'System Administrator', 'Investor (view only)');
+
+
+-- Owner decision D-257 Phase 0B (5 Nov 2026): product-neutral groundwork.
+-- Natural Stone keeps exactly today's behaviour: any unit (default as today),
+-- HS 680293, wooden crates, the natural-stone clauses, no extra quality documents.
+UPDATE product_categories SET default_hs_code = '680293', packing_type = 'Wooden Crates', tc_clause_set = 'natural_stone'
+WHERE is_system = 1 AND default_hs_code IS NULL;
+-- More units and supplier types for products other than stone (only those missing).
+INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
+SELECT 'unit', d.v, d.s, 0, 1 FROM (
+  SELECT 'MTR' AS v, 10 AS s UNION ALL SELECT 'LTR', 11 UNION ALL SELECT 'HOUR', 12 UNION ALL SELECT 'DAY', 13
+) d WHERE NOT EXISTS (SELECT 1 FROM dropdown_options o WHERE o.list_key = 'unit' AND o.option_value = d.v);
+INSERT INTO dropdown_options (list_key, option_value, sort_order, is_default, is_active)
+SELECT 'supplier_type', d.v, d.s, 0, 1 FROM (
+  SELECT 'Manufacturer' AS v, 5 AS s UNION ALL SELECT 'Machine Shop', 6 UNION ALL SELECT 'Forging / Casting Unit', 7
+) d WHERE NOT EXISTS (SELECT 1 FROM dropdown_options o WHERE o.list_key = 'supplier_type' AND o.option_value = d.v);
+-- Quality documents a category asks for (MTC, drawing approval …).
+INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description)
+SELECT 'quality_document', 'pdf,jpg,jpeg,png,docx,xlsx', 10485760, 'A quality document a product category asks for on an order (e.g. mill test certificate, drawing approval) — internal. D-257 Phase 0B.'
+WHERE NOT EXISTS (SELECT 1 FROM file_upload_contexts WHERE context_key = 'quality_document');

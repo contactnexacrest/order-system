@@ -23,6 +23,11 @@ final class ProductCategoryController
         View::render('products/categories', [
             'categories' => ProductCategoryRepository::all(),
             'maxAttributes' => ProductCategoryRepository::MAX_ATTRIBUTES,
+            // D-257 0B: each category's units, HS code, packing, quality documents and T&C clause set.
+            'units' => array_map(static fn ($o) => (string) $o['option_value'], \App\Repositories\LookupRepository::dropdownOptions('unit')),
+            'packageTypes' => array_map(static fn ($o) => (string) $o['option_value'], \App\Repositories\LookupRepository::dropdownOptions('package_type')),
+            'hsCodes' => \App\Repositories\HsCodeRepository::active(),
+            'tcClauseSets' => ProductCategoryRepository::TC_CLAUSE_SETS,
         ], 'layout/base');
     }
 
@@ -70,6 +75,38 @@ final class ProductCategoryController
         AuditLogRepository::log((int) AuthService::currentUserId(), 'PRODUCT_CATEGORY_UPDATED', 'product_categories', $id, 'attributes',
             $category['name'] . ': ' . implode(', ', $category['attributes']), $name . ': ' . implode(', ', $labels) . ($active ? '' : ' (inactive)'));
         Flash::set('success', "Category \"{$name}\" saved.");
+        header('Location: /products/categories');
+    }
+
+    /**
+     * Owner decision D-257 Phase 0B (5 Nov 2026): a category's settings —
+     * default and allowed units, default HS code, packing type, the quality
+     * documents its orders need, and its T&C clause set. Natural Stone's
+     * settings can be edited too (its attributes stay locked).
+     */
+    public function settings(array $params): void
+    {
+        $id = (int) $params['id'];
+        $category = ProductCategoryRepository::find($id);
+        if ($category === null) {
+            http_response_code(404);
+            echo 'Category not found.';
+            return;
+        }
+        [$settings, $error] = ProductCategoryRepository::parseSettings(
+            $_POST,
+            array_map(static fn ($o) => (string) $o['option_value'], \App\Repositories\LookupRepository::dropdownOptions('unit')),
+            array_map(static fn ($o) => (string) $o['option_value'], \App\Repositories\LookupRepository::dropdownOptions('package_type'))
+        );
+        if ($error !== null) {
+            Flash::set('error', $category['name'] . ': ' . $error);
+            header('Location: /products/categories');
+            return;
+        }
+        ProductCategoryRepository::updateSettings($id, $settings);
+        AuditLogRepository::log((int) AuthService::currentUserId(), 'PRODUCT_CATEGORY_SETTINGS_UPDATED', 'product_categories', $id, 'settings',
+            ProductCategoryRepository::settingsSummary($category), ProductCategoryRepository::settingsSummary($settings));
+        Flash::set('success', "Settings for \"{$category['name']}\" saved.");
         header('Location: /products/categories');
     }
 

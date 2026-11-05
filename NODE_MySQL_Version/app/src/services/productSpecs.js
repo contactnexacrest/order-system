@@ -31,6 +31,10 @@ const CHANGE_TYPES = {
   usd_m2: 'USD per m²',
   usd_rm: 'USD per running metre',
   usd_container: 'USD per container',
+  // D-257 Phase 0B: price options for products sold per piece, per kg or per set.
+  usd_piece: 'USD per piece',
+  usd_kg: 'USD per kg',
+  usd_set: 'USD per set',
   cbm: 'Priced per CBM',
 };
 
@@ -38,6 +42,17 @@ const KINDS = { normal: 'Normal', thickness: 'Thickness (m² or CBM)', quantity:
 
 /** Units that count as "per running metre" for per-rm amounts. */
 const RM_UNITS = ['RM', 'RMT', 'LM', 'RUNNING METRE', 'RUNNING METER'];
+
+/**
+ * D-257 Phase 0B: the units a per-piece / per-kg / per-set amount belongs to.
+ * On a product sold in that unit the amount goes into the unit price;
+ * otherwise it is listed as a separate charge, like per-rm amounts.
+ */
+const UNIT_TYPES = {
+  usd_piece: { label: 'piece', units: ['PCS', 'NOS', 'PC', 'PIECE', 'PIECES'] },
+  usd_kg: { label: 'kg', units: ['KG', 'KGS'] },
+  usd_set: { label: 'set', units: ['SET', 'SETS'] },
+};
 
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 
@@ -208,7 +223,7 @@ function adjustments(product, offeredSpecs, map, cbmFrom, exactSpecIds = []) {
       continue;
     }
     // D-256: an option worth 0 is included in the base price.
-    if (['pct', 'usd_m2', 'usd_rm', 'usd_container'].includes(type) && v === 0) {
+    if (['pct', 'usd_m2', 'usd_rm', 'usd_container', 'usd_piece', 'usd_kg', 'usd_set'].includes(type) && v === 0) {
       out.lines.push({ spec: s.name, option: o.name, kind: 'included', value: 0, usd_effect: null });
       continue;
     }
@@ -244,6 +259,15 @@ function adjustments(product, offeredSpecs, map, cbmFrom, exactSpecIds = []) {
     } else if (type === 'usd_container') {
       out.charges.push(`${o.name}: USD ${money(v)} per container, charged separately`);
       continue;
+    } else if (has(UNIT_TYPES, type)) {
+      const unitType = UNIT_TYPES[type];
+      if (unitType.units.includes(String(product.reference_unit ?? '').trim().toUpperCase())) {
+        line.usd_effect = v;
+        out.usd += v;
+      } else {
+        out.charges.push(`${o.name}: USD ${money(v)} per ${unitType.label}, charged separately`);
+        continue;
+      }
     }
     out.lines.push(line);
   }
@@ -258,7 +282,7 @@ function changeLabel(type, value) {
   if (v === 0) return 'Included in base price'; // D-256
   const sign = v < 0 ? '−' : '+';
   if (type === 'pct') return `${sign}${trim2(v)}%`;
-  const per = { usd_m2: '/m²', usd_rm: '/rm', usd_container: '/container' }[type] || '';
+  const per = { usd_m2: '/m²', usd_rm: '/rm', usd_container: '/container', usd_piece: '/piece', usd_kg: '/kg', usd_set: '/set' }[type] || '';
   return `${sign}$${trim2(v)}${per}`;
 }
 
@@ -319,6 +343,6 @@ function readOptionForm(post) {
 }
 
 module.exports = {
-  FORMS, CHANGE_TYPES, KINDS, RM_UNITS, validInt, categoryIdFor, productForms, splitForms, formsLabel, appliesTo, tree, offered,
+  FORMS, CHANGE_TYPES, KINDS, RM_UNITS, UNIT_TYPES, validInt, categoryIdFor, productForms, splitForms, formsLabel, appliesTo, tree, offered,
   normalize, describe, adjustments, changeLabel, readSpecForm, readOptionForm,
 };

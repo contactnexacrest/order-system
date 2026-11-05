@@ -117,6 +117,170 @@ final class ProductCategoryRepository
     }
 
     /**
+     * Owner decision D-257 Phase 0B (5 Nov 2026): the T&C clause sets a
+     * category can name. The documents print them from Phase 1; until then
+     * the choice is only stored (Natural Stone = today's stone clauses).
+     */
+    public const TC_CLAUSE_SETS = [
+        'natural_stone' => 'Natural stone clauses (today\'s)',
+        'general_goods' => 'General goods clauses',
+        'engineering'   => 'Engineering goods clauses',
+    ];
+    public const MAX_QUALITY_DOCUMENTS = 10;
+
+    /** @return list<string> the units a category allows (upper case); [] = any unit */
+    public static function allowedUnits(?array $category): array
+    {
+        $raw = trim((string) ($category['allowed_units'] ?? ''));
+        return $raw === '' ? [] : array_values(array_filter(array_map(static fn ($u) => strtoupper(trim($u)), explode(',', $raw)), static fn ($u) => $u !== ''));
+    }
+
+    /** @return list<string> the quality documents a category asks for on an order; [] = none */
+    public static function qualityDocuments(?array $category): array
+    {
+        $raw = trim((string) ($category['quality_documents'] ?? ''));
+        return $raw === '' ? [] : array_values(array_filter(array_map('trim', preg_split('/\R/', $raw) ?: []), static fn ($d) => $d !== ''));
+    }
+
+    /**
+     * Reads the posted category settings.
+     *
+     * @param list<string> $knownUnits the active Units list
+     * @param list<string> $packageTypes the active Package Types list
+     * @return array{0: array<string,?string>, 1: ?string} the settings, or the error
+     */
+    public static function parseSettings(array $post, array $knownUnits, array $packageTypes): array
+    {
+        $known = array_map('strtoupper', $knownUnits);
+        $allowed = [];
+        foreach ((array) ($post['allowed_units'] ?? []) as $u) {
+            $u = strtoupper(trim((string) $u));
+            if ($u === '') {
+                continue;
+            }
+            if (!in_array($u, $known, true)) {
+                return [[], "Unit \"{$u}\" is not on the Units list."];
+            }
+            if (!in_array($u, $allowed, true)) {
+                $allowed[] = $u;
+            }
+        }
+        $default = strtoupper(trim((string) ($post['default_unit'] ?? '')));
+        if ($default !== '' && !in_array($default, $known, true)) {
+            return [[], "Unit \"{$default}\" is not on the Units list."];
+        }
+        if ($default !== '' && $allowed !== [] && !in_array($default, $allowed, true)) {
+            return [[], "The default unit {$default} must be one of the allowed units."];
+        }
+        $hs = trim((string) ($post['default_hs_code'] ?? ''));
+        if ($hs !== '' && !HsCodeRepository::isActiveCode($hs)) {
+            return [[], "HS code \"{$hs}\" is not on the HS Code master list — add it there first (HS Codes, under Admin)."];
+        }
+        $packing = trim((string) ($post['packing_type'] ?? ''));
+        if ($packing !== '' && !in_array($packing, $packageTypes, true)) {
+            return [[], 'Choose the packing type from the Package Types list.'];
+        }
+        $docs = [];
+        foreach (preg_split('/\R/', (string) ($post['quality_documents'] ?? '')) ?: [] as $d) {
+            $d = trim($d);
+            if ($d === '') {
+                continue;
+            }
+            if (mb_strlen($d) > 120) {
+                return [[], "A quality document name can be at most 120 characters (\"{$d}\")."];
+            }
+            if (in_array(mb_strtolower($d), array_map('mb_strtolower', $docs), true)) {
+                return [[], "\"{$d}\" is listed twice — each quality document once."];
+            }
+            $docs[] = $d;
+        }
+        if (count($docs) > self::MAX_QUALITY_DOCUMENTS) {
+            return [[], 'A category can ask for at most ' . self::MAX_QUALITY_DOCUMENTS . ' quality documents.'];
+        }
+        $tc = trim((string) ($post['tc_clause_set'] ?? ''));
+        if ($tc !== '' && !array_key_exists($tc, self::TC_CLAUSE_SETS)) {
+            return [[], 'Choose the T&C clause set from the list.'];
+        }
+        return [[
+            'default_unit' => $default !== '' ? $default : null,
+            'allowed_units' => $allowed !== [] ? implode(',', $allowed) : null,
+            'default_hs_code' => $hs !== '' ? $hs : null,
+            'packing_type' => $packing !== '' ? $packing : null,
+            'quality_documents' => $docs !== [] ? implode("\n", $docs) : null,
+            'tc_clause_set' => $tc !== '' ? $tc : null,
+        ], null];
+    }
+
+    /** @param array<string,?string> $settings from parseSettings() */
+    public static function updateSettings(int $id, array $settings): void
+    {
+        Database::connection()->prepare(
+            'UPDATE product_categories SET default_unit = :du, allowed_units = :au, default_hs_code = :hs, packing_type = :pt, quality_documents = :qd, tc_clause_set = :tc WHERE id = :id'
+        )->execute([
+            'du' => $settings['default_unit'], 'au' => $settings['allowed_units'], 'hs' => $settings['default_hs_code'],
+            'pt' => $settings['packing_type'], 'qd' => $settings['quality_documents'], 'tc' => $settings['tc_clause_set'], 'id' => $id,
+        ]);
+    }
+
+    /** One line for the audit log: what the settings are. */
+    public static function settingsSummary(array $c): string
+    {
+        return 'unit ' . (($c['default_unit'] ?? null) ?: 'as today') . ' (allowed: ' . (($c['allowed_units'] ?? null) ?: 'any') . ')'
+            . '; HS ' . (($c['default_hs_code'] ?? null) ?: '-') . '; packing ' . (($c['packing_type'] ?? null) ?: '-')
+            . '; quality documents: ' . (self::qualityDocuments($c) !== [] ? implode(', ', self::qualityDocuments($c)) : 'none')
+            . '; T&C ' . (($c['tc_clause_set'] ?? null) ?: '-');
+    }
+
+    /**
+     * D-257 0B: the attributes of a category's option on the order-line
+     * form — its default HS code and unit (filled by app.js) and its allowed
+     * units (checked by app.js). '' for Natural Stone, which stays as today.
+     */
+    public static function lineOptionAttributes(array $category): string
+    {
+        if ((int) ($category['is_system'] ?? 0) === 1) {
+            return '';
+        }
+        $fills = array_filter(['hs_code' => (string) ($category['default_hs_code'] ?? ''), 'unit' => (string) ($category['default_unit'] ?? '')], static fn ($v) => $v !== '');
+        $out = $fills !== [] ? ' data-fills="' . htmlspecialchars((string) json_encode($fills), ENT_QUOTES) . '"' : '';
+        $allowed = self::allowedUnits($category);
+        return $out . ($allowed !== [] ? ' data-allowed-units="' . htmlspecialchars(implode(',', $allowed), ENT_QUOTES) . '"' : '');
+    }
+
+    /**
+     * D-257 0B: a new or edited order line in a category other than Natural
+     * Stone takes the category's default HS code (goods) and unit when they
+     * were left empty, and refuses a unit the category does not allow.
+     * Natural Stone (and no category) is left exactly as today.
+     *
+     * @param array<string,mixed> $post the posted line (changed in place)
+     * @return ?string the error, if any
+     */
+    public static function applyLineDefaults(array &$post): ?string
+    {
+        $categoryId = (int) ($post['category_id'] ?? 0);
+        if ($categoryId === 0 || (string) ($post['line_type'] ?? 'goods') === 'service') {
+            return null;
+        }
+        $category = self::find($categoryId);
+        if ($category === null || (int) $category['is_system'] === 1) {
+            return null;
+        }
+        if ((string) ($post['line_type'] ?? 'goods') === 'goods' && trim((string) ($post['hs_code'] ?? '')) === '' && !empty($category['default_hs_code'])) {
+            $post['hs_code'] = (string) $category['default_hs_code'];
+        }
+        if (trim((string) ($post['unit'] ?? '')) === '' && !empty($category['default_unit'])) {
+            $post['unit'] = (string) $category['default_unit'];
+        }
+        $allowed = self::allowedUnits($category);
+        $unit = strtoupper(trim((string) ($post['unit'] ?? '')));
+        if ($allowed !== [] && $unit !== '' && !in_array($unit, $allowed, true)) {
+            return "Unit {$unit} is not one of the units for {$category['name']} (" . implode(', ', $allowed) . ').';
+        }
+        return null;
+    }
+
+    /**
      * Saves an order line's category and, for a non-stone category, its
      * attribute values (label => value, in the category's order).
      *

@@ -3,11 +3,17 @@
   <h1>Product categories</h1>
   <p class="muted">Each category names the attributes an order line of that category carries — they print on the Quotation, Proforma Invoice and Commercial Invoice in the line's detail row, in this order, followed by the HS code. Natural Stone is today's products: its Dimensions and Finish stay exactly as they are.</p>
   <table class="list">
-    <tr><th>Category</th><th>Attributes</th><th>Status</th></tr>
+    <tr><th>Category</th><th>Attributes</th><th>Units</th><th>HS code</th><th>Packing</th><th>Quality documents</th><th>T&amp;C clauses</th><th>Status</th></tr>
     {% for c in categories %}
     <tr>
       <td>{{ c.name }}{% if c.is_system == 1 %} <small class="muted">(today's products)</small>{% endif %}</td>
       <td>{{ c.attributes | join(' · ') }}</td>
+      {# D-257 0B: the category's units, HS code, packing, quality documents and T&C clause set. #}
+      <td>{% if c.default_unit %}{{ c.default_unit }}{% if c.allowed_units %} ({{ c.allowed_units | replace(',', ', ') }}){% endif %}{% elif c.allowed_units %}{{ c.allowed_units | replace(',', ', ') }}{% else %}Any (as today){% endif %}</td>
+      <td>{{ c.default_hs_code or '—' }}</td>
+      <td>{{ c.packing_type or '—' }}</td>
+      <td>{{ (c.qualityDocuments | join(' · ')) or 'None' }}</td>
+      <td>{{ tcClauseSets[c.tc_clause_set] if (c.tc_clause_set and tcClauseSets[c.tc_clause_set]) else '—' }}</td>
       <td>{{ 'Active' if c.is_active == 1 else 'Inactive' }}</td>
     </tr>
     {% endfor %}
@@ -27,6 +33,43 @@
     </form>
   </details>
   {% endif %}{% endfor %}
+
+  {# Owner decision D-257 Phase 0B (5 Nov 2026): each category's settings, Natural Stone included. #}
+  <h2>Category settings</h2>
+  <p class="muted">What an order line of the category starts with: its unit (and the only units it may use), its HS code for goods, its packing type, the quality documents its orders must collect (a checklist appears on the order page), and the T&amp;C clause set its documents will print from Phase 1. Natural Stone keeps today's values — any unit, HS 680293, wooden crates, the stone clauses, no extra quality documents.</p>
+  {% for c in categories %}
+  <details class="category-settings" id="category-settings-{{ c.id }}">
+    <summary>Settings: {{ c.name }}</summary>
+    <form method="post" action="/products/categories/{{ c.id }}/settings">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Default unit
+        <select name="default_unit">
+          <option value="">No default (as today)</option>
+          {% for u in units %}<option value="{{ u }}" {{ 'selected' if (u | upper) == ((c.default_unit or '') | upper) else '' }}>{{ u }}</option>{% endfor %}
+        </select>
+      </label>
+      <fieldset><legend>Allowed units <small class="muted">(none ticked = any unit)</small></legend>
+        {% for u in units %}<label class="checkbox-row"><input type="checkbox" name="allowed_units[]" value="{{ u }}" {{ 'checked' if (u | upper) in c.allowedUnits else '' }}> {{ u }}</label>{% endfor %}
+      </fieldset>
+      <label>Default HS code <small class="muted">(goods; from the HS Code master list)</small><input type="text" name="default_hs_code" list="category_hs_codes" pattern="\d{6,8}" maxlength="8" value="{{ c.default_hs_code or '' }}" placeholder="e.g. 730791"></label>
+      <label>Packing type
+        <select name="packing_type">
+          <option value="">Not set</option>
+          {% for p in packageTypes %}<option value="{{ p }}" {{ 'selected' if p == (c.packing_type or '') else '' }}>{{ p }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Quality documents its orders need <small class="muted">(one per line, at most {{ maxQualityDocuments }})</small><textarea name="quality_documents" rows="3" maxlength="1300" placeholder="e.g. Mill test certificate 3.1&#10;Drawing approval">{{ c.quality_documents or '' }}</textarea></label>
+      <label>T&amp;C clause set
+        <select name="tc_clause_set">
+          <option value="">Not set</option>
+          {% for k, label in tcClauseSets %}<option value="{{ k }}" {{ 'selected' if k == (c.tc_clause_set or '') else '' }}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save settings for {{ c.name }}</button></div>
+    </form>
+  </details>
+  {% endfor %}
+  <datalist id="category_hs_codes">{% for h in hsCodes %}<option value="{{ h.code }}">{{ h.description }}</option>{% endfor %}</datalist>
 
   <h2>Add a category</h2>
   <form method="post" action="/products/categories">

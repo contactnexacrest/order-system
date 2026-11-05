@@ -704,6 +704,17 @@
     }
     var mismatch = matchError(el);
     if (mismatch) return mismatch;
+    // data-allowed-from="<select name>": the value must be one of the units
+    // the chosen option of that select allows (its data-allowed-units, comma
+    // separated; empty = any) — e.g. D-257 0B: a product category's units.
+    if (el.dataset.allowedFrom && el.form && value !== '') {
+      var from = el.form.elements.namedItem(el.dataset.allowedFrom);
+      var opt = from && from.options ? from.options[from.selectedIndex] : null;
+      var allowed = opt && !from.disabled && opt.dataset.allowedUnits ? opt.dataset.allowedUnits.split(',') : [];
+      if (allowed.length > 0 && allowed.indexOf(value.toUpperCase()) === -1) {
+        return 'Choose one of the units for ' + opt.textContent.trim() + ': ' + allowed.join(', ') + '.';
+      }
+    }
     // data-required-if="<name>=<value>": required while that field has that value
     // (e.g. the staff member's name when an expense was paid by staff);
     // data-required-if="<name>": required once that field is filled (e.g. the
@@ -1063,6 +1074,28 @@
     });
   }
 
+  // data-fills='{"<name>":"<value>",…}' on a select's option: choosing it
+  // fills those fields of the same form (text fields only while empty) — e.g.
+  // D-257 0B: a product category's default HS code and unit on a new line.
+  function initOptionFills() {
+    document.addEventListener('change', function (e) {
+      var select = e.target;
+      if (!select || select.tagName !== 'SELECT' || !select.form) return;
+      var opt = select.options[select.selectedIndex];
+      if (!opt || !opt.dataset.fills) return;
+      var fills;
+      try { fills = JSON.parse(opt.dataset.fills); } catch (err) { return; }
+      Object.keys(fills).forEach(function (name) {
+        var field = select.form.elements.namedItem(name);
+        // A text field is filled only while empty; a drop-down (e.g. Unit) takes the option's value.
+        if (field && 'value' in field && !field.disabled && fills[name] && (field.tagName === 'SELECT' || field.value.trim() === '')) {
+          field.value = fills[name];
+          field.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    });
+  }
+
   // Owner request (2026-10-27): GST is always picked as a rate (%) and the
   // amount worked out, never typed. Any form holding a [data-gst-base]
   // value and a [data-gst-rate] select fills its read-only
@@ -1374,6 +1407,7 @@
     initSchemeRows();
     initGstCalc();
     initShowWhen();
+    initOptionFills();
     initAutoReasons();
     initFieldLabels();
     initRequiredLabels();

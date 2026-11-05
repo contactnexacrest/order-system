@@ -5360,7 +5360,7 @@ CREATE TABLE spec_options (
   product_id   BIGINT UNSIGNED NULL,                -- set: an option for this product only
   name         VARCHAR(80) NOT NULL,
   is_base      TINYINT(1) NOT NULL DEFAULT 0,
-  change_type  ENUM('none','pct','usd_m2','usd_rm','usd_container','cbm') NOT NULL DEFAULT 'none',
+  change_type  ENUM('none','pct','usd_m2','usd_rm','usd_container','usd_piece','usd_kg','usd_set','cbm') NOT NULL DEFAULT 'none',
   value        DECIMAL(12,4) NULL,
   thickness_mm INT NULL,                            -- thickness options: decides m² or CBM and converts per-m² amounts
   sort_order   INT NOT NULL DEFAULT 0,
@@ -5550,3 +5550,35 @@ ALTER TABLE report_definitions ADD CONSTRAINT fk_report_definitions_division FOR
 -- Empty = a company-wide cost, shared out as overhead.
 ALTER TABLE ca_expenses ADD COLUMN division_id BIGINT UNSIGNED NULL;
 ALTER TABLE ca_expenses ADD CONSTRAINT fk_ca_expenses_division FOREIGN KEY (division_id) REFERENCES divisions(id);
+
+
+-- Owner decision D-257 Phase 0B (5 Nov 2026): product-neutral groundwork. A product
+-- category decides its default unit (and which units it offers), its default HS code,
+-- its packing type, the quality documents its orders need, and its T&C clause set.
+-- Empty = today's behaviour (any unit, HS 680293, no extra quality documents), so the
+-- system category Natural Stone behaves exactly as before.
+ALTER TABLE product_categories ADD COLUMN default_unit VARCHAR(20) NULL;
+ALTER TABLE product_categories ADD COLUMN allowed_units VARCHAR(255) NULL;
+ALTER TABLE product_categories ADD COLUMN default_hs_code VARCHAR(10) NULL;
+ALTER TABLE product_categories ADD COLUMN packing_type VARCHAR(80) NULL;
+ALTER TABLE product_categories ADD COLUMN quality_documents TEXT NULL;
+ALTER TABLE product_categories ADD COLUMN tc_clause_set VARCHAR(40) NULL;
+
+-- One row per quality document a category asks for on an order (e.g. "Mill test
+-- certificate 3.1"): its status and, once received, the file.
+CREATE TABLE order_quality_documents (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id BIGINT UNSIGNED NOT NULL,
+  category_id BIGINT UNSIGNED NOT NULL,
+  document_name VARCHAR(120) NOT NULL,
+  status ENUM('pending','received','approved') NOT NULL DEFAULT 'pending',
+  file_store_id BIGINT UNSIGNED NULL,
+  note VARCHAR(255) NULL,
+  updated_by BIGINT UNSIGNED NULL,
+  updated_at DATETIME NULL,
+  UNIQUE KEY uq_oqd_order_doc (order_id, category_id, document_name),
+  CONSTRAINT fk_oqd_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_oqd_category FOREIGN KEY (category_id) REFERENCES product_categories(id),
+  CONSTRAINT fk_oqd_file FOREIGN KEY (file_store_id) REFERENCES file_store(id),
+  CONSTRAINT fk_oqd_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;

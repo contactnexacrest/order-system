@@ -148,6 +148,8 @@ njkEnv.addFilter('maskEmail', mask.maskEmail);
 njkEnv.addFilter('maskPhone', mask.maskPhone);
 njkEnv.addFilter('humanDate', dates.human);
 // D-215 (5a): an order line's stored attribute values (JSON) as an object for the line forms.
+// D-257 0B: a product category's option attributes on the order-line form (default HS code and unit, allowed units).
+njkEnv.addFilter('categoryLineAttrs', (c) => new nunjucks.runtime.SafeString(require('./repositories/productCategoryRepository').lineOptionAttributes(c)));
 njkEnv.addFilter('fromJson', (v) => { try { return v ? JSON.parse(v) : {}; } catch (e) { return {}; } });
 njkEnv.addFilter('shortDate', dates.short);
 // D-245 P4: the time (HH:MM) of a 'YYYY-MM-DD HH:MM:SS' value, for the incentive history.
@@ -954,6 +956,7 @@ app.post('/orders/:id/archive', requireAuth, requirePermission('manage_orders'),
 app.post('/orders/:id/unarchive', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.unarchive));
 app.post('/orders/:id/duplicate', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(ordersController.duplicateOrder));
 app.post('/orders/:id/products', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.addProduct));
+app.post('/orders/:id/quality-documents', requireAuth, requirePermissionAny(['manage_orders', 'manage_purchasing']), checkOrderLock, uploadLarge.single('file'), verifyCsrf, asyncHandler(require('./controllers/orderQualityDocumentController').save)); // D-257 0B
 app.post('/orders/:id/products/:productId', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProduct));
 app.post('/orders/:id/products/:productId/delete', requireAuth, requirePermission('manage_orders'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.deleteProduct));
 // Owner decision D-245 P2: a line below the floor goes to the MD; only the MD approves it (never below the minimum price).
@@ -1227,6 +1230,7 @@ app.post('/products/create', requireAuth, requirePermission('manage_product_cata
 app.get('/products/categories', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productCategoryController.index));
 app.post('/products/categories', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productCategoryController.store));
 app.post('/products/categories/:id', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productCategoryController.update));
+app.post('/products/categories/:id/settings', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productCategoryController.settings));
 app.get('/products/:id', requireAuth, requirePermission('view_product_catalog'), asyncHandler(productsController.show));
 app.get('/products/:id/edit', requireAuth, requirePermission('manage_product_catalog'), asyncHandler(productsController.edit));
 app.post('/products/:id/update', requireAuth, requirePermission('manage_product_catalog'), verifyCsrf, asyncHandler(productsController.update));

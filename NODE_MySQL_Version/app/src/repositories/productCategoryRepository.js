@@ -92,4 +92,124 @@ function documentAttributes(line) {
   return Object.entries(values).map(([label, value]) => ({ label: String(label), value: String(value ?? '').trim() !== '' ? String(value) : 'To Be Confirmed' }));
 }
 
-module.exports = { MAX_ATTRIBUTES, all, find, attributeLabels, nameTaken, create, update, parseLabels, setLineCategory, documentAttributes };
+/**
+ * Owner decision D-257 Phase 0B (5 Nov 2026): the T&C clause sets a
+ * category can name. The documents print them from Phase 1; until then
+ * the choice is only stored (Natural Stone = today's stone clauses).
+ */
+const TC_CLAUSE_SETS = {
+  natural_stone: "Natural stone clauses (today's)",
+  general_goods: 'General goods clauses',
+  engineering: 'Engineering goods clauses',
+};
+const MAX_QUALITY_DOCUMENTS = 10;
+
+/** The units a category allows (upper case); [] = any unit. */
+function allowedUnits(category) {
+  const raw = String((category && category.allowed_units) ?? '').trim();
+  return raw === '' ? [] : raw.split(',').map((u) => u.trim().toUpperCase()).filter((u) => u !== '');
+}
+
+/** The quality documents a category asks for on an order; [] = none. */
+function qualityDocuments(category) {
+  const raw = String((category && category.quality_documents) ?? '').trim();
+  return raw === '' ? [] : raw.split(/\r\n|\r|\n/).map((d) => d.trim()).filter((d) => d !== '');
+}
+
+/** Reads the posted category settings. @returns {[object, string|null]} the settings, or the error */
+async function parseSettings(body, knownUnits, packageTypes) {
+  const hsCodeRepository = require('./hsCodeRepository');
+  const known = knownUnits.map((u) => u.toUpperCase());
+  const allowed = [];
+  for (const raw of [].concat(body.allowed_units ?? [])) {
+    const u = String(raw ?? '').trim().toUpperCase();
+    if (u === '') continue;
+    if (!known.includes(u)) return [{}, `Unit "${u}" is not on the Units list.`];
+    if (!allowed.includes(u)) allowed.push(u);
+  }
+  const def = String(body.default_unit ?? '').trim().toUpperCase();
+  if (def !== '' && !known.includes(def)) return [{}, `Unit "${def}" is not on the Units list.`];
+  if (def !== '' && allowed.length > 0 && !allowed.includes(def)) return [{}, `The default unit ${def} must be one of the allowed units.`];
+  const hs = String(body.default_hs_code ?? '').trim();
+  if (hs !== '' && !(await hsCodeRepository.isActiveCode(hs))) return [{}, `HS code "${hs}" is not on the HS Code master list — add it there first (HS Codes, under Admin).`];
+  const packing = String(body.packing_type ?? '').trim();
+  if (packing !== '' && !packageTypes.includes(packing)) return [{}, 'Choose the packing type from the Package Types list.'];
+  const docs = [];
+  for (const raw of String(body.quality_documents ?? '').split(/\r\n|\r|\n/)) {
+    const d = raw.trim();
+    if (d === '') continue;
+    if ([...d].length > 120) return [{}, `A quality document name can be at most 120 characters ("${d}").`];
+    if (docs.map((x) => x.toLowerCase()).includes(d.toLowerCase())) return [{}, `"${d}" is listed twice — each quality document once.`];
+    docs.push(d);
+  }
+  if (docs.length > MAX_QUALITY_DOCUMENTS) return [{}, `A category can ask for at most ${MAX_QUALITY_DOCUMENTS} quality documents.`];
+  const tc = String(body.tc_clause_set ?? '').trim();
+  if (tc !== '' && !Object.prototype.hasOwnProperty.call(TC_CLAUSE_SETS, tc)) return [{}, 'Choose the T&C clause set from the list.'];
+  return [{
+    default_unit: def !== '' ? def : null,
+    allowed_units: allowed.length > 0 ? allowed.join(',') : null,
+    default_hs_code: hs !== '' ? hs : null,
+    packing_type: packing !== '' ? packing : null,
+    quality_documents: docs.length > 0 ? docs.join('\n') : null,
+    tc_clause_set: tc !== '' ? tc : null,
+  }, null];
+}
+
+async function updateSettings(id, s) {
+  await db.execute(
+    'UPDATE product_categories SET default_unit = :du, allowed_units = :au, default_hs_code = :hs, packing_type = :pt, quality_documents = :qd, tc_clause_set = :tc WHERE id = :id',
+    { du: s.default_unit, au: s.allowed_units, hs: s.default_hs_code, pt: s.packing_type, qd: s.quality_documents, tc: s.tc_clause_set, id },
+  );
+}
+
+/** One line for the audit log: what the settings are. */
+function settingsSummary(c) {
+  const docs = qualityDocuments(c);
+  return `unit ${c.default_unit || 'as today'} (allowed: ${c.allowed_units || 'any'})`
+    + `; HS ${c.default_hs_code || '-'}; packing ${c.packing_type || '-'}`
+    + `; quality documents: ${docs.length > 0 ? docs.join(', ') : 'none'}`
+    + `; T&C ${c.tc_clause_set || '-'}`;
+}
+
+/**
+ * D-257 0B: the attributes of a category's option on the order-line form —
+ * its default HS code and unit (filled by app.js) and its allowed units
+ * (checked by app.js). '' for Natural Stone, which stays as today.
+ */
+function lineOptionAttributes(category) {
+  if (Number(category.is_system ?? 0) === 1) return '';
+  const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const fills = {};
+  if (String(category.default_hs_code ?? '') !== '') fills.hs_code = String(category.default_hs_code);
+  if (String(category.default_unit ?? '') !== '') fills.unit = String(category.default_unit);
+  let out = Object.keys(fills).length > 0 ? ` data-fills="${esc(JSON.stringify(fills))}"` : '';
+  const allowed = allowedUnits(category);
+  if (allowed.length > 0) out += ` data-allowed-units="${esc(allowed.join(','))}"`;
+  return out;
+}
+
+/**
+ * D-257 0B: a new or edited order line in a category other than Natural
+ * Stone takes the category's default HS code (goods) and unit when they
+ * were left empty, and refuses a unit the category does not allow.
+ * Natural Stone (and no category) is left exactly as today.
+ * Changes body in place; returns the error, if any.
+ */
+async function applyLineDefaults(body) {
+  const categoryId = parseInt(body.category_id, 10) || 0;
+  const lineType = String(body.line_type ?? 'goods');
+  if (categoryId === 0 || lineType === 'service') return null;
+  const category = await find(categoryId);
+  if (!category || Number(category.is_system) === 1) return null;
+  if (lineType === 'goods' && String(body.hs_code ?? '').trim() === '' && category.default_hs_code) body.hs_code = String(category.default_hs_code);
+  if (String(body.unit ?? '').trim() === '' && category.default_unit) body.unit = String(category.default_unit);
+  const allowed = allowedUnits(category);
+  const unit = String(body.unit ?? '').trim().toUpperCase();
+  if (allowed.length > 0 && unit !== '' && !allowed.includes(unit)) return `Unit ${unit} is not one of the units for ${category.name} (${allowed.join(', ')}).`;
+  return null;
+}
+
+module.exports = {
+  MAX_ATTRIBUTES, all, find, attributeLabels, nameTaken, create, update, parseLabels, setLineCategory, documentAttributes,
+  TC_CLAUSE_SETS, MAX_QUALITY_DOCUMENTS, allowedUnits, qualityDocuments, parseSettings, updateSettings, settingsSummary, lineOptionAttributes, applyLineDefaults,
+};

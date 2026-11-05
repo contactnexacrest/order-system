@@ -3,6 +3,7 @@
 const flash = require('../helpers/flash');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const productCategoryRepository = require('../repositories/productCategoryRepository');
+const lookupRepository = require('../repositories/lookupRepository');
 
 // Port of App\Controllers\ProductCategoryController. Owner decision D-215
 // (5a): Products → Categories — each category names the attributes its
@@ -17,9 +18,20 @@ async function nameError(name, id) {
 }
 
 async function index(req, res) {
+  const categories = await productCategoryRepository.all();
+  for (const c of categories) {
+    c.allowedUnits = productCategoryRepository.allowedUnits(c);
+    c.qualityDocuments = productCategoryRepository.qualityDocuments(c);
+  }
   res.renderView('products/categories', {
-    categories: await productCategoryRepository.all(),
+    categories,
+    maxQualityDocuments: productCategoryRepository.MAX_QUALITY_DOCUMENTS,
     maxAttributes: productCategoryRepository.MAX_ATTRIBUTES,
+    // D-257 0B: each category's units, HS code, packing, quality documents and T&C clause set.
+    units: (await lookupRepository.dropdownOptions('unit')).map((o) => String(o.option_value)),
+    packageTypes: (await lookupRepository.dropdownOptions('package_type')).map((o) => String(o.option_value)),
+    hsCodes: await require('../repositories/hsCodeRepository').active(),
+    tcClauseSets: productCategoryRepository.TC_CLAUSE_SETS,
   }, 'layout/base');
 }
 
@@ -66,4 +78,34 @@ async function update(req, res) {
   res.redirect('/products/categories');
 }
 
-module.exports = { index, store, update };
+/**
+ * Owner decision D-257 Phase 0B (5 Nov 2026): a category's settings —
+ * default and allowed units, default HS code, packing type, the quality
+ * documents its orders need, and its T&C clause set. Natural Stone's
+ * settings can be edited too (its attributes stay locked).
+ */
+async function settings(req, res) {
+  const id = parseInt(req.params.id, 10) || 0;
+  const category = await productCategoryRepository.find(id);
+  if (!category) {
+    res.status(404).send('Category not found.');
+    return;
+  }
+  const [values, error] = await productCategoryRepository.parseSettings(
+    req.body,
+    (await lookupRepository.dropdownOptions('unit')).map((o) => String(o.option_value)),
+    (await lookupRepository.dropdownOptions('package_type')).map((o) => String(o.option_value)),
+  );
+  if (error !== null) {
+    flash.set(req, 'error', `${category.name}: ${error}`);
+    res.redirect('/products/categories');
+    return;
+  }
+  await productCategoryRepository.updateSettings(id, values);
+  await auditLogRepository.log(req.user.id, 'PRODUCT_CATEGORY_SETTINGS_UPDATED', 'product_categories', id, 'settings',
+    productCategoryRepository.settingsSummary(category), productCategoryRepository.settingsSummary(values));
+  flash.set(req, 'success', `Settings for "${category.name}" saved.`);
+  res.redirect('/products/categories');
+}
+
+module.exports = { index, store, update, settings };
