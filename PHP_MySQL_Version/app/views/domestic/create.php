@@ -2,11 +2,12 @@
 /* Owner decision D-257 Phase 2: a new Domestic Trade (DOM) order — the buyer, its GST registration and the place of supply. */
 $o = static fn (string $k): string => htmlspecialchars((string) ($old[$k] ?? '')); ?>
 <div class="card page-wide">
-  <h1>New domestic order</h1>
+  <?php $imp = ($code ?? 'DOM') === 'IMP'; ?>
+  <h1><?= $imp ? 'New local sale (from stock)' : 'New domestic order' ?></h1>
   <?php if (!$active): ?>
-    <p class="muted" data-testid="dom-not-active">Domestic Trade is not active yet. The MD activates it in Admin › Divisions when it is ready.</p>
+    <p class="muted" data-testid="dom-not-active"><?= $imp ? 'Import & Distribution' : 'Domestic Trade' ?> is not active yet. The MD activates it in Admin › Divisions when it is ready.</p>
   <?php else: ?>
-  <p class="muted">A sale to a reseller in India, in rupees, with GST. Same state as NexaCrest: CGST + SGST; another state: IGST.</p>
+  <p class="muted"><?= $imp ? 'A sale of imported stock to a reseller in India' : 'A sale to a reseller in India' ?>, in rupees, with GST. Same state as NexaCrest: CGST + SGST; another state: IGST.</p>
   <form method="post" action="/domestic/orders" class="field-grid" data-testid="dom-create-form">
     <?= Csrf::field() ?>
     <label>Client *
@@ -34,7 +35,7 @@ $o = static fn (string $k): string => htmlspecialchars((string) ($old[$k] ?? '')
     <label>Delivery address<textarea name="delivery_address" rows="3" maxlength="1000" placeholder="e.g. Plot 12, KIADB Industrial Area, Hosur Road, Bengaluru 560099"><?= $o('delivery_address') ?></textarea></label>
     <label>Payment terms (days)<input type="number" name="payment_terms_days" min="0" max="365" step="1" value="<?= $o('payment_terms_days') ?>" placeholder="e.g. <?= htmlspecialchars((string) $defaultTerms) ?>"></label>
     <label>Buyer's PO number<input type="text" name="buyer_po_ref" maxlength="80" value="<?= $o('buyer_po_ref') ?>" placeholder="e.g. PO/2026/118"></label>
-    <p><button type="submit" class="btn">Create domestic order</button></p>
+    <p><button type="submit" class="btn"><?= $imp ? 'Create local sale' : 'Create domestic order' ?></button></p>
   </form>
   <?php endif; ?>
 </div>

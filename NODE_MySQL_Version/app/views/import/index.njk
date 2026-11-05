@@ -1,0 +1,49 @@
+{# Owner decision D-257 Phase 3: the imports of Import & Distribution — the Standard list and the Kanban board offer the same filter, links and actions (hard rule 2026-11-01). #}
+{% macro card(r) %}<a class="entity-card kanban-card" href="/import/{{ r.id }}"><div class="entity-card-header"><span class="entity-card-title">{{ r.reference }}</span><span class="badge badge-protected">{{ r.stage_label }}</span></div><div class="entity-card-sub">{{ r.supplier_name }} · {{ r.supplier_country }}</div><div class="entity-card-footer"><span class="muted small">{{ r.currency_code }} {{ r.value_fmt }}</span><span class="muted small">PO {{ r.po_date }}</span><span class="muted small">{{ r.line_count }} line{{ '' if r.line_count == 1 else 's' }}</span></div></a>{% endmacro %}
+<div class="card page-wide" data-testid="imp-list">
+  <div class="page-header-row">
+    <div>
+      <h1>Imports{{ ' — Kanban Board' if board else '' }}</h1>
+      <p class="muted" style="margin:0;">Goods bought abroad for Import &amp; Distribution: the import PO, LC, shipment, customs clearance, landed cost and stock.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      {% if canEdit and active %}<a class="btn-sm" href="/import/create">New import</a>{% endif %}
+      <a class="btn-sm btn-secondary" href="/import/reports">Reports</a>
+      {% if board %}<a class="btn-sm btn-secondary" href="/import?view=list{% if stage %}&amp;stage={{ stage }}{% endif %}">Switch to list view</a>
+      {% elif kanbanUser %}<a class="btn-sm btn-secondary" href="/import{% if stage %}?stage={{ stage }}{% endif %}">Switch to board view</a>{% endif %}
+    </div>
+  </div>
+  <form method="get" action="/import" class="filters" data-testid="imp-filter">
+    {% if not board %}<input type="hidden" name="view" value="list">{% endif %}
+    <label>Stage
+      <select name="stage" onchange="this.form.submit()">
+        <option value="">All stages</option>
+        {% for st in stages %}<option value="{{ st.key }}" {{ 'selected' if stage == st.key else '' }}>{{ st.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <noscript><button type="submit" class="btn-sm">Filter</button></noscript>
+  </form>
+  {% if board %}
+  <div class="kanban-board">
+    {% for col in columns %}
+    <div class="kanban-column" data-status="{{ col.key }}">
+      <div class="kanban-column-header"><span class="kanban-column-title">{{ col.label }}</span><span class="kanban-column-count">{{ col.rows.length }}</span></div>
+      {% if col.rows.length == 0 %}<p class="kanban-column-empty">Nothing here</p>{% else %}{% for r in col.rows %}{{ card(r) }}{% endfor %}{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <table class="list">
+    <tr><th>Import PO</th><th>Stage</th><th>Supplier</th><th>PO date</th><th>Value</th><th>Lines</th><th>BL</th><th>Bill of entry</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td><a href="/import/{{ r.id }}">{{ r.reference }}</a></td><td>{{ r.stage_label }}</td>
+      <td>{{ r.supplier_name }} · {{ r.supplier_country }}</td><td>{{ r.po_date }}</td>
+      <td>{{ r.currency_code }} {{ r.value_fmt }}</td><td>{{ r.line_count }}</td>
+      <td>{{ r.bl_no or '—' }}</td><td>{{ r.boe_no or '—' }}</td>
+    </tr>
+    {% endfor %}
+    {% if rows.length == 0 %}<tr><td colspan="8" class="muted">No imports yet.</td></tr>{% endif %}
+  </table>
+  {% endif %}
+</div>

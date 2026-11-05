@@ -323,7 +323,9 @@ async function duplicateOrder(req, res) {
 async function create(req, res) {
   // Owner decision D-257 Phase 2: someone working in Domestic Trade creates a domestic order.
   const domId = await require('../services/domesticOrderService').divisionId();
-  if (domId !== null && require('../services/divisionService').currentId() === domId) {
+  const impId = await require('../services/domesticOrderService').divisionId('IMP'); // D-257 Phase 3: Import & Distribution sells through the same form
+  const curId = require('../services/divisionService').currentId();
+  if (curId !== null && (curId === domId || curId === impId)) {
     res.redirect('/domestic/orders/create');
     return;
   }
@@ -468,7 +470,9 @@ async function store(req, res) {
   // Owner decision D-257 Phase 2: rupees are for Domestic Trade orders only; a domestic order has its own form.
   const inrCurrency = await db.queryOne("SELECT 1 AS x FROM currencies WHERE id = :id AND code = 'INR'", { id: currencyId });
   const domDivisionId = await require('../services/domesticOrderService').divisionId();
-  if (inrCurrency || (domDivisionId !== null && parseInt(body.division_id || 0, 10) === domDivisionId)) {
+  const impDivisionId = await require('../services/domesticOrderService').divisionId('IMP');
+  const postedDivision = parseInt(body.division_id || 0, 10);
+  if (inrCurrency || (domDivisionId !== null && postedDivision === domDivisionId) || (impDivisionId !== null && postedDivision === impDivisionId)) {
     flash.set(req, 'error', 'Orders in rupees belong to Domestic Trade: use New domestic order.');
     flash.setOld(req, body);
     res.redirect(`/orders/create?client_id=${clientId}`);

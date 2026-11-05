@@ -1813,6 +1813,144 @@ async function pushDomesticInvoice(orderId, userId = null) {
   return invoiceId;
 }
 
+// ---------------------------------------------------------------- D-257 Phase 3: imports
+
+/**
+ * Books accounts for an import (names to be confirmed by the CA): the goods
+ * and the customs duty go to stock (they are part of the landed cost); the
+ * IGST paid at customs is held until it is taken as input credit.
+ */
+const IMPORT_ACCOUNTS = {
+  goods: 'Inventory Asset',
+  duty: 'Inventory Asset',
+  igst_paid: 'IGST Paid on Import',
+  igst_credit: 'Input IGST',
+};
+
+/**
+ * The foreign supplier's bill for an import (pure: no network), in the
+ * supplier's currency at the customs exchange rate. gst_treatment
+ * overseas: no GST on the bill itself (IGST is paid at customs).
+ * Rule D-212: the notes say what the bill is, from whom, for which import.
+ */
+async function importBillPayload(s, lines, vendorId, accountIdByName) {
+  const items = [];
+  for (const l of lines) {
+    items.push({
+      account_id: await accountIdByName(IMPORT_ACCOUNTS.goods),
+      name: [...String(l.description)].slice(0, 100).join(''),
+      description: String(l.description),
+      hsn_or_sac: String(l.hsn_code),
+      quantity: Number(l.quantity),
+      rate: Number(l.unit_price_fc),
+    });
+  }
+  const payload = {
+    vendor_id: vendorId,
+    bill_number: String(s.reference),
+    reference_number: String(s.bl_no || ''),
+    date: String(s.bl_date || s.po_date),
+    currency_code: String(s.currency_code),
+    exchange_rate: Number(s.customs_fx_rate),
+    gst_treatment: 'overseas',
+    line_items: items,
+    notes: `Import purchase from ${s.supplier_name} (${s.supplier_country}) against import PO ${s.reference}`
+      + (s.bl_no ? `, BL ${s.bl_no}` : '') + (s.boe_no ? `, bill of entry ${s.boe_no}` : '') + '.',
+  };
+  const tags = await divisionTags(Number(s.division_id));
+  if (tags.length) payload.tags = tags;
+  return payload;
+}
+
+/**
+ * The customs duty of an import as a Books bill from Customs (pure: no
+ * network): basic customs duty and social welfare surcharge (added to the
+ * stock value) and the IGST paid on import (held for input credit).
+ */
+async function customsDutyBillPayload(s, vendorId, accountIdByName) {
+  if (!s.boe_no || s.bcd_total === null || s.bcd_total === undefined) throw new Error('This import is not cleared yet.');
+  const what = `import PO ${s.reference}, bill of entry ${s.boe_no} dated ${s.boe_date} at ${s.port_code}`;
+  const payload = {
+    vendor_id: vendorId,
+    bill_number: `BE-${s.boe_no}`,
+    reference_number: String(s.reference),
+    date: String(s.boe_date),
+    line_items: [
+      { account_id: await accountIdByName(IMPORT_ACCOUNTS.duty), name: 'Basic customs duty', description: `Basic customs duty on ${what}`, quantity: 1, rate: Number(s.bcd_total) },
+      { account_id: await accountIdByName(IMPORT_ACCOUNTS.duty), name: 'Social welfare surcharge', description: `Social welfare surcharge on ${what}`, quantity: 1, rate: Number(s.sws_total) },
+      { account_id: await accountIdByName(IMPORT_ACCOUNTS.igst_paid), name: 'IGST paid on import', description: `IGST paid on import on ${what} (input credit)`, quantity: 1, rate: Number(s.igst_total) },
+    ],
+    notes: `Customs duty and IGST on ${what}, cleared through ${s.cha_name}.`,
+  };
+  const tags = await divisionTags(Number(s.division_id));
+  if (tags.length) payload.tags = tags;
+  return payload;
+}
+
+/** The journal that takes the IGST paid on import as input credit (pure: no network): debit Input IGST, credit IGST Paid on Import. */
+async function importIgstCreditJournalPayload(s, accountIdByName) {
+  if (!s.igst_credit_on || s.igst_total === null || s.igst_total === undefined) throw new Error('The IGST credit of this import is not recorded yet.');
+  const amount = round(Number(s.igst_total), 2);
+  const G = require('./gstCalculator');
+  const payload = {
+    journal_date: String(s.igst_credit_on),
+    reference_number: `BE-${s.boe_no}`,
+    notes: `IGST paid on import taken as input credit: import PO ${s.reference}, bill of entry ${s.boe_no} dated ${s.boe_date}, ₹${G.inr(String(s.igst_total))}.`,
+    line_items: [
+      { account_id: await accountIdByName(IMPORT_ACCOUNTS.igst_credit), debit_or_credit: 'debit', amount, description: `Input IGST on bill of entry ${s.boe_no}` },
+      { account_id: await accountIdByName(IMPORT_ACCOUNTS.igst_paid), debit_or_credit: 'credit', amount, description: `IGST paid on import, bill of entry ${s.boe_no}` },
+    ],
+  };
+  const tags = await divisionTags(Number(s.division_id));
+  if (tags.length) payload.tags = tags;
+  return payload;
+}
+
+/**
+ * Sends a cleared import to Books: the supplier's bill and the customs duty
+ * bill (each created once; a retry finds it by number). Live test in the Zoho
+ * TEST organisation still pending (no credentials yet).
+ */
+async function pushImport(shipmentId, userId = null) {
+  const importRepository = require('../repositories/importRepository');
+  const s = await importRepository.find(shipmentId);
+  if (!s || !s.boe_no || s.bcd_total === null) throw new Error('This import is not cleared yet.');
+  assertVendorAllowed(String(s.supplier_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const account = (name) => accountId(config, accessToken, name);
+  const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const vendor = async (name, currency) => {
+    const rows = await getList(accessToken, `https://${config.apiDomain}/books/v3/contacts${query}&contact_type=vendor&contact_name=${encodeURIComponent(name)}`, 'contacts');
+    const found = rows.find((row) => String(row.contact_name || '') === name);
+    if (found) return String(found.contact_id);
+    const payload = { contact_name: name, company_name: name, contact_type: 'vendor', ...(currency !== null ? { currency_code: currency, gst_treatment: 'overseas' } : {}) };
+    const response = await request('POST', `https://${config.apiDomain}/books/v3/contacts${query}`, payload, authHeaders(accessToken));
+    const decoded = safeJson(response.body);
+    const id = decoded && decoded.contact && decoded.contact.contact_id;
+    if (!response.ok || typeof id !== 'string') throw new Error(`Zoho Books vendor creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+    return id;
+  };
+  const supplierId = await vendor(String(s.supplier_name), String(s.currency_code));
+  const customsId = await vendor(zohoGuard.isProduction() ? 'Indian Customs' : `${zohoGuard.TEST_PREFIX}Indian Customs`, null);
+  const ids = {};
+  const jobs = [
+    ['bill_id', String(s.reference), supplierId, await importBillPayload(s, await importRepository.lines(shipmentId), supplierId, account), 'zoho_bill_id'],
+    ['duty_bill_id', `BE-${s.boe_no}`, customsId, await customsDutyBillPayload(s, customsId, account), 'zoho_duty_bill_id'],
+  ];
+  for (const [key, number, vendorId, payload, column] of jobs) {
+    let existing = s[column] ? { bill_id: s[column] } : await findBill(config, accessToken, number, vendorId);
+    if (!existing) {
+      const response = await request('POST', `https://${config.apiDomain}/books/v3/bills${query}`, payload, authHeaders(accessToken));
+      existing = await findBill(config, accessToken, number, vendorId);
+      if (!existing) throw new Error(`Zoho Books bill ${number} failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+    }
+    ids[key] = String(existing.bill_id);
+    await importRepository.update(shipmentId, { [column]: ids[key] }, userId);
+  }
+  return ids;
+}
+
 module.exports = {
   associateBillPayload,
   associatePaymentPayload,
@@ -1827,4 +1965,6 @@ module.exports = {
   pushCustomerContact, customerPayload, pushItem, itemPayload, markInactive,
   // D-257 Phase 2: Domestic Trade invoices and the Division tag.
   divisionTags, domesticInvoicePayload, pushDomesticInvoice,
+  // D-257 Phase 3: imports (supplier bill, customs duty bill, IGST credit journal).
+  IMPORT_ACCOUNTS, importBillPayload, customsDutyBillPayload, importIgstCreditJournalPayload, pushImport,
 };

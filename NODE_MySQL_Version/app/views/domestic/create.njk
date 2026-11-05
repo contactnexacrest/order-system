@@ -1,10 +1,11 @@
 {# Owner decision D-257 Phase 2: a new Domestic Trade (DOM) order — the buyer, its GST registration and the place of supply. #}
 <div class="card page-wide">
-  <h1>New domestic order</h1>
+  {% set imp = (code == 'IMP') %}
+  <h1>{{ 'New local sale (from stock)' if imp else 'New domestic order' }}</h1>
   {% if not active %}
-    <p class="muted" data-testid="dom-not-active">Domestic Trade is not active yet. The MD activates it in Admin › Divisions when it is ready.</p>
+    <p class="muted" data-testid="dom-not-active">{{ 'Import & Distribution' if imp else 'Domestic Trade' }} is not active yet. The MD activates it in Admin › Divisions when it is ready.</p>
   {% else %}
-  <p class="muted">A sale to a reseller in India, in rupees, with GST. Same state as NexaCrest: CGST + SGST; another state: IGST.</p>
+  <p class="muted">{{ 'A sale of imported stock to a reseller in India' if imp else 'A sale to a reseller in India' }}, in rupees, with GST. Same state as NexaCrest: CGST + SGST; another state: IGST.</p>
   <form method="post" action="/domestic/orders" class="field-grid" data-testid="dom-create-form">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
     <label>Client *
@@ -32,7 +33,7 @@
     <label>Delivery address<textarea name="delivery_address" rows="3" maxlength="1000" placeholder="e.g. Plot 12, KIADB Industrial Area, Hosur Road, Bengaluru 560099">{{ old.delivery_address }}</textarea></label>
     <label>Payment terms (days)<input type="number" name="payment_terms_days" min="0" max="365" step="1" value="{{ old.payment_terms_days }}" placeholder="e.g. {{ defaultTerms }}"></label>
     <label>Buyer's PO number<input type="text" name="buyer_po_ref" maxlength="80" value="{{ old.buyer_po_ref }}" placeholder="e.g. PO/2026/118"></label>
-    <p><button type="submit" class="btn">Create domestic order</button></p>
+    <p><button type="submit" class="btn">{{ 'Create local sale' if imp else 'Create domestic order' }}</button></p>
   </form>
   {% endif %}
 </div>

@@ -109,6 +109,7 @@ $departments = new \App\Controllers\DepartmentController();
 $departmentAdmin = new \App\Controllers\DepartmentAdminController();
 $divisions = new \App\Controllers\DivisionController(); // D-257
 $domestic = new \App\Controllers\DomesticOrderController(); // D-257 Phase 2
+$imports = new \App\Controllers\ImportController(); // D-257 Phase 3
 $gstRates = new \App\Controllers\GstRateController(); // D-257 Phase 2
 $purchasing = new \App\Controllers\PurchasingController();
 $coordination = new \App\Controllers\CoordinationController();
@@ -495,6 +496,27 @@ $router->post('/domestic/orders/{id}/payments', [$domestic, 'recordPayment'], [S
 $router->post('/domestic/orders/{id}/documents', [$domestic, 'generate'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
 $router->post('/clients/{id}/gst', [$domestic, 'saveClientGst'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
 $router->post('/domestic/orders/{id}/zoho', [$domestic, 'pushZoho'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
+// Owner decision D-257 Phase 3 (5 Nov 2026): Import & Distribution — imports, landed cost, stock, duty rates.
+// /import/… belongs to the module "Import, stock and landed cost" (on for IMP only).
+$router->get('/import', [$imports, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices')]);
+$router->get('/import/create', [$imports, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing')]);
+$router->get('/import/reports', [$imports, 'reports'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices')]);
+$router->post('/import', [$imports, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->get('/import/{id}', [$imports, 'show'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices')]);
+$router->post('/import/{id}/po', [$imports, 'saveHeader'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/import/{id}/po-document', [$imports, 'poDocument'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices'), CsrfCheck::verify()]);
+$router->post('/import/{id}/lines', [$imports, 'addLine'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/import/{id}/lines/{lineId}/delete', [$imports, 'removeLine'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/import/{id}/lc', [$imports, 'saveLc'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/import/{id}/bl', [$imports, 'saveShipment'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/import/{id}/clearance', [$imports, 'saveClearance'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/import/{id}/igst-credit', [$imports, 'igstCredit'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/import/{id}/payments', [$imports, 'recordPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
+$router->post('/import/{id}/advance', [$imports, 'advance'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/import/{id}/zoho', [$imports, 'pushZoho'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
+$router->get('/admin/import-duty-rates', [$imports, 'dutyRates'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions')]);
+$router->post('/admin/import-duty-rates', [$imports, 'storeDutyRate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+$router->post('/admin/import-duty-rates/{id}/toggle', [$imports, 'toggleDutyRate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 
 $router->get('/admin/permissions', [$permissionAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
 $router->post('/admin/permissions/grant', [$permissionAdmin, 'grantOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);

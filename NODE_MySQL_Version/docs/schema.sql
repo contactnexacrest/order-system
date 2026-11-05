@@ -5732,3 +5732,182 @@ CREATE TABLE domestic_counters (
   last_no  INT NOT NULL DEFAULT 0,
   PRIMARY KEY (series, fy)
 ) ENGINE=InnoDB;
+
+-- ================================================================
+-- Owner decision D-257 Phase 3 (5 Nov 2026): the Import & Distribution
+-- division (IMP) — import goods into India in a foreign currency, clear
+-- them through customs, hold them in stock and sell them locally to Indian
+-- resellers with GST. Built now, used only once the owner activates IMP in
+-- Admin > Divisions; until then no screen changes for anyone.
+--
+--   import PO (foreign currency) > shipped (BL) > cleared (bill of entry,
+--   duty) > received into stock > closed
+--
+-- NexaCrest is the LC applicant here (the reverse of Export). Landed cost
+-- per item = purchase x exchange rate + freight + insurance + basic customs
+-- duty + social welfare surcharge + CHA + port + other charges, spread by
+-- value; IGST paid on import is input credit, so it is not a cost. The local
+-- sale reuses the Domestic Trade order (GST tax invoice, challan, e-way bill,
+-- payments) under IMP's own numbers. Duty rates are editable starting values,
+-- to be confirmed by the CA and the customs agent.
+-- ================================================================
+-- Customs duty per HSN (the longest matching start of the HSN wins); without
+-- a match the IMP settings imp_default_bcd_pct / _sws_pct / _igst_pct apply.
+CREATE TABLE import_duty_rates (
+  id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hsn_prefix   VARCHAR(8) NOT NULL,
+  bcd_pct      DECIMAL(5,2) NOT NULL,
+  sws_pct      DECIMAL(5,2) NOT NULL DEFAULT 10.00,
+  igst_pct     DECIMAL(5,2) NOT NULL,
+  note         VARCHAR(255) NULL,
+  is_active    TINYINT(1) NOT NULL DEFAULT 1,
+  updated_by   BIGINT UNSIGNED NULL,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_import_duty_hsn (hsn_prefix),
+  CONSTRAINT fk_import_duty_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- One import: the PO to the foreign supplier, the LC (NexaCrest as
+-- applicant), the inbound shipment, the bill of entry and its duty, the
+-- charges in INR, and the frozen landed cost once cleared.
+CREATE TABLE import_shipments (
+  id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  division_id       BIGINT UNSIGNED NOT NULL,
+  reference         VARCHAR(30) NOT NULL,
+  stage             ENUM('ordered','shipped','cleared','received','closed') NOT NULL DEFAULT 'ordered',
+  supplier_name     VARCHAR(255) NOT NULL,
+  supplier_country  VARCHAR(80) NOT NULL,
+  supplier_address  TEXT NULL,
+  currency_code     CHAR(3) NOT NULL,
+  incoterm          VARCHAR(10) NULL,
+  po_date           DATE NOT NULL,
+  payment_terms     VARCHAR(255) NULL,
+  ipo_generated_at  DATETIME NULL,
+  lc_no             VARCHAR(40) NULL,
+  lc_bank           VARCHAR(150) NULL,
+  lc_amount_fc      DECIMAL(14,2) NULL,
+  lc_expiry         DATE NULL,
+  lc_margin_inr     DECIMAL(14,2) NULL,
+  bl_no             VARCHAR(40) NULL,
+  bl_date           DATE NULL,
+  vessel            VARCHAR(100) NULL,
+  port_of_loading   VARCHAR(100) NULL,
+  port_code         VARCHAR(6) NULL,
+  cha_name          VARCHAR(150) NULL,
+  boe_no            VARCHAR(20) NULL,
+  boe_date          DATE NULL,
+  customs_fx_rate   DECIMAL(12,4) NULL,
+  clearance_date    DATE NULL,
+  freight_inr       DECIMAL(14,2) NOT NULL DEFAULT 0,
+  insurance_inr     DECIMAL(14,2) NOT NULL DEFAULT 0,
+  cha_inr           DECIMAL(14,2) NOT NULL DEFAULT 0,
+  port_inr          DECIMAL(14,2) NOT NULL DEFAULT 0,
+  other_inr         DECIMAL(14,2) NOT NULL DEFAULT 0,
+  value_total_inr   DECIMAL(14,2) NULL,
+  assessable_total  DECIMAL(14,2) NULL,
+  bcd_total         DECIMAL(14,2) NULL,
+  sws_total         DECIMAL(14,2) NULL,
+  igst_total        DECIMAL(14,2) NULL,
+  landed_total      DECIMAL(14,2) NULL,
+  igst_credit_on    DATE NULL,
+  received_on       DATE NULL,
+  zoho_bill_id      VARCHAR(50) NULL,
+  zoho_duty_bill_id VARCHAR(50) NULL,
+  created_by        BIGINT UNSIGNED NULL,
+  updated_by        BIGINT UNSIGNED NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_import_shipments_ref (reference),
+  KEY idx_import_shipments_division (division_id, stage),
+  CONSTRAINT fk_import_shipments_division FOREIGN KEY (division_id) REFERENCES divisions(id),
+  CONSTRAINT fk_import_shipments_created FOREIGN KEY (created_by) REFERENCES users(id),
+  CONSTRAINT fk_import_shipments_updated FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- The items of an import, priced in the supplier's currency. Duty and the
+-- landed cost are worked out and frozen when the shipment is cleared.
+CREATE TABLE import_shipment_lines (
+  id               BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  shipment_id      BIGINT UNSIGNED NOT NULL,
+  line_no          INT NOT NULL,
+  product_id       BIGINT UNSIGNED NOT NULL,
+  description      VARCHAR(500) NOT NULL,
+  hsn_code         VARCHAR(10) NOT NULL,
+  quantity         DECIMAL(14,3) NOT NULL,
+  unit             VARCHAR(20) NOT NULL,
+  unit_price_fc    DECIMAL(14,2) NOT NULL,
+  bcd_pct          DECIMAL(5,2) NOT NULL,
+  sws_pct          DECIMAL(5,2) NOT NULL,
+  igst_pct         DECIMAL(5,2) NOT NULL,
+  value_inr        DECIMAL(14,2) NULL,
+  assessable_inr   DECIMAL(14,2) NULL,
+  bcd_inr          DECIMAL(14,2) NULL,
+  sws_inr          DECIMAL(14,2) NULL,
+  igst_inr         DECIMAL(14,2) NULL,
+  landed_inr       DECIMAL(14,2) NULL,
+  landed_unit_inr  DECIMAL(14,4) NULL,
+  is_active        TINYINT(1) NOT NULL DEFAULT 1,
+  created_by       BIGINT UNSIGNED NULL,
+  created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_isl_shipment (shipment_id),
+  CONSTRAINT fk_isl_shipment FOREIGN KEY (shipment_id) REFERENCES import_shipments(id),
+  CONSTRAINT fk_isl_product FOREIGN KEY (product_id) REFERENCES products(id),
+  CONSTRAINT fk_isl_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Money paid abroad to the supplier (advance, balance, LC retirement). The
+-- description is built by the app from the facts (rule D-212) and the
+-- SWIFT / UTR reference is required.
+CREATE TABLE import_payments (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  shipment_id     BIGINT UNSIGNED NOT NULL,
+  paid_on         DATE NOT NULL,
+  kind            ENUM('advance','balance','lc') NOT NULL,
+  amount_fc       DECIMAL(14,2) NOT NULL,
+  fx_rate         DECIMAL(12,4) NOT NULL,
+  amount_inr      DECIMAL(14,2) NOT NULL,
+  bank_reference  VARCHAR(60) NOT NULL,
+  description     VARCHAR(500) NOT NULL,
+  note            VARCHAR(255) NULL,
+  recorded_by     BIGINT UNSIGNED NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_ip_shipment (shipment_id),
+  CONSTRAINT fk_ip_shipment FOREIGN KEY (shipment_id) REFERENCES import_shipments(id),
+  CONSTRAINT fk_ip_user FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Stock on hand per division and product, valued at weighted average cost
+-- (landed cost). It never goes below zero: an issue locks the row first.
+CREATE TABLE stock_balances (
+  division_id  BIGINT UNSIGNED NOT NULL,
+  product_id   BIGINT UNSIGNED NOT NULL,
+  qty_on_hand  DECIMAL(14,3) NOT NULL DEFAULT 0,
+  value_inr    DECIMAL(16,2) NOT NULL DEFAULT 0,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (division_id, product_id),
+  CONSTRAINT fk_stock_balances_division FOREIGN KEY (division_id) REFERENCES divisions(id),
+  CONSTRAINT fk_stock_balances_product FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB;
+
+-- Every movement into or out of stock: a receipt from an import, an issue
+-- to a local sale.
+CREATE TABLE stock_movements (
+  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  division_id    BIGINT UNSIGNED NOT NULL,
+  product_id     BIGINT UNSIGNED NOT NULL,
+  moved_on       DATE NOT NULL,
+  kind           ENUM('receipt','issue') NOT NULL,
+  quantity       DECIMAL(14,3) NOT NULL,
+  value_inr      DECIMAL(16,2) NOT NULL,
+  shipment_id    BIGINT UNSIGNED NULL,
+  order_id       BIGINT UNSIGNED NULL,
+  note           VARCHAR(255) NULL,
+  created_by     BIGINT UNSIGNED NULL,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_stock_movements_product (division_id, product_id, moved_on),
+  CONSTRAINT fk_stock_movements_division FOREIGN KEY (division_id) REFERENCES divisions(id),
+  CONSTRAINT fk_stock_movements_product FOREIGN KEY (product_id) REFERENCES products(id),
+  CONSTRAINT fk_stock_movements_shipment FOREIGN KEY (shipment_id) REFERENCES import_shipments(id),
+  CONSTRAINT fk_stock_movements_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_stock_movements_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;

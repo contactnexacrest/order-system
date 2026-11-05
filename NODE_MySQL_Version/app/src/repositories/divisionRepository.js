@@ -76,12 +76,28 @@ async function preflight(divisionId) {
     const ds = divisionService;
     items.push({ label: 'Export-only modules switched off (export shipping, LUT, benefits)', ok: !(await ds.moduleEnabledFor(divisionId, 'export_shipping')) && !(await ds.moduleEnabledFor(divisionId, 'lut_igst')) && !(await ds.moduleEnabledFor(divisionId, 'export_benefits')), help: 'Untick them under Modules.' });
   }
+  // D-257 Phase 3: what Import & Distribution needs before its first import and local sale.
+  if (division && division.code === 'IMP') {
+    const G = require('../services/gstCalculator');
+    const I = require('../services/importService');
+    const company = require('./companySettingsRepository');
+    const gstin = String((await company.companyValue('gstin')) || '');
+    const iec = String((await company.companyValue('iec_pan')) || '').trim();
+    const ds = divisionService;
+    items.push({ label: "NexaCrest's IEC is set (the importer of record)", ok: iec !== '' && !iec.toUpperCase().includes('PLACEHOLDER'), help: 'Settings: enter the Import Export Code.' });
+    items.push({ label: "NexaCrest's GSTIN is valid (IGST credit and local sales)", ok: G.isValidGstin(gstin), help: 'Settings: enter the company GSTIN.' });
+    items.push({ label: 'AD bank for import LCs set', ok: (await I.setting('imp_lc_bank')) !== '', help: 'Division setting imp_lc_bank (the bank that opens LCs and remits abroad).' });
+    items.push({ label: 'Customs agent (CHA) set', ok: (await I.setting('imp_default_cha')) !== '', help: 'Division setting imp_default_cha.' });
+    items.push({ label: 'Import duty rates set (confirm them with the CA and the customs agent)', ok: (await require('./importRepository').dutyRates(true)).length > 0, help: 'Admin › Import duty rates.' });
+    items.push({ label: 'Import, stock and landed cost module on; export-only modules off', ok: (await ds.moduleEnabledFor(divisionId, 'import_stock')) && !(await ds.moduleEnabledFor(divisionId, 'export_shipping')) && !(await ds.moduleEnabledFor(divisionId, 'lut_igst')) && !(await ds.moduleEnabledFor(divisionId, 'export_benefits')), help: 'Tick and untick them under Modules.' });
+  }
   return items;
 }
 
 /** D-257 Phase 2: the starting departments of a planned division, created on request from Admin › Divisions. */
 const STARTER_DEPARTMENTS = {
   DOM: [['DOM_SALES', 'Domestic Sales', '#2D7D56'], ['DOM_PURCHASE', 'Domestic Purchase', '#1D6FA8'], ['DOM_DISPATCH', 'Domestic Dispatch', '#8A5A00']],
+  IMP: [['IMP_PURCHASE', 'Import Purchase', '#1D6FA8'], ['IMP_WAREHOUSE', 'Warehouse', '#8A5A00'], ['IMP_SALES', 'Distribution Sales', '#2D7D56']],
 };
 
 /** Creates the division's starting departments that do not exist yet; returns how many were made. */

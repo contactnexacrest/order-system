@@ -1,0 +1,178 @@
+{# Owner decision D-257 Phase 3: one import — stages, import PO and lines, LC (NexaCrest as applicant), BL, customs clearance and duty, landed cost, stock, supplier payments. #}
+{% set cur = s.currency_code %}
+<div class="card page-wide" data-testid="imp-show">
+  <p><a href="/import">&larr; Imports</a></p>
+  <h1>{{ s.reference }} <span class="badge">{{ stageLabel }}</span></h1>
+  <p class="muted">{{ s.supplier_name }} · {{ s.supplier_country }} · in {{ cur }}{% if s.incoterm %} · {{ s.incoterm }}{% endif %}</p>
+
+  <ol class="stage-strip" data-testid="imp-stages" style="display:flex;flex-wrap:wrap;gap:6px 18px;padding-left:18px;">
+    {% for st in stages %}<li{% if st.cls == 'current' %} style="font-weight:700"{% elif st.cls == 'done' %} style="color:#2D7D56"{% else %} style="color:#8A94A6"{% endif %}>{{ st.label }}</li>{% endfor %}
+  </ol>
+
+  {% if next %}
+  <div class="section" data-testid="imp-next">
+    {% if blockers.length %}
+      <p><strong>Before moving on to {{ nextLabel }}:</strong></p>
+      <ul>{% for b in blockers %}<li>{{ b }}</li>{% endfor %}</ul>
+    {% elif canEdit %}
+      <form method="post" action="/import/{{ id }}/advance"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="from_stage" value="{{ stage }}">
+        <button type="submit" class="btn">Move on to {{ nextLabel }}</button>
+        {% if next == 'cleared' %}<small class="muted">This works out the duty and the landed cost per item and freezes them.</small>{% endif %}
+        {% if next == 'received' %}<small class="muted">This puts the goods into stock at their landed cost.</small>{% endif %}
+      </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="section" id="imp-po">
+    <h2>Import PO</h2>
+    {% if canEdit and stage == 'ordered' %}
+    <form method="post" action="/import/{{ id }}/po" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Supplier *<input type="text" name="supplier_name" required maxlength="255" value="{{ s.supplier_name }}" placeholder="e.g. Xiamen Stone Industries Co., Ltd."></label>
+      <label>Country *<input type="text" name="supplier_country" required maxlength="80" value="{{ s.supplier_country }}" placeholder="e.g. China"></label>
+      <label>Supplier address<textarea name="supplier_address" rows="2" maxlength="1000" placeholder="e.g. No. 8 Shuitou Road, Nan'an, Fujian 362342">{{ s.supplier_address }}</textarea></label>
+      <label>Currency *<select name="currency_code" required><option value="">Choose…</option>{% for c in currencies %}<option value="{{ c }}" {{ 'selected' if cur == c else '' }}>{{ c }}</option>{% endfor %}</select></label>
+      <label>Incoterm<select name="incoterm"><option value="">—</option>{% for t in incoterms %}<option value="{{ t }}" {{ 'selected' if s.incoterm == t else '' }}>{{ t }}</option>{% endfor %}</select></label>
+      <label>PO date *<input type="date" name="po_date" required max="{{ today }}" value="{{ s.po_date }}"></label>
+      <label>Payment terms<input type="text" name="payment_terms" maxlength="255" value="{{ s.payment_terms }}" placeholder="e.g. 30% advance by TT, 70% by LC at sight"></label>
+      <p><button type="submit" class="btn-secondary">Save</button></p>
+    </form>
+    {% else %}
+    <p>PO date {{ s.po_date }} · Payment {{ s.payment_terms or '—' }}</p>
+    {% endif %}
+    <form method="post" action="/import/{{ id }}/po-document" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-secondary">Download import PO (PDF)</button></form>
+    <span class="muted">{% if s.ipo_generated_at %}Generated {{ s.ipo_generated_at }}.{% else %}Not generated yet.{% endif %}</span>
+  </div>
+
+  <div class="section" id="imp-lines">
+    <h2>Lines and landed cost</h2>
+    <table class="list" data-testid="imp-lines">
+      <tr><th>#</th><th>Product</th><th>HSN</th><th>Qty</th><th>Unit</th><th>Price {{ cur }}</th><th>Amount {{ cur }}</th><th>Duty %</th>
+        <th>Assessable ₹</th><th>Duty ₹</th><th>IGST ₹</th><th>Landed ₹</th><th>Per unit ₹</th><th>Suggested price ₹</th><th></th></tr>
+      {% for l in lines %}
+      <tr>
+        <td>{{ loop.index }}</td><td>{{ l.product_name }}<br><small class="muted">{{ l.description }}</small></td><td>{{ l.hsn_code }}</td>
+        <td>{{ l.qty_fmt }}</td><td>{{ l.unit }}</td><td>{{ l.price_fmt }}</td><td>{{ l.value_fc_fmt }}</td>
+        <td><small>BCD {{ l.bcd_pct_fmt }} · SWS {{ l.sws_pct_fmt }} · IGST {{ l.igst_pct_fmt }}</small></td>
+        {% if cleared %}
+        <td>{{ l.assessable_fmt }}</td><td>{{ l.duty_fmt }}</td><td>{{ l.igst_fmt }}</td>
+        <td>{{ l.landed_fmt }}</td><td>{{ l.landed_unit_inr }}</td><td>{{ l.suggested_fmt }}</td>
+        {% else %}<td colspan="6" class="muted">After customs clearance</td>{% endif %}
+        <td>{% if canEdit and stage == 'ordered' %}<form method="post" action="/import/{{ id }}/lines/{{ l.id }}/delete" data-confirm="Remove this line?"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-link">Remove</button></form>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      {% if lines.length == 0 %}<tr><td colspan="15" class="muted">No lines yet.</td></tr>{% endif %}
+    </table>
+    <p data-testid="imp-totals">PO value {{ cur }} {{ totals.value_fc }}
+      {% if cleared %} · at ₹{{ s.customs_fx_rate }} = ₹{{ totals.value_inr }} · assessable ₹{{ totals.assessable }}
+      · basic duty ₹{{ totals.bcd }} · SWS ₹{{ totals.sws }} · IGST ₹{{ totals.igst }} (input credit, not a cost)
+      · charges ₹{{ totals.charges }} · <strong>landed cost ₹{{ totals.landed }}</strong>{{ ' (frozen at clearance)' if frozen else ' (estimate until cleared)' }}{% endif %}</p>
+    <p class="muted">Suggested selling price = landed cost per unit ÷ (1 − {{ margin }}% margin), before GST (Import &amp; Distribution setting <code>imp_margin_pct</code>).</p>
+    {% if canEdit and stage == 'ordered' %}
+    <form method="post" action="/import/{{ id }}/lines" class="field-grid" data-testid="imp-add-line">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Product *<select name="product_id" required><option value="">Choose…</option>{% for p in products %}<option value="{{ p.id }}">{{ p.name }} ({{ p.product_code }})</option>{% endfor %}</select></label>
+      <label>Description<input type="text" name="description" maxlength="500" placeholder="blank = the product's name"></label>
+      <label>HSN<input type="text" name="hsn_code" minlength="4" maxlength="8" pattern="[0-9]{4,8}" placeholder="blank = the product's HS code"></label>
+      <label>Quantity *<input type="number" name="quantity" required min="0.001" step="0.001" placeholder="e.g. 500"></label>
+      <label>Unit *<input type="text" name="unit" required maxlength="20" placeholder="e.g. SQM"></label>
+      <label>Unit price {{ cur }} *<input type="number" name="unit_price_fc" required min="0.01" step="0.01" placeholder="e.g. 18.50"></label>
+      <label>Basic duty %<input type="number" name="bcd_pct" min="0" max="150" step="0.01" placeholder="blank = from the duty rates"></label>
+      <label>SWS %<input type="number" name="sws_pct" min="0" max="150" step="0.01" placeholder="blank = from the duty rates"></label>
+      <label>IGST %<input type="number" name="igst_pct" min="0" max="150" step="0.01" placeholder="blank = from the duty rates"></label>
+      <p><button type="submit" class="btn-secondary">Add line</button></p>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="section" id="imp-lc">
+    <h2>Letter of credit (NexaCrest as applicant)</h2>
+    {% if s.lc_no %}<p>LC {{ s.lc_no }} · {{ s.lc_bank }} · {{ cur }} {{ lcAmountFmt }} · expires {{ s.lc_expiry }}{% if lcMarginFmt %} · margin money ₹{{ lcMarginFmt }}{% endif %}</p>{% else %}<p class="muted">No LC recorded (not every import uses one).</p>{% endif %}
+    {% if canEdit and stage != 'closed' %}
+    <form method="post" action="/import/{{ id }}/lc" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>LC number *<input type="text" name="lc_no" required maxlength="40" value="{{ s.lc_no }}" placeholder="e.g. 0123ILC000456"></label>
+      <label>Opening bank *<input type="text" name="lc_bank" required maxlength="150" value="{{ lcBankDefault }}" placeholder="e.g. State Bank of India, Bengaluru"></label>
+      <label>Amount {{ cur }} *<input type="number" name="lc_amount_fc" required min="0.01" step="0.01" value="{{ s.lc_amount_fc }}" placeholder="e.g. 9250.00"></label>
+      <label>Expiry *<input type="date" name="lc_expiry" required value="{{ s.lc_expiry }}"></label>
+      <label>Margin money ₹<input type="number" name="lc_margin_inr" min="0" step="0.01" value="{{ s.lc_margin_inr }}" placeholder="e.g. 77000.00"></label>
+      <p><button type="submit" class="btn-secondary">Save LC</button></p>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="section" id="imp-shipment">
+    <h2>Shipment</h2>
+    {% if canEdit and (stage == 'ordered' or stage == 'shipped') %}
+    <form method="post" action="/import/{{ id }}/bl" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>BL number *<input type="text" name="bl_no" required maxlength="40" value="{{ s.bl_no }}" placeholder="e.g. COSU6234567890"></label>
+      <label>BL date *<input type="date" name="bl_date" required value="{{ s.bl_date }}"></label>
+      <label>Vessel<input type="text" name="vessel" maxlength="100" value="{{ s.vessel }}" placeholder="e.g. COSCO Shipping Leo / 041W"></label>
+      <label>Port of loading<input type="text" name="port_of_loading" maxlength="100" value="{{ s.port_of_loading }}" placeholder="e.g. Xiamen, China"></label>
+      <p><button type="submit" class="btn-secondary">Save BL</button></p>
+    </form>
+    {% else %}<p>BL {{ s.bl_no or '—' }} dated {{ s.bl_date or '—' }} · {{ s.vessel or '—' }} · from {{ s.port_of_loading or '—' }}</p>{% endif %}
+  </div>
+
+  {% if stage != 'ordered' %}
+  <div class="section" id="imp-clearance">
+    <h2>Customs clearance</h2>
+    {% if canEdit and stage == 'shipped' %}
+    <form method="post" action="/import/{{ id }}/clearance" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Bill of entry number *<input type="text" name="boe_no" required minlength="6" maxlength="8" pattern="[0-9]{6,8}" value="{{ s.boe_no }}" placeholder="e.g. 4567891"></label>
+      <label>Bill of entry date *<input type="date" name="boe_date" required value="{{ s.boe_date }}"></label>
+      <label>Port code *<input type="text" name="port_code" required maxlength="6" pattern="[Ii][Nn][A-Za-z0-9]{4}" value="{{ s.port_code }}" placeholder="e.g. INNSA1"></label>
+      <label>Customs agent (CHA) *<input type="text" name="cha_name" required maxlength="150" value="{{ chaDefault }}" placeholder="e.g. Speedways Clearing Agency"></label>
+      <label>Customs exchange rate (₹ per {{ cur }}) *<input type="number" name="customs_fx_rate" required min="0.0001" max="999.9999" step="0.0001" value="{{ s.customs_fx_rate }}" placeholder="e.g. 84.6500"></label>
+      <label>Clearance date *<input type="date" name="clearance_date" required max="{{ today }}" value="{{ s.clearance_date }}"></label>
+      <label>Freight ₹<input type="number" name="freight_inr" min="0" step="0.01" value="{{ s.freight_inr }}" placeholder="e.g. 85000.00"></label>
+      <label>Insurance ₹<input type="number" name="insurance_inr" min="0" step="0.01" value="{{ s.insurance_inr }}" placeholder="e.g. 4200.00"></label>
+      <label>CHA charges ₹<input type="number" name="cha_inr" min="0" step="0.01" value="{{ s.cha_inr }}" placeholder="e.g. 18000.00"></label>
+      <label>Port and terminal charges ₹<input type="number" name="port_inr" min="0" step="0.01" value="{{ s.port_inr }}" placeholder="e.g. 22000.00"></label>
+      <label>Other charges ₹<input type="number" name="other_inr" min="0" step="0.01" value="{{ s.other_inr }}" placeholder="e.g. 6500.00"></label>
+      <p><button type="submit" class="btn-secondary">Save clearance</button></p>
+    </form>
+    <p class="muted">Freight and insurance make the assessable value with the goods; basic duty is on the assessable value, SWS on the duty, IGST on all three. Duty rates: Admin › Import duty rates (to be confirmed by the CA and the customs agent).</p>
+    {% else %}
+    <p>Bill of entry {{ s.boe_no or '—' }} dated {{ s.boe_date or '—' }} at {{ s.port_code or '—' }} · CHA {{ s.cha_name or '—' }} · rate ₹{{ s.customs_fx_rate or '—' }} · cleared {{ s.clearance_date or '—' }}{% if s.received_on %} · in stock {{ s.received_on }}{% endif %}</p>
+    {% endif %}
+    {% if stage == 'cleared' or stage == 'received' or stage == 'closed' %}
+      <p data-testid="imp-igst">IGST paid on import ₹{{ igstFmt }}: {% if s.igst_credit_on %}taken as input credit on {{ s.igst_credit_on }}.{% else %}input credit not taken yet.{% endif %}</p>
+      {% if canEdit and (stage == 'cleared' or stage == 'received') and not s.igst_credit_on %}
+      <form method="post" action="/import/{{ id }}/igst-credit" class="field-grid"><input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>IGST credit taken on *<input type="date" name="igst_credit_on" required max="{{ today }}"></label>
+        <p><button type="submit" class="btn-secondary">Record IGST credit</button></p>
+      </form>
+      {% endif %}
+      {% if canZoho %}
+      <form method="post" action="/import/{{ id }}/zoho"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-secondary">{{ 'Send to Zoho Books again' if s.zoho_bill_id else 'Send to Zoho Books' }}</button></form>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="section" id="imp-payments">
+    <h2>Payments to the supplier</h2>
+    <table class="list" data-testid="imp-payments">
+      <tr><th>Paid</th><th>What</th><th>Amount</th><th>Rate</th><th>₹</th><th>Bank reference</th><th>Description</th></tr>
+      {% for p in payments %}<tr><td>{{ p.paid_on }}</td><td>{{ p.kind_label }}</td><td>{{ cur }} {{ p.amount_fmt }}</td><td>{{ p.fx_rate }}</td><td>{{ p.inr_fmt }}</td><td>{{ p.bank_reference }}</td><td>{{ p.description }}</td></tr>{% endfor %}
+      {% if payments.length == 0 %}<tr><td colspan="7" class="muted">None yet.</td></tr>{% endif %}
+    </table>
+    <p>Paid {{ cur }} {{ paidFmt }} of {{ poFmt }}.</p>
+    {% if canPay and stage != 'closed' %}
+    <form method="post" action="/import/{{ id }}/payments" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>What *<select name="kind" required><option value="">Choose…</option>{% for k in paymentKinds %}<option value="{{ k.key }}">{{ k.label }}</option>{% endfor %}</select></label>
+      <label>Paid on *<input type="date" name="paid_on" required max="{{ today }}"></label>
+      <label>Amount {{ cur }} *<input type="number" name="amount_fc" required min="0.01" step="0.01" placeholder="e.g. 2775.00"></label>
+      <label>Bank's rate (₹ per {{ cur }}) *<input type="number" name="fx_rate" required min="0.0001" max="999.9999" step="0.0001" placeholder="e.g. 84.9200"></label>
+      <label>SWIFT / UTR reference *<input type="text" name="bank_reference" required maxlength="60" placeholder="e.g. SBININBB123 OUTWARD 556677"></label>
+      <label>Note<input type="text" name="note" maxlength="255" placeholder="e.g. 30% advance against proforma"></label>
+      <p><button type="submit" class="btn-secondary">Record payment</button></p>
+    </form>
+    {% endif %}
+  </div>
+</div>

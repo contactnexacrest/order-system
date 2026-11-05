@@ -287,7 +287,9 @@ final class OrderController
     {
         // Owner decision D-257 Phase 2: someone working in Domestic Trade creates a domestic order.
         $__dom = \App\Services\DomesticOrderService::divisionId();
-        if ($__dom !== null && \App\Services\DivisionService::currentId() === $__dom) {
+        $__imp = \App\Services\DomesticOrderService::divisionId('IMP'); // D-257 Phase 3: Import & Distribution sells through the same form
+        $__cur = \App\Services\DivisionService::currentId();
+        if ($__cur !== null && ($__cur === $__dom || $__cur === $__imp)) {
             header('Location: /domestic/orders/create');
             return;
         }
@@ -419,7 +421,9 @@ final class OrderController
         $__inr = Database::connection()->prepare("SELECT 1 FROM currencies WHERE id = :id AND code = 'INR'");
         $__inr->execute(['id' => $currencyId]);
         $__domId = \App\Services\DomesticOrderService::divisionId();
-        if ($__inr->fetchColumn() !== false || ($__domId !== null && (int) ($_POST['division_id'] ?? 0) === $__domId)) {
+        $__impId = \App\Services\DomesticOrderService::divisionId('IMP');
+        $__postedDivision = (int) ($_POST['division_id'] ?? 0);
+        if ($__inr->fetchColumn() !== false || ($__domId !== null && $__postedDivision === $__domId) || ($__impId !== null && $__postedDivision === $__impId)) {
             Flash::set('error', 'Orders in rupees belong to Domestic Trade: use New domestic order.');
             Flash::setOld($_POST);
             header('Location: /orders/create?client_id=' . $clientId);

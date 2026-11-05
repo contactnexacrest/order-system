@@ -402,6 +402,8 @@ final class DivisionService
         'ecgc'              => ['ECGC', []],
         'associates'        => ['Associates, price requests and pricing', ['#^/associates(?:/|$)#', '#^/reports/associates(?:/|$)#']],
         'team_incentive'    => ['Team incentive and CAFIN', ['#^/incentives(?:/|$)#', '#^/my-incentives(?:/|$)#', '#^/reports/incentives(?:/|$)#']],
+        // D-257 Phase 3: imports, landed cost and stock — on for Import & Distribution only.
+        'import_stock'      => ['Import, stock and landed cost', ['#^/import(?:/|$)#']],
     ];
 
     /** Whether a module is on for the current scope ("All" = on in any active division). */

@@ -2493,3 +2493,34 @@ JOIN (SELECT 'company' AS scope, 'dom_default_gst_rate' AS k, '18' AS v
       UNION ALL SELECT 'pricing', 'pricing_fx_rate', '1.0000'
       UNION ALL SELECT 'incentive', 'program_enabled', '0') s
 WHERE d.code = 'DOM';
+
+-- ================================================================
+-- Owner decision D-257 Phase 3 (5 Nov 2026): Import & Distribution (IMP).
+-- IMP stays "planned" — nothing here is visible until the owner activates it.
+-- Duty rates and the margin are starting values, TO BE CONFIRMED BY THE CA
+-- AND THE CUSTOMS AGENT.
+-- ================================================================
+-- The import, stock and landed-cost module: on for IMP only.
+INSERT IGNORE INTO division_modules (division_id, module_key, is_enabled)
+SELECT d.id, 'import_stock', CASE WHEN d.code = 'IMP' THEN 1 ELSE 0 END FROM divisions d;
+
+-- Worked building / monumental stone (HSN 6802): basic customs duty, social
+-- welfare surcharge (10 % of the duty) and IGST on import.
+INSERT INTO import_duty_rates (hsn_prefix, bcd_pct, sws_pct, igst_pct, note)
+SELECT '6802', 20.00, 10.00, 18.00, 'Worked building and monumental stone (HSN 6802) — starting value, to be confirmed by the CA and the customs agent.'
+WHERE NOT EXISTS (SELECT 1 FROM import_duty_rates WHERE hsn_prefix = '6802');
+
+-- IMP's own settings (Admin > Divisions > Import & Distribution). The local
+-- sale follows the same GST rules as Domestic Trade (rate, e-way bill,
+-- e-invoicing); prices are worked out in rupees; IMP's own team-incentive
+-- programme starts off. The LC bank and the customs agent start empty: the
+-- activation check asks for them.
+INSERT IGNORE INTO division_settings (division_id, scope, setting_key, setting_value)
+SELECT d.id, s.scope, s.k, s.v FROM divisions d
+JOIN (SELECT 'company' AS scope, 'imp_default_bcd_pct' AS k, '10' AS v
+      UNION ALL SELECT 'company', 'imp_default_sws_pct', '10'
+      UNION ALL SELECT 'company', 'imp_default_igst_pct', '18'
+      UNION ALL SELECT 'company', 'imp_margin_pct', '20'
+      UNION ALL SELECT 'pricing', 'pricing_fx_rate', '1.0000'
+      UNION ALL SELECT 'incentive', 'program_enabled', '0') s
+WHERE d.code = 'IMP';

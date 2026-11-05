@@ -13,6 +13,7 @@ $planned = $division['status'] !== 'active'; ?>
     <?php if ((int) $division['id'] === DivisionService::EXPORT_ID): ?>Export keeps the company's number formats and counters exactly as they are.<?php else: ?>This division counts its own numbers, starting with its code, unless its own format below says otherwise.<?php endif; ?></p>
 
   <?php if ($division['code'] === 'DOM'): ?><p data-testid="division-gst-link"><a href="/admin/gst-rates">GST rates</a> — the GST rate per HSN for domestic sales (to be confirmed by the CA).</p><?php endif; ?>
+  <?php if ($division['code'] === 'IMP'): ?><p data-testid="division-import-links"><a href="/admin/import-duty-rates">Import duty rates</a> — basic customs duty, SWS and IGST per HSN (to be confirmed by the CA and the customs agent). Its local sales use the <a href="/admin/gst-rates">GST rates</a> of Domestic Trade.</p><?php endif; ?>
   <div class="section">
     <h2>Modules</h2>
     <form method="post" action="/admin/divisions/<?= (int) $division['id'] ?>/modules">

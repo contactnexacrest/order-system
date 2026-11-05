@@ -31,10 +31,19 @@ const orderRepository = () => require('../repositories/orderRepository');
  * Trade): the default GST rate, the e-way bill threshold, e-invoicing and the
  * payment terms — standard Indian rules as starting values, to be confirmed by
  * the CA. GST rates per HSN / category are in Admin › GST rates.
+ *
+ * D-257 Phase 3: the Import & Distribution (IMP) division sells its stock to
+ * Indian resellers through the same order: an IMP local sale is this order in
+ * the IMP division, with IMP's own numbers (IMP/26-27/0001), the same GST
+ * rules, and its goods issued from stock (importService) when the tax invoice
+ * is fixed, instead of a supplier PO.
  * Port of PHP App\Services\DomesticOrderService.
  */
 
 const CODE = 'DOM';
+
+/** D-257 Phase 3: the divisions that sell in India with this order (Domestic Trade, and Import & Distribution from stock). */
+const LOCAL_CODES = ['DOM', 'IMP'];
 
 const STAGES = {
   enquiry: 'Enquiry',
@@ -64,20 +73,40 @@ const GST_RATES = ['0.00', '0.25', '3.00', '5.00', '12.00', '18.00', '28.00', '4
 const len = (s) => [...String(s)].length;
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
 
-async function divisionId() {
-  const d = (await divisionService().all()).find((x) => x.code === CODE);
+async function divisionId(code = CODE) {
+  const d = (await divisionService().all()).find((x) => x.code === code);
   return d ? Number(d.id) : null;
 }
 
-async function isActive() {
-  const id = await divisionId();
+async function isActive(code = CODE) {
+  const id = await divisionId(code);
   const d = id !== null ? await divisionService().find(id) : null;
   return !!d && d.status === 'active';
 }
 
 async function isDomesticOrder(order) {
-  const id = await divisionId();
-  return id !== null && Number(order && order.division_id) === id;
+  for (const code of LOCAL_CODES) {
+    const id = await divisionId(code);
+    if (id !== null && Number(order && order.division_id) === id) return true;
+  }
+  return false;
+}
+
+/** The division code of a local-sale order: IMP for Import & Distribution, else DOM. */
+async function codeOfDivision(divId) {
+  const imp = await divisionId('IMP');
+  return imp !== null && divId !== null && divId !== undefined && Number(divId) === imp ? 'IMP' : CODE;
+}
+
+/** The division code of a local-sale order (by its orders row). */
+async function codeOfOrder(orderId) {
+  const order = await orderRepository().find(orderId);
+  return codeOfDivision(order ? Number(order.division_id) : null);
+}
+
+/** The counter series of a document in a division: DOM keeps its own (GTI, QT…); IMP's are IMP-GTI, IMP-QT… */
+function series(code, s) {
+  return code === CODE ? s : `${code}-${s}`;
 }
 
 async function setting(key) {
@@ -144,9 +173,10 @@ async function partyFields(input) {
 }
 
 /** Creates a DOM order. @returns {Promise<[number|null, string|null]>} */
-async function create(input, userId) {
-  const domId = await divisionId();
-  if (domId === null || !(await isActive())) return [null, 'Domestic Trade is not active yet. The MD activates it in Admin › Divisions.'];
+async function create(input, userId, code = CODE) {
+  const divCode = LOCAL_CODES.includes(code) ? code : CODE;
+  const domId = await divisionId(divCode);
+  if (domId === null || !(await isActive(divCode))) return [null, `${divCode === 'IMP' ? 'Import & Distribution' : 'Domestic Trade'} is not active yet. The MD activates it in Admin › Divisions.`];
   const client = await repo.client(parseInt(input.client_id || 0, 10));
   if (!client || Number(client.is_active) !== 1 || (!(await divisionService().allowsClient(client.id)) && !divisionService().seesAll())) {
     return [null, 'Please select a valid client.'];
@@ -200,7 +230,7 @@ async function create(input, userId) {
       return id;
     });
   });
-  await auditLogRepository.log(userId, 'DOMESTIC_ORDER_CREATED', 'orders', orderId, 'division', null, CODE);
+  await auditLogRepository.log(userId, 'DOMESTIC_ORDER_CREATED', 'orders', orderId, 'division', null, divCode);
   return [orderId, null];
 }
 
@@ -235,6 +265,8 @@ async function addLine(orderId, input, userId) {
   else if (unit === '' || len(unit) > 20) error = 'Enter the unit (e.g. SQM, PCS).';
   else if (!/^\d{1,11}(\.\d{1,2})?$/.test(rate) || G.scaled(rate, 2) <= 0n) error = 'Enter the rate in ₹ above zero (up to 2 decimals).';
   else if (gst !== '' && !GST_RATES.includes(G.money(G.scaled(gst, 2)))) error = 'The GST rate must be one of 0, 0.25, 3, 5, 12, 18, 28 or 40 %.';
+  // D-257 Phase 3: an Import & Distribution sale comes out of stock, which is kept per product.
+  else if ((await codeOfOrder(orderId)) === 'IMP' && !(await require('../repositories/importRepository').product(input.product_id || 0))) error = 'Choose the product: an Import & Distribution sale comes out of stock.';
   if (error !== null) return error;
   await repo.addLine(orderId, {
     product_id: input.product_id ? parseInt(input.product_id, 10) : null,
@@ -272,6 +304,7 @@ async function savePurchase(orderId, input, userId) {
   let error = null;
   if (!dom) error = 'Order not found.';
   else if (!['order_confirmation', 'purchase'].includes(dom.stage)) error = 'The purchase is recorded after the order confirmation and before dispatch.';
+  else if ((await codeOfOrder(orderId)) === 'IMP') error = 'An Import & Distribution sale comes out of stock: there is no supplier PO.';
   else if (name === '' || len(name) > 255) error = 'Enter the supplier.';
   else if (ref === '' || len(ref) > 80) error = 'Enter the supplier PO number.';
   if (error !== null) return error;
@@ -332,11 +365,13 @@ async function markInvoiceSent(orderId, date, userId) {
 }
 
 /** Rule D-212: what a DOM receipt is, for which order and buyer, what it settles, and the bank reference. */
-function paymentDescription(order, dom, amount, bankReference, note) {
+async function paymentDescription(order, dom, amount, bankReference, note) {
   const buyer = String(order.company_legal_name || '');
+  // D-257 Phase 3: an Import & Distribution sale is a "local sale" (of imported stock).
+  const kind = (await codeOfDivision(order.division_id)) === 'IMP' ? 'Local sale' : 'Domestic sale';
   const text = dom.tax_invoice_no
-    ? `Domestic sale receipt of ₹${G.inr(amount)} from ${buyer} against GST tax invoice ${dom.tax_invoice_no} (order ${order.order_reference}), bank ref ${bankReference}`
-    : `Domestic sale advance of ₹${G.inr(amount)} from ${buyer} against order ${order.order_reference}, bank ref ${bankReference}`;
+    ? `${kind} receipt of ₹${G.inr(amount)} from ${buyer} against GST tax invoice ${dom.tax_invoice_no} (order ${order.order_reference}), bank ref ${bankReference}`
+    : `${kind} advance of ₹${G.inr(amount)} from ${buyer} against order ${order.order_reference}, bank ref ${bankReference}`;
   const n = String(note || '').trim();
   return n !== '' ? `${text}; note: ${n}` : text;
 }
@@ -357,7 +392,7 @@ async function recordPayment(orderId, input, userId) {
   else if (await repo.bankReferenceUsed(ref)) error = 'This bank reference is already recorded. Check the payment is not entered twice.';
   else if (len(note) > 255) error = 'The note is too long.';
   if (error !== null) return error;
-  const description = paymentDescription(order, dom, amount, ref, note);
+  const description = await paymentDescription(order, dom, amount, ref, note);
   await repo.addPayment(orderId, date, amount, ref, description, note !== '' ? note : null, userId);
   await auditLogRepository.log(userId, 'DOMESTIC_PAYMENT_RECORDED', 'orders', orderId, 'amount_inr', null, amount);
   return null;
@@ -390,7 +425,11 @@ async function blockers(orderId) {
       if (!(await has('DOC'))) out.push('Generate the order confirmation.');
       break;
     case 'purchase':
-      if (!dom.supplier_po_ref) out.push('Record the supplier PO.');
+      if ((await codeOfOrder(orderId)) === 'IMP') {
+        // D-257 Phase 3: the goods come out of IMP's stock when the tax invoice is fixed.
+        const order = await orderRepository().find(orderId);
+        out.push(...(await require('./importService').stockShortfalls(Number(order.division_id), lines)));
+      } else if (!dom.supplier_po_ref) out.push('Record the supplier PO.');
       if (lines.length === 0) out.push('Add at least one line.');
       break;
     case 'dispatch':
@@ -421,7 +460,8 @@ async function fixTaxInvoice(orderId, userId, trx) {
   const date = todayIst();
   const fy = financialYear.label(date);
   const short = `${fy.slice(2, 4)}-${fy.slice(5, 7)}`;
-  const number = `DOM/${short}/${String(await repo.nextNumber('GTI', fy)).padStart(4, '0')}`;
+  const code = await codeOfOrder(orderId);
+  const number = `${code}/${short}/${String(await repo.nextNumber(series(code, 'GTI'), fy)).padStart(4, '0')}`;
   const t = await totals(orderId);
   await repo.update(orderId, {
     tax_invoice_no: number,
@@ -443,12 +483,27 @@ async function advance(orderId, expectedStage, userId) {
   const b = await blockers(orderId);
   if (b.length > 0) return b.join(' ');
   const next = STAGE_KEYS[stageIndex(dom.stage) + 1];
-  const moved = await db.transaction(async (trx) => {
-    if (!(await repo.moveStage(orderId, dom.stage, next, userId, trx))) return false;
-    if (next === 'dispatch') await fixTaxInvoice(orderId, userId, trx);
-    if (next === 'closed') await trx.execute("UPDATE orders SET status = 'complete', is_locked = 1 WHERE id = :id", { id: orderId });
-    return true;
-  });
+  let stockError = null;
+  let moved;
+  try {
+    moved = await db.transaction(async (trx) => {
+      if (!(await repo.moveStage(orderId, dom.stage, next, userId, trx))) return false;
+      if (next === 'dispatch') {
+        await fixTaxInvoice(orderId, userId, trx);
+        // D-257 Phase 3: an Import & Distribution sale takes its goods out of stock now (locked, never below zero).
+        const order = await orderRepository().find(orderId);
+        if ((await codeOfDivision(Number(order.division_id))) === 'IMP') {
+          stockError = await require('./importService').issueForSale(Number(order.division_id), orderId, String(order.order_reference), await repo.lines(orderId), userId, trx);
+          if (stockError !== null) throw new Error('stock');
+        }
+      }
+      if (next === 'closed') await trx.execute("UPDATE orders SET status = 'complete', is_locked = 1 WHERE id = :id", { id: orderId });
+      return true;
+    });
+  } catch (e) {
+    if (stockError !== null) return stockError;
+    throw e;
+  }
   if (!moved) return 'Someone has already moved this order on. The page shows where it is now.';
   await auditLogRepository.log(userId, 'DOMESTIC_STAGE_MOVED', 'orders', orderId, 'stage', dom.stage, next);
   return null;
@@ -461,8 +516,9 @@ async function documentReference(orderId, code) {
   if (existing) return String(existing.reference); // a regenerated document keeps its number
   const fy = financialYear.label(todayIst());
   const short = `${fy.slice(2, 4)}-${fy.slice(5, 7)}`;
-  const series = { DQT: 'QT', DOC: 'OC', DCH: 'DC' }[code];
-  return `DOM/${series}/${short}/${String(await repo.nextNumber(series, fy)).padStart(4, '0')}`;
+  const s = { DQT: 'QT', DOC: 'OC', DCH: 'DC' }[code];
+  const division = await codeOfOrder(orderId);
+  return `${division}/${s}/${short}/${String(await repo.nextNumber(series(division, s), fy)).padStart(4, '0')}`;
 }
 
 /** Whether a document may be generated now (its stage reached, not after closing). */
@@ -471,7 +527,7 @@ function documentAllowed(dom, code) {
 }
 
 module.exports = {
-  CODE, STAGES, STAGE_KEYS, DEFAULTS, DOCUMENTS, DOCUMENT_FROM, LINES_OPEN, GST_RATES,
+  CODE, LOCAL_CODES, codeOfDivision, codeOfOrder, STAGES, STAGE_KEYS, DEFAULTS, DOCUMENTS, DOCUMENT_FROM, LINES_OPEN, GST_RATES,
   divisionId, isActive, isDomesticOrder, setting, sellerStateCode, stageIndex, atOrAfter, gstRateFor,
   partyFields, create, saveParty, addLine, removeLine, totals, savePurchase, needsEwayBill, saveDispatch,
   markInvoiceSent, paymentDescription, recordPayment, paidTotal, blockers, advance, documentReference, documentAllowed,

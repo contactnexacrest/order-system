@@ -1476,6 +1476,176 @@ final class ZohoBooksService
         return $invoiceId;
     }
 
+    // ---------------------------------------------------------------- D-257 Phase 3: imports
+
+    /**
+     * Books accounts for an import (names to be confirmed by the CA): the goods
+     * and the customs duty go to stock (they are part of the landed cost); the
+     * IGST paid at customs is held until it is taken as input credit.
+     */
+    public const IMPORT_ACCOUNTS = [
+        'goods' => 'Inventory Asset',
+        'duty' => 'Inventory Asset',
+        'igst_paid' => 'IGST Paid on Import',
+        'igst_credit' => 'Input IGST',
+    ];
+
+    /**
+     * The foreign supplier's bill for an import (pure: no network), in the
+     * supplier's currency at the customs exchange rate. gst_treatment
+     * overseas: no GST on the bill itself (IGST is paid at customs).
+     * Rule D-212: the notes say what the bill is, from whom, for which import.
+     *
+     * @param callable(string): string $accountIdByName
+     * @return array<string,mixed>
+     */
+    public static function importBillPayload(array $s, array $lines, string $vendorId, callable $accountIdByName): array
+    {
+        $items = [];
+        foreach ($lines as $l) {
+            $items[] = [
+                'account_id' => $accountIdByName(self::IMPORT_ACCOUNTS['goods']),
+                'name' => mb_substr((string) $l['description'], 0, 100),
+                'description' => (string) $l['description'],
+                'hsn_or_sac' => (string) $l['hsn_code'],
+                'quantity' => (float) $l['quantity'],
+                'rate' => (float) $l['unit_price_fc'],
+            ];
+        }
+        $payload = [
+            'vendor_id' => $vendorId,
+            'bill_number' => (string) $s['reference'],
+            'reference_number' => (string) ($s['bl_no'] ?? ''),
+            'date' => (string) ($s['bl_date'] ?: $s['po_date']),
+            'currency_code' => (string) $s['currency_code'],
+            'exchange_rate' => (float) $s['customs_fx_rate'],
+            'gst_treatment' => 'overseas',
+            'line_items' => $items,
+            'notes' => "Import purchase from {$s['supplier_name']} ({$s['supplier_country']}) against import PO {$s['reference']}"
+                . (!empty($s['bl_no']) ? ", BL {$s['bl_no']}" : '') . (!empty($s['boe_no']) ? ", bill of entry {$s['boe_no']}" : '') . '.',
+        ];
+        if (($tags = self::divisionTags((int) $s['division_id'])) !== []) {
+            $payload['tags'] = $tags;
+        }
+        return $payload;
+    }
+
+    /**
+     * The customs duty of an import as a Books bill from Customs (pure: no
+     * network): basic customs duty and social welfare surcharge (added to the
+     * stock value) and the IGST paid on import (held for input credit).
+     *
+     * @param callable(string): string $accountIdByName
+     * @return array<string,mixed>
+     */
+    public static function customsDutyBillPayload(array $s, string $vendorId, callable $accountIdByName): array
+    {
+        if (empty($s['boe_no']) || $s['bcd_total'] === null) {
+            throw new \RuntimeException('This import is not cleared yet.');
+        }
+        $what = "import PO {$s['reference']}, bill of entry {$s['boe_no']} dated {$s['boe_date']} at {$s['port_code']}";
+        $payload = [
+            'vendor_id' => $vendorId,
+            'bill_number' => 'BE-' . $s['boe_no'],
+            'reference_number' => (string) $s['reference'],
+            'date' => (string) $s['boe_date'],
+            'line_items' => [
+                ['account_id' => $accountIdByName(self::IMPORT_ACCOUNTS['duty']), 'name' => 'Basic customs duty', 'description' => "Basic customs duty on {$what}", 'quantity' => 1, 'rate' => (float) $s['bcd_total']],
+                ['account_id' => $accountIdByName(self::IMPORT_ACCOUNTS['duty']), 'name' => 'Social welfare surcharge', 'description' => "Social welfare surcharge on {$what}", 'quantity' => 1, 'rate' => (float) $s['sws_total']],
+                ['account_id' => $accountIdByName(self::IMPORT_ACCOUNTS['igst_paid']), 'name' => 'IGST paid on import', 'description' => "IGST paid on import on {$what} (input credit)", 'quantity' => 1, 'rate' => (float) $s['igst_total']],
+            ],
+            'notes' => "Customs duty and IGST on {$what}, cleared through {$s['cha_name']}.",
+        ];
+        if (($tags = self::divisionTags((int) $s['division_id'])) !== []) {
+            $payload['tags'] = $tags;
+        }
+        return $payload;
+    }
+
+    /**
+     * The journal that takes the IGST paid on import as input credit (pure:
+     * no network): debit Input IGST, credit IGST Paid on Import.
+     *
+     * @param callable(string): string $accountIdByName
+     * @return array<string,mixed>
+     */
+    public static function importIgstCreditJournalPayload(array $s, callable $accountIdByName): array
+    {
+        if (empty($s['igst_credit_on']) || $s['igst_total'] === null) {
+            throw new \RuntimeException('The IGST credit of this import is not recorded yet.');
+        }
+        $amount = round((float) $s['igst_total'], 2);
+        $payload = [
+            'journal_date' => (string) $s['igst_credit_on'],
+            'reference_number' => 'BE-' . $s['boe_no'],
+            'notes' => "IGST paid on import taken as input credit: import PO {$s['reference']}, bill of entry {$s['boe_no']} dated {$s['boe_date']}, ₹" . GstCalculator::inr((string) $s['igst_total']) . '.',
+            'line_items' => [
+                ['account_id' => $accountIdByName(self::IMPORT_ACCOUNTS['igst_credit']), 'debit_or_credit' => 'debit', 'amount' => $amount, 'description' => "Input IGST on bill of entry {$s['boe_no']}"],
+                ['account_id' => $accountIdByName(self::IMPORT_ACCOUNTS['igst_paid']), 'debit_or_credit' => 'credit', 'amount' => $amount, 'description' => "IGST paid on import, bill of entry {$s['boe_no']}"],
+            ],
+        ];
+        if (($tags = self::divisionTags((int) $s['division_id'])) !== []) {
+            $payload['tags'] = $tags;
+        }
+        return $payload;
+    }
+
+    /**
+     * Sends a cleared import to Books: the supplier's bill and the customs
+     * duty bill (each created once; a retry finds it by number), and the IGST
+     * credit journal once the credit is recorded. Live test in the Zoho TEST
+     * organisation still pending (no credentials yet).
+     *
+     * @return array{bill_id:string, duty_bill_id:string}
+     */
+    public static function pushImport(int $shipmentId): array
+    {
+        $s = \App\Repositories\ImportRepository::find($shipmentId);
+        if ($s === null || empty($s['boe_no']) || $s['bcd_total'] === null) {
+            throw new \RuntimeException('This import is not cleared yet.');
+        }
+        self::assertVendorAllowed((string) $s['supplier_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $account = static fn (string $name): string => self::accountId($config, $accessToken, $name);
+        $query = '?organization_id=' . rawurlencode($config['organizationId']);
+        $vendor = static function (string $name, ?string $currency) use ($config, $accessToken, $query): string {
+            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/contacts{$query}&contact_type=vendor&contact_name=" . rawurlencode($name), 'contacts') as $row) {
+                if ((string) ($row['contact_name'] ?? '') === $name) {
+                    return (string) $row['contact_id'];
+                }
+            }
+            $payload = ['contact_name' => $name, 'company_name' => $name, 'contact_type' => 'vendor'] + ($currency !== null ? ['currency_code' => $currency, 'gst_treatment' => 'overseas'] : []);
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts{$query}", $payload, self::authHeaders($accessToken));
+            $id = json_decode($response['body'], true)['contact']['contact_id'] ?? null;
+            if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($id)) {
+                throw new \RuntimeException('Zoho Books vendor creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+            return $id;
+        };
+        $supplierId = $vendor((string) $s['supplier_name'], (string) $s['currency_code']);
+        $customsName = ZohoGuard::isProduction() ? 'Indian Customs' : ZohoGuard::TEST_PREFIX . 'Indian Customs';
+        $customsId = $vendor($customsName, null);
+        $ids = [];
+        foreach ([
+            'bill_id' => [(string) $s['reference'], $supplierId, self::importBillPayload($s, \App\Repositories\ImportRepository::lines($shipmentId), $supplierId, $account), 'zoho_bill_id'],
+            'duty_bill_id' => ['BE-' . $s['boe_no'], $customsId, self::customsDutyBillPayload($s, $customsId, $account), 'zoho_duty_bill_id'],
+        ] as $key => [$number, $vendorId, $payload, $column]) {
+            $existing = !empty($s[$column]) ? ['bill_id' => $s[$column]] : self::findBill($config, $accessToken, $number, $vendorId);
+            if ($existing === null) {
+                $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/bills{$query}", $payload, self::authHeaders($accessToken));
+                $existing = self::findBill($config, $accessToken, $number, $vendorId);
+                if ($existing === null) {
+                    throw new \RuntimeException("Zoho Books bill {$number} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+                }
+            }
+            $ids[$key] = (string) $existing['bill_id'];
+            $__user = AuthService::currentUser();
+            \App\Repositories\ImportRepository::update($shipmentId, [$column => $ids[$key]], $__user !== null ? (int) $__user['id'] : null);
+        }
+        return $ids;
+    }
+
     private static function config(): array
     {
         // The .env switch comes first, so "switched off on this server" is

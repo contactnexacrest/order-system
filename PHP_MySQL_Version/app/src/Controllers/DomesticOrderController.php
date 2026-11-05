@@ -27,11 +27,20 @@ use App\Services\ZohoBooksService;
  */
 final class DomesticOrderController
 {
+    /** D-257 Phase 3: the division a new local sale belongs to — Import & Distribution when the person works in it, else Domestic Trade. */
+    private static function newOrderCode(): string
+    {
+        $imp = DomesticOrderService::divisionId('IMP');
+        return $imp !== null && DivisionService::currentId() === $imp ? 'IMP' : DomesticOrderService::CODE;
+    }
+
     public function create(array $params): void
     {
+        $code = self::newOrderCode();
         View::render('domestic/create', [
-            'active' => DomesticOrderService::isActive(),
-            'clients' => DomesticOrderService::isActive() ? ClientRepository::all() : [],
+            'code' => $code,
+            'active' => DomesticOrderService::isActive($code),
+            'clients' => DomesticOrderService::isActive($code) ? ClientRepository::all() : [],
             'states' => DomesticOrderRepository::states(),
             'defaultTerms' => DomesticOrderService::setting('dom_payment_terms_days'),
             'old' => Flash::pullOld(),
@@ -41,7 +50,7 @@ final class DomesticOrderController
     public function store(array $params): void
     {
         $user = AuthService::currentUser();
-        [$orderId, $error] = DomesticOrderService::create($_POST, (int) $user['id']);
+        [$orderId, $error] = DomesticOrderService::create($_POST, (int) $user['id'], self::newOrderCode());
         if ($error !== null) {
             Flash::set('error', $error);
             Flash::setOld($_POST);
@@ -66,7 +75,12 @@ final class DomesticOrderController
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
         $can = static fn (string $p): bool => PermissionService::can((int) $user['id'], $roleId, $p);
         $totals = DomesticOrderService::totals($orderId);
+        // D-257 Phase 3: an Import & Distribution sale comes out of stock.
+        $isImp = DomesticOrderService::codeOfDivision((int) $order['division_id']) === 'IMP';
         View::render('domestic/show', [
+            'isImp' => $isImp,
+            'stockProducts' => $isImp ? \App\Repositories\ImportRepository::stockOnHand([(int) $order['division_id']]) : [],
+            'stockIssues' => $isImp ? \App\Services\ImportService::stockShortfalls((int) $order['division_id'], DomesticOrderRepository::lines($orderId)) : [],
             'order' => $order,
             'dom' => $dom,
             'lines' => $totals['lines'],

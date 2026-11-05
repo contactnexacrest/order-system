@@ -13,7 +13,7 @@ $next = $stage !== 'closed' ? $keys[array_search($stage, $keys, true) + 1] : nul
 <div class="card page-wide" data-testid="dom-order">
   <p><a href="/orders">&larr; Orders</a></p>
   <h1><?= $h($order['order_reference']) ?> <span class="badge"><?= $h(D::STAGES[$stage]) ?></span></h1>
-  <p class="muted"><?= $h($order['company_legal_name']) ?> · Domestic sale in ₹ · <?= $totals['intra_state'] ? 'Same state: CGST + SGST' : 'Another state: IGST' ?></p>
+  <p class="muted"><?= $h($order['company_legal_name']) ?> · <?= !empty($isImp) ? 'Local sale of imported stock in ₹' : 'Domestic sale in ₹' ?> · <?= $totals['intra_state'] ? 'Same state: CGST + SGST' : 'Another state: IGST' ?></p>
 
   <ol class="stage-strip" data-testid="dom-stages" style="display:flex;flex-wrap:wrap;gap:6px 18px;padding-left:18px;">
     <?php foreach (D::STAGES as $k => $label): ?>
@@ -29,7 +29,7 @@ $next = $stage !== 'closed' ? $keys[array_search($stage, $keys, true) + 1] : nul
     <?php elseif ($canEdit): ?>
       <form method="post" action="/domestic/orders/<?= $id ?>/advance"><?= Csrf::field() ?><input type="hidden" name="from_stage" value="<?= $h($stage) ?>">
         <button type="submit" class="btn">Move on to <?= $h(D::STAGES[$next]) ?></button>
-        <?php if ($next === 'dispatch'): ?><small class="muted">This fixes the tax invoice number and its totals; the lines can no longer change.</small><?php endif; ?>
+        <?php if ($next === 'dispatch'): ?><small class="muted">This fixes the tax invoice number and its totals; the lines can no longer change.<?= !empty($isImp) ? ' The goods are taken out of stock now.' : '' ?></small><?php endif; ?>
       </form>
     <?php endif; ?>
   </div>
@@ -75,6 +75,9 @@ $next = $stage !== 'closed' ? $keys[array_search($stage, $keys, true) + 1] : nul
     <?php if ($canEdit && $linesOpen && $seesPrices): ?>
     <form method="post" action="/domestic/orders/<?= $id ?>/lines" class="field-grid" data-testid="dom-add-line">
       <?= Csrf::field() ?>
+      <?php if (!empty($isImp)): ?>
+      <label>Product (from stock) *<select name="product_id" required data-testid="imp-sale-product"><option value="">Choose…</option><?php foreach ($stockProducts as $sp): ?><option value="<?= (int) $sp['product_id'] ?>"><?= $h($sp['product_name'] . ' — on hand ' . rtrim(rtrim((string) $sp['qty_on_hand'], '0'), '.')) ?></option><?php endforeach; ?></select></label>
+      <?php endif; ?>
       <label>Description *<input type="text" name="description" required maxlength="500" placeholder="e.g. Black granite slabs, polished, 18 mm"></label>
       <label>HSN *<input type="text" name="hsn_code" required minlength="4" maxlength="8" pattern="[0-9]{4,8}" placeholder="e.g. 68029300"></label>
       <label>Quantity *<input type="number" name="quantity" required min="0.001" step="0.001" placeholder="e.g. 120.5"></label>
@@ -86,7 +89,18 @@ $next = $stage !== 'closed' ? $keys[array_search($stage, $keys, true) + 1] : nul
     <?php endif; ?>
   </div>
 
-  <?php if (D::atOrAfter($stage, 'order_confirmation')): ?>
+  <?php if (!empty($isImp) && D::atOrAfter($stage, 'order_confirmation')): ?>
+  <div class="section" id="dom-purchase" data-testid="imp-sale-stock">
+    <h2>Stock</h2>
+    <?php if (D::atOrAfter($stage, 'dispatch')): ?>
+      <p>The goods were taken out of stock when the tax invoice was fixed.</p>
+    <?php elseif ($stockIssues === []): ?>
+      <p>Every line is covered by the stock on hand. The goods are taken out of stock when the order moves on to Dispatch.</p>
+    <?php else: ?>
+      <ul><?php foreach ($stockIssues as $si): ?><li><?= $h($si) ?></li><?php endforeach; ?></ul>
+    <?php endif; ?>
+  </div>
+  <?php elseif (D::atOrAfter($stage, 'order_confirmation')): ?>
   <div class="section" id="dom-purchase">
     <h2>Purchase</h2>
     <?php if ($canEdit && in_array($stage, ['order_confirmation', 'purchase'], true)): ?>

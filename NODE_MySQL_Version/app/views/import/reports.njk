@@ -1,0 +1,46 @@
+{# Owner decision D-257 Phase 3: Import & Distribution reports — landed cost per item, stock on hand, customs duty and IGST input credit, stock movements. Only the person's divisions are shown. #}
+<div class="card page-wide" data-testid="imp-reports">
+  <p><a href="/import">&larr; Imports</a></p>
+  <h1>Import &amp; Distribution reports</h1>
+
+  <h2 id="stock">Stock on hand</h2>
+  <table class="list" data-testid="imp-stock">
+    <tr><th>Product</th><th>On hand</th><th>Value ₹</th><th>Average cost ₹ per unit</th><th>Suggested price ₹ per unit</th></tr>
+    {% for r in stock %}
+    <tr><td>{{ r.product_name }} <small class="muted">{{ r.product_code }}</small></td><td>{{ r.qty_fmt }}</td><td>{{ r.value_fmt }}</td><td>{{ r.avg_cost_inr }}</td><td>{{ r.suggested_fmt }}</td></tr>
+    {% endfor %}
+    {% if stock.length == 0 %}<tr><td colspan="5" class="muted">No stock.</td></tr>{% endif %}
+  </table>
+  <p class="muted">Valued at weighted average landed cost. Suggested price = average cost ÷ (1 − {{ margin }}% margin), before GST.</p>
+
+  <h2 id="landed">Landed cost per item</h2>
+  <table class="list" data-testid="imp-landed">
+    <tr><th>Import</th><th>Bill of entry</th><th>Product</th><th>Qty</th><th>Goods ₹</th><th>Assessable ₹</th><th>Basic duty ₹</th><th>SWS ₹</th><th>Landed ₹</th><th>Per unit ₹</th></tr>
+    {% for l in landed %}
+    <tr><td><a href="/import/{{ l.shipment_id }}">{{ l.reference }}</a></td><td>{{ l.boe_no }}</td><td>{{ l.product_name }}</td><td>{{ l.qty_fmt }} {{ l.unit }}</td>
+      <td>{{ l.value_fmt }}</td><td>{{ l.assessable_fmt }}</td><td>{{ l.bcd_fmt }}</td><td>{{ l.sws_fmt }}</td><td>{{ l.landed_fmt }}</td><td>{{ l.landed_unit_inr }}</td></tr>
+    {% endfor %}
+    {% if landed.length == 0 %}<tr><td colspan="10" class="muted">No cleared imports yet.</td></tr>{% endif %}
+  </table>
+
+  <h2 id="duty">Customs duty and IGST input credit</h2>
+  <table class="list" data-testid="imp-duty">
+    <tr><th>Import</th><th>Bill of entry</th><th>Date</th><th>Port</th><th>Assessable ₹</th><th>Basic duty ₹</th><th>SWS ₹</th><th>IGST ₹</th><th>IGST credit</th></tr>
+    {% for s in duty %}
+    <tr><td><a href="/import/{{ s.id }}">{{ s.reference }}</a></td><td>{{ s.boe_no }}</td><td>{{ s.boe_date }}</td><td>{{ s.port_code }}</td>
+      <td>{{ s.assessable_fmt }}</td><td>{{ s.bcd_fmt }}</td><td>{{ s.sws_fmt }}</td><td>{{ s.igst_fmt }}</td>
+      <td>{% if s.igst_credit_on %}Taken {{ s.igst_credit_on }}{% else %}<strong>Pending</strong>{% endif %}</td></tr>
+    {% endfor %}
+    {% if duty.length == 0 %}<tr><td colspan="9" class="muted">No cleared imports yet.</td></tr>{% endif %}
+  </table>
+
+  <h2 id="movements">Stock movements (latest 50)</h2>
+  <table class="list" data-testid="imp-movements">
+    <tr><th>Date</th><th>Product</th><th>In / out</th><th>Qty</th><th>Value ₹</th><th>From / to</th></tr>
+    {% for m in movements %}
+    <tr><td>{{ m.moved_on }}</td><td>{{ m.product_name }}</td><td>{{ 'In' if m.kind == 'receipt' else 'Out' }}</td><td>{{ m.qty_fmt }}</td><td>{{ m.value_fmt }}</td>
+      <td>{% if m.shipment_id %}<a href="/import/{{ m.shipment_id }}">{{ m.shipment_reference }}</a>{% elif m.order_id %}<a href="/orders/{{ m.order_id }}">{{ m.order_reference }}</a>{% endif %}</td></tr>
+    {% endfor %}
+    {% if movements.length == 0 %}<tr><td colspan="6" class="muted">None yet.</td></tr>{% endif %}
+  </table>
+</div>

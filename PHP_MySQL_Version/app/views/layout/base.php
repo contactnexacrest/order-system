@@ -93,13 +93,15 @@ $canViewComplaintsList = $can('manage_complaints') || $can('respond_to_complaint
 
 // Owner decision D-214, phase 3: Procurement's queue.
 $canProcurement = ($can('manage_purchasing') || $can('approve_purchases')) && \App\Services\DivisionService::moduleEnabled('supplier_purchase');
+// D-257 Phase 3: Import & Distribution's imports and stock — only where its module is on (IMP only).
+$canImports = $can('view_purchase_prices') && \App\Services\DivisionService::moduleEnabled('import_stock');
 // D-257: a module switched off for the request's division(s) hides its menu entries.
 $moduleAssociates = \App\Services\DivisionService::moduleEnabled('associates');
 $moduleIncentive = \App\Services\DivisionService::moduleEnabled('team_incentive');
 $canManageIncentives = $canManageIncentives && $moduleIncentive;
 $canPayIncentives = $canPayIncentives && $moduleIncentive;
 $canOwnIncentives = $canOwnIncentives && $moduleIncentive;
-$opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canComplaints || $canViewClients || $canViewOrders || $canProcurement;
+$opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canComplaints || $canViewClients || $canViewOrders || $canProcurement || $canImports;
 // Owner decision D-214, phase 4: the management cockpit.
 $canCockpit = $can('view_cockpit');
 // Owner decision 1 Nov 2026 (A-7 / A-9): Logistics and Procurement open their own report without the Reports page.
@@ -194,6 +196,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canViewDisputesList): ?><a href="/disputes" class="<?= $isActive('/disputes') ? 'active' : '' ?>">Disputes</a><?php endif; ?>
           <?php if ($canViewComplaintsList): ?><a href="/complaints" class="<?= $isActive('/complaints') ? 'active' : '' ?>">Complaints</a><?php endif; ?>
           <?php if ($canProcurement): ?><a href="/procurement" class="<?= $isActive('/procurement') ? 'active' : '' ?>">Procurement</a><?php endif; ?>
+          <?php if ($canImports): ?><a href="/import" class="<?= $isActive('/import') ? 'active' : '' ?>">Imports &amp; stock</a><?php endif; ?>
         </div>
       </details>
     <?php endif; ?>

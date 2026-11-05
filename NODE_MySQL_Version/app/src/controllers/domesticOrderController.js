@@ -21,9 +21,17 @@ const orderAccessService = require('../services/orderAccessService');
  * division) and that the order is a DOM order. Port of PHP DomesticOrderController.
  */
 
+/** D-257 Phase 3: the division a new local sale belongs to — Import & Distribution when the person works in it, else Domestic Trade. */
+async function newOrderCode() {
+  const imp = await D.divisionId('IMP');
+  return imp !== null && divisionService.currentId() === imp ? 'IMP' : D.CODE;
+}
+
 async function create(req, res) {
-  const active = await D.isActive();
+  const code = await newOrderCode();
+  const active = await D.isActive(code);
   res.renderView('domestic/create', {
+    code,
     active,
     clients: active ? await clientRepository.all() : [],
     states: await repo.states(),
@@ -33,7 +41,7 @@ async function create(req, res) {
 }
 
 async function store(req, res) {
-  const [orderId, error] = await D.create(req.body, req.user.id);
+  const [orderId, error] = await D.create(req.body, req.user.id, await newOrderCode());
   if (error !== null) {
     flash.set(req, 'error', error);
     flash.setOld(req, req.body);
@@ -66,7 +74,14 @@ async function pageData(order, permissions) {
   const keys = D.STAGE_KEYS;
   const next = stage !== 'closed' ? keys[keys.indexOf(stage) + 1] : null;
   const documents = (await repo.documents(orderId)).map((d) => ({ ...d, label: D.DOCUMENTS[d.doc_code] || d.doc_code }));
+  // D-257 Phase 3: an Import & Distribution sale comes out of stock.
+  const isImp = (await D.codeOfDivision(Number(order.division_id))) === 'IMP';
+  const importRepository = require('../repositories/importRepository');
+  const importService = require('../services/importService');
   return {
+    isImp,
+    stockProducts: isImp ? (await importRepository.stockOnHand([Number(order.division_id)])).map((r) => ({ ...r, qty_trim: String(r.qty_on_hand).replace(/\.?0+$/, '') })) : [],
+    stockIssues: isImp ? await importService.stockShortfalls(Number(order.division_id), await repo.lines(orderId)) : [],
     order,
     dom,
     stage,

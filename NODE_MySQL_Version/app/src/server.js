@@ -100,6 +100,7 @@ const departmentAdminController = require('./controllers/departmentAdminControll
 const divisionController = require('./controllers/divisionController'); // D-257
 const domesticOrderController = require('./controllers/domesticOrderController'); // D-257 Phase 2
 const gstRateController = require('./controllers/gstRateController'); // D-257 Phase 2
+const importController = require('./controllers/importController'); // D-257 Phase 3
 const purchasingController = require('./controllers/purchasingController');
 const coordinationController = require('./controllers/coordinationController');
 const paymentMilestoneController = require('./controllers/paymentMilestoneController');
@@ -897,6 +898,27 @@ app.post('/domestic/orders/:id/payments', requireAuth, requirePermission('manage
 app.post('/domestic/orders/:id/documents', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(domesticOrderController.generate));
 app.post('/clients/:id/gst', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(domesticOrderController.saveClientGst));
 app.post('/domestic/orders/:id/zoho', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(domesticOrderController.pushZoho));
+// Owner decision D-257 Phase 3 (5 Nov 2026): Import & Distribution — imports, landed cost, stock, duty rates.
+// /import/… belongs to the module "Import, stock and landed cost" (on for IMP only).
+app.get('/import', requireAuth, requirePermission('view_purchase_prices'), asyncHandler(importController.index));
+app.get('/import/create', requireAuth, requirePermission('manage_purchasing'), asyncHandler(importController.create));
+app.get('/import/reports', requireAuth, requirePermission('view_purchase_prices'), asyncHandler(importController.reports));
+app.post('/import', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(importController.store));
+app.get('/import/:id', requireAuth, requirePermission('view_purchase_prices'), asyncHandler(importController.show));
+app.post('/import/:id/po', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(importController.saveHeader));
+app.post('/import/:id/po-document', requireAuth, requirePermission('view_purchase_prices'), verifyCsrf, asyncHandler(importController.poDocument));
+app.post('/import/:id/lines', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(importController.addLine));
+app.post('/import/:id/lines/:lineId/delete', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(importController.removeLine));
+app.post('/import/:id/lc', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(importController.saveLc));
+app.post('/import/:id/bl', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(importController.saveShipment));
+app.post('/import/:id/clearance', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(importController.saveClearance));
+app.post('/import/:id/igst-credit', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(importController.igstCredit));
+app.post('/import/:id/payments', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(importController.recordPayment));
+app.post('/import/:id/advance', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(importController.advance));
+app.post('/import/:id/zoho', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(importController.pushZoho));
+app.get('/admin/import-duty-rates', requireAuth, requirePermission('manage_divisions'), asyncHandler(importController.dutyRates));
+app.post('/admin/import-duty-rates', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(importController.storeDutyRate));
+app.post('/admin/import-duty-rates/:id/toggle', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(importController.toggleDutyRate));
 app.get('/admin/departments', requireAuth, requirePermission('manage_permissions'), asyncHandler(departmentAdminController.index));
 app.post('/admin/departments', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.createDepartment));
 app.post('/admin/departments/:id/update', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.updateDepartment));

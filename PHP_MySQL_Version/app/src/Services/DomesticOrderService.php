@@ -31,11 +31,20 @@ use App\Repositories\OrderRepository;
  * Trade): the default GST rate, the e-way bill threshold, e-invoicing and the
  * payment terms — standard Indian rules as starting values, to be confirmed by
  * the CA. GST rates per HSN / category are in Admin › GST rates.
+ *
+ * D-257 Phase 3: the Import & Distribution (IMP) division sells its stock to
+ * Indian resellers through the same order: an IMP local sale is this order in
+ * the IMP division, with IMP's own numbers (IMP/26-27/0001), the same GST
+ * rules, and its goods issued from stock (ImportService) when the tax invoice
+ * is fixed, instead of a supplier PO.
  * Port: domesticOrderService.js.
  */
 final class DomesticOrderService
 {
     public const CODE = 'DOM';
+
+    /** D-257 Phase 3: the divisions that sell in India with this order (Domestic Trade, and Import & Distribution from stock). */
+    public const LOCAL_CODES = ['DOM', 'IMP'];
 
     public const STAGES = [
         'enquiry' => 'Enquiry',
@@ -69,19 +78,19 @@ final class DomesticOrderService
     /** Lines may change only before the tax invoice number is fixed. */
     private const LINES_OPEN = ['enquiry', 'quotation', 'order_confirmation', 'purchase'];
 
-    public static function divisionId(): ?int
+    public static function divisionId(string $code = self::CODE): ?int
     {
         foreach (DivisionService::all() as $d) {
-            if ($d['code'] === self::CODE) {
+            if ($d['code'] === $code) {
                 return (int) $d['id'];
             }
         }
         return null;
     }
 
-    public static function isActive(): bool
+    public static function isActive(string $code = self::CODE): bool
     {
-        $id = self::divisionId();
+        $id = self::divisionId($code);
         $d = $id !== null ? DivisionService::find($id) : null;
         return $d !== null && $d['status'] === 'active';
     }
@@ -89,8 +98,33 @@ final class DomesticOrderService
     /** @param array<string,mixed> $order */
     public static function isDomesticOrder(array $order): bool
     {
-        $id = self::divisionId();
-        return $id !== null && (int) ($order['division_id'] ?? 0) === $id;
+        foreach (self::LOCAL_CODES as $code) {
+            $id = self::divisionId($code);
+            if ($id !== null && (int) ($order['division_id'] ?? 0) === $id) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The division code of a local-sale order: IMP for Import & Distribution, else DOM. */
+    public static function codeOfDivision(?int $divisionId): string
+    {
+        $imp = self::divisionId('IMP');
+        return $imp !== null && $divisionId === $imp ? 'IMP' : self::CODE;
+    }
+
+    /** The division code of a local-sale order (by its orders row). */
+    public static function codeOfOrder(int $orderId): string
+    {
+        $order = OrderRepository::find($orderId);
+        return self::codeOfDivision($order !== null ? (int) $order['division_id'] : null);
+    }
+
+    /** The counter series of a document in a division: DOM keeps its own (GTI, QT…); IMP's are IMP-GTI, IMP-QT… */
+    private static function series(string $code, string $series): string
+    {
+        return $code === self::CODE ? $series : $code . '-' . $series;
     }
 
     public static function setting(string $key): string
@@ -144,11 +178,12 @@ final class DomesticOrderService
      * @param array<string,mixed> $in client_id, buyer_gstin, buyer_state_code, place_of_supply, delivery_address, payment_terms_days, buyer_po_ref
      * @return array{0:?int, 1:?string}
      */
-    public static function create(array $in, int $userId): array
+    public static function create(array $in, int $userId, string $code = self::CODE): array
     {
-        $divisionId = self::divisionId();
-        if ($divisionId === null || !self::isActive()) {
-            return [null, 'Domestic Trade is not active yet. The MD activates it in Admin › Divisions.'];
+        $code = in_array($code, self::LOCAL_CODES, true) ? $code : self::CODE;
+        $divisionId = self::divisionId($code);
+        if ($divisionId === null || !self::isActive($code)) {
+            return [null, ($code === 'IMP' ? 'Import & Distribution' : 'Domestic Trade') . ' is not active yet. The MD activates it in Admin › Divisions.'];
         }
         $client = DomesticOrderRepository::client((int) ($in['client_id'] ?? 0));
         if ($client === null || (int) $client['is_active'] !== 1 || !DivisionService::allowsClient((int) $client['id']) && !DivisionService::seesAll()) {
@@ -210,7 +245,7 @@ final class DomesticOrderService
                 throw $e;
             }
         });
-        AuditLogRepository::log($userId, 'DOMESTIC_ORDER_CREATED', 'orders', $orderId, 'division', null, self::CODE);
+        AuditLogRepository::log($userId, 'DOMESTIC_ORDER_CREATED', 'orders', $orderId, 'division', null, $code);
         return [$orderId, null];
     }
 
@@ -290,6 +325,8 @@ final class DomesticOrderService
             $unit === '' || mb_strlen($unit) > 20 => 'Enter the unit (e.g. SQM, PCS).',
             preg_match('/^\d{1,11}(\.\d{1,2})?$/', $rate) !== 1 || GstCalculator::scaled($rate, 2) <= 0 => 'Enter the rate in ₹ above zero (up to 2 decimals).',
             $gst !== '' && !in_array(GstCalculator::money(GstCalculator::scaled($gst, 2)), ['0.00', '0.25', '3.00', '5.00', '12.00', '18.00', '28.00', '40.00'], true) => 'The GST rate must be one of 0, 0.25, 3, 5, 12, 18, 28 or 40 %.',
+            // D-257 Phase 3: an Import & Distribution sale comes out of stock, which is kept per product.
+            self::codeOfOrder($orderId) === 'IMP' && \App\Repositories\ImportRepository::product((int) ($in['product_id'] ?? 0)) === null => 'Choose the product: an Import & Distribution sale comes out of stock.',
             default => null,
         };
         if ($error !== null) {
@@ -338,6 +375,7 @@ final class DomesticOrderService
         $error = match (true) {
             $dom === null => 'Order not found.',
             !in_array($dom['stage'], ['order_confirmation', 'purchase'], true) => 'The purchase is recorded after the order confirmation and before dispatch.',
+            self::codeOfOrder($orderId) === 'IMP' => 'An Import & Distribution sale comes out of stock: there is no supplier PO.',
             $name === '' || mb_strlen($name) > 255 => 'Enter the supplier.',
             $ref === '' || mb_strlen($ref) > 80 => 'Enter the supplier PO number.',
             default => null,
@@ -416,9 +454,11 @@ final class DomesticOrderService
     public static function paymentDescription(array $order, array $dom, string $amount, string $bankReference, ?string $note): string
     {
         $buyer = (string) ($order['company_legal_name'] ?? '');
+        // D-257 Phase 3: an Import & Distribution sale is a "local sale" (of imported stock).
+        $kind = self::codeOfDivision(isset($order['division_id']) ? (int) $order['division_id'] : null) === 'IMP' ? 'Local sale' : 'Domestic sale';
         $text = !empty($dom['tax_invoice_no'])
-            ? "Domestic sale receipt of ₹" . GstCalculator::inr($amount) . " from {$buyer} against GST tax invoice {$dom['tax_invoice_no']} (order {$order['order_reference']}), bank ref {$bankReference}"
-            : "Domestic sale advance of ₹" . GstCalculator::inr($amount) . " from {$buyer} against order {$order['order_reference']}, bank ref {$bankReference}";
+            ? "{$kind} receipt of ₹" . GstCalculator::inr($amount) . " from {$buyer} against GST tax invoice {$dom['tax_invoice_no']} (order {$order['order_reference']}), bank ref {$bankReference}"
+            : "{$kind} advance of ₹" . GstCalculator::inr($amount) . " from {$buyer} against order {$order['order_reference']}, bank ref {$bankReference}";
         $note = trim((string) $note);
         return $note !== '' ? $text . '; note: ' . $note : $text;
     }
@@ -495,7 +535,11 @@ final class DomesticOrderService
                 }
                 break;
             case 'purchase':
-                if (empty($dom['supplier_po_ref'])) {
+                if (self::codeOfOrder($orderId) === 'IMP') {
+                    // D-257 Phase 3: the goods come out of IMP's stock when the tax invoice is fixed.
+                    $order = OrderRepository::find($orderId);
+                    array_push($out, ...ImportService::stockShortfalls((int) $order['division_id'], $lines));
+                } elseif (empty($dom['supplier_po_ref'])) {
                     $out[] = 'Record the supplier PO.';
                 }
                 if ($lines === []) {
@@ -559,6 +603,15 @@ final class DomesticOrderService
             }
             if ($next === 'dispatch') {
                 self::fixTaxInvoice($orderId, $dom, $userId);
+                // D-257 Phase 3: an Import & Distribution sale takes its goods out of stock now (locked, never below zero).
+                $order = OrderRepository::find($orderId);
+                if (self::codeOfDivision((int) $order['division_id']) === 'IMP') {
+                    $stockError = ImportService::issueForSale((int) $order['division_id'], $orderId, (string) $order['order_reference'], DomesticOrderRepository::lines($orderId), $userId);
+                    if ($stockError !== null) {
+                        $pdo->rollBack();
+                        return $stockError;
+                    }
+                }
             }
             if ($next === 'closed') {
                 $pdo->prepare("UPDATE orders SET status = 'complete', is_locked = 1 WHERE id = :id")->execute(['id' => $orderId]);
@@ -578,7 +631,8 @@ final class DomesticOrderService
         $date = date('Y-m-d');
         $fy = FinancialYear::label($date); // 2026-27
         $short = substr($fy, 2, 2) . '-' . substr($fy, 5, 2); // 26-27
-        $number = 'DOM/' . $short . '/' . str_pad((string) DomesticOrderRepository::nextNumber('GTI', $fy), 4, '0', STR_PAD_LEFT);
+        $code = self::codeOfOrder($orderId);
+        $number = $code . '/' . $short . '/' . str_pad((string) DomesticOrderRepository::nextNumber(self::series($code, 'GTI'), $fy), 4, '0', STR_PAD_LEFT);
         $t = self::totals($orderId);
         DomesticOrderRepository::update($orderId, [
             'tax_invoice_no' => $number,
@@ -605,7 +659,8 @@ final class DomesticOrderService
         $fy = FinancialYear::current();
         $short = substr($fy, 2, 2) . '-' . substr($fy, 5, 2);
         $series = ['DQT' => 'QT', 'DOC' => 'OC', 'DCH' => 'DC'][$code];
-        return 'DOM/' . $series . '/' . $short . '/' . str_pad((string) DomesticOrderRepository::nextNumber($series, $fy), 4, '0', STR_PAD_LEFT);
+        $division = self::codeOfOrder($orderId);
+        return $division . '/' . $series . '/' . $short . '/' . str_pad((string) DomesticOrderRepository::nextNumber(self::series($division, $series), $fy), 4, '0', STR_PAD_LEFT);
     }
 
     /** Whether a document may be generated now (its stage reached, not after closing). */

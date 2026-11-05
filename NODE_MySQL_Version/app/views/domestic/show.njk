@@ -3,7 +3,7 @@
 <div class="card page-wide" data-testid="dom-order">
   <p><a href="/orders">&larr; Orders</a></p>
   <h1>{{ order.order_reference }} <span class="badge">{{ stageLabel }}</span></h1>
-  <p class="muted">{{ order.company_legal_name }} · Domestic sale in ₹ · {{ 'Same state: CGST + SGST' if totals.intra_state else 'Another state: IGST' }}</p>
+  <p class="muted">{{ order.company_legal_name }} · {{ 'Local sale of imported stock in ₹' if isImp else 'Domestic sale in ₹' }} · {{ 'Same state: CGST + SGST' if totals.intra_state else 'Another state: IGST' }}</p>
 
   <ol class="stage-strip" data-testid="dom-stages" style="display:flex;flex-wrap:wrap;gap:6px 18px;padding-left:18px;">
     {% for s in stages %}<li class="{{ s.cls }}" style="{{ 'font-weight:700' if s.cls == 'current' else ('color:#2D7D56' if s.cls == 'done' else 'color:#8A94A6') }}">{{ s.label }}</li>{% endfor %}
@@ -17,7 +17,7 @@
     {% elif canEdit %}
       <form method="post" action="/domestic/orders/{{ id }}/advance"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="from_stage" value="{{ stage }}">
         <button type="submit" class="btn">Move on to {{ nextLabel }}</button>
-        {% if next == 'dispatch' %}<small class="muted">This fixes the tax invoice number and its totals; the lines can no longer change.</small>{% endif %}
+        {% if next == 'dispatch' %}<small class="muted">This fixes the tax invoice number and its totals; the lines can no longer change.{{ ' The goods are taken out of stock now.' if isImp else '' }}</small>{% endif %}
       </form>
     {% endif %}
   </div>
@@ -64,6 +64,9 @@
     {% if canEdit and linesOpen and seesPrices %}
     <form method="post" action="/domestic/orders/{{ id }}/lines" class="field-grid" data-testid="dom-add-line">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      {% if isImp %}
+      <label>Product (from stock) *<select name="product_id" required data-testid="imp-sale-product"><option value="">Choose…</option>{% for sp in stockProducts %}<option value="{{ sp.product_id }}">{{ sp.product_name }} — on hand {{ sp.qty_trim }}</option>{% endfor %}</select></label>
+      {% endif %}
       <label>Description *<input type="text" name="description" required maxlength="500" placeholder="e.g. Black granite slabs, polished, 18 mm"></label>
       <label>HSN *<input type="text" name="hsn_code" required minlength="4" maxlength="8" pattern="[0-9]{4,8}" placeholder="e.g. 68029300"></label>
       <label>Quantity *<input type="number" name="quantity" required min="0.001" step="0.001" placeholder="e.g. 120.5"></label>
@@ -75,7 +78,18 @@
     {% endif %}
   </div>
 
-  {% if afterOc %}
+  {% if isImp and afterOc %}
+  <div class="section" id="dom-purchase" data-testid="imp-sale-stock">
+    <h2>Stock</h2>
+    {% if afterDispatch %}
+      <p>The goods were taken out of stock when the tax invoice was fixed.</p>
+    {% elif stockIssues.length == 0 %}
+      <p>Every line is covered by the stock on hand. The goods are taken out of stock when the order moves on to Dispatch.</p>
+    {% else %}
+      <ul>{% for si in stockIssues %}<li>{{ si }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+  {% elif afterOc %}
   <div class="section" id="dom-purchase">
     <h2>Purchase</h2>
     {% if canEdit and (stage == 'order_confirmation' or stage == 'purchase') %}

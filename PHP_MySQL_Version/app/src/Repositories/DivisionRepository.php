@@ -108,12 +108,24 @@ final class DivisionRepository
             $items[] = ['label' => 'E-way bill threshold and e-invoicing set (confirm them with the CA)', 'ok' => isset($own['company:dom_eway_threshold_inr'], $own['company:dom_e_invoice_applicable']), 'help' => 'Division settings dom_eway_threshold_inr (₹50,000 as a start) and dom_e_invoice_applicable (0 or 1).'];
             $items[] = ['label' => 'Export-only modules switched off (export shipping, LUT, benefits)', 'ok' => !DivisionService::moduleEnabledFor($divisionId, 'export_shipping') && !DivisionService::moduleEnabledFor($divisionId, 'lut_igst') && !DivisionService::moduleEnabledFor($divisionId, 'export_benefits'), 'help' => 'Untick them under Modules.'];
         }
+        // D-257 Phase 3: what Import & Distribution needs before its first import and local sale.
+        if (($division['code'] ?? '') === \App\Services\ImportService::CODE) {
+            $gstin = (string) (CompanySettingsRepository::companyValue('gstin') ?? '');
+            $iec = trim((string) (CompanySettingsRepository::companyValue('iec_pan') ?? ''));
+            $items[] = ['label' => 'NexaCrest\'s IEC is set (the importer of record)', 'ok' => $iec !== '' && stripos($iec, 'PLACEHOLDER') === false, 'help' => 'Settings: enter the Import Export Code.'];
+            $items[] = ['label' => 'NexaCrest\'s GSTIN is valid (IGST credit and local sales)', 'ok' => \App\Services\GstCalculator::isValidGstin($gstin), 'help' => 'Settings: enter the company GSTIN.'];
+            $items[] = ['label' => 'AD bank for import LCs set', 'ok' => \App\Services\ImportService::setting('imp_lc_bank') !== '', 'help' => 'Division setting imp_lc_bank (the bank that opens LCs and remits abroad).'];
+            $items[] = ['label' => 'Customs agent (CHA) set', 'ok' => \App\Services\ImportService::setting('imp_default_cha') !== '', 'help' => 'Division setting imp_default_cha.'];
+            $items[] = ['label' => 'Import duty rates set (confirm them with the CA and the customs agent)', 'ok' => \App\Repositories\ImportRepository::dutyRates(true) !== [], 'help' => 'Admin › Import duty rates.'];
+            $items[] = ['label' => 'Import, stock and landed cost module on; export-only modules off', 'ok' => DivisionService::moduleEnabledFor($divisionId, 'import_stock') && !DivisionService::moduleEnabledFor($divisionId, 'export_shipping') && !DivisionService::moduleEnabledFor($divisionId, 'lut_igst') && !DivisionService::moduleEnabledFor($divisionId, 'export_benefits'), 'help' => 'Tick and untick them under Modules.'];
+        }
         return $items;
     }
 
     /** D-257 Phase 2: the starting departments of a planned division, created on request from Admin › Divisions. */
     public const STARTER_DEPARTMENTS = [
         'DOM' => [['DOM_SALES', 'Domestic Sales', '#2D7D56'], ['DOM_PURCHASE', 'Domestic Purchase', '#1D6FA8'], ['DOM_DISPATCH', 'Domestic Dispatch', '#8A5A00']],
+        'IMP' => [['IMP_PURCHASE', 'Import Purchase', '#1D6FA8'], ['IMP_WAREHOUSE', 'Warehouse', '#8A5A00'], ['IMP_SALES', 'Distribution Sales', '#2D7D56']],
     ];
 
     /** Creates the division's starting departments that do not exist yet; returns how many were made. */
