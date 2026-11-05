@@ -194,6 +194,9 @@ async function pushInvoice(invoice) {
   if (invoice.due_date !== null) payload.due_date = invoice.due_date;
   if (invoice.currency_code !== 'INR') payload.exchange_rate = round(Number(invoice.exchange_rate), 6);
   if (gst) payload.gst_treatment = 'overseas';
+  // D-257 Phase 2: the Division reporting tag, only once two or more divisions are active (none today).
+  const tags = await divisionTags(await orderDivisionId(invoice.order_id));
+  if (tags.length > 0) payload.tags = tags;
 
   if (gst && String(invoice.invoice_number).length > 16) {
     // GST: a tax invoice number may have at most 16 characters (Books
@@ -1692,6 +1695,124 @@ async function associateCommission(cost) {
   };
 }
 
+// ---------------------------------------------------------------- D-257 Phase 2: divisions and domestic sales
+
+async function orderDivisionId(orderId) {
+  const ds = require('./divisionService');
+  if (orderId === null || orderId === undefined) return ds.EXPORT_ID;
+  const row = await db.queryOne('SELECT division_id FROM orders WHERE id = :id', { id: orderId });
+  return row ? Number(row.division_id) : ds.EXPORT_ID;
+}
+
+/**
+ * The "Division" reporting tag for a Books record — only when two or more
+ * divisions are active (with one it says nothing) and the tag is set up in
+ * Settings: zoho_division_tag_id, and zoho_division_tag_option_<code> for
+ * each division. Otherwise none, so nothing sent to Books changes.
+ */
+async function divisionTags(divisionId) {
+  const ds = require('./divisionService');
+  if (!(await ds.isMulti())) return [];
+  const division = await ds.find(divisionId);
+  const tagId = String((await companySettingsRepository.companyValue('zoho_division_tag_id')) || '').trim();
+  const option = division ? String((await companySettingsRepository.companyValue(`zoho_division_tag_option_${String(division.code).toLowerCase()}`)) || '').trim() : '';
+  return tagId !== '' && option !== '' ? [{ tag_id: tagId, tag_option_id: option }] : [];
+}
+
+/**
+ * A Domestic Trade GST tax invoice as a Books invoice (pure: no network).
+ * Same state: GST group (GST18 = CGST + SGST); another state: IGST18.
+ * gst_treatment business_gst with the buyer's GSTIN (unregistered:
+ * business_none), place of supply as Books' state code. Rule D-212: the
+ * notes say what the invoice is, for which order and buyer.
+ */
+async function domesticInvoicePayload(orderId, contactId, taxIdByName) {
+  const orderRepository = require('../repositories/orderRepository');
+  const domRepo = require('../repositories/domesticOrderRepository');
+  const D = require('./domesticOrderService');
+  const { trimDecimals } = require('./domesticDocumentService');
+  const order = await orderRepository.find(orderId);
+  const dom = await domRepo.find(orderId);
+  if (!order || !dom || !dom.tax_invoice_no) throw new Error('This domestic order has no tax invoice yet.');
+  const t = await D.totals(orderId);
+  const lineItems = [];
+  for (const l of t.lines) {
+    lineItems.push({
+      name: [...String(l.description)].slice(0, 100).join(''),
+      description: String(l.description),
+      hsn_or_sac: String(l.hsn_code),
+      quantity: Number(l.quantity),
+      unit: String(l.unit),
+      rate: Number(l.rate_inr),
+      tax_id: await taxIdByName(`${t.intra_state ? 'GST' : 'IGST'}${trimDecimals(l.gst_rate_pct)}`),
+    });
+  }
+  const due = new Date(`${String(dom.tax_invoice_date).slice(0, 10)}T00:00:00`);
+  due.setDate(due.getDate() + Number(dom.payment_terms_days));
+  const payload = {
+    customer_id: contactId,
+    invoice_number: String(dom.tax_invoice_no),
+    reference_number: String(order.order_reference),
+    date: String(dom.tax_invoice_date).slice(0, 10),
+    due_date: require('../helpers/dbDateTime').ymd(due),
+    gst_treatment: dom.buyer_gstin ? 'business_gst' : 'business_none',
+    place_of_supply: await domRepo.stateAbbr(dom.place_of_supply),
+    line_items: lineItems,
+    notes: `Domestic GST tax invoice ${dom.tax_invoice_no} for order ${order.order_reference}, ${order.company_legal_name}, place of supply ${await domRepo.stateName(dom.place_of_supply)}.`,
+  };
+  if (dom.buyer_gstin) payload.gst_no = String(dom.buyer_gstin);
+  const tags = await divisionTags(Number(order.division_id));
+  if (tags.length > 0) payload.tags = tags;
+  return payload;
+}
+
+/**
+ * Sends a Domestic Trade tax invoice to Books (created once; a retry finds
+ * it by number). The buyer becomes a Books customer in INR with its GSTIN.
+ * Live test in the Zoho TEST organisation still pending (no credentials yet).
+ */
+async function pushDomesticInvoice(orderId, userId = null) {
+  const orderRepository = require('../repositories/orderRepository');
+  const domRepo = require('../repositories/domesticOrderRepository');
+  const order = await orderRepository.find(orderId);
+  const dom = await domRepo.find(orderId);
+  if (!order || !dom || !dom.tax_invoice_no) throw new Error('This domestic order has no tax invoice yet.');
+  zohoGuard.assertCustomerAllowed(String(order.company_legal_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const client = await clientRepository.find(order.client_id);
+  let contactId = String((client && client.zoho_contact_id) || '');
+  if (contactId === '') {
+    const contact = {
+      contact_name: String(order.company_legal_name),
+      contact_type: 'customer',
+      currency_code: 'INR',
+      gst_treatment: dom.buyer_gstin ? 'business_gst' : 'business_none',
+      place_of_contact: await domRepo.stateAbbr(dom.buyer_state_code || dom.place_of_supply),
+    };
+    if (dom.buyer_gstin) contact.gst_no = String(dom.buyer_gstin);
+    const response = await request('POST', `https://${config.apiDomain}/books/v3/contacts${query}`, contact, authHeaders(accessToken));
+    const decoded = safeJson(response.body);
+    contactId = String((decoded && decoded.contact && decoded.contact.contact_id) || '');
+    if (contactId === '') throw new Error(`Zoho Books contact creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+    await clientRepository.setZohoContactId(order.client_id, contactId);
+  }
+  const payload = await domesticInvoicePayload(orderId, contactId, (name) => taxId(config, accessToken, name));
+  const existing = await findInvoiceByNumber(config, accessToken, String(dom.tax_invoice_no));
+  let invoiceId;
+  if (existing) {
+    invoiceId = String(existing.invoice_id);
+  } else {
+    const response = await request('POST', `https://${config.apiDomain}/books/v3/invoices${query}&ignore_auto_number_generation=true`, payload, authHeaders(accessToken));
+    const decoded = safeJson(response.body);
+    invoiceId = String((decoded && decoded.invoice && decoded.invoice.invoice_id) || '');
+    if (invoiceId === '') throw new Error(`Zoho Books invoice creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+  }
+  await domRepo.update(orderId, { zoho_invoice_id: invoiceId }, userId);
+  return invoiceId;
+}
+
 module.exports = {
   associateBillPayload,
   associatePaymentPayload,
@@ -1704,4 +1825,6 @@ module.exports = {
   testConnection, listExpenses, listTestContacts, listTestExpenses, deleteRecord, setTransport, forgetTokensInMemoryForTests,
   // Owner decision 2 Nov 2026 (D-238): clients and products kept in Books.
   pushCustomerContact, customerPayload, pushItem, itemPayload, markInactive,
+  // D-257 Phase 2: Domestic Trade invoices and the Division tag.
+  divisionTags, domesticInvoicePayload, pushDomesticInvoice,
 };

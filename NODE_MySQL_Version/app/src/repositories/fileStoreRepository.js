@@ -276,8 +276,9 @@ async function moneyClassFor(fileId) {
         WHEN EXISTS (SELECT 1 FROM file_store WHERE id = :f7 AND document_type_label = 'Client payment self-report screenshot') THEN 'buyer_payments'
         WHEN EXISTS (SELECT 1 FROM order_buyer_po_documents WHERE file_id = :f8) THEN 'selling'
         WHEN EXISTS (SELECT 1 FROM amendments WHERE signed_copy_file_id = :f9) THEN 'selling'
+        WHEN EXISTS (SELECT 1 FROM domestic_documents WHERE file_store_id = :f10) THEN 'selling'
         ELSE NULL END AS cls`,
-    { f1: fileId, f2: fileId, f3: fileId, f4: fileId, f5: fileId, f6: fileId, f7: fileId, f8: fileId, f9: fileId }
+    { f1: fileId, f2: fileId, f3: fileId, f4: fileId, f5: fileId, f6: fileId, f7: fileId, f8: fileId, f9: fileId, f10: fileId }
   );
   return row && row.cls ? row.cls : null;
 }

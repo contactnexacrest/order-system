@@ -5589,3 +5589,146 @@ CREATE TABLE order_quality_documents (
   CONSTRAINT fk_oqd_file FOREIGN KEY (file_store_id) REFERENCES file_store(id),
   CONSTRAINT fk_oqd_user FOREIGN KEY (updated_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
+
+-- ================================================================
+-- Owner decision D-257 Phase 2 (5 Nov 2026): the Domestic Trade division
+-- (DOM) — selling to Indian resellers with GST, in INR. Built now, used
+-- only once the owner activates DOM in Admin > Divisions; until then no
+-- screen changes for anyone. A DOM order is an ordinary orders row
+-- (division DOM, currency INR) plus its own domestic record below, with
+-- its own stages: enquiry > quotation > order confirmation > purchase >
+-- dispatch > tax invoice > payment > closed. No BL, LUT, FIRC or export
+-- benefits. GST rates, the e-way bill threshold and e-invoicing are
+-- settings, to be confirmed by the CA.
+-- ================================================================
+-- Indian states and union territories with their GST state code (the first
+-- two digits of a GSTIN) and the short code Zoho Books uses for place of supply.
+CREATE TABLE indian_states (
+  code        CHAR(2) NOT NULL PRIMARY KEY,
+  name        VARCHAR(80) NOT NULL,
+  abbr        VARCHAR(3) NOT NULL,
+  sort_order  INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB;
+
+-- A buyer's GST registration, for domestic sales (empty for an overseas buyer).
+ALTER TABLE clients ADD COLUMN gstin VARCHAR(15) NULL;
+ALTER TABLE clients ADD COLUMN gst_state_code CHAR(2) NULL;
+ALTER TABLE clients ADD COLUMN place_of_supply_state CHAR(2) NULL;
+
+-- GST rate per HSN (the longest matching start of the line's HSN wins) or
+-- per product category; the default rate is the DOM setting dom_default_gst_rate.
+CREATE TABLE gst_rates (
+  id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hsn_prefix   VARCHAR(8) NULL,
+  category_id  BIGINT UNSIGNED NULL,
+  rate_pct     DECIMAL(5,2) NOT NULL,
+  note         VARCHAR(255) NULL,
+  is_active    TINYINT(1) NOT NULL DEFAULT 1,
+  updated_by   BIGINT UNSIGNED NULL,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_gst_rates_hsn (hsn_prefix),
+  CONSTRAINT fk_gst_rates_category FOREIGN KEY (category_id) REFERENCES product_categories(id),
+  CONSTRAINT fk_gst_rates_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- One row per DOM order: its stage, the GST parties, purchase, dispatch,
+-- e-way bill and the tax invoice (number fixed once, totals frozen then).
+CREATE TABLE domestic_orders (
+  order_id           BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  stage              ENUM('enquiry','quotation','order_confirmation','purchase','dispatch','tax_invoice','payment','closed') NOT NULL DEFAULT 'enquiry',
+  buyer_gstin        VARCHAR(15) NULL,
+  buyer_state_code   CHAR(2) NULL,
+  place_of_supply    CHAR(2) NOT NULL,
+  seller_state_code  CHAR(2) NOT NULL,
+  delivery_address   TEXT NULL,
+  payment_terms_days INT NOT NULL DEFAULT 30,
+  buyer_po_ref       VARCHAR(80) NULL,
+  supplier_name      VARCHAR(255) NULL,
+  supplier_po_ref    VARCHAR(80) NULL,
+  dispatch_date      DATE NULL,
+  transporter_name   VARCHAR(150) NULL,
+  transporter_id     VARCHAR(15) NULL,
+  vehicle_no         VARCHAR(20) NULL,
+  lr_no              VARCHAR(40) NULL,
+  distance_km        INT NULL,
+  eway_bill_no       VARCHAR(12) NULL,
+  eway_bill_date     DATE NULL,
+  tax_invoice_no     VARCHAR(16) NULL,
+  tax_invoice_date   DATE NULL,
+  invoice_sent_on    DATE NULL,
+  taxable_total      DECIMAL(14,2) NULL,
+  cgst_total         DECIMAL(14,2) NULL,
+  sgst_total         DECIMAL(14,2) NULL,
+  igst_total         DECIMAL(14,2) NULL,
+  round_off          DECIMAL(6,2) NULL,
+  invoice_total      DECIMAL(14,2) NULL,
+  zoho_invoice_id    VARCHAR(50) NULL,
+  closed_at          DATETIME NULL,
+  updated_by         BIGINT UNSIGNED NULL,
+  updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_domestic_orders_invoice (tax_invoice_no),
+  CONSTRAINT fk_domestic_orders_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_domestic_orders_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- A DOM order's lines, in INR, each with its HSN and GST rate.
+CREATE TABLE domestic_order_lines (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id      BIGINT UNSIGNED NOT NULL,
+  line_no       INT NOT NULL,
+  product_id    BIGINT UNSIGNED NULL,
+  description   VARCHAR(500) NOT NULL,
+  hsn_code      VARCHAR(10) NOT NULL,
+  quantity      DECIMAL(14,3) NOT NULL,
+  unit          VARCHAR(20) NOT NULL,
+  rate_inr      DECIMAL(14,2) NOT NULL,
+  gst_rate_pct  DECIMAL(5,2) NOT NULL,
+  is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  created_by    BIGINT UNSIGNED NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_dol_order (order_id),
+  CONSTRAINT fk_dol_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_dol_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Money received against a DOM tax invoice. The description is built by the
+-- app from the facts (rule D-212) and the bank reference is required.
+CREATE TABLE domestic_payments (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id        BIGINT UNSIGNED NOT NULL,
+  received_on     DATE NOT NULL,
+  amount_inr      DECIMAL(14,2) NOT NULL,
+  bank_reference  VARCHAR(60) NOT NULL,
+  description     VARCHAR(500) NOT NULL,
+  note            VARCHAR(255) NULL,
+  recorded_by     BIGINT UNSIGNED NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_dp_order (order_id),
+  CONSTRAINT fk_dp_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_dp_user FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- The documents of a DOM order: DQT quotation, DOC order confirmation,
+-- GTI GST tax invoice, DCH delivery challan. The PDF is in file_store.
+CREATE TABLE domestic_documents (
+  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id       BIGINT UNSIGNED NOT NULL,
+  doc_code       ENUM('DQT','DOC','GTI','DCH') NOT NULL,
+  reference      VARCHAR(30) NOT NULL,
+  file_store_id  BIGINT UNSIGNED NOT NULL,
+  generated_by   BIGINT UNSIGNED NULL,
+  generated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_dd_order (order_id, doc_code),
+  CONSTRAINT fk_dd_order FOREIGN KEY (order_id) REFERENCES orders(id),
+  CONSTRAINT fk_dd_file FOREIGN KEY (file_store_id) REFERENCES file_store(id),
+  CONSTRAINT fk_dd_user FOREIGN KEY (generated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Number series of the DOM documents, per financial year (a GST tax invoice
+-- number is unique in its year and at most 16 characters: DOM/26-27/0001).
+CREATE TABLE domestic_counters (
+  series   VARCHAR(10) NOT NULL,
+  fy       CHAR(7) NOT NULL,
+  last_no  INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (series, fy)
+) ENGINE=InnoDB;

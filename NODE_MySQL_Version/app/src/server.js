@@ -98,6 +98,8 @@ const permissionAdminController = require('./controllers/permissionAdminControll
 const departmentController = require('./controllers/departmentController');
 const departmentAdminController = require('./controllers/departmentAdminController');
 const divisionController = require('./controllers/divisionController'); // D-257
+const domesticOrderController = require('./controllers/domesticOrderController'); // D-257 Phase 2
+const gstRateController = require('./controllers/gstRateController'); // D-257 Phase 2
 const purchasingController = require('./controllers/purchasingController');
 const coordinationController = require('./controllers/coordinationController');
 const paymentMilestoneController = require('./controllers/paymentMilestoneController');
@@ -876,6 +878,25 @@ app.post('/admin/divisions/:id/activate', requireAuth, requirePermission('manage
 app.post('/admin/divisions/:id/deactivate', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.deactivate));
 app.post('/users/:id/division', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(divisionController.setUserDivision));
 app.post('/admin/departments/:id/division', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(divisionController.setDepartmentDivision));
+app.post('/admin/divisions/:id/starter-departments', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.starterDepartments));
+app.post('/admin/divisions/:id/staff', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.addStaff));
+// Owner decision D-257 Phase 2 (5 Nov 2026): Domestic Trade orders and the GST rates.
+app.get('/admin/gst-rates', requireAuth, requirePermission('manage_divisions'), asyncHandler(gstRateController.index));
+app.post('/admin/gst-rates', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(gstRateController.store));
+app.post('/admin/gst-rates/:id/toggle', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(gstRateController.toggle));
+app.get('/domestic/orders/create', requireAuth, requirePermission('manage_orders'), asyncHandler(domesticOrderController.create));
+app.post('/domestic/orders', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(domesticOrderController.store));
+app.post('/domestic/orders/:id/party', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(domesticOrderController.saveParty));
+app.post('/domestic/orders/:id/lines', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(domesticOrderController.addLine));
+app.post('/domestic/orders/:id/lines/:lineId/delete', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(domesticOrderController.removeLine));
+app.post('/domestic/orders/:id/purchase', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(domesticOrderController.savePurchase));
+app.post('/domestic/orders/:id/dispatch', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(domesticOrderController.saveDispatch));
+app.post('/domestic/orders/:id/invoice-sent', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(domesticOrderController.invoiceSent));
+app.post('/domestic/orders/:id/advance', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(domesticOrderController.advance));
+app.post('/domestic/orders/:id/payments', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(domesticOrderController.recordPayment));
+app.post('/domestic/orders/:id/documents', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(domesticOrderController.generate));
+app.post('/clients/:id/gst', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(domesticOrderController.saveClientGst));
+app.post('/domestic/orders/:id/zoho', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(domesticOrderController.pushZoho));
 app.get('/admin/departments', requireAuth, requirePermission('manage_permissions'), asyncHandler(departmentAdminController.index));
 app.post('/admin/departments', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.createDepartment));
 app.post('/admin/departments/:id/update', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.updateDepartment));

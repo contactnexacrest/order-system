@@ -229,7 +229,11 @@ async function show(req, res) {
   const agreementActive = !agreementForceExpired && !agreementExpired;
   const agreementRenewEligible = !!(agreementExpiryDate && new Date(agreementExpiryDate).getTime() <= Date.now() + 30 * 86400000);
 
+  // D-257 Phase 2: GST registration for Domestic Trade, shown only once Domestic Trade is active.
+  const domesticActive = await require('../services/domesticOrderService').isActive();
   res.renderView('clients/show', {
+    domesticActive,
+    gstStates: domesticActive ? await require('../repositories/domesticOrderRepository').states() : [],
     agreementCard: await require('./agreementController').partyCard(req, 'client', client.id),
     associateLine: await require('../repositories/associateRepository').lineForClient(client.id, req.permissions),
     // Owner decision (2 Nov 2026, gap-list Q-6b): the buyer's ECGC-approved credit limit.

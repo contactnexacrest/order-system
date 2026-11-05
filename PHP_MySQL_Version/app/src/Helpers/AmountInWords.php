@@ -60,4 +60,35 @@ final class AmountInWords
         }
         return (string) $n;
     }
+
+    /**
+     * Owner decision D-257 Phase 2: a domestic GST invoice prints its total
+     * in Indian numbering (lakh / crore), e.g. "Indian Rupees Two Lakh
+     * Thirty-Four Thousand Five Hundred and Fifty Paise Only". The export
+     * documents keep format() above, unchanged.
+     */
+    public static function formatIndian(float|int|string $amount): string
+    {
+        $paise = (int) round(abs((float) $amount) * 100);
+        $whole = intdiv($paise, 100);
+        $minor = $paise % 100;
+        $text = 'Indian Rupees ' . self::wordsIndian($whole);
+        if ($minor > 0) {
+            $text .= ' and ' . self::words($minor) . ' Paise';
+        }
+        return $text . ' Only';
+    }
+
+    public static function wordsIndian(int $n): string
+    {
+        if ($n < 1000) {
+            return self::words($n);
+        }
+        foreach ([10000000 => 'Crore', 100000 => 'Lakh', 1000 => 'Thousand'] as $size => $name) {
+            if ($n >= $size) {
+                return self::wordsIndian(intdiv($n, $size)) . ' ' . $name . ($n % $size ? ' ' . self::wordsIndian($n % $size) : '');
+            }
+        }
+        return (string) $n;
+    }
 }

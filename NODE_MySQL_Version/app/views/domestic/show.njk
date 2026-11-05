@@ -1,0 +1,169 @@
+{# Owner decision D-257 Phase 2: a Domestic Trade (DOM) order — stages, buyer and GST, lines, purchase, dispatch and e-way bill, tax invoice, payments, documents. #}
+{% set id = order.id %}
+<div class="card page-wide" data-testid="dom-order">
+  <p><a href="/orders">&larr; Orders</a></p>
+  <h1>{{ order.order_reference }} <span class="badge">{{ stageLabel }}</span></h1>
+  <p class="muted">{{ order.company_legal_name }} · Domestic sale in ₹ · {{ 'Same state: CGST + SGST' if totals.intra_state else 'Another state: IGST' }}</p>
+
+  <ol class="stage-strip" data-testid="dom-stages" style="display:flex;flex-wrap:wrap;gap:6px 18px;padding-left:18px;">
+    {% for s in stages %}<li class="{{ s.cls }}" style="{{ 'font-weight:700' if s.cls == 'current' else ('color:#2D7D56' if s.cls == 'done' else 'color:#8A94A6') }}">{{ s.label }}</li>{% endfor %}
+  </ol>
+
+  {% if next %}
+  <div class="section" data-testid="dom-next">
+    {% if blockers.length %}
+      <p><strong>Before moving on to {{ nextLabel }}:</strong></p>
+      <ul>{% for b in blockers %}<li>{{ b }}</li>{% endfor %}</ul>
+    {% elif canEdit %}
+      <form method="post" action="/domestic/orders/{{ id }}/advance"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="from_stage" value="{{ stage }}">
+        <button type="submit" class="btn">Move on to {{ nextLabel }}</button>
+        {% if next == 'dispatch' %}<small class="muted">This fixes the tax invoice number and its totals; the lines can no longer change.</small>{% endif %}
+      </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="section" id="dom-party">
+    <h2>Buyer and GST</h2>
+    {% if canEdit and linesOpen %}
+    <form method="post" action="/domestic/orders/{{ id }}/party" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Buyer's GSTIN<input type="text" name="buyer_gstin" value="{{ dom.buyer_gstin }}" maxlength="15" pattern="[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][1-9A-Za-z][Zz][0-9A-Za-z]" placeholder="e.g. 29ABCDE1234F1Z5"></label>
+      <label>Buyer's state *<select name="buyer_state_code" required><option value="">Choose…</option>{% for s in states %}<option value="{{ s.code }}" {{ 'selected' if dom.buyer_state_code == s.code else '' }}>{{ s.name }} ({{ s.code }})</option>{% endfor %}</select></label>
+      <label>Place of supply *<select name="place_of_supply" required><option value="">Choose…</option>{% for s in states %}<option value="{{ s.code }}" {{ 'selected' if dom.place_of_supply == s.code else '' }}>{{ s.name }} ({{ s.code }})</option>{% endfor %}</select></label>
+      <label>Delivery address<textarea name="delivery_address" rows="2" maxlength="1000" placeholder="e.g. Plot 12, KIADB Industrial Area, Bengaluru 560099">{{ dom.delivery_address }}</textarea></label>
+      <label>Payment terms (days)<input type="number" name="payment_terms_days" min="0" max="365" step="1" value="{{ dom.payment_terms_days }}" placeholder="e.g. 30"></label>
+      <label>Buyer's PO number<input type="text" name="buyer_po_ref" maxlength="80" value="{{ dom.buyer_po_ref }}" placeholder="e.g. PO/2026/118"></label>
+      <p><button type="submit" class="btn-secondary">Save</button></p>
+    </form>
+    {% else %}
+    <p>GSTIN {{ dom.buyer_gstin or 'not given' }} · State {{ buyerStateName }} · Place of supply {{ posName }} · Payment {{ dom.payment_terms_days }} days · PO {{ dom.buyer_po_ref or '—' }}</p>
+    {% endif %}
+    <p class="muted">NexaCrest's GST state: {{ sellerStateName }}.</p>
+  </div>
+
+  <div class="section" id="dom-lines">
+    <h2>Lines</h2>
+    <table class="list" data-testid="dom-lines">
+      <tr><th>#</th><th>Description</th><th>HSN</th><th>Qty</th><th>Unit</th>{% if seesPrices %}<th>Rate ₹</th><th>Taxable ₹</th><th>GST</th><th>Tax ₹</th><th>Total ₹</th>{% endif %}<th></th></tr>
+      {% for l in lines %}
+      <tr>
+        <td>{{ loop.index }}</td><td>{{ l.description }}</td><td>{{ l.hsn_code }}</td><td>{{ l.quantity }}</td><td>{{ l.unit }}</td>
+        {% if seesPrices %}<td>{{ l.rate_fmt }}</td><td>{{ l.taxable_fmt }}</td><td>{{ l.gst_rate_pct }}%</td><td>{{ l.tax_fmt }}</td><td>{{ l.total_fmt }}</td>{% endif %}
+        <td>{% if canEdit and linesOpen %}<form method="post" action="/domestic/orders/{{ id }}/lines/{{ l.id }}/delete" data-confirm="Remove this line?"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-link">Remove</button></form>{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="11" class="muted">No lines yet.</td></tr>
+      {% endfor %}
+    </table>
+    {% if seesPrices and lines.length %}
+    <p data-testid="dom-totals">Taxable ₹{{ totalsFmt.taxable }}
+      {% if totals.intra_state %} · CGST ₹{{ totalsFmt.cgst }} · SGST ₹{{ totalsFmt.sgst }}{% else %} · IGST ₹{{ totalsFmt.igst }}{% endif %}
+      · Round off ₹{{ totalsFmt.roundOff }} · <strong>Total ₹{{ totalsFmt.total }}</strong></p>
+    {% endif %}
+    {% if canEdit and linesOpen and seesPrices %}
+    <form method="post" action="/domestic/orders/{{ id }}/lines" class="field-grid" data-testid="dom-add-line">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Description *<input type="text" name="description" required maxlength="500" placeholder="e.g. Black granite slabs, polished, 18 mm"></label>
+      <label>HSN *<input type="text" name="hsn_code" required minlength="4" maxlength="8" pattern="[0-9]{4,8}" placeholder="e.g. 68029300"></label>
+      <label>Quantity *<input type="number" name="quantity" required min="0.001" step="0.001" placeholder="e.g. 120.5"></label>
+      <label>Unit *<input type="text" name="unit" required maxlength="20" placeholder="e.g. SQM"></label>
+      <label>Rate ₹ *<input type="number" name="rate_inr" required min="0.01" step="0.01" placeholder="e.g. 1450.00"></label>
+      <label>GST %<input type="number" name="gst_rate_pct" min="0" max="40" step="0.01" placeholder="blank = from the GST rates"></label>
+      <p><button type="submit" class="btn-secondary">Add line</button></p>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if afterOc %}
+  <div class="section" id="dom-purchase">
+    <h2>Purchase</h2>
+    {% if canEdit and (stage == 'order_confirmation' or stage == 'purchase') %}
+    <form method="post" action="/domestic/orders/{{ id }}/purchase" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Supplier *<input type="text" name="supplier_name" required maxlength="255" value="{{ dom.supplier_name }}" placeholder="e.g. Sri Balaji Granites"></label>
+      <label>Supplier PO number *<input type="text" name="supplier_po_ref" required maxlength="80" value="{{ dom.supplier_po_ref }}" placeholder="e.g. NC/SPO/0045"></label>
+      <p><button type="submit" class="btn-secondary">Save purchase</button></p>
+    </form>
+    {% else %}<p>Supplier {{ dom.supplier_name or '—' }} · PO {{ dom.supplier_po_ref or '—' }}</p>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if afterDispatch %}
+  <div class="section" id="dom-dispatch">
+    <h2>Dispatch and e-way bill</h2>
+    <p>Tax invoice <strong data-testid="dom-invoice-no">{{ dom.tax_invoice_no }}</strong> dated {{ dom.tax_invoice_date }}{% if seesPrices %} · total ₹{{ invoiceTotalFmt }}{% endif %}.
+      {% if needsEway %}Above the e-way bill threshold (₹{{ ewayThresholdFmt }}): an e-way bill is needed.{% else %}Below the e-way bill threshold.{% endif %}</p>
+    {% if canEdit and stage == 'dispatch' %}
+    <form method="post" action="/domestic/orders/{{ id }}/dispatch" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Dispatch date *<input type="date" name="dispatch_date" required value="{{ dom.dispatch_date }}"></label>
+      <label>Transporter *<input type="text" name="transporter_name" required maxlength="150" value="{{ dom.transporter_name }}" placeholder="e.g. VRL Logistics"></label>
+      <label>Transporter ID<input type="text" name="transporter_id" maxlength="15" value="{{ dom.transporter_id }}" placeholder="e.g. 29AABCV1234D1Z5"></label>
+      <label>Vehicle number *<input type="text" name="vehicle_no" required maxlength="20" value="{{ dom.vehicle_no }}" placeholder="e.g. KA01AB1234"></label>
+      <label>LR number<input type="text" name="lr_no" maxlength="40" value="{{ dom.lr_no }}" placeholder="e.g. LR-55821"></label>
+      <label>Distance (km)<input type="number" name="distance_km" min="0" max="4000" step="1" value="{{ dom.distance_km }}" placeholder="e.g. 350"></label>
+      <label>E-way bill number{{ ' *' if needsEway else '' }}<input type="text" name="eway_bill_no" maxlength="12" pattern="[0-9]{12}" value="{{ dom.eway_bill_no }}" placeholder="e.g. 331012345678" {{ 'required' if needsEway else '' }}></label>
+      <label>E-way bill date<input type="date" name="eway_bill_date" value="{{ dom.eway_bill_date }}"></label>
+      <p><button type="submit" class="btn-secondary">Save dispatch</button></p>
+    </form>
+    {% else %}
+    <p>Dispatched {{ dom.dispatch_date or '—' }} · {{ dom.transporter_name or '—' }} · vehicle {{ dom.vehicle_no or '—' }} · e-way bill {{ dom.eway_bill_no or '—' }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if afterInvoice %}
+  <div class="section" id="dom-invoice">
+    <h2>Tax invoice</h2>
+    {% if dom.invoice_sent_on %}<p>Sent to the buyer on {{ dom.invoice_sent_on }}.</p>{% endif %}
+    {% if canEdit and stage == 'tax_invoice' %}
+    <form method="post" action="/domestic/orders/{{ id }}/invoice-sent" class="field-grid"><input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Sent to the buyer on *<input type="date" name="invoice_sent_on" required value="{{ dom.invoice_sent_on or today }}"></label>
+      <p><button type="submit" class="btn-secondary">Mark as sent</button></p>
+    </form>
+    {% endif %}
+    {% if canZoho %}
+    <form method="post" action="/domestic/orders/{{ id }}/zoho"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-secondary">{{ 'Send to Zoho Books again' if dom.zoho_invoice_id else 'Send to Zoho Books' }}</button></form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if seesPayments and afterOc %}
+  <div class="section" id="dom-payments">
+    <h2>Payments</h2>
+    <table class="list" data-testid="dom-payments">
+      <tr><th>Received</th><th>Amount ₹</th><th>Bank reference</th><th>Description</th></tr>
+      {% for p in payments %}<tr><td>{{ p.received_on }}</td><td>{{ p.amount_fmt }}</td><td>{{ p.bank_reference }}</td><td>{{ p.description }}</td></tr>
+      {% else %}<tr><td colspan="4" class="muted">None yet.</td></tr>{% endfor %}
+    </table>
+    <p>Received ₹{{ paidFmt }}{% if invoiceTotalFmt %} of ₹{{ invoiceTotalFmt }}{% endif %}.</p>
+    {% if canPay and stage != 'closed' %}
+    <form method="post" action="/domestic/orders/{{ id }}/payments" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Received on *<input type="date" name="received_on" required max="{{ today }}"></label>
+      <label>Amount ₹ *<input type="number" name="amount_inr" required min="0.01" step="0.01" placeholder="e.g. 250000.00"></label>
+      <label>Bank reference *<input type="text" name="bank_reference" required maxlength="60" placeholder="e.g. UTR SBIN226123456789"></label>
+      <label>Note<input type="text" name="note" maxlength="255" placeholder="e.g. part payment, balance next week"></label>
+      <p><button type="submit" class="btn-secondary">Record payment</button></p>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="section" id="dom-documents">
+    <h2>Documents</h2>
+    {% if seesPrices %}
+    <table class="list" data-testid="dom-documents">
+      <tr><th>Document</th><th>Number</th><th>Generated</th><th></th></tr>
+      {% for d in documents %}<tr><td>{{ d.label }}</td><td>{{ d.reference }}</td><td>{{ d.generated_at }} · {{ d.generated_by_name }}</td><td><a href="/file-store/{{ d.file_store_id }}/download">PDF</a></td></tr>
+      {% else %}<tr><td colspan="4" class="muted">None yet.</td></tr>{% endfor %}
+    </table>
+    {% if canDocs %}
+      {% for b in docButtons %}
+      <form method="post" action="/domestic/orders/{{ id }}/documents" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="doc_code" value="{{ b.code }}"><button type="submit" class="btn-secondary">Generate {{ b.label }}</button></form>
+      {% endfor %}
+    {% endif %}
+    {% else %}<p class="muted">The documents show prices.</p>{% endif %}
+  </div>
+</div>

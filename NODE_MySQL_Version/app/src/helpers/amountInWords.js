@@ -42,4 +42,26 @@ function format(amount, currencyCode) {
   return `${text} Only`;
 }
 
-module.exports = { format, words };
+/**
+ * Owner decision D-257 Phase 2: a domestic GST invoice prints its total in
+ * Indian numbering (lakh / crore). The export documents keep format() above,
+ * unchanged. PHP twin: AmountInWords::formatIndian().
+ */
+function wordsIndian(n) {
+  if (n < 1000) return words(n);
+  for (const [size, name] of [[10000000, 'Crore'], [100000, 'Lakh'], [1000, 'Thousand']]) {
+    if (n >= size) return `${wordsIndian(Math.floor(n / size))} ${name}${n % size ? ` ${wordsIndian(n % size)}` : ''}`;
+  }
+  return String(n);
+}
+
+function formatIndian(amount) {
+  const paise = Math.round(Math.abs(Number(amount) || 0) * 100);
+  const whole = Math.floor(paise / 100);
+  const minor = paise % 100;
+  let text = `Indian Rupees ${wordsIndian(whole)}`;
+  if (minor > 0) text += ` and ${words(minor)} Paise`;
+  return `${text} Only`;
+}
+
+module.exports = { format, words, formatIndian, wordsIndian };

@@ -321,6 +321,12 @@ async function duplicateOrder(req, res) {
 }
 
 async function create(req, res) {
+  // Owner decision D-257 Phase 2: someone working in Domestic Trade creates a domestic order.
+  const domId = await require('../services/domesticOrderService').divisionId();
+  if (domId !== null && require('../services/divisionService').currentId() === domId) {
+    res.redirect('/domestic/orders/create');
+    return;
+  }
   const preselectedClientId = req.query.client_id ? (parseInt(req.query.client_id, 10) || null) : null;
   const incoterms = await lookupRepository.incoterms();
 
@@ -455,6 +461,15 @@ async function store(req, res) {
   const paymentPresetId = parseInt(body.payment_preset_id || 0, 10);
   if (!incotermId || !currencyId || !paymentPresetId) {
     flash.set(req, 'error', 'Incoterm, currency, and a payment preset are all required.');
+    flash.setOld(req, body);
+    res.redirect(`/orders/create?client_id=${clientId}`);
+    return;
+  }
+  // Owner decision D-257 Phase 2: rupees are for Domestic Trade orders only; a domestic order has its own form.
+  const inrCurrency = await db.queryOne("SELECT 1 AS x FROM currencies WHERE id = :id AND code = 'INR'", { id: currencyId });
+  const domDivisionId = await require('../services/domesticOrderService').divisionId();
+  if (inrCurrency || (domDivisionId !== null && parseInt(body.division_id || 0, 10) === domDivisionId)) {
+    flash.set(req, 'error', 'Orders in rupees belong to Domestic Trade: use New domestic order.');
     flash.setOld(req, body);
     res.redirect(`/orders/create?client_id=${clientId}`);
     return;
@@ -1237,6 +1252,11 @@ async function show(req, res) {
   const accessDenied = await orderAccessService.denialReason(order, req.user && req.user.id, req.permissions);
   if (accessDenied !== null) {
     res.status(403).send(accessDenied);
+    return;
+  }
+  // Owner decision D-257 Phase 2: a Domestic Trade order has its own page and stages.
+  if ((await require('../services/domesticOrderService').isDomesticOrder(order)) && (await require('../repositories/domesticOrderRepository').find(order.id))) {
+    await require('./domesticOrderController').show(req, res, order);
     return;
   }
   const seesAllOrders = !!req.permissions.view_all_orders;

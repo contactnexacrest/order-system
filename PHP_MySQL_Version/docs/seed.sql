@@ -2450,3 +2450,46 @@ SELECT 'supplier_type', d.v, d.s, 0, 1 FROM (
 INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_bytes, description)
 SELECT 'quality_document', 'pdf,jpg,jpeg,png,docx,xlsx', 10485760, 'A quality document a product category asks for on an order (e.g. mill test certificate, drawing approval) — internal. D-257 Phase 0B.'
 WHERE NOT EXISTS (SELECT 1 FROM file_upload_contexts WHERE context_key = 'quality_document');
+
+-- ================================================================
+-- Owner decision D-257 Phase 2 (5 Nov 2026): Domestic Trade (DOM). DOM stays
+-- "planned" — nothing here is visible until the owner activates it.
+-- GST rates, the e-way bill threshold and e-invoicing are standard Indian
+-- rules as starting values, TO BE CONFIRMED BY THE CA.
+-- ================================================================
+INSERT INTO indian_states (code, name, abbr, sort_order) VALUES
+  ('01', 'Jammu and Kashmir', 'JK', 1), ('02', 'Himachal Pradesh', 'HP', 2), ('03', 'Punjab', 'PB', 3),
+  ('04', 'Chandigarh', 'CH', 4), ('05', 'Uttarakhand', 'UK', 5), ('06', 'Haryana', 'HR', 6),
+  ('07', 'Delhi', 'DL', 7), ('08', 'Rajasthan', 'RJ', 8), ('09', 'Uttar Pradesh', 'UP', 9),
+  ('10', 'Bihar', 'BR', 10), ('11', 'Sikkim', 'SK', 11), ('12', 'Arunachal Pradesh', 'AR', 12),
+  ('13', 'Nagaland', 'NL', 13), ('14', 'Manipur', 'MN', 14), ('15', 'Mizoram', 'MZ', 15),
+  ('16', 'Tripura', 'TR', 16), ('17', 'Meghalaya', 'ML', 17), ('18', 'Assam', 'AS', 18),
+  ('19', 'West Bengal', 'WB', 19), ('20', 'Jharkhand', 'JH', 20), ('21', 'Odisha', 'OR', 21),
+  ('22', 'Chhattisgarh', 'CG', 22), ('23', 'Madhya Pradesh', 'MP', 23), ('24', 'Gujarat', 'GJ', 24),
+  ('26', 'Dadra and Nagar Haveli and Daman and Diu', 'DN', 26), ('27', 'Maharashtra', 'MH', 27),
+  ('29', 'Karnataka', 'KA', 29), ('30', 'Goa', 'GA', 30), ('31', 'Lakshadweep', 'LD', 31),
+  ('32', 'Kerala', 'KL', 32), ('33', 'Tamil Nadu', 'TN', 33), ('34', 'Puducherry', 'PY', 34),
+  ('35', 'Andaman and Nicobar Islands', 'AN', 35), ('36', 'Telangana', 'TS', 36),
+  ('37', 'Andhra Pradesh', 'AP', 37), ('38', 'Ladakh', 'LA', 38), ('97', 'Other Territory', 'OT', 97);
+
+-- INR is the currency of DOM orders only: inactive, so it is never offered on an Export order.
+INSERT INTO currencies (code, name, is_default, is_active)
+SELECT 'INR', 'Indian Rupee', 0, 0 WHERE NOT EXISTS (SELECT 1 FROM currencies WHERE code = 'INR');
+
+-- GST on worked building / monumental stone (polished granite and marble slabs and tiles).
+INSERT INTO gst_rates (hsn_prefix, category_id, rate_pct, note)
+SELECT '6802', NULL, 18.00, 'Worked building and monumental stone (HSN 6802) — standard rate, to be confirmed by the CA.'
+WHERE NOT EXISTS (SELECT 1 FROM gst_rates WHERE hsn_prefix = '6802');
+
+-- DOM's own settings (Admin > Divisions > Domestic Trade). Prices are worked
+-- out in rupees (exchange rate 1), DOM's own team-incentive programme starts
+-- off, and the GST rules below are starting values for the CA to confirm.
+INSERT IGNORE INTO division_settings (division_id, scope, setting_key, setting_value)
+SELECT d.id, s.scope, s.k, s.v FROM divisions d
+JOIN (SELECT 'company' AS scope, 'dom_default_gst_rate' AS k, '18' AS v
+      UNION ALL SELECT 'company', 'dom_eway_threshold_inr', '50000'
+      UNION ALL SELECT 'company', 'dom_e_invoice_applicable', '0'
+      UNION ALL SELECT 'company', 'dom_payment_terms_days', '30'
+      UNION ALL SELECT 'pricing', 'pricing_fx_rate', '1.0000'
+      UNION ALL SELECT 'incentive', 'program_enabled', '0') s
+WHERE d.code = 'DOM';

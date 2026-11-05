@@ -108,6 +108,8 @@ $permissionAdmin = new PermissionAdminController();
 $departments = new \App\Controllers\DepartmentController();
 $departmentAdmin = new \App\Controllers\DepartmentAdminController();
 $divisions = new \App\Controllers\DivisionController(); // D-257
+$domestic = new \App\Controllers\DomesticOrderController(); // D-257 Phase 2
+$gstRates = new \App\Controllers\GstRateController(); // D-257 Phase 2
 $purchasing = new \App\Controllers\PurchasingController();
 $coordination = new \App\Controllers\CoordinationController();
 $milestones = new \App\Controllers\PaymentMilestoneController();
@@ -474,6 +476,25 @@ $router->post('/admin/divisions/{id}/activate', [$divisions, 'activate'], [Sessi
 $router->post('/admin/divisions/{id}/deactivate', [$divisions, 'deactivate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 $router->post('/users/{id}/division', [$divisions, 'setUserDivision'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 $router->post('/admin/departments/{id}/division', [$divisions, 'setDepartmentDivision'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
+$router->post('/admin/divisions/{id}/starter-departments', [$divisions, 'starterDepartments'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+$router->post('/admin/divisions/{id}/staff', [$divisions, 'addStaff'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+// Owner decision D-257 Phase 2 (5 Nov 2026): Domestic Trade orders and the GST rates.
+$router->get('/admin/gst-rates', [$gstRates, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions')]);
+$router->post('/admin/gst-rates', [$gstRates, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+$router->post('/admin/gst-rates/{id}/toggle', [$gstRates, 'toggle'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+$router->get('/domestic/orders/create', [$domestic, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_orders')]);
+$router->post('/domestic/orders', [$domestic, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/domestic/orders/{id}/party', [$domestic, 'saveParty'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/domestic/orders/{id}/lines', [$domestic, 'addLine'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/domestic/orders/{id}/lines/{lineId}/delete', [$domestic, 'removeLine'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/domestic/orders/{id}/purchase', [$domestic, 'savePurchase'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/domestic/orders/{id}/dispatch', [$domestic, 'saveDispatch'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/domestic/orders/{id}/invoice-sent', [$domestic, 'invoiceSent'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/domestic/orders/{id}/advance', [$domestic, 'advance'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/domestic/orders/{id}/payments', [$domestic, 'recordPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
+$router->post('/domestic/orders/{id}/documents', [$domestic, 'generate'], [SessionAuth::required(), PermissionCheck::requires('generate_documents'), CsrfCheck::verify()]);
+$router->post('/clients/{id}/gst', [$domestic, 'saveClientGst'], [SessionAuth::required(), PermissionCheck::requires('manage_orders'), CsrfCheck::verify()]);
+$router->post('/domestic/orders/{id}/zoho', [$domestic, 'pushZoho'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 
 $router->get('/admin/permissions', [$permissionAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
 $router->post('/admin/permissions/grant', [$permissionAdmin, 'grantOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);

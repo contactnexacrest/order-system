@@ -1388,6 +1388,16 @@ final class DocumentGenerationService
         }
     }
 
+    /**
+     * Owner decision D-257 Phase 2: a self-contained page (the Domestic Trade
+     * documents) through the same PDF renderer and running footer as every
+     * other document. The export documents do not use this.
+     */
+    public static function renderStandalonePdf(string $html, ?string $reference): string
+    {
+        return self::renderPdf($html, ['meta' => ['document_reference' => $reference]]);
+    }
+
     private static function renderPdf(string $html, array $context = []): string
     {
         $options = new DompdfOptions();

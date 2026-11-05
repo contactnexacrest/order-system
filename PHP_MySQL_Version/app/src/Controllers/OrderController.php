@@ -285,6 +285,12 @@ final class OrderController
 
     public function create(array $params): void
     {
+        // Owner decision D-257 Phase 2: someone working in Domestic Trade creates a domestic order.
+        $__dom = \App\Services\DomesticOrderService::divisionId();
+        if ($__dom !== null && \App\Services\DivisionService::currentId() === $__dom) {
+            header('Location: /domestic/orders/create');
+            return;
+        }
         $preselectedClientId = isset($_GET['client_id']) ? (int) $_GET['client_id'] : null;
         $incoterms = LookupRepository::incoterms();
 
@@ -405,6 +411,16 @@ final class OrderController
         $paymentPresetId = (int) ($_POST['payment_preset_id'] ?? 0);
         if (!$incotermId || !$currencyId || !$paymentPresetId) {
             Flash::set('error', 'Incoterm, currency, and a payment preset are all required.');
+            Flash::setOld($_POST);
+            header('Location: /orders/create?client_id=' . $clientId);
+            return;
+        }
+        // Owner decision D-257 Phase 2: rupees are for Domestic Trade orders only; a domestic order has its own form.
+        $__inr = Database::connection()->prepare("SELECT 1 FROM currencies WHERE id = :id AND code = 'INR'");
+        $__inr->execute(['id' => $currencyId]);
+        $__domId = \App\Services\DomesticOrderService::divisionId();
+        if ($__inr->fetchColumn() !== false || ($__domId !== null && (int) ($_POST['division_id'] ?? 0) === $__domId)) {
+            Flash::set('error', 'Orders in rupees belong to Domestic Trade: use New domestic order.');
             Flash::setOld($_POST);
             header('Location: /orders/create?client_id=' . $clientId);
             return;
@@ -1228,6 +1244,12 @@ final class OrderController
         if ($accessDenied !== null) {
             http_response_code(403);
             echo $accessDenied;
+            return;
+        }
+        // Owner decision D-257 Phase 2: a Domestic Trade order has its own page and stages.
+        if (\App\Services\DomesticOrderService::isDomesticOrder($order) && \App\Repositories\DomesticOrderRepository::find((int) $order['id']) !== null) {
+            \App\Services\DivisionService::enterOrderDivision((int) $order['division_id']);
+            DomesticOrderController::show($order);
             return;
         }
         $seesAllOrders = PermissionService::can((int) $actor['id'], $actorRoleId, 'view_all_orders');

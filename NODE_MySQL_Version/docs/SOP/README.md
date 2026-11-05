@@ -52,6 +52,7 @@ implementation detail.
 - [Agreements](./26-agreements.md) — the register of agreements with clients, suppliers, logistics partners, associates and staff: signed copies, expiry dates, reminders 30 and 7 days before and on the day, renew and end early.
 - [Pricing](./27-pricing.md) — supplier / market prices, the price build-up (cost → minimum price → floors → quote price), who sees which price, and the associate commission levels and ladder (D-245).
 - [Divisions](./28-divisions.md) — Export today; Domestic Trade, Merchant Trade and Import & Distribution planned. What a division is, Admin › Divisions (modules, own settings, numbering), and how to set up and activate a new division (D-257).
+- [Domestic Trade](./29-domestic-trade.md) — selling to Indian resellers with GST (planned until the MD activates it): set-up and activation, the eight stages, GST on the documents (CGST + SGST or IGST), e-way bill, tax invoice numbering, payments and Zoho (D-257 Phase 2).
 
 ## Guides to print or share
 

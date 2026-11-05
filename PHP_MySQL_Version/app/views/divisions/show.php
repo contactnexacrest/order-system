@@ -12,6 +12,7 @@ $planned = $division['status'] !== 'active'; ?>
   <p class="muted"><?= (int) $counts['orders'] ?> orders · <?= (int) $counts['staff'] ?> staff · <?= (int) $counts['departments'] ?> departments · <?= (int) $counts['clients'] ?> clients.
     <?php if ((int) $division['id'] === DivisionService::EXPORT_ID): ?>Export keeps the company's number formats and counters exactly as they are.<?php else: ?>This division counts its own numbers, starting with its code, unless its own format below says otherwise.<?php endif; ?></p>
 
+  <?php if ($division['code'] === 'DOM'): ?><p data-testid="division-gst-link"><a href="/admin/gst-rates">GST rates</a> — the GST rate per HSN for domestic sales (to be confirmed by the CA).</p><?php endif; ?>
   <div class="section">
     <h2>Modules</h2>
     <form method="post" action="/admin/divisions/<?= (int) $division['id'] ?>/modules">
@@ -54,6 +55,27 @@ $planned = $division['status'] !== 'active'; ?>
       <p><button type="submit" class="btn">Save setting</button></p>
     </form>
   </div>
+
+  <?php if ($planned && (int) $division['id'] !== DivisionService::EXPORT_ID): ?>
+  <div class="section" data-testid="division-setup">
+    <h2>Set it up</h2>
+    <?php if ($starterDepartments !== []): ?>
+    <form method="post" action="/admin/divisions/<?= (int) $division['id'] ?>/starter-departments"><?= Csrf::field() ?>
+      <button type="submit" class="btn-secondary">Create its departments</button>
+      <small class="muted"><?= htmlspecialchars(implode(', ', array_column($starterDepartments, 1))) ?> (only those not there yet).</small>
+    </form>
+    <?php endif; ?>
+    <form method="post" action="/admin/divisions/<?= (int) $division['id'] ?>/staff" class="field-grid"><?= Csrf::field() ?>
+      <label>Staff member who will work in this division *
+        <select name="user_id" required>
+          <option value="">Choose…</option>
+          <?php foreach ($staffChoices as $u): ?><option value="<?= (int) $u['id'] ?>"><?= htmlspecialchars($u['name'] . ' — ' . $u['email']) ?></option><?php endforeach; ?>
+        </select>
+      </label>
+      <p><button type="submit" class="btn-secondary">Move to <?= htmlspecialchars((string) $division['name']) ?></button></p>
+    </form>
+  </div>
+  <?php endif; ?>
 
   <?php if ($planned): ?>
   <div class="section" data-testid="division-preflight">

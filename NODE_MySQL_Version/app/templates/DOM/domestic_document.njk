@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+{# Owner decision D-257 Phase 2 (5 Nov 2026): the Domestic Trade documents — DQT quotation, DOC order
+   confirmation, GTI GST tax invoice, DCH delivery challan. DOM orders only; the export documents are
+   separate and unchanged. Every figure arrives formatted (DomesticDocumentService); this only prints.
+   The same template is in the Node app (templates/DOM/domestic_document.njk; PHP: domestic_document.html.twig). #}
+<style>
+  @page { margin: 0.5in 0.55in; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Aptos', sans-serif; font-size: 9pt; color: #000; }
+  table { border-collapse: collapse; width: 100%; }
+  .head td { vertical-align: top; padding: 0; }
+  .company { font-size: 13pt; font-weight: bold; color: #17233A; }
+  .doctype { font-size: 17pt; font-weight: bold; color: #17233A; text-align: right; }
+  .muted { color: #5B6573; }
+  .meta td { border: 1px solid #D7DEE6; background: #F1F5F9; padding: 3pt 6pt; vertical-align: top; }
+  .label { font-size: 7.5pt; color: #5B6573; display: block; }
+  .value { font-size: 9.5pt; font-weight: bold; color: #17233A; display: block; }
+  .parties td { border: 1px solid #D7DEE6; padding: 4pt 6pt; vertical-align: top; width: 50%; }
+  .section-title { font-weight: bold; color: #17233A; font-size: 9.5pt; margin: 8pt 0 3pt; border-bottom: 1.5px solid #17233A; }
+  .items th { background: #17233A; color: #fff; font-size: 8pt; padding: 3pt 4pt; text-align: left; }
+  .items td { border-bottom: 1px solid #D7DEE6; padding: 3pt 4pt; font-size: 8.5pt; vertical-align: top; }
+  .num { text-align: right; white-space: nowrap; }
+  .totals td { padding: 2pt 4pt; }
+  .totals .k { text-align: right; color: #5B6573; }
+  .totals .grand td { font-weight: bold; font-size: 10.5pt; color: #17233A; border-top: 1.5px solid #17233A; }
+  .words { margin-top: 4pt; font-style: italic; }
+  .box { border: 1px solid #D7DEE6; padding: 4pt 6pt; margin-top: 6pt; }
+  .sign { margin-top: 18pt; text-align: right; }
+  .banner { background: #EAF3DE; color: #27500A; padding: 4pt 8pt; margin: 6pt 0; font-weight: bold; }
+</style>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td>
+      <div class="company">{{ company.name }}</div>
+      {% for l in company.address_lines %}<div class="muted">{{ l }}</div>{% endfor %}
+      <div class="muted">GSTIN: {{ company.gstin }} · PAN: {{ company.pan }} · State: {{ company.state }}</div>
+      <div class="muted">{{ company.phone }} · {{ company.email }}</div>
+    </td>
+    <td class="doctype">{{ title }}{% if code == 'GTI' %}<div class="muted" style="font-size:8pt;">Original for recipient</div>{% endif %}</td>
+  </tr>
+</table>
+
+<table class="meta" style="margin-top:6pt;">
+  <tr>
+    <td><span class="label">{% if code == 'GTI' %}INVOICE NO.{% elseif code == 'DCH' %}CHALLAN NO.{% else %}REFERENCE{% endif %}</span><span class="value">{{ reference }}</span></td>
+    <td><span class="label">DATE</span><span class="value">{{ document_date }}</span></td>
+    <td><span class="label">ORDER</span><span class="value">{{ order_reference }}</span></td>
+    <td><span class="label">BUYER'S PO</span><span class="value">{% if buyer_po_ref %}{{ buyer_po_ref }}{% else %}—{% endif %}</span></td>
+    <td><span class="label">PLACE OF SUPPLY</span><span class="value">{{ place_of_supply }}</span></td>
+  </tr>
+</table>
+
+{% if code == 'DCH' and tax_invoice_no %}<p class="muted">Against tax invoice {{ tax_invoice_no }} dated {{ tax_invoice_date }}. Goods sent for supply to the buyer below.</p>{% endif %}
+
+<table class="parties" style="margin-top:6pt;">
+  <tr>
+    <td>
+      <span class="label">{% if code == 'GTI' %}BILLED TO (RECIPIENT){% else %}BUYER{% endif %}</span>
+      <strong>{{ buyer.name }}</strong>
+      {% for l in buyer.address_lines %}<div>{{ l }}</div>{% endfor %}
+      <div>GSTIN: {% if buyer.gstin %}{{ buyer.gstin }}{% else %}Unregistered{% endif %}</div>
+      <div>State: {{ buyer.state }}</div>
+    </td>
+    <td>
+      <span class="label">SHIPPED TO (DELIVERY ADDRESS)</span>
+      {% for l in delivery_address_lines %}<div>{{ l }}</div>{% endfor %}
+      <div>Place of supply: {{ place_of_supply }}</div>
+    </td>
+  </tr>
+</table>
+
+<div class="section-title">GOODS</div>
+<table class="items">
+  <tr>
+    <th>#</th><th>Description</th><th>HSN</th><th class="num">Qty</th><th>Unit</th>
+    <th class="num">Rate (₹)</th><th class="num">Taxable (₹)</th><th class="num">GST</th>
+    {% if intra_state %}<th class="num">CGST (₹)</th><th class="num">SGST (₹)</th>{% else %}<th class="num">IGST (₹)</th>{% endif %}
+    <th class="num">Total (₹)</th>
+  </tr>
+  {% for l in lines %}
+  <tr>
+    <td>{{ l.no }}</td><td>{{ l.description }}</td><td>{{ l.hsn_code }}</td><td class="num">{{ l.quantity }}</td><td>{{ l.unit }}</td>
+    <td class="num">{{ l.rate }}</td><td class="num">{{ l.taxable }}</td><td class="num">{{ l.gst_rate }}</td>
+    {% if intra_state %}<td class="num">{{ l.cgst }}</td><td class="num">{{ l.sgst }}</td>{% else %}<td class="num">{{ l.igst }}</td>{% endif %}
+    <td class="num">{{ l.line_total }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<table class="totals" style="width:55%; margin-left:45%; margin-top:4pt;">
+  <tr><td class="k">Taxable value</td><td class="num">₹ {{ taxable_total }}</td></tr>
+  {% if intra_state %}
+  <tr><td class="k">CGST</td><td class="num">₹ {{ cgst_total }}</td></tr>
+  <tr><td class="k">SGST</td><td class="num">₹ {{ sgst_total }}</td></tr>
+  {% else %}
+  <tr><td class="k">IGST</td><td class="num">₹ {{ igst_total }}</td></tr>
+  {% endif %}
+  <tr><td class="k">Round off</td><td class="num">₹ {{ round_off }}</td></tr>
+  <tr class="grand"><td class="k">{% if code == 'GTI' %}Invoice total{% else %}Total{% endif %}</td><td class="num">₹ {{ invoice_total }}</td></tr>
+</table>
+<div class="words">{{ amount_in_words }}</div>
+
+{% if code == 'GTI' %}
+<div class="section-title">HSN SUMMARY</div>
+<table class="items">
+  <tr><th>HSN</th><th class="num">GST</th><th class="num">Taxable (₹)</th>{% if intra_state %}<th class="num">CGST (₹)</th><th class="num">SGST (₹)</th>{% else %}<th class="num">IGST (₹)</th>{% endif %}<th class="num">Total tax (₹)</th></tr>
+  {% for h in hsn_summary %}
+  <tr><td>{{ h.hsn_code }}</td><td class="num">{{ h.gst_rate }}</td><td class="num">{{ h.taxable }}</td>{% if intra_state %}<td class="num">{{ h.cgst }}</td><td class="num">{{ h.sgst }}</td>{% else %}<td class="num">{{ h.igst }}</td>{% endif %}<td class="num">{{ h.tax_total }}</td></tr>
+  {% endfor %}
+</table>
+<p class="muted">Tax payable under reverse charge: No.{% if e_invoice_note %} E-invoice: the IRN and QR code are added from the e-invoice portal.{% endif %}</p>
+{% endif %}
+
+{% if show_transport %}
+<div class="section-title">TRANSPORT</div>
+<table class="meta">
+  <tr>
+    <td><span class="label">DISPATCH DATE</span><span class="value">{% if dispatch_date %}{{ dispatch_date }}{% else %}—{% endif %}</span></td>
+    <td><span class="label">TRANSPORTER</span><span class="value">{% if transporter_name %}{{ transporter_name }}{% else %}—{% endif %}{% if transporter_id %} ({{ transporter_id }}){% endif %}</span></td>
+    <td><span class="label">VEHICLE NO.</span><span class="value">{% if vehicle_no %}{{ vehicle_no }}{% else %}—{% endif %}</span></td>
+    <td><span class="label">LR NO.</span><span class="value">{% if lr_no %}{{ lr_no }}{% else %}—{% endif %}</span></td>
+    <td><span class="label">E-WAY BILL</span><span class="value">{% if eway_bill_no %}{{ eway_bill_no }} · {{ eway_bill_date }}{% else %}—{% endif %}</span></td>
+  </tr>
+</table>
+{% endif %}
+
+{% if code == 'DQT' %}
+<div class="section-title">TERMS</div>
+<div class="box">
+  <div>1. Prices are in Indian Rupees, per unit shown, with GST added as shown above.</div>
+  <div>2. This quotation is valid for {{ validity_days }} days from its date.</div>
+  <div>3. Payment: within {{ payment_terms_days }} days of the tax invoice, by bank transfer to the account below.</div>
+  <div>4. Delivery to the address above; transit by road, at the buyer's risk once handed to the transporter unless agreed otherwise in writing.</div>
+</div>
+{% elseif code == 'DOC' %}
+<div class="banner">We confirm your order on the terms below.</div>
+<div class="box">
+  <div>1. Prices and GST as above. Payment within {{ payment_terms_days }} days of the tax invoice, by bank transfer.</div>
+  <div>2. The tax invoice is issued when the goods are dispatched, with the e-way bill where the law asks for one.</div>
+  <div>3. Any change to quantity or delivery address must be confirmed in writing before dispatch.</div>
+</div>
+{% elseif code == 'GTI' %}
+<div class="section-title">PAYMENT</div>
+<div class="box">
+  <div>Due within {{ payment_terms_days }} days of this invoice. Please quote invoice {{ reference }} with your payment.</div>
+  <div>{{ company.name }} · {{ company.bank_name }}, {{ company.bank_branch }} · A/c {{ company.bank_account_no }} · IFSC {{ company.ifsc }}</div>
+</div>
+<p class="muted">Certified that the particulars given above are true and correct.</p>
+{% elseif code == 'DCH' %}
+<p class="muted">Received the goods above in good condition.</p>
+<table style="margin-top:14pt;"><tr><td>Receiver's signature and stamp: ______________________</td><td style="text-align:right;">Date: ______________</td></tr></table>
+{% endif %}
+
+<div class="sign">For {{ company.name }}<br><br><br>Authorised Signatory</div>
+</body>
+</html>

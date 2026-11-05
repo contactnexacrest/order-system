@@ -58,6 +58,8 @@ final class DivisionController
             'counts' => DivisionRepository::counts($id),
             'preflight' => $division['status'] === 'planned' ? DivisionRepository::preflight($id) : [],
             'orderRefFormat' => self::numberFormat($id),
+            'starterDepartments' => DivisionRepository::STARTER_DEPARTMENTS[$division['code']] ?? [],
+            'staffChoices' => $division['status'] === 'planned' ? DivisionRepository::staffChoices($id) : [],
         ], 'layout/base');
     }
 
@@ -173,6 +175,52 @@ final class DivisionController
         DivisionRepository::setStatus($id, 'planned', (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'DIVISION_DEACTIVATED', 'divisions', $id, 'status', 'active', 'planned');
         Flash::set('success', "{$division['name']} is back to planned.");
+        header("Location: /admin/divisions/{$id}");
+    }
+
+    /** D-257 Phase 2: creates a planned division's starting departments (Domestic Trade: Sales, Purchase, Dispatch). */
+    public function starterDepartments(array $params): void
+    {
+        $id = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $division = DivisionService::find($id);
+        if ($division === null || $id === DivisionService::EXPORT_ID) {
+            Flash::set('error', 'Division not found.');
+            header('Location: /admin/divisions');
+            return;
+        }
+        $made = DivisionRepository::createStarterDepartments($id);
+        AuditLogRepository::log((int) $user['id'], 'DIVISION_STARTER_DEPARTMENTS', 'divisions', $id, 'departments', null, (string) $made);
+        Flash::set('success', $made > 0 ? "{$made} departments created for {$division['name']}. Add their designations in Admin › Departments." : 'Its starting departments already exist.');
+        header("Location: /admin/divisions/{$id}");
+    }
+
+    /**
+     * D-257 Phase 2: puts a staff member into a division from Admin › Divisions —
+     * the way to staff a planned division before it is activated (the user's own
+     * Division field only appears once two divisions are active).
+     */
+    public function addStaff(array $params): void
+    {
+        $id = (int) $params['id'];
+        $user = AuthService::currentUser();
+        $division = DivisionService::find($id);
+        $staffId = (int) ($_POST['user_id'] ?? 0);
+        $staff = $staffId > 0 ? \App\Repositories\UserRepository::findById($staffId) : null;
+        $error = match (true) {
+            $division === null => 'Division not found.',
+            $staff === null || (int) ($staff['is_active'] ?? 0) !== 1 => 'Choose an active staff member.',
+            $staff['division_id'] === null => 'This person works at company level (sees every division); their division is not changed here.',
+            default => null,
+        };
+        if ($error !== null) {
+            Flash::set('error', $error);
+            header("Location: /admin/divisions/{$id}");
+            return;
+        }
+        DivisionRepository::setUserDivision($staffId, $id);
+        AuditLogRepository::log((int) $user['id'], 'USER_DIVISION_SET', 'users', $staffId, 'division_id', (string) $staff['division_id'], (string) $id);
+        Flash::set('success', "{$staff['name']} now works in {$division['name']}.");
         header("Location: /admin/divisions/{$id}");
     }
 

@@ -279,6 +279,23 @@ $canManageOrders = $__u && PermissionService::can((int) $__u['id'], $__u['role_i
   }
   </script>
   <?php endif; ?>
+  <?php if (\App\Services\DomesticOrderService::isActive()): /* D-257 Phase 2: GST registration, for Domestic Trade sales — shown only once Domestic Trade is active. */
+    $__states = \App\Repositories\DomesticOrderRepository::states(); ?>
+  <div class="section" id="client-gst" data-testid="client-gst">
+    <h2>GST registration (domestic sales)</h2>
+    <form method="post" action="/clients/<?= (int) $client['id'] ?>/gst" class="field-grid">
+      <?= Csrf::field() ?>
+      <label>GSTIN<input type="text" name="gstin" maxlength="15" pattern="[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][1-9A-Za-z][Zz][0-9A-Za-z]" value="<?= htmlspecialchars((string) ($client['gstin'] ?? '')) ?>" placeholder="e.g. 29ABCDE1234F1Z5"></label>
+      <label>State
+        <select name="gst_state_code"><option value="">—</option><?php foreach ($__states as $s): ?><option value="<?= htmlspecialchars($s['code']) ?>" <?= ($client['gst_state_code'] ?? '') === $s['code'] ? 'selected' : '' ?>><?= htmlspecialchars($s['name'] . ' (' . $s['code'] . ')') ?></option><?php endforeach; ?></select>
+      </label>
+      <label>Usual place of supply
+        <select name="place_of_supply_state"><option value="">—</option><?php foreach ($__states as $s): ?><option value="<?= htmlspecialchars($s['code']) ?>" <?= ($client['place_of_supply_state'] ?? '') === $s['code'] ? 'selected' : '' ?>><?= htmlspecialchars($s['name'] . ' (' . $s['code'] . ')') ?></option><?php endforeach; ?></select>
+      </label>
+      <p><button type="submit" class="btn-secondary">Save GST details</button></p>
+    </form>
+  </div>
+  <?php endif; ?>
 </div>
 
 <?php if (!empty($client["id"])) { $__partyType = "client"; $__partyId = (int) $client["id"]; require __DIR__ . "/../agreements/_party_card.php"; } ?>

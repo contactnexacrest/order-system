@@ -57,6 +57,9 @@ async function show(req, res) {
     preflight: division.status === 'planned' ? await divisionRepository.preflight(id) : [],
     orderRefFormat: await numberFormat(id),
     isExport: id === divisionService.EXPORT_ID,
+    starterDepartments: divisionRepository.STARTER_DEPARTMENTS[division.code] || [],
+    starterDepartmentNames: (divisionRepository.STARTER_DEPARTMENTS[division.code] || []).map((d) => d[1]).join(', '),
+    staffChoices: division.status === 'planned' ? await divisionRepository.staffChoices(id) : [],
   });
 }
 
@@ -145,6 +148,46 @@ async function deactivate(req, res) {
   res.redirect(`/admin/divisions/${id}`);
 }
 
+/** D-257 Phase 2: creates a planned division's starting departments (Domestic Trade: Sales, Purchase, Dispatch). */
+async function starterDepartments(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const division = await divisionService.find(id);
+  if (!division || id === divisionService.EXPORT_ID) {
+    flash.set(req, 'error', 'Division not found.');
+    res.redirect('/admin/divisions');
+    return;
+  }
+  const made = await divisionRepository.createStarterDepartments(id);
+  await auditLogRepository.log(req.user.id, 'DIVISION_STARTER_DEPARTMENTS', 'divisions', id, 'departments', null, String(made));
+  flash.set(req, 'success', made > 0 ? `${made} departments created for ${division.name}. Add their designations in Admin › Departments.` : 'Its starting departments already exist.');
+  res.redirect(`/admin/divisions/${id}`);
+}
+
+/**
+ * D-257 Phase 2: puts a staff member into a division from Admin › Divisions —
+ * the way to staff a planned division before it is activated (the user's own
+ * Division field only appears once two divisions are active).
+ */
+async function addStaff(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const division = await divisionService.find(id);
+  const staffId = parseInt(req.body.user_id || 0, 10);
+  const staff = staffId > 0 ? await require('../repositories/userRepository').findById(staffId) : null;
+  let error = null;
+  if (!division) error = 'Division not found.';
+  else if (!staff || Number(staff.is_active || 0) !== 1) error = 'Choose an active staff member.';
+  else if (staff.division_id === null) error = 'This person works at company level (sees every division); their division is not changed here.';
+  if (error !== null) {
+    flash.set(req, 'error', error);
+    res.redirect(`/admin/divisions/${id}`);
+    return;
+  }
+  await divisionRepository.setUserDivision(staffId, id);
+  await auditLogRepository.log(req.user.id, 'USER_DIVISION_SET', 'users', staffId, 'division_id', String(staff.division_id), String(id));
+  flash.set(req, 'success', `${staff.name} now works in ${division.name}.`);
+  res.redirect(`/admin/divisions/${id}`);
+}
+
 async function parseDivisionField(raw) {
   const value = String(raw === undefined || raw === null ? '' : raw);
   if (value === '') return { ok: true, id: null };
@@ -180,4 +223,4 @@ async function setDepartmentDivision(req, res) {
   res.redirect('/admin/departments');
 }
 
-module.exports = { SETTING_SCOPES, choose, index, show, numberFormat, saveModules, saveSetting, deleteSetting, activate, deactivate, setUserDivision, setDepartmentDivision };
+module.exports = { SETTING_SCOPES, choose, index, show, numberFormat, saveModules, saveSetting, deleteSetting, activate, deactivate, setUserDivision, setDepartmentDivision, starterDepartments, addStaff };

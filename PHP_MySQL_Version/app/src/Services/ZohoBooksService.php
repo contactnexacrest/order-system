@@ -229,6 +229,10 @@ final class ZohoBooksService
         if ($gst) {
             $payload['gst_treatment'] = 'overseas';
         }
+        // D-257 Phase 2: the Division reporting tag, only once two or more divisions are active (none today).
+        if (($tags = self::divisionTags(self::orderDivisionId($invoice['order_id'] ?? null))) !== []) {
+            $payload['tags'] = $tags;
+        }
 
         if ($gst && strlen((string) $invoice['invoice_number']) > 16) {
             // GST: a tax invoice number may have at most 16 characters (Books
@@ -1332,6 +1336,144 @@ final class ZohoBooksService
         if ($response['status'] < 200 || $response['status'] >= 300) {
             throw new \RuntimeException("Zoho Books could not mark the {$kind} inactive (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
         }
+    }
+
+    // ---------------------------------------------------------------- D-257 Phase 2: divisions and domestic sales
+
+    private static function orderDivisionId(mixed $orderId): int
+    {
+        if ($orderId === null) {
+            return DivisionService::EXPORT_ID;
+        }
+        $stmt = \App\Config\Database::connection()->prepare('SELECT division_id FROM orders WHERE id = :id');
+        $stmt->execute(['id' => (int) $orderId]);
+        return (int) ($stmt->fetchColumn() ?: DivisionService::EXPORT_ID);
+    }
+
+    /**
+     * The "Division" reporting tag for a Books record — only when two or more
+     * divisions are active (with one it says nothing) and the tag is set up in
+     * Settings: zoho_division_tag_id, and zoho_division_tag_option_<code> for
+     * each division (e.g. zoho_division_tag_option_dom). Otherwise none, so
+     * nothing sent to Books changes.
+     *
+     * @return list<array{tag_id:string, tag_option_id:string}>
+     */
+    public static function divisionTags(int $divisionId): array
+    {
+        if (!DivisionService::isMulti()) {
+            return [];
+        }
+        $division = DivisionService::find($divisionId);
+        $tagId = trim((string) CompanySettingsRepository::companyValue('zoho_division_tag_id'));
+        $option = $division !== null ? trim((string) CompanySettingsRepository::companyValue('zoho_division_tag_option_' . strtolower((string) $division['code']))) : '';
+        return $tagId !== '' && $option !== '' ? [['tag_id' => $tagId, 'tag_option_id' => $option]] : [];
+    }
+
+    /**
+     * A Domestic Trade GST tax invoice as a Books invoice (pure: no network).
+     * Same state: each line at the GST group (GST18 = CGST + SGST); another
+     * state: IGST18. gst_treatment business_gst with the buyer's GSTIN (an
+     * unregistered buyer: business_none), place of supply as Books' state code.
+     * Rule D-212: the notes say what the invoice is, for which order and buyer.
+     *
+     * @param callable(string): string $taxIdByName
+     * @return array<string,mixed>
+     */
+    public static function domesticInvoicePayload(int $orderId, string $contactId, callable $taxIdByName): array
+    {
+        $order = \App\Repositories\OrderRepository::find($orderId);
+        $dom = \App\Repositories\DomesticOrderRepository::find($orderId);
+        if ($order === null || $dom === null || empty($dom['tax_invoice_no'])) {
+            throw new \RuntimeException('This domestic order has no tax invoice yet.');
+        }
+        $t = DomesticOrderService::totals($orderId);
+        $lines = [];
+        foreach ($t['lines'] as $l) {
+            $rate = DomesticDocumentService::trimDecimals((string) $l['gst_rate_pct']);
+            $lines[] = [
+                'name' => mb_substr((string) $l['description'], 0, 100),
+                'description' => (string) $l['description'],
+                'hsn_or_sac' => (string) $l['hsn_code'],
+                'quantity' => (float) $l['quantity'],
+                'unit' => (string) $l['unit'],
+                'rate' => (float) $l['rate_inr'],
+                'tax_id' => $taxIdByName(($t['intra_state'] ? 'GST' : 'IGST') . $rate),
+            ];
+        }
+        $pos = \App\Repositories\DomesticOrderRepository::stateAbbr((string) $dom['place_of_supply']);
+        $payload = [
+            'customer_id' => $contactId,
+            'invoice_number' => (string) $dom['tax_invoice_no'],
+            'reference_number' => (string) $order['order_reference'],
+            'date' => (string) $dom['tax_invoice_date'],
+            'due_date' => date('Y-m-d', strtotime((string) $dom['tax_invoice_date'] . ' +' . (int) $dom['payment_terms_days'] . ' days')),
+            'gst_treatment' => !empty($dom['buyer_gstin']) ? 'business_gst' : 'business_none',
+            'place_of_supply' => $pos,
+            'line_items' => $lines,
+            'notes' => "Domestic GST tax invoice {$dom['tax_invoice_no']} for order {$order['order_reference']}, {$order['company_legal_name']}, place of supply " . \App\Repositories\DomesticOrderRepository::stateName((string) $dom['place_of_supply']) . '.',
+        ];
+        if (!empty($dom['buyer_gstin'])) {
+            $payload['gst_no'] = (string) $dom['buyer_gstin'];
+        }
+        if (($tags = self::divisionTags((int) $order['division_id'])) !== []) {
+            $payload['tags'] = $tags;
+        }
+        return $payload;
+    }
+
+    /**
+     * Sends a Domestic Trade tax invoice to Books (created once; a retry finds
+     * it by number). The buyer becomes a Books customer in INR with its GSTIN.
+     * Live test in the Zoho TEST organisation still pending (no credentials yet).
+     */
+    public static function pushDomesticInvoice(int $orderId): string
+    {
+        $order = \App\Repositories\OrderRepository::find($orderId);
+        $dom = \App\Repositories\DomesticOrderRepository::find($orderId);
+        if ($order === null || $dom === null || empty($dom['tax_invoice_no'])) {
+            throw new \RuntimeException('This domestic order has no tax invoice yet.');
+        }
+        ZohoGuard::assertCustomerAllowed((string) $order['company_legal_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $query = '?organization_id=' . rawurlencode($config['organizationId']);
+        $client = ClientRepository::find((int) $order['client_id']);
+        $contactId = (string) ($client['zoho_contact_id'] ?? '');
+        if ($contactId === '') {
+            $contact = [
+                'contact_name' => (string) $order['company_legal_name'],
+                'contact_type' => 'customer',
+                'currency_code' => 'INR',
+                'gst_treatment' => !empty($dom['buyer_gstin']) ? 'business_gst' : 'business_none',
+                'place_of_contact' => \App\Repositories\DomesticOrderRepository::stateAbbr((string) ($dom['buyer_state_code'] ?? $dom['place_of_supply'])),
+            ];
+            if (!empty($dom['buyer_gstin'])) {
+                $contact['gst_no'] = (string) $dom['buyer_gstin'];
+            }
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts{$query}", $contact, self::authHeaders($accessToken));
+            $decoded = json_decode($response['body'], true);
+            $contactId = (string) ($decoded['contact']['contact_id'] ?? '');
+            if ($contactId === '') {
+                throw new \RuntimeException('Zoho Books contact creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+            ClientRepository::setZohoContactId((int) $order['client_id'], $contactId);
+        }
+        $payload = self::domesticInvoicePayload($orderId, $contactId, static fn (string $name): string => self::taxId($config, $accessToken, $name));
+        $existing = self::findInvoiceByNumber($config, $accessToken, (string) $dom['tax_invoice_no']);
+        if ($existing !== null) {
+            $invoiceId = (string) $existing['invoice_id'];
+        } else {
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/invoices{$query}&ignore_auto_number_generation=true", $payload, self::authHeaders($accessToken));
+            $decoded = json_decode($response['body'], true);
+            $invoiceId = (string) ($decoded['invoice']['invoice_id'] ?? '');
+            if ($invoiceId === '') {
+                throw new \RuntimeException('Zoho Books invoice creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+        }
+        $__user = AuthService::currentUser();
+        \App\Repositories\DomesticOrderRepository::update($orderId, ['zoho_invoice_id' => $invoiceId], $__user !== null ? (int) $__user['id'] : null);
+        return $invoiceId;
     }
 
     private static function config(): array
