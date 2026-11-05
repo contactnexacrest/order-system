@@ -232,6 +232,26 @@ async function zohoSync(req, res) {
  * Reads only. (sessionAuth already applies the order's visibility rules to
  * every /orders/:id/ path.)
  */
+/**
+ * D-257 Zoho: the "App vs Zoho" check of a Domestic Trade order, an import or
+ * a merchant trade deal (reads only). The record's own controller checks
+ * access first.
+ */
+async function divisionZohoCheck(req, res, kind, id, back, title, party) {
+  let result = null;
+  let error = null;
+  if (!(await zohoBooksService.isEnabled())) {
+    error = 'Zoho Books is not enabled on this server, so there is nothing to compare with.';
+  } else {
+    try {
+      result = await require('../services/divisionZohoSync').check(kind, id);
+    } catch (e) {
+      error = `Could not read Zoho Books: ${e.message}`;
+    }
+  }
+  res.renderView('ca/division_zoho_check', { back, title, party, result, error, statusLabels: orderZohoMatchService.STATUS_LABELS }, 'layout/base');
+}
+
 async function orderZohoCheck(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -304,24 +324,26 @@ async function runZohoSync(req, res) {
   const result = await caSyncService.runFullSync('manual', user.id);
   const { revenue, purchases, expenses, benefits } = result;
   const gstRefunds = result.gst_refunds;
+  const divisions = result.divisions || { sent: 0, failed: 0, skipped: 0 };
   const master = result.master_data || { clients: 0, products: 0, inactivated: 0, failed: 0 };
 
   const done = (master.clients + master.products + master.inactivated > 0 ? `${master.clients} client(s) and ${master.products} product(s) sent or updated, ${master.inactivated} marked inactive, ` : '') + `${revenue.invoices} invoice(s) sent or updated, ${revenue.synced} payment(s) pushed, ${revenue.applied} payment(s) applied to invoices, `
-    + `${purchases.bills} bill(s), ${purchases.payments} vendor payment(s) (${purchases.applied} applied to bills) and ${purchases.expenses} order expense(s) / cost(s) sent, ${benefits.journals} export benefit journal(s) sent or updated, ${gstRefunds.journals} GST refund journal(s) sent, ${expenses.imported} expense(s) imported, ${expenses.updated} updated and ${expenses.removed} removed as in Zoho Books`;
-  const failed = revenue.failed + purchases.failed + expenses.failed + benefits.failed + gstRefunds.failed + master.failed;
+    + `${purchases.bills} bill(s), ${purchases.payments} vendor payment(s) (${purchases.applied} applied to bills) and ${purchases.expenses} order expense(s) / cost(s) sent, ${benefits.journals} export benefit journal(s) sent or updated, ${gstRefunds.journals} GST refund journal(s) sent, ${expenses.imported} expense(s) imported, ${expenses.updated} updated and ${expenses.removed} removed as in Zoho Books`
+    + (divisions.sent > 0 ? `, ${divisions.sent} Domestic Trade / Import & Distribution / Merchant Trade record(s) sent` : '');
+  const failed = revenue.failed + purchases.failed + expenses.failed + benefits.failed + gstRefunds.failed + master.failed + divisions.failed;
   if (result.stopped) {
     // Owner decision 2 Nov 2026 (D-239): stopped at once — the rest waits for the next sync.
     flash.set(req, 'warning', `Sync stopped: ${result.stopped} Sent before it stopped: ${done}.`);
   } else if (failed > 0) {
     flash.set(req, 'warning', `Sync finished: ${done}, ${failed} failed — see the log below for details.`);
-  } else if (master.clients + master.products + master.inactivated > 0 || revenue.synced > 0 || revenue.invoices > 0 || revenue.applied > 0 || purchases.bills + purchases.payments + purchases.applied + purchases.expenses > 0 || benefits.journals + benefits.removed + gstRefunds.journals > 0 || expenses.imported + expenses.updated + expenses.removed > 0) {
+  } else if (master.clients + master.products + master.inactivated > 0 || revenue.synced > 0 || revenue.invoices > 0 || revenue.applied > 0 || purchases.bills + purchases.payments + purchases.applied + purchases.expenses > 0 || benefits.journals + benefits.removed + gstRefunds.journals > 0 || expenses.imported + expenses.updated + expenses.removed > 0 || divisions.sent > 0) {
     flash.set(req, 'success', `Sync finished: ${done}.`);
   } else {
     flash.set(req, 'success', "Sync ran — nothing was pending (or Zoho Books isn't configured yet). See the log below.");
   }
   // External QA report N-08: this action never reached the audit log,
   // so it never notified anyone either.
-  await auditLogRepository.log(user.id, 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, `revenue: ${revenue.invoices} invoices, ${revenue.synced} synced, ${revenue.applied} applied/${revenue.failed} failed, purchases: ${purchases.bills} bills, ${purchases.payments} payments, ${purchases.applied} applied, ${purchases.expenses} expenses/${purchases.failed} failed, benefits: ${benefits.journals} journals, ${benefits.removed} removed/${benefits.failed} failed, GST refunds: ${gstRefunds.journals} journals/${gstRefunds.failed} failed, expenses: ${expenses.imported} imported, ${expenses.updated} updated, ${expenses.removed} removed/${expenses.failed} failed`);
+  await auditLogRepository.log(user.id, 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, `revenue: ${revenue.invoices} invoices, ${revenue.synced} synced, ${revenue.applied} applied/${revenue.failed} failed, purchases: ${purchases.bills} bills, ${purchases.payments} payments, ${purchases.applied} applied, ${purchases.expenses} expenses/${purchases.failed} failed, benefits: ${benefits.journals} journals, ${benefits.removed} removed/${benefits.failed} failed, GST refunds: ${gstRefunds.journals} journals/${gstRefunds.failed} failed, expenses: ${expenses.imported} imported, ${expenses.updated} updated, ${expenses.removed} removed/${expenses.failed} failed, divisions: ${divisions.sent} sent/${divisions.failed} failed`);
   res.redirect('/ca/zoho-sync');
 }
 
@@ -738,6 +760,15 @@ async function matchBankLineToRevenue(req, res) {
     res.redirect('/ca/bank-statement');
     return;
   }
+  // QA ACC-5: the bank line must exist, and the order must exist and be one of the user's divisions.
+  if (await recordCheck.missing(req, res, 'ca_bank_statement_lines', lineId, '/ca/bank-statement', 'bank line')) {
+    return;
+  }
+  if (!(await orderRepository.find(orderId)) || !(await require('../services/divisionService').allowsOrderId(orderId))) {
+    flash.set(req, 'error', 'That order was not found.');
+    res.redirect('/ca/bank-statement');
+    return;
+  }
 
   const ops = (await orderPaymentStatusRepository.find(orderId)) || {};
   const clearedAt = leg === 'lc' ? ((await orderLcDetailRepository.find(orderId)) || {}).lc_received_at ?? null : (ops[`${leg}_cleared_at`] ?? null);
@@ -919,7 +950,7 @@ async function tdsSummary(req, res) {
 }
 
 module.exports = {
-  index, cafinExport, reports, zohoSync, runZohoSync, repushMasterData, syncOrderToZoho, orderZohoCheck, expenses, setExpenseTds, linkExpenseToOrder, tdsSummary,
+  index, cafinExport, reports, zohoSync, runZohoSync, repushMasterData, syncOrderToZoho, orderZohoCheck, divisionZohoCheck, expenses, setExpenseTds, linkExpenseToOrder, tdsSummary,
   exportBenefits, recordExportBenefit, markExportBenefitReceived,
   bankStatement, uploadBankStatement, matchBankLineToRevenue, matchBankLineToExpense, unmatchBankLine, reconciliation,
   fyLocks, lockFinancialYear, unlockFinancialYear,

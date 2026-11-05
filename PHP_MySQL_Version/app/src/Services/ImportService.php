@@ -540,6 +540,32 @@ final class ImportService
         return null;
     }
 
+    /**
+     * D-257 Zoho: the customs duty and IGST paid for the bill of entry
+     * (ICEGATE e-payment) — its date and challan / bank reference (D-212).
+     * It goes to Zoho Books as a payment to Customs on the duty bill.
+     */
+    public static function saveDutyPayment(int $id, array $in, int $userId): ?string
+    {
+        $s = ImportRepository::find($id);
+        $date = trim((string) ($in['duty_paid_on'] ?? ''));
+        $ref = trim((string) ($in['duty_bank_reference'] ?? ''));
+        $error = match (true) {
+            $s === null => 'Import not found.',
+            empty($s['boe_no']) || $s['bcd_total'] === null => 'Record the bill of entry (customs clearance) first: the duty is worked out from it.',
+            !empty($s['duty_zoho_payment_id']) => 'This duty payment is already in Zoho Books, so it cannot be changed here. Ask the CA to correct it in Books.',
+            !self::isDate($date) || $date < (string) $s['boe_date'] || $date > date('Y-m-d') => 'Enter the date the duty was paid (on or after the bill of entry date, not in the future).',
+            $ref === '' || mb_strlen($ref) > 60 => 'Enter the challan or bank reference of the duty payment (e.g. ICEGATE challan CIN).',
+            default => null,
+        };
+        if ($error !== null) {
+            return $error;
+        }
+        ImportRepository::update($id, ['duty_paid_on' => $date, 'duty_bank_reference' => $ref], $userId);
+        AuditLogRepository::log($userId, 'IMPORT_DUTY_PAID', 'import_shipments', $id, 'duty_bank_reference', $s['duty_bank_reference'], $ref);
+        return null;
+    }
+
     /** Rule D-212: what a payment abroad is, to whom, for which import, at what rate, and the bank reference. */
     public static function paymentDescription(array $s, string $kind, string $amountFc, string $fxRate, string $amountInr, string $bankReference, ?string $note): string
     {

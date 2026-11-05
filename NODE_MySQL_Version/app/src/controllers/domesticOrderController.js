@@ -177,13 +177,17 @@ const generate = action(async (req, id) => {
   return error;
 }, (id, req) => `${D.DOCUMENTS[req.domDocCode] || 'Document'} generated.`, 'dom-documents');
 const pushZoho = action(async (req, id) => {
-  try {
-    await require('../services/zohoBooksService').pushDomesticInvoice(id, req.user.id);
-    return null;
-  } catch (e) {
-    return `Zoho Books: ${e.message}`;
-  }
-}, 'Tax invoice sent to Zoho Books.', 'dom-invoice');
+  const [error, ok] = await require('../services/divisionZohoSync').sendNow('order', id, req.user.id);
+  req.zohoOk = ok;
+  return error;
+}, (id, req) => req.zohoOk, 'dom-invoice');
+
+/** D-257 Zoho: the order's "App vs Zoho" check (reads only). */
+async function zohoCheck(req, res) {
+  const order = await loadOrder(req, res);
+  if (!order) return;
+  await require('./caController').divisionZohoCheck(req, res, 'order', Number(order.id), `/orders/${order.id}`, `Order ${order.order_reference}`, String(order.company_legal_name));
+}
 
 /** A client's GST registration (Domestic Trade). Shown on the client page only once Domestic Trade is active. */
 async function saveClientGst(req, res) {
@@ -211,4 +215,4 @@ async function saveClientGst(req, res) {
   res.redirect(`/clients/${clientId}#client-gst`);
 }
 
-module.exports = { create, store, show, pageData, saveParty, addLine, removeLine, savePurchase, saveDispatch, invoiceSent, recordPayment, advance, generate, pushZoho, saveClientGst };
+module.exports = { create, store, show, pageData, saveParty, addLine, removeLine, savePurchase, saveDispatch, invoiceSent, recordPayment, advance, generate, pushZoho, zohoCheck, saveClientGst };

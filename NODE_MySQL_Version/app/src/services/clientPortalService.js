@@ -143,6 +143,7 @@ async function attemptLogin(req, email, password) {
   await clientLoginRepository.resetFailedLogins(login.client_id);
   await regeneratePreserving(req, [STAFF_SESSION_KEY], () => {
     req.session[SESSION_CLIENT_ID] = login.client_id;
+    req.session[SESSION_PASSWORD_FP] = passwordFingerprint(login.password_hash);
   });
   await clientLoginRepository.updateLastLogin(login.client_id);
   await auditLogRepository.log(null, 'CLIENT_LOGIN_SUCCESS', 'clients', login.client_id);
@@ -214,8 +215,33 @@ function impersonatedByStaffId(req) {
   return req.session[SESSION_IMPERSONATED_BY] ?? null;
 }
 
-async function changePassword(clientId, newPassword) {
-  await clientLoginRepository.updatePassword(clientId, await passwordHash.hash(newPassword, 12), false);
+/**
+ * QA ACC-10: a fingerprint of the password this session logged in with. A
+ * password change or a staff reset changes the stored hash, so every other
+ * session of that client ends on its next request (as staff sessions do
+ * through users.session_version). Port of ClientPortalService::passwordFingerprint().
+ */
+const SESSION_PASSWORD_FP = '_client_portal_password_fp';
+function passwordFingerprint(hash) {
+  return require('crypto').createHash('sha256').update(String(hash || '')).digest('hex');
+}
+/** Whether this session's password is still the client's current one (a session from before the check is accepted and pinned). */
+function sessionPasswordStillCurrent(req, currentHash) {
+  const fp = passwordFingerprint(currentHash);
+  if (req.session[SESSION_PASSWORD_FP] === undefined || req.session[SESSION_PASSWORD_FP] === null) {
+    req.session[SESSION_PASSWORD_FP] = fp;
+    return true;
+  }
+  return req.session[SESSION_PASSWORD_FP] === fp;
+}
+
+async function changePassword(clientId, newPassword, req = null) {
+  const hash = await passwordHash.hash(newPassword, 12);
+  await clientLoginRepository.updatePassword(clientId, hash, false);
+  // QA ACC-10: this session (the one changing it) stays signed in; others end.
+  if (req && req.session && Number(currentClientId(req)) === Number(clientId)) {
+    req.session[SESSION_PASSWORD_FP] = passwordFingerprint(hash);
+  }
   await auditLogRepository.log(null, 'CLIENT_PASSWORD_CHANGED', 'clients', clientId);
 }
 
@@ -251,4 +277,6 @@ module.exports = {
   endImpersonation,
   isImpersonating,
   impersonatedByStaffId,
+  passwordFingerprint,
+  sessionPasswordStillCurrent,
 };

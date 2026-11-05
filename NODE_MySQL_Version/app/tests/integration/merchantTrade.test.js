@@ -203,7 +203,7 @@ describe('D-257 Phase 4 — Merchant Trade', () => {
     expect(await M.blockers(id)).toEqual(['Generate the sale invoice to the buyer.', 'Still to receive from the buyer: USD 19,250.00.']);
     expect(await step(() => M.fixInvoice(id, mttStaff.id))).toBeNull();
     d = await repo.find(id);
-    expect(d.sale_invoice_no).toMatch(/^MTT\/INV\/\d{2}-\d{2}\/\d{4}$/);
+    expect(d.sale_invoice_no).toMatch(/^MTT\/I\/\d{2}-\d{2}\/\d{4}$/);
     expect(await step(() => M.fixInvoice(id, mttStaff.id))).toBeNull();
     expect((await repo.find(id)).sale_invoice_no).toBe(d.sale_invoice_no);
     const inv = await merchantDocs.html(id, 'invoice');

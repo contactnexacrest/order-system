@@ -133,6 +133,7 @@ async function showData(s, permissions) {
     lcBankDefault: s.lc_bank || (await I.setting('imp_lc_bank')),
     chaDefault: s.cha_name || (await I.setting('imp_default_cha')),
     igstFmt: s.igst_total !== null && s.igst_total !== undefined ? G.inr(String(s.igst_total)) : '',
+    dutyTotalFmt: s.bcd_total !== null && s.bcd_total !== undefined ? G.inr((Number(s.bcd_total) + Number(s.sws_total) + Number(s.igst_total)).toFixed(2)) : '',
     payments: (await repo.payments(id)).map((p) => ({ ...p, kind_label: I.PAYMENT_KINDS[p.kind] || p.kind, amount_fmt: fcOf(p.amount_fc), inr_fmt: G.inr(String(p.amount_inr)) })),
     poFmt: I.fc(poCents),
     paidFmt: I.fc(paidCents),
@@ -169,6 +170,7 @@ const saveLc = act((req, id) => I.saveLc(id, req.body, req.user.id), 'LC saved.'
 const saveShipment = act((req, id) => I.saveShipment(id, req.body, req.user.id), 'Bill of lading saved.', 'imp-shipment');
 const saveClearance = act((req, id) => I.saveClearance(id, req.body, req.user.id), 'Customs clearance saved.', 'imp-clearance');
 const igstCredit = act((req, id) => I.saveIgstCredit(id, String(req.body.igst_credit_on || '').trim(), req.user.id), 'IGST input credit recorded.', 'imp-clearance');
+const dutyPayment = act((req, id) => I.saveDutyPayment(id, req.body, req.user.id), 'Customs duty payment recorded.', 'imp-clearance');
 const recordPayment = act((req, id) => I.recordPayment(id, req.body, req.user.id), 'Payment recorded.', 'imp-payments');
 
 async function advance(req, res) {
@@ -198,13 +200,15 @@ async function poDocument(req, res) {
 async function pushZoho(req, res) {
   const s = await shipment(req, res);
   if (!s) return;
-  let error = null;
-  try {
-    await require('../services/zohoBooksService').pushImport(Number(s.id), req.user.id);
-  } catch (e) {
-    error = `Zoho Books: ${e.message}`;
-  }
-  done(req, res, Number(s.id), error, 'Supplier bill and customs duty bill sent to Zoho Books.', 'imp-clearance');
+  const [error, ok] = await require('../services/divisionZohoSync').sendNow('import', Number(s.id), req.user.id);
+  done(req, res, Number(s.id), error, ok, 'imp-clearance');
+}
+
+/** D-257 Zoho: the import's "App vs Zoho" check (reads only). */
+async function zohoCheck(req, res) {
+  const s = await shipment(req, res);
+  if (!s) return;
+  await require('./caController').divisionZohoCheck(req, res, 'import', Number(s.id), `/import/${s.id}`, `Import ${s.reference}`, String(s.supplier_name));
 }
 
 // ------------------------------------------------------------ reports
@@ -280,5 +284,5 @@ async function toggleDutyRate(req, res) {
 
 module.exports = {
   index, indexData, create, store, show, showData, saveHeader, addLine, removeLine, saveLc, saveShipment, saveClearance, igstCredit,
-  recordPayment, advance, poDocument, pushZoho, reports, reportsData, dutyRates, storeDutyRate, toggleDutyRate,
+  recordPayment, dutyPayment, advance, poDocument, pushZoho, zohoCheck, reports, reportsData, dutyRates, storeDutyRate, toggleDutyRate,
 };

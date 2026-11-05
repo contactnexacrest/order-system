@@ -56,7 +56,7 @@ $__fyYear = (int) substr($fyStart, 0, 4);
             <form method="post" action="/associates/tds/<?= (int) $r['id'] ?>/challan" style="display:flex;gap:4px;flex-wrap:wrap">
               <?= Csrf::field() ?>
               <input type="hidden" name="fy" value="<?= htmlspecialchars($fyStart) ?>">
-              <input type="text" name="tds_challan_no" required minlength="5" maxlength="40" pattern="[0-9A-Za-z/ \-]+" value="<?= htmlspecialchars((string) ($r['tds_challan_no'] ?? '')) ?>" placeholder="e.g. 0510308 07112026 00045" aria-label="Challan no. (BSR code, date, serial)" style="width:12em">
+              <input type="text" name="tds_challan_no" required minlength="5" maxlength="40" pattern="[0-9A-Za-z\/ \-]+" value="<?= htmlspecialchars((string) ($r['tds_challan_no'] ?? '')) ?>" placeholder="e.g. 0510308 07112026 00045" aria-label="Challan no. (BSR code, date, serial)" style="width:12em">
               <input type="date" name="tds_challan_date" required min="<?= htmlspecialchars((string) $r['paid_on']) ?>" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars((string) ($r['tds_challan_date'] ?? '')) ?>" aria-label="Challan date">
               <button type="submit" class="btn-sm">Save</button>
             </form>

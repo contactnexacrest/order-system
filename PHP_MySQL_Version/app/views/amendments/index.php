@@ -20,6 +20,7 @@ $canEditLockedData = $__u && PermissionService::can((int) $__u['id'], $__u['role
         </label>
         <label>Requested By *
           <select name="requested_by" required>
+            <option value="">Choose…</option>
             <option value="importer">The Importer</option>
             <option value="exporter">NexaCrest</option>
           </select>

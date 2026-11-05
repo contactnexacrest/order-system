@@ -51,7 +51,7 @@ async function pendingReview() {
      FROM order_reorder_requests rr
      JOIN clients c ON c.id = rr.client_id
      JOIN orders o ON o.id = rr.source_order_id
-     WHERE rr.status = 'pending'
+     WHERE rr.status = 'pending'${require('../services/divisionService').sql('o.division_id')}
      ORDER BY rr.submitted_at ASC`
   );
 }
@@ -65,7 +65,7 @@ async function recentResolved(limit = 20) {
      JOIN orders o ON o.id = rr.source_order_id
      LEFT JOIN users u ON u.id = rr.reviewed_by
      LEFT JOIN orders no ON no.id = rr.new_order_id
-     WHERE rr.status != 'pending'
+     WHERE rr.status != 'pending'${require('../services/divisionService').sql('o.division_id')}
      ORDER BY rr.reviewed_at DESC
      LIMIT ${parseInt(limit, 10)}`
   );

@@ -41,6 +41,7 @@ function emptyResult() {
     expenses: { imported: 0, updated: 0, removed: 0, failed: 0, skipped: 0 },
     benefits: { journals: 0, removed: 0, failed: 0, skipped: 0 },
     gst_refunds: { journals: 0, failed: 0, skipped: 0 },
+    divisions: { sent: 0, failed: 0, skipped: 0 },
     stopped: null,
   };
 }
@@ -78,6 +79,8 @@ async function fullSync(triggeredBy, triggeredByUserId) {
     result.expenses = await importPendingExpenses(triggeredBy, triggeredByUserId);
     result.benefits = await syncBenefits(triggeredBy, triggeredByUserId);
     result.gst_refunds = await syncGstRefunds(triggeredBy, triggeredByUserId);
+    // D-257 Zoho: Domestic Trade, Import & Distribution and Merchant Trade money.
+    result.divisions = await require('./divisionZohoSync').run(triggeredBy, triggeredByUserId);
     if (dailyCheck) {
       await zohoRestoreService.markScheduledCheckDone();
     }

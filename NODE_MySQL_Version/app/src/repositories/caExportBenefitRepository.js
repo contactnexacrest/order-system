@@ -41,6 +41,7 @@ async function all() {
     `SELECT ceb.*, o.order_reference
      FROM ca_export_benefits ceb
      LEFT JOIN orders o ON o.id = ceb.order_id
+     WHERE 1 = 1${require('../services/divisionService').orderIdSql('ceb.order_id', true)}
      ORDER BY ceb.claimed_at DESC, ceb.id DESC`
   );
 }

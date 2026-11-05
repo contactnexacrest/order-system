@@ -84,6 +84,33 @@ final class SuperAdminService
     }
 
     /**
+     * QA ACC-3: only a PERMANENT Super Admin may hand out, take back or
+     * change Super Admin status — a delegate (whose access is meant to run
+     * out) cannot make itself or anyone else permanent, or hand out more
+     * delegations; nobody changes their own status; the target must be a
+     * real, active user.
+     *
+     * @throws \RuntimeException
+     */
+    public static function assertMayManage(int $actorId, ?int $targetUserId): void
+    {
+        $actor = UserRepository::findById($actorId);
+        if ($actor === null || (int) ($actor['is_super_admin'] ?? 0) !== 1) {
+            throw new \RuntimeException('Only a permanent Super Admin can change Super Admin access (a delegated Super Admin cannot).');
+        }
+        if ($targetUserId === null) {
+            return;
+        }
+        if ($targetUserId === $actorId) {
+            throw new \RuntimeException('You cannot change your own Super Admin access — ask another Super Admin.');
+        }
+        $target = UserRepository::findById($targetUserId);
+        if ($target === null || (int) ($target['is_active'] ?? 0) !== 1) {
+            throw new \RuntimeException('Choose an active user.');
+        }
+    }
+
+    /**
      * @throws \RuntimeException if the reason is too short, the target is
      *         already a permanent Super Admin, or already has an active
      *         delegation.
@@ -93,6 +120,7 @@ final class SuperAdminService
         if (mb_strlen(trim($reason)) < self::MIN_REASON_LENGTH) {
             throw new \RuntimeException('Reason must be at least ' . self::MIN_REASON_LENGTH . ' characters — describe why this delegation is needed.');
         }
+        self::assertMayManage($grantedBy, $delegateUserId);
         if (self::isEffective($delegateUserId)) {
             throw new \RuntimeException('This user is already a Super Admin or already has an active delegation.');
         }
@@ -120,6 +148,7 @@ final class SuperAdminService
         if (mb_strlen(trim($reason)) < self::MIN_REASON_LENGTH) {
             throw new \RuntimeException('Reason must be at least ' . self::MIN_REASON_LENGTH . ' characters.');
         }
+        self::assertMayManage($revokedBy, null);
 
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
@@ -151,6 +180,7 @@ final class SuperAdminService
         if (mb_strlen(trim($reason)) < self::MIN_REASON_LENGTH) {
             throw new \RuntimeException('Reason must be at least ' . self::MIN_REASON_LENGTH . ' characters.');
         }
+        self::assertMayManage($changedBy, $userId);
         if (!$isSuperAdmin && count(self::permanentSuperAdmins()) <= 1) {
             throw new \RuntimeException('Cannot remove the last remaining Super Admin — promote someone else first.');
         }

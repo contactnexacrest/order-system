@@ -212,18 +212,22 @@ final class DomesticOrderController
         self::done((int) $order['id'], $error, (DomesticOrderService::DOCUMENTS[$code] ?? 'Document') . ' generated.', 'dom-documents');
     }
 
+    /** D-257 Zoho: the order's "App vs Zoho" check (reads only). */
+    public function zohoCheck(array $params): void
+    {
+        if (($order = self::order($params)) === null) {
+            return;
+        }
+        \App\Controllers\CaController::divisionZohoCheck('order', (int) $order['id'], "/orders/{$order['id']}", 'Order ' . $order['order_reference'], (string) $order['company_legal_name']);
+    }
+
     public function pushZoho(array $params): void
     {
         if (($order = self::order($params)) === null) {
             return;
         }
-        $error = null;
-        try {
-            ZohoBooksService::pushDomesticInvoice((int) $order['id']);
-        } catch (\Throwable $e) {
-            $error = 'Zoho Books: ' . $e->getMessage();
-        }
-        self::done((int) $order['id'], $error, 'Tax invoice sent to Zoho Books.', 'dom-invoice');
+        [$error, $ok] = \App\Services\DivisionZohoSync::sendNow('order', (int) $order['id'], self::userId());
+        self::done((int) $order['id'], $error, $ok, 'dom-invoice');
     }
 
     /** A client's GST registration (Domestic Trade). Shown on the client page only once Domestic Trade is active. */

@@ -1411,6 +1411,9 @@ final class ZohoBooksService
             'gst_treatment' => !empty($dom['buyer_gstin']) ? 'business_gst' : 'business_none',
             'place_of_supply' => $pos,
             'line_items' => $lines,
+            // ZOH-8: the rupee round-off printed on the tax invoice, so Books' total is the invoice total.
+            'adjustment' => round((float) ($dom['round_off'] ?? 0), 2),
+            'adjustment_description' => 'Round off',
             'notes' => "Domestic GST tax invoice {$dom['tax_invoice_no']} for order {$order['order_reference']}, {$order['company_legal_name']}, place of supply " . \App\Repositories\DomesticOrderRepository::stateName((string) $dom['place_of_supply']) . '.',
         ];
         if (!empty($dom['buyer_gstin'])) {
@@ -1425,7 +1428,7 @@ final class ZohoBooksService
     /**
      * Sends a Domestic Trade tax invoice to Books (created once; a retry finds
      * it by number). The buyer becomes a Books customer in INR with its GSTIN.
-     * Live test in the Zoho TEST organisation still pending (no credentials yet).
+     * Live-tested in the Zoho TEST organisation on 5 Nov 2026 (Zoho change log Z-647 onwards).
      */
     public static function pushDomesticInvoice(int $orderId): string
     {
@@ -1438,31 +1441,17 @@ final class ZohoBooksService
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
         $query = '?organization_id=' . rawurlencode($config['organizationId']);
-        $client = ClientRepository::find((int) $order['client_id']);
-        $contactId = (string) ($client['zoho_contact_id'] ?? '');
-        if ($contactId === '') {
-            $contact = [
-                'contact_name' => (string) $order['company_legal_name'],
-                'contact_type' => 'customer',
-                'currency_code' => 'INR',
-                'gst_treatment' => !empty($dom['buyer_gstin']) ? 'business_gst' : 'business_none',
-                'place_of_contact' => \App\Repositories\DomesticOrderRepository::stateAbbr((string) ($dom['buyer_state_code'] ?? $dom['place_of_supply'])),
-            ];
-            if (!empty($dom['buyer_gstin'])) {
-                $contact['gst_no'] = (string) $dom['buyer_gstin'];
-            }
-            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts{$query}", $contact, self::authHeaders($accessToken));
-            $decoded = json_decode($response['body'], true);
-            $contactId = (string) ($decoded['contact']['contact_id'] ?? '');
-            if ($contactId === '') {
-                throw new \RuntimeException('Zoho Books contact creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
-            }
-            ClientRepository::setZohoContactId((int) $order['client_id'], $contactId);
+        if (strlen((string) $dom['tax_invoice_no']) > 16) {
+            throw new \RuntimeException("Invoice number {$dom['tax_invoice_no']} is longer than 16 characters, which Zoho Books does not accept for a GST invoice.");
         }
+        $contactId = self::domesticContact($config, $accessToken, $order, $dom);
         $payload = self::domesticInvoicePayload($orderId, $contactId, static fn (string $name): string => self::taxId($config, $accessToken, $name));
         $existing = self::findInvoiceByNumber($config, $accessToken, (string) $dom['tax_invoice_no']);
         if ($existing !== null) {
             $invoiceId = (string) $existing['invoice_id'];
+            if ((string) ($existing['status'] ?? '') === 'draft') {
+                self::markInvoiceSent($config, $accessToken, $invoiceId); // a retry after the app stopped before marking it
+            }
         } else {
             $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/invoices{$query}&ignore_auto_number_generation=true", $payload, self::authHeaders($accessToken));
             $decoded = json_decode($response['body'], true);
@@ -1470,6 +1459,8 @@ final class ZohoBooksService
             if ($invoiceId === '') {
                 throw new \RuntimeException('Zoho Books invoice creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
             }
+            // D-257 Zoho: sent (no e-mail goes out), so the buyer's receipts can be applied to it.
+            self::markInvoiceSent($config, $accessToken, $invoiceId);
         }
         $__user = AuthService::currentUser();
         \App\Repositories\DomesticOrderRepository::update($orderId, ['zoho_invoice_id' => $invoiceId], $__user !== null ? (int) $__user['id'] : null);
@@ -1484,8 +1475,10 @@ final class ZohoBooksService
      * IGST paid at customs is held until it is taken as input credit.
      */
     public const IMPORT_ACCOUNTS = [
-        'goods' => 'Inventory Asset',
-        'duty' => 'Inventory Asset',
+        // Live test 5 Nov 2026: Books' "Inventory Asset" is a stock account that needs an item on every line, so the
+        // landed cost goes to an "Imported Goods Stock" asset account instead (name to be confirmed by the CA).
+        'goods' => 'Imported Goods Stock',
+        'duty' => 'Imported Goods Stock',
         'igst_paid' => 'IGST Paid on Import',
         'igst_credit' => 'Input IGST',
     ];
@@ -1590,11 +1583,61 @@ final class ZohoBooksService
         return $payload;
     }
 
+    /** The import's clearance charges (₹), by line: freight, insurance, CHA, port and terminal, other. */
+    public const IMPORT_CLEARANCE_CHARGES = [
+        'freight_inr' => 'Freight',
+        'insurance_inr' => 'Insurance',
+        'cha_inr' => 'CHA charges',
+        'port_inr' => 'Port and terminal charges',
+        'other_inr' => 'Other clearance charges',
+    ];
+
+    public static function importClearanceTotal(array $s): float
+    {
+        $t = 0.0;
+        foreach (array_keys(self::IMPORT_CLEARANCE_CHARGES) as $k) {
+            $t += (float) ($s[$k] ?? 0);
+        }
+        return round($t, 2);
+    }
+
+    /**
+     * D-257 Zoho: the clearance charges of an import (pure: no network) as
+     * one Books bill from the CHA, to stock (they are part of the landed
+     * cost). Rule D-212: each line and the notes say what it is and for
+     * which import and bill of entry.
+     *
+     * @param callable(string): string $accountIdByName
+     * @return array<string,mixed>
+     */
+    public static function importClearanceBillPayload(array $s, string $vendorId, callable $accountIdByName): array
+    {
+        $what = "import PO {$s['reference']}, bill of entry {$s['boe_no']} dated {$s['boe_date']}";
+        $lines = [];
+        foreach (self::IMPORT_CLEARANCE_CHARGES as $k => $label) {
+            if ((float) ($s[$k] ?? 0) > 0) {
+                $lines[] = ['account_id' => $accountIdByName(self::IMPORT_ACCOUNTS['goods']), 'name' => $label, 'description' => "{$label} on {$what}", 'quantity' => 1, 'rate' => round((float) $s[$k], 2)];
+            }
+        }
+        $payload = [
+            'vendor_id' => $vendorId,
+            'bill_number' => 'CLR-' . $s['boe_no'],
+            'reference_number' => (string) $s['reference'],
+            'date' => (string) ($s['clearance_date'] ?: $s['boe_date']),
+            'line_items' => $lines,
+            'notes' => "Clearance charges on {$what}, through {$s['cha_name']} (part of the landed cost).",
+        ];
+        if (($tags = self::divisionTags((int) $s['division_id'])) !== []) {
+            $payload['tags'] = $tags;
+        }
+        return $payload;
+    }
+
     /**
      * Sends a cleared import to Books: the supplier's bill and the customs
      * duty bill (each created once; a retry finds it by number), and the IGST
-     * credit journal once the credit is recorded. Live test in the Zoho TEST
-     * organisation still pending (no credentials yet).
+     * credit journal once the credit is recorded. Live-tested in the Zoho TEST
+     * organisation on 5 Nov 2026 (Z-647 onwards).
      *
      * @return array{bill_id:string, duty_bill_id:string}
      */
@@ -1609,28 +1652,23 @@ final class ZohoBooksService
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
         $account = static fn (string $name): string => self::accountId($config, $accessToken, $name);
         $query = '?organization_id=' . rawurlencode($config['organizationId']);
-        $vendor = static function (string $name, ?string $currency) use ($config, $accessToken, $query): string {
-            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/contacts{$query}&contact_type=vendor&contact_name=" . rawurlencode($name), 'contacts') as $row) {
-                if ((string) ($row['contact_name'] ?? '') === $name) {
-                    return (string) $row['contact_id'];
-                }
-            }
-            $payload = ['contact_name' => $name, 'company_name' => $name, 'contact_type' => 'vendor'] + ($currency !== null ? ['currency_code' => $currency, 'gst_treatment' => 'overseas'] : []);
-            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts{$query}", $payload, self::authHeaders($accessToken));
-            $id = json_decode($response['body'], true)['contact']['contact_id'] ?? null;
-            if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($id)) {
-                throw new \RuntimeException('Zoho Books vendor creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
-            }
-            return $id;
-        };
+        $vendor = static fn (string $name, ?string $currency): string => self::namedContact($config, $accessToken, $name, 'vendor', $currency);
         $supplierId = $vendor((string) $s['supplier_name'], (string) $s['currency_code']);
         $customsName = ZohoGuard::isProduction() ? 'Indian Customs' : ZohoGuard::TEST_PREFIX . 'Indian Customs';
         $customsId = $vendor($customsName, null);
         $ids = [];
-        foreach ([
+        $bills = [
             'bill_id' => [(string) $s['reference'], $supplierId, self::importBillPayload($s, \App\Repositories\ImportRepository::lines($shipmentId), $supplierId, $account), 'zoho_bill_id'],
             'duty_bill_id' => ['BE-' . $s['boe_no'], $customsId, self::customsDutyBillPayload($s, $customsId, $account), 'zoho_duty_bill_id'],
-        ] as $key => [$number, $vendorId, $payload, $column]) {
+        ];
+        if (self::importClearanceTotal($s) > 0) {
+            // D-257 Zoho: the clearance charges as a bill from the CHA (landed cost).
+            $chaName = trim((string) $s['cha_name']) !== '' ? (string) $s['cha_name'] : 'Import clearance agent';
+            self::assertVendorAllowed($chaName);
+            $chaId = self::namedContact($config, $accessToken, $chaName, 'vendor', null);
+            $bills['clearance_bill_id'] = ['CLR-' . $s['boe_no'], $chaId, self::importClearanceBillPayload($s, $chaId, $account), 'zoho_clearance_bill_id'];
+        }
+        foreach ($bills as $key => [$number, $vendorId, $payload, $column]) {
             $existing = !empty($s[$column]) ? ['bill_id' => $s[$column]] : self::findBill($config, $accessToken, $number, $vendorId);
             if ($existing === null) {
                 $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/bills{$query}", $payload, self::authHeaders($accessToken));
@@ -1746,8 +1784,8 @@ final class ZohoBooksService
     /**
      * Sends a merchant trade deal to Books: the sale invoice (customer = the
      * foreign buyer) and the supplier's bill, each created once (a retry
-     * finds it by number). Live test in the Zoho TEST organisation still
-     * pending (no credentials yet).
+     * finds it by number). Live-tested in the Zoho TEST organisation on 5 Nov
+     * 2026 (Z-647 onwards).
      *
      * @return array{invoice_id:string, bill_id:string}
      */
@@ -1759,23 +1797,14 @@ final class ZohoBooksService
         }
         ZohoGuard::assertCustomerAllowed((string) $d['buyer_name']);
         self::assertVendorAllowed((string) $d['supplier_name']);
+        if (strlen((string) $d['sale_invoice_no']) > 16) {
+            throw new \RuntimeException("Invoice number {$d['sale_invoice_no']} is longer than 16 characters, which Zoho Books does not accept.");
+        }
         $config = self::config();
         $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
         $account = static fn (string $name): string => self::accountId($config, $accessToken, $name);
         $query = '?organization_id=' . rawurlencode($config['organizationId']);
-        $contact = static function (string $name, string $type, string $currency) use ($config, $accessToken, $query): string {
-            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/contacts{$query}&contact_type={$type}&contact_name=" . rawurlencode($name), 'contacts') as $row) {
-                if ((string) ($row['contact_name'] ?? '') === $name) {
-                    return (string) $row['contact_id'];
-                }
-            }
-            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts{$query}", ['contact_name' => $name, 'company_name' => $name, 'contact_type' => $type, 'currency_code' => $currency, 'gst_treatment' => 'overseas'], self::authHeaders($accessToken));
-            $id = json_decode($response['body'], true)['contact']['contact_id'] ?? null;
-            if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($id)) {
-                throw new \RuntimeException("Zoho Books {$type} creation failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
-            }
-            return $id;
-        };
+        $contact = static fn (string $name, string $type, string $currency): string => self::namedContact($config, $accessToken, $name, $type, $currency);
         $lines = \App\Repositories\MerchantTradeRepository::lines($dealId);
         $__user = AuthService::currentUser();
         $userId = $__user !== null ? (int) $__user['id'] : null;
@@ -1787,8 +1816,13 @@ final class ZohoBooksService
             if ($invoiceId === '') {
                 throw new \RuntimeException('Zoho Books invoice creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
             }
+            // D-257 Zoho: sent (no e-mail goes out), so the buyer's payments can be applied to it.
+            self::markInvoiceSent($config, $accessToken, $invoiceId);
         } else {
             $invoiceId = (string) $existing['invoice_id'];
+            if ((string) ($existing['status'] ?? '') === 'draft') {
+                self::markInvoiceSent($config, $accessToken, $invoiceId);
+            }
         }
         \App\Repositories\MerchantTradeRepository::update($dealId, ['zoho_invoice_id' => $invoiceId], $userId);
         $vendorId = $contact((string) $d['supplier_name'], 'vendor', (string) $d['purchase_currency']);
@@ -1802,6 +1836,399 @@ final class ZohoBooksService
         }
         \App\Repositories\MerchantTradeRepository::update($dealId, ['zoho_bill_id' => (string) $bill['bill_id']], $userId);
         return ['invoice_id' => $invoiceId, 'bill_id' => (string) $bill['bill_id']];
+    }
+
+    // ---------------------------------------------------------------- D-257 Zoho: the new divisions' money
+
+    /**
+     * A named Books contact (customer or vendor) found by its exact name, or
+     * created (foreign-currency contacts as overseas). Used for the import
+     * supplier, Customs, and the merchant trade supplier and buyer.
+     */
+    private static function namedContact(array $config, string $accessToken, string $name, string $type, ?string $currency): string
+    {
+        $query = '?organization_id=' . rawurlencode($config['organizationId']);
+        $find = static function (string $n) use ($config, $accessToken, $query, $type): ?array {
+            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/contacts{$query}&contact_type={$type}&contact_name=" . rawurlencode($n), 'contacts') as $row) {
+                if ((string) ($row['contact_name'] ?? '') === $n) {
+                    return $row;
+                }
+            }
+            return null;
+        };
+        $row = $find($name);
+        // ZOH-7: Books takes an invoice's / bill's currency from its contact — a same-named contact in another
+        // currency gets its own "<name> (<currency>)" contact instead.
+        if ($row !== null && $currency !== null && !empty($row['currency_code']) && (string) $row['currency_code'] !== $currency) {
+            $name = "{$name} ({$currency})";
+            $row = $find($name);
+        }
+        if ($row !== null) {
+            return (string) $row['contact_id'];
+        }
+        $payload = ['contact_name' => $name, 'company_name' => $name, 'contact_type' => $type]
+            + ($currency !== null ? ['currency_id' => self::currencyId($config, $accessToken, $currency), 'gst_treatment' => 'overseas'] : []);
+        $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts{$query}", $payload, self::authHeaders($accessToken));
+        $id = json_decode($response['body'], true)['contact']['contact_id'] ?? null;
+        if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($id)) {
+            throw new \RuntimeException("Zoho Books {$type} creation failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return $id;
+    }
+
+    /** Books' id of a currency (a contact takes currency_id, not the code — live test 5 Nov 2026). */
+    private static function currencyId(array $config, string $accessToken, string $code): string
+    {
+        foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/settings/currencies?organization_id=" . rawurlencode($config['organizationId']), 'currencies') as $row) {
+            if (($row['currency_code'] ?? null) === $code) {
+                return (string) $row['currency_id'];
+            }
+        }
+        throw new \RuntimeException("Currency {$code} is not turned on in Zoho Books. Add it in Zoho Books -> Settings -> Currencies, then sync again.");
+    }
+
+    /**
+     * Duplicate guard for a retry (the app stopped after Books saved the
+     * payment but before the app saved its id): a payment of this contact
+     * with the same bank reference and amount is the same payment.
+     */
+    private static function existingPayment(array $config, string $accessToken, bool $vendor, string $contactId, string $reference, float $amount): ?string
+    {
+        [$path, $key, $field] = $vendor ? ['vendorpayments', 'vendorpayments', 'vendor_id'] : ['customerpayments', 'customerpayments', 'customer_id'];
+        $url = "https://{$config['apiDomain']}/books/v3/{$path}?organization_id=" . rawurlencode($config['organizationId']) . "&{$field}=" . rawurlencode($contactId) . '&reference_number=' . rawurlencode($reference);
+        foreach (self::getList($config, $accessToken, $url, $key) as $row) {
+            if ((string) ($row['reference_number'] ?? '') === $reference && abs((float) ($row['amount'] ?? 0) - $amount) <= 0.01) {
+                return (string) $row['payment_id'];
+            }
+        }
+        return null;
+    }
+
+    /** A Books invoice or bill by id, from the list (its balance, total and status). */
+    private static function documentRow(array $config, string $accessToken, string $kind, string $number, string $id): ?array
+    {
+        $url = "https://{$config['apiDomain']}/books/v3/{$kind}s?organization_id=" . rawurlencode($config['organizationId']) . "&{$kind}_number=" . rawurlencode($number);
+        foreach (self::getList($config, $accessToken, $url, "{$kind}s") as $row) {
+            if ((string) ($row["{$kind}_id"] ?? '') === $id) {
+                return $row;
+            }
+        }
+        return null;
+    }
+
+    /** Marks a new Books invoice as sent (no e-mail goes out), so payments can be applied to it. */
+    private static function markInvoiceSent(array $config, string $accessToken, string $invoiceId): void
+    {
+        $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/invoices/" . rawurlencode($invoiceId) . '/status/sent?organization_id=' . rawurlencode($config['organizationId']), [], self::authHeaders($accessToken));
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            $body = (string) $response['body'];
+            // Already sent (a retry): Books says so — nothing to do.
+            if (!str_contains(strtolower($body), 'already')) {
+                throw new \RuntimeException('Zoho Books could not mark invoice ' . $invoiceId . ' as sent (HTTP ' . $response['status'] . '): ' . substr($body, 0, 500));
+            }
+        }
+    }
+
+    /**
+     * The payment payload for the new divisions (pure: no network). Rule
+     * D-212: the description is the app's own (what, for which order and
+     * party, what it settles, bank reference); the bank reference is the
+     * reference number (bank reconciliation). A foreign-currency payment
+     * goes in its own currency at the rate the bank gave.
+     *
+     * @param array{contact_id:string, vendor:bool, amount:float, date:string, reference:string, description:string, rate:?float, apply_to:?string, apply_amount:float} $p
+     * @return array<string,mixed>
+     */
+    public static function divisionPaymentPayload(array $p, string $depositAccountId): array
+    {
+        $payload = [
+            ($p['vendor'] ? 'vendor_id' : 'customer_id') => $p['contact_id'],
+            'payment_mode' => $p['vendor'] ? 'Bank Transfer' : 'banktransfer',
+            'amount' => round($p['amount'], 2),
+            'date' => $p['date'],
+            'reference_number' => $p['reference'],
+            'description' => $p['description'],
+            ($p['vendor'] ? 'paid_through_account_id' : 'account_id') => $depositAccountId,
+        ];
+        if ($p['rate'] !== null) {
+            $payload['exchange_rate'] = round($p['rate'], 6);
+        }
+        if ($p['apply_to'] !== null && $p['apply_amount'] > 0) {
+            $payload[$p['vendor'] ? 'bills' : 'invoices'] = [[($p['vendor'] ? 'bill_id' : 'invoice_id') => $p['apply_to'], 'amount_applied' => round($p['apply_amount'], 2)]];
+        }
+        return $payload;
+    }
+
+    /**
+     * Sends one payment of a new division and applies it to its invoice or
+     * bill (up to what that still owes; any excess stays unapplied in Books
+     * as an advance). A retry finds the payment by its bank reference.
+     *
+     * @return array{payment_id:string, applied:float}
+     */
+    private static function sendDivisionPayment(array $config, string $accessToken, bool $vendor, string $contactId, string $docKind, string $docNumber, string $docId, float $amount, string $date, string $reference, string $description, ?float $rate): array
+    {
+        $row = self::documentRow($config, $accessToken, $docKind, $docNumber, $docId);
+        if ($row === null) {
+            throw new \RuntimeException(ucfirst($docKind) . " {$docNumber} was not found in Zoho Books, so payment {$reference} was not sent. Sync again; if it stays, check the {$docKind} in Books.");
+        }
+        // The payment goes to the contact the invoice / bill is on (Books refuses any other — live test 5 Nov 2026).
+        $contactId = (string) ($row[$vendor ? 'vendor_id' : 'customer_id'] ?? $contactId);
+        $existing = self::existingPayment($config, $accessToken, $vendor, $contactId, $reference, round($amount, 2));
+        if ($existing !== null) {
+            return ['payment_id' => $existing, 'applied' => 0.0];
+        }
+        $applied = round(min($amount, (float) ($row['balance'] ?? 0)), 2);
+        $payload = self::divisionPaymentPayload([
+            'contact_id' => $contactId, 'vendor' => $vendor, 'amount' => $amount, 'date' => $date, 'reference' => $reference,
+            'description' => $description, 'rate' => $rate, 'apply_to' => $docId, 'apply_amount' => $applied,
+        ], $config['depositAccountId']);
+        $path = $vendor ? 'vendorpayments' : 'customerpayments';
+        $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/{$path}?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
+        $decoded = json_decode($response['body'], true);
+        $id = $decoded[$vendor ? 'vendorpayment' : 'payment']['payment_id'] ?? null;
+        if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($id)) {
+            throw new \RuntimeException('Zoho Books ' . ($vendor ? 'vendor' : 'customer') . " payment {$reference} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return ['payment_id' => $id, 'applied' => $applied];
+    }
+
+    /**
+     * D-257 Zoho (ZOH-6/7): the buyer's INR, GST-registered Books customer
+     * for Domestic Trade / local sales — kept apart from its export
+     * (overseas, foreign-currency) customer, remembered in
+     * clients.zoho_contact_id_inr. A same-named contact that is not INR, or
+     * is overseas, gets an "<name> (INR)" contact instead.
+     */
+    private static function domesticContact(array $config, string $accessToken, array $order, array $dom): string
+    {
+        $client = ClientRepository::find((int) $order['client_id']);
+        if (!empty($client['zoho_contact_id_inr'])) {
+            return (string) $client['zoho_contact_id_inr'];
+        }
+        $query = '?organization_id=' . rawurlencode($config['organizationId']);
+        $name = (string) $order['company_legal_name'];
+        $id = null;
+        foreach ([$name, "{$name} (INR)"] as $candidate) {
+            $existing = null;
+            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/contacts{$query}&contact_type=customer&contact_name=" . rawurlencode($candidate), 'contacts') as $row) {
+                if ((string) ($row['contact_name'] ?? '') === $candidate) {
+                    $existing = $row;
+                }
+            }
+            if ($existing === null) {
+                $contact = [
+                    'contact_name' => $candidate,
+                    'company_name' => $name,
+                    'contact_type' => 'customer',
+                    'currency_code' => 'INR',
+                    'gst_treatment' => !empty($dom['buyer_gstin']) ? 'business_gst' : 'business_none',
+                    'place_of_contact' => \App\Repositories\DomesticOrderRepository::stateAbbr((string) ($dom['buyer_state_code'] ?? $dom['place_of_supply'])),
+                ];
+                if (!empty($dom['buyer_gstin'])) {
+                    $contact['gst_no'] = (string) $dom['buyer_gstin'];
+                }
+                $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts{$query}", $contact, self::authHeaders($accessToken));
+                $id = (string) (json_decode($response['body'], true)['contact']['contact_id'] ?? '');
+                if ($id === '') {
+                    throw new \RuntimeException('Zoho Books contact creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+                }
+                break;
+            }
+            if ((string) ($existing['currency_code'] ?? 'INR') === 'INR' && (string) ($existing['gst_treatment'] ?? '') !== 'overseas') {
+                $id = (string) $existing['contact_id'];
+                break;
+            }
+        }
+        if ($id === null) {
+            throw new \RuntimeException("Zoho Books already has \"{$name}\" and \"{$name} (INR)\" as customers that are not INR / GST — rename one in Books, then send again.");
+        }
+        \App\Config\Database::connection()->prepare('UPDATE clients SET zoho_contact_id_inr = :z WHERE id = :id')->execute(['z' => $id, 'id' => (int) $order['client_id']]);
+        return $id;
+    }
+
+    /**
+     * Domestic Trade (and Import & Distribution's local sale): a buyer's
+     * receipt as a Books customer payment, applied to the GST tax invoice.
+     * The invoice must be in Books first.
+     *
+     * @param array<string,mixed> $payment domestic_payments row
+     * @return array{payment_id:string, applied:float}
+     */
+    public static function pushDomesticReceipt(array $payment): array
+    {
+        $orderId = (int) $payment['order_id'];
+        $order = \App\Repositories\OrderRepository::find($orderId);
+        $dom = \App\Repositories\DomesticOrderRepository::find($orderId);
+        if ($order === null || $dom === null || empty($dom['zoho_invoice_id'])) {
+            throw new \RuntimeException('The tax invoice of this order is not in Zoho Books yet.');
+        }
+        ZohoGuard::assertCustomerAllowed((string) $order['company_legal_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $contactId = self::domesticContact($config, $accessToken, $order, $dom);
+        return self::sendDivisionPayment($config, $accessToken, false, $contactId, 'invoice', (string) $dom['tax_invoice_no'], (string) $dom['zoho_invoice_id'],
+            (float) $payment['amount_inr'], (string) $payment['received_on'], (string) $payment['bank_reference'], (string) $payment['description'], null);
+    }
+
+    /**
+     * Import & Distribution: a payment to the supplier abroad (advance,
+     * balance or LC) as a Books vendor payment in the supplier's currency,
+     * at the rate the bank gave, applied to the import supplier bill.
+     *
+     * @param array<string,mixed> $payment import_payments row
+     * @return array{payment_id:string, applied:float}
+     */
+    public static function pushImportPayment(array $payment): array
+    {
+        $s = \App\Repositories\ImportRepository::find((int) $payment['shipment_id']);
+        if ($s === null || empty($s['zoho_bill_id'])) {
+            throw new \RuntimeException('The supplier bill of this import is not in Zoho Books yet.');
+        }
+        self::assertVendorAllowed((string) $s['supplier_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $vendorId = self::namedContact($config, $accessToken, (string) $s['supplier_name'], 'vendor', (string) $s['currency_code']);
+        return self::sendDivisionPayment($config, $accessToken, true, $vendorId, 'bill', (string) $s['reference'], (string) $s['zoho_bill_id'],
+            (float) $payment['amount_fc'], (string) $payment['paid_on'], (string) $payment['bank_reference'], (string) $payment['description'], (float) $payment['fx_rate']);
+    }
+
+    /** Rule D-212: the customs duty payment's description, built from the facts. */
+    public static function importDutyPaymentDescription(array $s): string
+    {
+        $total = (string) round((float) $s['bcd_total'] + (float) $s['sws_total'] + (float) $s['igst_total'], 2);
+        return "Customs duty and IGST paid to Indian Customs for import PO {$s['reference']}, bill of entry {$s['boe_no']} dated {$s['boe_date']} at {$s['port_code']}: "
+            . 'basic customs duty ₹' . GstCalculator::inr((string) $s['bcd_total']) . ' + social welfare surcharge ₹' . GstCalculator::inr((string) $s['sws_total'])
+            . ' + IGST ₹' . GstCalculator::inr((string) $s['igst_total']) . ' = ₹' . GstCalculator::inr($total) . ", against customs duty bill BE-{$s['boe_no']}, challan / bank ref {$s['duty_bank_reference']}";
+    }
+
+    /**
+     * Import & Distribution: the customs duty and IGST payment as a Books
+     * vendor payment to Customs, applied to the customs duty bill.
+     *
+     * @return array{payment_id:string, applied:float}
+     */
+    public static function pushImportDutyPayment(int $shipmentId): array
+    {
+        $s = \App\Repositories\ImportRepository::find($shipmentId);
+        if ($s === null || empty($s['zoho_duty_bill_id']) || empty($s['duty_paid_on'])) {
+            throw new \RuntimeException('The customs duty bill or its payment is not recorded yet.');
+        }
+        self::assertVendorAllowed((string) $s['supplier_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $customsName = ZohoGuard::isProduction() ? 'Indian Customs' : ZohoGuard::TEST_PREFIX . 'Indian Customs';
+        $customsId = self::namedContact($config, $accessToken, $customsName, 'vendor', null);
+        $amount = round((float) $s['bcd_total'] + (float) $s['sws_total'] + (float) $s['igst_total'], 2);
+        return self::sendDivisionPayment($config, $accessToken, true, $customsId, 'bill', 'BE-' . $s['boe_no'], (string) $s['zoho_duty_bill_id'],
+            $amount, (string) $s['duty_paid_on'], (string) $s['duty_bank_reference'], self::importDutyPaymentDescription($s), null);
+    }
+
+    /** Import & Distribution: the journal taking the import IGST as input credit (once the credit is recorded). */
+    public static function pushImportIgstJournal(int $shipmentId): string
+    {
+        $s = \App\Repositories\ImportRepository::find($shipmentId);
+        if ($s === null) {
+            throw new \RuntimeException("Import #{$shipmentId} not found.");
+        }
+        self::assertVendorAllowed((string) $s['supplier_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $payload = self::importIgstCreditJournalPayload($s, static fn (string $name): string => self::accountId($config, $accessToken, $name));
+        if (!ZohoGuard::isProduction()) {
+            $payload['notes'] = ZohoGuard::TEST_PREFIX . ' ' . $payload['notes'];
+        }
+        $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/journals?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
+        $id = json_decode($response['body'], true)['journal']['journal_id'] ?? null;
+        if ($response['status'] < 200 || $response['status'] >= 300 || $id === null) {
+            throw new \RuntimeException("Zoho Books IGST credit journal for import {$s['reference']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return (string) $id;
+    }
+
+    /**
+     * Merchant Trade: one payment leg — the buy leg as a Books vendor
+     * payment on the supplier's bill, the sell leg as a customer payment on
+     * the sale invoice — each in its own currency at the rate the bank gave.
+     *
+     * @param array<string,mixed> $payment merchant_payments row
+     * @return array{payment_id:string, applied:float}
+     */
+    public static function pushMerchantPayment(array $payment): array
+    {
+        $d = \App\Repositories\MerchantTradeRepository::find((int) $payment['deal_id']);
+        $buy = (string) $payment['leg'] === 'buy';
+        if ($d === null || empty($d[$buy ? 'zoho_bill_id' : 'zoho_invoice_id'])) {
+            throw new \RuntimeException('The ' . ($buy ? "supplier's bill" : 'sale invoice') . ' of this deal is not in Zoho Books yet.');
+        }
+        ZohoGuard::assertCustomerAllowed((string) $d['buyer_name']);
+        self::assertVendorAllowed((string) $d['supplier_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $contactId = $buy
+            ? self::namedContact($config, $accessToken, (string) $d['supplier_name'], 'vendor', (string) $d['purchase_currency'])
+            : self::namedContact($config, $accessToken, (string) $d['buyer_name'], 'customer', (string) $d['sale_currency']);
+        return self::sendDivisionPayment($config, $accessToken, $buy, $contactId, $buy ? 'bill' : 'invoice', (string) ($buy ? $d['po_no'] : $d['sale_invoice_no']),
+            (string) $d[$buy ? 'zoho_bill_id' : 'zoho_invoice_id'], (float) $payment['amount_fc'], (string) $payment['moved_on'], (string) $payment['bank_reference'], (string) $payment['description'], (float) $payment['fx_rate']);
+    }
+
+    /**
+     * The "App vs Zoho" check for a new division's record (reads only):
+     * the invoice / bills and the payments the app holds, beside what Books
+     * holds for them. Same statuses as OrderZohoMatchService.
+     *
+     * @param list<array{group:string, item:string, kind:string, number:string, zoho_id:?string, amount:float, unit:string, vendor:bool, contact:?string}> $records
+     * @return list<array{group:string, item:string, app:?string, books:?string, status:string, note:string}>
+     */
+    public static function matchRecords(array $records): array
+    {
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $cache = [];
+        $rows = [];
+        foreach ($records as $r) {
+            $fmt = static fn (?float $v): ?string => $v === null ? null : $r['unit'] . ' ' . number_format($v, 2);
+            if ($r['zoho_id'] === null || $r['zoho_id'] === '') {
+                $rows[] = ['group' => $r['group'], 'item' => $r['item'], 'app' => $fmt($r['amount']), 'books' => null, 'status' => 'not_sent', 'note' => 'Goes at the next sync (or see the Zoho Sync Log).'];
+                continue;
+            }
+            $books = null;
+            if ($r['kind'] === 'invoice' || $r['kind'] === 'bill') {
+                $row = self::documentRow($config, $accessToken, $r['kind'], $r['number'], (string) $r['zoho_id']);
+                $books = $row !== null ? (float) ($row['total'] ?? 0) : null;
+            } elseif ($r['kind'] === 'journal') {
+                $cache['journal'] ??= self::totalsById('journal');
+                $books = $cache['journal'][(string) $r['zoho_id']] ?? null;
+            } else {
+                $key = ($r['vendor'] ? 'v:' : 'c:') . $r['contact'];
+                if (!isset($cache[$key])) {
+                    $cache[$key] = [];
+                    if ($r['contact'] !== null) {
+                        foreach (self::contactRecords((string) $r['contact'], $r['vendor'])[$r['vendor'] ? 'vendorpayments' : 'customerpayments'] as $p) {
+                            $cache[$key][(string) $p['payment_id']] = (float) ($p['amount'] ?? 0);
+                        }
+                    }
+                }
+                $books = $cache[$key][(string) $r['zoho_id']] ?? null;
+            }
+            $status = $books === null ? 'missing' : (abs($books - $r['amount']) <= 0.01 ? 'match' : 'different');
+            $rows[] = ['group' => $r['group'], 'item' => $r['item'], 'app' => $fmt($r['amount']), 'books' => $fmt($books), 'status' => $status,
+                'note' => $status === 'missing' ? 'Sent by the app, but Books no longer has it.' : ''];
+        }
+        return $rows;
+    }
+
+    /** The Books contact id of a named contact, if it exists (reads only; for the match check). */
+    public static function contactIdByName(string $name, string $type): ?string
+    {
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/contacts?organization_id=" . rawurlencode($config['organizationId']) . "&contact_type={$type}&contact_name=" . rawurlencode($name), 'contacts') as $row) {
+            if ((string) ($row['contact_name'] ?? '') === $name) {
+                return (string) $row['contact_id'];
+            }
+        }
+        return null;
     }
 
     private static function config(): array

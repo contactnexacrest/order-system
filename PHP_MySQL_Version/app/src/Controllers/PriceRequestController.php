@@ -162,6 +162,12 @@ final class PriceRequestController
             }
         } else {
             $order = ['client_id' => !empty($_GET['client_id']) ? (int) $_GET['client_id'] : null, 'currency_code' => 'USD'];
+            // QA ACC-17: a client-specific price only for a client of the user's division(s).
+            if ($order['client_id'] !== null && !\App\Services\DivisionService::allowsClient($order['client_id'])) {
+                http_response_code(404);
+                echo json_encode(['ok' => false, 'reason' => 'Client not found.']);
+                return;
+            }
         }
         $ctx = OrderLinePricing::context($order);
         echo json_encode(OrderLinePricing::lineQuote($product, $ctx, OrderLinePricing::selectionInput((string) ($_GET['spec'] ?? '')) ?? []));

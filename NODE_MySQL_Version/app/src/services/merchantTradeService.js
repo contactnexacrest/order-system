@@ -546,7 +546,7 @@ async function fixInvoice(id, userId) {
   if (!d.bl_no) return 'Record the BL first: the sale invoice goes with the shipping documents.';
   const fields = { invoice_generated_at: nowIst() };
   if (!d.sale_invoice_no) {
-    fields.sale_invoice_no = await nextReference('MTT-INV', 'INV');
+    fields.sale_invoice_no = await nextReference('MTT-INV', 'I'); // MTT/I/26-27/0001: 16 characters, the most a GST-registered Books org accepts (ZOH-9)
     fields.invoice_date = todayIst();
   }
   await repo.update(id, fields, userId);

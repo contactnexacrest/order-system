@@ -55,7 +55,12 @@ Once Domestic Trade is active, the client page has a **GST registration** sectio
 ## Zoho Books
 - The tax invoice goes to Books as a GST invoice: `gst_treatment` business_gst with the buyer's GSTIN (business_none if unregistered), place of supply, HSN and the GST group (GST18) or IGST (IGST18) per line, and a note saying what it is.
 - The **Division reporting tag** is added to Books records only when two or more divisions are active and the tag is set up in Settings (`zoho_division_tag_id`, `zoho_division_tag_option_dom` / `_exp`). With one division nothing sent to Books changes.
-- **Pending:** the live test in the Zoho TEST organisation (no test credentials yet). Log it in the Zoho change log when it is done.
+- **The buyer is its own INR, GST customer in Books** (`gst_treatment` business_gst with the GSTIN, place of contact; business_none without a GSTIN), kept apart from the client's export customer (overseas, in a foreign currency). If Books already has a same-named customer that is not INR / GST, the app uses "<name> (INR)". The app remembers it on the client. The client sync (Settings → Zoho Books) only sends a client's **export** customer.
+- The invoice carries the tax invoice's **round-off** as the adjustment, so Books' total equals the printed total, and it is **marked sent** (no e-mail goes out) so receipts can be applied.
+- **Each buyer receipt** goes as a Books customer payment in INR: reference = the bank reference, description = the app's own D-212 text, applied to the tax invoice up to what it still owes. A receipt waits until its invoice is in Books.
+- **When it goes:** at the scheduled Zoho sync and *Sync now* (Zoho Books Sync page), or at once with *Send to Zoho Books* on the order (Finance). Each record has its row in the Zoho Sync Log; the "Waiting for Zoho" count includes them. Records dated before the go-live date are not sent (the CA books them by hand). A retry never makes a second record (found by invoice number, or by bank reference and amount).
+- **Check against Zoho Books** (on the order, reads only) shows the invoice and each receipt beside what Books holds: Matches / Not in Zoho Books yet / Different / Missing.
+- **Live-tested** in the Zoho TEST organisation on 5 Nov 2026 (Z-647 onwards in the Zoho change log): an intra-state invoice (GST18) with its receipt on the PHP stack, and an inter-state one (IGST18) with a part receipt on the Node stack; both checks matched.
 
 ## Not built yet (to decide with the CA when needed)
 - Generating the e-way bill or e-invoice (IRN) from the app — they are made on the government portals and their numbers entered here.

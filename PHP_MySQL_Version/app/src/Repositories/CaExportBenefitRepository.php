@@ -59,10 +59,12 @@ final class CaExportBenefitRepository
     /** @return array<int, array<string,mixed>> newest first, with the order reference joined in for display */
     public static function all(): array
     {
+        // QA ACC-5: only the benefits of the user's division(s) (and those tied to no order).
         $stmt = Database::connection()->query(
             'SELECT ceb.*, o.order_reference
              FROM ca_export_benefits ceb
              LEFT JOIN orders o ON o.id = ceb.order_id
+             WHERE 1 = 1' . \App\Services\DivisionService::orderIdSql('ceb.order_id', true) . '
              ORDER BY ceb.claimed_at DESC, ceb.id DESC'
         );
         return $stmt->fetchAll();

@@ -214,18 +214,22 @@ final class MerchantTradeController
         echo $pdf;
     }
 
+    /** D-257 Zoho: the deal's "App vs Zoho" check (reads only). */
+    public function zohoCheck(array $params): void
+    {
+        if (($d = self::deal($params)) === null) {
+            return;
+        }
+        \App\Controllers\CaController::divisionZohoCheck('deal', (int) $d['id'], "/merchant/{$d['id']}", 'Deal ' . $d['reference'], $d['supplier_name'] . ' → ' . $d['buyer_name']);
+    }
+
     public function pushZoho(array $params): void
     {
         if (($d = self::deal($params)) === null) {
             return;
         }
-        $error = null;
-        try {
-            ZohoBooksService::pushMerchantDeal((int) $d['id']);
-        } catch (\Throwable $e) {
-            $error = 'Zoho Books: ' . $e->getMessage();
-        }
-        self::done((int) $d['id'], $error, 'Sale invoice and supplier bill sent to Zoho Books.', 'mtt-payments');
+        [$error, $ok] = \App\Services\DivisionZohoSync::sendNow('deal', (int) $d['id'], (int) self::user()['id']);
+        self::done((int) $d['id'], $error, $ok, 'mtt-payments');
     }
 
     // ------------------------------------------------------------ reports

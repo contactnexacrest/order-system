@@ -440,6 +440,7 @@ CREATE TABLE clients (
   coo_type              VARCHAR(50) NULL,               -- from dropdown_options('coo_type')
   notify_party          VARCHAR(255) NULL,
   zoho_contact_id       VARCHAR(50) NULL,               -- CA / Accounting module (Phase 3) — cached Zoho Books contact_id once this client is first pushed, so every later sync is a lookup, not a re-create
+  zoho_contact_id_inr   VARCHAR(50) NULL,               -- D-257 Zoho (ZOH-6/7): the client's separate INR, GST-registered Books customer for Domestic Trade / local sales (the export customer above is overseas, in a foreign currency)
   duplicate_of_client_id BIGINT UNSIGNED NULL,
   order_history_visibility_override TINYINT(1) NULL,    -- 90-item backlog Phase 6 Item B: NULL = inherit company_settings
                                                          -- client_portal_show_order_history; 1 = always show this client's
@@ -5703,6 +5704,7 @@ CREATE TABLE domestic_payments (
   bank_reference  VARCHAR(60) NOT NULL,
   description     VARCHAR(500) NOT NULL,
   note            VARCHAR(255) NULL,
+  zoho_payment_id VARCHAR(50) NULL,            -- the Books customer payment, applied to the GST tax invoice (D-257 Zoho)
   recorded_by     BIGINT UNSIGNED NULL,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_dp_order (order_id),
@@ -5815,6 +5817,11 @@ CREATE TABLE import_shipments (
   received_on       DATE NULL,
   zoho_bill_id      VARCHAR(50) NULL,
   zoho_duty_bill_id VARCHAR(50) NULL,
+  duty_paid_on      DATE NULL,                 -- customs duty + IGST paid (ICEGATE e-payment)
+  duty_bank_reference VARCHAR(60) NULL,        -- the challan / bank reference of that payment (D-212)
+  duty_zoho_payment_id VARCHAR(50) NULL,       -- the Books vendor payment on the customs duty bill
+  zoho_igst_journal_id VARCHAR(50) NULL,       -- the Books journal taking the import IGST as input credit
+  zoho_clearance_bill_id VARCHAR(50) NULL,     -- the Books bill for the clearance charges (freight, insurance, CHA, port, other), from the CHA
   created_by        BIGINT UNSIGNED NULL,
   updated_by        BIGINT UNSIGNED NULL,
   created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -5871,6 +5878,7 @@ CREATE TABLE import_payments (
   bank_reference  VARCHAR(60) NOT NULL,
   description     VARCHAR(500) NOT NULL,
   note            VARCHAR(255) NULL,
+  zoho_payment_id VARCHAR(50) NULL,            -- the Books vendor payment, applied to the supplier's bill (D-257 Zoho)
   recorded_by     BIGINT UNSIGNED NULL,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_ip_shipment (shipment_id),
@@ -6012,6 +6020,7 @@ CREATE TABLE merchant_payments (
   bank_reference  VARCHAR(60) NOT NULL,
   description     VARCHAR(500) NOT NULL,
   note            VARCHAR(255) NULL,
+  zoho_payment_id VARCHAR(50) NULL,            -- buy leg: Books vendor payment on the supplier's bill; sell leg: customer payment on the sale invoice (D-257 Zoho)
   recorded_by     BIGINT UNSIGNED NULL,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_mp_deal (deal_id, leg, moved_on),

@@ -283,7 +283,7 @@ final class PiIntakeRepository
              FROM pi_intake_submissions pis
              JOIN orders o ON o.id = pis.order_id
              JOIN clients c ON c.id = o.client_id
-             WHERE pis.status = 'pending_review'
+             WHERE pis.status = 'pending_review'" . \App\Services\DivisionService::sql('o.division_id') . " -- QA ACC-6
              ORDER BY pis.submitted_at ASC"
         )->fetchAll();
     }
@@ -305,7 +305,7 @@ final class PiIntakeRepository
              JOIN orders o ON o.id = pis.order_id
              JOIN clients c ON c.id = o.client_id
              LEFT JOIN users u ON u.id = pis.reviewed_by
-             WHERE pis.status IN ('applied', 'rejected')
+             WHERE pis.status IN ('applied', 'rejected')" . \App\Services\DivisionService::sql('o.division_id') . " -- QA ACC-6
              ORDER BY pis.reviewed_at DESC LIMIT :limit"
         );
         $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);

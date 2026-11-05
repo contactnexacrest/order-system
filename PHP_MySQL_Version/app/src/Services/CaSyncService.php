@@ -72,6 +72,7 @@ final class CaSyncService
             'expenses' => ['imported' => 0, 'updated' => 0, 'removed' => 0, 'failed' => 0, 'skipped' => 0],
             'benefits' => ['journals' => 0, 'removed' => 0, 'failed' => 0, 'skipped' => 0],
             'gst_refunds' => ['journals' => 0, 'failed' => 0, 'skipped' => 0],
+            'divisions' => ['sent' => 0, 'failed' => 0, 'skipped' => 0],
             'stopped' => null,
         ];
     }
@@ -114,6 +115,8 @@ final class CaSyncService
             $result['expenses'] = self::importPendingExpenses($triggeredBy, $triggeredByUserId);
             $result['benefits'] = self::syncBenefits($triggeredBy, $triggeredByUserId);
             $result['gst_refunds'] = self::syncGstRefunds($triggeredBy, $triggeredByUserId);
+            // D-257 Zoho: Domestic Trade, Import & Distribution and Merchant Trade money.
+            $result['divisions'] = DivisionZohoSync::run($triggeredBy, $triggeredByUserId);
             if ($dailyCheck) {
                 ZohoRestoreService::markScheduledCheckDone();
             }

@@ -117,6 +117,54 @@
   // text, so no value anywhere needs a JS-string escape at all.
   // Capture phase so this always runs before the bubble-phase listener
   // below, matching the inline-onsubmit ordering it replaces.
+  // QA UI-4: a report opened for one division keeps that division on its
+  // own "Export CSV" links and when its date form is run again (the shared
+  // Division filter above the report sets ?division= for this page only).
+  function initKeepReportDivision() {
+    if (location.pathname.indexOf('/reports') !== 0) return;
+    var division = new URLSearchParams(location.search).get('division');
+    if (!division) return;
+    var links = document.querySelectorAll('main a[href^="/reports"]');
+    for (var i = 0; i < links.length; i++) {
+      var url = new URL(links[i].getAttribute('href'), location.origin);
+      if (!url.searchParams.has('division')) {
+        url.searchParams.set('division', division);
+        links[i].setAttribute('href', url.pathname + url.search + url.hash);
+      }
+    }
+    var forms = document.querySelectorAll('main form');
+    for (var j = 0; j < forms.length; j++) {
+      var form = forms[j];
+      if ((form.getAttribute('method') || 'get').toLowerCase() !== 'get') continue;
+      var action = form.getAttribute('action') || location.pathname;
+      if (action.indexOf('/reports') !== 0 || form.elements.namedItem('division')) continue;
+      var hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'division';
+      hidden.value = division;
+      form.appendChild(hidden);
+    }
+  }
+
+  // QA UI-11: "Switch to board view" / "Switch to list view" keeps the
+  // filters and search the user has set (not the page number).
+  function initSwitchViewKeepsFilters() {
+    var current = new URLSearchParams(location.search);
+    current.delete('view');
+    current.delete('page');
+    if (!current.toString()) return;
+    var links = document.querySelectorAll('a[href]');
+    for (var i = 0; i < links.length; i++) {
+      var text = (links[i].textContent || '').trim();
+      if (text !== 'Switch to board view' && text !== 'Switch to list view') continue;
+      var url = new URL(links[i].getAttribute('href'), location.origin);
+      current.forEach(function (value, key) {
+        if (!url.searchParams.has(key)) url.searchParams.set(key, value);
+      });
+      links[i].setAttribute('href', url.pathname + url.search);
+    }
+  }
+
   function initConfirmDialogs() {
     document.addEventListener('submit', function (e) {
       var form = e.target;
@@ -806,8 +854,13 @@
     if (/^bank_account_number(_confirm)?$/.test(name) && value !== '' && !/^[0-9]{6,20}$/.test(value.replace(/\s+/g, ''))) {
       return 'Enter the bank account number as digits only (6 to 20 digits).';
     }
-    if (/reason/i.test(name) && value !== '' && value.length < REASON_MIN_LENGTH) {
-      return 'Reason must be at least ' + REASON_MIN_LENGTH + ' characters (' + value.length + ' so far).';
+    // QA UI-1: only typed reasons have a minimum length — a reason picked
+    // from a list (<select name="difference_reason_choice">) carries an id.
+    // QA UI-9: a field's own minlength (e.g. 5 on an agreement's end reason,
+    // as the server allows) takes the place of the default.
+    var reasonMin = el.minLength > 0 ? el.minLength : REASON_MIN_LENGTH;
+    if ((el.tagName === 'TEXTAREA' || type === 'text') && /reason/i.test(name) && value !== '' && value.length < reasonMin) {
+      return 'Reason must be at least ' + reasonMin + ' characters (' + value.length + ' so far).';
     }
     if (type === 'text' && NUMERIC_FIELD_NAME.test(name) && value !== '' && !/^\d*\.?\d+$/.test(value)) {
       return 'Enter a number — digits and a decimal point only (no commas, spaces or units).';
@@ -1375,6 +1428,8 @@
     initSubmitValidation();
     initErrorPopup();
     initConfirmDialogs();
+    initKeepReportDivision();
+    initSwitchViewKeepsFilters();
 
     // Bound on document, not per-form, so every current and future POST
     // form sitewide gets a disabled/"Working…" submit button for free —

@@ -302,13 +302,13 @@ describe('D-257 Phase 3 — Import & Distribution', () => {
     const acc = async (name) => `acc:${name}`;
     const bill = await zoho.importBillPayload(s, await repo.lines(id), 'V1', acc);
     expect([bill.vendor_id, bill.bill_number, bill.reference_number, bill.currency_code, bill.exchange_rate, bill.gst_treatment]).toEqual(['V1', s.reference, 'COSU6234567890', 'USD', 84.65, 'overseas']);
-    expect([bill.line_items[0].quantity, bill.line_items[0].rate, bill.line_items[0].account_id, bill.line_items[0].hsn_or_sac]).toEqual([100, 18.5, 'acc:Inventory Asset', '68029300']);
+    expect([bill.line_items[0].quantity, bill.line_items[0].rate, bill.line_items[0].account_id, bill.line_items[0].hsn_or_sac]).toEqual([100, 18.5, 'acc:Imported Goods Stock', '68029300']);
     expect(bill.notes).toBe(`Import purchase from TEST-Xiamen Stone Industries (China) against import PO ${s.reference}, BL COSU6234567890, bill of entry 4567891.`);
     expect(bill.tags).toBeUndefined();
     const duty = await zoho.customsDutyBillPayload(s, 'C1', acc);
     expect(duty.bill_number).toBe('BE-4567891');
     expect(duty.line_items.map((l) => l.rate)).toEqual([41681.99, 4168.2, 53748.42]);
-    expect(duty.line_items.map((l) => l.account_id)).toEqual(['acc:Inventory Asset', 'acc:Inventory Asset', 'acc:IGST Paid on Import']);
+    expect(duty.line_items.map((l) => l.account_id)).toEqual(['acc:Imported Goods Stock', 'acc:Imported Goods Stock', 'acc:IGST Paid on Import']);
     const journal = await zoho.importIgstCreditJournalPayload(s, acc);
     expect(journal.line_items.map((l) => [l.account_id, l.debit_or_credit, l.amount])).toEqual([['acc:Input IGST', 'debit', 53748.42], ['acc:IGST Paid on Import', 'credit', 53748.42]]);
     expect(journal.notes).toContain('₹53,748.42');

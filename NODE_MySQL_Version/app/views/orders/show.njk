@@ -634,7 +634,7 @@
   {% if canAssignOwner %}
   <div class="btn-row" style="margin-top:-6px;align-items:center;flex-wrap:wrap;">
     {% for a in assignees %}
-      <form method="post" action="/orders/{{ order.id }}/assignees/{{ a.user_id }}/remove" style="display:inline" onsubmit="return confirm('Remove {{ a.name }} as an assignee on this order?');">
+      <form method="post" action="/orders/{{ order.id }}/assignees/{{ a.user_id }}/remove" style="display:inline" data-confirm="Remove {{ a.name }} as an assignee on this order?">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <span class="tag tag-navy">{{ a.name }} <button type="submit" class="btn-sm btn-danger" style="padding:0 4px;margin-left:4px;" title="Remove">&times;</button></span>
       </form>
@@ -674,13 +674,13 @@
   {% if order.is_archived %}
     <p class="muted small">Archived{% if order.archived_at %} on {{ order.archived_at }}{% endif %} — hidden from the main Orders list. Nothing was deleted.</p>
     {% if permissions.manage_orders %}
-    <form method="post" action="/orders/{{ order.id }}/unarchive" style="display:inline" onsubmit="return confirm('Restore {{ order.order_reference }} to the main Orders list?');">
+    <form method="post" action="/orders/{{ order.id }}/unarchive" style="display:inline" data-confirm="Restore {{ order.order_reference }} to the main Orders list?">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <button type="submit" class="btn-sm btn-success">Restore from Archive</button>
     </form>
     {% endif %}
   {% elif permissions.manage_orders %}
-    <form method="post" action="/orders/{{ order.id }}/archive" style="display:inline" onsubmit="return confirm('Archive {{ order.order_reference }}? It will no longer appear in the main Orders list, but nothing is deleted and it can be restored any time.');">
+    <form method="post" action="/orders/{{ order.id }}/archive" style="display:inline" data-confirm="Archive {{ order.order_reference }}? It will no longer appear in the main Orders list, but nothing is deleted and it can be restored any time.">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <button type="submit" class="btn-sm btn-secondary">Archive Order</button>
     </form>
@@ -721,7 +721,7 @@
           <form method="post" action="/orders/{{ order.id }}/cancellation/{{ approvedCancellation.id }}/complete-refund" style="display:inline" onsubmit="return confirm('Mark this refund as completed? Record this only once the money has actually been sent back.');">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <label class="small">Refund paid on *<input type="date" name="refund_paid_at" required max="{{ today() }}"></label>
-            <label class="small">Bank reference of the refund * <input type="text" name="refund_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="SWIFT / UTR" style="width:200px" title="Rule D-212: lets anyone match this refund to the bank statement later"></label>
+            <label class="small">Bank reference of the refund * <input type="text" name="refund_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="SWIFT / UTR" style="width:200px" title="Rule D-212: lets anyone match this refund to the bank statement later"></label>
             <input type="text" name="refund_notes" placeholder="Note (optional)" style="width:200px" aria-label="Note">
             <button type="submit" class="btn-sm btn-secondary">Mark Refund Completed</button>
           </form>
@@ -2003,7 +2003,7 @@
           {% set rd = { label: 'Advance', due: advanceDue, so_far: (partPayments.advance.received if partPayments else 0), currency: order.currency_code or '', max_pct: maxBankChargesPct } %}{% include 'orders/_remittance_difference.njk' %}
           <label>Received On<input type="date" name="advance_received_at"></label>
           {% set ri = { prefix: 'advance_', currency: order.currency_code or '' } %}{% include 'orders/_remittance_inr.njk' %}
-          <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="advance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
+          <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="advance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="{{ order.currency_code or '' }}"></p>
           {{ stepBadge('5d') | safe }}<button type="submit" class="btn-sm">{{ 'Record Another Advance Receipt' if (payment and payment.advance_remittance_received_at != null) else 'Record Advance Remittance' }}</button>
         </form>
@@ -2823,7 +2823,7 @@
         {% set rd = { label: 'Freight', due: (partPayments.freight.expected if (partPayments and partPayments.freight.expected != null) else 0), so_far: (partPayments.freight.received if partPayments else 0), currency: order.currency_code or '', max_pct: maxBankChargesPct } %}{% include 'orders/_remittance_difference.njk' %}
         <label>Received On<input type="date" name="freight_received_at"></label>
           {% set ri = { prefix: 'freight_', currency: order.currency_code or '' } %}{% include 'orders/_remittance_inr.njk' %}
-          <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="freight_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
+          <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="freight_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="{{ order.currency_code or '' }}"></p>
         {{ stepBadge('9c') | safe }}<button type="submit" class="btn-sm">{{ 'Record Another Freight Receipt' if (payment and payment.freight_remittance_received_at != null) else 'Record Freight Remittance' }}</button>
       </form>
@@ -3058,6 +3058,7 @@
                     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                     <label>Decision
                       <select name="decision" required>
+                        <option value="">Choose…</option>
                         <option value="approved">Approve</option>
                         <option value="revision_requested">Request Revision</option>
                       </select>
@@ -3218,7 +3219,7 @@
         {% set rd = { label: 'Balance', due: (partPayments.balance.expected if (partPayments and partPayments.balance.expected != null) else 0), so_far: (partPayments.balance.received if partPayments else 0), currency: order.currency_code or '', max_pct: maxBankChargesPct } %}{% include 'orders/_remittance_difference.njk' %}
         <label>Received On<input type="date" name="balance_received_at"></label>
           {% set ri = { prefix: 'balance_', currency: order.currency_code or '' } %}{% include 'orders/_remittance_inr.njk' %}
-          <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="balance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
+          <label>Bank reference * <small class="muted">(SWIFT / UTR / reference on the bank's credit advice)</small><input type="text" name="balance_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="e.g. HDFCN26304123456"><small class="muted">Rule D-212: lets anyone match this payment to the bank statement later. It goes into the payment's description here and in Zoho Books.</small></label>
           <p class="muted small remit-statement" data-remit-statement data-currency="{{ order.currency_code or '' }}"></p>
         {{ stepBadge('11c') | safe }}<button type="submit" class="btn-sm">{{ 'Record Another Balance Receipt' if (payment and payment.balance_remittance_received_at != null) else 'Record Balance Remittance' }}</button>
       </form>
@@ -3582,7 +3583,7 @@
         <label>Amount paid under the LC ({{ lcCur }}) *<input type="number" name="lc_received_amount" required min="0.01" step="0.01" value="{{ orderLcDetails.lc_received_amount if orderLcDetails.lc_received_amount != null else '' }}" placeholder="e.g. 45000.00"></label>
         <label>Rupees credited (&#8377;) *<input type="number" name="lc_inr_credited" required min="0.01" step="0.01" value="{{ orderLcDetails.lc_inr_credited if orderLcDetails.lc_inr_credited != null else '' }}" placeholder="e.g. 3700000.00"><small class="muted">As on the bank's credit advice.</small></label>
         <label>Bank charges deducted (&#8377;)<input type="number" name="lc_bank_charges_inr" min="0" step="0.01" value="{{ orderLcDetails.lc_bank_charges_inr if orderLcDetails.lc_bank_charges_inr != null else '0' }}" placeholder="e.g. 2500.00"></label>
-        <label style="grid-column:1 / -1">Bank reference of the credit * <small class="muted">(UTR / bank ref. / FIRC no. on the bank's advice)</small><input type="text" name="lc_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" value="{{ orderLcDetails.lc_bank_reference or '' }}" placeholder="e.g. 0915-2026-778"><small class="muted">Rule D-212: it goes into this payment's description here and in Zoho Books.</small></label>
+        <label style="grid-column:1 / -1">Bank reference of the credit * <small class="muted">(UTR / bank ref. / FIRC no. on the bank's advice)</small><input type="text" name="lc_bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" value="{{ orderLcDetails.lc_bank_reference or '' }}" placeholder="e.g. 0915-2026-778"><small class="muted">Rule D-212: it goes into this payment's description here and in Zoho Books.</small></label>
         <div><button type="submit" class="btn-sm">{{ 'Update LC Payment' if orderLcDetails.lc_received_at else 'Record LC Payment' }}</button></div>
       </form>
       {% endif %}
@@ -3959,7 +3960,7 @@
             <td class="fin-claim-cell">
               <input type="number" step="0.01" min="0" name="benefits[{{ row }}][received_amount]" placeholder="Amount received" aria-label="{{ b.scheme_name }} received amount">
               <input type="date" name="benefits[{{ row }}][received_at]" value="{{ today() }}" aria-label="{{ b.scheme_name }} received on">
-              <input type="text" name="benefits[{{ row }}][received_reference]" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" data-required-if="benefits[{{ row }}][received_amount]" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." placeholder="Credited by: UTR / e-scrip no." aria-label="{{ b.scheme_name }} credited by (bank UTR / e-scrip no.)">
+              <input type="text" name="benefits[{{ row }}][received_reference]" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" data-required-if="benefits[{{ row }}][received_amount]" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." placeholder="Credited by: UTR / e-scrip no." aria-label="{{ b.scheme_name }} credited by (bank UTR / e-scrip no.)">
             </td>
             {% endif %}
           </tr>
@@ -3977,7 +3978,7 @@
             <td class="fin-claim-cell">
               <input type="number" step="0.01" min="0" name="benefits[{{ row }}][received_amount]" placeholder="If already received" aria-label="{{ sch.scheme_name }} received amount"{{ benefitsDisabled }}>
               <input type="date" name="benefits[{{ row }}][received_at]" value="{{ today() }}" aria-label="{{ sch.scheme_name }} received on"{{ benefitsDisabled }}>
-              <input type="text" name="benefits[{{ row }}][received_reference]" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" data-required-if="benefits[{{ row }}][received_amount]" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." placeholder="Credited by: UTR / e-scrip no." aria-label="{{ sch.scheme_name }} credited by (bank UTR / e-scrip no.)"{{ benefitsDisabled }}>
+              <input type="text" name="benefits[{{ row }}][received_reference]" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" data-required-if="benefits[{{ row }}][received_amount]" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." placeholder="Credited by: UTR / e-scrip no." aria-label="{{ sch.scheme_name }} credited by (bank UTR / e-scrip no.)"{{ benefitsDisabled }}>
             </td>
           </tr>
           {% set row = row + 1 %}
@@ -4001,11 +4002,11 @@
               <label>Claim Ref.<input type="text" name="reference_number" value="{{ b.reference_number or '' }}" placeholder="e.g. REF-2026-001"></label>
               <label>Received (&#8377;) <small class="muted">(empty = not received yet)</small><input type="number" step="0.01" min="0" name="received_amount" value="{{ b.received_amount if b.received_amount != null else '' }}" placeholder="e.g. 1500.00"></label>
               <label>Received On<input type="date" name="received_at" value="{{ b.received_at or today() }}"></label>
-              <label>Credited by <small class="muted">(bank UTR / e-scrip no.; needed with a received amount)</small><input type="text" name="received_reference" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" data-required-if="received_amount" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." value="{{ b.received_reference or '' }}" placeholder="e.g. HDFCN26304123456"></label>
+              <label>Credited by <small class="muted">(bank UTR / e-scrip no.; needed with a received amount)</small><input type="text" name="received_reference" minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" data-required-if="received_amount" data-required-if-message="Say how it was credited (bank UTR / e-scrip no.) — rule D-212." value="{{ b.received_reference or '' }}" placeholder="e.g. HDFCN26304123456"></label>
               <label class="full">Reason for the correction *<input type="text" name="reason" required minlength="10" placeholder="e.g. Typed 50,000 instead of 5,000"></label>
               <div><button type="submit" class="btn-sm">Save Correction</button></div>
             </form>
-            <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/delete" class="fin-delete-claim" onsubmit="return confirm('Delete this {{ b.scheme_name }} claim? This cannot be undone (it stays in the audit log).');">
+            <form method="post" action="/orders/{{ order.id }}/export-benefits/{{ b.id }}/delete" class="fin-delete-claim" data-confirm="Delete this {{ b.scheme_name }} claim? This cannot be undone (it stays in the audit log).">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <input type="text" name="reason" required minlength="10" placeholder="Reason for deleting (e.g. recorded twice by mistake)" aria-label="Reason for deleting the {{ b.scheme_name }} claim">
               <button type="submit" class="btn-sm btn-danger">Delete Claim</button>

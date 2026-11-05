@@ -158,8 +158,17 @@ $num = static fn (string $v): string => str_contains($v, '.') ? rtrim(rtrim($v, 
         <p><button type="submit" class="btn-secondary">Record IGST credit</button></p>
       </form>
       <?php endif; ?>
+      <p data-testid="imp-duty-paid">Customs duty + IGST ₹<?= $h(G::inr((string) round((float) $s['bcd_total'] + (float) $s['sws_total'] + (float) $s['igst_total'], 2))) ?>: <?= $s['duty_paid_on'] ? 'paid on ' . $h($s['duty_paid_on']) . ', challan / bank ref ' . $h($s['duty_bank_reference']) . '.' : 'payment not recorded yet.' ?></p>
+      <?php if ($canPay && !$s['duty_zoho_payment_id']): ?>
+      <form method="post" action="/import/<?= $id ?>/duty-payment" class="field-grid"><?= Csrf::field() ?>
+        <label>Duty paid on *<input type="date" name="duty_paid_on" required min="<?= $h($s['boe_date']) ?>" max="<?= date('Y-m-d') ?>" value="<?= $h($s['duty_paid_on']) ?>"></label>
+        <label>Challan / bank reference *<input type="text" name="duty_bank_reference" required maxlength="60" value="<?= $h($s['duty_bank_reference']) ?>" placeholder="e.g. ICEGATE CIN 2611050012345"></label>
+        <p><button type="submit" class="btn-secondary"><?= $s['duty_paid_on'] ? 'Save duty payment' : 'Record duty payment' ?></button></p>
+      </form>
+      <?php endif; ?>
       <?php if ($canZoho): ?>
-      <form method="post" action="/import/<?= $id ?>/zoho"><?= Csrf::field() ?><button type="submit" class="btn-secondary"><?= $s['zoho_bill_id'] ? 'Send to Zoho Books again' : 'Send to Zoho Books' ?></button></form>
+      <form method="post" action="/import/<?= $id ?>/zoho"><?= Csrf::field() ?><button type="submit" class="btn-secondary">Send to Zoho Books</button> <span class="muted small">the bills, the payments to the supplier and to Customs, and the IGST credit journal — whatever is waiting</span></form>
+      <p class="small"><a href="/import/<?= $id ?>/zoho-check">Check this import against Zoho Books &rarr;</a> <span class="muted">(reads only)</span></p>
       <?php endif; ?>
     <?php endif; ?>
   </div>

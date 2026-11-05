@@ -1758,6 +1758,9 @@ async function domesticInvoicePayload(orderId, contactId, taxIdByName) {
     gst_treatment: dom.buyer_gstin ? 'business_gst' : 'business_none',
     place_of_supply: await domRepo.stateAbbr(dom.place_of_supply),
     line_items: lineItems,
+    // ZOH-8: the rupee round-off printed on the tax invoice, so Books' total is the invoice total.
+    adjustment: round(Number(dom.round_off || 0), 2),
+    adjustment_description: 'Round off',
     notes: `Domestic GST tax invoice ${dom.tax_invoice_no} for order ${order.order_reference}, ${order.company_legal_name}, place of supply ${await domRepo.stateName(dom.place_of_supply)}.`,
   };
   if (dom.buyer_gstin) payload.gst_no = String(dom.buyer_gstin);
@@ -1769,7 +1772,7 @@ async function domesticInvoicePayload(orderId, contactId, taxIdByName) {
 /**
  * Sends a Domestic Trade tax invoice to Books (created once; a retry finds
  * it by number). The buyer becomes a Books customer in INR with its GSTIN.
- * Live test in the Zoho TEST organisation still pending (no credentials yet).
+ * Live-tested in the Zoho TEST organisation on 5 Nov 2026 (Zoho change log Z-647 onwards).
  */
 async function pushDomesticInvoice(orderId, userId = null) {
   const orderRepository = require('../repositories/orderRepository');
@@ -1781,33 +1784,21 @@ async function pushDomesticInvoice(orderId, userId = null) {
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
   const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
-  const client = await clientRepository.find(order.client_id);
-  let contactId = String((client && client.zoho_contact_id) || '');
-  if (contactId === '') {
-    const contact = {
-      contact_name: String(order.company_legal_name),
-      contact_type: 'customer',
-      currency_code: 'INR',
-      gst_treatment: dom.buyer_gstin ? 'business_gst' : 'business_none',
-      place_of_contact: await domRepo.stateAbbr(dom.buyer_state_code || dom.place_of_supply),
-    };
-    if (dom.buyer_gstin) contact.gst_no = String(dom.buyer_gstin);
-    const response = await request('POST', `https://${config.apiDomain}/books/v3/contacts${query}`, contact, authHeaders(accessToken));
-    const decoded = safeJson(response.body);
-    contactId = String((decoded && decoded.contact && decoded.contact.contact_id) || '');
-    if (contactId === '') throw new Error(`Zoho Books contact creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
-    await clientRepository.setZohoContactId(order.client_id, contactId);
-  }
+  if (String(dom.tax_invoice_no).length > 16) throw new Error(`Invoice number ${dom.tax_invoice_no} is longer than 16 characters, which Zoho Books does not accept for a GST invoice.`);
+  const contactId = await domesticContact(config, accessToken, order, dom);
   const payload = await domesticInvoicePayload(orderId, contactId, (name) => taxId(config, accessToken, name));
   const existing = await findInvoiceByNumber(config, accessToken, String(dom.tax_invoice_no));
   let invoiceId;
   if (existing) {
     invoiceId = String(existing.invoice_id);
+    if (String(existing.status || '') === 'draft') await markInvoiceSent(config, accessToken, invoiceId); // a retry after the app stopped before marking it
   } else {
     const response = await request('POST', `https://${config.apiDomain}/books/v3/invoices${query}&ignore_auto_number_generation=true`, payload, authHeaders(accessToken));
     const decoded = safeJson(response.body);
     invoiceId = String((decoded && decoded.invoice && decoded.invoice.invoice_id) || '');
     if (invoiceId === '') throw new Error(`Zoho Books invoice creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+    // D-257 Zoho: sent (no e-mail goes out), so the buyer's receipts can be applied to it.
+    await markInvoiceSent(config, accessToken, invoiceId);
   }
   await domRepo.update(orderId, { zoho_invoice_id: invoiceId }, userId);
   return invoiceId;
@@ -1821,8 +1812,10 @@ async function pushDomesticInvoice(orderId, userId = null) {
  * IGST paid at customs is held until it is taken as input credit.
  */
 const IMPORT_ACCOUNTS = {
-  goods: 'Inventory Asset',
-  duty: 'Inventory Asset',
+  // Live test 5 Nov 2026: Books' "Inventory Asset" is a stock account that needs an item on every line, so the
+  // landed cost goes to an "Imported Goods Stock" asset account instead (name to be confirmed by the CA).
+  goods: 'Imported Goods Stock',
+  duty: 'Imported Goods Stock',
   igst_paid: 'IGST Paid on Import',
   igst_credit: 'Input IGST',
 };
@@ -1909,7 +1902,7 @@ async function importIgstCreditJournalPayload(s, accountIdByName) {
 /**
  * Sends a cleared import to Books: the supplier's bill and the customs duty
  * bill (each created once; a retry finds it by number). Live test in the Zoho
- * TEST organisation still pending (no credentials yet).
+ * TEST organisation on 5 Nov 2026 (Z-647 onwards).
  */
 async function pushImport(shipmentId, userId = null) {
   const importRepository = require('../repositories/importRepository');
@@ -1920,17 +1913,7 @@ async function pushImport(shipmentId, userId = null) {
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
   const account = (name) => accountId(config, accessToken, name);
   const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
-  const vendor = async (name, currency) => {
-    const rows = await getList(accessToken, `https://${config.apiDomain}/books/v3/contacts${query}&contact_type=vendor&contact_name=${encodeURIComponent(name)}`, 'contacts');
-    const found = rows.find((row) => String(row.contact_name || '') === name);
-    if (found) return String(found.contact_id);
-    const payload = { contact_name: name, company_name: name, contact_type: 'vendor', ...(currency !== null ? { currency_code: currency, gst_treatment: 'overseas' } : {}) };
-    const response = await request('POST', `https://${config.apiDomain}/books/v3/contacts${query}`, payload, authHeaders(accessToken));
-    const decoded = safeJson(response.body);
-    const id = decoded && decoded.contact && decoded.contact.contact_id;
-    if (!response.ok || typeof id !== 'string') throw new Error(`Zoho Books vendor creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
-    return id;
-  };
+  const vendor = (name, currency) => namedContact(config, accessToken, name, 'vendor', currency);
   const supplierId = await vendor(String(s.supplier_name), String(s.currency_code));
   const customsId = await vendor(zohoGuard.isProduction() ? 'Indian Customs' : `${zohoGuard.TEST_PREFIX}Indian Customs`, null);
   const ids = {};
@@ -1938,6 +1921,13 @@ async function pushImport(shipmentId, userId = null) {
     ['bill_id', String(s.reference), supplierId, await importBillPayload(s, await importRepository.lines(shipmentId), supplierId, account), 'zoho_bill_id'],
     ['duty_bill_id', `BE-${s.boe_no}`, customsId, await customsDutyBillPayload(s, customsId, account), 'zoho_duty_bill_id'],
   ];
+  if (importClearanceTotal(s) > 0) {
+    // D-257 Zoho: the clearance charges as a bill from the CHA (landed cost).
+    const chaName = String(s.cha_name || '').trim() !== '' ? String(s.cha_name) : 'Import clearance agent';
+    assertVendorAllowed(chaName);
+    const chaId = await namedContact(config, accessToken, chaName, 'vendor', null);
+    jobs.push(['clearance_bill_id', `CLR-${s.boe_no}`, chaId, await importClearanceBillPayload(s, chaId, account), 'zoho_clearance_bill_id']);
+  }
   for (const [key, number, vendorId, payload, column] of jobs) {
     let existing = s[column] ? { bill_id: s[column] } : await findBill(config, accessToken, number, vendorId);
     if (!existing) {
@@ -2026,7 +2016,7 @@ async function merchantBillPayload(d, lines, vendorId, accountIdByName) {
 /**
  * Sends a merchant trade deal to Books: the sale invoice (customer = the
  * foreign buyer) and the supplier's bill, each created once (a retry finds
- * it by number). Live test in the Zoho TEST organisation still pending.
+ * it by number). Live-tested in the Zoho TEST organisation on  5 Nov 2026 (Z-647 onwards).
  */
 async function pushMerchantDeal(dealId, userId = null) {
   const merchantRepository = require('../repositories/merchantTradeRepository');
@@ -2034,30 +2024,26 @@ async function pushMerchantDeal(dealId, userId = null) {
   if (!d || !d.sale_invoice_no) throw new Error('This deal has no sale invoice yet.');
   zohoGuard.assertCustomerAllowed(String(d.buyer_name));
   assertVendorAllowed(String(d.supplier_name));
+  if (String(d.sale_invoice_no).length > 16) throw new Error(`Invoice number ${d.sale_invoice_no} is longer than 16 characters, which Zoho Books does not accept.`);
   const config = await loadConfig();
   const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
   const account = (name) => accountId(config, accessToken, name);
   const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
-  const contact = async (name, type, currency) => {
-    const rows = await getList(accessToken, `https://${config.apiDomain}/books/v3/contacts${query}&contact_type=${type}&contact_name=${encodeURIComponent(name)}`, 'contacts');
-    const found = rows.find((row) => String(row.contact_name || '') === name);
-    if (found) return String(found.contact_id);
-    const response = await request('POST', `https://${config.apiDomain}/books/v3/contacts${query}`, { contact_name: name, company_name: name, contact_type: type, currency_code: currency, gst_treatment: 'overseas' }, authHeaders(accessToken));
-    const decoded = safeJson(response.body);
-    const id = decoded && decoded.contact && decoded.contact.contact_id;
-    if (!response.ok || typeof id !== 'string') throw new Error(`Zoho Books ${type} creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
-    return id;
-  };
+  const contact = (name, type, currency) => namedContact(config, accessToken, name, type, currency);
   const lines = await merchantRepository.lines(dealId);
   const customerId = await contact(String(d.buyer_name), 'customer', String(d.sale_currency));
   let invoiceId;
   const existing = d.zoho_invoice_id ? { invoice_id: d.zoho_invoice_id } : await findInvoiceByNumber(config, accessToken, String(d.sale_invoice_no));
-  if (existing) invoiceId = String(existing.invoice_id);
-  else {
+  if (existing) {
+    invoiceId = String(existing.invoice_id);
+    if (String(existing.status || '') === 'draft') await markInvoiceSent(config, accessToken, invoiceId);
+  } else {
     const response = await request('POST', `https://${config.apiDomain}/books/v3/invoices${query}&ignore_auto_number_generation=true`, await merchantInvoicePayload(d, lines, customerId, account), authHeaders(accessToken));
     const decoded = safeJson(response.body);
     invoiceId = String((decoded && decoded.invoice && decoded.invoice.invoice_id) || '');
     if (invoiceId === '') throw new Error(`Zoho Books invoice creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+    // D-257 Zoho: sent (no e-mail goes out), so the buyer's payments can be applied to it.
+    await markInvoiceSent(config, accessToken, invoiceId);
   }
   await merchantRepository.update(dealId, { zoho_invoice_id: invoiceId }, userId);
   const vendorId = await contact(String(d.supplier_name), 'vendor', String(d.purchase_currency));
@@ -2069,6 +2055,343 @@ async function pushMerchantDeal(dealId, userId = null) {
   }
   await merchantRepository.update(dealId, { zoho_bill_id: String(bill.bill_id) }, userId);
   return { invoice_id: invoiceId, bill_id: String(bill.bill_id) };
+}
+
+// ---------------------------------------------------------------- D-257 Zoho: the new divisions' money
+
+const money2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fixed2 = (v) => round(Number(v), 2).toFixed(2);
+
+/**
+ * A named Books contact (customer or vendor) found by its exact name, or
+ * created (foreign-currency contacts as overseas). ZOH-7: Books takes an
+ * invoice's / bill's currency from its contact — a same-named contact in
+ * another currency gets its own "<name> (<currency>)" contact instead.
+ */
+async function namedContact(config, accessToken, name, type, currency) {
+  const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const find = async (n) => {
+    const rows = await getList(accessToken, `https://${config.apiDomain}/books/v3/contacts${query}&contact_type=${type}&contact_name=${encodeURIComponent(n)}`, 'contacts');
+    return rows.find((row) => String(row.contact_name || '') === n) || null;
+  };
+  let row = await find(name);
+  if (row && currency !== null && row.currency_code && String(row.currency_code) !== currency) {
+    name = `${name} (${currency})`;
+    row = await find(name);
+  }
+  if (row) return String(row.contact_id);
+  const payload = { contact_name: name, company_name: name, contact_type: type, ...(currency !== null ? { currency_id: await currencyId(config, accessToken, currency), gst_treatment: 'overseas' } : {}) };
+  const response = await request('POST', `https://${config.apiDomain}/books/v3/contacts${query}`, payload, authHeaders(accessToken));
+  const decoded = safeJson(response.body);
+  const id = decoded && decoded.contact && decoded.contact.contact_id;
+  if (!response.ok || typeof id !== 'string') throw new Error(`Zoho Books ${type} creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+  return id;
+}
+
+/** Books' id of a currency (a contact takes currency_id, not the code — live test 5 Nov 2026). */
+async function currencyId(config, accessToken, code) {
+  const rows = await getList(accessToken, `https://${config.apiDomain}/books/v3/settings/currencies?organization_id=${encodeURIComponent(config.organizationId)}`, 'currencies');
+  const found = rows.find((r) => r.currency_code === code);
+  if (!found) throw new Error(`Currency ${code} is not turned on in Zoho Books. Add it in Zoho Books -> Settings -> Currencies, then sync again.`);
+  return String(found.currency_id);
+}
+
+/** Duplicate guard for a retry: a payment of this contact with the same bank reference and amount is the same payment. */
+async function existingPayment(config, accessToken, vendor, contactId, reference, amount) {
+  const [path, field] = vendor ? ['vendorpayments', 'vendor_id'] : ['customerpayments', 'customer_id'];
+  const url = `https://${config.apiDomain}/books/v3/${path}?organization_id=${encodeURIComponent(config.organizationId)}&${field}=${encodeURIComponent(contactId)}&reference_number=${encodeURIComponent(reference)}`;
+  const rows = await getList(accessToken, url, path);
+  const found = rows.find((r) => String(r.reference_number || '') === reference && Math.abs(Number(r.amount || 0) - amount) <= 0.01);
+  return found ? String(found.payment_id) : null;
+}
+
+/** A Books invoice or bill by id, from the list (its balance, total and status). */
+async function documentRow(config, accessToken, kind, number, id) {
+  const url = `https://${config.apiDomain}/books/v3/${kind}s?organization_id=${encodeURIComponent(config.organizationId)}&${kind}_number=${encodeURIComponent(number)}`;
+  const rows = await getList(accessToken, url, `${kind}s`);
+  return rows.find((r) => String(r[`${kind}_id`] || '') === id) || null;
+}
+
+/** Marks a new Books invoice as sent (no e-mail goes out), so payments can be applied to it. */
+async function markInvoiceSent(config, accessToken, invoiceId) {
+  const response = await request('POST', `https://${config.apiDomain}/books/v3/invoices/${encodeURIComponent(invoiceId)}/status/sent?organization_id=${encodeURIComponent(config.organizationId)}`, {}, authHeaders(accessToken));
+  if (!response.ok && !String(response.body).toLowerCase().includes('already')) {
+    throw new Error(`Zoho Books could not mark invoice ${invoiceId} as sent (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+  }
+}
+
+/**
+ * The payment payload for the new divisions (pure: no network). Rule D-212:
+ * the description is the app's own; the bank reference is the reference
+ * number. A foreign-currency payment goes in its own currency at the rate
+ * the bank gave.
+ */
+function divisionPaymentPayload(p, depositAccountId) {
+  const payload = {
+    [p.vendor ? 'vendor_id' : 'customer_id']: p.contact_id,
+    payment_mode: p.vendor ? 'Bank Transfer' : 'banktransfer',
+    amount: round(p.amount, 2),
+    date: p.date,
+    reference_number: p.reference,
+    description: p.description,
+    [p.vendor ? 'paid_through_account_id' : 'account_id']: depositAccountId,
+  };
+  if (p.rate !== null) payload.exchange_rate = round(p.rate, 6);
+  if (p.apply_to !== null && p.apply_amount > 0) {
+    payload[p.vendor ? 'bills' : 'invoices'] = [{ [p.vendor ? 'bill_id' : 'invoice_id']: p.apply_to, amount_applied: round(p.apply_amount, 2) }];
+  }
+  return payload;
+}
+
+/**
+ * Sends one payment of a new division and applies it to its invoice or bill
+ * (up to what that still owes; any excess stays unapplied as an advance). A
+ * retry finds the payment by its bank reference.
+ */
+async function sendDivisionPayment(config, accessToken, vendor, contactId, docKind, docNumber, docId, amount, date, reference, description, rate) {
+  const row = await documentRow(config, accessToken, docKind, docNumber, docId);
+  if (!row) throw new Error(`${docKind.charAt(0).toUpperCase()}${docKind.slice(1)} ${docNumber} was not found in Zoho Books, so payment ${reference} was not sent. Sync again; if it stays, check the ${docKind} in Books.`);
+  // The payment goes to the contact the invoice / bill is on (Books refuses any other — live test 5 Nov 2026).
+  contactId = String(row[vendor ? 'vendor_id' : 'customer_id'] || contactId);
+  const existing = await existingPayment(config, accessToken, vendor, contactId, reference, round(amount, 2));
+  if (existing !== null) return { payment_id: existing, applied: 0 };
+  const applied = round(Math.min(amount, Number(row.balance || 0)), 2);
+  const payload = divisionPaymentPayload({ contact_id: contactId, vendor, amount, date, reference, description, rate, apply_to: docId, apply_amount: applied }, config.depositAccountId);
+  const path = vendor ? 'vendorpayments' : 'customerpayments';
+  const response = await request('POST', `https://${config.apiDomain}/books/v3/${path}?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
+  const decoded = safeJson(response.body);
+  const id = decoded && decoded[vendor ? 'vendorpayment' : 'payment'] && decoded[vendor ? 'vendorpayment' : 'payment'].payment_id;
+  if (!response.ok || typeof id !== 'string') throw new Error(`Zoho Books ${vendor ? 'vendor' : 'customer'} payment ${reference} failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+  return { payment_id: id, applied };
+}
+
+/**
+ * D-257 Zoho (ZOH-6/7): the buyer's INR, GST-registered Books customer for
+ * Domestic Trade / local sales — kept apart from its export (overseas,
+ * foreign-currency) customer, remembered in clients.zoho_contact_id_inr. A
+ * same-named contact that is not INR, or is overseas, gets an
+ * "<name> (INR)" contact instead.
+ */
+async function domesticContact(config, accessToken, order, dom) {
+  const domRepo = require('../repositories/domesticOrderRepository');
+  const client = await clientRepository.find(order.client_id);
+  if (client && client.zoho_contact_id_inr) return String(client.zoho_contact_id_inr);
+  const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const name = String(order.company_legal_name);
+  let id = null;
+  for (const candidate of [name, `${name} (INR)`]) {
+    const rows = await getList(accessToken, `https://${config.apiDomain}/books/v3/contacts${query}&contact_type=customer&contact_name=${encodeURIComponent(candidate)}`, 'contacts');
+    let existing = null;
+    for (const row of rows) if (String(row.contact_name || '') === candidate) existing = row;
+    if (!existing) {
+      const contact = {
+        contact_name: candidate,
+        company_name: name,
+        contact_type: 'customer',
+        currency_code: 'INR',
+        gst_treatment: dom.buyer_gstin ? 'business_gst' : 'business_none',
+        place_of_contact: await domRepo.stateAbbr(dom.buyer_state_code || dom.place_of_supply),
+      };
+      if (dom.buyer_gstin) contact.gst_no = String(dom.buyer_gstin);
+      const response = await request('POST', `https://${config.apiDomain}/books/v3/contacts${query}`, contact, authHeaders(accessToken));
+      const decoded = safeJson(response.body);
+      id = String((decoded && decoded.contact && decoded.contact.contact_id) || '');
+      if (id === '') throw new Error(`Zoho Books contact creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+      break;
+    }
+    if (String(existing.currency_code || 'INR') === 'INR' && String(existing.gst_treatment || '') !== 'overseas') {
+      id = String(existing.contact_id);
+      break;
+    }
+  }
+  if (id === null) throw new Error(`Zoho Books already has "${name}" and "${name} (INR)" as customers that are not INR / GST — rename one in Books, then send again.`);
+  await db.execute('UPDATE clients SET zoho_contact_id_inr = :z WHERE id = :id', { z: id, id: Number(order.client_id) });
+  return id;
+}
+
+/**
+ * Domestic Trade (and Import & Distribution's local sale): a buyer's receipt
+ * as a Books customer payment, applied to the GST tax invoice. The invoice
+ * must be in Books first.
+ */
+async function pushDomesticReceipt(payment) {
+  const orderRepository = require('../repositories/orderRepository');
+  const domRepo = require('../repositories/domesticOrderRepository');
+  const orderId = Number(payment.order_id);
+  const order = await orderRepository.find(orderId);
+  const dom = await domRepo.find(orderId);
+  if (!order || !dom || !dom.zoho_invoice_id) throw new Error('The tax invoice of this order is not in Zoho Books yet.');
+  zohoGuard.assertCustomerAllowed(String(order.company_legal_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const contactId = await domesticContact(config, accessToken, order, dom);
+  return sendDivisionPayment(config, accessToken, false, contactId, 'invoice', String(dom.tax_invoice_no), String(dom.zoho_invoice_id),
+    Number(payment.amount_inr), String(payment.received_on).slice(0, 10), String(payment.bank_reference), String(payment.description), null);
+}
+
+/**
+ * Import & Distribution: a payment to the supplier abroad (advance, balance
+ * or LC) as a Books vendor payment in the supplier's currency, at the rate
+ * the bank gave, applied to the import supplier bill.
+ */
+async function pushImportPayment(payment) {
+  const importRepository = require('../repositories/importRepository');
+  const s = await importRepository.find(Number(payment.shipment_id));
+  if (!s || !s.zoho_bill_id) throw new Error('The supplier bill of this import is not in Zoho Books yet.');
+  assertVendorAllowed(String(s.supplier_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const vendorId = await namedContact(config, accessToken, String(s.supplier_name), 'vendor', String(s.currency_code));
+  return sendDivisionPayment(config, accessToken, true, vendorId, 'bill', String(s.reference), String(s.zoho_bill_id),
+    Number(payment.amount_fc), String(payment.paid_on).slice(0, 10), String(payment.bank_reference), String(payment.description), Number(payment.fx_rate));
+}
+
+/** Rule D-212: the customs duty payment's description, built from the facts. */
+function importDutyPaymentDescription(s) {
+  const G = require('./gstCalculator');
+  const total = fixed2(Number(s.bcd_total) + Number(s.sws_total) + Number(s.igst_total));
+  return `Customs duty and IGST paid to Indian Customs for import PO ${s.reference}, bill of entry ${s.boe_no} dated ${String(s.boe_date).slice(0, 10)} at ${s.port_code}: `
+    + `basic customs duty ₹${G.inr(String(s.bcd_total))} + social welfare surcharge ₹${G.inr(String(s.sws_total))}`
+    + ` + IGST ₹${G.inr(String(s.igst_total))} = ₹${G.inr(total)}, against customs duty bill BE-${s.boe_no}, challan / bank ref ${s.duty_bank_reference}`;
+}
+
+/** Import & Distribution: the customs duty and IGST payment as a Books vendor payment to Customs, applied to the customs duty bill. */
+async function pushImportDutyPayment(shipmentId) {
+  const importRepository = require('../repositories/importRepository');
+  const s = await importRepository.find(shipmentId);
+  if (!s || !s.zoho_duty_bill_id || !s.duty_paid_on) throw new Error('The customs duty bill or its payment is not recorded yet.');
+  assertVendorAllowed(String(s.supplier_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const customsId = await namedContact(config, accessToken, zohoGuard.isProduction() ? 'Indian Customs' : `${zohoGuard.TEST_PREFIX}Indian Customs`, 'vendor', null);
+  const amount = round(Number(s.bcd_total) + Number(s.sws_total) + Number(s.igst_total), 2);
+  return sendDivisionPayment(config, accessToken, true, customsId, 'bill', `BE-${s.boe_no}`, String(s.zoho_duty_bill_id),
+    amount, String(s.duty_paid_on).slice(0, 10), String(s.duty_bank_reference), importDutyPaymentDescription(s), null);
+}
+
+/** Import & Distribution: the journal taking the import IGST as input credit (once the credit is recorded). */
+async function pushImportIgstJournal(shipmentId) {
+  const importRepository = require('../repositories/importRepository');
+  const s = await importRepository.find(shipmentId);
+  if (!s) throw new Error(`Import #${shipmentId} not found.`);
+  assertVendorAllowed(String(s.supplier_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const payload = await importIgstCreditJournalPayload(s, (name) => accountId(config, accessToken, name));
+  if (!zohoGuard.isProduction()) payload.notes = `${zohoGuard.TEST_PREFIX} ${payload.notes}`;
+  const response = await request('POST', `https://${config.apiDomain}/books/v3/journals?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
+  const decoded = safeJson(response.body);
+  const id = decoded && decoded.journal && decoded.journal.journal_id;
+  if (!response.ok || !id) throw new Error(`Zoho Books IGST credit journal for import ${s.reference} failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+  return String(id);
+}
+
+/**
+ * Merchant Trade: one payment leg — the buy leg as a Books vendor payment on
+ * the supplier's bill, the sell leg as a customer payment on the sale
+ * invoice — each in its own currency at the rate the bank gave.
+ */
+async function pushMerchantPayment(payment) {
+  const merchantRepository = require('../repositories/merchantTradeRepository');
+  const d = await merchantRepository.find(Number(payment.deal_id));
+  const buy = String(payment.leg) === 'buy';
+  if (!d || !d[buy ? 'zoho_bill_id' : 'zoho_invoice_id']) throw new Error(`The ${buy ? "supplier's bill" : 'sale invoice'} of this deal is not in Zoho Books yet.`);
+  zohoGuard.assertCustomerAllowed(String(d.buyer_name));
+  assertVendorAllowed(String(d.supplier_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const contactId = buy
+    ? await namedContact(config, accessToken, String(d.supplier_name), 'vendor', String(d.purchase_currency))
+    : await namedContact(config, accessToken, String(d.buyer_name), 'customer', String(d.sale_currency));
+  return sendDivisionPayment(config, accessToken, buy, contactId, buy ? 'bill' : 'invoice', String(buy ? d.po_no : d.sale_invoice_no),
+    String(d[buy ? 'zoho_bill_id' : 'zoho_invoice_id']), Number(payment.amount_fc), String(payment.moved_on).slice(0, 10), String(payment.bank_reference), String(payment.description), Number(payment.fx_rate));
+}
+
+/**
+ * The "App vs Zoho" check for a new division's record (reads only): the
+ * invoice / bills and payments the app holds, beside what Books holds.
+ */
+async function matchRecords(records) {
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const cache = {};
+  const rows = [];
+  for (const r of records) {
+    const fmt = (v) => (v === null ? null : `${r.unit} ${money2(v)}`);
+    if (!r.zoho_id) {
+      rows.push({ group: r.group, item: r.item, app: fmt(r.amount), books: null, status: 'not_sent', note: 'Goes at the next sync (or see the Zoho Sync Log).' });
+      continue;
+    }
+    let books = null;
+    if (r.kind === 'invoice' || r.kind === 'bill') {
+      const row = await documentRow(config, accessToken, r.kind, r.number, String(r.zoho_id));
+      books = row ? Number(row.total || 0) : null;
+    } else if (r.kind === 'journal') {
+      if (!cache.journal) cache.journal = await totalsById('journal');
+      books = cache.journal[String(r.zoho_id)] !== undefined ? cache.journal[String(r.zoho_id)] : null;
+    } else {
+      const key = `${r.vendor ? 'v' : 'c'}:${r.contact}`;
+      if (!cache[key]) {
+        cache[key] = {};
+        if (r.contact !== null) {
+          const recs = await contactRecords(String(r.contact), r.vendor);
+          for (const p of recs[r.vendor ? 'vendorpayments' : 'customerpayments']) cache[key][String(p.payment_id)] = Number(p.amount || 0);
+        }
+      }
+      books = cache[key][String(r.zoho_id)] !== undefined ? cache[key][String(r.zoho_id)] : null;
+    }
+    const status = books === null ? 'missing' : (Math.abs(books - r.amount) <= 0.01 ? 'match' : 'different');
+    rows.push({ group: r.group, item: r.item, app: fmt(r.amount), books: fmt(books), status, note: status === 'missing' ? 'Sent by the app, but Books no longer has it.' : '' });
+  }
+  return rows;
+}
+
+/** The Books contact id of a named contact, if it exists (reads only; for the match check). */
+async function contactIdByName(name, type) {
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const rows = await getList(accessToken, `https://${config.apiDomain}/books/v3/contacts?organization_id=${encodeURIComponent(config.organizationId)}&contact_type=${type}&contact_name=${encodeURIComponent(name)}`, 'contacts');
+  const found = rows.find((row) => String(row.contact_name || '') === name);
+  return found ? String(found.contact_id) : null;
+}
+
+/** The import's clearance charges (₹), by line: freight, insurance, CHA, port and terminal, other. */
+const IMPORT_CLEARANCE_CHARGES = {
+  freight_inr: 'Freight',
+  insurance_inr: 'Insurance',
+  cha_inr: 'CHA charges',
+  port_inr: 'Port and terminal charges',
+  other_inr: 'Other clearance charges',
+};
+
+function importClearanceTotal(s) {
+  let t = 0;
+  for (const k of Object.keys(IMPORT_CLEARANCE_CHARGES)) t += Number(s[k] || 0);
+  return round(t, 2);
+}
+
+/**
+ * D-257 Zoho: the clearance charges of an import (pure: no network) as one
+ * Books bill from the CHA, to stock (part of the landed cost). Rule D-212:
+ * each line and the notes say what it is and for which import and bill of entry.
+ */
+async function importClearanceBillPayload(s, vendorId, accountIdByName) {
+  const what = `import PO ${s.reference}, bill of entry ${s.boe_no} dated ${String(s.boe_date).slice(0, 10)}`;
+  const lines = [];
+  for (const [k, label] of Object.entries(IMPORT_CLEARANCE_CHARGES)) {
+    if (Number(s[k] || 0) > 0) lines.push({ account_id: await accountIdByName(IMPORT_ACCOUNTS.goods), name: label, description: `${label} on ${what}`, quantity: 1, rate: round(Number(s[k]), 2) });
+  }
+  const payload = {
+    vendor_id: vendorId,
+    bill_number: `CLR-${s.boe_no}`,
+    reference_number: String(s.reference),
+    date: String(s.clearance_date || s.boe_date).slice(0, 10),
+    line_items: lines,
+    notes: `Clearance charges on ${what}, through ${s.cha_name} (part of the landed cost).`,
+  };
+  const tags = await divisionTags(Number(s.division_id));
+  if (tags.length) payload.tags = tags;
+  return payload;
 }
 
 module.exports = {
@@ -2089,4 +2412,7 @@ module.exports = {
   IMPORT_ACCOUNTS, importBillPayload, customsDutyBillPayload, importIgstCreditJournalPayload, pushImport,
   // D-257 Phase 4: merchant trade (sale invoice to the foreign buyer, the foreign supplier's bill).
   MERCHANT_ACCOUNTS, merchantInvoicePayload, merchantBillPayload, pushMerchantDeal,
+  // D-257 Zoho: the new divisions' payments, journals, clearance bill and the App vs Zoho check.
+  divisionPaymentPayload, pushDomesticReceipt, pushImportPayment, importDutyPaymentDescription, pushImportDutyPayment, pushImportIgstJournal,
+  pushMerchantPayment, matchRecords, contactIdByName, IMPORT_CLEARANCE_CHARGES, importClearanceTotal, importClearanceBillPayload,
 };

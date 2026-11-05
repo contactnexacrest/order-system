@@ -45,7 +45,7 @@
               <div class="field-grid">
                 <label>Amount credited (&#8377;) *<input type="number" name="amount" required min="0.01" max="{{ c.outstanding_plain }}" step="0.01" placeholder="e.g. 1500.00"></label>
                 <label>Credited on *<input type="date" name="credited_on" required min="{{ c.filed_on }}" max="{{ today() }}"></label>
-                <label>Bank reference (RFD-05 / UTR) *<input type="text" name="bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="as on the bank statement"></label>
+                <label>Bank reference (RFD-05 / UTR) *<input type="text" name="bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="as on the bank statement"></label>
                 <label>Part *
                   <select name="part" required><option value="">Choose…</option>{% for k, v in parts %}<option value="{{ k }}">{{ v | capitalize }}</option>{% endfor %}</select>
                 </label>

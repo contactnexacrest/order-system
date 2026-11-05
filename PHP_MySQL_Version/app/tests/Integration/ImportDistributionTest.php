@@ -336,13 +336,13 @@ final class ImportDistributionTest extends DbTestCase
         $acc = static fn (string $name): string => 'acc:' . $name;
         $bill = ZohoBooksService::importBillPayload($s, ImportRepository::lines($id), 'V1', $acc);
         self::assertSame(['V1', $s['reference'], 'COSU6234567890', 'USD', 84.65, 'overseas'], [$bill['vendor_id'], $bill['bill_number'], $bill['reference_number'], $bill['currency_code'], $bill['exchange_rate'], $bill['gst_treatment']]);
-        self::assertSame([100.0, 18.5, 'acc:Inventory Asset', '68029300'], [$bill['line_items'][0]['quantity'], $bill['line_items'][0]['rate'], $bill['line_items'][0]['account_id'], $bill['line_items'][0]['hsn_or_sac']]);
+        self::assertSame([100.0, 18.5, 'acc:Imported Goods Stock', '68029300'], [$bill['line_items'][0]['quantity'], $bill['line_items'][0]['rate'], $bill['line_items'][0]['account_id'], $bill['line_items'][0]['hsn_or_sac']]);
         self::assertSame("Import purchase from TEST-Xiamen Stone Industries (China) against import PO {$s['reference']}, BL COSU6234567890, bill of entry 4567891.", $bill['notes']);
         self::assertArrayNotHasKey('tags', $bill, 'two divisions are active here, but no Division tag is set up');
         $duty = ZohoBooksService::customsDutyBillPayload($s, 'C1', $acc);
         self::assertSame('BE-4567891', $duty['bill_number']);
         self::assertSame([41681.99, 4168.2, 53748.42], array_column($duty['line_items'], 'rate'));
-        self::assertSame(['acc:Inventory Asset', 'acc:Inventory Asset', 'acc:IGST Paid on Import'], array_column($duty['line_items'], 'account_id'));
+        self::assertSame(['acc:Imported Goods Stock', 'acc:Imported Goods Stock', 'acc:IGST Paid on Import'], array_column($duty['line_items'], 'account_id'));
         $journal = ZohoBooksService::importIgstCreditJournalPayload($s, $acc);
         self::assertSame([['acc:Input IGST', 'debit', 53748.42], ['acc:IGST Paid on Import', 'credit', 53748.42]],
             array_map(static fn (array $l): array => [$l['account_id'], $l['debit_or_credit'], $l['amount']], $journal['line_items']));

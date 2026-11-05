@@ -22,6 +22,18 @@ const emailService = require('./emailService');
 const SESSION_ID = '_associate_portal_id';
 const SESSION_PENDING = '_associate_portal_pending_id';
 const SESSION_VIEW_AS = '_associate_portal_view_as_staff_id';
+/** QA ACC-10: fingerprint of the password this session logged in with (a change or reset ends other sessions). */
+const SESSION_PASSWORD_FP = '_associate_portal_password_fp';
+
+/** Whether this session's password is still the associate's current one (a session from before the check is accepted and pinned). */
+function sessionPasswordStillCurrent(req, currentHash) {
+  const fp = sha256(String(currentHash || ''));
+  if (req.session[SESSION_PASSWORD_FP] === undefined || req.session[SESSION_PASSWORD_FP] === null) {
+    req.session[SESSION_PASSWORD_FP] = fp;
+    return true;
+  }
+  return req.session[SESSION_PASSWORD_FP] === fp;
+}
 const DUMMY_HASH = '$2y$12$XkZEWJ9OTUrQ7pC.e9pnpO1LA.XHdoTUKJahoxDBHKjd8rQTbId22';
 // Staff and buyer logins live in the same session: rotating the id keeps them.
 const OTHER_KEYS = ['_auth_user_id', '_client_portal_client_id', '_client_portal_impersonated_by_staff_id', '_flash'];
@@ -115,9 +127,11 @@ async function verifyCode(req, code) {
     return false;
   }
   await db.execute('UPDATE associate_tokens SET used_at = NOW() WHERE id = :id', { id: t.id });
+  const loggedIn = await associateRepository.find(Number(id));
   await regenerate(req, () => {
     delete req.session[SESSION_PENDING];
     req.session[SESSION_ID] = Number(id);
+    req.session[SESSION_PASSWORD_FP] = sha256(String((loggedIn && loggedIn.password_hash) || ''));
   });
   await associateRepository.setFields(Number(id), { failed_login_count: 0, locked_until: null, last_login_at: formatForDb(new Date()) });
   await auditLogRepository.log(null, 'ASSOCIATE_LOGIN', 'associates', Number(id));
@@ -142,6 +156,7 @@ async function logout(req) {
     delete req.session[SESSION_ID];
     delete req.session[SESSION_PENDING];
     delete req.session[SESSION_VIEW_AS];
+    delete req.session[SESSION_PASSWORD_FP];
   });
   delete req.session[SESSION_ID];
   delete req.session[SESSION_PENDING];
@@ -191,6 +206,7 @@ function isSuspended(a) {
 }
 
 module.exports = {
+  sessionPasswordStillCurrent,
   SUSPENDED_BANNER, SUSPENDED_REFUSED, isSuspended,
   SESSION_ID, SESSION_PENDING, SESSION_VIEW_AS, issueToken, associateForSetPassword, setPassword, attemptLogin, verifyCode,
   pendingId, currentId, current, logout, startViewAs, viewAsStaffId, endViewAs, showCodeOnScreen,

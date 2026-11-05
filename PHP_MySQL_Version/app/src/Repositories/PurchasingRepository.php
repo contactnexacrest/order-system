@@ -54,7 +54,9 @@ final class PurchasingRepository
     {
         $rows = Database::connection()->query(self::SELECT . " WHERE pr.status NOT IN ('received', 'cancelled')
             OR (pr.status = 'received' AND pr.received_on >= CURDATE() - INTERVAL 60 DAY) ORDER BY pr.needed_by, pr.id")->fetchAll();
-        $cancelled = (int) Database::connection()->query("SELECT COUNT(*) FROM purchase_requirements WHERE status = 'cancelled'")->fetchColumn();
+        // QA ACC-13: the cancelled count covers only the orders this user may see (as the cards do).
+        $cancelledOrderIds = Database::connection()->query("SELECT order_id FROM purchase_requirements WHERE status = 'cancelled'")->fetchAll(\PDO::FETCH_COLUMN);
+        $cancelled = count(array_filter($cancelledOrderIds, static fn ($orderId): bool => \App\Services\OrderAccessService::currentUserMaySeeOrderId((int) $orderId)));
         return ['rows' => $rows, 'cancelled' => $cancelled];
     }
 

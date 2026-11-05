@@ -16,7 +16,7 @@
 {% endif %}
 {% if viewAs %}
   <div class="impersonation-banner">&#128100; Staff view of this associate's portal — read-only.
-    <a class="impersonation-banner-end" href="/associate/logout">End staff view</a></div>
+    <form method="post" action="/associate/logout" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="impersonation-banner-end">End staff view</button></form></div>
 {% endif %}
 <header class="client-topbar">
   <div class="topbar-brand">
@@ -32,7 +32,7 @@
     <a href="/associate/commission">Commission</a>
     <a href="/associate/messages">Messages</a>
     <a href="/associate/profile">Profile</a>
-    {% if viewAs %}<a href="/associate/logout" style="margin-left:auto">End staff view</a>{% else %}
+    {% if viewAs %}<form method="post" action="/associate/logout" style="margin-left:auto"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="topbar-nav-logout">End staff view</button></form>{% else %}
     <form method="post" action="/associate/logout" style="margin-left:auto"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="topbar-nav-logout">Log out</button></form>{% endif %}
   </nav>
   {% endif %}

@@ -104,7 +104,7 @@ async function queue(req, res) {
     const rows = (boardStatus === '' ? board.rows : await purchasingRepository.queue(boardStatus)).filter((r) => mayOpenBoard(r.order_id));
     const columns = Object.entries(purchasingRepository.STATUSES).filter(([key]) => (boardStatus === '' ? key !== 'cancelled' : key === boardStatus))
       .map(([key, label]) => ({ key, label, rows: rows.filter((r) => r.status === key) }));
-    res.renderView('procurement/queue_kanban', { columns, cancelled: board.cancelled, today: todayIst(), statuses: purchasingRepository.STATUSES, status: boardStatus }, 'layout/base');
+    res.renderView('procurement/queue_kanban', { columns, cancelled: board.cancelledOrderIds.filter((id) => mayOpenBoard(id)).length, today: todayIst(), statuses: purchasingRepository.STATUSES, status: boardStatus }, 'layout/base');
     return;
   }
   const status = String(req.query.status || '');

@@ -104,6 +104,12 @@ async function verifyCode(req, res) {
 }
 
 async function logout(req, res) {
+  // QA ACC-15: signing out changes the session, so only the posted form (with
+  // its CSRF token) does it; a plain link or <img src> to the address does nothing.
+  if (req.method !== 'POST') {
+    res.redirect(associatePortalService.currentId(req) !== null ? '/associate' : '/associate/login');
+    return;
+  }
   if (associatePortalService.viewAsStaffId(req) !== null) {
     const id = await associatePortalService.endViewAs(req);
     res.redirect(`/associates/${Number(id)}`);

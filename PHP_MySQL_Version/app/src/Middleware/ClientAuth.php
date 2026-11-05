@@ -54,6 +54,23 @@ final class ClientAuth
                     header('Location: /client/login');
                     return false;
                 }
+                // QA ACC-9: the staff member behind it must still be an active user.
+                $staff = \App\Repositories\UserRepository::findById((int) ClientPortalService::impersonatedByStaffId());
+                if ($staff === null || !(int) $staff['is_active']) {
+                    ClientPortalService::endImpersonation();
+                    header('Location: /client/login');
+                    return false;
+                }
+                // QA ACC-9: logging in as a client is for looking only — staff do not
+                // acknowledge, upload, report payments, raise disputes or reorder as the buyer.
+                if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+                    $postPath = rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+                    if (!in_array($postPath, ['/client/end-impersonation', '/client/logout'], true)) {
+                        \App\Helpers\Flash::set('error', 'You are logged in as this client to look only: nothing can be saved for the buyer. Use "End impersonation" first.');
+                        header('Location: ' . \App\Helpers\Router::safeRedirectBack());
+                        return false;
+                    }
+                }
                 return true;
             }
 
@@ -62,7 +79,8 @@ final class ClientAuth
             // AUTH-10 for staff, is_active was otherwise only ever checked at
             // login time.
             $login = ClientLoginRepository::findById($clientId);
-            if (!$login || !$login['is_active'] || !$login['client_is_active']) {
+            // QA ACC-10: a password changed or reset since this session logged in ends it.
+            if (!$login || !$login['is_active'] || !$login['client_is_active'] || !ClientPortalService::sessionPasswordStillCurrent((string) $login['password_hash'])) {
                 ClientPortalService::logout();
                 header('Location: /client/login');
                 return false;

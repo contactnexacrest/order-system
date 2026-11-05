@@ -164,6 +164,37 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
     expect(boardHtml).toContain('class="filter-chip active" href="/orders?status=active">Active');
   });
 
+  // D-257: a Domestic Trade order (or local sale) shows its own stage (of 8) and its rupee amount on the
+  // list and the board alike; the board adds Domestic columns only when there are such orders. Export cards unchanged.
+  it('shows a Domestic Trade order with its own stage and rupee amount on the list and the board', async () => {
+    await db.execute('UPDATE users SET division_id = NULL WHERE id = :id', { id: userId });
+    const exportOrder = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [userId]);
+    expect((await agent.get('/orders')).text).not.toContain('Domestic · ');
+    await db.execute("UPDATE divisions SET status = 'active' WHERE id = 2");
+    try {
+      const dom = await createTestOrder(await createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [userId]);
+      await db.execute("UPDATE orders SET division_id = 2, currency_code = 'INR' WHERE id = :id", { id: dom });
+      await db.execute("INSERT INTO domestic_orders (order_id, stage, place_of_supply, seller_state_code) VALUES (:o, 'purchase', '29', '29')", { o: dom });
+      await db.execute("INSERT INTO domestic_order_lines (order_id, line_no, description, hsn_code, quantity, unit, rate_inr, gst_rate_pct) VALUES (:o, 1, 'Granite', '6802', 10, 'm2', 1500.50, 18)", { o: dom });
+      for (const [what, url] of [['list', '/orders?view=list'], ['board', '/orders']]) {
+        const html = (await agent.get(url)).text;
+        const card = html.slice(html.indexOf(`/orders/${dom}`), html.indexOf(`/orders/${dom}`) + 2500);
+        expect([what, card.includes('Stage 4 of 8 &middot; Purchase')]).toEqual([what, true]);
+        expect([what, card.includes('INR 15,005.00 + GST')]).toEqual([what, true]);
+        const exportCard = html.slice(html.indexOf(`/orders/${exportOrder}`), html.indexOf(`/orders/${exportOrder}`) + 2500);
+        expect([what, exportCard.includes('of 9 &middot;')]).toEqual([what, true]);
+      }
+      const board = (await agent.get('/orders')).text;
+      expect(board).toContain('data-column="dom_purchase"');
+      expect(board).toMatch(new RegExp(`data-column="dom_purchase"[\\s\\S]*?/orders/${dom}\\?from=kanban`));
+      await db.execute("UPDATE domestic_orders SET stage = 'payment', invoice_total = 17706.00 WHERE order_id = :o", { o: dom });
+      const list = (await agent.get('/orders?view=list')).text;
+      expect(list.slice(list.indexOf(`/orders/${dom}`), list.indexOf(`/orders/${dom}`) + 2500)).toContain('INR 17,706.00</span>');
+    } finally {
+      await db.execute("UPDATE divisions SET status = 'planned' WHERE id <> 1");
+    }
+  });
+
   // Owner decision 1 Nov 2026 (A-5, Q-R7-2): the board pages like the list — 25 per column, then "Show more".
   it('pages the Orders board like the list', async () => {
     // A Kanban user who sees only their own orders (an Admin sees every order in the test database).

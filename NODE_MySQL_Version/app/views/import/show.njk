@@ -147,8 +147,17 @@
         <p><button type="submit" class="btn-secondary">Record IGST credit</button></p>
       </form>
       {% endif %}
+      <p data-testid="imp-duty-paid">Customs duty + IGST ₹{{ dutyTotalFmt }}: {% if s.duty_paid_on %}paid on {{ s.duty_paid_on }}, challan / bank ref {{ s.duty_bank_reference }}.{% else %}payment not recorded yet.{% endif %}</p>
+      {% if canPay and not s.duty_zoho_payment_id %}
+      <form method="post" action="/import/{{ id }}/duty-payment" class="field-grid"><input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Duty paid on *<input type="date" name="duty_paid_on" required min="{{ s.boe_date }}" max="{{ today }}" value="{{ s.duty_paid_on or '' }}"></label>
+        <label>Challan / bank reference *<input type="text" name="duty_bank_reference" required maxlength="60" value="{{ s.duty_bank_reference or '' }}" placeholder="e.g. ICEGATE CIN 2611050012345"></label>
+        <p><button type="submit" class="btn-secondary">{{ 'Save duty payment' if s.duty_paid_on else 'Record duty payment' }}</button></p>
+      </form>
+      {% endif %}
       {% if canZoho %}
-      <form method="post" action="/import/{{ id }}/zoho"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-secondary">{{ 'Send to Zoho Books again' if s.zoho_bill_id else 'Send to Zoho Books' }}</button></form>
+      <form method="post" action="/import/{{ id }}/zoho"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-secondary">Send to Zoho Books</button> <span class="muted small">the bills, the payments to the supplier and to Customs, and the IGST credit journal — whatever is waiting</span></form>
+      <p class="small"><a href="/import/{{ id }}/zoho-check">Check this import against Zoho Books &rarr;</a> <span class="muted">(reads only)</span></p>
       {% endif %}
     {% endif %}
   </div>

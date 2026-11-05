@@ -95,7 +95,12 @@ final class MoneyVisibility
     public static function seesClient(): bool
     {
         $user = AuthService::currentUser();
-        if ($user === null || !empty($user['is_super_admin'])) {
+        if ($user === null) {
+            return true;
+        }
+        // QA ACC-16: an effective Super Admin (a delegation too, as on Node) sees the client —
+        // except during a preview, which shows exactly the previewed designation.
+        if (ActiveDepartmentService::preview() === null && SuperAdminService::isEffective((int) $user['id'])) {
             return true;
         }
         $roleId = ActiveDepartmentService::effectiveRoleId((int) $user['id'], $user['role_id'] !== null ? (int) $user['role_id'] : null);

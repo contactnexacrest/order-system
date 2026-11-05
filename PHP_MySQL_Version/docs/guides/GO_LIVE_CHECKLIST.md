@@ -8,7 +8,8 @@ Prepared 5 Nov 2026 (Phase 0C.1). Work through it top to bottom on go-live day, 
 - [ ] **Lawyer:** the Associate agreement and the manager's Schedule A are final (see `docs/legal/D-245-lawyer-notes.md`). Signed copies are ready for upload.
 - [ ] **Zoho:**
   - [ ] the live organisation is set up: bank (deposit) account, GST, TDS taxes, chart of accounts;
-  - [ ] the GST commission-bill test has passed in the **test** organisation, logged in `docs/zoho/zoho-change-log.csv`;
+  - [x] the GST commission-bill test has passed in the **test** organisation, logged in `docs/zoho/zoho-change-log.csv` (done 5 Nov 2026, Z-690 to Z-693);
+  - [ ] before activating Import & Distribution or Merchant Trade: the accounts *Imported Goods Stock*, *IGST Paid on Import*, *Merchanting Trade Sales* and *Merchanting Trade Purchases* exist in the live organisation (names confirmed by the CA);
   - [ ] every `TEST-` record has been removed, with each removal logged.
 - [ ] **Data ready:**
   - [ ] suppliers;

@@ -697,7 +697,7 @@ final class MerchantTradeService
         }
         $fields = ['invoice_generated_at' => date('Y-m-d H:i:s')];
         if (empty($d['sale_invoice_no'])) {
-            $fields['sale_invoice_no'] = self::nextReference('MTT-INV', 'INV');
+            $fields['sale_invoice_no'] = self::nextReference('MTT-INV', 'I'); // MTT/I/26-27/0001: 16 characters, the most a GST-registered Books org accepts (ZOH-9)
             $fields['invoice_date'] = date('Y-m-d');
         }
         MerchantTradeRepository::update($id, $fields, $userId);

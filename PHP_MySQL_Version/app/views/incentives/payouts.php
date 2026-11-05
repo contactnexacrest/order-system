@@ -70,7 +70,7 @@ foreach ($rows as $r) {
                   <?php endif; ?>
                 <?php endif; ?>
                 <select name="paid_via" required aria-label="Paid via" title="Paid via"><option value="">Paid via…</option><?php foreach (IncentiveRepository::PAID_VIA as $__k => $__v): ?><option value="<?= $__k ?>"><?= htmlspecialchars(ucfirst($__v)) ?></option><?php endforeach; ?></select>
-                <input type="text" name="paid_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="Payroll Nov-2026 / UTR / cheque no." aria-label="Payment reference" title="Payment reference: payroll month, UTR or cheque no. (rule D-212)" style="width:13em">
+                <input type="text" name="paid_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="Payroll Nov-2026 / UTR / cheque no." aria-label="Payment reference" title="Payment reference: payroll month, UTR or cheque no. (rule D-212)" style="width:13em">
                 <button type="submit" class="btn-sm">Mark paid</button>
               </div>
             </form>
@@ -90,7 +90,7 @@ foreach ($rows as $r) {
         <?php foreach ($__dueIds as $id): ?><input type="hidden" name="payout_ids[]" value="<?= $id ?>"><?php endforeach; ?>
         <label class="small">Paid on <input type="date" name="paid_on" required min="<?= \App\Services\IncentiveService::earliestPaidOn($month) ?>" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>"></label>
         <label class="small">Paid via <select name="paid_via" required aria-label="Paid via" title="Paid via"><option value="">Paid via…</option><?php foreach (IncentiveRepository::PAID_VIA as $__k => $__v): ?><option value="<?= $__k ?>"><?= htmlspecialchars(ucfirst($__v)) ?></option><?php endforeach; ?></select></label>
-        <label class="small">Payment reference <input type="text" name="paid_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="Payroll Nov-2026 / UTR / cheque no." title="Payment reference: payroll month, UTR or cheque no. (rule D-212)" style="width:13em"></label>
+        <label class="small">Payment reference <input type="text" name="paid_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="Payroll Nov-2026 / UTR / cheque no." title="Payment reference: payroll month, UTR or cheque no. (rule D-212)" style="width:13em"></label>
         <button type="submit" class="btn-sm">Mark all paid</button>
       </form>
     <?php endif; ?>

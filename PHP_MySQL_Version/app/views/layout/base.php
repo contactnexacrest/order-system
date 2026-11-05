@@ -236,6 +236,10 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canAssets): ?><a href="/company-assets" class="<?= $isActive('/company-assets') ? 'active' : '' ?>">Assets</a><?php endif; ?>
           <?php if ($canSignatories): ?><a href="/signatories" class="<?= $isActive('/signatories') ? 'active' : '' ?>">Signatories</a><?php endif; ?>
           <?php if ($can('manage_divisions')): // D-257 ?><a href="/admin/divisions" class="<?= $isActive('/admin/divisions') ? 'active' : '' ?>">Divisions</a><?php endif; ?>
+          <?php // QA UI-12: the GST and import duty rate lists, once a division that uses them is active (until then: Admin › Divisions).
+          $__activeCodes = $can('manage_divisions') ? array_column(\App\Services\DivisionService::active(), 'code') : []; ?>
+          <?php if (array_intersect(['DOM', 'IMP'], $__activeCodes) !== []): ?><a href="/admin/gst-rates" class="<?= $isActive('/admin/gst-rates') ? 'active' : '' ?>">GST Rates</a><?php endif; ?>
+          <?php if (in_array('IMP', $__activeCodes, true)): ?><a href="/admin/import-duty-rates" class="<?= $isActive('/admin/import-duty-rates') ? 'active' : '' ?>">Import Duty Rates</a><?php endif; ?>
           <?php if ($canPermissions): ?><a href="/admin/departments" class="<?= $isActive('/admin/departments') ? 'active' : '' ?>">Departments</a><?php endif; ?>
           <?php if ($can('manage_task_types')): ?><a href="/admin/task-types" class="<?= $isActive('/admin/task-types') ? 'active' : '' ?>">Task Due Days</a><?php endif; ?>
           <?php if ($canPermissions): ?><a href="/admin/permissions" class="<?= $isActive('/admin/permissions') ? 'active' : '' ?>">Permissions</a><?php endif; ?>

@@ -17,7 +17,7 @@
       <td>{{ o.archived_at }} {{ 'by ' + o.archived_by_name if o.archived_by_name }}</td>
       <td>
         <a href="/orders/{{ o.id }}">View</a>
-        <form method="post" action="/orders/{{ o.id }}/unarchive" style="display:inline" onsubmit="return confirm('Restore {{ o.order_reference }} to the main Orders list?');">
+        <form method="post" action="/orders/{{ o.id }}/unarchive" style="display:inline" data-confirm="Restore {{ o.order_reference }} to the main Orders list?">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <button type="submit" class="btn-sm btn-success">Restore</button>
         </form>

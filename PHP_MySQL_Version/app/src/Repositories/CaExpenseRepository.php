@@ -51,11 +51,16 @@ final class CaExpenseRepository
     /** @return array<int, array<string,mixed>> newest first, with the linked order's reference joined in for display */
     public static function all(): array
     {
+        // QA ACC-5: a user working in one division sees that division's costs and
+        // those of its orders (not other divisions' or company-wide costs).
+        $c = \App\Services\DivisionService::condition('ce.division_id');
+        $where = $c === null ? '' : "WHERE ({$c} OR (ce.division_id IS NULL AND ce.order_id IS NOT NULL" . \App\Services\DivisionService::orderIdSql('ce.order_id') . '))';
         $stmt = Database::connection()->query(
-            'SELECT ce.*, o.order_reference
+            "SELECT ce.*, o.order_reference
              FROM ca_expenses ce
              LEFT JOIN orders o ON o.id = ce.order_id
-             ORDER BY ce.expense_date DESC, ce.id DESC'
+             {$where}
+             ORDER BY ce.expense_date DESC, ce.id DESC"
         );
         return $stmt->fetchAll();
     }

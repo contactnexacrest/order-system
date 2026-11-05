@@ -39,11 +39,11 @@
         <td><span class="badge {{ 'badge-active' if p.is_active else 'badge-inactive' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
         <td>
           <a href="/logistics-partners/{{ p.id }}/edit" class="btn-sm btn-secondary">Edit</a>
-          <form method="post" action="/logistics-partners/{{ p.id }}/toggle" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if p.is_active else 'Reactivate' }} {{ p.partner_name }}?');">
+          <form method="post" action="/logistics-partners/{{ p.id }}/toggle" style="display:inline" data-confirm="{{ 'Deactivate' if p.is_active else 'Reactivate' }} {{ p.partner_name }}?">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm {{ 'btn-danger' if p.is_active else 'btn-success' }}">{{ 'Deactivate' if p.is_active else 'Reactivate' }}</button>
           </form>
-          <form method="post" action="/logistics-partners/{{ p.id }}/delete" style="display:inline" onsubmit="return confirm('Permanently delete {{ p.partner_name }} from the directory? This cannot be undone.');">
+          <form method="post" action="/logistics-partners/{{ p.id }}/delete" style="display:inline" data-confirm="Permanently delete {{ p.partner_name }} from the directory? This cannot be undone.">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm btn-danger">Delete</button>
           </form>

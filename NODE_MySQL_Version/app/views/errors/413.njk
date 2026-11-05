@@ -1,0 +1,10 @@
+<div class="card">
+  {% if tooMuchData %}
+  <h1>Too much data</h1>
+  <p>The data you submitted is too large for this form to accept (maximum {{ maxLabel }}). Please shorten it and try again.</p>
+  {% else %}
+  <h1>File too large</h1>
+  <p>The file you tried to upload is too large for this server to accept right now (maximum {{ maxLabel }}). Please use a smaller file and try again.</p>
+  {% endif %}
+  <p><a href="{{ backUrl }}">&larr; Back</a></p>
+</div>

@@ -1,5 +1,5 @@
 {# One order card, shared by the Standard list (orders/index.njk) and the Kanban board (orders/index_kanban.njk) — owner hard rule 2026-11-01: both templates show exactly the same. Expects o, seesAllOrders, sees, kanbanCard. #}
-      {% set stageTotal = 9 %}
+      {% set stageTotal = o.stage_total or 9 %}
       {% set stageNumber = o.current_stage_number or 0 %}
       {% set isLost = o.status == 'lost' %}
       {% set isShippedDocsSent = o.status == 'shipped_docs_sent' %}
@@ -25,7 +25,7 @@
           {% elif isLost %}
             {{ (o.lost_reason | truncate(46)) if o.lost_reason else 'Marked lost' }}
           {% elif isComplete %}
-            Stage 9 of 9 &middot; Closed
+            Stage {{ stageTotal }} of {{ stageTotal }} &middot; Closed
           {% elif isShippedDocsSent %}
             Stage 9 of 9 &middot; Docs Sent &mdash; Awaiting Benefits
           {% else %}
@@ -47,6 +47,6 @@
         {% else %}
           <span class="badge badge-active">Active</span>
         {% endif %}
-        {% if sees.selling %}<span class="entity-card-amount">{{ o.currency_code }} {{ o.total_fob_value | money }}</span>{% endif %}
+        {% if sees.selling %}<span class="entity-card-amount">{% if o.amount_text %}{{ o.amount_text }}{% else %}{{ o.currency_code }} {{ o.total_fob_value | money }}{% endif %}</span>{% endif %}
       </div>
     </a>

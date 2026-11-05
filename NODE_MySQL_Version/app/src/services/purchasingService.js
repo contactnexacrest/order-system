@@ -32,7 +32,8 @@ function designationLimit(dd) {
  * for Admin / Super Admin. Port of PurchasingService::limitFor().
  */
 async function limitFor(req, userId) {
-  const m = (await activeDepartmentService.current(req, userId)) || (await activeDepartmentService.preview(req));
+  // QA ACC-14: same order as effectiveRoleId — a preview wins over the membership.
+  const m = (await activeDepartmentService.preview(req)) || (await activeDepartmentService.current(req, userId));
   if (m) return designationLimit(m);
   const db = require('../config/db');
   const user = await db.queryOne('SELECT u.role_id, u.is_super_admin, r.name AS role_name FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = :id', { id: userId });

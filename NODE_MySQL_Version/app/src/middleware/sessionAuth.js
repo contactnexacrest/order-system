@@ -120,6 +120,36 @@ function required() {
     req.user = user;
     req.permissions = await permissionService.load(user.id, acting.effectiveRoleId, acting.previewing);
 
+    // QA ACC-12: staff placed in a division that is not active (planned, or
+    // switched back) cannot create or change anything until it is activated.
+    if (req.method === 'POST' && user.division_id !== null && user.division_id !== undefined && !req.permissions.see_all_divisions) {
+      const ownDivision = await divisionService.find(Number(user.division_id));
+      const postPath = String(req.path || '').replace(/\/+$/, '');
+      if (ownDivision && ownDivision.status !== 'active' && !['/logout', '/preview/exit', '/account/password'].includes(postPath)
+        && !(await superAdminService.isEffective(user.id))) {
+        const escapeHtml = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        res.status(403).send(`Your division (${escapeHtml(ownDivision.name)}) is not active yet: nothing can be saved until the MD activates it in Admin › Divisions.`);
+        return;
+      }
+    }
+
+    // QA ACC-2: "Preview as" / "view as" is for looking only. While a
+    // preview runs nothing can be saved, approved or granted with the
+    // previewed designation's rights — only "Exit preview" and log out post.
+    if (acting.previewing && req.method === 'POST') {
+      const postPath = String(req.path || '').replace(/\/+$/, '');
+      if (!['/preview/exit', '/logout'].includes(postPath)) {
+        require('../helpers/flash').set(req, 'error', 'You are previewing the app: nothing can be saved during a preview. Use "Exit preview" at the top first.');
+        let back = '/';
+        try {
+          const ref = new URL(req.get('Referer') || '');
+          if (ref.host === req.get('host')) back = ref.pathname + ref.search;
+        } catch (e) { /* no or foreign Referer: home */ }
+        res.redirect(back);
+        return;
+      }
+    }
+
     // A Super Admin (permanent flag or an active delegation) is
     // unrestricted everywhere: every permission key resolves true, with
     // no per-key configuration needed. Every currently-registered
@@ -128,7 +158,8 @@ function required() {
     // template's `permissions.xxx` access see the same real object.
     req.isSuperAdmin = await superAdminService.isEffective(user.id);
     // D-214: Procurement sees the order number only, not the client name (QA Round 7, R7-N02).
-    req.seesClient = req.isSuperAdmin || !(await require('../services/moneyVisibility').isProcurementRole(acting.effectiveRoleId));
+    // QA ACC-16: a preview shows exactly the designation, so a Super Admin previewing Procurement sees no client either (as on PHP).
+    req.seesClient = (req.isSuperAdmin && !acting.previewing) || !(await require('../services/moneyVisibility').isProcurementRole(acting.effectiveRoleId));
     // A preview shows exactly that designation, so no Super Admin bypass during it.
     if (req.isSuperAdmin && !acting.previewing) {
       for (const key of await permissionRepository.allKeys()) {
@@ -159,6 +190,7 @@ function required() {
         multi: divisionScope.multi,
         showSwitcher: divisionScope.multi && divisionScope.seesAll,
         active: activeDivisions,
+        activeCodes: activeDivisions.map((d) => d.code),
         all: allDivisions,
         currentId: divisionService.currentId(),
         modules,
@@ -250,7 +282,15 @@ function required() {
       const orderIdForPath = await orderAccessService.orderIdForPath(reqPath);
       if (orderIdForPath !== null) {
         const orderForPath = await db.queryOne('SELECT division_id FROM orders WHERE id = :id', { id: orderIdForPath });
-        if (orderForPath) ctxStore.forcedDivision = Number(orderForPath.division_id);
+        if (orderForPath) {
+          ctxStore.forcedDivision = Number(orderForPath.division_id);
+          // QA ACC-11: a module switched off in the ORDER's division refuses that order's addresses
+          // (a company-level user on "All divisions" included).
+          if (await divisionService.disabledModuleForPath(reqPath)) {
+            res.status(403).send('This part of the system is not in use here.');
+            return;
+          }
+        }
       }
 
 

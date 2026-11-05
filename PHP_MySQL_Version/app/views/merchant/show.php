@@ -136,7 +136,8 @@ $levelStyle = ['ok' => 'color:#2D7D56', 'info' => 'color:#5B6573', 'warn' => 'co
     </form>
     <?php endif; ?>
     <?php if ($canZoho && $d['sale_invoice_no']): ?>
-    <form method="post" action="/merchant/<?= $id ?>/zoho"><?= Csrf::field() ?><button type="submit" class="btn-secondary"><?= $d['zoho_invoice_id'] ? 'Send to Zoho Books again' : 'Send to Zoho Books' ?></button></form>
+    <form method="post" action="/merchant/<?= $id ?>/zoho"><?= Csrf::field() ?><button type="submit" class="btn-secondary">Send to Zoho Books</button> <span class="muted small">the sale invoice, the supplier's bill and both payment legs — whatever is waiting</span></form>
+    <p class="small"><a href="/merchant/<?= $id ?>/zoho-check">Check this deal against Zoho Books &rarr;</a> <span class="muted">(reads only)</span></p>
     <?php endif; ?>
   </div>
 

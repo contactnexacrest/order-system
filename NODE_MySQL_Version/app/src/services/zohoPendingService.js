@@ -32,6 +32,8 @@ const TYPE_LABELS = {
   gst_refund: 'GST refund journal',
   client: 'client (customer)',
   product: 'product (item)',
+  // D-257 Zoho: the new divisions' records.
+  ...require('./divisionZohoSync').TYPE_LABELS,
 };
 
 const sha = (value) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -114,6 +116,10 @@ async function counts(orderId = null) {
 
   if (orderId === null) {
     add('gst_refund', (await gstRefundRepository.creditsForZohoSync(start)).length);
+  }
+  if (orderId === null) {
+    // D-257 Zoho: the new divisions' invoices, bills, journals and payments.
+    for (const [type, n] of Object.entries(await require('./divisionZohoSync').pendingCounts(start))) add(type, n);
   }
   if (orderId === null) {
     // Owner decision 2 Nov 2026 (D-238): clients / products, only while their switch is on.

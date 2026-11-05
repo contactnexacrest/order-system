@@ -225,7 +225,7 @@ final class MerchantTradeTest extends DbTestCase
         self::assertSame(['Generate the sale invoice to the buyer.', 'Still to receive from the buyer: USD 19,250.00.'], M::blockers($id));
         self::assertNull(M::fixInvoice($id, $this->mttStaff));
         $d = MerchantTradeRepository::find($id);
-        self::assertMatchesRegularExpression('#^MTT/INV/\d{2}-\d{2}/\d{4}$#', (string) $d['sale_invoice_no']);
+        self::assertMatchesRegularExpression('#^MTT/I/\d{2}-\d{2}/\d{4}$#', (string) $d['sale_invoice_no']);
         self::assertNull(M::fixInvoice($id, $this->mttStaff));
         self::assertSame($d['sale_invoice_no'], MerchantTradeRepository::find($id)['sale_invoice_no'], 'the number is fixed once');
         $inv = MerchantDocumentService::html($id, 'invoice');

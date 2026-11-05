@@ -606,6 +606,14 @@ the same limit, so this app keeps to its own share:
   app is a few hundred calls. Raise it only if the Zoho Sync page shows the
   app regularly pausing.
 
+## Domestic Trade, Import & Distribution and Merchant Trade (D-257, 5 Nov 2026)
+The same sync (scheduled and *Sync now*) also sends the new divisions' money, after the export records — only for records that exist, so nothing changes while those divisions are planned:
+- **Domestic Trade** (and Import & Distribution's local sale): the GST tax invoice (marked sent, round-off as adjustment) to the buyer's own **INR, GST customer** (kept apart from its export customer), then each buyer receipt applied to it.
+- **Import & Distribution:** the supplier's bill (foreign currency), the customs duty bill, the clearance charges bill (from the CHA), each payment to the supplier abroad, the customs duty payment (with its challan) and the IGST input-credit journal.
+- **Merchant Trade:** the sale invoice and the supplier's bill (each in its own currency), and both payment legs.
+
+Each record is one row in the Sync Log (the import and deal rows link to the import / deal), is counted in "Waiting for Zoho", waits for its invoice or bill, and is never sent twice (found by number, or by bank reference and amount). Each record page has *Send to Zoho Books* (sends what is waiting for that record now) and *Check against Zoho Books* (reads only). Accounts used, **to be confirmed by the CA**: *Imported Goods Stock*, *IGST Paid on Import*, *Input IGST*, *Merchanting Trade Sales*, *Merchanting Trade Purchases* — they must exist in the live organisation before these divisions are activated. Live-tested in the TEST organisation on 5 Nov 2026 (Zoho change log Z-643 to Z-698), together with the GST commission bill (go-live item 0C.2: ₹10,000 + CGST ₹900 + SGST ₹900 = ₹11,800, paid in full).
+
 ## What to do if a sync fails
 
 **Finance is told (owner decision 2 Nov 2026, D-233).** When a sync run —

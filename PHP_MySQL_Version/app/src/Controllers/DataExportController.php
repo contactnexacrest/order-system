@@ -39,6 +39,17 @@ final class DataExportController
 
     public function downloadData(array $params): void
     {
+        // QA ACC-18: the data dump holds every division's records, all money and
+        // CAFIN — so it also needs those rights, not just data_export_run.
+        $user = AuthService::currentUser();
+        $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
+        foreach (['view_cafin', 'see_all_divisions'] as $key) {
+            if (!\App\Services\PermissionService::can((int) $user['id'], $roleId, $key)) {
+                http_response_code(403);
+                echo 'The data export holds every division\'s records, all money and CAFIN: it needs "View & download CAFIN" and "See all divisions" as well.';
+                return;
+            }
+        }
         $this->stream(MysqlDumpService::dumpData(), 'data', 'DATA_EXPORT_DATA');
     }
 

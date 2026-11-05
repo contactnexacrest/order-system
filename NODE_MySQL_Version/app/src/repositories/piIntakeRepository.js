@@ -270,7 +270,7 @@ async function pendingReview() {
      FROM pi_intake_submissions pis
      JOIN orders o ON o.id = pis.order_id
      JOIN clients c ON c.id = o.client_id
-     WHERE pis.status = 'pending_review'
+     WHERE pis.status = 'pending_review'${divisionService.sql('o.division_id')}
      ORDER BY pis.submitted_at ASC`
   );
 }
@@ -282,7 +282,7 @@ async function recentResolved(limit = 30) {
      JOIN orders o ON o.id = pis.order_id
      JOIN clients c ON c.id = o.client_id
      LEFT JOIN users u ON u.id = pis.reviewed_by
-     WHERE pis.status IN ('applied', 'rejected')
+     WHERE pis.status IN ('applied', 'rejected')${divisionService.sql('o.division_id')}
      ORDER BY pis.reviewed_at DESC LIMIT ${parseInt(limit, 10)}`
   );
 }

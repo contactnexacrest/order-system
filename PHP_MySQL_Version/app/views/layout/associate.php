@@ -15,7 +15,7 @@
 <?php endif; ?>
 <?php if ($__viewAs): ?>
   <div class="impersonation-banner">&#128100; Staff view of this associate's portal — read-only.
-    <a class="impersonation-banner-end" href="/associate/logout">End staff view</a></div>
+    <form method="post" action="/associate/logout" style="display:inline"><?= \App\Helpers\Csrf::field() ?><button type="submit" class="impersonation-banner-end">End staff view</button></form></div>
 <?php endif; ?>
 <header class="client-topbar">
   <div class="topbar-brand">
@@ -31,7 +31,7 @@
     <a href="/associate/commission">Commission</a>
     <a href="/associate/messages">Messages</a>
     <a href="/associate/profile">Profile</a>
-    <?php if ($__viewAs): ?><a href="/associate/logout" style="margin-left:auto">End staff view</a><?php else: ?>
+    <?php if ($__viewAs): ?><form method="post" action="/associate/logout" style="margin-left:auto"><?= \App\Helpers\Csrf::field() ?><button type="submit" class="topbar-nav-logout">End staff view</button></form><?php else: ?>
     <form method="post" action="/associate/logout" style="margin-left:auto"><?= \App\Helpers\Csrf::field() ?><button type="submit" class="topbar-nav-logout">Log out</button></form><?php endif; ?>
   </nav>
   <?php endif; ?>

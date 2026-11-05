@@ -7,17 +7,27 @@
  */
 $stageTotal = 9;
 $stageNumber = (int) ($o['current_stage_number'] ?? 0);
+// D-257: a Domestic Trade order (or an Import & Distribution local sale) shows its own 8 stages and its ₹ amount.
+$domStage = $o['dom_stage'] ?? null;
+if ($domStage !== null) {
+    $domStages = \App\Services\DomesticOrderService::STAGES;
+    $stageTotal = count($domStages);
+    $stageNumber = array_search($domStage, array_keys($domStages), true) + 1;
+    $o['current_stage_name'] = $domStages[$domStage] ?? $domStage;
+}
 $isLost = $o['status'] === 'lost';
 $isShippedDocsSent = $o['status'] === 'shipped_docs_sent';
 $isComplete = $o['status'] === 'complete';
 $isCancelled = $o['status'] === 'cancelled';
 $filledSegments = ($isComplete || $isShippedDocsSent) ? $stageTotal : (($isLost || $isCancelled) ? min(1, max($stageNumber, 1)) : $stageNumber);
-$amount = trim(($o['currency_code'] ?? '') . ' ' . number_format((float) $o['total_fob_value'], 2));
+$amount = $domStage !== null
+    ? 'INR ' . number_format((float) $o['dom_amount'], 2) . (!empty($o['dom_amount_with_gst']) ? '' : ' + GST')
+    : trim(($o['currency_code'] ?? '') . ' ' . number_format((float) $o['total_fob_value'], 2));
 ?>
     <a class="entity-card<?= isset($kanbanCard) && $kanbanCard ? ' kanban-card' : '' ?><?= !empty($o['is_overdue']) ? ' entity-card-overdue' : '' ?>" href="<?= htmlspecialchars($cardHref) ?>">
       <div class="entity-card-header">
         <span class="entity-card-title"><?= htmlspecialchars($o['order_reference']) ?></span>
-        <?php if (!empty($o['incoterm_code'])): ?><span class="tag tag-gold"><?= htmlspecialchars($o['incoterm_code']) ?></span><?php endif; ?>
+        <?php if ($domStage === null && !empty($o['incoterm_code'])): ?><span class="tag tag-gold"><?= htmlspecialchars($o['incoterm_code']) ?></span><?php endif; ?>
         <?php if (!empty($seesAllOrders) && !empty($o['assignee_names'])): ?><span class="tag tag-navy"><?= htmlspecialchars($o['assignee_names']) ?></span><?php endif; ?>
       </div>
       <?php if (!isset($sees['client']) || $sees['client']): // D-214: Procurement sees the order number only (QA R7-N02) ?><div class="entity-card-sub"><?= htmlspecialchars((string) ($o['company_legal_name'] ?? '')) ?></div><?php endif; ?>
@@ -33,7 +43,7 @@ $amount = trim(($o['currency_code'] ?? '') . ' ' . number_format((float) $o['tot
           <?php elseif ($isLost): ?>
             <?= htmlspecialchars($o['lost_reason'] ? mb_strimwidth($o['lost_reason'], 0, 46, '…') : 'Marked lost') ?>
           <?php elseif ($isComplete): ?>
-            Stage 9 of 9 &middot; Closed
+            Stage <?= $stageTotal ?> of <?= $stageTotal ?> &middot; Closed
           <?php elseif ($isShippedDocsSent): ?>
             Stage 9 of 9 &middot; Docs Sent &mdash; Awaiting Benefits
           <?php else: ?>

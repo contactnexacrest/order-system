@@ -98,6 +98,12 @@ final class AssociatePortalController
 
     public function logout(array $params): void
     {
+        // QA ACC-15: signing out changes the session, so only the posted form (with
+        // its CSRF token) does it; a plain link or <img src> to the address does nothing.
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            header('Location: ' . (AssociatePortalService::currentId() !== null ? '/associate' : '/associate/login'));
+            return;
+        }
         if (AssociatePortalService::viewAsStaffId() !== null) {
             $id = AssociatePortalService::endViewAs();
             header('Location: /associates/' . (int) $id);

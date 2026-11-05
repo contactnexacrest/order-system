@@ -36,6 +36,19 @@ final class AssociatePortalService
     private const SESSION_ID = '_associate_portal_id';
     private const SESSION_PENDING = '_associate_portal_pending_id';
     private const SESSION_VIEW_AS = '_associate_portal_view_as_staff_id';
+    /** QA ACC-10: fingerprint of the password this session logged in with (a change or reset ends other sessions). */
+    private const SESSION_PASSWORD_FP = '_associate_portal_password_fp';
+
+    /** Whether this session's password is still the associate's current one (a session from before the check is accepted and pinned). */
+    public static function sessionPasswordStillCurrent(?string $currentHash): bool
+    {
+        $fp = hash('sha256', (string) $currentHash);
+        if (!isset($_SESSION[self::SESSION_PASSWORD_FP])) {
+            $_SESSION[self::SESSION_PASSWORD_FP] = $fp;
+            return true;
+        }
+        return hash_equals((string) $_SESSION[self::SESSION_PASSWORD_FP], $fp);
+    }
     private const DUMMY_HASH = '$2y$12$XkZEWJ9OTUrQ7pC.e9pnpO1LA.XHdoTUKJahoxDBHKjd8rQTbId22';
 
     /** A one-time token (set password) or 6-digit code (login), stored hashed. Returns the raw value. */
@@ -126,6 +139,7 @@ final class AssociatePortalService
         self::regenerate();
         unset($_SESSION[self::SESSION_PENDING]);
         $_SESSION[self::SESSION_ID] = (int) $id;
+        $_SESSION[self::SESSION_PASSWORD_FP] = hash('sha256', (string) (AssociateRepository::find((int) $id)['password_hash'] ?? ''));
         AssociateRepository::setFields((int) $id, ['failed_login_count' => 0, 'locked_until' => null, 'last_login_at' => date('Y-m-d H:i:s')]);
         AuditLogRepository::log(null, 'ASSOCIATE_LOGIN', 'associates', (int) $id);
         return true;
@@ -149,7 +163,7 @@ final class AssociatePortalService
 
     public static function logout(): void
     {
-        unset($_SESSION[self::SESSION_ID], $_SESSION[self::SESSION_PENDING], $_SESSION[self::SESSION_VIEW_AS]);
+        unset($_SESSION[self::SESSION_ID], $_SESSION[self::SESSION_PENDING], $_SESSION[self::SESSION_VIEW_AS], $_SESSION[self::SESSION_PASSWORD_FP]);
         self::regenerate();
     }
 

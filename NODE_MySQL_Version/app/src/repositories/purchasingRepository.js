@@ -37,8 +37,9 @@ async function queue(status = null) {
 async function board() {
   const rows = await db.query(`${SELECT} WHERE pr.status NOT IN ('received', 'cancelled')
     OR (pr.status = 'received' AND pr.received_on >= CURDATE() - INTERVAL 60 DAY) ORDER BY pr.needed_by, pr.id`);
-  const c = await db.queryOne("SELECT COUNT(*) AS n FROM purchase_requirements WHERE status = 'cancelled'");
-  return { rows, cancelled: Number(c.n) };
+  // QA ACC-13: the controller counts only the cancelled rows of orders this user may see (as the cards do).
+  const cancelledOrderIds = (await db.query("SELECT order_id FROM purchase_requirements WHERE status = 'cancelled'")).map((r) => r.order_id);
+  return { rows, cancelled: cancelledOrderIds.length, cancelledOrderIds };
 }
 
 async function find(id) {

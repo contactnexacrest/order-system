@@ -149,7 +149,8 @@ $next = $stage !== 'closed' ? $keys[array_search($stage, $keys, true) + 1] : nul
     </form>
     <?php endif; ?>
     <?php if ($canZoho): ?>
-    <form method="post" action="/domestic/orders/<?= $id ?>/zoho"><?= Csrf::field() ?><button type="submit" class="btn-secondary"><?= $dom['zoho_invoice_id'] ? 'Send to Zoho Books again' : 'Send to Zoho Books' ?></button></form>
+    <form method="post" action="/domestic/orders/<?= $id ?>/zoho"><?= Csrf::field() ?><button type="submit" class="btn-secondary">Send to Zoho Books</button> <span class="muted small">the tax invoice and the buyer's receipts — whatever is waiting</span></form>
+    <p class="small"><a href="/domestic/orders/<?= $id ?>/zoho-check">Check this order against Zoho Books &rarr;</a> <span class="muted">(reads only)</span></p>
     <?php endif; ?>
   </div>
   <?php endif; ?>

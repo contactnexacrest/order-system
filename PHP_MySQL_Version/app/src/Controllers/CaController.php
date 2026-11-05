@@ -265,6 +265,27 @@ final class CaController
     }
 
     /**
+     * D-257 Zoho: the "App vs Zoho" check of a Domestic Trade order, an
+     * import or a merchant trade deal (reads only). The record's own
+     * controller checks access first.
+     */
+    public static function divisionZohoCheck(string $kind, int $id, string $back, string $title, string $party): void
+    {
+        $result = null;
+        $error = null;
+        if (!ZohoBooksService::isEnabled()) {
+            $error = 'Zoho Books is not enabled on this server, so there is nothing to compare with.';
+        } else {
+            try {
+                $result = \App\Services\DivisionZohoSync::check($kind, $id);
+            } catch (\Throwable $e) {
+                $error = 'Could not read Zoho Books: ' . $e->getMessage();
+            }
+        }
+        View::render('ca/division_zoho_check', ['back' => $back, 'title' => $title, 'party' => $party, 'result' => $result, 'error' => $error], 'layout/base');
+    }
+
+    /**
      * Owner 2 Nov 2026 (point 16): "Sync this order to Zoho now" — the same
      * pushes as Sync Now, limited to this order's records (same duplicate
      * guards; every record logged in the Zoho Sync Log).
@@ -315,24 +336,26 @@ final class CaController
         $purchases = $result['purchases'];
         $benefits = $result['benefits'];
         $gstRefunds = $result['gst_refunds'];
+        $divisions = $result['divisions'] ?? ['sent' => 0, 'failed' => 0, 'skipped' => 0];
         $master = $result['master_data'] ?? ['clients' => 0, 'products' => 0, 'inactivated' => 0, 'failed' => 0];
 
         $done = ($master['clients'] + $master['products'] + $master['inactivated'] > 0 ? "{$master['clients']} client(s) and {$master['products']} product(s) sent or updated, {$master['inactivated']} marked inactive, " : '') . "{$revenue['invoices']} invoice(s) sent or updated, {$revenue['synced']} payment(s) pushed, {$revenue['applied']} payment(s) applied to invoices, "
-            . "{$purchases['bills']} bill(s), {$purchases['payments']} vendor payment(s) ({$purchases['applied']} applied to bills) and {$purchases['expenses']} order expense(s) / cost(s) sent, {$benefits['journals']} export benefit journal(s) sent or updated, {$gstRefunds['journals']} GST refund journal(s) sent, {$expenses['imported']} expense(s) imported, {$expenses['updated']} updated and {$expenses['removed']} removed as in Zoho Books";
-        $failed = $revenue['failed'] + $purchases['failed'] + $expenses['failed'] + $benefits['failed'] + $gstRefunds['failed'] + $master['failed'];
+            . "{$purchases['bills']} bill(s), {$purchases['payments']} vendor payment(s) ({$purchases['applied']} applied to bills) and {$purchases['expenses']} order expense(s) / cost(s) sent, {$benefits['journals']} export benefit journal(s) sent or updated, {$gstRefunds['journals']} GST refund journal(s) sent, {$expenses['imported']} expense(s) imported, {$expenses['updated']} updated and {$expenses['removed']} removed as in Zoho Books"
+            . ($divisions['sent'] > 0 ? ", {$divisions['sent']} Domestic Trade / Import & Distribution / Merchant Trade record(s) sent" : '');
+        $failed = $revenue['failed'] + $purchases['failed'] + $expenses['failed'] + $benefits['failed'] + $gstRefunds['failed'] + $master['failed'] + $divisions['failed'];
         if (!empty($result['stopped'])) {
             // Owner decision 2 Nov 2026 (D-239): stopped at once — the rest waits for the next sync.
             Flash::set('warning', "Sync stopped: {$result['stopped']} Sent before it stopped: {$done}.");
         } elseif ($failed > 0) {
             Flash::set('warning', "Sync finished: {$done}, {$failed} failed — see the log below for details.");
-        } elseif ($master['clients'] + $master['products'] + $master['inactivated'] > 0 || $revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $purchases['bills'] + $purchases['payments'] + $purchases['applied'] + $purchases['expenses'] > 0 || $benefits['journals'] + $benefits['removed'] + $gstRefunds['journals'] > 0 || $expenses['imported'] + $expenses['updated'] + $expenses['removed'] > 0) {
+        } elseif ($master['clients'] + $master['products'] + $master['inactivated'] > 0 || $revenue['synced'] > 0 || $revenue['invoices'] > 0 || $revenue['applied'] > 0 || $purchases['bills'] + $purchases['payments'] + $purchases['applied'] + $purchases['expenses'] > 0 || $benefits['journals'] + $benefits['removed'] + $gstRefunds['journals'] > 0 || $expenses['imported'] + $expenses['updated'] + $expenses['removed'] > 0 || $divisions['sent'] > 0) {
             Flash::set('success', "Sync finished: {$done}.");
         } else {
             Flash::set('success', 'Sync ran — nothing was pending (or Zoho Books isn\'t configured yet). See the log below.');
         }
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
-        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['invoices']} invoices, {$revenue['synced']} synced, {$revenue['applied']} applied/{$revenue['failed']} failed, purchases: {$purchases['bills']} bills, {$purchases['payments']} payments, {$purchases['applied']} applied, {$purchases['expenses']} expenses/{$purchases['failed']} failed, benefits: {$benefits['journals']} journals, {$benefits['removed']} removed/{$benefits['failed']} failed, GST refunds: {$gstRefunds['journals']} journals/{$gstRefunds['failed']} failed, expenses: {$expenses['imported']} imported, {$expenses['updated']} updated, {$expenses['removed']} removed/{$expenses['failed']} failed");
+        AuditLogRepository::log((int) $user['id'], 'CA_ZOHO_SYNC_RUN', 'zoho_sync_log', null, null, null, "revenue: {$revenue['invoices']} invoices, {$revenue['synced']} synced, {$revenue['applied']} applied/{$revenue['failed']} failed, purchases: {$purchases['bills']} bills, {$purchases['payments']} payments, {$purchases['applied']} applied, {$purchases['expenses']} expenses/{$purchases['failed']} failed, benefits: {$benefits['journals']} journals, {$benefits['removed']} removed/{$benefits['failed']} failed, GST refunds: {$gstRefunds['journals']} journals/{$gstRefunds['failed']} failed, expenses: {$expenses['imported']} imported, {$expenses['updated']} updated, {$expenses['removed']} removed/{$expenses['failed']} failed, divisions: {$divisions['sent']} sent/{$divisions['failed']} failed");
         header('Location: /ca/zoho-sync');
     }
 
@@ -755,6 +778,15 @@ final class CaController
         $leg = (string) ($_POST['leg'] ?? '');
         if ($orderId <= 0 || !in_array($leg, ['advance', 'balance', 'freight', 'lc'], true)) {
             Flash::set('error', 'Choose a revenue leg to match.');
+            header('Location: /ca/bank-statement');
+            return;
+        }
+        // QA ACC-5: the bank line must exist, and the order must exist and be one of the user's divisions.
+        if (\App\Helpers\RecordCheck::missing('ca_bank_statement_lines', $lineId, '/ca/bank-statement', 'bank line')) {
+            return;
+        }
+        if (OrderRepository::find($orderId) === null || !\App\Services\DivisionService::allowsOrderId($orderId)) {
+            Flash::set('error', 'That order was not found.');
             header('Location: /ca/bank-statement');
             return;
         }

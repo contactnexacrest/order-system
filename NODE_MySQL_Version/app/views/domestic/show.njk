@@ -138,7 +138,8 @@
     </form>
     {% endif %}
     {% if canZoho %}
-    <form method="post" action="/domestic/orders/{{ id }}/zoho"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-secondary">{{ 'Send to Zoho Books again' if dom.zoho_invoice_id else 'Send to Zoho Books' }}</button></form>
+    <form method="post" action="/domestic/orders/{{ id }}/zoho"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-secondary">Send to Zoho Books</button> <span class="muted small">the tax invoice and the buyer's receipts — whatever is waiting</span></form>
+    <p class="small"><a href="/domestic/orders/{{ id }}/zoho-check">Check this order against Zoho Books &rarr;</a> <span class="muted">(reads only)</span></p>
     {% endif %}
   </div>
   {% endif %}

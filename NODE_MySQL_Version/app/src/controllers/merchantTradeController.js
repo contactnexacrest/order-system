@@ -209,13 +209,15 @@ async function document(req, res) {
 async function pushZoho(req, res) {
   const d = await deal(req, res);
   if (!d) return;
-  let error = null;
-  try {
-    await require('../services/zohoBooksService').pushMerchantDeal(Number(d.id), req.user.id);
-  } catch (e) {
-    error = `Zoho Books: ${e.message}`;
-  }
-  done(req, res, Number(d.id), error, 'Sale invoice and supplier bill sent to Zoho Books.', 'mtt-payments');
+  const [error, ok] = await require('../services/divisionZohoSync').sendNow('deal', Number(d.id), req.user.id);
+  done(req, res, Number(d.id), error, ok, 'mtt-payments');
+}
+
+/** D-257 Zoho: the deal's "App vs Zoho" check (reads only). */
+async function zohoCheck(req, res) {
+  const d = await deal(req, res);
+  if (!d) return;
+  await require('./caController').divisionZohoCheck(req, res, 'deal', Number(d.id), `/merchant/${d.id}`, `Deal ${d.reference}`, `${d.supplier_name} → ${d.buyer_name}`);
 }
 
 // ------------------------------------------------------------ reports
@@ -235,5 +237,5 @@ async function reports(req, res) {
 
 module.exports = {
   index, indexData, create, store, show, showData, saveHeader, addLine, removeLine, saveBacking, saveShipment, saveDocument, recordPayment,
-  advance, document, pushZoho, reports, reportsData,
+  advance, document, pushZoho, zohoCheck, reports, reportsData,
 };

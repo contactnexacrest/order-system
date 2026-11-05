@@ -52,6 +52,24 @@ final class FileStoreController
                 return;
             }
         }
+        // QA ACC-7: a client-level file (agreement, additional document, ECGC
+        // letter) needs the client to be in the user's division(s); a file of
+        // the agreements register needs the agreements permission, as on its page.
+        if (empty($file['order_id']) && !empty($file['client_id']) && !\App\Services\DivisionService::allowsClient((int) $file['client_id'])) {
+            http_response_code(403);
+            echo 'You do not have permission to view this document.';
+            return;
+        }
+        $agreementFile = \App\Config\Database::connection()->prepare('SELECT party_type FROM agreements WHERE file_id = :f LIMIT 1');
+        $agreementFile->execute(['f' => $fileId]);
+        $agreementParty = $agreementFile->fetchColumn();
+        if ($agreementParty !== false
+            && !PermissionService::can((int) $user['id'], $roleId, 'manage_agreements')
+            && ($agreementParty === 'staff' || !PermissionService::can((int) $user['id'], $roleId, 'view_agreements'))) {
+            http_response_code(403);
+            echo 'You do not have permission to view this document.';
+            return;
+        }
         if (FileStoreRepository::documentTypeCodeFor($fileId) === 'CAFIN'
             && (!PermissionService::can((int) $user['id'], $roleId, 'view_cafin')
                 || empty($file['order_id']) || !OrderAccessService::currentUserMayOpenOrderId((int) $file['order_id']))) {

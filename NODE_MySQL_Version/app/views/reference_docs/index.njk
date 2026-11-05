@@ -30,7 +30,7 @@
             <a href="/reference-docs/custom/{{ d.id }}" class="btn-sm">View</a>
             {% if permissions.manage_company_settings %}
             <a href="/reference-docs/custom/{{ d.id }}/edit" class="btn-sm btn-secondary">Edit</a>
-            <form method="post" action="/reference-docs/custom/{{ d.id }}/delete" style="display:inline" onsubmit="return confirm('Delete \'{{ d.title }}\' from the Reference Library? Any uploaded file stays on disk, but this entry and its typed content are removed.');">
+            <form method="post" action="/reference-docs/custom/{{ d.id }}/delete" style="display:inline" data-confirm="Delete '{{ d.title }}' from the Reference Library? Any uploaded file stays on disk, but this entry and its typed content are removed.">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <button type="submit" class="btn-sm btn-danger">Delete</button>
             </form>

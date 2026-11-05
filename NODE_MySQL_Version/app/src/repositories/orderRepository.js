@@ -25,6 +25,9 @@ async function all() {
   return db.query(
     `SELECT o.*, sm.stage_name AS current_stage_name,
             sm.stage_number AS current_stage_number,
+            dom.stage AS dom_stage,
+            COALESCE(dom.invoice_total, (SELECT COALESCE(SUM(ROUND(dl.quantity * dl.rate_inr, 2)), 0) FROM domestic_order_lines dl WHERE dl.order_id = o.id AND dl.is_active = 1)) AS dom_amount,
+            (dom.invoice_total IS NOT NULL) AS dom_amount_with_gst,
             (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id) AS total_fob_value,
             EXISTS (
                 SELECT 1 FROM order_payment_status ops
@@ -33,6 +36,7 @@ async function all() {
             ) AS is_overdue
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+     LEFT JOIN domestic_orders dom ON dom.order_id = o.id
      WHERE o.is_archived = 0${divisionService().sql('o.division_id')}
      ORDER BY o.created_at DESC, o.id DESC`
   );
@@ -55,6 +59,9 @@ async function allVisibleTo(userId, seesAll) {
             (SELECT GROUP_CONCAT(u2.name ORDER BY u2.name SEPARATOR ', ')
              FROM order_assignees oa2 JOIN users u2 ON u2.id = oa2.user_id
              WHERE oa2.order_id = o.id) AS assignee_names,
+            dom.stage AS dom_stage,
+            COALESCE(dom.invoice_total, (SELECT COALESCE(SUM(ROUND(dl.quantity * dl.rate_inr, 2)), 0) FROM domestic_order_lines dl WHERE dl.order_id = o.id AND dl.is_active = 1)) AS dom_amount,
+            (dom.invoice_total IS NOT NULL) AS dom_amount_with_gst,
             (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id) AS total_fob_value,
             EXISTS (
                 SELECT 1 FROM order_payment_status ops
@@ -63,6 +70,7 @@ async function allVisibleTo(userId, seesAll) {
             ) AS is_overdue
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+     LEFT JOIN domestic_orders dom ON dom.order_id = o.id
      WHERE o.is_archived = 0 ${scopeClause}${divisionService().sql('o.division_id')}
      ORDER BY o.created_at DESC, o.id DESC`,
     seesAll ? {} : { user_id: userId }
@@ -142,7 +150,8 @@ async function findUncached(id) {
 
 /** CA Phase 8 (export benefits) — lets staff link a claim by typing the order reference rather than picking from a long dropdown of every order. */
 async function findIdByReference(orderReference) {
-  const row = await db.queryOne('SELECT id FROM orders WHERE order_reference = :ref', { ref: orderReference });
+  // QA ACC-5: an order typed on a CA form must be one of the user's divisions (as if it did not exist otherwise).
+  const row = await db.queryOne(`SELECT o.id FROM orders o WHERE o.order_reference = :ref${divisionService().sql('o.division_id')}`, { ref: orderReference });
   return row ? row.id : null;
 }
 

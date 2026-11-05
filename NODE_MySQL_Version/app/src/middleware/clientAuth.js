@@ -46,6 +46,28 @@ function required() {
         res.redirect('/client/login');
         return;
       }
+      // QA ACC-9: the staff member behind it must still be an active user.
+      const staff = await require('../repositories/userRepository').findById(clientPortalService.impersonatedByStaffId(req));
+      if (!staff || !Number(staff.is_active)) {
+        await clientPortalService.endImpersonation(req);
+        res.redirect('/client/login');
+        return;
+      }
+      // QA ACC-9: logging in as a client is for looking only — staff do not
+      // acknowledge, upload, report payments, raise disputes or reorder as the buyer.
+      if (req.method === 'POST') {
+        const postPath = String(req.path || '').replace(/\/+$/, '');
+        if (!['/client/end-impersonation', '/client/logout'].includes(postPath)) {
+          require('../helpers/flash').set(req, 'error', 'You are logged in as this client to look only: nothing can be saved for the buyer. Use "End impersonation" first.');
+          let back = '/client';
+          try {
+            const ref = new URL(req.get('Referer') || '');
+            if (ref.host === req.get('host')) back = ref.pathname + ref.search;
+          } catch (e) { /* no or foreign Referer */ }
+          res.redirect(back);
+          return;
+        }
+      }
       next();
       return;
     }
@@ -55,7 +77,8 @@ function required() {
     // AUTH-10 for staff, is_active was otherwise only ever checked at
     // login time.
     const login = await clientLoginRepository.findById(clientId);
-    if (!login || !login.is_active || !login.client_is_active) {
+    // QA ACC-10: a password changed or reset since this session logged in ends it.
+    if (!login || !login.is_active || !login.client_is_active || !clientPortalService.sessionPasswordStillCurrent(req, login.password_hash)) {
       await clientPortalService.logout(req);
       res.redirect('/client/login');
       return;

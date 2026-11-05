@@ -28,7 +28,8 @@ function required() {
     }
     req.session[LAST_ACTIVITY_KEY] = Date.now();
     const viewAs = associatePortalService.viewAsStaffId(req) !== null;
-    if (!viewAs && (Number(a.portal_enabled) !== 1 || ['ended', 'inactive'].includes(a.status))) {
+    // QA ACC-10: a password changed or reset since this session logged in ends it.
+    if (!viewAs && (Number(a.portal_enabled) !== 1 || ['ended', 'inactive'].includes(a.status) || !associatePortalService.sessionPasswordStillCurrent(req, a.password_hash))) {
       await associatePortalService.logout(req);
       res.redirect('/associate/login');
       return;

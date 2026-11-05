@@ -191,8 +191,22 @@ final class OrderController
             $columns['lost'] = ['title' => 'Lost', 'orders' => []];
             $columns['cancelled'] = ['title' => 'Cancelled', 'orders' => []];
         }
+        // D-257: Domestic Trade orders (and local sales) work through their own stages — one column each, only when there are such orders.
+        $domStages = \App\Services\DomesticOrderService::STAGES;
+        unset($domStages['closed']); // a closed one is Complete
+        if (array_filter($visible, static fn (array $o): bool => ($o['dom_stage'] ?? null) !== null && $o['status'] === 'active') !== []) {
+            $domColumns = [];
+            foreach ($domStages as $k => $label) {
+                $domColumns['dom_' . $k] = ['title' => 'Domestic · ' . $label, 'orders' => []];
+            }
+            $at = array_search('shipped_docs_sent', array_keys($columns), true);
+            $columns = array_slice($columns, 0, (int) $at, true) + $domColumns + array_slice($columns, (int) $at, null, true);
+        }
         foreach ($visible as $o) {
             $key = $o['status'] === 'active' ? 'stage' . ((int) ($o['current_stage_number'] ?? 1) ?: 1) : (string) $o['status'];
+            if (($o['dom_stage'] ?? null) !== null && $o['status'] === 'active') {
+                $key = 'dom_' . $o['dom_stage'];
+            }
             if (isset($columns[$key])) {
                 $columns[$key]['orders'][] = $o;
             }

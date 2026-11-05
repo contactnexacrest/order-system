@@ -46,7 +46,7 @@
               <div class="field-grid">
                 <label>Amount credited (&#8377;) *<input type="number" name="amount" required min="0.01" max="<?= number_format($c['outstanding'], 2, '.', '') ?>" step="0.01" placeholder="e.g. 1500.00"></label>
                 <label>Credited on *<input type="date" name="credited_on" required min="<?= htmlspecialchars((string) $c['filed_on']) ?>" max="<?= date('Y-m-d') ?>"></label>
-                <label>Bank reference (RFD-05 / UTR) *<input type="text" name="bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 ./_#:()\-]*" placeholder="as on the bank statement"></label>
+                <label>Bank reference (RFD-05 / UTR) *<input type="text" name="bank_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="as on the bank statement"></label>
                 <label>Part *
                   <select name="part" required><option value="">Choose…</option><?php foreach ($parts as $__k => $__v): ?><option value="<?= $__k ?>"><?= htmlspecialchars(ucfirst($__v)) ?></option><?php endforeach; ?></select>
                 </label>

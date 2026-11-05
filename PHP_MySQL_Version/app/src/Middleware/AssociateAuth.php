@@ -34,7 +34,8 @@ final class AssociateAuth
             }
             $_SESSION[self::LAST_ACTIVITY_KEY] = time();
             $viewAs = AssociatePortalService::viewAsStaffId() !== null;
-            if (!$viewAs && ((int) $a['portal_enabled'] !== 1 || in_array($a['status'], ['ended', 'inactive'], true))) {
+            // QA ACC-10: a password changed or reset since this session logged in ends it.
+            if (!$viewAs && ((int) $a['portal_enabled'] !== 1 || in_array($a['status'], ['ended', 'inactive'], true) || !AssociatePortalService::sessionPasswordStillCurrent($a['password_hash'] ?? null))) {
                 AssociatePortalService::logout();
                 header('Location: /associate/login');
                 return false;

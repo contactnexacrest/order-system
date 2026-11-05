@@ -43,6 +43,19 @@ async function download(req, res) {
       return;
     }
   }
+  // QA ACC-7: a client-level file (agreement, additional document, ECGC
+  // letter) needs the client to be in the user's division(s); a file of the
+  // agreements register needs the agreements permission, as on its page
+  // (a staff agreement: manage_agreements only).
+  if (!file.order_id && file.client_id && !(await require('../services/divisionService').allowsClient(Number(file.client_id)))) {
+    res.status(403).send('You do not have permission to view this document.');
+    return;
+  }
+  const agreementRow = await require('../config/db').queryOne('SELECT party_type FROM agreements WHERE file_id = :f LIMIT 1', { f: fileId });
+  if (agreementRow && !permissions.manage_agreements && (agreementRow.party_type === 'staff' || !permissions.view_agreements)) {
+    res.status(403).send('You do not have permission to view this document.');
+    return;
+  }
   if ((await fileStoreRepository.documentTypeCodeFor(fileId)) === 'CAFIN'
     && (!permissions.view_cafin || !file.order_id || !(await orderAccessService.orderLinkChecker(req.user.id, permissions))(file.order_id))) {
     res.status(403).send('You do not have permission to view this document.');

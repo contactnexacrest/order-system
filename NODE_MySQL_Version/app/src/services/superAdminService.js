@@ -51,10 +51,33 @@ async function delegationHistory(limit = 50) {
   );
 }
 
+/**
+ * QA ACC-3: only a PERMANENT Super Admin may hand out, take back or change
+ * Super Admin status — a delegate (whose access is meant to run out) cannot
+ * make itself or anyone else permanent, or hand out more delegations; nobody
+ * changes their own status; the target must be a real, active user.
+ * Port of SuperAdminService::assertMayManage().
+ */
+async function assertMayManage(actorId, targetUserId) {
+  const actor = await userRepository.findById(actorId);
+  if (!actor || parseInt(actor.is_super_admin, 10) !== 1) {
+    throw new Error('Only a permanent Super Admin can change Super Admin access (a delegated Super Admin cannot).');
+  }
+  if (targetUserId === null || targetUserId === undefined) return;
+  if (Number(targetUserId) === Number(actorId)) {
+    throw new Error('You cannot change your own Super Admin access — ask another Super Admin.');
+  }
+  const target = await userRepository.findById(targetUserId);
+  if (!target || parseInt(target.is_active, 10) !== 1) {
+    throw new Error('Choose an active user.');
+  }
+}
+
 async function grantDelegation(delegateUserId, grantedBy, reason, expiresAt) {
   if ((reason || '').trim().length < MIN_REASON_LENGTH) {
     throw new Error(`Reason must be at least ${MIN_REASON_LENGTH} characters — describe why this delegation is needed.`);
   }
+  await assertMayManage(grantedBy, delegateUserId);
   if (await isEffective(delegateUserId)) {
     throw new Error('This user is already a Super Admin or already has an active delegation.');
   }
@@ -73,6 +96,7 @@ async function revokeDelegation(delegationId, revokedBy, reason) {
   if ((reason || '').trim().length < MIN_REASON_LENGTH) {
     throw new Error(`Reason must be at least ${MIN_REASON_LENGTH} characters.`);
   }
+  await assertMayManage(revokedBy, null);
 
   const result = await db.execute(
     `UPDATE super_admin_delegations
@@ -98,6 +122,7 @@ async function setPermanentFlag(userId, isSuperAdminFlag, changedBy, reason) {
   if ((reason || '').trim().length < MIN_REASON_LENGTH) {
     throw new Error(`Reason must be at least ${MIN_REASON_LENGTH} characters.`);
   }
+  await assertMayManage(changedBy, userId);
   if (!isSuperAdminFlag && (await permanentSuperAdmins()).length <= 1) {
     throw new Error('Cannot remove the last remaining Super Admin — promote someone else first.');
   }
@@ -121,5 +146,5 @@ async function setPermanentFlag(userId, isSuperAdminFlag, changedBy, reason) {
 
 module.exports = {
   MIN_REASON_LENGTH, isEffective, permanentSuperAdmins, activeDelegations,
-  delegationHistory, grantDelegation, revokeDelegation, setPermanentFlag,
+  delegationHistory, grantDelegation, revokeDelegation, setPermanentFlag, assertMayManage,
 };

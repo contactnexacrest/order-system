@@ -203,8 +203,29 @@ async function setUserDivision(req, res) {
     res.redirect(`/users/${userId}/edit`);
     return;
   }
+  // QA ACC-8: a real user; not yourself (unless Super Admin) and not a
+  // protected account; and someone who does not see all divisions may only
+  // place people in their own division.
+  const target = await require('../repositories/userRepository').findById(userId);
+  if (!target) {
+    res.status(404).send('User not found.');
+    return;
+  }
+  let refusal = null;
+  if (Number(userId) === Number(req.user.id) && !req.isSuperAdmin) {
+    refusal = 'You cannot change your own division — ask another administrator.';
+  } else if (Number(target.is_protected_account || 0) === 1) {
+    refusal = 'This is a protected account: its division cannot be changed here.';
+  } else if (!divisionService.seesAll() && (parsed.id === null || Number(parsed.id) !== divisionService.userDivisionId(req.user))) {
+    refusal = 'You can only place people in your own division.';
+  }
+  if (refusal !== null) {
+    flash.set(req, 'error', refusal);
+    res.redirect(`/users/${userId}/edit`);
+    return;
+  }
   await divisionRepository.setUserDivision(userId, parsed.id);
-  await auditLogRepository.log(req.user.id, 'USER_DIVISION_SET', 'users', userId, 'division_id', null, parsed.id === null ? 'company level' : String(parsed.id));
+  await auditLogRepository.log(req.user.id, 'USER_DIVISION_SET', 'users', userId, 'division_id', target.division_id === null || target.division_id === undefined ? 'company level' : String(target.division_id), parsed.id === null ? 'company level' : String(parsed.id));
   flash.set(req, 'success', 'Division saved.');
   res.redirect(`/users/${userId}/edit`);
 }

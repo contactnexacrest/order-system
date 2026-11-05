@@ -149,9 +149,9 @@ async function clearedSettlements() {
      FROM order_payment_status ops
      JOIN orders o ON o.id = ops.order_id
      JOIN clients c ON c.id = o.client_id
-     WHERE ops.advance_cleared_at IS NOT NULL
+     WHERE (ops.advance_cleared_at IS NOT NULL
         OR ops.balance_cleared_at IS NOT NULL
-        OR ops.freight_cleared_at IS NOT NULL
+        OR ops.freight_cleared_at IS NOT NULL)${require('../services/divisionService').sql('o.division_id')}
      ORDER BY o.id DESC`
   );
 }

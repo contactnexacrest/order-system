@@ -64,6 +64,13 @@ const RULES = [
   [/^\/port-routes\/lookup(?:[/?#]|$)/, ['manage_orders']],
   [/^\/(?:ports|port-routes)(?:[/?#]|$)/, ['manage_ports']],
   [/^\/users(?:[/?#]|$)/, ['manage_users']],
+  // QA UI-12 (D-257): division set-up pages, and the import / merchant trade modules.
+  [/^\/admin\/(?:divisions|gst-rates|import-duty-rates)(?:[/?#]|$)/, ['manage_divisions']],
+  // D-257 Zoho: the "App vs Zoho" check of an import, deal or Domestic Trade order (reads Zoho Books).
+  [/^\/(?:import|merchant|domestic\/orders)\/[^/]+\/zoho-check(?:[/?#]|$)/, ['ca_module_manage']],
+  [/^\/import\/create(?:[/?#]|$)/, ['manage_purchasing']],
+  [/^\/merchant\/create(?:[/?#]|$)/, ['manage_purchasing']],
+  [/^\/(?:import|merchant)(?:[/?#]|$)/, ['view_purchase_prices']],
 ];
 
 /** QA Round 6, R6-N02: pages of one order also need that order to be visible to the user (D-118). */

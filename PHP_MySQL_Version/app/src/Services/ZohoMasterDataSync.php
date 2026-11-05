@@ -133,7 +133,10 @@ final class ZohoMasterDataSync
     public static function clientsToPush(): array
     {
         $rows = Database::connection()->query(
-            "SELECT c.*, (SELECT o.currency_code FROM orders o WHERE o.client_id = c.id AND o.currency_code IS NOT NULL ORDER BY o.id DESC LIMIT 1) AS order_currency
+            // D-257 Zoho (ZOH-6): only export orders set the currency of the client's (overseas) Books customer;
+            // a Domestic Trade / local-sale buyer gets its own INR, GST customer from the tax invoice (zoho_contact_id_inr).
+            "SELECT c.*, (SELECT o.currency_code FROM orders o WHERE o.client_id = c.id AND o.currency_code IS NOT NULL
+                           AND NOT EXISTS (SELECT 1 FROM domestic_orders d WHERE d.order_id = o.id) ORDER BY o.id DESC LIMIT 1) AS order_currency
                FROM clients c
               WHERE COALESCE(c.is_sample_data, 0) = 0 AND c.duplicate_of_client_id IS NULL
               ORDER BY c.id"

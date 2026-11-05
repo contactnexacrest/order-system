@@ -123,6 +123,12 @@ final class ZohoPendingService
             $add('gst_refund', count(\App\Repositories\GstRefundRepository::creditsForZohoSync($start)));
         }
         if ($orderId === null) {
+            // D-257 Zoho: the new divisions' invoices, bills, journals and payments.
+            foreach (DivisionZohoSync::pendingCounts($start) as $type => $n) {
+                $add($type, $n);
+            }
+        }
+        if ($orderId === null) {
             // Owner decision 2 Nov 2026 (D-238): clients / products, only while their switch is on.
             foreach (ZohoMasterDataSync::pendingCounts() as $type => $n) {
                 $add($type, $n);
@@ -144,7 +150,7 @@ final class ZohoPendingService
         'gst_refund' => 'GST refund journal',
         'client' => 'client (customer)',
         'product' => 'product (item)',
-    ];
+    ] + DivisionZohoSync::TYPE_LABELS;
 
     /**
      * The menu badge: all records waiting, worked out at most once a minute

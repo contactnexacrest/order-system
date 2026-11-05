@@ -31,7 +31,8 @@ final class PurchasingService
      */
     public static function limitFor(int $userId): ?float
     {
-        $m = ActiveDepartmentService::current($userId) ?? ActiveDepartmentService::preview();
+        // QA ACC-14: same order as effectiveRoleId — a preview wins over the membership.
+        $m = ActiveDepartmentService::preview() ?? ActiveDepartmentService::current($userId);
         if ($m !== null) {
             return self::designationLimit($m);
         }

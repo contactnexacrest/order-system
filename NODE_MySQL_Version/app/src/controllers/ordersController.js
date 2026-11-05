@@ -198,6 +198,22 @@ function filterByStatus(all, statusFilter) {
 // filter — how many of the 9 mini-stage-track segments render filled
 // (lost/cancelled: the first one, as PHP).
 function withFilledSegments(o) {
+  // D-257: a Domestic Trade order (or an Import & Distribution local sale) shows its own 8 stages and its ₹ amount.
+  if (o.dom_stage !== null && o.dom_stage !== undefined) {
+    const stages = require('../services/domesticOrderService').STAGES;
+    const keys = Object.keys(stages);
+    const stageTotal = keys.length;
+    const number = keys.indexOf(o.dom_stage) + 1;
+    return {
+      ...o,
+      current_stage_number: number,
+      current_stage_name: stages[o.dom_stage] || o.dom_stage,
+      incoterm_code: null,
+      stage_total: stageTotal,
+      amount_text: `INR ${Number(o.dom_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${Number(o.dom_amount_with_gst) ? '' : ' + GST'}`,
+      filled_segments: (o.status === 'complete' || o.status === 'shipped_docs_sent') ? stageTotal : ((o.status === 'lost' || o.status === 'cancelled') ? 1 : number),
+    };
+  }
   const stageTotal = 9;
   return {
     ...o,
@@ -228,6 +244,12 @@ async function indexKanban(req, res, seesAllOrders) {
   for (const st of await lookupRepository.stagesMaster()) {
     columns.push({ key: `stage${st.stage_number}`, stage: Number(st.stage_number), title: st.stage_name, orders: [] });
   }
+  // D-257: Domestic Trade orders (and local sales) work through their own stages — one column each, only when there are such orders.
+  const domStages = { ...require('../services/domesticOrderService').STAGES };
+  delete domStages.closed; // a closed one is Complete
+  if (visible.some((o) => o.dom_stage !== null && o.dom_stage !== undefined && o.status === 'active')) {
+    for (const [k, label] of Object.entries(domStages)) columns.push({ key: `dom_${k}`, stage: null, title: `Domestic · ${label}`, orders: [] });
+  }
   columns.push({ key: 'shipped_docs_sent', stage: null, title: 'Docs Sent — Awaiting Benefits', orders: [] });
   columns.push({ key: 'complete', stage: null, title: 'Complete', orders: [] });
   if (['all', 'lost', 'cancelled', 'overdue'].includes(statusFilter)) {
@@ -235,7 +257,8 @@ async function indexKanban(req, res, seesAllOrders) {
     columns.push({ key: 'cancelled', stage: null, title: 'Cancelled', orders: [] });
   }
   for (const o of visible) {
-    const key = o.status === 'active' ? `stage${(o.current_stage_number || 1) || 1}` : String(o.status);
+    let key = o.status === 'active' ? `stage${(o.current_stage_number || 1) || 1}` : String(o.status);
+    if (o.dom_stage !== null && o.dom_stage !== undefined && o.status === 'active') key = `dom_${o.dom_stage}`;
     const col = columns.find((c) => c.key === key);
     if (col) col.orders.push(withFilledSegments(o));
   }

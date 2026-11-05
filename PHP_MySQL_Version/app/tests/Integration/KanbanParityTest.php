@@ -209,6 +209,46 @@ final class KanbanParityTest extends DbTestCase
     }
 
     /**
+     * D-257: a Domestic Trade order (or an Import & Distribution local sale)
+     * shows its own stage (of 8) and its rupee amount, on the list and on
+     * the board alike; the board gives Domestic stages their own columns
+     * only when there are such orders. Export cards are unchanged.
+     */
+    public function testADomesticOrderShowsItsOwnStageAndRupeeAmountOnTheListAndTheBoard(): void
+    {
+        $pdo = \App\Config\Database::connection();
+        $pdo->prepare('UPDATE users SET division_id = NULL WHERE id = :id')->execute(['id' => $this->userId]);
+        $export = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [$this->userId]);
+        $board = $this->render(new OrderController(), 'index', []);
+        self::assertStringNotContainsString('Domestic · ', $board, 'no Domestic columns without Domestic orders');
+        $pdo->exec("UPDATE divisions SET status = 'active' WHERE id = 2");
+        \App\Services\DivisionService::resetCache();
+        try {
+            $dom = $this->createTestOrder($this->createTestClient(), 'FOB', 'Standard — New Buyer', 'USD', null, null, [$this->userId]);
+            $pdo->prepare("UPDATE orders SET division_id = 2, currency_code = 'INR' WHERE id = :id")->execute(['id' => $dom]);
+            $pdo->prepare("INSERT INTO domestic_orders (order_id, stage, place_of_supply, seller_state_code) VALUES (:o, 'purchase', '29', '29')")->execute(['o' => $dom]);
+            $pdo->prepare("INSERT INTO domestic_order_lines (order_id, line_no, description, hsn_code, quantity, unit, rate_inr, gst_rate_pct) VALUES (:o, 1, 'Granite', '6802', 10, 'm2', 1500.50, 18)")->execute(['o' => $dom]);
+            foreach (['list' => ['view' => 'list'], 'board' => []] as $what => $get) {
+                $html = $this->render(new OrderController(), 'index', $get);
+                $card = substr($html, (int) strpos($html, "/orders/{$dom}"), 2500);
+                self::assertStringContainsString('Stage 4 of 8 &middot; Purchase', $card, $what);
+                self::assertStringContainsString('INR 15,005.00 + GST', $card, "{$what}: before the tax invoice, the lines without GST");
+                $exportCard = substr($html, (int) strpos($html, "/orders/{$export}"), 2500);
+                self::assertStringContainsString('of 9 &middot;', $exportCard, "{$what}: Export cards unchanged");
+            }
+            $board = $this->render(new OrderController(), 'index', []);
+            self::assertStringContainsString('data-column="dom_purchase"', $board);
+            self::assertMatchesRegularExpression('#data-column="dom_purchase".*?/orders/' . $dom . '\?from=kanban#s', $board);
+            $pdo->prepare("UPDATE domestic_orders SET stage = 'payment', invoice_total = 17706.00 WHERE order_id = :o")->execute(['o' => $dom]);
+            $list = $this->render(new OrderController(), 'index', ['view' => 'list']);
+            self::assertStringContainsString('INR 17,706.00</span>', substr($list, (int) strpos($list, "/orders/{$dom}"), 2500), 'the tax invoice total once fixed');
+        } finally {
+            $pdo->exec("UPDATE divisions SET status = 'planned' WHERE id <> 1");
+            \App\Services\DivisionService::resetCache();
+        }
+    }
+
+    /**
      * Owner decision 1 Nov 2026 (A-5, Q-R7-2): the board pages like the
      * list — 25 per column (the list shows 25 per page), then "Show more".
      */

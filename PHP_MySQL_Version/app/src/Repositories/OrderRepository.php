@@ -35,6 +35,9 @@ final class OrderRepository
         return Database::connection()->query(
             "SELECT o.*, sm.stage_name AS current_stage_name,
                     sm.stage_number AS current_stage_number,
+                    dom.stage AS dom_stage,
+                    COALESCE(dom.invoice_total, (SELECT COALESCE(SUM(ROUND(dl.quantity * dl.rate_inr, 2)), 0) FROM domestic_order_lines dl WHERE dl.order_id = o.id AND dl.is_active = 1)) AS dom_amount,
+                    (dom.invoice_total IS NOT NULL) AS dom_amount_with_gst,
                     (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id) AS total_fob_value,
                     EXISTS (
                         SELECT 1 FROM order_payment_status ops
@@ -43,6 +46,7 @@ final class OrderRepository
                     ) AS is_overdue
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+             LEFT JOIN domestic_orders dom ON dom.order_id = o.id
              WHERE o.is_archived = 0" . DivisionService::sql('o.division_id') . "
              ORDER BY o.created_at DESC, o.id DESC"
         )->fetchAll();
@@ -66,6 +70,9 @@ final class OrderRepository
                     (SELECT GROUP_CONCAT(u2.name ORDER BY u2.name SEPARATOR ', ')
                      FROM order_assignees oa2 JOIN users u2 ON u2.id = oa2.user_id
                      WHERE oa2.order_id = o.id) AS assignee_names,
+                    dom.stage AS dom_stage,
+                    COALESCE(dom.invoice_total, (SELECT COALESCE(SUM(ROUND(dl.quantity * dl.rate_inr, 2)), 0) FROM domestic_order_lines dl WHERE dl.order_id = o.id AND dl.is_active = 1)) AS dom_amount,
+                    (dom.invoice_total IS NOT NULL) AS dom_amount_with_gst,
                     (SELECT COALESCE(SUM(op.fob_value), 0) FROM order_products op WHERE op.order_id = o.id) AS total_fob_value,
                     EXISTS (
                         SELECT 1 FROM order_payment_status ops
@@ -74,6 +81,7 @@ final class OrderRepository
                     ) AS is_overdue
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
+             LEFT JOIN domestic_orders dom ON dom.order_id = o.id
              WHERE o.is_archived = 0 {$scopeClause}" . DivisionService::sql('o.division_id') . "
              ORDER BY o.created_at DESC, o.id DESC"
         );
@@ -160,7 +168,8 @@ final class OrderRepository
     /** CA Phase 8 (export benefits) — lets staff link a claim by typing the order reference rather than picking from a long dropdown of every order. */
     public static function findIdByReference(string $orderReference): ?int
     {
-        $stmt = Database::connection()->prepare('SELECT id FROM orders WHERE order_reference = :ref');
+        // QA ACC-5: an order typed on a CA form must be one of the user's divisions (as if it did not exist otherwise).
+        $stmt = Database::connection()->prepare('SELECT o.id FROM orders o WHERE o.order_reference = :ref' . \App\Services\DivisionService::sql('o.division_id'));
         $stmt->execute(['ref' => $orderReference]);
         $id = $stmt->fetchColumn();
         return $id !== false ? (int) $id : null;

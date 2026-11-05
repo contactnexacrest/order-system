@@ -519,18 +519,29 @@ app.use((req, res, next) => {
   next();
 });
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+// QA UI-15: each upload instance tells the friendly 413 page its own limit
+// (PHP shows its limit too), so a refused upload says how big a file may be.
+function withLimitLabel(instance, bytes) {
+  const label = `${Math.round(bytes / (1024 * 1024))} MB`;
+  const setLabel = (req, res, next) => { req.uploadLimitLabel = label; next(); };
+  const wrapped = {};
+  for (const method of ['single', 'array', 'fields', 'any', 'none']) {
+    wrapped[method] = (...args) => [setLabel, instance[method](...args)];
+  }
+  return wrapped;
+}
+const upload = withLimitLabel(multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }), 5 * 1024 * 1024);
 // Amendment signed copies and dispute documents allow up to 10MB per
 // file_upload_contexts (see fileUploadService, which enforces the real
 // per-context limit from that table) — this instance's own cap is just
 // generous enough not to reject a valid upload before fileUploadService
 // gets a chance to check it against the DB-configured limit.
-const uploadLarge = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+const uploadLarge = withLimitLabel(multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } }), 15 * 1024 * 1024);
 // Order progress chat attachments (docs/schema.sql Section AI) — images and
 // videos, up to file_upload_contexts.order_comment_media's real 50MB/file
 // limit (fileUploadService enforces that from the DB; this instance's cap
 // just has to be generous enough not to reject a valid upload first).
-const uploadMedia = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const uploadMedia = withLimitLabel(multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }), 50 * 1024 * 1024);
 
 // QA Round 6, R6-N05/N07: a record id in a URL (:id, :orderId, ...) is a
 // positive whole number (1-15 digits) — "-1", "0", "1.5", "abc" or a
@@ -540,7 +551,12 @@ const ID_PATTERN = /^[1-9][0-9]{0,14}$/;
 const ID_PARAMS = ['id', 'membershipId', 'addressId', 'amendmentId', 'benefitId', 'billId', 'cancellationId', 'chargeId', 'clientId', 'complaintId',
   'disputeId', 'documentId', 'emailLogId', 'entryId', 'expenseId', 'fileId', 'imageId', 'orderId', 'payoutId', 'productId',
   'creditId', 'reportId', 'requestId', 'reviewId', 'roundId', 'supplierId', 'userId', 'bankId', 'docId'];
-app.param(ID_PARAMS, (req, res, next, value) => (ID_PATTERN.test(String(value)) ? next() : next('route')));
+// QA ACC-1: Express decodes params but the access checks read the raw path,
+// so "/orders/%31/edit" would reach order 1 while every path-based check
+// (division, assignment, archive, client, associate) saw no order id at all.
+// An id must also appear literally in the raw path, as PHP's router requires
+// (it matches the raw path, so "%31" is a 404 there).
+app.param(ID_PARAMS, (req, res, next, value) => (ID_PATTERN.test(String(value)) && req.path.split('/').includes(String(value)) ? next() : next('route')));
 
 // QA Round 6, R6-N04: for a signed-in staff member, a page or action of an
 // order, document or order-linked record that does not exist answers 404 —
@@ -899,6 +915,7 @@ app.post('/domestic/orders/:id/payments', requireAuth, requirePermission('manage
 app.post('/domestic/orders/:id/documents', requireAuth, requirePermission('generate_documents'), verifyCsrf, asyncHandler(domesticOrderController.generate));
 app.post('/clients/:id/gst', requireAuth, requirePermission('manage_orders'), verifyCsrf, asyncHandler(domesticOrderController.saveClientGst));
 app.post('/domestic/orders/:id/zoho', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(domesticOrderController.pushZoho));
+app.get('/domestic/orders/:id/zoho-check', requireAuth, requirePermission('ca_module_manage'), asyncHandler(domesticOrderController.zohoCheck));
 // Owner decision D-257 Phase 3 (5 Nov 2026): Import & Distribution — imports, landed cost, stock, duty rates.
 // /import/… belongs to the module "Import, stock and landed cost" (on for IMP only).
 app.get('/import', requireAuth, requirePermission('view_purchase_prices'), asyncHandler(importController.index));
@@ -916,7 +933,9 @@ app.post('/import/:id/clearance', requireAuth, requirePermission('manage_purchas
 app.post('/import/:id/igst-credit', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(importController.igstCredit));
 app.post('/import/:id/payments', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(importController.recordPayment));
 app.post('/import/:id/advance', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(importController.advance));
+app.post('/import/:id/duty-payment', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(importController.dutyPayment));
 app.post('/import/:id/zoho', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(importController.pushZoho));
+app.get('/import/:id/zoho-check', requireAuth, requirePermission('ca_module_manage'), asyncHandler(importController.zohoCheck));
 app.get('/admin/import-duty-rates', requireAuth, requirePermission('manage_divisions'), asyncHandler(importController.dutyRates));
 app.post('/admin/import-duty-rates', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(importController.storeDutyRate));
 app.post('/admin/import-duty-rates/:id/toggle', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(importController.toggleDutyRate));
@@ -937,6 +956,7 @@ app.post('/merchant/:id/payments', requireAuth, requirePermission('manage_paymen
 app.post('/merchant/:id/advance', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(merchantTradeController.advance));
 app.post('/merchant/:id/document', requireAuth, requirePermission('view_purchase_prices'), verifyCsrf, asyncHandler(merchantTradeController.document));
 app.post('/merchant/:id/zoho', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(merchantTradeController.pushZoho));
+app.get('/merchant/:id/zoho-check', requireAuth, requirePermission('ca_module_manage'), asyncHandler(merchantTradeController.zohoCheck));
 app.get('/admin/departments', requireAuth, requirePermission('manage_permissions'), asyncHandler(departmentAdminController.index));
 app.post('/admin/departments', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.createDepartment));
 app.post('/admin/departments/:id/update', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.updateDepartment));
@@ -1542,7 +1562,8 @@ app.use((req, res) => {
 // a large amendment/dispute document just sees "something went wrong").
 app.use((err, req, res, next) => {
   if (err && err.code === 'LIMIT_FILE_SIZE') {
-    res.status(413).send('<h1>413 — File too large</h1><p>The file you tried to upload is too large for this server to accept. Please use a smaller file and try again.</p>');
+    res.status(413);
+    res.renderView('errors/413', { maxLabel: req.uploadLimitLabel || '5 MB', backUrl: safeRedirectBack(req) }, 'layout/bare');
     return;
   }
   // QA Round 5, R5-07: any other upload problem multer rejects (a file
@@ -1636,7 +1657,14 @@ app.use((err, req, res, next) => {
     res.status(413).json({ error: message });
     return;
   }
-  res.status(413).send(`<h1>413 — Too much data</h1><p>${message}</p>`);
+  res.status(413);
+  // The body parsers run before res.renderView is set up, so fall back to
+  // plain HTML when it is not there yet.
+  if (typeof res.renderView !== 'function') {
+    res.send(`<h1>413 — Too much data</h1><p>${message}</p>`);
+    return;
+  }
+  res.renderView('errors/413', { maxLabel: '2 MB', backUrl: safeRedirectBack(req), tooMuchData: true }, 'layout/bare');
 });
 
 /**

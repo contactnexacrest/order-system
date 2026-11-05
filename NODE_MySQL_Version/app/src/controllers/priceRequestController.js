@@ -120,6 +120,11 @@ async function lineQuote(req, res) {
     }
   } else {
     order = { client_id: req.query.client_id ? parseInt(req.query.client_id, 10) || null : null, currency_code: 'USD' };
+    // QA ACC-17: a client-specific price only for a client of the user's division(s).
+    if (order.client_id !== null && !(await require('../services/divisionService').allowsClient(order.client_id))) {
+      res.status(404).json({ ok: false, reason: 'Client not found.' });
+      return;
+    }
   }
   const ctx = await orderLinePricing.context(order);
   res.json(await orderLinePricing.lineQuote(product, ctx, orderLinePricing.selectionInput(String(req.query.spec || '')) || {}));

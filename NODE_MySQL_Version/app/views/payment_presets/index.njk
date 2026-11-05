@@ -27,7 +27,7 @@
         <td>
           <a href="/payment-presets/{{ p.id }}/edit" class="btn-sm btn-secondary">Edit</a>
           {% if not p.is_protected %}
-          <form method="post" action="/payment-presets/{{ p.id }}/toggle" style="display:inline" onsubmit="return confirm('{{ 'Deactivate' if p.is_active else 'Reactivate' }} {{ p.preset_name }}?');">
+          <form method="post" action="/payment-presets/{{ p.id }}/toggle" style="display:inline" data-confirm="{{ 'Deactivate' if p.is_active else 'Reactivate' }} {{ p.preset_name }}?">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <button type="submit" class="btn-sm {{ 'btn-danger' if p.is_active else 'btn-success' }}">{{ 'Deactivate' if p.is_active else 'Reactivate' }}</button>
           </form>

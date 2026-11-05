@@ -25,15 +25,17 @@ const SESSION_CHOICE = '_division_choice';
 
 /** Module registry: key => [label, URL path patterns that belong to the module]. */
 const MODULES = {
-  sales_documents: ['Quotation, PI and order confirmation', []],
-  supplier_purchase: ['Supplier purchase and RFQ', [/^\/procurement(?:\/|$)/]],
-  export_shipping: ['Export shipping (BL, shipping bill, CHA, COO)', []],
+  // QA ACC-11: every module names its own addresses, the order-scoped ones included
+  // (checked again in the order's own division once that is known — sessionAuth).
+  sales_documents: ['Quotation, PI and order confirmation', [/^\/orders\/\d+\/(?:oc-acknowledgment|oc-sent-to-buyer|pi-form|pi-form-link)(?:\/|$)/]],
+  supplier_purchase: ['Supplier purchase and RFQ', [/^\/procurement(?:\/|$)/, /^\/orders\/\d+\/(?:supplier-po|purchase-requirements)(?:\/|$)/]],
+  export_shipping: ['Export shipping (BL, shipping bill, CHA, COO)', [/^\/orders\/\d+\/(?:shipping|shipping-bill|draft-bl|bl-copy|bl-endorsed|bl-endorsement|bl-issued|bl-originals-received|scanned-bl-sent|packing)(?:\/|$)/]],
   lut_igst: ['LUT / IGST on export and GST refunds', [/^\/ca\/gst-refunds(?:\/|$)/]],
-  export_benefits: ['Export benefits (RoDTEP, drawback)', [/^\/ca\/export-benefits(?:\/|$)/]],
+  export_benefits: ['Export benefits (RoDTEP, drawback)', [/^\/ca\/export-benefits(?:\/|$)/, /^\/orders\/\d+\/(?:export-benefits|export-benefit-schemes)(?:\/|$)/]],
   firc_fema: ['FIRC / eBRC / FEMA', [/^\/reports\/missing-ebrc(?:\/|$)/]],
-  ecgc: ['ECGC', []],
+  ecgc: ['ECGC', [/^\/orders\/\d+\/ecgc-declaration(?:\/|$)/]],
   associates: ['Associates, price requests and pricing', [/^\/associates(?:\/|$)/, /^\/reports\/associates(?:\/|$)/]],
-  team_incentive: ['Team incentive and CAFIN', [/^\/incentives(?:\/|$)/, /^\/my-incentives(?:\/|$)/, /^\/reports\/incentives(?:\/|$)/]],
+  team_incentive: ['Team incentive and CAFIN', [/^\/incentives(?:\/|$)/, /^\/my-incentives(?:\/|$)/, /^\/reports\/incentives(?:\/|$)/, /^\/orders\/\d+\/incentive(?:\/|$)/]],
   // D-257 Phase 3: imports, landed cost and stock — on for Import & Distribution only.
   import_stock: ['Import, stock and landed cost', [/^\/import(?:\/|$)/]],
   // D-257 Phase 4: merchant trade deals and their RBI checks — on for Merchant Trade only.

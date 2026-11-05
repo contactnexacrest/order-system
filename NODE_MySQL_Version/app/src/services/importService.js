@@ -436,6 +436,27 @@ async function saveIgstCredit(id, date, userId) {
   return null;
 }
 
+/**
+ * D-257 Zoho: the customs duty and IGST paid for the bill of entry (ICEGATE
+ * e-payment) — its date and challan / bank reference (D-212). It goes to
+ * Zoho Books as a payment to Customs on the duty bill.
+ */
+async function saveDutyPayment(id, input, userId) {
+  const s = await repo.find(id);
+  const date = String((input && input.duty_paid_on) || '').trim();
+  const ref = String((input && input.duty_bank_reference) || '').trim();
+  let error = null;
+  if (!s) error = 'Import not found.';
+  else if (!s.boe_no || s.bcd_total === null || s.bcd_total === undefined) error = 'Record the bill of entry (customs clearance) first: the duty is worked out from it.';
+  else if (s.duty_zoho_payment_id) error = 'This duty payment is already in Zoho Books, so it cannot be changed here. Ask the CA to correct it in Books.';
+  else if (!isDate(date) || date < String(s.boe_date) || date > todayIst()) error = 'Enter the date the duty was paid (on or after the bill of entry date, not in the future).';
+  else if (ref === '' || [...ref].length > 60) error = 'Enter the challan or bank reference of the duty payment (e.g. ICEGATE challan CIN).';
+  if (error !== null) return error;
+  await repo.update(id, { duty_paid_on: date, duty_bank_reference: ref }, userId);
+  await auditLogRepository.log(userId, 'IMPORT_DUTY_PAID', 'import_shipments', id, 'duty_bank_reference', s.duty_bank_reference || null, ref);
+  return null;
+}
+
 /** Rule D-212: what a payment abroad is, to whom, for which import, at what rate, and the bank reference. */
 function paymentDescription(s, kind, amountFc, fxRate, amountInr, bankReference, note) {
   const what = { advance: 'Import supplier advance', balance: 'Import supplier balance payment', lc: 'LC retirement payment' }[kind];
@@ -645,6 +666,6 @@ module.exports = {
   CODE, STAGES, STAGE_KEYS, PAYMENT_KINDS, DEFAULTS, CURRENCIES, INCOTERMS,
   divisionId, isActive, setting, roundHalfAway, spread, fmt4, fmt3, fc, lineValueCents, compute, suggestedPrice, dutyFor,
   poValueCents, paidCents, figures, headerFields, create, saveHeader, addLine, removeLine, saveLc, saveShipment, saveClearance,
-  saveIgstCredit, paymentDescription, recordPayment, markPoGenerated, blockers, advance, stockShortfalls, issueForSale,
+  saveIgstCredit, saveDutyPayment, paymentDescription, recordPayment, markPoGenerated, blockers, advance, stockShortfalls, issueForSale,
   reportDivisionIds, stockReport,
 };

@@ -30,14 +30,14 @@ Menu **Operations › Merchant trade** (people who see purchase prices). *New de
 | Stage | What is done | To move on |
 |---|---|---|
 | **Contracted** | The goods: description, HS code, quantity, unit, **buy price** (purchase currency) and **sell price** (sale currency). *Download purchase order (PDF)* to the supplier. Advances on either leg. The **bill of lading** — and, only where the AD bank allows it, a **switch BL** (its number, who issued it and the bank's consent). | Goods, PO generated, BL recorded |
-| **Shipped** | *Download sale invoice (PDF)* — the invoice number (MTT/INV/26-27/0001) is fixed the first time, and needs the BL. The buyer pays; the supplier is paid. | Invoice generated, buyer paid in full, supplier paid in full |
+| **Shipped** | *Download sale invoice (PDF)* — the invoice number (MTT/I/26-27/0001) is fixed the first time, and needs the BL. The buyer pays; the supplier is paid. | Invoice generated, buyer paid in full, supplier paid in full |
 | **Settled** | Tick each document of the **AD bank's checklist** with the date the bank received it. | Every document with the bank |
 | **Closed** | Done. The closing date counts for the 9-month check. | — |
 
 ## Money on both legs (rule D-212)
 Each entry is **paid to the supplier** (buy leg, purchase currency) or **received from the buyer** (sell leg, sale currency), with the amount, the bank's rate and the **SWIFT / UTR reference (required)**. The app writes the description, for example:
 - *"Merchant trade supplier advance of EUR 8,000.00 (₹7,29,600.00 at 91.20) to Anatolia Marble (Turkey) against merchant trade deal MTT/26-27/0001, PO MTT/PO/26-27/0001, SWIFT/UTR ref …"* — a supplier payment before any money from the buyer is an **advance**; when it is backed by an LC or bank guarantee the description says so.
-- *"Merchant trade sale receipt of USD 19,250.00 (₹16,18,925.00 at 84.10) from Gulf Stone Trading (United Arab Emirates) against merchant trade deal MTT/26-27/0001, invoice MTT/INV/26-27/0001, SWIFT/UTR ref …"* — a buyer's payment before our invoice is a *buyer advance received*.
+- *"Merchant trade sale receipt of USD 19,250.00 (₹16,18,925.00 at 84.10) from Gulf Stone Trading (United Arab Emirates) against merchant trade deal MTT/26-27/0001, invoice MTT/I/26-27/0001, SWIFT/UTR ref …"* — a buyer's payment before our invoice is a *buyer advance received*.
 
 A reference already recorded, or more than is still owed on that leg, is refused. Two entries at the same moment are checked one after the other.
 
@@ -59,7 +59,11 @@ The **daily alert job** sends a reminder (in the app and by e-mail) to the peopl
 ## Zoho Books
 - A deal with its sale invoice goes to Books as an **invoice** to the buyer (sale currency, at the realised sell rate; `gst_treatment` overseas, no GST; account *Merchanting Trade Sales*) and a **bill** from the supplier (purchase currency, at the realised buy rate; account *Merchanting Trade Purchases*). **The account names are to be confirmed by the CA.**
 - The Division reporting tag is added only when two or more divisions are active and the tag is set up (`zoho_division_tag_option_mtt`).
-- **Pending:** the live test in the Zoho TEST organisation (no test credentials yet). Log it in the Zoho change log when it is done.
+- The buyer and the supplier are Books contacts **in their own currency** (if Books already has the same name in another currency, the app uses "<name> (<currency>)"), so the invoice and the bill are in the deal's currencies. The invoice is **marked sent** (no e-mail goes out).
+- **Both payment legs go to Books:** the buy leg as vendor payments on the supplier's bill (purchase currency, at the bank's rate), the sell leg as customer payments on the sale invoice (sale currency, at the bank's rate); reference = SWIFT/UTR, description = the app's D-212 text. A payment waits until its invoice or bill is in Books.
+- **The sale invoice number is `MTT/I/26-27/0001`** (16 characters — the most a GST-registered Books organisation accepts for an invoice number).
+- **When it goes:** at the scheduled Zoho sync and *Sync now*, or at once with *Send to Zoho Books* on the deal (Finance). Sync Log rows link to the deal; the "Waiting for Zoho" count includes them; records dated before the go-live date are not sent. **Check against Zoho Books** on the deal (reads only) compares the invoice, the bill and every payment.
+- **Live-tested** in the Zoho TEST organisation on 5 Nov 2026 (Zoho change log Z-647 onwards): invoice in USD, bill in EUR, both legs applied; the check matched all four.
 
 ## Not built yet (to decide with the AD bank / CA when needed)
 - The bank's own merchanting forms and filings; reporting a delay to the bank is done outside the app (the red check says when).

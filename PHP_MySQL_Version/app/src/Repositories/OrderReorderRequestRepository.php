@@ -92,7 +92,7 @@ final class OrderReorderRequestRepository
              FROM order_reorder_requests rr
              JOIN clients c ON c.id = rr.client_id
              JOIN orders o ON o.id = rr.source_order_id
-             WHERE rr.status = 'pending'
+             WHERE rr.status = 'pending'" . \App\Services\DivisionService::sql('o.division_id') . " -- QA ACC-6
              ORDER BY rr.submitted_at ASC"
         )->fetchAll();
     }
@@ -108,7 +108,7 @@ final class OrderReorderRequestRepository
              JOIN orders o ON o.id = rr.source_order_id
              LEFT JOIN users u ON u.id = rr.reviewed_by
              LEFT JOIN orders no ON no.id = rr.new_order_id
-             WHERE rr.status != 'pending'
+             WHERE rr.status != 'pending'" . \App\Services\DivisionService::sql('o.division_id') . " -- QA ACC-6
              ORDER BY rr.reviewed_at DESC
              LIMIT :limit"
         );

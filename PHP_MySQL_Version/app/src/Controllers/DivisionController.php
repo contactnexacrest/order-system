@@ -235,8 +235,30 @@ final class DivisionController
             header("Location: /users/{$userId}/edit");
             return;
         }
+        // QA ACC-8: a real user; not yourself (unless Super Admin) and not a
+        // protected account; and someone who does not see all divisions may
+        // only place people in their own division.
+        $target = \App\Repositories\UserRepository::findById($userId);
+        if ($target === null) {
+            http_response_code(404);
+            echo 'User not found.';
+            return;
+        }
+        $refusal = null;
+        if ($userId === (int) $user['id'] && !\App\Services\SuperAdminService::isEffective((int) $user['id'])) {
+            $refusal = 'You cannot change your own division — ask another administrator.';
+        } elseif ((int) ($target['is_protected_account'] ?? 0) === 1) {
+            $refusal = 'This is a protected account: its division cannot be changed here.';
+        } elseif (!DivisionService::seesAll($user) && ($divisionId === null || $divisionId !== DivisionService::userDivisionId($user))) {
+            $refusal = 'You can only place people in your own division.';
+        }
+        if ($refusal !== null) {
+            Flash::set('error', $refusal);
+            header("Location: /users/{$userId}/edit");
+            return;
+        }
         DivisionRepository::setUserDivision($userId, $divisionId);
-        AuditLogRepository::log((int) $user['id'], 'USER_DIVISION_SET', 'users', $userId, 'division_id', null, $divisionId === null ? 'company level' : (string) $divisionId);
+        AuditLogRepository::log((int) $user['id'], 'USER_DIVISION_SET', 'users', $userId, 'division_id', $target['division_id'] === null ? 'company level' : (string) $target['division_id'], $divisionId === null ? 'company level' : (string) $divisionId);
         Flash::set('success', 'Division saved.');
         header("Location: /users/{$userId}/edit");
     }

@@ -49,6 +49,30 @@ final class ClientPortalService
     // viewing as staff" in the portal and to audit-log who ends up acting.
     private const SESSION_IMPERSONATED_BY = '_client_portal_impersonated_by_staff_id';
 
+    /**
+     * QA ACC-10: a fingerprint of the password this session logged in with.
+     * A password change or a staff reset changes the stored hash, so every
+     * other session of that client ends on its next request (as staff
+     * sessions do through users.session_version).
+     */
+    private const SESSION_PASSWORD_FP = '_client_portal_password_fp';
+
+    public static function passwordFingerprint(string $passwordHash): string
+    {
+        return hash('sha256', $passwordHash);
+    }
+
+    /** Whether this session's password is still the client's current one (a session from before the check is accepted and pinned). */
+    public static function sessionPasswordStillCurrent(string $currentHash): bool
+    {
+        $fp = self::passwordFingerprint($currentHash);
+        if (!isset($_SESSION[self::SESSION_PASSWORD_FP])) {
+            $_SESSION[self::SESSION_PASSWORD_FP] = $fp;
+            return true;
+        }
+        return hash_equals((string) $_SESSION[self::SESSION_PASSWORD_FP], $fp);
+    }
+
     // CP-07: a fixed dummy hash so password_verify() always runs real
     // bcrypt work, even for an email with no client_logins row — otherwise
     // the timing difference alone could tell an attacker an account exists.
@@ -162,6 +186,7 @@ final class ClientPortalService
         // always start a clean, non-impersonated identity.
         unset($_SESSION[self::SESSION_IMPERSONATED_BY]);
         $_SESSION[self::SESSION_CLIENT_ID] = (int) $login['client_id'];
+        $_SESSION[self::SESSION_PASSWORD_FP] = self::passwordFingerprint((string) $login['password_hash']);
         ClientLoginRepository::updateLastLogin((int) $login['client_id']);
         AuditLogRepository::log(null, 'CLIENT_LOGIN_SUCCESS', 'clients', (int) $login['client_id']);
 
@@ -243,7 +268,12 @@ final class ClientPortalService
 
     public static function changePassword(int $clientId, string $newPassword): void
     {
-        ClientLoginRepository::updatePassword($clientId, password_hash($newPassword, PASSWORD_DEFAULT), false);
+        $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+        ClientLoginRepository::updatePassword($clientId, $hash, false);
+        // QA ACC-10: this session (the one changing it) stays signed in; others end.
+        if (self::currentClientId() === $clientId) {
+            $_SESSION[self::SESSION_PASSWORD_FP] = self::passwordFingerprint($hash);
+        }
         AuditLogRepository::log(null, 'CLIENT_PASSWORD_CHANGED', 'clients', $clientId);
     }
 }

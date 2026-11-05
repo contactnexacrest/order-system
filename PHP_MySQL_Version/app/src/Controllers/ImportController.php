@@ -172,6 +172,20 @@ final class ImportController
         $this->act($params, static fn (int $id): ?string => ImportService::saveIgstCredit($id, trim((string) ($_POST['igst_credit_on'] ?? '')), (int) self::user()['id']), 'IGST input credit recorded.', 'imp-clearance');
     }
 
+    public function dutyPayment(array $params): void
+    {
+        $this->act($params, static fn (int $id): ?string => ImportService::saveDutyPayment($id, $_POST, (int) self::user()['id']), 'Customs duty payment recorded.', 'imp-clearance');
+    }
+
+    /** D-257 Zoho: the import's "App vs Zoho" check (reads only). */
+    public function zohoCheck(array $params): void
+    {
+        if (($s = self::shipment($params)) === null) {
+            return;
+        }
+        \App\Controllers\CaController::divisionZohoCheck('import', (int) $s['id'], "/import/{$s['id']}", 'Import ' . $s['reference'], (string) $s['supplier_name']);
+    }
+
     public function recordPayment(array $params): void
     {
         $this->act($params, static fn (int $id): ?string => ImportService::recordPayment($id, $_POST, (int) self::user()['id']), 'Payment recorded.', 'imp-payments');
@@ -210,13 +224,8 @@ final class ImportController
         if (($s = self::shipment($params)) === null) {
             return;
         }
-        $error = null;
-        try {
-            ZohoBooksService::pushImport((int) $s['id']);
-        } catch (\Throwable $e) {
-            $error = 'Zoho Books: ' . $e->getMessage();
-        }
-        self::done((int) $s['id'], $error, 'Supplier bill and customs duty bill sent to Zoho Books.', 'imp-clearance');
+        [$error, $ok] = \App\Services\DivisionZohoSync::sendNow('import', (int) $s['id'], (int) self::user()['id']);
+        self::done((int) $s['id'], $error, $ok, 'imp-clearance');
     }
 
     // ------------------------------------------------------------ reports

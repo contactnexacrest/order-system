@@ -853,7 +853,7 @@ async function changePassword(req, res) {
     return;
   }
 
-  await clientPortalService.changePassword(clientId, newPassword);
+  await clientPortalService.changePassword(clientId, newPassword, req);
   flash.set(req, 'success', 'Password updated.');
   res.redirect('/client/account');
 }

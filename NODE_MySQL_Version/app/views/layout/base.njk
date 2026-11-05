@@ -124,6 +124,10 @@
           {% if permissions.manage_assets %}<a href="/company-assets" class="{{ 'active' if (currentPath | startswith('/company-assets')) else '' }}">Assets</a>{% endif %}
           {% if permissions.manage_signatories %}<a href="/signatories" class="{{ 'active' if (currentPath | startswith('/signatories')) else '' }}">Signatories</a>{% endif %}
           {% if permissions.manage_divisions %}<a href="/admin/divisions" class="{{ 'active' if (currentPath | startswith('/admin/divisions')) else '' }}">Divisions</a>{% endif %}{# D-257 #}
+          {# QA UI-12: the GST and import duty rate lists, once a division that uses them is active (until then: Admin › Divisions). #}
+          {% set __activeCodes = (division.activeCodes or []) if permissions.manage_divisions else [] %}
+          {% if 'DOM' in __activeCodes or 'IMP' in __activeCodes %}<a href="/admin/gst-rates" class="{{ 'active' if (currentPath | startswith('/admin/gst-rates')) else '' }}">GST Rates</a>{% endif %}
+          {% if 'IMP' in __activeCodes %}<a href="/admin/import-duty-rates" class="{{ 'active' if (currentPath | startswith('/admin/import-duty-rates')) else '' }}">Import Duty Rates</a>{% endif %}
           {% if permissions.manage_permissions %}<a href="/admin/departments" class="{{ 'active' if (currentPath | startswith('/admin/departments')) else '' }}">Departments</a>{% endif %}
           {% if permissions.manage_task_types %}<a href="/admin/task-types" class="{{ 'active' if (currentPath | startswith('/admin/task-types')) else '' }}">Task Due Days</a>{% endif %}
           {% if permissions.manage_permissions %}<a href="/admin/permissions" class="{{ 'active' if (currentPath | startswith('/admin/permissions')) else '' }}">Permissions</a>{% endif %}

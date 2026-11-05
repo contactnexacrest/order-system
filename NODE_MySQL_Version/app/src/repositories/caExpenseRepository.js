@@ -29,10 +29,16 @@ async function insert(zohoExpenseId, category, description, vendorName, amount, 
 
 /** @returns newest first, with the linked order's reference joined in for display */
 async function all() {
+  // QA ACC-5: a user working in one division sees that division's costs and
+  // those of its orders (not other divisions' or company-wide costs).
+  const divisionService = require('../services/divisionService');
+  const c = divisionService.condition('ce.division_id');
+  const where = c === null ? '' : `WHERE (${c} OR (ce.division_id IS NULL AND ce.order_id IS NOT NULL${divisionService.orderIdSql('ce.order_id')}))`;
   return db.query(
     `SELECT ce.*, o.order_reference
      FROM ca_expenses ce
      LEFT JOIN orders o ON o.id = ce.order_id
+     ${where}
      ORDER BY ce.expense_date DESC, ce.id DESC`
   );
 }

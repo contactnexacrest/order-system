@@ -110,6 +110,31 @@ final class SessionAuth
                 }
             }
 
+            // QA ACC-2: "Preview as" / "view as" is for looking only. While a
+            // preview runs nothing can be saved, approved or granted with the
+            // previewed designation's rights — only "Exit preview" and log out post.
+            if (\App\Services\ActiveDepartmentService::preview() !== null && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+                $postPath = rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+                if (!in_array($postPath, ['/preview/exit', '/logout'], true)) {
+                    \App\Helpers\Flash::set('error', 'You are previewing the app: nothing can be saved during a preview. Use "Exit preview" at the top first.');
+                    header('Location: ' . \App\Helpers\Router::safeRedirectBack());
+                    return false;
+                }
+            }
+
+            // QA ACC-12: staff placed in a division that is not active (planned, or
+            // switched back) cannot create or change anything until it is activated.
+            if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && ($user['division_id'] ?? null) !== null
+                && !\App\Services\DivisionService::seesAll($user)) {
+                $ownDivision = \App\Services\DivisionService::find((int) $user['division_id']);
+                $postPath = rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+                if ($ownDivision !== null && $ownDivision['status'] !== 'active' && !in_array($postPath, ['/logout', '/preview/exit', '/account/password'], true)) {
+                    http_response_code(403);
+                    echo 'Your division (' . htmlspecialchars((string) $ownDivision['name'], ENT_QUOTES, 'UTF-8') . ') is not active yet: nothing can be saved until the MD activates it in Admin › Divisions.';
+                    return false;
+                }
+            }
+
             // QA Round 5, R5-24: the archived-order and assignment rules
             // apply to every page and action of an order, not just its
             // main page — checked once here for every staff route.
@@ -160,6 +185,13 @@ final class SessionAuth
                 $orderForPath = \App\Repositories\OrderRepository::find($orderIdForPath);
                 if ($orderForPath) {
                     \App\Services\DivisionService::enterOrderDivision((int) ($orderForPath['division_id'] ?? \App\Services\DivisionService::EXPORT_ID));
+                    // QA ACC-11: a module switched off in the ORDER's division refuses that order's addresses
+                    // (a company-level user on "All divisions" included).
+                    if (\App\Services\DivisionService::disabledModuleForPath($requestPath) !== null) {
+                        http_response_code(403);
+                        echo 'This part of the system is not in use here.';
+                        return false;
+                    }
                 }
             }
 
