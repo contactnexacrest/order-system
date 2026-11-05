@@ -343,7 +343,7 @@ final class DocumentDataAssembler
                 // actually received (OrderPaymentStatusRepository::balanceDue).
                 'balance_amount'                  => $payment['balance_remittance_received_at'] !== null && $payment['balance_amount'] !== null
                     ? self::formatMoney($payment['balance_amount'])
-                    : self::formatMoney(OrderPaymentStatusRepository::balanceDue($fobValue, $advancePct, $payment, $milestonesReceived)),
+                    : self::formatMoney(OrderPaymentStatusRepository::balanceDue($fobValue, $advancePct, $payment, \App\Repositories\PaymentMilestoneRepository::balanceDeduction((int) $order['id'], (float) $fobValue, false))), // QA batch 4, ORD-09 (owner double-confirmed): net of milestone write-offs
                 'balance_remittance_received_at'  => self::formatDate($payment['balance_remittance_received_at']),
                 'balance_cleared_at'              => self::formatDate($payment['balance_cleared_at']),
                 'balance_due_date'                => self::formatDate($payment['balance_due_date']),

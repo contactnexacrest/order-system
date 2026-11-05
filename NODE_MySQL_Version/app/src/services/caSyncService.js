@@ -57,11 +57,14 @@ async function logStop(stop, triggeredBy, triggeredByUserId, orderId) {
 }
 
 async function runFullSync(triggeredBy, triggeredByUserId) {
-  // Owner decision 2 Nov 2026 (D-239): the scheduled run waits out the per-minute limit; a person's "Sync now" does not.
-  if (triggeredBy === 'scheduled') {
-    return zohoApiBudget.inBackground(() => fullSync(triggeredBy, triggeredByUserId));
-  }
-  return fullSync(triggeredBy, triggeredByUserId);
+  // QA batch 4, ZOH-1: never two syncs at once.
+  return require('./zohoSyncLock').run(() => {
+    // Owner decision 2 Nov 2026 (D-239): the scheduled run waits out the per-minute limit; a person's "Sync now" does not.
+    if (triggeredBy === 'scheduled') {
+      return zohoApiBudget.inBackground(() => fullSync(triggeredBy, triggeredByUserId));
+    }
+    return fullSync(triggeredBy, triggeredByUserId);
+  }, () => ({ ...emptyResult(), stopped: require('./zohoSyncLock').BUSY }), triggeredBy, triggeredByUserId);
 }
 
 async function fullSync(triggeredBy, triggeredByUserId) {
@@ -735,6 +738,15 @@ function inScope(onlyOrderId, orderId) {
 }
 
 async function runForOrder(orderId, triggeredByUserId) {
+  // QA batch 4, ZOH-1: never two syncs at once.
+  return require('./zohoSyncLock').run(() => forOrder(orderId, triggeredByUserId), () => {
+    const r = { ...emptyResult(), stopped: require('./zohoSyncLock').BUSY };
+    delete r.master_data;
+    return r;
+  }, 'manual', triggeredByUserId, orderId);
+}
+
+async function forOrder(orderId, triggeredByUserId) {
   const since = await zohoSyncFailureNotifier.mark();
   const result = emptyResult();
   delete result.master_data; // D-238: clients and products go only with the full sync

@@ -173,7 +173,9 @@ async function sendNow(kind, id, userId) {
   if (!(await zohoBooksService.isEnabled())) return ['Zoho Books is not connected (Settings → Zoho Books) — nothing was sent.', ''];
   let r;
   try {
-    r = await run('manual', userId, [kind, id]);
+    // QA batch 4, ZOH-1: never two syncs at once.
+    r = await require('./zohoSyncLock').run(() => run('manual', userId, [kind, id]), () => null, 'manual', userId);
+    if (r === null) return [`Zoho Books: ${require('./zohoSyncLock').BUSY}`, ''];
   } catch (e) {
     if (!(e instanceof zohoApiBudget.ZohoSyncStop)) throw e;
     await zohoSyncLogRepository.log('division_sync', null, null, null, 'error', null, e.message, 'manual', userId);

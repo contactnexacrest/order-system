@@ -20,4 +20,9 @@ function round2(x) {
   return negative && result !== 0 ? -result : result;
 }
 
-module.exports = { round2 };
+/** PHP number_format(round($x, 2), 2): "1,66,833.02"-style en-US grouping, rounded the PHP way first (QA batch 4, MON-3). */
+function format2(x) {
+  return round2(Number(x) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+module.exports = { round2, format2 };

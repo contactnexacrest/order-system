@@ -329,7 +329,8 @@ final class AssociateCommission
         if (($order['payment_method'] ?? '') === 'LC') {
             $lc = OrderLcDetailRepository::find((int) $order['id']);
             if ($lc !== null && (float) ($lc['lc_received_amount'] ?? 0) > 0) {
-                $inr += (float) $lc['lc_inr_credited'];
+                // QA batch 4, MON-6: plus the rupees the bank kept as LC charges, as for every other receipt.
+                $inr += (float) $lc['lc_inr_credited'] + (float) ($lc['lc_bank_charges_inr'] ?? 0);
                 $foreign += (float) $lc['lc_received_amount'];
             }
         }

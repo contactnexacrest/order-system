@@ -608,7 +608,8 @@ async function recordExportBenefit(req, res) {
 
   const referenceNumber = String(req.body.reference_number || '').trim() || null;
   const notes = String(req.body.notes || '').trim() || null;
-  const currencyCode = String(req.body.currency_code || '').trim() || 'INR';
+  // QA batch 4, MON-5 (owner double-confirmed 5 Nov 2026): an export benefit (RoDTEP, drawback, …) is credited in rupees.
+  const currencyCode = 'INR';
 
   const id = await caExportBenefitRepository.record(orderId, schemeName, referenceNumber, parseFloat(claimedAmount), claimedAt, currencyCode, notes, user.id);
   await auditLogRepository.log(user.id, 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', id, null, null, schemeName);

@@ -129,6 +129,16 @@ async function fullyPaidOn(orderId) {
     }
     dates.push(String(payment[`${leg}_cleared_at`]).slice(0, 10));
   }
+  // QA batch 4, MON-2: a middle payment milestone must be cleared too before the order is fully paid.
+  for (const m of await require('../repositories/paymentMilestoneRepository').forOrder(orderId)) {
+    if (Number(m.pct) <= 0) {
+      continue;
+    }
+    if (!m.cleared_on) {
+      return null;
+    }
+    dates.push(String(m.cleared_on).slice(0, 10));
+  }
   return dates.length === 0 ? null : dates.sort()[dates.length - 1];
 }
 
@@ -183,7 +193,7 @@ async function productRate(order) {
   }
   const lc = await orderLcDetailRepository.find(Number(order.id));
   if ((order.payment_method || '') === 'LC' && lc && Number(lc.lc_received_amount || 0) > 0) {
-    inr += Number(lc.lc_inr_credited);
+    inr += Number(lc.lc_inr_credited) + Number(lc.lc_bank_charges_inr || 0); // QA batch 4, MON-6: plus the rupees the bank kept as LC charges
     foreign += Number(lc.lc_received_amount);
   }
   if (foreign > 0) {

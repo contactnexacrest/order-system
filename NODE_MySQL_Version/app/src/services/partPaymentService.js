@@ -16,7 +16,7 @@ const db = require('../config/db');
 
 const LEGS = ['advance', 'freight', 'balance'];
 const TOLERANCE = 0.01;
-const round2 = (n) => Math.round(Number(n) * 100) / 100;
+const { round2, format2 } = require('../helpers/money'); // QA batch 4, MON-3: PHP-compatible rounding
 const round4 = (n) => Math.round(Number(n) * 10000) / 10000;
 
 function label(leg, milestone = null) {
@@ -24,7 +24,7 @@ function label(leg, milestone = null) {
 }
 
 function money(currency, amount) {
-  return `${currency} ${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim();
+  return `${currency} ${format2(amount)}`.trim();
 }
 
 /** Oldest first, with who recorded it. `c` is an optional transaction connection. */
@@ -90,7 +90,7 @@ async function expected(orderId, leg, milestone = null) {
     return paymentActionService.amountDue(order, 'freight');
   }
   if (leg === 'balance') {
-    return orderPaymentStatusRepository.balanceDue(fob, order.advance_pct, await orderPaymentStatusRepository.find(orderId), await paymentMilestoneRepository.plannedTotal(orderId, fob));
+    return orderPaymentStatusRepository.balanceDue(fob, order.advance_pct, await orderPaymentStatusRepository.find(orderId), await paymentMilestoneRepository.balanceDeduction(orderId, fob, true)); // QA batch 4, ORD-09
   }
   return milestone ? round2(fob * parseFloat(milestone.pct) / 100) : null;
 }
@@ -213,11 +213,13 @@ function duplicateRateClause(inrCredited) {
 }
 
 /** A second click of the same form: this exact receipt is already there (checked before the reason is). */
-async function receiptExists(orderId, leg, amount, receivedOn, rate, inrCredited = null) {
+async function receiptExists(orderId, leg, amount, receivedOn, rate, inrCredited = null, bankReference = null) {
+  // QA batch 4, MON-8: two genuine remittances of the same amount on the same day differ by their bank reference.
+  const byRef = bankReference !== null && bankReference !== undefined;
   const row = await db.queryOne(
     `SELECT 1 AS x FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id IS NULL
-        AND ABS(amount - :a) < 0.005 AND received_on = :d AND ${duplicateRateClause(inrCredited)} LIMIT 1`,
-    { o: orderId, l: leg, a: round2(amount), d: String(receivedOn).slice(0, 10), r: inrCredited !== null && inrCredited !== undefined ? round2(inrCredited) : round4(rate) }
+        AND ABS(amount - :a) < 0.005 AND received_on = :d AND ${duplicateRateClause(inrCredited)}${byRef ? " AND TRIM(COALESCE(bank_reference, '')) = :br" : ''} LIMIT 1`,
+    { o: orderId, l: leg, a: round2(amount), d: String(receivedOn).slice(0, 10), r: inrCredited !== null && inrCredited !== undefined ? round2(inrCredited) : round4(rate), ...(byRef ? { br: String(bankReference).trim() } : {}) }
   );
   return !!row;
 }

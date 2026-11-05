@@ -68,7 +68,8 @@ async function computeForOrder(orderId, withIncentives = true) {
   const currencyCode = (order && order.currency_code) || null;
   const payment = await withLcPayment(order, await orderPaymentStatusRepository.find(orderId));
 
-  const [revenueBeforeLcExtra, revenueIsEstimated] = revenueInInr(fobValue, payment);
+  const [revenueBeforeLcExtra, revenueIsEstimatedLegs] = revenueInInr(fobValue, payment);
+  let revenueIsEstimated = revenueIsEstimatedLegs;
   let revenueInr = revenueBeforeLcExtra + Number((payment && payment.lc_extra_inr) || 0);
   // Owner 2 Nov 2026: where the rupees actually credited are used, the bank charges the banks
   // deducted are added back — the buyer paid them; they are counted once, as the order cost.
@@ -76,6 +77,17 @@ async function computeForOrder(orderId, withIncentives = true) {
     if (payment && payment[`${leg}_inr_actual`] !== null && payment[`${leg}_inr_actual`] !== undefined) {
       revenueInr += await require('./remittanceDifference').chargesInr(orderId, leg);
     }
+  }
+  // QA batch 4, MON-2 (owner double-confirmed 5 Nov 2026): the middle payment milestones are revenue too —
+  // the balance leg leaves them out (D-215).
+  const fallbackRate = payment
+    ? (payment.balance_exchange_rate !== null && payment.balance_exchange_rate !== undefined ? Number(payment.balance_exchange_rate)
+      : (payment.advance_exchange_rate !== null && payment.advance_exchange_rate !== undefined ? Number(payment.advance_exchange_rate) : null))
+    : null;
+  const milestones = await require('../repositories/paymentMilestoneRepository').inInr(orderId, fobValue, fallbackRate);
+  if (milestones.rows.length > 0) {
+    revenueInr += milestones.inr;
+    revenueIsEstimated = revenueIsEstimated || milestones.estimated;
   }
 
   const supplierPo = await orderSupplierPoRepository.findLatestForOrder(orderId);
@@ -327,7 +339,7 @@ function revenueInInr(fobValue, payment) {
 function conversionText(profit, which) {
   const foreign = profit[which === 'insurance' ? 'insurance_foreign' : 'freight_foreign'];
   if (foreign === null || foreign === undefined) return null;
-  const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (n) => require('../helpers/money').format2(n);
   const amount = `${profit.currency_code || ''} ${fmt(foreign)}`.trim();
   const rate = profit.freight_rate_used;
   if (rate === null || rate === undefined) return `${amount} — not counted yet, no exchange rate`;
@@ -387,9 +399,8 @@ function freightLegInInr(amount, inrActual, rate) {
   return [0, true];
 }
 
-function round2(value) {
-  return Math.round(value * 100) / 100;
-}
+// QA batch 4, MON-3: PHP-compatible rounding.
+const { round2 } = require('../helpers/money');
 
 /**
  * D-245 P5: profit before commission and incentive → − associate commission → profit for the

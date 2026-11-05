@@ -349,3 +349,15 @@ nothing financial is left outstanding. Once that's done too, the order
 remains in the system as a completed record — visible in
 [Reports](./14-reports.md), still reachable from the client's own order
 history, but with no further actions expected of anyone.
+
+### The original BLs come before Close Order (QA batch 4, ORD-14 — owner decision 5 Nov 2026)
+
+**Close Order** now also needs the two BL steps on Stage 9 recorded first:
+1. **Record Original BLs Received** from the CHA (step 11a), and
+2. **Mark Original BLs Endorsed**.
+
+Without them the app refuses to close and says which step is missing. As
+with the BL Instruction Sheet and COO Prep Sheet, a user with **Override
+locked data** can still close with a reason (at least 10 characters) when
+the BLs genuinely cannot be handled in the app — the override is
+audit-logged.

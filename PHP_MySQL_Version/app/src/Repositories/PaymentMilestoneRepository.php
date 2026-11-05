@@ -55,6 +55,78 @@ final class PaymentMilestoneRepository
         return round(array_sum(array_map(static fn (array $m): float => round($fobTotal * (float) $m['pct'] / 100, 2), self::forOrder($orderId))), 2);
     }
 
+    /**
+     * QA batch 4, MON-2 (owner double-confirmed 5 Nov 2026): the order's middle payment milestones in rupees,
+     * for profit, CAFIN, the ledger and "fully paid". A milestone received with the INR credited on every
+     * receipt is its INR actual (plus the bank charges deducted, which the buyer paid and which are counted
+     * once as the order's Bank Charges cost); received with only a rate, received × rate (estimated); not
+     * received yet, its planned share of the FOB value at $fallbackRate (estimated).
+     *
+     * @return array{inr: float, estimated: bool, rows: list<array<string,mixed>>}
+     */
+    public static function inInr(int $orderId, float $fobTotal, ?float $fallbackRate): array
+    {
+        $total = 0.0;
+        $estimated = false;
+        $rows = [];
+        $receipts = Database::connection()->prepare("SELECT inr_credited FROM order_payment_receipts WHERE order_id = :o AND leg = 'milestone' AND milestone_id = :m");
+        foreach (self::forOrder($orderId) as $m) {
+            $planned = round($fobTotal * (float) $m['pct'] / 100, 2);
+            $received = $m['received_amount'] !== null ? (float) $m['received_amount'] : null;
+            $rate = $m['exchange_rate'] !== null ? (float) $m['exchange_rate'] : null;
+            $credited = null;
+            $charges = 0.0;
+            if ($received !== null) {
+                $receipts->execute(['o' => $orderId, 'm' => $m['id']]);
+                $credited = \App\Services\RemittanceInr::legInrActual($receipts->fetchAll(\PDO::FETCH_ASSOC));
+                $charges = \App\Services\RemittanceDifference::chargesInr($orderId, 'milestone', (int) $m['id']);
+            }
+            if ($credited !== null) {
+                $inr = round($credited + $charges, 2);
+                $basis = 'actual';
+            } elseif ($received !== null && $rate !== null) {
+                $inr = round($received * $rate, 2);
+                $basis = 'rate';
+            } elseif ($received === null && $fallbackRate !== null && $planned > 0) {
+                $inr = round($planned * $fallbackRate, 2);
+                $basis = 'planned';
+            } else {
+                $inr = 0.0;
+                $basis = null;
+            }
+            if ($basis !== 'actual' && ($planned > 0 || $received !== null)) {
+                $estimated = true;
+            }
+            $total += $inr;
+            $rows[] = $m + ['planned_amount' => $planned, 'credited_inr' => $credited, 'charges_inr' => $charges, 'inr' => $inr, 'inr_basis' => $basis];
+        }
+        return ['inr' => round($total, 2), 'estimated' => $estimated, 'rows' => $rows];
+    }
+
+    /**
+     * QA batch 4, ORD-09 (owner double-confirmed 5 Nov 2026): what the order's milestones take off the
+     * balance — one formula for the buyer pages, the commercial invoice and the staff checks. A milestone
+     * received (or settled short) counts its money received plus any shortfall written off (an agreed
+     * discount); a shortfall carried to the balance stays in the balance. A milestone not received yet
+     * counts its planned share for the staff side ($plannedForOpen) and nothing on the buyer side, where
+     * it is still owed with the balance.
+     */
+    public static function balanceDeduction(int $orderId, float $fobTotal, bool $plannedForOpen): float
+    {
+        $writtenOff = Database::connection()->prepare("SELECT COALESCE(SUM(shortfall_amount), 0) FROM order_payment_shortfalls WHERE order_id = :o AND leg = 'milestone' AND milestone_id = :m AND treatment = 'written_off'");
+        $total = 0.0;
+        foreach (self::forOrder($orderId) as $m) {
+            $writtenOff->execute(['o' => $orderId, 'm' => $m['id']]);
+            $off = (float) $writtenOff->fetchColumn();
+            if ($m['received_amount'] !== null || $off > 0) {
+                $total += (float) ($m['received_amount'] ?? 0) + $off;
+            } elseif ($plannedForOpen) {
+                $total += round($fobTotal * (float) $m['pct'] / 100, 2);
+            }
+        }
+        return round($total, 2);
+    }
+
     public static function anyMoneyRecorded(int $orderId): bool
     {
         $stmt = Database::connection()->prepare('SELECT COUNT(*) FROM order_payment_milestones WHERE order_id = :o AND received_amount IS NOT NULL');

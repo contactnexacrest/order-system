@@ -151,6 +151,28 @@ async function build(orderId) {
     }
     receipts.push(row);
   }
+  // QA batch 4, MON-2 (owner double-confirmed 5 Nov 2026): money received on the middle payment milestones (D-215),
+  // shown like the legs: the rupees credited, or the amount at its recorded rate less the bank charges.
+  for (const m of (await require('../repositories/paymentMilestoneRepository').inInr(orderId, 0, null)).rows) {
+    if (m.received_amount === null || m.received_amount === undefined) {
+      continue;
+    }
+    const amount = Number(m.received_amount);
+    const rate = m.exchange_rate !== null && m.exchange_rate !== undefined ? Number(m.exchange_rate) : null;
+    const chargesInr = require('../helpers/money').round2(Number(m.charges_inr));
+    const inr = m.credited_inr !== null ? Number(m.credited_inr) : (rate !== null ? require('../helpers/money').round2(amount * rate - chargesInr) : null);
+    receiptsForeign += amount;
+    receiptsInr += Number(inr || 0);
+    receipts.push({
+      leg: `Payment milestone ${Number(m.seq)} (${m.due_text})`,
+      amount: money(amount),
+      rate: rate !== null ? rate.toFixed(4) : '—',
+      inr: inr !== null ? money(inr) : '—',
+      received: date(m.received_on),
+      cleared: date(m.cleared_on || null),
+      basis: m.credited_inr !== null ? 'INR actual' : (rate !== null ? 'at recorded rate' : 'no rate yet'),
+    });
+  }
   // Owner decision 2026-10-29 (confirmed twice): the money the bank paid under an LC, at the rupees credited.
   const lc = await orderLcDetailRepository.find(orderId);
   if (lc && lc.lc_received_at !== null && Number(lc.lc_received_amount) > 0) {

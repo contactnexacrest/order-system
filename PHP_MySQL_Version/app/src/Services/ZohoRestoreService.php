@@ -99,9 +99,11 @@ final class ZohoRestoreService
             foreach (['advance', 'balance', 'freight'] as $leg) {
                 if ($ops["{$leg}_zoho_reference"] !== null) {
                     $currency = (string) ($ops['currency_code'] ?? 'INR');
+                    // QA batch 4, ZOH-3: the bank charges the banks deducted were sent with the payment, so they are compared and put back too.
+                    $charges = RemittanceDifference::chargesInr((int) $ops['order_id'], $leg);
                     $payments[] = ['key' => "leg:{$ops['order_id']}:{$leg}", 'leg' => $leg, 'order_id' => (int) $ops['order_id'], 'contact' => $ops['zoho_contact_id'], 'id' => (string) $ops["{$leg}_zoho_reference"],
-                        'date' => substr((string) $ops["{$leg}_cleared_at"], 0, 10), 'amount' => $currency === 'INR' ? (float) $ops["{$leg}_inr_actual"] : (float) $ops["{$leg}_amount"], 'applied' => $ops["{$leg}_zoho_applied_at"] !== null,
-                        'args' => [(int) $ops['client_id'], (string) $ops['company_legal_name'], $currency, $ops["{$leg}_amount"] !== null ? (float) $ops["{$leg}_amount"] : null, (float) $ops["{$leg}_inr_actual"], substr((string) $ops["{$leg}_cleared_at"], 0, 10), "{$ops['buyer_inquiry_ref']}-{$leg}"], 'charges' => 0.0];
+                        'date' => substr((string) $ops["{$leg}_cleared_at"], 0, 10), 'amount' => $currency === 'INR' ? round((float) $ops["{$leg}_inr_actual"] + $charges, 2) : (float) $ops["{$leg}_amount"], 'applied' => $ops["{$leg}_zoho_applied_at"] !== null,
+                        'args' => [(int) $ops['client_id'], (string) $ops['company_legal_name'], $currency, $ops["{$leg}_amount"] !== null ? (float) $ops["{$leg}_amount"] : null, (float) $ops["{$leg}_inr_actual"], substr((string) $ops["{$leg}_cleared_at"], 0, 10), "{$ops['buyer_inquiry_ref']}-{$leg}"], 'charges' => $charges];
                 }
             }
         }

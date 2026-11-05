@@ -2126,7 +2126,7 @@ final class OrderController
         }
         // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why —
         // bank charges deducted, the buyer paid less, or the buyer paid more.
-        if (\App\Services\PartPaymentService::receiptExists($orderId, 'advance', null, $amount, $receivedAt, $rate, $inr['inr'])) {
+        if (\App\Services\PartPaymentService::receiptExists($orderId, 'advance', null, $amount, $receivedAt, $rate, $inr['inr'], $bankRef)) {
             Flash::set('warning', 'Advance remittance already recorded with these details — nothing changed.');
             header("Location: /orders/{$orderId}");
             return;
@@ -2142,7 +2142,7 @@ final class OrderController
         $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval, $inr): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
-            if (\App\Services\PartPaymentService::receiptExists($orderId, 'advance', null, $amount, $receivedAt, $rate, $inr['inr'])) {
+            if (\App\Services\PartPaymentService::receiptExists($orderId, 'advance', null, $amount, $receivedAt, $rate, $inr['inr'], $bankRef)) {
                 return false;
             }
             $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'advance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges'], $inr);
@@ -2239,7 +2239,7 @@ final class OrderController
         $fobTotal = OrderProductRepository::totalFobValue($orderId);
         $order = OrderRepository::find($orderId);
         // D-215 (5a, owner confirmed twice): the balance leg leaves out the order's payment milestones.
-        $balanceAmount = OrderPaymentStatusRepository::balanceDue($fobTotal, (float) $order['advance_pct'], $existingPayment, \App\Repositories\PaymentMilestoneRepository::plannedTotal($orderId, $fobTotal));
+        $balanceAmount = OrderPaymentStatusRepository::balanceDue($fobTotal, (float) $order['advance_pct'], $existingPayment, \App\Repositories\PaymentMilestoneRepository::balanceDeduction($orderId, $fobTotal, true)); // QA batch 4, ORD-09
         // Gap list G-2 (owner, 1 Nov 2026): before shipment, the balance is due on shipment readiness (no fixed date);
         // against the BL, it gets its due date only when the scanned BL is sent to the buyer (recordScannedBlSent()).
         $balanceDueDate = null;
@@ -3203,7 +3203,7 @@ final class OrderController
             return;
         }
         // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why.
-        if (\App\Services\PartPaymentService::receiptExists($orderId, 'freight', null, $amount, $receivedAt, $rate, $inr['inr'])) {
+        if (\App\Services\PartPaymentService::receiptExists($orderId, 'freight', null, $amount, $receivedAt, $rate, $inr['inr'], $bankRef)) {
             Flash::set('warning', 'Freight remittance already recorded with these details — nothing changed.');
             header("Location: /orders/{$orderId}");
             return;
@@ -3220,7 +3220,7 @@ final class OrderController
         $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval, $inr): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
-            if (\App\Services\PartPaymentService::receiptExists($orderId, 'freight', null, $amount, $receivedAt, $rate, $inr['inr'])) {
+            if (\App\Services\PartPaymentService::receiptExists($orderId, 'freight', null, $amount, $receivedAt, $rate, $inr['inr'], $bankRef)) {
                 return false;
             }
             $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'freight', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges'], $inr);
@@ -3803,7 +3803,7 @@ final class OrderController
             return;
         }
         // Owner 2 Nov 2026 ("18 yes"): an amount that differs from what is still due says why.
-        if (\App\Services\PartPaymentService::receiptExists($orderId, 'balance', null, $amount, $receivedAt, $rate, $inr['inr'])) {
+        if (\App\Services\PartPaymentService::receiptExists($orderId, 'balance', null, $amount, $receivedAt, $rate, $inr['inr'], $bankRef)) {
             Flash::set('warning', 'Balance remittance already recorded with these details — nothing changed.');
             header("Location: /orders/{$orderId}");
             return;
@@ -3820,7 +3820,7 @@ final class OrderController
         $recorded = \App\Config\Database::transaction(static function () use ($orderId, $amount, $receivedAt, $rate, $bankRef, $diffEval, $inr): bool {
             // QA Round 6, R6-N17: a second click with the same details records and logs nothing more.
             // Gap list G-5 (owner, 1 Nov 2026): each remittance is its own receipt; the leg keeps the total.
-            if (\App\Services\PartPaymentService::receiptExists($orderId, 'balance', null, $amount, $receivedAt, $rate, $inr['inr'])) {
+            if (\App\Services\PartPaymentService::receiptExists($orderId, 'balance', null, $amount, $receivedAt, $rate, $inr['inr'], $bankRef)) {
                 return false;
             }
             $receiptId = \App\Services\PartPaymentService::addLegReceipt($orderId, 'balance', $amount, $receivedAt, $rate, $bankRef, (int) AuthService::currentUserId(), $diffEval['reason'], (float) $diffEval['charges'], $inr);
@@ -4356,6 +4356,25 @@ final class OrderController
      * permission (Super Admin bypasses automatically) plus a mandatory
      * reason, both re-checked here rather than trusted from the form.
      */
+    /**
+     * QA batch 4, ORD-14 (owner decision 5 Nov 2026): what is still missing on the original BLs before the
+     * order can be closed (step 11a received from the CHA, then endorsed). Empty when both are recorded.
+     *
+     * @return list<string>
+     */
+    public static function blOriginalsMissing(int $orderId): array
+    {
+        $shipping = OrderShippingRepository::find($orderId) ?? [];
+        $missing = [];
+        if (empty($shipping['bl_originals_received_at'])) {
+            $missing[] = 'record the original BLs received from the CHA (step 11a)';
+        }
+        if (empty($shipping['bl_endorsed_at'])) {
+            $missing[] = 'mark the original BLs endorsed';
+        }
+        return $missing;
+    }
+
     public function closeOrder(array $params): void
     {
         $orderId = (int) $params['id'];
@@ -4388,6 +4407,12 @@ final class OrderController
             $blockedBy = DocumentGenerationService::closureBlockedBy($orderId);
             if (!empty($blockedBy)) {
                 Flash::set('error', 'Before closing: generate and get approval for ' . implode(' and ', $blockedBy) . '. A user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            // QA batch 4, ORD-14 (owner decision 5 Nov 2026): the original BLs must be received from the CHA and endorsed.
+            if (($blMissing = self::blOriginalsMissing($orderId)) !== []) {
+                Flash::set('error', 'Before closing: ' . implode(' and ', $blMissing) . '. A user with the "Override locked data" permission can force this through with a reason if absolutely necessary.');
                 header("Location: /orders/{$orderId}");
                 return;
             }

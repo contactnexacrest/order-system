@@ -549,8 +549,11 @@ async function markPaid(req, res) {
         return;
       }
     }
-    if (paidInr <= 0 || (tds !== null && (tds < 0 || tds > paidInr))) {
-      flash.set(req, 'error', 'Enter the amount paid above 0, and TDS between 0 and that amount.');
+    // QA batch 4, MON-1: an associate payout can be settled wholly or mostly by TDS (paid + TDS ≤ the commission,
+    // checked above); a staff payout keeps TDS within the amount paid.
+    if (paidInr < 0 || (tds !== null && tds < 0) || paidInr + Number(tds || 0) <= 0
+      || (!tdsCalc && tds !== null && tds > paidInr)) {
+      flash.set(req, 'error', `Enter the amount paid and the TDS: neither below 0, and together above 0${!tdsCalc ? ' (TDS no more than the amount paid)' : ''}.`);
       res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
       return;
     }
@@ -578,6 +581,8 @@ async function markPaid(req, res) {
         recordedTds > 0 ? (tdsCalc.section || (await associateTds.settings()).section) : null,
         overrideReason !== null ? `changed by hand: ${overrideReason} (worked out: ₹${money(tdsCalc.tds)}, ${tdsCalc.reason})` : tdsCalc.reason,
         overrideReason);
+      // QA batch 4, MON-1: the TDS the cap cut off is carried to the next payout (none when changed by hand).
+      await incentiveRepository.setPayoutTdsShortfall(id, overrideReason === null ? Number(tdsCalc.shortfall || 0) : 0);
       if (overrideReason !== null) {
         await auditLogRepository.log(req.user.id, 'ASSOCIATE_TDS_OVERRIDDEN', 'incentive_payouts', id, 'tds_inr', tdsCalc.tds.toFixed(2), recordedTds.toFixed(2), overrideReason);
       }

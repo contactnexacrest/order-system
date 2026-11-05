@@ -188,6 +188,28 @@ final class CaFinancialSnapshotService
             }
             $receipts[] = $row;
         }
+        // QA batch 4, MON-2 (owner double-confirmed 5 Nov 2026): money received on the middle payment milestones (D-215),
+        // shown like the legs: the rupees credited, or the amount at its recorded rate less the bank charges.
+        foreach (\App\Repositories\PaymentMilestoneRepository::inInr($orderId, 0.0, null)['rows'] as $m) {
+            if ($m['received_amount'] === null) {
+                continue;
+            }
+            $amount = (float) $m['received_amount'];
+            $rate = $m['exchange_rate'] !== null ? (float) $m['exchange_rate'] : null;
+            $chargesInr = round((float) $m['charges_inr'], 2);
+            $inr = $m['credited_inr'] !== null ? (float) $m['credited_inr'] : ($rate !== null ? round($amount * $rate - $chargesInr, 2) : null);
+            $receiptsForeign += $amount;
+            $receiptsInr += (float) $inr;
+            $receipts[] = [
+                'leg' => 'Payment milestone ' . (int) $m['seq'] . ' (' . $m['due_text'] . ')',
+                'amount' => self::money($amount),
+                'rate' => $rate !== null ? number_format($rate, 4) : '—',
+                'inr' => $inr !== null ? self::money($inr) : '—',
+                'received' => self::date($m['received_on']),
+                'cleared' => self::date($m['cleared_on'] ?? null),
+                'basis' => $m['credited_inr'] !== null ? 'INR actual' : ($rate !== null ? 'at recorded rate' : 'no rate yet'),
+            ];
+        }
         // Owner decision 2026-10-29 (confirmed twice): the money the bank paid under an LC, at the rupees credited.
         $lc = \App\Repositories\OrderLcDetailRepository::find($orderId);
         if ($lc !== null && $lc['lc_received_at'] !== null && (float) $lc['lc_received_amount'] > 0) {

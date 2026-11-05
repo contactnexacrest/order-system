@@ -306,6 +306,9 @@ final class CaController
             return;
         }
         $user = AuthService::currentUser();
+        // QA batch 4, ZOH-20: a manual sync is never cut off halfway (between a Zoho write and the app marking it sent).
+        ignore_user_abort(true);
+        set_time_limit(0);
         $r = CaSyncService::runForOrder($orderId, (int) $user['id']);
         $rev = $r['revenue'];
         $pur = $r['purchases'];
@@ -330,6 +333,9 @@ final class CaController
     public function runZohoSync(array $params): void
     {
         $user = AuthService::currentUser();
+        // QA batch 4, ZOH-20: a manual sync is never cut off halfway (between a Zoho write and the app marking it sent).
+        ignore_user_abort(true);
+        set_time_limit(0);
         $result = CaSyncService::runFullSync('manual', (int) $user['id']);
         $revenue = $result['revenue'];
         $expenses = $result['expenses'];
@@ -636,7 +642,8 @@ final class CaController
 
         $referenceNumber = trim((string) ($_POST['reference_number'] ?? '')) ?: null;
         $notes = trim((string) ($_POST['notes'] ?? '')) ?: null;
-        $currencyCode = trim((string) ($_POST['currency_code'] ?? '')) ?: 'INR';
+        // QA batch 4, MON-5 (owner double-confirmed 5 Nov 2026): an export benefit (RoDTEP, drawback, …) is credited in rupees.
+        $currencyCode = 'INR';
 
         $id = CaExportBenefitRepository::record($orderId, $schemeName, $referenceNumber, (float) $claimedAmount, $claimedAt, $currencyCode, $notes, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', $id, null, null, $schemeName);

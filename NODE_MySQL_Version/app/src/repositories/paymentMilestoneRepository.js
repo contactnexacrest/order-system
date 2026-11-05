@@ -38,6 +38,77 @@ async function plannedTotal(orderId, fobTotal) {
   return Math.round(total * 100) / 100;
 }
 
+/**
+ * QA batch 4, MON-2 (owner double-confirmed 5 Nov 2026): the order's middle payment milestones in rupees,
+ * for profit, CAFIN, the ledger and "fully paid". A milestone received with the INR credited on every
+ * receipt is its INR actual (plus the bank charges deducted, counted once as the order's Bank Charges
+ * cost); received with only a rate, received × rate (estimated); not received yet, its planned share of
+ * the FOB value at fallbackRate (estimated). Port of PaymentMilestoneRepository::inInr.
+ */
+async function inInr(orderId, fobTotal, fallbackRate) {
+  const { round2 } = require('../helpers/money');
+  const remittanceInr = require('../services/remittanceInr');
+  const remittanceDifference = require('../services/remittanceDifference');
+  let total = 0;
+  let estimated = false;
+  const rows = [];
+  for (const m of await forOrder(orderId)) {
+    const planned = round2(Number(fobTotal) * parseFloat(m.pct) / 100);
+    const received = m.received_amount !== null && m.received_amount !== undefined ? Number(m.received_amount) : null;
+    const rate = m.exchange_rate !== null && m.exchange_rate !== undefined ? Number(m.exchange_rate) : null;
+    let credited = null;
+    let charges = 0;
+    if (received !== null) {
+      const receipts = await db.query("SELECT inr_credited FROM order_payment_receipts WHERE order_id = :o AND leg = 'milestone' AND milestone_id = :m", { o: orderId, m: m.id });
+      credited = remittanceInr.legInrActual(receipts);
+      charges = await remittanceDifference.chargesInr(orderId, 'milestone', Number(m.id));
+    }
+    let inr;
+    let basis;
+    if (credited !== null) {
+      inr = round2(credited + charges);
+      basis = 'actual';
+    } else if (received !== null && rate !== null) {
+      inr = round2(received * rate);
+      basis = 'rate';
+    } else if (received === null && fallbackRate !== null && fallbackRate !== undefined && planned > 0) {
+      inr = round2(planned * Number(fallbackRate));
+      basis = 'planned';
+    } else {
+      inr = 0;
+      basis = null;
+    }
+    if (basis !== 'actual' && (planned > 0 || received !== null)) {
+      estimated = true;
+    }
+    total += inr;
+    rows.push({ ...m, planned_amount: planned, credited_inr: credited, charges_inr: charges, inr, inr_basis: basis });
+  }
+  return { inr: round2(total), estimated, rows };
+}
+
+/**
+ * QA batch 4, ORD-09 (owner double-confirmed 5 Nov 2026): what the order's milestones take off the
+ * balance — one formula for the buyer pages, the commercial invoice and the staff checks. A milestone
+ * received (or settled short) counts its money received plus any shortfall written off; a shortfall
+ * carried to the balance stays in the balance. A milestone not received yet counts its planned share
+ * for the staff side (plannedForOpen) and nothing on the buyer side. Port of balanceDeduction().
+ */
+async function balanceDeduction(orderId, fobTotal, plannedForOpen) {
+  const { round2 } = require('../helpers/money');
+  let total = 0;
+  for (const m of await forOrder(orderId)) {
+    const row = await db.queryOne("SELECT COALESCE(SUM(shortfall_amount), 0) AS t FROM order_payment_shortfalls WHERE order_id = :o AND leg = 'milestone' AND milestone_id = :m AND treatment = 'written_off'", { o: orderId, m: m.id });
+    const off = Number(row ? row.t : 0);
+    if ((m.received_amount !== null && m.received_amount !== undefined) || off > 0) {
+      total += Number(m.received_amount || 0) + off;
+    } else if (plannedForOpen) {
+      total += round2(Number(fobTotal) * parseFloat(m.pct) / 100);
+    }
+  }
+  return round2(total);
+}
+
 async function anyMoneyRecorded(orderId) {
   const row = await db.queryOne('SELECT COUNT(*) AS n FROM order_payment_milestones WHERE order_id = :o AND received_amount IS NOT NULL', { o: orderId });
   return Number(row.n) > 0;
@@ -117,6 +188,8 @@ async function heldInZoho() {
 }
 
 module.exports = {
+  balanceDeduction,
+  inInr,
   MAX_STEPS, forOrder, find, totalPct, receivedTotal, plannedTotal, anyMoneyRecorded, notCleared, replaceSchedule, recordReceived, markCleared,
   setZohoReference, setZohoApplied, pendingZohoSync, heldInZoho,
 };

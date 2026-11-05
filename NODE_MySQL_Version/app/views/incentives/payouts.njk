@@ -37,7 +37,7 @@
               {% endif %}
               <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">
                 <input type="date" name="paid_on" required min="{{ r.earliestPaidOn }}" max="{{ today() }}" value="{{ today() }}" aria-label="Paid on" title="Paid on" style="width:10.5em">
-                <input type="number" name="paid_inr" required min="0.01" max="{{ r.amountPlain }}" step="0.01" value="{{ t.net.toFixed(2) if t else r.amountPlain }}" aria-label="Amount paid (₹)" title="{{ 'Net amount paid (₹) — the commission less TDS' if t else 'Amount paid (₹)' }}" style="width:8.5em" placeholder="e.g. 25000.00">
+                <input type="number" name="paid_inr" required min="{{ '0' if t else '0.01' }}" max="{{ r.amountPlain }}" step="0.01" value="{{ t.net.toFixed(2) if t else r.amountPlain }}" aria-label="Amount paid (₹)" title="{{ 'Net amount paid (₹) — the commission less TDS' if t else 'Amount paid (₹)' }}" style="width:8.5em" placeholder="e.g. 25000.00">
                 <input type="number" name="tds_inr" min="0" step="0.01" placeholder="TDS ₹" aria-label="TDS (₹)" title="TDS (₹){{ ' — worked out by the app; change it only with a reason' if t else ', if any' }}" style="width:7em"{% if t %} value="{{ t.tds.toFixed(2) }}"{% endif %} data-not-more-than="[name=paid_inr]" data-not-more-than-message="TDS cannot be more than the amount paid.">
                 {% if t %}
                   <input type="text" name="tds_override_reason" minlength="10" maxlength="255" placeholder="Only if you change the TDS: why (e.g. CA advice)" aria-label="Reason for a different TDS" title="Needed only when the TDS differs from the amount worked out" style="width:16em">

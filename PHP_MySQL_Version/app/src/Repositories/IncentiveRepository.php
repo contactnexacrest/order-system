@@ -335,6 +335,13 @@ final class IncentiveRepository
             ->execute(['r' => $rate, 's' => $section, 'why' => $reason !== null ? mb_substr($reason, 0, 255) : null, 'o' => $overrideReason !== null ? mb_substr($overrideReason, 0, 255) : null, 'id' => $id]);
     }
 
+    /** QA batch 4, MON-1: TDS still owed after this payout (capped at the payout), carried to the next one. */
+    public static function setPayoutTdsShortfall(int $id, float $shortfall): void
+    {
+        Database::connection()->prepare('UPDATE incentive_payouts SET tds_shortfall_inr = :s WHERE id = :id')
+            ->execute(['s' => $shortfall > 0 ? round($shortfall, 2) : null, 'id' => $id]);
+    }
+
     /** Owner decision 2 Nov 2026 (D-235): the challan Accounts deposited the TDS with. */
     public static function setPayoutChallan(int $id, ?string $challanNo, ?string $challanDate): void
     {

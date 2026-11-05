@@ -44,6 +44,18 @@ final class CaSyncService
     /** @return array same shape as runFullSync(); expenses and gst_refunds are zero (app-wide only) */
     public static function runForOrder(int $orderId, ?int $triggeredByUserId): array
     {
+        // QA batch 4, ZOH-1: never two syncs at once.
+        return ZohoSyncLock::run(fn (): array => self::forOrder($orderId, $triggeredByUserId), static function (): array {
+            $r = self::emptyResult();
+            unset($r['master_data']);
+            $r['stopped'] = ZohoSyncLock::BUSY;
+            return $r;
+        }, 'manual', $triggeredByUserId, $orderId);
+    }
+
+    /** @return array<string, mixed> */
+    private static function forOrder(int $orderId, ?int $triggeredByUserId): array
+    {
         $since = ZohoSyncFailureNotifier::mark();
         self::$onlyOrderId = $orderId;
         $result = self::emptyResult();
@@ -92,10 +104,17 @@ final class CaSyncService
     public static function runFullSync(string $triggeredBy, ?int $triggeredByUserId): array
     {
         // Owner decision 2 Nov 2026 (D-239): the scheduled run waits out the per-minute limit; a person's "Sync now" does not.
-        if ($triggeredBy === 'scheduled') {
-            return ZohoApiBudget::inBackground(fn (): array => self::fullSync($triggeredBy, $triggeredByUserId));
-        }
-        return self::fullSync($triggeredBy, $triggeredByUserId);
+        // QA batch 4, ZOH-1: never two syncs at once.
+        return ZohoSyncLock::run(static function () use ($triggeredBy, $triggeredByUserId): array {
+            if ($triggeredBy === 'scheduled') {
+                return ZohoApiBudget::inBackground(fn (): array => self::fullSync($triggeredBy, $triggeredByUserId));
+            }
+            return self::fullSync($triggeredBy, $triggeredByUserId);
+        }, static function (): array {
+            $r = self::emptyResult();
+            $r['stopped'] = ZohoSyncLock::BUSY;
+            return $r;
+        }, $triggeredBy, $triggeredByUserId);
     }
 
     /** @return array<string, mixed> */

@@ -12,7 +12,7 @@ async function forOrder(orderId) {
 // pool for every other existing call site.
 async function add(orderId, lineNo, description, dimensions, finish, quantity, quantityIsTbc, unit, unitPrice, hsCode = '680293', executor = db) {
   const fobValue = (quantity !== null && unitPrice !== null && !quantityIsTbc)
-    ? String(parseFloat(quantity) * parseFloat(unitPrice))
+    ? require('../helpers/money').round2(parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2) // QA batch 4, MON-3: PHP round(), not the binary float
     : null;
 
   const result = await executor.execute(
@@ -45,7 +45,7 @@ async function nextLineNo(orderId) {
  */
 async function update(id, description, dimensions, finish, quantity, quantityIsTbc, unit, unitPrice, hsCode) {
   const fobValue = (quantity !== null && unitPrice !== null && !quantityIsTbc)
-    ? String(parseFloat(quantity) * parseFloat(unitPrice))
+    ? require('../helpers/money').round2(parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2) // QA batch 4, MON-3: PHP round(), not the binary float
     : null;
 
   await db.execute(

@@ -107,7 +107,7 @@ final class PartPaymentService
         return match ($leg) {
             'advance' => round($fob * (float) ($order['advance_pct'] ?? 0) / 100, 2),
             'freight' => PaymentActionService::amountDue($order, 'freight'),
-            'balance' => OrderPaymentStatusRepository::balanceDue($fob, (float) ($order['advance_pct'] ?? 0), OrderPaymentStatusRepository::find($orderId), PaymentMilestoneRepository::plannedTotal($orderId, $fob)),
+            'balance' => OrderPaymentStatusRepository::balanceDue($fob, (float) ($order['advance_pct'] ?? 0), OrderPaymentStatusRepository::find($orderId), PaymentMilestoneRepository::balanceDeduction($orderId, $fob, true)), // QA batch 4, ORD-09
             default => $milestone !== null ? round($fob * (float) $milestone['pct'] / 100, 2) : null,
         };
     }
@@ -130,7 +130,7 @@ final class PartPaymentService
     }
 
     /** A second click of the same form: this exact receipt is already there. Locks the leg's row; call inside the transaction. */
-    public static function receiptExists(int $orderId, string $leg, ?int $milestoneId, float $amount, string $receivedOn, float $rate, ?float $inrCredited = null): bool
+    public static function receiptExists(int $orderId, string $leg, ?int $milestoneId, float $amount, string $receivedOn, float $rate, ?float $inrCredited = null, ?string $bankReference = null): bool
     {
         $pdo = Database::connection();
         $pdo->prepare('SELECT order_id FROM order_payment_status WHERE order_id = :o FOR UPDATE')->execute(['o' => $orderId]);
@@ -138,9 +138,15 @@ final class PartPaymentService
         $stmt = $pdo->prepare(
             'SELECT 1 FROM order_payment_receipts WHERE order_id = :o AND leg = :l AND milestone_id <=> :m
                 AND ABS(amount - :a) < 0.005 AND received_on = :d AND '
-                . ($inrCredited !== null ? 'ABS(COALESCE(inr_credited, -1) - :r) < 0.005' : 'inr_credited IS NULL AND ABS(COALESCE(exchange_rate, 0) - :r) < 0.00005') . ' LIMIT 1'
+                . ($inrCredited !== null ? 'ABS(COALESCE(inr_credited, -1) - :r) < 0.005' : 'inr_credited IS NULL AND ABS(COALESCE(exchange_rate, 0) - :r) < 0.00005')
+                // QA batch 4, MON-8: two genuine remittances of the same amount on the same day differ by their bank reference.
+                . ($bankReference !== null ? ' AND TRIM(COALESCE(bank_reference, \'\')) = :br' : '') . ' LIMIT 1'
         );
-        $stmt->execute(['o' => $orderId, 'l' => $leg, 'm' => $milestoneId, 'a' => round($amount, 2), 'd' => substr($receivedOn, 0, 10), 'r' => $inrCredited !== null ? round($inrCredited, 2) : round($rate, 4)]);
+        $params = ['o' => $orderId, 'l' => $leg, 'm' => $milestoneId, 'a' => round($amount, 2), 'd' => substr($receivedOn, 0, 10), 'r' => $inrCredited !== null ? round($inrCredited, 2) : round($rate, 4)];
+        if ($bankReference !== null) {
+            $params['br'] = trim($bankReference);
+        }
+        $stmt->execute($params);
         return $stmt->fetchColumn() !== false;
     }
 

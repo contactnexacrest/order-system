@@ -110,6 +110,16 @@ final class IncentiveService
             }
             $dates[] = substr((string) $payment[$leg . '_cleared_at'], 0, 10);
         }
+        // QA batch 4, MON-2: a middle payment milestone must be cleared too before the order is fully paid.
+        foreach (\App\Repositories\PaymentMilestoneRepository::forOrder((int) $order['id']) as $m) {
+            if ((float) $m['pct'] <= 0) {
+                continue;
+            }
+            if (empty($m['cleared_on'])) {
+                return null;
+            }
+            $dates[] = substr((string) $m['cleared_on'], 0, 10);
+        }
         return $dates === [] ? null : max($dates);
     }
 
@@ -168,7 +178,8 @@ final class IncentiveService
         }
         $lc = OrderLcDetailRepository::find((int) $order['id']);
         if (($order['payment_method'] ?? '') === 'LC' && $lc !== null && (float) ($lc['lc_received_amount'] ?? 0) > 0) {
-            $inr += (float) $lc['lc_inr_credited'];
+            // QA batch 4, MON-6: plus the rupees the bank kept as LC charges, as for every other receipt.
+            $inr += (float) $lc['lc_inr_credited'] + (float) ($lc['lc_bank_charges_inr'] ?? 0);
             $foreign += (float) $lc['lc_received_amount'];
         }
         if ($foreign > 0) {

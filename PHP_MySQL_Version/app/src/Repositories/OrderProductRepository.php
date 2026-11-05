@@ -58,7 +58,7 @@ final class OrderProductRepository
         string $hsCode
     ): void {
         $fobValue = ($quantity !== null && $unitPrice !== null && !$quantityIsTbc)
-            ? (string) (((float) $quantity) * ((float) $unitPrice))
+            ? number_format(round(((float) $quantity) * ((float) $unitPrice), 2), 2, '.', '') // QA batch 4, MON-3: rounded once, half away from zero, the same on both stacks
             : null;
 
         Database::connection()->prepare(
@@ -132,7 +132,7 @@ final class OrderProductRepository
         string $hsCode = '680293'
     ): int {
         $fobValue = ($quantity !== null && $unitPrice !== null && !$quantityIsTbc)
-            ? (string) (((float) $quantity) * ((float) $unitPrice))
+            ? number_format(round(((float) $quantity) * ((float) $unitPrice), 2), 2, '.', '') // QA batch 4, MON-3: rounded once, half away from zero, the same on both stacks
             : null;
 
         $pdo = Database::connection();

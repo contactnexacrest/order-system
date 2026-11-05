@@ -344,6 +344,7 @@ persistent worker process on shared hosting, which is exactly why these
 exist as polling scripts rather than a queue consumer):
 
 ```
+CRON_TZ=Asia/Kolkata
 */10 * * * *  php /home/yourcpaneluser/nexacrest_webapp/app/cron/dispatch_deferred_emails.php >> /home/yourcpaneluser/logs/dispatch_deferred_emails.log 2>&1
 */15 * * * *  php /home/yourcpaneluser/nexacrest_webapp/app/cron/auto_confirm_oc_acknowledgments.php >> /home/yourcpaneluser/logs/auto_confirm_oc_acknowledgments.log 2>&1
 0 6 * * *     php /home/yourcpaneluser/nexacrest_webapp/app/cron/check_alerts.php >> /home/yourcpaneluser/logs/check_alerts.log 2>&1

@@ -21,8 +21,8 @@ const REASONS = {
   excess: 'Buyer paid more',
 };
 
-const round2 = (n) => Math.round(Number(n) * 100) / 100;
-const num = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const { round2, format2 } = require('../helpers/money'); // QA batch 4, MON-3: PHP-compatible rounding
+const num = (n) => format2(n);
 const money = (currency, v) => `${currency} ${num(v)}`.trim();
 const pct = (v) => String(Number(Number(v).toFixed(2)));
 

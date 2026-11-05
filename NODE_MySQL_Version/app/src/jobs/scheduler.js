@@ -47,13 +47,14 @@ function start() {
   }
   started = true;
 
-  // Daily at 02:00 server time — LUT/RCMC expiry escalation, FDN/dispute
-  // overdue checks. Matches the deployment guide's suggested crontab entry
-  // for the external-cron option, so behavior is the same either way.
+  // Daily at 06:00 IST — LUT/RCMC expiry escalation, FDN/dispute
+  // overdue checks. QA batch 4, PAR-2: the same IST time as the PHP stack's
+  // crontab entry (CRON_TZ=Asia/Kolkata, 0 6 * * *), so alerts reach staff
+  // on the same morning on either stack.
   tasks.push(
-    cron.schedule('0 2 * * *', () => {
+    cron.schedule('0 6 * * *', () => {
       checkAlerts.run().catch((e) => logger.error('scheduler:checkAlerts', e));
-    })
+    }, { timezone: 'Asia/Kolkata' })
   );
 
   // Every 10 minutes — deferred/approved email dispatch.
@@ -84,7 +85,7 @@ function start() {
   tasks.push(
     cron.schedule('0 * * * *', () => {
       zohoSync.run().catch((e) => logger.error('scheduler:zohoSync', e));
-    })
+    }, { timezone: 'Asia/Kolkata', noOverlap: true }) // QA batch 4, ZOH-1: a long run never overlaps the next hour's
   );
 
   // Daily at 02:15 IST — owner points 5/8/9 (2 Nov 2026): Document copies clean-up.
@@ -95,7 +96,7 @@ function start() {
     }, { timezone: 'Asia/Kolkata' })
   );
 
-  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 02:00, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min, zohoSync hourly, dailyDigest daily @ 08:15 incl. associate reminders, documentCopyCleanup daily @ 02:15).');
+  console.log('[scheduler] in-process background jobs started (checkAlerts daily @ 06:00 IST, dispatchDeferredEmails every 10 min, autoConfirmOcAcknowledgments every 15 min, zohoSync hourly, dailyDigest daily @ 08:15 incl. associate reminders, documentCopyCleanup daily @ 02:15).');
   return tasks;
 }
 

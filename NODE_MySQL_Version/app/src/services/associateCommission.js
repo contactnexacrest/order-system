@@ -269,7 +269,7 @@ async function realisedRate(order) {
   if ((order.payment_method || '') === 'LC') {
     const lc = await require('../repositories/orderLcDetailRepository').find(Number(order.id));
     if (lc && Number(lc.lc_received_amount || 0) > 0) {
-      inr += Number(lc.lc_inr_credited);
+      inr += Number(lc.lc_inr_credited) + Number(lc.lc_bank_charges_inr || 0); // QA batch 4, MON-6: plus the rupees the bank kept as LC charges
       foreign += Number(lc.lc_received_amount);
     }
   }

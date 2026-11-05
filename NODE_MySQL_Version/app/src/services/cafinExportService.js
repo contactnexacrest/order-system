@@ -70,7 +70,7 @@ const SUMMARY_HEADERS = [
 ];
 
 function num(v) {
-  return (Math.round((Number(v) || 0) * 100) / 100).toFixed(2);
+  return require('../helpers/money').round2(Number(v) || 0).toFixed(2); // QA batch 4, MON-3
 }
 
 /** "₹1,23,456.00" / "−₹5.00" / "—" → "123456.00" / "-5.00" / "" — numbers Excel can add up. */
@@ -125,7 +125,7 @@ async function commissionTaxes(orderId) {
     gst += po.status === 'paid' ? Number(po.gst_inr || 0) : Number(await associateCommission.gstFor(po));
     tds += Number(po.tds_inr || 0);
   }
-  return [Math.round(gst * 100) / 100, Math.round(tds * 100) / 100];
+  return [require('../helpers/money').round2(gst), require('../helpers/money').round2(tds)];
 }
 
 /** Only the orders whose incentive the MD has locked. */

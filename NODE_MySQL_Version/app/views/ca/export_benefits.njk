@@ -31,9 +31,7 @@
         <label>Claimed Amount
           <input type="number" step="0.01" min="0.01" name="claimed_amount" placeholder="e.g., 15000.00" required>
         </label>
-        <label>Currency
-          <input type="text" name="currency_code" value="INR" maxlength="10" placeholder="e.g., INR" style="width:70px;">
-        </label>
+        <p class="muted small">Currency: INR (₹) — export benefits are credited in rupees.</p>
         <label>Claim Date
           <input type="date" name="claimed_at" required>
         </label>

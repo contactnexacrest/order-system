@@ -1866,7 +1866,7 @@ async function skipPiForm(req, res) {
     return;
   }
   await orderRepository.markPiFormSkipped(orderId, req.user.id, reason);
-  await auditLogRepository.log(req.user.id, 'PI_FORM_SKIPPED', 'orders', orderId, 'pi_form_skipped_at', null, new Date().toISOString().slice(0, 19).replace('T', ' '), reason);
+  await auditLogRepository.log(req.user.id, 'PI_FORM_SKIPPED', 'orders', orderId, 'pi_form_skipped_at', null, require('../helpers/dbDateTime').formatForDb(new Date()) /* QA batch 4, PAR-1: IST, as PHP date() */, reason);
   flash.set(req, 'success', 'PI-stage form skipped — Step 5c (Generate Proforma Invoice) is now open.');
   res.redirect(`/orders/${orderId}`);
 }
@@ -2359,7 +2359,7 @@ async function recordAdvancePayment(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
-  if (await partPaymentService.receiptExists(orderId, 'advance', amount, receivedAt, rate, inr.inr)) {
+  if (await partPaymentService.receiptExists(orderId, 'advance', amount, receivedAt, rate, inr.inr, bankRef)) {
     flash.set(req, 'warning', 'Advance remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -2468,7 +2468,7 @@ async function clearAdvancePayment(req, res) {
   const fobTotal = await orderProductRepository.totalFobValue(orderId);
   const order = await orderRepository.find(orderId);
   // D-215 (5a, owner confirmed twice): the balance leg leaves out the order's payment milestones.
-  const balanceAmount = orderPaymentStatusRepository.balanceDue(fobTotal, order.advance_pct, existingPayment, await require('../repositories/paymentMilestoneRepository').plannedTotal(orderId, fobTotal));
+  const balanceAmount = orderPaymentStatusRepository.balanceDue(fobTotal, order.advance_pct, existingPayment, await require('../repositories/paymentMilestoneRepository').balanceDeduction(orderId, fobTotal, true)); // QA batch 4, ORD-09
   // Gap list G-2 (owner, 1 Nov 2026): before shipment, the balance is due on shipment readiness (no fixed date);
   // against the BL, it gets its due date only when the scanned BL is sent to the buyer (recordScannedBlSent()).
   const balanceDueDate = null;
@@ -2722,7 +2722,7 @@ async function confirmLcUsable(req, res) {
 
   await orderLcDetailRepository.confirmUsable(orderId, user.id);
   await orderPaymentStatusRepository.setBalanceAmount(orderId, balanceAmount, balanceDueDate);
-  await auditLogRepository.log(user.id, 'LC_CONFIRMED_USABLE', 'order_lc_details', orderId, 'lc_confirmed_at', null, new Date().toISOString().slice(0, 19).replace('T', ' '));
+  await auditLogRepository.log(user.id, 'LC_CONFIRMED_USABLE', 'order_lc_details', orderId, 'lc_confirmed_at', null, require('../helpers/dbDateTime').formatForDb(new Date()) /* QA batch 4, PAR-1: IST, as PHP date() */);
   await stageGateService.passAndUnlockNext(orderId, 3, user.id);
 
   const provisionStatus = await clientPortalService.provisionIfNeeded(order.client_id, orderId);
@@ -3298,7 +3298,7 @@ async function skipSupplierPoAck(req, res) {
     return;
   }
   await orderSupplierPoRepository.markAckSkipped(supplierPo.id, req.user.id, reason);
-  await auditLogRepository.log(req.user.id, 'SUPPLIER_PO_ACK_SKIPPED', 'order_supplier_po', supplierPo.id, 'ack_skipped_at', null, new Date().toISOString().slice(0, 19).replace('T', ' '), reason);
+  await auditLogRepository.log(req.user.id, 'SUPPLIER_PO_ACK_SKIPPED', 'order_supplier_po', supplierPo.id, 'ack_skipped_at', null, require('../helpers/dbDateTime').formatForDb(new Date()) /* QA batch 4, PAR-1: IST, as PHP date() */, reason);
   flash.set(req, 'success', 'Recorded that the supplier did not acknowledge — Step 7d (confirm the PO) is now open.');
   res.redirect(`/orders/${orderId}#step-7d-supplier-po-signed`);
 }
@@ -3430,7 +3430,7 @@ async function recordFreightPayment(req, res) {
     return;
   }
 
-  if (await partPaymentService.receiptExists(orderId, 'freight', amount, receivedAt, rate, inr.inr)) {
+  if (await partPaymentService.receiptExists(orderId, 'freight', amount, receivedAt, rate, inr.inr, bankRef)) {
     flash.set(req, 'warning', 'Freight remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -4028,7 +4028,7 @@ async function recordBalancePayment(req, res) {
     return;
   }
 
-  if (await partPaymentService.receiptExists(orderId, 'balance', amount, receivedAt, rate, inr.inr)) {
+  if (await partPaymentService.receiptExists(orderId, 'balance', amount, receivedAt, rate, inr.inr, bankRef)) {
     flash.set(req, 'warning', 'Balance remittance already recorded with these details — nothing changed.');
     res.redirect(`/orders/${orderId}`);
     return;
@@ -4551,6 +4551,22 @@ async function generateBlEndorsement(req, res) {
  * bypasses automatically) plus a mandatory reason, both re-checked here
  * rather than trusted from the form.
  */
+/**
+ * QA batch 4, ORD-14 (owner decision 5 Nov 2026): what is still missing on the original BLs before the
+ * order can be closed (step 11a received from the CHA, then endorsed). Port of OrderController::blOriginalsMissing.
+ */
+async function blOriginalsMissing(orderId) {
+  const shipping = (await orderShippingRepository.find(orderId)) || {};
+  const missing = [];
+  if (!shipping.bl_originals_received_at) {
+    missing.push('record the original BLs received from the CHA (step 11a)');
+  }
+  if (!shipping.bl_endorsed_at) {
+    missing.push('mark the original BLs endorsed');
+  }
+  return missing;
+}
+
 async function closeOrder(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
@@ -4581,6 +4597,13 @@ async function closeOrder(req, res) {
     const blockedBy = await documentGenerationService.closureBlockedBy(orderId);
     if (blockedBy.length > 0) {
       flash.set(req, 'error', `Before closing: generate and get approval for ${blockedBy.join(' and ')}. A user with the "Override locked data" permission can force this through with a reason if absolutely necessary.`);
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    // QA batch 4, ORD-14 (owner decision 5 Nov 2026): the original BLs must be received from the CHA and endorsed.
+    const blMissing = await blOriginalsMissing(orderId);
+    if (blMissing.length > 0) {
+      flash.set(req, 'error', `Before closing: ${blMissing.join(' and ')}. A user with the "Override locked data" permission can force this through with a reason if absolutely necessary.`);
       res.redirect(`/orders/${orderId}`);
       return;
     }

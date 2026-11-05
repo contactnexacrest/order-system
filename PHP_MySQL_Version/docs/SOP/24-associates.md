@@ -480,3 +480,15 @@ Staff can set a new code on the associate's page; ticking **Block the old
 code** (with a reason, e.g. it leaked) stops that old code from bringing new
 clients — such a code then counts as "not applied" (A6).
 
+
+## TDS never more than the payout (QA batch 4, MON-1 — 5 Nov 2026)
+
+When a payout takes the associate's year past the TDS threshold, the
+catch-up TDS on the earlier payments can be larger than the payout itself
+(for example 20% without a verified PAN). The app now keeps back at most the
+whole payout — the payout can be recorded with **net ₹0, settled by TDS** —
+and carries the rest of the TDS to the associate's **next payout in the same
+financial year**. The payout's TDS note says how much was carried
+("capped at the payout; ₹X TDS carried to the next payout"), and the next
+payout's TDS includes it ("includes ₹X TDS carried from an earlier payout").
+If Accounts changes the TDS by hand (with a reason), nothing is carried.

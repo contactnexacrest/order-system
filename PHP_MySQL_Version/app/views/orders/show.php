@@ -752,7 +752,7 @@ $renderVendorBills = static function (array $bills, bool $showPartner, bool $can
                     <?php foreach (\App\Repositories\OrderVendorBillRepository::PAYMENT_MODES as $__mode): ?><option><?= htmlspecialchars($__mode) ?></option><?php endforeach; ?>
                   </select>
                 </label>
-                <label>UTR / reference *<input type="text" name="payment_ref" required placeholder="e.g. SBIN1234567890"></label>
+                <label>UTR / reference *<input type="text" name="payment_ref" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="e.g. SBIN1234567890"></label>
                 <div><button type="submit" class="btn-sm">Save Payment</button></div>
               </form>
             </details>
@@ -4777,7 +4777,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             <label>Reference Number (shipping bill / scroll no.)<input type="text" name="reference_number" placeholder="e.g. REF-2026-001"></label>
             <label>Claimed Amount *<input type="text" name="claimed_amount" required placeholder="e.g. 25000.00"></label>
             <label>Claimed On *<input type="date" name="claimed_at" value="<?= date('Y-m-d') ?>" required></label>
-            <label>Currency<input type="text" name="currency_code" value="INR" placeholder="e.g. USD"></label>
+            <p class="muted small">Amounts are in rupees (₹): export benefits are credited in INR.</p>
             <label>Notes<input type="text" name="notes" placeholder="Optional notes"></label>
             <button type="submit" class="btn-sm">Record Claim</button>
           </form>

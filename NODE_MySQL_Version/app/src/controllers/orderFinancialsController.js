@@ -76,7 +76,8 @@ async function addExportBenefit(req, res) {
 
   const referenceNumber = String(req.body.reference_number || '').trim() || null;
   const notes = String(req.body.notes || '').trim() || null;
-  const currencyCode = String(req.body.currency_code || '').trim() || 'INR';
+  // QA batch 4, MON-5 (owner double-confirmed 5 Nov 2026): an export benefit (RoDTEP, drawback, …) is credited in rupees.
+  const currencyCode = 'INR';
 
   const id = await caExportBenefitRepository.record(orderId, schemeName, referenceNumber, parseFloat(claimedAmount), claimedAt, currencyCode, notes, user.id);
   await auditLogRepository.log(user.id, 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', id, null, null, schemeName);
@@ -900,7 +901,7 @@ async function skipFinancials(req, res) {
     return;
   }
   await orderRepository.markFinancialsSkipped(orderId, req.user.id, reason);
-  await auditLogRepository.log(req.user.id, 'ORDER_FINANCIALS_SKIPPED', 'orders', orderId, 'financials_skipped_at', null, new Date().toISOString().slice(0, 19).replace('T', ' '), reason);
+  await auditLogRepository.log(req.user.id, 'ORDER_FINANCIALS_SKIPPED', 'orders', orderId, 'financials_skipped_at', null, require('../helpers/dbDateTime').formatForDb(new Date()) /* QA batch 4, PAR-1: IST, as PHP date() */, reason);
   flash.set(req, 'success', 'Step 12 marked complete without financial figures — nothing was recorded as 0. You can still add figures later.');
   res.redirect(`/orders/${orderId}#order-financials`);
 }
@@ -967,7 +968,7 @@ async function completeFinancials(req, res) {
     return;
   }
   await orderRepository.setFinancialsCompleted(orderId, req.user.id);
-  await auditLogRepository.log(req.user.id, 'ORDER_FINANCIALS_COMPLETED', 'orders', orderId, 'financials_completed_at', null, new Date().toISOString().slice(0, 19).replace('T', ' '));
+  await auditLogRepository.log(req.user.id, 'ORDER_FINANCIALS_COMPLETED', 'orders', orderId, 'financials_completed_at', null, require('../helpers/dbDateTime').formatForDb(new Date()) /* QA batch 4, PAR-1: IST, as PHP date() */);
   flash.set(req, 'success', 'Step 12 complete. Benefit money still to come can be recorded in 12c whenever it arrives.');
   res.redirect(`/orders/${orderId}#order-financials`);
 }

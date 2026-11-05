@@ -546,8 +546,11 @@ final class IncentiveController
                     return;
                 }
             }
-            if ($paidInr <= 0 || ($tds !== null && ($tds < 0 || $tds > $paidInr))) {
-                Flash::set('error', 'Enter the amount paid above 0, and TDS between 0 and that amount.');
+            // QA batch 4, MON-1: an associate payout can be settled wholly or mostly by TDS (paid + TDS ≤ the commission,
+            // checked above); a staff payout keeps TDS within the amount paid.
+            if ($paidInr < 0 || ($tds !== null && $tds < 0) || $paidInr + (float) ($tds ?? 0) <= 0
+                || ($tdsCalc === null && $tds !== null && $tds > $paidInr)) {
+                Flash::set('error', 'Enter the amount paid and the TDS: neither below 0, and together above 0' . ($tdsCalc === null ? ' (TDS no more than the amount paid)' : '') . '.');
                 header('Location: /incentives/payouts?month=' . rawurlencode($month));
                 return;
             }
@@ -574,6 +577,8 @@ final class IncentiveController
                     $recordedTds > 0 ? ($tdsCalc['section'] ?? \App\Services\AssociateTds::settings()['section']) : null,
                     $overrideReason !== null ? 'changed by hand: ' . $overrideReason . ' (worked out: ₹' . number_format($tdsCalc['tds'], 2) . ', ' . $tdsCalc['reason'] . ')' : $tdsCalc['reason'],
                     $overrideReason);
+                // QA batch 4, MON-1: the TDS the cap cut off is carried to the next payout (none when changed by hand).
+                IncentiveRepository::setPayoutTdsShortfall($id, $overrideReason === null ? (float) ($tdsCalc['shortfall'] ?? 0) : 0.0);
                 if ($overrideReason !== null) {
                     AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_TDS_OVERRIDDEN', 'incentive_payouts', $id, 'tds_inr', number_format($tdsCalc['tds'], 2, '.', ''), number_format($recordedTds, 2, '.', ''), $overrideReason);
                 }

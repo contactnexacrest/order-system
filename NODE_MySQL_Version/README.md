@@ -353,7 +353,7 @@ web process's own uptime).** Add five crontab entries:
 ```
 */10 * * * *  cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/dispatchDeferredEmails.js >> /var/log/nexacrest/dispatch_deferred_emails.log 2>&1
 */15 * * * *  cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/autoConfirmOcAcknowledgments.js >> /var/log/nexacrest/auto_confirm_oc_acknowledgments.log 2>&1
-0 2 * * *     cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/checkAlerts.js >> /var/log/nexacrest/check_alerts.log 2>&1
+0 6 * * *     cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/checkAlerts.js >> /var/log/nexacrest/check_alerts.log 2>&1
 0 * * * *     cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/zohoSync.js >> /var/log/nexacrest/zoho_sync.log 2>&1
 15 8 * * *    cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/dailyDigest.js >> /var/log/nexacrest/daily_digest.log 2>&1
 ```
@@ -365,7 +365,7 @@ shell's.
 **Option 2 — in-process, via node-cron.** Set `RUN_JOBS_IN_PROCESS=true`
 in `.env` and restart the app (`pm2 restart nexacrest`). `src/server.js`
 then starts `src/jobs/scheduler.js`, which runs `checkAlerts` daily at
-02:00, `dispatchDeferredEmails` every 10 minutes,
+06:00 IST (the same time as the PHP stack — QA batch 4, PAR-2), `dispatchDeferredEmails` every 10 minutes,
 `autoConfirmOcAcknowledgments` every 15 minutes, `zohoSync` hourly and
 `dailyDigest` at 08:15, all inside the same process — nothing else to configure, but job
 execution is then tied to the web process's uptime (a restart briefly

@@ -331,7 +331,7 @@ async function assemble(orderId, documentTypeCode = null) {
           // received (orderPaymentStatusRepository.balanceDue).
           balance_amount: payment.balance_remittance_received_at !== null && payment.balance_amount !== null
             ? formatMoney(payment.balance_amount)
-            : formatMoney(orderPaymentStatusRepository.balanceDue(fobValue, advancePct, payment, milestonesReceived)),
+            : formatMoney(orderPaymentStatusRepository.balanceDue(fobValue, advancePct, payment, await require('../repositories/paymentMilestoneRepository').balanceDeduction(Number(order.id), Number(fobValue), false))), // QA batch 4, ORD-09 (owner double-confirmed)
           balance_remittance_received_at: formatDate(payment.balance_remittance_received_at),
           balance_cleared_at: formatDate(payment.balance_cleared_at),
           balance_due_date: formatDate(payment.balance_due_date),

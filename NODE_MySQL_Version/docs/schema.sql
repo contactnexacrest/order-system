@@ -4460,7 +4460,8 @@ ALTER TABLE incentive_payouts
   ADD COLUMN tds_reason VARCHAR(255) NULL AFTER tds_section,
   ADD COLUMN tds_override_reason VARCHAR(255) NULL AFTER tds_reason,
   ADD COLUMN tds_challan_no VARCHAR(40) NULL AFTER tds_override_reason,
-  ADD COLUMN tds_challan_date DATE NULL AFTER tds_challan_no;
+  ADD COLUMN tds_challan_date DATE NULL AFTER tds_challan_no,
+  ADD COLUMN tds_shortfall_inr DECIMAL(14,2) NULL AFTER tds_challan_date; -- QA batch 4, MON-1: TDS owed after this payout (capped at the payout), carried to the next
 ALTER TABLE ca_export_benefits ADD COLUMN received_reference VARCHAR(100) NULL AFTER received_at;
 ALTER TABLE order_cancellations
   ADD COLUMN refund_paid_at DATE NULL AFTER refund_notes,

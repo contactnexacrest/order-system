@@ -85,6 +85,14 @@ final class OrderProfitabilityService
                 $revenueInr += RemittanceDifference::chargesInr($orderId, $__leg);
             }
         }
+        // QA batch 4, MON-2 (owner double-confirmed 5 Nov 2026): the middle payment milestones are revenue too —
+        // the balance leg leaves them out (D-215).
+        $__milestones = \App\Repositories\PaymentMilestoneRepository::inInr($orderId, $fobValue,
+            $payment !== null ? (($payment['balance_exchange_rate'] ?? null) !== null ? (float) $payment['balance_exchange_rate'] : (($payment['advance_exchange_rate'] ?? null) !== null ? (float) $payment['advance_exchange_rate'] : null)) : null);
+        if ($__milestones['rows'] !== []) {
+            $revenueInr += $__milestones['inr'];
+            $isEstimated = $isEstimated || $__milestones['estimated'];
+        }
 
         $supplierPo = OrderSupplierPoRepository::findLatestForOrder($orderId);
         $supplierCostInr = ($supplierPo !== null && $supplierPo['total_payable_inr'] !== null) ? (float) $supplierPo['total_payable_inr'] : 0.0;

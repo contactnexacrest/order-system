@@ -44,6 +44,8 @@ final class BenefitsAtSettlementTest extends DbTestCase
         }
         OrderShippingRepository::upsert($this->orderId, ['shipping_line' => 'Maersk', 'vessel_name' => 'MSC MAYA', 'etd' => '2026-06-01', 'eta' => '2026-06-20']);
         OrderShippingRepository::recordBl($this->orderId, 'MSCU1234567', '2026-06-15');
+        // QA batch 4, ORD-14 (owner decision 5 Nov 2026): closing needs the original BLs received from the CHA and endorsed.
+        \App\Config\Database::connection()->prepare('UPDATE order_shipping SET bl_originals_received_at = NOW(), bl_originals_received_count = 3, bl_endorsed_at = NOW() WHERE order_id = :o')->execute(['o' => $this->orderId]);
         for ($stage = 1; $stage <= 8; $stage++) {
             StageGateService::passAndUnlockNext($this->orderId, $stage, null);
         }

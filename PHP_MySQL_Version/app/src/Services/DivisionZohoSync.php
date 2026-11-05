@@ -209,7 +209,11 @@ final class DivisionZohoSync
             return ['Zoho Books is not connected (Settings → Zoho Books) — nothing was sent.', ''];
         }
         try {
-            $r = self::run('manual', $userId, [$kind, $id]);
+            // QA batch 4, ZOH-1: never two syncs at once.
+            $r = ZohoSyncLock::run(fn (): array => self::run('manual', $userId, [$kind, $id]), static fn (): ?array => null, 'manual', $userId);
+            if ($r === null) {
+                return ['Zoho Books: ' . ZohoSyncLock::BUSY, ''];
+            }
         } catch (ZohoSyncStop $stop) {
             ZohoSyncLogRepository::log('division_sync', null, null, null, 'error', null, $stop->getMessage(), 'manual', $userId);
             return ['Zoho Books: ' . $stop->getMessage(), ''];

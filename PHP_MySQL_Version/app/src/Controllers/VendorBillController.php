@@ -317,8 +317,9 @@ final class VendorBillController
             return;
         }
         $reference = trim((string) ($_POST['payment_ref'] ?? ''));
-        if ($reference === '') {
-            $this->back($orderId, $anchor, 'error', 'Enter the UTR / payment reference.');
+        // QA batch 4, MON-7: the same bank-reference rule as every other money form (rule D-212).
+        if (($refError = \App\Helpers\FieldValidator::bankReference($reference, 'The UTR / payment reference')) !== null) {
+            $this->back($orderId, $anchor, 'error', $refError);
             return;
         }
         $user = AuthService::currentUser();

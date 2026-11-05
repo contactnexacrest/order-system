@@ -104,11 +104,13 @@ async function revenue(startDate, triggeredBy, userId) {
       if (ops[`${leg}_zoho_reference`] === null) continue;
       const currency = String(ops.currency_code || 'INR');
       const date = String(ops[`${leg}_cleared_at`] || '').slice(0, 10);
+      // QA batch 4, ZOH-3: the bank charges the banks deducted were sent with the payment, so they are compared and put back too.
+      const charges = await require('./remittanceDifference').chargesInr(Number(ops.order_id), leg);
       payments.push({
         key: `leg:${ops.order_id}:${leg}`, leg, order_id: Number(ops.order_id), contact: ops.zoho_contact_id, id: String(ops[`${leg}_zoho_reference`]), date,
-        amount: currency === 'INR' ? Number(ops[`${leg}_inr_actual`]) : Number(ops[`${leg}_amount`]), applied: ops[`${leg}_zoho_applied_at`] !== null,
+        amount: currency === 'INR' ? require('../helpers/money').round2(Number(ops[`${leg}_inr_actual`]) + charges) : Number(ops[`${leg}_amount`]), applied: ops[`${leg}_zoho_applied_at`] !== null,
         args: [Number(ops.client_id), String(ops.company_legal_name), currency, ops[`${leg}_amount`] !== null ? Number(ops[`${leg}_amount`]) : null, Number(ops[`${leg}_inr_actual`]), date, `${ops.buyer_inquiry_ref}-${leg}`],
-        charges: 0,
+        charges,
       });
     }
   }

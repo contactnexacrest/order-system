@@ -118,14 +118,14 @@ final class AssociateTds
     /**
      * The TDS on one associate payout paid on $paidOn.
      *
-     * @return array{gross:float, rate:float, tds:float, net:float, section:?string, reason:string, catch_up:float, abroad:bool, missing_foreign:list<string>, missing_payout:list<string>, fy_total:float}
+     * @return array{gross:float, rate:float, tds:float, net:float, section:?string, reason:string, catch_up:float, carried_in:float, shortfall:float, abroad:bool, missing_foreign:list<string>, missing_payout:list<string>, fy_total:float}
      */
     public static function compute(array $payout, string $paidOn): array
     {
         $s = self::settings();
         $gross = round((float) $payout['amount_inr'], 2);
         $associate = AssociateRepository::find((int) $payout['associate_id']) ?? ['id' => (int) $payout['associate_id'], 'based_in' => 'india'];
-        $result = ['gross' => $gross, 'rate' => 0.0, 'tds' => 0.0, 'net' => $gross, 'section' => null, 'reason' => '', 'catch_up' => 0.0,
+        $result = ['gross' => $gross, 'rate' => 0.0, 'tds' => 0.0, 'net' => $gross, 'section' => null, 'reason' => '', 'catch_up' => 0.0, 'carried_in' => 0.0, 'shortfall' => 0.0,
             'abroad' => self::isAbroad($associate), 'missing_foreign' => [], 'missing_payout' => [], 'fy_total' => 0.0];
         if ($result['abroad']) {
             $result['missing_foreign'] = self::missingForeignDocs((int) $associate['id']);
@@ -156,15 +156,39 @@ final class AssociateTds
         }
         // Catch-up only on the payment that takes the year past the threshold; once past it, each payment carries TDS on itself.
         $catchUp = $priorGross <= $s['threshold'] + 0.005 ? round((float) $prior['untaxed'], 2) : 0.0;
-        $tds = min($gross, (float) round(($gross + $catchUp) * $rate / 100, 0));
+        // QA batch 4, MON-1: TDS is never more than the payout. Whatever the cap cuts off is carried to the
+        // associate's next payout in the same financial year (the latest paid payout records what is still owed).
+        $carryIn = self::shortfallCarried((int) $associate['id'], $from, $to, (int) ($payout['id'] ?? 0));
+        $due = (float) round(($gross + $catchUp) * $rate / 100, 0) + $carryIn;
+        $tds = min($gross, $due);
         $result['rate'] = $rate;
         $result['tds'] = $tds;
         $result['net'] = round($gross - $tds, 2);
         $result['section'] = $panOk ? $s['section'] : '206AA';
         $result['catch_up'] = $catchUp;
+        $result['carried_in'] = $carryIn;
+        $result['shortfall'] = round($due - $tds, 2);
         $result['reason'] = ($panOk ? $s['section'] . ' ' . self::pct($rate) : 'no PAN ' . self::pct($rate) . ' (206AA)')
-            . ($catchUp > 0 ? ' — includes catch-up on ₹' . number_format($catchUp, 2) . ' paid earlier this ' . self::fyLabel($paidOn) . ' without TDS' : '');
+            . ($catchUp > 0 ? ' — includes catch-up on ₹' . number_format($catchUp, 2) . ' paid earlier this ' . self::fyLabel($paidOn) . ' without TDS' : '')
+            . ($carryIn > 0 ? ' — includes ₹' . number_format($carryIn, 2) . ' TDS carried from an earlier payout' : '')
+            . ($result['shortfall'] > 0 ? ' — capped at the payout; ₹' . number_format($result['shortfall'], 2) . ' TDS carried to the next payout' : '');
         return $result;
+    }
+
+    /**
+     * QA batch 4, MON-1: the TDS still owed from the associate's latest paid payout in the year
+     * (a payout whose TDS was capped at the payout itself), carried into the next one.
+     */
+    public static function shortfallCarried(int $associateId, string $from, string $to, int $exceptPayoutId = 0): float
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT COALESCE(tds_shortfall_inr, 0) FROM incentive_payouts
+              WHERE associate_id = :a AND payee_kind = 'associate' AND status = 'paid' AND clawback_of_payout_id IS NULL
+                AND paid_on BETWEEN :f AND :t AND id <> :id
+              ORDER BY paid_on DESC, id DESC LIMIT 1"
+        );
+        $stmt->execute(['a' => $associateId, 'f' => $from, 't' => $to, 'id' => $exceptPayoutId]);
+        return round((float) ($stmt->fetchColumn() ?: 0), 2);
     }
 
     public static function pct(float $rate): string

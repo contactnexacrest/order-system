@@ -37,7 +37,7 @@ const TYPE_LABELS = {
 };
 
 const sha = (value) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
-const round2 = (n) => Math.round(Number(n) * 100) / 100;
+const { round2 } = require('../helpers/money'); // QA batch 4, MON-3: PHP-compatible rounding
 
 /** @return {Promise<{enabled: boolean, total: number, by_type: Object<string, number>}>} */
 /**

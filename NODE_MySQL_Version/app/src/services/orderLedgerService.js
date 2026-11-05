@@ -80,6 +80,27 @@ async function forOrder(orderId, orderCurrency, full) {
       rows.push(info(payment[`${leg}_cleared_at`], `${label} cleared (funds confirmed)`, amount, orderCurrency, 'Staff-recorded'));
     }
   }
+  // QA batch 4, MON-2: money received on the middle payment milestones (D-215).
+  for (const m of (await require('../repositories/paymentMilestoneRepository').inInr(orderId, 0, null)).rows) {
+    if (m.received_amount === null || m.received_amount === undefined || !m.received_on) {
+      continue;
+    }
+    const label = `Payment milestone ${Number(m.seq)} (${m.due_text})`;
+    rows.push({
+      date: str(m.received_on),
+      event: `${label} received from buyer`,
+      direction: 'in',
+      amount: m.received_amount,
+      currency: orderCurrency,
+      rate: m.exchange_rate,
+      inr: m.credited_inr !== null ? Number(m.credited_inr) : (m.exchange_rate !== null && m.exchange_rate !== undefined ? Number(m.received_amount) * Number(m.exchange_rate) : null),
+      inr_basis: m.credited_inr !== null ? 'actual' : (m.exchange_rate !== null && m.exchange_rate !== undefined ? 'rate' : null),
+      source: 'Staff-recorded',
+    });
+    if (m.cleared_on) {
+      rows.push(info(m.cleared_on, `${label} cleared (funds confirmed)`, m.received_amount, orderCurrency, 'Staff-recorded'));
+    }
+  }
   // Owner decision 2026-10-29 (confirmed twice): the money the bank paid under an LC.
   const lc = await orderLcDetailRepository.find(orderId);
   if (lc && lc.lc_received_at !== null && Number(lc.lc_received_amount) > 0) {

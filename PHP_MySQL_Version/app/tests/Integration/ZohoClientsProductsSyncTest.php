@@ -43,6 +43,11 @@ final class ZohoClientsProductsSyncTest extends DbTestCase
         $pdo->exec("UPDATE clients SET company_legal_name = CONCAT('OLD-', company_legal_name) WHERE company_legal_name LIKE 'TEST-%'");
         $pdo->exec("UPDATE catalog_products SET name = CONCAT('OLD-', name) WHERE name LIKE 'TEST-%'");
         $pdo->exec('DELETE FROM zoho_pending_inactivations');
+        // QA batch 4: the full sync now also sends Import & Distribution and Merchant Trade records (D-257 Zoho);
+        // other tests' TEST- imports and deals must not reach this fake Zoho either.
+        $pdo->exec("UPDATE import_shipments SET supplier_name = CONCAT('OLD-', supplier_name) WHERE supplier_name LIKE 'TEST-%'");
+        $pdo->exec("UPDATE merchant_deals SET supplier_name = CONCAT('OLD-', supplier_name) WHERE supplier_name LIKE 'TEST-%'");
+        $pdo->exec("UPDATE merchant_deals SET buyer_name = CONCAT('OLD-', buyer_name) WHERE buyer_name LIKE 'TEST-%'");
     }
 
     protected function tearDown(): void

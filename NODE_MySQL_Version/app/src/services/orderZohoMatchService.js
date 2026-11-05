@@ -89,8 +89,22 @@ async function check(orderId) {
   };
   for (const [leg, label] of [['advance', 'Advance'], ['balance', 'Balance'], ['freight', 'Freight']]) {
     if (payment[`${leg}_inr_actual`] === null || payment[`${leg}_inr_actual`] === undefined) continue;
-    const amount = currency === 'INR' ? Number(payment[`${leg}_inr_actual`]) : Number(payment[`${leg}_amount`]);
+    // QA batch 4, ZOH-5: an INR leg went to Books with the bank charges deducted on the way (amount + charges).
+    const amount = currency === 'INR'
+      ? require('../helpers/money').round2(Number(payment[`${leg}_inr_actual`]) + await require('./remittanceDifference').chargesInr(orderId, leg))
+      : Number(payment[`${leg}_amount`]);
     salesPayment(`${label} payment`, amount, payment[`${leg}_zoho_reference`], notSent(payment[`${leg}_cleared_at`]), errorFor('revenue_payment', leg));
+  }
+  // QA batch 4, ZOH-5: the middle payment milestones (D-215), sent as their own customer payments.
+  for (const m of await require('../repositories/paymentMilestoneRepository').forOrder(orderId)) {
+    if (m.received_amount === null || m.received_amount === undefined) continue;
+    const msAmount = currency === 'INR' ? require('../helpers/money').round2(Number(m.received_amount)) : Number(m.received_amount);
+    let msId = null;
+    if (m.zoho_reference) {
+      const found = books.customerpayments.find((row) => String(row.reference_number || '') === String(m.zoho_reference) || String(row.payment_id || '') === String(m.zoho_reference));
+      msId = found ? String(found.payment_id) : String(m.zoho_reference);
+    }
+    salesPayment(`Payment milestone ${Number(m.seq)} payment`, msAmount, msId, notSent(m.cleared_on || m.received_on), errorFor('revenue_payment', 'milestone'));
   }
   const lc = await orderLcDetailRepository.find(orderId);
   if (lc && lc.lc_received_at !== null) {

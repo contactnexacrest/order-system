@@ -73,7 +73,8 @@ final class OrderFinancialsController
 
         $referenceNumber = trim((string) ($_POST['reference_number'] ?? '')) ?: null;
         $notes = trim((string) ($_POST['notes'] ?? '')) ?: null;
-        $currencyCode = trim((string) ($_POST['currency_code'] ?? '')) ?: 'INR';
+        // QA batch 4, MON-5 (owner double-confirmed 5 Nov 2026): an export benefit (RoDTEP, drawback, …) is credited in rupees.
+        $currencyCode = 'INR';
 
         $id = CaExportBenefitRepository::record($orderId, $schemeName, $referenceNumber, (float) $claimedAmount, $claimedAt, $currencyCode, $notes, (int) $user['id']);
         AuditLogRepository::log((int) $user['id'], 'CA_EXPORT_BENEFIT_RECORDED', 'ca_export_benefits', $id, null, null, $schemeName);

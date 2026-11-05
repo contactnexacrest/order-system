@@ -57,6 +57,27 @@ final class OrderLedgerService
                 $rows[] = self::info((string) $payment[$leg . '_cleared_at'], "{$label} cleared (funds confirmed)", $amount, $orderCurrency, 'Staff-recorded');
             }
         }
+        // QA batch 4, MON-2: money received on the middle payment milestones (D-215).
+        foreach (\App\Repositories\PaymentMilestoneRepository::inInr($orderId, 0.0, null)['rows'] as $m) {
+            if ($m['received_amount'] === null || empty($m['received_on'])) {
+                continue;
+            }
+            $label = 'Payment milestone ' . (int) $m['seq'] . ' (' . $m['due_text'] . ')';
+            $rows[] = [
+                'date' => (string) $m['received_on'],
+                'event' => "{$label} received from buyer",
+                'direction' => 'in',
+                'amount' => $m['received_amount'],
+                'currency' => $orderCurrency,
+                'rate' => $m['exchange_rate'],
+                'inr' => $m['credited_inr'] !== null ? (float) $m['credited_inr'] : ($m['exchange_rate'] !== null ? (float) $m['received_amount'] * (float) $m['exchange_rate'] : null),
+                'inr_basis' => $m['credited_inr'] !== null ? 'actual' : ($m['exchange_rate'] !== null ? 'rate' : null),
+                'source' => 'Staff-recorded',
+            ];
+            if (!empty($m['cleared_on'])) {
+                $rows[] = self::info((string) $m['cleared_on'], "{$label} cleared (funds confirmed)", $m['received_amount'], $orderCurrency, 'Staff-recorded');
+            }
+        }
         // Owner decision 2026-10-29 (confirmed twice): the money the bank paid under an LC.
         $lc = \App\Repositories\OrderLcDetailRepository::find($orderId);
         if ($lc !== null && $lc['lc_received_at'] !== null && (float) $lc['lc_received_amount'] > 0) {

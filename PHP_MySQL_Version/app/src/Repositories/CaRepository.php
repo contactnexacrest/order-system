@@ -47,9 +47,11 @@ final class CaRepository
     {
         $map = [];
         $rows = \App\Config\Database::connection()->query(
-            "SELECT order_id, leg, SUM(rate_gap_inr) AS charges
+            // QA batch 4, MON-4 (owner double-confirmed 5 Nov 2026): the charges the banks deducted in foreign
+            // currency (RemittanceDifference, bank_charges_inr) count too, not only D-244's rupee gap.
+            "SELECT order_id, leg, SUM(COALESCE(bank_charges_inr, 0) + CASE WHEN rate_gap_choice = 'bank_charges' THEN COALESCE(rate_gap_inr, 0) ELSE 0 END) AS charges
              FROM order_payment_receipts
-             WHERE rate_gap_choice = 'bank_charges' AND rate_gap_inr > 0
+             WHERE milestone_id IS NULL AND (COALESCE(bank_charges_inr, 0) > 0 OR (rate_gap_choice = 'bank_charges' AND rate_gap_inr > 0))
              GROUP BY order_id, leg"
         )->fetchAll();
         foreach ($rows as $r) {

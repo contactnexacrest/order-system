@@ -632,3 +632,25 @@ leg stays "Pending" and is retried automatically on the next sync run
 (manual or scheduled) — nothing needs to be manually reset. If the same
 leg keeps failing, the message column is the place to start diagnosing
 why.
+
+### One sync at a time, and no double posting (QA batch 4, 5 Nov 2026)
+
+- **Only one Zoho sync runs at a time** (ZOH-1). If the hourly sync is
+  running when someone presses **Sync now**, **Sync this order** or a
+  record's **Send to Zoho Books**, the second run stops at once with
+  "A Zoho sync is already running — try again in a minute." and one row in
+  the Sync Log. Nothing is lost: the records wait for the next run. The
+  lock is shared by the PHP and Node stacks on the same database.
+- **A retry never posts twice** (ZOH-2). Before the app creates a customer
+  payment, vendor payment, expense, cost entry or journal in Books, it looks
+  for one with the same reference (and amount); if an earlier run already
+  put it there, the app adopts that record instead of creating a second one.
+- The **daily check** and the **App vs Zoho** check compare a buyer
+  payment together with the bank charges the banks deducted (sent with the
+  payment), and the App vs Zoho check now lists payment-milestone payments
+  too (ZOH-3, ZOH-5).
+- A bill found in Books by its number is used only when its total agrees
+  with the app's (within ₹1) — otherwise the sync stops on that bill with a
+  message for the CA (ZOH-14).
+- A vendor payment's description now ends with its bank reference
+  ("· bank ref UTR…"), like the buyer's payments (rule D-212, ZOH-18).

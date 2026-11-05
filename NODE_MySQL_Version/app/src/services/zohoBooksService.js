@@ -101,6 +101,37 @@ async function isEnabled() {
  * @throws on any missing config, HTTP failure, or unexpected response
  * @return {Promise<{payment_id: string, applied: number}>} the Zoho-side customerpayment_id and the amount applied to the invoice
  */
+/**
+ * QA batch 4, ZOH-2: find-before-create for money records. When an earlier
+ * run's POST reached Books but the app never recorded it (an unreadable
+ * answer, a timeout, the app's own write failing), the next run finds the
+ * record by its unique reference and adopts it instead of posting a second
+ * copy. Null when Books has none (or the list cannot be read). Port of
+ * ZohoBooksService::findExistingByReference.
+ */
+async function findExistingByReference(config, accessToken, endpoint, listKey, idKey, reference, filters, matches) {
+  const ref = String(reference || '').trim();
+  if (ref === '') return null;
+  const query = new URLSearchParams({ organization_id: config.organizationId, reference_number: ref, ...filters }).toString();
+  const res = await request('GET', `https://${config.apiDomain}/books/v3/${endpoint}?${query}`, {}, authHeaders(accessToken));
+  if (!res.ok) return null;
+  const decoded = safeJson(res.body);
+  const rows = decoded && Array.isArray(decoded[listKey]) ? decoded[listKey] : [];
+  for (const row of rows) {
+    if (row && String(row.reference_number || '').trim() === ref && row[idKey] && matches(row)) {
+      return String(row[idKey]);
+    }
+  }
+  return null;
+}
+
+/** ZOH-2: a Books list row is the same money record — same amount (and same date when Books gives one). */
+function sameMoney(row, amount, date) {
+  const rowAmount = row.amount !== undefined ? row.amount : (row.total !== undefined ? row.total : -1);
+  return Math.abs(Number(rowAmount) - Number(amount)) < 0.01
+    && (!date || row.date === undefined || String(row.date).slice(0, 10) === String(date).slice(0, 10));
+}
+
 async function pushRevenuePayment(clientId, companyLegalName, currencyCode, foreignAmount, amountInr, date, referenceNumber, invoiceNumber = null, bankChargesInr = 0, description = '') {
   zohoGuard.assertCustomerAllowed(companyLegalName);
   const config = await loadConfig();
@@ -113,6 +144,10 @@ async function pushRevenuePayment(clientId, companyLegalName, currencyCode, fore
     [payload.invoices, applied] = await invoiceApplication(config, accessToken, invoiceNumber, contactId, payload.amount);
   }
 
+  // QA batch 4, ZOH-2: a payment an earlier run already put in Books is adopted, never posted twice.
+  const existing = await findExistingByReference(config, accessToken, 'customerpayments', 'customerpayments', 'payment_id', referenceNumber, { customer_id: contactId },
+    (row) => sameMoney(row, payload.amount, date) && (row.customer_id === undefined || String(row.customer_id) === String(contactId)));
+  if (existing !== null) return { payment_id: existing, applied: 0 };
   const res = await request('POST', `https://${config.apiDomain}/books/v3/customerpayments?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
   const decoded = safeJson(res.body);
   const paymentId = decoded && decoded.payment && decoded.payment.payment_id;
@@ -328,7 +363,13 @@ async function pushBill(bill, zohoBillId = null) {
   const line = await billTax(config, accessToken, bill);
   const vendorId = await findOrCreateVendor(config, accessToken, bill);
   const existing = zohoBillId === null ? await findBill(config, accessToken, String(bill.bill_no), vendorId) : null;
-  if (existing) return String(existing.bill_id);
+  if (existing) {
+    // QA batch 4, ZOH-14: a bill found by number is only adopted when its total agrees, as a new bill is checked below.
+    if (Math.abs(Number(existing.total !== undefined && existing.total !== null ? existing.total : bill.total_inr) - Number(bill.total_inr)) > 1.0) {
+      throw new Error(`Bill ${bill.bill_no} is in Zoho Books with total ${existing.total}, but the app has ${bill.total_inr} — check it in Books with the CA.`);
+    }
+    return String(existing.bill_id);
+  }
 
   const forKey = bill.vendor_kind === 'supplier' ? 'supplier' : String(bill.bill_for);
   const what = bill.vendor_kind === 'supplier'
@@ -389,6 +430,10 @@ async function pushVendorPayment(payment, bill, targetBill) {
   if (targetBill) {
     [payload.bills, applied] = await billApplication(config, accessToken, targetBill, vendorId, payload.amount);
   }
+  // QA batch 4, ZOH-2: a payment an earlier run already put in Books is adopted, never posted twice.
+  const existing = await findExistingByReference(config, accessToken, 'vendorpayments', 'vendorpayments', 'payment_id', payload.reference_number || '', { vendor_id: vendorId },
+    (row) => sameMoney(row, payload.amount, payload.date || '') && (row.vendor_id === undefined || String(row.vendor_id) === String(vendorId)));
+  if (existing !== null) return { payment_id: existing, applied: 0 };
   const res = await request('POST', `https://${config.apiDomain}/books/v3/vendorpayments?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
   const decoded = safeJson(res.body);
   const paymentId = decoded && decoded.vendorpayment && decoded.vendorpayment.payment_id;
@@ -497,6 +542,10 @@ async function pushExpense(expense, zohoExpenseId = null) {
     reference_number: `${expense.buyer_inquiry_ref}-EXP-${expense.id}`,
     description: `${expense.buyer_name} / ${expense.buyer_inquiry_ref}: ${label} — ${expense.details}${expense.paid_by === 'staff' && expense.staff_name ? ` (paid by ${expense.staff_name})` : ''}`,
   };
+  // QA batch 4, ZOH-2: an expense an earlier run already put in Books is adopted (then updated), never posted twice.
+  if (zohoExpenseId === null || zohoExpenseId === undefined) {
+    zohoExpenseId = await findExistingByReference(config, accessToken, 'expenses', 'expenses', 'expense_id', payload.reference_number, {}, () => true);
+  }
   const url = `https://${config.apiDomain}/books/v3/expenses${zohoExpenseId !== null ? `/${encodeURIComponent(zohoExpenseId)}` : ''}?organization_id=${encodeURIComponent(config.organizationId)}`;
   const res = await request(zohoExpenseId !== null ? 'PUT' : 'POST', url, payload, authHeaders(accessToken));
   const decoded = safeJson(res.body);
@@ -533,6 +582,10 @@ async function pushCostEntry(cost, zohoExpenseId = null) {
     reference_number: `${cost.buyer_inquiry_ref}-COST-${cost.id}`,
     description: `${cost.buyer_name} / ${cost.buyer_inquiry_ref}: ${label}${cost.description ? ` — ${cost.description}` : ''}`,
   };
+  // QA batch 4, ZOH-2: an expense an earlier run already put in Books is adopted (then updated), never posted twice.
+  if (zohoExpenseId === null || zohoExpenseId === undefined) {
+    zohoExpenseId = await findExistingByReference(config, accessToken, 'expenses', 'expenses', 'expense_id', payload.reference_number, {}, () => true);
+  }
   const url = `https://${config.apiDomain}/books/v3/expenses${zohoExpenseId !== null ? `/${encodeURIComponent(zohoExpenseId)}` : ''}?organization_id=${encodeURIComponent(config.organizationId)}`;
   const res = await request(zohoExpenseId !== null ? 'PUT' : 'POST', url, payload, authHeaders(accessToken));
   const decoded = safeJson(res.body);
@@ -585,6 +638,10 @@ async function pushBenefitJournal(benefit, journalId = null) {
       { account_id: await accountId(config, accessToken, BENEFIT_INCOME_ACCOUNT), debit_or_credit: 'credit', amount, description: `${scheme} received` },
     ],
   };
+  // QA batch 4, ZOH-2: a journal an earlier run already put in Books is adopted (then updated), never posted twice.
+  if (journalId === null || journalId === undefined) {
+    journalId = await findExistingByReference(config, accessToken, 'journals', 'journals', 'journal_id', payload.reference_number, {}, () => true);
+  }
   const url = `https://${config.apiDomain}/books/v3/journals${journalId !== null ? `/${encodeURIComponent(journalId)}` : ''}?organization_id=${encodeURIComponent(config.organizationId)}`;
   const res = await request(journalId !== null ? 'PUT' : 'POST', url, payload, authHeaders(accessToken));
   const decoded = safeJson(res.body);
@@ -627,6 +684,9 @@ async function pushGstRefundJournal(credit) {
       { account_id: await accountId(config, accessToken, GST_REFUND_ACCOUNT), debit_or_credit: 'credit', amount, description: `GST refund under LUT, claim ${credit.claim_arn}` },
     ],
   };
+  // QA batch 4, ZOH-2: a journal an earlier run already put in Books is adopted, never posted twice.
+  const existing = await findExistingByReference(config, accessToken, 'journals', 'journals', 'journal_id', payload.reference_number, {}, () => true);
+  if (existing !== null) return existing;
   const res = await request('POST', `https://${config.apiDomain}/books/v3/journals?organization_id=${encodeURIComponent(config.organizationId)}`, payload, authHeaders(accessToken));
   const decoded = safeJson(res.body);
   const id = decoded && decoded.journal && decoded.journal.journal_id;
@@ -1337,13 +1397,15 @@ function vendorPaymentPayload(config, vendorId, payment, bill) {
 function vendorPaymentDescription(payment, bill) {
   const order = String(bill.buyer_inquiry_ref || '');
   const billLabel = `${DOC_KINDS[bill.doc_kind] || 'Bill'} ${bill.bill_no}`;
+  // QA batch 4, ZOH-18 (rule D-212): the bank reference is named in the description too, as on the buyer's payments.
+  const bankRef = String(payment.payment_ref || '').trim() !== '' ? ` · bank ref ${String(payment.payment_ref).trim()}` : '';
   if (bill.vendor_kind === 'supplier') {
     const leg = payment.leg === 'balance' ? 'balance' : 'advance';
-    return `Supplier ${leg} payment for order ${order}${bill.supplier_po_reference ? ` · Supplier PO ${bill.supplier_po_reference}` : ''} · against ${billLabel}`;
+    return `Supplier ${leg} payment for order ${order}${bill.supplier_po_reference ? ` · Supplier PO ${bill.supplier_po_reference}` : ''} · against ${billLabel}${bankRef}`;
   }
   const service = LOGISTICS_SERVICES[bill.bill_for] || 'Logistics';
   const kind = bill.payment_kind === 'advance' ? 'advance' : 'final';
-  return `${service} — ${kind} payment for order ${order} · against ${billLabel}`;
+  return `${service} — ${kind} payment for order ${order} · against ${billLabel}${bankRef}`;
 }
 
 /** As much of amount as the bill still owes. @return {Promise<[Array, number]>} */
@@ -1432,9 +1494,12 @@ async function getAccessToken(accountsDomain, clientId, clientSecret, refreshTok
   const lockName = `nx_zoho_token_${key.slice(0, 40)}`;
   const conn = await db.pool.getConnection();
   try {
-    await conn.query('SELECT GET_LOCK(?, 15)', [lockName]);
+    const [lockRows] = await conn.query('SELECT GET_LOCK(?, 15) AS got', [lockName]);
+    const locked = Number(lockRows && lockRows[0] ? lockRows[0].got : 0) === 1;
     fromDb = await cachedToken(key); // another request may have refreshed it while we waited
     if (fromDb) return rememberToken(refreshToken, fromDb.token, fromDb.expires, owner);
+    // QA batch 4, ZOH-16: another request is still fetching the token — never ask Zoho for a second one at the same time.
+    if (!locked) throw new Error('Zoho Books sign-in is being renewed by another request — try again in a minute.');
     const res = await request('POST', `https://${accountsDomain}/oauth/v2/token`, {
       refresh_token: refreshToken,
       client_id: clientId,
@@ -1511,8 +1576,14 @@ async function send(method, url, payload, headers, formEncoded) {
   }
   let body;
   if (method !== 'GET' && method !== 'DELETE') body = formEncoded ? new URLSearchParams(payload).toString() : JSON.stringify(payload);
-  const res = await fetch(url, { method, headers, body });
-  return { ok: res.ok, status: res.status, body: await res.text() };
+  // QA batch 4, ZOH-15 / PAR-6: a 20-second limit, as PHP's CURLOPT_TIMEOUT, and the same error text as PHP.
+  let res;
+  try {
+    res = await fetch(url, { method, headers, body, signal: AbortSignal.timeout(20000) });
+    return { ok: res.ok, status: res.status, body: await res.text() };
+  } catch (e) {
+    throw new Error(`Zoho Books API request failed: ${e && e.message ? e.message : String(e)}`);
+  }
 }
 
 function safeJson(text) {
@@ -1660,8 +1731,11 @@ async function associateCommission(cost) {
   const associateTds = require('./associateTds');
   const tdsSettings = await associateTds.settings();
   const taxed = payouts.find((p) => Number(p.tds_inr || 0) > 0);
-  const tdsRate = taxed && taxed.tds_rate !== null && taxed.tds_rate !== undefined ? Number(taxed.tds_rate) : null;
-  const tdsSection = taxed ? (taxed.tds_section || null) : null;
+  // QA batch 4, PAR-5: the first rate (and section) recorded among the taxed payouts, as PHP.
+  const taxedRates = payouts.filter((p) => Number(p.tds_inr || 0) > 0).map((p) => p.tds_rate).filter((r) => r !== null && r !== undefined);
+  const tdsRate = taxedRates.length ? Number(taxedRates[0]) : null;
+  const taxedSections = payouts.filter((p) => Number(p.tds_inr || 0) > 0).map((p) => p.tds_section).filter((v) => v);
+  const tdsSection = taxed ? (taxedSections[0] || null) : null;
   // Owner decision D-245 P3: the level fixed at PI, on the invoiced FOB of the goods.
   const associateCommission = require('./associateCommission');
   const orderRow = await require('../repositories/orderRepository').find(Number(cost.order_id));
@@ -1701,7 +1775,7 @@ async function orderDivisionId(orderId) {
   const ds = require('./divisionService');
   if (orderId === null || orderId === undefined) return ds.EXPORT_ID;
   const row = await db.queryOne('SELECT division_id FROM orders WHERE id = :id', { id: orderId });
-  return row ? Number(row.division_id) : ds.EXPORT_ID;
+  return row && row.division_id ? Number(row.division_id) : ds.EXPORT_ID; // QA batch 4, PAR-3: no division = Export, as PHP
 }
 
 /**
@@ -1788,6 +1862,10 @@ async function pushDomesticInvoice(orderId, userId = null) {
   const contactId = await domesticContact(config, accessToken, order, dom);
   const payload = await domesticInvoicePayload(orderId, contactId, (name) => taxId(config, accessToken, name));
   const existing = await findInvoiceByNumber(config, accessToken, String(dom.tax_invoice_no));
+  // QA batch 4, ZOH-24: never adopt another customer's invoice that happens to carry the same number.
+  if (existing && existing.customer_id !== undefined && String(existing.customer_id) !== String(contactId)) {
+    throw new Error(`Invoice number ${dom.tax_invoice_no} is already used in Zoho Books for ${existing.customer_name || 'another customer'}. Nothing was changed.`);
+  }
   let invoiceId;
   if (existing) {
     invoiceId = String(existing.invoice_id);
@@ -2034,6 +2112,10 @@ async function pushMerchantDeal(dealId, userId = null) {
   const customerId = await contact(String(d.buyer_name), 'customer', String(d.sale_currency));
   let invoiceId;
   const existing = d.zoho_invoice_id ? { invoice_id: d.zoho_invoice_id } : await findInvoiceByNumber(config, accessToken, String(d.sale_invoice_no));
+  // QA batch 4, ZOH-24: never adopt another customer's invoice that happens to carry the same number.
+  if (existing && existing.customer_id !== undefined && String(existing.customer_id) !== String(customerId)) {
+    throw new Error(`Invoice number ${d.sale_invoice_no} is already used in Zoho Books for ${existing.customer_name || 'another customer'}. Nothing was changed.`);
+  }
   if (existing) {
     invoiceId = String(existing.invoice_id);
     if (String(existing.status || '') === 'draft') await markInvoiceSent(config, accessToken, invoiceId);

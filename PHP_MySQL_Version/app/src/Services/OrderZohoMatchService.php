@@ -86,9 +86,28 @@ final class OrderZohoMatchService
             if (($payment["{$leg}_inr_actual"] ?? null) === null) {
                 continue;
             }
-            $amount = $currency === 'INR' ? (float) $payment["{$leg}_inr_actual"] : (float) $payment["{$leg}_amount"];
+            // QA batch 4, ZOH-5: an INR leg went to Books with the bank charges deducted on the way (amount + charges).
+            $amount = $currency === 'INR' ? round((float) $payment["{$leg}_inr_actual"] + RemittanceDifference::chargesInr($orderId, $leg), 2) : (float) $payment["{$leg}_amount"];
             $zohoId = $payment["{$leg}_zoho_reference"] ?? null;
             self::payment($add, $compare, "{$label} payment", $amount, $zohoId, $paymentsById, $seenPayments, $currency, $notSent((string) $payment["{$leg}_cleared_at"]), $errorFor('revenue_payment', $leg));
+        }
+        // QA batch 4, ZOH-5: the middle payment milestones (D-215), sent as their own customer payments.
+        foreach (\App\Repositories\PaymentMilestoneRepository::forOrder($orderId) as $m) {
+            if ($m['received_amount'] === null) {
+                continue;
+            }
+            $msAmount = $currency === 'INR' ? round((float) $m['received_amount'], 2) : (float) $m['received_amount'];
+            $msId = null;
+            if (!empty($m['zoho_reference'])) {
+                foreach ($books['customerpayments'] as $row) {
+                    if ((string) ($row['reference_number'] ?? '') === (string) $m['zoho_reference'] || (string) ($row['payment_id'] ?? '') === (string) $m['zoho_reference']) {
+                        $msId = (string) $row['payment_id'];
+                        break;
+                    }
+                }
+                $msId ??= (string) $m['zoho_reference'];
+            }
+            self::payment($add, $compare, 'Payment milestone ' . (int) $m['seq'] . ' payment', $msAmount, $msId, $paymentsById, $seenPayments, $currency, $notSent((string) ($m['cleared_on'] ?? $m['received_on'])), $errorFor('revenue_payment', 'milestone'));
         }
         $lc = OrderLcDetailRepository::find($orderId);
         if ($lc !== null && $lc['lc_received_at'] !== null) {

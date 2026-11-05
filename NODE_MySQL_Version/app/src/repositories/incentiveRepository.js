@@ -282,6 +282,11 @@ async function setPayoutTds(id, rate, section, reason, overrideReason) {
   });
 }
 
+/** QA batch 4, MON-1: TDS still owed after this payout (capped at the payout), carried to the next one. */
+async function setPayoutTdsShortfall(id, shortfall) {
+  await db.execute('UPDATE incentive_payouts SET tds_shortfall_inr = :s WHERE id = :id', { s: Number(shortfall) > 0 ? Math.round(Number(shortfall) * 100) / 100 : null, id });
+}
+
 /** Owner decision 2 Nov 2026 (D-235): the challan Accounts deposited the TDS with. */
 async function setPayoutChallan(id, challanNo, challanDate) {
   await db.execute("UPDATE incentive_payouts SET tds_challan_no = :n, tds_challan_date = :d WHERE id = :id AND payee_kind = 'associate' AND status = 'paid' AND tds_inr > 0",
@@ -395,6 +400,7 @@ async function unlockedOrderIdsWithPayments() {
 
 module.exports = {
   setPayoutTds,
+  setPayoutTdsShortfall,
   setPayoutChallan,
   addClawbackWithinPaid,
   allRoles,

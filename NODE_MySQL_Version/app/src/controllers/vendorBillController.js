@@ -279,8 +279,10 @@ async function payBill(req, res) {
     return;
   }
   const reference = str(req.body.payment_ref);
-  if (reference === '') {
-    back(req, res, orderId, anchor, 'error', 'Enter the UTR / payment reference.');
+  // QA batch 4, MON-7: the same bank-reference rule as every other money form (rule D-212).
+  const refError = require('../helpers/fieldValidator').bankReference(reference, 'The UTR / payment reference');
+  if (refError !== null) {
+    back(req, res, orderId, anchor, 'error', refError);
     return;
   }
   if (!(await caFyLockGuard.allow(req, paidAt, 'order_vendor_bills', bill.id, 'mark_paid'))) {

@@ -34,9 +34,8 @@ const orderShippingRepository = require('../repositories/orderShippingRepository
 
 const KIND_LABELS = { ci: 'Commercial Invoice', dn: 'Debit Note' };
 
-function round2(value) {
-  return Math.round(value * 100) / 100;
-}
+// QA batch 4, MON-3: PHP round($x, 2) (half away from zero, blind to binary noise), so the CI total sent to Zoho matches PHP's.
+const { round2 } = require('../helpers/money');
 
 async function build(orderId, kind, documentId) {
   const order = await orderRepository.find(orderId);

@@ -533,3 +533,11 @@ estimated". GST on commission and TDS are not costs and are not shown there. Onc
 the MD locks the order the amounts move into C3 and the totals and the box
 disappears (owner decision 4 Nov 2026, CAFIN change confirmed twice). The CAFIN
 CSV export adds the new columns. See SOP 20 for the incentive reports.
+
+**QA batch 4 (5 Nov 2026, owner double-confirmed):** money received on a
+**payment milestone** (SOP 03 / D-215) now counts in the order's revenue and
+profit, the team-incentive basis, CAFIN "A. Money received from the buyer",
+the ledger and the cash position, and an order is "fully paid" only once every
+milestone is cleared too (MON-2). Bank charges the banks deducted in foreign
+currency appear in the CA register as bank charges, not as a forex loss
+(MON-4). Export benefits are always recorded in rupees (MON-5).

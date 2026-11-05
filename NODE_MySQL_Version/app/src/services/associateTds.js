@@ -88,7 +88,7 @@ async function compute(payout, paidOn) {
   const s = await settings();
   const gross = round2(payout.amount_inr);
   const associate = (await associateRepository.find(Number(payout.associate_id))) || { id: Number(payout.associate_id), based_in: 'india' };
-  const result = { gross, rate: 0, tds: 0, net: gross, section: null, reason: '', catch_up: 0, abroad: isAbroad(associate), missing_foreign: [], missing_payout: [], fy_total: 0 };
+  const result = { gross, rate: 0, tds: 0, net: gross, section: null, reason: '', catch_up: 0, carried_in: 0, shortfall: 0, abroad: isAbroad(associate), missing_foreign: [], missing_payout: [], fy_total: 0 };
   if (result.abroad) {
     result.missing_foreign = await missingForeignDocs(Number(associate.id));
     result.missing_payout = payout.id ? await missingPayoutDocs(Number(payout.id)) : [];
@@ -117,15 +117,38 @@ async function compute(payout, paidOn) {
   }
   // Catch-up only on the payment that takes the year past the threshold; once past it, each payment carries TDS on itself.
   const catchUp = priorGross <= s.threshold + 0.005 ? round2(prior.untaxed) : 0;
-  const tds = Math.min(gross, Math.round((gross + catchUp) * rate / 100));
+  // QA batch 4, MON-1: TDS is never more than the payout. Whatever the cap cuts off is carried to the
+  // associate's next payout in the same financial year (the latest paid payout records what is still owed).
+  const carryIn = await shortfallCarried(associate.id, from, to, Number(payout.id || 0));
+  const due = Math.round((gross + catchUp) * rate / 100) + carryIn;
+  const tds = Math.min(gross, due);
   result.rate = rate;
   result.tds = tds;
   result.net = round2(gross - tds);
   result.section = panOk ? s.section : '206AA';
   result.catch_up = catchUp;
+  result.carried_in = carryIn;
+  result.shortfall = round2(due - tds);
   result.reason = (panOk ? `${s.section} ${pct(rate)}` : `no PAN ${pct(rate)} (206AA)`)
-    + (catchUp > 0 ? ` — includes catch-up on ₹${money(catchUp)} paid earlier this ${fyLabel(paidOn)} without TDS` : '');
+    + (catchUp > 0 ? ` — includes catch-up on ₹${money(catchUp)} paid earlier this ${fyLabel(paidOn)} without TDS` : '')
+    + (carryIn > 0 ? ` — includes ₹${money(carryIn)} TDS carried from an earlier payout` : '')
+    + (result.shortfall > 0 ? ` — capped at the payout; ₹${money(result.shortfall)} TDS carried to the next payout` : '');
   return result;
+}
+
+/**
+ * QA batch 4, MON-1: the TDS still owed from the associate's latest paid payout in the year
+ * (a payout whose TDS was capped at the payout itself), carried into the next one.
+ */
+async function shortfallCarried(associateId, from, to, exceptPayoutId = 0) {
+  const row = await db.queryOne(
+    `SELECT COALESCE(tds_shortfall_inr, 0) AS s FROM incentive_payouts
+      WHERE associate_id = :a AND payee_kind = 'associate' AND status = 'paid' AND clawback_of_payout_id IS NULL
+        AND paid_on BETWEEN :f AND :t AND id <> :id
+      ORDER BY paid_on DESC, id DESC LIMIT 1`,
+    { a: associateId, f: from, t: to, id: Number(exceptPayoutId || 0) }
+  );
+  return round2(row ? row.s : 0);
 }
 
 /** Owner rule D-212: the description of an associate commission payment, from the facts; fresh-eyes review M5: the GST paid on top is named too (the Zoho payment amount includes it). */
@@ -201,5 +224,6 @@ async function reminders(today) {
 }
 
 module.exports = {
+  shortfallCarried,
   FOREIGN_DOCS, settings, fyBounds, fyLabel, quarter, isAbroad, pct, panVerified, missingForeignDocs, missingPayoutDocs, compute, paymentDescription, register, reminders,
 };

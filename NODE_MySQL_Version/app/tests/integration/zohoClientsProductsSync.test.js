@@ -87,6 +87,11 @@ describe('Zoho Books: clients and products (D-238)', () => {
     // The test database is shared by the whole run: earlier tests' TEST- records must not reach this fake Zoho.
     await db.execute("UPDATE clients SET company_legal_name = CONCAT('OLD-', company_legal_name) WHERE company_legal_name LIKE 'TEST-%'");
     await db.execute("UPDATE catalog_products SET name = CONCAT('OLD-', name) WHERE name LIKE 'TEST-%'");
+    // QA batch 4: the full sync now also sends Import & Distribution and Merchant Trade records (D-257 Zoho);
+    // other tests' TEST- imports and deals must not reach this fake Zoho either.
+    await db.execute("UPDATE import_shipments SET supplier_name = CONCAT('OLD-', supplier_name) WHERE supplier_name LIKE 'TEST-%'");
+    await db.execute("UPDATE merchant_deals SET supplier_name = CONCAT('OLD-', supplier_name) WHERE supplier_name LIKE 'TEST-%'");
+    await db.execute("UPDATE merchant_deals SET buyer_name = CONCAT('OLD-', buyer_name) WHERE buyer_name LIKE 'TEST-%'");
     await db.execute('DELETE FROM zoho_pending_inactivations');
   });
 

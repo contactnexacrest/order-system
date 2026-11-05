@@ -86,6 +86,44 @@ final class ZohoBooksService
      * @throws \RuntimeException on any missing config, HTTP failure, or unexpected response
      * @return array{payment_id: string, applied: float} the Zoho-side customerpayment_id and the amount applied to the invoice
      */
+    /**
+     * QA batch 4, ZOH-2: find-before-create for money records. When an earlier
+     * run's POST reached Books but the app never recorded it (an unreadable
+     * answer, a timeout, the app's own write failing, the process stopped),
+     * the next run finds the record by its unique reference and adopts it
+     * instead of posting a second copy. Null when Books has none (or the list
+     * cannot be read — the POST then goes ahead as before).
+     *
+     * @param array<string,string> $filters
+     * @param callable(array<string,mixed>):bool $matches
+     */
+    private static function findExistingByReference(array $config, string $accessToken, string $endpoint, string $listKey, string $idKey, string $reference, array $filters, callable $matches): ?string
+    {
+        $reference = trim($reference);
+        if ($reference === '') {
+            return null;
+        }
+        $query = http_build_query(['organization_id' => $config['organizationId'], 'reference_number' => $reference] + $filters);
+        $response = self::request('GET', "https://{$config['apiDomain']}/books/v3/{$endpoint}?{$query}", [], self::authHeaders($accessToken));
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            return null;
+        }
+        $decoded = json_decode($response['body'], true);
+        foreach (is_array($decoded[$listKey] ?? null) ? $decoded[$listKey] : [] as $row) {
+            if (is_array($row) && trim((string) ($row['reference_number'] ?? '')) === $reference && !empty($row[$idKey]) && $matches($row)) {
+                return (string) $row[$idKey];
+            }
+        }
+        return null;
+    }
+
+    /** ZOH-2: a Books list row is the same money record — same amount (and same date when Books gives one). */
+    private static function sameMoney(array $row, float $amount, ?string $date): bool
+    {
+        return abs((float) ($row['amount'] ?? $row['total'] ?? -1) - $amount) < 0.01
+            && ($date === null || !isset($row['date']) || substr((string) $row['date'], 0, 10) === substr($date, 0, 10));
+    }
+
     public static function pushRevenuePayment(
         int $clientId,
         string $companyLegalName,
@@ -109,6 +147,12 @@ final class ZohoBooksService
             [$payload['invoices'], $applied] = self::invoiceApplication($config, $accessToken, $invoiceNumber, $contactId, (float) $payload['amount']);
         }
 
+        // QA batch 4, ZOH-2: a payment an earlier run already put in Books is adopted, never posted twice.
+        $existing = self::findExistingByReference($config, $accessToken, 'customerpayments', 'customerpayments', 'payment_id', $referenceNumber, ['customer_id' => $contactId],
+            static fn (array $row): bool => self::sameMoney($row, (float) $payload['amount'], $date) && (!isset($row['customer_id']) || (string) $row['customer_id'] === (string) $contactId));
+        if ($existing !== null) {
+            return ['payment_id' => $existing, 'applied' => 0.0];
+        }
         $response = self::request(
             'POST',
             "https://{$config['apiDomain']}/books/v3/customerpayments?organization_id=" . rawurlencode($config['organizationId']),
@@ -367,6 +411,10 @@ final class ZohoBooksService
         $vendorId = self::findOrCreateVendor($config, $accessToken, $bill);
         $existing = $zohoBillId === null ? self::findBill($config, $accessToken, (string) $bill['bill_no'], $vendorId) : null;
         if ($existing !== null) {
+            // QA batch 4, ZOH-14: a bill found by number is only adopted when its total agrees, as a new bill is checked below.
+            if (abs((float) ($existing['total'] ?? $bill['total_inr']) - (float) $bill['total_inr']) > 1.0) {
+                throw new \RuntimeException("Bill {$bill['bill_no']} is in Zoho Books with total " . $existing['total'] . ', but the app has ' . $bill['total_inr'] . ' — check it in Books with the CA.');
+            }
             return (string) $existing['bill_id'];
         }
 
@@ -428,6 +476,12 @@ final class ZohoBooksService
         $applied = 0.0;
         if ($targetBill !== null) {
             [$payload['bills'], $applied] = self::billApplication($config, $accessToken, $targetBill, $vendorId, (float) $payload['amount']);
+        }
+        // QA batch 4, ZOH-2: a payment an earlier run already put in Books is adopted, never posted twice.
+        $existing = self::findExistingByReference($config, $accessToken, 'vendorpayments', 'vendorpayments', 'payment_id', (string) ($payload['reference_number'] ?? ''), ['vendor_id' => $vendorId],
+            static fn (array $row): bool => self::sameMoney($row, (float) $payload['amount'], (string) ($payload['date'] ?? '')) && (!isset($row['vendor_id']) || (string) $row['vendor_id'] === (string) $vendorId));
+        if ($existing !== null) {
+            return ['payment_id' => $existing, 'applied' => 0.0];
         }
         $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/vendorpayments?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
         $decoded = json_decode($response['body'], true);
@@ -541,6 +595,9 @@ final class ZohoBooksService
             'reference_number' => "{$expense['buyer_inquiry_ref']}-EXP-{$expense['id']}",
             'description' => "{$expense['buyer_name']} / {$expense['buyer_inquiry_ref']}: {$label} — {$expense['details']}" . ($expense['paid_by'] === 'staff' && !empty($expense['staff_name']) ? " (paid by {$expense['staff_name']})" : ''),
         ];
+        // QA batch 4, ZOH-2: an expense an earlier run already put in Books is adopted (then updated), never posted twice.
+        $zohoExpenseId ??= self::findExistingByReference($config, $accessToken, 'expenses', 'expenses', 'expense_id', $payload['reference_number'], [],
+            static fn (array $row): bool => true);
         $url = "https://{$config['apiDomain']}/books/v3/expenses" . ($zohoExpenseId !== null ? '/' . rawurlencode($zohoExpenseId) : '') . '?organization_id=' . rawurlencode($config['organizationId']);
         $response = self::request($zohoExpenseId !== null ? 'PUT' : 'POST', $url, $payload, self::authHeaders($accessToken));
         $decoded = json_decode($response['body'], true);
@@ -578,6 +635,9 @@ final class ZohoBooksService
             'reference_number' => "{$cost['buyer_inquiry_ref']}-COST-{$cost['id']}",
             'description' => "{$cost['buyer_name']} / {$cost['buyer_inquiry_ref']}: {$label}" . (!empty($cost['description']) ? " — {$cost['description']}" : ''),
         ];
+        // QA batch 4, ZOH-2: an expense an earlier run already put in Books is adopted (then updated), never posted twice.
+        $zohoExpenseId ??= self::findExistingByReference($config, $accessToken, 'expenses', 'expenses', 'expense_id', $payload['reference_number'], [],
+            static fn (array $row): bool => true);
         $url = "https://{$config['apiDomain']}/books/v3/expenses" . ($zohoExpenseId !== null ? '/' . rawurlencode($zohoExpenseId) : '') . '?organization_id=' . rawurlencode($config['organizationId']);
         $response = self::request($zohoExpenseId !== null ? 'PUT' : 'POST', $url, $payload, self::authHeaders($accessToken));
         $decoded = json_decode($response['body'], true);
@@ -814,6 +874,8 @@ final class ZohoBooksService
                 ['account_id' => self::accountId($config, $accessToken, self::BENEFIT_INCOME_ACCOUNT), 'debit_or_credit' => 'credit', 'amount' => $amount, 'description' => "{$scheme} received"],
             ],
         ];
+        // QA batch 4, ZOH-2: a journal an earlier run already put in Books is adopted (then updated), never posted twice.
+        $journalId ??= self::findExistingByReference($config, $accessToken, 'journals', 'journals', 'journal_id', $payload['reference_number'], [], static fn (array $row): bool => true);
         $url = "https://{$config['apiDomain']}/books/v3/journals" . ($journalId !== null ? '/' . rawurlencode($journalId) : '') . '?organization_id=' . rawurlencode($config['organizationId']);
         $response = self::request($journalId !== null ? 'PUT' : 'POST', $url, $payload, self::authHeaders($accessToken));
         $decoded = json_decode($response['body'], true);
@@ -858,6 +920,10 @@ final class ZohoBooksService
                 ['account_id' => self::accountId($config, $accessToken, self::GST_REFUND_ACCOUNT), 'debit_or_credit' => 'credit', 'amount' => $amount, 'description' => 'GST refund under LUT, claim ' . $credit['claim_arn']],
             ],
         ];
+        // QA batch 4, ZOH-2: a journal an earlier run already put in Books is adopted, never posted twice.
+        if (($existing = self::findExistingByReference($config, $accessToken, 'journals', 'journals', 'journal_id', $payload['reference_number'], [], static fn (array $row): bool => true)) !== null) {
+            return $existing;
+        }
         $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/journals?organization_id=" . rawurlencode($config['organizationId']), $payload, self::authHeaders($accessToken));
         $decoded = json_decode($response['body'], true);
         $id = $decoded['journal']['journal_id'] ?? null;
@@ -1447,6 +1513,10 @@ final class ZohoBooksService
         $contactId = self::domesticContact($config, $accessToken, $order, $dom);
         $payload = self::domesticInvoicePayload($orderId, $contactId, static fn (string $name): string => self::taxId($config, $accessToken, $name));
         $existing = self::findInvoiceByNumber($config, $accessToken, (string) $dom['tax_invoice_no']);
+        // QA batch 4, ZOH-24: never adopt another customer's invoice that happens to carry the same number.
+        if ($existing !== null && isset($existing['customer_id']) && (string) $existing['customer_id'] !== (string) $contactId) {
+            throw new \RuntimeException("Invoice number {$dom['tax_invoice_no']} is already used in Zoho Books for " . ($existing['customer_name'] ?? 'another customer') . '. Nothing was changed.');
+        }
         if ($existing !== null) {
             $invoiceId = (string) $existing['invoice_id'];
             if ((string) ($existing['status'] ?? '') === 'draft') {
@@ -1810,6 +1880,10 @@ final class ZohoBooksService
         $userId = $__user !== null ? (int) $__user['id'] : null;
         $customerId = $contact((string) $d['buyer_name'], 'customer', (string) $d['sale_currency']);
         $existing = !empty($d['zoho_invoice_id']) ? ['invoice_id' => $d['zoho_invoice_id']] : self::findInvoiceByNumber($config, $accessToken, (string) $d['sale_invoice_no']);
+        // QA batch 4, ZOH-24: never adopt another customer's invoice that happens to carry the same number.
+        if ($existing !== null && isset($existing['customer_id']) && (string) $existing['customer_id'] !== (string) $customerId) {
+            throw new \RuntimeException("Invoice number {$d['sale_invoice_no']} is already used in Zoho Books for " . ($existing['customer_name'] ?? 'another customer') . '. Nothing was changed.');
+        }
         if ($existing === null) {
             $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/invoices{$query}&ignore_auto_number_generation=true", self::merchantInvoicePayload($d, $lines, $customerId, $account), self::authHeaders($accessToken));
             $invoiceId = (string) (json_decode($response['body'], true)['invoice']['invoice_id'] ?? '');
@@ -2584,15 +2658,17 @@ final class ZohoBooksService
     {
         $order = (string) ($bill['buyer_inquiry_ref'] ?? '');
         $billLabel = (\App\Repositories\OrderVendorBillRepository::DOC_KINDS[$bill['doc_kind'] ?? ''] ?? 'Bill') . ' ' . $bill['bill_no'];
+        // QA batch 4, ZOH-18 (rule D-212): the bank reference is named in the description too, as on the buyer's payments.
+        $bankRef = trim((string) ($payment['payment_ref'] ?? '')) !== '' ? ' · bank ref ' . trim((string) $payment['payment_ref']) : '';
         if (($bill['vendor_kind'] ?? '') === 'supplier') {
             $leg = ($payment['leg'] ?? '') === 'balance' ? 'balance' : 'advance';
             return "Supplier {$leg} payment for order {$order}"
                 . (!empty($bill['supplier_po_reference']) ? " · Supplier PO {$bill['supplier_po_reference']}" : '')
-                . " · against {$billLabel}";
+                . " · against {$billLabel}{$bankRef}";
         }
         $service = \App\Repositories\OrderVendorBillRepository::LOGISTICS_SERVICES[$bill['bill_for'] ?? ''] ?? 'Logistics';
         $kind = ($bill['payment_kind'] ?? '') === 'advance' ? 'advance' : 'final';
-        return "{$service} — {$kind} payment for order {$order} · against {$billLabel}";
+        return "{$service} — {$kind} payment for order {$order} · against {$billLabel}{$bankRef}";
     }
 
     /** @return array{0: list<array{bill_id: string, amount_applied: float}>, 1: float} as much of $amount as the bill still owes */
@@ -2683,10 +2759,15 @@ final class ZohoBooksService
         $lockName = 'nx_zoho_token_' . substr($key, 0, 40);
         $lock = $pdo->prepare('SELECT GET_LOCK(:n, 15)');
         $lock->execute(['n' => $lockName]);
+        $locked = (int) $lock->fetchColumn() === 1;
         try {
             $fromDb = self::cachedToken($key); // another request may have refreshed it while we waited
             if ($fromDb !== null) {
                 return self::rememberToken($refreshToken, $fromDb['token'], $fromDb['expires'], [$accountsDomain, $clientId, $clientSecret, $refreshToken]);
+            }
+            // QA batch 4, ZOH-16: another request is still fetching the token — never ask Zoho for a second one at the same time.
+            if (!$locked) {
+                throw new \RuntimeException('Zoho Books sign-in is being renewed by another request — try again in a minute.');
             }
             $response = self::request(
                 'POST',

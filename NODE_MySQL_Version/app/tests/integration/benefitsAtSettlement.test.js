@@ -53,6 +53,8 @@ describe('Benefits at settlement — Step 13g (owner decision 2026-10-27)', () =
     }
     await orderShippingRepository.upsert(orderId, { shipping_line: 'Maersk', vessel_name: 'MSC MAYA', etd: '2026-06-01', eta: '2026-06-20' });
     await orderShippingRepository.recordBl(orderId, 'MSCU1234567', '2026-06-15');
+    // QA batch 4, ORD-14 (owner decision 5 Nov 2026): closing needs the original BLs received from the CHA and endorsed.
+    await db.execute('UPDATE order_shipping SET bl_originals_received_at = NOW(), bl_originals_received_count = 3, bl_endorsed_at = NOW() WHERE order_id = :o', { o: orderId });
     for (let stage = 1; stage <= 8; stage++) await stageGateService.passAndUnlockNext(orderId, stage, null);
     await createTestDocument(orderId, 'BLI', 'approved');
     await createTestDocument(orderId, 'COOPREP', 'sent');
