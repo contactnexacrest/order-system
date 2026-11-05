@@ -105,6 +105,8 @@ correctly once the password is changed.
 
 ## First-time setup (local machine or Bluehost)
 
+> **Go-live day:** work through `docs/guides/GO_LIVE_CHECKLIST.md`. It is the business view of these steps, with the settings, people, prices and dry run, in order.
+
 1. **Database.** Create a MySQL/MariaDB database (utf8mb4) and import these two files in order —
    that is the whole database; a new installation runs **no** migration (D-241):
    ```

@@ -93,6 +93,8 @@ storage/
 
 ## First-time setup (a fresh Linux VPS)
 
+> **Go-live day:** work through `docs/guides/GO_LIVE_CHECKLIST.md`. It is the business view of these steps, with the settings, people, prices and dry run, in order.
+
 1. **Install Node.js 22 LTS.** On Ubuntu/Debian:
    ```bash
    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
