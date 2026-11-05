@@ -119,6 +119,14 @@ final class DivisionRepository
             $items[] = ['label' => 'Import duty rates set (confirm them with the CA and the customs agent)', 'ok' => \App\Repositories\ImportRepository::dutyRates(true) !== [], 'help' => 'Admin › Import duty rates.'];
             $items[] = ['label' => 'Import, stock and landed cost module on; export-only modules off', 'ok' => DivisionService::moduleEnabledFor($divisionId, 'import_stock') && !DivisionService::moduleEnabledFor($divisionId, 'export_shipping') && !DivisionService::moduleEnabledFor($divisionId, 'lut_igst') && !DivisionService::moduleEnabledFor($divisionId, 'export_benefits'), 'help' => 'Tick and untick them under Modules.'];
         }
+        // D-257 Phase 4: what Merchant Trade needs before its first deal (RBI merchanting, through the AD bank).
+        if (($division['code'] ?? '') === \App\Services\MerchantTradeService::CODE) {
+            $iec = trim((string) (CompanySettingsRepository::companyValue('iec_pan') ?? ''));
+            $items[] = ['label' => 'NexaCrest\'s IEC is set', 'ok' => $iec !== '' && stripos($iec, 'PLACEHOLDER') === false, 'help' => 'Settings: enter the Import Export Code.'];
+            $items[] = ['label' => 'AD bank\'s merchanting approval recorded', 'ok' => \App\Services\MerchantTradeService::setting('mtt_ad_bank_approval') !== '', 'help' => 'Division setting mtt_ad_bank_approval: the AD bank and its approval or letter reference for merchanting trade.'];
+            $items[] = ['label' => 'RBI limits and the bank\'s document list set (confirm them with the AD bank and the CA)', 'ok' => isset($own['company:mtt_max_months_total'], $own['company:mtt_max_outlay_months'], $own['company:mtt_advance_limit_usd'], $own['company:mtt_bank_documents']), 'help' => 'Division settings mtt_max_months_total (9), mtt_max_outlay_months (4), mtt_advance_limit_usd (500000), mtt_bank_documents (a list separated by |).'];
+            $items[] = ['label' => 'Merchant trade module on; export-only modules off', 'ok' => DivisionService::moduleEnabledFor($divisionId, 'merchant_trade') && !DivisionService::moduleEnabledFor($divisionId, 'export_shipping') && !DivisionService::moduleEnabledFor($divisionId, 'lut_igst') && !DivisionService::moduleEnabledFor($divisionId, 'export_benefits'), 'help' => 'Tick and untick them under Modules.'];
+        }
         return $items;
     }
 
@@ -126,6 +134,7 @@ final class DivisionRepository
     public const STARTER_DEPARTMENTS = [
         'DOM' => [['DOM_SALES', 'Domestic Sales', '#2D7D56'], ['DOM_PURCHASE', 'Domestic Purchase', '#1D6FA8'], ['DOM_DISPATCH', 'Domestic Dispatch', '#8A5A00']],
         'IMP' => [['IMP_PURCHASE', 'Import Purchase', '#1D6FA8'], ['IMP_WAREHOUSE', 'Warehouse', '#8A5A00'], ['IMP_SALES', 'Distribution Sales', '#2D7D56']],
+        'MTT' => [['MTT_TRADE', 'Merchant Trade Desk', '#1D6FA8'], ['MTT_DOCS', 'Merchant Trade Documents', '#8A5A00']],
     ];
 
     /** Creates the division's starting departments that do not exist yet; returns how many were made. */

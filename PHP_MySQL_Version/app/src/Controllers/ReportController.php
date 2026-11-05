@@ -769,6 +769,8 @@ final class ReportController
             'rows' => $data['rows'],
             'totals' => $data['totals'],
             'filters' => ['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'scope' => $scope],
+            // D-257 Phase 5: profit by division with overhead shared by revenue — null (nothing shown) with one division.
+            'divisionProfit' => \App\Services\DivisionProfitService::summary($data['rows'], $dateFrom, $dateTo, $seeIncentives),
         ], 'layout/base');
     }
 

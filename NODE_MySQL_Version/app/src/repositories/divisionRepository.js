@@ -91,6 +91,16 @@ async function preflight(divisionId) {
     items.push({ label: 'Import duty rates set (confirm them with the CA and the customs agent)', ok: (await require('./importRepository').dutyRates(true)).length > 0, help: 'Admin › Import duty rates.' });
     items.push({ label: 'Import, stock and landed cost module on; export-only modules off', ok: (await ds.moduleEnabledFor(divisionId, 'import_stock')) && !(await ds.moduleEnabledFor(divisionId, 'export_shipping')) && !(await ds.moduleEnabledFor(divisionId, 'lut_igst')) && !(await ds.moduleEnabledFor(divisionId, 'export_benefits')), help: 'Tick and untick them under Modules.' });
   }
+  // D-257 Phase 4: what Merchant Trade needs before its first deal (RBI merchanting, through the AD bank).
+  if (division && division.code === 'MTT') {
+    const M = require('../services/merchantTradeService');
+    const iec = String((await require('./companySettingsRepository').companyValue('iec_pan')) || '').trim();
+    const ds = divisionService;
+    items.push({ label: "NexaCrest's IEC is set", ok: iec !== '' && !iec.toUpperCase().includes('PLACEHOLDER'), help: 'Settings: enter the Import Export Code.' });
+    items.push({ label: "AD bank's merchanting approval recorded", ok: (await M.setting('mtt_ad_bank_approval')) !== '', help: 'Division setting mtt_ad_bank_approval: the AD bank and its approval or letter reference for merchanting trade.' });
+    items.push({ label: "RBI limits and the bank's document list set (confirm them with the AD bank and the CA)", ok: own.has('company:mtt_max_months_total') && own.has('company:mtt_max_outlay_months') && own.has('company:mtt_advance_limit_usd') && own.has('company:mtt_bank_documents'), help: 'Division settings mtt_max_months_total (9), mtt_max_outlay_months (4), mtt_advance_limit_usd (500000), mtt_bank_documents (a list separated by |).' });
+    items.push({ label: 'Merchant trade module on; export-only modules off', ok: (await ds.moduleEnabledFor(divisionId, 'merchant_trade')) && !(await ds.moduleEnabledFor(divisionId, 'export_shipping')) && !(await ds.moduleEnabledFor(divisionId, 'lut_igst')) && !(await ds.moduleEnabledFor(divisionId, 'export_benefits')), help: 'Tick and untick them under Modules.' });
+  }
   return items;
 }
 
@@ -98,6 +108,7 @@ async function preflight(divisionId) {
 const STARTER_DEPARTMENTS = {
   DOM: [['DOM_SALES', 'Domestic Sales', '#2D7D56'], ['DOM_PURCHASE', 'Domestic Purchase', '#1D6FA8'], ['DOM_DISPATCH', 'Domestic Dispatch', '#8A5A00']],
   IMP: [['IMP_PURCHASE', 'Import Purchase', '#1D6FA8'], ['IMP_WAREHOUSE', 'Warehouse', '#8A5A00'], ['IMP_SALES', 'Distribution Sales', '#2D7D56']],
+  MTT: [['MTT_TRADE', 'Merchant Trade Desk', '#1D6FA8'], ['MTT_DOCS', 'Merchant Trade Documents', '#8A5A00']],
 };
 
 /** Creates the division's starting departments that do not exist yet; returns how many were made. */

@@ -404,6 +404,8 @@ final class DivisionService
         'team_incentive'    => ['Team incentive and CAFIN', ['#^/incentives(?:/|$)#', '#^/my-incentives(?:/|$)#', '#^/reports/incentives(?:/|$)#']],
         // D-257 Phase 3: imports, landed cost and stock — on for Import & Distribution only.
         'import_stock'      => ['Import, stock and landed cost', ['#^/import(?:/|$)#']],
+        // D-257 Phase 4: merchant trade deals and their RBI checks — on for Merchant Trade only.
+        'merchant_trade'    => ['Merchant trade', ['#^/merchant(?:/|$)#']],
     ];
 
     /** Whether a module is on for the current scope ("All" = on in any active division). */

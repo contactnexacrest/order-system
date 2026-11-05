@@ -1951,6 +1951,126 @@ async function pushImport(shipmentId, userId = null) {
   return ids;
 }
 
+// ---------------------------------------------------------------- D-257 Phase 4: merchant trade
+
+/** Books accounts for a merchant trade deal (names to be confirmed by the CA): no GST, the goods never enter India. */
+const MERCHANT_ACCOUNTS = { sales: 'Merchanting Trade Sales', purchases: 'Merchanting Trade Purchases' };
+
+/**
+ * Our sale invoice to the foreign buyer as a Books invoice (pure: no
+ * network), in the sale currency at the rate realised on the buyer's money
+ * (left to Books until money has come in). gst_treatment overseas, no GST.
+ * Rule D-212: the notes say what the invoice is, for which deal, buyer and route.
+ */
+async function merchantInvoicePayload(d, lines, customerId, accountIdByName) {
+  if (!d.sale_invoice_no) throw new Error('This deal has no sale invoice yet.');
+  const items = [];
+  for (const l of lines) {
+    items.push({
+      account_id: await accountIdByName(MERCHANT_ACCOUNTS.sales),
+      name: [...String(l.description)].slice(0, 100).join(''),
+      description: String(l.description),
+      hsn_or_sac: String(l.hsn_code),
+      quantity: Number(l.quantity),
+      rate: Number(l.sell_price_fc),
+    });
+  }
+  const f = await require('./merchantTradeService').figures(d);
+  const bl = d.bl_no ? `, BL ${Number(d.switch_bl) ? `${d.switch_bl_no} (switch BL)` : d.bl_no}` : '';
+  const payload = {
+    customer_id: customerId,
+    invoice_number: String(d.sale_invoice_no),
+    reference_number: String(d.reference),
+    date: String(d.invoice_date).slice(0, 10),
+    currency_code: String(d.sale_currency),
+    gst_treatment: 'overseas',
+    line_items: items,
+    notes: `Merchant trade sale invoice ${d.sale_invoice_no} for deal ${d.reference} to ${d.buyer_name} (${d.buyer_country}): goods from ${d.origin_country} shipped directly to the buyer${bl}; they do not enter India.`,
+  };
+  if (f.sell_rate !== null) payload.exchange_rate = Number(f.sell_rate);
+  const tags = await divisionTags(Number(d.division_id));
+  if (tags.length > 0) payload.tags = tags;
+  return payload;
+}
+
+/** The foreign supplier's bill for a merchant trade deal (pure: no network), at the rate realised on the payments to the supplier. */
+async function merchantBillPayload(d, lines, vendorId, accountIdByName) {
+  const items = [];
+  for (const l of lines) {
+    items.push({
+      account_id: await accountIdByName(MERCHANT_ACCOUNTS.purchases),
+      name: [...String(l.description)].slice(0, 100).join(''),
+      description: String(l.description),
+      hsn_or_sac: String(l.hsn_code),
+      quantity: Number(l.quantity),
+      rate: Number(l.buy_price_fc),
+    });
+  }
+  const f = await require('./merchantTradeService').figures(d);
+  const payload = {
+    vendor_id: vendorId,
+    bill_number: String(d.po_no),
+    reference_number: String(d.reference),
+    date: String(d.bl_date || d.deal_date).slice(0, 10),
+    currency_code: String(d.purchase_currency),
+    gst_treatment: 'overseas',
+    line_items: items,
+    notes: `Merchant trade purchase from ${d.supplier_name} (${d.supplier_country}) against PO ${d.po_no}, deal ${d.reference}${d.bl_no ? `, BL ${d.bl_no}` : ''}; goods shipped directly to the buyer abroad.`,
+  };
+  if (f.buy_rate !== null) payload.exchange_rate = Number(f.buy_rate);
+  const tags = await divisionTags(Number(d.division_id));
+  if (tags.length > 0) payload.tags = tags;
+  return payload;
+}
+
+/**
+ * Sends a merchant trade deal to Books: the sale invoice (customer = the
+ * foreign buyer) and the supplier's bill, each created once (a retry finds
+ * it by number). Live test in the Zoho TEST organisation still pending.
+ */
+async function pushMerchantDeal(dealId, userId = null) {
+  const merchantRepository = require('../repositories/merchantTradeRepository');
+  const d = await merchantRepository.find(dealId);
+  if (!d || !d.sale_invoice_no) throw new Error('This deal has no sale invoice yet.');
+  zohoGuard.assertCustomerAllowed(String(d.buyer_name));
+  assertVendorAllowed(String(d.supplier_name));
+  const config = await loadConfig();
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  const account = (name) => accountId(config, accessToken, name);
+  const query = `?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const contact = async (name, type, currency) => {
+    const rows = await getList(accessToken, `https://${config.apiDomain}/books/v3/contacts${query}&contact_type=${type}&contact_name=${encodeURIComponent(name)}`, 'contacts');
+    const found = rows.find((row) => String(row.contact_name || '') === name);
+    if (found) return String(found.contact_id);
+    const response = await request('POST', `https://${config.apiDomain}/books/v3/contacts${query}`, { contact_name: name, company_name: name, contact_type: type, currency_code: currency, gst_treatment: 'overseas' }, authHeaders(accessToken));
+    const decoded = safeJson(response.body);
+    const id = decoded && decoded.contact && decoded.contact.contact_id;
+    if (!response.ok || typeof id !== 'string') throw new Error(`Zoho Books ${type} creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+    return id;
+  };
+  const lines = await merchantRepository.lines(dealId);
+  const customerId = await contact(String(d.buyer_name), 'customer', String(d.sale_currency));
+  let invoiceId;
+  const existing = d.zoho_invoice_id ? { invoice_id: d.zoho_invoice_id } : await findInvoiceByNumber(config, accessToken, String(d.sale_invoice_no));
+  if (existing) invoiceId = String(existing.invoice_id);
+  else {
+    const response = await request('POST', `https://${config.apiDomain}/books/v3/invoices${query}&ignore_auto_number_generation=true`, await merchantInvoicePayload(d, lines, customerId, account), authHeaders(accessToken));
+    const decoded = safeJson(response.body);
+    invoiceId = String((decoded && decoded.invoice && decoded.invoice.invoice_id) || '');
+    if (invoiceId === '') throw new Error(`Zoho Books invoice creation failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+  }
+  await merchantRepository.update(dealId, { zoho_invoice_id: invoiceId }, userId);
+  const vendorId = await contact(String(d.supplier_name), 'vendor', String(d.purchase_currency));
+  let bill = d.zoho_bill_id ? { bill_id: d.zoho_bill_id } : await findBill(config, accessToken, String(d.po_no), vendorId);
+  if (!bill) {
+    const response = await request('POST', `https://${config.apiDomain}/books/v3/bills${query}`, await merchantBillPayload(d, lines, vendorId, account), authHeaders(accessToken));
+    bill = await findBill(config, accessToken, String(d.po_no), vendorId);
+    if (!bill) throw new Error(`Zoho Books bill ${d.po_no} failed (HTTP ${response.status}): ${String(response.body).slice(0, 500)}`);
+  }
+  await merchantRepository.update(dealId, { zoho_bill_id: String(bill.bill_id) }, userId);
+  return { invoice_id: invoiceId, bill_id: String(bill.bill_id) };
+}
+
 module.exports = {
   associateBillPayload,
   associatePaymentPayload,
@@ -1967,4 +2087,6 @@ module.exports = {
   divisionTags, domesticInvoicePayload, pushDomesticInvoice,
   // D-257 Phase 3: imports (supplier bill, customs duty bill, IGST credit journal).
   IMPORT_ACCOUNTS, importBillPayload, customsDutyBillPayload, importIgstCreditJournalPayload, pushImport,
+  // D-257 Phase 4: merchant trade (sale invoice to the foreign buyer, the foreign supplier's bill).
+  MERCHANT_ACCOUNTS, merchantInvoicePayload, merchantBillPayload, pushMerchantDeal,
 };

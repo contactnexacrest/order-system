@@ -5911,3 +5911,137 @@ CREATE TABLE stock_movements (
   CONSTRAINT fk_stock_movements_order FOREIGN KEY (order_id) REFERENCES orders(id),
   CONSTRAINT fk_stock_movements_user FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
+
+-- ================================================================
+-- Owner decision D-257 Phase 4 (5 Nov 2026): the Merchant Trade division
+-- (MTT) — RBI "merchanting trade": NexaCrest buys goods from a supplier
+-- abroad and sells them to a buyer abroad; the goods go straight from the
+-- one to the other and never enter India. Built now, used only once the
+-- owner activates MTT in Admin > Divisions; until then no screen changes.
+--
+--   contracted > shipped (BL) > settled (both legs paid) > closed (bank
+--   documents complete)
+--
+-- One deal has two foreign-currency legs: the buy leg (paid to the
+-- supplier) and the sell leg (received from the buyer), each in its own
+-- currency. The margin is tracked in INR and USD at the rates actually
+-- realised. RBI checks (whole deal within 9 months, outlay within 4
+-- months, no advance above the limit unless backed by an LC/BG, the bank's
+-- document checklist) are settings, TO BE CONFIRMED WITH THE AD BANK / CA.
+-- ================================================================
+CREATE TABLE merchant_deals (
+  id                 BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  division_id        BIGINT UNSIGNED NOT NULL,
+  reference          VARCHAR(30) NOT NULL,
+  po_no              VARCHAR(30) NOT NULL,
+  sale_invoice_no    VARCHAR(30) NULL,
+  stage              ENUM('contracted','shipped','settled','closed') NOT NULL DEFAULT 'contracted',
+  deal_date          DATE NOT NULL,
+  supplier_name      VARCHAR(255) NOT NULL,
+  supplier_country   VARCHAR(80) NOT NULL,
+  supplier_address   TEXT NULL,
+  purchase_currency  CHAR(3) NOT NULL,
+  purchase_incoterm  VARCHAR(10) NULL,
+  buyer_name         VARCHAR(255) NOT NULL,
+  buyer_country      VARCHAR(80) NOT NULL,
+  buyer_address      TEXT NULL,
+  sale_currency      CHAR(3) NOT NULL,
+  sale_incoterm      VARCHAR(10) NULL,
+  origin_country     VARCHAR(80) NOT NULL,
+  port_of_loading    VARCHAR(100) NULL,
+  port_of_discharge  VARCHAR(100) NULL,
+  advance_backing    ENUM('none','lc','bg') NOT NULL DEFAULT 'none',
+  backing_ref        VARCHAR(60) NULL,
+  bl_no              VARCHAR(40) NULL,
+  bl_date            DATE NULL,
+  vessel             VARCHAR(100) NULL,
+  switch_bl          TINYINT(1) NOT NULL DEFAULT 0,
+  switch_bl_no       VARCHAR(40) NULL,
+  switch_bl_ref      VARCHAR(255) NULL,
+  po_generated_at    DATETIME NULL,
+  invoice_generated_at DATETIME NULL,
+  invoice_date       DATE NULL,
+  closed_on          DATE NULL,
+  zoho_invoice_id    VARCHAR(50) NULL,
+  zoho_bill_id       VARCHAR(50) NULL,
+  created_by         BIGINT UNSIGNED NULL,
+  updated_by         BIGINT UNSIGNED NULL,
+  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_merchant_deals_ref (reference),
+  KEY idx_merchant_deals_division (division_id, stage),
+  CONSTRAINT fk_merchant_deals_division FOREIGN KEY (division_id) REFERENCES divisions(id),
+  CONSTRAINT fk_merchant_deals_created FOREIGN KEY (created_by) REFERENCES users(id),
+  CONSTRAINT fk_merchant_deals_updated FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- The goods of a deal: what NexaCrest pays the supplier per unit (buy, in
+-- the purchase currency) and charges the buyer per unit (sell, in the sale
+-- currency).
+CREATE TABLE merchant_deal_lines (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  deal_id         BIGINT UNSIGNED NOT NULL,
+  line_no         INT NOT NULL,
+  description     VARCHAR(500) NOT NULL,
+  hsn_code        VARCHAR(10) NOT NULL,
+  quantity        DECIMAL(14,3) NOT NULL,
+  unit            VARCHAR(20) NOT NULL,
+  buy_price_fc    DECIMAL(14,2) NOT NULL,
+  sell_price_fc   DECIMAL(14,2) NOT NULL,
+  is_active       TINYINT(1) NOT NULL DEFAULT 1,
+  created_by      BIGINT UNSIGNED NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_mdl_deal (deal_id, is_active),
+  CONSTRAINT fk_mdl_deal FOREIGN KEY (deal_id) REFERENCES merchant_deals(id),
+  CONSTRAINT fk_mdl_user FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Money on the two legs: 'buy' = paid to the supplier abroad, 'sell' =
+-- received from the buyer abroad. The description is built by the app from
+-- the facts (rule D-212) and the SWIFT / UTR reference is required.
+CREATE TABLE merchant_payments (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  deal_id         BIGINT UNSIGNED NOT NULL,
+  leg             ENUM('buy','sell') NOT NULL,
+  moved_on        DATE NOT NULL,
+  amount_fc       DECIMAL(14,2) NOT NULL,
+  fx_rate         DECIMAL(12,4) NOT NULL,
+  amount_inr      DECIMAL(14,2) NOT NULL,
+  bank_reference  VARCHAR(60) NOT NULL,
+  description     VARCHAR(500) NOT NULL,
+  note            VARCHAR(255) NULL,
+  recorded_by     BIGINT UNSIGNED NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_mp_deal (deal_id, leg, moved_on),
+  KEY idx_mp_bank_ref (bank_reference),
+  CONSTRAINT fk_mp_deal FOREIGN KEY (deal_id) REFERENCES merchant_deals(id),
+  CONSTRAINT fk_mp_user FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- The AD bank's document checklist of a deal: which documents are with the
+-- bank and when (the list itself is the MTT setting mtt_bank_documents).
+CREATE TABLE merchant_deal_documents (
+  deal_id      BIGINT UNSIGNED NOT NULL,
+  doc_key      VARCHAR(80) NOT NULL,
+  received_on  DATE NOT NULL,
+  recorded_by  BIGINT UNSIGNED NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (deal_id, doc_key),
+  CONSTRAINT fk_mdd_deal FOREIGN KEY (deal_id) REFERENCES merchant_deals(id),
+  CONSTRAINT fk_mdd_user FOREIGN KEY (recorded_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- The RBI-check reminders already sent (once per deal, check and level), so
+-- the daily alert job never repeats one.
+CREATE TABLE merchant_alerts_sent (
+  deal_id    BIGINT UNSIGNED NOT NULL,
+  check_key  VARCHAR(20) NOT NULL,
+  level      VARCHAR(20) NOT NULL,
+  sent_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (deal_id, check_key, level),
+  CONSTRAINT fk_mas_deal FOREIGN KEY (deal_id) REFERENCES merchant_deals(id)
+) ENGINE=InnoDB;
+
+-- D-257 Phase 5 (performance): the division profit report reads company and
+-- division costs by division and date; ca_expenses already has its date index.
+CREATE INDEX idx_ca_expenses_division_date ON ca_expenses (division_id, expense_date);

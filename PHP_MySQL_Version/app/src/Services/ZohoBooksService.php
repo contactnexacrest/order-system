@@ -1646,6 +1646,164 @@ final class ZohoBooksService
         return $ids;
     }
 
+    // ---------------------------------------------------------------- D-257 Phase 4: merchant trade
+
+    /** Books accounts for a merchant trade deal (names to be confirmed by the CA): no GST, the goods never enter India. */
+    public const MERCHANT_ACCOUNTS = [
+        'sales' => 'Merchanting Trade Sales',
+        'purchases' => 'Merchanting Trade Purchases',
+    ];
+
+    /**
+     * Our sale invoice to the foreign buyer as a Books invoice (pure: no
+     * network), in the sale currency at the rate realised on the buyer's
+     * money (left to Books until money has come in). gst_treatment overseas,
+     * no GST. Rule D-212: the notes say what the invoice is, for which deal,
+     * buyer and route.
+     *
+     * @param callable(string): string $accountIdByName
+     * @return array<string,mixed>
+     */
+    public static function merchantInvoicePayload(array $d, array $lines, string $customerId, callable $accountIdByName): array
+    {
+        if (empty($d['sale_invoice_no'])) {
+            throw new \RuntimeException('This deal has no sale invoice yet.');
+        }
+        $items = [];
+        foreach ($lines as $l) {
+            $items[] = [
+                'account_id' => $accountIdByName(self::MERCHANT_ACCOUNTS['sales']),
+                'name' => mb_substr((string) $l['description'], 0, 100),
+                'description' => (string) $l['description'],
+                'hsn_or_sac' => (string) $l['hsn_code'],
+                'quantity' => (float) $l['quantity'],
+                'rate' => (float) $l['sell_price_fc'],
+            ];
+        }
+        $f = MerchantTradeService::figures($d);
+        $payload = [
+            'customer_id' => $customerId,
+            'invoice_number' => (string) $d['sale_invoice_no'],
+            'reference_number' => (string) $d['reference'],
+            'date' => (string) $d['invoice_date'],
+            'currency_code' => (string) $d['sale_currency'],
+            'gst_treatment' => 'overseas',
+            'line_items' => $items,
+            'notes' => "Merchant trade sale invoice {$d['sale_invoice_no']} for deal {$d['reference']} to {$d['buyer_name']} ({$d['buyer_country']}): goods from {$d['origin_country']} shipped directly to the buyer"
+                . (!empty($d['bl_no']) ? ', BL ' . ($d['switch_bl'] ? $d['switch_bl_no'] . ' (switch BL)' : $d['bl_no']) : '') . '; they do not enter India.',
+        ];
+        if ($f['sell_rate'] !== null) {
+            $payload['exchange_rate'] = (float) $f['sell_rate'];
+        }
+        if (($tags = self::divisionTags((int) $d['division_id'])) !== []) {
+            $payload['tags'] = $tags;
+        }
+        return $payload;
+    }
+
+    /**
+     * The foreign supplier's bill for a merchant trade deal (pure: no
+     * network), in the purchase currency at the rate realised on the
+     * payments to the supplier. Rule D-212: the notes say what the bill is.
+     *
+     * @param callable(string): string $accountIdByName
+     * @return array<string,mixed>
+     */
+    public static function merchantBillPayload(array $d, array $lines, string $vendorId, callable $accountIdByName): array
+    {
+        $items = [];
+        foreach ($lines as $l) {
+            $items[] = [
+                'account_id' => $accountIdByName(self::MERCHANT_ACCOUNTS['purchases']),
+                'name' => mb_substr((string) $l['description'], 0, 100),
+                'description' => (string) $l['description'],
+                'hsn_or_sac' => (string) $l['hsn_code'],
+                'quantity' => (float) $l['quantity'],
+                'rate' => (float) $l['buy_price_fc'],
+            ];
+        }
+        $f = MerchantTradeService::figures($d);
+        $payload = [
+            'vendor_id' => $vendorId,
+            'bill_number' => (string) $d['po_no'],
+            'reference_number' => (string) $d['reference'],
+            'date' => (string) ($d['bl_date'] ?: $d['deal_date']),
+            'currency_code' => (string) $d['purchase_currency'],
+            'gst_treatment' => 'overseas',
+            'line_items' => $items,
+            'notes' => "Merchant trade purchase from {$d['supplier_name']} ({$d['supplier_country']}) against PO {$d['po_no']}, deal {$d['reference']}"
+                . (!empty($d['bl_no']) ? ", BL {$d['bl_no']}" : '') . '; goods shipped directly to the buyer abroad.',
+        ];
+        if ($f['buy_rate'] !== null) {
+            $payload['exchange_rate'] = (float) $f['buy_rate'];
+        }
+        if (($tags = self::divisionTags((int) $d['division_id'])) !== []) {
+            $payload['tags'] = $tags;
+        }
+        return $payload;
+    }
+
+    /**
+     * Sends a merchant trade deal to Books: the sale invoice (customer = the
+     * foreign buyer) and the supplier's bill, each created once (a retry
+     * finds it by number). Live test in the Zoho TEST organisation still
+     * pending (no credentials yet).
+     *
+     * @return array{invoice_id:string, bill_id:string}
+     */
+    public static function pushMerchantDeal(int $dealId): array
+    {
+        $d = \App\Repositories\MerchantTradeRepository::find($dealId);
+        if ($d === null || empty($d['sale_invoice_no'])) {
+            throw new \RuntimeException('This deal has no sale invoice yet.');
+        }
+        ZohoGuard::assertCustomerAllowed((string) $d['buyer_name']);
+        self::assertVendorAllowed((string) $d['supplier_name']);
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        $account = static fn (string $name): string => self::accountId($config, $accessToken, $name);
+        $query = '?organization_id=' . rawurlencode($config['organizationId']);
+        $contact = static function (string $name, string $type, string $currency) use ($config, $accessToken, $query): string {
+            foreach (self::getList($config, $accessToken, "https://{$config['apiDomain']}/books/v3/contacts{$query}&contact_type={$type}&contact_name=" . rawurlencode($name), 'contacts') as $row) {
+                if ((string) ($row['contact_name'] ?? '') === $name) {
+                    return (string) $row['contact_id'];
+                }
+            }
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/contacts{$query}", ['contact_name' => $name, 'company_name' => $name, 'contact_type' => $type, 'currency_code' => $currency, 'gst_treatment' => 'overseas'], self::authHeaders($accessToken));
+            $id = json_decode($response['body'], true)['contact']['contact_id'] ?? null;
+            if ($response['status'] < 200 || $response['status'] >= 300 || !is_string($id)) {
+                throw new \RuntimeException("Zoho Books {$type} creation failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+            return $id;
+        };
+        $lines = \App\Repositories\MerchantTradeRepository::lines($dealId);
+        $__user = AuthService::currentUser();
+        $userId = $__user !== null ? (int) $__user['id'] : null;
+        $customerId = $contact((string) $d['buyer_name'], 'customer', (string) $d['sale_currency']);
+        $existing = !empty($d['zoho_invoice_id']) ? ['invoice_id' => $d['zoho_invoice_id']] : self::findInvoiceByNumber($config, $accessToken, (string) $d['sale_invoice_no']);
+        if ($existing === null) {
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/invoices{$query}&ignore_auto_number_generation=true", self::merchantInvoicePayload($d, $lines, $customerId, $account), self::authHeaders($accessToken));
+            $invoiceId = (string) (json_decode($response['body'], true)['invoice']['invoice_id'] ?? '');
+            if ($invoiceId === '') {
+                throw new \RuntimeException('Zoho Books invoice creation failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+        } else {
+            $invoiceId = (string) $existing['invoice_id'];
+        }
+        \App\Repositories\MerchantTradeRepository::update($dealId, ['zoho_invoice_id' => $invoiceId], $userId);
+        $vendorId = $contact((string) $d['supplier_name'], 'vendor', (string) $d['purchase_currency']);
+        $bill = !empty($d['zoho_bill_id']) ? ['bill_id' => $d['zoho_bill_id']] : self::findBill($config, $accessToken, (string) $d['po_no'], $vendorId);
+        if ($bill === null) {
+            $response = self::request('POST', "https://{$config['apiDomain']}/books/v3/bills{$query}", self::merchantBillPayload($d, $lines, $vendorId, $account), self::authHeaders($accessToken));
+            $bill = self::findBill($config, $accessToken, (string) $d['po_no'], $vendorId);
+            if ($bill === null) {
+                throw new \RuntimeException("Zoho Books bill {$d['po_no']} failed (HTTP " . $response['status'] . '): ' . substr($response['body'], 0, 500));
+            }
+        }
+        \App\Repositories\MerchantTradeRepository::update($dealId, ['zoho_bill_id' => (string) $bill['bill_id']], $userId);
+        return ['invoice_id' => $invoiceId, 'bill_id' => (string) $bill['bill_id']];
+    }
+
     private static function config(): array
     {
         // The .env switch comes first, so "switched off on this server" is

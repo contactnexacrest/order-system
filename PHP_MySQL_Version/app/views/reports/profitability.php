@@ -38,6 +38,19 @@
     </div>
   </div>
 
+  <?php if (!empty($divisionProfit)): ?>
+  <div class="section" data-testid="division-profit">
+    <h2>Profit by division</h2>
+    <p class="muted">Company costs not linked to an order or a division (₹<?= htmlspecialchars(\App\Services\GstCalculator::inr($divisionProfit['overhead_inr'])) ?> in this period) are shared out by revenue<?= $divisionProfit['overhead_unshared'] ? ' — not shared: no revenue in this period' : '' ?>. A division's own costs are charged to it alone.</p>
+    <table class="list">
+      <tr><th>Division</th><th>Orders</th><th>Revenue (INR)</th><th>Share of revenue</th><th><?= htmlspecialchars($divisionProfit['profit_label']) ?> (INR)</th><th>Division's own costs (INR)</th><th>Share of company overhead (INR)</th><th>Profit after overhead (INR)</th></tr>
+      <?php foreach ($divisionProfit['rows'] as $d): ?>
+      <tr data-division="<?= htmlspecialchars($d['code']) ?>"><td><?= htmlspecialchars($d['name']) ?></td><td><?= (int) $d['orders'] ?></td><td><?= htmlspecialchars(\App\Services\GstCalculator::inr($d['revenue_inr'])) ?></td><td><?= htmlspecialchars($d['revenue_share_pct']) ?>%</td>
+        <td><?= htmlspecialchars(\App\Services\GstCalculator::inr($d['profit_inr'])) ?></td><td><?= htmlspecialchars(\App\Services\GstCalculator::inr($d['own_costs_inr'])) ?></td><td><?= htmlspecialchars(\App\Services\GstCalculator::inr($d['overhead_share_inr'])) ?></td><td><?= htmlspecialchars(\App\Services\GstCalculator::inr($d['profit_after_overhead_inr'])) ?></td></tr>
+      <?php endforeach; ?>
+    </table>
+  </div>
+  <?php endif; ?>
   <div class="section">
     <table class="list">
       <tr><th>Order</th><th>Client</th><th>Created</th><th>Revenue (INR)</th><th>Cost before commission &amp; incentive (INR)</th><th>Profit before (INR)</th><?php if (!empty($seeIncentives)): ?><th>Associate commission (INR)</th><th>Team incentive (INR)</th><th>Profit after (INR)</th><th>Margin after %</th><?php endif; ?></tr>

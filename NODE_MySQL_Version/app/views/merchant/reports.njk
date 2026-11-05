@@ -1,0 +1,28 @@
+{# Owner decision D-257 Phase 4: Merchant Trade reports — open deals with their RBI status, and the margin per deal (both only for the divisions the person may see). #}
+<div class="card page-wide" data-testid="mtt-reports">
+  <p><a href="/merchant">&larr; Merchant trade deals</a></p>
+  <h1>Merchant trade reports</h1>
+  <p class="muted">RBI limits (Merchant Trade settings, to be confirmed with the AD bank and the CA): whole deal within {{ settings.mtt_max_months_total }} months; outlay within {{ settings.mtt_max_outlay_months }} months; advance above USD {{ limitFmt }} only against an LC or bank guarantee.</p>
+
+  <h2>Open deals and their RBI status</h2>
+  <table class="list" data-testid="mtt-open">
+    <tr><th>Deal</th><th>Stage</th><th>Buyer</th><th>Whole deal</th><th>Outlay</th><th>Advance</th><th>Bank documents</th></tr>
+    {% for r in open %}
+    <tr><td><a href="/merchant/{{ r.id }}">{{ r.reference }}</a></td><td>{{ r.stage_label }}</td><td>{{ r.buyer_name }}</td>
+      {% for c in r.statusCells %}<td style="{{ c.style }}">{{ c.text }}</td>{% endfor %}</tr>
+    {% endfor %}
+    {% if open.length == 0 %}<tr><td colspan="7" class="muted">No open deals.</td></tr>{% endif %}
+  </table>
+
+  <h2>Margin per deal</h2>
+  <table class="list" data-testid="mtt-margins">
+    <tr><th>Deal</th><th>Stage</th><th>Sale</th><th>Received ₹</th><th>Purchase</th><th>Paid ₹</th><th>Margin ₹</th><th>Margin USD</th><th>Margin %</th></tr>
+    {% for r in rows %}
+    <tr><td><a href="/merchant/{{ r.id }}">{{ r.reference }}</a></td><td>{{ r.stage_label }}</td>
+      <td>{{ r.sale_currency }} {{ r.f.sale_fmt }}</td><td>{{ r.f.received_inr_fmt }}</td>
+      <td>{{ r.purchase_currency }} {{ r.f.purchase_fmt }}</td><td>{{ r.f.paid_inr_fmt }}</td>
+      <td>{{ r.f.margin_inr_fmt }}{{ '' if r.f.final else ' (so far)' }}</td><td>{{ r.f.margin_usd_fmt }}</td><td>{{ (r.f.margin_pct + '%') if r.f.margin_pct !== null else '—' }}</td></tr>
+    {% endfor %}
+    {% if rows.length == 0 %}<tr><td colspan="9" class="muted">No deals yet.</td></tr>{% endif %}
+  </table>
+</div>

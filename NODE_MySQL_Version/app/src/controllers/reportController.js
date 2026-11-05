@@ -804,7 +804,10 @@ async function profitability(req, res) {
     return;
   }
 
-  res.renderView('reports/profitability', { seeIncentives, rows: data.rows, totals: data.totals, filters: { dateFrom, dateTo, scope } }, 'layout/base');
+  // D-257 Phase 5: profit by division with overhead shared by revenue — null (nothing shown) with one division.
+  const divisionProfit = require('../services/divisionProfitService');
+  const byDivision = divisionProfit.forView(await divisionProfit.summary(data.rows, dateFrom, dateTo, seeIncentives));
+  res.renderView('reports/profitability', { seeIncentives, rows: data.rows, totals: data.totals, filters: { dateFrom, dateTo, scope }, divisionProfit: byDivision }, 'layout/base');
 }
 
 /**

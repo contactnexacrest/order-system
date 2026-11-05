@@ -2525,3 +2525,30 @@ JOIN (SELECT 'company' AS scope, 'imp_default_bcd_pct' AS k, '10' AS v
       UNION ALL SELECT 'pricing', 'pricing_fx_rate', '1.0000'
       UNION ALL SELECT 'incentive', 'program_enabled', '0') s
 WHERE d.code = 'IMP';
+
+-- ================================================================
+-- Owner decision D-257 Phase 4 (5 Nov 2026): Merchant Trade (MTT).
+-- MTT stays "planned" — nothing here is visible until the owner activates
+-- it. The RBI limits and the bank's document list are starting values,
+-- TO BE CONFIRMED WITH THE AD BANK AND THE CA.
+-- ================================================================
+-- The merchant-trade module: on for MTT only.
+INSERT IGNORE INTO division_modules (division_id, module_key, is_enabled)
+SELECT d.id, 'merchant_trade', CASE WHEN d.code = 'MTT' THEN 1 ELSE 0 END FROM divisions d;
+
+-- MTT's own settings (Admin > Divisions > Merchant Trade): the whole deal
+-- within 9 months, foreign-exchange outlay within 4 months, an advance to
+-- the supplier above USD 5,00,000 only against an LC or bank guarantee, the
+-- ₹ per USD used to compare a non-USD advance with that limit, and the
+-- documents the AD bank asks for. The AD bank's merchanting approval starts
+-- empty: the activation check asks for it. MTT's own team-incentive
+-- programme starts off.
+INSERT IGNORE INTO division_settings (division_id, scope, setting_key, setting_value)
+SELECT d.id, s.scope, s.k, s.v FROM divisions d
+JOIN (SELECT 'company' AS scope, 'mtt_max_months_total' AS k, '9' AS v
+      UNION ALL SELECT 'company', 'mtt_max_outlay_months', '4'
+      UNION ALL SELECT 'company', 'mtt_advance_limit_usd', '500000'
+      UNION ALL SELECT 'company', 'mtt_usd_inr_rate', '84.0000'
+      UNION ALL SELECT 'company', 'mtt_bank_documents', 'Sale contract or buyer''s order|Purchase contract or supplier''s proforma|Supplier''s invoice|Bill of lading|Our sale invoice|Inward remittance advice (sell leg)|Outward remittance SWIFT copy (buy leg)'
+      UNION ALL SELECT 'incentive', 'program_enabled', '0') s
+WHERE d.code = 'MTT';

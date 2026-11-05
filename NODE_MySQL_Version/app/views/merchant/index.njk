@@ -1,0 +1,49 @@
+{# Owner decision D-257 Phase 4: the deals of Merchant Trade — the Standard list and the Kanban board offer the same filter, links, figures and actions (hard rule 2026-11-01). #}
+{% macro card(r) %}<a class="entity-card kanban-card" href="/merchant/{{ r.id }}"><div class="entity-card-header"><span class="entity-card-title">{{ r.reference }}</span><span class="badge badge-protected">{{ r.stage_label }}</span></div><div class="entity-card-sub">{{ r.supplier_name }} ({{ r.supplier_country }}) → {{ r.buyer_name }} ({{ r.buyer_country }})</div><div class="entity-card-footer"><span class="muted small">Buy {{ r.purchase_currency }} {{ r.f.purchase_fmt }}</span><span class="muted small">Sell {{ r.sale_currency }} {{ r.f.sale_fmt }}</span><span class="muted small" data-rbi="{{ r.worst }}">{{ r.rbi_label }}</span></div></a>{% endmacro %}
+<div class="card page-wide" data-testid="mtt-list">
+  <div class="page-header-row">
+    <div>
+      <h1>Merchant trade deals{{ ' — Kanban Board' if board else '' }}</h1>
+      <p class="muted" style="margin:0;">Goods bought abroad and sold abroad without entering India: both legs, the BL, the margin and the RBI checks.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      {% if canEdit and active %}<a class="btn-sm" href="/merchant/create">New deal</a>{% endif %}
+      <a class="btn-sm btn-secondary" href="/merchant/reports">Reports</a>
+      {% if board %}<a class="btn-sm btn-secondary" href="/merchant?view=list{% if stage %}&amp;stage={{ stage }}{% endif %}">Switch to list view</a>
+      {% elif kanbanUser %}<a class="btn-sm btn-secondary" href="/merchant{% if stage %}?stage={{ stage }}{% endif %}">Switch to board view</a>{% endif %}
+    </div>
+  </div>
+  <form method="get" action="/merchant" class="filters" data-testid="mtt-filter">
+    {% if not board %}<input type="hidden" name="view" value="list">{% endif %}
+    <label>Stage
+      <select name="stage" onchange="this.form.submit()">
+        <option value="">All stages</option>
+        {% for st in stages %}<option value="{{ st.key }}" {{ 'selected' if stage == st.key else '' }}>{{ st.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <noscript><button type="submit" class="btn-sm">Filter</button></noscript>
+  </form>
+  {% if board %}
+  <div class="kanban-board">
+    {% for col in columns %}
+    <div class="kanban-column" data-status="{{ col.key }}">
+      <div class="kanban-column-header"><span class="kanban-column-title">{{ col.label }}</span><span class="kanban-column-count">{{ col.rows.length }}</span></div>
+      {% if col.rows.length == 0 %}<p class="kanban-column-empty">Nothing here</p>{% else %}{% for r in col.rows %}{{ card(r) }}{% endfor %}{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <table class="list">
+    <tr><th>Deal</th><th>Stage</th><th>Supplier</th><th>Buyer</th><th>Deal date</th><th>Buy</th><th>Sell</th><th>RBI</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td><a href="/merchant/{{ r.id }}">{{ r.reference }}</a></td><td>{{ r.stage_label }}</td>
+      <td>{{ r.supplier_name }} ({{ r.supplier_country }})</td><td>{{ r.buyer_name }} ({{ r.buyer_country }})</td><td>{{ r.deal_date }}</td>
+      <td>Buy {{ r.purchase_currency }} {{ r.f.purchase_fmt }}</td><td>Sell {{ r.sale_currency }} {{ r.f.sale_fmt }}</td>
+      <td data-rbi="{{ r.worst }}">{{ r.rbi_label }}</td>
+    </tr>
+    {% endfor %}
+    {% if rows.length == 0 %}<tr><td colspan="8" class="muted">No deals yet.</td></tr>{% endif %}
+  </table>
+  {% endif %}
+</div>

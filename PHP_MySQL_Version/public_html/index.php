@@ -110,6 +110,7 @@ $departmentAdmin = new \App\Controllers\DepartmentAdminController();
 $divisions = new \App\Controllers\DivisionController(); // D-257
 $domestic = new \App\Controllers\DomesticOrderController(); // D-257 Phase 2
 $imports = new \App\Controllers\ImportController(); // D-257 Phase 3
+$merchant = new \App\Controllers\MerchantTradeController(); // D-257 Phase 4
 $gstRates = new \App\Controllers\GstRateController(); // D-257 Phase 2
 $purchasing = new \App\Controllers\PurchasingController();
 $coordination = new \App\Controllers\CoordinationController();
@@ -517,6 +518,23 @@ $router->post('/import/{id}/zoho', [$imports, 'pushZoho'], [SessionAuth::require
 $router->get('/admin/import-duty-rates', [$imports, 'dutyRates'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions')]);
 $router->post('/admin/import-duty-rates', [$imports, 'storeDutyRate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
 $router->post('/admin/import-duty-rates/{id}/toggle', [$imports, 'toggleDutyRate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+// Owner decision D-257 Phase 4 (5 Nov 2026): Merchant Trade — deals, both legs, BL / switch BL, RBI checks.
+// /merchant/… belongs to the module "Merchant trade" (on for MTT only).
+$router->get('/merchant', [$merchant, 'index'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices')]);
+$router->get('/merchant/create', [$merchant, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing')]);
+$router->get('/merchant/reports', [$merchant, 'reports'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices')]);
+$router->post('/merchant', [$merchant, 'store'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->get('/merchant/{id}', [$merchant, 'show'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices')]);
+$router->post('/merchant/{id}/deal', [$merchant, 'saveHeader'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/merchant/{id}/lines', [$merchant, 'addLine'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/merchant/{id}/lines/{lineId}/delete', [$merchant, 'removeLine'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/merchant/{id}/backing', [$merchant, 'saveBacking'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/merchant/{id}/bl', [$merchant, 'saveShipment'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/merchant/{id}/bank-documents', [$merchant, 'saveDocument'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/merchant/{id}/payments', [$merchant, 'recordPayment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), CsrfCheck::verify()]);
+$router->post('/merchant/{id}/advance', [$merchant, 'advance'], [SessionAuth::required(), PermissionCheck::requires('manage_purchasing'), CsrfCheck::verify()]);
+$router->post('/merchant/{id}/document', [$merchant, 'document'], [SessionAuth::required(), PermissionCheck::requires('view_purchase_prices'), CsrfCheck::verify()]);
+$router->post('/merchant/{id}/zoho', [$merchant, 'pushZoho'], [SessionAuth::required(), PermissionCheck::requires('ca_module_manage'), CsrfCheck::verify()]);
 
 $router->get('/admin/permissions', [$permissionAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
 $router->post('/admin/permissions/grant', [$permissionAdmin, 'grantOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);

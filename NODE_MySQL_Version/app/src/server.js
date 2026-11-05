@@ -101,6 +101,7 @@ const divisionController = require('./controllers/divisionController'); // D-257
 const domesticOrderController = require('./controllers/domesticOrderController'); // D-257 Phase 2
 const gstRateController = require('./controllers/gstRateController'); // D-257 Phase 2
 const importController = require('./controllers/importController'); // D-257 Phase 3
+const merchantTradeController = require('./controllers/merchantTradeController'); // D-257 Phase 4
 const purchasingController = require('./controllers/purchasingController');
 const coordinationController = require('./controllers/coordinationController');
 const paymentMilestoneController = require('./controllers/paymentMilestoneController');
@@ -919,6 +920,23 @@ app.post('/import/:id/zoho', requireAuth, requirePermission('ca_module_manage'),
 app.get('/admin/import-duty-rates', requireAuth, requirePermission('manage_divisions'), asyncHandler(importController.dutyRates));
 app.post('/admin/import-duty-rates', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(importController.storeDutyRate));
 app.post('/admin/import-duty-rates/:id/toggle', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(importController.toggleDutyRate));
+// Owner decision D-257 Phase 4 (5 Nov 2026): Merchant Trade — deals, both legs, BL / switch BL, RBI checks.
+// /merchant/… belongs to the module "Merchant trade" (on for MTT only).
+app.get('/merchant', requireAuth, requirePermission('view_purchase_prices'), asyncHandler(merchantTradeController.index));
+app.get('/merchant/create', requireAuth, requirePermission('manage_purchasing'), asyncHandler(merchantTradeController.create));
+app.get('/merchant/reports', requireAuth, requirePermission('view_purchase_prices'), asyncHandler(merchantTradeController.reports));
+app.post('/merchant', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(merchantTradeController.store));
+app.get('/merchant/:id', requireAuth, requirePermission('view_purchase_prices'), asyncHandler(merchantTradeController.show));
+app.post('/merchant/:id/deal', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(merchantTradeController.saveHeader));
+app.post('/merchant/:id/lines', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(merchantTradeController.addLine));
+app.post('/merchant/:id/lines/:lineId/delete', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(merchantTradeController.removeLine));
+app.post('/merchant/:id/backing', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(merchantTradeController.saveBacking));
+app.post('/merchant/:id/bl', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(merchantTradeController.saveShipment));
+app.post('/merchant/:id/bank-documents', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(merchantTradeController.saveDocument));
+app.post('/merchant/:id/payments', requireAuth, requirePermission('manage_payments'), verifyCsrf, asyncHandler(merchantTradeController.recordPayment));
+app.post('/merchant/:id/advance', requireAuth, requirePermission('manage_purchasing'), verifyCsrf, asyncHandler(merchantTradeController.advance));
+app.post('/merchant/:id/document', requireAuth, requirePermission('view_purchase_prices'), verifyCsrf, asyncHandler(merchantTradeController.document));
+app.post('/merchant/:id/zoho', requireAuth, requirePermission('ca_module_manage'), verifyCsrf, asyncHandler(merchantTradeController.pushZoho));
 app.get('/admin/departments', requireAuth, requirePermission('manage_permissions'), asyncHandler(departmentAdminController.index));
 app.post('/admin/departments', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.createDepartment));
 app.post('/admin/departments/:id/update', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.updateDepartment));

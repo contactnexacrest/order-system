@@ -1,0 +1,15 @@
+{# Owner decision D-257 Phase 4: a new merchant trade deal — the supplier abroad, the buyer abroad, both currencies and the route of the goods. #}
+<div class="card page-wide">
+  <p><a href="/merchant">&larr; Merchant trade deals</a></p>
+  <h1>New merchant trade deal</h1>
+  {% if not active %}
+    <p class="muted" data-testid="mtt-not-active">Merchant Trade is not active yet. The MD activates it in Admin › Divisions when it is ready.</p>
+  {% else %}
+  <p class="muted">Buy from a supplier abroad and sell to a buyer abroad; the goods go straight from one to the other. The deal and PO numbers are given when you save.</p>
+  <form method="post" action="/merchant" class="field-grid" data-testid="mtt-create-form">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    {% include "merchant/_deal_fields.njk" %}
+    <p><button type="submit" class="btn">Create deal</button></p>
+  </form>
+  {% endif %}
+</div>

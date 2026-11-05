@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+{# Owner decision D-257 Phase 4 (5 Nov 2026): the two documents of a Merchant Trade deal — the sale invoice
+   to the buyer (kind "invoice", in the sale currency) and the purchase order to the supplier (kind "po", in
+   the purchase currency). Merchant Trade only; the export documents are separate and unchanged. Every figure
+   arrives formatted (MerchantDocumentService); this only prints. The same template is in the Node app
+   (templates/MTT/merchant_document.njk). #}
+<style>
+  @page { margin: 0.5in 0.55in; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Aptos', sans-serif; font-size: 9pt; color: #000; }
+  table { border-collapse: collapse; width: 100%; }
+  .head td { vertical-align: top; padding: 0; }
+  .company { font-size: 13pt; font-weight: bold; color: #17233A; }
+  .doctype { font-size: 17pt; font-weight: bold; color: #17233A; text-align: right; }
+  .muted { color: #5B6573; }
+  .meta td { border: 1px solid #D7DEE6; background: #F1F5F9; padding: 3pt 6pt; vertical-align: top; }
+  .label { font-size: 7.5pt; color: #5B6573; display: block; }
+  .value { font-size: 9.5pt; font-weight: bold; color: #17233A; display: block; }
+  .parties td { border: 1px solid #D7DEE6; padding: 4pt 6pt; vertical-align: top; width: 50%; }
+  .section-title { font-weight: bold; color: #17233A; font-size: 9.5pt; margin: 8pt 0 3pt; border-bottom: 1.5px solid #17233A; }
+  .items th { background: #17233A; color: #fff; font-size: 8pt; padding: 3pt 4pt; text-align: left; }
+  .items td { border-bottom: 1px solid #D7DEE6; padding: 3pt 4pt; font-size: 8.5pt; vertical-align: top; }
+  .num { text-align: right; white-space: nowrap; }
+  .totals td { padding: 2pt 4pt; }
+  .totals .k { text-align: right; color: #5B6573; }
+  .totals .grand td { font-weight: bold; font-size: 10.5pt; color: #17233A; border-top: 1.5px solid #17233A; }
+  .words { margin-top: 4pt; font-style: italic; }
+  .box { border: 1px solid #D7DEE6; padding: 4pt 6pt; margin-top: 6pt; }
+  .sign { margin-top: 18pt; text-align: right; }
+</style>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td>
+      <div class="company">{{ company.name }}</div>
+      {% for l in company.address_lines %}<div class="muted">{{ l }}</div>{% endfor %}
+      <div class="muted">IEC / PAN: {{ company.iec }}</div>
+      <div class="muted">{{ company.phone }} · {{ company.email }}</div>
+    </td>
+    <td class="doctype">{{ title }}<div class="muted" style="font-size:8pt;">Merchanting trade</div></td>
+  </tr>
+</table>
+
+<table class="meta" style="margin-top:6pt;">
+  <tr>
+    <td><span class="label">{% if kind == 'invoice' %}INVOICE NO.{% else %}PO NO.{% endif %}</span><span class="value">{{ number }}</span></td>
+    <td><span class="label">DATE</span><span class="value">{{ date }}</span></td>
+    <td><span class="label">OUR REF.</span><span class="value">{{ deal_reference }}</span></td>
+    <td><span class="label">CURRENCY</span><span class="value">{{ currency }}</span></td>
+    <td><span class="label">INCOTERM</span><span class="value">{% if incoterm %}{{ incoterm }}{% else %}—{% endif %}</span></td>
+  </tr>
+  <tr>
+    <td><span class="label">ORIGIN</span><span class="value">{{ origin_country }}</span></td>
+    <td><span class="label">PORT OF LOADING</span><span class="value">{% if port_of_loading %}{{ port_of_loading }}{% else %}—{% endif %}</span></td>
+    <td><span class="label">PORT OF DISCHARGE</span><span class="value">{% if port_of_discharge %}{{ port_of_discharge }}{% else %}—{% endif %}</span></td>
+    <td><span class="label">B/L NO.</span><span class="value">{% if bl_no %}{{ bl_no }}{% else %}—{% endif %}</span></td>
+    <td><span class="label">VESSEL</span><span class="value">{% if vessel %}{{ vessel }}{% else %}—{% endif %}</span></td>
+  </tr>
+</table>
+
+<table class="parties" style="margin-top:6pt;">
+  <tr>
+    <td>
+      <span class="label">{% if kind == 'invoice' %}SELLER{% else %}BUYER{% endif %}</span>
+      <strong>{{ company.name }}</strong>
+      {% for l in company.address_lines %}<div>{{ l }}</div>{% endfor %}
+      <div>India · IEC: {{ company.iec }}</div>
+    </td>
+    <td>
+      <span class="label">{{ party.label }}</span>
+      <strong>{{ party.name }}</strong>
+      {% for l in party.address_lines %}<div>{{ l }}</div>{% endfor %}
+      <div>{{ party.country }}</div>
+    </td>
+  </tr>
+</table>
+
+<div class="section-title">GOODS</div>
+<table class="items">
+  <tr><th>#</th><th>Description</th><th>HS code</th><th class="num">Qty</th><th>Unit</th><th class="num">Unit price ({{ currency }})</th><th class="num">Amount ({{ currency }})</th></tr>
+  {% for l in lines %}
+  <tr><td>{{ l.no }}</td><td>{{ l.description }}</td><td>{{ l.hsn_code }}</td><td class="num">{{ l.quantity }}</td><td>{{ l.unit }}</td><td class="num">{{ l.unit_price }}</td><td class="num">{{ l.amount }}</td></tr>
+  {% endfor %}
+</table>
+<table class="totals" style="width:55%; margin-left:45%; margin-top:4pt;">
+  <tr class="grand"><td class="k">Total</td><td class="num">{{ currency }} {{ total }}</td></tr>
+</table>
+<div class="words">{{ total_in_words }}</div>
+
+<div class="section-title">TERMS</div>
+<div class="box">
+  <div>1. Merchanting trade: the goods are shipped directly from {{ origin_country }} to the {% if kind == 'invoice' %}buyer{% else %}buyer named by us{% endif %}; they do not enter India.</div>
+  {% if kind == 'invoice' %}
+  <div>2. Payment in {{ currency }} by bank transfer to our account with our authorised dealer bank in India, quoting this invoice number.</div>
+  {% else %}
+  <div>2. The commercial invoice, packing list, bill of lading and certificate of origin are to quote this PO number{% if port_of_discharge %} and show the goods consigned to {{ port_of_discharge }}{% endif %}.</div>
+  {% endif %}
+  <div>3. The goods must match the description, quantity and HS code above.</div>
+</div>
+
+<div class="sign">For {{ company.name }}<br><br><br>Authorised Signatory</div>
+</body>
+</html>

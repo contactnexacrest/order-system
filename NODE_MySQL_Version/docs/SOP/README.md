@@ -54,6 +54,7 @@ implementation detail.
 - [Divisions](./28-divisions.md) — Export today; Domestic Trade, Merchant Trade and Import & Distribution planned. What a division is, Admin › Divisions (modules, own settings, numbering), and how to set up and activate a new division (D-257).
 - [Domestic Trade](./29-domestic-trade.md) — selling to Indian resellers with GST (planned until the MD activates it): set-up and activation, the eight stages, GST on the documents (CGST + SGST or IGST), e-way bill, tax invoice numbering, payments and Zoho (D-257 Phase 2).
 - [Import & Distribution](./30-import-distribution.md) — importing into India, stock and local sales (planned until the MD activates it): set-up and activation, import PO, LC as applicant, bill of entry and duty, landed cost, stock that never goes below zero, the local sale from stock, reports and Zoho (D-257 Phase 3).
+- [Merchant Trade](./31-merchant-trade.md) — buying abroad and selling abroad without the goods entering India (planned until the MD activates it): set-up and activation, the deal and its two currency legs, BL and switch BL, the sale invoice and PO, margin in ₹ and USD, the RBI checks and their reminders, the AD bank's documents, reports and Zoho (D-257 Phase 4).
 
 ## Guides to print or share
 

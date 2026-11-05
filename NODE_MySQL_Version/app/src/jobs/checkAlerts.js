@@ -150,6 +150,8 @@ async function run() {
 
   // --- Agreements expiring (owner decision 2 Nov 2026, point 4): 30 / 7 days before and on the day, once each ---
   created += await require('../services/agreementAlertService').run(todayIst());
+  // --- D-257 Phase 4: Merchant Trade's RBI checks (due soon / passed), once per deal, check and level ---
+  created += await require('../services/merchantTradeService').runAlerts(todayIst());
   // --- TDS on associate commission (owner decision 2 Nov 2026, D-235): deposit by the 7th, Form 26Q after each quarter ---
   {
     const payIncentiveIds = await permissionRepository.usersWithPermission('pay_incentives');

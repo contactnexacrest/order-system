@@ -1,0 +1,15 @@
+{# Owner decision D-257 Phase 4: the deal's own fields, on the create form and on the deal page (v holds the values). #}
+    <label>Deal date *<input type="date" name="deal_date" required max="{{ today }}" value="{{ v.deal_date or today }}"></label>
+    <label>Supplier *<input type="text" name="supplier_name" required maxlength="255" value="{{ v.supplier_name }}" placeholder="e.g. Anatolia Marble Export A.S."></label>
+    <label>Supplier's country *<input type="text" name="supplier_country" required maxlength="80" value="{{ v.supplier_country }}" placeholder="e.g. Turkey"></label>
+    <label>Supplier address<textarea name="supplier_address" rows="2" maxlength="1000" placeholder="e.g. Organize Sanayi Bolgesi 12, Afyonkarahisar">{{ v.supplier_address }}</textarea></label>
+    <label>Purchase currency *<select name="purchase_currency" required><option value="">Choose…</option>{% for c in currencies %}<option value="{{ c }}" {{ 'selected' if v.purchase_currency == c else '' }}>{{ c }}</option>{% endfor %}</select></label>
+    <label>Purchase Incoterm<select name="purchase_incoterm"><option value="">—</option>{% for t in incoterms %}<option value="{{ t }}" {{ 'selected' if v.purchase_incoterm == t else '' }}>{{ t }}</option>{% endfor %}</select></label>
+    <label>Buyer *<input type="text" name="buyer_name" required maxlength="255" value="{{ v.buyer_name }}" placeholder="e.g. Gulf Stone Trading LLC"></label>
+    <label>Buyer's country *<input type="text" name="buyer_country" required maxlength="80" value="{{ v.buyer_country }}" placeholder="e.g. United Arab Emirates"></label>
+    <label>Buyer address<textarea name="buyer_address" rows="2" maxlength="1000" placeholder="e.g. Office 1203, Al Moosa Tower, Dubai">{{ v.buyer_address }}</textarea></label>
+    <label>Sale currency *<select name="sale_currency" required><option value="">Choose…</option>{% for c in currencies %}<option value="{{ c }}" {{ 'selected' if v.sale_currency == c else '' }}>{{ c }}</option>{% endfor %}</select></label>
+    <label>Sale Incoterm<select name="sale_incoterm"><option value="">—</option>{% for t in incoterms %}<option value="{{ t }}" {{ 'selected' if v.sale_incoterm == t else '' }}>{{ t }}</option>{% endfor %}</select></label>
+    <label>Goods come from (country) *<input type="text" name="origin_country" required maxlength="80" value="{{ v.origin_country }}" placeholder="e.g. Turkey"></label>
+    <label>Port of loading<input type="text" name="port_of_loading" maxlength="100" value="{{ v.port_of_loading }}" placeholder="e.g. Izmir, Turkey"></label>
+    <label>Port of discharge<input type="text" name="port_of_discharge" maxlength="100" value="{{ v.port_of_discharge }}" placeholder="e.g. Jebel Ali, UAE"></label>
