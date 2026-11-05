@@ -124,8 +124,26 @@ The D-240 reference selling price, its note settings and its order-level discoun
 are gone; a product keeps only its **selling unit** (Products → edit). Zoho items now go with
 rate 0.
 
-## Not yet (later phases)
+## Settings to check on go-live day (owner decision, 5 Nov 2026)
 
-Commission is not yet paid on the levels and ladder (P3) — the ladder step used for an
-associate's quote in P2 counts their earlier orders whose PI was issued; P3 replaces that with
-counting orders. The team incentive is not yet worked out from the reserve (P4).
+The installed values below are the owner's chosen starting values. Only the first two need
+entering by hand on the day the site goes live (Admin › Pricing):
+
+| Setting | Value | Where |
+|---|---|---|
+| Pricing exchange rate | **today's market ₹ per USD minus about 1.5%**; review monthly, or when the rupee moves more than 1% | Admin › Pricing |
+| Other costs to FOB | 2.5% until worked out from the last 3–5 shipments (packing, inland freight, CHA, inspection, bank); override heavy products such as blocks | Admin › Pricing, and per product |
+| Minimum margin | 20% of the price (raise per product where the market allows) | Admin › Pricing |
+| Negotiating buffer | 3% | Admin › Pricing |
+| Team incentive | 15% of profit (review after 6 months) | Admin › Pricing |
+| Supplier price stale after | 60 days | Admin › Pricing |
+| Commission due | 30 days after full payment, held while a buyer claim is open | Associates › Commission settings |
+| Payout run | monthly, on the 5th | Associates › Commission settings |
+| Counting order | invoiced FOB of ₹5,00,000 or more | Associates › Commission settings |
+| Buyer registration valid | 6 months | Associates › Commission settings |
+| GST on commission | 18% (associates with a GSTIN and a tax invoice) | Associates › Commission settings |
+| Associate registration link | 7 days | Associates › Commission settings |
+| Personal code changes | 3 a year | Associates › Commission settings |
+
+Commission levels and the ladder (P1/P3) and the team incentive (P4) are in use; see SOP 20
+and SOP 24.
