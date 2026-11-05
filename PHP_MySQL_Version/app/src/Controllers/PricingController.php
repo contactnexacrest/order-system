@@ -278,11 +278,12 @@ final class PricingController
             $rows[] = $s;
         }
         // Newest first; the one used for pricing on top.
-        usort($rows, static fn (array $a, array $b): int => [(int) $b['is_primary'], (string) $b['price_date']] <=> [(int) $a['is_primary'], (string) $a['price_date']]);
+        usort($rows, static fn (array $a, array $b): int => [max((int) $b['is_primary'], (int) ($b['is_cbm_primary'] ?? 0)), (string) $b['price_date']] <=> [max((int) $a['is_primary'], (int) ($a['is_cbm_primary'] ?? 0)), (string) $a['price_date']]);
         View::render('products/market_prices', [
             'product' => $product,
             'rows' => $rows,
             'staleDays' => $settings['stale_days'],
+            'cbmFrom' => $settings['cbm_from_mm'],
             'quotes' => PricingRepository::purchaseQuotesForProduct($id),
             'canRecord' => self::can('record_market_prices'),
         ], 'layout/base');
@@ -311,6 +312,8 @@ final class PricingController
             'notes' => trim((string) ($_POST['notes'] ?? '')) ?: null,
             'quoted_on' => $date('quoted_on'),
             'valid_until' => $date('valid_until'),
+            // D-255: per unit, or per CBM for thick stone (50 mm and above).
+            'price_basis' => ($_POST['price_basis'] ?? 'unit') === 'cbm' ? 'cbm' : 'unit',
         ];
         if ($data['supplier_name'] === '' || mb_strlen($data['supplier_name']) > 255) {
             return [$data, 'Enter the supplier\'s name.'];
@@ -365,11 +368,19 @@ final class PricingController
         }
         $data['product_id'] = $productId;
         $userId = (int) self::user()['id'];
+        $usedForPricing = $data['is_primary'] === 1;
+        if ($data['price_basis'] === 'cbm') {
+            $data['is_primary'] = 0;
+        }
         $id = ProductSupplierRepository::create($data, $userId);
         PricingRepository::setSupplierDates($id, $data['quoted_on'], $data['valid_until'], $quoteId);
-        if ($data['is_primary'] === 1) {
+        PricingRepository::setSupplierBasis($id, $data['price_basis']);
+        if ($usedForPricing && $data['price_basis'] === 'cbm') {
+            PricingRepository::setCbmPrimary($productId, $id);
+        } elseif ($usedForPricing) {
             (new ProductService())->setPrimarySupplier($productId, $id, $userId);
         }
+        $data['is_primary'] = $usedForPricing ? 1 : 0;
         AuditLogRepository::log($userId, 'MARKET_PRICE_ADDED', 'product_suppliers', $id, null, null,
             $data['supplier_name'] . ': ₹' . number_format((float) $data['fob_value'], 2) . ' quoted ' . $data['quoted_on'] . ($data['is_primary'] ? ' (used for pricing)' : ''));
         Flash::set('success', 'Supplier price recorded' . ($data['is_primary'] ? ' and used for pricing.' : '.'));
@@ -387,6 +398,15 @@ final class PricingController
         }
         $userId = (int) self::user()['id'];
         $productId = (int) $s['product_id'];
+        if (($s['price_basis'] ?? 'unit') === 'cbm') {
+            // D-255: the per-CBM price used for thick stone (50 mm and above).
+            $old = PricingService::cbmSupplier($productId);
+            PricingRepository::setCbmPrimary($productId, $supplierId);
+            AuditLogRepository::log($userId, 'MARKET_PRICE_USED_FOR_PRICING', 'product_suppliers', $supplierId, 'is_cbm_primary', $old !== null ? $old['supplier_name'] . ' #' . $old['id'] : null, $s['supplier_name'] . ' #' . $supplierId);
+            Flash::set('success', "{$s['supplier_name']}'s per-CBM price is now used for thick stone. New quotes use it.");
+            header("Location: /products/{$productId}/market-prices");
+            return;
+        }
         $old = PricingService::pricingSupplier($productId);
         (new ProductService())->setPrimarySupplier($productId, $supplierId, $userId);
         AuditLogRepository::log($userId, 'MARKET_PRICE_USED_FOR_PRICING', 'product_suppliers', $supplierId, 'is_primary', $old !== null ? $old['supplier_name'] . ' #' . $old['id'] : null, $s['supplier_name'] . ' #' . $supplierId);

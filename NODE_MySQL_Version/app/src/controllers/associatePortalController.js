@@ -524,35 +524,93 @@ async function sendMessage(req, res) {
   res.redirect('/associate/messages');
 }
 
-/**
- * Owner decision D-245 P3: the associate's price range — per product, the quote price and
- * the lowest price they may agree, never cost or formula. A dated notice they acknowledge
- * whenever the prices change.
- */
-async function prices(req, res) {
-  const a = await me(req);
-  const associateCommission = require('../services/associateCommission');
-  const list = await associateCommission.priceList(a);
-  await render(req, res, 'prices', { list, levelText: associateCommission.levelLabel(list.level) });
+function prices(req, res) {
+  res.redirect('/associate/catalogue');
 }
 
-async function acknowledgePrices(req, res) {
+/**
+ * Owner decision D-255 (5 Nov 2026): the catalogue — products the associate may
+ * price, with no prices, supplier names or quarry locations; "Get price" on each.
+ */
+async function catalogue(req, res) {
   const a = await me(req);
-  const list = await require('../services/associateCommission').priceList(a);
-  if (String((req.body || {}).hash || '') !== list.hash) {
-    flash.set(req, 'error', 'The prices changed while you were reading them — please look at the new list and acknowledge it again.');
-  } else {
-    await db.execute('UPDATE associates SET price_list_ack_hash = :h, price_list_ack_at = NOW() WHERE id = :id', { h: list.hash, id: a.id });
-    await associateEventRepository.add(Number(a.id), 'prices_acknowledged', `Price list dated ${dates.short(String(list.changed_at || '').slice(0, 10))} acknowledged.`, null, null, null, null, false);
-    await auditLogRepository.log(null, 'ASSOCIATE_PRICES_ACKNOWLEDGED', 'associates', Number(a.id), 'price_list', null, list.hash);
-    flash.set(req, 'success', 'Thank you — your acknowledgement of this price list is recorded.');
+  const priceRequestService = require('../services/priceRequestService');
+  await render(req, res, 'catalogue', {
+    products: await priceRequestService.catalogue(a),
+    left: await priceRequestService.leftToday(a),
+    limit: await priceRequestService.dailyLimit(a),
+    requests: (await priceRequestService.forAssociate(Number(a.id), 20)).map(({ figures, ...r }) => ({ ...r, display_status: priceRequestService.displayStatus(r) })), // never the full figures (cost) — D-255
+  });
+}
+
+async function getPriceForm(req, res) {
+  const a = await me(req);
+  const priceRequestService = require('../services/priceRequestService');
+  const product = await require('../repositories/productRepository').find(parseInt(req.params.id, 10) || 0);
+  if (!product || !(await priceRequestService.mayPrice(a, product))) {
+    flash.set(req, 'error', 'That product is not in your catalogue.');
+    res.redirect('/associate/catalogue');
+    return;
   }
-  res.redirect('/associate/prices');
+  await render(req, res, 'get_price', {
+    product,
+    specs: await require('../services/productSpecs').offered(product),
+    left: await priceRequestService.leftToday(a),
+    old: flash.pullOld(req),
+  });
+}
+
+async function requestPrice(req, res) {
+  const a = await me(req);
+  const productId = parseInt(req.params.id, 10) || 0;
+  if (refuseWhenSuspended(req, res, a, `/associate/catalogue/${productId}`)) return;
+  const product = await require('../repositories/productRepository').find(productId);
+  if (!product) {
+    flash.set(req, 'error', 'That product is not in your catalogue.');
+    res.redirect('/associate/catalogue');
+    return;
+  }
+  const body = req.body || {};
+  const selection = {};
+  const raw = body.spec && typeof body.spec === 'object' ? body.spec : {};
+  for (const [specId, optionId] of Object.entries(raw)) {
+    if (/^\d+$/.test(String(specId)) && /^\d+$/.test(String(optionId))) selection[Number(specId)] = Number(optionId);
+  }
+  const [id, error] = await require('../services/priceRequestService').create(a, product, selection, !!body.other, body.note !== undefined ? String(body.note) : null);
+  if (error !== null) {
+    flash.set(req, 'error', error);
+    flash.setOld(req, body);
+    res.redirect(`/associate/catalogue/${productId}`);
+    return;
+  }
+  res.redirect(`/associate/price-requests/${id}`);
+}
+
+async function priceRequest(req, res) {
+  const a = await me(req);
+  const priceRequestService = require('../services/priceRequestService');
+  const r = await priceRequestService.find(parseInt(req.params.id, 10) || 0);
+  if (!r || Number(r.associate_id) !== Number(a.id)) {
+    flash.set(req, 'error', 'That price request was not found.');
+    res.status(404);
+    res.redirect('/associate/catalogue');
+    return;
+  }
+  let breakdown = {};
+  if (r.breakdown) { try { breakdown = JSON.parse(r.breakdown) || {}; } catch (e) { breakdown = {}; } }
+  const { figures, ...shown } = r; // never the full figures (cost) — D-255
+  await render(req, res, 'price_request', {
+    r: shown,
+    product: await require('../repositories/productRepository').find(Number(r.product_id)),
+    status: priceRequestService.displayStatus(r),
+    breakdown,
+    left: await priceRequestService.leftToday(a),
+  });
 }
 
 module.exports = {
   proposeCode,
   codeLink, showLogin, login, showCode, verifyCode, logout, showSetPassword, setPassword, home, clients, createInvitation, cancelInvitation, chooseCode,
   orders, order, commission, uploadInvoice, certificate, profile, saveProfile, uploadDocument, requestBank, downloadDocument, downloadAgreement,
-  messages, sendMessage, prices, acknowledgePrices,
+  messages, sendMessage, prices, catalogue, getPriceForm, requestPrice, priceRequest,
 };

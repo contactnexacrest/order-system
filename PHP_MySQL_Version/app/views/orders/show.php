@@ -1484,7 +1484,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <form method="post" action="/orders/<?= (int) $order['id'] ?>/products/<?= (int) $p['id'] ?>">
             <?= Csrf::field() ?>
             <div class="kv-grid">
-              <?php $__pickerName = 'catalog_product_id'; $__pickerSelected = (int) ($p['catalog_product_id'] ?? 0); $__pickerCurrency = (string) ($order['currency_code'] ?? ''); $__pickerKey = (string) ($linePricing['ctx']['key'] ?? 'staff'); include __DIR__ . '/_product_picker.php'; ?>
+              <?php $__pickerName = 'catalog_product_id'; $__pickerSelected = (int) ($p['catalog_product_id'] ?? 0); $__pickerCurrency = (string) ($order['currency_code'] ?? ''); $__pickerKey = (string) ($linePricing['ctx']['key'] ?? 'staff'); $__pickerSpecSel = (string) ($p['spec_selection'] ?? ''); $__pickerOrderId = (int) $order['id']; include __DIR__ . '/_product_picker.php'; ?>
               <label>Description *<input type="text" name="description" value="<?= htmlspecialchars($p['description']) ?>" required placeholder="e.g. Granite slabs, polished"></label>
               <label>Dimensions<input type="text" name="dimensions" value="<?= htmlspecialchars($p['dimensions'] ?? '') ?>" placeholder="e.g. 240 x 120 x 2 cm"></label>
               <label>Finish
@@ -1555,7 +1555,11 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <form method="post" action="/orders/<?= (int) $order['id'] ?>/products">
           <?= Csrf::field() ?>
           <div class="kv-grid">
-            <?php $__pickerName = 'catalog_product_id'; $__pickerSelected = 0; $__pickerCurrency = (string) ($order['currency_code'] ?? ''); $__pickerKey = (string) ($linePricing['ctx']['key'] ?? 'staff'); include __DIR__ . '/_product_picker.php'; ?>
+            <?php $__pickerName = 'catalog_product_id'; $__pickerSelected = 0; $__pickerCurrency = (string) ($order['currency_code'] ?? ''); $__pickerKey = (string) ($linePricing['ctx']['key'] ?? 'staff'); $__pickerSpecSel = ''; $__pickerOrderId = (int) $order['id']; include __DIR__ . '/_product_picker.php'; ?>
+            <?php if (!empty($sees['selling']) && !empty($linePricing['ctx']['associate'])): // Owner decision D-255: a line from the associate's price request ?>
+              <label class="full">From the associate's price request <small class="muted">(optional — fills the product, options, price and unit from a valid request; you can still change the price)</small>
+                <input type="text" name="price_request_number" maxlength="20" pattern="[Pp][Rr]-[0-9]{2}-[0-9]{2}-[0-9]{4}" placeholder="e.g. PR-26-05-0042"></label>
+            <?php endif; ?>
             <label>Description *<input type="text" name="description" required placeholder="e.g. Granite slabs, polished"></label>
             <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 240 x 120 x 2 cm"></label>
             <label>Finish

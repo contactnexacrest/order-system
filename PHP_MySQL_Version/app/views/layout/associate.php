@@ -27,7 +27,7 @@
     <a href="/associate">Home<?= !empty($unread) ? ' (' . (int) $unread . ' new)' : '' ?></a>
     <a href="/associate/clients">My clients</a>
     <a href="/associate/orders">Orders</a>
-    <a href="/associate/prices">Prices</a>
+    <a href="/associate/catalogue">Catalogue</a>
     <a href="/associate/commission">Commission</a>
     <a href="/associate/messages">Messages</a>
     <a href="/associate/profile">Profile</a>

@@ -20,7 +20,6 @@
  *
  * PHP twin: src/Services/AssociateCommission.php.
  */
-const crypto = require('crypto');
 const db = require('../config/db');
 const { short } = require('../helpers/dates');
 const incentiveRepository = require('../repositories/incentiveRepository');
@@ -361,33 +360,8 @@ async function lapseRegistrations(today = null) {
   return n;
 }
 
-/**
- * The associate's price list: per active product with a price, their quote price and
- * the lowest price they may agree, at the level their next order would get. Never
- * cost, margin or formula. Records when the list last changed.
- */
-async function priceList(associate) {
-  const [level] = await levelForAssociate(associate, null);
-  const ctx = { associate, level, key: `L${level ? Number(level.id) : 0}`, label: String(associate.name) };
-  const orderLinePricing = require('./orderLinePricing');
-  const rows = [];
-  for (const product of await require('../repositories/productRepository').all(true)) {
-    const f = await orderLinePricing.liveFigures(product, ctx);
-    if (f.missing !== undefined) continue;
-    rows.push({ name: String(product.name || ''), unit: String(product.reference_unit || ''), quote: Number(f.quote), lowest: Number(f.floor) });
-  }
-  // The same fingerprint as PHP (json_encode of [level id, rows], numbers as PHP prints them).
-  const hash = crypto.createHash('sha256').update(JSON.stringify([level ? Number(level.id) : null, rows])).digest('hex');
-  let changedAt = associate.price_list_changed_at || null;
-  if (hash !== (associate.price_list_hash || null)) {
-    await db.execute('UPDATE associates SET price_list_hash = :h, price_list_changed_at = NOW() WHERE id = :id', { h: hash, id: associate.id });
-    changedAt = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ');
-  }
-  return { level, rows, hash, changed_at: changedAt, acknowledged: (associate.price_list_ack_hash || null) === hash, ack_at: associate.price_list_ack_at || null };
-}
-
 module.exports = {
   SETTLEMENT_KINDS, WEEKDAYS, round2, addDays, settings, dueOn, payoutRunOn, runLabel, claimOpen, payBlockReason,
   earningAssociate, countingOrders, levelForAssociate, levelLabel, fixedLevel, fixLevelAtPi, belowFloorApproved, goodsLines, inRangeValue,
-  settlements, realisedRate, forOrder, gstFor, payoutDescription, lapseRegistrations, priceList,
+  settlements, realisedRate, forOrder, gstFor, payoutDescription, lapseRegistrations,
 };

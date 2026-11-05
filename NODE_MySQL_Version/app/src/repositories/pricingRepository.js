@@ -110,6 +110,18 @@ async function setAssociateCommission(associateId, mode, levelId) {
   await db.execute('UPDATE associates SET commission_mode = :m, commission_level_id = :l WHERE id = :id', { m: mode, l: levelId, id: associateId });
 }
 
+/** D-255: a supplier price per unit (the selling unit) or per CBM (thick stone). */
+async function setSupplierBasis(supplierId, basis) {
+  await db.execute("UPDATE catalog_product_suppliers SET price_basis = :b, is_primary = IF(:b2 = 'cbm', 0, is_primary) WHERE id = :id",
+    { b: basis === 'cbm' ? 'cbm' : 'unit', b2: basis, id: supplierId });
+}
+
+/** D-255: marks one per-CBM supplier price "used for pricing" thick stone. */
+async function setCbmPrimary(productId, supplierId) {
+  await db.execute('UPDATE catalog_product_suppliers SET is_cbm_primary = 0 WHERE product_id = :p', { p: productId });
+  await db.execute("UPDATE catalog_product_suppliers SET is_cbm_primary = 1 WHERE id = :id AND price_basis = 'cbm'", { id: supplierId });
+}
+
 async function setSupplierDates(supplierId, quotedOn, validUntil, quoteId = null) {
   await db.execute(
     'UPDATE catalog_product_suppliers SET quoted_on = :q, valid_until = :v, purchase_quote_id = COALESCE(:pq, purchase_quote_id) WHERE id = :id',
@@ -138,5 +150,5 @@ async function purchaseQuote(quoteId, productId) {
 
 module.exports = {
   settings, setSetting, saveProductOverrides, levels, findLevel, levelNameTaken, createLevel, updateLevel, setLevelActive, deleteLevel,
-  levelUse, associatesPerLevel, ladder, replaceLadder, setAssociateCommission, setSupplierDates, purchaseQuotesForProduct, purchaseQuote,
+  levelUse, associatesPerLevel, ladder, replaceLadder, setAssociateCommission, setSupplierBasis, setCbmPrimary, setSupplierDates, purchaseQuotesForProduct, purchaseQuote,
 };

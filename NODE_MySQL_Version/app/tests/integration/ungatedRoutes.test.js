@@ -26,6 +26,10 @@ const EXPECTED = [
   'GET /associate/orders associate',
   'GET /associate/orders/{} associate',
   'GET /associate/prices associate',
+  'GET /associate/catalogue associate',
+  'GET /associate/catalogue/{} associate',
+  'GET /associate/price-requests/{} associate',
+  'GET /pricing/line-quote staff',
   'GET /associate/profile associate',
   'GET /associate/set-password/{} public',
   'GET /invite/{} public',
@@ -44,7 +48,8 @@ const EXPECTED = [
   'POST /associate/login/code public +csrf',
   'POST /associate/logout public +csrf',
   'POST /associate/messages associate +csrf',
-  'POST /associate/prices/acknowledge associate +csrf',
+  // Owner decision D-255 (5 Nov 2026): the catalogue and price requests replace the price-range acknowledgement.
+  'POST /associate/catalogue/{}/price associate +csrf',
   'POST /associate/profile associate +csrf',
   'POST /associate/set-password/{} public +csrf',
   'POST /quotation-details/verify public +csrf',
@@ -313,7 +318,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status !== 302 || res.headers.location !== '/login') wrong.push(`${label(route)} → ${res.status} ${res.headers.location}`);
       checked++;
     }
-    expect(checked).toBe(40);
+    expect(checked).toBe(41);
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -367,7 +372,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(21);
+    expect(checked).toBe(24);
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -414,7 +419,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status >= 500) failed.push(`${label(route)} → ${res.status}`);
       checked++;
     }
-    expect(checked).toBe(56);
+    expect(checked).toBe(59);
     expect(failed).toEqual([]);
   }, 120000);
 
@@ -424,13 +429,13 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
     for (const route of routes().filter((r) => r.method === 'GET' && !r.pattern.includes(':'))) {
       const agent = await agentFor(route.guard);
       const res = await agent.get(route.pattern);
-      const redirectsOnPurpose = ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement' /* 404 until a signed agreement is on file */].includes(route.pattern);
+      const redirectsOnPurpose = ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement' /* 404 until a signed agreement is on file */, '/associate/prices' /* D-255: to the catalogue */, '/pricing/line-quote' /* D-255: 404 JSON without a product */].includes(route.pattern);
       if (res.status >= 500 || (res.status !== 200 && !redirectsOnPurpose) || (res.status === 200 && (res.text || res.body || '').length === 0)) {
         failed.push(`${label(route)} → ${res.status}`);
       }
       checked++;
     }
-    expect(checked).toBe(36);
+    expect(checked).toBe(38);
     expect(failed).toEqual([]);
   }, 120000);
 

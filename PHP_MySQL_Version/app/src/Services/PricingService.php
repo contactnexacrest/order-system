@@ -28,6 +28,10 @@ final class PricingService
         'incentive_value' => '15.0000',
         'stale_days' => '60',
         'require_product_pick' => '1',
+        // D-255 (5 Nov 2026)
+        'cbm_from_mm' => '50',
+        'price_request_daily_limit' => '10',
+        'price_request_valid_days' => '7',
     ];
 
     /** Labels for the settings page and the audit log. */
@@ -40,6 +44,9 @@ final class PricingService
         'incentive_value' => 'Team incentive reserve value',
         'stale_days' => 'Supplier price is stale after (days)',
         'require_product_pick' => 'Goods lines must be picked from Products',
+        'cbm_from_mm' => 'Price per CBM from (mm, this thickness and above)',
+        'price_request_daily_limit' => 'Associate price requests per day',
+        'price_request_valid_days' => 'An associate\'s price stays valid for (days)',
     ];
 
     /** @return array{margin_pct: float, other_cost_pct: float, pricing_fx_rate: float, buffer_pct: float, incentive_mode: string, incentive_value: float, stale_days: int} */
@@ -55,6 +62,9 @@ final class PricingService
             'incentive_value' => (float) $raw['incentive_value'],
             'stale_days' => max(1, (int) $raw['stale_days']),
             'require_product_pick' => (string) $raw['require_product_pick'] === '1',
+            'cbm_from_mm' => max(1, (int) $raw['cbm_from_mm']),
+            'price_request_daily_limit' => max(0, (int) $raw['price_request_daily_limit']),
+            'price_request_valid_days' => max(1, (int) $raw['price_request_valid_days']),
         ];
     }
 
@@ -108,6 +118,19 @@ final class PricingService
         if (array_key_exists('require_product_pick', $post)) {
             $values['require_product_pick'] = (string) $post['require_product_pick'] === '1' ? '1' : '0';
         }
+        // D-255: only when the form carries them (an older form keeps the stored values).
+        foreach (['cbm_from_mm' => [1, 2000], 'price_request_daily_limit' => [0, 1000], 'price_request_valid_days' => [1, 365]] as $key => [$min, $max]) {
+            if (!array_key_exists($key, $post)) {
+                continue;
+            }
+            $n = filter_var($post[$key], FILTER_VALIDATE_INT);
+            if ($n === false || $n < $min || $n > $max) {
+                $errors[] = self::LABELS[$key] . ": enter a whole number from {$min} to {$max}.";
+                $values[$key] = '';
+            } else {
+                $values[$key] = (string) $n;
+            }
+        }
         return [$values, $errors];
     }
 
@@ -160,7 +183,18 @@ final class PricingService
     public static function pricingSupplier(int $productId): ?array
     {
         foreach (ProductSupplierRepository::forProduct($productId) as $s) {
-            if (!empty($s['is_primary'])) {
+            if (!empty($s['is_primary']) && ($s['price_basis'] ?? 'unit') === 'unit') {
+                return $s;
+            }
+        }
+        return null;
+    }
+
+    /** D-255: the per-CBM supplier row used for pricing thick stone (50 mm and above). */
+    public static function cbmSupplier(int $productId): ?array
+    {
+        foreach (ProductSupplierRepository::forProduct($productId) as $s) {
+            if (($s['price_basis'] ?? 'unit') === 'cbm' && !empty($s['is_cbm_primary'])) {
                 return $s;
             }
         }
@@ -196,11 +230,20 @@ final class PricingService
      * @param list<array<string,mixed>>|null $levels active commission levels (loaded when null)
      * @return array<string,mixed>
      */
-    public static function forProduct(array $product, ?array $levels = null, ?array $settings = null, ?bool $programOn = null): array
+    public static function forProduct(array $product, ?array $levels = null, ?array $settings = null, ?bool $programOn = null, ?array $selection = null): array
     {
         $settings ??= self::settings();
         $programOn ??= self::programOn();
-        $supplier = self::pricingSupplier((int) $product['id']);
+        // D-255: the chosen specification options (spec id => option id); null = the base product.
+        $spec = null;
+        if ($selection !== null) {
+            $offered = ProductSpecs::offered($product);
+            [$map, $specErrors] = ProductSpecs::normalize($offered, $selection);
+            $adj = ProductSpecs::adjustments($product, $offered, $map, $settings['cbm_from_mm']);
+            $spec = ['map' => $map, 'offered' => $offered, 'adj' => $adj, 'text' => ProductSpecs::describe($offered, $map),
+                'errors' => $specErrors];
+        }
+        $supplier = $spec !== null && $spec['adj']['basis'] === 'cbm' ? self::cbmSupplier((int) $product['id']) : self::pricingSupplier((int) $product['id']);
         $effective = [
             'margin_pct' => $product['pricing_margin_pct'] !== null ? (float) $product['pricing_margin_pct'] : $settings['margin_pct'],
             'other_mode' => $product['pricing_other_cost_mode'] ?? 'pct',
@@ -223,8 +266,23 @@ final class PricingService
             $overrides[] = 'buffer ' . self::pct($effective['buffer_pct']);
         }
         $out = ['supplier' => $supplier, 'effective' => $effective, 'overrides' => $overrides, 'settings' => $settings, 'program_on' => $programOn,
-            'build' => null, 'levels' => [], 'lowest' => null, 'staleness' => null, 'price_date' => null, 'missing' => null];
+            'build' => null, 'levels' => [], 'lowest' => null, 'staleness' => null, 'price_date' => null, 'missing' => null,
+            'spec' => $spec, 'manual' => false, 'unit' => $spec['adj']['unit'] ?? ((string) ($product['reference_unit'] ?? '') ?: null)];
+        if ($spec !== null && $spec['errors'] !== []) {
+            $out['missing'] = implode(' ', $spec['errors']);
+            return $out;
+        }
+        if ($spec !== null && $spec['adj']['manual'] !== null) {
+            $out['missing'] = $spec['adj']['manual'];
+            $out['manual'] = true;
+            return $out;
+        }
         if ($supplier === null) {
+            if ($spec !== null && $spec['adj']['basis'] === 'cbm') {
+                $out['missing'] = 'No per-CBM supplier price is marked "used for pricing" for thick stone yet — needs a manual price.';
+                $out['manual'] = true;
+                return $out;
+            }
             $out['missing'] = 'No supplier price is marked "used for pricing" yet.';
             return $out;
         }
@@ -242,6 +300,7 @@ final class PricingService
             'margin_pct' => $effective['margin_pct'],
             'incentive_mode' => $effective['incentive_mode'], 'incentive_value' => $effective['incentive_value'], 'program_on' => $programOn,
             'buffer_pct' => $effective['buffer_pct'],
+            'adjust' => $spec !== null ? ['pct' => $spec['adj']['pct'], 'usd' => $spec['adj']['usd'], 'qty_pct' => $spec['adj']['qty_pct']] : null,
         ]);
         $out['build'] = $build;
         foreach ($levels ?? PricingRepository::levels(true) as $l) {

@@ -22,7 +22,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
     </div>
     <div class="btn-row" style="margin-top:0">
       <a class="btn-sm btn-secondary" href="/associates">All associates</a>
-      <?php if ($canManage): ?><a class="btn-sm" href="/associates/<?= $id ?>/edit">Edit</a> <a class="btn-sm btn-secondary" href="/associates/<?= $id ?>/view-as">View their portal (read-only)</a><?php endif; ?>
+      <?php if ($canManage): ?><a class="btn-sm" href="/associates/<?= $id ?>/edit">Edit</a> <a class="btn-sm btn-secondary" href="/associates/<?= $id ?>/view-as">View their portal (read-only)</a><?php endif; ?><?php /* D-255 */ $__pu = \App\Services\AuthService::currentUser(); if ($__pu !== null && \App\Services\PermissionService::can((int) $__pu['id'], $__pu['role_id'] !== null ? (int) $__pu['role_id'] : null, 'manage_pricing')): ?> <a class="btn-sm btn-secondary" href="/associates/<?= $id ?>/price-access">Price access</a><?php endif; ?>
     </div>
   </div>
 

@@ -142,7 +142,7 @@
       <div id="product-rows">
         <?php foreach ($__oldDescriptions as $__i => $__desc): ?>
         <div class="product-row">
-          <?php $__pickerName = 'product_catalog_id[]'; $__pickerSelected = (int) ($old['product_catalog_id'][$__i] ?? 0); include __DIR__ . '/_product_picker.php'; ?>
+          <?php $__pickerName = 'product_catalog_id[]'; $__pickerSelected = (int) ($old['product_catalog_id'][$__i] ?? 0); $__pickerSpecSel = (string) ($old['product_spec_json'][$__i] ?? ''); $__pickerOrderId = null; include __DIR__ . '/_product_picker.php'; ?>
           <label>Description *<input type="text" name="product_description[]" required value="<?= htmlspecialchars((string) $__desc) ?>" placeholder="e.g. Granite Memorial Headstone"></label>
           <label>Dimensions<input type="text" name="product_dimensions[]" value="<?= htmlspecialchars((string) ($old['product_dimensions'][$__i] ?? '')) ?>" placeholder="e.g. 24x12x3 inches"></label>
           <label>Finish

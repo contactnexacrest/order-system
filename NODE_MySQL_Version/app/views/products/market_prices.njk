@@ -6,22 +6,24 @@
 <div class="card page-wide">
   <p class="muted small"><a href="/products/{{ product.id }}">&larr; Back to {{ product.name }}</a></p>
   <h1>Market Prices — {{ product.name }}</h1>
-  <p class="muted">Supplier and market prices for this product, newest first, with the one <strong>used for pricing</strong> on top. Record a new price as a new row so the history stays; a price older than {{ staleDays }} days, or past its "valid until" date, is marked. Changing the price used for pricing changes new quotes only — orders with an issued Proforma Invoice keep their prices.</p>
+  <p class="muted">Supplier and market prices for this product, newest first, with the ones <strong>used for pricing</strong> on top. A price is per the product's unit, or <strong>per CBM for thick stone ({{ cbmFrom or 50 }} mm and above)</strong> — each kind has its own price used for pricing (D-255). Record a new price as a new row so the history stays; a price older than {{ staleDays }} days, or past its "valid until" date, is marked. Changing the price used for pricing changes new quotes only — orders with an issued Proforma Invoice keep their prices.</p>
 
   <table class="list">
-    <tr><th>Used for pricing</th><th>Supplier</th><th class="num">Price (₹)</th><th>Quoted on</th><th>Valid until</th><th>Notes</th>{% if canRecord %}<th></th>{% endif %}</tr>
-    {% if not rows.length %}<tr><td colspan="7" class="muted">No supplier prices recorded yet.</td></tr>{% endif %}
+    <tr><th>Used for pricing</th><th>Supplier</th><th>Per</th><th class="num">Price (₹)</th><th>Quoted on</th><th>Valid until</th><th>Notes</th>{% if canRecord %}<th></th>{% endif %}</tr>
+    {% if not rows.length %}<tr><td colspan="8" class="muted">No supplier prices recorded yet.</td></tr>{% endif %}
     {% for r in rows %}
       <tr>
-        <td>{% if r.is_primary == 1 %}<span class="badge badge-active">● Yes</span>{% else %}<span class="muted">○</span>{% endif %}</td>
+        {% set isCbm = (r.price_basis or 'unit') == 'cbm' %}{% set used = (r.is_cbm_primary == 1) if isCbm else (r.is_primary == 1) %}
+        <td>{% if used %}<span class="badge badge-active">● Yes</span>{% else %}<span class="muted">○</span>{% endif %}</td>
         <td>{{ r.supplier_name }}{% if r.location %}<br><small class="muted">{{ r.location }}</small>{% endif %}</td>
+        <td>{% if isCbm %}<span class="badge">CBM — thick stone</span>{% else %}{{ product.reference_unit or 'unit' }}{% endif %}</td>
         <td class="num">{{ 'To Be Confirmed' if r.effective_fob == null else (r.effective_fob | money) }}{% if r.fob_source == 'computed' %}<br><small class="muted">worked out from cost components</small>{% endif %}</td>
         <td>{{ r.price_date or '—' }}{% if r.staleness == 'stale' %} <span class="badge badge-warning">stale</span>{% endif %}</td>
         <td>{% if r.valid_until %}{{ r.valid_until }}{% if r.staleness == 'expired' %} <span class="badge badge-danger">expired</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{{ r.notes or '' }}</td>
         {% if canRecord %}
           <td>
-            {% if r.is_primary != 1 %}
+            {% if not used %}
               <form method="post" action="/products/suppliers/{{ r.id }}/use-for-pricing" style="display:inline">
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                 <button type="submit" class="btn-sm">Use for pricing</button>
@@ -55,7 +57,12 @@
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <label>Supplier *<input type="text" name="supplier_name" maxlength="255" required placeholder="e.g. Sri Balaji Granites"></label>
       <label>Location<input type="text" name="location" maxlength="150" placeholder="e.g. Ongole, Andhra Pradesh"></label>
-      <label>Price (₹ per unit) *<input type="number" name="price_inr" min="0.01" step="0.01" required placeholder="e.g. 80000.00"></label>
+      <label>Price (₹) *<input type="number" name="price_inr" min="0.01" step="0.01" required placeholder="e.g. 80000.00"></label>
+      <label>Price per *
+        <select name="price_basis" required>
+          <option value="unit">The product's unit ({{ product.reference_unit or 'unit' }}) — below {{ cbmFrom or 50 }} mm</option>
+          <option value="cbm">CBM — thick stone, {{ cbmFrom or 50 }} mm and above</option>
+        </select></label>
       <label>Quoted on *<input type="date" name="quoted_on" required max="{{ today }}" value="{{ today }}"></label>
       <label>Valid until<input type="date" name="valid_until"></label>
       <label class="full">Notes<textarea name="notes" rows="2" maxlength="1000" placeholder="e.g. Ex-works, Grade A, min 2 blocks"></textarea></label>

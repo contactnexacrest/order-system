@@ -17,6 +17,10 @@
   <div class="section">
     <h2>Specifications</h2>
     <p><?= nl2br(View::e($product['specifications'])) ?></p>
+    <?php /* Owner decision D-255 (5 Nov 2026): the options that change the price. */
+    $__su = \App\Services\AuthService::currentUser(); $__sr = $__su !== null && $__su['role_id'] !== null ? (int) $__su['role_id'] : null;
+    $__canSpecs = $__su !== null && (\App\Services\PermissionService::can((int) $__su['id'], $__sr, 'view_price_buildup') || \App\Services\PermissionService::can((int) $__su['id'], $__sr, 'manage_product_specifications') || \App\Services\PermissionService::can((int) $__su['id'], $__sr, 'manage_pricing'));
+    if ($__canSpecs): ?><p><a class="btn-sm btn-secondary" href="/products/<?= (int) $product['id'] ?>/specifications">Price options (specifications)</a></p><?php endif; ?>
   </div>
 
 

@@ -35,7 +35,17 @@ function build(input) {
   if (margin < 0 || margin >= 100) throw new Error('The margin must be at least 0 and below 100 %.');
   const supplierUsd = Number(input.supplier_inr) / fx;
   const other = input.other_mode === 'usd' ? Number(input.other_value) : supplierUsd * Number(input.other_value) / 100;
-  const cost = supplierUsd + other;
+  let cost = supplierUsd + other;
+  // D-255 (5 Nov 2026): the chosen specification options change the cost — % options
+  // multiply it, fixed USD amounts are added, the quantity discount comes last — so the
+  // margin, incentive, commission and buffer are always added on top.
+  const adjust = input.adjust;
+  if (adjust && typeof adjust === 'object') {
+    for (const p of adjust.pct || []) cost *= 1 + Number(p) / 100;
+    cost += Number(adjust.usd || 0);
+    cost *= 1 + Number(adjust.qty_pct || 0) / 100;
+    if (cost <= 0) throw new Error('The chosen options bring the price to zero or below.');
+  }
   const minimum = cost / (1 - margin / 100);
   let reserve = 0;
   if (input.program_on) {

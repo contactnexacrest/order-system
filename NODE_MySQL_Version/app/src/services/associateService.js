@@ -86,7 +86,7 @@ const SUBJECTS = {
   commission_earned: 'commission earned', payout_paid: 'commission paid', payout_held: 'commission on hold',
   clawback: 'commission adjustment', bank_changed: 'your bank details changed', bank_rejected: 'your new bank details were not accepted', link_changed: 'a client link changed',
   lock_ending: 'protection ending soon', registration_lapsed: 'a buyer registration lapsed', agreement_ending: 'agreement ending soon', portal_invite: 'your portal login link',
-  document_accepted: 'your document was accepted', document_rejected: 'please upload a document again', code_changed: 'your personal code changed',
+  document_accepted: 'your document was accepted', document_rejected: 'please upload a document again', code_changed: 'your personal code changed', price_ready: 'your price is ready',
 };
 
 /** A notice in the associate's portal and, where useful, an e-mail. */

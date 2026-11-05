@@ -27,8 +27,9 @@ final class PricingEngine
      *   other_mode: string, other_value: float,
      *   margin_pct: float,
      *   incentive_mode: string, incentive_value: float, program_on: bool,
-     *   buffer_pct: float
-     * } $in  other_mode / incentive_mode: 'pct' | 'usd'
+     *   buffer_pct: float,
+     *   adjust?: array{pct?: list<float>, usd?: float, qty_pct?: float}
+     * } $in  other_mode / incentive_mode: 'pct' | 'usd'; adjust: D-255 specification options
      * @return array{supplier_usd: float, other_costs: float, cost: float, minimum: float, reserve: float, staff_floor: float, staff_quote: float, raw: array<string,float>}
      */
     public static function build(array $in): array
@@ -44,6 +45,20 @@ final class PricingEngine
         $supplierUsd = (float) $in['supplier_inr'] / $fx;
         $other = $in['other_mode'] === 'usd' ? (float) $in['other_value'] : $supplierUsd * (float) $in['other_value'] / 100;
         $cost = $supplierUsd + $other;
+        // D-255 (5 Nov 2026): the chosen specification options change the cost — % options
+        // multiply it, fixed USD amounts are added, the quantity discount comes last — so the
+        // margin, incentive, commission and buffer are always added on top.
+        $adjust = $in['adjust'] ?? null;
+        if (is_array($adjust)) {
+            foreach ((array) ($adjust['pct'] ?? []) as $p) {
+                $cost *= 1 + (float) $p / 100;
+            }
+            $cost += (float) ($adjust['usd'] ?? 0);
+            $cost *= 1 + (float) ($adjust['qty_pct'] ?? 0) / 100;
+            if ($cost <= 0) {
+                throw new \InvalidArgumentException('The chosen options bring the price to zero or below.');
+            }
+        }
         $minimum = $cost / (1 - $margin / 100);
         $reserve = 0.0;
         if ($in['program_on']) {

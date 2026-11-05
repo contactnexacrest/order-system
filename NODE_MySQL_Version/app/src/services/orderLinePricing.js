@@ -87,9 +87,10 @@ async function context(order) {
 }
 
 /** Live figures for a product in this order's context, or { missing }. */
-async function liveFigures(product, ctx) {
-  const p = await pricingService.forProduct(product, []);
-  if (!p.build) return { missing: String(p.missing) };
+async function liveFigures(product, ctx, selection = null) {
+  // D-255: with the line's chosen specification options (null = the base product).
+  const p = await pricingService.forProduct(product, [], null, null, selection);
+  if (!p.build) return { missing: String(p.missing), manual: !!p.manual };
   const b = p.build;
   let floor = b.staff_floor;
   let quote = b.staff_quote;
@@ -114,7 +115,58 @@ async function liveFigures(product, ctx) {
     program_on: p.program_on, fx_rate: p.settings.pricing_fx_rate,
     supplier_inr: p.supplier_inr ?? null,
     supplier_id: p.supplier && p.supplier.id ? Number(p.supplier.id) : null,
+    unit: p.unit, spec_text: p.spec ? p.spec.text : null, spec_map: p.spec ? p.spec.map : null,
   };
+}
+
+const intOk = (v) => /^\s*[+-]?(0|[1-9]\d*)\s*$/.test(String(v));
+
+/** D-255: a line's chosen options from the form (JSON {spec id: option id}); null when none. */
+function selectionInput(raw) {
+  let data;
+  if (raw && typeof raw === 'object') {
+    data = raw;
+  } else {
+    raw = String(raw ?? '').trim();
+    if (raw === '') return null;
+    try { data = JSON.parse(raw); } catch (e) { return null; }
+  }
+  if (!data || typeof data !== 'object' || !Object.keys(data).length) return null;
+  const out = {};
+  for (const [spec, option] of Object.entries(data)) {
+    if (intOk(spec) && (typeof option === 'number' ? Number.isInteger(option) : intOk(option))) out[parseInt(spec, 10)] = parseInt(option, 10);
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** D-255: stores a line's chosen options and the price request it came from. */
+async function saveSelection(lineId, selection, priceRequestId) {
+  await db.execute('UPDATE order_products SET spec_selection = :s, price_request_id = :pr WHERE id = :id',
+    { s: selection !== null && selection !== undefined ? JSON.stringify(selection) : null, pr: priceRequestId ?? null, id: lineId });
+}
+
+/** D-255: a line's options as stored (null = none). */
+function lineSelection(line) {
+  return selectionInput(String(line.spec_selection ?? ''));
+}
+
+/** D-255: the figures of the price request a line came from, while it still follows it. */
+async function priceRequestFigures(line) {
+  if (!line.price_request_id) return null;
+  const r = await require('./priceRequestService').find(Number(line.price_request_id));
+  let f = null;
+  if (r && r.figures) { try { f = JSON.parse(r.figures); } catch (e) { f = null; } }
+  if (!f || typeof f !== 'object') return null;
+  if (f.minimum === undefined || f.minimum === null) f.minimum = f.floor;
+  f.price_request = r.number;
+  return f;
+}
+
+/** D-255: the quote and floor for a product with chosen options, for the order form (never cost). */
+async function lineQuote(product, ctx, selection) {
+  const f = await liveFigures(product, ctx, selection);
+  if (f.missing !== undefined) return { ok: false, reason: f.missing, manual: !!f.manual };
+  return { ok: true, quote: f.quote, floor: f.floor, unit: f.unit, spec_text: f.spec_text };
 }
 
 /** Whether a line is in scope of the check at all, with the reason when not. */
@@ -148,8 +200,15 @@ async function checkLine(line, ctx, product = null) {
     figures = snapshot;
     out.fixed = true;
   } else {
-    product = product || await require('../repositories/productRepository').find(Number(line.catalog_product_id));
-    figures = product ? await liveFigures(product, ctx) : { missing: 'The product is no longer in Products.' };
+    const prFigures = await priceRequestFigures(line);
+    if (prFigures !== null) {
+      // D-255: a line from a price request keeps the request's prices.
+      figures = prFigures;
+      out.fixed = true;
+    } else {
+      product = product || await require('../repositories/productRepository').find(Number(line.catalog_product_id));
+      figures = product ? await liveFigures(product, ctx, lineSelection(line)) : { missing: 'The product is no longer in Products.' };
+    }
   }
   if (approvalHolds(line)) {
     out.approval = {
@@ -221,13 +280,32 @@ async function pickRefusal(currencyCode, catalogProductId, lineType) {
 }
 
 /** Refuses a price below the product's minimum price before it is saved. Null when the price may be saved. */
-async function saveRefusal(order, catalogProductId, lineType, unitPrice, seesBuildup) {
-  if (!catalogProductId || lineType !== 'goods' || unitPrice === null || unitPrice === undefined || unitPrice === '') return null;
+async function saveRefusal(order, catalogProductId, lineType, unitPrice, seesBuildup, selection = null, unit = null, priceRequest = null) {
+  if (!catalogProductId || lineType !== 'goods') return null;
   const ctx = await context(order);
   if (!ctx.usd) return null;
   const product = await require('../repositories/productRepository').find(Number(catalogProductId));
   if (!product) return null;
-  const f = await liveFigures(product, ctx);
+  // D-255: 50 mm and above is priced per CBM — the line's unit must say so.
+  if (selection !== null && selection !== undefined) {
+    const productSpecs = require('./productSpecs');
+    const settings = await pricingService.settings();
+    const offered = await productSpecs.offered(product);
+    const [map, errors] = productSpecs.normalize(offered, selection);
+    if (errors.length) return errors.join(' ');
+    const adj = productSpecs.adjustments(product, offered, map, settings.cbm_from_mm);
+    if (adj.basis === 'cbm' && String(unit ?? '').toUpperCase() !== 'CBM') {
+      return `A thickness of ${(parseInt(product.cbm_from_mm, 10) || 0) || settings.cbm_from_mm} mm and above is priced per CBM — set the unit to CBM and the quantity in CBM.`;
+    }
+  }
+  if (unitPrice === null || unitPrice === undefined || unitPrice === '') return null;
+  let f;
+  if (priceRequest && priceRequest.figures) {
+    f = JSON.parse(priceRequest.figures);
+    if (f.minimum === undefined || f.minimum === null) f.minimum = f.floor ?? 0;
+  } else {
+    f = await liveFigures(product, ctx, selection);
+  }
   if (f.missing !== undefined || Number(unitPrice) >= Number(f.minimum) - 0.0001) return null;
   return `This price is below what NexaCrest can accept for ${product.name} — raise it.`
     + (seesBuildup ? ` Minimum price: USD ${money(f.minimum)}; to go lower, change the product's margin (Products → pricing).` : '');
@@ -388,7 +466,8 @@ async function snapshotForPi(orderId) {
     if (line.price_snapshot || scope(line, ctx) !== null) continue;
     const product = await productRepository.find(Number(line.catalog_product_id));
     if (!product) continue;
-    const f = await liveFigures(product, ctx);
+    // D-255: a line from a price request fixes the request's prices; else the line's options.
+    const f = (await priceRequestFigures(line)) ?? await liveFigures(product, ctx, lineSelection(line));
     if (f.missing !== undefined) continue;
     f.fixed_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
     await db.execute('UPDATE order_products SET price_snapshot = :s WHERE id = :id AND price_snapshot IS NULL', { s: JSON.stringify(f), id: Number(line.id) });
@@ -408,6 +487,30 @@ async function pickerPrices(pickerProducts) {
     const prices = { staff: [p.build.staff_quote, p.build.staff_floor] };
     for (const l of p.levels) prices[`L${l.id}`] = [l.quote, l.floor];
     out[Number(pp.id)] = prices;
+  }
+  return out;
+}
+
+/**
+ * D-255: each picker product's specifications and options — names only (no values,
+ * no cost), and whether an option is priced per CBM — for the order form's option selects.
+ */
+async function pickerSpecs(pickerProducts) {
+  const productSpecs = require('./productSpecs');
+  const cbmFrom = (await pricingService.settings()).cbm_from_mm;
+  const productRepository = require('../repositories/productRepository');
+  const out = {};
+  for (const pp of pickerProducts) {
+    const product = await productRepository.find(Number(pp.id));
+    if (!product) continue;
+    const from = (parseInt(product.cbm_from_mm, 10) || 0) > 0 ? parseInt(product.cbm_from_mm, 10) : cbmFrom;
+    const specs = (await productSpecs.offered(product)).map((s) => ({
+      id: s.id, name: s.name, options: s.options.map((o) => ({
+        id: o.id, name: o.name, base: o.is_base,
+        cbm: s.kind === 'thickness' && (o.change_type === 'cbm' || (o.thickness_mm !== null && o.thickness_mm >= from)),
+      })),
+    }));
+    if (specs.length) out[Number(pp.id)] = specs;
   }
   return out;
 }
@@ -440,5 +543,6 @@ module.exports = {
   OK, BELOW, BELOW_MINIMUM, NO_PRICE, APPROVED, UNCHECKED, BLOCKING,
   PICK_MESSAGE, productPickRequired, pickRefusal, documentBlockReason,
   context, levelForAssociate, liveFigures, scope, approvalHolds, checkLine, forOrder, piBlockReason,
-  saveRefusal, afterSave, requestApproval, approvalView, approve, refuse, snapshotForPi, pickerPrices, clientKeys,
+  saveRefusal, afterSave, requestApproval, approvalView, approve, refuse, snapshotForPi, pickerPrices, pickerSpecs, clientKeys,
+  selectionInput, saveSelection, lineSelection, priceRequestFigures, lineQuote,
 };

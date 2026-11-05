@@ -597,6 +597,12 @@ $router->post('/incentives/settings', [$incentives, 'saveSettings'], [SessionAut
 // Associates — staff side (owner decision 1 Nov 2026, "AS all as recommended").
 $router->get('/associates', [$associateAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_associates', 'manage_associates', 'manage_associate_bank'])]);
 $router->get('/associates/new', [$associateAdmin, 'create'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
+// Owner decision D-255 (5 Nov 2026): associate price requests (queue, manual pricing) and an associate's price access.
+$priceRequests = new \App\Controllers\PriceRequestController();
+$router->get('/associates/price-requests', [$priceRequests, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
+$router->post('/associates/price-requests/{id}/price', [$priceRequests, 'price'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->get('/associates/{id}/price-access', [$priceRequests, 'access'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing')]);
+$router->post('/associates/{id}/price-access', [$priceRequests, 'saveAccess'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
 $router->post('/associates', [$associateAdmin, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 // Owner decision D-253 (4 Nov 2026, A1): associate self-registration through the MD's one-use link.
 $associateRegistration = new \App\Controllers\AssociateRegistrationController();
@@ -951,7 +957,11 @@ $router->post('/associate/code', [$associatePortal, 'chooseCode'], [AssociateAut
 $router->get('/associate/orders', [$associatePortal, 'orders'], [AssociateAuth::required()]);
 $router->get('/associate/orders/{id}', [$associatePortal, 'order'], [AssociateAuth::required()]);
 $router->get('/associate/prices', [$associatePortal, 'prices'], [AssociateAuth::required()]);
-$router->post('/associate/prices/acknowledge', [$associatePortal, 'acknowledgePrices'], [AssociateAuth::required(), CsrfCheck::verify()]);
+// Owner decision D-255 (5 Nov 2026): catalogue with no prices, get a price for chosen options (replaces P3's price range).
+$router->get('/associate/catalogue', [$associatePortal, 'catalogue'], [AssociateAuth::required()]);
+$router->get('/associate/catalogue/{id}', [$associatePortal, 'getPriceForm'], [AssociateAuth::required()]);
+$router->post('/associate/catalogue/{id}/price', [$associatePortal, 'requestPrice'], [AssociateAuth::required(), CsrfCheck::verify()]);
+$router->get('/associate/price-requests/{id}', [$associatePortal, 'priceRequest'], [AssociateAuth::required()]);
 $router->get('/associate/commission', [$associatePortal, 'commission'], [AssociateAuth::required()]);
 $router->post('/associate/commission/{id}/invoice', [$associatePortal, 'uploadInvoice'], [AssociateAuth::required(), CsrfCheck::verify()]);
 $router->get('/associate/profile', [$associatePortal, 'profile'], [AssociateAuth::required()]);
@@ -1026,6 +1036,31 @@ $router->get('/products/{id}/market-prices', [$pricing, 'marketPrices'], [Sessio
 $router->post('/products/{id}/market-prices', [$pricing, 'addMarketPrice'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
 $router->post('/products/suppliers/{supplierId}/use-for-pricing', [$pricing, 'useForPricing'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
 $router->post('/products/suppliers/{supplierId}/market-price', [$pricing, 'updateMarketDates'], [SessionAuth::required(), PermissionCheck::requires('record_market_prices'), CsrfCheck::verify()]);
+// Owner decision D-255 (5 Nov 2026): specifications that change the price — per category (manage_pricing) and per product (manage_product_specifications).
+$specs = new \App\Controllers\SpecController();
+$router->get('/pricing/specifications', [$specs, 'index'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_pricing'])]);
+$router->post('/pricing/specifications', [$specs, 'addSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/specifications/{id}', [$specs, 'updateSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/specifications/{id}/active', [$specs, 'toggleSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/specifications/{id}/delete', [$specs, 'deleteSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/specifications/{id}/options', [$specs, 'addOption'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/spec-options/{id}', [$specs, 'updateOption'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/spec-options/{id}/active', [$specs, 'toggleOption'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->post('/pricing/spec-options/{id}/delete', [$specs, 'deleteOption'], [SessionAuth::required(), PermissionCheck::requires('manage_pricing'), CsrfCheck::verify()]);
+$router->get('/products/{id}/specifications', [$specs, 'product'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_price_buildup', 'manage_product_specifications', 'manage_pricing'])]);
+$router->post('/products/{id}/specifications/settings', [$specs, 'saveProductFields'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+$router->post('/products/{id}/specifications/add', [$specs, 'addProductSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+$router->post('/products/{id}/specifications/reset', [$specs, 'resetProduct'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+$router->post('/products/{id}/specifications/{specId}', [$specs, 'saveProductSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+$router->post('/products/{id}/specifications/{specId}/hide', [$specs, 'hideProductSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+$router->post('/products/{id}/specifications/{specId}/show', [$specs, 'showProductSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+$router->post('/products/{id}/specifications/{specId}/reset', [$specs, 'resetProductSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+$router->post('/products/{id}/specifications/{specId}/options', [$specs, 'addProductOption'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+$router->post('/products/{pid}/own-specs/{id}', [$specs, 'updateSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+$router->post('/products/{pid}/own-specs/{id}/delete', [$specs, 'deleteSpec'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+$router->post('/products/{pid}/spec-options/{id}/delete', [$specs, 'deleteOption'], [SessionAuth::required(), PermissionCheck::requires('manage_product_specifications'), CsrfCheck::verify()]);
+// The order form's live quote for a product with chosen options (selling-price visibility is checked inside; never cost).
+$router->get('/pricing/line-quote', [$priceRequests, 'lineQuote'], [SessionAuth::required()]);
 
 // Test Mode's two access gates (docs/schema.sql Section V) run before
 // dispatch: the client-facing block must intercept public routes that

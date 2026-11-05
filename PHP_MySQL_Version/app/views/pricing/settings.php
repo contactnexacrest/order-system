@@ -52,6 +52,15 @@ $__ro = $canManage ? '' : ' disabled';
         </select></label>
     </fieldset>
 
+    <fieldset><legend>Specifications and associate prices (D-255)</legend>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['cbm_from_mm']) ?> *<small class="muted">From this thickness the price is per CBM, from the product's per-CBM supplier price (Market prices). A product can set its own.</small></span>
+        <input type="number" name="cbm_from_mm" min="1" max="2000" step="1" required value="<?= View::e($settings['cbm_from_mm']) ?>" placeholder="e.g. 50"<?= $__ro ?>></label>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['price_request_daily_limit']) ?> *<small class="muted">Automatic price requests an associate may make in one day; non-standard requests to our team do not count. An associate can have their own limit.</small></span>
+        <input type="number" name="price_request_daily_limit" min="0" max="1000" step="1" required value="<?= View::e($settings['price_request_daily_limit']) ?>" placeholder="e.g. 10"<?= $__ro ?>></label>
+      <label class="setting-row"><span class="setting-label"><?= View::e($labels['price_request_valid_days']) ?> *<small class="muted">How long the price an associate gets stays valid.</small></span>
+        <input type="number" name="price_request_valid_days" min="1" max="365" step="1" required value="<?= View::e($settings['price_request_valid_days']) ?>" placeholder="e.g. 7"<?= $__ro ?>></label>
+    </fieldset>
+
     <?php if ($canManage): ?><button type="submit">Save settings</button><?php else: ?><p class="muted small">Only the MD can change these settings.</p><?php endif; ?>
   </form>
 
@@ -60,7 +69,8 @@ $__ro = $canManage ? '' : ' disabled';
     <tr><th>Permission</th><th>Default roles</th></tr>
     <tr><td>Record supplier / market prices and costs to FOB</td><td>Procurement (Executive, Manager, Director), MD</td></tr>
     <tr><td>See the full price build-up</td><td>MD, ED</td></tr>
-    <tr><td>Change these settings, product overrides, commission levels and ladder</td><td>MD only</td></tr>
+    <tr><td>Change these settings, product overrides, commission levels and ladder, category specifications</td><td>MD only</td></tr>
+    <tr><td>Change one product's specifications (hide, change, add for that product)</td><td>Roles with "Manage a product's specifications" — Admin and MD to start</td></tr>
   </table>
-  <p><a class="btn-sm" href="/pricing/commission-levels">Associate commission levels and ladder</a></p>
+  <p><a class="btn-sm" href="/pricing/commission-levels">Associate commission levels and ladder</a> <a class="btn-sm" href="/pricing/specifications">Specifications</a> <a class="btn-sm" href="/associates/price-requests">Associate price requests</a></p>
 </div>

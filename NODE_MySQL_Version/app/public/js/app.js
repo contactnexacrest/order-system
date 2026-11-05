@@ -737,7 +737,9 @@
     if (el.dataset.requiredWhen && el.form && value === '') {
       var cond = el.dataset.requiredWhen.split('=');
       var other = el.form.elements.namedItem(cond[0]);
-      if (other && other.value === cond[1]) return el.dataset.requiredWhenMessage || 'This field is required.';
+      // A checkbox counts only while ticked (D-255: the associate's "something not listed" box).
+      var otherValue = other && (other.type === 'checkbox' || other.type === 'radio') ? (other.checked ? other.value : '') : (other ? other.value : '');
+      if (other && otherValue === cond[1]) return el.dataset.requiredWhenMessage || 'This field is required.';
     }
     // data-not-before="<selector>": a date that cannot be earlier than another
     // date field in the same form (e.g. a GST refund claim's period end).

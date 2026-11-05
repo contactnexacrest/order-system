@@ -24,6 +24,10 @@ const DEFAULTS = {
   incentive_value: '15.0000',
   stale_days: '60',
   require_product_pick: '1',
+  // D-255 (5 Nov 2026)
+  cbm_from_mm: '50',
+  price_request_daily_limit: '10',
+  price_request_valid_days: '7',
 };
 
 const LABELS = {
@@ -35,6 +39,9 @@ const LABELS = {
   incentive_value: 'Team incentive reserve value',
   stale_days: 'Supplier price is stale after (days)',
   require_product_pick: 'Goods lines must be picked from Products',
+  cbm_from_mm: 'Price per CBM from (mm, this thickness and above)',
+  price_request_daily_limit: 'Associate price requests per day',
+  price_request_valid_days: "An associate's price stays valid for (days)",
 };
 
 /** PHP number_format($v, $d) — comma thousands, fixed decimals. */
@@ -70,6 +77,9 @@ async function settings() {
     incentive_value: Number(raw.incentive_value),
     stale_days: Math.max(1, parseInt(raw.stale_days, 10) || 0),
     require_product_pick: String(raw.require_product_pick) === '1',
+    cbm_from_mm: Math.max(1, parseInt(raw.cbm_from_mm, 10) || 0),
+    price_request_daily_limit: Math.max(0, parseInt(raw.price_request_daily_limit, 10) || 0),
+    price_request_valid_days: Math.max(1, parseInt(raw.price_request_valid_days, 10) || 0),
   };
 }
 
@@ -117,6 +127,18 @@ function readSettingsForm(post) {
   if (Object.prototype.hasOwnProperty.call(post, 'require_product_pick')) {
     values.require_product_pick = String(post.require_product_pick) === '1' ? '1' : '0';
   }
+  // D-255: only when the form carries them (an older form keeps the stored values).
+  for (const [key, [min, max]] of Object.entries({ cbm_from_mm: [1, 2000], price_request_daily_limit: [0, 1000], price_request_valid_days: [1, 365] })) {
+    if (!Object.prototype.hasOwnProperty.call(post, key)) continue;
+    const v = String(post[key] ?? '').trim();
+    const n = /^[+-]?\d+$/.test(v) ? Number(v) : NaN;
+    if (Number.isNaN(n) || n < min || n > max) {
+      errors.push(`${LABELS[key]}: enter a whole number from ${min} to ${max}.`);
+      values[key] = '';
+    } else {
+      values[key] = String(n);
+    }
+  }
   return [values, errors];
 }
 
@@ -156,7 +178,12 @@ function readOverridesForm(post) {
 }
 
 async function pricingSupplier(productId) {
-  return (await productSupplierRepository.forProduct(productId)).find((s) => Number(s.is_primary) === 1) || null;
+  return (await productSupplierRepository.forProduct(productId)).find((s) => Number(s.is_primary) === 1 && (s.price_basis || 'unit') === 'unit') || null;
+}
+
+/** D-255: the per-CBM supplier row used for pricing thick stone (50 mm and above). */
+async function cbmSupplier(productId) {
+  return (await productSupplierRepository.forProduct(productId)).find((s) => (s.price_basis || 'unit') === 'cbm' && Number(s.is_cbm_primary) === 1) || null;
 }
 
 function ymd(d) {
@@ -181,10 +208,19 @@ function staleness(supplier, staleDays, today = null) {
 }
 
 /** The full build-up for a product, or a reason it cannot be worked out. */
-async function forProduct(product, levels = null, s = null, program = null) {
+async function forProduct(product, levels = null, s = null, program = null, selection = null) {
   s = s || (await settings());
   program = program === null ? await programOn() : program;
-  const supplier = await pricingSupplier(product.id);
+  // D-255: the chosen specification options (spec id => option id); null = the base product.
+  const productSpecs = require('./productSpecs');
+  let spec = null;
+  if (selection !== null && selection !== undefined) {
+    const offered = await productSpecs.offered(product);
+    const [map, specErrors] = productSpecs.normalize(offered, selection);
+    const adj = productSpecs.adjustments(product, offered, map, s.cbm_from_mm);
+    spec = { map, offered, adj, text: productSpecs.describe(offered, map), errors: specErrors };
+  }
+  const supplier = spec !== null && spec.adj.basis === 'cbm' ? await cbmSupplier(product.id) : await pricingSupplier(product.id);
   const has = (k) => product[k] !== null && product[k] !== undefined;
   const effective = {
     margin_pct: has('pricing_margin_pct') ? Number(product.pricing_margin_pct) : s.margin_pct,
@@ -202,8 +238,23 @@ async function forProduct(product, levels = null, s = null, program = null) {
   const out = {
     supplier, effective, overrides, settings: s, program_on: program,
     build: null, levels: [], lowest: null, staleness: null, price_date: null, missing: null,
+    spec, manual: false, unit: spec !== null ? spec.adj.unit : (String(product.reference_unit || '') || null),
   };
+  if (spec !== null && spec.errors.length) {
+    out.missing = spec.errors.join(' ');
+    return out;
+  }
+  if (spec !== null && spec.adj.manual !== null) {
+    out.missing = spec.adj.manual;
+    out.manual = true;
+    return out;
+  }
   if (supplier === null) {
+    if (spec !== null && spec.adj.basis === 'cbm') {
+      out.missing = 'No per-CBM supplier price is marked "used for pricing" for thick stone yet — needs a manual price.';
+      out.manual = true;
+      return out;
+    }
     out.missing = 'No supplier price is marked "used for pricing" yet.';
     return out;
   }
@@ -221,6 +272,7 @@ async function forProduct(product, levels = null, s = null, program = null) {
     margin_pct: effective.margin_pct,
     incentive_mode: effective.incentive_mode, incentive_value: effective.incentive_value, program_on: program,
     buffer_pct: effective.buffer_pct,
+    adjust: spec !== null ? { pct: spec.adj.pct, usd: spec.adj.usd, qty_pct: spec.adj.qty_pct } : null,
   });
   out.build = build;
   for (const l of levels || (await pricingRepository.levels(true))) {
@@ -288,6 +340,6 @@ function readLadderForm(post, levelsById) {
 }
 
 module.exports = {
-  DEFAULTS, LABELS, settings, settingsRaw, programOn, readSettingsForm, readOverridesForm, pricingSupplier, staleness, priceDate,
+  DEFAULTS, LABELS, settings, settingsRaw, programOn, readSettingsForm, readOverridesForm, pricingSupplier, cbmSupplier, staleness, priceDate,
   forProduct, levelLabel, pct, modeLabel, numberFormat, readLadderForm,
 };

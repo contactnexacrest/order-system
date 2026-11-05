@@ -1007,6 +1007,12 @@ app.get('/agreements/:id/file', requireAuth, requirePermissionAny(['view_agreeme
 // Associates — staff side (owner decision 1 Nov 2026, "AS all as recommended").
 app.get('/associates', requireAuth, requirePermissionAny(['view_associates', 'manage_associates', 'manage_associate_bank']), asyncHandler(associateAdminController.index));
 app.get('/associates/new', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.create));
+// Owner decision D-255 (5 Nov 2026): associate price requests (queue, manual pricing) and an associate's price access.
+const priceRequestController = require('./controllers/priceRequestController');
+app.get('/associates/price-requests', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(priceRequestController.index));
+app.post('/associates/price-requests/:id/price', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(priceRequestController.price));
+app.get('/associates/:id/price-access', requireAuth, requirePermission('manage_pricing'), asyncHandler(priceRequestController.access));
+app.post('/associates/:id/price-access', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(priceRequestController.saveAccess));
 app.post('/associates', requireAuth, requirePermission('manage_associates'), uploadLarge.single('agreement_file'), verifyCsrf, asyncHandler(associateAdminController.save));
 // Owner decision D-253 (4 Nov 2026, A1): associate self-registration through the MD's one-use link.
 const associateRegistrationController = require('./controllers/associateRegistrationController');
@@ -1234,6 +1240,31 @@ app.get('/products/:id/market-prices', requireAuth, requirePermissionAny(['recor
 app.post('/products/:id/market-prices', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.addMarketPrice));
 app.post('/products/suppliers/:supplierId/use-for-pricing', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.useForPricing));
 app.post('/products/suppliers/:supplierId/market-price', requireAuth, requirePermission('record_market_prices'), verifyCsrf, asyncHandler(pricingController.updateMarketDates));
+// Owner decision D-255 (5 Nov 2026): specifications that change the price — per category (manage_pricing) and per product (manage_product_specifications).
+const specController = require('./controllers/specController');
+app.get('/pricing/specifications', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_pricing']), asyncHandler(specController.index));
+app.post('/pricing/specifications', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(specController.addSpec));
+app.post('/pricing/specifications/:id', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(specController.updateSpec));
+app.post('/pricing/specifications/:id/active', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(specController.toggleSpec));
+app.post('/pricing/specifications/:id/delete', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(specController.deleteSpec));
+app.post('/pricing/specifications/:id/options', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(specController.addOption));
+app.post('/pricing/spec-options/:id', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(specController.updateOption));
+app.post('/pricing/spec-options/:id/active', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(specController.toggleOption));
+app.post('/pricing/spec-options/:id/delete', requireAuth, requirePermission('manage_pricing'), verifyCsrf, asyncHandler(specController.deleteOption));
+app.get('/products/:id/specifications', requireAuth, requirePermissionAny(['view_price_buildup', 'manage_product_specifications', 'manage_pricing']), asyncHandler(specController.product));
+app.post('/products/:id/specifications/settings', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.saveProductFields));
+app.post('/products/:id/specifications/add', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.addProductSpec));
+app.post('/products/:id/specifications/reset', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.resetProduct));
+app.post('/products/:id/specifications/:specId', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.saveProductSpec));
+app.post('/products/:id/specifications/:specId/hide', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.hideProductSpec));
+app.post('/products/:id/specifications/:specId/show', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.showProductSpec));
+app.post('/products/:id/specifications/:specId/reset', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.resetProductSpec));
+app.post('/products/:id/specifications/:specId/options', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.addProductOption));
+app.post('/products/:pid/own-specs/:id', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.updateSpec));
+app.post('/products/:pid/own-specs/:id/delete', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.deleteSpec));
+app.post('/products/:pid/spec-options/:id/delete', requireAuth, requirePermission('manage_product_specifications'), verifyCsrf, asyncHandler(specController.deleteOption));
+// The order form's live quote for a product with chosen options (selling-price visibility is checked inside; never cost).
+app.get('/pricing/line-quote', requireAuth, asyncHandler(priceRequestController.lineQuote));
 
 // --- Phase C: Stages 4-9 ---
 // (routes land here once Phase C's controllers exist)
@@ -1382,7 +1413,11 @@ app.post('/associate/code', requireAssociateAuth, verifyCsrf, asyncHandler(assoc
 app.get('/associate/orders', requireAssociateAuth, asyncHandler(associatePortalController.orders));
 app.get('/associate/orders/:id', requireAssociateAuth, asyncHandler(associatePortalController.order));
 app.get('/associate/prices', requireAssociateAuth, asyncHandler(associatePortalController.prices));
-app.post('/associate/prices/acknowledge', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.acknowledgePrices));
+// Owner decision D-255 (5 Nov 2026): catalogue with no prices, get a price for chosen options (replaces P3's price range).
+app.get('/associate/catalogue', requireAssociateAuth, asyncHandler(associatePortalController.catalogue));
+app.get('/associate/catalogue/:id', requireAssociateAuth, asyncHandler(associatePortalController.getPriceForm));
+app.post('/associate/catalogue/:id/price', requireAssociateAuth, verifyCsrf, asyncHandler(associatePortalController.requestPrice));
+app.get('/associate/price-requests/:id', requireAssociateAuth, asyncHandler(associatePortalController.priceRequest));
 app.get('/associate/commission', requireAssociateAuth, asyncHandler(associatePortalController.commission));
 app.post('/associate/commission/:id/invoice', requireAssociateAuth, uploadLarge.single('invoice_file'), verifyCsrf, asyncHandler(associatePortalController.uploadInvoice));
 app.get('/associate/profile', requireAssociateAuth, asyncHandler(associatePortalController.profile));

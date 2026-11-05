@@ -22,7 +22,7 @@ We will not use the "Business Introducer Agreement" (India) or the "Business Int
    - NexaCrest gives the associate a written price list per product, with a **quote price** and a **lowest price**.
    - The associate may negotiate only between those two prices. Their commission is the same anywhere in that range.
    - A price below the lowest price needs the **Managing Director's written approval**, and **no commission is paid on that line**.
-   - The associate must acknowledge each new price list.
+   - **Changed by D-255 (5 Nov 2026):** there is no longer a full price list to acknowledge. The associate asks for a price per product and specification in the portal ("price request"); each answer has a number, a quote price, a lowest price and a valid-until date (7 days). Please word the clause around these price requests instead of an acknowledged list.
 3. **Full payment only.**
    - Commission becomes due only when the buyer has paid the full order value.
    - Remove any pro-rata payment for part payments.
@@ -49,6 +49,15 @@ We will not use the "Business Introducer Agreement" (India) or the "Business Int
    - price lists and rate notices are given in writing, through the associate portal or by e-mail;
    - the associate's acknowledgement is recorded;
    - the latest acknowledged notice applies.
+
+## 2a. Non-circumvention and price confidentiality (new clause, D-255, 5 Nov 2026)
+
+Please add to the associate agreement:
+
+1. **No going around NexaCrest.** During the agreement and for **24 months** after it ends, the associate shall not, directly or through anyone else, buy from, sell for, or deal with any supplier, quarry, processor or transporter they came to know through NexaCrest, for any buyer they introduced or learned of through NexaCrest, without NexaCrest's written consent.
+2. **Prices are confidential.** Price requests and their answers are for the associate only. They may tell a buyer a price, but must not pass on, copy, screenshot, publish or forward the price pages, the price breakdown or any list of prices.
+3. **Fair use of price requests.** Price requests are for real enquiries. NexaCrest may limit the number per day, and may suspend price requests for an associate who asks for many prices without orders.
+4. **Remedies.** On a breach: no commission on the affected business, termination for cause, and damages (please advise whether liquidated damages are enforceable here, and a reasonable amount).
 
 ## 3. Sales Manager employment agreement: Schedule A
 

@@ -9,7 +9,7 @@
   Port of views/orders/_product_picker.php.
 #}
 <label class="full">Pick from Products <small class="muted">{{ '(needed for a goods line on a USD order — fills the line; you can still change anything)' if pickRequiredWhen else '(optional — fills the line; you can still change anything)' }}</small>
-  <select name="{{ pickerName }}" class="product-picker"{% if pickerCurrency %} data-order-currency="{{ pickerCurrency }}"{% endif %}{% if pickerKey %} data-price-key="{{ pickerKey }}"{% endif %}{% if sees.selling %} data-selling="1"{% endif %}{% if pickRequiredWhen %} data-required-when="{{ pickRequiredWhen }}" data-required-when-message="Pick this goods line from Products — on a USD order goods lines cannot be typed by hand (service and charge lines can)."{% endif %}>
+  <select name="{{ pickerName }}" class="product-picker"{% if pickerOrderId %} data-order-id="{{ pickerOrderId }}"{% endif %}{% if pickerCurrency %} data-order-currency="{{ pickerCurrency }}"{% endif %}{% if pickerKey %} data-price-key="{{ pickerKey }}"{% endif %}{% if sees.selling %} data-selling="1"{% endif %}{% if pickRequiredWhen %} data-required-when="{{ pickRequiredWhen }}" data-required-when-message="Pick this goods line from Products — on a USD order goods lines cannot be typed by hand (service and charge lines can)."{% endif %}>
     <option value="">— Type the line by hand —</option>
     {% for pp in pickerProducts %}
       {% set ppPrices = pickerPrices[pp.id] if pickerPrices else null %}
@@ -19,8 +19,12 @@
         data-specs="{{ (pp.specifications or '') | truncate(200, true, '') }}"
         data-unit="{{ pp.reference_unit or '' }}"
         {% if ppPrices %}data-prices="{{ ppPrices | dump }}"{% endif %}
+        {% if pickerSpecs and pickerSpecs[pp.id] %}data-spec-options="{{ pickerSpecs[pp.id] | dump }}"{% endif %}
         {{ 'selected' if (pickerSelected | int) == pp.id }}>{{ pp.name }} (HS {{ pp.hs_code }})</option>
     {% endfor %}
   </select>
   <span class="muted small product-picker-hint" aria-live="polite"></span>
 </label>
+{# Owner decision D-255: the product's specification options (names only — never values or cost) and the chosen ones. #}
+<div class="full spec-options" aria-live="polite"></div>
+<input type="hidden" name="{{ 'product_spec_json[]' if (pickerName | string).endsWith('[]') else 'spec_json' }}" class="spec-json" value="{{ pickerSpecSel or '' }}">

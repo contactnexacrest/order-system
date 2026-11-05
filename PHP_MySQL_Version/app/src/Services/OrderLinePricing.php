@@ -119,11 +119,12 @@ final class OrderLinePricing
      *
      * @return array<string,mixed>
      */
-    public static function liveFigures(array $product, array $ctx): array
+    public static function liveFigures(array $product, array $ctx, ?array $selection = null): array
     {
-        $p = PricingService::forProduct($product, []);
+        // D-255: with the line's chosen specification options (null = the base product).
+        $p = PricingService::forProduct($product, [], null, null, $selection);
         if ($p['build'] === null) {
-            return ['missing' => (string) $p['missing']];
+            return ['missing' => (string) $p['missing'], 'manual' => (bool) $p['manual']];
         }
         $b = $p['build'];
         $floor = $b['staff_floor'];
@@ -149,7 +150,77 @@ final class OrderLinePricing
             'program_on' => $p['program_on'], 'fx_rate' => $p['settings']['pricing_fx_rate'],
             'supplier_inr' => $p['supplier_inr'] ?? null,
             'supplier_id' => isset($p['supplier']['id']) ? (int) $p['supplier']['id'] : null,
+            'unit' => $p['unit'], 'spec_text' => $p['spec']['text'] ?? null, 'spec_map' => $p['spec']['map'] ?? null,
         ];
+    }
+
+    /** D-255: a line's chosen options from the form (JSON {spec id: option id}); null when none. */
+    public static function selectionInput(mixed $raw): ?array
+    {
+        if (is_array($raw)) {
+            $data = $raw;
+        } else {
+            $raw = trim((string) $raw);
+            if ($raw === '') {
+                return null;
+            }
+            $data = json_decode($raw, true);
+        }
+        if (!is_array($data) || $data === []) {
+            return null;
+        }
+        $out = [];
+        foreach ($data as $spec => $option) {
+            if (filter_var($spec, FILTER_VALIDATE_INT) !== false && filter_var($option, FILTER_VALIDATE_INT) !== false) {
+                $out[(int) $spec] = (int) $option;
+            }
+        }
+        ksort($out);
+        return $out === [] ? null : $out;
+    }
+
+    /** D-255: stores a line's chosen options and the price request it came from. */
+    public static function saveSelection(int $lineId, ?array $selection, ?int $priceRequestId): void
+    {
+        Database::connection()->prepare('UPDATE order_products SET spec_selection = :s, price_request_id = :pr WHERE id = :id')
+            ->execute(['s' => $selection !== null ? json_encode((object) $selection) : null, 'pr' => $priceRequestId, 'id' => $lineId]);
+    }
+
+    /** D-255: a line's options as stored (null = none). */
+    public static function lineSelection(array $line): ?array
+    {
+        return self::selectionInput((string) ($line['spec_selection'] ?? ''));
+    }
+
+    /** D-255: the figures of the price request a line came from, while it still follows it. */
+    public static function priceRequestFigures(array $line): ?array
+    {
+        if (empty($line['price_request_id'])) {
+            return null;
+        }
+        $r = PriceRequestService::find((int) $line['price_request_id']);
+        $f = $r !== null && !empty($r['figures']) ? json_decode((string) $r['figures'], true) : null;
+        if (!is_array($f)) {
+            return null;
+        }
+        $f['minimum'] ??= $f['floor'];
+        $f['price_request'] = $r['number'];
+        return $f;
+    }
+
+    /**
+     * D-255: the quote and floor for a product with chosen options, for the order form
+     * (only the seller's own two prices — never cost).
+     *
+     * @return array<string,mixed>
+     */
+    public static function lineQuote(array $product, array $ctx, ?array $selection): array
+    {
+        $f = self::liveFigures($product, $ctx, $selection);
+        if (isset($f['missing'])) {
+            return ['ok' => false, 'reason' => $f['missing'], 'manual' => !empty($f['manual'])];
+        }
+        return ['ok' => true, 'quote' => $f['quote'], 'floor' => $f['floor'], 'unit' => $f['unit'], 'spec_text' => $f['spec_text']];
     }
 
     /** Whether a line is in scope of the check at all, with the reason when not. */
@@ -193,9 +264,13 @@ final class OrderLinePricing
         if (is_array($snapshot)) {
             $figures = $snapshot;
             $out['fixed'] = true;
+        } elseif (($prFigures = self::priceRequestFigures($line)) !== null) {
+            // D-255: a line from a price request keeps the request's prices.
+            $figures = $prFigures;
+            $out['fixed'] = true;
         } else {
             $product ??= ProductRepository::find((int) $line['catalog_product_id']);
-            $figures = $product !== null ? self::liveFigures($product, $ctx) : ['missing' => 'The product is no longer in Products.'];
+            $figures = $product !== null ? self::liveFigures($product, $ctx, self::lineSelection($line)) : ['missing' => 'The product is no longer in Products.'];
         }
         if (self::approvalHolds($line)) {
             $out['approval'] = [
@@ -295,9 +370,10 @@ final class OrderLinePricing
      * Refuses a price below the product's minimum price before it is saved
      * (nobody, not even the MD, goes below it). Null when the price may be saved.
      */
-    public static function saveRefusal(array $order, ?int $catalogProductId, string $lineType, ?string $unitPrice, bool $seesBuildup): ?string
+    public static function saveRefusal(array $order, ?int $catalogProductId, string $lineType, ?string $unitPrice, bool $seesBuildup,
+        ?array $selection = null, ?string $unit = null, ?array $priceRequest = null): ?string
     {
-        if ($catalogProductId === null || $lineType !== 'goods' || $unitPrice === null || $unitPrice === '') {
+        if ($catalogProductId === null || $lineType !== 'goods') {
             return null;
         }
         $ctx = self::context($order);
@@ -308,7 +384,28 @@ final class OrderLinePricing
         if ($product === null) {
             return null;
         }
-        $f = self::liveFigures($product, $ctx);
+        // D-255: 50 mm and above is priced per CBM — the line's unit must say so.
+        if ($selection !== null) {
+            $settings = PricingService::settings();
+            $offered = ProductSpecs::offered($product);
+            [$map, $errors] = ProductSpecs::normalize($offered, $selection);
+            if ($errors !== []) {
+                return implode(' ', $errors);
+            }
+            $adj = ProductSpecs::adjustments($product, $offered, $map, $settings['cbm_from_mm']);
+            if ($adj['basis'] === 'cbm' && strtoupper((string) $unit) !== 'CBM') {
+                return 'A thickness of ' . ((int) ($product['cbm_from_mm'] ?? 0) ?: $settings['cbm_from_mm']) . ' mm and above is priced per CBM — set the unit to CBM and the quantity in CBM.';
+            }
+        }
+        if ($unitPrice === null || $unitPrice === '') {
+            return null;
+        }
+        if ($priceRequest !== null && !empty($priceRequest['figures'])) {
+            $f = json_decode((string) $priceRequest['figures'], true);
+            $f['minimum'] ??= $f['floor'] ?? 0;
+        } else {
+            $f = self::liveFigures($product, $ctx, $selection);
+        }
         if (isset($f['missing']) || (float) $unitPrice >= (float) $f['minimum'] - 0.0001) {
             return null;
         }
@@ -513,7 +610,8 @@ final class OrderLinePricing
             if ($product === null) {
                 continue;
             }
-            $f = self::liveFigures($product, $ctx);
+            // D-255: a line from a price request fixes the request's prices; else the line's options.
+            $f = self::priceRequestFigures($line) ?? self::liveFigures($product, $ctx, self::lineSelection($line));
             if (isset($f['missing'])) {
                 continue;
             }
@@ -547,6 +645,36 @@ final class OrderLinePricing
                 $prices['L' . $l['id']] = [$l['quote'], $l['floor']];
             }
             $out[(int) $pp['id']] = $prices;
+        }
+        return $out;
+    }
+
+    /**
+     * D-255: each picker product's specifications and options — names only (no values,
+     * no cost), and whether an option is priced per CBM — for the order form's option selects.
+     *
+     * @return array<int, list<array{id:int, name:string, options: list<array{id:int, name:string, base:bool, cbm:bool}>}>>
+     */
+    public static function pickerSpecs(array $pickerProducts): array
+    {
+        $cbmFrom = PricingService::settings()['cbm_from_mm'];
+        $out = [];
+        foreach ($pickerProducts as $pp) {
+            $product = ProductRepository::find((int) $pp['id']);
+            if ($product === null) {
+                continue;
+            }
+            $from = (int) ($product['cbm_from_mm'] ?? 0) > 0 ? (int) $product['cbm_from_mm'] : $cbmFrom;
+            $specs = [];
+            foreach (ProductSpecs::offered($product) as $s) {
+                $specs[] = ['id' => $s['id'], 'name' => $s['name'], 'options' => array_map(static fn (array $o): array => [
+                    'id' => $o['id'], 'name' => $o['name'], 'base' => $o['is_base'],
+                    'cbm' => $s['kind'] === 'thickness' && ($o['change_type'] === 'cbm' || ($o['thickness_mm'] !== null && $o['thickness_mm'] >= $from)),
+                ], $s['options'])];
+            }
+            if ($specs !== []) {
+                $out[(int) $pp['id']] = $specs;
+            }
         }
         return $out;
     }

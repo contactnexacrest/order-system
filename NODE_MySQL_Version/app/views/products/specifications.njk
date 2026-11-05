@@ -1,0 +1,113 @@
+{# Owner decision D-255 (5 Nov 2026): one product's specifications. It starts from its category; change only what is
+   different for this product — hide a specification or an option, change an option's value (empty = follow the
+   category), add options or specifications for this product only, or reset. PHP twin: specifications.php. #}
+{% set ro = '' if canEdit else ' disabled' %}
+{% macro csrf() %}<input type="hidden" name="_csrf" value="{{ csrfToken }}">{% endmacro %}
+{% macro badge(kind) %}{% if kind == 'category' %}<span class="badge">From category</span>{% elif kind == 'changed' %}<span class="badge badge-warning">Changed for this product</span>{% elif kind == 'product' %}<span class="badge badge-active">This product only</span>{% elif kind == 'hidden' %}<span class="badge badge-danger">Hidden for this product</span>{% endif %}{% endmacro %}
+<div class="card page-wide">
+  <p class="muted small"><a href="/products/{{ product.id }}">&larr; Back to {{ product.name }}</a></p>
+  <h1>Specifications — {{ product.name }}</h1>
+  <p class="muted">Starts from its category. Change only what is different for this product — everything else follows the category automatically, including later changes there.</p>
+  <p>{{ badge('category') }} {{ badge('changed') }} {{ badge('product') }} {{ badge('hidden') }}</p>
+
+  <form method="post" action="/products/{{ product.id }}/specifications/settings" class="field-grid">
+    {{ csrf() }}
+    <label>Category *<select name="category_id" required{{ ro }}>{% for c in categories %}<option value="{{ c.id }}"{% if c.id == categoryId %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></label>
+    <label>Priced per CBM from (mm)<input type="number" name="cbm_from_mm" min="1" max="2000" step="1" value="{{ product.cbm_from_mm if product.cbm_from_mm !== null else '' }}" placeholder="global {{ cbmFrom }}"{{ ro }}></label>
+    <fieldset class="full"><legend>Forms this product comes in (none ticked = all)</legend>
+      {% for k, l in forms %}<label class="inline"><input type="checkbox" name="forms[]" value="{{ k }}"{% if k in productForms %} checked{% endif %}{{ ro }}> {{ l }}</label> {% endfor %}
+    </fieldset>
+    {% if canEdit %}<div><button type="submit" class="btn-sm">Save</button></div>{% endif %}
+  </form>
+
+  <table class="list">
+    <tr><th>Specification</th><th>Options for this product</th><th>Actions</th></tr>
+    {% for s in tree %}
+      {% set kind = 'product' if s.source == 'product' else ('hidden' if s.hidden else ('changed' if s.changed else 'category')) %}
+      <tr id="spec-{{ s.id }}">
+        <td><b>{{ s.name }}</b> {{ badge(kind) }}</td>
+        <td>{% if s.hidden %}<span class="muted">Not offered for this product</span>{% else %}{% for o in s.options %}
+          {% set ok = 'hidden' if o.hidden else ('product' if o.source == 'product' else ('changed' if o.source == 'changed' else 'category')) %}
+          <span class="badge{{ {'hidden': ' badge-danger', 'product': ' badge-active', 'changed': ' badge-warning', 'category': ''}[ok] }}"{% if o.hidden %} style="text-decoration:line-through"{% endif %}>{{ o.name }} {{ o.change_label }}{% if o.source == 'changed' and o.category_value !== null %} (category {{ o.category_label }}){% endif %}</span>
+        {% endfor %}{% endif %}</td>
+        <td>{% if canEdit %}
+          {% if s.source == 'category' %}
+            {% if s.hidden %}
+              <form method="post" action="/products/{{ product.id }}/specifications/{{ s.id }}/show" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm">Show again</button></form>
+            {% else %}
+              <a class="btn-sm" href="/products/{{ product.id }}/specifications?edit={{ s.id }}#spec-{{ s.id }}">{{ 'Edit' if s.changed else 'Change for this product' }}</a>
+              <form method="post" action="/products/{{ product.id }}/specifications/{{ s.id }}/hide" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Not offered</button></form>
+            {% endif %}
+            {% if s.changed %}<form method="post" action="/products/{{ product.id }}/specifications/{{ s.id }}/reset" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Reset to category</button></form>{% endif %}
+          {% else %}
+            <a class="btn-sm" href="/products/{{ product.id }}/specifications?edit={{ s.id }}#spec-{{ s.id }}">Edit</a>
+            <form method="post" action="/products/{{ product.id }}/own-specs/{{ s.id }}/delete" style="display:inline" data-confirm="Remove this specification from this product?">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Remove</button></form>
+          {% endif %}
+        {% endif %}</td>
+      </tr>
+      {% if canEdit and edit == s.id %}
+        <tr><td colspan="3">
+          {% if s.source == 'category' %}
+            <h3>Edit: {{ s.name }} — {{ product.name }} only</h3>
+            <form method="post" action="/products/{{ product.id }}/specifications/{{ s.id }}">
+              {{ csrf() }}
+              <table class="list">
+                <tr><th>Option</th><th>Category value</th><th>For this product <small class="muted">(empty = same as category)</small></th><th>Offered</th></tr>
+                {% for o in s.options %}{% if o.source != 'product' %}
+                  <tr>
+                    <td>{{ o.name }}</td>
+                    <td>{{ o.category_label }}</td>
+                    <td>{% if o.change_type == 'none' or o.change_type == 'cbm' %}—{% else %}<input type="number" name="value[{{ o.id }}]" step="0.0001" value="{{ o.value if o.source == 'changed' else '' }}" aria-label="{{ o.name }} for this product" placeholder="same as category">{% endif %}</td>
+                    <td><label class="inline"><input type="checkbox" name="offered[{{ o.id }}]" value="1"{% if not o.hidden %} checked{% endif %}> offered</label></td>
+                  </tr>
+                {% endif %}{% endfor %}
+              </table>
+              <button type="submit" class="btn-sm">Save for this product</button>
+            </form>
+          {% else %}
+            <h3>Edit: {{ s.name }} (this product only)</h3>
+            <form method="post" action="/products/{{ product.id }}/own-specs/{{ s.id }}" class="field-grid">
+              {{ csrf() }}
+              <label>Name *<input type="text" name="name" required maxlength="80" value="{{ s.name }}" placeholder="e.g. Book-matching"></label>
+              <input type="hidden" name="kind" value="{{ s.kind }}"><input type="hidden" name="sort_order" value="50">
+              <div><button type="submit" class="btn-sm">Save</button></div>
+            </form>
+          {% endif %}
+          {% set own = s.options | whereEq('source', 'product') %}
+          {% if own.length %}
+            <table class="list"><tr><th>This product's own options</th><th></th></tr>
+              {% for o in own %}
+                <tr><td>{{ o.name }} {{ o.change_label }}</td>
+                  <td><form method="post" action="/products/{{ product.id }}/spec-options/{{ o.id }}/delete" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Remove</button></form></td></tr>
+              {% endfor %}
+            </table>
+          {% endif %}
+          <form method="post" action="/products/{{ product.id }}/specifications/{{ s.id }}/options" class="field-grid">
+            {{ csrf() }}
+            <label>Add an option for this product only *<input type="text" name="name" required maxlength="80" placeholder="e.g. Antique"></label>
+            <label>Change type *<select name="change_type" required>{% for k, l in changeTypes %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
+            <label>Value<input type="number" name="value" step="0.0001" placeholder="e.g. 6.00"></label>
+            <label>Thickness (mm)<input type="number" name="thickness_mm" min="1" max="2000" step="1" placeholder="e.g. 25 (thickness options)"></label>
+            <input type="hidden" name="sort_order" value="90">
+            <label class="inline"><input type="checkbox" name="is_base" value="1"> base option</label>
+            <div><button type="submit" class="btn-sm btn-accent">+ Add option</button></div>
+          </form>
+        </td></tr>
+      {% endif %}
+    {% endfor %}
+  </table>
+  {% if canEdit %}
+    <form method="post" action="/products/{{ product.id }}/specifications/add" class="field-grid">
+      {{ csrf() }}
+      <label>Add a specification for this product only *<input type="text" name="name" required maxlength="80" placeholder="e.g. Book-matching"></label>
+      <input type="hidden" name="kind" value="normal"><input type="hidden" name="sort_order" value="50">
+      <div><button type="submit" class="btn-sm btn-accent">+ Add specification</button></div>
+    </form>
+    <form method="post" action="/products/{{ product.id }}/specifications/reset" data-confirm="Reset every specification of this product to its category?">
+      {{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Reset whole product to category</button>
+    </form>
+    <p class="small muted">Untick to hide a category option for this product · type a value to change it for this product only (empty = follow the category) · add options that exist only here. If the category value changes later, this product follows it — except where you typed your own value.</p>
+  {% else %}
+    <p class="muted small">Changing a product's specifications needs the "Manage a product's specifications" permission.</p>
+  {% endif %}
+</div>

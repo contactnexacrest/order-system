@@ -330,24 +330,5 @@ final class AssociateCommissionTest extends DbTestCase
         self::assertSame('1', (string) $pdo->query("SELECT COUNT(*) FROM associate_events WHERE associate_id = {$a} AND event = 'registration_lapsed'")->fetchColumn());
     }
 
-    public function testThePortalPriceListShowsOnlyTheirTwoPricesAndIsAcknowledged(): void
-    {
-        $id = ProductRepository::create(['name' => 'P3 Black Galaxy ' . bin2hex(random_bytes(3)), 'specifications' => 'Granite block', 'hs_code' => '25161100', 'reference_unit' => 'CBM'], $this->admin);
-        $s = ProductSupplierRepository::create(['product_id' => $id, 'supplier_name' => 'Sri Balaji Granites', 'location' => null, 'contact_person' => null, 'contact_phone' => null, 'contact_email' => null,
-            'fob_source' => 'direct', 'fob_value' => 80000, 'factory_cost' => null, 'transportation_cost' => null, 'packing_cost' => null, 'loading_cost' => null, 'cha_cost' => null,
-            'is_primary' => 1, 'notes' => null], $this->admin);
-        PricingRepository::setSupplierDates($s, date('Y-m-d'), null);
-        [$a] = $this->associate('fixed', 'Level 2');
-        Database::connection()->exec("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'");
-        $list = AssociateCommission::priceList(AssociateRepository::find($a));
-        $row = array_values(array_filter($list['rows'], static fn (array $r): bool => str_starts_with($r['name'], 'P3 Black Galaxy')))[0];
-        self::assertSame(['name', 'unit', 'quote', 'lowest'], array_keys($row), 'never cost, margin or formula');
-        self::assertSame(['CBM', 1355.26], [$row['unit'], $row['lowest']], 'their lowest price at 5%: staff floor USD 1,287.50 ÷ 0.95');
-        self::assertFalse($list['acknowledged']);
-        Database::connection()->prepare('UPDATE associates SET price_list_ack_hash = :h, price_list_ack_at = NOW() WHERE id = :id')->execute(['h' => $list['hash'], 'id' => $a]);
-        self::assertTrue(AssociateCommission::priceList(AssociateRepository::find($a))['acknowledged']);
-        // Prices change (the team incentive program is switched off): the list is new and must be acknowledged again.
-        Database::connection()->exec("UPDATE incentive_settings SET setting_value = '0' WHERE setting_key = 'program_enabled'");
-        self::assertFalse(AssociateCommission::priceList(AssociateRepository::find($a))['acknowledged']);
-    }
+    // The P3 price list and its acknowledgement were replaced by price requests (owner decision D-255, 5 Nov 2026) — see D255PriceRequestsTest.
 }

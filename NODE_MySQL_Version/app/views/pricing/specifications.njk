@@ -1,0 +1,103 @@
+{# Owner decision D-255 (5 Nov 2026): Pricing → Specifications — a category's specifications and their options
+   (what changes the price). Every option changes the cost; margin, team incentive, associate commission and buffer
+   are added on top, so every option keeps the margin. PHP twin: specifications.php. #}
+{% set ro = '' if canManage else ' disabled' %}
+{% macro csrf() %}<input type="hidden" name="_csrf" value="{{ csrfToken }}">{% endmacro %}
+<div class="card page-wide">
+  <p class="muted small"><a href="/pricing/settings">&larr; Pricing settings</a></p>
+  <h1>Specifications</h1>
+  <p class="muted">What changes the price, by category. Every option is applied to the <b>cost</b>; the margin, team incentive, associate commission and buffer are then added as usual — so every option keeps your margin. The first (base) option of each changes nothing. % options multiply the cost, USD amounts are added, the quantity discount comes last. A product can hide or change any option, or add its own (Products → a product → Specifications).</p>
+  <form method="get" action="/pricing/specifications" class="field-grid">
+    <label>Category
+      <select name="category" onchange="this.form.submit()">
+        {% for c in categories %}<option value="{{ c.id }}"{% if c.id == categoryId %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+      </select></label>
+  </form>
+  <table class="list">
+    <tr><th>Order</th><th>Specification</th><th>Applies to forms</th><th>Options (first = base)</th><th>Status</th><th>Actions</th></tr>
+    {% for s in specs %}
+      <tr id="spec-{{ s.id }}">
+        <td>{{ s.sort_order }}</td>
+        <td><b>{{ s.name }}</b>{% if s.kind != 'normal' %}<br><small class="muted">{{ kinds[s.kind] }}</small>{% endif %}</td>
+        <td>{{ s.forms_label }}</td>
+        <td>{% set first = true %}{% for o in s.options %}{% if o.is_active == 1 %}{% if not first %} · {% endif %}{{ o.name }} <small class="muted">{{ o.change_label }}</small>{% set first = false %}{% endif %}{% endfor %}</td>
+        <td>{% if s.is_active == 1 %}<span class="badge badge-active">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}</td>
+        <td>
+          <a class="btn-sm" href="/pricing/specifications?category={{ categoryId }}&edit={{ s.id }}#spec-{{ s.id }}">Edit</a>
+          {% if canManage %}
+            <form method="post" action="/pricing/specifications/{{ s.id }}/active" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">{{ 'Deactivate' if s.is_active == 1 else 'Activate' }}</button></form>
+            {% if not s.used %}<form method="post" action="/pricing/specifications/{{ s.id }}/delete" style="display:inline" data-confirm="Delete this specification and its options?">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Delete</button></form>{% else %}<small class="muted">used — can only be deactivated</small>{% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% if edit == s.id %}
+        <tr><td colspan="6">
+          <h3>Edit: {{ s.name }}</h3>
+          <form method="post" action="/pricing/specifications/{{ s.id }}" class="field-grid">
+            {{ csrf() }}
+            <label>Name *<input type="text" name="name" required maxlength="80" value="{{ s.name }}" placeholder="e.g. Surface finish"{{ ro }}></label>
+            <label>Kind *<select name="kind" required{{ ro }}>{% for k, l in kinds %}<option value="{{ k }}"{% if s.kind == k %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+            <label>Order *<input type="number" name="sort_order" required min="0" max="999" step="1" value="{{ s.sort_order }}" placeholder="e.g. 3"{{ ro }}></label>
+            <fieldset class="full"><legend>Applies to forms (none ticked = all)</legend>
+              {% for k, l in forms %}<label class="inline"><input type="checkbox" name="applies_to[]" value="{{ k }}"{% if k in s.applies_list %} checked{% endif %}{{ ro }}> {{ l }}</label> {% endfor %}
+            </fieldset>
+            {% if canManage %}<div><button type="submit" class="btn-sm">Save specification</button></div>{% endif %}
+          </form>
+          <table class="list">
+            <tr><th>Option</th><th>Change type</th><th class="num">Value</th><th>Thickness (mm)</th><th>Base?</th><th>Status</th><th></th></tr>
+            {% for o in s.options %}
+              <tr>
+                <td colspan="5">
+                  <form method="post" action="/pricing/spec-options/{{ o.id }}" class="inline-form">
+                    {{ csrf() }}
+                    <input type="text" name="name" required maxlength="80" value="{{ o.name }}" aria-label="Option name" placeholder="e.g. Leather"{{ ro }}>
+                    <select name="change_type" aria-label="Change type"{{ ro }}>{% for k, l in changeTypes %}<option value="{{ k }}"{% if o.change_type == k %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+                    <input type="number" name="value" step="0.0001" value="{{ (o.value | string) | replace(r/0+$/, '') | replace(r/\.$/, '') if o.value !== null else '' }}" aria-label="Value" placeholder="e.g. 4.00 or -8"{{ ro }}>
+                    <input type="number" name="thickness_mm" min="1" max="2000" step="1" value="{{ o.thickness_mm if o.thickness_mm !== null else '' }}" aria-label="Thickness in mm" placeholder="e.g. 30"{{ ro }}>
+                    <label class="inline"><input type="checkbox" name="is_base" value="1"{% if o.is_base == 1 %} checked{% endif %}{{ ro }}> base</label>
+                    <input type="hidden" name="sort_order" value="{{ o.sort_order }}">
+                    {% if canManage %}<button type="submit" class="btn-sm">Save</button>{% endif %}
+                  </form>
+                </td>
+                <td>{% if o.is_active == 1 %}<span class="badge badge-active">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}</td>
+                <td>{% if canManage %}
+                  <form method="post" action="/pricing/spec-options/{{ o.id }}/active" style="display:inline">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">{{ 'Deactivate' if o.is_active == 1 else 'Activate' }}</button></form>
+                  {% if not o.used %}<form method="post" action="/pricing/spec-options/{{ o.id }}/delete" style="display:inline" data-confirm="Remove this option?">{{ csrf() }}<button type="submit" class="btn-sm btn-secondary">Remove</button></form>{% endif %}
+                {% endif %}</td>
+              </tr>
+            {% endfor %}
+          </table>
+          {% if canManage %}
+            <form method="post" action="/pricing/specifications/{{ s.id }}/options" class="field-grid">
+              {{ csrf() }}
+              <label>New option *<input type="text" name="name" required maxlength="80" placeholder="e.g. Antique"></label>
+              <label>Change type *<select name="change_type" required>{% for k, l in changeTypes %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
+              <label>Value<input type="number" name="value" step="0.0001" placeholder="e.g. 6.00 or -8"></label>
+              <label>Thickness (mm)<input type="number" name="thickness_mm" min="1" max="2000" step="1" placeholder="e.g. 60 (thickness options)"></label>
+              <label>Order<input type="number" name="sort_order" min="0" max="999" step="1" value="{{ s.options.length + 1 }}" placeholder="e.g. 7"></label>
+              <label class="inline"><input type="checkbox" name="is_base" value="1"> This is the base option</label>
+              <div><button type="submit" class="btn-sm btn-accent">+ Add option</button></div>
+            </form>
+          {% endif %}
+        </td></tr>
+      {% endif %}
+    {% endfor %}
+    {% if not specs.length %}<tr><td colspan="6" class="muted">No specifications for this category yet.</td></tr>{% endif %}
+  </table>
+  <p class="small muted">Not here on purpose: the destination port, CFR or CIF (freight is a separate charge; prices stay FOB) and the colour (each stone is its own product). Changes apply to every product in the category that has not changed that option itself; an option already used on an order or a price request can only be deactivated. Every change is logged; prices already issued do not change.</p>
+
+  {% if canManage %}
+    <h2>Add a specification</h2>
+    <form method="post" action="/pricing/specifications" class="field-grid">
+      {{ csrf() }}
+      <input type="hidden" name="category_id" value="{{ categoryId }}">
+      <label>Name *<input type="text" name="name" required maxlength="80" placeholder="e.g. Water-jet inlay"></label>
+      <label>Kind *<select name="kind" required>{% for k, l in kinds %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
+      <label>Order *<input type="number" name="sort_order" required min="0" max="999" step="1" value="{{ specs.length + 1 }}" placeholder="e.g. 10"></label>
+      <fieldset class="full"><legend>Applies to forms (none ticked = all)</legend>
+        {% for k, l in forms %}<label class="inline"><input type="checkbox" name="applies_to[]" value="{{ k }}"> {{ l }}</label> {% endfor %}
+      </fieldset>
+      <div><button type="submit" class="btn-sm btn-accent">+ Add specification</button></div>
+    </form>
+  {% endif %}
+</div>

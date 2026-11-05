@@ -246,12 +246,12 @@ async function marketPrices(req, res) {
       valid_until: r.valid_until ? String(r.valid_until).slice(0, 10) : null,
     });
   }
-  rows.sort((a, b) => (Number(b.is_primary) - Number(a.is_primary)) || String(b.price_date || '').localeCompare(String(a.price_date || '')));
+  rows.sort((a, b) => (Math.max(Number(b.is_primary), Number(b.is_cbm_primary || 0)) - Math.max(Number(a.is_primary), Number(a.is_cbm_primary || 0))) || String(b.price_date || '').localeCompare(String(a.price_date || '')));
   const quotes = (await pricingRepository.purchaseQuotesForProduct(id)).map((q) => ({
     ...q, recorded_on: String(q.recorded_at).slice(0, 10), valid_until: q.valid_until ? String(q.valid_until).slice(0, 10) : null,
   }));
   res.renderView('products/market_prices', {
-    product, rows, staleDays: s.stale_days, quotes, canRecord: can(req, 'record_market_prices'), today: todayYmd(),
+    product, rows, staleDays: s.stale_days, cbmFrom: s.cbm_from_mm, quotes, canRecord: can(req, 'record_market_prices'), today: todayYmd(),
   }, 'layout/base');
 }
 
@@ -278,6 +278,8 @@ function readMarketPrice(body) {
     notes: opt('notes'),
     quoted_on: date('quoted_on'),
     valid_until: date('valid_until'),
+    // D-255: per unit, or per CBM for thick stone (50 mm and above).
+    price_basis: body.price_basis === 'cbm' ? 'cbm' : 'unit',
   };
   if (data.supplier_name === '' || [...data.supplier_name].length > 255) return [data, 'Enter the supplier\'s name.'];
   const raw = String(body.price_inr ?? '').trim();
@@ -321,9 +323,14 @@ async function addMarketPrice(req, res) {
     return;
   }
   data.product_id = productId;
+  const usedForPricing = data.is_primary === 1;
+  if (data.price_basis === 'cbm') data.is_primary = 0;
   const id = await productSupplierRepository.create(data, req.user.id);
   await pricingRepository.setSupplierDates(id, data.quoted_on, data.valid_until, quoteId);
-  if (data.is_primary === 1) await productService.setPrimarySupplier(productId, id, req.user.id);
+  await pricingRepository.setSupplierBasis(id, data.price_basis);
+  if (usedForPricing && data.price_basis === 'cbm') await pricingRepository.setCbmPrimary(productId, id);
+  else if (usedForPricing) await productService.setPrimarySupplier(productId, id, req.user.id);
+  data.is_primary = usedForPricing ? 1 : 0;
   await auditLogRepository.log(req.user.id, 'MARKET_PRICE_ADDED', 'product_suppliers', id, null, null,
     `${data.supplier_name}: ₹${fmt2(data.fob_value)} quoted ${data.quoted_on}${data.is_primary ? ' (used for pricing)' : ''}`);
   flash.set(req, 'success', `Supplier price recorded${data.is_primary ? ' and used for pricing.' : '.'}`);
@@ -339,6 +346,15 @@ async function useForPricing(req, res) {
     return;
   }
   const productId = Number(s.product_id);
+  if ((s.price_basis || 'unit') === 'cbm') {
+    // D-255: the per-CBM price used for thick stone (50 mm and above).
+    const oldCbm = await pricingService.cbmSupplier(productId);
+    await pricingRepository.setCbmPrimary(productId, supplierId);
+    await auditLogRepository.log(req.user.id, 'MARKET_PRICE_USED_FOR_PRICING', 'product_suppliers', supplierId, 'is_cbm_primary', oldCbm ? `${oldCbm.supplier_name} #${oldCbm.id}` : null, `${s.supplier_name} #${supplierId}`);
+    flash.set(req, 'success', `${s.supplier_name}'s per-CBM price is now used for thick stone. New quotes use it.`);
+    res.redirect(`/products/${productId}/market-prices`);
+    return;
+  }
   const old = await pricingService.pricingSupplier(productId);
   await productService.setPrimarySupplier(productId, supplierId, req.user.id);
   await auditLogRepository.log(req.user.id, 'MARKET_PRICE_USED_FOR_PRICING', 'product_suppliers', supplierId, 'is_primary', old ? `${old.supplier_name} #${old.id}` : null, `${s.supplier_name} #${supplierId}`);

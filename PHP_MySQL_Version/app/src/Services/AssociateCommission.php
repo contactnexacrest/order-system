@@ -451,33 +451,4 @@ final class AssociateCommission
         }
         return $n;
     }
-
-    /**
-     * The associate's price list: for every active product with a price, their quote
-     * price and the lowest price they may agree, at the level their next order would
-     * get. Never cost, margin or formula. Records when the list last changed.
-     *
-     * @return array{level: ?array, rows: list<array{name:string, unit:string, quote:float, lowest:float}>, changed_at: ?string, acknowledged: bool, ack_at: ?string}
-     */
-    public static function priceList(array $associate): array
-    {
-        [$level] = self::levelForAssociate($associate, null);
-        $ctx = ['associate' => $associate, 'level' => $level, 'key' => 'L' . (int) ($level['id'] ?? 0), 'label' => (string) $associate['name']];
-        $rows = [];
-        foreach (\App\Repositories\ProductRepository::all(true) as $product) {
-            $f = OrderLinePricing::liveFigures($product, $ctx);
-            if (isset($f['missing'])) {
-                continue;
-            }
-            $rows[] = ['name' => (string) ($product['name'] ?? $product['product_name'] ?? ''), 'unit' => (string) ($product['reference_unit'] ?? ''),
-                'quote' => (float) $f['quote'], 'lowest' => (float) $f['floor']];
-        }
-        $hash = hash('sha256', json_encode([$level['id'] ?? null, $rows]));
-        if ($hash !== ($associate['price_list_hash'] ?? null)) {
-            Database::connection()->prepare('UPDATE associates SET price_list_hash = :h, price_list_changed_at = NOW() WHERE id = :id')->execute(['h' => $hash, 'id' => $associate['id']]);
-            $associate['price_list_changed_at'] = date('Y-m-d H:i:s');
-        }
-        return ['level' => $level, 'rows' => $rows, 'hash' => $hash, 'changed_at' => $associate['price_list_changed_at'] ?? null,
-            'acknowledged' => ($associate['price_list_ack_hash'] ?? null) === $hash, 'ack_at' => $associate['price_list_ack_at'] ?? null];
-    }
 }

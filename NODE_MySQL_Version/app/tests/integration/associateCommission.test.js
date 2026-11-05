@@ -306,22 +306,5 @@ describe('Associate commission (D-245, P3)', () => {
     expect(Number((await db.queryOne("SELECT COUNT(*) AS n FROM associate_events WHERE associate_id = :a AND event = 'registration_lapsed'", { a })).n)).toBe(1);
   });
 
-  it('the portal price list shows only their two prices and is acknowledged', async () => {
-    const id = await productRepository.create({ name: `P3 Black Galaxy ${crypto.randomBytes(3).toString('hex')}`, specifications: 'Granite block', hs_code: '25161100', reference_unit: 'CBM' }, admin.id);
-    const s = await productSupplierRepository.create({ product_id: id, supplier_name: 'Sri Balaji Granites', fob_source: 'direct', fob_value: 80000, is_primary: 1 }, admin.id);
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    await pricingRepository.setSupplierDates(s, `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, null);
-    const [a] = await associate('fixed', 'Level 2');
-    await db.execute("UPDATE incentive_settings SET setting_value = '1' WHERE setting_key = 'program_enabled'");
-    const list = await associateCommission.priceList(await associateRepository.find(a));
-    const row = list.rows.filter((r) => r.name.startsWith('P3 Black Galaxy'))[0];
-    expect(Object.keys(row)).toEqual(['name', 'unit', 'quote', 'lowest']);
-    expect([row.unit, row.lowest]).toEqual(['CBM', 1355.26]);
-    expect(list.acknowledged).toBe(false);
-    await db.execute('UPDATE associates SET price_list_ack_hash = :h, price_list_ack_at = NOW() WHERE id = :id', { h: list.hash, id: a });
-    expect((await associateCommission.priceList(await associateRepository.find(a))).acknowledged).toBe(true);
-    await db.execute("UPDATE incentive_settings SET setting_value = '0' WHERE setting_key = 'program_enabled'");
-    expect((await associateCommission.priceList(await associateRepository.find(a))).acknowledged).toBe(false);
-  });
+  // The P3 price list and its acknowledgement were replaced by price requests (owner decision D-255, 5 Nov 2026) — see d255PriceRequests.test.js.
 });

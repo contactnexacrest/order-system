@@ -147,3 +147,54 @@ entering by hand on the day the site goes live (Admin › Pricing):
 
 Commission levels and the ladder (P1/P3) and the team incentive (P4) are in use; see SOP 20
 and SOP 24.
+
+## Specifications that change the price (D-255, 5 Nov 2026)
+
+**Pricing › Specifications** (MD — manage pricing; MD and ED can view) lists, per
+category, the specifications and their options. The Natural Stone category starts
+with: Grade / quality, Thickness, Surface finish, Size / format, Edge work,
+Quantity, Packing, Treatment, Calibration. The first (base) option of each changes
+nothing; every other option changes the **cost**:
+
+- a **%** — multiplies the cost (e.g. Standard −8%, 30 mm +35%);
+- **USD per m²** — added to the cost (e.g. Leather +USD 4.00/m²);
+- **USD per running metre** — in the unit price only for products sold per running
+  metre; otherwise shown to the associate as a separate charge;
+- **USD per container** — always a separate charge (e.g. A-frame);
+- **Quantity** % — applied last (e.g. 2–4 containers −2%).
+
+Margin, team incentive, associate commission and buffer are then added as usual, so
+every option keeps the margin. Worked example (₹3,280 per m², ₹82 = USD 1, other
+costs 0%, margin 20%, incentive 15% on, buffer 3%, Level 2 = 5%): Standard · 30 mm ·
+Leather · 2–4 containers → quote **USD 73.43**, lowest **USD 71.30** per m².
+
+**Thick stone — per CBM.** From **50 mm** (setting "Price per CBM from (mm)"; a
+product can set its own) the price is per CBM and starts from the product's
+**per-CBM supplier price** (Products › Market prices › "Price per: CBM — thick
+stone", with its own "Used for pricing"). Thickness % options no longer apply;
+per-m² amounts are converted ×1000 ÷ thickness. Example at 80 mm with ₹53,300 per CBM:
+quote **USD 904.56**, lowest **USD 878.21** per CBM (≈ USD 72.36 per m²). No per-CBM
+supplier price, or "Other, 50 mm or more", goes to a manual price. On an order line
+of 50 mm or more the unit must be **CBM**; the floor check uses the CBM price.
+
+**A product's own specifications** — Products › a product › **Price options
+(specifications)**. Needs the role permission **Manage a product's
+specifications** (Admin and MD to start). A product follows its category; it can
+set its category, forms and "CBM from"; untick an option (not offered), type its
+own value (empty = follow the category, so later category changes flow through),
+hide a whole specification, add options or whole specifications for itself only,
+and reset one specification or the whole product. Badges show *From category*,
+*Changed for this product*, *This product only* and *Hidden for this product*. An
+option or specification already used on an order line or price request can only be
+deactivated. Every change is in the audit log; prices already issued do not change.
+
+**Order lines.** Picking a product on an order line shows its options; the quote and
+the floor follow them (fetched from the server — cost never reaches the browser), and
+the unit switches to CBM for 50 mm and above. The options go into the line's
+existing fields (description, dimensions, finish, unit); documents are unchanged.
+
+| Setting | Default | Where |
+|---|---|---|
+| Price per CBM from (mm) | 50 | Pricing › Settings |
+| Associate price requests per day | 10 | Pricing › Settings (per associate: Associates › Price access) |
+| An associate's price stays valid for (days) | 7 | Pricing › Settings (per associate: Associates › Price access) |

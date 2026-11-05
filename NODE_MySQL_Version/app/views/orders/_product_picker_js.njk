@@ -28,7 +28,7 @@
     var scope = select.closest('.product-row') || select.closest('form');
     var hint = scope.querySelector('.product-picker-hint');
     var price = field(scope, 'unit_price');
-    if (!opt || !opt.value) { if (hint) { hint.textContent = ''; } return; }
+    if (!opt || !opt.value) { if (hint) { hint.textContent = ''; } renderSpecs(select, false); return; }
     var desc = field(scope, 'description'); if (desc) { desc.value = opt.dataset.name || desc.value; }
     var hs = field(scope, 'hs_code'); if (hs && opt.dataset.hs) { hs.value = opt.dataset.hs; }
     var unit = field(scope, 'unit');
@@ -52,6 +52,97 @@
       text += (text ? ' · ' : '') + 'No price set for this product yet — the line will need the MD\'s approval.';
     }
     if (hint) { hint.textContent = text; }
+    // Owner decision D-255: the product's specification options; the price follows them.
+    renderSpecs(select, true);
   });
+  // ---- D-255: specification options on the order line ------------------------------------
+  function specScope(select) { return select.closest('.product-row') || select.closest('form'); }
+  function specJsonField(select) { return specScope(select).querySelector('input.spec-json'); }
+  function currentSelection(select) {
+    var f = specJsonField(select);
+    try { return f && f.value ? JSON.parse(f.value) : {}; } catch (err) { return {}; }
+  }
+  function renderSpecs(select, refresh) {
+    var scope = specScope(select);
+    var box = scope.querySelector('.spec-options');
+    var json = specJsonField(select);
+    if (!box || !json) { return; }
+    var opt = select.options[select.selectedIndex];
+    box.innerHTML = '';
+    if (!opt || !opt.value || !opt.dataset.specOptions) { json.value = ''; return; }
+    var specs = JSON.parse(opt.dataset.specOptions);
+    var chosen = refresh ? {} : currentSelection(select);
+    var sel = {};
+    specs.forEach(function (spec) {
+      var label = document.createElement('label');
+      label.className = 'spec-option';
+      label.appendChild(document.createTextNode(spec.name + ' '));
+      var s = document.createElement('select');
+      s.setAttribute('data-spec-id', spec.id);
+      s.setAttribute('aria-label', spec.name);
+      var pick = null;
+      spec.options.forEach(function (o) {
+        var el = document.createElement('option');
+        el.value = o.id;
+        el.textContent = o.name + (o.cbm ? ' (priced per CBM)' : '');
+        if (o.cbm) { el.setAttribute('data-cbm', '1'); }
+        if (String(chosen[spec.id]) === String(o.id) || (pick === null && o.base && chosen[spec.id] === undefined)) { pick = o.id; }
+        s.appendChild(el);
+      });
+      if (pick === null && spec.options.length) { pick = spec.options[0].id; }
+      s.value = String(pick);
+      sel[spec.id] = Number(pick);
+      label.appendChild(s);
+      box.appendChild(label);
+    });
+    json.value = JSON.stringify(sel);
+    if (refresh) { refreshPrice(select); }
+  }
+  function refreshPrice(select) {
+    var scope = specScope(select);
+    var price = field(scope, 'unit_price');
+    var unit = field(scope, 'unit');
+    var hint = scope.querySelector('.product-picker-hint');
+    var opt = select.options[select.selectedIndex];
+    var selection = currentSelection(select);
+    var thick = scope.querySelector('.spec-options option[data-cbm="1"]:checked');
+    // 50 mm and above is priced per CBM: the unit follows the thickness.
+    if (unit) {
+      var want = thick ? 'CBM' : (opt && opt.dataset.unit) || '';
+      if (want) { for (var i = 0; i < unit.options.length; i++) { if (unit.options[i].value === want) { unit.selectedIndex = i; } } }
+    }
+    if (select.dataset.selling !== '1' || !price || orderCurrency(select) !== 'USD' || !opt || !opt.value) { return; }
+    var q = 'product_id=' + encodeURIComponent(opt.value) + '&spec=' + encodeURIComponent(JSON.stringify(selection));
+    if (select.dataset.orderId) { q += '&order_id=' + encodeURIComponent(select.dataset.orderId); }
+    else { var client = document.querySelector('select[name="client_id"]'); if (client && client.value) { q += '&client_id=' + encodeURIComponent(client.value); } }
+    fetch('/pricing/line-quote?' + q, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) { return; }
+        if (d.ok) {
+          price.value = Number(d.quote).toFixed(2);
+          price.setAttribute('data-floor', Number(d.floor).toFixed(2));
+          if (hint) { hint.textContent = 'Quote price USD ' + Number(d.quote).toFixed(2) + ' per ' + d.unit + (d.spec_text ? ' (' + d.spec_text + ')' : '') + ' filled in; your lowest price is USD ' + Number(d.floor).toFixed(2) + '.'; }
+        } else {
+          price.removeAttribute('data-floor');
+          if (hint) { hint.textContent = d.reason + ' The line will need the MD\'s approval.'; }
+        }
+        price.dispatchEvent(new CustomEvent('floor-changed', { bubbles: true }));
+      })
+      .catch(function () {});
+  }
+  document.addEventListener('change', function (e) {
+    var s = e.target.closest && e.target.closest('.spec-options select');
+    if (!s) { return; }
+    var scope = s.closest('.product-row') || s.closest('form');
+    var picker = scope.querySelector('select.product-picker');
+    var json = scope.querySelector('input.spec-json');
+    var sel = {};
+    scope.querySelectorAll('.spec-options select').forEach(function (x) { sel[x.getAttribute('data-spec-id')] = Number(x.value); });
+    if (json) { json.value = JSON.stringify(sel); }
+    if (picker) { refreshPrice(picker); }
+  });
+  // An edited line shows its saved options without changing its price.
+  document.querySelectorAll('select.product-picker').forEach(function (select) { if (select.value) { renderSpecs(select, false); } });
 })();
 </script>

@@ -361,30 +361,90 @@ final class AssociatePortalController
             'commissionSettings' => \App\Services\AssociateCommission::settings()]);
     }
 
-    /**
-     * Owner decision D-245 P3: the associate's price range — per product, the quote price
-     * and the lowest price they may agree, never cost or formula. A dated notice they
-     * acknowledge whenever the prices change.
-     */
+    /** D-255 (5 Nov 2026): the P3 price list is replaced by the catalogue and price requests. */
     public function prices(array $params): void
     {
-        $me = self::me();
-        self::render('prices', ['list' => \App\Services\AssociateCommission::priceList($me)]);
+        header('Location: /associate/catalogue');
     }
 
-    public function acknowledgePrices(array $params): void
+    /**
+     * Owner decision D-255 (5 Nov 2026): the catalogue — products the associate may
+     * price, with no prices, supplier names or quarry locations; "Get price" on each.
+     */
+    public function catalogue(array $params): void
     {
         $me = self::me();
-        $list = \App\Services\AssociateCommission::priceList($me);
-        if (($_POST['hash'] ?? '') !== $list['hash']) {
-            Flash::set('error', 'The prices changed while you were reading them — please look at the new list and acknowledge it again.');
-        } else {
-            \App\Config\Database::connection()->prepare('UPDATE associates SET price_list_ack_hash = :h, price_list_ack_at = NOW() WHERE id = :id')->execute(['h' => $list['hash'], 'id' => $me['id']]);
-            AssociateEventRepository::add((int) $me['id'], 'prices_acknowledged', 'Price list dated ' . \App\Helpers\Dates::short(substr((string) $list['changed_at'], 0, 10)) . ' acknowledged.', null, null, null, null, false);
-            AuditLogRepository::log(null, 'ASSOCIATE_PRICES_ACKNOWLEDGED', 'associates', (int) $me['id'], 'price_list', null, $list['hash']);
-            Flash::set('success', 'Thank you — your acknowledgement of this price list is recorded.');
+        self::render('catalogue', [
+            'products' => \App\Services\PriceRequestService::catalogue($me),
+            'left' => \App\Services\PriceRequestService::leftToday($me),
+            'limit' => \App\Services\PriceRequestService::dailyLimit($me),
+            'requests' => array_map(static function (array $r): array { unset($r['figures']); return $r; }, \App\Services\PriceRequestService::forAssociate((int) $me['id'], 20)), // never the full figures (cost) — D-255
+        ]);
+    }
+
+    public function getPriceForm(array $params): void
+    {
+        $me = self::me();
+        $product = \App\Repositories\ProductRepository::find((int) ($params['id'] ?? 0));
+        if ($product === null || !\App\Services\PriceRequestService::mayPrice($me, $product)) {
+            Flash::set('error', 'That product is not in your catalogue.');
+            header('Location: /associate/catalogue');
+            return;
         }
-        header('Location: /associate/prices');
+        self::render('get_price', [
+            'product' => $product,
+            'specs' => \App\Services\ProductSpecs::offered($product),
+            'left' => \App\Services\PriceRequestService::leftToday($me),
+        ]);
+    }
+
+    public function requestPrice(array $params): void
+    {
+        $me = self::me();
+        $productId = (int) ($params['id'] ?? 0);
+        if (self::refuseWhenSuspended($me, "/associate/catalogue/{$productId}")) {
+            return;
+        }
+        $product = \App\Repositories\ProductRepository::find($productId);
+        if ($product === null) {
+            Flash::set('error', 'That product is not in your catalogue.');
+            header('Location: /associate/catalogue');
+            return;
+        }
+        $selection = [];
+        foreach ((array) ($_POST['spec'] ?? []) as $specId => $optionId) {
+            if (filter_var($specId, FILTER_VALIDATE_INT) !== false && filter_var($optionId, FILTER_VALIDATE_INT) !== false) {
+                $selection[(int) $specId] = (int) $optionId;
+            }
+        }
+        [$id, $error] = \App\Services\PriceRequestService::create($me, $product, $selection, !empty($_POST['other']), isset($_POST['note']) ? (string) $_POST['note'] : null);
+        if ($error !== null) {
+            Flash::set('error', $error);
+            Flash::setOld($_POST);
+            header("Location: /associate/catalogue/{$productId}");
+            return;
+        }
+        header("Location: /associate/price-requests/{$id}");
+    }
+
+    public function priceRequest(array $params): void
+    {
+        $me = self::me();
+        $r = \App\Services\PriceRequestService::find((int) ($params['id'] ?? 0));
+        if ($r === null || (int) $r['associate_id'] !== (int) $me['id']) {
+            http_response_code(404);
+            Flash::set('error', 'That price request was not found.');
+            header('Location: /associate/catalogue');
+            return;
+        }
+        unset($r['figures']); // never the full figures (cost) — D-255
+        self::render('price_request', [
+            'r' => $r,
+            'product' => \App\Repositories\ProductRepository::find((int) $r['product_id']),
+            'status' => \App\Services\PriceRequestService::displayStatus($r),
+            'breakdown' => $r['breakdown'] !== null ? (json_decode((string) $r['breakdown'], true) ?: []) : [],
+            'left' => \App\Services\PriceRequestService::leftToday($me),
+        ]);
     }
 
     public function saveProfile(array $params): void

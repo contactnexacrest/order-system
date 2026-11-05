@@ -853,7 +853,7 @@
           <form method="post" action="/orders/{{ order.id }}/products/{{ p.id }}">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
             <div class="kv-grid">
-              {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = p.catalog_product_id or 0 %}{% set pickerCurrency = order.currency_code or '' %}{% set pickerKey = linePricing.ctx.key or 'staff' %}{% include "orders/_product_picker.njk" %}
+              {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = p.catalog_product_id or 0 %}{% set pickerCurrency = order.currency_code or '' %}{% set pickerKey = linePricing.ctx.key or 'staff' %}{% set pickerSpecSel = p.spec_selection or '' %}{% set pickerOrderId = order.id %}{% include "orders/_product_picker.njk" %}
               <label>Description *<input type="text" name="description" value="{{ p.description }}" required placeholder="e.g. Granite slabs, polished"></label>
               <label>Dimensions<input type="text" name="dimensions" value="{{ p.dimensions or '' }}" placeholder="e.g. 240 x 120 x 2 cm"></label>
               <label>Finish
@@ -924,7 +924,11 @@
         <form method="post" action="/orders/{{ order.id }}/products">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           <div class="kv-grid">
-            {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = 0 %}{% set pickerCurrency = order.currency_code or '' %}{% set pickerKey = linePricing.ctx.key or 'staff' %}{% include "orders/_product_picker.njk" %}
+            {% set pickerName = 'catalog_product_id' %}{% set pickerSelected = 0 %}{% set pickerCurrency = order.currency_code or '' %}{% set pickerKey = linePricing.ctx.key or 'staff' %}{% set pickerSpecSel = '' %}{% set pickerOrderId = order.id %}{% include "orders/_product_picker.njk" %}
+            {% if sees.selling and linePricing.ctx.associate %}{# Owner decision D-255: a line from the associate's price request #}
+              <label class="full">From the associate's price request <small class="muted">(optional — fills the product, options, price and unit from a valid request; you can still change the price)</small>
+                <input type="text" name="price_request_number" maxlength="20" pattern="[Pp][Rr]-[0-9]{2}-[0-9]{2}-[0-9]{4}" placeholder="e.g. PR-26-05-0042"></label>
+            {% endif %}
             <label>Description *<input type="text" name="description" required placeholder="e.g. Granite slabs, polished"></label>
             <label>Dimensions<input type="text" name="dimensions" placeholder="e.g. 240 x 120 x 2 cm"></label>
             <label>Finish

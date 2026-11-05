@@ -17,7 +17,7 @@
     </div>
     <div class="btn-row" style="margin-top:0">
       <a class="btn-sm btn-secondary" href="/associates">All associates</a>
-      {% if canManage %}<a class="btn-sm" href="/associates/{{ id }}/edit">Edit</a> <a class="btn-sm btn-secondary" href="/associates/{{ id }}/view-as">View their portal (read-only)</a>{% endif %}
+      {% if canManage %}<a class="btn-sm" href="/associates/{{ id }}/edit">Edit</a> <a class="btn-sm btn-secondary" href="/associates/{{ id }}/view-as">View their portal (read-only)</a>{% endif %}{# D-255 #}{% if permissions.manage_pricing %} <a class="btn-sm btn-secondary" href="/associates/{{ id }}/price-access">Price access</a>{% endif %}
     </div>
   </div>
 

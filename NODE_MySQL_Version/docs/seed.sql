@@ -2280,3 +2280,78 @@ SELECT k, l, p, 1, o FROM (
   SELECT 'logistics', 'Logistics', 15.00, 6 UNION ALL
   SELECT 'accounts', 'Accounts', 10.00, 7
 ) d WHERE NOT EXISTS (SELECT 1 FROM incentive_roles r WHERE r.role_key = d.k);
+
+-- Owner decision D-255 (5 Nov 2026): specification settings, the new permission, and the
+-- starting specifications for Natural Stone (the MD edits them in Admin → Pricing → Specifications).
+INSERT IGNORE INTO pricing_settings (setting_key, setting_value) VALUES
+  ('cbm_from_mm', '50'),                -- 50 mm and above is priced per CBM
+  ('price_request_daily_limit', '10'),  -- an associate's automatic price requests per day
+  ('price_request_valid_days', '7');    -- how long an associate's price stays valid
+
+INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
+  ('manage_product_specifications', 'Manage a product''s specifications', 'Change one product''s specifications: hide a specification or option, change an option''s value, add options or specifications for that product only, reset to the category. D-255: privileged roles (Admin, MD to start).', 'catalog');
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'manage_product_specifications'
+  AND r.name IN ('Admin', 'Managing Director');
+
+INSERT INTO spec_definitions (category_id, name, kind, applies_to, sort_order)
+SELECT c.id, d.n, d.k, d.a, d.o FROM product_categories c
+JOIN (SELECT 'Grade / quality' AS n, 'normal' AS k, NULL AS a, 1 AS o UNION ALL
+      SELECT 'Thickness', 'thickness', 'slab,tile', 2 UNION ALL
+      SELECT 'Surface finish', 'normal', 'slab,tile,kerb,step', 3 UNION ALL
+      SELECT 'Size / format', 'normal', 'slab,tile,block', 4 UNION ALL
+      SELECT 'Edge work', 'normal', 'tile,step,kerb', 5 UNION ALL
+      SELECT 'Quantity', 'quantity', NULL, 6 UNION ALL
+      SELECT 'Packing', 'normal', NULL, 7 UNION ALL
+      SELECT 'Treatment', 'normal', 'slab', 8 UNION ALL
+      SELECT 'Calibration', 'normal', 'tile', 9) d
+WHERE c.is_system = 1
+  AND NOT EXISTS (SELECT 1 FROM spec_definitions s WHERE s.category_id = c.id AND s.name = d.n AND s.product_id IS NULL);
+
+INSERT INTO spec_options (spec_id, name, is_base, change_type, value, thickness_mm, sort_order)
+SELECT s.id, d.n, d.b, d.t, d.v, d.mm, d.o FROM spec_definitions s
+JOIN product_categories c ON c.id = s.category_id AND c.is_system = 1
+JOIN (SELECT 'Grade / quality' AS sn, 'Premium' AS n, 1 AS b, 'none' AS t, NULL AS v, NULL AS mm, 1 AS o UNION ALL
+      SELECT 'Grade / quality', 'Standard', 0, 'pct', -8, NULL, 2 UNION ALL
+      SELECT 'Grade / quality', 'Commercial', 0, 'pct', -15, NULL, 3 UNION ALL
+      SELECT 'Thickness', '20 mm', 1, 'none', NULL, 20, 1 UNION ALL
+      SELECT 'Thickness', '15 mm', 0, 'pct', -20, 15, 2 UNION ALL
+      SELECT 'Thickness', '18 mm', 0, 'pct', -5, 18, 3 UNION ALL
+      SELECT 'Thickness', '30 mm', 0, 'pct', 35, 30, 4 UNION ALL
+      SELECT 'Thickness', '40 mm', 0, 'pct', 70, 40, 5 UNION ALL
+      SELECT 'Thickness', '50 mm', 0, 'cbm', NULL, 50, 6 UNION ALL
+      SELECT 'Thickness', '60 mm', 0, 'cbm', NULL, 60, 7 UNION ALL
+      SELECT 'Thickness', '80 mm', 0, 'cbm', NULL, 80, 8 UNION ALL
+      SELECT 'Thickness', '100 mm', 0, 'cbm', NULL, 100, 9 UNION ALL
+      SELECT 'Thickness', 'Other, 50 mm or more', 0, 'cbm', NULL, NULL, 10 UNION ALL
+      SELECT 'Surface finish', 'Polished', 1, 'none', NULL, NULL, 1 UNION ALL
+      SELECT 'Surface finish', 'Honed', 0, 'usd_m2', 1, NULL, 2 UNION ALL
+      SELECT 'Surface finish', 'Flamed', 0, 'usd_m2', 2, NULL, 3 UNION ALL
+      SELECT 'Surface finish', 'Sandblasted', 0, 'usd_m2', 3, NULL, 4 UNION ALL
+      SELECT 'Surface finish', 'Leather', 0, 'usd_m2', 4, NULL, 5 UNION ALL
+      SELECT 'Surface finish', 'Brushed', 0, 'usd_m2', 4.5, NULL, 6 UNION ALL
+      SELECT 'Size / format', 'Gangsaw slab', 1, 'none', NULL, NULL, 1 UNION ALL
+      SELECT 'Size / format', 'Cutter slab', 0, 'pct', -10, NULL, 2 UNION ALL
+      SELECT 'Size / format', 'Tiles 30×30', 0, 'pct', 5, NULL, 3 UNION ALL
+      SELECT 'Size / format', 'Tiles 60×30', 0, 'pct', 6, NULL, 4 UNION ALL
+      SELECT 'Size / format', 'Tiles 60×60', 0, 'pct', 8, NULL, 5 UNION ALL
+      SELECT 'Size / format', 'Cut-to-size', 0, 'pct', 12, NULL, 6 UNION ALL
+      SELECT 'Size / format', 'Block: gangsaw size', 0, 'none', NULL, NULL, 7 UNION ALL
+      SELECT 'Size / format', 'Block: cutter size', 0, 'pct', -12, NULL, 8 UNION ALL
+      SELECT 'Edge work', 'None', 1, 'none', NULL, NULL, 1 UNION ALL
+      SELECT 'Edge work', 'Chamfer', 0, 'usd_rm', 1.5, NULL, 2 UNION ALL
+      SELECT 'Edge work', 'Bullnose', 0, 'usd_rm', 4, NULL, 3 UNION ALL
+      SELECT 'Quantity', '1 container', 1, 'none', NULL, NULL, 1 UNION ALL
+      SELECT 'Quantity', '2–4 containers', 0, 'pct', -2, NULL, 2 UNION ALL
+      SELECT 'Quantity', '5+ containers', 0, 'pct', -4, NULL, 3 UNION ALL
+      SELECT 'Packing', 'Standard crate', 1, 'none', NULL, NULL, 1 UNION ALL
+      SELECT 'Packing', 'ISPM-15 fumigated', 0, 'usd_m2', 0.5, NULL, 2 UNION ALL
+      SELECT 'Packing', 'A-frame for slabs', 0, 'usd_container', 150, NULL, 3 UNION ALL
+      SELECT 'Treatment', 'None', 1, 'none', NULL, NULL, 1 UNION ALL
+      SELECT 'Treatment', 'Resin / epoxy', 0, 'usd_m2', 3, NULL, 2 UNION ALL
+      SELECT 'Treatment', 'Mesh backing', 0, 'usd_m2', 2, NULL, 3 UNION ALL
+      SELECT 'Calibration', 'Not calibrated', 1, 'none', NULL, NULL, 1 UNION ALL
+      SELECT 'Calibration', 'Calibrated', 0, 'pct', 4, NULL, 2) d ON d.sn = s.name
+WHERE s.product_id IS NULL
+  AND NOT EXISTS (SELECT 1 FROM spec_options o WHERE o.spec_id = s.id AND o.name = d.n AND o.product_id IS NULL);

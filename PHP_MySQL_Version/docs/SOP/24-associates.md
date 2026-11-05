@@ -347,10 +347,38 @@ challans →** opens `/associates/tds` (D-235).
    personal code and the quotation link (with the code), change the code
    (D-254, below), registered clients with how they came ("came via"),
    their orders, protection and certificate, links and codes used.
-5. **Prices** (D-245 P3): "Your price range" — each product's quote price
-   and the lowest price they may offer, at their own level. When the list
-   changes they are asked to read it again and press **I have read this
-   price range** (recorded with the date).
+5. **Catalogue and price requests** (D-255, 5 Nov 2026 — replaces the P3
+   "Your price range" page and its acknowledgement): the catalogue lists the
+   products in the categories and forms NexaCrest opened to the associate —
+   name, description, forms and finishes, with **no prices, supplier names or
+   quarry locations**. **Get price** on a product shows only that product's
+   options (grade, thickness, finish, size, edge, quantity, packing, treatment,
+   calibration). The answer comes at once: request number **PR-YY-DD-NNNN**,
+   the **quote price** and the **lowest price they may agree** at their own
+   commission level, in the right unit (per CBM from 50 mm, with an ≈ per-m²
+   figure for comparison), what each option did to the price, separate
+   charges (edge work per running metre, A-frame per container), and the date
+   it is **valid until** (7 days, setting). At most **10 automatic requests a
+   day** (setting; the MD can give one associate another limit). Ticking
+   **The buyer needs something not listed here** (with a note of at least 10
+   characters), an unlisted thickness of 50 mm or more, or a product without
+   a supplier price sends the request to our team: priced within **24 hours**,
+   not counted toward the daily limit; the associate is told in the portal and
+   by e-mail when it is priced. Prices are shown on screen only (no download
+   or export) and every request is logged. Cost is never shown.
+
+   Staff side: **Associates › Price requests** (MD, ED — view the price
+   build-up or manage pricing) lists every request, manual ones waiting first
+   with their due time; **Price it** (MD — manage pricing) enters the quote,
+   lowest price, unit and a note. Below it, **Requests and orders — last 90
+   days** per associate, with a red badge when 20 or more prices were asked
+   and no order came. This page is a work queue (like Registrations), so it
+   has no Kanban board. **Associates › an associate › Price access** (MD) sets
+   the categories and forms they may price, and their own daily limit and
+   validity (empty = the global value). On an order for that associate's
+   buyer, staff can type the **price request number** in "Add a product line":
+   the line takes the request's product, options, price and unit, the order
+   check uses the request's prices, and the request shows "Became an order".
 6. **Orders** (with the per-order commission statement), **Commission** (statement, invoice upload per payout, tax
    certificates), **Messages**, **Profile** (contact and tax details,
    bank details, documents, agreement download).

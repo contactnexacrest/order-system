@@ -1,0 +1,26 @@
+{# Owner decision D-255 (5 Nov 2026): ask for a price for one product and specification.
+   Only this product's options are offered. PHP twin: get_price.php. #}
+<div class="card page-wide">
+  <p class="muted small"><a href="/associate/catalogue">&larr; Catalogue</a></p>
+  <h1>Get price — {{ product.name }}</h1>
+  <p class="muted">{{ left }} price requests left today. A price for a standard specification comes at once; anything else goes to our team.</p>
+  <form method="post" action="/associate/catalogue/{{ product.id }}/price" class="field-grid">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    {% for s in specs %}
+      <label>{{ s.name }} *
+        <select name="spec[{{ s.id }}]" required>
+          {% for o in s.options %}
+            {% set oldSel = old.spec[s.id] if old.spec else none %}
+            {% set hasOld = oldSel is defined and oldSel !== null %}
+            <option value="{{ o.id }}"{% if (hasOld and (oldSel | string) == (o.id | string)) or (not hasOld and o.is_base) %} selected{% endif %}>{{ o.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    {% endfor %}
+    <label class="full inline"><input type="checkbox" name="other" value="1"{% if old.other %} checked{% endif %}> The buyer needs something not listed here (our team prices it within 24 hours)</label>
+    <label class="full">Notes for our team <small class="muted">(needed when something is not listed — at least 10 characters)</small>
+      <textarea name="note" rows="2" maxlength="500" data-required-when="other=1" data-required-when-message="Tell our team what the buyer needs (at least 10 characters)." minlength="10" placeholder="e.g. Buyer needs 25 mm for a hotel lobby, 1 container">{{ old.note or '' }}</textarea></label>
+    <div><button type="submit" class="btn-sm btn-accent">Get price</button></div>
+  </form>
+  <p class="small muted">Prices are FOB, per unit (per CBM for 50 mm and above), confirmed on the Proforma Invoice. They are for you only — do not pass this page on.</p>
+</div>

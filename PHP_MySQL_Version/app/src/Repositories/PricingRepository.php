@@ -154,6 +154,21 @@ final class PricingRepository
     }
 
     /** Market price dates on a supplier row. */
+    /** D-255: a supplier price per unit (the selling unit) or per CBM (thick stone). */
+    public static function setSupplierBasis(int $supplierId, string $basis): void
+    {
+        Database::connection()->prepare('UPDATE catalog_product_suppliers SET price_basis = :b, is_primary = IF(:b2 = \'cbm\', 0, is_primary) WHERE id = :id')
+            ->execute(['b' => $basis === 'cbm' ? 'cbm' : 'unit', 'b2' => $basis, 'id' => $supplierId]);
+    }
+
+    /** D-255: marks one per-CBM supplier price "used for pricing" thick stone. */
+    public static function setCbmPrimary(int $productId, int $supplierId): void
+    {
+        $pdo = Database::connection();
+        $pdo->prepare('UPDATE catalog_product_suppliers SET is_cbm_primary = 0 WHERE product_id = :p')->execute(['p' => $productId]);
+        $pdo->prepare("UPDATE catalog_product_suppliers SET is_cbm_primary = 1 WHERE id = :id AND price_basis = 'cbm'")->execute(['id' => $supplierId]);
+    }
+
     public static function setSupplierDates(int $supplierId, ?string $quotedOn, ?string $validUntil, ?int $quoteId = null): void
     {
         Database::connection()->prepare('UPDATE catalog_product_suppliers SET quoted_on = :q, valid_until = :v, purchase_quote_id = COALESCE(:pq, purchase_quote_id) WHERE id = :id')

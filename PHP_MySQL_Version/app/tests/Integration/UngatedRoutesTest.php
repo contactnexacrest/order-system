@@ -148,6 +148,10 @@ final class UngatedRoutesTest extends DbTestCase
         'GET /associate/orders associate',
         'GET /associate/orders/{} associate',
         'GET /associate/prices associate',
+        'GET /associate/catalogue associate',
+        'GET /associate/catalogue/{} associate',
+        'GET /associate/price-requests/{} associate',
+        'GET /pricing/line-quote staff',
         'GET /associate/profile associate',
         'GET /associate/set-password/{} public',
         'GET /invite/{} public',
@@ -166,7 +170,8 @@ final class UngatedRoutesTest extends DbTestCase
         'POST /associate/login/code public +csrf',
         'POST /associate/logout public +csrf',
         'POST /associate/messages associate +csrf',
-        'POST /associate/prices/acknowledge associate +csrf',
+        // Owner decision D-255 (5 Nov 2026): the catalogue and price requests replace the price-range acknowledgement.
+        'POST /associate/catalogue/{}/price associate +csrf',
         'POST /associate/profile associate +csrf',
         'POST /associate/set-password/{} public +csrf',
         'POST /quotation-details/verify public +csrf',
@@ -427,7 +432,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(40, $checked);
+        self::assertSame(41, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -472,7 +477,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(21, $checked);
+        self::assertSame(24, $checked);
         self::assertSame([], $wrong);
     }
 
@@ -564,7 +569,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(56, $checked);
+        self::assertSame(59, $checked);
         self::assertSame([], $failed);
     }
 
@@ -579,8 +584,9 @@ final class UngatedRoutesTest extends DbTestCase
             $this->signInFor($route['guard']);
             try {
                 [$code, $body] = $this->dispatch('GET', $route['pattern']);
-                // /associate/login/code and /associate/logout go to the login, /associate/agreement is 404 until an agreement is on file.
-                $redirectsOnPurpose = in_array($route['pattern'], ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement'], true);
+                // /associate/login/code and /associate/logout go to the login, /associate/agreement is 404 until an agreement is on file;
+                // D-255: /associate/prices now goes to the catalogue, /pricing/line-quote is 404 (JSON) without a product.
+                $redirectsOnPurpose = in_array($route['pattern'], ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement', '/associate/prices', '/pricing/line-quote'], true);
                 if ($code >= 500 || ($code !== 200 && !$redirectsOnPurpose) || ($code === 200 && trim($body) === '')) {
                     $failed[] = self::label($route) . " → {$code}";
                 }
@@ -590,7 +596,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(36, $checked);
+        self::assertSame(38, $checked);
         self::assertSame([], $failed);
     }
 

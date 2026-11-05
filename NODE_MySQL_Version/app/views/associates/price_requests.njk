@@ -1,0 +1,63 @@
+{# Owner decision D-255 (5 Nov 2026): the staff queue of associate price requests and the 90-day report. PHP twin: price_requests.php. #}
+<div class="card page-wide">
+  <div class="page-header-row">
+    <div>
+      <h1>Price requests</h1>
+      <p class="muted" style="margin:0">Prices associates asked for in their portal. Automatic ones are priced by the system from the specifications; a combination with no standard price comes here to be priced by hand within 24 hours.</p>
+    </div>
+    <div class="btn-row" style="margin-top:0"><a class="btn-sm btn-secondary" href="/associates">All associates</a></div>
+  </div>
+
+  <p>{% for f, l in {'all': 'All', 'pending': 'Needs a price', 'manual': 'Manual', 'auto': 'Automatic'} %}<a class="btn-sm {{ '' if filter == f else 'btn-secondary' }}" href="/associates/price-requests?show={{ f }}">{{ l }}</a> {% endfor %}</p>
+
+  <table class="list" id="price-requests">
+    <tr><th>No.</th><th>Associate</th><th>Product · specification</th><th>How</th><th class="num">Quote · lowest (USD)</th><th>Status</th></tr>
+    {% if not rows.length %}<tr><td colspan="6" class="muted">No price requests yet.</td></tr>{% endif %}
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.number }}<br><small class="muted">{{ r.requested_text }}</small></td>
+        <td><a href="/associates/{{ r.associate_id }}">{{ r.associate_name }}</a></td>
+        <td>{{ r.product_name }} · {{ r.selection_text }}
+          {% if r.other_note %}<br><small class="muted">Asked: {{ r.other_note }}</small>{% endif %}</td>
+        <td>{% if r.kind == 'manual' %}<span class="badge badge-warning">Needs a manual price</span>{% else %}<span class="badge badge-ok">Automatic</span>{% endif %}</td>
+        <td class="num">{% if r.quote !== null %}{{ r.quote | money }} · {{ r.lowest | money }} <small class="muted">per {{ r.unit }}</small>{% else %}—{% endif %}</td>
+        <td>
+          {% if r.display_status == 'pending' %}
+            <span class="muted small">due {{ r.due_text }}</span>
+            {% if canPrice %}
+              <details><summary class="btn-sm">Price it</summary>
+                <form method="post" action="/associates/price-requests/{{ r.id }}/price" class="inline-form">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <label>Quote price (USD) *<input type="number" name="quote" required min="0.01" step="0.01" placeholder="e.g. 73.43"></label>
+                  <label>Lowest price (USD) *<input type="number" name="lowest" required min="0.01" step="0.01" placeholder="e.g. 71.30"></label>
+                  <label>Per (unit) *<input type="text" name="unit" required maxlength="20" value="{{ r.unit }}" placeholder="e.g. SQM or CBM"></label>
+                  <label>Note to the associate<input type="text" name="note" maxlength="500" placeholder="e.g. priced for 30 mm, flamed"></label>
+                  <button type="submit" class="btn-sm">Send the price</button>
+                </form>
+              </details>
+            {% endif %}
+          {% elif r.display_status == 'ordered' %}Became order {% if r.order_id %}<a href="/orders/{{ r.order_id }}">#{{ r.order_id }}</a>{% endif %}
+          {% elif r.display_status == 'expired' %}Expired {{ r.valid_until | shortDate }}
+          {% elif r.display_status == 'refused' %}Refused
+          {% else %}Valid to {{ r.valid_until | shortDate }}{% if r.display_status == 'priced' %}<br><small class="muted">priced by hand</small>{% endif %}
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+
+  <div class="section">
+    <h2>Requests and orders — last 90 days</h2>
+    <table class="list" id="price-request-report">
+      <tr><th>Associate</th><th class="num">Price requests</th><th class="num">Orders</th><th class="num">Requests per order</th><th></th></tr>
+      {% if not report.length %}<tr><td colspan="5" class="muted">No price requests in the last 90 days.</td></tr>{% endif %}
+      {% for x in report %}
+        <tr><td><a href="/associates/{{ x.associate_id }}">{{ x.name }}</a></td>
+          <td class="num">{{ x.requests }}</td><td class="num">{{ x.orders }}</td>
+          <td class="num">{{ x.per_order if x.per_order !== null else '—' }}</td>
+          <td>{% if x.warn %}<span class="badge badge-danger">Many prices, no orders — check</span>{% endif %}</td></tr>
+      {% endfor %}
+    </table>
+    <p class="muted small">The warning shows when an associate has asked for {{ warnAt }} or more prices in 90 days with no order from their buyers.</p>
+  </div>
+</div>

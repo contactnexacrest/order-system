@@ -5215,12 +5215,7 @@ ALTER TABLE incentive_payouts ADD COLUMN takeback_kind ENUM('fraud','breach') NU
 -- An approved shortfall says what it is: an agreed discount or a settled claim lowers the
 -- commission basis; an unpaid amount means the order was not paid in full (no commission).
 ALTER TABLE order_payment_shortfalls ADD COLUMN settlement_kind ENUM('agreed_discount','claim_settled','unpaid') NULL;
--- The associate's price list (their quote price and lowest price per product, never cost or
--- formula): when it last changed, and when they acknowledged it.
-ALTER TABLE associates ADD COLUMN price_list_hash CHAR(64) NULL;
-ALTER TABLE associates ADD COLUMN price_list_changed_at DATETIME NULL;
-ALTER TABLE associates ADD COLUMN price_list_ack_hash CHAR(64) NULL;
-ALTER TABLE associates ADD COLUMN price_list_ack_at DATETIME NULL;
+-- (The P3 price list and its acknowledgement were replaced by D-255 price requests.)
 
 -- ================================================================
 -- Owner decision D-245 (4 Nov 2026), phase P4: the team incentive.
@@ -5328,3 +5323,127 @@ ALTER TABLE associate_codes ADD COLUMN blocked_at DATETIME NULL;
 ALTER TABLE associate_codes ADD COLUMN blocked_reason VARCHAR(300) NULL;
 -- The code a buyer registered with ("came via").
 ALTER TABLE associate_invitations ADD COLUMN code_used VARCHAR(30) NULL;
+
+-- ================================================================
+-- Owner decision D-255 (5 Nov 2026): specifications that change the price, and
+-- associate price requests. Each category has specifications (Grade, Thickness,
+-- Finish, …) with options that change the cost: a %, a USD amount per m², per
+-- running metre or per container, or "priced per CBM" (thick stone). A product
+-- follows its category and may hide a specification or an option, change an
+-- option's value, or add its own options and specifications. 50 mm and above is
+-- priced per CBM from the product's per-CBM supplier price. Associates see a
+-- catalogue without prices and ask for a price for one product and specification;
+-- the app answers at once (valid N days, N requests a day) or, for anything
+-- non-standard, sends it to staff. Go-live installs fresh (D-241): no migration.
+-- ================================================================
+CREATE TABLE spec_definitions (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  category_id BIGINT UNSIGNED NULL,                 -- a category's specification
+  product_id  BIGINT UNSIGNED NULL,                 -- or a specification for this product only
+  name        VARCHAR(80) NOT NULL,
+  kind        ENUM('normal','thickness','quantity') NOT NULL DEFAULT 'normal', -- thickness: decides m² or CBM; quantity: applied last
+  applies_to  VARCHAR(120) NULL,                    -- comma list of product forms; NULL = all forms
+  sort_order  INT NOT NULL DEFAULT 0,
+  is_active   TINYINT(1) NOT NULL DEFAULT 1,
+  updated_by  BIGINT UNSIGNED NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_spec_definitions_category (category_id),
+  KEY idx_spec_definitions_product (product_id),
+  CONSTRAINT fk_spec_definitions_category FOREIGN KEY (category_id) REFERENCES product_categories(id),
+  CONSTRAINT fk_spec_definitions_product FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE,
+  CONSTRAINT fk_spec_definitions_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE spec_options (
+  id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  spec_id      BIGINT UNSIGNED NOT NULL,
+  product_id   BIGINT UNSIGNED NULL,                -- set: an option for this product only
+  name         VARCHAR(80) NOT NULL,
+  is_base      TINYINT(1) NOT NULL DEFAULT 0,
+  change_type  ENUM('none','pct','usd_m2','usd_rm','usd_container','cbm') NOT NULL DEFAULT 'none',
+  value        DECIMAL(12,4) NULL,
+  thickness_mm INT NULL,                            -- thickness options: decides m² or CBM and converts per-m² amounts
+  sort_order   INT NOT NULL DEFAULT 0,
+  is_active    TINYINT(1) NOT NULL DEFAULT 1,
+  updated_by   BIGINT UNSIGNED NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_spec_options_spec (spec_id),
+  CONSTRAINT fk_spec_options_spec FOREIGN KEY (spec_id) REFERENCES spec_definitions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_spec_options_product FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE,
+  CONSTRAINT fk_spec_options_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+-- A product hides a whole category specification.
+CREATE TABLE product_spec_hidden (
+  product_id BIGINT UNSIGNED NOT NULL,
+  spec_id    BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (product_id, spec_id),
+  CONSTRAINT fk_product_spec_hidden_product FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE,
+  CONSTRAINT fk_product_spec_hidden_spec FOREIGN KEY (spec_id) REFERENCES spec_definitions(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+-- A product hides a category option, or changes its value (NULL value = follow the category).
+CREATE TABLE product_option_overrides (
+  product_id BIGINT UNSIGNED NOT NULL,
+  option_id  BIGINT UNSIGNED NOT NULL,
+  is_hidden  TINYINT(1) NOT NULL DEFAULT 0,
+  value      DECIMAL(12,4) NULL,
+  PRIMARY KEY (product_id, option_id),
+  CONSTRAINT fk_product_option_overrides_product FOREIGN KEY (product_id) REFERENCES catalog_products(id) ON DELETE CASCADE,
+  CONSTRAINT fk_product_option_overrides_option FOREIGN KEY (option_id) REFERENCES spec_options(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+-- A product's category (NULL = the system category, Natural Stone), the forms it comes in
+-- (comma list: block,slab,tile,kerb,step,cobble; NULL = all) and its own CBM switch-over.
+ALTER TABLE catalog_products ADD COLUMN category_id BIGINT UNSIGNED NULL;
+ALTER TABLE catalog_products ADD CONSTRAINT fk_catalog_products_category FOREIGN KEY (category_id) REFERENCES product_categories(id);
+ALTER TABLE catalog_products ADD COLUMN forms VARCHAR(120) NULL;
+ALTER TABLE catalog_products ADD COLUMN cbm_from_mm INT NULL;
+-- A supplier price per unit (the product's selling unit) or per CBM (thick stone, 50 mm and above),
+-- each with its own "used for pricing" row.
+ALTER TABLE catalog_product_suppliers ADD COLUMN price_basis ENUM('unit','cbm') NOT NULL DEFAULT 'unit';
+ALTER TABLE catalog_product_suppliers ADD COLUMN is_cbm_primary TINYINT(1) NOT NULL DEFAULT 0;
+-- What each associate may ask prices for, their own daily limit and validity (NULL = the global setting).
+ALTER TABLE associates ADD COLUMN price_request_daily_limit INT NULL;
+ALTER TABLE associates ADD COLUMN price_valid_days INT NULL;
+CREATE TABLE associate_price_access (
+  associate_id BIGINT UNSIGNED NOT NULL,
+  category_id  BIGINT UNSIGNED NOT NULL,
+  forms        VARCHAR(120) NULL,                   -- comma list of forms; NULL = all forms of the category
+  PRIMARY KEY (associate_id, category_id),
+  CONSTRAINT fk_associate_price_access_associate FOREIGN KEY (associate_id) REFERENCES associates(id) ON DELETE CASCADE,
+  CONSTRAINT fk_associate_price_access_category FOREIGN KEY (category_id) REFERENCES product_categories(id)
+) ENGINE=InnoDB;
+CREATE TABLE price_requests (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  number        VARCHAR(20) NOT NULL,
+  associate_id  BIGINT UNSIGNED NOT NULL,
+  product_id    BIGINT UNSIGNED NOT NULL,
+  selection     TEXT NOT NULL,                      -- JSON {spec id: option id}
+  selection_text VARCHAR(500) NOT NULL,             -- the options in words, e.g. "Standard · 30 mm · Leather"
+  other_note    VARCHAR(500) NULL,                  -- the associate's note for a non-standard request
+  kind          ENUM('auto','manual') NOT NULL,
+  status        ENUM('valid','pending','priced','ordered','refused') NOT NULL,
+  unit          VARCHAR(20) NULL,                   -- the unit the price is per (the product's unit, or CBM)
+  quote         DECIMAL(14,2) NULL,
+  lowest        DECIMAL(14,2) NULL,
+  figures       TEXT NULL,                          -- JSON: full figures for the order check (never shown to the associate)
+  breakdown     TEXT NULL,                          -- JSON: what the associate sees beside the price
+  level_name    VARCHAR(60) NULL,
+  valid_until   DATE NULL,
+  requested_at  DATETIME NOT NULL,
+  due_at        DATETIME NULL,                      -- manual requests: priced within 24 hours
+  priced_by     BIGINT UNSIGNED NULL,
+  priced_at     DATETIME NULL,
+  price_note    VARCHAR(500) NULL,
+  order_id      BIGINT UNSIGNED NULL,
+  UNIQUE KEY uq_price_requests_number (number),
+  KEY idx_price_requests_associate (associate_id, requested_at),
+  KEY idx_price_requests_status (status),
+  CONSTRAINT fk_price_requests_associate FOREIGN KEY (associate_id) REFERENCES associates(id),
+  CONSTRAINT fk_price_requests_product FOREIGN KEY (product_id) REFERENCES catalog_products(id),
+  CONSTRAINT fk_price_requests_priced_by FOREIGN KEY (priced_by) REFERENCES users(id),
+  CONSTRAINT fk_price_requests_order FOREIGN KEY (order_id) REFERENCES orders(id)
+) ENGINE=InnoDB;
+-- The options chosen on an order line, and the price request it came from.
+ALTER TABLE order_products ADD COLUMN spec_selection TEXT NULL;
+ALTER TABLE order_products ADD COLUMN price_request_id BIGINT UNSIGNED NULL;
+ALTER TABLE order_products ADD CONSTRAINT fk_order_products_price_request FOREIGN KEY (price_request_id) REFERENCES price_requests(id);

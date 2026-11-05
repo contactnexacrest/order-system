@@ -517,7 +517,10 @@ async function store(req, res) {
       const refusal = await require('../services/orderLinePricing').saveRefusal(
         { client_id: clientId, currency_code: currency ? currency.code : '' },
         await catalogProductInput([].concat(body.product_catalog_id || [])[i]),
-        'goods', str(unitPricesInput[i]) || null, seesPriceBuildup(req)
+        'goods', str(unitPricesInput[i]) || null, seesPriceBuildup(req),
+        // D-255: the row's chosen specification options and unit.
+        require('../services/orderLinePricing').selectionInput([].concat(body.product_spec_json || [])[i] ?? ''),
+        str([].concat(body.product_unit || [])[i]) || null
       );
       if (refusal !== null) {
         flash.set(req, 'error', `Product line ${i + 1}: ${refusal}`);
@@ -550,6 +553,7 @@ async function store(req, res) {
   // property in general: any failure anywhere in this block rolls back the
   // order row itself along with everything else.
   const createdLineIds = [];
+  const createdSpecs = [];
   const { orderId, orderReference } = await db.transaction(async (trx) => {
     // QA-5 CONC-03: sequence-number reservation and the order INSERT now
     // happen atomically inside createWithNextSequence() (a single
@@ -633,6 +637,7 @@ async function store(req, res) {
       await orderProductRepository.setCatalogProduct(lineId, pickedIds[i] || null, trx);
       if (str(unitPrices[i]) !== '') await orderProductRepository.setPriceSetBy(lineId, user.id, trx);
       createdLineIds.push(lineId);
+      createdSpecs.push(require('../services/orderLinePricing').selectionInput([].concat(body.product_spec_json || [])[i] ?? ''));
     }
 
     return result;
@@ -641,6 +646,7 @@ async function store(req, res) {
   // External QA report L-23: order creation was never audit-logged.
   await auditLogRepository.log(user.id, 'ORDER_CREATED', 'orders', orderId, 'order_reference', null, orderReference);
   // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
+  for (let k = 0; k < createdLineIds.length; k++) await require('../services/orderLinePricing').saveSelection(createdLineIds[k], createdSpecs[k] ?? null, null);
   for (const lineId of createdLineIds) await require('../services/orderLinePricing').afterSave(lineId, null, user.id);
 
   // QA Round 5, R5-03: terms needing MD/ED approval — tell the approvers.
@@ -856,7 +862,7 @@ async function pickerViewData(req, withClients = false) {
   const orderLinePricing = require('../services/orderLinePricing');
   const pickerProducts = await require('../repositories/productRepository').forPicker();
   const selling = require('../services/moneyVisibility').can(req.permissions, 'selling');
-  const out = { pickerProducts, pickerPrices: selling ? await orderLinePricing.pickerPrices(pickerProducts) : {} };
+  const out = { pickerProducts, pickerPrices: selling ? await orderLinePricing.pickerPrices(pickerProducts) : {}, pickerSpecs: await orderLinePricing.pickerSpecs(pickerProducts) };
   if (withClients) {
     out.clientPriceKeys = selling ? await orderLinePricing.clientKeys(await clientRepository.all()) : {};
     // Owner decision D-245 P2: on a USD order goods lines come from Products (browser rule beside the picker).
@@ -952,6 +958,27 @@ async function addProduct(req, res) {
     return;
   }
   const body = req.body;
+  // Owner decision D-255 (5 Nov 2026): a line may come from an associate's price request — it then
+  // takes the request's product, options, price and unit (the price can still be changed).
+  let priceRequest = null;
+  if (str(body.price_request_number) !== '') {
+    const priceRequestService = require('../services/priceRequestService');
+    const [pr, prError] = await priceRequestService.usableForOrder(String(body.price_request_number), order);
+    if (prError !== null) {
+      flash.set(req, 'error', `Product line: ${prError}`);
+      res.redirect(`/orders/${orderId}#step-products`);
+      return;
+    }
+    priceRequest = pr;
+    const prProduct = await require('../repositories/productRepository').find(Number(pr.product_id));
+    body.catalog_product_id = String(pr.product_id);
+    body.spec_json = String(pr.selection);
+    body.line_type = 'goods';
+    if (str(body.unit_price) === '') body.unit_price = String(pr.quote);
+    if (pr.unit) body.unit = String(pr.unit);
+    if (str(body.description) === '' && prProduct) body.description = prProduct.name + (pr.selection_text !== 'Standard specification' ? ` — ${pr.selection_text}` : '');
+    if (str(body.hs_code) === '' && prProduct) body.hs_code = String(prProduct.hs_code);
+  }
   const description = str(body.description);
   if (description === '') {
     flash.set(req, 'error', 'Description is required.');
@@ -978,7 +1005,8 @@ async function addProduct(req, res) {
   const orderLinePricing = require('../services/orderLinePricing');
   const pickedId = await catalogProductInput(body.catalog_product_id);
   const refusal = (await orderLinePricing.pickRefusal(order.currency_code, pickedId, lineType))
-    ?? (await orderLinePricing.saveRefusal(order, pickedId, lineType, str(body.unit_price) || null, seesPriceBuildup(req)));
+    ?? (await orderLinePricing.saveRefusal(order, pickedId, lineType, str(body.unit_price) || null, seesPriceBuildup(req),
+      orderLinePricing.selectionInput(body.spec_json ?? ''), str(body.unit) || null, priceRequest));
   if (refusal !== null) {
     flash.set(req, 'error', `Product line: ${refusal}`);
     res.redirect(`/orders/${orderId}#step-products`);
@@ -1008,6 +1036,9 @@ async function addProduct(req, res) {
   // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
   await orderProductRepository.setCatalogProduct(newLineId, await catalogProductInput(body.catalog_product_id));
   if (str(body.unit_price) !== '') await orderProductRepository.setPriceSetBy(newLineId, req.user.id);
+  // D-255: the options chosen, and the price request the line came from (now "became an order").
+  await require('../services/orderLinePricing').saveSelection(newLineId, require('../services/orderLinePricing').selectionInput(body.spec_json ?? ''), priceRequest ? Number(priceRequest.id) : null);
+  if (priceRequest) await require('../services/priceRequestService').markOrdered(Number(priceRequest.id), orderId);
   // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
   await require('../services/orderLinePricing').afterSave(newLineId, null, req.user.id);
   flash.set(req, 'success', await lineSavedMessage(newLineId, 'Product line added.'));
@@ -1051,10 +1082,15 @@ async function updateProduct(req, res) {
   const newPriceIn = str(body.unit_price) || null;
   const priceUnchanged = newPriceIn !== null && product.unit_price !== null && Math.abs(Number(product.unit_price) - Number(newPriceIn)) < 0.005
     && Number(product.catalog_product_id || 0) === Number(catalogId || 0);
+  // D-255: the chosen options (a form without the field keeps the line's options).
+  const olp = require('../services/orderLinePricing');
+  const specSel = Object.prototype.hasOwnProperty.call(body, 'spec_json') ? olp.selectionInput(body.spec_json) : olp.selectionInput(String(product.spec_selection ?? ''));
+  const specUnchanged = JSON.stringify(specSel) === JSON.stringify(olp.selectionInput(String(product.spec_selection ?? '')));
   {
     const orderLinePricing = require('../services/orderLinePricing');
     const refusal = (await orderLinePricing.pickRefusal(order.currency_code, catalogId, lineType))
-      ?? (priceUnchanged ? null : await orderLinePricing.saveRefusal(order, catalogId, lineType, newPriceIn, seesPriceBuildup(req)));
+      ?? (priceUnchanged && specUnchanged ? null : await orderLinePricing.saveRefusal(order, catalogId, lineType, newPriceIn, seesPriceBuildup(req),
+        specSel, str(body.unit) || null, null));
     if (refusal !== null) {
       flash.set(req, 'error', `Product line: ${refusal}`);
       res.redirect(`/orders/${orderId}#step-products`);
@@ -1084,6 +1120,10 @@ async function updateProduct(req, res) {
   // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
   if (Object.prototype.hasOwnProperty.call(body, 'catalog_product_id')) {
     await orderProductRepository.setCatalogProduct(productId, await catalogProductInput(body.catalog_product_id));
+  }
+  if (!specUnchanged || Number(product.catalog_product_id || 0) !== Number(catalogId || 0)) {
+    // A changed product or options: the line no longer follows its price request.
+    await olp.saveSelection(productId, specSel, null);
   }
   const newPrice = str(body.unit_price);
   if (newPrice !== '' && (product.unit_price === null || Math.abs(Number(product.unit_price) - Number(newPrice)) > 0.0001)) {

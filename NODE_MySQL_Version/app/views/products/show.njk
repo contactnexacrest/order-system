@@ -16,6 +16,8 @@
   <div class="section">
     <h2>Specifications</h2>
     <p>{{ product.specifications | nl2br }}</p>
+    {# Owner decision D-255 (5 Nov 2026): the options that change the price. #}
+    {% if permissions.view_price_buildup or permissions.manage_product_specifications or permissions.manage_pricing %}<p><a class="btn-sm btn-secondary" href="/products/{{ product.id }}/specifications">Price options (specifications)</a></p>{% endif %}
   </div>
 
 

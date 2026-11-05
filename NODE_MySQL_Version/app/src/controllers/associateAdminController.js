@@ -98,6 +98,7 @@ async function index(req, res) {
     canBank: can(req, 'manage_associate_bank'),
     pendingBank: await associateBankRepository.pendingCount(),
     pendingRegistrations: await require('../repositories/associateRegistrationRepository').pendingCount(),
+    pendingPriceRequests: await require('../services/priceRequestService').pendingCount(),
     kanbanUser: (await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban',
   };
   if (await uiTemplateService.showsBoard(req)) {

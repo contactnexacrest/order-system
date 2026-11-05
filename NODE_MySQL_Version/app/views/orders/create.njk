@@ -135,7 +135,7 @@
       <div id="product-rows">
         {% for desc in oldDescriptionsList %}
         <div class="product-row">
-          {% set pickerName = 'product_catalog_id[]' %}{% set pickerSelected = (old.product_catalog_id[loop.index0] if old.product_catalog_id else 0) %}{% set pickerCurrency = '' %}{% include "orders/_product_picker.njk" %}
+          {% set pickerName = 'product_catalog_id[]' %}{% set pickerSelected = (old.product_catalog_id[loop.index0] if old.product_catalog_id else 0) %}{% set pickerCurrency = '' %}{% set pickerSpecSel = (old.product_spec_json[loop.index0] if old.product_spec_json else '') %}{% set pickerOrderId = null %}{% include "orders/_product_picker.njk" %}
           <label>Description *<input type="text" name="product_description[]" required value="{{ desc or '' }}" placeholder="e.g. Granite Memorial Headstone"></label>
           <label>Dimensions<input type="text" name="product_dimensions[]" value="{{ old.product_dimensions[loop.index0] or '' if old.product_dimensions else '' }}" placeholder="e.g. 24x12x3 inches"></label>
           <label>Finish

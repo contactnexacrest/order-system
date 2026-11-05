@@ -363,6 +363,7 @@ final class OrderController
             // Owner decision D-245 P2: "Pick from Products" fills the quote price of whoever sells (selling-visible people only).
             'pickerProducts'  => \App\Repositories\ProductRepository::forPicker(),
             'pickerPrices'    => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::pickerPrices(\App\Repositories\ProductRepository::forPicker()) : [],
+            'pickerSpecs'     => \App\Services\OrderLinePricing::pickerSpecs(\App\Repositories\ProductRepository::forPicker()),
             'clientPriceKeys' => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::clientKeys(ClientRepository::all()) : [],
             // Owner decision D-245 P2: on a USD order goods lines come from Products (browser rule beside the picker).
             'pickRequiredWhen' => self::createPickRequiredWhen(),
@@ -496,7 +497,10 @@ final class OrderController
                 self::catalogProductInput($_POST['product_catalog_id'][$i] ?? ''),
                 'goods',
                 trim((string) ($_POST['product_unit_price'][$i] ?? '')) ?: null,
-                self::seesPriceBuildup()
+                self::seesPriceBuildup(),
+                // D-255: the row's chosen specification options and unit.
+                \App\Services\OrderLinePricing::selectionInput($_POST['product_spec_json'][$i] ?? ''),
+                trim((string) ($_POST['product_unit'][$i] ?? '')) ?: null
             );
             if ($__refusal !== null) {
                 Flash::set('error', 'Product line ' . ($i + 1) . ": {$__refusal}");
@@ -610,6 +614,7 @@ final class OrderController
                 if (trim((string) ($_POST['product_unit_price'][$i] ?? '')) !== '') {
                     OrderProductRepository::setPriceSetBy($__lineId, (int) $user['id']);
                 }
+                \App\Services\OrderLinePricing::saveSelection($__lineId, \App\Services\OrderLinePricing::selectionInput($_POST['product_spec_json'][$i] ?? ''), null);
                 // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
                 \App\Services\OrderLinePricing::afterSave($__lineId, null, (int) $user['id']);
             }
@@ -933,6 +938,33 @@ final class OrderController
             echo 'Order not found.';
             return;
         }
+        // Owner decision D-255 (5 Nov 2026): a line may come from an associate's price request — it then
+        // takes the request's product, options, price and unit (the price can still be changed).
+        $__priceRequest = null;
+        if (trim((string) ($_POST['price_request_number'] ?? '')) !== '') {
+            [$__priceRequest, $__prError] = \App\Services\PriceRequestService::usableForOrder((string) $_POST['price_request_number'], $order);
+            if ($__prError !== null) {
+                Flash::set('error', 'Product line: ' . $__prError);
+                header("Location: /orders/{$orderId}#step-products");
+                return;
+            }
+            $__prProduct = \App\Repositories\ProductRepository::find((int) $__priceRequest['product_id']);
+            $_POST['catalog_product_id'] = (string) $__priceRequest['product_id'];
+            $_POST['spec_json'] = (string) $__priceRequest['selection'];
+            $_POST['line_type'] = 'goods';
+            if (trim((string) ($_POST['unit_price'] ?? '')) === '') {
+                $_POST['unit_price'] = (string) $__priceRequest['quote'];
+            }
+            if (!empty($__priceRequest['unit'])) {
+                $_POST['unit'] = (string) $__priceRequest['unit'];
+            }
+            if (trim((string) ($_POST['description'] ?? '')) === '' && $__prProduct !== null) {
+                $_POST['description'] = $__prProduct['name'] . ($__priceRequest['selection_text'] !== 'Standard specification' ? ' — ' . $__priceRequest['selection_text'] : '');
+            }
+            if (trim((string) ($_POST['hs_code'] ?? '')) === '' && $__prProduct !== null) {
+                $_POST['hs_code'] = (string) $__prProduct['hs_code'];
+            }
+        }
         $description = trim((string) ($_POST['description'] ?? ''));
         if ($description === '') {
             Flash::set('error', 'Description is required.');
@@ -955,8 +987,11 @@ final class OrderController
         }
 
         // Owner decision D-245 P2: on a USD order goods lines come from Products; never below the product's minimum price.
+        // D-255: with the chosen specification options (and their unit: 50 mm and above is per CBM).
+        $__specSel = \App\Services\OrderLinePricing::selectionInput($_POST['spec_json'] ?? '');
         $__refusal = \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType)
-            ?? \App\Services\OrderLinePricing::saveRefusal($order, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, trim((string) ($_POST['unit_price'] ?? '')) ?: null, self::seesPriceBuildup());
+            ?? \App\Services\OrderLinePricing::saveRefusal($order, self::catalogProductInput($_POST['catalog_product_id'] ?? ''), $lineType, trim((string) ($_POST['unit_price'] ?? '')) ?: null, self::seesPriceBuildup(),
+                $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, $__priceRequest);
         if ($__refusal !== null) {
             Flash::set('error', 'Product line: ' . $__refusal);
             header("Location: /orders/{$orderId}#step-products");
@@ -990,6 +1025,11 @@ final class OrderController
         OrderProductRepository::setCatalogProduct($newLineId, self::catalogProductInput($_POST['catalog_product_id'] ?? ''));
         if (trim((string) ($_POST['unit_price'] ?? '')) !== '') {
             OrderProductRepository::setPriceSetBy($newLineId, (int) $user['id']);
+        }
+        // D-255: the options chosen, and the price request the line came from (now "became an order").
+        \App\Services\OrderLinePricing::saveSelection($newLineId, $__specSel, $__priceRequest !== null ? (int) $__priceRequest['id'] : null);
+        if ($__priceRequest !== null) {
+            \App\Services\PriceRequestService::markOrdered((int) $__priceRequest['id'], $orderId);
         }
         // Owner decision D-245 P2: a line below its floor goes to the MD for approval.
         \App\Services\OrderLinePricing::afterSave($newLineId, null, (int) $user['id']);
@@ -1034,8 +1074,12 @@ final class OrderController
         $__newPriceIn = trim((string) ($_POST['unit_price'] ?? '')) ?: null;
         $__priceUnchanged = $__newPriceIn !== null && $product['unit_price'] !== null && abs((float) $product['unit_price'] - (float) $__newPriceIn) < 0.005
             && (int) ($product['catalog_product_id'] ?? 0) === (int) ($__catalogId ?? 0);
+        // D-255: the chosen options (a form without the field keeps the line's options).
+        $__specSel = array_key_exists('spec_json', $_POST) ? \App\Services\OrderLinePricing::selectionInput($_POST['spec_json']) : \App\Services\OrderLinePricing::selectionInput((string) ($product['spec_selection'] ?? ''));
+        $__specUnchanged = json_encode($__specSel) === json_encode(\App\Services\OrderLinePricing::selectionInput((string) ($product['spec_selection'] ?? '')));
         $__refusal = \App\Services\OrderLinePricing::pickRefusal($order['currency_code'] ?? null, $__catalogId, $lineType)
-            ?? ($__priceUnchanged ? null : \App\Services\OrderLinePricing::saveRefusal($order, $__catalogId, $lineType, $__newPriceIn, self::seesPriceBuildup()));
+            ?? ($__priceUnchanged && $__specUnchanged ? null : \App\Services\OrderLinePricing::saveRefusal($order, $__catalogId, $lineType, $__newPriceIn, self::seesPriceBuildup(),
+                $__specSel, trim((string) ($_POST['unit'] ?? '')) ?: null, null));
         if ($__refusal !== null) {
             Flash::set('error', 'Product line: ' . $__refusal);
             header("Location: /orders/{$orderId}#step-products");
@@ -1067,6 +1111,10 @@ final class OrderController
         // Owner decision 2 Nov 2026 (D-240): the product it was picked from; who set its price.
         if (array_key_exists('catalog_product_id', $_POST)) {
             OrderProductRepository::setCatalogProduct($productId, self::catalogProductInput($_POST['catalog_product_id']));
+        }
+        if (!$__specUnchanged || (int) ($product['catalog_product_id'] ?? 0) !== (int) ($__catalogId ?? 0)) {
+            // A changed product or options: the line no longer follows its price request.
+            \App\Services\OrderLinePricing::saveSelection($productId, $__specSel, null);
         }
         $__newPrice = trim((string) ($_POST['unit_price'] ?? ''));
         if ($__newPrice !== '' && ($product['unit_price'] === null || abs((float) $product['unit_price'] - (float) $__newPrice) > 0.0001)) {
@@ -1327,6 +1375,7 @@ final class OrderController
             // Owner decision D-245 P2: "Pick from Products" fills the quote price; each line's price check and the MD's approval.
             'pickerProducts' => \App\Repositories\ProductRepository::forPicker(),
             'pickerPrices' => MoneyVisibility::can(MoneyVisibility::SELLING) ? \App\Services\OrderLinePricing::pickerPrices(\App\Repositories\ProductRepository::forPicker()) : [],
+            'pickerSpecs' => \App\Services\OrderLinePricing::pickerSpecs(\App\Repositories\ProductRepository::forPicker()),
             'linePricing' => \App\Services\OrderLinePricing::forOrder($orderId),
             'pickRequiredWhen' => \App\Services\OrderLinePricing::productPickRequired($order['currency_code'] ?? null) ? 'line_type=goods' : '',
             'canManagePricing' => PermissionService::can((int) $actor['id'], $actorRoleId, 'manage_pricing'),
