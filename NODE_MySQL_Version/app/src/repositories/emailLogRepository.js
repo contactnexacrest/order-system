@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const divisionService = require('../services/divisionService');
 
 /**
  * Spec Section 10 — "EMAIL & DEFERRED SEND SYSTEM", 2-level approval.
@@ -81,7 +82,7 @@ async function pendingApproval() {
  * badge number always matches what staff see when they click through.
  */
 async function awaitingDispatchCount() {
-  const row = await db.queryOne("SELECT COUNT(*) AS c FROM email_log WHERE status IN ('pending_approval', 'approved')");
+  const row = await db.queryOne(`SELECT COUNT(*) AS c FROM email_log WHERE status IN ('pending_approval', 'approved')${divisionService.orderIdSql('order_id', true)}`);
   return parseInt(row.c, 10);
 }
 
@@ -102,7 +103,7 @@ async function awaitingDispatch() {
      LEFT JOIN orders o ON o.id = el.order_id
      LEFT JOIN documents d ON d.id = el.document_id
      LEFT JOIN document_types dt ON dt.id = d.document_type_id
-     WHERE el.status IN ('pending_approval', 'approved')
+     WHERE el.status IN ('pending_approval', 'approved')${divisionService.orderIdSql('el.order_id', true)}
      ORDER BY el.created_at DESC`
   );
 }

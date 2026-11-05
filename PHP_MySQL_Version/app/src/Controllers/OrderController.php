@@ -532,6 +532,21 @@ final class OrderController
         // deadlock detector already guarantees this is always safe to
         // retry: it only ever aborts a transaction that made no visible
         // change (it rolls back everything the aborted side did).
+        // D-257: the order's division — the creator's own, or the one a company-level person chose.
+        $chosenDivision = ($_POST['division_id'] ?? '') !== '' ? (int) $_POST['division_id'] : null;
+        if (\App\Services\DivisionService::needsChoiceOnCreate() && ($chosenDivision === null || \App\Services\DivisionService::find($chosenDivision) === null)) {
+            Flash::set('error', 'Please choose the division this order belongs to.');
+            Flash::setOld($_POST);
+            header('Location: /orders/create');
+            return;
+        }
+        if (!\App\Services\DivisionService::allowsClient($clientId) && !\App\Services\DivisionService::seesAll()) {
+            Flash::set('error', 'Please select a valid client.');
+            Flash::setOld($_POST);
+            header('Location: /orders/create');
+            return;
+        }
+        \App\Services\DivisionService::enterOrderDivision(\App\Services\DivisionService::forNewRecord($chosenDivision));
         $testModeEnabled = TestModeService::isEnabled();
         ['orderId' => $orderId, 'orderReference' => $orderReference] = DeadlockRetry::run(function () use (
             $testModeEnabled, $clientId, $client, $paymentPresetId, $incotermId,
@@ -626,6 +641,7 @@ final class OrderController
             throw $e;
         }
         });
+        \App\Services\DivisionService::leaveOrderDivision();
 
         // External QA report L-23: order creation was never audit-logged.
         AuditLogRepository::log((int) $user['id'], 'ORDER_CREATED', 'orders', $orderId, 'order_reference', null, $orderReference);

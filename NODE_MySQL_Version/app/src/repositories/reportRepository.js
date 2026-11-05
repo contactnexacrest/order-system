@@ -6,6 +6,7 @@ const documentRepository = require('./documentRepository');
 const amendmentRepository = require('./amendmentRepository');
 const disputeRepository = require('./disputeRepository');
 const testModeService = require('../services/testModeService');
+const divisionService = require('../services/divisionService');
 const orderProfitabilityService = require('../services/orderProfitabilityService');
 const { todayIst } = require('../helpers/dbDateTime');
 
@@ -31,7 +32,7 @@ async function isTestModeFlag() {
 async function perClient(clientId, visibility = { sql: '', params: {} }) {
   const isTestMode = await isTestModeFlag();
   const client = await db.queryOne('SELECT * FROM clients WHERE id = :id', { id: clientId });
-  if (client && parseInt(client.is_test_data, 10) !== isTestMode) {
+  if (client && (parseInt(client.is_test_data, 10) !== isTestMode || !(await divisionService.allowsClient(clientId)))) {
     // A real client while Test Mode is on, or a test client while it's
     // off — never shown, same contract as "client not found".
     return { client: null, orders: [], documents: [], payments: [], products: [], total_fob_value_by_currency: {}, total_cleared_by_currency: {} };
@@ -43,7 +44,7 @@ async function perClient(clientId, visibility = { sql: '', params: {} }) {
             sm.stage_name AS current_stage_name
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-     WHERE o.client_id = :client_id AND o.is_test_data = :is_test_data${visibility.sql}
+     WHERE o.client_id = :client_id AND o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}${visibility.sql}
      ORDER BY o.created_at DESC, o.id DESC`,
     { client_id: clientId, is_test_data: isTestMode, ...visibility.params }
   );
@@ -127,7 +128,7 @@ function sortObjectKeys(obj) {
 async function perOrder(orderId) {
   const isTestMode = await isTestModeFlag();
   const order = await orderRepository.find(orderId);
-  if (order && parseInt(order.is_test_data, 10) !== isTestMode) {
+  if (order && (parseInt(order.is_test_data, 10) !== isTestMode || !divisionService.allows(order.division_id || divisionService.EXPORT_ID))) {
     return { order: null, stages: [], documents: [], audit: [] };
   }
 
@@ -181,7 +182,7 @@ async function perOrder(orderId) {
  * @returns {Promise<Array<object>>}
  */
 async function aggregate(dateFrom, dateTo, stageId, incotermId, country, visibility = { sql: '', params: {} }) {
-  const where = ['o.is_test_data = :is_test_data'];
+  const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const params = { is_test_data: await isTestModeFlag() };
   if (visibility.sql) {
     where.push(visibility.sql.replace(/^ AND /, ''));
@@ -302,7 +303,7 @@ function sortByCountDesc(obj) {
  */
 async function distinctCountries() {
   const rows = await db.query(
-    "SELECT DISTINCT country_of_destination FROM orders WHERE country_of_destination IS NOT NULL AND country_of_destination != '' ORDER BY country_of_destination"
+    `SELECT DISTINCT country_of_destination FROM orders WHERE 1 = 1${divisionService.sql('division_id')} AND country_of_destination IS NOT NULL AND country_of_destination != '' ORDER BY country_of_destination`
   );
   return rows.map((r) => r.country_of_destination);
 }
@@ -349,7 +350,7 @@ function sentClause(code) {
 
 async function queueRows(whereSql, extraJoins = '') {
   return db.query(
-    `SELECT ${ORDER_ROW_COLS} ${ORDER_ROW_JOIN} ${extraJoins} WHERE (${whereSql}) AND o.is_test_data = :is_test_data ORDER BY o.created_at`,
+    `SELECT ${ORDER_ROW_COLS} ${ORDER_ROW_JOIN} ${extraJoins} WHERE (${whereSql}) AND o.is_test_data = :is_test_data${divisionService.sql('o.division_id')} ORDER BY o.created_at`,
     { is_test_data: await isTestModeFlag() }
   );
 }
@@ -489,7 +490,7 @@ async function funnelActivity(dateFrom, dateTo) {
   const isTestMode = await isTestModeFlag();
 
   async function sentCount(code, dateCol) {
-    const clauses = [`dt.code = :code`, `el.status = 'sent'`, `o.is_test_data = :is_test_data`];
+    const clauses = [`dt.code = :code`, `el.status = 'sent'`, `o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}`];
     const p = { code, is_test_data: isTestMode };
     if (dateFrom) {
       clauses.push(`DATE(el.${dateCol}) >= :date_from`);
@@ -512,7 +513,7 @@ async function funnelActivity(dateFrom, dateTo) {
   }
 
   async function lostCount(reachedPi) {
-    const clauses = [`o.status = 'lost'`, `o.is_test_data = :is_test_data`];
+    const clauses = [`o.status = 'lost'`, `o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}`];
     const p = { is_test_data: isTestMode };
     const reachedClause = `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`;
     clauses.push(reachedPi ? reachedClause : `NOT ${reachedClause}`);
@@ -531,7 +532,7 @@ async function funnelActivity(dateFrom, dateTo) {
   async function quotationsWon() {
     const clauses = [
       `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`,
-      `o.is_test_data = :is_test_data`,
+      `o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}`,
     ];
     const p = { is_test_data: isTestMode };
     if (dateFrom) {
@@ -548,7 +549,7 @@ async function funnelActivity(dateFrom, dateTo) {
 
   async function amendmentCount() {
     const clauses = [
-      `EXISTS (SELECT 1 FROM orders oo WHERE oo.id = amendments.order_id AND oo.is_test_data = :is_test_data)`,
+      `EXISTS (SELECT 1 FROM orders oo WHERE oo.id = amendments.order_id AND oo.is_test_data = :is_test_data${divisionService.sql('oo.division_id')})`,
     ];
     const p = { is_test_data: isTestMode };
     if (dateFrom) {
@@ -603,7 +604,7 @@ async function funnelActivity(dateFrom, dateTo) {
 
 /** @returns {Promise<{rows: Array<object>, by_currency: object}>} */
 async function paymentsReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
-  const where = ['o.is_test_data = :is_test_data'];
+  const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const params = { is_test_data: await isTestModeFlag() };
   if (visibility.sql) {
     where.push(visibility.sql.replace(/^ AND /, ''));
@@ -700,7 +701,7 @@ function round2(n) {
 
 /** @returns {Promise<{rows: Array<object>, by_status: object, open_count: number, avg_resolution_days: ?number}>} */
 async function disputesReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
-  const where = ['o.is_test_data = :is_test_data'];
+  const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const params = { is_test_data: await isTestModeFlag() };
   if (visibility.sql) {
     where.push(visibility.sql.replace(/^ AND /, ''));
@@ -758,7 +759,7 @@ async function disputesReport(dateFrom, dateTo, visibility = { sql: '', params: 
 
 /** @returns {Promise<{rows: Array<object>, by_status: object, by_requested_by: object}>} */
 async function amendmentsReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
-  const where = ['o.is_test_data = :is_test_data'];
+  const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const params = { is_test_data: await isTestModeFlag() };
   if (visibility.sql) {
     where.push(visibility.sql.replace(/^ AND /, ''));
@@ -813,7 +814,7 @@ async function searchOrders(query) {
   return db.query(
     `SELECT o.id, o.order_reference, o.status, o.created_at, o.company_legal_name
      FROM orders o
-     WHERE o.is_test_data = :is_test_data
+     WHERE o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}
        AND (o.order_reference LIKE :q OR o.company_legal_name LIKE :q2)
      ORDER BY o.created_at DESC, o.id DESC
      LIMIT 25`,
@@ -852,7 +853,7 @@ async function monthlyTrends(months = 12) {
 
   const ordersRows = await db.query(
     `SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, COUNT(*) AS n
-     FROM orders WHERE is_test_data = :t AND created_at >= :from GROUP BY ym`,
+     FROM orders WHERE is_test_data = :t${divisionService.sql('division_id')} AND created_at >= :from GROUP BY ym`,
     { t: isTestMode, from: fromDate }
   );
   for (const row of ordersRows) {
@@ -863,7 +864,7 @@ async function monthlyTrends(months = 12) {
     `SELECT DATE_FORMAT(o.created_at, '%Y-%m') AS ym, o.currency_code AS cc, COALESCE(SUM(p.fob_value), 0) AS total
      FROM orders o
      JOIN order_products p ON p.order_id = o.id AND p.is_active = 1
-     WHERE o.is_test_data = :t AND o.created_at >= :from GROUP BY ym, cc`,
+     WHERE o.is_test_data = :t${divisionService.sql('o.division_id')} AND o.created_at >= :from GROUP BY ym, cc`,
     { t: isTestMode, from: fromDate }
   );
   for (const row of fobRows) {
@@ -876,7 +877,7 @@ async function monthlyTrends(months = 12) {
      JOIN documents doc ON doc.id = el.document_id
      JOIN document_types dt ON dt.id = doc.document_type_id
      JOIN orders o ON o.id = doc.order_id
-     WHERE dt.code = 'QT' AND el.status = 'sent' AND o.is_test_data = :t AND el.sent_at >= :from
+     WHERE dt.code = 'QT' AND el.status = 'sent' AND o.is_test_data = :t${divisionService.sql('o.division_id')} AND el.sent_at >= :from
      GROUP BY ym`,
     { t: isTestMode, from: fromDate }
   );
@@ -890,7 +891,7 @@ async function monthlyTrends(months = 12) {
      JOIN documents doc ON doc.id = el.document_id
      JOIN document_types dt ON dt.id = doc.document_type_id
      JOIN orders o ON o.id = doc.order_id
-     WHERE dt.code = 'PI' AND el.status = 'sent' AND o.is_test_data = :t AND el.sent_at >= :from
+     WHERE dt.code = 'PI' AND el.status = 'sent' AND o.is_test_data = :t${divisionService.sql('o.division_id')} AND el.sent_at >= :from
      GROUP BY ym`,
     { t: isTestMode, from: fromDate }
   );
@@ -900,7 +901,7 @@ async function monthlyTrends(months = 12) {
 
   const lostRows = await db.query(
     `SELECT DATE_FORMAT(lost_at, '%Y-%m') AS ym, COUNT(*) AS n
-     FROM orders WHERE is_test_data = :t AND status = 'lost' AND lost_at >= :from GROUP BY ym`,
+     FROM orders WHERE is_test_data = :t${divisionService.sql('division_id')} AND status = 'lost' AND lost_at >= :from GROUP BY ym`,
     { t: isTestMode, from: fromDate }
   );
   for (const row of lostRows) {
@@ -931,7 +932,7 @@ async function monthlyTrends(months = 12) {
 async function staffProductivity(dateFrom, dateTo) {
   const isTestMode = await isTestModeFlag();
 
-  const docWhere = ['o.is_test_data = :is_test_data'];
+  const docWhere = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const docParams = { is_test_data: isTestMode };
   if (dateFrom) {
     docWhere.push('DATE(d.generated_at) >= :date_from');
@@ -1035,7 +1036,7 @@ async function ageingReport() {
             ops.freight_amount, ops.freight_cleared_at
      FROM orders o
      JOIN order_payment_status ops ON ops.order_id = o.id
-     WHERE o.is_test_data = :is_test_data AND o.status NOT IN ('lost')
+     WHERE o.is_test_data = :is_test_data${divisionService.sql('o.division_id')} AND o.status NOT IN ('lost')
        AND (
          (ops.advance_amount IS NOT NULL AND ops.advance_cleared_at IS NULL) OR
          (ops.balance_amount IS NOT NULL AND ops.balance_cleared_at IS NULL) OR
@@ -1100,7 +1101,7 @@ async function ageingReport() {
 /** @returns {Promise<{rows: Array<object>, by_forwarder: object}>} */
 async function freightCostReport(dateFrom, dateTo, visibility = { sql: '', params: {} }) {
   const isTestMode = await isTestModeFlag();
-  const where = ['o.is_test_data = :is_test_data', 'fr.id IS NOT NULL'];
+  const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id'), 'fr.id IS NOT NULL'];
   const params = { is_test_data: isTestMode };
   if (visibility.sql) {
     where.push(visibility.sql.replace(/^ AND /, ''));
@@ -1154,7 +1155,7 @@ async function freightCostReport(dateFrom, dateTo, visibility = { sql: '', param
 /** @returns {Promise<{rows: Array<object>, by_hs_code: Array<object>}>} */
 async function productSalesReport(dateFrom, dateTo) {
   const isTestMode = await isTestModeFlag();
-  const where = ['o.is_test_data = :is_test_data', 'p.is_active = 1'];
+  const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id'), 'p.is_active = 1'];
   const params = { is_test_data: isTestMode };
   if (dateFrom) {
     where.push('DATE(o.created_at) >= :date_from');
@@ -1227,7 +1228,7 @@ async function supplierPerformanceReport() {
      JOIN suppliers s ON s.id = spo.supplier_id
      JOIN orders o ON o.id = spo.order_id
      LEFT JOIN order_packing pk ON pk.order_id = spo.order_id
-     WHERE o.is_test_data = :is_test_data
+     WHERE o.is_test_data = :is_test_data${divisionService.sql('o.division_id')}
      ORDER BY s.supplier_legal_name`,
     { is_test_data: isTestMode }
   );
@@ -1307,7 +1308,7 @@ async function conversionRateReport(dateFrom, dateTo) {
 // ================================================================
 
 async function ordersCreatedCount(dateFrom, dateTo) {
-  const clauses = ['is_test_data = :is_test_data'];
+  const clauses = ['is_test_data = :is_test_data' + divisionService.sql('division_id')];
   const params = { is_test_data: await isTestModeFlag() };
   if (dateFrom) {
     clauses.push('DATE(created_at) >= :date_from');
@@ -1325,7 +1326,7 @@ async function ordersCreatedCount(dateFrom, dateTo) {
 async function fobWonByCurrency(dateFrom, dateTo) {
   const clauses = [
     `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`,
-    'o.is_test_data = :is_test_data',
+    'o.is_test_data = :is_test_data' + divisionService.sql('o.division_id'),
   ];
   const params = { is_test_data: await isTestModeFlag() };
   if (dateFrom) {
@@ -1352,7 +1353,7 @@ async function fobWonByCurrency(dateFrom, dateTo) {
 /** @returns {Promise<Array<Object>>} every order marked lost in the period, newest first, with its own reason text */
 async function lostOrdersDetail(dateFrom, dateTo) {
   const reachedClause = `EXISTS (SELECT 1 FROM documents d JOIN document_types dt ON dt.id = d.document_type_id WHERE dt.code = 'PI' AND d.order_id = o.id)`;
-  const clauses = [`o.status = 'lost'`, 'o.is_test_data = :is_test_data'];
+  const clauses = [`o.status = 'lost'`, 'o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const params = { is_test_data: await isTestModeFlag() };
   if (dateFrom) {
     clauses.push('DATE(o.lost_at) >= :date_from');
@@ -1472,7 +1473,7 @@ async function salesPerformanceReport(dateFrom, dateTo) {
  */
 async function orderProfitabilityReport(dateFrom, dateTo, visibility = { sql: '', params: {} }, scope = 'all') {
   const isTestMode = await isTestModeFlag();
-  const where = ['o.is_test_data = :is_test_data'];
+  const where = ['o.is_test_data = :is_test_data' + divisionService.sql('o.division_id')];
   const params = { is_test_data: isTestMode };
   if (visibility.sql) {
     where.push(visibility.sql.replace(/^ AND /, ''));

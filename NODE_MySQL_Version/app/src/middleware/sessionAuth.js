@@ -27,6 +27,8 @@ const dashboardRepository = require('../repositories/dashboardRepository');
 const orderAccessService = require('../services/orderAccessService');
 const activeDepartmentService = require('../services/activeDepartmentService');
 const requestContext = require('../helpers/requestContext');
+const divisionService = require('../services/divisionService');
+const db = require('../config/db');
 
 const LAST_ACTIVITY_KEY = '_last_activity_ts';
 
@@ -134,65 +136,124 @@ function required() {
       }
     }
 
-    req.unreadCount = await notificationRepository.unreadCountForUser(user.id);
-
-    // Standing-request nav badges — live, not cached, so the sidebar
-    // always reflects reality: a submission appearing the moment it's
-    // filed, the number dropping the moment it's accepted or rejected.
-    // Both review screens are gated on manage_orders, so only query for
-    // staff who could actually act on one.
-    if (req.permissions.manage_orders) {
-      req.clientIntakePendingCount = await clientIntakeRepository.pendingCount();
-      req.piIntakePendingCount = await piIntakeRepository.pendingReviewCount();
-    } else {
-      req.clientIntakePendingCount = 0;
-      req.piIntakePendingCount = 0;
-    }
-
-    // Same live-count badge on My Reviews: documents waiting on this user's own review.
-    req.myReviewsPendingCount = await documentReviewRepository.pendingCountForReviewer(user.id);
-
-    // User-reported batch item 16: same live-COUNT badge pattern as the
-    // Quotation/PI Intake Review links above — only queried for staff
-    // who could actually act on it.
-    req.emailApprovalsPendingCount = req.permissions.approve_email_send
-      ? await emailLogRepository.awaitingDispatchCount()
-      : 0;
-
-    // 90-item backlog item #11: a per-field lock badge + save-time
-    // warning already existed on the Settings page itself
-    // (dashboardRepository.complianceExpiryWarnings() already computed
-    // this, shown only on the Dashboard body) — but nothing surfaced it
-    // from every other page the way the other standing-request badges
-    // above do. Reuses the exact same computation, just counted and
-    // attached to the Settings link instead of rendered inline.
-    if (req.permissions.manage_company_settings) {
-      const warnings = await dashboardRepository.complianceExpiryWarnings();
-      req.settingsExpiryWarningCount = (warnings.lut ? 1 : 0) + (warnings.rcmc ? 1 : 0);
-    } else {
-      req.settingsExpiryWarningCount = 0;
-    }
-
-    // Owner decision 2 Nov 2026 (D-233): "Waiting for Zoho: N" next to Zoho Sync in the menu.
-    req.zohoWaitingMenu = null;
-    if (req.permissions.ca_module_manage && req.method === 'GET') {
-      req.zohoWaitingMenu = await require('../services/zohoPendingService').menuCount(req.session);
-      // Owner decision 2 Nov 2026 (D-239): the badge says so when the day's Zoho allowance is used.
-      req.zohoPausedText = req.zohoWaitingMenu > 0 ? await require('../services/zohoPendingService').pausedText() : null;
-    }
-
-    // QA Round 5, R5-24: the archived-order and assignment rules apply to
-    // every page and action of an order, not just its main page — checked
-    // once here for every staff route.
-    const denied = await orderAccessService.denialReasonForPath(req.path, user.id, req.permissions);
-    if (denied !== null) {
-      res.status(403).send(denied);
-      return;
-    }
-
-    requestContext.run({
+    // Owner decision D-257: the request's division scope, worked out once and
+    // kept in the request context so every repository reads it without `req`.
+    const divisionScope = await divisionService.resolveScope(user, req.permissions, req.session);
+    const ctxStore = {
       userId: user.id, effectiveRoleId: acting.effectiveRoleId, previewing: acting.previewing, actingAs: acting.actingAs,
-    }, next);
+      divisionIds: divisionScope.ids, divisionSeesAll: divisionScope.seesAll, divisionUser: user,
+    };
+    await requestContext.run(ctxStore, async () => {
+      const allDivisions = await divisionService.all();
+      const activeDivisions = allDivisions.filter((d) => d.status === 'active');
+      const scopeIds = divisionService.currentIds() || activeDivisions.map((d) => Number(d.id));
+      const off = new Set((await db.query('SELECT division_id, module_key FROM division_modules WHERE is_enabled = 0')).map((r) => `${r.division_id}:${r.module_key}`));
+      const disabledPatterns = [];
+      const modules = {};
+      for (const [key, [, patterns]] of Object.entries(divisionService.MODULES)) {
+        // On for the scope when on in any of its divisions (a module with no row is on).
+        modules[key] = scopeIds.some((id) => !off.has(`${id}:${key}`));
+        if (!modules[key]) disabledPatterns.push(...patterns);
+      }
+      req.divisionUi = {
+        multi: divisionScope.multi,
+        showSwitcher: divisionScope.multi && divisionScope.seesAll,
+        active: activeDivisions,
+        all: allDivisions,
+        currentId: divisionService.currentId(),
+        modules,
+        isDisabledPath: (path) => disabledPatterns.some((p) => p.test(path)),
+      };
+      req.unreadCount = await notificationRepository.unreadCountForUser(user.id);
+
+      // Standing-request nav badges — live, not cached, so the sidebar
+      // always reflects reality: a submission appearing the moment it's
+      // filed, the number dropping the moment it's accepted or rejected.
+      // Both review screens are gated on manage_orders, so only query for
+      // staff who could actually act on one.
+      if (req.permissions.manage_orders) {
+        req.clientIntakePendingCount = await clientIntakeRepository.pendingCount();
+        req.piIntakePendingCount = await piIntakeRepository.pendingReviewCount();
+      } else {
+        req.clientIntakePendingCount = 0;
+        req.piIntakePendingCount = 0;
+      }
+
+      // Same live-count badge on My Reviews: documents waiting on this user's own review.
+      req.myReviewsPendingCount = await documentReviewRepository.pendingCountForReviewer(user.id);
+
+      // User-reported batch item 16: same live-COUNT badge pattern as the
+      // Quotation/PI Intake Review links above — only queried for staff
+      // who could actually act on it.
+      req.emailApprovalsPendingCount = req.permissions.approve_email_send
+        ? await emailLogRepository.awaitingDispatchCount()
+        : 0;
+
+      // 90-item backlog item #11: a per-field lock badge + save-time
+      // warning already existed on the Settings page itself
+      // (dashboardRepository.complianceExpiryWarnings() already computed
+      // this, shown only on the Dashboard body) — but nothing surfaced it
+      // from every other page the way the other standing-request badges
+      // above do. Reuses the exact same computation, just counted and
+      // attached to the Settings link instead of rendered inline.
+      if (req.permissions.manage_company_settings) {
+        const warnings = await dashboardRepository.complianceExpiryWarnings();
+        req.settingsExpiryWarningCount = (warnings.lut ? 1 : 0) + (warnings.rcmc ? 1 : 0);
+      } else {
+        req.settingsExpiryWarningCount = 0;
+      }
+
+      // Owner decision 2 Nov 2026 (D-233): "Waiting for Zoho: N" next to Zoho Sync in the menu.
+      req.zohoWaitingMenu = null;
+      if (req.permissions.ca_module_manage && req.method === 'GET') {
+        req.zohoWaitingMenu = await require('../services/zohoPendingService').menuCount(req.session);
+        // Owner decision 2 Nov 2026 (D-239): the badge says so when the day's Zoho allowance is used.
+        req.zohoPausedText = req.zohoWaitingMenu > 0 ? await require('../services/zohoPendingService').pausedText() : null;
+      }
+
+      // QA Round 5, R5-24: the archived-order and assignment rules apply to
+      // every page and action of an order, not just its main page — checked
+      // once here for every staff route.
+      const denied = await orderAccessService.denialReasonForPath(req.path, user.id, req.permissions);
+      if (denied !== null) {
+        res.status(403).send(denied);
+        return;
+      }
+
+      // D-257: a module switched off for the request's division(s) refuses its addresses.
+      if (req.divisionUi.isDisabledPath(req.path)) {
+        res.status(403).send('This part of the system is not in use here.');
+        return;
+      }
+      // D-257: a client or an associate outside the request's division(s) is not available.
+      const clientMatch = /^\/clients\/(\d+)(?:\/|$)/.exec(req.path);
+      if (clientMatch && !(await divisionService.allowsClient(parseInt(clientMatch[1], 10)))) {
+        res.status(403).send('This client is not available to you.');
+        return;
+      }
+      const associateMatch = /^\/associates\/(\d+)(?:\/|$)/.exec(req.path);
+      if (associateMatch) {
+        const associateRow = await db.queryOne('SELECT division_id FROM associates WHERE id = :id', { id: parseInt(associateMatch[1], 10) });
+        if (associateRow && !divisionService.allows(associateRow.division_id)) {
+          res.status(403).send('This associate is not available to you.');
+          return;
+        }
+      }
+      // D-257: the report Division filter (company level, two or more active divisions).
+      if (req.path.startsWith('/reports') && req.query && req.query.division && req.divisionUi.showSwitcher) {
+        const reportDivision = await divisionService.find(parseInt(req.query.division, 10));
+        if (reportDivision && reportDivision.status === 'active' && divisionService.allows(reportDivision.id)) ctxStore.forcedDivision = Number(reportDivision.id);
+      }
+      // D-257: an order's pages work in the order's own division (its numbering and settings).
+      const orderIdForPath = await orderAccessService.orderIdForPath(req.path);
+      if (orderIdForPath !== null) {
+        const orderForPath = await db.queryOne('SELECT division_id FROM orders WHERE id = :id', { id: orderIdForPath });
+        if (orderForPath) ctxStore.forcedDivision = Number(orderForPath.division_id);
+      }
+
+
+      next();
+    });
   };
 }
 

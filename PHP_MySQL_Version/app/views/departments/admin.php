@@ -86,6 +86,20 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
         <label class="inline"><input type="checkbox" name="sees_whole_company" value="1" <?= (int) $dept['sees_whole_company'] === 1 ? 'checked' : '' ?>> Sees the whole company</label>
         <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save department</button></div>
       </form>
+      <?php if (\App\Services\DivisionService::isMulti()): // D-257: shown only with two or more active divisions ?>
+      <form method="post" action="/admin/departments/<?= (int) $dept['id'] ?>/division" class="field-grid" data-testid="department-division">
+        <?= Csrf::field() ?>
+        <label>Division
+        <select name="division_id">
+          <option value=""<?= ($dept['division_id'] ?? null) === null ? ' selected' : '' ?>>Company level (all divisions)</option>
+          <?php foreach (\App\Services\DivisionService::all() as $__div): ?>
+            <option value="<?= (int) $__div['id'] ?>"<?= (int) ($dept['division_id'] ?? 0) === (int) $__div['id'] ? ' selected' : '' ?>><?= htmlspecialchars((string) $__div['name']) ?><?= $__div['status'] === 'active' ? '' : ' (planned)' ?></option>
+          <?php endforeach; ?>
+        </select>
+        </label>
+        <div class="btn-row"><button type="submit" class="btn-sm">Save division</button></div>
+      </form>
+      <?php endif; ?>
       <?php if ($list !== []): ?>
       <table class="list">
         <tr><th>Designation</th><th>Level</th><th>Approval limit (₹)</th><th>Active</th><th></th></tr>

@@ -110,7 +110,8 @@ async function history(orderId) {
 /** @returns {Promise<Object<string,string>>} setting_key => setting_value */
 async function settings() {
   // D-245 P5: read once per report run (batchCache), fresh otherwise.
-  return { ...(await require('../helpers/batchCache').memo('incentive_settings', settingsUncached)) };
+  // D-257: a division's own values over the company ones (outside the memo, which is not per division).
+  return require('../services/divisionService').overlay('incentive', { ...(await require('../helpers/batchCache').memo('incentive_settings', settingsUncached)) });
 }
 
 async function settingsUncached() {

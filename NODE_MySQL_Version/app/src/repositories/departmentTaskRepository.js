@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const divisionService = require('../services/divisionService');
 
 // Port of App\Repositories\DepartmentTaskRepository. Owner decision D-214
 // (2026-10-31), phase 4: each department's open work, built from the
@@ -124,7 +125,7 @@ async function open(departmentCodes = null) {
        LEFT JOIN departments d ON d.code = tt.department_code
        LEFT JOIN order_department_owners odo ON odo.order_id = w.order_id AND odo.department_id = d.id
        LEFT JOIN users u ON u.id = odo.user_id
-       ${where}
+       ${where || 'WHERE 1 = 1'}${divisionService.sql('o.division_id')}
       ORDER BY due_on, w.order_id, tt.sort_order`,
     params
   );
@@ -197,7 +198,7 @@ async function setOwner(orderId, departmentId, userId, assignedBy) {
 
 /** Active orders by status, for the cockpit. */
 async function ordersByStatus() {
-  const rows = await db.query("SELECT status, COUNT(*) AS n FROM orders WHERE status NOT IN ('complete', 'lost', 'cancelled') GROUP BY status ORDER BY status");
+  const rows = await db.query(`SELECT status, COUNT(*) AS n FROM orders WHERE status NOT IN ('complete', 'lost', 'cancelled')${divisionService.sql('division_id')} GROUP BY status ORDER BY status`);
   const out = {};
   for (const r of rows) {
     out[r.status] = Number(r.n);

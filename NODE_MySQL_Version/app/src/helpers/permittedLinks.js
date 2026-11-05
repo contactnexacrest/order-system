@@ -79,7 +79,9 @@ function requiredFor(path) {
  * canSeeOrder (optional): orderAccessService.orderVisibilityChecker()'s
  * function; without it, links to one order are judged by permission only.
  */
-function mayOpen(path, permissions, canSeeOrder = null) {
+function mayOpen(path, permissions, canSeeOrder = null, isDisabledPath = null) {
+  // D-257: a module switched off for the request's division(s).
+  if (isDisabledPath && isDisabledPath(path.split(/[?#]/)[0])) return false;
   const order = canSeeOrder ? path.match(ORDER_PAGE) : null;
   if (order && !canSeeOrder(Number(order[1]))) return false;
   const required = requiredFor(path);
@@ -87,9 +89,9 @@ function mayOpen(path, permissions, canSeeOrder = null) {
 }
 
 /** Replaces every internal link the user may not open with its plain text. */
-function filterHtml(html, permissions, canSeeOrder = null) {
+function filterHtml(html, permissions, canSeeOrder = null, isDisabledPath = null) {
   return String(html).replace(/<a\s[^>]*href="(\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/g, (whole, href, text) => (
-    mayOpen(href.replace(/&amp;/g, '&'), permissions, canSeeOrder) ? whole : `<span class="link-not-permitted">${text}</span>`
+    mayOpen(href.replace(/&amp;/g, '&'), permissions, canSeeOrder, isDisabledPath) ? whole : `<span class="link-not-permitted">${text}</span>`
   ));
 }
 

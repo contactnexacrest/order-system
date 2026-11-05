@@ -72,4 +72,22 @@
   </form>
 </div>
 
+<?php if (\App\Services\DivisionService::isMulti()): // D-257: shown only with two or more active divisions ?>
+<div class="card" data-testid="user-division">
+  <h2>Division</h2>
+  <p class="muted">The division this person works in; they see only its orders, clients and reports. Company level: sees every division (needs "See all divisions").</p>
+  <form method="post" action="/users/<?= (int) $target['id'] ?>/division" class="field-grid">
+    <?= \App\Helpers\Csrf::field() ?>
+    <label>Division
+        <select name="division_id">
+          <option value=""<?= ($target['division_id'] ?? null) === null ? ' selected' : '' ?>>Company level (all divisions)</option>
+          <?php foreach (\App\Services\DivisionService::all() as $__div): ?>
+            <option value="<?= (int) $__div['id'] ?>"<?= (int) ($target['division_id'] ?? 0) === (int) $__div['id'] ? ' selected' : '' ?>><?= htmlspecialchars((string) $__div['name']) ?><?= $__div['status'] === 'active' ? '' : ' (planned)' ?></option>
+          <?php endforeach; ?>
+        </select>
+    </label>
+    <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save division</button></div>
+  </form>
+</div>
+<?php endif; ?>
 <?php $__partyType = "staff"; $__partyId = (int) $target["id"]; require __DIR__ . "/../agreements/_party_card.php"; ?>

@@ -125,6 +125,8 @@ final class DepartmentTaskRepository
             }
             $where = 'WHERE tt.department_code IN (' . implode(', ', $in) . ')';
         }
+        // D-257: only the orders of the request's division(s).
+        $where = ($where === '' ? 'WHERE 1 = 1' : $where) . \App\Services\DivisionService::sql('o.division_id');
         $stmt = Database::connection()->prepare(
             "SELECT w.*, o.order_reference, tt.department_code, tt.title, d.id AS department_id, d.name AS department_name, d.color AS department_color,
                     DATE_ADD(w.since, INTERVAL tt.standard_days DAY) AS due_on,
@@ -225,7 +227,7 @@ final class DepartmentTaskRepository
     /** @return array<string,int> active orders by status, for the cockpit */
     public static function ordersByStatus(): array
     {
-        $rows = Database::connection()->query("SELECT status, COUNT(*) AS n FROM orders WHERE status NOT IN ('complete', 'lost', 'cancelled') GROUP BY status ORDER BY status")->fetchAll();
+        $rows = Database::connection()->query("SELECT status, COUNT(*) AS n FROM orders WHERE status NOT IN ('complete', 'lost', 'cancelled')" . \App\Services\DivisionService::sql('division_id') . " GROUP BY status ORDER BY status")->fetchAll();
         $out = [];
         foreach ($rows as $r) {
             $out[(string) $r['status']] = (int) $r['n'];

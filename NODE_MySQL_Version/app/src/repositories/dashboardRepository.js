@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const divisionService = require('../services/divisionService');
 const companySettingsRepository = require('./companySettingsRepository');
 
 /**
@@ -17,14 +18,14 @@ async function activeOrdersByStage() {
   return db.query(
     `SELECT sm.stage_name, sm.stage_slug, sm.sequence, COUNT(o.id) AS order_count
      FROM stages_master sm
-     LEFT JOIN orders o ON o.current_stage_id = sm.id AND o.status = 'active'
+     LEFT JOIN orders o ON o.current_stage_id = sm.id AND o.status = 'active'${divisionService.sql('o.division_id')}
      GROUP BY sm.id, sm.stage_name, sm.stage_slug, sm.sequence
      ORDER BY sm.sequence`
   );
 }
 
 async function activeOrderCount() {
-  const row = await db.queryOne("SELECT COUNT(*) AS c FROM orders WHERE status = 'active'");
+  const row = await db.queryOne(`SELECT COUNT(*) AS c FROM orders WHERE status = 'active'${divisionService.sql('division_id')}`);
   return parseInt(row.c, 10);
 }
 
@@ -40,7 +41,7 @@ async function pendingReviewCount(reviewerId = null) {
   // review nobody could actually act on.
   let sql = `SELECT COUNT(*) AS c FROM document_reviews dr
              JOIN documents d ON d.id = dr.document_id
-             WHERE dr.status = 'pending' AND d.status != 'superseded'`;
+             WHERE dr.status = 'pending' AND d.status != 'superseded'${divisionService.orderIdSql('d.order_id', true)}`;
   const params = {};
   if (reviewerId !== null) {
     sql += ' AND dr.reviewer_id = :reviewer_id';
@@ -51,12 +52,12 @@ async function pendingReviewCount(reviewerId = null) {
 }
 
 async function pendingEmailApprovalCount() {
-  const row = await db.queryOne("SELECT COUNT(*) AS c FROM email_log WHERE status = 'pending_approval'");
+  const row = await db.queryOne(`SELECT COUNT(*) AS c FROM email_log WHERE status = 'pending_approval'${divisionService.orderIdSql('order_id', true)}`);
   return parseInt(row.c, 10);
 }
 
 async function pendingAmendmentApprovalCount() {
-  const row = await db.queryOne("SELECT COUNT(*) AS c FROM amendments WHERE status = 'pending'");
+  const row = await db.queryOne(`SELECT COUNT(*) AS c FROM amendments WHERE status = 'pending'${divisionService.orderIdSql('order_id')}`);
   return parseInt(row.c, 10);
 }
 
@@ -80,7 +81,7 @@ async function overdueBalancePayments() {
      WHERE ops.balance_due_date IS NOT NULL
        AND ops.balance_cleared_at IS NULL
        AND ops.balance_due_date < CURDATE()
-       AND o.status = 'active'
+       AND o.status = 'active'${divisionService.sql('o.division_id')}
      ORDER BY ops.balance_due_date ASC`
   );
 }
@@ -98,7 +99,7 @@ async function overdueFreightPayments() {
      WHERE of_.fdn_document_id IS NOT NULL
        AND ps.freight_cleared_at IS NULL
        AND DATE(d.generated_at) <= DATE_SUB(CURDATE(), INTERVAL :days DAY)
-       AND o.status = 'active'
+       AND o.status = 'active'${divisionService.sql('o.division_id')}
      ORDER BY d.generated_at ASC`,
     { days: overdueDays }
   );
@@ -163,9 +164,9 @@ async function search(term) {
      FROM orders o
      JOIN clients c ON c.id = o.client_id
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-     WHERE o.order_reference LIKE :term1
+     WHERE (o.order_reference LIKE :term1
         OR c.client_unique_number LIKE :term2
-        OR c.company_legal_name LIKE :term3
+        OR c.company_legal_name LIKE :term3)${divisionService.sql('o.division_id')}
      ORDER BY o.created_at DESC
      LIMIT 50`,
     { term1: like, term2: like, term3: like }

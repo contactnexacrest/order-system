@@ -26,6 +26,17 @@ final class CompanySettingsRepository
 
     public static function get(string $key): ?string
     {
+        // D-257: a division's own value first (only while the request works in one division), then the company value.
+        $own = \App\Services\DivisionService::overrideFor('company', $key);
+        if ($own !== null) {
+            return $own;
+        }
+        return self::companyValue($key);
+    }
+
+    /** The company's own value, without any division's (Admin › Divisions shows both). */
+    public static function companyValue(string $key): ?string
+    {
         $stmt = Database::connection()->prepare(
             'SELECT setting_value FROM company_settings WHERE setting_key = :key LIMIT 1'
         );

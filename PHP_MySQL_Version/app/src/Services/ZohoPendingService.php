@@ -46,7 +46,9 @@ final class ZohoPendingService
         if ($start === null && ZohoGuard::isProduction()) {
             return ['enabled' => true, 'total' => 0, 'by_type' => []];
         }
-        $in = static fn ($id): bool => $orderId === null || ($id !== null && (int) $id === $orderId);
+        // D-257: only the orders of the request's division(s).
+        $in = static fn ($id): bool => ($orderId === null || ($id !== null && (int) $id === $orderId))
+            && ($id === null || DivisionService::allowsOrderId((int) $id));
         $add = static function (string $type, int $n) use (&$by): void {
             if ($n > 0) {
                 $by[$type] = ($by[$type] ?? 0) + $n;
@@ -152,7 +154,8 @@ final class ZohoPendingService
     {
         $now = time();
         $cached = $_SESSION['zoho_waiting_badge'] ?? null;
-        if (is_array($cached) && ($now - (int) $cached['at']) < 60) {
+        $scope = DivisionService::condition() ?? '';
+        if (is_array($cached) && ($now - (int) $cached['at']) < 60 && ($cached['scope'] ?? '') === $scope) {
             return $cached['n'];
         }
         try {
@@ -162,7 +165,7 @@ final class ZohoPendingService
             $n = null;
         }
         if (session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION['zoho_waiting_badge'] = ['at' => $now, 'n' => $n];
+            $_SESSION['zoho_waiting_badge'] = ['at' => $now, 'n' => $n, 'scope' => $scope];
         }
         return $n;
     }

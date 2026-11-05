@@ -1,0 +1,76 @@
+{# Owner decision D-257: one division — name, code and number format (read-only), modules, its own settings, pre-flight and Activate. #}
+{% set planned = division.status !== 'active' %}
+<div class="card page-wide">
+  <p><a href="/admin/divisions">&larr; All divisions</a></p>
+  <h1>{{ division.name }} <span class="badge {{ 'badge-inactive' if planned else 'badge-success' }}">{{ 'Planned' if planned else 'Active' }}</span></h1>
+  <div class="field-grid">
+    <label>Name<input type="text" value="{{ division.name }}" placeholder="e.g. Export" readonly></label>
+    <label>Code<input type="text" value="{{ division.code }}" placeholder="e.g. EXP" readonly></label>
+    <label>Order number format<input type="text" value="{{ orderRefFormat }}" placeholder="e.g. NC/SC/ORD/{YY}/{DDMM}{NNN}" readonly data-testid="division-number-format"></label>
+  </div>
+  <p class="muted">{{ counts.orders }} orders · {{ counts.staff }} staff · {{ counts.departments }} departments · {{ counts.clients }} clients.
+    {% if isExport %}Export keeps the company's number formats and counters exactly as they are.{% else %}This division counts its own numbers, starting with its code, unless its own format below says otherwise.{% endif %}</p>
+
+  <div class="section">
+    <h2>Modules</h2>
+    <form method="post" action="/admin/divisions/{{ division.id }}/modules">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      {% for m in moduleList %}
+        <label class="checkbox"><input type="checkbox" name="modules" value="{{ m.key }}" {{ 'checked' if modules[m.key] else '' }}> {{ m.label }}</label>
+      {% endfor %}
+      <p><button type="submit" class="btn">Save modules</button></p>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>This division's own settings</h2>
+    <p class="muted">A value here replaces the company value, only while someone works in this division. Leave a setting out to use the company value. Facts that depend on the CA or the bank (GST rates, e-invoice and e-way bill thresholds, merchanting limits) start from standard Indian rules and are <strong>to be confirmed by the CA / bank</strong>.</p>
+    {% if settings.length === 0 %}
+      <p class="muted" data-testid="division-settings-empty">None — every company, pricing and incentive setting applies as it is.</p>
+    {% else %}
+    <table class="list" data-testid="division-settings">
+      <tr><th>Kind</th><th>Setting</th><th>Value</th><th></th></tr>
+      {% for s in settings %}
+      <tr>
+        <td>{{ settingScopes[s.scope] or s.scope }}</td>
+        <td><code>{{ s.setting_key }}</code></td>
+        <td>{{ s.setting_value }}</td>
+        <td><form method="post" action="/admin/divisions/{{ division.id }}/settings/delete"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="scope" value="{{ s.scope }}"><input type="hidden" name="setting_key" value="{{ s.setting_key }}"><button type="submit" class="btn-link">Remove</button></form></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    <form method="post" action="/admin/divisions/{{ division.id }}/settings" class="field-grid">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label>Kind *
+        <select name="scope" required>
+          <option value="">Choose…</option>
+          {% for k, label in settingScopes %}<option value="{{ k }}">{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Setting name *<input type="text" name="setting_key" required maxlength="100" pattern="[A-Za-z][A-Za-z0-9_:.\-]{1,99}" placeholder="e.g. order_ref_format"></label>
+      <label>Value *<input type="text" name="setting_value" required maxlength="2000" placeholder="e.g. NC/DOM/{YY}/{DDMM}{NNN}"></label>
+      <p><button type="submit" class="btn">Save setting</button></p>
+    </form>
+  </div>
+
+  {% if planned %}
+  <div class="section" data-testid="division-preflight">
+    <h2>Before activating</h2>
+    <ul class="checklist">
+      {% for item in preflight %}
+        <li class="{{ 'ok' if item.ok else 'missing' }}">{{ '&#10003;' | safe if item.ok else '&#9744;' | safe }} {{ item.label }}{% if not item.ok %} — <small class="muted">{{ item.help }}</small>{% endif %}</li>
+      {% endfor %}
+    </ul>
+    <form method="post" action="/admin/divisions/{{ division.id }}/activate">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <label class="checkbox"><input type="checkbox" name="confirm" value="1" required> I have checked the list above. Activating shows the division switcher, "All divisions", the report Division filter and the Division field to company-level people.</label>
+      <p><button type="submit" class="btn">Activate {{ division.name }}</button></p>
+    </form>
+  </div>
+  {% elif not isExport %}
+  <div class="section">
+    <form method="post" action="/admin/divisions/{{ division.id }}/deactivate"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-secondary">Back to planned</button> <small class="muted">Only while it has no orders.</small></form>
+  </div>
+  {% endif %}
+</div>

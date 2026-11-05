@@ -1,0 +1,21 @@
+{# Owner decision D-257: Admin › Divisions (MD only). #}
+<div class="card page-wide">
+  <h1>Divisions</h1>
+  <p class="muted">One company, several divisions. Every order belongs to one division for life; staff see only their own division. Divisions stay invisible to everyone until two or more are active. A planned division cannot be used until it is activated here.</p>
+  <div class="table-scroll">
+  <table class="list" data-testid="divisions-table">
+    <tr><th>Code</th><th>Division</th><th>Status</th><th>Orders</th><th>Staff</th><th>Departments</th><th></th></tr>
+    {% for d in divisions %}{% set planned = d.status !== 'active' %}
+    <tr class="{{ 'division-planned' if planned else '' }}" style="{{ 'opacity:.6' if planned else '' }}">
+      <td><code>{{ d.code }}</code></td>
+      <td><strong>{{ d.name }}</strong><br><small class="muted">{{ d.description or '' }}</small></td>
+      <td><span class="badge {{ 'badge-inactive' if planned else 'badge-success' }}">{{ 'Planned' if planned else 'Active' }}</span></td>
+      <td>{{ d.counts.orders }}</td>
+      <td>{{ d.counts.staff }}</td>
+      <td>{{ d.counts.departments }}</td>
+      <td><a href="/admin/divisions/{{ d.id }}">Open</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+</div>

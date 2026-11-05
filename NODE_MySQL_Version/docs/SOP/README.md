@@ -51,6 +51,7 @@ implementation detail.
 - [Export Compliance](./25-export-compliance.md) — the department for government and agency work (ECGC, Certificate of Origin, phytosanitary / fumigation / inspection, export benefit claims, eBRC / FIRC): its three roles, its task list, and what it never sees.
 - [Agreements](./26-agreements.md) — the register of agreements with clients, suppliers, logistics partners, associates and staff: signed copies, expiry dates, reminders 30 and 7 days before and on the day, renew and end early.
 - [Pricing](./27-pricing.md) — supplier / market prices, the price build-up (cost → minimum price → floors → quote price), who sees which price, and the associate commission levels and ladder (D-245).
+- [Divisions](./28-divisions.md) — Export today; Domestic Trade, Merchant Trade and Import & Distribution planned. What a division is, Admin › Divisions (modules, own settings, numbering), and how to set up and activate a new division (D-257).
 
 ## Guides to print or share
 

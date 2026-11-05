@@ -97,6 +97,7 @@ const superAdminController = require('./controllers/superAdminController');
 const permissionAdminController = require('./controllers/permissionAdminController');
 const departmentController = require('./controllers/departmentController');
 const departmentAdminController = require('./controllers/departmentAdminController');
+const divisionController = require('./controllers/divisionController'); // D-257
 const purchasingController = require('./controllers/purchasingController');
 const coordinationController = require('./controllers/coordinationController');
 const paymentMilestoneController = require('./controllers/paymentMilestoneController');
@@ -481,6 +482,8 @@ app.use((req, res, next) => {
       isImpersonating: clientPortalService.isImpersonating(req),
       currentPath: req.path,
       query: req.query || {},
+      // Owner decision D-257: the switcher, the report Division filter and module menus (all hidden with one active division).
+      division: req.divisionUi || { showSwitcher: false, multi: false, modules: {}, active: [], all: [], currentId: null },
     };
     const context = Object.assign({}, common, data);
     let content = njkEnv.render(`${viewPath}.njk`, context);
@@ -498,12 +501,12 @@ app.use((req, res, next) => {
     const perms = req.permissions || {};
     const linksToOneOrder = /href="\/(?:orders|reports\/order)\/\d+/.test(content) && !(perms.view_all_orders && perms.view_archived_orders);
     if (!linksToOneOrder) {
-      content = permittedLinks.filterHtml(content, perms);
+      content = permittedLinks.filterHtml(content, perms, null, req.divisionUi ? req.divisionUi.isDisabledPath : null);
       sendPage();
       return;
     }
     orderAccessService.orderVisibilityChecker(req.user.id, perms).then((canSeeOrder) => {
-      content = permittedLinks.filterHtml(content, perms, canSeeOrder);
+      content = permittedLinks.filterHtml(content, perms, canSeeOrder, req.divisionUi ? req.divisionUi.isDisabledPath : null);
       sendPage();
     }).catch(next);
   };
@@ -860,6 +863,17 @@ app.post('/choose-department', requireAuth, verifyCsrf, asyncHandler(departmentC
 app.post('/switch-department', requireAuth, verifyCsrf, asyncHandler(departmentController.switchDepartment));
 app.post('/admin/preview-as', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentController.previewStart));
 app.post('/preview/exit', requireAuth, verifyCsrf, asyncHandler(departmentController.previewEnd));
+// Owner decision D-257 (5 Nov 2026): divisions.
+app.post('/divisions/choose', requireAuth, requirePermission('see_all_divisions'), verifyCsrf, asyncHandler(divisionController.choose));
+app.get('/admin/divisions', requireAuth, requirePermission('manage_divisions'), asyncHandler(divisionController.index));
+app.get('/admin/divisions/:id', requireAuth, requirePermission('manage_divisions'), asyncHandler(divisionController.show));
+app.post('/admin/divisions/:id/modules', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.saveModules));
+app.post('/admin/divisions/:id/settings', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.saveSetting));
+app.post('/admin/divisions/:id/settings/delete', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.deleteSetting));
+app.post('/admin/divisions/:id/activate', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.activate));
+app.post('/admin/divisions/:id/deactivate', requireAuth, requirePermission('manage_divisions'), verifyCsrf, asyncHandler(divisionController.deactivate));
+app.post('/users/:id/division', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(divisionController.setUserDivision));
+app.post('/admin/departments/:id/division', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(divisionController.setDepartmentDivision));
 app.get('/admin/departments', requireAuth, requirePermission('manage_permissions'), asyncHandler(departmentAdminController.index));
 app.post('/admin/departments', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.createDepartment));
 app.post('/admin/departments/:id/update', requireAuth, requirePermission('manage_permissions'), verifyCsrf, asyncHandler(departmentAdminController.updateDepartment));

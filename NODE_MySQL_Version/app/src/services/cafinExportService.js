@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../config/db');
+const divisionService = require('./divisionService');
 const financialYear = require('../helpers/financialYear');
 const orderRepository = require('../repositories/orderRepository');
 const orderProductRepository = require('../repositories/orderProductRepository');
@@ -41,7 +42,7 @@ async function orderIds(fy, status) {
   const rows = await db.query(
     `SELECT o.id FROM orders o
      WHERE o.is_test_data = 0 AND o.is_sample_data = 0
-       AND DATE(o.created_at) BETWEEN :f AND :t ${statusSql}
+       AND DATE(o.created_at) BETWEEN :f AND :t ${statusSql}${divisionService.sql('o.division_id')}
      ORDER BY o.created_at, o.id`,
     { f: start, t: end }
   );
@@ -50,7 +51,7 @@ async function orderIds(fy, status) {
 
 /** The financial years that have real orders, newest first. */
 async function financialYears() {
-  const rows = await db.query('SELECT created_at FROM orders WHERE is_test_data = 0 AND is_sample_data = 0');
+  const rows = await db.query(`SELECT created_at FROM orders WHERE is_test_data = 0 AND is_sample_data = 0${divisionService.sql('division_id')}`);
   const years = financialYear.labelsPresentIn(rows.map((r) => r.created_at));
   if (!years.includes(financialYear.current())) years.push(financialYear.current());
   return years.sort().reverse();

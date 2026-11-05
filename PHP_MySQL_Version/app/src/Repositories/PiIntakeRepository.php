@@ -292,7 +292,7 @@ final class PiIntakeRepository
     public static function pendingReviewCount(): int
     {
         return (int) Database::connection()
-            ->query("SELECT COUNT(*) AS c FROM pi_intake_submissions WHERE status = 'pending_review'")
+            ->query("SELECT COUNT(*) AS c FROM pi_intake_submissions WHERE status = 'pending_review'" . \App\Services\DivisionService::orderIdSql('order_id'))
             ->fetch()['c'];
     }
 

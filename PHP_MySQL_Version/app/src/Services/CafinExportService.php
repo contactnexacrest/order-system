@@ -42,7 +42,7 @@ final class CafinExportService
         $stmt = Database::connection()->prepare(
             "SELECT o.id FROM orders o
              WHERE o.is_test_data = 0 AND o.is_sample_data = 0
-               AND DATE(o.created_at) BETWEEN :f AND :t {$statusSql}
+               AND DATE(o.created_at) BETWEEN :f AND :t {$statusSql}" . DivisionService::sql('o.division_id') . "
              ORDER BY o.created_at, o.id"
         );
         $stmt->execute(['f' => $from, 't' => $to]);
@@ -52,7 +52,7 @@ final class CafinExportService
     /** @return list<string> the financial years that have real orders, newest first */
     public static function financialYears(): array
     {
-        $dates = Database::connection()->query('SELECT created_at FROM orders WHERE is_test_data = 0 AND is_sample_data = 0')->fetchAll(\PDO::FETCH_COLUMN);
+        $dates = Database::connection()->query('SELECT created_at FROM orders WHERE is_test_data = 0 AND is_sample_data = 0' . DivisionService::sql('division_id'))->fetchAll(\PDO::FETCH_COLUMN);
         $years = FinancialYear::labelsPresentIn($dates);
         if (!in_array(FinancialYear::current(), $years, true)) {
             $years[] = FinancialYear::current();

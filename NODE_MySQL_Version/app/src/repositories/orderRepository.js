@@ -6,6 +6,8 @@ const orderAssigneeRepository = require('./orderAssigneeRepository');
 const orderComplianceTaskRepository = require('./orderComplianceTaskRepository');
 const orderExportBenefitSchemeRepository = require('./orderExportBenefitSchemeRepository');
 const referenceNumberService = require('../services/referenceNumberService');
+// D-257 (lazy: divisionService loads nothing from here, but keep the require order free of cycles).
+const divisionService = () => require('../services/divisionService');
 const encryptionService = require('../services/encryptionService');
 const { formatForDb, parseDbDateTime } = require('../helpers/dbDateTime');
 
@@ -31,7 +33,7 @@ async function all() {
             ) AS is_overdue
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-     WHERE o.is_archived = 0
+     WHERE o.is_archived = 0${divisionService().sql('o.division_id')}
      ORDER BY o.created_at DESC, o.id DESC`
   );
 }
@@ -61,7 +63,7 @@ async function allVisibleTo(userId, seesAll) {
             ) AS is_overdue
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-     WHERE o.is_archived = 0 ${scopeClause}
+     WHERE o.is_archived = 0 ${scopeClause}${divisionService().sql('o.division_id')}
      ORDER BY o.created_at DESC, o.id DESC`,
     seesAll ? {} : { user_id: userId }
   );
@@ -75,7 +77,7 @@ async function allArchived() {
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
      LEFT JOIN users u ON u.id = o.archived_by
-     WHERE o.is_archived = 1
+     WHERE o.is_archived = 1${divisionService().sql('o.division_id')}
      ORDER BY o.archived_at DESC, o.id DESC`
   );
 }
@@ -191,6 +193,12 @@ async function createWithNextSequence(clientId, buildFields, createdBy, executor
   const sequenceNo = await referenceNumberService.nextOrderSequenceForClient(clientId);
   const fields = { ...buildFields(sequenceNo), client_id: clientId, sequence_no: sequenceNo };
   const orderId = await insertOrderRow(executor, fields, createdBy);
+  // D-257: the order belongs to one division for life — the creator's (or the one a company-level person chose).
+  const divisionId = fields.division_id !== undefined && fields.division_id !== null ? Number(fields.division_id) : await divisionService().forNewRecord();
+  if (divisionId !== divisionService().EXPORT_ID) {
+    await executor.execute('UPDATE orders SET division_id = :d WHERE id = :id', { d: divisionId, id: orderId });
+  }
+  await divisionService().linkClient(clientId, divisionId, executor);
   // Owner decision 1 Nov 2026 (C-7a, O-7): every order has an assignee — whoever creates it, until someone else is added.
   // Same connection as the insert (it may be inside a transaction holding the order row).
   if (Number(createdBy) > 0) {

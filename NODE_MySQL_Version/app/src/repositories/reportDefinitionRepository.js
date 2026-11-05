@@ -1,6 +1,13 @@
 'use strict';
 
 const db = require('../config/db');
+const divisionService = () => require('../services/divisionService');
+
+/** D-257: saved reports of the request's division(s), plus those saved without one. */
+function divisionSql() {
+  const c = divisionService().condition('rd.division_id');
+  return c === null ? '' : ` AND (rd.division_id IS NULL OR ${c})`;
+}
 
 /**
  * Port of App\Repositories\ReportDefinitionRepository. Spec Section 16 /
@@ -14,8 +21,8 @@ const db = require('../config/db');
 
 async function create(name, reportType, ownerUserId, visibility, filters, columns) {
   const result = await db.execute(
-    `INSERT INTO report_definitions (name, report_type, owner_user_id, visibility, filters_json, columns_json)
-     VALUES (:name, :report_type, :owner_user_id, :visibility, :filters_json, :columns_json)`,
+    `INSERT INTO report_definitions (name, report_type, owner_user_id, visibility, filters_json, columns_json, division_id)
+     VALUES (:name, :report_type, :owner_user_id, :visibility, :filters_json, :columns_json, :division_id)`,
     {
       name,
       report_type: reportType,
@@ -23,6 +30,8 @@ async function create(name, reportType, ownerUserId, visibility, filters, column
       visibility: visibility === 'shared' ? 'shared' : 'private',
       filters_json: JSON.stringify(filters ?? {}),
       columns_json: JSON.stringify(columns ?? {}),
+      // D-257: a saved report remembers the division it was saved in (empty = "All" / the user's own scope).
+      division_id: (await divisionService().isMulti()) ? divisionService().currentId() : null,
     }
   );
   return result.insertId;
@@ -42,7 +51,7 @@ async function visibleTo(userId) {
   return db.query(
     `SELECT rd.*, u.name AS owner_name FROM report_definitions rd
      JOIN users u ON u.id = rd.owner_user_id
-     WHERE rd.owner_user_id = :user_id OR rd.visibility = 'shared'
+     WHERE (rd.owner_user_id = :user_id OR rd.visibility = 'shared')${divisionSql()}
      ORDER BY rd.name`,
     { user_id: userId }
   );

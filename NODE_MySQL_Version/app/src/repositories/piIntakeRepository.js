@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const divisionService = require('../services/divisionService');
 const db = require('../config/db');
 const { formatForDb } = require('../helpers/dbDateTime');
 
@@ -303,7 +304,7 @@ async function markRejected(id, reviewedBy, reason) {
 // Nav-badge count — live, not cached, so it self-decrements the moment a
 // submission is accepted/rejected.
 async function pendingReviewCount() {
-  const row = await db.queryOne("SELECT COUNT(*) AS c FROM pi_intake_submissions WHERE status = 'pending_review'");
+  const row = await db.queryOne(`SELECT COUNT(*) AS c FROM pi_intake_submissions WHERE status = 'pending_review'${divisionService.orderIdSql('order_id')}`);
   return row ? parseInt(row.c, 10) : 0;
 }
 

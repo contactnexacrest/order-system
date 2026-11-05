@@ -107,6 +107,7 @@ $superAdmin = new SuperAdminController();
 $permissionAdmin = new PermissionAdminController();
 $departments = new \App\Controllers\DepartmentController();
 $departmentAdmin = new \App\Controllers\DepartmentAdminController();
+$divisions = new \App\Controllers\DivisionController(); // D-257
 $purchasing = new \App\Controllers\PurchasingController();
 $coordination = new \App\Controllers\CoordinationController();
 $milestones = new \App\Controllers\PaymentMilestoneController();
@@ -462,6 +463,17 @@ $router->post('/admin/designations', [$departmentAdmin, 'createDesignation'], [S
 $router->post('/admin/designations/{id}/update', [$departmentAdmin, 'updateDesignation'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
 $router->post('/users/{id}/memberships', [$departmentAdmin, 'addMembership'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
 $router->post('/users/{id}/memberships/{membershipId}/end', [$departmentAdmin, 'endMembership'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
+// Owner decision D-257 (5 Nov 2026): divisions.
+$router->post('/divisions/choose', [$divisions, 'choose'], [SessionAuth::required(), PermissionCheck::requires('see_all_divisions'), CsrfCheck::verify()]);
+$router->get('/admin/divisions', [$divisions, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions')]);
+$router->get('/admin/divisions/{id}', [$divisions, 'show'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions')]);
+$router->post('/admin/divisions/{id}/modules', [$divisions, 'saveModules'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+$router->post('/admin/divisions/{id}/settings', [$divisions, 'saveSetting'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+$router->post('/admin/divisions/{id}/settings/delete', [$divisions, 'deleteSetting'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+$router->post('/admin/divisions/{id}/activate', [$divisions, 'activate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+$router->post('/admin/divisions/{id}/deactivate', [$divisions, 'deactivate'], [SessionAuth::required(), PermissionCheck::requires('manage_divisions'), CsrfCheck::verify()]);
+$router->post('/users/{id}/division', [$divisions, 'setUserDivision'], [SessionAuth::required(), PermissionCheck::requires('manage_users'), CsrfCheck::verify()]);
+$router->post('/admin/departments/{id}/division', [$divisions, 'setDepartmentDivision'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);
 
 $router->get('/admin/permissions', [$permissionAdmin, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions')]);
 $router->post('/admin/permissions/grant', [$permissionAdmin, 'grantOverride'], [SessionAuth::required(), PermissionCheck::requires('manage_permissions'), CsrfCheck::verify()]);

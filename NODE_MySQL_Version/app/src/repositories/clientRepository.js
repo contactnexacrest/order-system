@@ -6,8 +6,8 @@ const companySettingsRepository = require('./companySettingsRepository');
 /** Also carries order_count — the card-grid list view (clients/index.njk) shows it per client. */
 async function all() {
   return db.query(
-    `SELECT c.*, (SELECT COUNT(*) FROM orders o WHERE o.client_id = c.id AND o.is_archived = 0) AS order_count
-     FROM clients c WHERE c.is_active = 1 ORDER BY c.company_legal_name`
+    `SELECT c.*, (SELECT COUNT(*) FROM orders o WHERE o.client_id = c.id AND o.is_archived = 0${require('../services/divisionService').sql('o.division_id')}) AS order_count
+     FROM clients c WHERE c.is_active = 1${require('../services/divisionService').clientSql('c')} ORDER BY c.company_legal_name`
   );
 }
 
@@ -54,7 +54,7 @@ async function findDuplicatesOf(clientId) {
 }
 
 async function allInactive() {
-  return db.query('SELECT * FROM clients WHERE is_active = 0 ORDER BY company_legal_name');
+  return db.query(`SELECT * FROM clients c WHERE is_active = 0${require('../services/divisionService').clientSql('c')} ORDER BY company_legal_name`);
 }
 
 async function create(data, createdBy, clientUniqueNumber) {
@@ -122,6 +122,9 @@ async function create(data, createdBy, clientUniqueNumber) {
       created_by: createdBy,
     }
   );
+  // D-257: one shared client record; it buys from the division that created it.
+  const divisionService = require('../services/divisionService');
+  await divisionService.linkClient(result.insertId, await divisionService.forNewRecord());
   return result.insertId;
 }
 

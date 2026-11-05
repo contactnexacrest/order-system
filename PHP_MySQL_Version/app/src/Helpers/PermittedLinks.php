@@ -91,6 +91,10 @@ final class PermittedLinks
 
     public static function currentUserMayOpen(string $path): bool
     {
+        // D-257: a module switched off for the request's division(s).
+        if (\App\Services\DivisionService::disabledModuleForPath((string) parse_url($path, PHP_URL_PATH)) !== null) {
+            return false;
+        }
         if (preg_match(self::ORDER_PAGE, $path, $m) && !\App\Services\OrderAccessService::currentUserMaySeeOrderId((int) $m[1])) {
             return false;
         }

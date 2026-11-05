@@ -5464,3 +5464,89 @@ CREATE TABLE catalog_product_supplier_options (
   CONSTRAINT fk_cpso_spec FOREIGN KEY (spec_id) REFERENCES spec_definitions(id),
   CONSTRAINT fk_cpso_option FOREIGN KEY (option_id) REFERENCES spec_options(id)
 ) ENGINE=InnoDB;
+
+-- ================================================================
+-- Owner decision D-257 (5 Nov 2026): divisions. One company, several
+-- divisions. Export (EXP) is today's business and the only ACTIVE one;
+-- Domestic Trade, Merchant Trade and Import & Distribution are listed as
+-- "planned" and cannot be used until the owner activates them in
+-- Admin > Divisions. Divisions stay invisible to staff until two or more
+-- are active. Every existing record belongs to Export (id 1).
+-- ================================================================
+CREATE TABLE divisions (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code          VARCHAR(10) NOT NULL,                 -- EXP / DOM / MTT / IMP; never changes
+  name          VARCHAR(100) NOT NULL,
+  status        ENUM('active','planned') NOT NULL DEFAULT 'planned',
+  sort_order    INT NOT NULL DEFAULT 0,
+  description   VARCHAR(255) NULL,
+  activated_at  DATETIME NULL,
+  activated_by  BIGINT UNSIGNED NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_divisions_code (code),
+  UNIQUE KEY uq_divisions_name (name),
+  CONSTRAINT fk_divisions_activated_by FOREIGN KEY (activated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+INSERT INTO divisions (id, code, name, status, sort_order, description) VALUES
+  (1, 'EXP', 'Export',                'active',  10, 'Export of goods from India (today''s business).'),
+  (2, 'DOM', 'Domestic Trade',        'planned', 20, 'Sale to Indian resellers with GST.'),
+  (3, 'MTT', 'Merchant Trade',        'planned', 30, 'Buy abroad, sell abroad (RBI merchanting).'),
+  (4, 'IMP', 'Import & Distribution', 'planned', 40, 'Import into India and sell locally.');
+
+-- Which modules each division uses. A module with no row is on.
+CREATE TABLE division_modules (
+  division_id   BIGINT UNSIGNED NOT NULL,
+  module_key    VARCHAR(40) NOT NULL,
+  is_enabled    TINYINT(1) NOT NULL DEFAULT 1,
+  updated_by    BIGINT UNSIGNED NULL,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (division_id, module_key),
+  CONSTRAINT fk_division_modules_division FOREIGN KEY (division_id) REFERENCES divisions(id),
+  CONSTRAINT fk_division_modules_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- A division's own value for a company / pricing / incentive setting. Empty for Export.
+CREATE TABLE division_settings (
+  division_id   BIGINT UNSIGNED NOT NULL,
+  scope         ENUM('company','pricing','incentive') NOT NULL,
+  setting_key   VARCHAR(100) NOT NULL,
+  setting_value TEXT NULL,
+  updated_by    BIGINT UNSIGNED NULL,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (division_id, scope, setting_key),
+  CONSTRAINT fk_division_settings_division FOREIGN KEY (division_id) REFERENCES divisions(id),
+  CONSTRAINT fk_division_settings_user FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- Which divisions a client buys from: one shared client record, no duplicates.
+-- A client with no row here belongs to Export.
+CREATE TABLE client_divisions (
+  client_id     BIGINT UNSIGNED NOT NULL,
+  division_id   BIGINT UNSIGNED NOT NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (client_id, division_id),
+  KEY idx_client_divisions_division (division_id),
+  CONSTRAINT fk_client_divisions_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+  CONSTRAINT fk_client_divisions_division FOREIGN KEY (division_id) REFERENCES divisions(id)
+) ENGINE=InnoDB;
+
+-- Every order belongs to one division for life (never changed after creation).
+ALTER TABLE orders ADD COLUMN division_id BIGINT UNSIGNED NOT NULL DEFAULT 1;
+ALTER TABLE orders ADD KEY idx_orders_division (division_id);
+ALTER TABLE orders ADD CONSTRAINT fk_orders_division FOREIGN KEY (division_id) REFERENCES divisions(id);
+-- The division a staff member works in; empty = company level (sees every division with "See all divisions").
+ALTER TABLE users ADD COLUMN division_id BIGINT UNSIGNED NULL DEFAULT 1;
+ALTER TABLE users ADD CONSTRAINT fk_users_division FOREIGN KEY (division_id) REFERENCES divisions(id);
+-- Empty = a company-level department (Management, Accounts & Finance, Audit, Administration).
+ALTER TABLE departments ADD COLUMN division_id BIGINT UNSIGNED NULL;
+ALTER TABLE departments ADD CONSTRAINT fk_departments_division FOREIGN KEY (division_id) REFERENCES divisions(id);
+ALTER TABLE associates ADD COLUMN division_id BIGINT UNSIGNED NOT NULL DEFAULT 1;
+ALTER TABLE associates ADD CONSTRAINT fk_associates_division FOREIGN KEY (division_id) REFERENCES divisions(id);
+ALTER TABLE price_requests ADD COLUMN division_id BIGINT UNSIGNED NOT NULL DEFAULT 1;
+ALTER TABLE price_requests ADD CONSTRAINT fk_price_requests_division FOREIGN KEY (division_id) REFERENCES divisions(id);
+-- A saved report remembers the division it was saved in; empty = the user's own scope.
+ALTER TABLE report_definitions ADD COLUMN division_id BIGINT UNSIGNED NULL;
+ALTER TABLE report_definitions ADD CONSTRAINT fk_report_definitions_division FOREIGN KEY (division_id) REFERENCES divisions(id);
+-- Empty = a company-wide cost, shared out as overhead.
+ALTER TABLE ca_expenses ADD COLUMN division_id BIGINT UNSIGNED NULL;
+ALTER TABLE ca_expenses ADD CONSTRAINT fk_ca_expenses_division FOREIGN KEY (division_id) REFERENCES divisions(id);

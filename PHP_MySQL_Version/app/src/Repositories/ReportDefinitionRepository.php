@@ -20,8 +20,8 @@ final class ReportDefinitionRepository
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare(
-            'INSERT INTO report_definitions (name, report_type, owner_user_id, visibility, filters_json, columns_json)
-             VALUES (:name, :report_type, :owner_user_id, :visibility, :filters_json, :columns_json)'
+            'INSERT INTO report_definitions (name, report_type, owner_user_id, visibility, filters_json, columns_json, division_id)
+             VALUES (:name, :report_type, :owner_user_id, :visibility, :filters_json, :columns_json, :division_id)'
         );
         $stmt->execute([
             'name' => $name,
@@ -30,8 +30,17 @@ final class ReportDefinitionRepository
             'visibility' => $visibility === 'shared' ? 'shared' : 'private',
             'filters_json' => json_encode($filters, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
             'columns_json' => json_encode($columns, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            // D-257: a saved report remembers the division it was saved in (empty = "All" / the user's own scope).
+            'division_id' => \App\Services\DivisionService::isMulti() ? \App\Services\DivisionService::currentId() : null,
         ]);
         return (int) $pdo->lastInsertId();
+    }
+
+    /** D-257: saved reports of the request's division(s), plus those saved without one. */
+    private static function divisionSql(): string
+    {
+        $c = \App\Services\DivisionService::condition('rd.division_id');
+        return $c === null ? '' : " AND (rd.division_id IS NULL OR {$c})";
     }
 
     public static function find(int $id): ?array
@@ -52,7 +61,7 @@ final class ReportDefinitionRepository
         $stmt = Database::connection()->prepare(
             "SELECT rd.*, u.name AS owner_name FROM report_definitions rd
              JOIN users u ON u.id = rd.owner_user_id
-             WHERE rd.owner_user_id = :user_id OR rd.visibility = 'shared'
+             WHERE (rd.owner_user_id = :user_id OR rd.visibility = 'shared')" . self::divisionSql() . "
              ORDER BY rd.name"
         );
         $stmt->execute(['user_id' => $userId]);

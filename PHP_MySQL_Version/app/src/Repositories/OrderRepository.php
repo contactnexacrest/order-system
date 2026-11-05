@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
+use App\Services\DivisionService;
 use App\Services\ReferenceNumberService;
 
 final class OrderRepository
@@ -42,7 +43,7 @@ final class OrderRepository
                     ) AS is_overdue
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-             WHERE o.is_archived = 0
+             WHERE o.is_archived = 0" . DivisionService::sql('o.division_id') . "
              ORDER BY o.created_at DESC, o.id DESC"
         )->fetchAll();
     }
@@ -73,7 +74,7 @@ final class OrderRepository
                     ) AS is_overdue
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-             WHERE o.is_archived = 0 {$scopeClause}
+             WHERE o.is_archived = 0 {$scopeClause}" . DivisionService::sql('o.division_id') . "
              ORDER BY o.created_at DESC, o.id DESC"
         );
         $stmt->execute($seesAll ? [] : ['user_id' => $userId]);
@@ -89,7 +90,7 @@ final class OrderRepository
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
              LEFT JOIN users u ON u.id = o.archived_by
-             WHERE o.is_archived = 1
+             WHERE o.is_archived = 1' . DivisionService::sql('o.division_id') . '
              ORDER BY o.archived_at DESC, o.id DESC'
         )->fetchAll();
     }
@@ -203,6 +204,12 @@ final class OrderRepository
         $sequenceNo = ReferenceNumberService::nextOrderSequenceForClient($clientId);
         $fields = $buildFields($sequenceNo) + ['client_id' => $clientId, 'sequence_no' => $sequenceNo];
         $orderId = self::insertRow($fields, $createdBy);
+        // D-257: the order belongs to one division for life — the creator's (or the one a company-level person chose).
+        $divisionId = isset($fields['division_id']) ? (int) $fields['division_id'] : DivisionService::forNewRecord();
+        if ($divisionId !== DivisionService::EXPORT_ID) {
+            Database::connection()->prepare('UPDATE orders SET division_id = :d WHERE id = :id')->execute(['d' => $divisionId, 'id' => $orderId]);
+        }
+        DivisionService::linkClient($clientId, $divisionId);
         // Owner decision 1 Nov 2026 (C-7a, O-7): every order has an assignee — whoever creates it, until someone else is added.
         if ($createdBy > 0) {
             OrderAssigneeRepository::add($orderId, $createdBy, $createdBy);

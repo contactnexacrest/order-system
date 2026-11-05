@@ -139,7 +139,8 @@ final class IncentiveRepository
     public static function settings(): array
     {
         // D-245 P5: read once per report run (BatchCache scope only).
-        return \App\Helpers\BatchCache::memo('incentive_settings', static fn () => self::settingsUncached());
+        // D-257: a division's own values over the company ones (outside the memo, which is not per division).
+        return \App\Services\DivisionService::overlay('incentive', \App\Helpers\BatchCache::memo('incentive_settings', static fn () => self::settingsUncached()));
     }
 
         private static function settingsUncached(): array

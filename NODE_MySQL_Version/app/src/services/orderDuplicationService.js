@@ -44,6 +44,12 @@ async function duplicate(sourceOrderId, createdBy, productLines = null) {
   if (!source) {
     throw new Error(`Cannot duplicate order ${sourceOrderId} — not found.`);
   }
+  // D-257: a duplicate stays in the source order's division (its numbering too).
+  const divisionService = require('./divisionService');
+  return divisionService.withDivision(Number(source.division_id || divisionService.EXPORT_ID), () => duplicateInDivision(source, sourceOrderId, createdBy, productLines));
+}
+
+async function duplicateInDivision(source, sourceOrderId, createdBy, productLines) {
   const client = await clientRepository.find(source.client_id);
 
   // Owner decision 4 Nov 2026 (D1): NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter.

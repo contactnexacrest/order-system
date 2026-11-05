@@ -92,7 +92,13 @@ $canComplaints = $can('manage_complaints') || $can('respond_to_complaints');
 $canViewComplaintsList = $can('manage_complaints') || $can('respond_to_complaints');
 
 // Owner decision D-214, phase 3: Procurement's queue.
-$canProcurement = $can('manage_purchasing') || $can('approve_purchases');
+$canProcurement = ($can('manage_purchasing') || $can('approve_purchases')) && \App\Services\DivisionService::moduleEnabled('supplier_purchase');
+// D-257: a module switched off for the request's division(s) hides its menu entries.
+$moduleAssociates = \App\Services\DivisionService::moduleEnabled('associates');
+$moduleIncentive = \App\Services\DivisionService::moduleEnabled('team_incentive');
+$canManageIncentives = $canManageIncentives && $moduleIncentive;
+$canPayIncentives = $canPayIncentives && $moduleIncentive;
+$canOwnIncentives = $canOwnIncentives && $moduleIncentive;
 $opsGroupVisible = $canOrders || $canViewArchivedOrders || $canDisputes || $canComplaints || $canViewClients || $canViewOrders || $canProcurement;
 // Owner decision D-214, phase 4: the management cockpit.
 $canCockpit = $can('view_cockpit');
@@ -110,7 +116,7 @@ $insightsGroupVisible = $canReports || $canAudit || $canPayIncentives || $canOwn
 $adminGroupVisible = $canSettings || $canAssets || $canSignatories || $canPermissions
     || $canUsers || $canFieldProtection || $canOverrides || $canSampleData || $canDataExport || $canManageLogisticsPartners || $canManageSuppliers || $canManagePaymentPresets
     || $canManageHsCodes || $canManageComplianceTaskTypes || $canManageDropdownOptions || $canManageEmailTemplates
-    || $canManagePorts || $canManageIncentives || $canPricing; // QA Round 5, R5-19: Ports / Port Routes live in this group too (Node already had it)
+    || $canManagePorts || $canManageIncentives || $canPricing || $can('manage_divisions'); // QA Round 5, R5-19: Ports / Port Routes live in this group too (Node already had it)
 
 // Sidebar redesign (2026-09-23, "cover all" UI pass) — highlights the
 // current section so a fresher can see at a glance where they are, and
@@ -175,7 +181,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
         <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></span>Operations</summary>
         <div class="nav-dropdown">
           <?php if ($canOrders || $canViewClients): ?><a href="/clients" class="<?= $isActive('/clients') ? 'active' : '' ?>">Clients</a><?php endif; ?>
-          <?php if ($can('view_associates') || $can('manage_associates') || $can('manage_associate_bank')): ?><a href="/associates" class="<?= $isActive('/associates') ? 'active' : '' ?>">Associates</a><?php endif; ?>
+          <?php if ($moduleAssociates && ($can('view_associates') || $can('manage_associates') || $can('manage_associate_bank'))): ?><a href="/associates" class="<?= $isActive('/associates') ? 'active' : '' ?>">Associates</a><?php endif; ?>
           <?php if ($can('view_agreements') || $can('manage_agreements')): ?><a href="/agreements" class="<?= $isActive('/agreements') ? 'active' : '' ?>">Agreements</a><?php endif; ?>
           <?php if ($canOrders || $canViewOrders): ?><a href="/orders" class="<?= $currentPath === '/orders' || (str_starts_with($currentPath, '/orders/') && !str_starts_with($currentPath, '/orders/archived')) ? 'active' : '' ?>">Orders</a><?php endif; ?>
           <?php if ($canViewArchivedOrders): ?><a href="/orders/archived" class="<?= $isActive('/orders/archived') ? 'active' : '' ?>">Archived Orders</a><?php endif; ?>
@@ -223,6 +229,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canSettings): ?><a href="/watermarks" class="<?= $isActive('/watermarks') ? 'active' : '' ?>">Watermarks</a><?php endif; ?>
           <?php if ($canAssets): ?><a href="/company-assets" class="<?= $isActive('/company-assets') ? 'active' : '' ?>">Assets</a><?php endif; ?>
           <?php if ($canSignatories): ?><a href="/signatories" class="<?= $isActive('/signatories') ? 'active' : '' ?>">Signatories</a><?php endif; ?>
+          <?php if ($can('manage_divisions')): // D-257 ?><a href="/admin/divisions" class="<?= $isActive('/admin/divisions') ? 'active' : '' ?>">Divisions</a><?php endif; ?>
           <?php if ($canPermissions): ?><a href="/admin/departments" class="<?= $isActive('/admin/departments') ? 'active' : '' ?>">Departments</a><?php endif; ?>
           <?php if ($can('manage_task_types')): ?><a href="/admin/task-types" class="<?= $isActive('/admin/task-types') ? 'active' : '' ?>">Task Due Days</a><?php endif; ?>
           <?php if ($canPermissions): ?><a href="/admin/permissions" class="<?= $isActive('/admin/permissions') ? 'active' : '' ?>">Permissions</a><?php endif; ?>
@@ -270,6 +277,21 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php endif; ?>
         </div>
       <?php endif; ?>
+      <?php if (\App\Services\DivisionService::showSwitcher()): // D-257: company level, two or more active divisions ?>
+        <form method="post" action="/divisions/choose" class="division-switch" data-testid="division-switcher" style="margin:8px 0;color:#fff;font-size:12px">
+          <?= \App\Helpers\Csrf::field() ?>
+          <input type="hidden" name="back" value="<?= htmlspecialchars($currentPath) ?>">
+          <label>Division
+            <select name="division" onchange="this.form.submit()">
+              <option value="all"<?= \App\Services\DivisionService::currentId() === null ? ' selected' : '' ?>>All divisions</option>
+              <?php foreach (\App\Services\DivisionService::active() as $__div): ?>
+                <option value="<?= (int) $__div['id'] ?>"<?= \App\Services\DivisionService::currentId() === (int) $__div['id'] ? ' selected' : '' ?>><?= htmlspecialchars((string) $__div['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <noscript><button type="submit" class="btn-sm">Show</button></noscript>
+        </form>
+      <?php endif; ?>
       <a href="/account" class="sidebar-user-card">
         <span class="sidebar-user-avatar"><?= htmlspecialchars(mb_strtoupper(mb_substr($current['name'], 0, 1))) ?></span>
         <span class="sidebar-user-name"><?= htmlspecialchars($current['name']) ?></span>
@@ -292,6 +314,20 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
     <?php foreach (Flash::pull() as $f): ?>
       <div class="alert alert-<?= htmlspecialchars($f['type']) ?>"><?= htmlspecialchars($f['message']) ?></div>
     <?php endforeach; ?>
+    <?php if (str_starts_with($currentPath, '/reports') && \App\Services\DivisionService::showSwitcher()): // D-257: one shared Division filter for every report (two or more active divisions only) ?>
+      <form method="get" class="report-division-filter" data-testid="report-division-filter">
+        <?php foreach ($_GET as $__k => $__v): if ($__k === 'division' || !is_scalar($__v)) { continue; } ?><input type="hidden" name="<?= htmlspecialchars((string) $__k) ?>" value="<?= htmlspecialchars((string) $__v) ?>"><?php endforeach; ?>
+        <label>Division
+          <select name="division" onchange="this.form.submit()">
+            <option value="">All divisions</option>
+            <?php foreach (\App\Services\DivisionService::active() as $__div): ?>
+              <option value="<?= (int) $__div['id'] ?>"<?= (int) ($_GET['division'] ?? 0) === (int) $__div['id'] ? ' selected' : '' ?>><?= htmlspecialchars((string) $__div['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <noscript><button type="submit" class="btn-sm">Show</button></noscript>
+      </form>
+    <?php endif; ?>
     <?= $content ?>
   </main>
 </div>

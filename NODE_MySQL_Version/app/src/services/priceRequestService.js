@@ -216,6 +216,8 @@ async function insert(row) {
       for (const k of INSERT_KEYS) params[k] = row[k] ?? null;
       const r = await db.execute(
         `INSERT INTO price_requests (${INSERT_KEYS.join(', ')}) VALUES (${INSERT_KEYS.map((k) => `:${k}`).join(', ')})`, params);
+      // D-257: a price request belongs to its associate's division.
+      await db.execute('UPDATE price_requests r JOIN associates a ON a.id = r.associate_id SET r.division_id = a.division_id WHERE r.id = :id AND r.division_id <> a.division_id', { id: r.insertId });
       return Number(r.insertId);
     } catch (e) {
       if (!String(e.message).includes('Duplicate') || attempt === 4) throw e;
@@ -272,7 +274,7 @@ async function create(associate, product, selection, other, note) {
 
 /** Manual requests waiting for a price (shown beside the "Price requests" link). */
 async function pendingCount() {
-  return Number((await db.queryOne("SELECT COUNT(*) AS n FROM price_requests WHERE status = 'pending'")).n);
+  return Number((await db.queryOne(`SELECT COUNT(*) AS n FROM price_requests WHERE status = 'pending'${require('./divisionService').sql('division_id')}`)).n);
 }
 
 async function find(id) {
@@ -305,7 +307,7 @@ async function queue(filter = 'all', limit = 200) {
   return db.query(
     `SELECT r.*, p.name AS product_name, a.name AS associate_name FROM price_requests r
      JOIN catalog_products p ON p.id = r.product_id JOIN associates a ON a.id = r.associate_id
-     ${where} ORDER BY (r.status = 'pending') DESC, r.id DESC LIMIT ${parseInt(limit, 10) || 200}`);
+     ${where || 'WHERE 1 = 1'}${require('./divisionService').sql('r.division_id')} ORDER BY (r.status = 'pending') DESC, r.id DESC LIMIT ${parseInt(limit, 10) || 200}`);
 }
 
 /** Requests against orders per associate over the last 90 days. */

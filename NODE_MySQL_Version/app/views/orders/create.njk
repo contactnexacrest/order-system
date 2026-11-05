@@ -19,6 +19,17 @@
           {% endfor %}
         </select>
       </label>
+      {% if divisionChoices %}{# D-257: company level, several active divisions, "All divisions" chosen #}
+      <label>Division *
+        <select name="division_id" required>
+          <option value="">Choose…</option>
+          {% for d in divisionChoices %}
+            <option value="{{ d.id }}" {{ 'selected' if (old.division_id | int) == d.id else '' }}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+        <small class="help">The order belongs to this division for life.</small>
+      </label>
+      {% endif %}
     </fieldset>
 
     <fieldset>

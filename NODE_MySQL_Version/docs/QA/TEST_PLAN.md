@@ -491,6 +491,14 @@ Browser suite: `12-money-matrix.spec.js` — every role × about 75 screens, 18 
 
 Totals at go-live (2 Nov 2026): PHPUnit 2,191 tests; Jest 392 suites / 2,258 tests; browser suite 58 tests per stack (including `12-money-matrix.spec.js`, 0 violations). Two tests that exercised back-fills of existing data were removed with the migration files (D-241): the go-live database has no existing data to back-fill.
 
+## 13. Added since (5 Nov 2026: divisions, D-257)
+
+| Test | What it proves |
+|---|---|
+| `divisionIsolation.test.js` | A second division (DOM) made active inside the test only: each division's staff never see the other's orders (list, board, archive, order page, child routes, single-order report), clients, reports (payments, countries), dashboard search, tasks/cockpit, CAFIN CSV order list or waiting-email badge; company-level people see both, pick one in the switcher, and "All"; a new order asks for the division on "All"; the switcher, report Division filter and user/department Division field appear only with two or more active divisions; numbering is separate (DOM/…) and Export's next number unchanged; a division setting overrides the company value only in that division; a module switched off hides its menu and refuses its address (403); Export's QT/PI/OC/CI/PL document data is identical with and without a division scope; a planned division is not activated before its pre-flight checklist is complete. |
+
+No existing test was changed.
+
 ## Appendix
 
 Full route-by-route and table-by-table inventory:

@@ -53,7 +53,7 @@ final class ReferenceNumberService
         $now = new \DateTimeImmutable();
         $scope = str_contains($format, '{DDMM}') ? $now->format('Ymd') : ((str_contains($format, '{YY}') || str_contains($format, '{YYYY}')) ? $now->format('Y') : 'all');
         $seq = self::nextSeq('order_ref:' . $scope);
-        $rendered = strtr($format, ['{YYYY}' => $now->format('Y'), '{YY}' => $now->format('y'), '{DDMM}' => $now->format('dm'), '{NNN}' => str_pad((string) $seq, 3, '0', STR_PAD_LEFT)]);
+        $rendered = self::withDivisionCode($format, strtr($format, ['{YYYY}' => $now->format('Y'), '{YY}' => $now->format('y'), '{DDMM}' => $now->format('dm'), '{NNN}' => str_pad((string) $seq, 3, '0', STR_PAD_LEFT), '{DIV}' => self::divisionCode()]));
         return $testPrefix ? TestModeService::applyReferencePrefix($rendered, TestModeService::isEnabled()) : $rendered;
     }
 
@@ -65,12 +65,14 @@ final class ReferenceNumberService
     public static function generateDocumentRef(int $documentTypeId): ?string
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT ref_format FROM document_types WHERE id = :id');
+        $stmt = $pdo->prepare('SELECT code, ref_format FROM document_types WHERE id = :id');
         $stmt->execute(['id' => $documentTypeId]);
         $row = $stmt->fetch();
         if (!$row || !$row['ref_format']) {
             return null;
         }
+        // D-257: a division may set its own format for a document (division setting "ref_format:<code>").
+        $row['ref_format'] = DivisionService::overrideFor('company', 'ref_format:' . $row['code']) ?: $row['ref_format'];
 
         $now = new \DateTimeImmutable();
         $seq = self::nextSeq('document:' . $documentTypeId . ':' . $now->format('Ymd'));
@@ -98,6 +100,7 @@ final class ReferenceNumberService
         if (!$row || !$row['ref_format']) {
             return null;
         }
+        $row['ref_format'] = DivisionService::overrideFor('company', 'ref_format:AMD') ?: $row['ref_format'];
 
         $now = new \DateTimeImmutable();
         $seq = self::nextSeq('amendment:' . $now->format('Ymd'));
@@ -129,6 +132,11 @@ final class ReferenceNumberService
      */
     private static function nextSeq(string $scopeKey): int
     {
+        // D-257: a division other than Export counts on its own; Export keeps today's counters exactly.
+        $division = self::nonExportDivision();
+        if ($division !== null) {
+            $scopeKey = 'div' . (int) $division['id'] . ':' . $scopeKey;
+        }
         $pdo = Database::connection();
         // reference_sequences has no AUTO_INCREMENT column (scope_key is
         // the PK), so on this scope's very first-ever call the plain
@@ -236,8 +244,35 @@ final class ReferenceNumberService
             '{YY}'   => $now->format('y'),
             '{DDMM}' => $now->format('dm'),
             '{NNN}'  => str_pad((string) $seq, 3, '0', STR_PAD_LEFT),
+            '{DIV}'  => self::divisionCode(),
         ];
-        $rendered = strtr($format, $replacements);
+        $rendered = self::withDivisionCode($format, strtr($format, $replacements));
         return TestModeService::applyReferencePrefix($rendered, TestModeService::isEnabled());
+    }
+
+    /** D-257: the division a new number is for, when it is not Export (Export's numbers never change). */
+    private static function nonExportDivision(): ?array
+    {
+        $id = DivisionService::currentId();
+        if ($id === null || $id === DivisionService::EXPORT_ID) {
+            return null;
+        }
+        return DivisionService::find($id);
+    }
+
+    private static function divisionCode(): string
+    {
+        $d = self::nonExportDivision();
+        return $d !== null ? (string) $d['code'] : 'EXP';
+    }
+
+    /** A non-Export division's number starts with its code ("DOM/…") unless its format places {DIV} itself. */
+    private static function withDivisionCode(string $format, string $rendered): string
+    {
+        $d = self::nonExportDivision();
+        if ($d === null || str_contains($format, '{DIV}')) {
+            return $rendered;
+        }
+        return $d['code'] . '/' . $rendered;
     }
 }

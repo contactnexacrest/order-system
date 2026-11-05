@@ -124,6 +124,45 @@ final class SessionAuth
                 return false;
             }
 
+            // D-257: a module switched off for the request's division(s) refuses its addresses.
+            $requestPath = (string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+            if (\App\Services\DivisionService::disabledModuleForPath($requestPath) !== null) {
+                http_response_code(403);
+                echo 'This part of the system is not in use here.';
+                return false;
+            }
+            // D-257: a client outside the request's division(s) is not available.
+            if (preg_match('#^/clients/(\d+)(?:/|$)#', $requestPath, $clientMatch) && !\App\Services\DivisionService::allowsClient((int) $clientMatch[1])) {
+                http_response_code(403);
+                echo 'This client is not available to you.';
+                return false;
+            }
+            // D-257: the report Division filter (company level, two or more active divisions).
+            if (str_starts_with($requestPath, '/reports') && ($_GET['division'] ?? '') !== '' && \App\Services\DivisionService::showSwitcher()) {
+                $reportDivision = \App\Services\DivisionService::find((int) $_GET['division']);
+                if ($reportDivision !== null && $reportDivision['status'] === 'active' && \App\Services\DivisionService::allows((int) $reportDivision['id'])) {
+                    \App\Services\DivisionService::enterOrderDivision((int) $reportDivision['id']);
+                }
+            }
+            if (preg_match('#^/associates/(\d+)(?:/|$)#', $requestPath, $associateMatch)) {
+                $associateDivision = \App\Config\Database::connection()->prepare('SELECT division_id FROM associates WHERE id = :id');
+                $associateDivision->execute(['id' => (int) $associateMatch[1]]);
+                $associateDivisionId = $associateDivision->fetchColumn();
+                if ($associateDivisionId !== false && !\App\Services\DivisionService::allows((int) $associateDivisionId)) {
+                    http_response_code(403);
+                    echo 'This associate is not available to you.';
+                    return false;
+                }
+            }
+            // D-257: an order's pages work in the order's own division (its numbering and settings).
+            $orderIdForPath = \App\Services\OrderAccessService::orderIdForPath($requestPath);
+            if ($orderIdForPath !== null) {
+                $orderForPath = \App\Repositories\OrderRepository::find($orderIdForPath);
+                if ($orderForPath) {
+                    \App\Services\DivisionService::enterOrderDivision((int) ($orderForPath['division_id'] ?? \App\Services\DivisionService::EXPORT_ID));
+                }
+            }
+
             return true;
         };
     }

@@ -2361,3 +2361,52 @@ JOIN (SELECT 'Grade / quality' AS sn, 'Premium' AS n, 1 AS b, 'none' AS t, NULL 
       SELECT 'Calibration', 'Calibrated', 0, 'pct', 4, NULL, 2) d ON d.sn = s.name
 WHERE s.product_id IS NULL
   AND NOT EXISTS (SELECT 1 FROM spec_options o WHERE o.spec_id = s.id AND o.name = d.n AND o.product_id IS NULL);
+
+-- ================================================================
+-- Owner decision D-257 (5 Nov 2026): divisions. Export uses every module; the
+-- planned divisions start with the modules their trade needs (owner can change
+-- them in Admin > Divisions before activating). Company-level departments and
+-- people have no division; everyone else works in Export.
+-- ================================================================
+INSERT IGNORE INTO division_modules (division_id, module_key, is_enabled)
+SELECT d.id, m.k,
+       CASE WHEN d.code = 'EXP' THEN 1
+            WHEN m.k IN ('sales_documents','supplier_purchase','associates','team_incentive') THEN 1
+            WHEN d.code = 'MTT' AND m.k IN ('firc_fema','ecgc') THEN 1
+            ELSE 0 END
+FROM divisions d
+JOIN (SELECT 'sales_documents' AS k UNION ALL SELECT 'supplier_purchase' UNION ALL SELECT 'export_shipping'
+      UNION ALL SELECT 'lut_igst' UNION ALL SELECT 'export_benefits' UNION ALL SELECT 'firc_fema'
+      UNION ALL SELECT 'ecgc' UNION ALL SELECT 'associates' UNION ALL SELECT 'team_incentive') m;
+
+UPDATE departments SET division_id = 1 WHERE code IN ('SALES','PROC','LOG','OPS','EXPORT_COMPLIANCE');
+UPDATE departments SET division_id = NULL WHERE code IN ('MGMT','FIN','AUDIT','ADMIN');
+
+INSERT IGNORE INTO client_divisions (client_id, division_id) SELECT id, 1 FROM clients;
+
+INSERT IGNORE INTO permissions (permission_key, name, description, category) VALUES
+  ('see_all_divisions', 'See all divisions', 'Company level: see every division''s orders, clients and reports, and pick one division or "All divisions" in the header (the picker shows only when two or more divisions are active). D-257.', 'admin'),
+  ('manage_divisions',  'Manage divisions',  'Admin > Divisions: modules, number formats, division settings and activating a planned division. D-257.', 'admin');
+
+INSERT IGNORE INTO roles (name, description, is_system_role) VALUES
+  ('Investor (view only)', 'Dashboards and reports across all divisions; no editing (D-257).', 0);
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'see_all_divisions'
+  AND r.name IN ('Admin', 'Managing Director', 'Executive Director', 'CA / Chartered Accountant', 'Viewer / Auditor',
+                 'Accounts Executive', 'Finance Manager', 'Finance Director', 'System Administrator', 'Investor (view only)');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE p.permission_key = 'manage_divisions' AND r.name IN ('Admin', 'Managing Director');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id, is_enabled)
+SELECT r.id, p.id, 1 FROM roles r CROSS JOIN permissions p
+WHERE r.name = 'Investor (view only)' AND p.permission_key IN ('view_reports', 'view_cockpit');
+
+-- Company-level people (no division): founders, management, finance, audit, administration, CA.
+UPDATE users u JOIN roles r ON r.id = u.role_id SET u.division_id = NULL
+WHERE u.is_super_admin = 1
+   OR r.name IN ('Admin', 'Managing Director', 'Executive Director', 'CA / Chartered Accountant', 'Viewer / Auditor',
+                 'Accounts Executive', 'Finance Manager', 'Finance Director', 'System Administrator', 'Investor (view only)');

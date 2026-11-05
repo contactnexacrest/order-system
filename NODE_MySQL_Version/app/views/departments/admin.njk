@@ -85,6 +85,20 @@
         <label class="inline"><input type="checkbox" name="sees_whole_company" value="1" {{ 'checked' if dept.sees_whole_company == 1 else '' }}> Sees the whole company</label>
         <div class="btn-row"><button type="submit" class="btn-sm btn-success">Save department</button></div>
       </form>
+      {% if division.multi %}{# D-257: shown only with two or more active divisions #}
+      <form method="post" action="/admin/departments/{{ dept.id }}/division" class="field-grid" data-testid="department-division">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Division
+        <select name="division_id">
+          <option value=""{{ ' selected' if dept.division_id === null else '' }}>Company level (all divisions)</option>
+          {% for d in division.all %}
+            <option value="{{ d.id }}"{{ ' selected' if dept.division_id == d.id else '' }}>{{ d.name }}{{ '' if d.status == 'active' else ' (planned)' }}</option>
+          {% endfor %}
+        </select>
+        </label>
+        <div class="btn-row"><button type="submit" class="btn-sm">Save division</button></div>
+      </form>
+      {% endif %}
       {% if list.length %}
       <table class="list">
         <tr><th>Designation</th><th>Level</th><th>Approval limit (₹)</th><th>Active</th><th></th></tr>

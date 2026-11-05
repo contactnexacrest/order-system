@@ -257,7 +257,10 @@ final class PriceRequestService
                      VALUES (:number, :associate_id, :product_id, :selection, :selection_text, :other_note, :kind, :status, :unit, :quote, :lowest,
                         :figures, :breakdown, :level_name, :valid_until, :requested_at, :due_at)'
                 )->execute($row);
-                return (int) $pdo->lastInsertId();
+                $requestId = (int) $pdo->lastInsertId();
+                // D-257: a price request belongs to its associate's division.
+                $pdo->prepare('UPDATE price_requests r JOIN associates a ON a.id = r.associate_id SET r.division_id = a.division_id WHERE r.id = :id AND r.division_id <> a.division_id')->execute(['id' => $requestId]);
+                return $requestId;
             } catch (\PDOException $e) {
                 if (!str_contains($e->getMessage(), 'Duplicate') || $try === 4) {
                     throw $e;
@@ -329,7 +332,7 @@ final class PriceRequestService
     /** Manual requests waiting for a price (shown beside the "Price requests" link). */
     public static function pendingCount(): int
     {
-        return (int) Database::connection()->query("SELECT COUNT(*) FROM price_requests WHERE status = 'pending'")->fetchColumn();
+        return (int) Database::connection()->query("SELECT COUNT(*) FROM price_requests WHERE status = 'pending'" . DivisionService::sql('division_id'))->fetchColumn();
     }
 
     public static function find(int $id): ?array
@@ -382,7 +385,7 @@ final class PriceRequestService
         return Database::connection()->query(
             "SELECT r.*, p.name AS product_name, a.name AS associate_name FROM price_requests r
              JOIN catalog_products p ON p.id = r.product_id JOIN associates a ON a.id = r.associate_id
-             {$where} ORDER BY (r.status = 'pending') DESC, r.id DESC LIMIT " . (int) $limit
+             {$where}" . ($where === '' ? ' WHERE 1 = 1' : '') . DivisionService::sql('r.division_id') . " ORDER BY (r.status = 'pending') DESC, r.id DESC LIMIT " . (int) $limit
         )->fetchAll();
     }
 

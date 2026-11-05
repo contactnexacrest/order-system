@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const divisionService = require('../services/divisionService');
 const db = require('../config/db');
 
 // Port of App\Repositories\ClientIntakeRepository. Public quotation-stage
@@ -148,6 +149,8 @@ async function pending() {
 // Nav-badge count — live, not cached, so it self-decrements the moment a
 // submission is accepted/rejected.
 async function pendingCount() {
+  // D-257: the public enquiry form is Export's; other divisions do not count it.
+  if (!divisionService.allows(divisionService.EXPORT_ID)) return 0;
   const row = await db.queryOne("SELECT COUNT(*) AS c FROM client_intake_submissions WHERE status = 'pending'");
   return row ? parseInt(row.c, 10) : 0;
 }

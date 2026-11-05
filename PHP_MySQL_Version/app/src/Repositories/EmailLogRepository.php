@@ -124,7 +124,7 @@ final class EmailLogRepository
     public static function awaitingDispatchCount(): int
     {
         $stmt = Database::connection()->query(
-            "SELECT COUNT(*) AS c FROM email_log WHERE status IN ('pending_approval', 'approved')"
+            "SELECT COUNT(*) AS c FROM email_log WHERE status IN ('pending_approval', 'approved')" . \App\Services\DivisionService::orderIdSql('order_id', true)
         );
         return (int) $stmt->fetch()['c'];
     }
@@ -141,7 +141,7 @@ final class EmailLogRepository
              LEFT JOIN orders o ON o.id = el.order_id
              LEFT JOIN documents d ON d.id = el.document_id
              LEFT JOIN document_types dt ON dt.id = d.document_type_id
-             WHERE el.status IN ('pending_approval', 'approved')
+             WHERE el.status IN ('pending_approval', 'approved')" . \App\Services\DivisionService::orderIdSql('el.order_id', true) . "
              ORDER BY el.created_at DESC"
         );
         return $stmt->fetchAll();

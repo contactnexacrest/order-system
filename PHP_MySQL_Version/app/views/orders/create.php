@@ -25,6 +25,17 @@
           <?php endforeach; ?>
         </select>
       </label>
+      <?php if (\App\Services\DivisionService::needsChoiceOnCreate()): // D-257: company level, several active divisions, "All divisions" chosen ?>
+      <label>Division *
+        <select name="division_id" required>
+          <option value="">Choose…</option>
+          <?php foreach (\App\Services\DivisionService::active() as $__d): ?>
+            <option value="<?= (int) $__d['id'] ?>" <?= (int) ($old['division_id'] ?? 0) === (int) $__d['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $__d['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <small class="help">The order belongs to this division for life.</small>
+      </label>
+      <?php endif; ?>
     </fieldset>
 
     <fieldset>

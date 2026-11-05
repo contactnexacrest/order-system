@@ -388,6 +388,8 @@ async function create(req, res) {
         return cid > 0 ? require('../services/complianceTrackingService').ecgcPosition(cid) : null;
       })(),
       clients: await clientRepository.all(),
+      // D-257: company level, several active divisions, "All divisions" chosen — the form asks which division.
+      divisionChoices: (await require('../services/divisionService').needsChoiceOnCreate()) ? await require('../services/divisionService').active() : null,
       incoterms,
       currencies: await lookupRepository.currencies(),
       loadingPorts: await lookupRepository.ports('loading'),
@@ -431,6 +433,22 @@ async function store(req, res) {
     res.redirect('/orders/create');
     return;
   }
+  // D-257: the order's division — the creator's own, or the one a company-level person chose.
+  const divisionService = require('../services/divisionService');
+  const chosenDivision = body.division_id !== undefined && body.division_id !== '' ? parseInt(body.division_id, 10) : null;
+  if ((await divisionService.needsChoiceOnCreate()) && (chosenDivision === null || !(await divisionService.find(chosenDivision)))) {
+    flash.set(req, 'error', 'Please choose the division this order belongs to.');
+    flash.setOld(req, body);
+    res.redirect('/orders/create');
+    return;
+  }
+  if (!divisionService.seesAll() && !(await divisionService.allowsClient(clientId))) {
+    flash.set(req, 'error', 'Please select a valid client.');
+    flash.setOld(req, body);
+    res.redirect('/orders/create');
+    return;
+  }
+  const newOrderDivision = await divisionService.forNewRecord(chosenDivision);
 
   const incotermId = parseInt(body.incoterm_id || 0, 10);
   const currencyId = parseInt(body.currency_id || 0, 10);
@@ -539,7 +557,7 @@ async function store(req, res) {
   const sanitizedCooType = await lookupRepository.sanitizeOption('coo_type', str(body.coo_type));
 
   // Owner decision 4 Nov 2026 (D1): NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter.
-  const orderReferenceNew = await referenceNumberService.generateOrderReference();
+  const orderReferenceNew = await divisionService.withDivision(newOrderDivision, () => referenceNumberService.generateOrderReference());
   const testModeEnabled = await testModeService.isEnabled();
   const quotationValidityDays = parseInt((await companySettingsRepository.get('quotation_validity_days')) || '30', 10);
 
@@ -554,7 +572,7 @@ async function store(req, res) {
   // order row itself along with everything else.
   const createdLineIds = [];
   const createdSpecs = [];
-  const { orderId, orderReference } = await db.transaction(async (trx) => {
+  const { orderId, orderReference } = await divisionService.withDivision(newOrderDivision, () => db.transaction(async (trx) => {
     // QA-5 CONC-03: sequence-number reservation and the order INSERT now
     // happen atomically inside createWithNextSequence() (a single
     // transaction holding a row lock for this client) — see its docblock in
@@ -641,7 +659,7 @@ async function store(req, res) {
     }
 
     return result;
-  });
+  }));
 
   // External QA report L-23: order creation was never audit-logged.
   await auditLogRepository.log(user.id, 'ORDER_CREATED', 'orders', orderId, 'order_reference', null, orderReference);

@@ -21,7 +21,7 @@
 {% set canViewComplaintsList = permissions.manage_complaints or permissions.respond_to_complaints %}
 {# External QA report U-18: /clients and /orders each also accept their own narrower view_clients/view_orders permission (server.js) — a Viewer/Auditor holds exactly these two and nothing else in this group, so without them here the whole Operations dropdown never rendered at all, even though both routes worked fine by direct URL. #}
 {# Owner decision D-214, phase 3: Procurement's queue. #}
-{% set canProcurement = permissions.manage_purchasing or permissions.approve_purchases %}
+{% set canProcurement = (permissions.manage_purchasing or permissions.approve_purchases) and division.modules.supplier_purchase !== false %}{# D-257: a module switched off for the division hides its menu #}
 {% set opsGroupVisible = permissions.manage_orders or permissions.view_archived_orders or canDisputes or canComplaints or permissions.view_clients or permissions.view_orders or canProcurement %}
 {# External QA report U-01: the main /disputes LIST route requires manage_disputes only (see server.js) — respond_to_disputes alone (e.g. Export Executive) never grants the cross-order list page. canDisputes above stays as the Ops group's own broader visibility check. #}
 {% set canViewDisputesList = permissions.manage_disputes or permissions.respond_to_disputes %}
@@ -34,7 +34,7 @@
    inside this dropdown but were never added to the group's own visibility
    check — a role whose ONLY Admin-section permission was one of these
    four saw no "Admin" dropdown at all. #}
-{% set adminGroupVisible = permissions.manage_company_settings or permissions.manage_assets or permissions.manage_signatories or permissions.manage_permissions or permissions.manage_users or permissions.manage_field_protection or permissions.edit_locked_data or permissions.manage_sample_data or permissions.data_export_run or permissions.manage_logistics_partners or permissions.manage_suppliers or permissions.manage_ports or permissions.manage_payment_presets or permissions.manage_hs_codes or permissions.manage_compliance_task_types or permissions.manage_dropdown_options or permissions.manage_email_templates or permissions.manage_incentives or permissions.view_price_buildup or permissions.manage_pricing %}
+{% set adminGroupVisible = permissions.manage_company_settings or permissions.manage_assets or permissions.manage_signatories or permissions.manage_permissions or permissions.manage_users or permissions.manage_field_protection or permissions.edit_locked_data or permissions.manage_sample_data or permissions.data_export_run or permissions.manage_logistics_partners or permissions.manage_suppliers or permissions.manage_ports or permissions.manage_payment_presets or permissions.manage_hs_codes or permissions.manage_compliance_task_types or permissions.manage_dropdown_options or permissions.manage_email_templates or permissions.manage_incentives or permissions.view_price_buildup or permissions.manage_pricing or permissions.manage_divisions %}
 {% set opsGroupActive = (currentPath | startswith('/procurement')) or (currentPath | startswith('/clients')) or (currentPath | startswith('/associates')) or (currentPath | startswith('/agreements')) or (currentPath | startswith('/orders')) or (currentPath | startswith('/client-intake')) or (currentPath | startswith('/pi-intake-review')) or (currentPath | startswith('/reorder-requests')) or (currentPath | startswith('/disputes')) or (currentPath | startswith('/complaints')) %}
 {% set insightsGroupActive = (currentPath | startswith('/cockpit')) or ((currentPath | startswith('/reports')) and not (currentPath | startswith('/reports/associates'))) or (currentPath | startswith('/audit-log')) or (currentPath | startswith('/incentives/payouts')) or (currentPath | startswith('/my-incentives')) %}
 {% set adminGroupActive = (currentPath | startswith('/settings')) or (currentPath | startswith('/holidays')) or (currentPath | startswith('/hs-codes')) or (currentPath | startswith('/watermarks')) or (currentPath | startswith('/company-assets')) or (currentPath | startswith('/signatories')) or (currentPath | startswith('/admin')) or (currentPath | startswith('/users')) or (currentPath | startswith('/sample-data')) or (currentPath | startswith('/email-templates')) or (currentPath | startswith('/ui-templates')) or (currentPath | startswith('/logistics-partners')) or (currentPath | startswith('/suppliers')) or (currentPath | startswith('/ports')) or (currentPath | startswith('/payment-presets')) or (currentPath | startswith('/compliance-task-types')) or (currentPath | startswith('/incentives/settings')) or (currentPath | startswith('/pricing')) %}
@@ -71,7 +71,7 @@
         <summary><span class="nav-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></span>Operations</summary>
         <div class="nav-dropdown">
           {% if permissions.manage_orders or permissions.view_clients %}<a href="/clients" class="{{ 'active' if (currentPath | startswith('/clients')) else '' }}">Clients</a>{% endif %}
-          {% if permissions.view_associates or permissions.manage_associates or permissions.manage_associate_bank %}<a href="/associates" class="{{ 'active' if (currentPath | startswith('/associates')) else '' }}">Associates</a>{% endif %}
+          {% if division.modules.associates !== false and (permissions.view_associates or permissions.manage_associates or permissions.manage_associate_bank) %}<a href="/associates" class="{{ 'active' if (currentPath | startswith('/associates')) else '' }}">Associates</a>{% endif %}
           {% if permissions.view_agreements or permissions.manage_agreements %}<a href="/agreements" class="{{ 'active' if (currentPath | startswith('/agreements')) else '' }}">Agreements</a>{% endif %}
           {% if permissions.manage_orders or permissions.view_orders %}<a href="/orders" class="{{ 'active' if ordersActive else '' }}">Orders</a>{% endif %}
           {% if permissions.view_archived_orders %}<a href="/orders/archived" class="{{ 'active' if (currentPath | startswith('/orders/archived')) else '' }}">Archived Orders</a>{% endif %}
@@ -94,8 +94,8 @@
           {% if permissions.view_reports %}<a href="/reports" class="{{ 'active' if (currentPath | startswith('/reports')) else '' }}">Reports</a>{% endif %}
           {% if canFreightReport %}<a href="/reports/freight-cost" class="{{ 'active' if (currentPath | startswith('/reports/freight-cost')) else '' }}">Freight Cost Report</a>{% endif %}
           {% if canSupplierReport %}<a href="/reports/suppliers" class="{{ 'active' if (currentPath | startswith('/reports/suppliers')) else '' }}">Supplier Report</a>{% endif %}
-          {% if permissions.pay_incentives %}<a href="/incentives/payouts" class="{{ 'active' if (currentPath | startswith('/incentives/payouts')) else '' }}">Incentive Payouts</a>{% endif %}
-          {% if permissions.view_own_incentives %}<a href="/my-incentives" class="{{ 'active' if (currentPath | startswith('/my-incentives')) else '' }}">My Incentives</a>{% endif %}
+          {% if permissions.pay_incentives and division.modules.team_incentive !== false %}<a href="/incentives/payouts" class="{{ 'active' if (currentPath | startswith('/incentives/payouts')) else '' }}">Incentive Payouts</a>{% endif %}
+          {% if permissions.view_own_incentives and division.modules.team_incentive !== false %}<a href="/my-incentives" class="{{ 'active' if (currentPath | startswith('/my-incentives')) else '' }}">My Incentives</a>{% endif %}
           {% if permissions.view_cockpit %}<a href="/cockpit" class="{{ 'active' if (currentPath | startswith('/cockpit')) else '' }}">Management Cockpit</a>{% endif %}
           {% if permissions.view_audit_log %}<a href="/audit-log" class="{{ 'active' if (currentPath | startswith('/audit-log')) else '' }}">Audit Log</a>{% endif %}
         </div>
@@ -119,12 +119,13 @@
           {% if permissions.manage_company_settings %}<a href="/watermarks" class="{{ 'active' if (currentPath | startswith('/watermarks')) else '' }}">Watermarks</a>{% endif %}
           {% if permissions.manage_assets %}<a href="/company-assets" class="{{ 'active' if (currentPath | startswith('/company-assets')) else '' }}">Assets</a>{% endif %}
           {% if permissions.manage_signatories %}<a href="/signatories" class="{{ 'active' if (currentPath | startswith('/signatories')) else '' }}">Signatories</a>{% endif %}
+          {% if permissions.manage_divisions %}<a href="/admin/divisions" class="{{ 'active' if (currentPath | startswith('/admin/divisions')) else '' }}">Divisions</a>{% endif %}{# D-257 #}
           {% if permissions.manage_permissions %}<a href="/admin/departments" class="{{ 'active' if (currentPath | startswith('/admin/departments')) else '' }}">Departments</a>{% endif %}
           {% if permissions.manage_task_types %}<a href="/admin/task-types" class="{{ 'active' if (currentPath | startswith('/admin/task-types')) else '' }}">Task Due Days</a>{% endif %}
           {% if permissions.manage_permissions %}<a href="/admin/permissions" class="{{ 'active' if (currentPath | startswith('/admin/permissions')) else '' }}">Permissions</a>{% endif %}
           {% if permissions.manage_users %}<a href="/users" class="{{ 'active' if (currentPath | startswith('/users')) else '' }}">Users</a>{% endif %}
           {% if permissions.manage_field_protection %}<a href="/admin/field-protection" class="{{ 'active' if (currentPath | startswith('/admin/field-protection')) else '' }}">Field Protection</a>{% endif %}
-          {% if permissions.manage_incentives %}<a href="/incentives/settings" class="{{ 'active' if (currentPath | startswith('/incentives/settings')) else '' }}">Team Incentives</a>{% endif %}
+          {% if permissions.manage_incentives and division.modules.team_incentive !== false %}<a href="/incentives/settings" class="{{ 'active' if (currentPath | startswith('/incentives/settings')) else '' }}">Team Incentives</a>{% endif %}
           {% if permissions.view_price_buildup or permissions.manage_pricing %}<a href="/pricing/settings" class="{{ 'active' if (currentPath | startswith('/pricing')) else '' }}">Pricing</a>{% endif %}
           {% if permissions.edit_locked_data %}<a href="/admin/overrides" class="{{ 'active' if (currentPath | startswith('/admin/overrides')) else '' }}">Admin Overrides</a>{% endif %}
           {% if permissions.manage_sample_data %}<a href="/sample-data" class="{{ 'active' if (currentPath | startswith('/sample-data')) else '' }}">Sample Data</a>{% endif %}
@@ -166,6 +167,21 @@
           {% endif %}
         </div>
       {% endif %}
+      {% if division.showSwitcher %}{# D-257: company level, two or more active divisions #}
+        <form method="post" action="/divisions/choose" class="division-switch" data-testid="division-switcher" style="margin:8px 0;color:#fff;font-size:12px">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          <input type="hidden" name="back" value="{{ currentPath }}">
+          <label>Division
+            <select name="division" onchange="this.form.submit()">
+              <option value="all"{{ ' selected' if division.currentId === null else '' }}>All divisions</option>
+              {% for d in division.active %}
+                <option value="{{ d.id }}"{{ ' selected' if division.currentId == d.id else '' }}>{{ d.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <noscript><button type="submit" class="btn-sm">Show</button></noscript>
+        </form>
+      {% endif %}
       <a href="/account" class="sidebar-user-card">
         <span class="sidebar-user-avatar">{{ currentUser.name[0] | upper }}</span>
         <span class="sidebar-user-name">{{ currentUser.name }}</span>
@@ -188,6 +204,20 @@
     {% for f in flashes %}
       <div class="alert alert-{{ f.type }}">{{ f.message }}</div>
     {% endfor %}
+    {% if (currentPath | startswith('/reports')) and division.showSwitcher %}{# D-257: one shared Division filter for every report (two or more active divisions only) #}
+      <form method="get" class="report-division-filter" data-testid="report-division-filter">
+        {% for k, v in query %}{% if k != 'division' and (v is string or v is number) %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+        <label>Division
+          <select name="division" onchange="this.form.submit()">
+            <option value="">All divisions</option>
+            {% for d in division.active %}
+              <option value="{{ d.id }}"{{ ' selected' if (query.division | int) == d.id else '' }}>{{ d.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <noscript><button type="submit" class="btn-sm">Show</button></noscript>
+      </form>
+    {% endif %}
     {{ content | safe }}
   </main>
 </div>

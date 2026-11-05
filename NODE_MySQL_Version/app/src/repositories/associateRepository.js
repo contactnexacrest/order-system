@@ -34,7 +34,8 @@ async function all() {
   return db.query(
     `SELECT a.*, (SELECT COUNT(*) FROM clients c WHERE c.associate_id = a.id) AS client_count, f.original_filename AS agreement_file_name,
             cl.name AS commission_level_name
-     FROM associates a LEFT JOIN file_store f ON f.id = a.agreement_file_id LEFT JOIN commission_levels cl ON cl.id = a.commission_level_id ORDER BY a.status, a.name`
+     FROM associates a LEFT JOIN file_store f ON f.id = a.agreement_file_id LEFT JOIN commission_levels cl ON cl.id = a.commission_level_id
+     WHERE 1 = 1${require('../services/divisionService').sql('a.division_id')} ORDER BY a.status, a.name`
   );
 }
 
@@ -46,6 +47,10 @@ async function create(data, userId) {
   const cols = FIELDS.join(', ');
   const marks = FIELDS.map((f) => `:${f}`).join(', ');
   const result = await db.execute(`INSERT INTO associates (${cols}, created_by) VALUES (${marks}, :created_by)`, { ...pick(data), created_by: userId });
+  // D-257: an associate works for the division that added them.
+  const divisionService = require('../services/divisionService');
+  const division = await divisionService.forNewRecord();
+  if (division !== divisionService.EXPORT_ID) await db.execute('UPDATE associates SET division_id = :d WHERE id = :id', { d: division, id: result.insertId });
   return result.insertId;
 }
 

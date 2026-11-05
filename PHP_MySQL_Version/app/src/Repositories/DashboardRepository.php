@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repositories;
 
 use App\Config\Database;
+use App\Services\DivisionService;
 
 /**
  * Spec Section 16 — "DASHBOARD: Active orders by stage, awaiting
@@ -21,7 +22,7 @@ final class DashboardRepository
         $stmt = Database::connection()->query(
             "SELECT sm.stage_name, sm.stage_slug, sm.sequence, COUNT(o.id) AS order_count
              FROM stages_master sm
-             LEFT JOIN orders o ON o.current_stage_id = sm.id AND o.status = 'active'
+             LEFT JOIN orders o ON o.current_stage_id = sm.id AND o.status = 'active'" . DivisionService::sql('o.division_id') . "
              GROUP BY sm.id, sm.stage_name, sm.stage_slug, sm.sequence
              ORDER BY sm.sequence"
         );
@@ -30,7 +31,7 @@ final class DashboardRepository
 
     public static function activeOrderCount(): int
     {
-        $stmt = Database::connection()->query("SELECT COUNT(*) AS c FROM orders WHERE status = 'active'");
+        $stmt = Database::connection()->query("SELECT COUNT(*) AS c FROM orders WHERE status = 'active'" . DivisionService::sql('division_id'));
         return (int) $stmt->fetch()['c'];
     }
 
@@ -47,7 +48,7 @@ final class DashboardRepository
         // counting a dead-end review nobody could actually act on.
         $sql = "SELECT COUNT(*) AS c FROM document_reviews dr
                 JOIN documents d ON d.id = dr.document_id
-                WHERE dr.status = 'pending' AND d.status != 'superseded'";
+                WHERE dr.status = 'pending' AND d.status != 'superseded'" . DivisionService::orderIdSql('d.order_id', true);
         $params = [];
         if ($reviewerId !== null) {
             $sql .= ' AND dr.reviewer_id = :reviewer_id';
@@ -60,13 +61,13 @@ final class DashboardRepository
 
     public static function pendingEmailApprovalCount(): int
     {
-        $stmt = Database::connection()->query("SELECT COUNT(*) AS c FROM email_log WHERE status = 'pending_approval'");
+        $stmt = Database::connection()->query("SELECT COUNT(*) AS c FROM email_log WHERE status = 'pending_approval'" . DivisionService::orderIdSql('order_id', true));
         return (int) $stmt->fetch()['c'];
     }
 
     public static function pendingAmendmentApprovalCount(): int
     {
-        $stmt = Database::connection()->query("SELECT COUNT(*) AS c FROM amendments WHERE status = 'pending'");
+        $stmt = Database::connection()->query("SELECT COUNT(*) AS c FROM amendments WHERE status = 'pending'" . DivisionService::orderIdSql('order_id'));
         return (int) $stmt->fetch()['c'];
     }
 
@@ -91,7 +92,7 @@ final class DashboardRepository
              WHERE ops.balance_due_date IS NOT NULL
                AND ops.balance_cleared_at IS NULL
                AND ops.balance_due_date < CURDATE()
-               AND o.status = 'active'
+               AND o.status = 'active'" . DivisionService::sql('o.division_id') . "
              ORDER BY ops.balance_due_date ASC"
         );
         return $stmt->fetchAll();
@@ -111,7 +112,7 @@ final class DashboardRepository
              WHERE of_.fdn_document_id IS NOT NULL
                AND ps.freight_cleared_at IS NULL
                AND DATE(d.generated_at) <= DATE_SUB(CURDATE(), INTERVAL :days DAY)
-               AND o.status = 'active'
+               AND o.status = 'active'" . DivisionService::sql('o.division_id') . "
              ORDER BY d.generated_at ASC"
         );
         $stmt->execute(['days' => $overdueDays]);
@@ -168,9 +169,9 @@ final class DashboardRepository
              FROM orders o
              JOIN clients c ON c.id = o.client_id
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
-             WHERE o.order_reference LIKE :term1
+             WHERE (o.order_reference LIKE :term1
                 OR c.client_unique_number LIKE :term2
-                OR c.company_legal_name LIKE :term3
+                OR c.company_legal_name LIKE :term3)" . DivisionService::sql('o.division_id') . "
              ORDER BY o.created_at DESC
              LIMIT 50"
         );

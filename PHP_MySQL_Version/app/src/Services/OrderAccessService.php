@@ -16,12 +16,16 @@ use App\Repositories\OrderRepository;
  */
 final class OrderAccessService
 {
-    /** @var array{user: int, ids: array<int, true>, archived: array<int, true>}|null per-request cache for currentUserMayOpenOrderId() */
+    /** @var array{user: string, other_division: array<int, true>, ids: array<int, true>, archived: array<int, true>}|null per-request cache for currentUserMayOpenOrderId() */
     private static ?array $openableCache = null;
 
     /** @return string|null why this user may not see the order, or null when they may */
     public static function denialReason(array $order, int $userId, ?int $roleId): ?string
     {
+        // D-257: an order of another division does not exist for this user (same answer as a missing order id).
+        if (!DivisionService::allows((int) ($order['division_id'] ?? DivisionService::EXPORT_ID))) {
+            return 'This order is not available to you.';
+        }
         if ((int) ($order['is_archived'] ?? 0) === 1 && !PermissionService::can($userId, $roleId, 'view_archived_orders')) {
             return 'This order has been archived. You need the "View archived orders" permission to open it.';
         }
@@ -143,15 +147,22 @@ final class OrderAccessService
         }
         $userId = (int) $user['id'];
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-        if (self::$openableCache === null || self::$openableCache['user'] !== $userId) {
+        $divisionCond = DivisionService::condition('division_id');
+        $cacheKey = $userId . '|' . ($divisionCond ?? '');
+        if (self::$openableCache === null || self::$openableCache['user'] !== $cacheKey) {
             $pdo = \App\Config\Database::connection();
             $assigned = $pdo->prepare('SELECT order_id FROM order_assignees WHERE user_id = :u');
             $assigned->execute(['u' => $userId]);
             self::$openableCache = [
-                'user'     => $userId,
+                'user'     => $cacheKey,
+                // D-257: orders outside the request's division scope.
+                'other_division' => $divisionCond === null ? [] : array_fill_keys(array_map('intval', $pdo->query('SELECT id FROM orders WHERE NOT (' . $divisionCond . ')')->fetchAll(\PDO::FETCH_COLUMN)), true),
                 'ids'      => array_fill_keys(array_map('intval', $assigned->fetchAll(\PDO::FETCH_COLUMN)), true),
                 'archived' => array_fill_keys(array_map('intval', $pdo->query('SELECT id FROM orders WHERE is_archived = 1')->fetchAll(\PDO::FETCH_COLUMN)), true),
             ];
+        }
+        if (isset(self::$openableCache['other_division'][$orderId])) {
+            return false;
         }
         if (isset(self::$openableCache['archived'][$orderId]) && !PermissionService::can($userId, $roleId, 'view_archived_orders')) {
             return false;
@@ -186,7 +197,8 @@ final class OrderAccessService
         }
         $userId = (int) $user['id'];
         $roleId = $user['role_id'] !== null ? (int) $user['role_id'] : null;
-        $sql = '';
+        // D-257: only the request's division(s); "" when it sees every division.
+        $sql = DivisionService::sql("{$alias}.division_id");
         $params = [];
         if (!PermissionService::can($userId, $roleId, 'view_all_orders')) {
             $sql .= " AND {$alias}.id IN (SELECT vis_oa.order_id FROM order_assignees vis_oa WHERE vis_oa.user_id = :vis_user_id)";

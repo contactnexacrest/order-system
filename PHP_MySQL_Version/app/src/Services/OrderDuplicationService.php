@@ -45,6 +45,16 @@ final class OrderDuplicationService
         if ($source === null) {
             throw new \RuntimeException("Cannot duplicate order {$sourceOrderId} — not found.");
         }
+        // D-257: a duplicate stays in the source order's division (its numbering too).
+        return DivisionService::withDivision(
+            (int) ($source['division_id'] ?? DivisionService::EXPORT_ID),
+            static fn (): int => self::duplicateInDivision($source, $createdBy, $productLines)
+        );
+    }
+
+    private static function duplicateInDivision(array $source, int $createdBy, ?array $productLines): int
+    {
+        $sourceOrderId = (int) $source['id'];
         $client = ClientRepository::find((int) $source['client_id']);
 
         // Owner decision 4 Nov 2026 (D1): NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter.

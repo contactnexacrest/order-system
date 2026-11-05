@@ -14,8 +14,8 @@ final class ClientRepository
     {
         return Database::connection()
             ->query(
-                'SELECT c.*, (SELECT COUNT(*) FROM orders o WHERE o.client_id = c.id AND o.is_archived = 0) AS order_count
-                 FROM clients c WHERE c.is_active = 1 ORDER BY c.company_legal_name'
+                'SELECT c.*, (SELECT COUNT(*) FROM orders o WHERE o.client_id = c.id AND o.is_archived = 0' . \App\Services\DivisionService::sql('o.division_id') . ') AS order_count
+                 FROM clients c WHERE c.is_active = 1' . \App\Services\DivisionService::clientSql('c') . ' ORDER BY c.company_legal_name'
             )
             ->fetchAll();
     }
@@ -86,7 +86,7 @@ final class ClientRepository
     public static function allInactive(): array
     {
         return Database::connection()
-            ->query('SELECT * FROM clients WHERE is_active = 0 ORDER BY company_legal_name')
+            ->query('SELECT * FROM clients c WHERE is_active = 0' . \App\Services\DivisionService::clientSql('c') . ' ORDER BY company_legal_name')
             ->fetchAll();
     }
 
@@ -156,7 +156,10 @@ final class ClientRepository
             'notify_party_email'      => $data['notify_party_email'] ?? null,
             'created_by'              => $createdBy,
         ]);
-        return (int) $pdo->lastInsertId();
+        $clientId = (int) $pdo->lastInsertId();
+        // D-257: one shared client record; it buys from the division that created it.
+        \App\Services\DivisionService::linkClient($clientId, \App\Services\DivisionService::forNewRecord());
+        return $clientId;
     }
 
     public static function update(int $id, array $data): void

@@ -32,6 +32,9 @@ const testModeService = require('./testModeService');
  * separate read, so no gap for another caller's write to land in.
  */
 async function nextSeq(scopeKey) {
+  // D-257: a division other than Export counts on its own; Export keeps today's counters exactly.
+  const division = await nonExportDivision();
+  if (division) scopeKey = `div${Number(division.id)}:${scopeKey}`;
   // reference_sequences has no AUTO_INCREMENT column (scope_key is the
   // PK), so on this scope's very first-ever call the plain INSERT branch
   // never sets the session's LAST_INSERT_ID() at all — the driver's
@@ -131,7 +134,24 @@ async function render(format, seq, now) {
     .replace(/\{DDMM\}/g, dd + mm)
     .replace(/\{NNN\}/g, nnn);
   const testMode = await testModeService.isEnabled();
-  return testModeService.applyReferencePrefix(rendered, testMode);
+  return testModeService.applyReferencePrefix(await withDivisionCode(format, rendered), testMode);
+}
+
+/** D-257: the division a new number is for, when it is not Export (Export's numbers never change). */
+async function nonExportDivision() {
+  const divisionService = require('./divisionService');
+  const id = divisionService.currentId();
+  if (id === null || id === divisionService.EXPORT_ID) return null;
+  return divisionService.find(id);
+}
+
+/** {DIV} is the division code; a non-Export number starts with its code ("DOM/…") unless its format places {DIV} itself. */
+async function withDivisionCode(format, rendered) {
+  const d = await nonExportDivision();
+  const code = d ? String(d.code) : 'EXP';
+  const out = rendered.replace(/\{DIV\}/g, code);
+  if (!d || format.includes('{DIV}')) return out;
+  return `${code}/${out}`;
 }
 
 function ymd(now) {
@@ -146,8 +166,10 @@ async function generateClientUniqueNumber() {
 }
 
 async function generateDocumentRef(documentTypeId) {
-  const row = await db.queryOne('SELECT ref_format FROM document_types WHERE id = :id', { id: documentTypeId });
+  const row = await db.queryOne('SELECT code, ref_format FROM document_types WHERE id = :id', { id: documentTypeId });
   if (!row || !row.ref_format) return null;
+  // D-257: a division may set its own format for a document (division setting "ref_format:<code>").
+  row.ref_format = (await require('./divisionService').overrideFor('company', `ref_format:${row.code}`)) || row.ref_format;
 
   const now = new Date();
   const seq = await nextSeq('document:' + documentTypeId + ':' + ymd(now));
@@ -162,6 +184,7 @@ async function generateDocumentRef(documentTypeId) {
 async function generateAmendmentRef() {
   const row = await db.queryOne("SELECT ref_format FROM document_types WHERE code = 'AMD'");
   if (!row || !row.ref_format) return null;
+  row.ref_format = (await require('./divisionService').overrideFor('company', 'ref_format:AMD')) || row.ref_format;
 
   const now = new Date();
   const seq = await nextSeq('amendment:' + ymd(now));
@@ -185,8 +208,8 @@ async function generateOrderReference(testPrefix = true) {
   const seq = await nextSeq('order_ref:' + scope);
   if (testPrefix) return render(format, seq, now);
   const yyyy = String(now.getFullYear());
-  return format.replace(/\{YYYY\}/g, yyyy).replace(/\{YY\}/g, yyyy.slice(2))
-    .replace(/\{DDMM\}/g, pad2(now.getDate()) + pad2(now.getMonth() + 1)).replace(/\{NNN\}/g, String(seq).padStart(3, '0'));
+  return withDivisionCode(format, format.replace(/\{YYYY\}/g, yyyy).replace(/\{YY\}/g, yyyy.slice(2))
+    .replace(/\{DDMM\}/g, pad2(now.getDate()) + pad2(now.getMonth() + 1)).replace(/\{NNN\}/g, String(seq).padStart(3, '0')));
 }
 
 module.exports = { generateClientUniqueNumber, generateDocumentRef, generateAmendmentRef, generateOrderReference, DEFAULT_ORDER_REF_FORMAT, nextOrderSequenceForClient, nextDocumentRevisionNumber };

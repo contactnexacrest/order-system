@@ -4,6 +4,7 @@ const db = require('../config/db');
 const orderAssigneeRepository = require('../repositories/orderAssigneeRepository');
 const orderRepository = require('../repositories/orderRepository');
 const documentRepository = require('../repositories/documentRepository');
+const divisionService = () => require('./divisionService');
 
 /**
  * Who may see an order at all — the archived-order and order-assignment
@@ -16,6 +17,10 @@ const documentRepository = require('../repositories/documentRepository');
  */
 async function denialReason(order, userId, permissions) {
   const perms = permissions || {};
+  // D-257: an order of another division is not available to this user.
+  if (!divisionService().allows(order.division_id || divisionService().EXPORT_ID)) {
+    return 'This order is not available to you.';
+  }
   if (Number(order.is_archived) === 1 && !perms.view_archived_orders) {
     return 'This order has been archived. You need the "View archived orders" permission to open it.';
   }
@@ -118,8 +123,11 @@ async function orderVisibilityChecker(userId, permissions) {
   const archived = perms.view_archived_orders
     ? null
     : new Set((await db.query('SELECT id FROM orders WHERE is_archived = 1')).map((r) => Number(r.id)));
+  // D-257: orders outside the request's division scope.
+  const inDivision = await divisionService().orderIdChecker();
   return (orderId) => {
     const id = Number(orderId);
+    if (!inDivision(id)) return false;
     if (archived && archived.has(id)) return false;
     return assigned === null || assigned.has(id);
   };
@@ -139,7 +147,8 @@ async function visibleRows(rows, userId, permissions, orderIdKey = 'order_id') {
 function visibilitySql(userId, permissions, alias = 'o') {
   const perms = permissions || {};
   if (!userId) return { sql: '', params: {} };
-  let sql = '';
+  // D-257: only the request's division(s); "" when it sees every division.
+  let sql = divisionService().sql(`${alias}.division_id`);
   const params = {};
   if (!perms.view_all_orders) {
     sql += ` AND ${alias}.id IN (SELECT vis_oa.order_id FROM order_assignees vis_oa WHERE vis_oa.user_id = :vis_user_id)`;

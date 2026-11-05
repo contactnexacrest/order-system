@@ -602,6 +602,8 @@ async function runDefinition(req, res) {
   if (f.stage_id) params.stage_id = f.stage_id;
   if (f.incoterm_id) params.incoterm_id = f.incoterm_id;
   if (f.country) params.country = f.country;
+  // D-257: the division it was saved in (applied only while that division is in the user's scope).
+  if (def.division_id !== null && def.division_id !== undefined && require('../services/divisionService').allows(def.division_id)) params.division = Number(def.division_id);
   const qs = querystring.stringify(params);
   res.redirect('/reports/aggregate' + (qs !== '' ? `?${qs}` : ''));
 }

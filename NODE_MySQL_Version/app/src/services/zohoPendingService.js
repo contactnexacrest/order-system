@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const divisionService = require('./divisionService');
 const caRepository = require('../repositories/caRepository');
 const caExportBenefitRepository = require('../repositories/caExportBenefitRepository');
 const orderLcDetailRepository = require('../repositories/orderLcDetailRepository');
@@ -60,7 +61,9 @@ async function counts(orderId = null) {
   const add = (type, n) => {
     if (n > 0) by[type] = (by[type] || 0) + n;
   };
-  const inScope = (id) => orderId === null || (id !== null && id !== undefined && Number(id) === Number(orderId));
+  // D-257: only the orders of the request's division(s).
+  const inDivision = await divisionService.orderIdChecker();
+  const inScope = (id) => (orderId === null || (id !== null && id !== undefined && Number(id) === Number(orderId))) && inDivision(id);
   const onOrAfter = (date) => start === null || String(date ?? '').slice(0, 10) >= start;
 
   let n = 0;
@@ -123,7 +126,8 @@ async function counts(orderId = null) {
 async function menuCount(session) {
   const now = Date.now();
   const cached = session && session.zohoWaitingBadge;
-  if (cached && now - cached.at < 60000) return cached.n;
+  const scope = divisionService.condition() || '';
+  if (cached && now - cached.at < 60000 && (cached.scope || '') === scope) return cached.n;
   let n = null;
   try {
     const c = await counts(null);
@@ -131,7 +135,7 @@ async function menuCount(session) {
   } catch (e) {
     n = null;
   }
-  if (session) session.zohoWaitingBadge = { at: now, n };
+  if (session) session.zohoWaitingBadge = { at: now, n, scope };
   return n;
 }
 

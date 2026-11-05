@@ -413,6 +413,8 @@ final class ReportController
             'stage_id' => $f['stage_id'] ?? null,
             'incoterm_id' => $f['incoterm_id'] ?? null,
             'country' => $f['country'] ?? null,
+            // D-257: the division it was saved in (applied only while that division is in the user's scope).
+            'division' => ($def['division_id'] ?? null) !== null && \App\Services\DivisionService::allows((int) $def['division_id']) ? (int) $def['division_id'] : null,
         ]));
         header('Location: /reports/aggregate' . ($qs !== '' ? "?{$qs}" : ''));
     }

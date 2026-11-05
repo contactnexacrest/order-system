@@ -165,6 +165,10 @@ final class ClientIntakeRepository
     /** Nav-badge count — live, not cached, so it self-decrements the moment a submission is accepted/rejected. */
     public static function pendingCount(): int
     {
+        // D-257: the public enquiry form is Export's; other divisions do not count it.
+        if (!\App\Services\DivisionService::allows(\App\Services\DivisionService::EXPORT_ID)) {
+            return 0;
+        }
         return (int) Database::connection()
             ->query("SELECT COUNT(*) AS c FROM client_intake_submissions WHERE status = 'pending'")
             ->fetch()['c'];
