@@ -1824,6 +1824,15 @@ CREATE TABLE client_password_reset_tokens (
 ALTER TABLE documents
   ADD COLUMN company_snapshot_json JSON NULL;
 
+-- QA batch 3 DOC-2 (owner confirmed twice, 5 Nov 2026): the full render
+-- context a revision was generated with. The FINAL copy (after approval) and
+-- the SUPERSEDED copy are re-rendered from this, never from live order data,
+-- so they always show exactly what was reviewed / what the buyer received.
+-- NULL on rows generated before this column existed (they fall back to the
+-- old live re-render).
+ALTER TABLE documents
+  ADD COLUMN render_context_json LONGTEXT NULL;
+
 -- ================================================================
 -- SECTION Q — WORKING-DAYS CALCULATOR & HOLIDAY CALENDAR (added 2026-09-21)
 -- ================================================================

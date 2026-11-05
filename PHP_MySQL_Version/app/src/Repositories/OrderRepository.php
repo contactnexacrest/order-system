@@ -92,15 +92,20 @@ final class OrderRepository
     /** Archived orders only — visible via the separate view_archived_orders permission, never deleted, never dropped from any other listing/report. */
     public static function allArchived(): array
     {
-        return Database::connection()->query(
+        // QA batch 2 (ORD-15): the same visibility rule as every other list — the request's division(s) and,
+        // without view_all_orders, only the orders the person is assigned to.
+        [$visSql, $visParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        $stmt = Database::connection()->prepare(
             'SELECT o.*, sm.stage_name AS current_stage_name,
                     u.name AS archived_by_name
              FROM orders o
              LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
              LEFT JOIN users u ON u.id = o.archived_by
-             WHERE o.is_archived = 1' . DivisionService::sql('o.division_id') . '
+             WHERE o.is_archived = 1' . ($visSql !== '' ? $visSql : DivisionService::sql('o.division_id')) . '
              ORDER BY o.archived_at DESC, o.id DESC'
-        )->fetchAll();
+        );
+        $stmt->execute($visParams);
+        return $stmt->fetchAll();
     }
 
     public static function archive(int $orderId, int $archivedBy): void
@@ -874,14 +879,17 @@ final class OrderRepository
      * refund detail lives on the order_cancellations row itself, not
      * duplicated onto this table.
      */
-    public static function cancel(int $orderId): void
+    public static function cancel(int $orderId): bool
     {
-        Database::connection()->prepare(
+        // QA batch 2 (ORD-01): only a running order can become cancelled — never a shipped, settled or lost one.
+        $stmt = Database::connection()->prepare(
             "UPDATE orders SET status = 'cancelled', is_locked = 1,
                     buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL,
                     payment_action_token_hash = NULL, payment_action_token_plain = NULL, payment_action_token_expires_at = NULL
-             WHERE id = :id"
-        )->execute(['id' => $orderId]);
+             WHERE id = :id AND status IN ('active', 'disputed')"
+        );
+        $stmt->execute(['id' => $orderId]);
+        return $stmt->rowCount() === 1;
     }
 
     /**

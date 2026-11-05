@@ -47,6 +47,22 @@ final class PartPaymentService
         return $stmt->fetchAll();
     }
 
+    /**
+     * QA batch 2 (ORD-03/04): everything the buyer has paid on the order so far, in the order's currency —
+     * the advance, freight and balance legs plus every payment milestone (bank charges deducted count as paid).
+     */
+    public static function orderReceivedTotal(int $orderId): float
+    {
+        $total = 0.0;
+        foreach (self::LEGS as $leg) {
+            $total += self::receivedTotal($orderId, $leg);
+        }
+        foreach (PaymentMilestoneRepository::forOrder($orderId) as $m) {
+            $total += self::receivedTotal($orderId, 'milestone', (int) $m['id']);
+        }
+        return round($total, 2);
+    }
+
     public static function receivedTotal(int $orderId, string $leg, ?int $milestoneId = null): float
     {
         // Owner 2 Nov 2026 ("18 yes"): bank charges the banks deducted count as paid by the buyer.

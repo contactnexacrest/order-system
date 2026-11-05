@@ -98,22 +98,39 @@ final class DashboardRepository
         return $stmt->fetchAll();
     }
 
+    /**
+     * QA batch 3 MAIL-1: one row per order — its latest RELEASED Freight Debit
+     * Note (sent; or approved while e-mail sending is off) and the date
+     * printed on it (fdn_date). Before this, both the alert and this panel
+     * joined order_freight.fdn_document_id, which nothing ever set.
+     */
+    public static function releasedFdnSql(): string
+    {
+        $released = \App\Services\EmailDispatchService::mailSendingEnabled() ? "'sent'" : "'approved', 'sent'";
+        return "SELECT d.order_id, COALESCE(d.document_date, DATE(d.generated_at)) AS fdn_date
+                FROM documents d
+                JOIN document_types dt ON dt.id = d.document_type_id AND dt.code = 'FDN'
+                WHERE d.status IN ({$released})
+                  AND d.id = (SELECT MAX(d2.id) FROM documents d2
+                              WHERE d2.order_id = d.order_id AND d2.document_type_id = d.document_type_id AND d2.status IN ({$released}))";
+    }
+
     /** @return array<int, array<string,mixed>> */
     public static function overdueFreightPayments(): array
     {
         $overdueDays = (int) (CompanySettingsRepository::get('fdn_overdue_days_c') ?? '7');
+        // QA batch 3 MAIL-1: the FDN actually issued to the buyer, by the date printed on it.
         $stmt = Database::connection()->prepare(
-            "SELECT o.id AS order_id, o.order_reference, c.company_legal_name, d.generated_at AS fdn_generated_at
-             FROM order_freight of_
-             JOIN documents d ON d.id = of_.fdn_document_id
-             JOIN orders o ON o.id = of_.order_id
+            "SELECT o.id AS order_id, o.order_reference, c.company_legal_name, d.fdn_date AS fdn_generated_at
+             FROM (" . self::releasedFdnSql() . ") d
+             JOIN orders o ON o.id = d.order_id
              JOIN clients c ON c.id = o.client_id
              LEFT JOIN order_payment_status ps ON ps.order_id = o.id
-             WHERE of_.fdn_document_id IS NOT NULL
-               AND ps.freight_cleared_at IS NULL
-               AND DATE(d.generated_at) <= DATE_SUB(CURDATE(), INTERVAL :days DAY)
+             WHERE ps.freight_cleared_at IS NULL
+               AND d.fdn_date <= DATE_SUB(CURDATE(), INTERVAL :days DAY)
+               AND o.is_locked = 0
                AND o.status = 'active'" . DivisionService::sql('o.division_id') . "
-             ORDER BY d.generated_at ASC"
+             ORDER BY d.fdn_date ASC"
         );
         $stmt->execute(['days' => $overdueDays]);
         return $stmt->fetchAll();

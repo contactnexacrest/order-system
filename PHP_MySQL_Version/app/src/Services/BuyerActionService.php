@@ -166,11 +166,9 @@ final class BuyerActionService
     public static function issuedBuyerDocument(int $orderId, string $typeCode): ?array
     {
         $stage = ['BUYERPO' => 2, 'PI' => 3, 'OC' => 4][$typeCode] ?? null;
-        $latest = $stage !== null ? DocumentRepository::findLatestForOrderAndTypeCode($orderId, $typeCode) : null;
-        if (!$latest || empty($latest['pdf_file_id']) || DocumentGenerationService::stageDocumentBlockedBy($orderId, $stage) !== []) {
-            return null;
-        }
-        $document = DocumentRepository::find((int) $latest['id']);
+        // QA batch 3 DOC-6: the newest revision that is issued — a newer draft
+        // or one in review no longer hides the valid copy the buyer already has.
+        $document = $stage !== null ? DocumentGenerationService::latestReleasedDocument($orderId, $typeCode) : null;
         if (!$document || !in_array($document['status'], ['approved', 'sent'], true)
             || $document['document_type_category'] !== 'customer_facing'
             || !empty($document['document_type_never_shown_to_buyer'])) {

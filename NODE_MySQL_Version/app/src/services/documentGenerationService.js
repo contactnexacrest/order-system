@@ -306,7 +306,7 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
       null,
       docxPath,
       docxUuidName,
-      `${documentTypeCode} ${filenameSafeReference} Rev.${revisionNumber} (internal).docx`,
+      `${documentTypeCode} ${filenameSafeReference} Rev.${clientRevisionNumber} (internal).docx`, // QA batch 3 DOC-3: same revision as the PDF's name
       docxStat.size,
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       generatedByUserId,
@@ -328,6 +328,13 @@ async function generate(orderId, documentTypeCode, generatedByUserId, signatoryO
   );
   if (documentDate) {
     await documentRepository.setDocumentDate(documentId, documentDate);
+  }
+  // QA batch 3 DOC-2 (owner confirmed twice): keep what this revision was rendered from (fonts are re-added on load).
+  const { fonts: _fonts, ...storedContext } = context;
+  await documentRepository.storeRenderContext(documentId, storedContext);
+  // QA batch 3 MAIL-1: the order's freight record points at its latest Freight Debit Note.
+  if (documentTypeCode === 'FDN') {
+    await require('../repositories/orderFreightRepository').setFdnDocumentId(orderId, documentId);
   }
 
   // External QA report M-08: "Regenerating an earlier-stage document
@@ -524,6 +531,18 @@ const STAGE_DOCUMENTS = {
 };
 
 /**
+ * QA batch 3 DOC-6 (port of PHP latestReleasedDocument): the newest revision
+ * of a type the buyer may rely on, skipping a newer draft or one in review.
+ */
+async function latestReleasedDocument(orderId, documentTypeCode) {
+  const mailEnabled = await require('./emailDispatchService').mailSendingEnabled();
+  for (const document of await documentRepository.liveRevisionsForOrderAndTypeCode(orderId, documentTypeCode)) {
+    if (document.pdf_file_id && isDocumentComplete(document, mailEnabled)) return document;
+  }
+  return null;
+}
+
+/**
  * Whether a document counts as finished for its stage: an internal
  * never-shown-to-buyer type (SUPPO, BLI) once approved; a buyer-facing one
  * once approved while email sending is off (approval marks it sent anyway —
@@ -670,6 +689,13 @@ async function finalWatermark() {
   return watermarkFromRow(row);
 }
 
+/** QA batch 3 DOC-2: a revision's stored render context with a new watermark (and the fonts), or null for rows older than the snapshot. */
+async function fromStoredContext(documentId, watermark) {
+  const stored = await documentRepository.renderContext(documentId);
+  if (!stored) return null;
+  return { fonts: fontsBlock(), ...stored, watermark };
+}
+
 /**
  * Spec Section 9 — once every required reviewer has approved a document
  * (reviewWorkflowService::approve() decides when that's true), the DRAFT
@@ -709,7 +735,7 @@ async function finalizeApproval(documentId) {
     data.show_notify_party_section ?? true
   );
 
-  const context = {
+  let context = {
     fonts: fontsBlock(),
     ...data,
     meta: {
@@ -745,6 +771,9 @@ async function finalizeApproval(documentId) {
     // row's own snapshot.
     company: await documentDataAssembler.companyFromSnapshot(document),
   };
+  // QA batch 3 DOC-2 (owner confirmed twice): the FINAL copy shows exactly what
+  // was generated and reviewed — the stored context, only the watermark swapped.
+  context = (await fromStoredContext(documentId, context.watermark)) || context;
 
   const twig = templatesEnvironment();
   const html = twig.render(templateFileFor(documentTypeCode), context);
@@ -873,7 +902,7 @@ async function markSuperseded(documentId) {
     data.show_notify_party_section ?? true
   );
 
-  const context = {
+  let context = {
     fonts: fontsBlock(),
     ...data,
     meta: {
@@ -897,6 +926,9 @@ async function markSuperseded(documentId) {
     signatory: await documentDataAssembler.signatoryFromSnapshot(document),
     company: await documentDataAssembler.companyFromSnapshot(document),
   };
+  // QA batch 3 DOC-2 (owner confirmed twice): the SUPERSEDED copy keeps the
+  // figures this revision really carried — the stored context, INVALID watermark.
+  context = (await fromStoredContext(documentId, invalidWatermark())) || context;
 
   const twig = templatesEnvironment();
   const html = twig.render(templateFileFor(documentTypeCode), context);
@@ -1566,7 +1598,8 @@ function formatNow() {
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
   const d = new Date();
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  // QA batch 3 DOC-1: two-digit day, as PHP's 'd F Y'.
+  return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function formatNowWithTime() {
@@ -1577,6 +1610,7 @@ function formatNowWithTime() {
 }
 
 module.exports = {
+  latestReleasedDocument,
   generate,
   finalizeApproval,
   markSuperseded,

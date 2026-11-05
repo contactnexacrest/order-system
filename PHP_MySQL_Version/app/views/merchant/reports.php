@@ -12,12 +12,13 @@ $levelStyle = ['ok' => 'color:#2D7D56', 'info' => 'color:#5B6573', 'warn' => 'co
   <table class="list" data-testid="mtt-open">
     <tr><th>Deal</th><th>Stage</th><th>Buyer</th><th>Whole deal</th><th>Outlay</th><th>Advance</th><th>Bank documents</th></tr>
     <?php foreach ($open as $r): $c = array_column($r['checks'], null, 'key'); ?>
-    <tr><td><a href="/merchant/<?= (int) $r['id'] ?>"><?= $h($r['reference']) ?></a></td><td><?= $h(M::STAGES[$r['stage']]) ?></td><td><?= $h($r['buyer_name']) ?></td>
+    <tr><td><a href="/merchant/<?= (int) $r['id'] ?>"><?= $h($r['reference']) ?></a></td><td><?= $h(M::STAGES[$r['stage']]) ?></td><td><?= $money['client'] ? $h($r['buyer_name']) : $h($r['buyer_country']) /* QA batch 2 (ACC-4) */ ?></td>
       <?php foreach (['total', 'outlay', 'advance', 'documents'] as $k): ?><td style="<?= $levelStyle[$c[$k]['level']] ?? '' ?>"><?= $h($c[$k]['text']) ?></td><?php endforeach; ?></tr>
     <?php endforeach; ?>
     <?php if ($open === []): ?><tr><td colspan="7" class="muted">No open deals.</td></tr><?php endif; ?>
   </table>
 
+  <?php if ($money['selling'] && $money['buyer_payments']): /* QA batch 2 (ACC-4): sale, receipts and margin are selling-side money */ ?>
   <h2>Margin per deal</h2>
   <table class="list" data-testid="mtt-margins">
     <tr><th>Deal</th><th>Stage</th><th>Sale</th><th>Received ₹</th><th>Purchase</th><th>Paid ₹</th><th>Margin ₹</th><th>Margin USD</th><th>Margin %</th></tr>
@@ -29,4 +30,5 @@ $levelStyle = ['ok' => 'color:#2D7D56', 'info' => 'color:#5B6573', 'warn' => 'co
     <?php endforeach; ?>
     <?php if ($rows === []): ?><tr><td colspan="9" class="muted">No deals yet.</td></tr><?php endif; ?>
   </table>
+  <?php endif; ?>
 </div>

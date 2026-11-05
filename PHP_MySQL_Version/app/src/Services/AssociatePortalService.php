@@ -110,7 +110,7 @@ final class AssociatePortalService
             return ['status' => 'disabled'];
         }
         $code = self::issueToken((int) $a['id'], 'login_code', 10);
-        EmailService::sendPlainText((string) $a['email'], 'Your NexaCrest login code', "Your login code is {$code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.");
+        EmailService::sendPlainText((string) $a['email'], 'Your NexaCrest login code', "Your login code is {$code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.", true); // QA batch 3 MAIL-13: a one-time login code is security mail
         self::regenerate();
         unset($_SESSION[self::SESSION_ID], $_SESSION[self::SESSION_VIEW_AS]);
         $_SESSION[self::SESSION_PENDING] = (int) $a['id'];

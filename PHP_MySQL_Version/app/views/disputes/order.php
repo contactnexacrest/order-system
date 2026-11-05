@@ -11,7 +11,7 @@
       <?= Csrf::field() ?>
       <div class="field-grid">
         <label>Notice Date *
-          <input type="date" name="notice_date" value="<?= date('Y-m-d') ?>" required>
+          <input type="date" name="notice_date" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" required>
         </label>
         <label>From
           <input type="text" name="from_party" placeholder="e.g. Buyer, via email">

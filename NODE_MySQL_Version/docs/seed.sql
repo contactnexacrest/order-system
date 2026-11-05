@@ -818,13 +818,13 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
    'Dear {buyer_contact_person},\n\nPlease find attached our Quotation {document_reference} dated {generated_date} for your reference (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nThis quotation is valid until {quotation_valid_until}. Please let us know if you have any questions or would like to proceed.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('send_pi', 'Proforma Invoice {document_reference} — {company_name}',
-   'Dear {buyer_contact_person},\n\nPlease find attached Proforma Invoice {document_reference} dated {generated_date}, issued against Quotation {quotation_ref} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nThis Proforma Invoice is valid until {pi_valid_until}. Kindly arrange the advance payment as per the terms stated to enable us to commence production.\n\n{sender_signature}',
+   'Dear {buyer_contact_person},\n\nPlease find attached Proforma Invoice {document_reference} dated {generated_date}, issued against Quotation {quotation_ref} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nThis Proforma Invoice is valid until {pi_valid_until}. {payment_request_sentence}\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('send_oc', 'Order Confirmation {document_reference} — {company_name}',
    'Dear {buyer_contact_person},\n\nWe are pleased to confirm your order. Please find attached Order Confirmation {document_reference} dated {generated_date}, issued against Proforma Invoice {pi_ref} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nProduction will proceed as per the schedule stated in the attached document.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('send_ci', 'Commercial Invoice {document_reference} — {company_name}',
-   'Dear {buyer_contact_person},\n\nPlease find attached Commercial Invoice {document_reference} dated {generated_date} for your order (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nKindly review the invoice value and payment settlement details and arrange the balance payment as per the terms stated.\n\n{sender_signature}',
+   'Dear {buyer_contact_person},\n\nPlease find attached Commercial Invoice {document_reference} dated {generated_date} for your order (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\n{payment_request_sentence}\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('send_fdn', 'Debit Note {document_reference} — Payment Required Before Shipment',
    'Dear {buyer_contact_person},\n\nPlease find attached Debit Note {document_reference} dated {generated_date} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nPayment is required within 3 Calendar Days of this Debit Note''s date. We will confirm shipment booking only upon receipt of full freight payment.\n\n{sender_signature}',
@@ -833,7 +833,7 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
    'Dear {buyer_contact_person},\n\nThis is a follow-up regarding the pending payment on your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}). Kindly arrange the payment at your earliest convenience and share the remittance copy so we can proceed.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('shipment_readiness', 'Shipment Readiness Confirmation — Order {order_reference}',
-   'Dear {buyer_contact_person},\n\nWe are pleased to confirm that your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}) is packed and ready for shipment. Please find the relevant shipment details attached.\n\n{sender_signature}',
+   'Dear {buyer_contact_person},\n\nWe are pleased to confirm that your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}) is packed and ready for shipment. We will share the shipment documents with you as they are issued.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('bl_copy_sent', 'Bill of Lading Copy — Order {order_reference}',
    'Dear {buyer_contact_person},\n\nPlease find attached the scanned copy of the Bill of Lading for your order {order_reference} (Buyer Inquiry Ref: {buyer_inquiry_ref}). BL originals will be couriered upon clearance of the balance payment, per the agreed terms.\n\n{sender_signature}',
@@ -848,7 +848,7 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
   -- every customer_facing type lands on a ready preview, not an empty
   -- "Select a template…" picker, the same as QT/PI/OC/CI/FDN already did.
   ('send_buyerpo', 'Buyer PO — Order Acceptance {document_reference} — {company_name}',
-   'Dear {buyer_contact_person},\n\nPlease find attached our formal acceptance of your Purchase Order, {document_reference} dated {generated_date}, issued against Order Confirmation {oc_ref} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\n{sender_signature}',
+   'Dear {buyer_contact_person},\n\nPlease find attached our formal acceptance of your Purchase Order, {document_reference} dated {generated_date}, issued against Quotation {quotation_ref} (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}'),
   ('send_annexa', 'Annexure A {document_reference} — {company_name}',
    'Dear {buyer_contact_person},\n\nPlease find attached Annexure A {document_reference} dated {generated_date}, accompanying your order (Buyer Inquiry Ref: {buyer_inquiry_ref}). This annexure must always be read together with its parent document.\n\n{sender_signature}',
@@ -858,6 +858,10 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
    '{company_name} | {company_email} | {company_phone}'),
   ('send_ble', 'Bill of Lading Endorsement {document_reference} — {company_name}',
    'Dear {buyer_contact_person},\n\nPlease find attached the Bill of Lading Endorsement {document_reference} dated {generated_date} for your order (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\n{sender_signature}',
+   '{company_name} | {company_email} | {company_phone}'),
+  -- QA batch 3 MAIL-7: the Export Service Invoice (customer_facing) can be e-mailed too.
+  ('send_esi', 'Export Service Invoice {document_reference} — {company_name}',
+   'Dear {buyer_contact_person},\n\nPlease find attached Export Service Invoice {document_reference} dated {generated_date} for the services on your order (Buyer Inquiry Ref: {buyer_inquiry_ref}).\n\nKindly arrange the payment as per the terms stated in the invoice.\n\n{sender_signature}',
    '{company_name} | {company_email} | {company_phone}');
 
 -- 90-item backlog #37 (email-templates completeness audit): these 7
@@ -891,7 +895,7 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
    'Hello,\n\nThank you for accepting our Quotation for order {order_reference}.\n\nTo issue your Proforma Invoice, please confirm your shipping/consignee details at:\n{pi_form_link}\n\nThis link works for 30 days.\n\nNexaCrest International Private Limited',
    NULL),
   ('buyer_action_link', 'NexaCrest — acknowledge your order / upload your Buyer PO',
-   'Hello,\n\nTo acknowledge your Order Confirmation and/or upload your signed Buyer PO copy for order {order_reference}, please visit:\n{buyer_action_link}\n\nThis link works for 90 days.\n\nNexaCrest International Private Limited',
+   'Hello,\n\nFor order {order_reference}, please use this link to download your Purchase Order, upload the signed copy with your PO number, and acknowledge your Order Confirmation once you receive it:\n{buyer_action_link}\n\nThis link works for 90 days.\n\nNexaCrest International Private Limited',
    NULL);
 
 -- ================================================================

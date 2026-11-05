@@ -62,7 +62,9 @@ async function create(req, res) {
     || (effectiveFrom !== null && !(/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom) && !Number.isNaN(Date.parse(`${effectiveFrom}T00:00:00Z`)) && new Date(`${effectiveFrom}T00:00:00Z`).toISOString().slice(0, 10) === effectiveFrom)
       ? 'Effective from: enter a valid date (YYYY-MM-DD).' : null)
     // Owner decision 1 Nov 2026 (C-4): an amendment cannot take the advance to 0% unless the order's preset may run without one (LC).
-    || (amendedAdvancePct === 0 && !(await presetAllowsZero(orderId)) ? 'Amended advance %: 0% is allowed only on a Letter of Credit order. Enter the advance %.' : null);
+    || (amendedAdvancePct === 0 && !(await presetAllowsZero(orderId)) ? 'Amended advance %: 0% is allowed only on a Letter of Credit order. Enter the advance %.' : null)
+    // QA batch 2 (ORD-02): the balance is what the advance and the payment milestones leave — never negative.
+    || (amendedAdvancePct !== null ? await amendmentService.milestoneOverflowError(orderId, amendedAdvancePct) : null);
   if (numberError) {
     flash.set(req, 'error', numberError);
     res.redirect(`/orders/${orderId}/amendments`);

@@ -32,8 +32,8 @@ async function setDutyRateActive(id, active, userId) {
 
 // ------------------------------------------------------------ shipments
 
-async function find(id) {
-  return db.queryOne('SELECT * FROM import_shipments WHERE id = :id', { id });
+async function find(id, executor = db) {
+  return executor.queryOne('SELECT * FROM import_shipments WHERE id = :id', { id });
 }
 
 /** @param {number[]|null} divisionIds null = every division */
@@ -119,16 +119,16 @@ async function setLineFigures(lineId, f, executor = db) {
 
 // ------------------------------------------------------------ supplier payments
 
-async function payments(shipmentId) {
-  return db.query(
+async function payments(shipmentId, executor = db) {
+  return executor.query(
     `SELECT p.*, u.name AS recorded_by_name FROM import_payments p LEFT JOIN users u ON u.id = p.recorded_by
       WHERE p.shipment_id = :s ORDER BY p.paid_on, p.id`,
     { s: shipmentId }
   );
 }
 
-async function addPayment(shipmentId, row, userId) {
-  const r = await db.execute(
+async function addPayment(shipmentId, row, userId, executor = db) {
+  const r = await executor.execute(
     `INSERT INTO import_payments (shipment_id, paid_on, kind, amount_fc, fx_rate, amount_inr, bank_reference, description, note, recorded_by)
      VALUES (:s, :d, :k, :a, :fx, :inr, :b, :desc, :n, :u)`,
     {
@@ -139,8 +139,8 @@ async function addPayment(shipmentId, row, userId) {
   return r.insertId;
 }
 
-async function bankReferenceUsed(bankReference) {
-  return !!(await db.queryOne('SELECT 1 AS x FROM import_payments WHERE bank_reference = :b LIMIT 1', { b: bankReference }));
+async function bankReferenceUsed(bankReference, executor = db) {
+  return !!(await executor.queryOne('SELECT 1 AS x FROM import_payments WHERE bank_reference = :b LIMIT 1', { b: bankReference }));
 }
 
 // ------------------------------------------------------------ stock

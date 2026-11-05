@@ -1367,9 +1367,8 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <select name="refund_status" aria-label="Refund status">
             <option value="not_applicable">No refund applicable</option>
             <option value="pending">Refund pending</option>
-            <option value="completed">Refund already completed</option>
           </select>
-          <input type="text" name="refund_amount" placeholder="Refund amount (optional)" style="width:160px" aria-label="Refund amount">
+          <input type="number" name="refund_amount" min="0.01" step="0.01" placeholder="Refund amount (optional), e.g. 2500.00" style="width:200px" aria-label="Refund amount">
           <input type="text" name="decision_notes" placeholder="Approval notes (optional)" style="width:220px" aria-label="Approval notes">
           <button type="submit" class="btn-sm btn-success">Approve Cancellation</button>
         </form>
@@ -1871,7 +1870,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
       $__msFob = \App\Repositories\OrderProductRepository::totalFobValue((int) $order['id']);
       $__msAdvPct = (float) $order['advance_pct'];
       $__msTotalPct = array_sum(array_map(static fn (array $m): float => (float) $m['pct'], $__ms));
-      $__msFixed = !empty($payment['advance_cleared_at']) || \App\Repositories\PaymentMilestoneRepository::anyMoneyRecorded((int) $order['id']);
+      $__msFixed = !empty($payment['advance_cleared_at']) || !empty($lcConfirmed) || \App\Repositories\PaymentMilestoneRepository::anyMoneyRecorded((int) $order['id']); // QA batch 2 (ORD-06): an LC order fixes its schedule when the LC is confirmed
       $__msPct = static fn (float $v): string => rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
       $__msLegStatus = static fn (string $leg): string => !empty($payment[$leg . '_cleared_at']) ? 'Cleared' : (!empty($payment[$leg . '_remittance_received_at']) ? 'Received — not yet cleared' : 'Due');
       $__msAdvAmount = round($__msFob * $__msAdvPct / 100, 2);

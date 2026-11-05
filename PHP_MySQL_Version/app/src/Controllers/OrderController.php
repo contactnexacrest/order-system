@@ -786,6 +786,17 @@ final class OrderController
             header("Location: /orders/{$orderId}/edit");
             return;
         }
+        // QA batch 2 (ORD-07): the incoterm decides the freight stage (FOB skips Stage 6), which is settled once
+        // Stage 6 is reached or skipped — after that an incoterm change would leave freight wrong either way.
+        if ($incotermId !== (int) $order['incoterm_id']) {
+            $freightStage = OrderStageRepository::findByOrderAndStageNumber($orderId, 6);
+            if ($freightStage !== null && in_array($freightStage['status'], ['in_progress', 'gate_passed', 'skipped'], true)) {
+                Flash::set('error', 'The incoterm can no longer change: the freight stage (Stage 6) is already ' . ($freightStage['status'] === 'skipped' ? 'skipped' : 'under way') . ' for the current incoterm. Agree the change with the buyer through an amendment, and ask an administrator to correct the order.');
+                Flash::setOld($_POST);
+                header("Location: /orders/{$orderId}/edit");
+                return;
+            }
+        }
 
         $currentStageNumber = $order['current_stage_number'] !== null ? (int) $order['current_stage_number'] : null;
         $reason = trim((string) ($_POST['reason'] ?? ''));
@@ -1615,7 +1626,10 @@ final class OrderController
         $rawToken = PiIntakeRepository::createLink($orderId, (int) $user['id']);
         $link = rtrim(Env::get('APP_URL', ''), '/') . '/pi-details/' . $rawToken;
 
-        if (!empty($order['client_email'])) {
+        // QA batch 3 MAIL-4: fall back to the client record's e-mail; MAIL-2: report what really happened.
+        $clientEmail = \App\Services\EmailDispatchService::clientEmailFor($order);
+        $sent = false;
+        if ($clientEmail !== null) {
             // 90-item backlog #37: admin-editable (Admin > Settings >
             // Email Templates) — this exact original wording is the
             // fallback.
@@ -1629,11 +1643,11 @@ final class OrderController
                     . "This link works for 30 days.\n\n"
                     . "NexaCrest International Private Limited"
             );
-            EmailService::sendPlainText($order['client_email'], $rendered['subject'], $rendered['body']);
+            $sent = EmailService::sendPlainText($clientEmail, $rendered['subject'], $rendered['body']);
         }
 
-        AuditLogRepository::log((int) $user['id'], 'PI_INTAKE_LINK_GENERATED', 'orders', $orderId, null, null, null, 'PI-stage intake link generated' . (!empty($order['client_email']) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
-        Flash::set('success', "PI-stage form link" . (!empty($order['client_email']) ? " emailed to {$order['client_email']}" : ' generated') . ": {$link}");
+        AuditLogRepository::log((int) $user['id'], 'PI_INTAKE_LINK_GENERATED', 'orders', $orderId, null, null, null, 'PI-stage intake link generated' . ($sent ? ' and emailed to client' : ($clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
+        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('PI-stage form link', $clientEmail, $sent, $link));
         header('Location: ' . self::linkReturnUrl($orderId, 'step-5a-pi-form-link'));
     }
 
@@ -1691,7 +1705,10 @@ final class OrderController
         }
         $link = rtrim(Env::get('APP_URL', ''), '/') . '/buyer-action/' . $rawToken;
 
-        if (!empty($order['client_email'])) {
+        // QA batch 3 MAIL-4: fall back to the client record's e-mail; MAIL-2: report what really happened.
+        $clientEmail = \App\Services\EmailDispatchService::clientEmailFor($order);
+        $sent = false;
+        if ($clientEmail !== null) {
             // 90-item backlog #37: admin-editable (Admin > Settings >
             // Email Templates) — this exact original wording is the
             // fallback.
@@ -1704,11 +1721,11 @@ final class OrderController
                     . "This link works for 90 days.\n\n"
                     . "NexaCrest International Private Limited"
             );
-            EmailService::sendPlainText($order['client_email'], $rendered['subject'], $rendered['body']);
+            $sent = EmailService::sendPlainText($clientEmail, $rendered['subject'], $rendered['body']);
         }
 
-        AuditLogRepository::log((int) $user['id'], 'BUYER_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Buyer Action link generated' . (!empty($order['client_email']) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
-        Flash::set('success', "Buyer Action link" . (!empty($order['client_email']) ? " emailed to {$order['client_email']}" : ' generated') . ": {$link}");
+        AuditLogRepository::log((int) $user['id'], 'BUYER_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Buyer Action link generated' . ($sent ? ' and emailed to client' : ($clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
+        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('Buyer Action link', $clientEmail, $sent, $link));
         // Owner request (2026-10-26): sent from Step 4b or 6b — return to that card (3 Nov: opened, link focused).
         header('Location: ' . self::linkReturnUrl($orderId, $returnAnchor));
     }
@@ -1731,8 +1748,9 @@ final class OrderController
 
         $user = AuthService::currentUser();
         $link = rtrim(Env::get('APP_URL', ''), '/') . '/payment-action/' . OrderRepository::generatePaymentActionToken($orderId);
-        $clientEmail = $order['client_email'] ?: (\App\Repositories\ClientRepository::find((int) $order['client_id'])['email'] ?? null);
-        if (!empty($clientEmail)) {
+        $clientEmail = \App\Services\EmailDispatchService::clientEmailFor($order);
+        $sent = false;
+        if ($clientEmail !== null) {
             $rendered = EmailTemplateRepository::renderOrDefault(
                 'payment_action_link',
                 ['{order_reference}' => $order['order_reference'], '{payment_action_link}' => $link],
@@ -1742,11 +1760,11 @@ final class OrderController
                     . "Our team will check them against our bank statement and confirm. The same link works for every payment on this order.\n\n"
                     . "NexaCrest International Private Limited"
             );
-            EmailService::sendPlainText($clientEmail, $rendered['subject'], $rendered['body']);
+            $sent = EmailService::sendPlainText($clientEmail, $rendered['subject'], $rendered['body']);
         }
 
-        AuditLogRepository::log((int) $user['id'], 'PAYMENT_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Payment Action link generated' . (!empty($clientEmail) ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
-        Flash::set('success', 'Payment Action link' . (!empty($clientEmail) ? " emailed to {$clientEmail}" : ' generated') . ": {$link}");
+        AuditLogRepository::log((int) $user['id'], 'PAYMENT_ACTION_LINK_GENERATED', 'orders', $orderId, null, null, null, 'Payment Action link generated' . ($sent ? ' and emailed to client' : ($clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
+        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('Payment Action link', $clientEmail, $sent, $link));
         header('Location: ' . self::linkReturnUrl($orderId, self::linkReturnAnchor('step-5d-payment-record')));
     }
 
@@ -2267,6 +2285,12 @@ final class OrderController
             return;
         }
         $user = AuthService::currentUser();
+        // QA batch 2 (ORD-10): the LC route exists only on an LC order — never a side door past the cash advance.
+        if (($order['payment_method'] ?? '') !== 'LC') {
+            Flash::set('error', 'This order is not paid by Letter of Credit.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
 
         $lcAmount = (float) ($_POST['lc_amount'] ?? 0);
         if ($lcAmount <= 0) {
@@ -2427,6 +2451,13 @@ final class OrderController
     {
         $orderId = (int) $params['id'];
         $user = AuthService::currentUser();
+        // QA batch 2 (ORD-10): the LC route exists only on an LC order — never a side door past the cash advance.
+        $lcOrder = OrderRepository::find($orderId);
+        if ($lcOrder === null || ($lcOrder['payment_method'] ?? '') !== 'LC') {
+            Flash::set('error', 'This order is not paid by Letter of Credit.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         if (!StageGateService::isUnlocked($orderId, 3)) {
             Flash::set('error', 'Stage 3 has not been unlocked for this order yet — complete Stage 2 first.');
             header("Location: /orders/{$orderId}");
@@ -3033,6 +3064,7 @@ final class OrderController
         $rawToken = OrderSupplierPoRepository::generateActionToken((int) $supplierPo['id']);
         $link = rtrim(Env::get('APP_URL', ''), '/') . '/supplier-action/' . $rawToken;
         $email = trim((string) ($supplierPo['supplier_email'] ?? ''));
+        $sent = false;
         if ($email !== '') {
             $rendered = EmailTemplateRepository::renderOrDefault(
                 'supplier_action_link',
@@ -3043,10 +3075,11 @@ final class OrderController
                     . "This link works for 60 days.\n\n"
                     . "NexaCrest International Private Limited"
             );
-            EmailService::sendPlainText($email, $rendered['subject'], $rendered['body']);
+            $sent = EmailService::sendPlainText($email, $rendered['subject'], $rendered['body']);
         }
-        AuditLogRepository::log((int) AuthService::currentUserId(), 'SUPPLIER_ACTION_LINK_GENERATED', 'order_supplier_po', (int) $supplierPo['id'], null, null, null, 'Supplier Action link generated' . ($email !== '' ? ' and emailed to the supplier' : ' — no supplier email on the PO, hand this link over directly'));
-        Flash::set('success', 'Supplier Action link' . ($email !== '' ? " emailed to {$email}" : ' generated') . ": {$link}");
+        AuditLogRepository::log((int) AuthService::currentUserId(), 'SUPPLIER_ACTION_LINK_GENERATED', 'order_supplier_po', (int) $supplierPo['id'], null, null, null, 'Supplier Action link generated' . ($sent ? ' and emailed to the supplier' : ($email !== '' ? ' — the e-mail was not sent, hand this link over directly' : ' — no supplier email on the PO, hand this link over directly')));
+        // QA batch 3 MAIL-2: "emailed" only when the e-mail really went out.
+        Flash::set('success', \App\Services\EmailDispatchService::linkMailOutcome('Supplier Action link', $email !== '' ? $email : null, $sent, $link));
         header('Location: ' . self::linkReturnUrl($orderId, 'step-7c-supplier-po-attach'));
     }
 
@@ -4655,6 +4688,20 @@ final class OrderController
             header("Location: /orders/{$orderId}");
             return;
         }
+        // QA batch 2 (ORD-04): "lost" is the walk-away before any money. Once the buyer has paid (or an LC is
+        // confirmed usable), or while a cancellation awaits its decision, the order goes through the
+        // cancellation workflow instead (second approver, refund recorded with its bank reference).
+        if (OrderCancellationRepository::findPendingForOrder($orderId)) {
+            Flash::set('error', 'This order has a cancellation request awaiting a decision — approve or reject it instead of marking the order lost.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        $lc = \App\Repositories\OrderLcDetailRepository::find($orderId);
+        if (\App\Services\PartPaymentService::orderReceivedTotal($orderId) > 0 || ($lc !== null && !empty($lc['lc_confirmed_at']))) {
+            Flash::set('error', 'The buyer has already paid on this order, so it cannot be marked lost. Use Request Cancellation: a second person approves it and the refund is recorded.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         $reason = trim((string) ($_POST['reason'] ?? ''));
         if ($error = ReasonValidator::check($reason)) {
             Flash::set('error', $error);
@@ -4740,17 +4787,50 @@ final class OrderController
             return;
         }
 
+        // QA batch 2 (ORD-01): the request may be weeks old — only an order that is still running
+        // (active or disputed) can be cancelled. A shipped, settled or lost order keeps its status.
+        $order = OrderRepository::find($orderId);
+        if (!$order || !in_array($order['status'], ['active', 'disputed'], true)) {
+            Flash::set('error', 'This order is now "' . ($order['status'] ?? 'missing') . '", so the cancellation can no longer be approved. Reject the request instead.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+
+        // QA batch 2 (ORD-03, rule D-212): a refund is "completed" only through Record refund paid, with the
+        // date it left the bank and its bank reference. Approval records "pending" or "not applicable".
         $refundStatus = (string) ($_POST['refund_status'] ?? 'not_applicable');
-        if (!in_array($refundStatus, ['not_applicable', 'pending', 'completed'], true)) {
+        if ($refundStatus === 'completed') {
+            Flash::set('error', 'Approve with "Refund pending", then record the refund with the date it was paid and its bank reference.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
+        if (!in_array($refundStatus, ['not_applicable', 'pending'], true)) {
             $refundStatus = 'not_applicable';
         }
         $refundAmountRaw = trim((string) ($_POST['refund_amount'] ?? ''));
-        $refundAmount = $refundAmountRaw !== '' && is_numeric($refundAmountRaw) ? (float) $refundAmountRaw : null;
+        $refundAmount = null;
+        if ($refundAmountRaw !== '') {
+            $received = \App\Services\PartPaymentService::orderReceivedTotal($orderId);
+            if (!is_numeric($refundAmountRaw) || (float) $refundAmountRaw <= 0) {
+                Flash::set('error', 'Enter the refund amount as a number above zero, or leave it empty.');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            if (round((float) $refundAmountRaw, 2) > $received) {
+                Flash::set('error', 'The refund (' . number_format((float) $refundAmountRaw, 2) . ') is more than the buyer has paid on this order (' . number_format($received, 2) . ').');
+                header("Location: /orders/{$orderId}");
+                return;
+            }
+            $refundAmount = round((float) $refundAmountRaw, 2);
+        }
         $decisionNotes = trim((string) ($_POST['decision_notes'] ?? '')) ?: null;
 
+        if (!OrderRepository::cancel($orderId)) {
+            Flash::set('error', 'The order changed while you were deciding, so it was not cancelled. Reload and check it.');
+            header("Location: /orders/{$orderId}");
+            return;
+        }
         OrderCancellationRepository::approve($cancellationId, (int) $user['id'], $decisionNotes, $refundAmount, $refundStatus);
-        $order = OrderRepository::find($orderId);
-        OrderRepository::cancel($orderId);
         // External QA report N-07: the requester was never told what
         // happened to their own request — only the catch-all notification
         // email below fired.

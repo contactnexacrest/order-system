@@ -11,7 +11,7 @@ $o = static fn (string $k): string => htmlspecialchars((string) ($old[$k] ?? '')
   <form method="post" action="/import" class="field-grid" data-testid="imp-create-form">
     <?= Csrf::field() ?>
     <label>Supplier *<input type="text" name="supplier_name" required maxlength="255" value="<?= $o('supplier_name') ?>" placeholder="e.g. Xiamen Stone Industries Co., Ltd."></label>
-    <label>Country *<input type="text" name="supplier_country" required maxlength="80" value="<?= $o('supplier_country') ?>" placeholder="e.g. China"></label>
+    <label>Country *<input type="text" name="supplier_country" required maxlength="80" value="<?= $o('supplier_country') ?>" placeholder="e.g. China" pattern="(?!\s*[Ii][Nn][Dd][Ii][Aa]\s*$).*" data-pattern-message="An import comes from a supplier abroad: the country cannot be India."></label>
     <label>Supplier address<textarea name="supplier_address" rows="3" maxlength="1000" placeholder="e.g. No. 8 Shuitou Road, Nan'an, Fujian 362342"><?= $o('supplier_address') ?></textarea></label>
     <label>Currency *
       <select name="currency_code" required>

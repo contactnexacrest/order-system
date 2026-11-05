@@ -10,7 +10,7 @@
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <div class="field-grid">
         <label>Notice Date *
-          <input type="date" name="notice_date" value="{{ today() }}" required>
+          <input type="date" name="notice_date" value="{{ today() }}" max="{{ today() }}" required>
         </label>
         <label>From
           <input type="text" name="from_party" placeholder="e.g. Buyer, via email">

@@ -43,7 +43,8 @@ async function forOrder(orderId) {
  */
 async function hasActiveSendFor(documentId) {
   const row = await db.queryOne(
-    "SELECT 1 AS x FROM email_log WHERE document_id = :document_id AND status IN ('pending_approval', 'approved') LIMIT 1",
+    // QA batch 3 MAIL-9: a row being sent right now ('sending') is in flight too.
+    "SELECT 1 AS x FROM email_log WHERE document_id = :document_id AND status IN ('pending_approval', 'approved', 'sending') LIMIT 1",
     { document_id: documentId }
   );
   return !!row;

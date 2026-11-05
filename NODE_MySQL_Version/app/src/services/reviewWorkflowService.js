@@ -28,6 +28,12 @@ async function assignReviewers(documentId, reviewerIds, assignedByUserId) {
   if (!document) {
     throw new Error(`Document ${documentId} not found`);
   }
+  // QA batch 3 DOC-7: a document already sent to the buyer (or superseded) is
+  // never pulled back into review — an approved, not-yet-sent one may still get
+  // a second look before it goes out.
+  if (['sent', 'superseded'].includes(document.status)) {
+    throw new Error(`Reviewers cannot be assigned to this document — it is already ${document.status}.`);
+  }
 
   // QA-5: validate every requested reviewer up front (all-or-nothing)
   // before inserting any — a partial insert followed by a thrown error
@@ -145,7 +151,8 @@ async function reject(documentReviewId, reviewerUserId, comments) {
   await documentReviewRepository.reject(documentReviewId, comments);
 
   const document = await documentRepository.find(review.document_id);
-  if (document) {
+  // QA batch 3 DOC-7: a sent or superseded document is never pulled back to draft.
+  if (document && !['sent', 'superseded'].includes(document.status)) {
     // "Document returns to creator. New version must be generated and
     // re-submitted." — back to draft; the creator regenerates (a fresh call
     // to documentGenerationService.generate(), a new revision) once
@@ -182,7 +189,8 @@ async function crossVerify(documentId, verifiedByUserId, result, comments) {
  */
 async function finalizeIfFullyApproved(documentId) {
   const document = await documentRepository.find(documentId);
-  if (!document || document.status === 'approved') {
+  // QA batch 3 DOC-7: an approved, sent or superseded document is never re-finalised.
+  if (!document || ['approved', 'sent', 'superseded'].includes(document.status)) {
     return;
   }
 

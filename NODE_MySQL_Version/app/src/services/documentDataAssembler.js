@@ -295,6 +295,9 @@ async function assemble(orderId, documentTypeCode = null) {
       balance_terms_text: balanceTriggerSentence(order.balance_trigger_option || null, order.balance_days != null ? parseInt(order.balance_days, 10) : null, order.balance_trigger_wording || null),
       bank_charges_text: BANK_CHARGES_SENTENCE,
       cleared_funds_text: CLEARED_FUNDS_SENTENCE,
+      // QA batch 3 DOC-4 (owner confirmed twice, 5 Nov 2026): the Buyer PO's payment terms follow the order —
+      // no "0% advance" on an LC/no-advance order, the milestones, and the balance's own wording (no hard-coded "before shipment").
+      buyer_po_payment_terms: buyerPoPaymentTerms(advancePct, balancePct, milestones, order),
       // Owner decision (2026-10-28): an order with no advance (e.g. the
       // Letter of Credit preset) says so on the PI instead of "ADVANCE
       // PAYABLE NOW: 0.00", without the advance sentences.
@@ -1007,6 +1010,23 @@ async function sectionDisplayFlags(resolvedConsignee, resolvedNotifyParty) {
   ];
 }
 
+/**
+ * QA batch 3 DOC-4: the Buyer PO's one-line payment terms (port of PHP
+ * DocumentDataAssembler::buyerPoPaymentTerms) — same facts as the QT/PI
+ * payment block. The freight sentence is added by the template, as before.
+ */
+function buyerPoPaymentTerms(advancePct, balancePct, milestones, order) {
+  const pct = (v) => trimTrailingZeros(Number(v).toFixed(2));
+  const balanceText = balanceTriggerSentence(order.balance_trigger_option || null, order.balance_days != null ? parseInt(order.balance_days, 10) : null, order.balance_trigger_wording || null);
+  const parts = [];
+  if (advancePct > 0) parts.push(`${pct(advancePct)}% advance T/T (Telegraphic Transfer) against Proforma Invoice before production.`);
+  for (const m of milestones) parts.push(`${m.pct}% Payment on FOB Value ${m.due_text}.`);
+  parts.push(advancePct > 0
+    ? `${pct(balancePct)}% balance T/T — ${balanceText}`
+    : `${pct(balancePct)}% Payment on FOB Value${order.payment_method === 'LC' ? ' by Letter of Credit' : ''} — ${balanceText}`);
+  return parts.join(' ');
+}
+
 function formatNumber(value) {
   if (value === null || value === undefined || value === '') {
     return 'To Be Confirmed';
@@ -1039,7 +1059,8 @@ function formatDate(value) {
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  // QA batch 3 DOC-1 (owner confirmed twice, 5 Nov 2026): two-digit day, as PHP's 'd F Y' ("05 November 2026").
+  return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function round2(n) {

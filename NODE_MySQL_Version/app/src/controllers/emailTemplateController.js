@@ -10,7 +10,7 @@ const AVAILABLE_TOKENS = [
   '{buyer_contact_person}', '{buyer_company_name}', '{document_reference}', '{generated_date}',
   '{order_reference}', '{buyer_inquiry_ref}', '{quotation_ref}', '{quotation_valid_until}',
   '{pi_ref}', '{pi_valid_until}', '{oc_ref}', '{company_name}', '{company_email}', '{company_phone}',
-  '{sender_name}', '{sender_title}', '{sender_signature}',
+  '{sender_name}', '{sender_title}', '{sender_signature}', '{payment_request_sentence}',
 ];
 
 /**

@@ -18,7 +18,7 @@
   <h2>Add a rate</h2>
   <form method="post" action="/admin/gst-rates" class="field-grid">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-    <label>HSN starts with<input type="text" name="hsn_prefix" maxlength="8" pattern="[0-9]{2,8}" placeholder="e.g. 6802"></label>
+    <label>HSN starts with<input type="text" name="hsn_prefix" maxlength="8" pattern="[0-9]{2,8}" placeholder="e.g. 6802" data-not-with="category_id" data-not-with-message="Give the HSN prefix or the category, not both." data-required-when="category_id=" data-required-when-message="Give the HSN prefix, or choose a category."></label>
     <label>or Category
       <select name="category_id">
         <option value="">—</option>

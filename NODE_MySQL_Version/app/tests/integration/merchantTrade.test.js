@@ -40,6 +40,19 @@ describe('D-257 Phase 4 — Merchant Trade', () => {
     await db.pool.end();
   });
 
+  // QA batch 2 (ACC-4): the merchant trade desk works both legs — a test role with Procurement Manager's
+  // permissions plus the selling side (a Procurement designation sees neither the sale nor the buyer).
+  async function ensureDeskRole() {
+    await db.execute("INSERT IGNORE INTO roles (name, description) VALUES ('TEST-Merchant Trade Desk', 'Test only: merchant trade desk, both legs')");
+    const desk = Number((await db.queryOne("SELECT id FROM roles WHERE name = 'TEST-Merchant Trade Desk'")).id);
+    await db.execute('DELETE FROM role_permissions WHERE role_id = :r', { r: desk });
+    await db.execute(`INSERT INTO role_permissions (role_id, permission_id, is_enabled)
+      SELECT :r, rp.permission_id, rp.is_enabled FROM role_permissions rp JOIN roles r ON r.id = rp.role_id WHERE r.name = 'Procurement Manager'`, { r: desk });
+    await db.execute(`INSERT INTO role_permissions (role_id, permission_id, is_enabled)
+      SELECT :r, p.id, 1 FROM permissions p WHERE p.permission_key IN ('view_selling_prices', 'view_buyer_payments')
+        AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = :r2 AND x.permission_id = p.id)`, { r: desk, r2: desk });
+  }
+
   async function createUser(roleName, divisionId) {
     const role = await db.queryOne('SELECT id FROM roles WHERE name = :name', { name: roleName });
     const email = `jest-mtt-${Math.random().toString(16).slice(2, 10)}@nexacrest.test`;
@@ -90,7 +103,8 @@ describe('D-257 Phase 4 — Merchant Trade', () => {
 
   beforeEach(async () => {
     md = await createUser('Managing Director', null);
-    mttStaff = await createUser('Procurement Manager', MTT);
+    await ensureDeskRole();
+    mttStaff = await createUser('TEST-Merchant Trade Desk', MTT);
     expStaff = await createUser('Procurement Manager', 1);
     await db.execute("UPDATE division_modules SET is_enabled = CASE WHEN division_id = 3 THEN 1 ELSE 0 END WHERE module_key = 'merchant_trade'");
   });

@@ -241,7 +241,53 @@ async function deleteDraft(id) {
   });
 }
 
+/**
+ * QA batch 3 DOC-2 (port of PHP DocumentRepository::storeRenderContext):
+ * the full render context a revision was generated with, so the FINAL and
+ * SUPERSEDED copies are re-rendered from what was actually reviewed / sent.
+ */
+async function storeRenderContext(documentId, context) {
+  let json;
+  try {
+    json = JSON.stringify(context);
+  } catch (e) {
+    return;
+  }
+  await db.execute('UPDATE documents SET render_context_json = :c WHERE id = :id', { c: json, id: documentId });
+}
+
+async function renderContext(documentId) {
+  const row = await db.queryOne('SELECT render_context_json FROM documents WHERE id = :id', { id: documentId });
+  const json = row ? row.render_context_json : null;
+  if (!json) return null;
+  try {
+    const context = JSON.parse(json);
+    return context && typeof context === 'object' ? context : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** QA batch 3 DOC-6: every revision of an order's document type, newest first (superseded ones left out), as find() rows. */
+async function liveRevisionsForOrderAndTypeCode(orderId, documentTypeCode) {
+  const rows = await db.query(
+    `SELECT d.id FROM documents d
+     JOIN document_types dt ON dt.id = d.document_type_id
+     WHERE d.order_id = :order_id AND dt.code = :code AND d.status <> 'superseded'
+     ORDER BY d.revision_number DESC`,
+    { order_id: orderId, code: documentTypeCode }
+  );
+  const out = [];
+  for (const r of rows) {
+    const d = await find(r.id);
+    if (d) out.push(d);
+  }
+  return out;
+}
+
 module.exports = {
+  liveRevisionsForOrderAndTypeCode,
+  storeRenderContext, renderContext,
   customerFacingForOrder, forOrder, find, findLatestForOrderAndType, findLatestForOrderAndTypeCode,
   allForOrderAndType, countPriorSent, markApproved, linkFiles, markSuperseded, markInReview, markDraft, markSent, create, deleteDraft,
   flagDrift, setDocumentDate, printedDate,

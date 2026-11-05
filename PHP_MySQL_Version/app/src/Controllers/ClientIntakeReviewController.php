@@ -26,8 +26,25 @@ use App\Services\UiTemplateService;
  */
 final class ClientIntakeReviewController
 {
+    /**
+     * QA batch 2 (ORD-05): the public enquiry form is Export's (foreign buyers) — its queue is reviewed only by
+     * people working in Export (or "All divisions"). False after answering 403.
+     */
+    private static function exportScope(): bool
+    {
+        if (\App\Services\DivisionService::allows(\App\Services\DivisionService::EXPORT_ID)) {
+            return true;
+        }
+        http_response_code(403);
+        echo 'The quotation enquiry queue belongs to the Export division.';
+        return false;
+    }
+
     public function index(array $params): void
     {
+        if (!self::exportScope()) {
+            return;
+        }
         $actor = AuthService::currentUser();
         if (UiTemplateService::showsBoard($actor['ui_template_preference_id'] ?? null)) {
             $this->indexKanban();
@@ -59,6 +76,9 @@ final class ClientIntakeReviewController
 
     public function accept(array $params): void
     {
+        if (!self::exportScope()) {
+            return;
+        }
         $user = AuthService::currentUser();
         $id = (int) ($params['id'] ?? 0);
         $submission = ClientIntakeRepository::find($id);
@@ -139,6 +159,9 @@ final class ClientIntakeReviewController
      */
     public function resendLink(array $params): void
     {
+        if (!self::exportScope()) {
+            return;
+        }
         $user = AuthService::currentUser();
         $id = (int) ($params['id'] ?? 0);
         $submission = ClientIntakeRepository::find($id);
@@ -158,6 +181,9 @@ final class ClientIntakeReviewController
 
     public function reject(array $params): void
     {
+        if (!self::exportScope()) {
+            return;
+        }
         $user = AuthService::currentUser();
         $id = (int) ($params['id'] ?? 0);
         $reason = trim((string) ($_POST['reason'] ?? ''));
@@ -168,11 +194,14 @@ final class ClientIntakeReviewController
             return;
         }
 
+        // QA batch 2 (ORD-13): only a pending submission can be rejected — never one already accepted or rejected.
         $submission = ClientIntakeRepository::find($id);
-        ClientIntakeRepository::markRejected($id, (int) $user['id'], $reason);
-        if ($submission !== null && $submission['status'] === 'pending') {
-            \App\Services\AssociateIntakeService::onRejected($submission, $reason, (int) $user['id']);
+        if ($submission === null || $submission['status'] !== 'pending' || !ClientIntakeRepository::markRejected($id, (int) $user['id'], $reason)) {
+            Flash::set('error', 'Submission not found, or already resolved.');
+            header('Location: /client-intake');
+            return;
         }
+        \App\Services\AssociateIntakeService::onRejected($submission, $reason, (int) $user['id']);
         // External QA report N-08: this action never reached the audit
         // log, so it never notified anyone either.
         AuditLogRepository::log((int) $user['id'], 'CLIENT_INTAKE_REJECTED', 'client_intake_submissions', $id, null, 'pending', 'rejected', $reason);

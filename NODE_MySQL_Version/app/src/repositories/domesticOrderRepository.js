@@ -42,8 +42,8 @@ async function setGstRateActive(id, active, userId) {
   await db.execute('UPDATE gst_rates SET is_active = :a, updated_by = :u WHERE id = :id', { a: active ? 1 : 0, u: userId, id });
 }
 
-async function find(orderId) {
-  return db.queryOne('SELECT * FROM domestic_orders WHERE order_id = :o', { o: orderId });
+async function find(orderId, executor = db) {
+  return executor.queryOne('SELECT * FROM domestic_orders WHERE order_id = :o', { o: orderId });
 }
 
 async function insert(orderId, row, userId, executor = db) {
@@ -93,16 +93,16 @@ async function removeLine(orderId, lineId) {
   return r.affectedRows === 1;
 }
 
-async function payments(orderId) {
-  return db.query(
+async function payments(orderId, executor = db) {
+  return executor.query(
     `SELECT p.*, u.name AS recorded_by_name FROM domestic_payments p LEFT JOIN users u ON u.id = p.recorded_by
       WHERE p.order_id = :o ORDER BY p.received_on, p.id`,
     { o: orderId }
   );
 }
 
-async function addPayment(orderId, receivedOn, amount, bankReference, description, note, userId) {
-  const r = await db.execute(
+async function addPayment(orderId, receivedOn, amount, bankReference, description, note, userId, executor = db) {
+  const r = await executor.execute(
     `INSERT INTO domestic_payments (order_id, received_on, amount_inr, bank_reference, description, note, recorded_by)
      VALUES (:o, :d, :a, :b, :desc, :n, :u)`,
     { o: orderId, d: receivedOn, a: amount, b: bankReference, desc: description, n: note, u: userId }
@@ -110,8 +110,8 @@ async function addPayment(orderId, receivedOn, amount, bankReference, descriptio
   return r.insertId;
 }
 
-async function bankReferenceUsed(bankReference) {
-  return !!(await db.queryOne('SELECT 1 AS x FROM domestic_payments WHERE bank_reference = :b LIMIT 1', { b: bankReference }));
+async function bankReferenceUsed(bankReference, executor = db) {
+  return !!(await executor.queryOne('SELECT 1 AS x FROM domestic_payments WHERE bank_reference = :b LIMIT 1', { b: bankReference }));
 }
 
 async function documents(orderId) {

@@ -148,11 +148,9 @@ async function uploadBuyerPo(req, order) {
  */
 async function issuedBuyerDocument(orderId, typeCode) {
   const stage = { BUYERPO: 2, PI: 3, OC: 4 }[typeCode];
-  const latest = stage ? await documentRepository.findLatestForOrderAndTypeCode(orderId, typeCode) : null;
-  if (!latest || !latest.pdf_file_id || (await documentGenerationService.stageDocumentBlockedBy(orderId, stage)).length > 0) {
-    return null;
-  }
-  const document = await documentRepository.find(latest.id);
+  // QA batch 3 DOC-6: the newest revision that is issued — a newer draft or one
+  // in review no longer hides the valid copy the buyer already has.
+  const document = stage ? await documentGenerationService.latestReleasedDocument(orderId, typeCode) : null;
   if (!document || !['approved', 'sent'].includes(document.status)
     || document.document_type_category !== 'customer_facing'
     || Number(document.document_type_never_shown_to_buyer)) {

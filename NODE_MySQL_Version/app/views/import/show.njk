@@ -30,7 +30,7 @@
     <form method="post" action="/import/{{ id }}/po" class="field-grid">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <label>Supplier *<input type="text" name="supplier_name" required maxlength="255" value="{{ s.supplier_name }}" placeholder="e.g. Xiamen Stone Industries Co., Ltd."></label>
-      <label>Country *<input type="text" name="supplier_country" required maxlength="80" value="{{ s.supplier_country }}" placeholder="e.g. China"></label>
+      <label>Country *<input type="text" name="supplier_country" required maxlength="80" value="{{ s.supplier_country }}" placeholder="e.g. China" pattern="(?!\s*[Ii][Nn][Dd][Ii][Aa]\s*$).*" data-pattern-message="An import comes from a supplier abroad: the country cannot be India."></label>
       <label>Supplier address<textarea name="supplier_address" rows="2" maxlength="1000" placeholder="e.g. No. 8 Shuitou Road, Nan'an, Fujian 362342">{{ s.supplier_address }}</textarea></label>
       <label>Currency *<select name="currency_code" required><option value="">Choose…</option>{% for c in currencies %}<option value="{{ c }}" {{ 'selected' if cur == c else '' }}>{{ c }}</option>{% endfor %}</select></label>
       <label>Incoterm<select name="incoterm"><option value="">—</option>{% for t in incoterms %}<option value="{{ t }}" {{ 'selected' if s.incoterm == t else '' }}>{{ t }}</option>{% endfor %}</select></label>
@@ -108,7 +108,7 @@
     <form method="post" action="/import/{{ id }}/bl" class="field-grid">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <label>BL number *<input type="text" name="bl_no" required maxlength="40" value="{{ s.bl_no }}" placeholder="e.g. COSU6234567890"></label>
-      <label>BL date *<input type="date" name="bl_date" required value="{{ s.bl_date }}"></label>
+      <label>BL date *<input type="date" name="bl_date" required min="{{ s.po_date }}" value="{{ s.bl_date }}"></label>
       <label>Vessel<input type="text" name="vessel" maxlength="100" value="{{ s.vessel }}" placeholder="e.g. COSCO Shipping Leo / 041W"></label>
       <label>Port of loading<input type="text" name="port_of_loading" maxlength="100" value="{{ s.port_of_loading }}" placeholder="e.g. Xiamen, China"></label>
       <p><button type="submit" class="btn-secondary">Save BL</button></p>
@@ -123,11 +123,11 @@
     <form method="post" action="/import/{{ id }}/clearance" class="field-grid">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <label>Bill of entry number *<input type="text" name="boe_no" required minlength="6" maxlength="8" pattern="[0-9]{6,8}" value="{{ s.boe_no }}" placeholder="e.g. 4567891"></label>
-      <label>Bill of entry date *<input type="date" name="boe_date" required value="{{ s.boe_date }}"></label>
+      <label>Bill of entry date *<input type="date" name="boe_date" required min="{{ s.bl_date }}" value="{{ s.boe_date }}"></label>
       <label>Port code *<input type="text" name="port_code" required maxlength="6" pattern="[Ii][Nn][A-Za-z0-9]{4}" value="{{ s.port_code }}" placeholder="e.g. INNSA1"></label>
       <label>Customs agent (CHA) *<input type="text" name="cha_name" required maxlength="150" value="{{ chaDefault }}" placeholder="e.g. Speedways Clearing Agency"></label>
       <label>Customs exchange rate (₹ per {{ cur }}) *<input type="number" name="customs_fx_rate" required min="0.0001" max="999.9999" step="0.0001" value="{{ s.customs_fx_rate }}" placeholder="e.g. 84.6500"></label>
-      <label>Clearance date *<input type="date" name="clearance_date" required max="{{ today }}" value="{{ s.clearance_date }}"></label>
+      <label>Clearance date *<input type="date" name="clearance_date" required max="{{ today }}" value="{{ s.clearance_date }}" data-not-before="[name=boe_date]" data-not-before-message="The goods clear on or after the bill of entry date."></label>
       <label>Freight ₹<input type="number" name="freight_inr" min="0" step="0.01" value="{{ s.freight_inr }}" placeholder="e.g. 85000.00"></label>
       <label>Insurance ₹<input type="number" name="insurance_inr" min="0" step="0.01" value="{{ s.insurance_inr }}" placeholder="e.g. 4200.00"></label>
       <label>CHA charges ₹<input type="number" name="cha_inr" min="0" step="0.01" value="{{ s.cha_inr }}" placeholder="e.g. 18000.00"></label>
@@ -143,7 +143,7 @@
       <p data-testid="imp-igst">IGST paid on import ₹{{ igstFmt }}: {% if s.igst_credit_on %}taken as input credit on {{ s.igst_credit_on }}.{% else %}input credit not taken yet.{% endif %}</p>
       {% if canEdit and (stage == 'cleared' or stage == 'received') and not s.igst_credit_on %}
       <form method="post" action="/import/{{ id }}/igst-credit" class="field-grid"><input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        <label>IGST credit taken on *<input type="date" name="igst_credit_on" required max="{{ today }}"></label>
+        <label>IGST credit taken on *<input type="date" name="igst_credit_on" required min="{{ s.boe_date }}" max="{{ today }}"></label>
         <p><button type="submit" class="btn-secondary">Record IGST credit</button></p>
       </form>
       {% endif %}

@@ -84,7 +84,7 @@ final class PaymentTermsWordingTest extends DbTestCase
     public function testWordQuotationConfirmationAndDebitNoteCountBuyerPaymentsInCalendarDays(): void
     {
         $orderId = $this->order();
-        foreach (['QT' => 'Payment required within 3 Calendar Days of Freight Debit Note date.', 'OC' => 'Payment required within 3 Calendar Days of the Debit Note date.', 'FDN' => 'Within 3 Calendar Days of this Debit Note date — by'] as $type => $expected) {
+        foreach (['QT' => 'Payment required within 3 Calendar Days of Debit Note date.' /* QA batch 3 DOC-3: the PDF's wording */, 'OC' => 'Payment required within 3 Calendar Days of the Debit Note date.', 'FDN' => 'Within 3 Calendar Days of this Debit Note date — by'] as $type => $expected) {
             [, $word] = $this->generate($orderId, $type);
             self::assertStringContainsString($expected, $word, $type);
             self::assertStringNotContainsString('3 working days', $word, $type);

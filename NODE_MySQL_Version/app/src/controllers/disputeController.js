@@ -137,6 +137,23 @@ async function create(req, res) {
     res.redirect(`/orders/${orderId}/disputes`);
     return;
   }
+  // QA batch 2 (ORD-11): a real notice date, not in the future (it starts the contractual response clock),
+  // and an assignee who is an active user.
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(noticeDate);
+  const realDate = dm && new Date(Date.UTC(+dm[1], +dm[2] - 1, +dm[3])).toISOString().slice(0, 10) === noticeDate;
+  if (!realDate || noticeDate > todayYmd()) {
+    flash.set(req, 'error', 'Notice date: enter the date the notice was received (YYYY-MM-DD, today or earlier).');
+    res.redirect(`/orders/${orderId}/disputes`);
+    return;
+  }
+  if (assignedTo !== null) {
+    const assignee = Number.isInteger(assignedTo) ? await userRepository.findById(assignedTo) : null;
+    if (!assignee || Number(assignee.is_active) !== 1) {
+      flash.set(req, 'error', 'Assign the dispute to an active user, or leave it unassigned.');
+      res.redirect(`/orders/${orderId}/disputes`);
+      return;
+    }
+  }
 
   // The seeded Dispute Resolution clause promises "ten (10) WORKING days"
   // on every QT/PI/OC/BUYERPO — calendar-day arithmetic here would

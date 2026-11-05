@@ -283,7 +283,7 @@ final class DocxDocumentBuilder
         ));
     }
 
-    private static function paymentTermsBlock(Section $section, array $context, bool $noAdvanceWording = false, bool $withMilestones = false): void
+    private static function paymentTermsBlock(Section $section, array $context, bool $noAdvanceWording = false, bool $withMilestones = false, string $advanceAgainst = 'Proforma Invoice'): void
     {
         $financial = $context['financial'] ?? [];
         $order = $context['order'] ?? [];
@@ -312,7 +312,8 @@ final class DocxDocumentBuilder
             return;
         }
         DocxComponents::addRichParagraph($section, [
-            ['• ', []], [self::g($financial, 'advance_pct', '') . '% advance T/T (Telegraphic Transfer) on FOB Value against Proforma Invoice. ', []], self::starRun(),
+            // QA batch 3 DOC-3 (owner confirmed twice): the PDF's D-224 wording.
+            ['• ', []], [self::g($financial, 'advance_pct', '') . '% Advance Payment on FOB Value against ' . $advanceAgainst . '. ', []], self::starRun(),
         ]);
         DocxComponents::addRichParagraph($section, [
             ['   ' . self::g($financial, 'advance_pct', '') . '% Advance Amount:  ' . $currency . ' ' . self::g($financial, 'advance_amount', ''), []], self::starRun(),
@@ -323,7 +324,7 @@ final class DocxDocumentBuilder
         $balanceText = self::g($financial, 'balance_terms_text', '');
         $milestoneLines();
         DocxComponents::addRichParagraph($section, [
-            ['• ', []], [self::g($financial, 'balance_pct', '') . '% balance T/T on FOB Value ' . $balanceText . ' ', []], self::starRun(),
+            ['• ', []], [self::g($financial, 'balance_pct', '') . '% Balance Payment on FOB Value ' . $balanceText . ' ', []], self::starRun(),
         ]);
         DocxComponents::addRichParagraph($section, [
             ['   ' . self::g($financial, 'balance_pct', '') . '% Balance Amount:  ' . $currency . ' ' . self::g($financial, 'balance_amount', ''), []], self::starRun(),
@@ -337,7 +338,7 @@ final class DocxDocumentBuilder
         if (empty($order['is_fob'])) {
             DocxComponents::addRichParagraph($section, [
                 [!empty($order['is_cif']) ? '• Freight & Insurance (CFR/CIF orders only): ' : '• Freight (CFR order — buyer arranges insurance): ', []],
-                ['Actual confirmed amounts invoiced separately by Freight Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Freight Debit Note date.', ['color' => '333333']],
+                ['Actual confirmed amounts invoiced separately by Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Debit Note date.', ['color' => '333333']],
             ]);
         }
         DocxComponents::addPlainParagraph($section, '   Currency: ' . $currency);
@@ -360,7 +361,7 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('QT'), self::g($order, 'incoterm_code', null) ? (self::g($order, 'incoterm_code') . ' ' . strtoupper((string) self::g($order, 'port_of_loading', ''))) : null);
         DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'QUOTATION NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'QUOTATION NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($order, 'quotation_date') !== '—' ? self::g($order, 'quotation_date') : self::g($meta, 'generated_date', '')],
             ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
         ]);
@@ -414,7 +415,8 @@ final class DocxDocumentBuilder
         ]);
 
         DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
-        self::paymentTermsBlock($section, $context, true);
+        // QA batch 3 DOC-4: the QT lists the order's milestones too, as the PDF.
+        self::paymentTermsBlock($section, $context, true, true);
 
         DocxComponents::addSectionTitle($section, '6. DOCUMENTS TO BE PROVIDED');
         self::documentsProvidedParagraphs($section, 'Upon shipment, the following documents will be provided:', [
@@ -460,7 +462,7 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('PI'), self::g($order, 'incoterm_code', null) ? (self::g($order, 'incoterm_code') . ' ' . strtoupper((string) self::g($order, 'port_of_loading', ''))) : null);
         DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'PI NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'PI NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'PI DATE *', 'value' => self::g($order, 'pi_date') !== '—' ? self::g($order, 'pi_date') : self::g($meta, 'generated_date', '')],
             ['label' => 'QUOTATION REF *', 'value' => self::g($order, 'quotation_ref', '—')],
             ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
@@ -556,7 +558,7 @@ final class DocxDocumentBuilder
         ]);
 
         DocxComponents::addSectionTitle($section, '5. PAYMENT TERMS');
-        self::paymentTermsBlock($section, $context, true, true);
+        self::paymentTermsBlock($section, $context, true, true, 'this document');
         if (!empty($financial['has_advance'])) {
             DocxComponents::addPlainParagraph($section, '• ' . self::g($financial, 'cleared_funds_text', ''));
         }
@@ -619,7 +621,7 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('OC'), null); // OC's header carries no incoterm chip
         DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'OC NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'OC NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
             ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
             ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
@@ -734,7 +736,7 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('ANNEXA'), null);
         DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'ANNEXURE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'ANNEXURE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'ANNEXURE TO', 'value' => self::g($order, 'quotation_ref') !== '—' ? self::g($order, 'quotation_ref') : (self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : self::g($order, 'buyer_inquiry_ref'))],
             ['label' => 'ORDER REF', 'value' => self::g($order, 'order_reference', '')],
             ['label' => 'DATE', 'value' => self::g($meta, 'generated_date', '')],
@@ -898,7 +900,7 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('BUYERPO'), 'ORDER ACCEPTANCE — Issued to Buyer for Signature and Return');
         DocxComponents::addPlainParagraph($section, 'This Purchase Order is prepared by NexaCrest and sent to the buyer for signature and return. Buyer fills Column B of Section 4 only. All other fields are pre-filled by NexaCrest.', ['italic' => true, 'color' => DocxComponents::MUTED, 'size' => 9]);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'PO NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'PO NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
             ['label' => 'QT REFERENCE *', 'value' => self::g($order, 'quotation_ref', '—')],
             ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
@@ -927,21 +929,21 @@ final class DocxDocumentBuilder
         ]);
 
         $productList = implode('; ', array_map(static fn(array $p) => $p['description'] ?? '', $products));
-        $first = $products[0] ?? [];
         DocxComponents::addSectionTitle($section, '3. ORDER DETAILS  (Pre-filled from Quotation — buyer to confirm)');
         DocxComponents::addKvTable($section, [
             ['label' => 'Against Quotation No. *', 'value' => self::g($order, 'quotation_ref', '—') . ' (fixed)'],
             ['label' => 'Quotation Date *', 'value' => self::g($order, 'quotation_date', '—') . ' (fixed)'],
             ['label' => 'Product Description *', 'value' => $productList],
-            ['label' => 'Quantity *', 'value' => $first['quantity'] ?? 'To Be Confirmed'],
-            ['label' => 'Unit *', 'value' => $first['unit'] ?? 'To Be Confirmed'],
-            ['label' => "Unit Price ({$currency}) *", 'value' => $first['unit_price'] ?? 'To Be Confirmed'],
+            // QA batch 3 DOC-4 (owner confirmed twice): every line, in the same order as the product list — as the PDF.
+            ['label' => 'Quantity *', 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['quantity'] ?? ''), $products)) : 'To Be Confirmed'],
+            ['label' => 'Unit *', 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['unit'] ?? ''), $products)) : 'To Be Confirmed'],
+            ['label' => "Unit Price ({$currency}) *", 'value' => $products !== [] ? implode('; ', array_map(static fn (array $p): string => (string) ($p['unit_price'] ?? ''), $products)) : 'To Be Confirmed'],
             ['label' => "Total FOB Value ({$currency}) *", 'value' => self::g($financial, 'fob_value')],
             ['label' => 'Incoterm', 'value' => self::g($order, 'incoterm_label')],
             ['label' => 'Port of Loading', 'value' => self::g($order, 'port_of_loading')],
             ['label' => 'Port of Discharge *', 'value' => self::g($order, 'port_of_discharge')],
             ['label' => 'Certificate of Origin *', 'value' => self::g($order, 'coo_type')],
-            ['label' => 'Payment Terms', 'value' => self::g($financial, 'advance_pct') . '% advance T/T (Telegraphic Transfer) against Proforma Invoice before production. ' . self::g($financial, 'balance_pct') . '% balance T/T before shipment — ' . self::g($financial, 'balance_terms_text') . self::freightTermsSentence((string) self::g($order, 'incoterm_code', ''))],
+            ['label' => 'Payment Terms', 'value' => self::g($financial, 'buyer_po_payment_terms') . self::freightTermsSentence((string) self::g($order, 'incoterm_code', ''))],
         ]);
 
         DocxComponents::addSectionTitle($section, '4. BUYER ACCEPTANCE  (Buyer fills this section, signs and returns)');
@@ -968,7 +970,11 @@ final class DocxDocumentBuilder
         DocxComponents::addColorBox($section, 'E8F1FB', DocxComponents::BLUE_TEXT, function (AbstractContainer $cell) use ($context, $financial) {
             $run = $cell->addTextRun();
             $run->addText('By signing above, the buyer confirms acceptance of all order details, specifications and payment terms stated in this Purchase Order. ', ['color' => DocxComponents::BLUE_TEXT]);
-            $run->addText('This signed Purchase Order authorises NexaCrest to issue the Proforma Invoice and commence production upon receipt of the ' . self::g($financial, 'advance_pct') . '% advance payment. ', ['bold' => true, 'color' => DocxComponents::BLUE_TEXT]);
+            // QA batch 3 DOC-4: no "0% advance" on an LC / no-advance order — as the PDF.
+            $productionTrigger = !empty($financial['has_advance'])
+                ? 'upon receipt of the ' . self::g($financial, 'advance_pct') . '% advance payment.'
+                : ((($financial['payment_method'] ?? null) === 'LC') ? 'upon receipt of the Letter of Credit.' : 'as per the payment terms above.');
+            $run->addText('This signed Purchase Order authorises NexaCrest to issue the Proforma Invoice and commence production ' . $productionTrigger . ' ', ['bold' => true, 'color' => DocxComponents::BLUE_TEXT]);
             $run->addText('The following clauses are legally binding on both parties:', ['color' => DocxComponents::BLACK]);
             foreach (($context['terms'] ?? []) as $clause) {
                 $parts = explode(': ', (string) $clause, 2);
@@ -1014,7 +1020,7 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('SUPPO'), 'Issued to Supplier for Signature and Return');
         DocxComponents::addPlainParagraph($section, 'This Purchase Order is issued by NexaCrest International Private Limited to the named supplier for material procurement. Supplier fills Section 7 only. All other sections are issued by NexaCrest.', ['italic' => true, 'color' => DocxComponents::MUTED, 'size' => 9]);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'PO NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'PO NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
             ['label' => 'BUYER ORDER REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
             ['label' => 'EXPORT ORDER REF *', 'value' => self::g($order, 'pi_ref') !== '—' ? self::g($order, 'pi_ref') : self::g($order, 'quotation_ref', '—')],
@@ -1157,7 +1163,7 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('FDN'), 'FREIGHT COST RECOVERY');
         DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'DEBIT NOTE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'DEBIT NOTE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
             ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
             ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
@@ -1244,7 +1250,7 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('PL'), null);
         DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'PL NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'PL NUMBER *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
             ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
             ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
@@ -1361,7 +1367,7 @@ final class DocxDocumentBuilder
             $run->addText('All details must match the Commercial Invoice and Packing List exactly. Any mismatch on the issued BL is expensive and time-consuming to correct — amendments after BL issuance attract charges and delays.', ['italic' => true, 'color' => DocxComponents::BLUE_TEXT]);
         }, 0);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'BL INSTRUCTION NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'BL INSTRUCTION NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
             ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
             ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
@@ -1489,7 +1495,7 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('CI'), self::g($order, 'incoterm_code', null) ? (self::g($order, 'incoterm_code') . ' ' . strtoupper((string) self::g($order, 'port_of_loading', ''))) : null);
         DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'INVOICE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'INVOICE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
             ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
             ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],
@@ -1644,7 +1650,7 @@ final class DocxDocumentBuilder
         DocxComponents::addHeader($section, $context, self::titleFor('ESI'), null);
         DocxComponents::addMandatoryNote($section);
         DocxComponents::addMetaBar($section, [
-            ['label' => 'INVOICE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'revision_label', '')],
+            ['label' => 'INVOICE NO. *', 'value' => self::g($meta, 'document_reference', '') . ' ' . self::g($meta, 'client_revision_label', '')],
             ['label' => 'DATE *', 'value' => self::g($meta, 'generated_date', '')],
             ['label' => 'PI REFERENCE *', 'value' => self::g($order, 'pi_ref', '—')],
             ['label' => 'BUYER INQUIRY REF *', 'value' => self::g($order, 'buyer_inquiry_ref', '')],

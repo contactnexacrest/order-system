@@ -32,7 +32,8 @@ final class MailSenderService
         // through, so it can never be bypassed by a future transport added
         // below Zoho/SMTP the way a per-transport check could be.
         if (!$isSecurityEmail && CompanySettingsRepository::get('mail_sending_enabled') === '0') {
-            error_log("[EMAIL NOT SENT — sending disabled by admin (mail_sending_enabled=0)] To: {$to} | Subject: {$subject}");
+            // QA batch 3 MAIL-2: the body is logged too (as the no-SMTP fallback does), so staff can send it themselves.
+            error_log("[EMAIL NOT SENT — sending disabled by admin (mail_sending_enabled=0)] To: {$to} | Subject: {$subject} | Body: {$body}");
             return false;
         }
 

@@ -40,6 +40,20 @@ final class MerchantTradeController
     }
 
     /** The deal behind /merchant/{id}/…, or null after answering 404. */
+    /**
+     * QA batch 2 (ACC-4): what of the selling side this person may see — the sale prices and margin
+     * (view_selling_prices), the buyer's payments (view_buyer_payments) and the buyer's name (not Procurement).
+     * @return array{selling:bool, buyer_payments:bool, client:bool}
+     */
+    private static function money(): array
+    {
+        return [
+            'selling' => \App\Services\MoneyVisibility::can(\App\Services\MoneyVisibility::SELLING),
+            'buyer_payments' => \App\Services\MoneyVisibility::can(\App\Services\MoneyVisibility::BUYER_PAYMENTS),
+            'client' => \App\Services\MoneyVisibility::seesClient(),
+        ];
+    }
+
     private static function deal(array $params): ?array
     {
         $d = MerchantTradeRepository::find((int) ($params['id'] ?? 0));
@@ -85,6 +99,7 @@ final class MerchantTradeController
             'kanbanUser' => UiTemplateService::resolve($pref !== null ? (int) $pref : null) === 'kanban',
             'active' => MerchantTradeService::isActive(),
             'canEdit' => self::can('manage_purchasing'),
+            'money' => self::money(),
         ], 'layout/base');
     }
 
@@ -126,6 +141,7 @@ final class MerchantTradeController
             'canEdit' => self::can('manage_purchasing'),
             'canPay' => self::can('manage_payments'),
             'canZoho' => self::can('ca_module_manage') && ZohoBooksService::isEnabled(),
+            'money' => self::money(),
         ], 'layout/base');
     }
 
@@ -139,11 +155,21 @@ final class MerchantTradeController
 
     public function saveHeader(array $params): void
     {
+        // QA batch 2 (ACC-4): the deal header carries the buyer and the sale terms.
+        if (!self::money()['client'] || !self::money()['selling']) {
+            $this->act($params, static fn (int $id): ?string => 'The deal carries the buyer and the sale terms, which your department does not see.', '', 'mtt-deal');
+            return;
+        }
         $this->act($params, static fn (int $id): ?string => MerchantTradeService::saveHeader($id, $_POST, (int) self::user()['id']), 'Deal saved.', 'mtt-deal');
     }
 
     public function addLine(array $params): void
     {
+        // QA batch 2 (ACC-4): a line carries its sell price.
+        if (!self::money()['selling']) {
+            $this->act($params, static fn (int $id): ?string => 'A line carries its sell price, which your department does not see.', '', 'mtt-lines');
+            return;
+        }
         $this->act($params, static fn (int $id): ?string => MerchantTradeService::addLine($id, $_POST, (int) self::user()['id']), 'Line added.', 'mtt-lines');
     }
 
@@ -196,8 +222,15 @@ final class MerchantTradeController
                 self::done($id, 'Add the goods first.', '', 'mtt-lines');
                 return;
             }
-            MerchantTradeService::markPoGenerated($id, $userId);
+            if (self::can('manage_purchasing')) { // QA batch 2 (ACC-4): only an editor marks the PO generated
+                MerchantTradeService::markPoGenerated($id, $userId);
+            }
         } elseif ($kind === 'invoice') {
+            // QA batch 2 (ACC-4): the sale invoice carries the selling prices and fixes its number (a write).
+            if (!self::money()['selling'] || !self::can('manage_purchasing')) {
+                self::done($id, 'The sale invoice carries selling prices your department does not see.', '', 'mtt-shipment');
+                return;
+            }
             if (($error = MerchantTradeService::fixInvoice($id, $userId)) !== null) {
                 self::done($id, $error, '', 'mtt-shipment');
                 return;
@@ -236,7 +269,7 @@ final class MerchantTradeController
 
     public function reports(array $params): void
     {
-        View::render('merchant/reports', ['rows' => MerchantTradeService::reportRows(), 'settings' => MerchantTradeService::rbiSettings()], 'layout/base');
+        View::render('merchant/reports', ['rows' => MerchantTradeService::reportRows(), 'settings' => MerchantTradeService::rbiSettings(), 'money' => self::money()], 'layout/base');
     }
 
     /** Formatting shared by the views: cents of a currency => "1,234.56". */

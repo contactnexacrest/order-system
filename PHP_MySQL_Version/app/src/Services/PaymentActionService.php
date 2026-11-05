@@ -35,11 +35,8 @@ final class PaymentActionService
     public static function issuedDocument(int $orderId, string $leg): ?array
     {
         $code = self::LEGS[$leg]['doc'] ?? null;
-        $latest = $code !== null ? DocumentRepository::findLatestForOrderAndTypeCode($orderId, $code) : null;
-        if (!$latest || empty($latest['pdf_file_id'])) {
-            return null;
-        }
-        $document = DocumentRepository::find((int) $latest['id']);
+        // QA batch 3 DOC-6: the newest issued revision, not merely the newest row.
+        $document = $code !== null ? DocumentGenerationService::latestReleasedDocument($orderId, $code) : null;
         if (!$document || $document['status'] === 'superseded'
             || $document['document_type_category'] !== 'customer_facing'
             || !empty($document['document_type_never_shown_to_buyer'])

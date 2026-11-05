@@ -78,15 +78,19 @@ async function allVisibleTo(userId, seesAll) {
 }
 
 /** Archived orders only — visible via the separate view_archived_orders permission, never deleted, never dropped from any other listing/report. */
-async function allArchived() {
+async function allArchived(userId = null, permissions = null) {
+  // QA batch 2 (ORD-15): the same visibility rule as every other list — the request's division(s) and,
+  // without view_all_orders, only the orders the person is assigned to.
+  const vis = userId ? require('../services/orderAccessService').visibilitySql(userId, permissions, 'o') : { sql: '', params: {} };
   return db.query(
     `SELECT o.*, sm.stage_name AS current_stage_name,
             u.name AS archived_by_name
      FROM orders o
      LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
      LEFT JOIN users u ON u.id = o.archived_by
-     WHERE o.is_archived = 1${divisionService().sql('o.division_id')}
-     ORDER BY o.archived_at DESC, o.id DESC`
+     WHERE o.is_archived = 1${vis.sql !== '' ? vis.sql : divisionService().sql('o.division_id')}
+     ORDER BY o.archived_at DESC, o.id DESC`,
+    vis.params
   );
 }
 
@@ -770,14 +774,16 @@ async function markLost(orderId, reason, userId) {
  * duplicated onto this table.
  */
 async function cancel(orderId) {
-  await db.execute(
+  // QA batch 2 (ORD-01): only a running order can become cancelled — never a shipped, settled or lost one.
+  const result = await db.execute(
     `UPDATE orders
         SET status = 'cancelled', is_locked = 1,
             buyer_action_token_hash = NULL, buyer_action_token_plain = NULL, buyer_action_token_expires_at = NULL,
             payment_action_token_hash = NULL, payment_action_token_plain = NULL, payment_action_token_expires_at = NULL
-      WHERE id = :id`,
+      WHERE id = :id AND status IN ('active', 'disputed')`,
     { id: orderId }
   );
+  return Number(result && result.affectedRows) === 1;
 }
 
 /**

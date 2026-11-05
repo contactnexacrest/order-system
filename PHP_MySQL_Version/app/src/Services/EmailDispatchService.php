@@ -329,7 +329,7 @@ final class EmailDispatchService
         }
         $document = DocumentRepository::find((int) $emailLogRow['document_id']);
         if (!$document || !$document['pdf_file_id']) {
-            EmailLogRepository::markFailed((int) $emailLogRow['id']);
+            self::failed($emailLogRow);
             return false;
         }
         // Defense in depth (QA-4 P0.4): buildPreview()/requestSend() only
@@ -340,13 +340,16 @@ final class EmailDispatchService
         // or looking at any pending send. Without this re-check here, a
         // stale approved PDF would still go out to the buyer from a send
         // queued before that rejection.
-        if ($document['status'] !== 'approved') {
-            EmailLogRepository::markFailed((int) $emailLogRow['id']);
+        // QA batch 3 MAIL-9: an already-sent document may be sent again (the
+        // preview offers it) — only a document pulled back to draft/review is refused.
+        if (!in_array($document['status'], ['approved', 'sent'], true)) {
+            self::failed($emailLogRow);
             return false;
         }
+        $isResend = $document['status'] === 'sent';
         $file = FileStoreRepository::find((int) $document['pdf_file_id']);
         if (!$file || !is_file($file['server_path'])) {
-            EmailLogRepository::markFailed((int) $emailLogRow['id']);
+            self::failed($emailLogRow);
             return false;
         }
 
@@ -368,17 +371,39 @@ final class EmailDispatchService
             // recordOcAcknowledgment() / ClientPortalController::
             // acknowledgeOc() / the auto_confirm_oc_acknowledgments.php cron
             // are the three ways it later resolves).
-            self::startOcAcknowledgmentClock($document);
+            // QA batch 3 MAIL-9: a re-send does not restart the OC clock or re-pass the stage.
+            if (!$isResend) {
+                self::startOcAcknowledgmentClock($document);
+            }
             // With email sending on, the Quotation completes Stage 1 when it's
             // sent, not when it's approved (ReviewWorkflowService).
-            if ($document['document_type_code'] === 'QT' && $document['order_id'] !== null) {
+            if (!$isResend && $document['document_type_code'] === 'QT' && $document['order_id'] !== null) {
                 StageGateService::passAndUnlockNext((int) $document['order_id'], 1, null);
             }
         } else {
-            EmailLogRepository::markFailed((int) $emailLogRow['id']);
+            self::failed($emailLogRow);
         }
 
         return $sent;
+    }
+
+    /**
+     * QA batch 3 MAIL-9: a failed send is recorded AND the person who asked
+     * for it (and the approver) are told — before, a send that failed (SMTP
+     * down, a missing file) was marked failed silently, so e.g. the OC's
+     * 48-hour acknowledgement clock never started and nobody knew.
+     *
+     * @param array<string,mixed> $emailLogRow
+     */
+    private static function failed(array $emailLogRow): void
+    {
+        EmailLogRepository::markFailed((int) $emailLogRow['id']);
+        $orderId = !empty($emailLogRow['order_id']) ? (int) $emailLogRow['order_id'] : null;
+        $message = 'The e-mail "' . ($emailLogRow['subject'] ?? '') . '" to ' . ($emailLogRow['recipient_email'] ?? '') . ' could not be sent. Check the e-mail log and send it again.';
+        foreach (array_unique(array_filter([(int) ($emailLogRow['requested_by'] ?? 0), (int) ($emailLogRow['approved_by'] ?? 0)])) as $userId) {
+            // In-app only: e-mail is what just failed.
+            NotificationRepository::createInAppOnly($userId, 'email_send_failed', $orderId, $message);
+        }
     }
 
     public static function startOcAcknowledgmentClock(array $document): void
@@ -395,6 +420,37 @@ final class EmailDispatchService
                 $now->modify("+{$hours} hours")->format('Y-m-d H:i:s')
             );
         }
+    }
+
+    /**
+     * QA batch 3 MAIL-4: the buyer's e-mail for an order — the order's own
+     * snapshot, else the client record's — the same fallback buildPreview()
+     * and the payment-action link already use.
+     *
+     * @param array<string,mixed> $order
+     */
+    public static function clientEmailFor(array $order): ?string
+    {
+        $email = trim((string) ($order['client_email'] ?? ''));
+        if ($email === '' && !empty($order['client_id'])) {
+            $email = trim((string) (\App\Repositories\ClientRepository::find((int) $order['client_id'])['email'] ?? ''));
+        }
+        return $email !== '' ? $email : null;
+    }
+
+    /**
+     * QA batch 3 MAIL-2: the honest flash wording after a link e-mail —
+     * "emailed to x" only when the e-mail really went out.
+     */
+    public static function linkMailOutcome(string $what, ?string $email, bool $sent, string $link): string
+    {
+        if ($email === null) {
+            return "{$what} generated (no client e-mail on file — hand this link over directly): {$link}";
+        }
+        if (!$sent) {
+            return "{$what} generated, but the e-mail to {$email} was not sent (" . (self::mailSendingEnabled() ? 'sending failed' : 'e-mail sending is off') . ") — send this link yourself: {$link}";
+        }
+        return "{$what} emailed to {$email}: {$link}";
     }
 
     public static function mailSendingEnabled(): bool
@@ -444,12 +500,12 @@ final class EmailDispatchService
         if ($emailLogRow['template_key'] === 'bl_copy_sent') {
             $shipping = \App\Repositories\OrderShippingRepository::find((int) $emailLogRow['order_id']);
             if (!$shipping || !$shipping['bl_copy_file_id']) {
-                EmailLogRepository::markFailed((int) $emailLogRow['id']);
+                self::failed($emailLogRow);
                 return false;
             }
             $file = FileStoreRepository::find((int) $shipping['bl_copy_file_id']);
             if (!$file || !is_file($file['server_path'])) {
-                EmailLogRepository::markFailed((int) $emailLogRow['id']);
+                self::failed($emailLogRow);
                 return false;
             }
             $attachments[] = ['path' => $file['server_path'], 'name' => $file['original_filename']];
@@ -466,10 +522,38 @@ final class EmailDispatchService
             EmailLogRepository::markSent((int) $emailLogRow['id']);
             AuditLogRepository::log(null, 'EMAIL_SENT', 'email_log', (int) $emailLogRow['id'], 'recipient_email', null, $emailLogRow['recipient_email']);
         } else {
-            EmailLogRepository::markFailed((int) $emailLogRow['id']);
+            self::failed($emailLogRow);
         }
 
         return $sent;
+    }
+
+    /**
+     * QA-5 EML-08 / L-12 (and QA batch 3 MAIL-5, which reuses it for comment
+     * and complaint replies): the sender's own designation, else their role
+     * name; the company md_title only when there is no sender at all.
+     *
+     * @param array<string,mixed>|null $sender
+     */
+    public static function senderTitle(?array $sender): string
+    {
+        $senderTitle = $sender ? '' : (string) CompanySettingsRepository::get('md_title');
+        if ($sender && !empty($sender['designation_id'])) {
+            $designation = SignatoryRepository::findDesignation((int) $sender['designation_id']);
+            if ($designation) {
+                $senderTitle = $designation['title'];
+            }
+        }
+        if ($sender && $senderTitle === '' && !empty($sender['role_id'])) {
+            $role = RoleRepository::find((int) $sender['role_id']);
+            if ($role) {
+                $senderTitle = $role['name'];
+            }
+        }
+        if ($senderTitle === '') {
+            $senderTitle = (string) CompanySettingsRepository::get('md_title');
+        }
+        return $senderTitle;
     }
 
     /** @return array<string,string> */
@@ -491,22 +575,7 @@ final class EmailDispatchService
         // email went out signed "Founder & Managing Director". Fall back to
         // the sender's own role name instead; md_title is now only the
         // fallback when there is no specific sender at all (system emails).
-        $senderTitle = $sender ? '' : (string) CompanySettingsRepository::get('md_title');
-        if ($sender && $sender['designation_id']) {
-            $designation = SignatoryRepository::findDesignation((int) $sender['designation_id']);
-            if ($designation) {
-                $senderTitle = $designation['title'];
-            }
-        }
-        if ($sender && $senderTitle === '' && $sender['role_id']) {
-            $role = RoleRepository::find((int) $sender['role_id']);
-            if ($role) {
-                $senderTitle = $role['name'];
-            }
-        }
-        if ($senderTitle === '') {
-            $senderTitle = (string) CompanySettingsRepository::get('md_title');
-        }
+        $senderTitle = self::senderTitle($sender);
 
         $signature = trim((string) ($sender['email_signature'] ?? ''));
         if ($signature === '') {
@@ -532,6 +601,35 @@ final class EmailDispatchService
             '{sender_name}'          => $sender['name'] ?? (string) CompanySettingsRepository::get('md_name'),
             '{sender_title}'         => $senderTitle,
             '{sender_signature}'     => $signature,
+            // QA batch 3 MAIL-12: the PI / CI e-mail's payment request follows the order.
+            '{payment_request_sentence}' => self::paymentRequestSentence($order, $document),
         ];
+    }
+
+    /**
+     * QA batch 3 MAIL-12: what the PI / CI e-mail asks the buyer to pay —
+     * the advance (cash-advance orders), the Letter of Credit (LC orders),
+     * the balance (CI), or a thank-you when the balance is already in.
+     *
+     * @param array<string,mixed> $order
+     * @param array<string,mixed>|null $document
+     */
+    public static function paymentRequestSentence(array $order, ?array $document): string
+    {
+        $code = $document['document_type_code'] ?? null;
+        if ($code === 'CI') {
+            $status = \App\Repositories\OrderPaymentStatusRepository::find((int) $order['id']);
+            if (!empty($status['balance_remittance_received_at']) || !empty($status['balance_cleared_at'])) {
+                return 'Kindly review the invoice value and payment settlement details. The balance payment has already been received — thank you.';
+            }
+            return 'Kindly review the invoice value and payment settlement details and arrange the balance payment as per the terms stated.';
+        }
+        if ((float) ($order['advance_pct'] ?? 0) > 0) {
+            return 'Kindly arrange the advance payment as per the terms stated to enable us to commence production.';
+        }
+        if (($order['payment_method'] ?? null) === 'LC') {
+            return 'Kindly arrange the Letter of Credit as per the terms stated to enable us to commence production.';
+        }
+        return 'Kindly arrange the payment as per the terms stated.';
     }
 }

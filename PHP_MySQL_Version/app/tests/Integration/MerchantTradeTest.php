@@ -43,7 +43,17 @@ final class MerchantTradeTest extends DbTestCase
         parent::setUp();
         $pdo = Database::connection();
         $this->md = $this->createTestUser('Managing Director');
-        $this->mttStaff = $this->createTestUser('Procurement Manager');
+        // QA batch 2 (ACC-4): the merchant trade desk works both legs — a test role with Procurement Manager's
+        // permissions plus the selling side (a Procurement designation sees neither the sale nor the buyer).
+        $pdo->exec("INSERT IGNORE INTO roles (name, description) VALUES ('TEST-Merchant Trade Desk', 'Test only: merchant trade desk, both legs')");
+        $deskRole = (int) $pdo->query("SELECT id FROM roles WHERE name = 'TEST-Merchant Trade Desk'")->fetchColumn();
+        $pdo->exec("DELETE FROM role_permissions WHERE role_id = {$deskRole}");
+        $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, is_enabled)
+            SELECT {$deskRole}, rp.permission_id, rp.is_enabled FROM role_permissions rp JOIN roles r ON r.id = rp.role_id WHERE r.name = 'Procurement Manager'");
+        $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, is_enabled)
+            SELECT {$deskRole}, p.id, 1 FROM permissions p WHERE p.permission_key IN ('view_selling_prices', 'view_buyer_payments')
+              AND NOT EXISTS (SELECT 1 FROM role_permissions x WHERE x.role_id = {$deskRole} AND x.permission_id = p.id)");
+        $this->mttStaff = $this->createTestUser('TEST-Merchant Trade Desk');
         $this->expStaff = $this->createTestUser('Procurement Manager');
         $pdo->prepare('UPDATE users SET division_id = NULL WHERE id = :id')->execute(['id' => $this->md]);
         $pdo->prepare('UPDATE users SET division_id = :d WHERE id = :id')->execute(['d' => self::MTT, 'id' => $this->mttStaff]);

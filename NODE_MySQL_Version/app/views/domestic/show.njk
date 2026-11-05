@@ -53,7 +53,7 @@
         <td>{% if canEdit and linesOpen %}<form method="post" action="/domestic/orders/{{ id }}/lines/{{ l.id }}/delete" data-confirm="Remove this line?"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-link">Remove</button></form>{% endif %}</td>
       </tr>
       {% else %}
-      <tr><td colspan="11" class="muted">No lines yet.</td></tr>
+      <tr><td colspan="{{ 11 if seesPrices else 6 }}" class="muted">No lines yet.</td></tr>
       {% endfor %}
     </table>
     {% if seesPrices and lines.length %}

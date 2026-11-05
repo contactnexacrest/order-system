@@ -463,7 +463,33 @@ final class DomesticOrderService
         return $note !== '' ? $text . '; note: ' . $note : $text;
     }
 
+    /**
+     * QA batch 2 (ORD-12): the domestic order row is locked while a receipt is checked and written, so the same
+     * bank reference (or more than the invoice) cannot be recorded twice by two people at the same moment.
+     */
     public static function recordPayment(int $orderId, array $in, int $userId): ?string
+    {
+        $pdo = \App\Config\Database::connection();
+        $own = !$pdo->inTransaction();
+        if ($own) {
+            $pdo->beginTransaction();
+        }
+        try {
+            $pdo->prepare('SELECT order_id FROM domestic_orders WHERE order_id = :id FOR UPDATE')->execute(['id' => $orderId]);
+            $error = self::recordPaymentLocked($orderId, $in, $userId);
+            if ($own) {
+                $error === null ? $pdo->commit() : $pdo->rollBack();
+            }
+            return $error;
+        } catch (\Throwable $e) {
+            if ($own && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    private static function recordPaymentLocked(int $orderId, array $in, int $userId): ?string
     {
         $order = OrderRepository::find($orderId);
         $dom = DomesticOrderRepository::find($orderId);
@@ -481,6 +507,13 @@ final class DomesticOrderService
             mb_strlen($note) > 255 => 'The note is too long.',
             default => null,
         };
+        // QA batch 2 (ORD-12): once the tax invoice is fixed, a receipt never takes the total paid above it.
+        if ($error === null && $dom['invoice_total'] !== null) {
+            $owed = GstCalculator::scaled((string) $dom['invoice_total'], 2) - GstCalculator::scaled(self::paidTotal($orderId), 2);
+            if (GstCalculator::scaled($amount, 2) > $owed) {
+                $error = 'This is more than the buyer still owes on tax invoice ' . $dom['tax_invoice_no'] . ' (₹' . GstCalculator::money(max(0, $owed)) . ').';
+            }
+        }
         if ($error !== null) {
             return $error;
         }

@@ -1,5 +1,5 @@
 {# Owner decision D-257 Phase 3: the imports of Import & Distribution — the Standard list and the Kanban board offer the same filter, links and actions (hard rule 2026-11-01). #}
-{% macro card(r) %}<a class="entity-card kanban-card" href="/import/{{ r.id }}"><div class="entity-card-header"><span class="entity-card-title">{{ r.reference }}</span><span class="badge badge-protected">{{ r.stage_label }}</span></div><div class="entity-card-sub">{{ r.supplier_name }} · {{ r.supplier_country }}</div><div class="entity-card-footer"><span class="muted small">{{ r.currency_code }} {{ r.value_fmt }}</span><span class="muted small">PO {{ r.po_date }}</span><span class="muted small">{{ r.line_count }} line{{ '' if r.line_count == 1 else 's' }}</span></div></a>{% endmacro %}
+{% macro card(r) %}<a class="entity-card kanban-card" href="/import/{{ r.id }}"><div class="entity-card-header"><span class="entity-card-title">{{ r.reference }}</span><span class="badge badge-protected">{{ r.stage_label }}</span></div><div class="entity-card-sub">{{ r.supplier_name }} · {{ r.supplier_country }}</div><div class="entity-card-sub muted small" data-field="bl_boe">BL {{ r.bl_no or '—' }} · Bill of entry {{ r.boe_no or '—' }}</div><div class="entity-card-footer"><span class="muted small">{{ r.currency_code }} {{ r.value_fmt }}</span><span class="muted small">PO {{ r.po_date }}</span><span class="muted small">{{ r.line_count }} line{{ '' if r.line_count == 1 else 's' }}</span></div></a>{% endmacro %}
 <div class="card page-wide" data-testid="imp-list">
   <div class="page-header-row">
     <div>
@@ -43,7 +43,7 @@
       <td>{{ r.bl_no or '—' }}</td><td>{{ r.boe_no or '—' }}</td>
     </tr>
     {% endfor %}
-    {% if rows.length == 0 %}<tr><td colspan="8" class="muted">No imports yet.</td></tr>{% endif %}
+    {% if rows.length == 0 %}<tr><td colspan="8" class="muted">{{ 'None at this stage.' if stage else 'No imports yet.' }}</td></tr>{% endif %}
   </table>
   {% endif %}
 </div>

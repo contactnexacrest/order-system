@@ -170,18 +170,20 @@ async function markConverted(id, clientId, reviewedBy) {
   await db.execute(
     `UPDATE client_intake_submissions
      SET status = 'converted', converted_client_id = :client_id, reviewed_by = :reviewed_by, reviewed_at = NOW()
-     WHERE id = :id`,
+     WHERE id = :id AND status = 'pending'`,
     { client_id: clientId, reviewed_by: reviewedBy, id }
   );
 }
 
+/** QA batch 2 (ORD-13): only a pending submission can be rejected; false when it was already resolved or is missing. */
 async function markRejected(id, reviewedBy, reason) {
-  await db.execute(
+  const result = await db.execute(
     `UPDATE client_intake_submissions
      SET status = 'rejected', rejection_reason = :reason, reviewed_by = :reviewed_by, reviewed_at = NOW()
-     WHERE id = :id`,
+     WHERE id = :id AND status = 'pending'`,
     { reason, reviewed_by: reviewedBy, id }
   );
+  return Number(result && result.affectedRows) === 1;
 }
 
 // 90-item backlog #41/#46: the commercial preferences the buyer gave at

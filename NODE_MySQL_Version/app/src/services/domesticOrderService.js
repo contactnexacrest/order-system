@@ -376,9 +376,24 @@ async function paymentDescription(order, dom, amount, bankReference, note) {
   return n !== '' ? `${text}; note: ${n}` : text;
 }
 
+/**
+ * QA batch 2 (ORD-12): the domestic order row is locked while a receipt is checked and written, so the same
+ * bank reference (or more than the invoice) cannot be recorded twice by two people at the same moment.
+ */
 async function recordPayment(orderId, input, userId) {
+  const db = require('../config/db');
+  const done = await db.transaction(async (trx) => {
+    await trx.queryOne('SELECT order_id FROM domestic_orders WHERE order_id = :id FOR UPDATE', { id: orderId });
+    return recordPaymentLocked(orderId, input, userId, trx);
+  });
+  if (done.error !== null) return done.error;
+  await auditLogRepository.log(userId, 'DOMESTIC_PAYMENT_RECORDED', 'orders', orderId, 'amount_inr', null, done.amount);
+  return null;
+}
+
+async function recordPaymentLocked(orderId, input, userId, trx) {
   const order = await orderRepository().find(orderId);
-  const dom = await repo.find(orderId);
+  const dom = await repo.find(orderId, trx);
   const date = String(input.received_on || '').trim();
   const amount = String(input.amount_inr === undefined || input.amount_inr === null ? '' : input.amount_inr).trim();
   const ref = String(input.bank_reference || '').trim();
@@ -389,13 +404,19 @@ async function recordPayment(orderId, input, userId) {
   else if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > todayIst()) error = 'Enter the date the money reached the bank (not in the future).';
   else if (!/^\d{1,11}(\.\d{1,2})?$/.test(amount) || G.scaled(amount, 2) <= 0n) error = 'Enter the amount received in ₹.';
   else if (ref === '' || len(ref) > 60) error = 'Enter the bank reference (UTR / NEFT / RTGS / cheque number).';
-  else if (await repo.bankReferenceUsed(ref)) error = 'This bank reference is already recorded. Check the payment is not entered twice.';
+  else if (await repo.bankReferenceUsed(ref, trx)) error = 'This bank reference is already recorded. Check the payment is not entered twice.';
   else if (len(note) > 255) error = 'The note is too long.';
-  if (error !== null) return error;
+  // QA batch 2 (ORD-12): once the tax invoice is fixed, a receipt never takes the total paid above it.
+  if (error === null && dom.invoice_total !== null && dom.invoice_total !== undefined) {
+    let paidPaise = 0n;
+    for (const p of await repo.payments(orderId, trx)) paidPaise += G.scaled(String(p.amount_inr), 2);
+    const owed = G.scaled(String(dom.invoice_total), 2) - paidPaise;
+    if (G.scaled(amount, 2) > owed) error = `This is more than the buyer still owes on tax invoice ${dom.tax_invoice_no} (₹${G.money(owed > 0n ? owed : 0n)}).`;
+  }
+  if (error !== null) return { error, amount };
   const description = await paymentDescription(order, dom, amount, ref, note);
-  await repo.addPayment(orderId, date, amount, ref, description, note !== '' ? note : null, userId);
-  await auditLogRepository.log(userId, 'DOMESTIC_PAYMENT_RECORDED', 'orders', orderId, 'amount_inr', null, amount);
-  return null;
+  await repo.addPayment(orderId, date, amount, ref, description, note !== '' ? note : null, userId, trx);
+  return { error: null, amount };
 }
 
 async function paidTotal(orderId) {

@@ -195,17 +195,20 @@ final class ClientIntakeRepository
         Database::connection()->prepare(
             "UPDATE client_intake_submissions
              SET status = 'converted', converted_client_id = :client_id, reviewed_by = :reviewed_by, reviewed_at = NOW()
-             WHERE id = :id"
+             WHERE id = :id AND status = 'pending'"
         )->execute(['client_id' => $clientId, 'reviewed_by' => $reviewedBy, 'id' => $id]);
     }
 
-    public static function markRejected(int $id, int $reviewedBy, string $reason): void
+    /** QA batch 2 (ORD-13): only a pending submission can be rejected; false when it was already resolved or is missing. */
+    public static function markRejected(int $id, int $reviewedBy, string $reason): bool
     {
-        Database::connection()->prepare(
+        $stmt = Database::connection()->prepare(
             "UPDATE client_intake_submissions
              SET status = 'rejected', rejection_reason = :reason, reviewed_by = :reviewed_by, reviewed_at = NOW()
-             WHERE id = :id"
-        )->execute(['reason' => $reason, 'reviewed_by' => $reviewedBy, 'id' => $id]);
+             WHERE id = :id AND status = 'pending'"
+        );
+        $stmt->execute(['reason' => $reason, 'reviewed_by' => $reviewedBy, 'id' => $id]);
+        return $stmt->rowCount() === 1;
     }
 
     /**

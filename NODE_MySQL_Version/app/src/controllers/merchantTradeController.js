@@ -29,6 +29,15 @@ const fcOf = (v) => I.fc(G.scaled(String(v), 2));
 const RBI_LABEL = { breach: 'RBI: action needed', warn: 'RBI: due soon', ok: 'RBI: on track' };
 const LEVEL_STYLE = { ok: 'color:#2D7D56', info: 'color:#5B6573', warn: 'color:#8A5A00;font-weight:700', breach: 'color:#B42318;font-weight:700' };
 
+/**
+ * QA batch 2 (ACC-4): what of the selling side this person may see — the sale prices and margin
+ * (view_selling_prices), the buyer's payments (view_buyer_payments) and the buyer's name (not Procurement).
+ */
+function money(permissions, seesClient = true) {
+  const mv = require('../services/moneyVisibility');
+  return { selling: mv.can(permissions || {}, mv.SELLING), buyer_payments: mv.can(permissions || {}, mv.BUYER_PAYMENTS), client: seesClient !== false };
+}
+
 /** The deal behind /merchant/:id/…, or null after answering 404. */
 async function deal(req, res) {
   const d = await repo.find(parseInt(req.params.id, 10) || 0);
@@ -80,6 +89,7 @@ async function indexData(req) {
     kanbanUser: (await uiTemplateService.resolve(req.user.ui_template_preference_id || null)) === 'kanban',
     active: await M.isActive(),
     canEdit: !!req.permissions.manage_purchasing,
+    money: money(req.permissions, req.seesClient),
   };
 }
 
@@ -109,7 +119,7 @@ async function store(req, res) {
 
 // ------------------------------------------------------------ one deal
 
-async function showData(d, permissions) {
+async function showData(d, permissions, seesClient = true) {
   const id = Number(d.id);
   const stage = d.stage;
   const pos = M.STAGE_KEYS.indexOf(stage);
@@ -132,7 +142,8 @@ async function showData(d, permissions) {
       buy_amount_fmt: I.fc(I.lineValueCents(String(l.quantity), String(l.buy_price_fc))), sell_amount_fmt: I.fc(I.lineValueCents(String(l.quantity), String(l.sell_price_fc))),
     })),
     f: fmtFigures(await M.figures(d)),
-    payments: (await repo.payments(id)).map((p) => ({
+    // QA batch 2 (ACC-4): the buyer's payments only for those who may see them.
+    payments: (await repo.payments(id)).filter((p) => p.leg === 'buy' || money(permissions, seesClient).buyer_payments).map((p) => ({
       ...p, leg_label: M.LEGS[p.leg], cur: p.leg === 'buy' ? d.purchase_currency : d.sale_currency, amount_fmt: fcOf(p.amount_fc), inr_fmt: G.inr(String(p.amount_inr)),
     })),
     backingLabel: M.BACKING[d.advance_backing],
@@ -143,13 +154,14 @@ async function showData(d, permissions) {
     canEdit: !!permissions.manage_purchasing,
     canPay: !!permissions.manage_payments,
     canZoho: !!permissions.ca_module_manage && (await require('../services/zohoBooksService').isEnabled()),
+    money: money(permissions, seesClient),
   };
 }
 
 async function show(req, res) {
   const d = await deal(req, res);
   if (!d) return;
-  res.renderView('merchant/show', await showData(d, req.permissions));
+  res.renderView('merchant/show', await showData(d, req.permissions, req.seesClient));
 }
 
 function act(fn, ok, anchor) {
@@ -160,8 +172,12 @@ function act(fn, ok, anchor) {
   };
 }
 
-const saveHeader = act((req, id) => M.saveHeader(id, req.body, req.user.id), 'Deal saved.', 'mtt-deal');
-const addLine = act((req, id) => M.addLine(id, req.body, req.user.id), 'Line added.', 'mtt-lines');
+// QA batch 2 (ACC-4): the deal header carries the buyer and the sale terms; a line carries its sell price.
+const saveHeader = act((req, id) => {
+  const m = money(req.permissions, req.seesClient);
+  return m.client && m.selling ? M.saveHeader(id, req.body, req.user.id) : 'The deal carries the buyer and the sale terms, which your department does not see.';
+}, 'Deal saved.', 'mtt-deal');
+const addLine = act((req, id) => (money(req.permissions).selling ? M.addLine(id, req.body, req.user.id) : 'A line carries its sell price, which your department does not see.'), 'Line added.', 'mtt-lines');
 const removeLine = act((req, id) => M.removeLine(id, parseInt(req.params.lineId, 10), req.user.id), 'Line removed.', 'mtt-lines');
 const saveBacking = act((req, id) => M.saveBacking(id, req.body, req.user.id), 'Advance backing saved.', 'mtt-payments');
 const saveShipment = act((req, id) => M.saveShipment(id, req.body, req.user.id), 'Bill of lading saved.', 'mtt-shipment');
@@ -187,8 +203,13 @@ async function document(req, res) {
       done(req, res, id, 'Add the goods first.', '', 'mtt-lines');
       return;
     }
-    await M.markPoGenerated(id, req.user.id);
+    if (req.permissions.manage_purchasing) await M.markPoGenerated(id, req.user.id); // QA batch 2 (ACC-4): only an editor marks the PO generated
   } else if (kind === 'invoice') {
+    // QA batch 2 (ACC-4): the sale invoice carries the selling prices and fixes its number (a write).
+    if (!money(req.permissions).selling || !req.permissions.manage_purchasing) {
+      done(req, res, id, 'The sale invoice carries selling prices your department does not see.', '', 'mtt-shipment');
+      return;
+    }
     const error = await M.fixInvoice(id, req.user.id);
     if (error !== null) {
       done(req, res, id, error, '', 'mtt-shipment');
@@ -222,17 +243,20 @@ async function zohoCheck(req, res) {
 
 // ------------------------------------------------------------ reports
 
-async function reportsData() {
+async function reportsData(req = null) {
   const rows = (await M.reportRows()).map((r) => {
     const byKey = Object.fromEntries(r.checks.map((c) => [c.key, { ...c, style: LEVEL_STYLE[c.level] || '' }]));
     return { ...r, stage_label: M.STAGES[r.stage], f: fmtFigures(r.figures), statusCells: ['total', 'outlay', 'advance', 'documents'].map((k) => byKey[k]) };
   });
   const settings = await M.rbiSettings();
-  return { rows, open: rows.filter((r) => r.stage !== 'closed'), settings, limitFmt: I.fc(G.scaled(settings.mtt_advance_limit_usd, 2)) };
+  return {
+    rows, open: rows.filter((r) => r.stage !== 'closed'), settings, limitFmt: I.fc(G.scaled(settings.mtt_advance_limit_usd, 2)),
+    money: req ? money(req.permissions, req.seesClient) : money({ view_selling_prices: true, view_buyer_payments: true }),
+  };
 }
 
 async function reports(req, res) {
-  res.renderView('merchant/reports', await reportsData());
+  res.renderView('merchant/reports', await reportsData(req));
 }
 
 module.exports = {

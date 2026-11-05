@@ -88,7 +88,9 @@ final class OrderComplaintService
             return;
         }
         $order = OrderRepository::find((int) $complaint['order_id']);
-        if (!$order || empty($order['client_email'])) {
+        // QA batch 3 MAIL-4: the client record's e-mail when the order has none of its own.
+        $clientEmail = $order ? \App\Services\EmailDispatchService::clientEmailFor($order) : null;
+        if (!$order || $clientEmail === null) {
             return;
         }
         $sender = UserRepository::findById($authorUserId);
@@ -97,8 +99,8 @@ final class OrderComplaintService
         $signature = trim((string) ($sender['email_signature'] ?? ''));
         $message = $greeting . $body . "\n\n" . ($signature !== ''
             ? $signature
-            : "Regards,\n" . ($sender['name'] ?? '') . "\n" . (string) \App\Repositories\CompanySettingsRepository::get('md_title'));
+            : "Regards,\n" . ($sender['name'] ?? '') . "\n" . \App\Services\EmailDispatchService::senderTitle($sender ?: null)); // QA batch 3 MAIL-5
 
-        \App\Services\MailSenderService::send($order['client_email'], $subject, $message, []);
+        \App\Services\MailSenderService::send($clientEmail, $subject, $message, []);
     }
 }

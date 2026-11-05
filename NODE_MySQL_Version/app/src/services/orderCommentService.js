@@ -46,7 +46,10 @@ async function postAsStaff(orderId, authorUserId, body, fileStoreIds) {
     await orderCommentRepository.attachFile(commentId, fileId);
   }
 
-  if (order.client_email) {
+  // QA batch 3 MAIL-4: the client record's e-mail when the order has none of its own.
+  const clientEmail = await require('./emailDispatchService').clientEmailFor(order);
+  if (clientEmail !== null) {
+    order.client_email = clientEmail;
     await emailClient(order, authorUserId, commentId, bodyTrim, fileStoreIds);
   }
 
@@ -105,7 +108,7 @@ async function emailClient(order, authorUserId, commentId, body, fileStoreIds) {
   const signature = (sender && sender.email_signature ? String(sender.email_signature).trim() : '');
   message += signature !== ''
     ? signature
-    : `Regards,\n${(sender && sender.name) || ''}\n${await companySettingsRepository.get('md_title')}`;
+    : `Regards,\n${(sender && sender.name) || ''}\n${await require('./emailDispatchService').senderTitleFor(sender || null)}`; // QA batch 3 MAIL-5
 
   const sent = await mailSenderService.send(order.client_email, subject, message, direct);
   if (sent) {

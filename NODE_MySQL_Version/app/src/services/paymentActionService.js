@@ -2,7 +2,6 @@
 
 const auditLogRepository = require('../repositories/auditLogRepository');
 const clientPaymentReportRepository = require('../repositories/clientPaymentReportRepository');
-const documentRepository = require('../repositories/documentRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const orderFreightRepository = require('../repositories/orderFreightRepository');
 const orderPaymentStatusRepository = require('../repositories/orderPaymentStatusRepository');
@@ -32,11 +31,8 @@ const LEGS = {
 /** The document a leg is paid against, once it is issued to the buyer (approved, or sent while email is on). */
 async function issuedDocument(orderId, leg) {
   const code = LEGS[leg] ? LEGS[leg].doc : null;
-  const latest = code ? await documentRepository.findLatestForOrderAndTypeCode(orderId, code) : null;
-  if (!latest || !latest.pdf_file_id) {
-    return null;
-  }
-  const document = await documentRepository.find(latest.id);
+  // QA batch 3 DOC-6: the newest issued revision, not merely the newest row.
+  const document = code ? await documentGenerationService.latestReleasedDocument(orderId, code) : null;
   // Required here, not at the top: emailDispatchService requires services that require this one.
   const mailEnabled = await require('./emailDispatchService').mailSendingEnabled();
   if (!document || document.status === 'superseded'

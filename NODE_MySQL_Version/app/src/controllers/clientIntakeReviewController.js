@@ -31,7 +31,19 @@ async function withAssociateInfo(rows) {
   return rows;
 }
 
+/**
+ * QA batch 2 (ORD-05): the public enquiry form is Export's (foreign buyers) — its queue is reviewed only by
+ * people working in Export (or "All divisions"). False after answering 403.
+ */
+function exportScope(res) {
+  const divisionService = require('../services/divisionService');
+  if (divisionService.allows(divisionService.EXPORT_ID)) return true;
+  res.status(403).send('The quotation enquiry queue belongs to the Export division.');
+  return false;
+}
+
 async function index(req, res) {
+  if (!exportScope(res)) return;
   if ((await uiTemplateService.showsBoard(req))) {
     await indexKanban(req, res);
     return;
@@ -56,6 +68,7 @@ async function indexKanban(req, res) {
 }
 
 async function accept(req, res) {
+  if (!exportScope(res)) return;
   const user = req.user;
   const id = parseInt(req.params.id, 10) || 0;
   const submission = await clientIntakeRepository.find(id);
@@ -141,6 +154,7 @@ async function accept(req, res) {
  * (ordersController.generatePiFormLink) and the Buyer Action link.
  */
 async function resendLink(req, res) {
+  if (!exportScope(res)) return;
   const user = req.user;
   const id = parseInt(req.params.id, 10) || 0;
   const submission = await clientIntakeRepository.find(id);
@@ -159,6 +173,7 @@ async function resendLink(req, res) {
 }
 
 async function reject(req, res) {
+  if (!exportScope(res)) return;
   const user = req.user;
   const id = parseInt(req.params.id, 10) || 0;
   const reason = String(req.body.reason || '').trim();
@@ -170,11 +185,14 @@ async function reject(req, res) {
     return;
   }
 
+  // QA batch 2 (ORD-13): only a pending submission can be rejected — never one already accepted or rejected.
   const submission = await clientIntakeRepository.find(id);
-  await clientIntakeRepository.markRejected(id, user.id, reason);
-  if (submission && submission.status === 'pending') {
-    await associateIntakeService.onRejected(submission, reason, user.id);
+  if (!submission || submission.status !== 'pending' || !(await clientIntakeRepository.markRejected(id, user.id, reason))) {
+    flash.set(req, 'error', 'Submission not found, or already resolved.');
+    res.redirect('/client-intake');
+    return;
   }
+  await associateIntakeService.onRejected(submission, reason, user.id);
   // External QA report N-08: this action never reached the audit log, so
   // it never notified anyone either.
   await auditLogRepository.log(user.id, 'CLIENT_INTAKE_REJECTED', 'client_intake_submissions', id, null, 'pending', 'rejected', reason);

@@ -28,7 +28,8 @@ async function send(to, subject, body, attachments = [], opts = {}) {
   // one chokepoint every non-security send passes through, so it can never
   // be bypassed by a future transport added below Zoho/SMTP.
   if (!opts.isSecurityEmail && (await companySettingsRepository.get('mail_sending_enabled')) === '0') {
-    console.error(`[EMAIL NOT SENT — sending disabled by admin (mail_sending_enabled=0)] To: ${to} | Subject: ${subject}`);
+    // QA batch 3 MAIL-2: the body is logged too (as the no-SMTP fallback does), so staff can send it themselves.
+    console.error(`[EMAIL NOT SENT — sending disabled by admin (mail_sending_enabled=0)] To: ${to} | Subject: ${subject} | Body: ${body}`);
     return false;
   }
 

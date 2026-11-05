@@ -309,6 +309,9 @@ final class DocumentDataAssembler
                 'balance_terms_text' => self::balanceTriggerSentence($order['balance_trigger_option'] ?? null, isset($order['balance_days']) ? (int) $order['balance_days'] : null, $order['balance_trigger_wording'] ?? null),
                 'bank_charges_text'  => self::BANK_CHARGES_SENTENCE,
                 'cleared_funds_text' => self::CLEARED_FUNDS_SENTENCE,
+                // QA batch 3 DOC-4 (owner confirmed twice, 5 Nov 2026): the Buyer PO's payment terms follow the order —
+                // no "0% advance" on an LC/no-advance order, the milestones, and the balance's own wording (no hard-coded "before shipment").
+                'buyer_po_payment_terms' => self::buyerPoPaymentTerms($advancePct, $balancePct, $milestones, $order),
                 // Owner decision (2026-10-28): an order with no advance (e.g.
                 // the Letter of Credit preset) says so on the PI instead of
                 // "ADVANCE PAYABLE NOW: 0.00", without the advance sentences.
@@ -903,6 +906,32 @@ final class DocumentDataAssembler
             return null;
         }
         return $text;
+    }
+
+    /**
+     * QA batch 3 DOC-4: the Buyer PO's one-line payment terms, built from the
+     * same facts as the QT/PI payment block (advance or not, LC, milestones,
+     * the balance's own trigger wording). The freight sentence is added by the
+     * template, as before.
+     *
+     * @param list<array<string,mixed>> $milestones
+     * @param array<string,mixed> $order
+     */
+    public static function buyerPoPaymentTerms(float $advancePct, float $balancePct, array $milestones, array $order): string
+    {
+        $pct = static fn (float $v): string => rtrim(rtrim(number_format($v, 2), '0'), '.');
+        $balanceText = self::balanceTriggerSentence($order['balance_trigger_option'] ?? null, isset($order['balance_days']) ? (int) $order['balance_days'] : null, $order['balance_trigger_wording'] ?? null);
+        $parts = [];
+        if ($advancePct > 0) {
+            $parts[] = $pct($advancePct) . '% advance T/T (Telegraphic Transfer) against Proforma Invoice before production.';
+        }
+        foreach ($milestones as $m) {
+            $parts[] = $m['pct'] . '% Payment on FOB Value ' . $m['due_text'] . '.';
+        }
+        $parts[] = $advancePct > 0
+            ? $pct($balancePct) . '% balance T/T — ' . $balanceText
+            : $pct($balancePct) . '% Payment on FOB Value' . (($order['payment_method'] ?? null) === 'LC' ? ' by Letter of Credit' : '') . ' — ' . $balanceText;
+        return implode(' ', $parts);
     }
 
     /**

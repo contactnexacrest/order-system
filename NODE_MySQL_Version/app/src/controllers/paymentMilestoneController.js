@@ -77,6 +77,13 @@ async function saveSchedule(req, res) {
     back(res, orderId);
     return;
   }
+  // QA batch 2 (ORD-06): an LC order never clears an advance — its schedule is fixed once the LC is confirmed usable.
+  const lc = await require('../repositories/orderLcDetailRepository').find(orderId);
+  if (lc && lc.lc_confirmed_at) {
+    flash.set(req, 'error', 'The payment schedule is fixed once the LC is confirmed usable — change it with a payment terms amendment.');
+    back(res, orderId);
+    return;
+  }
   if (await paymentMilestoneRepository.anyMoneyRecorded(orderId)) {
     flash.set(req, 'error', 'A milestone payment is already recorded — the schedule can no longer be changed.');
     back(res, orderId);
@@ -239,7 +246,8 @@ async function scheduleView(orderId, order) {
     balanceAmount: r2(fob - advanceAmount - midAmount),
     balanceText: balanceTriggerSentence(order.balance_trigger_option || null, order.balance_days != null ? parseInt(order.balance_days, 10) : null, order.balance_trigger_wording || null),
     balanceStatus: legStatus('balance'),
-    fixed: Boolean(payment.advance_cleared_at) || (await paymentMilestoneRepository.anyMoneyRecorded(orderId)),
+    // QA batch 2 (ORD-06): an LC order fixes its schedule when the LC is confirmed.
+    fixed: Boolean(payment.advance_cleared_at) || Boolean(((await require('../repositories/orderLcDetailRepository').find(orderId)) || {}).lc_confirmed_at) || (await paymentMilestoneRepository.anyMoneyRecorded(orderId)),
     maxSteps: paymentMilestoneRepository.MAX_STEPS,
     fobInput: fob > 0 ? Number(fob).toFixed(2) : '999999999999.99',
     editRows: Array.from({ length: paymentMilestoneRepository.MAX_STEPS }, (_, i) => rows[i] ? { seq: i + 2, pct: pct(rows[i].pct), due: rows[i].due_text } : { seq: i + 2, pct: '', due: '' }),

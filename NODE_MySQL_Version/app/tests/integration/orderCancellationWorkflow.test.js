@@ -105,6 +105,8 @@ describe('Order cancellation workflow (External QA report M-09)', () => {
     const requester = await createTestUser();
     const approver = await createTestUser('Admin');
     const cancellationId = await orderCancellationRepository.create(orderId, 'Buyer requested cancellation before shipment.', requester);
+    // QA batch 2 (ORD-03): a refund is at most what the buyer has paid — record the advance received.
+    await db.execute("INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, inr_credited, bank_reference) VALUES (:o, 'advance', 3000, '2026-10-10', 84, 252000, :r)", { o: orderId, r: `UTR-CANCEL-${orderId}` });
 
     await ordersController.approveCancellation(
       fakeReq(orderId, approver, { refund_status: 'pending', refund_amount: '1500.50', decision_notes: 'Advance will be refunded once reconciled.' }, { cancellationId: String(cancellationId) }),

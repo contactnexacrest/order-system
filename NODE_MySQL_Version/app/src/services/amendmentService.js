@@ -206,6 +206,12 @@ async function attachSignedCopyAndActivate(amendmentId, signedCopyFileId, userId
     throw new Error('Generate the Amendment Agreement document before uploading the signed copy.');
   }
 
+  // QA batch 2 (ORD-02): the schedule may have changed since the request — re-check before it takes effect.
+  if (amendment.amended_advance_pct !== null && amendment.amended_advance_pct !== undefined) {
+    const overflow = await milestoneOverflowError(Number(amendment.order_id), parseFloat(amendment.amended_advance_pct));
+    if (overflow) throw new Error(overflow);
+  }
+
   await amendmentRepository.activate(amendmentId, signedCopyFileId);
 
   const order = await orderRepository.find(amendment.order_id);
@@ -243,4 +249,13 @@ async function attachSignedCopyAndActivate(amendmentId, signedCopyFileId, userId
   await auditLogRepository.log(userId, 'AMENDMENT_ACTIVATED', 'amendments', amendmentId, 'payment_terms', null, amendment.amendment_reference);
 }
 
-module.exports = { createRequest, approveByMd, rejectAmendment, generateDocument, attachSignedCopyAndActivate };
+/** QA batch 2 (ORD-02): null when the amended advance + the order's payment milestones stay below 100%. */
+async function milestoneOverflowError(orderId, advancePct) {
+  const milestones = Number(await require('../repositories/paymentMilestoneRepository').totalPct(Number(orderId)));
+  if (milestones <= 0 || Math.round((advancePct + milestones) * 100) / 100 < 100) return null;
+  const f = (v) => Number(v).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return `Advance ${f(advancePct)}% + payment milestones ${f(milestones)}% leave nothing for the balance — together they must stay below 100%. Change the payment schedule first.`;
+}
+
+module.exports = {
+  milestoneOverflowError, createRequest, approveByMd, rejectAmendment, generateDocument, attachSignedCopyAndActivate };

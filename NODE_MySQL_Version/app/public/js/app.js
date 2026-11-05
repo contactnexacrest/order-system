@@ -800,6 +800,13 @@
       var otherValue = other && (other.type === 'checkbox' || other.type === 'radio') ? (other.checked ? other.value : '') : (other ? other.value : '');
       if (other && otherValue === cond[1]) return el.dataset.requiredWhenMessage || 'This field is required.';
     }
+    // data-not-with="<field>": this field and that field of the same form
+    // cannot both be filled (QA batch 2, UI-8: a GST rate is for an HSN
+    // prefix or for a category, never both).
+    if (el.dataset.notWith && el.form && value !== '') {
+      var partner = el.form.elements.namedItem(el.dataset.notWith);
+      if (partner && String(partner.value || '').trim() !== '') return el.dataset.notWithMessage || 'Fill in only one of these fields.';
+    }
     // data-not-before="<selector>": a date that cannot be earlier than another
     // date field in the same form (e.g. a GST refund claim's period end).
     if (el.dataset.notBefore && el.form && value !== '') {

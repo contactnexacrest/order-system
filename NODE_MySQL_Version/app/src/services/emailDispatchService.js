@@ -39,7 +39,33 @@ function strtr(str, tokens) {
   const keys = Object.keys(tokens);
   if (keys.length === 0) return str;
   const pattern = new RegExp(keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
-  return str.replace(pattern, (match) => (tokens[match] !== undefined && tokens[match] !== null ? String(tokens[match]) : match));
+  // QA batch 3 MAIL-10: a known token with no value renders as "", as PHP's strtr() does — never the literal {token}.
+  return str.replace(pattern, (match) => (tokens[match] !== undefined && tokens[match] !== null ? String(tokens[match]) : ''));
+}
+
+/**
+ * QA-5 EML-08 / L-12 (and QA batch 3 MAIL-5, reused for comment and complaint
+ * replies; port of PHP senderTitle()): the sender's own designation, else
+ * their role name; the company md_title only when there is no sender at all.
+ */
+async function senderTitleFor(sender) {
+  let senderTitle = sender ? '' : ((await companySettingsRepository.get('md_title')) || '');
+  if (sender && sender.designation_id) {
+    const designation = await signatoryRepository.findDesignation(sender.designation_id);
+    if (designation) {
+      senderTitle = designation.title;
+    }
+  }
+  if (sender && senderTitle === '' && sender.role_id) {
+    const role = await roleRepository.find(sender.role_id);
+    if (role) {
+      senderTitle = role.name;
+    }
+  }
+  if (senderTitle === '') {
+    senderTitle = (await companySettingsRepository.get('md_title')) || '';
+  }
+  return senderTitle;
 }
 
 async function tokensFor(order, document, sender) {
@@ -58,22 +84,7 @@ async function tokensFor(order, document, sender) {
   // out signed "Founder & Managing Director". Fall back to the sender's own
   // role name instead; md_title is now only the fallback when there is no
   // specific sender at all (system emails).
-  let senderTitle = sender ? '' : ((await companySettingsRepository.get('md_title')) || '');
-  if (sender && sender.designation_id) {
-    const designation = await signatoryRepository.findDesignation(sender.designation_id);
-    if (designation) {
-      senderTitle = designation.title;
-    }
-  }
-  if (sender && senderTitle === '' && sender.role_id) {
-    const role = await roleRepository.find(sender.role_id);
-    if (role) {
-      senderTitle = role.name;
-    }
-  }
-  if (senderTitle === '') {
-    senderTitle = (await companySettingsRepository.get('md_title')) || '';
-  }
+  const senderTitle = await senderTitleFor(sender);
 
   let signature = (sender && sender.email_signature ? String(sender.email_signature).trim() : '');
   if (signature === '') {
@@ -98,7 +109,28 @@ async function tokensFor(order, document, sender) {
     '{sender_name}': (sender && sender.name) || (await companySettingsRepository.get('md_name')) || '',
     '{sender_title}': senderTitle,
     '{sender_signature}': signature,
+    // QA batch 3 MAIL-12: the PI / CI e-mail's payment request follows the order.
+    '{payment_request_sentence}': await paymentRequestSentence(order, document),
   };
+}
+
+/** QA batch 3 MAIL-12 (port of PHP paymentRequestSentence). */
+async function paymentRequestSentence(order, document) {
+  const code = document ? document.document_type_code : null;
+  if (code === 'CI') {
+    const status = await require('../repositories/orderPaymentStatusRepository').find(order.id);
+    if (status && (status.balance_remittance_received_at || status.balance_cleared_at)) {
+      return 'Kindly review the invoice value and payment settlement details. The balance payment has already been received — thank you.';
+    }
+    return 'Kindly review the invoice value and payment settlement details and arrange the balance payment as per the terms stated.';
+  }
+  if (parseFloat(order.advance_pct || 0) > 0) {
+    return 'Kindly arrange the advance payment as per the terms stated to enable us to commence production.';
+  }
+  if (order.payment_method === 'LC') {
+    return 'Kindly arrange the Letter of Credit as per the terms stated to enable us to commence production.';
+  }
+  return 'Kindly arrange the payment as per the terms stated.';
 }
 
 /**
@@ -384,7 +416,7 @@ async function dispatch(emailLogRow) {
   }
   const document = await documentRepository.find(emailLogRow.document_id);
   if (!document || !document.pdf_file_id) {
-    await emailLogRepository.markFailed(emailLogRow.id);
+    await failed(emailLogRow);
     return false;
   }
   // Defense in depth (QA-4 P0.4): buildPreview()/requestSend() only ever
@@ -394,13 +426,16 @@ async function dispatch(emailLogRow) {
   // to 'draft' without touching pdf_file_id or looking at any pending
   // send. Without this re-check here, a stale approved PDF would still go
   // out to the buyer from a send queued before that rejection.
-  if (document.status !== 'approved') {
-    await emailLogRepository.markFailed(emailLogRow.id);
+  // QA batch 3 MAIL-9: an already-sent document may be sent again (the preview
+  // offers it) — only a document pulled back to draft/review is refused.
+  if (!['approved', 'sent'].includes(document.status)) {
+    await failed(emailLogRow);
     return false;
   }
+  const isResend = document.status === 'sent';
   const file = await fileStoreRepository.find(document.pdf_file_id);
   if (!file || !fs.existsSync(file.server_path)) {
-    await emailLogRepository.markFailed(emailLogRow.id);
+    await failed(emailLogRow);
     return false;
   }
 
@@ -416,14 +451,15 @@ async function dispatch(emailLogRow) {
     await documentRepository.markSent(document.id);
     await auditLogRepository.log(null, 'EMAIL_SENT', 'email_log', emailLogRow.id, 'recipient_email', null, emailLogRow.recipient_email);
 
-    await startOcAcknowledgmentClock(document);
+    // QA batch 3 MAIL-9: a re-send does not restart the OC clock or re-pass the stage.
+    if (!isResend) await startOcAcknowledgmentClock(document);
     // With email sending on, the Quotation completes Stage 1 when it's sent,
     // not when it's approved (reviewWorkflowService).
-    if (document.document_type_code === 'QT' && document.order_id !== null && document.order_id !== undefined) {
+    if (!isResend && document.document_type_code === 'QT' && document.order_id !== null && document.order_id !== undefined) {
       await stageGateService.passAndUnlockNext(document.order_id, 1, null);
     }
   } else {
-    await emailLogRepository.markFailed(emailLogRow.id);
+    await failed(emailLogRow);
   }
 
   return sent;
@@ -434,6 +470,20 @@ async function dispatch(emailLogRow) {
 // (ordersController.recordOcAcknowledgment() /
 // clientPortalController.acknowledgeOc() / the autoConfirmOcAcknowledgments
 // cron are the three ways it later resolves).
+/**
+ * QA batch 3 MAIL-9 (port of PHP failed()): a failed send is recorded AND the
+ * person who asked for it (and the approver) are told.
+ */
+async function failed(emailLogRow) {
+  await emailLogRepository.markFailed(emailLogRow.id);
+  const orderId = emailLogRow.order_id ? Number(emailLogRow.order_id) : null;
+  const message = `The e-mail "${emailLogRow.subject || ''}" to ${emailLogRow.recipient_email || ''} could not be sent. Check the e-mail log and send it again.`;
+  for (const userId of [...new Set([Number(emailLogRow.requested_by || 0), Number(emailLogRow.approved_by || 0)].filter(Boolean))]) {
+    // In-app only: e-mail is what just failed.
+    await notificationRepository.createInAppOnly(userId, 'email_send_failed', orderId, message);
+  }
+}
+
 async function startOcAcknowledgmentClock(document) {
   if (document.document_type_code === 'OC' && document.order_id !== null && document.order_id !== undefined) {
     // docs/schema.sql Section AU: admin-configurable, default 48 (matches
@@ -491,12 +541,12 @@ async function dispatchGeneric(emailLogRow) {
   if (emailLogRow.template_key === 'bl_copy_sent') {
     const shipping = await orderShippingRepository.find(emailLogRow.order_id);
     if (!shipping || !shipping.bl_copy_file_id) {
-      await emailLogRepository.markFailed(emailLogRow.id);
+      await failed(emailLogRow);
       return false;
     }
     const file = await fileStoreRepository.find(shipping.bl_copy_file_id);
     if (!file || !fs.existsSync(file.server_path)) {
-      await emailLogRepository.markFailed(emailLogRow.id);
+      await failed(emailLogRow);
       return false;
     }
     attachments.push({ path: file.server_path, name: file.original_filename });
@@ -508,10 +558,29 @@ async function dispatchGeneric(emailLogRow) {
     await emailLogRepository.markSent(emailLogRow.id);
     await auditLogRepository.log(null, 'EMAIL_SENT', 'email_log', emailLogRow.id, 'recipient_email', null, emailLogRow.recipient_email);
   } else {
-    await emailLogRepository.markFailed(emailLogRow.id);
+    await failed(emailLogRow);
   }
 
   return sent;
 }
 
-module.exports = { buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride, mailSendingEnabled, markSentIfMailDisabled, startOcAcknowledgmentClock };
+/**
+ * QA batch 3 MAIL-4 (port of PHP clientEmailFor): the buyer's e-mail for an
+ * order — the order's own snapshot, else the client record's.
+ */
+async function clientEmailFor(order) {
+  let email = String(order.client_email || '').trim();
+  if (email === '' && order.client_id) {
+    email = String(((await require('../repositories/clientRepository').find(order.client_id)) || {}).email || '').trim();
+  }
+  return email !== '' ? email : null;
+}
+
+/** QA batch 3 MAIL-2 (port of PHP linkMailOutcome): "emailed to x" only when the e-mail really went out. */
+async function linkMailOutcome(what, email, sent, link) {
+  if (email === null) return `${what} generated (no client e-mail on file — hand this link over directly): ${link}`;
+  if (!sent) return `${what} generated, but the e-mail to ${email} was not sent (${(await mailSendingEnabled()) ? 'sending failed' : 'e-mail sending is off'}) — send this link yourself: ${link}`;
+  return `${what} emailed to ${email}: ${link}`;
+}
+
+module.exports = { senderTitleFor, clientEmailFor, linkMailOutcome, buildPreview, requestSend, approveSend, rejectSend, cancelSend, dispatch, sendNowOverride, mailSendingEnabled, markSentIfMailDisabled, startOcAcknowledgmentClock };

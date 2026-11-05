@@ -205,6 +205,12 @@ final class AmendmentService
             throw new \RuntimeException('Generate the Amendment Agreement document before uploading the signed copy.');
         }
 
+        // QA batch 2 (ORD-02): the schedule may have changed since the request — re-check before it takes effect.
+        if ($amendment['amended_advance_pct'] !== null
+            && ($overflow = self::milestoneOverflowError((int) $amendment['order_id'], (float) $amendment['amended_advance_pct'])) !== null) {
+            throw new \RuntimeException($overflow);
+        }
+
         AmendmentRepository::activate($amendmentId, $signedCopyFileId);
 
         $order = OrderRepository::find((int) $amendment['order_id']);
@@ -250,5 +256,16 @@ final class AmendmentService
         );
 
         AuditLogRepository::log($userId, 'AMENDMENT_ACTIVATED', 'amendments', $amendmentId, 'payment_terms', null, $amendment['amendment_reference']);
+    }
+
+    /** QA batch 2 (ORD-02): null when the amended advance + the order's payment milestones stay below 100%. */
+    public static function milestoneOverflowError(int $orderId, float $advancePct): ?string
+    {
+        $milestones = \App\Repositories\PaymentMilestoneRepository::totalPct($orderId);
+        if ($milestones <= 0 || round($advancePct + $milestones, 2) < 100) {
+            return null;
+        }
+        $f = static fn (float $v): string => rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+        return 'Advance ' . $f($advancePct) . '% + payment milestones ' . $f($milestones) . '% leave nothing for the balance — together they must stay below 100%. Change the payment schedule first.';
     }
 }

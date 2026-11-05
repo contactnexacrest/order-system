@@ -356,7 +356,18 @@ final class ImportService
         if ($error !== null) {
             return $error;
         }
-        ImportRepository::update($id, $fields, $userId);
+        // QA batch 2 (ORD-08): payments are recorded in the PO's currency — it cannot change under them.
+        if ($fields['currency_code'] !== (string) $s['currency_code'] && ImportRepository::payments($id) !== []) {
+            return 'The supplier has already been paid in ' . $s['currency_code'] . ', so the PO currency can no longer change.';
+        }
+        // A PO generated before this change is out of date: generate it again before the goods ship.
+        $changed = false;
+        foreach ($fields as $col => $value) {
+            if ((string) ($s[$col] ?? '') !== (string) ($value ?? '')) {
+                $changed = true;
+            }
+        }
+        ImportRepository::update($id, $fields + ($changed ? ['ipo_generated_at' => null] : []), $userId);
         AuditLogRepository::log($userId, 'IMPORT_PO_SAVED', 'import_shipments', $id, 'supplier_name', $s['supplier_name'], $fields['supplier_name']);
         return null;
     }
@@ -412,6 +423,7 @@ final class ImportService
             'sws_pct' => $pct($pcts['sws_pct'], $duty['sws']),
             'igst_pct' => $pct($pcts['igst_pct'], $duty['igst']),
         ], $userId);
+        ImportRepository::update($id, ['ipo_generated_at' => null], $userId); // QA batch 2 (ORD-08): the PO changed
         AuditLogRepository::log($userId, 'IMPORT_LINE_ADDED', 'import_shipments', $id, 'line', null, (string) $product['product_code'] . ' × ' . $qty);
         return null;
     }
@@ -422,9 +434,24 @@ final class ImportService
         if ($s === null || $s['stage'] !== 'ordered') {
             return 'The lines can change only while the goods are not shipped.';
         }
+        // QA batch 2 (ORD-08): the PO value never falls below what the supplier has already been paid.
+        $line = null;
+        foreach (ImportRepository::lines($id) as $l) {
+            if ((int) $l['id'] === $lineId) {
+                $line = $l;
+            }
+        }
+        if ($line === null) {
+            return 'Line not found.';
+        }
+        $after = self::poValueCents($id) - self::lineValueCents((string) $line['quantity'], (string) $line['unit_price_fc']);
+        if ($after < self::paidCents($id)) {
+            return 'Removing this line would take the PO value (' . $s['currency_code'] . ' ' . self::fc($after) . ') below what the supplier has already been paid (' . $s['currency_code'] . ' ' . self::fc(self::paidCents($id)) . ').';
+        }
         if (!ImportRepository::removeLine($id, $lineId)) {
             return 'Line not found.';
         }
+        ImportRepository::update($id, ['ipo_generated_at' => null], $userId);
         AuditLogRepository::log($userId, 'IMPORT_LINE_REMOVED', 'import_shipments', $id, 'line', (string) $lineId, null);
         return null;
     }
@@ -578,7 +605,33 @@ final class ImportService
         return $note !== '' ? $text . '; note: ' . $note : $text;
     }
 
+    /**
+     * QA batch 2 (ORD-12): the import row is locked while a payment is checked and written, so two people
+     * recording the same SWIFT/UTR (or together paying more than the PO) at the same moment cannot both pass.
+     */
     public static function recordPayment(int $id, array $in, int $userId): ?string
+    {
+        $pdo = \App\Config\Database::connection();
+        $own = !$pdo->inTransaction();
+        if ($own) {
+            $pdo->beginTransaction();
+        }
+        try {
+            $pdo->prepare('SELECT id FROM import_shipments WHERE id = :id FOR UPDATE')->execute(['id' => $id]);
+            $error = self::recordPaymentLocked($id, $in, $userId);
+            if ($own) {
+                $error === null ? $pdo->commit() : $pdo->rollBack();
+            }
+            return $error;
+        } catch (\Throwable $e) {
+            if ($own && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    private static function recordPaymentLocked(int $id, array $in, int $userId): ?string
     {
         $s = ImportRepository::find($id);
         $date = trim((string) ($in['paid_on'] ?? ''));

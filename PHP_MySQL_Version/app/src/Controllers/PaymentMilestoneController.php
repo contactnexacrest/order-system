@@ -83,6 +83,13 @@ final class PaymentMilestoneController
             self::back($orderId);
             return;
         }
+        // QA batch 2 (ORD-06): an LC order never clears an advance — its schedule is fixed once the LC is confirmed usable.
+        $lc = \App\Repositories\OrderLcDetailRepository::find($orderId);
+        if ($lc !== null && !empty($lc['lc_confirmed_at'])) {
+            Flash::set('error', 'The payment schedule is fixed once the LC is confirmed usable — change it with a payment terms amendment.');
+            self::back($orderId);
+            return;
+        }
         if (PaymentMilestoneRepository::anyMoneyRecorded($orderId)) {
             Flash::set('error', 'A milestone payment is already recorded — the schedule can no longer be changed.');
             self::back($orderId);

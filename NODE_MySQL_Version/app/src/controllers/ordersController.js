@@ -100,6 +100,7 @@ const fileUploadService = require('../services/fileUploadService');
 const testModeService = require('../services/testModeService');
 const wetSignatureGuardService = require('../services/wetSignatureGuardService');
 const partPaymentService = require('../services/partPaymentService');
+const moneyHelper = require('../helpers/money');
 const remittanceDifference = require('../services/remittanceDifference');
 const { todayIst } = require('../helpers/dbDateTime');
 const dates = require('../helpers/dates');
@@ -286,7 +287,7 @@ async function indexKanban(req, res, seesAllOrders) {
 }
 
 async function archivedIndex(req, res) {
-  res.renderView('orders/archived', { orders: await orderRepository.allArchived() }, 'layout/base');
+  res.renderView('orders/archived', { orders: await orderRepository.allArchived(req.user.id, req.permissions) }, 'layout/base');
 }
 
 /**
@@ -812,6 +813,17 @@ async function updateDetails(req, res) {
     flash.set(req, 'error', conflict);
     res.redirect(`/orders/${orderId}/edit`);
     return;
+  }
+  // QA batch 2 (ORD-07): the incoterm decides the freight stage (FOB skips Stage 6), which is settled once
+  // Stage 6 is reached or skipped — after that an incoterm change would leave freight wrong either way.
+  if (incotermId !== Number(order.incoterm_id)) {
+    const freightStage = await orderStageRepository.findByOrderAndStageNumber(orderId, 6);
+    if (freightStage && ['in_progress', 'gate_passed', 'skipped'].includes(freightStage.status)) {
+      flash.set(req, 'error', `The incoterm can no longer change: the freight stage (Stage 6) is already ${freightStage.status === 'skipped' ? 'skipped' : 'under way'} for the current incoterm. Agree the change with the buyer through an amendment, and ask an administrator to correct the order.`);
+      flash.setOld(req, body);
+      res.redirect(`/orders/${orderId}/edit`);
+      return;
+    }
   }
 
   const reason = str(body.reason);
@@ -1886,7 +1898,10 @@ async function generatePiFormLink(req, res) {
   const rawToken = await piIntakeRepository.createLink(orderId, user.id);
   const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/pi-details/${rawToken}`;
 
-  if (order.client_email) {
+  // QA batch 3 MAIL-4: fall back to the client record's e-mail; MAIL-2: report what really happened.
+  const clientEmail = await require('../services/emailDispatchService').clientEmailFor(order);
+  let sent = false;
+  if (clientEmail !== null) {
     // 90-item backlog #37: admin-editable (Admin > Settings > Email
     // Templates) — this exact original wording is the fallback.
     const rendered = await emailTemplateRepository.renderOrDefault(
@@ -1899,11 +1914,11 @@ async function generatePiFormLink(req, res) {
         + 'This link works for 30 days.\n\n'
         + 'NexaCrest International Private Limited'
     );
-    await emailService.sendPlainText(order.client_email, rendered.subject, rendered.body);
+    sent = await emailService.sendPlainText(clientEmail, rendered.subject, rendered.body);
   }
 
-  await auditLogRepository.log(user.id, 'PI_INTAKE_LINK_GENERATED', 'orders', orderId, null, null, null, 'PI-stage intake link generated' + (order.client_email ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
-  flash.set(req, 'success', `PI-stage form link${order.client_email ? ` emailed to ${order.client_email}` : ' generated'}: ${link}`);
+  await auditLogRepository.log(user.id, 'PI_INTAKE_LINK_GENERATED', 'orders', orderId, null, null, null, 'PI-stage intake link generated' + (sent ? ' and emailed to client' : (clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
+  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('PI-stage form link', clientEmail, sent, link));
   res.redirect(linkReturnUrl(orderId, 'step-5a-pi-form-link'));
 }
 
@@ -1933,7 +1948,10 @@ async function generateBuyerActionLink(req, res) {
   }
   const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/buyer-action/${rawToken}`;
 
-  if (order.client_email) {
+  // QA batch 3 MAIL-4: fall back to the client record's e-mail; MAIL-2: report what really happened.
+  const clientEmail = await require('../services/emailDispatchService').clientEmailFor(order);
+  let sent = false;
+  if (clientEmail !== null) {
     // 90-item backlog #37: admin-editable (Admin > Settings > Email
     // Templates) — this exact original wording is the fallback.
     const rendered = await emailTemplateRepository.renderOrDefault(
@@ -1945,11 +1963,11 @@ async function generateBuyerActionLink(req, res) {
         + 'This link works for 90 days.\n\n'
         + 'NexaCrest International Private Limited'
     );
-    await emailService.sendPlainText(order.client_email, rendered.subject, rendered.body);
+    sent = await emailService.sendPlainText(clientEmail, rendered.subject, rendered.body);
   }
 
-  await auditLogRepository.log(user.id, 'BUYER_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Buyer Action link generated' + (order.client_email ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
-  flash.set(req, 'success', `Buyer Action link${order.client_email ? ` emailed to ${order.client_email}` : ' generated'}: ${link}`);
+  await auditLogRepository.log(user.id, 'BUYER_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Buyer Action link generated' + (sent ? ' and emailed to client' : (clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
+  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('Buyer Action link', clientEmail, sent, link));
   // Owner request (2026-10-26): sent from Step 4b or 6b — return to that card (3 Nov: opened, link focused).
   res.redirect(linkReturnUrl(orderId, returnAnchor));
 }
@@ -1970,8 +1988,9 @@ async function generatePaymentActionLink(req, res) {
 
   const user = req.user;
   const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/payment-action/${await orderRepository.generatePaymentActionToken(orderId)}`;
-  const clientEmail = order.client_email || ((await clientRepository.find(order.client_id)) || {}).email || null;
-  if (clientEmail) {
+  const clientEmail = await require('../services/emailDispatchService').clientEmailFor(order);
+  let sent = false;
+  if (clientEmail !== null) {
     const rendered = await emailTemplateRepository.renderOrDefault(
       'payment_action_link',
       { '{order_reference}': order.order_reference, '{payment_action_link}': link },
@@ -1981,11 +2000,11 @@ async function generatePaymentActionLink(req, res) {
         + 'Our team will check them against our bank statement and confirm. The same link works for every payment on this order.\n\n'
         + 'NexaCrest International Private Limited'
     );
-    await emailService.sendPlainText(clientEmail, rendered.subject, rendered.body);
+    sent = await emailService.sendPlainText(clientEmail, rendered.subject, rendered.body);
   }
 
-  await auditLogRepository.log(user.id, 'PAYMENT_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Payment Action link generated' + (clientEmail ? ' and emailed to client' : ' — no client email on file, hand this link over directly'));
-  flash.set(req, 'success', `Payment Action link${clientEmail ? ` emailed to ${clientEmail}` : ' generated'}: ${link}`);
+  await auditLogRepository.log(user.id, 'PAYMENT_ACTION_LINK_GENERATED', 'orders', orderId, null, null, null, 'Payment Action link generated' + (sent ? ' and emailed to client' : (clientEmail !== null ? ' — the e-mail was not sent, hand this link over directly' : ' — no client email on file, hand this link over directly')));
+  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('Payment Action link', clientEmail, sent, link));
   res.redirect(linkReturnUrl(orderId, linkReturnAnchor(req, 'step-5d-payment-record')));
 }
 
@@ -2493,6 +2512,12 @@ async function recordLcDetails(req, res) {
     return;
   }
   const user = req.user;
+  // QA batch 2 (ORD-10): the LC route exists only on an LC order — never a side door past the cash advance.
+  if (order.payment_method !== 'LC') {
+    flash.set(req, 'error', 'This order is not paid by Letter of Credit.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
 
   const lcAmount = parseFloat(req.body.lc_amount || 0);
   if (!(lcAmount > 0)) {
@@ -2662,6 +2687,13 @@ async function addLcAmendment(req, res) {
 async function confirmLcUsable(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const user = req.user;
+  // QA batch 2 (ORD-10): the LC route exists only on an LC order — never a side door past the cash advance.
+  const lcOrder = await orderRepository.find(orderId);
+  if (!lcOrder || lcOrder.payment_method !== 'LC') {
+    flash.set(req, 'error', 'This order is not paid by Letter of Credit.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   if (!(await stageGateService.isUnlocked(orderId, 3))) {
     flash.set(req, 'error', 'Stage 3 has not been unlocked for this order yet — complete Stage 2 first.');
     res.redirect(`/orders/${orderId}`);
@@ -3230,6 +3262,7 @@ async function generateSupplierActionLink(req, res) {
   const rawToken = await orderSupplierPoRepository.generateActionToken(supplierPo.id);
   const link = `${env.get('APP_URL', '').replace(/\/+$/, '')}/supplier-action/${rawToken}`;
   const email = String(supplierPo.supplier_email || '').trim();
+  let sent = false;
   if (email !== '') {
     const rendered = await emailTemplateRepository.renderOrDefault(
       'supplier_action_link',
@@ -3240,10 +3273,11 @@ async function generateSupplierActionLink(req, res) {
         + 'This link works for 60 days.\n\n'
         + 'NexaCrest International Private Limited'
     );
-    await emailService.sendPlainText(email, rendered.subject, rendered.body);
+    sent = await emailService.sendPlainText(email, rendered.subject, rendered.body);
   }
-  await auditLogRepository.log(req.user.id, 'SUPPLIER_ACTION_LINK_GENERATED', 'order_supplier_po', supplierPo.id, null, null, null, 'Supplier Action link generated' + (email !== '' ? ' and emailed to the supplier' : ' — no supplier email on the PO, hand this link over directly'));
-  flash.set(req, 'success', `Supplier Action link${email !== '' ? ` emailed to ${email}` : ' generated'}: ${link}`);
+  await auditLogRepository.log(req.user.id, 'SUPPLIER_ACTION_LINK_GENERATED', 'order_supplier_po', supplierPo.id, null, null, null, 'Supplier Action link generated' + (sent ? ' and emailed to the supplier' : (email !== '' ? ' — the e-mail was not sent, hand this link over directly' : ' — no supplier email on the PO, hand this link over directly')));
+  // QA batch 3 MAIL-2: "emailed" only when the e-mail really went out.
+  flash.set(req, 'success', await require('../services/emailDispatchService').linkMailOutcome('Supplier Action link', email !== '' ? email : null, sent, link));
   res.redirect(linkReturnUrl(orderId, 'step-7c-supplier-po-attach'));
 }
 
@@ -4882,6 +4916,20 @@ async function markLost(req, res) {
     res.redirect(`/orders/${orderId}`);
     return;
   }
+  // QA batch 2 (ORD-04): "lost" is the walk-away before any money. Once the buyer has paid (or an LC is
+  // confirmed usable), or while a cancellation awaits its decision, the order goes through the
+  // cancellation workflow instead (second approver, refund recorded with its bank reference).
+  if (await orderCancellationRepository.findPendingForOrder(orderId)) {
+    flash.set(req, 'error', 'This order has a cancellation request awaiting a decision — approve or reject it instead of marking the order lost.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  const lc = await orderLcDetailRepository.find(orderId);
+  if ((await partPaymentService.orderReceivedTotal(orderId)) > 0 || (lc && lc.lc_confirmed_at)) {
+    flash.set(req, 'error', 'The buyer has already paid on this order, so it cannot be marked lost. Use Request Cancellation: a second person approves it and the refund is recorded.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   const reason = str(req.body.reason);
   const reasonError = reasonValidator.check(reason);
   if (reasonError) {
@@ -4966,17 +5014,52 @@ async function approveCancellation(req, res) {
     return;
   }
 
+  // QA batch 2 (ORD-01): the request may be weeks old — only an order that is still running
+  // (active or disputed) can be cancelled. A shipped, settled or lost order keeps its status.
+  const freshOrder = await orderRepository.find(orderId);
+  if (!freshOrder || !['active', 'disputed'].includes(freshOrder.status)) {
+    flash.set(req, 'error', `This order is now "${freshOrder ? freshOrder.status : 'missing'}", so the cancellation can no longer be approved. Reject the request instead.`);
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+
+  // QA batch 2 (ORD-03, rule D-212): a refund is "completed" only through Record refund paid, with the
+  // date it left the bank and its bank reference. Approval records "pending" or "not applicable".
   let refundStatus = String(req.body.refund_status || 'not_applicable');
-  if (!['not_applicable', 'pending', 'completed'].includes(refundStatus)) {
+  if (refundStatus === 'completed') {
+    flash.set(req, 'error', 'Approve with "Refund pending", then record the refund with the date it was paid and its bank reference.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
+  if (!['not_applicable', 'pending'].includes(refundStatus)) {
     refundStatus = 'not_applicable';
   }
   const refundAmountRaw = str(req.body.refund_amount);
-  const refundAmount = refundAmountRaw !== '' && !Number.isNaN(Number(refundAmountRaw)) ? Number(refundAmountRaw) : null;
+  const fmt2 = (v) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let refundAmount = null;
+  if (refundAmountRaw !== '') {
+    const received = await partPaymentService.orderReceivedTotal(orderId);
+    const n = Number(refundAmountRaw);
+    if (!/^-?\d+(\.\d+)?$/.test(refundAmountRaw) || !(n > 0)) {
+      flash.set(req, 'error', 'Enter the refund amount as a number above zero, or leave it empty.');
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    if (moneyHelper.round2(n) > received) {
+      flash.set(req, 'error', `The refund (${fmt2(n)}) is more than the buyer has paid on this order (${fmt2(received)}).`);
+      res.redirect(`/orders/${orderId}`);
+      return;
+    }
+    refundAmount = moneyHelper.round2(n);
+  }
   const decisionNotes = str(req.body.decision_notes) || null;
 
+  if (!(await orderRepository.cancel(orderId))) {
+    flash.set(req, 'error', 'The order changed while you were deciding, so it was not cancelled. Reload and check it.');
+    res.redirect(`/orders/${orderId}`);
+    return;
+  }
   await orderCancellationRepository.approve(cancellationId, user.id, decisionNotes, refundAmount, refundStatus);
-  const freshOrder = await orderRepository.find(orderId);
-  await orderRepository.cancel(orderId);
   // External QA report N-07: the requester was never told what happened
   // to their own request — only the catch-all notification email below
   // fired.

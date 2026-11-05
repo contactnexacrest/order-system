@@ -544,6 +544,9 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .page-header-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap;}
 .page-header-row h1{margin:0 0 2px;}
 .filter-chip-row{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.25rem;}
+/* QA batch 2 (UI-6): the GET filter form on the Imports and Merchant trade list/board pages. */
+form.filters{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:0 0 12px;}
+form.filters label{display:flex;flex-direction:column;gap:4px;font-size:0.85rem;}
 .filter-chip{background:#fff;color:var(--ink-soft);font-size:0.82rem;font-weight:600;padding:0.45rem 1rem;border-radius:8px;border:1px solid var(--line);text-decoration:none;}
 .filter-chip:hover{border-color:var(--navy);color:var(--navy);text-decoration:none;}
 .filter-chip.active{background:var(--navy);color:#fff;border-color:var(--navy);}

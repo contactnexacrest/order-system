@@ -84,10 +84,20 @@ final class AlertRunCache
         if (self::$once === null) {
             self::$once = [];
             foreach (Database::connection()->query("SELECT user_id, type, related_order_id, message FROM notifications WHERE type IN ('lc_last_shipment_soon', 'lc_presentation_soon', 'lc_expiry_soon')")->fetchAll() as $r) {
-                self::$once[$r['user_id'] . '|' . $r['type'] . '|' . (int) $r['related_order_id'] . '|' . $r['message']] = true;
+                self::$once[$r['user_id'] . '|' . $r['type'] . '|' . (int) $r['related_order_id'] . '|' . self::onceMessageKey((string) $r['message'])] = true;
             }
         }
         return self::$once;
+    }
+
+    /**
+     * QA batch 3 MAIL-3: a "once" reminder is once per date — the day count
+     * in the message ("(5 day(s) away)") changes every day, so it is left out
+     * of the dedupe key; the date itself stays in.
+     */
+    public static function onceMessageKey(string $message): string
+    {
+        return (string) preg_replace('/ \(\d+ day\(s\) away\)\.$/', '', $message);
     }
 
     /** @return list<int> */
@@ -130,7 +140,7 @@ function notifyOnce(array $userIds, string $type, string $message, int $relatedO
     $count = 0;
     $sent = AlertRunCache::once();
     foreach (array_unique($userIds) as $userId) {
-        $key = $userId . '|' . $type . '|' . $relatedOrderId . '|' . $message;
+        $key = $userId . '|' . $type . '|' . $relatedOrderId . '|' . AlertRunCache::onceMessageKey($message);
         if (isset($sent[$key])) {
             continue;
         }
@@ -217,19 +227,22 @@ function run(): int
     // calendar days too — the alert fires the day after the date printed on
     // the FDN, not later.
     $fdnOverdueDays = (int) (CompanySettingsRepository::get('fdn_overdue_days_c') ?? '3');
+    // QA batch 3 MAIL-1: the FDN the buyer was actually issued (the latest
+    // released revision — sent, or approved while e-mail is off), counted from
+    // the date printed on it; not for a locked, cancelled or lost order.
     $stmt = $pdo->query(
-        "SELECT o.id AS order_id, o.order_reference, d.generated_at
-         FROM order_freight of_
-         JOIN documents d ON d.id = of_.fdn_document_id
-         JOIN orders o ON o.id = of_.order_id
+        "SELECT o.id AS order_id, o.order_reference, d.fdn_date
+         FROM (" . \App\Repositories\DashboardRepository::releasedFdnSql() . ") d
+         JOIN orders o ON o.id = d.order_id
          LEFT JOIN order_payment_status ps ON ps.order_id = o.id
-         WHERE of_.fdn_document_id IS NOT NULL
-           AND ps.freight_cleared_at IS NULL"
+         WHERE ps.freight_cleared_at IS NULL
+           AND o.is_locked = 0 AND o.status NOT IN ('cancelled', 'lost')"
     );
     foreach ($stmt->fetchAll() as $row) {
-        $dueDate = (new DateTimeImmutable(substr((string) $row['generated_at'], 0, 10)))->modify("+{$fdnOverdueDays} days")->format('Y-m-d');
+        $dueDate = (new DateTimeImmutable((string) $row['fdn_date']))->modify("+{$fdnOverdueDays} days")->format('Y-m-d');
         if ($dueDate < $today->format('Y-m-d')) {
-            $created += notifyMdAndAdmin($mdAndAdminIds, 'fdn_overdue', "Freight payment overdue on order {$row['order_reference']} — FDN issued {$row['generated_at']}, still not cleared.", (int) $row['order_id']);
+            $issued = (new DateTimeImmutable((string) $row['fdn_date']))->format('d F Y');
+            $created += notifyMdAndAdmin($mdAndAdminIds, 'fdn_overdue', "Freight payment overdue on order {$row['order_reference']} — FDN dated {$issued}, still not cleared.", (int) $row['order_id']);
         }
     }
 

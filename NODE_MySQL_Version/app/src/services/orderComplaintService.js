@@ -74,7 +74,9 @@ async function emailClient(complaintId, authorUserId, body) {
   const complaint = await orderComplaintRepository.find(complaintId);
   if (!complaint) return;
   const order = await orderRepository.find(complaint.order_id);
-  if (!order || !order.client_email) return;
+  // QA batch 3 MAIL-4: the client record's e-mail when the order has none of its own.
+  const clientEmail = order ? await require('./emailDispatchService').clientEmailFor(order) : null;
+  if (!order || clientEmail === null) return;
 
   const sender = await userRepository.findById(authorUserId);
   const subject = `Update on your complaint for order ${order.order_reference} — ${await companySettingsRepository.get('legal_name')}`;
@@ -82,9 +84,9 @@ async function emailClient(complaintId, authorUserId, body) {
   const signature = (sender && sender.email_signature ? String(sender.email_signature).trim() : '');
   const message = greeting + body + '\n\n' + (signature !== ''
     ? signature
-    : `Regards,\n${(sender && sender.name) || ''}\n${await companySettingsRepository.get('md_title')}`);
+    : `Regards,\n${(sender && sender.name) || ''}\n${await require('./emailDispatchService').senderTitleFor(sender || null)}`); // QA batch 3 MAIL-5
 
-  await mailSenderService.send(order.client_email, subject, message, []);
+  await mailSenderService.send(clientEmail, subject, message, []);
 }
 
 module.exports = { raiseAsClient, raiseAsStaff, replyAsStaff, replyAsClient, updateStatus };

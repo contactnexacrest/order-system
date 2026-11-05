@@ -118,7 +118,7 @@ describe('Payment terms wording on the PI, CI, QT, OC and Debit Note (owner deci
   it('the Word quotation, confirmation and debit note count buyer payments in Calendar Days', async () => {
     const orderId = await order();
     const expected = {
-      QT: 'Payment required within 3 Calendar Days of Freight Debit Note date.',
+      QT: 'Payment required within 3 Calendar Days of Debit Note date.' /* QA batch 3 DOC-3: the PDF's wording */,
       OC: 'Payment required within 3 Calendar Days of the Debit Note date.',
       FDN: 'Within 3 Calendar Days of this Debit Note date — by',
     };

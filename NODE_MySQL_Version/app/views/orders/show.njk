@@ -737,9 +737,8 @@
           <select name="refund_status" aria-label="Refund status">
             <option value="not_applicable">No refund applicable</option>
             <option value="pending">Refund pending</option>
-            <option value="completed">Refund already completed</option>
           </select>
-          <input type="text" name="refund_amount" placeholder="Refund amount (optional)" style="width:160px" aria-label="Refund amount">
+          <input type="number" name="refund_amount" min="0.01" step="0.01" placeholder="Refund amount (optional), e.g. 2500.00" style="width:200px" aria-label="Refund amount">
           <input type="text" name="decision_notes" placeholder="Approval notes (optional)" style="width:220px" aria-label="Approval notes">
           <button type="submit" class="btn-sm btn-success">Approve Cancellation</button>
         </form>

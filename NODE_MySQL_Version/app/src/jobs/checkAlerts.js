@@ -66,7 +66,7 @@ async function onceSent() {
   if (runCache.once === null) {
     runCache.once = new Set();
     const rows = await db.query("SELECT user_id, type, related_order_id, message FROM notifications WHERE type IN ('lc_last_shipment_soon', 'lc_presentation_soon', 'lc_expiry_soon')");
-    for (const r of rows) runCache.once.add(`${Number(r.user_id)}|${r.type}|${Number(r.related_order_id)}|${r.message}`);
+    for (const r of rows) runCache.once.add(`${Number(r.user_id)}|${r.type}|${Number(r.related_order_id)}|${onceMessageKey(r.message)}`);
   }
   return runCache.once;
 }
@@ -91,11 +91,20 @@ async function notifyMdAndAdmin(userIds, type, message, relatedOrderId = null) {
  * person, order and date (not once a day) — sent again only if the date
  * itself changes (e.g. after an LC amendment).
  */
+/**
+ * QA batch 3 MAIL-3 (port of PHP AlertRunCache::onceMessageKey): a "once"
+ * reminder is once per date — the changing "(5 day(s) away)" is left out of
+ * the dedupe key; the date itself stays in.
+ */
+function onceMessageKey(message) {
+  return String(message).replace(/ \(\d+ day\(s\) away\)\.$/, '');
+}
+
 async function notifyOnce(userIds, type, message, relatedOrderId) {
   let count = 0;
   const sent = await onceSent();
   for (const userId of [...new Set(userIds.map(Number))]) {
-    const key = `${userId}|${type}|${Number(relatedOrderId)}|${message}`;
+    const key = `${userId}|${type}|${Number(relatedOrderId)}|${onceMessageKey(message)}`;
     if (sent.has(key)) {
       continue;
     }
@@ -193,22 +202,26 @@ async function run() {
   // calendar days too — the alert fires the day after the date printed on
   // the FDN, not later.
   const fdnOverdueDays = parseInt((await companySettingsRepository.get('fdn_overdue_days_c')) || '3', 10);
+  // QA batch 3 MAIL-1: the FDN the buyer was actually issued (the latest
+  // released revision), counted from the date printed on it; not for a
+  // locked, cancelled or lost order.
   const overdueFreight = await db.query(
-    `SELECT o.id AS order_id, o.order_reference, d.generated_at
-     FROM order_freight of_
-     JOIN documents d ON d.id = of_.fdn_document_id
-     JOIN orders o ON o.id = of_.order_id
+    `SELECT o.id AS order_id, o.order_reference, d.fdn_date
+     FROM (${await require('../repositories/dashboardRepository').releasedFdnSql()}) d
+     JOIN orders o ON o.id = d.order_id
      LEFT JOIN order_payment_status ps ON ps.order_id = o.id
-     WHERE of_.fdn_document_id IS NOT NULL
-       AND ps.freight_cleared_at IS NULL`
+     WHERE ps.freight_cleared_at IS NULL
+       AND o.is_locked = 0 AND o.status NOT IN ('cancelled', 'lost')`
   );
   const todayStr = today.toISOString().slice(0, 10);
   for (const row of overdueFreight) {
-    const due = new Date(`${String(row.generated_at).slice(0, 10)}T00:00:00Z`);
+    const fdnDate = String(row.fdn_date).slice(0, 10);
+    const due = new Date(`${fdnDate}T00:00:00Z`);
     due.setUTCDate(due.getUTCDate() + fdnOverdueDays);
     const dueDate = due.toISOString().slice(0, 10);
     if (dueDate < todayStr) {
-      created += await notifyMdAndAdmin(mdAndAdminIds, 'fdn_overdue', `Freight payment overdue on order ${row.order_reference} — FDN issued ${row.generated_at}, still not cleared.`, row.order_id);
+      const issued = require('../services/documentDataAssembler').formatDate(fdnDate);
+      created += await notifyMdAndAdmin(mdAndAdminIds, 'fdn_overdue', `Freight payment overdue on order ${row.order_reference} — FDN dated ${issued}, still not cleared.`, row.order_id);
     }
   }
 

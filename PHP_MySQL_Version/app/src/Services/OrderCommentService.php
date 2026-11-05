@@ -45,7 +45,10 @@ final class OrderCommentService
             OrderCommentRepository::attachFile($commentId, $fileId);
         }
 
-        if (!empty($order['client_email'])) {
+        // QA batch 3 MAIL-4: the client record's e-mail when the order has none of its own.
+        $clientEmail = EmailDispatchService::clientEmailFor($order);
+        if ($clientEmail !== null) {
+            $order['client_email'] = $clientEmail;
             self::emailClient($order, $authorUserId, $commentId, $bodyTrim, $fileStoreIds);
         }
 
@@ -117,7 +120,7 @@ final class OrderCommentService
         $signature = trim((string) ($sender['email_signature'] ?? ''));
         $message .= $signature !== ''
             ? $signature
-            : "Regards,\n" . ($sender['name'] ?? '') . "\n" . (string) CompanySettingsRepository::get('md_title');
+            : "Regards,\n" . ($sender['name'] ?? '') . "\n" . EmailDispatchService::senderTitle($sender ?: null); // QA batch 3 MAIL-5: the sender's own title, not the MD's
 
         $sent = MailSenderService::send($order['client_email'], $subject, $message, $direct);
         if ($sent) {

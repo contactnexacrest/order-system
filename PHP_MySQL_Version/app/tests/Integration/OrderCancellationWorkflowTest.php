@@ -100,6 +100,9 @@ final class OrderCancellationWorkflowTest extends DbTestCase
         $requester = $this->createTestUser('Export Executive');
         $approver = $this->createTestUser('Admin');
         $cancellationId = OrderCancellationRepository::create($orderId, 'Buyer requested cancellation before shipment.', $requester);
+        // QA batch 2 (ORD-03): a refund is at most what the buyer has paid — record the advance received.
+        Database::connection()->prepare("INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, inr_credited, bank_reference) VALUES (:o, 'advance', 3000, '2026-10-10', 84, 252000, :r)")
+            ->execute(['o' => $orderId, 'r' => 'UTR-CANCEL-' . $orderId]);
 
         $_SESSION['_auth_user_id'] = $approver;
         $_POST = ['refund_status' => 'pending', 'refund_amount' => '1500.50', 'decision_notes' => 'Advance will be refunded once reconciled.'];

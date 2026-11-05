@@ -73,7 +73,8 @@ final class EmailLogRepository
     public static function hasActiveSendFor(int $documentId): bool
     {
         $stmt = Database::connection()->prepare(
-            "SELECT 1 FROM email_log WHERE document_id = :document_id AND status IN ('pending_approval', 'approved') LIMIT 1"
+            // QA batch 3 MAIL-9: a row being sent right now ('sending') is in flight too.
+            "SELECT 1 FROM email_log WHERE document_id = :document_id AND status IN ('pending_approval', 'approved', 'sending') LIMIT 1"
         );
         $stmt->execute(['document_id' => $documentId]);
         return (bool) $stmt->fetchColumn();

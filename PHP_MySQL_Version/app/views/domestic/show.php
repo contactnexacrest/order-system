@@ -65,7 +65,7 @@ $next = $stage !== 'closed' ? $keys[array_search($stage, $keys, true) + 1] : nul
         <td><?php if ($canEdit && $linesOpen): ?><form method="post" action="/domestic/orders/<?= $id ?>/lines/<?= (int) $l['id'] ?>/delete" data-confirm="Remove this line?"><?= Csrf::field() ?><button type="submit" class="btn-link">Remove</button></form><?php endif; ?></td>
       </tr>
       <?php endforeach; ?>
-      <?php if ($lines === []): ?><tr><td colspan="11" class="muted">No lines yet.</td></tr><?php endif; ?>
+      <?php if ($lines === []): ?><tr><td colspan="<?= $seesPrices ? 11 : 6 /* QA batch 2 (UI-14) */ ?>" class="muted">No lines yet.</td></tr><?php endif; ?>
     </table>
     <?php if ($seesPrices && $lines !== []): ?>
     <p data-testid="dom-totals">Taxable ₹<?= $h(G::inr($totals['taxable_total'])) ?>

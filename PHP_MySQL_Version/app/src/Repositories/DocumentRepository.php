@@ -123,6 +123,24 @@ final class DocumentRepository
             ->execute(['date' => $date, 'id' => $documentId]);
     }
 
+    /**
+     * QA batch 3 DOC-6: every revision of an order's document type, newest
+     * first (superseded ones left out).
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public static function liveRevisionsForOrderAndTypeCode(int $orderId, string $documentTypeCode): array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT d.id FROM documents d
+             JOIN document_types dt ON dt.id = d.document_type_id
+             WHERE d.order_id = :order_id AND dt.code = :code AND d.status <> 'superseded'
+             ORDER BY d.revision_number DESC"
+        );
+        $stmt->execute(['order_id' => $orderId, 'code' => $documentTypeCode]);
+        return array_values(array_filter(array_map(static fn ($id): ?array => self::find((int) $id), $stmt->fetchAll(\PDO::FETCH_COLUMN))));
+    }
+
     /** The date a document carries: the one staff picked, else the day it was generated. */
     public static function printedDate(array $document): string
     {
@@ -237,6 +255,36 @@ final class DocumentRepository
                 SET fs.sent_to_client = 1, fs.sent_at = COALESCE(fs.sent_at, NOW())
               WHERE d.id = :id'
         )->execute(['id' => $id]);
+    }
+
+    /**
+     * QA batch 3 DOC-2: the full render context a revision was generated
+     * with, so the FINAL and SUPERSEDED copies are re-rendered from what was
+     * actually reviewed / sent, never from live order data. Best effort: a
+     * context that cannot be encoded is simply not stored (old live path).
+     *
+     * @param array<string,mixed> $context
+     */
+    public static function storeRenderContext(int $documentId, array $context): void
+    {
+        $json = json_encode($context, JSON_INVALID_UTF8_SUBSTITUTE | JSON_PRESERVE_ZERO_FRACTION);
+        if ($json === false) {
+            return;
+        }
+        Database::connection()->prepare('UPDATE documents SET render_context_json = :c WHERE id = :id')->execute(['c' => $json, 'id' => $documentId]);
+    }
+
+    /** @return array<string,mixed>|null */
+    public static function renderContext(int $documentId): ?array
+    {
+        $stmt = Database::connection()->prepare('SELECT render_context_json FROM documents WHERE id = :id');
+        $stmt->execute(['id' => $documentId]);
+        $json = $stmt->fetchColumn();
+        if (!is_string($json) || $json === '') {
+            return null;
+        }
+        $context = json_decode($json, true);
+        return is_array($context) ? $context : null;
     }
 
     /**

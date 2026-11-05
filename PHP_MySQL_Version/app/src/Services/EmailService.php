@@ -64,6 +64,14 @@ final class EmailService
      */
     public static function sendPlainText(string $toEmail, string $subject, string $body, bool $isSecurityEmail = false): bool
     {
+        // QA batch 3 MAIL-2: every business e-mail (link e-mails, notifications,
+        // alerts) goes through MailSenderService — the one place with the
+        // "e-mail sending off" switch, Test Mode, Mail Redirect and the Zoho
+        // transport. Only security mail (2FA, password reset, one-time codes)
+        // keeps this direct path.
+        if (!$isSecurityEmail) {
+            return MailSenderService::send($toEmail, $subject, $body);
+        }
         $to = TestModeService::resolveEmailRecipient($toEmail, $isSecurityEmail, $subject);
         if ($to === null) {
             // QA-5 TM-07: Test Mode is on and no test_email is configured —
@@ -184,6 +192,10 @@ final class EmailService
      */
     public static function sendWithAttachments(string $toEmail, string $subject, string $body, array $attachments, bool $isSecurityEmail = false): bool
     {
+        // QA batch 3 MAIL-2: business mail goes through MailSenderService (see sendPlainText()).
+        if (!$isSecurityEmail) {
+            return MailSenderService::send($toEmail, $subject, $body, $attachments);
+        }
         $to = TestModeService::resolveEmailRecipient($toEmail, $isSecurityEmail, $subject);
         if ($to === null) {
             // QA-5 TM-07: see sendPlainText() above.
@@ -207,6 +219,15 @@ final class EmailService
      */
     public static function deliverWithAttachments(string $to, string $subject, string $body, array $attachments, array $cc = []): bool
     {
+        // QA batch 3 MAIL-10: an attachment whose file is missing fails the send
+        // clearly (as on Node) — never a mail that says "please see the attached
+        // file" with nothing attached.
+        foreach ($attachments as $att) {
+            if (!is_file((string) ($att['path'] ?? ''))) {
+                error_log("[EMAIL NOT SENT — attachment missing] To: {$to} | Subject: {$subject} | Attachment: " . ($att['name'] ?? ''));
+                return false;
+            }
+        }
         $smtpHost = Env::get('SMTP_HOST');
         $hasPhpMailer = class_exists('PHPMailer\\PHPMailer\\PHPMailer');
 

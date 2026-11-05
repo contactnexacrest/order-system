@@ -75,6 +75,10 @@ final class AmendmentController
                 $numberError = 'Amended advance %: 0% is allowed only on a Letter of Credit order. Enter the advance %.';
             }
         }
+        // QA batch 2 (ORD-02): the balance is what the advance and the payment milestones leave — never negative.
+        if ($numberError === null && $amendedAdvancePct !== null) {
+            $numberError = \App\Services\AmendmentService::milestoneOverflowError($orderId, (float) $amendedAdvancePct);
+        }
         if ($numberError !== null) {
             Flash::set('error', $numberError);
             header("Location: /orders/{$orderId}/amendments");

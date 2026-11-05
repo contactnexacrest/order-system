@@ -123,7 +123,7 @@ final class AssociateIntakeService
         Database::connection()->prepare('UPDATE client_intake_submissions SET email_code_hash = :h, email_code_expires_at = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE id = :id')
             ->execute(['h' => hash('sha256', $code), 'id' => $submissionId]);
         EmailService::sendPlainText($email, 'NexaCrest — your verification code',
-            "Hello,\n\nYour code to confirm your quotation request with NexaCrest: {$code}\n\nIt is valid for 30 minutes.\n\nNexaCrest International Private Limited");
+            "Hello,\n\nYour code to confirm your quotation request with NexaCrest: {$code}\n\nIt is valid for 30 minutes.\n\nNexaCrest International Private Limited", true); // QA batch 3 MAIL-13: a one-time code is security mail
         return $code;
     }
 

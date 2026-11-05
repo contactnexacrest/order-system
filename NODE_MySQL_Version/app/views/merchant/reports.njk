@@ -8,12 +8,13 @@
   <table class="list" data-testid="mtt-open">
     <tr><th>Deal</th><th>Stage</th><th>Buyer</th><th>Whole deal</th><th>Outlay</th><th>Advance</th><th>Bank documents</th></tr>
     {% for r in open %}
-    <tr><td><a href="/merchant/{{ r.id }}">{{ r.reference }}</a></td><td>{{ r.stage_label }}</td><td>{{ r.buyer_name }}</td>
+    <tr><td><a href="/merchant/{{ r.id }}">{{ r.reference }}</a></td><td>{{ r.stage_label }}</td><td>{{ r.buyer_name if money.client else r.buyer_country }}</td>
       {% for c in r.statusCells %}<td style="{{ c.style }}">{{ c.text }}</td>{% endfor %}</tr>
     {% endfor %}
     {% if open.length == 0 %}<tr><td colspan="7" class="muted">No open deals.</td></tr>{% endif %}
   </table>
 
+  {% if money.selling and money.buyer_payments %}{# QA batch 2 (ACC-4): sale, receipts and margin are selling-side money #}
   <h2>Margin per deal</h2>
   <table class="list" data-testid="mtt-margins">
     <tr><th>Deal</th><th>Stage</th><th>Sale</th><th>Received ₹</th><th>Purchase</th><th>Paid ₹</th><th>Margin ₹</th><th>Margin USD</th><th>Margin %</th></tr>
@@ -25,4 +26,5 @@
     {% endfor %}
     {% if rows.length == 0 %}<tr><td colspan="9" class="muted">No deals yet.</td></tr>{% endif %}
   </table>
+  {% endif %}
 </div>

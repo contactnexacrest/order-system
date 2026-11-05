@@ -204,7 +204,7 @@ final class DocumentGenerationService
                 null,
                 $docxPath,
                 $docxUuidName,
-                "{$documentTypeCode} {$filenameSafeReference} Rev.{$revisionNumber} (internal).docx",
+                "{$documentTypeCode} {$filenameSafeReference} Rev.{$clientRevisionNumber} (internal).docx", // QA batch 3 DOC-3: same revision as the PDF's name
                 filesize($docxPath),
                 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 $generatedByUserId,
@@ -226,6 +226,12 @@ final class DocumentGenerationService
         );
         if ($documentDate !== null) {
             DocumentRepository::setDocumentDate($documentId, $documentDate);
+        }
+        // QA batch 3 DOC-2 (owner confirmed twice): keep what this revision was rendered from.
+        DocumentRepository::storeRenderContext($documentId, $context);
+        // QA batch 3 MAIL-1: the order's freight record points at its latest Freight Debit Note.
+        if ($documentTypeCode === 'FDN') {
+            \App\Repositories\OrderFreightRepository::setFdnDocumentId($orderId, $documentId);
         }
 
         // External QA report M-08: "Regenerating an earlier-stage document
@@ -420,6 +426,24 @@ final class DocumentGenerationService
         7 => ['PL', 'BLI'],
         8 => ['CI'],
     ];
+
+    /**
+     * QA batch 3 DOC-6: the newest revision of a type that the buyer may rely
+     * on (isDocumentComplete()), skipping a newer draft or one still in
+     * review — so a valid, sent PI does not vanish from the buyer's link the
+     * moment staff start a correction.
+     *
+     * @return array<string,mixed>|null the full document row (as DocumentRepository::find())
+     */
+    public static function latestReleasedDocument(int $orderId, string $documentTypeCode): ?array
+    {
+        foreach (DocumentRepository::liveRevisionsForOrderAndTypeCode($orderId, $documentTypeCode) as $document) {
+            if (!empty($document['pdf_file_id']) && self::isDocumentComplete($document)) {
+                return $document;
+            }
+        }
+        return null;
+    }
 
     /**
      * Whether a document counts as finished for its stage: an internal
@@ -692,6 +716,12 @@ final class DocumentGenerationService
             'company' => DocumentDataAssembler::companyFromSnapshot($document),
         ]);
 
+        // QA batch 3 DOC-2 (owner confirmed twice): the FINAL copy shows exactly
+        // what was generated and reviewed — the stored context, only the
+        // watermark swapped. Rows from before the snapshot existed keep the
+        // live re-render above.
+        $context = self::fromStoredContext($documentId, $context['watermark']) ?? $context;
+
         $twig = self::twigEnvironment();
         $html = $twig->render(self::templateFileFor($documentTypeCode), $context);
         $pdfBytes = self::renderPdf($html, $context);
@@ -765,6 +795,23 @@ final class DocumentGenerationService
     private static function clientRevisionFilenameSuffix(int $clientRevisionNumber): string
     {
         return $clientRevisionNumber < 1 ? '' : ' Rev.' . str_pad((string) $clientRevisionNumber, 2, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * QA batch 3 DOC-2: the stored render context of a revision with a new
+     * watermark, or null when the row predates the snapshot.
+     *
+     * @param array<string,mixed> $watermark
+     * @return array<string,mixed>|null
+     */
+    private static function fromStoredContext(int $documentId, array $watermark): ?array
+    {
+        $stored = DocumentRepository::renderContext($documentId);
+        if ($stored === null) {
+            return null;
+        }
+        $stored['watermark'] = $watermark;
+        return $stored;
     }
 
     /**
@@ -850,6 +897,11 @@ final class DocumentGenerationService
             'signatory' => DocumentDataAssembler::signatoryFromSnapshot($document),
             'company' => DocumentDataAssembler::companyFromSnapshot($document),
         ]);
+
+        // QA batch 3 DOC-2 (owner confirmed twice): the SUPERSEDED copy keeps the
+        // figures this revision really carried — the stored context, with the
+        // INVALID watermark — never the newer revision's live data.
+        $context = self::fromStoredContext($documentId, self::invalidWatermark()) ?? $context;
 
         $twig = self::twigEnvironment();
         $html = $twig->render(self::templateFileFor($documentTypeCode), $context);

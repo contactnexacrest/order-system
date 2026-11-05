@@ -59,6 +59,18 @@ async function receivedTotal(orderId, leg, milestoneId = null) {
   return round2(row.t);
 }
 
+/**
+ * QA batch 2 (ORD-03/04): everything the buyer has paid on the order so far, in the order's currency —
+ * the advance, freight and balance legs plus every payment milestone (bank charges deducted count as paid).
+ */
+async function orderReceivedTotal(orderId) {
+  const paymentMilestoneRepository = require('../repositories/paymentMilestoneRepository');
+  let total = 0;
+  for (const leg of LEGS) total += await receivedTotal(orderId, leg);
+  for (const m of await paymentMilestoneRepository.forOrder(orderId)) total += await receivedTotal(orderId, 'milestone', Number(m.id));
+  return round2(total);
+}
+
 /** What the buyer owes on the leg; null when not known yet. */
 async function expected(orderId, leg, milestone = null) {
   const orderRepository = require('../repositories/orderRepository');
@@ -300,6 +312,6 @@ async function pageData(orderId, milestones) {
 
 module.exports = {
   receiptExists,
-  LEGS, TOLERANCE, label, money, receipts, receivedTotal, expected, summary, joinReferences, addLegReceipt, addMilestoneReceipt,
+  LEGS, TOLERANCE, label, money, receipts, receivedTotal, orderReceivedTotal, expected, summary, joinReferences, addLegReceipt, addMilestoneReceipt,
   clearCheck, recordShortfall, recordedBy, clearedMessage, pageData,
 };

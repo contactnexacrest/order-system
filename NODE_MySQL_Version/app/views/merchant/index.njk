@@ -1,5 +1,7 @@
 {# Owner decision D-257 Phase 4: the deals of Merchant Trade — the Standard list and the Kanban board offer the same filter, links, figures and actions (hard rule 2026-11-01). #}
-{% macro card(r) %}<a class="entity-card kanban-card" href="/merchant/{{ r.id }}"><div class="entity-card-header"><span class="entity-card-title">{{ r.reference }}</span><span class="badge badge-protected">{{ r.stage_label }}</span></div><div class="entity-card-sub">{{ r.supplier_name }} ({{ r.supplier_country }}) → {{ r.buyer_name }} ({{ r.buyer_country }})</div><div class="entity-card-footer"><span class="muted small">Buy {{ r.purchase_currency }} {{ r.f.purchase_fmt }}</span><span class="muted small">Sell {{ r.sale_currency }} {{ r.f.sale_fmt }}</span><span class="muted small" data-rbi="{{ r.worst }}">{{ r.rbi_label }}</span></div></a>{% endmacro %}
+{# QA batch 2 (ACC-4): the buyer's name and the sale figures only for those who may see them; UI-6: the card carries the deal date like the list. #}
+{% macro buyer(r, money) %}{% if money.client %}{{ r.buyer_name }} {% else %}Buyer {% endif %}({{ r.buyer_country }}){% endmacro %}
+{% macro card(r, money) %}<a class="entity-card kanban-card" href="/merchant/{{ r.id }}"><div class="entity-card-header"><span class="entity-card-title">{{ r.reference }}</span><span class="badge badge-protected">{{ r.stage_label }}</span></div><div class="entity-card-sub">{{ r.supplier_name }} ({{ r.supplier_country }}) → {{ buyer(r, money) }}</div><div class="entity-card-sub muted small" data-field="deal_date">Deal date {{ r.deal_date }}</div><div class="entity-card-footer"><span class="muted small">Buy {{ r.purchase_currency }} {{ r.f.purchase_fmt }}</span>{% if money.selling %}<span class="muted small">Sell {{ r.sale_currency }} {{ r.f.sale_fmt }}</span>{% endif %}<span class="muted small" data-rbi="{{ r.worst }}">{{ r.rbi_label }}</span></div></a>{% endmacro %}
 <div class="card page-wide" data-testid="mtt-list">
   <div class="page-header-row">
     <div>
@@ -28,22 +30,22 @@
     {% for col in columns %}
     <div class="kanban-column" data-status="{{ col.key }}">
       <div class="kanban-column-header"><span class="kanban-column-title">{{ col.label }}</span><span class="kanban-column-count">{{ col.rows.length }}</span></div>
-      {% if col.rows.length == 0 %}<p class="kanban-column-empty">Nothing here</p>{% else %}{% for r in col.rows %}{{ card(r) }}{% endfor %}{% endif %}
+      {% if col.rows.length == 0 %}<p class="kanban-column-empty">Nothing here</p>{% else %}{% for r in col.rows %}{{ card(r, money) }}{% endfor %}{% endif %}
     </div>
     {% endfor %}
   </div>
   {% else %}
   <table class="list">
-    <tr><th>Deal</th><th>Stage</th><th>Supplier</th><th>Buyer</th><th>Deal date</th><th>Buy</th><th>Sell</th><th>RBI</th></tr>
+    <tr><th>Deal</th><th>Stage</th><th>Supplier</th><th>Buyer</th><th>Deal date</th><th>Buy</th>{% if money.selling %}<th>Sell</th>{% endif %}<th>RBI</th></tr>
     {% for r in rows %}
     <tr>
       <td><a href="/merchant/{{ r.id }}">{{ r.reference }}</a></td><td>{{ r.stage_label }}</td>
-      <td>{{ r.supplier_name }} ({{ r.supplier_country }})</td><td>{{ r.buyer_name }} ({{ r.buyer_country }})</td><td>{{ r.deal_date }}</td>
-      <td>Buy {{ r.purchase_currency }} {{ r.f.purchase_fmt }}</td><td>Sell {{ r.sale_currency }} {{ r.f.sale_fmt }}</td>
+      <td>{{ r.supplier_name }} ({{ r.supplier_country }})</td><td>{{ buyer(r, money) }}</td><td>{{ r.deal_date }}</td>
+      <td>Buy {{ r.purchase_currency }} {{ r.f.purchase_fmt }}</td>{% if money.selling %}<td>Sell {{ r.sale_currency }} {{ r.f.sale_fmt }}</td>{% endif %}
       <td data-rbi="{{ r.worst }}">{{ r.rbi_label }}</td>
     </tr>
     {% endfor %}
-    {% if rows.length == 0 %}<tr><td colspan="8" class="muted">No deals yet.</td></tr>{% endif %}
+    {% if rows.length == 0 %}<tr><td colspan="{{ 8 if money.selling else 7 }}" class="muted">{{ 'None at this stage.' if stage else 'No deals yet.' }}</td></tr>{% endif %}
   </table>
   {% endif %}
 </div>

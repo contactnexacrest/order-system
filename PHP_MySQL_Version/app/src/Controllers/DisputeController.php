@@ -145,6 +145,21 @@ final class DisputeController
             header("Location: /orders/{$orderId}/disputes");
             return;
         }
+        // QA batch 2 (ORD-11): a real notice date, not in the future (it starts the contractual response clock),
+        // and an assignee who is an active user.
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $noticeDate, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || $noticeDate > date('Y-m-d')) {
+            Flash::set('error', 'Notice date: enter the date the notice was received (YYYY-MM-DD, today or earlier).');
+            header("Location: /orders/{$orderId}/disputes");
+            return;
+        }
+        if ($assignedTo !== null) {
+            $assignee = \App\Repositories\UserRepository::findById($assignedTo);
+            if ($assignee === null || (int) ($assignee['is_active'] ?? 0) !== 1) {
+                Flash::set('error', 'Assign the dispute to an active user, or leave it unassigned.');
+                header("Location: /orders/{$orderId}/disputes");
+                return;
+            }
+        }
 
         // The seeded Dispute Resolution clause promises "ten (10) WORKING
         // days" on every QT/PI/OC/BUYERPO — calendar-day arithmetic here

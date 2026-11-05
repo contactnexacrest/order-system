@@ -209,7 +209,7 @@ function weightTable(order, context = {}) {
   return out;
 }
 
-function paymentTermsBlock(context, noAdvanceWording = false, withMilestones = false) {
+function paymentTermsBlock(context, noAdvanceWording = false, withMilestones = false, advanceAgainst = 'Proforma Invoice') {
   const financial = context.financial || {};
   const order = context.order || {};
   const currency = g(order, 'currency_code', '');
@@ -230,14 +230,15 @@ function paymentTermsBlock(context, noAdvanceWording = false, withMilestones = f
     out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}], starRun()]));
     return out.concat(freightAndCurrencyLines(order, currency));
   }
-  out.push(C.rich([['• ', {}], [`${g(financial, 'advance_pct', '')}% advance T/T (Telegraphic Transfer) on FOB Value against Proforma Invoice. `, {}], starRun()]));
+  // QA batch 3 DOC-3 (owner confirmed twice): the PDF's D-224 wording.
+  out.push(C.rich([['• ', {}], [`${g(financial, 'advance_pct', '')}% Advance Payment on FOB Value against ${advanceAgainst}. `, {}], starRun()]));
   out.push(C.rich([[`   ${g(financial, 'advance_pct', '')}% Advance Amount:  ${currency} ${g(financial, 'advance_amount', '')}`, {}], starRun()]));
   // Owner decision (2026-10-28): the Word balance line now prints the
   // order's own balance terms — the same sentence as the PDF (Calendar
   // Days, and the preset's own wording when it has one).
   const balanceText = g(financial, 'balance_terms_text', '');
   milestoneLines();
-  out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% balance T/T on FOB Value ${balanceText} `, {}], starRun()]));
+  out.push(C.rich([['• ', {}], [`${g(financial, 'balance_pct', '')}% Balance Payment on FOB Value ${balanceText} `, {}], starRun()]));
   out.push(C.rich([[`   ${g(financial, 'balance_pct', '')}% Balance Amount:  ${currency} ${g(financial, 'balance_amount', '')}`, {}], starRun()]));
   return out.concat(freightAndCurrencyLines(order, currency));
 }
@@ -248,7 +249,7 @@ function freightAndCurrencyLines(order, currency) {
     out.push(
       C.rich([
         [order.is_cif ? '• Freight & Insurance (CFR/CIF orders only): ' : '• Freight (CFR order — buyer arranges insurance): ', {}],
-        ['Actual confirmed amounts invoiced separately by Freight Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Freight Debit Note date.', { color: '333333' }],
+        ['Actual confirmed amounts invoiced separately by Debit Note before shipment booking is confirmed. Payment required within 3 Calendar Days of Debit Note date.', { color: '333333' }],
       ])
     );
   }
@@ -272,7 +273,7 @@ function renderQt(context) {
   children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
-      { label: 'QUOTATION NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'QUOTATION NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
       { label: 'DATE *', value: g(order, 'quotation_date') !== '—' ? g(order, 'quotation_date') : g(meta, 'generated_date', '') },
       { label: 'BUYER INQUIRY REF *', value: g(order, 'buyer_inquiry_ref', '') },
     ])
@@ -336,7 +337,8 @@ function renderQt(context) {
   );
 
   children.push(...C.sectionTitle('5. PAYMENT TERMS'));
-  children.push(...paymentTermsBlock(context, true));
+  // QA batch 3 DOC-4: the QT lists the order's milestones too, as the PDF.
+  children.push(...paymentTermsBlock(context, true, true));
 
   children.push(...C.sectionTitle('6. DOCUMENTS TO BE PROVIDED'));
   children.push(
@@ -383,7 +385,7 @@ function renderPi(context) {
   children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
-      { label: 'PI NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'PI NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
       { label: 'PI DATE *', value: g(order, 'pi_date') !== '—' ? g(order, 'pi_date') : g(meta, 'generated_date', '') },
       { label: 'QUOTATION REF *', value: g(order, 'quotation_ref', '—') },
       { label: 'BUYER INQUIRY REF *', value: g(order, 'buyer_inquiry_ref', '') },
@@ -505,7 +507,7 @@ function renderPi(context) {
   );
 
   children.push(...C.sectionTitle('5. PAYMENT TERMS'));
-  children.push(...paymentTermsBlock(context, true, true));
+  children.push(...paymentTermsBlock(context, true, true, 'this document'));
   if (financial.has_advance) children.push(C.plain(`• ${g(financial, 'cleared_funds_text', '')}`));
 
   children.push(...C.sectionTitle('6. PRODUCTION & ESTIMATED SHIPMENT'));
@@ -579,7 +581,7 @@ function renderOc(context) {
   children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
-      { label: 'OC NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'OC NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
       { label: 'DATE *', value: g(meta, 'generated_date', '') },
       { label: 'PI REFERENCE *', value: g(order, 'pi_ref', '—') },
       { label: 'BUYER INQUIRY REF *', value: g(order, 'buyer_inquiry_ref', '') },
@@ -840,7 +842,7 @@ function renderAnnexa(context) {
   children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
-      { label: 'ANNEXURE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'ANNEXURE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
       { label: 'ANNEXURE TO', value: g(order, 'quotation_ref') !== '—' ? g(order, 'quotation_ref') : g(order, 'pi_ref') !== '—' ? g(order, 'pi_ref') : g(order, 'buyer_inquiry_ref') },
       { label: 'ORDER REF', value: g(order, 'order_reference', '') },
       { label: 'DATE', value: g(meta, 'generated_date', '') },
@@ -871,7 +873,7 @@ function renderBuyerPo(context) {
   children.push(C.plain('This Purchase Order is prepared by NexaCrest and sent to the buyer for signature and return. Buyer fills Column B of Section 4 only. All other fields are pre-filled by NexaCrest.', { italics: true, color: C.MUTED, size: 18 }));
   children.push(
     ...C.metaBar([
-      { label: 'PO NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'PO NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
       { label: 'DATE *', value: g(meta, 'generated_date', '') },
       { label: 'QT REFERENCE *', value: g(order, 'quotation_ref', '—') },
       { label: 'BUYER INQUIRY REF *', value: g(order, 'buyer_inquiry_ref', '') },
@@ -906,16 +908,16 @@ function renderBuyerPo(context) {
   );
 
   const productList = products.map((p) => p.description || '').join('; ');
-  const first = products[0] || {};
   children.push(...C.sectionTitle('3. ORDER DETAILS  (Pre-filled from Quotation — buyer to confirm)'));
   children.push(
     ...C.kvTable([
       { label: 'Against Quotation No. *', value: `${g(order, 'quotation_ref', '—')} (fixed)` },
       { label: 'Quotation Date *', value: `${g(order, 'quotation_date', '—')} (fixed)` },
       { label: 'Product Description *', value: productList },
-      { label: 'Quantity *', value: first.quantity ?? 'To Be Confirmed' },
-      { label: 'Unit *', value: first.unit || 'To Be Confirmed' },
-      { label: `Unit Price (${currency}) *`, value: first.unit_price ?? 'To Be Confirmed' },
+      // QA batch 3 DOC-4 (owner confirmed twice): every line, in the same order as the product list — as the PDF.
+      { label: 'Quantity *', value: products.length ? products.map((p) => String(p.quantity ?? '')).join('; ') : 'To Be Confirmed' },
+      { label: 'Unit *', value: products.length ? products.map((p) => String(p.unit ?? '')).join('; ') : 'To Be Confirmed' },
+      { label: `Unit Price (${currency}) *`, value: products.length ? products.map((p) => String(p.unit_price ?? '')).join('; ') : 'To Be Confirmed' },
       { label: `Total FOB Value (${currency}) *`, value: g(financial, 'fob_value') },
       { label: 'Incoterm', value: g(order, 'incoterm_label') },
       { label: 'Port of Loading', value: g(order, 'port_of_loading') },
@@ -923,7 +925,7 @@ function renderBuyerPo(context) {
       { label: 'Certificate of Origin *', value: g(order, 'coo_type') },
       {
         label: 'Payment Terms',
-        value: `${g(financial, 'advance_pct')}% advance T/T against Proforma Invoice before production. ${g(financial, 'balance_pct')}% balance T/T before shipment — ${g(financial, 'balance_terms_text')}${freightTermsSentence(g(order, 'incoterm_code', ''))}`,
+        value: `${g(financial, 'buyer_po_payment_terms')}${freightTermsSentence(g(order, 'incoterm_code', ''))}`,
       },
     ])
   );
@@ -972,7 +974,8 @@ function renderBuyerPo(context) {
     ...C.colorBox('E8F1FB', C.BLUE_TEXT, [
       C.rich([
         ['By signing above, the buyer confirms acceptance of all order details, specifications and payment terms stated in this Purchase Order. ', { color: C.BLUE_TEXT }],
-        [`This signed Purchase Order authorises NexaCrest to issue the Proforma Invoice and commence production upon receipt of the ${g(financial, 'advance_pct')}% advance payment. `, { bold: true, color: C.BLUE_TEXT }],
+        // QA batch 3 DOC-4: no "0% advance" on an LC / no-advance order — as the PDF.
+        [`This signed Purchase Order authorises NexaCrest to issue the Proforma Invoice and commence production ${financial.has_advance ? `upon receipt of the ${g(financial, 'advance_pct')}% advance payment.` : (financial.payment_method === 'LC' ? 'upon receipt of the Letter of Credit.' : 'as per the payment terms above.')} `, { bold: true, color: C.BLUE_TEXT }],
         ['The following clauses are legally binding on both parties:', { color: C.BLACK }],
       ]),
       ...clauseParas,
@@ -1012,7 +1015,7 @@ function renderSupPo(context) {
   children.push(C.plain('This Purchase Order is issued by NexaCrest International Private Limited to the named supplier for material procurement. Supplier fills Section 7 only. All other sections are issued by NexaCrest.', { italics: true, color: C.MUTED, size: 18 }));
   children.push(
     ...C.metaBar([
-      { label: 'PO NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'PO NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
       { label: 'DATE *', value: g(meta, 'generated_date', '') },
       { label: 'BUYER ORDER REF *', value: g(order, 'buyer_inquiry_ref', '') },
       { label: 'EXPORT ORDER REF *', value: g(order, 'pi_ref') !== '—' ? g(order, 'pi_ref') : g(order, 'quotation_ref', '—') },
@@ -1152,7 +1155,7 @@ function renderFdn(context) {
   children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
-      { label: 'DEBIT NOTE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'DEBIT NOTE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
       { label: 'DATE *', value: g(meta, 'generated_date', '') },
       { label: 'PI REFERENCE *', value: g(order, 'pi_ref', '—') },
       { label: 'BUYER INQUIRY REF *', value: g(order, 'buyer_inquiry_ref', '') },
@@ -1249,7 +1252,7 @@ function renderPl(context) {
   children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
-      { label: 'PL NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'PL NUMBER *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
       { label: 'DATE *', value: g(meta, 'generated_date', '') },
       { label: 'PI REFERENCE *', value: g(order, 'pi_ref', '—') },
       { label: 'BUYER INQUIRY REF *', value: g(order, 'buyer_inquiry_ref', '') },
@@ -1387,7 +1390,7 @@ function renderBli(context) {
   );
   children.push(
     ...C.metaBar([
-      { label: 'BL INSTRUCTION NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'BL INSTRUCTION NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
       { label: 'DATE *', value: g(meta, 'generated_date', '') },
       { label: 'PI REFERENCE *', value: g(order, 'pi_ref', '—') },
       { label: 'BUYER INQUIRY REF *', value: g(order, 'buyer_inquiry_ref', '') },
@@ -1555,7 +1558,7 @@ function renderCi(context) {
   children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
-      { label: 'INVOICE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'INVOICE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
       { label: 'DATE *', value: g(meta, 'generated_date', '') },
       { label: 'PI REFERENCE *', value: g(order, 'pi_ref', '—') },
       { label: 'BUYER INQUIRY REF *', value: g(order, 'buyer_inquiry_ref', '') },
@@ -1746,7 +1749,7 @@ function renderEsi(context) {
   children.push(C.mandatoryNote());
   children.push(
     ...C.metaBar([
-      { label: 'INVOICE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'revision_label', '')}` },
+      { label: 'INVOICE NO. *', value: `${g(meta, 'document_reference', '')} ${g(meta, 'client_revision_label', '')}` },
       { label: 'DATE *', value: g(meta, 'generated_date', '') },
       { label: 'PI REFERENCE *', value: g(order, 'pi_ref', '—') },
       { label: 'BUYER INQUIRY REF *', value: g(order, 'buyer_inquiry_ref', '') },

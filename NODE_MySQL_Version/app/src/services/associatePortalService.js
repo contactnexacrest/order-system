@@ -100,7 +100,7 @@ async function attemptLogin(req, email, password) {
   }
   const code = await issueToken(Number(a.id), 'login_code', 10);
   try {
-    await emailService.sendPlainText(String(a.email), 'Your NexaCrest login code', `Your login code is ${code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.`);
+    await emailService.sendPlainText(String(a.email), 'Your NexaCrest login code', `Your login code is ${code}. It is valid for 10 minutes.\n\nIf you did not try to log in, change your password.`, { isSecurityEmail: true }); // QA batch 3 MAIL-13: a one-time login code is security mail
   } catch (e) {
     // shown on screen in development; otherwise the associate asks again
   }

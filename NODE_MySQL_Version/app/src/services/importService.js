@@ -235,15 +235,15 @@ async function nextReference(series, label) {
 }
 
 /** The PO value in the supplier's currency, in cents. */
-async function poValueCents(shipmentId) {
+async function poValueCents(shipmentId, executor = undefined) {
   let c = 0n;
-  for (const l of await repo.lines(shipmentId)) c += lineValueCents(String(l.quantity), String(l.unit_price_fc));
+  for (const l of await repo.lines(shipmentId, executor)) c += lineValueCents(String(l.quantity), String(l.unit_price_fc));
   return c;
 }
 
-async function paidCents(shipmentId) {
+async function paidCents(shipmentId, executor = undefined) {
   let c = 0n;
-  for (const p of await repo.payments(shipmentId)) c += G.scaled(String(p.amount_fc), 2);
+  for (const p of await repo.payments(shipmentId, executor)) c += G.scaled(String(p.amount_fc), 2);
   return c;
 }
 
@@ -301,7 +301,14 @@ async function saveHeader(id, input, userId) {
   if (s.stage !== 'ordered') return 'The PO can change only while the goods are not shipped.';
   const [fields, error] = headerFields(input);
   if (error !== null) return error;
-  await repo.update(id, fields, userId);
+  // QA batch 2 (ORD-08): payments are recorded in the PO's currency — it cannot change under them.
+  if (fields.currency_code !== String(s.currency_code) && (await repo.payments(id)).length > 0) {
+    return `The supplier has already been paid in ${s.currency_code}, so the PO currency can no longer change.`;
+  }
+  // A PO generated before this change is out of date: generate it again before the goods ship.
+  const asText = (v) => (v === null || v === undefined ? '' : (v instanceof Date ? v.toISOString().slice(0, 10) : String(v)));
+  const changed = Object.keys(fields).some((col) => asText(s[col]) !== asText(fields[col]));
+  await repo.update(id, changed ? { ...fields, ipo_generated_at: null } : fields, userId);
   await auditLogRepository.log(userId, 'IMPORT_PO_SAVED', 'import_shipments', id, 'supplier_name', s.supplier_name, fields.supplier_name);
   return null;
 }
@@ -342,6 +349,7 @@ async function addLine(id, input, userId) {
     sws_pct: pick(p.sws_pct, duty.sws),
     igst_pct: pick(p.igst_pct, duty.igst),
   }, userId);
+  await repo.update(id, { ipo_generated_at: null }, userId); // QA batch 2 (ORD-08): the PO changed
   await auditLogRepository.log(userId, 'IMPORT_LINE_ADDED', 'import_shipments', id, 'line', null, `${product.product_code} × ${qty}`);
   return null;
 }
@@ -349,7 +357,14 @@ async function addLine(id, input, userId) {
 async function removeLine(id, lineId, userId) {
   const s = await repo.find(id);
   if (!s || s.stage !== 'ordered') return 'The lines can change only while the goods are not shipped.';
+  // QA batch 2 (ORD-08): the PO value never falls below what the supplier has already been paid.
+  const line = (await repo.lines(id)).find((l) => Number(l.id) === Number(lineId));
+  if (!line) return 'Line not found.';
+  const after = (await poValueCents(id)) - lineValueCents(String(line.quantity), String(line.unit_price_fc));
+  const paid = await paidCents(id);
+  if (after < paid) return `Removing this line would take the PO value (${s.currency_code} ${fc(after)}) below what the supplier has already been paid (${s.currency_code} ${fc(paid)}).`;
   if (!(await repo.removeLine(id, lineId))) return 'Line not found.';
+  await repo.update(id, { ipo_generated_at: null }, userId);
   await auditLogRepository.log(userId, 'IMPORT_LINE_REMOVED', 'import_shipments', id, 'line', String(lineId), null);
   return null;
 }
@@ -467,8 +482,23 @@ function paymentDescription(s, kind, amountFc, fxRate, amountInr, bankReference,
   return n !== '' ? `${text}; note: ${n}` : text;
 }
 
+/**
+ * QA batch 2 (ORD-12): the import row is locked while a payment is checked and written, so two people
+ * recording the same SWIFT/UTR (or together paying more than the PO) at the same moment cannot both pass.
+ */
 async function recordPayment(id, input, userId) {
-  const s = await repo.find(id);
+  const db = require('../config/db');
+  const done = await db.transaction(async (trx) => {
+    await trx.queryOne('SELECT id FROM import_shipments WHERE id = :id FOR UPDATE', { id });
+    return recordPaymentLocked(id, input, userId, trx);
+  });
+  if (done.error !== null) return done.error;
+  await auditLogRepository.log(userId, 'IMPORT_PAYMENT_RECORDED', 'import_shipments', id, 'amount_fc', null, done.amount);
+  return null;
+}
+
+async function recordPaymentLocked(id, input, userId, trx) {
+  const s = await repo.find(id, trx);
   const date = str(input.paid_on);
   const kind = String(input.kind || '');
   const amount = str(input.amount_fc);
@@ -484,21 +514,20 @@ async function recordPayment(id, input, userId) {
   else if (!/^\d{1,9}(\.\d{1,2})?$/.test(amount) || G.scaled(amount, 2) <= 0n) error = `Enter the amount paid in ${s.currency_code}.`;
   else if (!/^\d{1,3}(\.\d{1,4})?$/.test(fx) || G.scaled(fx, 4) <= 0n) error = `Enter the bank's exchange rate (₹ per ${s.currency_code}, up to 4 decimals).`;
   else if (ref === '' || len(ref) > 60) error = 'Enter the SWIFT / UTR reference of the remittance.';
-  else if (await repo.bankReferenceUsed(ref)) error = 'This bank reference is already recorded. Check the payment is not entered twice.';
+  else if (await repo.bankReferenceUsed(ref, trx)) error = 'This bank reference is already recorded. Check the payment is not entered twice.';
   else {
-    const po = await poValueCents(id);
-    const paid = await paidCents(id);
+    const po = await poValueCents(id, trx);
+    const paid = await paidCents(id, trx);
     if (paid + G.scaled(amount, 2) > po) error = `This is more than the PO still owes (${s.currency_code} ${fc(po - paid)}).`;
     else if (len(note) > 255) error = 'The note is too long.';
   }
-  if (error !== null) return error;
+  if (error !== null) return { error, amount };
   const inr = G.money(G.roundDiv(G.scaled(amount, 2) * G.scaled(fx, 4), 10000n));
   const description = paymentDescription(s, kind, amount, fx, inr, ref, note);
   await repo.addPayment(id, {
     paid_on: date, kind, amount_fc: amount, fx_rate: fx, amount_inr: inr, bank_reference: ref, description, note: note !== '' ? note : null,
-  }, userId);
-  await auditLogRepository.log(userId, 'IMPORT_PAYMENT_RECORDED', 'import_shipments', id, 'amount_fc', null, amount);
-  return null;
+  }, userId, trx);
+  return { error: null, amount };
 }
 
 async function markPoGenerated(id, userId) {

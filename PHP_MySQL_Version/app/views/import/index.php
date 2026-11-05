@@ -5,6 +5,8 @@ $card = static function (array $r) use ($h): string {
     return '<a class="entity-card kanban-card" href="/import/' . (int) $r['id'] . '"><div class="entity-card-header"><span class="entity-card-title">' . $h($r['reference']) . '</span>'
         . '<span class="badge badge-protected">' . $h(I::STAGES[$r['stage']] ?? $r['stage']) . '</span></div>'
         . '<div class="entity-card-sub">' . $h($r['supplier_name']) . ' · ' . $h($r['supplier_country']) . '</div>'
+        // QA batch 2 (UI-6): the card carries the BL and the bill of entry like the list.
+        . '<div class="entity-card-sub muted small" data-field="bl_boe">BL ' . $h($r['bl_no'] ?: '—') . ' · Bill of entry ' . $h($r['boe_no'] ?: '—') . '</div>'
         . '<div class="entity-card-footer"><span class="muted small">' . $h($r['currency_code']) . ' ' . $h(I::fc(\App\Services\GstCalculator::scaled((string) $r['po_value_fc'], 2))) . '</span>'
         . '<span class="muted small">PO ' . $h($r['po_date']) . '</span><span class="muted small">' . (int) $r['line_count'] . ' line' . ((int) $r['line_count'] === 1 ? '' : 's') . '</span></div></a>';
 }; ?>
@@ -51,7 +53,7 @@ $card = static function (array $r) use ($h): string {
       <td><?= $h($r['bl_no'] ?: '—') ?></td><td><?= $h($r['boe_no'] ?: '—') ?></td>
     </tr>
     <?php endforeach; ?>
-    <?php if ($rows === []): ?><tr><td colspan="8" class="muted">No imports yet.</td></tr><?php endif; ?>
+    <?php if ($rows === []): ?><tr><td colspan="8" class="muted"><?= $stage !== '' ? 'None at this stage.' : 'No imports yet.' /* QA batch 2 (UI-13) */ ?></td></tr><?php endif; ?>
   </table>
   <?php endif; ?>
 </div>

@@ -93,6 +93,14 @@ async function identityOptions() {
  * @returns {Promise<boolean>} true if actually handed to a transport, false if only logged (dev fallback)
  */
 async function sendPlainText(toEmail, subject, body, opts = {}) {
+  // QA batch 3 MAIL-2: every business e-mail (link e-mails, notifications,
+  // alerts) goes through mailSenderService — the one place with the "e-mail
+  // sending off" switch, Test Mode, Mail Redirect and the Zoho transport.
+  // Only security mail (2FA, password reset, one-time codes) keeps this path.
+  // Required here, not at the top: mailSenderService requires this module.
+  if (!opts.isSecurityEmail) {
+    return require('./mailSenderService').send(toEmail, subject, body);
+  }
   const resolved = await testModeService.resolveEmailRecipient(toEmail, !!opts.isSecurityEmail, subject);
   if (resolved === null) {
     // QA-5 TM-07: Test Mode is on and no test_email is configured — never
@@ -135,6 +143,10 @@ async function sendWithAttachment(toEmail, subject, body, attachmentPath, attach
  * @returns {Promise<boolean>}
  */
 async function sendWithAttachments(toEmail, subject, body, attachments, opts = {}) {
+  // QA batch 3 MAIL-2: business mail goes through mailSenderService (see sendPlainText()).
+  if (!opts.isSecurityEmail) {
+    return require('./mailSenderService').send(toEmail, subject, body, attachments);
+  }
   const resolved = await testModeService.resolveEmailRecipient(toEmail, !!opts.isSecurityEmail, subject);
   if (resolved === null) {
     // QA-5 TM-07: see sendPlainText() above.
@@ -157,6 +169,13 @@ async function sendWithAttachments(toEmail, subject, body, attachments, opts = {
  * @returns {Promise<boolean>}
  */
 async function deliverWithAttachments(to, subject, body, attachments, cc = []) {
+  // QA batch 3 MAIL-10: an attachment whose file is missing fails the send
+  // clearly (as on PHP), before any transport is tried.
+  const missing = attachments.find((a) => !a.path || !require('fs').existsSync(a.path));
+  if (missing) {
+    console.error(`[EMAIL NOT SENT — attachment missing] To: ${to} | Subject: ${subject} | Attachment: ${missing.name || ''}`);
+    return false;
+  }
   const t = transport();
   if (!t) {
     const names = attachments.map((a) => a.name).join(', ');

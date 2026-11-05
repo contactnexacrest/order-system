@@ -31,6 +31,12 @@ final class ReviewWorkflowService
         if (!$document) {
             throw new \RuntimeException("Document {$documentId} not found");
         }
+        // QA batch 3 DOC-7: a document already sent to the buyer (or superseded)
+        // is never pulled back into review — an approved, not-yet-sent one may
+        // still get a second look before it goes out.
+        if (in_array($document['status'], ['sent', 'superseded'], true)) {
+            throw new \RuntimeException('Reviewers cannot be assigned to this document — it is already ' . $document['status'] . '.');
+        }
 
         // QA-5: validate every requested reviewer up front (all-or-nothing)
         // before inserting any — a partial insert followed by a thrown
@@ -161,7 +167,8 @@ final class ReviewWorkflowService
         DocumentReviewRepository::reject($documentReviewId, $comments);
 
         $document = DocumentRepository::find((int) $review['document_id']);
-        if ($document) {
+        // QA batch 3 DOC-7: a sent or superseded document is never pulled back to draft.
+        if ($document && !in_array($document['status'], ['sent', 'superseded'], true)) {
             // "Document returns to creator. New version must be generated
             // and re-submitted." — back to draft; the creator regenerates
             // (a fresh call to DocumentGenerationService::generate(), a
@@ -200,7 +207,8 @@ final class ReviewWorkflowService
     private static function finalizeIfFullyApproved(int $documentId): void
     {
         $document = DocumentRepository::find($documentId);
-        if (!$document || $document['status'] === 'approved') {
+        // QA batch 3 DOC-7: an approved, sent or superseded document is never re-finalised.
+        if (!$document || in_array($document['status'], ['approved', 'sent', 'superseded'], true)) {
             return;
         }
 
