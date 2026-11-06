@@ -40,15 +40,23 @@ final class AssociateCodeService
         return self::ALPHABET[$sum % strlen(self::ALPHABET)];
     }
 
-    /** A new code NXA-{PART}-{R}{CHECK}, unique across all associates, past and present. */
+    /** A new code NXA-{PART}-{R…}{CHECK} (1–3 random letters), unique across all associates, past and present. */
     public static function generate(string $readable): string
     {
         $part = self::readablePart($readable);
         if (strlen($part) < 3) {
             $part = str_pad($part, 3, 'X');
         }
-        for ($i = 0; $i < 50; $i++) {
-            $body = 'NXA-' . $part . '-' . self::ALPHABET[random_int(0, strlen(self::ALPHABET) - 1)];
+        // One random letter gives only 31 codes per name part (e.g. many associates called RAJESH, or many
+        // past codes): after a few clashes the random part grows to 2, then 3 letters (961, 29,791 codes).
+        // Old 1-letter codes stay valid; isValid() accepts 1 to 3 random letters before the check letter.
+        for ($i = 0; $i < 60; $i++) {
+            $len = $i < 20 ? 1 : ($i < 40 ? 2 : 3);
+            $random = '';
+            for ($k = 0; $k < $len; $k++) {
+                $random .= self::ALPHABET[random_int(0, strlen(self::ALPHABET) - 1)];
+            }
+            $body = 'NXA-' . $part . '-' . $random;
             $code = $body . self::checkChar($body);
             $stmt = Database::connection()->prepare('SELECT 1 FROM associates WHERE personal_code = :c UNION SELECT 1 FROM associate_codes WHERE code = :c2');
             $stmt->execute(['c' => $code, 'c2' => $code]);
@@ -109,7 +117,7 @@ final class AssociateCodeService
     public static function isValid(string $code): bool
     {
         $c = self::normalise($code);
-        if (preg_match('/^(NXA-[A-Z0-9]{3,12}-[' . self::ALPHABET . '])([' . self::ALPHABET . '])$/', $c, $m) !== 1) {
+        if (preg_match('/^(NXA-[A-Z0-9]{3,12}-[' . self::ALPHABET . ']{1,3})([' . self::ALPHABET . '])$/', $c, $m) !== 1) {
             return false;
         }
         return self::checkChar($m[1]) === $m[2];

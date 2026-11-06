@@ -37,8 +37,16 @@ async function generate(readable) {
   if (part.length < 3) {
     part = part.padEnd(3, 'X');
   }
-  for (let i = 0; i < 50; i++) {
-    const body = `NXA-${part}-${ALPHABET[crypto.randomInt(0, ALPHABET.length)]}`;
+  // One random letter gives only 31 codes per name part (e.g. many associates called RAJESH, or many
+  // past codes): after a few clashes the random part grows to 2, then 3 letters (961, 29,791 codes).
+  // Old 1-letter codes stay valid; isValid() accepts 1 to 3 random letters before the check letter.
+  for (let i = 0; i < 60; i++) {
+    const len = i < 20 ? 1 : (i < 40 ? 2 : 3);
+    let random = '';
+    for (let k = 0; k < len; k++) {
+      random += ALPHABET[crypto.randomInt(0, ALPHABET.length)];
+    }
+    const body = `NXA-${part}-${random}`;
     const code = body + checkChar(body);
     const taken = await db.queryOne('SELECT 1 AS yes FROM associates WHERE personal_code = :c UNION SELECT 1 FROM associate_codes WHERE code = :c2', { c: code, c2: code });
     if (!taken) {
@@ -92,7 +100,7 @@ async function codes(associateId) {
 /** Whether the code is well-formed and its check letter matches (typo protection). */
 function isValid(code) {
   const c = normalise(code);
-  const m = c.match(new RegExp(`^(NXA-[A-Z0-9]{3,12}-[${ALPHABET}])([${ALPHABET}])$`));
+  const m = c.match(new RegExp(`^(NXA-[A-Z0-9]{3,12}-[${ALPHABET}]{1,3})([${ALPHABET}])$`));
   if (!m) {
     return false;
   }

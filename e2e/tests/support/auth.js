@@ -48,6 +48,10 @@ async function loginClient(page, email, password) {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
+  // Final QA run: wait until the portal page has replaced the login page, so a check made right after
+  // (e.g. the phone-width overflow check) never measures a page that is still navigating.
+  await page.waitForURL((url) => !/\/client\/login/.test(url.pathname));
+  await page.waitForLoadState('load');
 }
 
 module.exports = { login, logout, loginClient, ROLES, PASSWORD };
