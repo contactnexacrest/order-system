@@ -37,7 +37,8 @@ final class IncentiveReportController
     public function register(array $params): void
     {
         $f = self::filters();
-        $rows = IncentiveReportService::rows($f);
+        // D-259: the register also lists what the company kept from people who were not eligible.
+        $rows = IncentiveReportService::rows($f + ['with_kept' => true]);
         if (($_GET['format'] ?? '') === 'csv') {
             Csv::stream('incentive_commission_register.csv', IncentiveReportService::HEADERS, IncentiveReportService::csvRows($rows));
         }

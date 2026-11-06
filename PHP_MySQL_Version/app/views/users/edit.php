@@ -23,6 +23,15 @@
         </select>
       </label>
     </div>
+    <?php // D-259 (owner approval 6 Nov 2026): the team incentive switch; only the MD changes it.
+    $__first = explode(' ', (string) $target['name'])[0]; ?>
+    <fieldset id="incentive-eligible"><legend>Team incentive</legend>
+      <?php if (!empty($incentiveCanEdit)): ?><input type="hidden" name="incentive_eligible_present" value="1"><?php endif; ?>
+      <label><input type="checkbox" name="incentive_eligible" value="1"<?= !empty($incentiveEligible) ? ' checked' : '' ?><?= !empty($incentiveCanEdit) ? '' : ' disabled' ?>> Eligible for team incentive</label>
+      <p class="muted small">On by default. Off: <?= htmlspecialchars($__first) ?> gets no share of any order's team incentive; the share stays with the company.
+        <?php if (!empty($incentiveDesignation)): ?>Their designation (<?= htmlspecialchars($incentiveDesignation['title']) ?>) is <?= $incentiveDesignation['eligible'] ? 'eligible' : 'not eligible' ?> — this switch overrides it for them only.<?php endif; ?>
+        Applies to orders whose incentive is not locked yet; locked and paid orders never change.<?= !empty($incentiveCanEdit) ? '' : ' <strong>Only the MD can change this.</strong>' ?></p>
+    </fieldset>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Save Changes</button>
       <a href="/users" class="btn-sm btn-secondary">Cancel</a>

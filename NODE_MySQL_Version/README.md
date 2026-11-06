@@ -55,8 +55,11 @@ docs/
   ARCHITECTURE.md         the original architecture document this build
                           (and the PHP build before it) was implemented from
 scripts/
-  backup_db.sh            daily DB backup template — see "Database backups"
-  backup_storage.sh       daily storage/ backup template — see "Backing up storage/"
+  backup_lib.sh           shared helpers for the backup scripts (D-260) — see "Backups"
+  backup_db.sh            nightly database copy (encrypted, 10-year retention) — see "Backups"
+  backup_storage.sh       nightly documents copy (each file stored once) — see "Backups"
+  backup_test_restore.sh  monthly test-restore into a scratch database — see "Backups"
+  tests/                  backup_scripts_test.sh, the scripts' self-test
 storage/
   assets/                 4 placeholder brand images (logo, signature,
                           seal, watermark) — see step 3 of
@@ -359,6 +362,8 @@ CRON_TZ=Asia/Kolkata
 15 8 * * *    cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/dailyDigest.js >> /var/log/nexacrest/daily_digest.log 2>&1
 15 2 * * *    cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/documentCopyCleanup.js >> /var/log/nexacrest/document_copy_cleanup.log 2>&1
 ```
+
+Plus the three backup lines (database 02:00, documents 02:30, monthly test-restore) — see "Backups" below.
 (`CRON_TZ=Asia/Kolkata` makes 06:00, 08:15 and 02:15 IST, the same as the PHP stack. If your cron does not support `CRON_TZ`, set the server time zone to IST or convert the times.)
 (`sudo mkdir -p /var/log/nexacrest` first.) Use the full path to `node`
 (`which node`) — cron's `$PATH` is much smaller than an interactive
@@ -391,81 +396,71 @@ Two more scripts in `src/jobs/` are run by hand, never scheduled:
   run by default; `--apply` moves them. Back up `storage/` and the
   database first.
 
-## Database backups
+## Backups — database and every order document (owner decisions D-260, 6 Nov 2026)
 
-`scripts/backup_db.sh` is a template, not a script that ships pre-wired
-with real credentials — those never belong in a delivered codebase. Copy
-it to the server, fill in `DB_NAME`/`DB_USER`/`DB_PASS`/`BACKUP_DIR` at the
-top (matching your real `.env` values), then:
+The backup is **only an extra copy**. The scripts only *read* the live database and the live
+documents (`STORAGE_BASE_PATH`); they never change, move or delete anything live, and they never
+overwrite an older backup. Records must be kept for **10 years**.
 
-```bash
-chmod 700 scripts/backup_db.sh
-sudo mkdir -p /var/backups/nexacrest && sudo chmod 700 /var/backups/nexacrest
+The scripts ship in the repository (`scripts/`, the same files on both stacks):
+
+| Script | What it does | Cron (IST) |
+|---|---|---|
+| `scripts/backup_db.sh` | `mysqldump --single-transaction` (read-only, no locks), gzip, encrypt, `.sha256` beside it → `BACKUP_DIR/db/nexacrest_db_YYYY-MM-DD_HHMMSS.sql.gz.enc` | `0 2 * * *` |
+| `scripts/backup_storage.sh` | Daily snapshot of every document → `BACKUP_DIR/storage/snapshots/nexacrest_files_YYYY-MM-DD/`. Unchanged files are **stored once** (hard links via `rsync --link-dest`). On the first run of each month also a full encrypted archive → `BACKUP_DIR/storage/archives/` | `30 2 * * *` |
+| `scripts/backup_test_restore.sh` | Monthly proof that the newest copy restores: checksum, decrypt, load into a **separate scratch database** (`BACKUP_RESTORE_TEST_DB`, default `<DB_DATABASE>_restore_test`, never the live one), count tables, drop it again; checks the newest documents archive opens | `0 4 1 * *` |
+
+**Where the copies go is set in `app/.env`, not in the cron line:**
+
+```
+BACKUP_DIR=/var/backups/nexacrest            # outside the web root and outside STORAGE_BASE_PATH (the scripts refuse otherwise)
+BACKUP_KEEP_YEARS=10                     # everything kept 10 years, then removed
+BACKUP_THIN_AFTER_DAYS=120               # older database copies thinned to one per month; 0 = keep every nightly copy
+BACKUP_ENCRYPTION_KEY_FILE=/etc/nexacrest/backup.key
+BACKUP_OFFSITE_TARGET=                   # empty until the owner chooses; then an rclone remote, e.g. b2crypt:nexacrest
 ```
 
-and add a third cron entry:
-```
-0 2 * * *  /opt/nexacrest_node/scripts/backup_db.sh >> /var/log/nexacrest/backup_db.log 2>&1
-```
+**Retention in one rule:** everything is kept `BACKUP_KEEP_YEARS` (10) years. To save space, database copies
+older than `BACKUP_THIN_AFTER_DAYS` (120) days are thinned to the first copy of each month; documents never need
+thinning because each file is stored once. Only files named like a backup, inside `BACKUP_DIR`, are ever removed.
 
-It uses `mysqldump --single-transaction` (safe against the live InnoDB
-tables while the app keeps running), gzips the dump, and prunes anything
-older than 30 days. Restoring: `gunzip < nexacrest_YYYYMMDD_HHMMSS.sql.gz
-| mysql -u"$DB_USER" -p"$DB_PASS" "$DB_NAME"`. **Test a restore at least
-once against a scratch database** after setting this up — this exact
-script and restore command were run against this app's own dev database
-during this delivery's own verification (see "Verifying this delivery
-yourself" below), so the mechanism is proven; only your server's specific
-credentials/paths are new.
+**One-time set-up on the server:**
 
-## Backing up storage/ — the gap a database-only backup leaves
+1. Create the folder and the key (keep a copy of the key somewhere safe **away from the server** — without it the
+   encrypted copies cannot be opened):
+   ```
+   mkdir -p /var/backups/nexacrest && chmod 700 /var/backups/nexacrest
+   openssl rand -base64 48 > /etc/nexacrest/backup.key && chmod 600 /etc/nexacrest/backup.key
+   ```
+2. Add the keys above to `app/.env`.
+3. Make the scripts executable: `chmod 700 /opt/nexacrest_node/scripts/*.sh`
+4. Add the cron lines (the scripts read everything else from `app/.env`):
+   ```
+   CRON_TZ=Asia/Kolkata
+   0 2 * * *   /opt/nexacrest_node/scripts/backup_db.sh >> /var/log/nexacrest/backup_db.log 2>&1
+   30 2 * * *  /opt/nexacrest_node/scripts/backup_storage.sh >> /var/log/nexacrest/backup_storage.log 2>&1
+   0 4 1 * *   /opt/nexacrest_node/scripts/backup_test_restore.sh >> /var/log/nexacrest/backup_test_restore.log 2>&1
+   ```
+5. Run `scripts/backup_db.sh` and `scripts/backup_storage.sh` once by hand, then open **Admin › Backups** — both
+   rows should say OK.
+6. The test-restore needs a MySQL user allowed to create and drop the scratch database
+   (`BACKUP_RESTORE_TEST_DB`). On Bluehost create that database once in cPanel → MySQL Databases and give the app
+   user all rights on it.
 
-**A database backup alone is not a backup of this application.** Every
-generated PDF/DOCX and every received file (dispute evidence, amendment
-signed copies, buyer PO copies, supplier PO acknowledgments, product
-images, ...) lives on disk under `STORAGE_BASE_PATH`, outside any
-web-served directory — `file_store` only holds each one's *path* and
-metadata. Restoring the database after a disaster without also restoring
-`storage/` leaves every `file_store` row pointing at a file that no
-longer exists: every "Download PDF" link 404s, the "Download Full
-Dossier (ZIP)" button on an order page silently skips every missing
-file, and a document that was ever draft/final-watermark-swapped can
-never be regenerated to look the way it did when a reviewer actually
-approved it — that exact historical PDF is gone, not reconstructible
-from data alone (see `documentGenerationService.js`'s document-
-integrity snapshot columns, which only guarantee correct *content* if
-the swapped-final PDF file itself still exists).
+**Watching it:** Admin › Backups (MD / Admin, read-only) shows the last run of each job, sizes, encryption,
+off-site status and the settings. The daily digest warns whoever manages company settings when a nightly copy is
+older than 26 hours, has failed, is not encrypted, the test-restore is older than 35 days or failed, or (on a
+production server) `BACKUP_DIR` is not set.
 
-`scripts/backup_storage.sh` is a template, same convention as
-`backup_db.sh` above — copy it to the server, fill in `STORAGE_DIR`/
-`BACKUP_DIR` at the top, then:
+**Off-site (later):** when the owner chooses a provider, install `rclone`, configure an encrypted remote
+(`rclone config`), and set `BACKUP_OFFSITE_TARGET`. The scripts then `rclone copy --immutable` the database copies
+and the monthly archives — copy only, never delete at the target.
 
-```bash
-chmod 700 scripts/backup_storage.sh
-sudo mkdir -p /var/backups/nexacrest_storage && sudo chmod 700 /var/backups/nexacrest_storage
-```
+**Restoring** is never automatic: follow SOP 32 "Backups and restore" step by step.
 
-and add a fourth cron entry, offset from the DB backup so they don't
-compete for I/O:
-```
-30 2 * * *  /opt/nexacrest_node/scripts/backup_storage.sh >> /var/log/nexacrest/backup_storage.log 2>&1
-```
-
-It `tar`s the whole `storage/` tree and prunes anything older than 30
-days, same retention as the DB backup. The two backups are only
-consistent with each other if taken close together — scheduling both
-within the same maintenance window (2:00 and 2:30 above) keeps the drift
-to at most 30 minutes. Restoring:
-`tar -xzf nexacrest_storage_YYYYMMDD_HHMMSS.tar.gz -C "$(dirname "$STORAGE_DIR")"`.
-**Test a restore at least once** — verify a handful of
-`file_store.server_path` values from a restored DB backup taken the same
-night actually resolve to real files after extracting.
-
-The full order dossier ZIP (`/orders/:id/dossier`, "Download Full
-Dossier (ZIP)" on the order page) is a convenient one-order-at-a-time
-export for handing files to someone, or spot-checking that an order's
-files are all present — it is not a substitute for backing up
-`storage/` as a whole; it only ever reflects the current live files.
+**Self-test:** `bash scripts/tests/backup_scripts_test.sh` (also run by PHPUnit `BackupFacilityTest` / Jest
+`backupFacility.test.js`) proves retention, thinning, one-copy documents, the guard, untouched live files,
+encryption and checksums in a temporary folder.
 
 ## Security hardening already built in
 

@@ -354,6 +354,11 @@ async function calculate(orderId, baseProfit = null) {
     unallocated: sp.unallocated,
     roles: sp.roles,
     per_person: sp.per_person,
+    lines: sp.lines,
+    team_by_share: sp.team_by_share,
+    kept_total: sp.kept_total,
+    kept_not_eligible: sp.kept_not_eligible,
+    kept_capped: sp.kept_capped,
     shares_customised: sp.customised,
     left_for_company: round2(basis - sp.team_total),
     margin_after_pct: marginAfter,
@@ -370,6 +375,136 @@ async function calculate(orderId, baseProfit = null) {
  * order. Unticked roles (or roles with nobody) give their share to the ticked
  * ones in proportion; custom shares (they add up to 100%) win.
  */
+/**
+ * D-259 (owner approval 6 Nov 2026): who shares in the team incentive. A person's own switch
+ * (users.incentive_eligible) wins; empty follows their designation (the default active
+ * membership's department designation); with no designation they are eligible.
+ */
+async function eligibility() {
+  const designation = new Map();
+  const rows = await db.query(
+    `SELECT m.user_id, d.title, d.incentive_eligible FROM user_department_memberships m
+     JOIN department_designations d ON d.id = m.designation_id
+     WHERE m.starts_on <= CURDATE() AND (m.ends_on IS NULL OR m.ends_on >= CURDATE())
+     ORDER BY m.is_default DESC, m.id`);
+  for (const r of rows) {
+    if (!designation.has(Number(r.user_id))) designation.set(Number(r.user_id), { title: String(r.title), eligible: Number(r.incentive_eligible) === 1 });
+  }
+  const out = new Map();
+  for (const u of await db.query('SELECT id, incentive_eligible FROM users')) {
+    const id = Number(u.id);
+    const d = designation.get(id) || null;
+    if (u.incentive_eligible !== null && u.incentive_eligible !== undefined) {
+      out.set(id, { eligible: Number(u.incentive_eligible) === 1, source: 'person', designation: d ? d.title : null });
+    } else {
+      out.set(id, { eligible: d ? d.eligible : true, source: d ? 'designation' : 'default', designation: d ? d.title : null });
+    }
+  }
+  return out;
+}
+
+/** D-259: the incentive month an unlocked order would be locked into today (the next staff payout run). */
+async function estimateMonth() {
+  return String(await require('./associateCommission').payoutRunOn(todayIst())).slice(0, 7);
+}
+
+/** D-259: only the Managing Director changes who is eligible for the team incentive. */
+async function isMd(user) {
+  if (!user || !user.role_id) return false;
+  const r = await db.queryOne('SELECT name FROM roles WHERE id = :id', { id: Number(user.role_id) });
+  return !!r && r.name === 'Managing Director';
+}
+
+/** D-259: the person's designation and whether it is eligible (null: no designation). */
+async function designationEligibility(userId) {
+  const r = await db.queryOne(
+    `SELECT d.title, d.incentive_eligible FROM user_department_memberships m
+     JOIN department_designations d ON d.id = m.designation_id
+     WHERE m.user_id = :u AND m.starts_on <= CURDATE() AND (m.ends_on IS NULL OR m.ends_on >= CURDATE())
+     ORDER BY m.is_default DESC, m.id LIMIT 1`, { u: userId });
+  return r ? { title: String(r.title), eligible: Number(r.incentive_eligible) === 1 } : null;
+}
+
+/** D-259: whether this person shares in the team incentive now (their own switch, else their designation). */
+async function isEligible(userId) {
+  const u = await db.queryOne('SELECT incentive_eligible FROM users WHERE id = :u', { u: userId });
+  if (u && u.incentive_eligible !== null && u.incentive_eligible !== undefined) return Number(u.incentive_eligible) === 1;
+  const d = await designationEligibility(userId);
+  return d ? d.eligible : true;
+}
+
+/** D-259: active people whose own switch differs from their designation's. */
+async function eligibilityOverrides() {
+  const out = [];
+  for (const u of await db.query('SELECT id, name, incentive_eligible FROM users WHERE is_active = 1 AND incentive_eligible IS NOT NULL ORDER BY name')) {
+    const d = await designationEligibility(Number(u.id));
+    const own = Number(u.incentive_eligible) === 1;
+    if (own !== (d ? d.eligible : true)) out.push({ name: String(u.name), designation: d ? d.title : null, eligible: own });
+  }
+  return out;
+}
+
+/**
+ * D-259: the MD sets the person's switch. Matching the designation stores "follow the
+ * designation" (NULL), so a later change to the designation still applies to them.
+ * Resolves an error or null.
+ */
+async function setEligible(actor, userId, eligible) {
+  if (!(await isMd(actor))) return 'Only the MD can change who is eligible for the team incentive.';
+  const before = await isEligible(userId);
+  const d = await designationEligibility(userId);
+  const value = eligible === (d ? d.eligible : true) ? null : (eligible ? 1 : 0);
+  await db.execute('UPDATE users SET incentive_eligible = :v WHERE id = :u', { v: value, u: userId });
+  if (before !== eligible) {
+    await require('../repositories/auditLogRepository').log(Number(actor.id), 'USER_UPDATED', 'users', userId, 'incentive_eligible', before ? '1' : '0', eligible ? '1' : '0');
+  }
+  return null;
+}
+
+/** Indian grouping, no decimals: 14000 => "14,000". */
+function inr0(v) {
+  return Math.round(Number(v)).toLocaleString('en-IN');
+}
+
+/**
+ * D-259: one person's line in one role — their share, what they get and what the company
+ * keeps (not eligible, or above the role's per-order / monthly cap). The monthly cap counts
+ * what the person already has locked in that role for the month the order would lock into.
+ */
+async function applyEligibilityAndCaps(orderId, role, roleLabel, person, share, roleRow, elig) {
+  const line = { user_id: Number(person.id), name: String(person.name), role, role_label: roleLabel,
+    by_share: round2(share), gets: round2(share), kept: 0, reason: null, note: null };
+  if (share <= 0) return line;
+  const e = elig.get(Number(person.id)) || { eligible: true, source: 'default', designation: null };
+  if (!e.eligible) {
+    line.gets = 0;
+    line.kept = line.by_share;
+    line.reason = 'not_eligible';
+    line.note = e.source === 'person'
+      ? 'not eligible (switched off for this person), share stays with company'
+      : `not eligible (${e.designation || 'designation'} designation), share stays with company`;
+    return line;
+  }
+  const capOrder = roleRow ? roleRow.cap_per_order : null;
+  if (capOrder !== null && capOrder !== undefined && line.gets > capOrder) {
+    line.gets = round2(capOrder);
+    line.reason = 'cap_order';
+    line.note = `capped at ₹${inr0(capOrder)} per order`;
+  }
+  const capMonth = roleRow ? roleRow.cap_per_month : null;
+  if (capMonth !== null && capMonth !== undefined) {
+    const already = await incentiveRepository.lockedInMonth(Number(person.id), role, await estimateMonth(), orderId);
+    const room = round2(Math.max(0, capMonth - already));
+    if (line.gets > room) {
+      line.gets = room;
+      line.reason = 'cap_month';
+      line.note = `capped: ₹${inr0(already)} already this month, monthly cap ₹${inr0(capMonth)}`;
+    }
+  }
+  line.kept = round2(line.by_share - line.gets);
+  return line;
+}
+
 async function split(orderId, amount) {
   const row = await incentiveRepository.forOrder(orderId);
   const customised = Number((row && row.shares_customised) || 0) === 1;
@@ -389,11 +524,15 @@ async function split(orderId, amount) {
   }
   const sum = Object.values(weights).reduce((a, b) => a + b, 0);
   let teamTotal = 0;
+  let byShare = 0;
   const perPerson = new Map();
+  const lines = [];
   if (sum > 0 && amount > 0) {
     const keys = Object.keys(weights);
+    const elig = await eligibility();
     let allocated = 0;
-    keys.forEach((key, i) => {
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
       const pct = weights[key] / sum * 100;
       // The last ticked role takes the rounding, so the shares add up to the amount exactly.
       const roleAmount = i === keys.length - 1 ? round2(amount - allocated) : round2(amount * pct / 100);
@@ -403,19 +542,27 @@ async function split(orderId, amount) {
       roles[key].pct = round2(pct);
       roles[key].amount = roleAmount;
       roles[key].each = each;
-      roles[key].people.forEach((p, j) => {
+      for (let j = 0; j < n; j++) {
+        const p = roles[key].people[j];
         const share = j === n - 1 ? round2(roleAmount - each * (n - 1)) : each;
+        // D-259: not eligible / above a cap → the company keeps it; nobody else's amount goes up.
+        const line = await applyEligibilityAndCaps(orderId, key, roles[key].label, p, share, all[key] || null, elig);
+        lines.push(line);
         if (!perPerson.has(p.id)) perPerson.set(p.id, { id: p.id, name: p.name, amount: 0, roles: [] });
         const pp = perPerson.get(p.id);
-        pp.amount = round2(pp.amount + share);
+        pp.amount = round2(pp.amount + line.gets);
         pp.roles.push(roles[key].label);
-      });
-    });
-    teamTotal = round2(allocated);
+      }
+    }
+    byShare = round2(allocated);
+    teamTotal = round2(lines.reduce((t, l) => t + l.gets, 0));
   } else if (sum > 0) {
     for (const [key, w] of Object.entries(weights)) roles[key].pct = round2(w / sum * 100);
   }
-  return { roles, team_total: teamTotal, unallocated: round2(Math.max(0, amount - teamTotal)), per_person: [...perPerson.values()], customised };
+  const keptNotEligible = round2(lines.reduce((t, l) => t + (l.reason === 'not_eligible' ? l.kept : 0), 0));
+  const keptCapped = round2(lines.reduce((t, l) => t + (l.reason !== null && l.reason !== 'not_eligible' ? l.kept : 0), 0));
+  return { roles, team_total: teamTotal, unallocated: round2(Math.max(0, amount - byShare)), per_person: [...perPerson.values()], customised,
+    lines, team_by_share: byShare, kept_total: round2(keptNotEligible + keptCapped), kept_not_eligible: keptNotEligible, kept_capped: keptCapped };
 }
 
 /** open | ready | locked | paid */
@@ -524,17 +671,18 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
     const existing = await c.queryOne('SELECT COUNT(*) AS n FROM incentive_payouts WHERE order_id = :id AND clawback_of_payout_id IS NULL', { id: orderId });
     if ((claim && claim.locked_at) || Number(existing.n) > 0) return false;
     let teamEntryId = null;
+    // D-259: what each person gets after eligibility and caps; what the company keeps is recorded per line.
+    for (const l of calc.lines || []) {
+      if (l.kept > 0) {
+        await incentiveRepository.addKept({ order_id: orderId, user_id: l.user_id, role: l.role, by_share_inr: l.by_share, paid_inr: l.gets,
+          kept_inr: l.kept, kept_reason: l.reason, kept_note: l.note, incentive_month: month, locked_on: today }, c);
+      }
+    }
     if (calc.team_total > 0) {
-      for (const [role, r] of Object.entries(calc.roles)) {
-        if (!r.gets_it || r.amount <= 0) continue;
-        const n = r.people.length;
-        for (let j = 0; j < n; j++) {
-          const p = r.people[j];
-          const share = j === n - 1 ? round2(r.amount - r.each * (n - 1)) : r.each;
-          if (share > 0) {
-            await incentiveRepository.addPayout({ order_id: orderId, payee_kind: 'staff', user_id: p.id, role, amount_inr: share,
-              incentive_month: month, payout_run_on: staffRun, locked_on: today }, c);
-          }
+      for (const l of calc.lines || []) {
+        if (l.gets > 0) {
+          await incentiveRepository.addPayout({ order_id: orderId, payee_kind: 'staff', user_id: l.user_id, role: l.role, amount_inr: l.gets,
+            incentive_month: month, payout_run_on: staffRun, locked_on: today }, c);
         }
       }
       teamEntryId = await incentiveRepository.addCostEntry(orderId, 'team', `Team incentive for order ${(order && (order.buyer_inquiry_ref || order.order_reference)) || orderId}`
@@ -562,6 +710,9 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
       incentive_month: month,
       profit_basis_inr: calc.basis,
       team_total_inr: calc.team_total,
+      team_by_share_inr: calc.team_by_share !== undefined ? calc.team_by_share : calc.team_total,
+      kept_not_eligible_inr: calc.kept_not_eligible || 0,
+      kept_capped_inr: calc.kept_capped || 0,
       associate_id: a ? a.id : null,
       associate_order_number: a && a.counts ? a.counting_number : null,
       associate_rate_pct: a ? a.rate : null,
@@ -633,9 +784,11 @@ async function unlock(orderId, userId, reason = '') {
     if (!relock || !relock.locked_at) return 'This order\'s incentive is not locked.';
     if (Number(paidNow.n) > 0) return 'Part of this order\'s incentive is already paid, so it can no longer be unlocked.';
     await incentiveRepository.deleteOrderPayouts(orderId, c);
+    await incentiveRepository.deleteOrderKept(orderId, c);
     await c.execute('DELETE FROM order_cost_entries WHERE order_id = :id AND incentive_kind IS NOT NULL', { id: orderId });
     await incentiveRepository.saveOrder(orderId, {
       locked_at: null, locked_by: null, unlock_reason: why, fully_paid_on: null, incentive_month: null, profit_basis_inr: null, team_total_inr: null,
+      team_by_share_inr: null, kept_not_eligible_inr: null, kept_capped_inr: null,
       associate_id: null, associate_order_number: null, associate_rate_pct: null,
       associate_amount_fc: null, associate_currency: null, associate_amount_inr: null,
       associate_basis_fc: null, associate_basis_inr: null, associate_counts: null, associate_due_on: null,
@@ -747,6 +900,14 @@ module.exports = {
   orderRule,
   globalAmount,
   split,
+  eligibility,
+  estimateMonth,
+  isMd,
+  designationEligibility,
+  isEligible,
+  eligibilityOverrides,
+  setEligible,
+  applyEligibilityAndCaps,
   state,
   readyReason,
   readyToLock,

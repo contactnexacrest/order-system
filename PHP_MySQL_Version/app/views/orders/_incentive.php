@@ -57,6 +57,18 @@ $__rule = $__c['rule'];
       <?php endforeach; ?>
       <?php if ($incentivePayouts === []): ?><tr><td colspan="4" class="muted">No incentive on this order.</td></tr><?php endif; ?>
     </table>
+    <?php $__kept = IncentiveRepository::keptForOrder($__oid); // D-259 ?>
+    <?php if ($__kept !== []): ?>
+      <table class="list" style="margin-top:6px">
+        <tr><th>Person</th><th>Role</th><th>By share (&#8377;)</th><th>Gets (&#8377;)</th><th>Kept by company</th></tr>
+        <?php foreach ($__kept as $__k): ?>
+          <tr><td><?= htmlspecialchars((string) $__k['user_name']) ?></td><td><?= htmlspecialchars(IncentiveRepository::roleLabel((string) $__k['role'])) ?></td>
+            <td><?= number_format((float) $__k['by_share_inr'], 2) ?></td><td><?= number_format((float) $__k['paid_inr'], 2) ?></td>
+            <td><?= number_format((float) $__k['kept_inr'], 2) ?> &mdash; <?= htmlspecialchars((string) $__k['kept_note']) ?></td></tr>
+        <?php endforeach; ?>
+        <tr><td colspan="4"><strong>Kept by company</strong></td><td><strong><?= number_format((float) $__inc['kept_not_eligible_inr'] + (float) $__inc['kept_capped_inr'], 2) ?></strong> (not eligible <?= number_format((float) $__inc['kept_not_eligible_inr'], 2) ?> &middot; capped <?= number_format((float) $__inc['kept_capped_inr'], 2) ?>)</td></tr>
+      </table>
+    <?php endif; ?>
     <?php if (!empty($__c['associate'])): $c = $__c['associate']; ?>
       <details style="margin-top:8px"><summary class="small">Associate commission statement</summary><?php require __DIR__ . '/../associate_portal/_statement.php'; ?></details>
     <?php endif; ?>
@@ -143,6 +155,21 @@ $__rule = $__c['rule'];
       </table>
       <?php if ($__c['per_person'] !== []): ?>
         <p class="small"><strong>Per person:</strong> <?= implode(' · ', array_map(static fn (array $p): string => htmlspecialchars($p['name']) . ' ' . $__money($p['amount']), $__c['per_person'])) ?></p>
+      <?php endif; ?>
+      <?php // D-259 (owner approval 6 Nov 2026): each person's share, what they get and what the company keeps.
+      $__lines = array_values(array_filter($__c['lines'] ?? [], static fn (array $l): bool => $l['by_share'] > 0)); ?>
+      <?php if ($__lines !== []): ?>
+        <table class="list" style="margin-top:6px" id="incentive-kept-<?= $__oid ?>">
+          <tr><th>Person</th><th>Role</th><th>By share (&#8377;)</th><th>Gets (&#8377;)</th><th>Kept by company</th></tr>
+          <?php foreach ($__lines as $__l): ?>
+            <tr><td><?= htmlspecialchars($__l['name']) ?></td><td><?= htmlspecialchars($__l['role_label']) ?></td>
+              <td><?= number_format($__l['by_share'], 2) ?></td><td><?= number_format($__l['gets'], 2) ?></td>
+              <td><?= $__l['kept'] > 0 ? number_format($__l['kept'], 2) . ' &mdash; ' . htmlspecialchars((string) $__l['note']) : '&mdash;' ?></td></tr>
+          <?php endforeach; ?>
+          <tr><td colspan="2"><strong>Total</strong></td><td><strong><?= number_format((float) ($__c['team_by_share'] ?? 0), 2) ?></strong></td><td><strong><?= number_format($__c['team_total'], 2) ?></strong></td>
+            <td><strong><?= number_format((float) ($__c['kept_total'] ?? 0), 2) ?> kept by company</strong><?= ($__c['kept_total'] ?? 0) > 0 ? ' (not eligible ' . number_format((float) $__c['kept_not_eligible'], 2) . ' &middot; capped ' . number_format((float) $__c['kept_capped'], 2) . ')' : '' ?></td></tr>
+        </table>
+        <?php if (($__c['kept_total'] ?? 0) > 0): ?><p class="muted small">The company's incentive cost on this order is <?= $__money($__c['team_total']) ?>, not <?= $__money((float) $__c['team_by_share']) ?>. Other people's amounts are not raised.</p><?php endif; ?>
       <?php endif; ?>
       <?php if ($__c['unallocated'] > 0): ?><p class="small">&#8377;<?= number_format($__c['unallocated'], 2) ?> has nobody to go to and is not paid. Tick a role with people, or give staff their incentive roles in Team Incentives.</p><?php endif; ?>
       <?php if ($__edit): ?>

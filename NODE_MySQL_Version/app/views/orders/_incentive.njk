@@ -45,6 +45,18 @@
       {% endfor %}
       {% if incentivePayouts.length == 0 %}<tr><td colspan="4" class="muted">No incentive on this order.</td></tr>{% endif %}
     </table>
+    {# D-259 #}
+    {% if incentiveKept and incentiveKept.length %}
+      <table class="list" style="margin-top:6px">
+        <tr><th>Person</th><th>Role</th><th>By share (&#8377;)</th><th>Gets (&#8377;)</th><th>Kept by company</th></tr>
+        {% for k in incentiveKept %}
+          <tr><td>{{ k.user_name }}</td><td>{{ incentive.roleLabel(k.role) }}</td>
+            <td>{{ k.by_share_inr | money }}</td><td>{{ k.paid_inr | money }}</td>
+            <td>{{ k.kept_inr | money }} &mdash; {{ k.kept_note }}</td></tr>
+        {% endfor %}
+        <tr><td colspan="4"><strong>Kept by company</strong></td><td><strong>{{ ((inc.kept_not_eligible_inr | float) + (inc.kept_capped_inr | float)) | money }}</strong> (not eligible {{ inc.kept_not_eligible_inr | money }} &middot; capped {{ inc.kept_capped_inr | money }})</td></tr>
+      </table>
+    {% endif %}
     {% if calc.associate %}{% set c = calc.associate %}
       <details style="margin-top:8px"><summary class="small">Associate commission statement</summary>{% include "associate_portal/_statement.njk" %}</details>
     {% endif %}
@@ -131,6 +143,20 @@
       </table>
       {% if calc.per_person.length %}
         <p class="small"><strong>Per person:</strong> {% for p in calc.per_person %}{{ p.name }} &#8377;{{ p.amount | money }}{{ ' · ' if not loop.last }}{% endfor %}</p>
+      {% endif %}
+      {# D-259 (owner approval 6 Nov 2026): each person's share, what they get and what the company keeps. #}
+      {% if calc.lines and calc.team_by_share > 0 %}
+        <table class="list" style="margin-top:6px" id="incentive-kept-{{ order.id }}">
+          <tr><th>Person</th><th>Role</th><th>By share (&#8377;)</th><th>Gets (&#8377;)</th><th>Kept by company</th></tr>
+          {% for l in calc.lines %}{% if l.by_share > 0 %}
+            <tr><td>{{ l.name }}</td><td>{{ l.role_label }}</td>
+              <td>{{ l.by_share | money }}</td><td>{{ l.gets | money }}</td>
+              <td>{% if l.kept > 0 %}{{ l.kept | money }} &mdash; {{ l.note }}{% else %}&mdash;{% endif %}</td></tr>
+          {% endif %}{% endfor %}
+          <tr><td colspan="2"><strong>Total</strong></td><td><strong>{{ (calc.team_by_share or 0) | money }}</strong></td><td><strong>{{ calc.team_total | money }}</strong></td>
+            <td><strong>{{ (calc.kept_total or 0) | money }} kept by company</strong>{% if calc.kept_total > 0 %} (not eligible {{ calc.kept_not_eligible | money }} &middot; capped {{ calc.kept_capped | money }}){% endif %}</td></tr>
+        </table>
+        {% if calc.kept_total > 0 %}<p class="muted small">The company's incentive cost on this order is &#8377;{{ calc.team_total | money }}, not &#8377;{{ calc.team_by_share | money }}. Other people's amounts are not raised.</p>{% endif %}
       {% endif %}
       {% if calc.unallocated > 0 %}<p class="small">&#8377;{{ calc.unallocated | money }} has nobody to go to and is not paid. Tick a role with people, or give staff their incentive roles in Team Incentives.</p>{% endif %}
       {% if edit %}

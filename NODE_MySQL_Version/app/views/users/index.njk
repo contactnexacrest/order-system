@@ -84,6 +84,9 @@
           </select>
         </label>
       </div>
+      {# D-259: the team incentive switch, on by default; only the MD changes it. #}
+      {% if incentiveCanEdit %}<input type="hidden" name="incentive_eligible_present" value="1">{% endif %}
+      <label><input type="checkbox" name="incentive_eligible" value="1" checked{{ '' if incentiveCanEdit else ' disabled' }}> Eligible for team incentive <small class="muted">(on by default; off keeps their share with the company{{ '' if incentiveCanEdit else ' — only the MD can change this' }})</small></label>
       <button type="submit" class="btn-sm">Create User</button>
     </form>
   </div>

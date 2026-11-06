@@ -70,10 +70,29 @@ final class IncentiveController
                 $errors = array_merge($errors, $roleErrors);
             }
         }
+        // D-259: caps per role (MD only — manage_pricing). Empty = no cap.
+        $caps = null;
+        if (isset($_POST['caps_present']) || isset($_POST['caps'])) {
+            if (!self::canManagePricing()) {
+                $errors[] = 'Only the MD can change the incentive caps.';
+            } else {
+                [$caps, $capErrors] = self::parseCaps();
+                $errors = array_merge($errors, $capErrors);
+            }
+        }
         if ($errors !== []) {
             Flash::set('error', implode(' ', $errors));
             header('Location: /incentives/settings');
             return;
+        }
+        if ($caps !== null) {
+            $capText = static fn (): string => (string) json_encode(array_map(static fn (array $r): array => [$r['cap_per_order'], $r['cap_per_month']], IncentiveRepository::allRoles()));
+            $before = $capText();
+            IncentiveRepository::saveCaps($caps, $userId);
+            $after = $capText();
+            if ($before !== $after) {
+                AuditLogRepository::log($userId, 'INCENTIVE_CAPS_CHANGED', 'incentive_roles', null, 'caps', $before, $after);
+            }
         }
         $old = IncentiveRepository::settings();
         $values = ['program_enabled' => !empty($_POST['program_enabled']) ? '1' : '0', 'lock_reminder_days' => (string) (int) $reminder];
@@ -106,6 +125,37 @@ final class IncentiveController
         }
         Flash::set('success', 'Team incentive settings saved.');
         header('Location: /incentives/settings');
+    }
+
+    /**
+     * D-259: the caps table from the form — caps[role_key][order|month] in rupees; empty = no cap.
+     *
+     * @return array{0: array<string, array{order:?float, month:?float}>, 1: list<string>}
+     */
+    private static function parseCaps(): array
+    {
+        $errors = [];
+        $out = [];
+        $roles = IncentiveRepository::allRoles();
+        foreach ((array) ($_POST['caps'] ?? []) as $key => $c) {
+            if (!isset($roles[$key]) || !is_array($c)) {
+                continue;
+            }
+            $vals = [];
+            foreach (['order', 'month'] as $k) {
+                $v = trim((string) ($c[$k] ?? ''));
+                if ($v === '') {
+                    $vals[$k] = null;
+                } elseif (!is_numeric($v) || (float) $v < 0 || (float) $v > 1000000000) {
+                    $errors[] = 'Enter the ' . $roles[$key]['label'] . ' cap ' . ($k === 'order' ? 'per order' : 'per month') . ' as rupees from 0 to 1,00,00,00,000, or leave it empty for no cap.';
+                    $vals[$k] = null;
+                } else {
+                    $vals[$k] = round((float) $v, 2);
+                }
+            }
+            $out[(string) $key] = $vals;
+        }
+        return [$out, array_values(array_unique($errors))];
     }
 
     /**

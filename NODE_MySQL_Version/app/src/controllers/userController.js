@@ -31,7 +31,8 @@ async function index(req, res) {
     userRepository.statusCounts(),
     lookupRepository.roles(),
   ]);
-  res.renderView('users/index', { users, statusCounts, currentStatus: status, roles }, 'layout/base');
+  res.renderView('users/index', { users, statusCounts, currentStatus: status, roles,
+    incentiveCanEdit: await require('../services/incentiveService').isMd(req.user) }, 'layout/base');
 }
 
 async function create(req, res) {
@@ -71,6 +72,11 @@ async function create(req, res) {
 
   const actor = req.user;
   await auditLogRepository.log(actor.id, 'USER_CREATED', 'users', userId, null, null, null, `Created user ${email}`);
+  // D-259: the MD may switch the team incentive off for the new person (on by default).
+  const incentiveService = require('../services/incentiveService');
+  if ((req.body || {}).incentive_eligible_present && await incentiveService.isMd(actor)) {
+    await incentiveService.setEligible(actor, userId, !!req.body.incentive_eligible);
+  }
 
   // Shown once, here, in a flash message — never emailed, never
   // logged, never stored anywhere but the (already hashed) DB row.
@@ -99,7 +105,13 @@ async function editForm(req, res) {
   const designations = (await departmentRepository.designations())
     .filter((d) => Number(d.is_active) === 1 && Number(d.department_active) === 1);
   const agreementCard = await require('./agreementController').partyCard(req, 'staff', target.id);
-  res.renderView('users/edit', { target, roles, memberships, designations, today: todayIst(), agreementCard }, 'layout/base');
+  // D-259: the team incentive switch (only the MD changes it).
+  const incentiveService = require('../services/incentiveService');
+  res.renderView('users/edit', { target, roles, memberships, designations, today: todayIst(), agreementCard,
+    incentiveEligible: await incentiveService.isEligible(target.id),
+    incentiveDesignation: await incentiveService.designationEligibility(target.id),
+    incentiveCanEdit: await incentiveService.isMd(req.user),
+    incentiveFirstName: String(target.name || '').split(' ')[0] }, 'layout/base');
 }
 
 async function update(req, res) {
@@ -162,6 +174,15 @@ async function update(req, res) {
   ].filter(([, oldVal, newVal]) => String(oldVal ?? '') !== String(newVal ?? ''));
 
   await userRepository.update(userId, name, email, phone, roleId);
+  // D-259: the team incentive switch — the MD only; anyone else's form does not carry it.
+  if ((req.body || {}).incentive_eligible_present) {
+    const err = await require('../services/incentiveService').setEligible(actor, userId, !!req.body.incentive_eligible);
+    if (err !== null) {
+      flash.set(req, 'error', err);
+      res.redirect(`/users/${userId}/edit`);
+      return;
+    }
+  }
 
   for (const [field, oldVal, newVal] of changes) {
     await auditLogRepository.log(actor.id, 'USER_UPDATED', 'users', userId, field, oldVal !== null && oldVal !== undefined ? String(oldVal) : null, newVal !== null && newVal !== undefined ? String(newVal) : null);

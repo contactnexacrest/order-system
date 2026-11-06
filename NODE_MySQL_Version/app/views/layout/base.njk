@@ -138,6 +138,7 @@
           {% if permissions.edit_locked_data %}<a href="/admin/overrides" class="{{ 'active' if (currentPath | startswith('/admin/overrides')) else '' }}">Admin Overrides</a>{% endif %}
           {% if permissions.manage_sample_data %}<a href="/sample-data" class="{{ 'active' if (currentPath | startswith('/sample-data')) else '' }}">Sample Data</a>{% endif %}
           {% if permissions.data_export_run %}<a href="/admin/data-export" class="{{ 'active' if (currentPath | startswith('/admin/data-export')) else '' }}">Data Export / Migration</a>{% endif %}
+          {% if permissions.manage_company_settings %}<a href="/admin/backups" class="{{ 'active' if (currentPath | startswith('/admin/backups')) else '' }}">Backups</a>{% endif %}
         </div>
       </details>
     {% endif %}

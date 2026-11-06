@@ -38,7 +38,14 @@ Prepared 5 Nov 2026 (Phase 0C.1). Work through it top to bottom on go-live day, 
   - [ ] `ZOHO_EINVOICE_ENABLED=false`.
 - [ ] Point the web root at `public_html/` (PHP), or start the Node service.
 - [ ] Set up the scheduled jobs (README: "Bluehost cron setup" or "Background jobs"): daily digest and alerts, Zoho sync, backups. Run them in Indian time (`CRON_TZ=Asia/Kolkata`): alerts at 06:00, digest at 08:15.
-- [ ] Set up the **database and storage backups** (README, Section 14). Test one restore.
+- [ ] Set up the **backups** (README, "Backups"; SOP 32; owner decisions D-260):
+  - [ ] create `BACKUP_DIR` outside the web root and outside the storage folder, and the encryption key file;
+  - [ ] keep a copy of the key **away from the server** (without it the copies cannot be opened);
+  - [ ] add the `BACKUP_…` lines to `app/.env` (keep 10 years; thin after 120 days);
+  - [ ] add the three cron lines (database 02:00, documents 02:30, test-restore 04:00 on the 1st);
+  - [ ] run the database and documents backups once by hand; **Admin › Backups** shows both as OK;
+  - [ ] run `scripts/backup_test_restore.sh` once; Admin › Backups shows the test-restore as OK;
+  - [ ] off-site copy: when the provider is chosen, set `BACKUP_OFFSITE_TARGET`.
 
 ## C. First login and company setup
 
@@ -93,6 +100,6 @@ Prepared 5 Nov 2026 (Phase 0C.1). Work through it top to bottom on go-live day, 
 ## G. After go-live (first week)
 
 - [ ] Daily: Zoho sync log free of errors; the alert digest arrives.
-- [ ] Weekly: backups are present; prices are not stale; the "Ready to lock" list is reviewed.
+- [ ] Weekly: Admin › Backups shows all jobs OK (the daily digest also warns); prices are not stale; the "Ready to lock" list is reviewed.
 - [ ] First payout run: check the "To pay" report, then lock and pay.
 - [ ] Gather the real "other costs to FOB" from the first 3–5 shipments and update the %.

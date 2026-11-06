@@ -1,63 +1,46 @@
 #!/bin/bash
-set -euo pipefail
+# Nightly documents backup (owner decisions D-260). Cron: 30 2 * * * (IST) — see README "Backups".
+# Reads only from STORAGE_BASE_PATH (every generated PDF/DOCX and every uploaded file).
+#  - Daily snapshot: BACKUP_DIR/storage/snapshots/nexacrest_files_YYYY-MM-DD/ — rsync --link-dest to the
+#    previous snapshot, so a file that has not changed is stored ONCE (hard link, no extra space).
+#  - Monthly full archive (first run of each month): BACKUP_DIR/storage/archives/nexacrest_files_full_YYYY-MM-DD.tar.gz[.enc]
+#    + .sha256 — the encrypted copy that goes off-site.
+# Never writes to STORAGE_BASE_PATH; never uses --delete against anything but a brand-new snapshot folder.
+source "$(dirname "${BASH_SOURCE[0]}")/backup_lib.sh"
+load_config
+guard_backup_dir
 
-# Daily storage/ backup for the NexaCrest Node/MySQL deployment.
-#
-# A database backup alone is not a backup of this application. Every
-# generated PDF/DOCX and every received file (dispute evidence, amendment
-# signed copies, buyer PO copies, supplier PO acknowledgments, product
-# images, ...) lives on disk under STORAGE_BASE_PATH, outside any
-# web-served directory — file_store only holds each one's *path* and
-# metadata. Restoring the database without also restoring storage/ leaves
-# every file_store row pointing at a file that no longer exists: every
-# "Download PDF" link 404s, the "Download Full Dossier (ZIP)" button on an
-# order page silently skips every missing file, and a document that was
-# ever draft/final-watermark-swapped can never be regenerated to look the
-# way it did when a reviewer actually approved it — that exact historical
-# PDF is gone, not reconstructible from data alone.
-#
-# This is documentation to fill in and install on the real server, same
-# convention as backup_db.sh — copy this file to the server, fill in the
-# two variables below, chmod it, and add it to cron/systemd as described
-# in the deployment guide's "Database backups" section (this job belongs
-# right next to that one, offset by 30 minutes so they don't compete for
-# I/O).
+SRC="$(abs_path "$STORAGE_BASE_PATH")"
+[ -d "$SRC" ] || { write_status storage failed "STORAGE_BASE_PATH ($SRC) does not exist"; fail "STORAGE_BASE_PATH ($SRC) does not exist"; }
+SNAPS="$BACKUP_DIR/storage/snapshots"
+DEST="$SNAPS/nexacrest_files_${TODAY}"
+if [ -e "$DEST" ]; then
+  log "Today's snapshot already exists ($DEST) — not overwritten."
+else
+  PREV="$(ls -1d "$SNAPS"/nexacrest_files_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] 2>/dev/null | sort | tail -n 1 || true)"
+  LINK=(); [ -n "$PREV" ] && LINK=(--link-dest="$PREV")
+  if ! rsync -a "${LINK[@]}" "$SRC"/ "$DEST.partial"/; then
+    rm -rf -- "$DEST.partial"
+    write_status storage failed "rsync of the documents failed — no new snapshot (older ones are untouched)"
+    fail "rsync failed"
+  fi
+  mv "$DEST.partial" "$DEST"
+fi
 
-STORAGE_DIR="/opt/nexacrest_node/storage"   # your STORAGE_BASE_PATH from .env
-BACKUP_DIR="/var/backups/nexacrest_storage" # outside any web-served directory — never web-reachable
-RETENTION_DAYS=30
+ARCH_DIR="$BACKUP_DIR/storage/archives"
+ENCRYPTED=no; ARCH_NOTE=""
+if ! ls -1 "$ARCH_DIR" 2>/dev/null | grep -qE "^nexacrest_files_full_${TODAY:0:7}-[0-9]{2}\.tar\.gz(\.enc)?$"; then
+  ARCH="$ARCH_DIR/nexacrest_files_full_${TODAY}.tar.gz"
+  tar -czf "$ARCH" -C "$DEST" .
+  if [ -n "$BACKUP_ENCRYPTION_KEY_FILE" ]; then encrypt_file "$ARCH"; ARCH="$ARCH.enc"; ENCRYPTED=yes; fi
+  write_checksum "$ARCH"
+  ARCH_NOTE="; monthly full archive $(basename "$ARCH")"
+fi
 
-mkdir -p "$BACKUP_DIR"
-STAMP=$(date +%Y%m%d_%H%M%S)
-FILE="$BACKUP_DIR/nexacrest_storage_${STAMP}.tar.gz"
-
-tar -czf "$FILE" -C "$(dirname "$STORAGE_DIR")" "$(basename "$STORAGE_DIR")"
-
-# Retention — delete anything older than RETENTION_DAYS, keep everything newer.
-find "$BACKUP_DIR" -name 'nexacrest_storage_*.tar.gz' -mtime +"$RETENTION_DAYS" -delete
-
-echo "Storage backup complete: $FILE ($(du -h "$FILE" | cut -f1))"
-
-# --- Notes ---
-# - A full tar of the whole tree is the simplest correct approach for a
-#   cron job that has to run unattended — `rsync -a --delete` to a second
-#   location is a reasonable alternative if storage/ grows large enough
-#   that a nightly full tarball becomes slow or expensive to keep 30 days
-#   of, but loses the point-in-time-snapshot property tar gives you for
-#   free (an rsync --delete mirror only has the *current* state, not
-#   yesterday's).
-# - The DB backup and this storage backup are only consistent with each
-#   other if taken close together — schedule both within the same
-#   maintenance window (e.g. 2:00 and 2:30) to keep the drift small, or
-#   run both back-to-back inside one script instead of two separate cron
-#   entries for a stronger guarantee.
-# - Restoring: tar -xzf nexacrest_storage_YYYYMMDD_HHMMSS.tar.gz -C "$(dirname "$STORAGE_DIR")"
-#   restores the whole tree back to STORAGE_DIR. Test this at least once
-#   against a scratch location — verify a handful of file_store.server_path
-#   values from a restored DB backup taken the same night actually resolve
-#   to real files after extracting.
-# - A managed object-storage backend, if storage/ is ever moved to one
-#   (S3, GCS, ...) instead of local disk, would have its own
-#   versioning/replication story and this script would no longer apply —
-#   it's specifically for the local-disk STORAGE_BASE_PATH this app ships
-#   with today.
+apply_retention "$SNAPS" '^nexacrest_files_[0-9]{4}-[0-9]{2}-[0-9]{2}$' 1
+apply_retention "$ARCH_DIR" '^nexacrest_files_full_[0-9]{4}-[0-9]{2}-[0-9]{2}\.tar\.gz(\.enc)?$' 0
+OFFSITE="$(offsite_copy "$ARCH_DIR" storage)"
+FILES="$(find "$DEST" -type f | wc -l)"
+SIZE="$(du -sb "$DEST" | cut -f1)"
+write_status storage ok "Documents snapshot made ($FILES files)$ARCH_NOTE" "$(basename "$DEST")" "$SIZE" "$ENCRYPTED" "$OFFSITE"
+log "Documents snapshot: $DEST ($FILES files)$ARCH_NOTE; off-site: $OFFSITE"

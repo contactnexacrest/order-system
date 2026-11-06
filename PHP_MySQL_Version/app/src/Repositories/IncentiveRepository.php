@@ -31,7 +31,10 @@ final class IncentiveRepository
             self::$roleCache = [];
             foreach (Database::connection()->query('SELECT * FROM incentive_roles ORDER BY sort_order, id')->fetchAll() as $r) {
                 self::$roleCache[(string) $r['role_key']] = ['id' => (int) $r['id'], 'role_key' => (string) $r['role_key'], 'label' => (string) $r['label'],
-                    'share_pct' => (float) $r['share_pct'], 'is_active' => (int) $r['is_active'] === 1, 'sort_order' => (int) $r['sort_order']];
+                    'share_pct' => (float) $r['share_pct'], 'is_active' => (int) $r['is_active'] === 1, 'sort_order' => (int) $r['sort_order'],
+                    // D-259: the most one person gets per order / per calendar month in this role (null = no cap).
+                    'cap_per_order' => isset($r['cap_per_order_inr']) && $r['cap_per_order_inr'] !== null ? (float) $r['cap_per_order_inr'] : null,
+                    'cap_per_month' => isset($r['cap_per_month_inr']) && $r['cap_per_month_inr'] !== null ? (float) $r['cap_per_month_inr'] : null];
             }
         }
         return self::$roleCache;
@@ -85,6 +88,61 @@ final class IncentiveRepository
             isset($existing[$r['role_key']]) ? $upd->execute($params) : $ins->execute($params);
         }
         self::forgetRoles();
+    }
+
+    /**
+     * D-259: the caps per role. @param array<string, array{order:?float, month:?float}> $caps role key => caps (null = no cap)
+     */
+    public static function saveCaps(array $caps, int $userId): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE incentive_roles SET cap_per_order_inr = :o, cap_per_month_inr = :m, updated_by = :u WHERE role_key = :k');
+        foreach ($caps as $key => $c) {
+            $stmt->execute(['o' => $c['order'], 'm' => $c['month'], 'u' => $userId, 'k' => $key]);
+        }
+        self::forgetRoles();
+    }
+
+    /**
+     * D-259: what a person has already been given in a role in one incentive month (locked
+     * payouts of other orders, clawbacks included) — the monthly cap counts this.
+     */
+    public static function lockedInMonth(int $userId, string $role, string $month, int $exceptOrderId): float
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT COALESCE(SUM(amount_inr), 0) FROM incentive_payouts
+             WHERE payee_kind = 'staff' AND user_id = :u AND role = :r AND incentive_month = :m AND order_id <> :o"
+        );
+        $stmt->execute(['u' => $userId, 'r' => $role, 'm' => $month, 'o' => $exceptOrderId]);
+        return round((float) $stmt->fetchColumn(), 2);
+    }
+
+    /** D-259: one kept line (not eligible / above a cap) written when the order is locked. @param array<string,mixed> $row */
+    public static function addKept(array $row): void
+    {
+        Database::connection()->prepare(
+            'INSERT INTO incentive_kept (order_id, user_id, role, by_share_inr, paid_inr, kept_inr, kept_reason, kept_note, incentive_month, locked_on)
+             VALUES (:order_id, :user_id, :role, :by_share_inr, :paid_inr, :kept_inr, :kept_reason, :kept_note, :incentive_month, :locked_on)'
+        )->execute([
+            'order_id' => $row['order_id'], 'user_id' => $row['user_id'], 'role' => $row['role'], 'by_share_inr' => $row['by_share_inr'],
+            'paid_inr' => $row['paid_inr'], 'kept_inr' => $row['kept_inr'], 'kept_reason' => $row['kept_reason'], 'kept_note' => $row['kept_note'] ?? null,
+            'incentive_month' => $row['incentive_month'], 'locked_on' => $row['locked_on'],
+        ]);
+    }
+
+    /** @return list<array<string,mixed>> the order's kept lines, with the person's name */
+    public static function keptForOrder(int $orderId): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT k.*, u.name AS user_name FROM incentive_kept k JOIN users u ON u.id = k.user_id WHERE k.order_id = :id ORDER BY k.id'
+        );
+        $stmt->execute(['id' => $orderId]);
+        return $stmt->fetchAll();
+    }
+
+    /** D-259: the kept lines go with the payouts when the MD unlocks the order. */
+    public static function deleteOrderKept(int $orderId): void
+    {
+        Database::connection()->prepare('DELETE FROM incentive_kept WHERE order_id = :id')->execute(['id' => $orderId]);
     }
 
     public static function deleteRole(string $key): void

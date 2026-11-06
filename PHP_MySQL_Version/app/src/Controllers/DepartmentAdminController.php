@@ -37,6 +37,9 @@ final class DepartmentAdminController
             'roles' => RoleRepository::all(),
             'canLimits' => self::canChangeLimits(AuthService::currentUser() ?? []),
             'ownRoleIds' => \App\Services\GrantGuard::ownRoleIds(AuthService::currentUser() ?? []),
+            // D-259: the team incentive per designation (MD only) and the people whose own switch differs.
+            'incentiveCanEdit' => \App\Services\IncentiveService::isMd(AuthService::currentUser()),
+            'incentiveOverrides' => \App\Services\IncentiveService::eligibilityOverrides(),
         ], 'layout/base');
     }
 
@@ -161,6 +164,14 @@ final class DepartmentAdminController
             return;
         }
         DepartmentRepository::updateDesignation((int) $d['id'], $title, $level, !empty($_POST['is_active']), $limitRaw === '' ? null : round((float) $limitRaw, 2));
+        // D-259: the designation's team incentive eligibility — the MD only (anyone else's form does not carry it).
+        if (isset($_POST['incentive_eligible_present']) && \App\Services\IncentiveService::isMd($user)) {
+            $eligible = !empty($_POST['incentive_eligible']) ? 1 : 0;
+            if ((int) ($d['incentive_eligible'] ?? 1) !== $eligible) {
+                \App\Config\Database::connection()->prepare('UPDATE department_designations SET incentive_eligible = :e WHERE id = :id')->execute(['e' => $eligible, 'id' => (int) $d['id']]);
+                AuditLogRepository::log((int) $user['id'], 'DESIGNATION_UPDATED', 'department_designations', (int) $d['id'], 'incentive_eligible', (string) (int) ($d['incentive_eligible'] ?? 1), (string) $eligible);
+            }
+        }
         AuditLogRepository::log((int) $user['id'], 'DESIGNATION_UPDATED', 'department_designations', (int) $d['id'], null,
             "{$d['title']} · {$d['level']} · limit " . ($d['approval_limit_inr'] ?? '—'), "{$title} · {$level} · limit " . ($limitRaw === '' ? '—' : $limitRaw));
         if ($limitChanged) {

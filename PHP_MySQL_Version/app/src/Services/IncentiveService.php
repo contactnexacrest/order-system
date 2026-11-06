@@ -189,6 +189,115 @@ final class IncentiveService
     }
 
     /**
+     * D-259 (owner approval 6 Nov 2026): who shares in the team incentive. A person's own
+     * switch (users.incentive_eligible) wins; empty follows their designation (the default
+     * active membership's department designation); with no designation they are eligible.
+     *
+     * @return array<int, array{eligible:bool, source:string, designation:?string}>
+     */
+    public static function eligibility(): array
+    {
+        return \App\Helpers\BatchCache::memo('incentive-eligibility', static function (): array {
+            $pdo = Database::connection();
+            $designation = [];
+            foreach ($pdo->query(
+                'SELECT m.user_id, d.title, d.incentive_eligible FROM user_department_memberships m
+                 JOIN department_designations d ON d.id = m.designation_id
+                 WHERE m.starts_on <= CURDATE() AND (m.ends_on IS NULL OR m.ends_on >= CURDATE())
+                 ORDER BY m.is_default DESC, m.id'
+            )->fetchAll() as $r) {
+                $designation[(int) $r['user_id']] ??= ['title' => (string) $r['title'], 'eligible' => (int) $r['incentive_eligible'] === 1];
+            }
+            $out = [];
+            foreach ($pdo->query('SELECT id, incentive_eligible FROM users')->fetchAll() as $u) {
+                $id = (int) $u['id'];
+                $d = $designation[$id] ?? null;
+                if ($u['incentive_eligible'] !== null) {
+                    $out[$id] = ['eligible' => (int) $u['incentive_eligible'] === 1, 'source' => 'person', 'designation' => $d['title'] ?? null];
+                } else {
+                    $out[$id] = ['eligible' => $d['eligible'] ?? true, 'source' => $d !== null ? 'designation' : 'default', 'designation' => $d['title'] ?? null];
+                }
+            }
+            return $out;
+        });
+    }
+
+    /** D-259: only the Managing Director changes who is eligible for the team incentive. */
+    public static function isMd(?array $user): bool
+    {
+        if ($user === null || empty($user['role_id'])) {
+            return false;
+        }
+        return (\App\Repositories\RoleRepository::find((int) $user['role_id'])['name'] ?? '') === 'Managing Director';
+    }
+
+    /** D-259: the person's designation and whether it is eligible (null: no designation). @return array{title:string, eligible:bool}|null */
+    public static function designationEligibility(int $userId): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT d.title, d.incentive_eligible FROM user_department_memberships m
+             JOIN department_designations d ON d.id = m.designation_id
+             WHERE m.user_id = :u AND m.starts_on <= CURDATE() AND (m.ends_on IS NULL OR m.ends_on >= CURDATE())
+             ORDER BY m.is_default DESC, m.id LIMIT 1'
+        );
+        $stmt->execute(['u' => $userId]);
+        $r = $stmt->fetch();
+        return $r ? ['title' => (string) $r['title'], 'eligible' => (int) $r['incentive_eligible'] === 1] : null;
+    }
+
+    /** D-259: active people whose own switch differs from their designation's. @return list<array{name:string, designation:?string, eligible:bool}> */
+    public static function eligibilityOverrides(): array
+    {
+        $out = [];
+        foreach (Database::connection()->query('SELECT id, name, incentive_eligible FROM users WHERE is_active = 1 AND incentive_eligible IS NOT NULL ORDER BY name')->fetchAll() as $u) {
+            $d = self::designationEligibility((int) $u['id']);
+            $own = (int) $u['incentive_eligible'] === 1;
+            if ($own !== ($d['eligible'] ?? true)) {
+                $out[] = ['name' => (string) $u['name'], 'designation' => $d['title'] ?? null, 'eligible' => $own];
+            }
+        }
+        return $out;
+    }
+
+    /** D-259: whether this person shares in the team incentive now (their own switch, else their designation). */
+    public static function isEligible(int $userId): bool
+    {
+        $stmt = Database::connection()->prepare('SELECT incentive_eligible FROM users WHERE id = :u');
+        $stmt->execute(['u' => $userId]);
+        $own = $stmt->fetchColumn();
+        if ($own !== false && $own !== null) {
+            return (int) $own === 1;
+        }
+        return self::designationEligibility($userId)['eligible'] ?? true;
+    }
+
+    /**
+     * D-259: the MD sets the person's switch. Matching the designation stores "follow the
+     * designation" (NULL), so a later change to the designation still applies to them.
+     * Returns an error or null.
+     */
+    public static function setEligible(?array $actor, int $userId, bool $eligible): ?string
+    {
+        if (!self::isMd($actor)) {
+            return 'Only the MD can change who is eligible for the team incentive.';
+        }
+        $before = self::isEligible($userId);
+        $designation = self::designationEligibility($userId);
+        $value = $eligible === ($designation['eligible'] ?? true) ? null : ($eligible ? 1 : 0);
+        Database::connection()->prepare('UPDATE users SET incentive_eligible = :v WHERE id = :u')->execute(['v' => $value, 'u' => $userId]);
+        if ($before !== $eligible) {
+            \App\Repositories\AuditLogRepository::log((int) $actor['id'], 'USER_UPDATED', 'users', $userId, 'incentive_eligible', $before ? '1' : '0', $eligible ? '1' : '0');
+        }
+        return null;
+    }
+
+    /** D-259: the incentive month an unlocked order would be locked into today (the next staff payout run). */
+    public static function estimateMonth(): string
+    {
+        return substr(AssociateCommission::payoutRunOn(date('Y-m-d')), 0, 7);
+    }
+
+    /**
      * The people on each role: those set on the order, else the order's
      * assignees with that incentive role, else everyone with that role.
      *
@@ -341,6 +450,11 @@ final class IncentiveService
             'unallocated' => $split['unallocated'],
             'roles' => $split['roles'],
             'per_person' => $split['per_person'],
+            'lines' => $split['lines'],
+            'team_by_share' => $split['team_by_share'],
+            'kept_total' => $split['kept_total'],
+            'kept_not_eligible' => $split['kept_not_eligible'],
+            'kept_capped' => $split['kept_capped'],
             'shares_customised' => $split['customised'],
             'left_for_company' => $left,
             'margin_after_pct' => $marginAfter,
@@ -382,7 +496,9 @@ final class IncentiveService
         }
         $sum = array_sum($weights);
         $teamTotal = 0.0;
+        $byShare = 0.0;
         $perPerson = [];
+        $lines = [];
         if ($sum > 0 && $amount > 0) {
             $keys = array_keys($weights);
             $allocated = 0.0;
@@ -399,19 +515,73 @@ final class IncentiveService
                 foreach ($roles[$key]['people'] as $j => $p) {
                     // The last person in a role takes the rounding too.
                     $share = $j === $n - 1 ? round($roleAmount - $each * ($n - 1), 2) : $each;
+                    // D-259: not eligible / above a cap → the company keeps it; nobody else's amount goes up.
+                    $line = self::applyEligibilityAndCaps($orderId, $key, $roles[$key]['label'], $p, $share, $all[$key] ?? []);
+                    $lines[] = $line;
                     $perPerson[$p['id']] ??= ['id' => $p['id'], 'name' => $p['name'], 'amount' => 0.0, 'roles' => []];
-                    $perPerson[$p['id']]['amount'] = round($perPerson[$p['id']]['amount'] + $share, 2);
+                    $perPerson[$p['id']]['amount'] = round($perPerson[$p['id']]['amount'] + $line['gets'], 2);
                     $perPerson[$p['id']]['roles'][] = $roles[$key]['label'];
                 }
             }
-            $teamTotal = round($allocated, 2);
+            $byShare = round($allocated, 2);
+            $teamTotal = round(array_sum(array_column($lines, 'gets')), 2);
         } elseif ($sum > 0) {
             foreach ($weights as $key => $w) {
                 $roles[$key]['pct'] = round($w / $sum * 100, 2);
             }
         }
-        return ['roles' => $roles, 'team_total' => $teamTotal, 'unallocated' => round(max(0.0, $amount - $teamTotal), 2),
-            'per_person' => array_values($perPerson), 'customised' => $customised];
+        $keptNotEligible = round(array_sum(array_map(static fn (array $l): float => $l['reason'] === 'not_eligible' ? $l['kept'] : 0.0, $lines)), 2);
+        $keptCapped = round(array_sum(array_map(static fn (array $l): float => $l['reason'] !== null && $l['reason'] !== 'not_eligible' ? $l['kept'] : 0.0, $lines)), 2);
+        return ['roles' => $roles, 'team_total' => $teamTotal, 'unallocated' => round(max(0.0, $amount - $byShare), 2),
+            'per_person' => array_values($perPerson), 'customised' => $customised,
+            'lines' => $lines, 'team_by_share' => $byShare, 'kept_total' => round($keptNotEligible + $keptCapped, 2),
+            'kept_not_eligible' => $keptNotEligible, 'kept_capped' => $keptCapped];
+    }
+
+    /**
+     * D-259: one person's line in one role — their share, what they get and what the company
+     * keeps (not eligible, or above the role's per-order / monthly cap). The monthly cap counts
+     * what the person already has locked in that role for the month the order would lock into.
+     *
+     * @param array{id:int,name:string} $person
+     * @param array<string,mixed> $roleRow incentive_roles row (caps)
+     * @return array{user_id:int, name:string, role:string, role_label:string, by_share:float, gets:float, kept:float, reason:?string, note:?string}
+     */
+    public static function applyEligibilityAndCaps(int $orderId, string $role, string $roleLabel, array $person, float $share, array $roleRow): array
+    {
+        $line = ['user_id' => (int) $person['id'], 'name' => (string) $person['name'], 'role' => $role, 'role_label' => $roleLabel,
+            'by_share' => round($share, 2), 'gets' => round($share, 2), 'kept' => 0.0, 'reason' => null, 'note' => null];
+        if ($share <= 0) {
+            return $line;
+        }
+        $e = self::eligibility()[(int) $person['id']] ?? ['eligible' => true, 'source' => 'default', 'designation' => null];
+        if (!$e['eligible']) {
+            $line['gets'] = 0.0;
+            $line['kept'] = $line['by_share'];
+            $line['reason'] = 'not_eligible';
+            $line['note'] = $e['source'] === 'person'
+                ? 'not eligible (switched off for this person), share stays with company'
+                : 'not eligible (' . ($e['designation'] ?? 'designation') . ' designation), share stays with company';
+            return $line;
+        }
+        $capOrder = $roleRow['cap_per_order'] ?? null;
+        if ($capOrder !== null && $line['gets'] > $capOrder) {
+            $line['gets'] = round((float) $capOrder, 2);
+            $line['reason'] = 'cap_order';
+            $line['note'] = 'capped at ₹' . number_format((float) $capOrder, 0) . ' per order';
+        }
+        $capMonth = $roleRow['cap_per_month'] ?? null;
+        if ($capMonth !== null) {
+            $already = IncentiveRepository::lockedInMonth((int) $person['id'], $role, self::estimateMonth(), $orderId);
+            $room = round(max(0.0, (float) $capMonth - $already), 2);
+            if ($line['gets'] > $room) {
+                $line['gets'] = $room;
+                $line['reason'] = 'cap_month';
+                $line['note'] = 'capped: ₹' . number_format($already, 0) . ' already this month, monthly cap ₹' . number_format((float) $capMonth, 0);
+            }
+        }
+        $line['kept'] = round($line['by_share'] - $line['gets'], 2);
+        return $line;
     }
 
     /** open | ready | locked | paid */
@@ -522,18 +692,19 @@ final class IncentiveService
                 return false;
             }
             $teamEntryId = null;
+            // D-259: what each person gets after eligibility and caps; what the company keeps is recorded per line.
+            foreach ($calc['lines'] ?? [] as $l) {
+                if ($l['kept'] > 0) {
+                    IncentiveRepository::addKept(['order_id' => $orderId, 'user_id' => $l['user_id'], 'role' => $l['role'], 'by_share_inr' => $l['by_share'],
+                        'paid_inr' => $l['gets'], 'kept_inr' => $l['kept'], 'kept_reason' => $l['reason'], 'kept_note' => $l['note'],
+                        'incentive_month' => $month, 'locked_on' => $today]);
+                }
+            }
             if ($calc['team_total'] > 0) {
-                foreach ($calc['roles'] as $role => $r) {
-                    if (!$r['gets_it'] || $r['amount'] <= 0) {
-                        continue;
-                    }
-                    $n = count($r['people']);
-                    foreach ($r['people'] as $j => $p) {
-                        $share = $j === $n - 1 ? round($r['amount'] - $r['each'] * ($n - 1), 2) : $r['each'];
-                        if ($share > 0) {
-                            IncentiveRepository::addPayout(['order_id' => $orderId, 'payee_kind' => 'staff', 'user_id' => $p['id'], 'role' => $role, 'amount_inr' => $share,
-                                'incentive_month' => $month, 'payout_run_on' => $staffRun, 'locked_on' => $today]);
-                        }
+                foreach ($calc['lines'] ?? [] as $l) {
+                    if ($l['gets'] > 0) {
+                        IncentiveRepository::addPayout(['order_id' => $orderId, 'payee_kind' => 'staff', 'user_id' => $l['user_id'], 'role' => $l['role'], 'amount_inr' => $l['gets'],
+                            'incentive_month' => $month, 'payout_run_on' => $staffRun, 'locked_on' => $today]);
                     }
                 }
                 $order = OrderRepository::find($orderId);
@@ -566,6 +737,9 @@ final class IncentiveService
                 'incentive_month' => $month,
                 'profit_basis_inr' => $calc['basis'],
                 'team_total_inr' => $calc['team_total'],
+                'team_by_share_inr' => $calc['team_by_share'] ?? $calc['team_total'],
+                'kept_not_eligible_inr' => $calc['kept_not_eligible'] ?? 0.0,
+                'kept_capped_inr' => $calc['kept_capped'] ?? 0.0,
                 'associate_id' => $a['id'] ?? null,
                 'associate_order_number' => $a !== null && $a['counts'] ? $a['counting_number'] : null,
                 'associate_rate_pct' => $a['rate'] ?? null,
@@ -659,9 +833,11 @@ final class IncentiveService
             return 'Part of this order\'s incentive is already paid, so it can no longer be unlocked.';
         }
         IncentiveRepository::deleteOrderPayouts($orderId);
+        IncentiveRepository::deleteOrderKept($orderId);
         $pdo->prepare('DELETE FROM order_cost_entries WHERE order_id = :id AND incentive_kind IS NOT NULL')->execute(['id' => $orderId]);
         IncentiveRepository::saveOrder($orderId, [
             'locked_at' => null, 'locked_by' => null, 'unlock_reason' => $reason, 'fully_paid_on' => null, 'incentive_month' => null, 'profit_basis_inr' => null, 'team_total_inr' => null,
+            'team_by_share_inr' => null, 'kept_not_eligible_inr' => null, 'kept_capped_inr' => null,
             'associate_id' => null, 'associate_order_number' => null, 'associate_rate_pct' => null,
             'associate_amount_fc' => null, 'associate_currency' => null, 'associate_amount_inr' => null,
             'associate_basis_fc' => null, 'associate_basis_inr' => null, 'associate_counts' => null, 'associate_due_on' => null,

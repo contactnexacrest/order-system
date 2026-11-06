@@ -26,7 +26,7 @@ const STATES = {
   paid: 'Paid',
 };
 
-const HEADERS = ['Order', 'Client', 'Order date', 'Payee', 'Payee type', 'Role', 'Amount (INR)', 'GST (INR)', 'TDS (INR)', 'State', 'Due on', 'Payout run', 'Paid on'];
+const HEADERS = ['Order', 'Client', 'Order date', 'Payee', 'Payee type', 'Role', 'Amount (INR)', 'GST (INR)', 'TDS (INR)', 'State', 'Due on', 'Payout run', 'Paid on', 'Kept — not eligible (INR)', 'Kept — capped (INR)'];
 
 const { round2 } = require('../helpers/money'); // PHP round(x, 2) (fresh-eyes review M3)
 
@@ -61,6 +61,11 @@ async function lockedRows() {
      ORDER BY o.id, p.payee_kind DESC, p.id`, // D-257 (fresh-eyes review L1): only the orders of the request's division(s)
     { t: await testFlag() }
   );
+  // D-259: what the company kept on capped lines, by order:person:role.
+  const kept = new Map();
+  for (const k of await db.query("SELECT order_id, user_id, role, kept_inr FROM incentive_kept WHERE kept_reason <> 'not_eligible'")) {
+    kept.set(`${k.order_id}:${k.user_id}:${k.role}`, round2(k.kept_inr));
+  }
   const out = [];
   for (const p of rows) {
     const associate = p.payee_kind === 'associate';
@@ -84,9 +89,34 @@ async function lockedRows() {
       payout_run_on: ymd(p.payout_run_on),
       locked_on: ymd(p.locked_on),
       paid_on: ymd(p.paid_on),
+      kept_not_eligible_inr: 0,
+      kept_capped_inr: associate ? 0 : (kept.get(`${p.order_id}:${p.user_id}:${p.role}`) || 0),
     });
   }
   return out;
+}
+
+/** D-259: kept-only register rows of locked orders (people not eligible: nothing paid, all kept). */
+async function lockedKeptOnlyRows() {
+  await incentiveRepository.allRoles();
+  const list = await db.query(
+    `SELECT k.*, o.order_reference, o.buyer_inquiry_ref, o.company_legal_name, o.created_at AS order_created_at, u.name AS user_name
+     FROM incentive_kept k
+     JOIN orders o ON o.id = k.order_id
+     JOIN users u ON u.id = k.user_id
+     WHERE k.kept_reason = 'not_eligible' AND o.is_test_data = :t AND o.is_sample_data = 0${require('./divisionService').sql('o.division_id')}
+     ORDER BY k.order_id, k.id`, { t: await testFlag() });
+  return list.map((k) => ({
+    order_id: Number(k.order_id),
+    order_reference: String(k.buyer_inquiry_ref || k.order_reference),
+    client: String(k.company_legal_name),
+    order_date: ymd(k.order_created_at),
+    payee_kind: 'staff', user_id: Number(k.user_id), associate_id: null,
+    payee: String(k.user_name), role: incentiveRepository.roleLabel(String(k.role)),
+    amount_inr: 0, gst_inr: 0, tds_inr: 0, state: 'locked',
+    due_on: null, payout_run_on: null, locked_on: ymd(k.locked_on), paid_on: null,
+    kept_not_eligible_inr: round2(k.kept_inr), kept_capped_inr: 0, kept_only: true,
+  }));
 }
 
 /** D-245 P6: rows per page on the register (totals are always over the whole filtered set). */
@@ -145,15 +175,26 @@ async function estimatedRows(orderId) {
     gst_inr: 0, tds_inr: 0, state, locked_on: null, paid_on: null,
   };
   const rows = [];
+  // D-259: what the company keeps from each person (not eligible / above a cap).
+  const keptNe = new Map();
+  const keptCap = new Map();
+  for (const l of calc.lines || []) {
+    if (l.reason === 'not_eligible') keptNe.set(l.user_id, round2((keptNe.get(l.user_id) || 0) + l.kept));
+    else if (l.reason !== null) keptCap.set(l.user_id, round2((keptCap.get(l.user_id) || 0) + l.kept));
+  }
   for (const p of calc.per_person) {
-    if (Number(p.amount) <= 0) continue;
+    const ne = keptNe.get(Number(p.id)) || 0;
+    const cap = keptCap.get(Number(p.id)) || 0;
+    if (Number(p.amount) <= 0 && ne <= 0 && cap <= 0) continue;
     rows.push({ ...base, payee_kind: 'staff', user_id: Number(p.id), associate_id: null, payee: String(p.name),
-      role: [...new Set(p.roles)].join(', '), amount_inr: round2(p.amount), due_on: null, payout_run_on: staffRun });
+      role: [...new Set(p.roles)].join(', '), amount_inr: round2(p.amount), due_on: null, payout_run_on: staffRun,
+      kept_not_eligible_inr: ne, kept_capped_inr: cap, kept_only: Number(p.amount) <= 0 });
   }
   const a = calc.associate;
   if (a && a.state !== 'unpaid' && Number(a.amount_inr) > 0) {
     rows.push({ ...base, payee_kind: 'associate', user_id: null, associate_id: Number(a.id), payee: String(a.name),
-      role: 'Associate commission', amount_inr: round2(a.amount_inr), due_on: ymd(a.due_on), payout_run_on: ymd(a.payout_run_on) });
+      role: 'Associate commission', amount_inr: round2(a.amount_inr), due_on: ymd(a.due_on), payout_run_on: ymd(a.payout_run_on),
+      kept_not_eligible_inr: 0, kept_capped_inr: 0 });
   }
   return rows;
 }
@@ -177,6 +218,7 @@ async function estimatedRowsFor(ids) {
 /** Locked rows and estimated rows (before filtering); f limits which open orders are estimated. */
 async function allRows(f = {}) {
   const rows = await lockedRows();
+  rows.push(...await lockedKeptOnlyRows());
   rows.push(...await estimatedRowsFor(await openOrderIds(f)));
   return rows;
 }
@@ -227,17 +269,22 @@ function filter(rows, f = {}) {
 }
 
 async function rows(f = {}) {
-  return filter(await allRows(f), f);
+  const list = filter(await allRows(f), f);
+  // D-259: kept-only rows (nothing paid) are for the register only, never "to pay" / "owed".
+  return f.with_kept ? list : list.filter((r) => !r.kept_only);
 }
 
 function totals(list) {
-  const t = { amount_inr: 0, gst_inr: 0, tds_inr: 0, count: list.length };
+  const t = { amount_inr: 0, gst_inr: 0, tds_inr: 0, ne: 0, cap: 0, count: list.length };
   for (const r of list) {
     t.amount_inr += Number(r.amount_inr);
     t.gst_inr += Number(r.gst_inr);
     t.tds_inr += Number(r.tds_inr);
+    t.ne += Number(r.kept_not_eligible_inr || 0);
+    t.cap += Number(r.kept_capped_inr || 0);
   }
-  return { amount_inr: round2(t.amount_inr), gst_inr: round2(t.gst_inr), tds_inr: round2(t.tds_inr), count: t.count };
+  return { amount_inr: round2(t.amount_inr), gst_inr: round2(t.gst_inr), tds_inr: round2(t.tds_inr), count: t.count,
+    kept_not_eligible_inr: round2(t.ne), kept_capped_inr: round2(t.cap) };
 }
 
 /** "To pay": this month's payout run, next month's, and not locked yet (estimated). payeeKind: '' | staff | associate. */
@@ -278,7 +325,7 @@ async function owedAt(date, f = {}) {
     }
   }
   if (date >= today()) {
-    for (const r of await estimatedRowsFor(await openOrderIds(f))) if (r.state === 'ready') out.push(r);
+    for (const r of await estimatedRowsFor(await openOrderIds(f))) if (r.state === 'ready' && !r.kept_only) out.push(r);
   }
   return out;
 }
@@ -304,6 +351,8 @@ function csvRows(list) {
     'Due on': r.due_on || '',
     'Payout run': r.payout_run_on || '',
     'Paid on': r.paid_on || '',
+    'Kept — not eligible (INR)': Number(r.kept_not_eligible_inr || 0).toFixed(2),
+    'Kept — capped (INR)': Number(r.kept_capped_inr || 0).toFixed(2),
   }));
 }
 

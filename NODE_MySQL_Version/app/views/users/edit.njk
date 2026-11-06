@@ -22,6 +22,14 @@
         </select>
       </label>
     </div>
+    {# D-259 (owner approval 6 Nov 2026): the team incentive switch; only the MD changes it. #}
+    <fieldset id="incentive-eligible"><legend>Team incentive</legend>
+      {% if incentiveCanEdit %}<input type="hidden" name="incentive_eligible_present" value="1">{% endif %}
+      <label><input type="checkbox" name="incentive_eligible" value="1"{{ ' checked' if incentiveEligible }}{{ '' if incentiveCanEdit else ' disabled' }}> Eligible for team incentive</label>
+      <p class="muted small">On by default. Off: {{ incentiveFirstName }} gets no share of any order's team incentive; the share stays with the company.
+        {% if incentiveDesignation %}Their designation ({{ incentiveDesignation.title }}) is {{ 'eligible' if incentiveDesignation.eligible else 'not eligible' }} — this switch overrides it for them only.{% endif %}
+        Applies to orders whose incentive is not locked yet; locked and paid orders never change.{% if not incentiveCanEdit %} <strong>Only the MD can change this.</strong>{% endif %}</p>
+    </fieldset>
     <div class="btn-row">
       <button type="submit" class="btn-sm btn-success">Save Changes</button>
       <a href="/users" class="btn-sm btn-secondary">Cancel</a>

@@ -85,6 +85,9 @@
           </select>
         </label>
       </div>
+      <?php // D-259: the team incentive switch, on by default; only the MD changes it. ?>
+      <?php if (!empty($incentiveCanEdit)): ?><input type="hidden" name="incentive_eligible_present" value="1"><?php endif; ?>
+      <label><input type="checkbox" name="incentive_eligible" value="1" checked<?= !empty($incentiveCanEdit) ? '' : ' disabled' ?>> Eligible for team incentive <small class="muted">(on by default; off keeps their share with the company<?= !empty($incentiveCanEdit) ? '' : ' — only the MD can change this' ?>)</small></label>
       <button type="submit" class="btn-sm">Create User</button>
     </form>
   </div>

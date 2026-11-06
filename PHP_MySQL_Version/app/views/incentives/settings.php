@@ -43,6 +43,21 @@ foreach ($roles as $__r) {
       </table>
     </fieldset>
 
+    <?php // D-259 (owner approval 6 Nov 2026): caps per role. ?>
+    <fieldset id="incentive-caps"><legend>Caps</legend>
+      <p class="muted small">The most one person can receive. Empty = no cap. Anything above the cap stays with the company (it is not shared out to others). Per order: the most from one order. Per month: the most across all orders locked in one calendar month. Applies only to orders not yet locked.<?= $canManagePricing ? '' : ' Only the MD can change the caps.' ?></p>
+      <?php if ($canManagePricing): ?><input type="hidden" name="caps_present" value="1"><?php endif; ?>
+      <table class="list"><tr><th>Role</th><th>Max per person per order (&#8377;)</th><th>Max per person per month (&#8377;)</th></tr>
+        <?php foreach ($roles as $key => $r): if (!$r['is_active']) { continue; } ?>
+          <tr>
+            <td><?= htmlspecialchars($r['label']) ?></td>
+            <td><input type="number" name="caps[<?= htmlspecialchars($key) ?>][order]" min="0" max="1000000000" step="0.01" value="<?= $r['cap_per_order'] !== null ? htmlspecialchars(rtrim(rtrim(number_format($r['cap_per_order'], 2, '.', ''), '0'), '.')) : '' ?>" aria-label="<?= htmlspecialchars($r['label']) ?> cap per order" placeholder="No cap, e.g. 15000"<?= $canManagePricing ? '' : ' disabled' ?>></td>
+            <td><input type="number" name="caps[<?= htmlspecialchars($key) ?>][month]" min="0" max="1000000000" step="0.01" value="<?= $r['cap_per_month'] !== null ? htmlspecialchars(rtrim(rtrim(number_format($r['cap_per_month'], 2, '.', ''), '0'), '.')) : '' ?>" aria-label="<?= htmlspecialchars($r['label']) ?> cap per month" placeholder="No cap, e.g. 40000"<?= $canManagePricing ? '' : ' disabled' ?>></td>
+          </tr>
+        <?php endforeach; ?>
+      </table>
+    </fieldset>
+
     <fieldset><legend>Each person's incentive role</legend>
       <p class="muted small">Who usually does which role. On each order, the people assigned to it with that role get it (or everyone with the role, if none is assigned); the MD can change it on the order.</p>
       <input type="hidden" name="user_roles_present" value="1">

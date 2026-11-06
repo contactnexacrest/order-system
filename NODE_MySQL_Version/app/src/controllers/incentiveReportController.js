@@ -38,7 +38,8 @@ function query(obj) {
 
 async function register(req, res) {
   const f = filters(req.query || {});
-  const rows = await svc.rows(f);
+  // D-259: the register also lists what the company kept from people who were not eligible.
+  const rows = await svc.rows({ ...f, with_kept: true });
   if (req.query.format === 'csv') {
     csv.stream(res, 'incentive_commission_register.csv', svc.HEADERS, svc.csvRows(rows));
     return;

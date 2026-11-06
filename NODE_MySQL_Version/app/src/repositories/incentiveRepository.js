@@ -24,7 +24,10 @@ async function allRoles() {
     const out = {};
     for (const r of await db.query('SELECT * FROM incentive_roles ORDER BY sort_order, id')) {
       out[String(r.role_key)] = { id: Number(r.id), role_key: String(r.role_key), label: String(r.label), share_pct: Number(r.share_pct),
-        is_active: Number(r.is_active) === 1, sort_order: Number(r.sort_order) };
+        is_active: Number(r.is_active) === 1, sort_order: Number(r.sort_order),
+        // D-259: the most one person gets per order / per calendar month in this role (null = no cap).
+        cap_per_order: r.cap_per_order_inr !== null && r.cap_per_order_inr !== undefined ? Number(r.cap_per_order_inr) : null,
+        cap_per_month: r.cap_per_month_inr !== null && r.cap_per_month_inr !== undefined ? Number(r.cap_per_month_inr) : null };
     }
     roleCache = out;
   }
@@ -69,6 +72,46 @@ async function saveRoles(rows, userId) {
     }
   }
   forgetRoles();
+}
+
+/** D-259: the caps per role. caps: role key => { order, month } (null = no cap). */
+async function saveCaps(caps, userId) {
+  for (const [key, c] of Object.entries(caps)) {
+    await db.execute('UPDATE incentive_roles SET cap_per_order_inr = :o, cap_per_month_inr = :m, updated_by = :u WHERE role_key = :k',
+      { o: c.order, m: c.month, u: userId, k: key });
+  }
+  forgetRoles();
+}
+
+/**
+ * D-259: what a person has already been given in a role in one incentive month (locked
+ * payouts of other orders, clawbacks included) — the monthly cap counts this.
+ */
+async function lockedInMonth(userId, role, month, exceptOrderId) {
+  const r = await db.queryOne(
+    `SELECT COALESCE(SUM(amount_inr), 0) AS s FROM incentive_payouts
+     WHERE payee_kind = 'staff' AND user_id = :u AND role = :r AND incentive_month = :m AND order_id <> :o`,
+    { u: userId, r: role, m: month, o: exceptOrderId });
+  return Math.round(Number(r.s) * 100) / 100;
+}
+
+/** D-259: one kept line (not eligible / above a cap) written when the order is locked. */
+async function addKept(row, c = db) {
+  await c.execute(
+    `INSERT INTO incentive_kept (order_id, user_id, role, by_share_inr, paid_inr, kept_inr, kept_reason, kept_note, incentive_month, locked_on)
+     VALUES (:order_id, :user_id, :role, :by_share_inr, :paid_inr, :kept_inr, :kept_reason, :kept_note, :incentive_month, :locked_on)`,
+    { order_id: row.order_id, user_id: row.user_id, role: row.role, by_share_inr: row.by_share_inr, paid_inr: row.paid_inr, kept_inr: row.kept_inr,
+      kept_reason: row.kept_reason, kept_note: row.kept_note ?? null, incentive_month: row.incentive_month, locked_on: row.locked_on });
+}
+
+/** The order's kept lines, with the person's name. */
+async function keptForOrder(orderId) {
+  return db.query('SELECT k.*, u.name AS user_name FROM incentive_kept k JOIN users u ON u.id = k.user_id WHERE k.order_id = :id ORDER BY k.id', { id: orderId });
+}
+
+/** D-259: the kept lines go with the payouts when the MD unlocks the order. */
+async function deleteOrderKept(orderId, c = db) {
+  await c.execute('DELETE FROM incentive_kept WHERE order_id = :id', { id: orderId });
 }
 
 async function deleteRole(key) {
@@ -410,6 +453,11 @@ module.exports = {
   roleInUse,
   saveRoles,
   deleteRole,
+  saveCaps,
+  lockedInMonth,
+  addKept,
+  keptForOrder,
+  deleteOrderKept,
   orderRoles,
   replaceOrderRoles,
   addHistory,

@@ -30,6 +30,7 @@ final class UserController
     {
         $status = in_array($_GET['status'] ?? '', ['active', 'inactive', 'archived'], true) ? $_GET['status'] : 'active';
         View::render('users/index', [
+            'incentiveCanEdit' => \App\Services\IncentiveService::isMd(AuthService::currentUser()),
             'users' => UserRepository::listAllForAdmin($status),
             'statusCounts' => UserRepository::statusCounts(),
             'currentStatus' => $status,
@@ -75,6 +76,10 @@ final class UserController
 
         $actor = AuthService::currentUser();
         AuditLogRepository::log((int) $actor['id'], 'USER_CREATED', 'users', $userId, null, null, null, "Created user {$email}");
+        // D-259: the MD may switch the team incentive off for the new person (on by default).
+        if (isset($_POST['incentive_eligible_present']) && \App\Services\IncentiveService::isMd($actor)) {
+            \App\Services\IncentiveService::setEligible($actor, $userId, !empty($_POST['incentive_eligible']));
+        }
 
         // Shown once, here, in a flash message — never emailed, never
         // logged, never stored anywhere but the (already hashed) DB row.
@@ -100,6 +105,10 @@ final class UserController
         }
         View::render('users/edit', [
             'target' => $target,
+            // D-259: the team incentive switch (only the MD changes it).
+            'incentiveEligible' => \App\Services\IncentiveService::isEligible($userId),
+            'incentiveDesignation' => \App\Services\IncentiveService::designationEligibility($userId),
+            'incentiveCanEdit' => \App\Services\IncentiveService::isMd(AuthService::currentUser()),
             'roles' => LookupRepository::roles(),
             // Owner decision D-214: the person's departments, and the designations they can be added to.
             'memberships' => \App\Repositories\DepartmentRepository::membershipsForUser($userId),
@@ -169,6 +178,15 @@ final class UserController
         ], static fn(array $c): bool => (string) ($c[1] ?? '') !== (string) ($c[2] ?? ''));
 
         UserRepository::update($userId, $name, $email, $phone, $roleId);
+        // D-259: the team incentive switch — the MD only; anyone else's form does not carry it.
+        if (isset($_POST['incentive_eligible_present'])) {
+            $err = \App\Services\IncentiveService::setEligible($actor, $userId, !empty($_POST['incentive_eligible']));
+            if ($err !== null) {
+                Flash::set('error', $err);
+                header("Location: /users/{$userId}/edit");
+                return;
+            }
+        }
 
         foreach ($changes as [$field, $oldVal, $newVal]) {
             AuditLogRepository::log(

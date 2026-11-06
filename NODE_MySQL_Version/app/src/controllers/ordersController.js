@@ -1495,6 +1495,8 @@ async function show(req, res) {
       incentiveReadyReason: incentiveCalc.state === 'open' ? await incentiveService.readyReason(orderId) : null,
       incentiveRuleText: incentiveService.ruleText(incentiveCalc),
       incentivePayouts: await incentiveRepository.payoutsForOrder(orderId),
+      // D-259: what the company kept on the locked order (not eligible / above a cap).
+      incentiveKept: await incentiveRepository.keptForOrder(orderId),
       incentiveUsers: await userRepository.listActive(),
       incentiveHistory: await incentiveRepository.history(orderId),
       // Owner 2 Nov 2026 (point 10): nothing associate-related when the client has no associate.

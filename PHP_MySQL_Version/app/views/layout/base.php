@@ -250,6 +250,7 @@ $adminGroupActive = $isActive('/settings') || $isActive('/holidays') || $isActiv
           <?php if ($canOverrides): ?><a href="/admin/overrides" class="<?= $isActive('/admin/overrides') ? 'active' : '' ?>">Admin Overrides</a><?php endif; ?>
           <?php if ($canSampleData): ?><a href="/sample-data" class="<?= $isActive('/sample-data') ? 'active' : '' ?>">Sample Data</a><?php endif; ?>
           <?php if ($canDataExport): ?><a href="/admin/data-export" class="<?= $isActive('/admin/data-export') ? 'active' : '' ?>">Data Export / Migration</a><?php endif; ?>
+          <?php if ($canSettings): ?><a href="/admin/backups" class="<?= $isActive('/admin/backups') ? 'active' : '' ?>">Backups</a><?php endif; ?>
         </div>
       </details>
     <?php endif; ?>

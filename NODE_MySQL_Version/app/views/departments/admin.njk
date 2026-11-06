@@ -2,6 +2,9 @@
 <div class="card page-wide">
   <h1>Departments &amp; designations</h1>
   <p class="muted">Each department has its own ladder. Each designation is its own role (its permissions and money view). To give someone access, add them to a department on their user page — no permission editing needed.</p>
+  {# D-259: who shares in the team incentive. #}
+  <p class="muted small" id="incentive-eligibility-note">Each designation says whether its people share in the team incentive ("Incentive eligible"; only the MD changes it). A person's own switch (Edit User) overrides this for that person only.
+    {% if incentiveOverrides and incentiveOverrides.length %}<br><strong>People overriding their designation:</strong> {% for o in incentiveOverrides %}{{ o.name }} ({{ o.designation or 'no designation' }}, switched {{ 'on' if o.eligible else 'off' }}){{ '; ' if not loop.last }}{% endfor %}.{% endif %}</p>
 
   <div class="table-scroll">
   <table class="list dept-ladder">
@@ -101,7 +104,7 @@
       {% endif %}
       {% if list.length %}
       <table class="list">
-        <tr><th>Designation</th><th>Level</th><th>Approval limit (₹)</th><th>Active</th><th></th></tr>
+        <tr><th>Designation</th><th>Level</th><th>Approval limit (₹)</th><th>Incentive eligible</th><th>Active</th><th></th></tr>
         {% for d in list %}{% set formId = 'designation-' + d.id %}
         <tr>
           <td><input form="{{ formId }}" type="text" name="title" value="{{ d.title }}" required minlength="2" maxlength="100" placeholder="e.g. Logistics Executive" aria-label="Title"></td>
@@ -114,6 +117,10 @@
           <td><input form="{{ formId }}" type="hidden" name="level" value="{{ d.level }}">{{ levels[d.level] or d.level }}</td>
           <td><input form="{{ formId }}" type="hidden" name="approval_limit_inr" value="{{ d.approval_limit_inr if d.approval_limit_inr !== null else '' }}">{{ (d.approval_limit_inr | money) if d.approval_limit_inr !== null else 'none' }}<br><small class="muted">{{ 'Only the MD or ED changes approval limits.' if not canLimits else 'Your own designation — another MD/ED changes it.' }}</small></td>
           {% endif %}
+          {# D-259 (owner approval 6 Nov 2026): whether this designation's people share in the team incentive (MD only). #}
+          {% set incOn = (d.incentive_eligible is not defined) or (d.incentive_eligible === null) or (d.incentive_eligible == 1) %}
+          <td>{% if incentiveCanEdit %}<input form="{{ formId }}" type="hidden" name="incentive_eligible_present" value="1">{% endif %}
+            <label class="small"><input form="{{ formId }}" type="checkbox" name="incentive_eligible" value="1" {{ 'checked' if incOn else '' }}{{ '' if incentiveCanEdit else ' disabled' }} aria-label="{{ d.title }} incentive eligible"> {{ 'Eligible' if incOn else 'Not eligible' }}</label></td>
           <td><input form="{{ formId }}" type="checkbox" name="is_active" value="1" {{ 'checked' if d.is_active == 1 else '' }} aria-label="Active"></td>
           <td><form id="{{ formId }}" method="post" action="/admin/designations/{{ d.id }}/update"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-success">Save</button></form></td>
         </tr>

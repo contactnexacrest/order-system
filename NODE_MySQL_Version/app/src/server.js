@@ -91,6 +91,7 @@ const userController = require('./controllers/userController');
 const adminOverrideController = require('./controllers/adminOverrideController');
 const fieldProtectionController = require('./controllers/fieldProtectionController');
 const dataExportController = require('./controllers/dataExportController');
+const backupController = require('./controllers/backupController');
 const sampleDataController = require('./controllers/sampleDataController');
 const signatoryController = require('./controllers/signatoryController');
 const superAdminController = require('./controllers/superAdminController');
@@ -1475,6 +1476,8 @@ app.post('/admin/field-protection/:requestId/approve', requireAuth, requirePermi
 app.post('/admin/field-protection/:requestId/reject', requireAuth, requirePermission('manage_field_protection'), verifyCsrf, asyncHandler(fieldProtectionController.reject));
 
 app.get('/admin/data-export', requireAuth, requirePermission('data_export_run'), asyncHandler(dataExportController.index));
+// D-260: Admin › Backups — read-only status of the nightly backup jobs.
+app.get('/admin/backups', requireAuth, requirePermission('manage_company_settings'), asyncHandler(backupController.index));
 app.get('/admin/data-export/schema', requireAuth, requirePermission('data_export_run'), asyncHandler(dataExportController.downloadSchema));
 app.get('/admin/data-export/data', requireAuth, requirePermission('data_export_run'), asyncHandler(dataExportController.downloadData));
 

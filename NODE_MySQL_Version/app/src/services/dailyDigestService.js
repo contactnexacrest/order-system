@@ -30,6 +30,12 @@ async function itemsFor(userId) {
   for (const r of await documentReviewRepository.pendingForReviewer(userId)) {
     items.push({ kind: 'review', text: `${r.document_reference} (${r.document_type_name}) — waiting for your review` });
   }
+  // D-260: a missing, failed or too-old backup goes to whoever manages company settings (MD / Admin).
+  const u = await db.queryOne('SELECT role_id FROM users WHERE id = :id', { id: userId });
+  const perms = await require('./permissionService').load(userId, u && u.role_id !== null ? Number(u.role_id) : null);
+  if (perms.manage_company_settings) {
+    for (const problem of require('./backupStatusService').problems()) items.push({ kind: 'backup', text: problem });
+  }
   return items;
 }
 
@@ -37,10 +43,12 @@ function compose(name, items, date) {
   const tasks = items.filter((i) => i.kind === 'task');
   const reviews = items.filter((i) => i.kind === 'review');
   const count = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
-  const subject = `NexaCrest — your day ${dayLabel(date)}: ${count(tasks.length, 'task')}, ${count(reviews.length, 'review')}`;
+  const backups = items.filter((i) => i.kind === 'backup');
+  const subject = `NexaCrest — your day ${dayLabel(date)}: ${count(tasks.length, 'task')}, ${count(reviews.length, 'review')}${backups.length ? ' — BACKUP WARNING' : ''}`;
   let body = `Good morning ${name},\n\nThis is what waits on you today.\n`;
   if (tasks.length) body += `\nTasks (My tasks):\n${tasks.map((i) => `- ${i.text}`).join('\n')}\n`;
   if (reviews.length) body += `\nDocuments to review (My Reviews):\n${reviews.map((i) => `- ${i.text}`).join('\n')}\n`;
+  if (backups.length) body += `\nBackups need attention (Admin › Backups):\n${backups.map((i) => `- ${i.text}`).join('\n')}\n`;
   body += '\nOpen the app to act on them. You get this e-mail once a day, only when something waits on you.\n';
   return { subject, body };
 }

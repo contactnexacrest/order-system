@@ -46,6 +46,9 @@ async function index(req, res) {
     roles: await roleRepository.all(),
     canLimits: canChangeLimits(req),
     ownRoleIds: await grantGuard.ownRoleIds(req),
+    // D-259: the team incentive per designation (MD only) and the people whose own switch differs.
+    incentiveCanEdit: await require('../services/incentiveService').isMd(req.user),
+    incentiveOverrides: await require('../services/incentiveService').eligibilityOverrides(),
   }, 'layout/base');
 }
 
@@ -156,6 +159,15 @@ async function updateDesignation(req, res) {
     return;
   }
   await departmentRepository.updateDesignation(Number(d.id), title, level, !!req.body.is_active, limitRaw === '' ? null : Math.round(limitNumber * 100) / 100);
+  // D-259: the designation's team incentive eligibility — the MD only (anyone else's form does not carry it).
+  if (req.body.incentive_eligible_present && await require('../services/incentiveService').isMd(user)) {
+    const eligible = req.body.incentive_eligible ? 1 : 0;
+    const was = d.incentive_eligible === undefined || d.incentive_eligible === null ? 1 : Number(d.incentive_eligible);
+    if (was !== eligible) {
+      await require('../config/db').execute('UPDATE department_designations SET incentive_eligible = :e WHERE id = :id', { e: eligible, id: Number(d.id) });
+      await auditLogRepository.log(user.id, 'DESIGNATION_UPDATED', 'department_designations', Number(d.id), 'incentive_eligible', String(was), String(eligible));
+    }
+  }
   await auditLogRepository.log(user.id, 'DESIGNATION_UPDATED', 'department_designations', Number(d.id), null,
     `${d.title} · ${d.level} · limit ${d.approval_limit_inr ?? '—'}`, `${title} · ${level} · limit ${limitRaw === '' ? '—' : limitRaw}`);
   if (limitChanged) {

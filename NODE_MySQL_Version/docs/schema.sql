@@ -6064,3 +6064,40 @@ CREATE TABLE merchant_alerts_sent (
 -- D-257 Phase 5 (performance): the division profit report reads company and
 -- division costs by division and date; ca_expenses already has its date index.
 CREATE INDEX idx_ca_expenses_division_date ON ca_expenses (division_id, expense_date);
+
+-- ---------------------------------------------------------------------------
+-- D-259 (owner approval 6 Nov 2026, mockups mock12): team incentive eligibility
+-- and caps. A person's own switch (users.incentive_eligible; NULL = follow the
+-- designation) overrides their designation's default. Caps per incentive role:
+-- the most one person gets per order and per calendar month (empty = no cap).
+-- What is not paid (not eligible / above a cap) is kept by the company and
+-- recorded per person line at lock (incentive_kept) and in total on the order.
+-- Applies only to orders whose incentive is not locked yet.
+-- ---------------------------------------------------------------------------
+ALTER TABLE users ADD COLUMN incentive_eligible TINYINT(1) NULL;
+ALTER TABLE department_designations ADD COLUMN incentive_eligible TINYINT(1) NOT NULL DEFAULT 1;
+ALTER TABLE incentive_roles
+  ADD COLUMN cap_per_order_inr DECIMAL(14,2) NULL,
+  ADD COLUMN cap_per_month_inr DECIMAL(14,2) NULL;
+ALTER TABLE order_incentives
+  ADD COLUMN team_by_share_inr       DECIMAL(14,2) NULL,
+  ADD COLUMN kept_not_eligible_inr   DECIMAL(14,2) NULL,
+  ADD COLUMN kept_capped_inr         DECIMAL(14,2) NULL;
+CREATE TABLE incentive_kept (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id        BIGINT UNSIGNED NOT NULL,
+  user_id         BIGINT UNSIGNED NOT NULL,
+  role            VARCHAR(40) NOT NULL,              -- incentive_roles.role_key
+  by_share_inr    DECIMAL(14,2) NOT NULL,            -- the person's share before eligibility / caps
+  paid_inr        DECIMAL(14,2) NOT NULL,            -- what the payout carries
+  kept_inr        DECIMAL(14,2) NOT NULL,            -- kept by the company
+  kept_reason     ENUM('not_eligible','cap_order','cap_month') NOT NULL,
+  kept_note       VARCHAR(255) NULL,
+  incentive_month CHAR(7) NOT NULL,
+  locked_on       DATE NOT NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  INDEX idx_incentive_kept_order (order_id),
+  INDEX idx_incentive_kept_month (incentive_month)
+) ENGINE=InnoDB;

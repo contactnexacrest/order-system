@@ -74,6 +74,7 @@ correctly once the password is changed.
   payment presets, stages, document types, the 21 real Terms & Conditions
   clauses, 9 email templates for the deferred-send pipeline, and the new
   `cross_verify_documents`/`approve_email_send` permissions.
+- `scripts/` — the backup scripts and their self-test (owner decisions D-260; see "Backups" below).
 - `app/cron/` — the five scheduled jobs (see "Bluehost cron setup" below):
   `dispatch_deferred_emails.php`, `auto_confirm_oc_acknowledgments.php`,
   `check_alerts.php` and `zoho_sync.php`; plus two scripts run by hand,
@@ -331,7 +332,7 @@ Send to Buyer" section appears per generated document, plus new
   `Received Documents/` folders. This is a convenient one-order export for
   handing files to someone or spot-checking that everything's on file —
   it is not a substitute for backing up `storage/` as a whole (see
-  "Backing up storage/" below).
+  "Backups" below).
 - **Notifications** (bell icon, top right, unread count shown) — reviewer
   assignments, amendments awaiting MD approval, email sends awaiting Level-2
   approval, and the alert cron's own findings (below) all land here.
@@ -352,6 +353,8 @@ CRON_TZ=Asia/Kolkata
 15 8 * * *    php /home/yourcpaneluser/nexacrest_webapp/app/cron/daily_digest.php >> /home/yourcpaneluser/logs/daily_digest.log 2>&1
 15 2 * * *    php /home/yourcpaneluser/nexacrest_webapp/app/cron/document_copy_cleanup.php >> /home/yourcpaneluser/logs/document_copy_cleanup.log 2>&1
 ```
+
+Plus the three backup lines (database 02:00, documents 02:30, monthly test-restore) — see "Backups" below.
 
 - `document_copy_cleanup.php` — once a day (owner points 5/8/9, 2 Nov 2026):
   removes the document copies Admin → Settings → Document copies clean-up
@@ -442,166 +445,71 @@ Two more scripts in `app/cron/` are run by hand, never from cron:
   files into the per-step folders (`01-quotation/`, …). A dry run by
   default; `--apply` moves them. Back up `storage/` and the database first.
 
-### Bluehost database backups (Section 14)
+### Backups — database and every order document (owner decisions D-260, 6 Nov 2026)
 
-Nothing in this codebase can run a backup for you from this sandbox — there's
-no server to schedule against — so this is documentation to follow on the
-real Bluehost account, not a script that ships pre-wired. Add a third cPanel
-→ Cron Job alongside the two above:
+The backup is **only an extra copy**. The scripts only *read* the live database and the live
+documents (`STORAGE_BASE_PATH`); they never change, move or delete anything live, and they never
+overwrite an older backup. Records must be kept for **10 years**.
 
-```
-0 2 * * *  /home/yourcpaneluser/nexacrest_webapp/scripts/backup_db.sh >> /home/yourcpaneluser/logs/backup_db.log 2>&1
-```
+The scripts ship in the repository (`scripts/`, the same files on both stacks):
 
-`scripts/backup_db.sh` (create this file on the server — it isn't part of
-the app itself, since it needs real production DB credentials that never
-belong in the delivered codebase):
+| Script | What it does | Cron (IST) |
+|---|---|---|
+| `scripts/backup_db.sh` | `mysqldump --single-transaction` (read-only, no locks), gzip, encrypt, `.sha256` beside it → `BACKUP_DIR/db/nexacrest_db_YYYY-MM-DD_HHMMSS.sql.gz.enc` | `0 2 * * *` |
+| `scripts/backup_storage.sh` | Daily snapshot of every document → `BACKUP_DIR/storage/snapshots/nexacrest_files_YYYY-MM-DD/`. Unchanged files are **stored once** (hard links via `rsync --link-dest`). On the first run of each month also a full encrypted archive → `BACKUP_DIR/storage/archives/` | `30 2 * * *` |
+| `scripts/backup_test_restore.sh` | Monthly proof that the newest copy restores: checksum, decrypt, load into a **separate scratch database** (`BACKUP_RESTORE_TEST_DB`, default `<DB_DATABASE>_restore_test`, never the live one), count tables, drop it again; checks the newest documents archive opens | `0 4 1 * *` |
 
-```bash
-#!/bin/bash
-set -euo pipefail
-
-# Bluehost/cPanel database names and usernames are typically prefixed with
-# your cPanel account name (e.g. cpaneluser_nexacrest) — use the exact
-# values from cPanel → MySQL Databases, which will differ from the
-# DB_DATABASE/DB_USERNAME in this app's .env in the sandbox.
-DB_NAME="cpaneluser_nexacrest"
-DB_USER="cpaneluser_nexacrest"
-DB_PASS="REPLACE_WITH_REAL_PASSWORD"     # or read from a chmod-600 file outside public_html
-BACKUP_DIR="/home/yourcpaneluser/db_backups"   # outside public_html/ — never web-reachable
-RETENTION_DAYS=30
-
-mkdir -p "$BACKUP_DIR"
-STAMP=$(date +%Y%m%d_%H%M%S)
-FILE="$BACKUP_DIR/nexacrest_${STAMP}.sql.gz"
-
-mysqldump --single-transaction --quick --routines --triggers \
-  -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" | gzip > "$FILE"
-
-# 30-day retention — delete anything older, keep everything newer.
-find "$BACKUP_DIR" -name 'nexacrest_*.sql.gz' -mtime +"$RETENTION_DAYS" -delete
-
-echo "Backup complete: $FILE ($(du -h "$FILE" | cut -f1))"
-```
+**Where the copies go is set in `app/.env`, not in the cron line:**
 
 ```
-chmod 700 scripts/backup_db.sh   # DB password is inside it
-chmod 700 /home/yourcpaneluser/db_backups
+BACKUP_DIR=/home/yourcpaneluser/nexacrest_backups            # outside the web root and outside STORAGE_BASE_PATH (the scripts refuse otherwise)
+BACKUP_KEEP_YEARS=10                     # everything kept 10 years, then removed
+BACKUP_THIN_AFTER_DAYS=120               # older database copies thinned to one per month; 0 = keep every nightly copy
+BACKUP_ENCRYPTION_KEY_FILE=/home/yourcpaneluser/.nexacrest_backup_key
+BACKUP_OFFSITE_TARGET=                   # empty until the owner chooses; then an rclone remote, e.g. b2crypt:nexacrest
 ```
 
-Notes specific to Bluehost shared hosting:
+**Retention in one rule:** everything is kept `BACKUP_KEEP_YEARS` (10) years. To save space, database copies
+older than `BACKUP_THIN_AFTER_DAYS` (120) days are thinned to the first copy of each month; documents never need
+thinning because each file is stored once. Only files named like a backup, inside `BACKUP_DIR`, are ever removed.
 
-- `--single-transaction` avoids table locks on the live InnoDB tables while
-  the dump runs (this schema is 100% InnoDB) — safe to run at 2am while the
-  app is technically still reachable.
-- Store backups outside `public_html/` (as above) — anything inside
-  `public_html/` is web-reachable unless you've separately blocked `.sql.gz`
-  downloads, and a stray database dump sitting in a web root is a real
-  incident waiting to happen, not a hypothetical one.
-- Bluehost's own cPanel → Backup Wizard can additionally take a full-account
-  snapshot on its own schedule — this script is the finer-grained,
-  app-aware daily backup the spec asks for (30-day retention, DB only, no
-  manual step); the two are complementary, not either/or.
-- Restoring: `gunzip < nexacrest_YYYYMMDD_HHMMSS.sql.gz | mysql -u"$DB_USER" -p"$DB_PASS" "$DB_NAME"`.
-  Test this at least once against a scratch database after first setting
-  this up — an untested backup is not a backup.
-- If Bluehost's plan doesn't expose cron minute-level granularity or
-  `mysqldump` isn't on the shell `PATH` for cron's environment (cron often
-  runs with a much smaller `$PATH` than an interactive SSH shell), use the
-  full path (`which mysqldump` over SSH first) inside the script.
+**One-time set-up on the server:**
 
-(This backup job is Phase E work — it's grouped with the other two cron
-jobs above rather than under "Using Phase E" below because it's the same
-cPanel → Cron Jobs mechanism, not because it's a Phase D feature.)
+1. Create the folder and the key (keep a copy of the key somewhere safe **away from the server** — without it the
+   encrypted copies cannot be opened):
+   ```
+   mkdir -p /home/yourcpaneluser/nexacrest_backups && chmod 700 /home/yourcpaneluser/nexacrest_backups
+   openssl rand -base64 48 > /home/yourcpaneluser/.nexacrest_backup_key && chmod 600 /home/yourcpaneluser/.nexacrest_backup_key
+   ```
+2. Add the keys above to `app/.env`.
+3. Make the scripts executable: `chmod 700 /home/yourcpaneluser/nexacrest_webapp/scripts/*.sh`
+4. Add the cron lines (the scripts read everything else from `app/.env`):
+   ```
+   CRON_TZ=Asia/Kolkata
+   0 2 * * *   /home/yourcpaneluser/nexacrest_webapp/scripts/backup_db.sh >> /home/yourcpaneluser/logs/backup_db.log 2>&1
+   30 2 * * *  /home/yourcpaneluser/nexacrest_webapp/scripts/backup_storage.sh >> /home/yourcpaneluser/logs/backup_storage.log 2>&1
+   0 4 1 * *   /home/yourcpaneluser/nexacrest_webapp/scripts/backup_test_restore.sh >> /home/yourcpaneluser/logs/backup_test_restore.log 2>&1
+   ```
+5. Run `scripts/backup_db.sh` and `scripts/backup_storage.sh` once by hand, then open **Admin › Backups** — both
+   rows should say OK.
+6. The test-restore needs a MySQL user allowed to create and drop the scratch database
+   (`BACKUP_RESTORE_TEST_DB`). On Bluehost create that database once in cPanel → MySQL Databases and give the app
+   user all rights on it.
 
-### Backing up storage/ — the gap a database-only backup leaves (Section 3, 14)
+**Watching it:** Admin › Backups (MD / Admin, read-only) shows the last run of each job, sizes, encryption,
+off-site status and the settings. The daily digest warns whoever manages company settings when a nightly copy is
+older than 26 hours, has failed, is not encrypted, the test-restore is older than 35 days or failed, or (on a
+production server) `BACKUP_DIR` is not set.
 
-**A database backup alone is not a backup of this application.** Every
-generated PDF/DOCX and every received file (dispute evidence, amendment
-signed copies, buyer PO copies, supplier PO acknowledgments, product
-images, ...) lives on disk under `STORAGE_BASE_PATH`, outside
-`public_html/` — `file_store` only holds each one's *path* and metadata.
-Restoring the database after a disaster without also restoring
-`storage/` leaves every `file_store` row pointing at a file that no
-longer exists: every "Download PDF" link 404s, the "Download Full
-Dossier (ZIP)" button on an order page silently skips every missing
-file, and a document that was ever draft/final-watermark-swapped can
-never be regenerated to look the way it did when a reviewer actually
-approved it — that exact historical PDF is gone, not reconstructible
-from data alone (see DocumentGenerationService's document-integrity
-snapshot columns, which only guarantee correct *content* if the swapped-
-final PDF file itself still exists).
+**Off-site (later):** when the owner chooses a provider, install `rclone`, configure an encrypted remote
+(`rclone config`), and set `BACKUP_OFFSITE_TARGET`. The scripts then `rclone copy --immutable` the database copies
+and the monthly archives — copy only, never delete at the target.
 
-Add a fourth cPanel → Cron Job alongside the three above, offset from
-the DB backup so they don't compete for I/O:
+**Restoring** is never automatic: follow SOP 32 "Backups and restore" step by step.
 
-```
-30 2 * * *  /home/yourcpaneluser/nexacrest_webapp/scripts/backup_storage.sh >> /home/yourcpaneluser/logs/backup_storage.log 2>&1
-```
-
-`scripts/backup_storage.sh` (create this file on the server, same reason
-as `backup_db.sh` — it references real paths that shouldn't be baked
-into the delivered codebase):
-
-```bash
-#!/bin/bash
-set -euo pipefail
-
-STORAGE_DIR="/home/yourcpaneluser/nexacrest_webapp/storage"   # same value as STORAGE_BASE_PATH in .env
-BACKUP_DIR="/home/yourcpaneluser/storage_backups"              # outside public_html/ — never web-reachable
-RETENTION_DAYS=30
-
-mkdir -p "$BACKUP_DIR"
-STAMP=$(date +%Y%m%d_%H%M%S)
-FILE="$BACKUP_DIR/nexacrest_storage_${STAMP}.tar.gz"
-
-tar -czf "$FILE" -C "$(dirname "$STORAGE_DIR")" "$(basename "$STORAGE_DIR")"
-
-find "$BACKUP_DIR" -name 'nexacrest_storage_*.tar.gz' -mtime +"$RETENTION_DAYS" -delete
-
-echo "Storage backup complete: $FILE ($(du -h "$FILE" | cut -f1))"
-```
-
-```
-chmod 700 scripts/backup_storage.sh
-chmod 700 /home/yourcpaneluser/storage_backups
-```
-
-Notes:
-
-- A full `tar` of the whole tree is the simplest correct approach for a
-  cron job that has to run unattended — `rsync -a --delete` to a second
-  location is a reasonable alternative if `storage/` grows large enough
-  that a nightly full tarball becomes slow or expensive to keep 30 days
-  of, but loses the point-in-time-snapshot property `tar` gives you for
-  free (an `rsync --delete` mirror only has the *current* state, not
-  yesterday's).
-- The DB backup and the storage backup are **only consistent with each
-  other if taken close together** — a `file_store` row inserted between
-  the two backup runs will reference a file the storage backup doesn't
-  have yet (recoverable — worst case that one file is missing on
-  restore) or, worse, a storage backup taken well after the DB backup
-  can contain files whose `file_store` row was itself part of an order
-  that later changed. Scheduling both within the same maintenance window
-  (2:00 and 2:30 above) keeps the drift to at most 30 minutes; for a
-  stronger guarantee, take both backups back-to-back inside one script
-  instead of two separate cron entries.
-- Restoring: `tar -xzf nexacrest_storage_YYYYMMDD_HHMMSS.tar.gz -C /home/yourcpaneluser/nexacrest_webapp/`
-  restores the whole tree back to `storage/` at that path. As with the DB
-  backup, test this at least once against a scratch location — verify a
-  handful of `file_store.server_path` values from a restored DB backup
-  taken the same night actually resolve to real files after extracting.
-- Bluehost's cPanel → Backup Wizard full-account snapshot (mentioned
-  above for the database) already includes `storage/` if it sits inside
-  the account's home directory — this script is still worth having as
-  the finer-grained, retained-on-your-own-schedule backup, same
-  reasoning as the DB backup script being complementary to it, not a
-  replacement.
-- The full order dossier ZIP (`/orders/{id}/dossier`, "Download Full
-  Dossier (ZIP)" on the order page) is a convenient one-order-at-a-time
-  export for handing files to someone, or spot-checking that an order's
-  files are all present — it is not a substitute for backing up
-  `storage/` as a whole; it only ever reflects the current live files.
+**Self-test:** `bash scripts/tests/backup_scripts_test.sh` (also run by PHPUnit `BackupFacilityTest` / Jest
+`backupFacility.test.js`) proves retention, thinning, one-copy documents, the guard, untouched live files,
+encryption and checksums in a temporary folder.
 
 ## Using Phase E: dashboard, reports, security hardening
 
@@ -990,10 +898,10 @@ description, not yet resolved.
 - A management UI for adding a wholly new admin-override *category* beyond
   the six Phase E ships — see "Judgment calls made in Phase E" below for
   why this was scoped to named fields rather than built generically.
-- Actual execution of the Bluehost DB backup — Phase E documents the exact
-  cron job and script (see "Bluehost database backups" above) but can't run
-  or test it from this sandbox, since there's no real Bluehost account or
-  cron scheduler to run it against.
+- Running the backups on the real Bluehost account — since D-260 (6 Nov 2026)
+  the scripts are in `scripts/` and are tested end to end in the sandbox
+  (self-test plus a real dump, restore and documents run), but the cron lines
+  and the key file must be set up on the server (see "Backups" above).
 - Editing an existing user's name/email/role from `/users` — the Phase E
   follow-up covers create/list/deactivate/reactivate/force-reset only (see
   "Judgment calls made in the Phase E follow-up" below).

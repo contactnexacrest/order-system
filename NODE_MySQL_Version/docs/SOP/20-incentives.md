@@ -68,6 +68,44 @@ Each person has their usual role(s). On each order the MD can:
 
 People sharing a role on an order share that role's amount equally.
 
+## Who is eligible, and caps (owner decision 6 Nov 2026, D-259)
+
+- **Eligible for team incentive.** Every person is eligible unless switched
+  off. Each **designation** (Admin › Departments & designations, column
+  "Incentive eligible") says whether its people share in the team incentive;
+  a person's own switch (**Edit User → Team incentive**, also on **Add user**)
+  overrides the designation for that person only. Only the **MD** changes
+  either; everyone else sees them greyed out. Admin › Departments lists the
+  people whose own switch differs from their designation.
+- **Not eligible** means the person gets **no share** of any order's team
+  incentive. Their share **stays with the company** — it is **not** shared
+  out to the others.
+- **Caps** (Team Incentives → settings → **Caps**, MD only): per role, the
+  most one person can receive **per order** and **per month** (the month the
+  order is locked into — the staff payout run). Empty means no cap. The
+  monthly cap counts what the person already has **locked** in that role for
+  the month. Anything above a cap **stays with the company**; nobody else's
+  amount goes up. No salary is entered anywhere.
+- **Where you see it.** On the order (Step 12d) each person's share, what they
+  get and what the company keeps, with the reason (e.g. "capped at ₹15,000 per
+  order", "not eligible (Sales Manager designation)") and the total kept. The
+  Incentive & Commission Register has two columns, **Kept — not eligible** and
+  **Kept — capped**, with totals; a person not eligible appears there with
+  ₹0 paid and the amount kept (never in "To pay" or "Owed").
+- **Cost and profit.** The order's incentive cost (profit, CAFIN) is what is
+  actually payable — the kept part is not a cost.
+- **Only orders not locked yet.** Changing a switch, a designation or a cap
+  changes open orders' estimates at once. **Locked and paid orders never
+  change**; unlocking an order (with a reason) works it out again.
+
+Worked example (mockup): profit ₹4,00,000 × 15% = ₹60,000, shared by role.
+Sales (30%, ₹18,000) is capped at ₹15,000 per order → gets ₹15,000, ₹3,000
+kept. The Sales Manager (10%, ₹6,000) is not eligible → ₹0, ₹6,000 kept.
+Logistics (15%, ₹9,000) already has ₹14,000 locked this month against a
+monthly cap of ₹20,000 → gets ₹6,000, ₹3,000 kept. Everyone else in full.
+Paid ₹48,000; kept by the company ₹12,000 (not eligible ₹6,000, capped
+₹6,000).
+
 ## My Incentives (everyone with an incentive role)
 
 **My Incentives** (left menu) lists your own incentive on each order once

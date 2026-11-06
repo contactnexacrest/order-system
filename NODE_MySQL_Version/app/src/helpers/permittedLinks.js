@@ -26,6 +26,7 @@ const RULES = [
   [/^\/documents\/\d+\/download(?:[/?#]|$)/, ['download_pdf', 'view_cafin']],
   [/^\/sop\/ca-/, ['ca_module_view']],
   [/^\/settings(?:[/?#]|$)/, ['manage_company_settings']],
+  [/^\/admin\/backups(?:[/?#]|$)/, ['manage_company_settings']], // D-260
   [/^\/audit-log(?:[/?#]|$)/, ['view_audit_log']],
   [/^\/ca\/cafin-export(?:[/?#]|$)/, ['view_cafin']],
   [/^\/ca\/(?:zoho-sync|fy-locks)(?:[/?#]|$)/, ['ca_module_manage']],

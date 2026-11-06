@@ -36,6 +36,15 @@ final class DailyDigestService
         foreach (DocumentReviewRepository::pendingForReviewer($userId) as $r) {
             $items[] = ['kind' => 'review', 'text' => "{$r['document_reference']} ({$r['document_type_name']}) — waiting for your review"];
         }
+        // D-260: a missing, failed or too-old backup goes to whoever manages company settings (MD / Admin).
+        $roleId = Database::connection()->prepare('SELECT role_id FROM users WHERE id = :id');
+        $roleId->execute(['id' => $userId]);
+        $role = $roleId->fetchColumn();
+        if (\App\Services\PermissionService::can($userId, $role !== false && $role !== null ? (int) $role : null, 'manage_company_settings')) {
+            foreach (\App\Services\BackupStatusService::problems() as $problem) {
+                $items[] = ['kind' => 'backup', 'text' => $problem];
+            }
+        }
         return $items;
     }
 
@@ -45,13 +54,18 @@ final class DailyDigestService
         $tasks = array_values(array_filter($items, static fn (array $i): bool => $i['kind'] === 'task'));
         $reviews = array_values(array_filter($items, static fn (array $i): bool => $i['kind'] === 'review'));
         $count = static fn (int $n, string $one): string => $n . ' ' . $one . ($n === 1 ? '' : 's');
-        $subject = 'NexaCrest — your day ' . date('j M Y', strtotime($date)) . ': ' . $count(count($tasks), 'task') . ', ' . $count(count($reviews), 'review');
+        $backups = array_values(array_filter($items, static fn (array $i): bool => $i['kind'] === 'backup'));
+        $subject = 'NexaCrest — your day ' . date('j M Y', strtotime($date)) . ': ' . $count(count($tasks), 'task') . ', ' . $count(count($reviews), 'review')
+            . ($backups !== [] ? ' — BACKUP WARNING' : '');
         $body = "Good morning {$name},\n\nThis is what waits on you today.\n";
         if ($tasks !== []) {
             $body .= "\nTasks (My tasks):\n" . implode("\n", array_map(static fn (array $i): string => '- ' . $i['text'], $tasks)) . "\n";
         }
         if ($reviews !== []) {
             $body .= "\nDocuments to review (My Reviews):\n" . implode("\n", array_map(static fn (array $i): string => '- ' . $i['text'], $reviews)) . "\n";
+        }
+        if ($backups !== []) {
+            $body .= "\nBackups need attention (Admin › Backups):\n" . implode("\n", array_map(static fn (array $i): string => '- ' . $i['text'], $backups)) . "\n";
         }
         $body .= "\nOpen the app to act on them. You get this e-mail once a day, only when something waits on you.\n";
         return ['subject' => $subject, 'body' => $body];

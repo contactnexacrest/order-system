@@ -34,7 +34,7 @@ final class IncentiveReportService
     /** D-245 P6: rows per page on the register (totals are always over the whole filtered set). */
     public const PER_PAGE = 100;
 
-    public const HEADERS = ['Order', 'Client', 'Order date', 'Payee', 'Payee type', 'Role', 'Amount (INR)', 'GST (INR)', 'TDS (INR)', 'State', 'Due on', 'Payout run', 'Paid on'];
+    public const HEADERS = ['Order', 'Client', 'Order date', 'Payee', 'Payee type', 'Role', 'Amount (INR)', 'GST (INR)', 'TDS (INR)', 'State', 'Due on', 'Payout run', 'Paid on', 'Kept — not eligible (INR)', 'Kept — capped (INR)'];
 
     private static function testFlag(): int
     {
@@ -58,6 +58,7 @@ final class IncentiveReportService
         );
         $stmt->execute(['t' => self::testFlag()]);
         $rows = [];
+        $kept = self::lockedKeptCapped();
         foreach ($stmt->fetchAll() as $p) {
             $associate = $p['payee_kind'] === 'associate';
             $state = $p['status'] === 'paid' ? 'paid' : ($p['status'] === 'held' ? 'held' : 'locked');
@@ -80,6 +81,54 @@ final class IncentiveReportService
                 'payout_run_on' => $p['payout_run_on'] !== null ? (string) $p['payout_run_on'] : null,
                 'locked_on' => $p['locked_on'] !== null ? (string) $p['locked_on'] : null,
                 'paid_on' => $p['paid_on'] !== null ? (string) $p['paid_on'] : null,
+                'kept_not_eligible_inr' => 0.0,
+                'kept_capped_inr' => $associate ? 0.0 : (float) ($kept[$p['order_id'] . ':' . $p['user_id'] . ':' . $p['role']] ?? 0),
+            ];
+        }
+        return $rows;
+    }
+
+    /**
+     * D-259: what the company kept on locked orders, by order:person:role (capped lines sit on the
+     * person's payout row; not-eligible lines have no payout and become kept-only register rows).
+     *
+     * @return array<string, float>
+     */
+    private static function lockedKeptCapped(): array
+    {
+        $out = [];
+        foreach (Database::connection()->query("SELECT order_id, user_id, role, kept_inr FROM incentive_kept WHERE kept_reason <> 'not_eligible'")->fetchAll() as $k) {
+            $out[$k['order_id'] . ':' . $k['user_id'] . ':' . $k['role']] = round((float) $k['kept_inr'], 2);
+        }
+        return $out;
+    }
+
+    /** D-259: kept-only register rows of locked orders (people not eligible: nothing paid, all kept). @return list<array<string,mixed>> */
+    private static function lockedKeptOnlyRows(): array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT k.*, o.order_reference, o.buyer_inquiry_ref, o.company_legal_name, o.created_at AS order_created_at, u.name AS user_name,
+                    oi.locked_at
+             FROM incentive_kept k
+             JOIN orders o ON o.id = k.order_id
+             JOIN users u ON u.id = k.user_id
+             LEFT JOIN order_incentives oi ON oi.order_id = k.order_id
+             WHERE k.kept_reason = 'not_eligible' AND o.is_test_data = :t AND o.is_sample_data = 0"
+            . \App\Services\DivisionService::sql('o.division_id') . ' ORDER BY k.order_id, k.id'
+        );
+        $stmt->execute(['t' => self::testFlag()]);
+        $rows = [];
+        foreach ($stmt->fetchAll() as $k) {
+            $rows[] = [
+                'order_id' => (int) $k['order_id'],
+                'order_reference' => (string) (($k['buyer_inquiry_ref'] ?? '') ?: $k['order_reference']),
+                'client' => (string) $k['company_legal_name'],
+                'order_date' => substr((string) $k['order_created_at'], 0, 10),
+                'payee_kind' => 'staff', 'user_id' => (int) $k['user_id'], 'associate_id' => null,
+                'payee' => (string) $k['user_name'], 'role' => IncentiveRepository::roleLabel((string) $k['role']),
+                'amount_inr' => 0.0, 'gst_inr' => 0.0, 'tds_inr' => 0.0, 'state' => 'locked',
+                'due_on' => null, 'payout_run_on' => null, 'locked_on' => (string) $k['locked_on'], 'paid_on' => null,
+                'kept_not_eligible_inr' => round((float) $k['kept_inr'], 2), 'kept_capped_inr' => 0.0, 'kept_only' => true,
             ];
         }
         return $rows;
@@ -149,18 +198,32 @@ final class IncentiveReportService
             'gst_inr' => 0.0, 'tds_inr' => 0.0, 'state' => $state, 'locked_on' => null, 'paid_on' => null,
         ];
         $rows = [];
+        // D-259: what the company keeps from each person (not eligible / above a cap).
+        $keptNe = [];
+        $keptCap = [];
+        foreach ($calc['lines'] ?? [] as $l) {
+            if ($l['reason'] === 'not_eligible') {
+                $keptNe[$l['user_id']] = round(($keptNe[$l['user_id']] ?? 0.0) + $l['kept'], 2);
+            } elseif ($l['reason'] !== null) {
+                $keptCap[$l['user_id']] = round(($keptCap[$l['user_id']] ?? 0.0) + $l['kept'], 2);
+            }
+        }
         foreach ($calc['per_person'] as $p) {
-            if ($p['amount'] <= 0) {
+            $ne = $keptNe[(int) $p['id']] ?? 0.0;
+            $cap = $keptCap[(int) $p['id']] ?? 0.0;
+            if ($p['amount'] <= 0 && $ne <= 0 && $cap <= 0) {
                 continue;
             }
             $rows[] = $base + ['payee_kind' => 'staff', 'user_id' => (int) $p['id'], 'associate_id' => null, 'payee' => (string) $p['name'],
-                'role' => implode(', ', array_unique($p['roles'])), 'amount_inr' => round((float) $p['amount'], 2), 'due_on' => null, 'payout_run_on' => $staffRun];
+                'role' => implode(', ', array_unique($p['roles'])), 'amount_inr' => round((float) $p['amount'], 2), 'due_on' => null, 'payout_run_on' => $staffRun,
+                'kept_not_eligible_inr' => $ne, 'kept_capped_inr' => $cap, 'kept_only' => $p['amount'] <= 0];
         }
         $a = $calc['associate'];
         if ($a !== null && ($a['state'] ?? '') !== 'unpaid' && (float) $a['amount_inr'] > 0) {
             $rows[] = $base + ['payee_kind' => 'associate', 'user_id' => null, 'associate_id' => (int) $a['id'], 'payee' => (string) $a['name'],
                 'role' => 'Associate commission', 'amount_inr' => round((float) $a['amount_inr'], 2),
-                'due_on' => $a['due_on'] ?? null, 'payout_run_on' => $a['payout_run_on'] ?? null];
+                'due_on' => $a['due_on'] ?? null, 'payout_run_on' => $a['payout_run_on'] ?? null,
+                'kept_not_eligible_inr' => 0.0, 'kept_capped_inr' => 0.0];
         }
         return $rows;
     }
@@ -174,7 +237,9 @@ final class IncentiveReportService
      */
     public static function rows(array $f = []): array
     {
-        return self::filter(self::allRows($f), $f);
+        $rows = self::filter(self::allRows($f), $f);
+        // D-259: kept-only rows (nothing paid) are for the register only, never "to pay" / "owed".
+        return empty($f['with_kept']) ? array_values(array_filter($rows, static fn (array $r): bool => empty($r['kept_only']))) : $rows;
     }
 
     /**
@@ -183,7 +248,7 @@ final class IncentiveReportService
      */
     public static function allRows(array $f = []): array
     {
-        $rows = self::lockedRows();
+        $rows = array_merge(self::lockedRows(), self::lockedKeptOnlyRows());
         // D-245 P5 (performance): settings and per-order rows read once for the whole run.
         \App\Helpers\BatchCache::within(static function () use (&$rows, $f): void {
             foreach (self::openOrderIds($f) as $orderId) {
@@ -256,13 +321,16 @@ final class IncentiveReportService
     /** @param list<array<string,mixed>> $rows @return array{amount_inr: float, gst_inr: float, tds_inr: float, count: int} */
     public static function totals(array $rows): array
     {
-        $t = ['amount_inr' => 0.0, 'gst_inr' => 0.0, 'tds_inr' => 0.0, 'count' => count($rows)];
+        $t = ['amount_inr' => 0.0, 'gst_inr' => 0.0, 'tds_inr' => 0.0, 'kept_ne' => 0.0, 'kept_cap' => 0.0, 'count' => count($rows)];
         foreach ($rows as $r) {
             $t['amount_inr'] += (float) $r['amount_inr'];
             $t['gst_inr'] += (float) $r['gst_inr'];
             $t['tds_inr'] += (float) $r['tds_inr'];
+            $t['kept_ne'] += (float) ($r['kept_not_eligible_inr'] ?? 0);
+            $t['kept_cap'] += (float) ($r['kept_capped_inr'] ?? 0);
         }
-        return ['amount_inr' => round($t['amount_inr'], 2), 'gst_inr' => round($t['gst_inr'], 2), 'tds_inr' => round($t['tds_inr'], 2), 'count' => $t['count']];
+        return ['amount_inr' => round($t['amount_inr'], 2), 'gst_inr' => round($t['gst_inr'], 2), 'tds_inr' => round($t['tds_inr'], 2), 'count' => $t['count'],
+            'kept_not_eligible_inr' => round($t['kept_ne'], 2), 'kept_capped_inr' => round($t['kept_cap'], 2)];
     }
 
     /**
@@ -326,7 +394,7 @@ final class IncentiveReportService
             \App\Helpers\BatchCache::within(static function () use (&$out, $f): void {
                 foreach (self::openOrderIds($f) as $orderId) {
                     foreach (self::estimatedRows($orderId) as $r) {
-                        if ($r['state'] === 'ready') {
+                        if ($r['state'] === 'ready' && empty($r['kept_only'])) {
                             $out[] = $r;
                         }
                     }
@@ -362,6 +430,8 @@ final class IncentiveReportService
             'Due on' => $r['due_on'] ?? '',
             'Payout run' => $r['payout_run_on'] ?? '',
             'Paid on' => $r['paid_on'] ?? '',
+            'Kept — not eligible (INR)' => number_format((float) ($r['kept_not_eligible_inr'] ?? 0), 2, '.', ''),
+            'Kept — capped (INR)' => number_format((float) ($r['kept_capped_inr'] ?? 0), 2, '.', ''),
         ], $rows);
     }
 }

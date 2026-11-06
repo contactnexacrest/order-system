@@ -21,6 +21,7 @@ use App\Controllers\OrderExpenseController;
 use App\Controllers\VendorBillController;
 use App\Controllers\ClientController;
 use App\Controllers\DataExportController;
+use App\Controllers\BackupController;
 use App\Controllers\AssociateAdminController;
 use App\Controllers\SelfApprovalController;
 use App\Controllers\AssociatePortalController;
@@ -171,6 +172,7 @@ $fieldProtection = new FieldProtectionController();
 $users = new UserController();
 $sampleData = new SampleDataController();
 $dataExport = new DataExportController();
+$backups = new BackupController();
 $products = new ProductController();
 $pricing = new PricingController();
 $testMode = new TestModeController();
@@ -999,6 +1001,8 @@ $router->post('/admin/field-protection/{requestId}/approve', [$fieldProtection, 
 $router->post('/admin/field-protection/{requestId}/reject', [$fieldProtection, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_field_protection'), CsrfCheck::verify()]);
 
 $router->get('/admin/data-export', [$dataExport, 'index'], [SessionAuth::required(), PermissionCheck::requires('data_export_run')]);
+// D-260: Admin › Backups — read-only status of the nightly backup jobs.
+$router->get('/admin/backups', [$backups, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->get('/admin/data-export/schema', [$dataExport, 'downloadSchema'], [SessionAuth::required(), PermissionCheck::requires('data_export_run')]);
 $router->get('/admin/data-export/data', [$dataExport, 'downloadData'], [SessionAuth::required(), PermissionCheck::requires('data_export_run')]);
 $router->post('/clients/{id}/override-unique-number', [$clients, 'overrideUniqueNumber'], [SessionAuth::required(), PermissionCheck::requires('edit_locked_data'), CsrfCheck::verify()]);

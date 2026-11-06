@@ -3,6 +3,9 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
 <div class="card page-wide">
   <h1>Departments &amp; designations</h1>
   <p class="muted">Each department has its own ladder. Each designation is its own role (its permissions and money view). To give someone access, add them to a department on their user page — no permission editing needed.</p>
+  <?php // D-259: who shares in the team incentive. ?>
+  <p class="muted small" id="incentive-eligibility-note">Each designation says whether its people share in the team incentive ("Incentive eligible"; only the MD changes it). A person's own switch (Edit User) overrides this for that person only.
+    <?php if (!empty($incentiveOverrides)): ?><br><strong>People overriding their designation:</strong> <?= implode('; ', array_map(static fn (array $o): string => htmlspecialchars($o['name'] . ' (' . ($o['designation'] ?? 'no designation') . ', switched ' . ($o['eligible'] ? 'on' : 'off') . ')'), $incentiveOverrides)) ?>.<?php endif; ?></p>
 
   <div class="table-scroll">
   <table class="list dept-ladder">
@@ -102,7 +105,7 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
       <?php endif; ?>
       <?php if ($list !== []): ?>
       <table class="list">
-        <tr><th>Designation</th><th>Level</th><th>Approval limit (₹)</th><th>Active</th><th></th></tr>
+        <tr><th>Designation</th><th>Level</th><th>Approval limit (₹)</th><th>Incentive eligible</th><th>Active</th><th></th></tr>
         <?php foreach ($list as $d): $formId = 'designation-' . (int) $d['id']; ?>
         <tr>
           <td><input form="<?= $formId ?>" type="text" name="title" value="<?= htmlspecialchars((string) $d['title']) ?>" required minlength="2" maxlength="100" placeholder="e.g. Logistics Executive" aria-label="Title"></td>
@@ -115,6 +118,9 @@ $columns = ['executive' => 'Executive', 'manager' => 'Manager', 'director' => 'D
           <td><input form="<?= $formId ?>" type="hidden" name="level" value="<?= htmlspecialchars((string) $d['level']) ?>"><?= htmlspecialchars($levels[$d['level']] ?? (string) $d['level']) ?></td>
           <td><input form="<?= $formId ?>" type="hidden" name="approval_limit_inr" value="<?= $d['approval_limit_inr'] !== null ? htmlspecialchars((string) $d['approval_limit_inr']) : '' ?>"><?= $d['approval_limit_inr'] !== null ? number_format((float) $d['approval_limit_inr'], 2) : 'none' ?><br><small class="muted"><?= empty($canLimits) ? 'Only the MD or ED changes approval limits.' : 'Your own designation — another MD/ED changes it.' ?></small></td>
           <?php endif; ?>
+          <?php // D-259 (owner approval 6 Nov 2026): whether this designation's people share in the team incentive (MD only). ?>
+          <td><?php if (!empty($incentiveCanEdit)): ?><input form="<?= $formId ?>" type="hidden" name="incentive_eligible_present" value="1"><?php endif; ?>
+            <label class="small"><input form="<?= $formId ?>" type="checkbox" name="incentive_eligible" value="1" <?= (int) ($d['incentive_eligible'] ?? 1) === 1 ? 'checked' : '' ?><?= !empty($incentiveCanEdit) ? '' : ' disabled' ?> aria-label="<?= htmlspecialchars((string) $d['title']) ?> incentive eligible"> <?= (int) ($d['incentive_eligible'] ?? 1) === 1 ? 'Eligible' : 'Not eligible' ?></label></td>
           <td><input form="<?= $formId ?>" type="checkbox" name="is_active" value="1" <?= (int) $d['is_active'] === 1 ? 'checked' : '' ?> aria-label="Active"></td>
           <td><form id="<?= $formId ?>" method="post" action="/admin/designations/<?= (int) $d['id'] ?>/update"><?= Csrf::field() ?><button type="submit" class="btn-sm btn-success">Save</button></form></td>
         </tr>

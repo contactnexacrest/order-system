@@ -58,7 +58,10 @@ async function settings(req, res) {
   const roleTotal = Object.values(roles).reduce((sum, r) => sum + (r.is_active ? r.share_pct : 0), 0);
   res.renderView('incentives/settings', {
     settings: await incentiveService.settings(),
-    roles: Object.values(roles).map((r) => ({ ...r, shareText: trimPct(r.share_pct) })),
+    roles: Object.values(roles).map((r) => ({ ...r, shareText: trimPct(r.share_pct),
+      // D-259: the caps as typed (empty = no cap).
+      capOrderText: r.cap_per_order !== null ? trimPct(r.cap_per_order).replace(/,/g, '') : '',
+      capMonthText: r.cap_per_month !== null ? trimPct(r.cap_per_month).replace(/,/g, '') : '' })),
     activeRoles: Object.entries(await incentiveRepository.roles()).map(([key, label]) => ({ key, label })),
     roleTotalText: trimPct(roleTotal),
     runLabel: require('../services/associateCommission').runLabel(await require('../services/associateCommission').settings()),
@@ -73,6 +76,30 @@ async function settings(req, res) {
  * The roles table from the form: label, share %, active; a new role from
  * new_role_label / new_role_share. Active shares must add up to 100%.
  */
+/** D-259: the caps table from the form — caps[role_key][order|month] in rupees; empty = no cap. */
+async function parseCaps(body) {
+  const errors = [];
+  const out = {};
+  const roles = await incentiveRepository.allRoles();
+  for (const [key, c] of Object.entries(body.caps || {})) {
+    if (!roles[key] || !c || typeof c !== 'object') continue;
+    const vals = {};
+    for (const k of ['order', 'month']) {
+      const v = String(c[k] ?? '').trim();
+      if (v === '') {
+        vals[k] = null;
+      } else if (!/^-?\d+(\.\d+)?$/.test(v) || Number(v) < 0 || Number(v) > 1000000000) {
+        errors.push(`Enter the ${roles[key].label} cap ${k === 'order' ? 'per order' : 'per month'} as rupees from 0 to 1,00,00,00,000, or leave it empty for no cap.`);
+        vals[k] = null;
+      } else {
+        vals[k] = Math.round(Number(v) * 100) / 100;
+      }
+    }
+    out[String(key)] = vals;
+  }
+  return [out, [...new Set(errors)]];
+}
+
 async function parseRoles(body) {
   const errors = [];
   const rows = [];
@@ -137,10 +164,30 @@ async function saveSettings(req, res) {
       errors = errors.concat(roleErrors);
     }
   }
+  // D-259: caps per role (MD only — manage_pricing). Empty = no cap.
+  let caps = null;
+  if (body.caps_present || body.caps) {
+    if (!canManagePricing(req)) {
+      errors.push('Only the MD can change the incentive caps.');
+    } else {
+      const [parsed, capErrors] = await parseCaps(body);
+      caps = parsed;
+      errors = errors.concat(capErrors);
+    }
+  }
   if (errors.length) {
     flash.set(req, 'error', errors.join(' '));
     res.redirect('/incentives/settings');
     return;
+  }
+  if (caps !== null) {
+    const capText = async () => JSON.stringify(Object.fromEntries(Object.entries(await incentiveRepository.allRoles()).map(([k, r]) => [k, [r.cap_per_order, r.cap_per_month]])));
+    const before = await capText();
+    await incentiveRepository.saveCaps(caps, userId);
+    const after = await capText();
+    if (before !== after) {
+      await auditLogRepository.log(userId, 'INCENTIVE_CAPS_CHANGED', 'incentive_roles', null, 'caps', before, after);
+    }
   }
   const old = await incentiveRepository.settings();
   const values = { program_enabled: body.program_enabled ? '1' : '0', lock_reminder_days: String(Number(reminder)) };
