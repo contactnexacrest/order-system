@@ -16,7 +16,9 @@ describe('QA final run — personal code never runs out for a name', () => {
   it('still finds a code when every one-letter code for the name is taken', async () => {
     const [res] = await db.pool.query("INSERT INTO associates (name, status, commission_mode) VALUES (?, 'active', 'ladder')", [`QA Final Assoc ${crypto.randomBytes(3).toString('hex')}`]);
     const associate = res.insertId;
-    const part = `QF${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    // Random part from unambiguous characters only: the service turns 0/1/O/I/L into their look-alikes.
+    const unambiguous = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+    const part = `QF${Array.from({ length: 6 }, () => unambiguous[crypto.randomInt(unambiguous.length)]).join('')}`;
     for (const r of codes.ALPHABET) {
       const body = `NXA-${part}-${r}`;
       await db.pool.query('INSERT INTO associate_codes (code, associate_id) VALUES (?, ?)', [body + codes.checkChar(body), associate]);

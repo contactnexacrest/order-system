@@ -20,8 +20,12 @@ final class QaFinalRunTest extends DbTestCase
         $pdo = Database::connection();
         $pdo->prepare("INSERT INTO associates (name, status, commission_mode) VALUES (:n, 'active', 'ladder')")->execute(['n' => 'QA Final Assoc ' . bin2hex(random_bytes(3))]);
         $associate = (int) $pdo->lastInsertId();
-        $part = 'QF' . strtoupper(bin2hex(random_bytes(3)));
         $alphabet = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+        // Random part from unambiguous characters only: the service turns 0/1/O/I/L into their look-alikes.
+        $part = 'QF';
+        for ($i = 0; $i < 6; $i++) {
+            $part .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
         foreach (str_split($alphabet) as $r) {
             $body = 'NXA-' . $part . '-' . $r;
             $pdo->prepare('INSERT INTO associate_codes (code, associate_id) VALUES (:c, :a)')->execute(['c' => $body . AssociateCodeService::checkChar($body), 'a' => $associate]);
