@@ -8,9 +8,9 @@
   <?php endif; ?>
   <?php if (!empty($access['commission'])): // D-261 ?>
   <div class="stat-row">
-    <div class="stat"><div class="stat-label">Earned this year</div><div class="stat-value"><?= $__m($totals['earned_year']) ?></div></div>
+    <div class="stat"><div class="stat-label">Earned in the last <?= (int) $totals['months'] ?> months</div><div class="stat-value"><?= $__m($totals['earned']) ?></div></div>
     <div class="stat"><div class="stat-label">Waiting to be paid</div><div class="stat-value"><?= $__m($totals['waiting']) ?></div></div>
-    <div class="stat"><div class="stat-label">Paid this year</div><div class="stat-value"><?= $__m($totals['paid_year']) ?></div></div>
+    <div class="stat"><div class="stat-label">Paid in the last <?= (int) $totals['months'] ?> months</div><div class="stat-value"><?= $__m($totals['paid']) ?></div></div>
     <?php if ($totals['held'] > 0): ?><div class="stat"><div class="stat-label">On hold</div><div class="stat-value"><?= $__m($totals['held']) ?></div></div><?php endif; ?>
   </div>
   <?php endif; ?>

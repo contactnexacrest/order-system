@@ -58,7 +58,16 @@ async function settings() {
     gst_pct: Number(s.associate_gst_pct ?? 18),
     zoho_gst_tax_id: String(s.zoho_gst_commission_tax_id ?? '').trim(),
     registration_months: months > 0 ? months : 6,
+    portal_months: portalMonths(s),
   };
+}
+
+/** D-263: the commission period an associate sees in the portal (totals and list). */
+const PORTAL_MONTH_CHOICES = [3, 6, 9, 12, 15, 18, 24];
+
+function portalMonths(s) {
+  const m = parseInt((s || {}).associate_portal_commission_months ?? '12', 10);
+  return PORTAL_MONTH_CHOICES.includes(m) ? m : 12;
 }
 
 async function dueOn(fullyPaidOn, set = null) {
@@ -155,6 +164,13 @@ async function levelForAssociate(associate, excludeOrderId, orderInRangeInr = nu
     }
   }
   return [null, count];
+}
+
+/** Task #80 / D-263: the rate alone, without the level name (what an associate may see). */
+function rateLabel(level) {
+  if (!level) return 'no commission level';
+  const v = Number(level.value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return (level.kind || 'pct') === 'pct' ? `${v}%` : `USD ${money(level.value)} per unit`;
 }
 
 function levelLabel(level) {
@@ -420,6 +436,6 @@ async function lapseRegistrations(today = null) {
 
 module.exports = {
   SETTLEMENT_KINDS, WEEKDAYS, round2, addDays, settings, dueOn, payoutRunOn, runLabel, claimOpen, payBlockReason,
-  earningAssociate, countingOrders, levelForAssociate, levelLabel, fixedLevel, fixLevelAtPi, belowFloorApproved, goodsLines, inRangeValue,
+  earningAssociate, countingOrders, levelForAssociate, levelLabel, rateLabel, PORTAL_MONTH_CHOICES, portalMonths, fixedLevel, fixLevelAtPi, belowFloorApproved, goodsLines, inRangeValue,
   settlements, realisedRate, usdRate, estimateInr, forOrder, gstFor, payoutDescription, lapseRegistrations,
 };

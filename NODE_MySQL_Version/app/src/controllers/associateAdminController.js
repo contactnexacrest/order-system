@@ -839,6 +839,7 @@ async function ladder(req, res) {
 }
 
 async function saveLadder(req, res) {
+  const associateCommission = require('../services/associateCommission');
   const body = req.body || {};
   const values = {};
   const int = (v) => (/^-?\d+$/.test(String(v ?? '').trim()) ? parseInt(v, 10) : null);
@@ -859,6 +860,7 @@ async function saveLadder(req, res) {
     const threshold = isNum(body.associate_counting_threshold_inr) ? Number(body.associate_counting_threshold_inr) : null;
     const months = int(body.associate_protection_months);
     const gst = isNum(body.associate_gst_pct) ? Number(body.associate_gst_pct) : null;
+    const portalMonths = int(body.associate_portal_commission_months);
     let error = null;
     if (days === null || days < 0 || days > 365) error = 'Enter the days after full payment as 0 to 365.';
     else if (!['monthly', 'weekly'].includes(run)) error = 'Choose a monthly or a weekly payout run.';
@@ -866,6 +868,7 @@ async function saveLadder(req, res) {
     else if (threshold === null || threshold < 0 || threshold > 1000000000) error = 'Enter the counting-order threshold in rupees (0 or more).';
     else if (months === null || months < 1 || months > 60) error = 'Enter the buyer registration period as 1 to 60 months.';
     else if (gst === null || gst < 0 || gst > 28) error = 'Enter the GST on commission as 0 to 28 %.';
+    else if (!associateCommission.PORTAL_MONTH_CHOICES.includes(portalMonths)) error = 'Choose the commission period shown to associates: 3, 6, 9, 12, 15, 18 or 24 months.';
     if (error) {
       flash.set(req, 'error', error);
       res.redirect('/associates/ladder');
@@ -878,6 +881,7 @@ async function saveLadder(req, res) {
     values.associate_counting_threshold_inr = threshold.toFixed(2);
     values.associate_protection_months = String(months);
     values.associate_gst_pct = gst.toFixed(2);
+    values.associate_portal_commission_months = String(portalMonths);
     // D-256: the Zoho Books GST tax booked on an associate's commission bill when GST is paid on top.
     const gstTax = String(body.zoho_gst_commission_tax_id ?? '').trim();
     if (gstTax !== '' && !/^[0-9A-Za-z_-]{1,40}$/.test(gstTax)) {

@@ -158,7 +158,7 @@ final class AssociateService
             return;
         }
         self::notify($a, 'order_created', "New order {$o['order_reference']} from your client {$o['company_legal_name']}. "
-            . ($level === null ? 'No commission applies to it.' : 'Your commission level for now: ' . AssociateCommission::levelLabel($level) . ' — fixed on the order when its Proforma Invoice is issued.'), (int) $o['client_id'], $orderId);
+            . ($level === null ? 'No commission applies to it.' : 'Your commission for now: ' . AssociateCommission::rateLabel($level) . ' — fixed on the order when its Proforma Invoice is issued.'), (int) $o['client_id'], $orderId);
     }
 
     /**

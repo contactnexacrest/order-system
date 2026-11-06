@@ -1,4 +1,4 @@
-{# Expects: me, statuses (STATUSES map), totals {earned_year, waiting, paid_year, held}, clients, orders (latest 5, each with stage and commission),
+{# Expects: me, statuses (STATUSES map), totals {earned, waiting, paid, held, months}, clients, orders (latest 5, each with stage and commission),
    events (notices: created_at, message, read_at, is_notice), openInvitations (count of created/opened/registered invitations). #}
 <div class="card page-wide">
   <h1>Welcome, {{ me.name }}</h1>
@@ -9,9 +9,9 @@
   {% endif %}
   {% if access.commission %}{# D-261 #}
   <div class="stat-row">
-    <div class="stat"><div class="stat-label">Earned this year</div><div class="stat-value">₹{{ totals.earned_year | money }}</div></div>
+    <div class="stat"><div class="stat-label">Earned in the last {{ totals.months }} months</div><div class="stat-value">₹{{ totals.earned | money }}</div></div>
     <div class="stat"><div class="stat-label">Waiting to be paid</div><div class="stat-value">₹{{ totals.waiting | money }}</div></div>
-    <div class="stat"><div class="stat-label">Paid this year</div><div class="stat-value">₹{{ totals.paid_year | money }}</div></div>
+    <div class="stat"><div class="stat-label">Paid in the last {{ totals.months }} months</div><div class="stat-value">₹{{ totals.paid | money }}</div></div>
     {% if totals.held > 0 %}<div class="stat"><div class="stat-label">On hold</div><div class="stat-value">₹{{ totals.held | money }}</div></div>{% endif %}
   </div>
   {% endif %}

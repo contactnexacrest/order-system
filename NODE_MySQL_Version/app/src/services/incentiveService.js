@@ -741,7 +741,7 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
       } else {
         await associateService.notify(associate, a.status === 'suspended' ? 'payout_held' : 'commission_earned',
           `Your client paid order ${order.order_reference} in full. Commission earned: ${a.currency} ${fmt2(a.amount_fc)}`
-          + ` (${a.level_label} on the invoiced FOB of the goods, ${a.currency} ${fmt2(a.basis_fc)}).`
+          + ` (${require('./associateCommission').rateLabel(a.level || null)} on the invoiced FOB of the goods, ${a.currency} ${fmt2(a.basis_fc)}).`
           + (a.status === 'suspended' ? ' It is on hold while your account is suspended.'
             : ` It is due on ${short(due)} and paid in the ${short(runOn)} payout run, against your invoice`
               + (String(associate.gstin || '').trim() !== '' ? ' (GST is added on top once your tax invoice is on file)' : '') + '.'),

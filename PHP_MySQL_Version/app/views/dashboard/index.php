@@ -3,7 +3,7 @@
   <p>Signed in as <strong><?= htmlspecialchars($user['name']) ?></strong> (<?= htmlspecialchars($user['email']) ?>).</p>
 </div>
 
-<?php if (!empty($associateUpgrades)): // D-261: only the MD sees this ?>
+<?php if (!empty($associateUpgrades)): // D-261 / D-263: users with "Manage associates" see this ?>
 <div class="card page-wide" id="associate-upgrades">
   <h2 style="margin-top:0;">Associates ready for the Quoting level? (<?= count($associateUpgrades) ?>)</h2>
   <ul>

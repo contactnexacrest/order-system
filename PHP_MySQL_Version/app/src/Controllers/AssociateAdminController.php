@@ -907,6 +907,7 @@ final class AssociateAdminController
             $threshold = filter_var($_POST['associate_counting_threshold_inr'] ?? '', FILTER_VALIDATE_FLOAT);
             $months = filter_var($_POST['associate_protection_months'] ?? '', FILTER_VALIDATE_INT);
             $gst = filter_var($_POST['associate_gst_pct'] ?? '', FILTER_VALIDATE_FLOAT);
+            $portalMonths = filter_var($_POST['associate_portal_commission_months'] ?? '', FILTER_VALIDATE_INT);
             $error = match (true) {
                 $days === false || $days < 0 || $days > 365 => 'Enter the days after full payment as 0 to 365.',
                 !in_array($run, ['monthly', 'weekly'], true) => 'Choose a monthly or a weekly payout run.',
@@ -914,6 +915,7 @@ final class AssociateAdminController
                 $threshold === false || $threshold < 0 || $threshold > 1000000000 => 'Enter the counting-order threshold in rupees (0 or more).',
                 $months === false || $months < 1 || $months > 60 => 'Enter the buyer registration period as 1 to 60 months.',
                 $gst === false || $gst < 0 || $gst > 28 => 'Enter the GST on commission as 0 to 28 %.',
+                !in_array($portalMonths, \App\Services\AssociateCommission::PORTAL_MONTH_CHOICES, true) => 'Choose the commission period shown to associates: 3, 6, 9, 12, 15, 18 or 24 months.',
                 default => null,
             };
             if ($error !== null) {
@@ -928,6 +930,7 @@ final class AssociateAdminController
             $values['associate_counting_threshold_inr'] = number_format($threshold, 2, '.', '');
             $values['associate_protection_months'] = (string) $months;
             $values['associate_gst_pct'] = number_format($gst, 2, '.', '');
+            $values['associate_portal_commission_months'] = (string) $portalMonths;
             // D-256: the Zoho Books GST tax booked on an associate's commission bill when GST is paid on top.
             $gstTax = trim((string) ($_POST['zoho_gst_commission_tax_id'] ?? ''));
             if ($gstTax !== '' && preg_match('/^[0-9A-Za-z_\-]{1,40}$/', $gstTax) !== 1) {

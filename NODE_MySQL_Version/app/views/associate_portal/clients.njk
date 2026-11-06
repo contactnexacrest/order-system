@@ -63,11 +63,11 @@
   <div class="section">
     <h2>Registered clients ({{ clients.length }})</h2>
     <table class="list">
-      <tr><th>Client</th><th>Country</th><th>Came via</th><th>Registered</th><th>Protected until</th><th>Orders</th><th>10-day window ends</th><th></th></tr>
+      <tr><th>Client</th><th>Country</th><th>Came via</th><th>Registered</th><th>Protected until</th>{% if access.orders %}<th>Orders</th>{% endif %}<th>10-day window ends</th><th></th></tr>
       {% for c in clients %}
         <tr><td>{{ c.company_legal_name }}</td><td>{{ c.country_of_destination or '' }}</td>
           <td>{{ c.came_via or '' }}</td><td>{{ (c.associate_registered_on | shortDate) if c.associate_registered_on else '—' }}</td><td>{{ (c.associate_locked_until | shortDate) if c.associate_locked_until else '—' }}</td>
-          <td>{% if c.order_refs.length %}{{ c.order_refs | join(', ') }}{% else %}<span class="muted">none yet</span>{% endif %}</td><td>{{ (c.window_ends_on | shortDate) if c.window_ends_on else '—' }}</td>
+          {% if access.orders %}<td>{% if c.order_refs.length %}{{ c.order_refs | join(', ') }}{% else %}<span class="muted">none yet</span>{% endif %}</td>{% endif %}<td>{{ (c.window_ends_on | shortDate) if c.window_ends_on else '—' }}</td>
           <td><a class="btn-sm btn-secondary" style="white-space:nowrap" href="/associate/clients/{{ c.id }}/certificate" target="_blank" rel="noopener">Registration certificate</a></td></tr>
       {% endfor %}
       {% if clients.length == 0 %}<tr><td colspan="8" class="muted">No clients yet.</td></tr>{% endif %}

@@ -64,7 +64,8 @@ final class DashboardController
             ? count(\App\Services\IncentiveService::readyToLock()) : null;
 
         // D-261: the MD is asked "Ready for the Quoting level?" for Starter associates with enough completed, fully paid orders.
-        $data['associateUpgrades'] = \App\Services\IncentiveService::isMd($user) ? \App\Services\AssociateAccess::upgradeSuggestions() : [];
+        // D-263: gated by the "Manage associates" permission (same as the associate page), not by the MD role.
+        $data['associateUpgrades'] = PermissionService::can($userId, $roleId, 'manage_associates') ? \App\Services\AssociateAccess::upgradeSuggestions() : [];
 
         if ($canViewReports) {
             $data['recentActivity'] = \App\Services\AuditMoneyMask::maskAll(AuditLogRepository::search(null, null, null, null, null, null, 15, 0));

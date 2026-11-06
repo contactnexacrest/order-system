@@ -9,7 +9,8 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
   <h1>My commission</h1>
   <?php if (!empty($access['commission'])): // D-261 ?>
   <?php if (!$print && !empty($access['commission_statement'])): ?><p><a class="btn-sm btn-secondary" href="/associate/commission?format=csv">Statement (CSV)</a> <a class="btn-sm btn-secondary" href="/associate/commission?print=1" target="_blank" rel="noopener">Printable statement</a></p><?php endif; ?>
-  <p>Waiting to be paid: <b>₹<?= $__m($totals['waiting']) ?></b> · Paid this year: <b>₹<?= $__m($totals['paid_year']) ?></b><?= $totals['held'] > 0 ? ' · On hold: <b>₹' . $__m($totals['held']) . '</b>' : '' ?></p>
+  <p>Earned in the last <?= (int) $totals['months'] ?> months: <b>₹<?= $__m($totals['earned']) ?></b> · Paid in the last <?= (int) $totals['months'] ?> months: <b>₹<?= $__m($totals['paid']) ?></b> · Waiting to be paid: <b>₹<?= $__m($totals['waiting']) ?></b><?= $totals['held'] > 0 ? ' · On hold: <b>₹' . $__m($totals['held']) . '</b>' : '' ?></p>
+  <p class="muted small" data-commission-period>This shows the commission of the last <?= (int) $totals['months'] ?> months, and any commission still waiting to be paid.</p>
   <p class="muted small">Each commission is paid in the incentive month shown, against your invoice. Upload your invoice for each line below. Payments go only to your verified bank account.</p>
   <table class="list">
     <tr><th>Month</th><th>Order</th><th>Client</th><th>Amount</th><th>Status</th><th>Paid</th><?php if (!$print): ?><th>Your invoice</th><?php endif; ?></tr>

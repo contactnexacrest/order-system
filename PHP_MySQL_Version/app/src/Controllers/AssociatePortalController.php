@@ -303,7 +303,9 @@ final class AssociatePortalController
     public function commission(array $params): void
     {
         $id = (int) self::me()['id'];
-        $payouts = AssociatePortalRepository::payouts($id);
+        // D-263: the portal shows only the last N months of commission (plus anything still unpaid).
+        $months = \App\Services\AssociateCommission::portalMonths();
+        $payouts = AssociatePortalRepository::portalPayouts($id, $months);
         if (($_GET['format'] ?? '') === 'csv') {
             // QA Round 8, R8-N03: through the shared CSV writer, so a cell like =HYPERLINK(...) is plain text in Excel.
             \App\Helpers\Csv::send('commission-statement.csv',
@@ -311,7 +313,7 @@ final class AssociatePortalController
                 array_map(static fn (array $p): array => [$p['incentive_month'], $p['order_reference'], $p['company_legal_name'], $p['amount_fc'], $p['currency_code'], $p['amount_inr'], $p['status'], $p['paid_on'], $p['paid_inr'], $p['tds_inr'], $p['paid_reference'] ?? '', $p['note'] ?? $p['hold_reason'] ?? ''], $payouts));
             return;
         }
-        self::render('commission', ['payouts' => $payouts, 'totals' => AssociatePortalRepository::totals($id), 'print' => ($_GET['print'] ?? '') === '1',
+        self::render('commission', ['payouts' => $payouts, 'totals' => AssociatePortalRepository::totals($id, $months), 'print' => ($_GET['print'] ?? '') === '1',
             'documents' => AssociateDocumentRepository::forAssociate($id)]);
     }
 
@@ -371,7 +373,10 @@ final class AssociatePortalController
         $documents = AssociateDocumentRepository::forAssociate($id);
         self::render('profile', ['banks' => AssociateBankRepository::forAssociate($id), 'documents' => $documents, 'kyc' => \App\Services\AssociateKyc::checklist($me, $documents),
             'codes' => AssociateCodeService::codes($id),
-            'commissionNow' => (($me['commission_mode'] ?? 'ladder') === 'fixed' ? 'Fixed level: ' : 'Ladder — your next order: ') . \App\Services\AssociateCommission::levelLabel($level),
+            // D-263: the rate only (no level name, no ladder wording), and only with "Show commission %".
+            'commissionNow' => \App\Services\AssociateAccess::allows($me, 'commission_pct')
+                ? (($me['commission_mode'] ?? 'ladder') === 'fixed' ? 'Your commission: ' : 'Your commission on your next order: ') . \App\Services\AssociateCommission::rateLabel($level)
+                : 'Your commission is as set out in your agreement.',
             'commissionSettings' => \App\Services\AssociateCommission::settings()]);
     }
 

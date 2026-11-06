@@ -3,7 +3,7 @@
   <p>Signed in as <strong>{{ user.name }}</strong> ({{ user.email }}).</p>
 </div>
 
-{% if associateUpgrades and associateUpgrades.length %}{# D-261: only the MD sees this #}
+{% if associateUpgrades and associateUpgrades.length %}{# D-261 / D-263: users with "Manage associates" see this #}
 <div class="card page-wide" id="associate-upgrades">
   <h2 style="margin-top:0;">Associates ready for the Quoting level? ({{ associateUpgrades.length }})</h2>
   <ul>

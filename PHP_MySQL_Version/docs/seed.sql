@@ -2577,3 +2577,5 @@ INSERT IGNORE INTO associate_access_level_settings (level, feature_key, allowed)
   ('full','registration_links',1),('full','catalogue',1),('full','get_price',1),('full','price_requests',1),('full','messages',1),
   ('full','order_documents',1),('full','tds_certificates',1),('full','commission_statement',1),('full','notice_amounts',1);
 INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('associate_upgrade_after_orders', '3');
+-- D-263 (owner 6 Nov 2026): how many months of commission an associate sees in the portal (3/6/9/12/15/18/24).
+INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('associate_portal_commission_months', '12');

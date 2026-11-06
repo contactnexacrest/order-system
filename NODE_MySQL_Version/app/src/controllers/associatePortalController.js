@@ -310,7 +310,9 @@ async function order(req, res) {
 async function commission(req, res) {
   const a = await me(req);
   const id = Number(a.id);
-  const payouts = await associatePortalRepository.payouts(id);
+  // D-263: the portal shows only the last N months of commission (plus anything still unpaid).
+  const months = require('../services/associateCommission').portalMonths(await require('../repositories/incentiveRepository').settings());
+  const payouts = await associatePortalRepository.portalPayouts(id, months);
   if (req.query.format === 'csv') {
     csv.stream(res, 'commission-statement.csv', ['Incentive month', 'Order', 'Client', 'Amount (order currency)', 'Currency', 'Amount INR', 'Status', 'Paid on', 'Paid INR', 'TDS INR', 'Reference', 'Note'],
       payouts.map((p) => [p.incentive_month, p.order_reference, p.company_legal_name, p.amount_fc, p.currency_code, p.amount_inr, p.status, p.paid_on, p.paid_inr, p.tds_inr, p.paid_reference || '', p.note || p.hold_reason || '']));
@@ -327,7 +329,7 @@ async function commission(req, res) {
   }
   await render(req, res, 'commission', {
     payouts,
-    totals: await associatePortalRepository.totals(id),
+    totals: await associatePortalRepository.totals(id, months),
     print: req.query.print === '1',
     invoiceByPayout,
     documents: await associateDocumentRepository.forAssociate(id),
@@ -383,7 +385,10 @@ async function profile(req, res) {
   const associateCommission = require('../services/associateCommission');
   const [level] = await associateCommission.levelForAssociate(a, null);
   const commissionSettings = await associateCommission.settings();
-  const commissionNow = `${(a.commission_mode || 'ladder') === 'fixed' ? 'Fixed level: ' : 'Ladder — your next order: '}${associateCommission.levelLabel(level)}`;
+  // D-263: the rate only (no level name, no ladder wording), and only with "Show commission %".
+  const commissionNow = (await associateAccess.allows(a, 'commission_pct'))
+    ? `${(a.commission_mode || 'ladder') === 'fixed' ? 'Your commission: ' : 'Your commission on your next order: '}${associateCommission.rateLabel(level)}`
+    : 'Your commission is as set out in your agreement.';
   const today = associateService.todayIst();
   const banks = await associateBankRepository.forAssociate(id);
   for (const b of banks) {

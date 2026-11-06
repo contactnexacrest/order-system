@@ -180,6 +180,11 @@ final class AssociateAccess
             $o['commission']['level'] = null;
             $o['commission']['rate'] = null;
         }
+        // D-263 (owner 6 Nov 2026): an associate never sees the ladder level name (it points to an order-count band) —
+        // only their rate, and only with "Show commission %".
+        if ($pct && isset($o['commission']) && is_array($o['commission'])) {
+            $o['commission']['level'] = self::rateOnly($o['commission']['level'] ?? null);
+        }
         if (isset($o['commission']['detail']) && is_array($o['commission']['detail'])) {
             $d = $o['commission']['detail'];
             if (!$fob) {
@@ -194,12 +199,31 @@ final class AssociateAccess
             if (!$pct) {
                 $d['level_label'] = null;
                 $d['rate'] = null;
+            } else {
+                $d['level_label'] = self::rateOnly($d['level_label'] ?? null);
             }
+            // D-263: never the running count of their orders nor the ladder threshold (owner rule: no total business).
+            $d['counting_number'] = null;
+            $d['threshold_inr'] = null;
+            $d['portal'] = true;
             $d['show_fob'] = $fob;
             $d['show_pct'] = $pct;
             $o['commission']['detail'] = $d;
         }
         return $o;
+    }
+
+    /**
+     * D-263: "Level 2 — 5%" → "5%" (the level name, which points to the ladder band, is dropped).
+     * Text after the rate (e.g. "(for now — fixed when the PI is issued)") is kept.
+     */
+    public static function rateOnly(?string $levelText): ?string
+    {
+        if ($levelText === null || $levelText === '') {
+            return $levelText;
+        }
+        $parts = explode(' — ', $levelText, 2);
+        return count($parts) === 2 && preg_match('/^\s*(\d|USD)/', $parts[1]) === 1 ? $parts[1] : $levelText;
     }
 
     /**
@@ -209,6 +233,10 @@ final class AssociateAccess
      */
     public static function maskNotice(array $associate, string $message): string
     {
+        // D-263: the order's FOB in a notice follows "Show FOB order value" (the commission amount itself stays).
+        if (!self::allows($associate, 'fob_value')) {
+            $message = (string) preg_replace('/(invoiced FOB of the goods),\s*(?:[A-Z]{3}\s?)?-?\d[\d,]*(?:\.\d+)?/u', '$1', $message);
+        }
         if (!self::allows($associate, 'notice_amounts')) {
             $message = (string) preg_replace('/(?:\b(?:USD|EUR|GBP|INR|AED|AUD|CAD|SGD|JPY|CNY|CHF|SAR)\s?|₹\s?|Rs\.?\s?)-?\d[\d,]*(?:\.\d+)?/u', '[amount in your portal]', $message);
         }

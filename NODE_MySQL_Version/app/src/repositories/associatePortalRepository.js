@@ -153,20 +153,43 @@ async function payouts(associateId) {
   );
 }
 
-/** INR totals for the home page: {earned_year, waiting, paid_year, held}. */
-async function totals(associateId) {
-  const year = String(new Date(Date.now() + 5.5 * 3600 * 1000).getUTCFullYear());
-  const t = { earned_year: 0, waiting: 0, paid_year: 0, held: 0 };
+/** D-263: the first month (YYYY-MM) of the portal window of N months, counting the current month (IST). */
+function portalFromMonth(months, today = null) {
+  const t = String(today || new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10));
+  const d = new Date(Date.UTC(Number(t.slice(0, 4)), Number(t.slice(5, 7)) - 1, 1));
+  d.setUTCMonth(d.getUTCMonth() - Math.max(0, months - 1));
+  return d.toISOString().slice(0, 7);
+}
+
+/**
+ * D-263: the payouts an associate sees in the portal — commission earned (incentive month) in the
+ * last N months, plus anything still waiting to be paid or on hold whatever its month (money still owed).
+ * Staff screens use payouts(), which is unlimited.
+ */
+async function portalPayouts(associateId, months, today = null) {
+  const from = portalFromMonth(months, today);
+  return (await payouts(associateId)).filter((p) => String(p.incentive_month) >= from || ['due', 'held'].includes(String(p.status)));
+}
+
+/**
+ * INR commission totals for the portal: earned (incentive month) and paid (paid on) within the last N
+ * months; waiting and on hold = all unpaid. Commission only — never an order count or order value
+ * (owner rule, 6 Nov 2026). Returns {earned, waiting, paid, held, months}.
+ */
+async function totals(associateId, months = null, today = null) {
+  if (months === null || months === undefined) months = require('../services/associateCommission').portalMonths(await require('./incentiveRepository').settings());
+  const from = portalFromMonth(months, today);
+  const t = { earned: 0, waiting: 0, paid: 0, held: 0 };
   for (const p of await payouts(associateId)) {
     const amount = Number(p.amount_inr);
-    if (String(p.incentive_month).startsWith(year)) t.earned_year += amount;
+    if (String(p.incentive_month) >= from) t.earned += amount;
     if (p.status === 'due') t.waiting += amount;
     else if (p.status === 'held') t.held += amount;
-    else if (p.status === 'paid' && String(p.paid_on || '').startsWith(year)) t.paid_year += Number(p.paid_inr);
+    else if (p.status === 'paid' && String(p.paid_on || '').slice(0, 7) >= from) t.paid += Number(p.paid_inr);
   }
   for (const k of Object.keys(t)) t[k] = Math.round(t[k] * 100) / 100;
-  return t;
+  return { ...t, months };
 }
 
 module.exports = {
-  cameVia, stageLabel, clients, orders, commission, payouts, totals };
+  cameVia, stageLabel, clients, orders, commission, payouts, portalFromMonth, portalPayouts, totals };

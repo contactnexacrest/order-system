@@ -21,7 +21,8 @@
     <tr><th>GST</th><td>{% if c.gstin %}GST {{ c.gst_pct | pct2 }}% added on top once your tax invoice is on file{% else %}none (not GST-registered){% endif %}</td></tr>
     <tr><th>Full payment</th><td>{{ ((c.fully_paid_on | shortDate) + ' ✓') if c.fully_paid_on else 'not yet' }}</td></tr>
     <tr><th>Due / payout run</th><td>{% if c.due_on %}due {{ c.due_on | shortDate }} · paid in the {{ c.payout_run_on | shortDate }} payout run{% else %}once the buyer has paid in full{% endif %}{% if c.claim_hold %} — <b>held while a buyer claim is open</b>{% endif %}</td></tr>
-    <tr><th>Counts toward the ladder</th><td>{% if c.state != 'paid' %}decided when the buyer has paid in full{% elif c.counts %}yes (counting order no. {{ c.counting_number }}){% else %}no — under ₹{{ c.threshold_inr | money0 }} within range{% endif %}</td></tr>
+    {# D-263 (owner 6 Nov 2026): in the associate portal only yes / no — never the running count of their orders nor the threshold. #}
+    <tr><th>Counts toward the ladder</th><td>{% if c.state != 'paid' %}decided when the buyer has paid in full{% elif c.portal %}{{ 'yes' if c.counts else 'no' }}{% elif c.counts %}yes (counting order no. {{ c.counting_number }}){% else %}no — under ₹{{ c.threshold_inr | money0 }} within range{% endif %}</td></tr>
   </table>
   <p class="muted small">Basis is the final invoiced FOB of the goods only — no freight, insurance or services. Bank charges never reduce it; an agreed discount or settled claim does; an order not paid in full earns nothing.</p>
 </div>

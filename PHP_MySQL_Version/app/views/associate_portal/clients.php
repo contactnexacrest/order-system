@@ -68,11 +68,11 @@ $__codeChosen = false;
   <div class="section">
     <h2>Registered clients (<?= count($clients) ?>)</h2>
     <table class="list">
-      <tr><th>Client</th><th>Country</th><th>Came via</th><th>Registered</th><th>Protected until</th><th>Orders</th><th>10-day window ends</th><th></th></tr>
+      <tr><th>Client</th><th>Country</th><th>Came via</th><th>Registered</th><th>Protected until</th><?php if (!empty($access['orders'])): // D-263 ?><th>Orders</th><?php endif; ?><th>10-day window ends</th><th></th></tr>
       <?php foreach ($clients as $c): ?>
         <tr><td><?= htmlspecialchars((string) $c['company_legal_name']) ?></td><td><?= htmlspecialchars((string) ($c['country_of_destination'] ?? '')) ?></td>
           <td><?= htmlspecialchars((string) ($c['came_via'] ?? '')) ?></td><td><?= $__d($c['associate_registered_on']) ?></td><td><?= $__d($c['associate_locked_until']) ?></td>
-          <td><?= $c['order_refs'] !== [] ? htmlspecialchars(implode(', ', $c['order_refs'])) : '<span class="muted">none yet</span>' ?></td><td><?= $__d($c['window_ends_on']) ?></td>
+          <?php if (!empty($access['orders'])): ?><td><?= $c['order_refs'] !== [] ? htmlspecialchars(implode(', ', $c['order_refs'])) : '<span class="muted">none yet</span>' ?></td><?php endif; ?><td><?= $__d($c['window_ends_on']) ?></td>
           <td><a class="btn-sm btn-secondary" style="white-space:nowrap" href="/associate/clients/<?= (int) $c['id'] ?>/certificate" target="_blank" rel="noopener">Registration certificate</a></td></tr>
       <?php endforeach; ?>
       <?php if ($clients === []): ?><tr><td colspan="8" class="muted">No clients yet.</td></tr><?php endif; ?>

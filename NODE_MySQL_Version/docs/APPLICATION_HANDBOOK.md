@@ -1466,11 +1466,24 @@ buyer payment amounts, other associates.
 **Owner decisions of 6 Nov 2026 (business volume and FOB):**
 
 - An associate **may see their commission** (per order, and the portal's
-  "Earned this year / Waiting to be paid / Paid this year" commission
-  figures), but must **never see the total business they bring in**. The
-  portal has no lifetime or period order-value summary (no total FOB, no
-  total sales, no "your business with us" figure) on any page,
-  statement, notice or e-mail, and one must never be added.
+  "Earned in the last N months / Waiting to be paid / Paid in the last N
+  months / On hold" commission figures — N is the setting "Commission period
+  shown to associates", 3–24 months, default 12, D-263), but must **never see
+  the total business they bring in, nor a count or total of their orders**.
+  The portal has no lifetime or period order-value or order-count summary
+  (no total FOB, no total sales, no "your business with us" figure, no
+  number of orders) on any page, statement, notice or e-mail, and one must
+  never be added. The number of clients they brought in is allowed.
+- **D-263 (6 Nov 2026):** the associate never sees the running number of
+  their counting orders or the ₹ threshold behind the ladder (the statement
+  says only "Counts toward the ladder: yes / no"), nor a level name or band —
+  only the rate ("5%"), and only with "Show commission %"
+  (`AssociateAccess::rateOnly`, `AssociateCommission::rateLabel`). The FOB in
+  a "commission earned" notice is removed unless `fob_value` is on
+  (`maskNotice`). My clients shows order numbers only with `orders`.
+  `AssociateCommissionPeriodTest` / `associateCommissionPeriod.test.js`
+  render every portal page and download at Starter, Quoting, Full and
+  Custom (everything on) and fail on any aggregate of orders or business.
 - Whether an associate sees the **FOB value of an individual order** is
   governed **only by the Access-levels matrix** below (`fob_value`; for a
   Custom associate, their own tick). No other setting or screen adds or
@@ -1512,9 +1525,10 @@ Default matrix (`AssociateAccess::DEFAULTS`; MD can change it in
   6 Nov 2026 stays **Full**.
 - Only the MD changes a level (associate page → Portal access, reason ≥ 10
   characters, logged in `associate_access_log`).
-- After 3 completed, fully paid orders (setting) the MD sees "Ready for the
-  Quoting level?" on the associate page and the dashboard. Nothing upgrades
-  by itself.
+- After 3 completed, fully paid orders (setting) "Ready for the Quoting
+  level?" shows on the associate page and on the dashboard of everyone with
+  `manage_associates` (D-263; not tied to the MD role). Nothing upgrades by
+  itself.
 
 Staff permissions for associates: `manage_associates` (Admin, MD, ED),
 `view_associates` (Sales roles: who introduced which client, no amounts),
@@ -2156,8 +2170,14 @@ the same filters, counts, fields, actions and money rules on both templates
     with catch-up; never more than the payout; abroad needs TRC, Form 10F,
     no-PE and Form 15CA/15CB. Rules and worked examples: §7.3.
   - **Never the total business (owner, 6 Nov 2026):** commission yes; a
-    lifetime or period order-value total no. The FOB of one order shows only
-    as the Access-levels matrix says (4.11).
+    lifetime or period order-value total, or a count of orders, no. The FOB
+    of one order shows only as the Access-levels matrix says (4.11).
+  - **Portal commission period (D-263):** the portal totals and the
+    commission list, CSV and printable statement cover the last N months
+    (setting, default 12, counting the current month): earned by incentive
+    month, paid by payment date; commission still due or on hold always
+    shows. Staff screens are unlimited (`AssociatePortalRepository::payouts`
+    vs `portalPayouts` / `totals($id, $months)`).
   - **Bank details:** a change is a request; two different Finance people
     check and verify; 7-day wait before first use; encrypted, masked;
     payment only into a verified usable account.
@@ -3380,6 +3400,7 @@ Also in Pricing: commission levels (`commission_levels`) and ladder (`commission
 | `associate_payout_run` / `associate_payout_day` | monthly / 5 | 〃 |
 | `associate_counting_threshold_inr` | 500000 | 〃 |
 | `associate_gst_pct` | 18.00 | 〃 |
+| `associate_portal_commission_months` | 12 | 〃 — commission period shown to associates: 3, 6, 9, 12, 15, 18 or 24 months (D-263) |
 | `associate_protection_months` | 6 | 〃 (buyer registration) |
 | `associate_registration_link_days` | 7 | 〃 (D-253) |
 | `associate_code_changes_per_year` | 3 | 〃 (D-254) |
@@ -3874,7 +3895,7 @@ node src/jobs/zohoCleanupTestRecords.js --apply --by "Admin" --log ../docs/zoho/
 
 ## 13. Decision history
 
-The full register is `docs/decisions/owner-decisions-register.md` (about 260 decisions, last updated 6 Nov 2026). It has: §2 standing rules R1–R26; §3 decisions by area (D-001…D-262); §4 an index of every test finding (QA rounds 1–6 and the 5–6 Nov programme); §5 open points (O-1…O-23); §6 sources and caveats. **How to use it:** check every new finding there first; if a decision covers it, apply it and cite the row ("per D-041"); never re-ask a decided point (R18 — the owner's words: "STICK TO THE DECISIONS WHICH WE HAD ALREADY TAKEN"); record each new decision the same day as a new D-row (numbers are never reused).
+The full register is `docs/decisions/owner-decisions-register.md` (about 260 decisions, last updated 6 Nov 2026). It has: §2 standing rules R1–R26; §3 decisions by area (D-001…D-263); §4 an index of every test finding (QA rounds 1–6 and the 5–6 Nov programme); §5 open points (O-1…O-23); §6 sources and caveats. **How to use it:** check every new finding there first; if a decision covers it, apply it and cite the row ("per D-041"); never re-ask a decided point (R18 — the owner's words: "STICK TO THE DECISIONS WHICH WE HAD ALREADY TAKEN"); record each new decision the same day as a new D-row (numbers are never reused).
 
 ### 13.1 The big "whys"
 
@@ -3910,7 +3931,7 @@ The full register is `docs/decisions/owner-decisions-register.md` (about 260 dec
 
 **CA module and CAFIN (D-106–D-115, D-236).** See 13.1. The CA role is read-only and sees every order (D-114).
 
-**Roles, access, organisation (D-116–D-124, D-214–D-216, D-221, D-226, D-261).** Role + permission (Owner Decision #3); order visibility by assignment, `view_all_orders` for management (D-118); departments → designations → roles → permissions with Log in as, Preview as, My tasks and the cockpit (D-214); nobody grants what they do not hold (D-216); self-approval rules in Admin (D-221); associate portal access levels Starter / Quoting / Full / Custom (D-261).
+**Roles, access, organisation (D-116–D-124, D-214–D-216, D-221, D-226, D-261, D-263).** Role + permission (Owner Decision #3); order visibility by assignment, `view_all_orders` for management (D-118); departments → designations → roles → permissions with Log in as, Preview as, My tasks and the cockpit (D-214); nobody grants what they do not hold (D-216); self-approval rules in Admin (D-221); associate portal access levels Starter / Quoting / Full / Custom (D-261); an associate never sees a count or total of orders or business, a level name or the ladder threshold, and sees commission for a set period (D-263).
 
 **Client portal and links (D-125–D-134, D-206, D-242, D-246, D-250).** One step at a time on the Buyer Action Link; one e-mail per client (D-129); feedback only after shipping documents; a buyer never sees an error caused by an associate code (D-246).
 

@@ -58,7 +58,19 @@ final class AssociateCommission
             'gst_pct' => (float) ($s['associate_gst_pct'] ?? 18),
             'zoho_gst_tax_id' => trim((string) ($s['zoho_gst_commission_tax_id'] ?? '')),
             'registration_months' => AssociateService::protectionMonths(),
+            'portal_months' => self::portalMonths($s),
         ];
+    }
+
+    /** D-263: the commission period an associate sees in the portal (totals and list). */
+    public const PORTAL_MONTH_CHOICES = [3, 6, 9, 12, 15, 18, 24];
+
+    /** @param array<string,string>|null $s incentive settings */
+    public static function portalMonths(?array $s = null): int
+    {
+        $s ??= IncentiveRepository::settings();
+        $m = (int) ($s['associate_portal_commission_months'] ?? 12);
+        return in_array($m, self::PORTAL_MONTH_CHOICES, true) ? $m : 12;
     }
 
     public static function dueOn(string $fullyPaidOn, ?array $settings = null): string
@@ -168,6 +180,19 @@ final class AssociateCommission
             }
         }
         return [null, $count];
+    }
+
+    /**
+     * D-263 (owner 6 Nov 2026): what an associate is shown — the rate only, never the level name
+     * (a ladder level name points to an order-count band). "5%" / "USD 2.00 per unit".
+     */
+    public static function rateLabel(?array $level): string
+    {
+        if ($level === null) {
+            return 'no commission level';
+        }
+        $v = rtrim(rtrim(number_format((float) $level['value'], 2, '.', ''), '0'), '.');
+        return ($level['kind'] ?? 'pct') === 'pct' ? $v . '%' : 'USD ' . number_format((float) $level['value'], 2) . ' per unit';
     }
 
     public static function levelLabel(?array $level): string

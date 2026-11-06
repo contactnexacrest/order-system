@@ -770,7 +770,7 @@ final class IncentiveService
                 } else {
                     AssociateService::notify($associate, $a['status'] === 'suspended' ? 'payout_held' : 'commission_earned',
                         "Your client paid order {$order['order_reference']} in full. Commission earned: {$a['currency']} " . number_format($a['amount_fc'], 2)
-                        . ' (' . $a['level_label'] . ' on the invoiced FOB of the goods, ' . $a['currency'] . ' ' . number_format($a['basis_fc'], 2) . ').'
+                        . ' (' . AssociateCommission::rateLabel($a['level'] ?? null) . ' on the invoiced FOB of the goods, ' . $a['currency'] . ' ' . number_format($a['basis_fc'], 2) . ').'
                         . ($a['status'] === 'suspended' ? ' It is on hold while your account is suspended.'
                             : ' It is due on ' . \App\Helpers\Dates::short((string) $dueOn) . ' and paid in the ' . \App\Helpers\Dates::short((string) $runOn) . ' payout run, against your invoice'
                               . (trim((string) ($associate['gstin'] ?? '')) !== '' ? ' (GST is added on top once your tax invoice is on file)' : '') . '.'),

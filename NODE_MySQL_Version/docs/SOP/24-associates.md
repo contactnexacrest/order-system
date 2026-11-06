@@ -96,6 +96,12 @@ the same links, filters and actions, and switch to each other.
 - **Buyer registration valid** for N months with no order (default 6).
 - **GST on commission** % (default 18 %), added for GST-registered
   associates once their tax invoice is on file.
+- **Commission period shown to associates** (D-263, 6 Nov 2026): 3, 6, 9,
+  12, 15, 18 or 24 months (default 12). The associate's portal shows the
+  commission of that many months — the totals ("Earned in the last 12
+  months", "Paid in the last 12 months") and the commission list, the CSV and
+  the printable statement. Commission still waiting to be paid or on hold is
+  always shown, however old. Staff screens always show everything.
 - **Zoho GST tax for commission** (D-256, 5 Nov 2026): the Zoho Books tax
   id put on the associate's commission bill when GST is paid on top (find
   it in Zoho Books → Settings → Taxes; e.g. `460000000067890`). Empty is
@@ -112,7 +118,9 @@ steps are in **Admin → Pricing → Commission levels**.
 
 **The level is fixed on the order when its Proforma Invoice is issued**
 (the order shows "Level 2 — 5%" and "fixed at PI on …"). Until then the
-order shows the level the associate would get today.
+order shows the level the associate would get today. Staff see the level
+name; the associate sees only the rate ("5%"), and only when their access
+level shows the commission % (D-263).
 If the MD later moves the client to another associate, the level fixed at
 the PI stays with the associate it was fixed for: the new associate earns on
 the order at their own level, the same level the order's price check uses.
@@ -231,7 +239,9 @@ Owner decision D-245 P3 (4 Nov 2026) replaces the client numbering
 - **Statement**: the order page (Incentive card) and the associate's
   portal order page show the commission statement: each goods line, its
   basis, any reduction, the level, the rate realised, the amount, the state
-  (estimated / earned / paid), due date and payout run.
+  (estimated / earned / paid), due date and payout run. "Counts toward the
+  ladder" shows the counting-order number and the threshold to staff only;
+  the associate sees just "yes" or "no" (D-263).
 
 ## Paying (Accounts)
 
@@ -354,12 +364,18 @@ challans →** opens `/associates/tds` (D-235).
 2. Log in at `/associate/login` with e-mail and password, then the 6-digit
    code e-mailed each time. Five wrong passwords lock the login for 15
    minutes.
-3. **Home**: totals (earned this year, waiting, paid this year, on hold),
-   latest orders and notices.
+3. **Home**: commission totals — **Earned in the last N months**, **Waiting
+   to be paid**, **Paid in the last N months**, **On hold** (N is the
+   "Commission period shown to associates" setting, default 12) — latest
+   orders and notices. "Earned" counts commission by its incentive month;
+   "Paid" counts what was paid out (after TDS) by the payment date; "Waiting"
+   and "On hold" are everything still unpaid, whatever its month. The portal
+   never shows a count or total of orders or of business (owner rule, D-263).
 4. **My clients**: create buyer registration links, see and copy the
    personal code and the quotation link (with the code), change the code
    (D-254, below), registered clients with how they came ("came via"),
-   their orders, protection and certificate, links and codes used.
+   their orders (only when the level shows orders), protection and
+   certificate, links and codes used.
 5. **Catalogue and price requests** (D-255, 5 Nov 2026 — replaces the P3
    "Your price range" page and its acknowledgement): the catalogue lists the
    products in the categories and forms NexaCrest opened to the associate —
@@ -392,7 +408,8 @@ challans →** opens `/associates/tds` (D-235).
    buyer, staff can type the **price request number** in "Add a product line":
    the line takes the request's product, options, price and unit, the order
    check uses the request's prices, and the request shows "Became an order".
-6. **Orders** (with the per-order commission statement), **Commission** (statement, invoice upload per payout, tax
+6. **Orders** (with the per-order commission statement), **Commission** (the
+   last N months plus anything still unpaid; statement, invoice upload per payout, tax
    certificates), **Messages**, **Profile** (contact and tax details,
    bank details, documents, agreement download).
 
@@ -507,8 +524,10 @@ A new associate does not get the whole portal at once. The MD decides how much e
 
 **Changing what a level shows (MD only)** — **Associates › Access levels** has one row per feature and a tick for Starter, Quoting and Full. A change applies to every associate on that level at once; an associate on Custom keeps their own ticks. A reason is needed, every change is logged, and **Restore recommended defaults** puts the starting ticks back. "Show FOB order value" is off for Starter by default.
 
-**When to open more** — the associate page has a **Track record** panel: clients brought in, orders, order value, and orders completed and fully paid. After **3** completed, fully paid orders (a setting) the MD sees "Ready for the Quoting level?" on the associate page and on the dashboard. Nothing upgrades by itself: change the level, or click **Not yet** and you are asked again after their next completed, fully paid order.
+**When to open more** — the associate page has a **Track record** panel: clients brought in, orders, order value, and orders completed and fully paid. After **3** completed, fully paid orders (a setting) "Ready for the Quoting level?" shows on the associate page and on the dashboard of everyone with **Manage associates** (D-263). Nothing upgrades by itself: change the level, or click **Not yet** and you are asked again after their next completed, fully paid order.
 
 **What the associate sees when something is hidden** — the menu does not show it, and if they open it anyway (for example an old bookmark) they get "Not available at your access level — please contact NexaCrest". The order value and the % are taken out on the server, not just hidden on the screen, and amounts (and the %) are blanked in their notices and e-mails where their level does not show them.
+
+**Never shown to an associate, at any level (owner rule, D-263, 6 Nov 2026)** — a count or total of their orders or of their business; the running number of their counting orders and the ₹ threshold behind the ladder; the name of a commission level or its band (only the rate, and only with "Show commission %"); the FOB in a "commission earned" notice unless "Show FOB order value" is on. The number of clients they brought in is shown.
 
 Cost, margin, supplier prices and CAFIN are never shown to an associate at any level.

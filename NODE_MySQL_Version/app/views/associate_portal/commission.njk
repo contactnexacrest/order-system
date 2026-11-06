@@ -4,7 +4,8 @@
   <h1>My commission</h1>
   {% if access.commission %}{# D-261 #}
   {% if not print and access.commission_statement %}<p><a class="btn-sm btn-secondary" href="/associate/commission?format=csv">Statement (CSV)</a> <a class="btn-sm btn-secondary" href="/associate/commission?print=1" target="_blank" rel="noopener">Printable statement</a></p>{% endif %}
-  <p>Waiting to be paid: <b>₹{{ totals.waiting | money }}</b> · Paid this year: <b>₹{{ totals.paid_year | money }}</b>{% if totals.held > 0 %} · On hold: <b>₹{{ totals.held | money }}</b>{% endif %}</p>
+  <p>Earned in the last {{ totals.months }} months: <b>₹{{ totals.earned | money }}</b> · Paid in the last {{ totals.months }} months: <b>₹{{ totals.paid | money }}</b> · Waiting to be paid: <b>₹{{ totals.waiting | money }}</b>{% if totals.held > 0 %} · On hold: <b>₹{{ totals.held | money }}</b>{% endif %}</p>
+  <p class="muted small" data-commission-period>This shows the commission of the last {{ totals.months }} months, and any commission still waiting to be paid.</p>
   <p class="muted small">Each commission is paid in the incentive month shown, against your invoice. Upload your invoice for each line below. Payments go only to your verified bank account.</p>
   <table class="list">
     <tr><th>Month</th><th>Order</th><th>Client</th><th>Amount</th><th>Status</th><th>Paid</th>{% if not print %}<th>Your invoice</th>{% endif %}</tr>

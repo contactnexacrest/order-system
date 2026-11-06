@@ -537,7 +537,7 @@ final class RouteBehaviourTest extends DbTestCase
         self::assertSame('Route notes', $this->value("SELECT notes FROM associates WHERE id = {$id}"));
         $this->assertPage($this->call('GET', '/associates/ladder'), 'When commission is paid', 'GET /associates/ladder');
         $this->assertDone($this->call('POST', '/associates/ladder', ['associate_tds_pct' => '2.00', 'associate_bank_wait_days' => '7', 'associate_commission_due_days' => '30', 'associate_claim_hold' => '1',
-            'associate_payout_run' => 'monthly', 'associate_payout_day' => '5', 'associate_counting_threshold_inr' => '500000', 'associate_protection_months' => '6', 'associate_gst_pct' => '18']), 'POST /associates/ladder');
+            'associate_payout_run' => 'monthly', 'associate_payout_day' => '5', 'associate_counting_threshold_inr' => '500000', 'associate_protection_months' => '6', 'associate_gst_pct' => '18', 'associate_portal_commission_months' => '12']), 'POST /associates/ladder');
         $this->assertPage($this->call('GET', '/reports/associates'), 'TDS register', 'GET /reports/associates');
 
         $r = $this->call('POST', "/associates/{$id}/status", ['status' => 'active', 'reason' => 'Route test activation']);

@@ -25,7 +25,7 @@ $__unit = (string) ($r['unit'] ?? '');
       <?php foreach ($breakdown['lines'] ?? [] as $l): ?><tr><td><?= View::e($l['label']) ?></td><td class="r"><?= View::e($l['change']) ?></td></tr><?php endforeach; ?>
     </table>
     <?php foreach ($breakdown['charges'] ?? [] as $c): ?><p class="small">+ <?= View::e($c) ?></p><?php endforeach; ?>
-    <p class="small muted">Your commission<?= !empty($r['level_name']) ? ' (' . View::e((string) $r['level_name']) . ')' : '' ?> is the same anywhere between the two prices. Prices are confirmed on the Proforma Invoice. <?= (int) $left ?> price requests left today.</p>
+    <p class="small muted">Your commission is the same anywhere between the two prices. Prices are confirmed on the Proforma Invoice. <?= (int) $left ?> price requests left today.</p>
   <?php else: ?>
     <p class="muted">This request was not priced.</p>
   <?php endif; ?>

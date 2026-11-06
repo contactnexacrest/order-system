@@ -29,7 +29,8 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
     <tr><th>GST</th><td><?= trim($c['gstin']) !== '' ? 'GST ' . rtrim(rtrim(number_format((float) $c['gst_pct'], 2), '0'), '.') . '% added on top once your tax invoice is on file' : 'none (not GST-registered)' ?></td></tr>
     <tr><th>Full payment</th><td><?= $c['fully_paid_on'] ? $__d($c['fully_paid_on']) . ' ✓' : 'not yet' ?></td></tr>
     <tr><th>Due / payout run</th><td><?= $c['due_on'] ? 'due ' . $__d($c['due_on']) . ' · paid in the ' . $__d($c['payout_run_on']) . ' payout run' : 'once the buyer has paid in full' ?><?= $c['claim_hold'] ? ' — <b>held while a buyer claim is open</b>' : '' ?></td></tr>
-    <tr><th>Counts toward the ladder</th><td><?= $c['state'] !== 'paid' ? 'decided when the buyer has paid in full' : ($c['counts'] ? 'yes (counting order no. ' . (int) $c['counting_number'] . ')' : 'no — under ₹' . number_format((float) $c['threshold_inr'], 0) . ' within range') ?></td></tr>
+    <?php // D-263 (owner 6 Nov 2026): in the associate portal only yes / no — never the running count of their orders nor the threshold. ?>
+    <tr><th>Counts toward the ladder</th><td><?= $c['state'] !== 'paid' ? 'decided when the buyer has paid in full' : (!empty($c['portal']) ? ($c['counts'] ? 'yes' : 'no') : ($c['counts'] ? 'yes (counting order no. ' . (int) $c['counting_number'] . ')' : 'no — under ₹' . number_format((float) $c['threshold_inr'], 0) . ' within range')) ?></td></tr>
   </table>
   <p class="muted small">Basis is the final invoiced FOB of the goods only — no freight, insurance or services. Bank charges never reduce it; an agreed discount or settled claim does; an order not paid in full earns nothing.</p>
 </div>

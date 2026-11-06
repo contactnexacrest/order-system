@@ -183,7 +183,7 @@ async function onOrderCreated(orderId, executor = db) {
   );
   if (Number(o.is_test_data) === 1 || Number(o.is_sample_data) === 1) return;
   await notify(a, 'order_created', `New order ${o.order_reference} from your client ${o.company_legal_name}. `
-    + (!level ? 'No commission applies to it.' : `Your commission level for now: ${associateCommission.levelLabel(level)} — fixed on the order when its Proforma Invoice is issued.`), Number(o.client_id), orderId);
+    + (!level ? 'No commission applies to it.' : `Your commission for now: ${associateCommission.rateLabel(level)} — fixed on the order when its Proforma Invoice is issued.`), Number(o.client_id), orderId);
 }
 
 /**

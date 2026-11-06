@@ -142,6 +142,10 @@ function filterOrder(access, o) {
     if (!pct) {
       out.commission.level = null;
       out.commission.rate = null;
+    } else {
+      // D-263 (owner 6 Nov 2026): an associate never sees the ladder level name (it points to an order-count band) —
+      // only their rate, and only with "Show commission %".
+      out.commission.level = rateOnly(out.commission.level ?? null);
     }
     if (out.commission.detail && typeof out.commission.detail === 'object') {
       const d = { ...out.commission.detail };
@@ -155,13 +159,32 @@ function filterOrder(access, o) {
       if (!pct) {
         d.level_label = null;
         d.rate = null;
+      } else {
+        d.level_label = rateOnly(d.level_label ?? null);
       }
+      // D-263: never the running count of their orders nor the ladder threshold (owner rule: no total business).
+      d.counting_number = null;
+      d.threshold_inr = null;
+      d.portal = true;
       d.show_fob = fob;
       d.show_pct = pct;
       out.commission.detail = d;
     }
   }
   return out;
+}
+
+/**
+ * D-263: "Level 2 — 5%" → "5%" (the level name, which points to the ladder band, is dropped).
+ * Text after the rate (e.g. "(for now — fixed when the PI is issued)") is kept.
+ */
+function rateOnly(levelText) {
+  if (levelText === null || levelText === undefined || levelText === '') return levelText;
+  const text = String(levelText);
+  const i = text.indexOf(' — ');
+  if (i < 0) return text;
+  const rest = text.slice(i + 3);
+  return /^\s*(\d|USD)/.test(rest) ? rest : text;
 }
 
 /**
@@ -172,6 +195,10 @@ function filterOrder(access, o) {
 async function maskNotice(associate, message) {
   const f = await features(associate);
   let m = String(message);
+  // D-263: the order's FOB in a notice follows "Show FOB order value" (the commission amount itself stays).
+  if (!f.fob_value) {
+    m = m.replace(/(invoiced FOB of the goods),\s*(?:[A-Z]{3}\s?)?-?\d[\d,]*(?:\.\d+)?/gu, '$1');
+  }
   if (!f.notice_amounts) {
     m = m.replace(/(?:\b(?:USD|EUR|GBP|INR|AED|AUD|CAD|SGD|JPY|CNY|CHF|SAR)\s?|₹\s?|Rs\.?\s?)-?\d[\d,]*(?:\.\d+)?/gu, '[amount in your portal]');
   }
@@ -342,6 +369,6 @@ async function upgradeSuggestions() {
 
 module.exports = {
   LEVELS, ALL_LEVELS, FEATURES, DEFAULTS, TDS_KINDS,
-  resetCache, defaultMatrix, matrix, level, features, allows, featuresForPath, allowsPath, filterOrder, maskNotice,
+  resetCache, defaultMatrix, matrix, level, features, allows, featuresForPath, allowsPath, filterOrder, rateOnly, maskNotice,
   describe, setLevel, saveMatrix, history, countsPerLevel, upgradeAfter, trackRecord, suggestUpgrade, dismissUpgrade, upgradeSuggestions,
 };

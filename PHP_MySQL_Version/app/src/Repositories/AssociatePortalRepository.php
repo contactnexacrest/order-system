@@ -193,24 +193,53 @@ final class AssociatePortalRepository
         return $stmt->fetchAll();
     }
 
-    /** @return array{earned_year: float, waiting: float, paid_year: float, held: float} INR totals for the home page */
-    public static function totals(int $associateId): array
+    /**
+     * D-263: the first month an associate sees in the portal, for a window of $months months that
+     * includes the current month (12 → this month and the 11 before it). Format YYYY-MM.
+     */
+    public static function portalFromMonth(int $months, ?string $today = null): string
     {
-        $year = date('Y');
-        $t = ['earned_year' => 0.0, 'waiting' => 0.0, 'paid_year' => 0.0, 'held' => 0.0];
+        $t = strtotime(($today ?? date('Y-m-d')) . ' 00:00:00');
+        return date('Y-m', strtotime(date('Y-m-01', $t) . ' -' . max(0, $months - 1) . ' months'));
+    }
+
+    /**
+     * D-263: the payouts an associate sees in the portal — commission earned (incentive month) in the
+     * last N months, plus anything still waiting to be paid or on hold whatever its month (money still owed).
+     * Staff screens use payouts(), which is unlimited.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function portalPayouts(int $associateId, int $months, ?string $today = null): array
+    {
+        $from = self::portalFromMonth($months, $today);
+        return array_values(array_filter(self::payouts($associateId),
+            static fn (array $p): bool => (string) $p['incentive_month'] >= $from || in_array((string) $p['status'], ['due', 'held'], true)));
+    }
+
+    /**
+     * @return array{earned: float, waiting: float, paid: float, held: float, months: int} INR commission totals for
+     * the portal: earned (incentive month) and paid (paid on) within the last N months; waiting and on hold = all unpaid.
+     * Commission only — never an order count or order value (owner rule, 6 Nov 2026).
+     */
+    public static function totals(int $associateId, ?int $months = null, ?string $today = null): array
+    {
+        $months ??= \App\Services\AssociateCommission::portalMonths();
+        $from = self::portalFromMonth($months, $today);
+        $t = ['earned' => 0.0, 'waiting' => 0.0, 'paid' => 0.0, 'held' => 0.0];
         foreach (self::payouts($associateId) as $p) {
             $amount = (float) $p['amount_inr'];
-            if (str_starts_with((string) $p['incentive_month'], $year)) {
-                $t['earned_year'] += $amount;
+            if ((string) $p['incentive_month'] >= $from) {
+                $t['earned'] += $amount;
             }
             if ($p['status'] === 'due') {
                 $t['waiting'] += $amount;
             } elseif ($p['status'] === 'held') {
                 $t['held'] += $amount;
-            } elseif ($p['status'] === 'paid' && str_starts_with((string) $p['paid_on'], $year)) {
-                $t['paid_year'] += (float) $p['paid_inr'];
+            } elseif ($p['status'] === 'paid' && substr((string) $p['paid_on'], 0, 7) >= $from) {
+                $t['paid'] += (float) $p['paid_inr'];
             }
         }
-        return array_map(static fn (float $v): float => round($v, 2), $t);
+        return array_map(static fn (float $v): float => round($v, 2), $t) + ['months' => $months];
     }
 }
