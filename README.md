@@ -1,5 +1,7 @@
 # NexaCrest Order System — CRM
 
+**Start here for the full picture: [docs/APPLICATION_HANDBOOK.md](docs/APPLICATION_HANDBOOK.md)**
+
 Internal order-management CRM covering NexaCrest International's complete
 export order lifecycle, start to end: from the moment a Zoho-qualified buyer
 is sent a quotation-stage form link, through all 9 pipeline stages, to final

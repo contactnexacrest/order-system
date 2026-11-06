@@ -1,0 +1,4262 @@
+# NexaCrest Application Handbook
+
+**Version 1.0 — first go-live edition, November 2026**
+
+The complete description of the NexaCrest export order system: what it is for, how it is built on both stacks (PHP + MySQL and Node + MySQL), every role, rule, screen, money formula, document, setting and test, how to run it, why it is the way it is, and how to change it safely.
+
+| | |
+|---|---|
+| Application | NexaCrest export order system (`PHP_MySQL_Version/` and `NODE_MySQL_Version/`, in parity) |
+| State described | 6 Nov 2026, before go-live |
+| Size at this edition | 194 tables · 24 roles · 94 permissions · ~744 routes per stack · PHPUnit 2,433 · Jest ~2,500 · e2e 68 + 68 |
+| Copies | `docs/APPLICATION_HANDBOOK.md` (master), `PHP_MySQL_Version/docs/APPLICATION_HANDBOOK.md`, `NODE_MySQL_Version/docs/APPLICATION_HANDBOOK.md` (identical) |
+| People | Roles only: Managing Director (md@email.com), Executive Director (ed@email.com), Admin (admin@email.com), company info@email.com, +91-0000000000. Real names are entered only on the live server. |
+
+---
+
+## How to use this handbook
+
+**Who it is for.** A developer, owner or adviser who comes back to this system years from now with no memory of it. It is the input for any future development: read the relevant sections before you change anything.
+
+**How it is organised.**
+
+| If you want to… | Read |
+|---|---|
+| Understand the business and the words used | §1, §2 |
+| Find your way around the code | §3 and Appendix A |
+| Know who may see or do what | §4 |
+| Follow an order from enquiry to closure | §5 |
+| Work on one area of the app | §6 (one subsection per module) |
+| Check a money calculation | §7 (worked examples in INR/USD) |
+| Change a generated document | §8 first (double confirmation rule) |
+| Change a setting or install the app | §9, §12 |
+| Know the rules you must never break | §10 |
+| Run or add tests | §11 |
+| Operate the live system | §12 |
+| Know *why* something was decided | §13 and the register `docs/decisions/owner-decisions-register.md` |
+| Know what is missing or still open | §14 (open questions in §14.5) |
+| Add a division, category, document, role, report, Zoho flow, setting or list page | §15 |
+| Make any change | §16 (the change checklist) and Appendix B |
+
+**Conventions.**
+
+- **Both stacks.** A PHP class `App\Services\FooService` (`PHP_MySQL_Version/app/src/Services/FooService.php`) has a Node twin `NODE_MySQL_Version/app/src/services/fooService.js`. Where only the PHP name is given, the Node file is the camelCase twin.
+- **Codes.** `D-nnn` = numbered owner decision; `R1…R26` = standing rules; `O-nn` = open points; QA finding IDs (`ZOH-1`, `PAR-7` …) come from the register. Search the code for a D-code to find where it is built.
+- **Menu paths** are written *Admin › Settings › Zoho Books*. Section references are written §7.3.
+- **Money.** Amounts are INR (₹) or USD with two decimals; worked examples were recomputed from the code. Dates and times are IST.
+- **Source of truth.** The code. Where this handbook and the code disagree, the code wins and this handbook is wrong: fix it (Appendix B).
+
+---
+
+## Contents
+
+- [How to use this handbook](#how-to-use-this-handbook)
+- [1. Purpose and business context](#1-purpose-and-business-context)
+  - [1.1 What NexaCrest does](#11-what-nexacrest-does)
+  - [1.2 The divisions](#12-the-divisions)
+  - [1.3 Who uses the system](#13-who-uses-the-system)
+  - [1.4 What the app replaces](#14-what-the-app-replaces)
+  - [1.5 How the app relates to Zoho Books](#15-how-the-app-relates-to-zoho-books)
+- [2. Glossary](#2-glossary)
+  - [2.1 Documents the app generates](#21-documents-the-app-generates)
+  - [2.2 Shipping, customs and trade terms](#22-shipping-customs-and-trade-terms)
+  - [2.3 Indian regulatory and finance terms](#23-indian-regulatory-and-finance-terms)
+  - [2.4 Order process terms](#24-order-process-terms)
+  - [2.5 Money, pricing and people terms](#25-money-pricing-and-people-terms)
+  - [2.6 System and project terms](#26-system-and-project-terms)
+- [3. Architecture](#3-architecture)
+  - [3.1 Why two stacks, and the parity rule](#31-why-two-stacks-and-the-parity-rule)
+  - [3.2 Tech stack and versions](#32-tech-stack-and-versions)
+  - [3.3 Folder layout](#33-folder-layout)
+  - [3.4 Request flow](#34-request-flow)
+  - [3.5 Templates: Standard and Kanban](#35-templates-standard-and-kanban)
+  - [3.6 app.js — sitewide browser behaviour and validation](#36-appjs--sitewide-browser-behaviour-and-validation)
+  - [3.7 The database](#37-the-database)
+    - [3.7.1 Tables grouped by area](#371-tables-grouped-by-area)
+    - [3.7.2 Key relationships](#372-key-relationships)
+  - [3.8 Documents: generation, versions and snapshots](#38-documents-generation-versions-and-snapshots)
+  - [3.9 Cron jobs and the scheduler](#39-cron-jobs-and-the-scheduler)
+  - [3.10 E-mail sending](#310-e-mail-sending)
+  - [3.11 File storage](#311-file-storage)
+  - [3.12 Zoho integration overview](#312-zoho-integration-overview)
+  - [3.13 Security](#313-security)
+  - [3.14 Environments and .env](#314-environments-and-env)
+  - [3.15 Backups overview](#315-backups-overview)
+  - [3.16 Where to look first (quick map)](#316-where-to-look-first-quick-map)
+- [4. Roles, permissions and access](#4-roles-permissions-and-access)
+  - [4.1 How a permission check works](#41-how-a-permission-check-works)
+  - [4.2 The 24 roles](#42-the-24-roles)
+  - [4.3 The 94 permissions](#43-the-94-permissions)
+  - [4.4 Departments, designations, "Log in as" and "Preview as"](#44-departments-designations-log-in-as-and-preview-as)
+  - [4.5 Who may give rights; Super Admin; protected founder accounts](#45-who-may-give-rights-super-admin-protected-founder-accounts)
+  - [4.6 Self-approval rules and approval limits](#46-self-approval-rules-and-approval-limits)
+  - [4.7 Money visibility (MoneySeparation, D-214 phase 2)](#47-money-visibility-moneyseparation-d-214-phase-2)
+  - [4.8 Division visibility (see_all_divisions, D-257)](#48-division-visibility-see_all_divisions-d-257)
+  - [4.9 The Investor (view only) role](#49-the-investor-view-only-role)
+  - [4.10 The client portal (buyers)](#410-the-client-portal-buyers)
+  - [4.11 The associate portal and access levels](#411-the-associate-portal-and-access-levels)
+- [5. The order life cycle, step by step](#5-the-order-life-cycle-step-by-step)
+  - [5.1 Two trackers on one page: 9 stages and 19 steps](#51-two-trackers-on-one-page-9-stages-and-19-steps)
+  - [5.2 Before the order: enquiry and intake](#52-before-the-order-enquiry-and-intake)
+  - [5.3 Creating the order](#53-creating-the-order)
+  - [5.4 Step-by-step reference](#54-step-by-step-reference)
+    - [Step 1–3 · Quotation (Stage 1)](#step-13--quotation-stage-1)
+    - [Step 4 · Buyer's PO (Stage 2)](#step-4--buyers-po-stage-2)
+    - [Step 5 · Proforma Invoice & Payment (Stage 3)](#step-5--proforma-invoice--payment-stage-3)
+    - [Step 6 · Order Confirmation (Stage 4)](#step-6--order-confirmation-stage-4)
+    - [Step 7 · Supplier PO (Stage 5) — Procurement](#step-7--supplier-po-stage-5--procurement)
+    - [Step 8 · Production & Estimated Shipment](#step-8--production--estimated-shipment)
+    - [Step 9 · Freight Payment (Stage 6) — CFR/CIF only](#step-9--freight-payment-stage-6--cfrcif-only)
+    - [Step 10 · Packing & BL Instruction (Stage 7)](#step-10--packing--bl-instruction-stage-7)
+    - [Step 11 · Commercial Invoice & Balance (Stage 8)](#step-11--commercial-invoice--balance-stage-8)
+    - [Step 12 · Closure — Financials, Benefits & Costs](#step-12--closure--financials-benefits--costs)
+    - [Step 13 · Closure — Documents & Settlement (Stage 9)](#step-13--closure--documents--settlement-stage-9)
+    - [Steps 14–19](#steps-1419)
+  - [5.5 What freezes at PI approval (D-262 snapshot)](#55-what-freezes-at-pi-approval-d-262-snapshot)
+  - [5.6 Incoterm effects (FOB / CFR / CIF)](#56-incoterm-effects-fob--cfr--cif)
+  - [5.7 Payment presets](#57-payment-presets)
+  - [5.8 LC orders](#58-lc-orders)
+  - [5.9 Amendments, complaints, disputes, cancellation, Mark Lost](#59-amendments-complaints-disputes-cancellation-mark-lost)
+  - [5.10 Editing, duplicating, archiving](#510-editing-duplicating-archiving)
+- [6. Modules](#6-modules)
+  - [6.1 Clients and intake](#61-clients-and-intake)
+  - [6.2 Products, categories and specifications](#62-products-categories-and-specifications)
+  - [6.3 Pricing engine and price requests](#63-pricing-engine-and-price-requests)
+  - [6.4 Associates and commission / TDS](#64-associates-and-commission--tds)
+  - [6.5 Team incentive (eligibility and caps)](#65-team-incentive-eligibility-and-caps)
+  - [6.6 Procurement (RFQ, POs, QC)](#66-procurement-rfq-pos-qc)
+  - [6.7 Logistics and freight](#67-logistics-and-freight)
+  - [6.8 Documents and review / approval](#68-documents-and-review--approval)
+  - [6.9 Payments and remittances](#69-payments-and-remittances)
+  - [6.10 CAFIN and the CA module](#610-cafin-and-the-ca-module)
+  - [6.11 Reports and dashboard](#611-reports-and-dashboard)
+  - [6.12 My Tasks and the management cockpit](#612-my-tasks-and-the-management-cockpit)
+  - [6.13 E-mail templates](#613-e-mail-templates)
+  - [6.14 Zoho Books sync](#614-zoho-books-sync)
+  - [6.15 Divisions: Domestic Trade, Import & Distribution, Merchant Trade](#615-divisions-domestic-trade-import--distribution-merchant-trade)
+  - [6.16 Backups](#616-backups)
+  - [6.17 Admin pages](#617-admin-pages)
+  - [6.18 Sample data playground](#618-sample-data-playground)
+- [7. Money rules and formulas](#7-money-rules-and-formulas)
+  - [7.1 Pricing (D-245, D-255, D-256)](#71-pricing-d-245-d-255-d-256)
+    - [The seven steps](#the-seven-steps)
+    - [Global settings and per-product overrides](#global-settings-and-per-product-overrides)
+    - [Who sees what](#who-sees-what)
+    - [Specifications and options (D-255)](#specifications-and-options-d-255)
+    - [CBM at 50 mm and above](#cbm-at-50-mm-and-above)
+    - [Exact supplier prices (D-256)](#exact-supplier-prices-d-256)
+    - ["Included in base price" (D-256)](#included-in-base-price-d-256)
+    - [Staleness](#staleness)
+    - [Pricing ready? and Try a price (D-256)](#pricing-ready-and-try-a-price-d-256)
+  - [7.2 Order-line pricing and MD approval (D-245 P2)](#72-order-line-pricing-and-md-approval-d-245-p2)
+  - [7.3 Associate commission (D-245 P3, D-235, D-252)](#73-associate-commission-d-245-p3-d-235-d-252)
+  - [7.4 Team incentive (D-245 P4, D-259)](#74-team-incentive-d-245-p4-d-259)
+  - [7.5 Profit layers: estimated, locked, paid (D-245 P5)](#75-profit-layers-estimated-locked-paid-d-245-p5)
+  - [7.6 Exchange rates](#76-exchange-rates)
+  - [7.7 CAFIN logic and milestone money](#77-cafin-logic-and-milestone-money)
+  - [7.8 Domestic GST (D-257 Phase 2)](#78-domestic-gst-d-257-phase-2)
+  - [7.9 Import: landed cost and duty (D-257 Phase 3)](#79-import-landed-cost-and-duty-d-257-phase-3)
+  - [7.10 Merchant trade margin (D-257 Phase 4)](#710-merchant-trade-margin-d-257-phase-4)
+  - [7.11 Rounding parity between PHP and Node](#711-rounding-parity-between-php-and-node)
+  - [7.12 The D-212 money description rule](#712-the-d-212-money-description-rule)
+- [8. Generated documents](#8-generated-documents)
+  - [8.1 Document types](#81-document-types)
+  - [8.2 Revisions, approval and superseded copies](#82-revisions-approval-and-superseded-copies)
+  - [8.3 Signatory and seal](#83-signatory-and-seal)
+  - [8.4 Watermarks](#84-watermarks)
+  - [8.5 Category-driven columns, quality documents and T&C clause sets (D-257 Phase 0B / 1)](#85-category-driven-columns-quality-documents-and-tc-clause-sets-d-257-phase-0b--1)
+  - [8.6 The Natural Stone identity tests](#86-the-natural-stone-identity-tests)
+  - [8.7 Double confirmation for any document change](#87-double-confirmation-for-any-document-change)
+- [9. Settings and configuration](#9-settings-and-configuration)
+  - [9.1 Admin settings areas and keys](#91-admin-settings-areas-and-keys)
+    - [Company Settings (company_settings, /settings, manage_company_settings)](#company-settings-company_settings-settings-manage_company_settings)
+    - [E-mail (in company_settings)](#e-mail-in-company_settings)
+    - [Zoho Books (in company_settings, category zoho_books)](#zoho-books-in-company_settings-category-zoho_books)
+    - [Pricing (pricing_settings, Admin › Pricing, MD only, audited)](#pricing-pricing_settings-admin--pricing-md-only-audited)
+    - [Team incentive (incentive_settings, incentive_roles; Admin › Team Incentives, MD)](#team-incentive-incentive_settings-incentive_roles-admin--team-incentives-md)
+    - [Associate commission and TDS (incentive_settings)](#associate-commission-and-tds-incentive_settings)
+    - [Divisions (divisions, division_modules, division_settings; Admin › Divisions, MD, manage_divisions)](#divisions-divisions-division_modules-division_settings-admin--divisions-md-manage_divisions)
+    - [GST and duty rates](#gst-and-duty-rates)
+    - [Document copies clean-up (company_settings, category document_cleanup)](#document-copies-clean-up-company_settings-category-document_cleanup)
+    - [Watermarks and DOCX](#watermarks-and-docx)
+    - [Remittance difference reasons](#remittance-difference-reasons)
+    - [Backups (Admin › Backups, read only, D-260)](#backups-admin--backups-read-only-d-260)
+  - [9.2 .env keys (both app/.env.example files)](#92-env-keys-both-appenvexample-files)
+  - [9.3 Installation order (D-241)](#93-installation-order-d-241)
+  - [9.4 README go-live SQL block (real values)](#94-readme-go-live-sql-block-real-values)
+- [10. Hard rules and restrictions](#10-hard-rules-and-restrictions)
+  - [10.1 Other standing owner rules](#101-other-standing-owner-rules)
+- [11. Testing](#11-testing)
+  - [11.1 The suites at a glance](#111-the-suites-at-a-glance)
+  - [11.2 Running the suites locally](#112-running-the-suites-locally)
+  - [11.3 Test databases and isolation](#113-test-databases-and-isolation)
+  - [11.4 The QA matrices and the UI crawl (built 5–6 Nov 2026, D-258)](#114-the-qa-matrices-and-the-ui-crawl-built-56-nov-2026-d-258)
+  - [11.5 Conventions tests (the ones that enforce the standing rules)](#115-conventions-tests-the-ones-that-enforce-the-standing-rules)
+  - [11.6 Continuous integration](#116-continuous-integration)
+  - [11.7 Known slow or fragile tests](#117-known-slow-or-fragile-tests)
+  - [11.8 Adding a test for a new feature, on both stacks](#118-adding-a-test-for-a-new-feature-on-both-stacks)
+- [12. Operations](#12-operations)
+  - [12.1 Install and go-live](#121-install-and-go-live)
+  - [12.2 Daily and weekly checks](#122-daily-and-weekly-checks)
+  - [12.3 Backup and restore (SOP 32, D-260)](#123-backup-and-restore-sop-32-d-260)
+  - [12.4 Zoho](#124-zoho)
+  - [12.5 Troubleshooting](#125-troubleshooting)
+  - [12.6 Logs](#126-logs)
+- [13. Decision history](#13-decision-history)
+  - [13.1 The big "whys"](#131-the-big-whys)
+  - [13.2 Decisions by theme (condensed)](#132-decisions-by-theme-condensed)
+  - [13.3 Standing rules in one list](#133-standing-rules-in-one-list)
+  - [13.4 Owner decisions of 6 Nov 2026 recorded here](#134-owner-decisions-of-6-nov-2026-recorded-here)
+- [14. Known limits and open items](#14-known-limits-and-open-items)
+  - [14.1 Deferred items (decided to wait)](#141-deferred-items-decided-to-wait)
+  - [14.2 What is NOT built](#142-what-is-not-built)
+  - [14.3 Pending answers from the CA, the bank and the lawyer (docs/external/)](#143-pending-answers-from-the-ca-the-bank-and-the-lawyer-docsexternal)
+  - [14.4 Placeholders to replace at go-live](#144-placeholders-to-replace-at-go-live)
+  - [14.5 Open questions](#145-open-questions)
+- [15. Scope for enhancement](#15-scope-for-enhancement)
+  - [15.1 Activate (or add) a division](#151-activate-or-add-a-division)
+  - [15.2 Add a product category (e.g. Engineering)](#152-add-a-product-category-eg-engineering)
+  - [15.3 Add a document type](#153-add-a-document-type)
+  - [15.4 Add a role or permission](#154-add-a-role-or-permission)
+  - [15.5 Add a report](#155-add-a-report)
+  - [15.6 Add a Zoho flow](#156-add-a-zoho-flow)
+  - [15.7 Add a setting](#157-add-a-setting)
+  - [15.8 Add a list page (Standard + Kanban)](#158-add-a-list-page-standard--kanban)
+  - [15.9 Ideas already discussed with the owner](#159-ideas-already-discussed-with-the-owner)
+- [16. How to work on this codebase](#16-how-to-work-on-this-codebase)
+- [Appendix A. Index of code locations](#appendix-a-index-of-code-locations)
+- [Appendix B. Keeping this handbook current](#appendix-b-keeping-this-handbook-current)
+
+---
+
+## 1. Purpose and business context
+
+### 1.1 What NexaCrest does
+
+NexaCrest International Private Limited is an Indian export trading company. Today it **exports Natural Stone** (granite and similar stone products: slabs, tiles, monuments, cut-to-size pieces) to buyers abroad. The stone is bought from Indian suppliers (quarries, factories, traders), checked, packed in wooden crates, shipped by sea in containers, and invoiced in a foreign currency (normally USD).
+
+The company plans to sell **other products later, for example engineering goods** (machined, forged or cast parts). The system is already prepared for this (owner decision **D-257 Phase 0B / Phase 1**, 5 Nov 2026):
+
+- Each **product category** has its own settings: units, default HS code, packing type, the quality documents its orders need, and the set of Terms & Conditions clauses its documents print.
+- **Natural Stone is a system category.** It always prints today's documents, word for word. Tests (`StoneDocumentsUnchangedTest` / `stoneDocumentsUnchanged.test.js`) compare the PDF and Word text against copies captured before the change.
+- Engineering clauses (Specification & Drawings, Quality Documents, Traceability & Test Certificates …) exist as a **starting text** that the lawyer must review before the first non-stone sale.
+
+Document references carry the prefix `SC` (for example `SC/PI/26/0511001`; client and order references start `NC/SC/…`). `SC` is the fixed short form used in every reference (D-178). It comes from the project's early working name "StoneCrest" (Workflow Specification v2; the `composer.json` / `package.json` descriptions still say "NexaCrest / StoneCrest"). The specification and the app were renamed NexaCrest (D-199), but the prefix stays, because numbers already issued must never change.
+
+### 1.2 The divisions
+
+One company, several **divisions** (D-257, 5 Nov 2026). Every order belongs to one division for life.
+
+| Code | Division | Status at go-live | What it is | SOP |
+|---|---|---|---|---|
+| EXP | Export | **Active** (the only active one) | Export of goods from India: today's stone business. All 9 stages, all documents. | 01–27 |
+| DOM | Domestic Trade | Built, **planned** (off) | Sale to Indian resellers in INR with GST tax invoices. | 29 |
+| IMP | Import & Distribution | Built, **planned** (off) | Import into India, customs duty and landed cost, stock, local sale. | 30 |
+| MTT | Merchant Trade | Built, **planned** (off) | Buy abroad, sell abroad (RBI merchanting trade), both legs in foreign currency. | 31 |
+
+Key points:
+
+- A planned division cannot be used until the MD activates it in **Admin › Divisions** (with a pre-flight checklist).
+- **While only one division is active, divisions are invisible** to staff: no switcher, no Division filter, no Division field. Only Admin › Divisions shows them.
+- Company-level people (Admin, MD, ED, Finance, Audit, Administration, CA, Investor) hold `see_all_divisions`. Everyone else sees only their own division.
+- Each division can switch **modules** on or off (see Glossary: *module switch*).
+- Each division can override company, pricing and incentive settings (`division_settings`). Export has no overrides.
+- Non-Export divisions number their records separately, prefixed with their code (for example `DOM/NC/SC/ORD/26/0511001`).
+
+### 1.3 Who uses the system
+
+There are **three separate sign-ins** that never open each other's pages, plus several no-login token links.
+
+| Who | Sign-in | What they do | Guard |
+|---|---|---|---|
+| **Staff** (all departments) | `/login` (+ 2FA if enabled) | Run orders, documents, payments, reports, settings | `SessionAuth` + `PermissionCheck` |
+| **Buyers (clients)** | `/client/login` | See their own orders, download released documents, report payments, acknowledge the OC, give feedback, request reorders, raise complaints | `ClientAuth` |
+| **Associates** (outside agents who introduce buyers) | `/associate/login` (+ e-mailed code) | Their own clients and orders, quotes (by access level), commission and payouts. Never costs, margins or supplier prices. | `AssociateAuth` |
+| Prospects, buyers, suppliers, partners **without login** | Token links: `/quotation-details`, `/pi-details/{token}`, `/buyer-action/{token}`, `/payment-action/{token}`, `/supplier-action/{token}`, `/vendor-details/{token}`, `/associate-register/{token}`, `/invite/{token}` | Fill in their details, upload a signed PO or acknowledgment, send payment proof | Random token, hashed/encrypted at rest; rate limits on public forms |
+
+**Staff departments** (MGMT, SALES, PROC, LOG, EXPORT_COMPLIANCE, FIN, AUDIT, ADMIN, OPS), their designations and which ones see the whole company are listed once, in §4.4. The 24 roles are in §4.2.
+
+Other important user types:
+
+| User type | Role / flag | Notes |
+|---|---|---|
+| **MD** (Managing Director) | role *Managing Director*, protected founder account | Final authority: approvals, price below floor, locking incentives, activating divisions. Login placeholder `md@email.com`. |
+| **ED** (Executive Director) | role *Executive Director*, protected founder account | Same business authority as MD by default. Login placeholder `ed@email.com`. |
+| **Admin** | role *Admin* (system role) | Full system access including user/role administration. Placeholder `admin@email.com`. |
+| **Super Admin** | flag `users.is_super_admin` | Can never be deleted or deactivated (DB trigger). Manages Self-approval rules, delegations. |
+| **CA** (Chartered Accountant) | role *CA / Chartered Accountant* | CA/Accounting module (expenses, bank reconciliation, FY lock, export benefits, GST refunds, Zoho sync). Can open orders read-only, sees all orders and CAFIN (`view_orders`, `view_all_orders`, `view_cafin`). |
+| **Investor** | role *Investor (view only)* | Dashboards, management cockpit and reports across every division. Every page that changes anything is refused (D-257 Phase 5). |
+| **Associates** | `associates` table, own portal | Access level Starter / Quoting / Full / Custom set by the MD (D-261). Commission on invoiced FOB (D-245 P3), TDS deducted (D-235). |
+| **Clients** | `clients` + `client_logins` | One client record can buy from several divisions (`client_divisions`). |
+
+### 1.4 What the app replaces
+
+Before the app, each order was run from a folder of **Word and Excel templates** (42 files in 8 folders: buyer-facing documents, internal checklists, SOP and stage-gate sheets) filled in by hand, with e-mails and spreadsheets to track payments. The source review found real defects, for example Tier-2 (post-BL) payment wording sitting inside the Tier-1 (before-shipment) Order Confirmation and Commercial Invoice. The app replaces this with:
+
+- **One database record per order** and every document generated from it (PDF and Word), so a figure is typed once.
+- **Stage gates** that stop a later step until the earlier one is done.
+- **Review and approval** of every document before it goes to the buyer, with DRAFT/FINAL watermarks.
+- **Payment presets** as the single source of payment wording (fixes the Tier-1/Tier-2 mix-up structurally).
+- **Audit log** of every action, **role-based money visibility**, and a **client portal** instead of e-mail attachments.
+
+Lead capture and nurture **stay in Zoho CRM** and are out of scope. A Zoho-qualified buyer is sent the quotation-details form link; from there the app runs the order to closure.
+
+### 1.5 How the app relates to Zoho Books
+
+| | The app | Zoho Books |
+|---|---|---|
+| Role | **Operational system of record**: orders, documents, payments as they happen, costs, profit, incentives, commissions | **Accounting ledger**: invoices, customer payments, bills, vendor payments, expenses, journals, GST |
+| Direction | Pushes to Books (**one way, app → Zoho**) | Receives; the app only reads Books to check ("App vs Zoho check") |
+| When | Hourly job `zoho_sync` plus "Sync now" / "Sync this order" | — |
+| What goes | Commercial Invoice and Debit Note as invoices (at the customs exchange rate from the shipping bill), customer receipts, vendor bills and payments, expenses, cost entries, LC receipts, export benefits, GST refund journals, optionally customers and items (D-238); the new divisions' records too (D-257 (6)) | — |
+| Description rule | Every money record carries the same description in the app and in Books (D-212) | — |
+| Safety | `.env` switches (`ZOHO_INTEGRATION_ENABLED`, `ZOHO_ENVIRONMENT`, `ZOHO_EINVOICE_ENABLED`) + Admin setting "Zoho Books enabled" + go-live date | — |
+
+CAFIN (the internal financial annexure) and the profit figures are built in the app, not in Books. Books is where the CA files GST and closes the year. Details: §3.12 (how the integration is built), §6.14 (the module) and §12.4 (running it).
+
+---
+
+## 2. Glossary
+
+Terms are grouped. "Code" means the `document_types.code` value in the database.
+
+### 2.1 Documents the app generates
+
+Full list with formats, PDF/DOCX and audience: §8.1. All reference formats come from `document_types.ref_format` and use a 2-digit year since 29 Oct (`{YY}`; numbers issued earlier keep `2026`). Example: `SC/CI/26/2910001` = Commercial Invoice, 2026, 29 Oct, first of the day. A GST invoice number may have at most 16 characters, which is why the year is short.
+
+| Code | Name | Audience | Stage / step | Notes |
+|---|---|---|---|---|
+| **QT** | Quotation | Buyer | Stage 1 | Valid for `quotation_validity_days` (default 30). Needs payment-terms approval first if the preset "Requires MD approval". |
+| **ANNEXA** | Annexure A | Buyer | Stage 1 | Optional product annexure with images and terms (`include_annexure_a`). Reference `SC/ANX/…`. |
+| **BUYERPO** | Buyer PO — Order Acceptance | Buyer | Stage 2 | A PO the app prepares for the buyer to sign when the buyer has no PO of their own. |
+| **PI** | Proforma Invoice | Buyer | Stage 3 | Asks for the advance. Amber "ADVANCE PAYABLE NOW" box, or "NO ADVANCE PAYABLE — … by Letter of Credit". **The first PI approval freezes the order** (D-262). |
+| **OC** | Order Confirmation | Buyer | Stage 4 | Buyer acknowledges in the portal; auto-confirmed after 48 hours. |
+| **SUPPO** | Supplier PO — Material Procurement | Supplier (never the buyer) | Stage 5 | Purchase order to the stone supplier; `never_shown_to_buyer = 1`. |
+| **FDN** | Freight Debit Note ("DN", "Debit Note") | Buyer | Stage 6 (CFR/CIF only) | Charges freight (and insurance on CIF). Goes to Zoho Books as an invoice. Auto-skipped for FOB. |
+| **PL** | Packing List | Buyer | Stage 7 | Crate-by-crate weights and volumes. |
+| **BLI** | BL Instruction Sheet | Internal / CHA | Stage 7 | Instructions to the forwarder/CHA for drafting the Bill of Lading. |
+| **CI** | Commercial Invoice | Buyer and customs | Stage 8 | Goods only (services go on the ESI). Uses `documents.document_date`. Goes to Zoho at the customs exchange rate. |
+| **ESI** | Export Service Invoice | Buyer | Stage 8 | Separate invoice for service lines (D-215). |
+| **COOPREP** | Certificate of Origin Preparation sheet | Internal | Stage 8–9 | Data sheet for applying for the COO (through CAPEXIL). |
+| **BLE** | Bill of Lading Endorsement | Buyer | Closure | Endorsement of the original BL after the balance is paid. |
+| **AMD** | Payment Terms Amendment | Buyer signs it (category *internal*: never in the portal) | Any | Legal agreement changing advance %, balance trigger or days. Request → MD approval → generate → upload signed copy → activate. |
+| **CAFIN** | CA Financial Annexure — Government Benefits & Expenses (Internal Only) | **Internal only, never the client** | Any stage; automatic at *Mark Fully Settled* | Snapshot of money received, costs, benefits and profit. Needs `view_cafin`. Template `templates/CAFIN/`. |
+| CHECKLIST, CHECKLIST_2_FINANCE, CHECKLIST_3_PACKING, CHECKLIST_4_SHIPPING | Cross-verification checklists 1–4 | Internal | Before release | One per role (Sales, Finance, Packing, Shipping). In-app Reference Library pages (`/reference-docs/{code}`), not per-order documents. |
+| DOM / IMP / MTT | Division documents | Varies | Division flows | Domestic tax invoice; import PO; merchant trade deal documents. |
+| SOP_A_SALES, SOP_B_SALES, STAGEGATE, WALLREF | Reference documents | Internal | — | Internal reference sheets carried over from the old template set; in-app Reference Library pages. |
+
+### 2.2 Shipping, customs and trade terms
+
+| Term | Meaning | Where in the app |
+|---|---|---|
+| **BL** | Bill of Lading: the shipping line's receipt and title document for the goods. Draft BL → checked → original BL issued → scanned copy sent → originals couriered after balance. | Stage 7, `order_shipping`, `order_draft_bl_reviews`, `order_bl_endorsements` |
+| **COO** | Certificate of Origin. For stone it is applied for through CAPEXIL. | COOPREP document; `coo_type` on client/order (`TBC` blocks Stage 1) |
+| **Incoterms** | ICC 2020 delivery terms. Seeded: **FOB** (Free On Board, named port of loading; default), **CFR** (Cost and Freight, named port of discharge), **CIF** (Cost, Insurance and Freight). | `incoterms`; order snapshot `incoterm_code`. On FOB, Stage 6 is skipped. On CFR/CIF the freight sentence follows the incoterm (D-219). |
+| **CHA** | Customs House Agent: clears goods through Indian customs; often also the forwarder. | `logistics_partners` |
+| **Shipping bill** | Indian customs export declaration. Its number, date and **customs exchange rate** are recorded. | `order_shipping.shipping_bill_*`, `POST /orders/{id}/shipping-bill` |
+| **HS code** | Harmonised System tariff code for goods (stone default 680293). | `hs_codes`, order lines |
+| **SAC** | Services Accounting Code, the GST code for a service line. | `order_products.sac_code` |
+| **LC** | Letter of Credit: a bank's promise to pay on documents. A preset with payment method `LC` has 0% advance. | `order_lc_details`, `order_lc_amendments` |
+| **Pre-shipment inspection** | Inspection before shipping; a Passed inspection can be a shipment gate. | `order_inspections`, `ShipmentGateService` |
+| **Port routes** | Pairs of ports with suggested sailing lead time. | `ports`, `port_routes` |
+
+### 2.3 Indian regulatory and finance terms
+
+| Term | Meaning | Where in the app |
+|---|---|---|
+| **IEC** | Importer-Exporter Code issued by DGFT; needed for any export. | Company settings (category `company`); printed on documents |
+| **LUT** | Letter of Undertaking: lets the company export without paying IGST (zero-rated supply). Renewed every financial year. | Settings `lut_number`, `lut_valid_fy`, `lut_expiry_date`; alerts 30 days before, escalation to MD 15 days before (`check_alerts`) |
+| **RCMC** | Registration-cum-Membership Certificate from the export promotion council (CAPEXIL for stone). Needed for COO and benefits. | Settings `rcmc_number`, `rcmc_valid_until`; same alert pattern |
+| **CAPEXIL** | Export promotion council for stone and minerals; issues the RCMC and the COO. | COOPREP |
+| **FIRC** | Foreign Inward Remittance Certificate: the bank's proof that foreign currency came in. | Payment legs, LC receipts (`lc_firc_reference`) |
+| **eBRC** | Electronic Bank Realisation Certificate on the DGFT system; proves export proceeds were realised. Needed for benefits and GST refunds. | *Missing eBRC/FIRC* report (`/reports/missing-ebrc`), module `firc_fema` |
+| **FEMA** | Foreign Exchange Management Act: export proceeds must be realised within the RBI time limit. | Module `firc_fema`; tracking via FIRC/eBRC |
+| **ECGC** | Export Credit Guarantee Corporation: insures export receivables. Per-client limit and per-order declaration. | `clients.ecgc_limit_*`, `orders.ecgc_declared_on`, `ComplianceTrackingService` (D-234) |
+| **RoDTEP / Duty Drawback** | Export incentive schemes (refund of embedded taxes/duties) credited as scrips or cash. | "Export benefits": `ca_export_benefits`, `order_export_benefit_schemes`, module `export_benefits` |
+| **GST refund** | Refund of input GST on exports under LUT. | `gst_refund_claims`, `gst_refund_credits` (D-213), module `lut_igst` |
+| **IGST** | Integrated GST (interstate/import). Relevant for IMP (IGST paid on import) and DOM. | `gst_rates`, `GstCalculator` |
+| **GSTIN** | GST registration number of an Indian party. | `clients.gstin` (DOM), vendor bill snapshots |
+| **Reverse charge** | GST paid by the recipient (for example on some transport bills, 5%). | `order_vendor_bills.gst_reverse_charge` |
+| **e-invoice (IRN) / e-way bill** | GST electronic invoice registration / goods movement permit. | Only with `ZOHO_EINVOICE_ENABLED=true` **and** `ZOHO_ENVIRONMENT=production` |
+| **TDS** | Tax Deducted at Source. Associates' commission: section 194H, 2% above ₹20,000 a year with catch-up, 20% without PAN. | `AssociateTds`, `/associates/tds` (D-235) |
+| **UTR / SWIFT** | Bank transfer reference numbers (Indian NEFT/RTGS UTR; international SWIFT/MT103). | Required "bank reference" on money forms (D-212) |
+| **FY / FY lock** | Indian financial year (1 April – 31 March). A locked FY refuses changes to its money records. | `ca_fy_locks`, `CaFyLockGuard` |
+| **INR Settlement Register** | Per-order record of each foreign-currency leg (advance, freight, balance, LC) and the rupees actually credited. | Order Step 12 and CA pages |
+
+### 2.4 Order process terms
+
+| Term | Meaning |
+|---|---|
+| **Stage (1–9)** | The 9 fixed stages in `stages_master`: 1 Enquiry & Quotation, 2 Buyer PO, 3 Proforma Invoice, 4 Order Confirmation, 5 Supplier PO, 6 Freight Payment, 7 Packing & BL Instruction, 8 Commercial Invoice & Balance, 9 Document Despatch & Closure. |
+| **Stage gate** | The one action that "passes" a stage and unlocks the next (for example Stage 3 passes when the advance is cleared, or the LC is confirmed usable). It is refused until that stage's document is finished (`stageDocumentGate()`). |
+| **Step / step card** | The order page is a list of collapsible step cards, numbered by the real order of work (1 QT … 12 Financials … Complaints, Disputes). Steps are finer than stages; sub-steps are lettered (4d, 7e, 9a, 10f …). |
+| **Force-generate** | Override to generate a later-stage document before its stage; needs a typed reason; audit-logged. |
+| **Order lock** | `orders.is_locked`: set once an order is complete or lost. `OrderLockGuard` refuses edits. Separately, the "frozen" state after the PI (see *snapshot*). |
+| **Payment preset** | A named set of payment terms in `payment_presets`: advance %, method (`CASH_ADVANCE` / `LC`), balance %, balance trigger (`A_BEFORE_SHIPMENT` / `B_AGAINST_BL`), balance days, printed wording, "Requires MD approval", "allow zero advance". Five are seeded; the order copies its preset at creation. Table and worked examples: §5.7. |
+| **Tier 1 / Tier 2 (A / B)** | Old names for the two balance triggers: Tier 1 / Option A = balance before shipment; Tier 2 / Option B = balance against the scanned BL. |
+| **Payment milestones** | An optional schedule of several payment parts for one order (`order_payment_milestones`, D-215), beyond the simple advance/balance split. |
+| **Line type** | Order line is Goods, Service or Charge (`order_products.line_type`). Goods go on the CI; services on the ESI; goods FOB excludes services. |
+| **Remittance difference** | When the buyer's payment differs from the amount asked: a reason (bank charges, exchange, short payment …) and optional bank charges booked as a cost (D-227, D-244). |
+| **Shortfall / write-off** | A short payment that is approved and cleared (`order_payment_shortfalls`, permission `approve_short_payment`). The balance formula is net of write-offs (ORD-09). |
+| **Shipment gate** | Step 10f waits for a before-shipment balance and a Passed inspection unless a manager releases it with a reason (`order_shipment_gate_overrides`). |
+| **Mark Fully Settled** | Final money step; generates CAFIN automatically. |
+| **Amendment** | Change of payment terms during an order (AMD document). Activation updates the order's own terms. |
+| **Dispute / Complaint** | Dispute = commercial disagreement with formal replies; Complaint = quality/service complaint, split out on 23 Oct. Both have their own step card and portal pages. |
+| **Reorder request** | A buyer's request (portal) to repeat an earlier order. |
+| **Intake** | The forms a buyer fills: *quotation details* (public form, becomes a client after staff review) and *PI details* (per-order link to confirm buyer/consignee/notify party). |
+| **Buyer Action Link / Supplier Link / Payment Action Link** | No-login token links: buyer uploads signed PO / acknowledgment; supplier downloads the Supplier PO and uploads acknowledgment; buyer reports payment details (UTR, amount, date). |
+| **Cancellation** | Order cancellation workflow with request and decision (`order_cancellations`). |
+| **Lost** | Order status `lost`: buyer walked away; reason required. |
+
+### 2.5 Money, pricing and people terms
+
+| Term | Meaning |
+|---|---|
+| **Money visibility** | Each person sees only the money their permissions allow: `view_selling_prices`, `view_buyer_payments`, `view_purchase_prices`, `view_logistics_costs` … (`MoneyVisibility`, D-214 phase 2). Sales sees the selling side, Procurement the buying side, Logistics only logistics costs; Finance, Management, Audit and CA see all. |
+| **Minimum price / floor / quote price** | Pricing from the supplier price (D-245 P1/P2). Below the floor the MD approves; below the minimum nobody can. The QT and PI wait for the approval. |
+| **Price snapshot** | `order_products.price_snapshot`: the line's price build-up, fixed at the PI. |
+| **Associate commission** | Paid to an associate on the invoiced FOB of goods, only after the buyer has paid in full; level fixed at the PI (D-245 P3). |
+| **Team incentive** | Reward to staff per order from profit after associate commission; Open → Ready → Locked by MD → Paid; eligibility and caps (D-245 P4, D-259). |
+| **Profit (estimated / locked / paid)** | One profit calculation in `OrderProfitabilityService`: before commission & incentive → commission → incentive → after. |
+| **Vendor bill** | Supplier or logistics bill (proforma or tax invoice), with part payments (`order_vendor_bills`, `order_vendor_bill_payments`). Logistics enters, Accounts pays (D-232). |
+| **Maker-checker / Self-approval** | A person may not approve their own request unless Admin › Self-approval rules allows their role for that rule (seven-plus rules: payment terms, document review, e-mail send, cancellation, purchase award, amendment MD-approval, short-payment, price discount). `MakerCheckerGuard`, `SelfApprovalRules`. |
+| **Grant guard** | Nobody can grant a right they do not hold or change their own rights (`GrantGuard`, D-216). |
+| **Department / designation** | A person can belong to several departments; they work under one at a time ("Log in as"). Designations (Executive/Manager/Director) map to roles. |
+| **Preview as** | Admin views the app as a designation would see it; read-only (nothing can be posted). |
+| **Protected founder account** | MD and ED accounts (`users.is_protected_account`). Name, e-mail, phone, role, designation, signatory flag, active flag cannot be changed through the app or SQL while the trigger is on. |
+| **Super Admin** | `users.is_super_admin`; cannot be deleted or deactivated (trigger). |
+| **Field protection** | Protected rows in `company_settings`, `tc_clauses`, `payment_presets` cannot be deleted or blanked (triggers); lock/unlock needs a second person's approval. |
+| **Cockpit / My tasks / Daily digest** | Management overview (`/cockpit`), each person's queue (`/my-tasks`), and the 08:15 IST e-mail of what waits on each person. |
+
+### 2.6 System and project terms
+
+| Term | Meaning |
+|---|---|
+| **Stack** | One of the two complete implementations: `PHP_MySQL_Version` or `NODE_MySQL_Version`. |
+| **Parity** | Both stacks must behave the same; every change goes into both (rule R1). |
+| **D-codes (D-001 … D-262)** | Numbered owner decisions in `docs/decisions/owner-decisions-register.md`. Stable numbers, never renumbered. Cite them in code comments and commits. |
+| **The register** | That file. It also holds standing rules **R1, R2 …**, a test finding index, and **open points O-nn**. Rule: never re-ask a decided point. |
+| **Finding IDs** | QA finding codes cited in comments: `R5-24`, `R6-N04` (QA Round 5/6/8), `QA-5 UP-02`, `AUTH-10`, `L-26`, `M-09` (external QA report), `ACC-2`, `ZOH-1`, `MAIL-2`, `PAR-2` (QA fix batches, D-258). |
+| **"Confirmed twice"** | A change to a generated document needs the owner's double confirmation of before/after (rule R6). |
+| **Standard / Kanban** | The two UI templates. Standard = list pages; Kanban = boards (columns by stage/status). Each user picks one (`users.ui_template_preference_id`), else the company default `default_ui_template`. **Both must offer the same functions** (hard rule 1 Nov; `KanbanParityTest` / `kanbanParity.test.js`). |
+| **Division** | See 1.2. `division_id` on orders, users (NULL = company level), departments, associates, price requests, report definitions, CA expenses. |
+| **Module switch** | Per-division on/off for a part of the system (`division_modules`; no row = on). Keys: `sales_documents`, `supplier_purchase`, `export_shipping`, `lut_igst`, `export_benefits`, `firc_fema`, `ecgc`, `associates`, `team_incentive`, `import_stock` (IMP only), `merchant_trade` (MTT only). A module that is off hides its menu and its addresses answer 403 (`DivisionService::MODULES`, checked in `SessionAuth`). |
+| **Snapshot** | The word is used for several "copy at a moment" mechanisms: (1) **order snapshot columns** — preset, incoterm, ports, currency, buyer/consignee/notify party copied onto `orders` at creation, so editing a lookup never rewrites an old order; (2) **frozen snapshot** — at the first PI approval, `OrderSnapshotService::freeze` stores company details, T&C clauses, categories, tolerance, MD-approval flag and pricing FX rate (`orders.frozen_snapshot_json`, D-262); (3) **revision data snapshot** — `document_revisions.data_snapshot` and `documents.render_context_json` hold the exact data used to render each revision (DOC-2); (4) **CAFIN** is a pre-formatted financial snapshot; (5) **price snapshot** on order lines; (6) **backup snapshots** of storage. |
+| **TEST- records** | (a) Records created while **Test Mode** is on get a `TEST-` prefix and are hidden from real reports. (b) In **Zoho**, test customers and their documents are named `TEST-…`; with `ZOHO_ENVIRONMENT=test` only those may be sent; all must be removed before go-live (`zoho_cleanup_test_records`) and each removal logged. |
+| **Test Mode** | Sandbox switch (`test_mode_settings`): client portal and public form closed, business e-mail redirected to one test address, admin settings frozen, records flagged TEST-. |
+| **Sample data** | `is_sample_data = 1` rows from the Sample Data Playground; hard-deletable; left out of CAFIN export and Zoho. |
+| **Zoho change log** | `docs/zoho/zoho-change-log.csv` (UTF-8 with BOM): one row (Z-001 …) for every change made in Zoho by anyone, plus read-only checks. Different from the app's own **Zoho Sync Log** table (`zoho_sync_log`). |
+| **Migration** | After go-live, every schema change is a guarded, re-runnable SQL file in `docs/migrations/` (information_schema + PREPARE; no `IF [NOT] EXISTS` column/index syntax because the host runs MySQL). Before go-live all migrations were folded into `schema.sql` / `seed.sql` (D-241). |
+| **Reference library** | Internal documents and guides shown inside the app (`internal_reference_docs`, `reference_library_documents`). |
+
+---
+
+## 3. Architecture
+
+### 3.1 Why two stacks, and the parity rule
+
+| Stack | Folder | Runs on | Why it exists |
+|---|---|---|---|
+| PHP + MySQL | `PHP_MySQL_Version/` | **Bluehost shared hosting** today (cPanel, cron, no long-running processes, no Chromium) | Must run where the company is hosted now, with nothing but PHP + MySQL. |
+| Node + MySQL | `NODE_MySQL_Version/` | A **VPS** (needs Node and a Chromium binary for PDFs) | So the company can move to a VPS at any time without redevelopment. |
+
+Both stacks use **the same database schema** (`docs/schema.sql` is identical in purpose; 194 tables in each), the same seed data, the same URLs, the same screens, the same documents and the same business rules.
+
+**Parity rule (R1, CLAUDE.md):** every change goes into both stacks, and into both UI templates (Standard and Kanban), in the same change, with tests on both. A feature is not done until it works on both. The Playwright suite in `e2e/` runs the same browser tests against both (`npm run test:php` → `http://127.0.0.1:8080`, `npm run test:node` → `http://127.0.0.1:3000`).
+
+Mapping between stacks is mechanical: PHP `App\Services\OrderSnapshotService` ↔ Node `src/services/orderSnapshotService.js`; PHP `Controllers/OrderController.php` ↔ Node `controllers/ordersController.js`; PHP view `views/orders/show.php` ↔ Node `views/orders/show.njk`; Twig document template `templates/PI/*.html.twig` ↔ Nunjucks `templates/PI/*.njk`. Counts match: 89 controllers each; 120 repositories each; ~110 PHP / 106 Node service files (some PHP services sit in subfolders such as `Services/Docx/`).
+
+### 3.2 Tech stack and versions
+
+Verified from `PHP_MySQL_Version/app/composer.json` + `composer.lock`, `NODE_MySQL_Version/app/package.json` + `package-lock.json`, and `e2e/package.json` (6 Nov 2026).
+
+**PHP stack**
+
+| Layer | Library | Constraint | Locked version | Use |
+|---|---|---|---|---|
+| Runtime | PHP | `>=8.1` | dev: 8.3 | Plain PHP, `declare(strict_types=1)` |
+| Routing | own `App\Helpers\Router` | — | — | Hand-rolled front controller; no framework |
+| Screen views | **plain PHP files** | — | — | `app/views/**.php` (not Twig) |
+| Document templates | `twig/twig` | ^3.8 | 3.30.0 | `app/templates/<CODE>/*.html.twig` for PDFs |
+| PDF | `dompdf/dompdf` | ^3.0 | 3.1.6 | HTML/CSS → PDF; pure PHP (chosen over Puppeteer/TCPDF for shared hosting). Note: **DOMPDF, not mPDF.** |
+| Word | `phpoffice/phpword` | ^1.2 | 1.4.0 | DOCX builders in `Services/Docx/` (`DocxDocumentBuilder`) |
+| E-mail | `phpmailer/phpmailer` | ^6.9 | 6.12.0 | SMTP transport |
+| Markdown | `league/commonmark` | ^2.4 | 2.10.3 | SOP / help pages |
+| HTML sanitising | `ezyang/htmlpurifier` | ^4.19 | 4.19.1 | Rich text (annexure terms etc.) |
+| Tests | `phpunit/phpunit` | ^11.0 | 11.5.56 | `app/tests/Unit`, `app/tests/Integration` |
+| `.env` | own `App\Config\Env` | — | — | No phpdotenv dependency |
+
+The bootstrap (`app/bootstrap.php`) has its own PSR-4 autoloader for `App\`, so login/RBAC pages run even before `composer install`; document generation needs `vendor/`.
+
+**Node stack**
+
+| Layer | Library | Constraint | Locked | Use |
+|---|---|---|---|---|
+| Runtime | Node.js | — | dev: 22.x | `TZ=Asia/Kolkata node src/server.js` |
+| Web | `express` | ^4.19.2 | 4.22.3 | Routes in `src/server.js` |
+| Views + document templates | `nunjucks` | ^3.2.4 | 3.2.4 | `app/views/**.njk` and `app/templates/<CODE>/*.njk` |
+| DB | `knex` + `mysql2` | ^3.1 / ^3.11 | 3.3.0 / 3.24.4 | Query builder and driver |
+| Sessions | `express-session` + `connect-session-knex` | ^1.18 / ^5.0 | 1.19.0 | Stored in a `sessions` table that the store creates itself (not among the 194 schema tables) |
+| PDF | `puppeteer-core` | ^25.11 | 25.16.0 | Headless Chromium at `PUPPETEER_EXECUTABLE_PATH` (`services/pdfRenderService.js`) |
+| Word | `docx` | ^9.0.2 | 9.7.1 | `services/docx/` |
+| E-mail | `nodemailer` | ^10.0 | 10.3.1 | SMTP |
+| Scheduler | `node-cron` | ^4.6 | 4.6.0 | Optional in-process jobs |
+| Uploads | `multer` | ^2.4 | 2.5.0 | Multipart files |
+| Passwords | `bcrypt` | ^6.0 | 6.0.0 | Hashes compatible with PHP `password_hash` |
+| Others | `qs`, `cookie-parser`, `csv-stringify`, `express-validator`, `jszip`, `marked`, `node-html-parser`, `sanitize-html` (2.17.0), `dotenv` | | | |
+| Tests | `jest` + `supertest` | ^30.5 / ^7.3 | 30.5.2 / 7.3.0 | `app/tests/{unit,integration,manual}`; run one file at a time (`--runInBand`, shared test DB) |
+
+**Shared**
+
+| Item | Version / note |
+|---|---|
+| Database | MySQL 8 on the host; MariaDB in development. Rules: no `ADD/DROP/CHANGE COLUMN IF [NOT] EXISTS`, no `CREATE INDEX IF NOT EXISTS`; queries must pass `ONLY_FULL_GROUP_BY`; `utf8mb4` / `utf8mb4_unicode_ci`. |
+| E2E | `@playwright/test` ^1.56.1 (locked 1.64.1) in `e2e/` |
+| CI | `.github/workflows/tests.yml`: PHPUnit job and Jest job (installs `poppler-utils` to read generated PDFs/Word text) |
+| Fonts | `app/assets/fonts` in each stack (embedded in PDFs) |
+
+### 3.3 Folder layout
+
+**Repository root**
+
+```
+order-system/
+├── CLAUDE.md                     standing rules (parity, ask before push, review pack, PDF double confirmation …)
+├── README.md                     overview of both stacks
+├── ARCHITECTURE.html             visual architecture page
+├── docs/
+│   ├── SOP/                      user manual, chapters 00–32 + ca-01…ca-09 (master copy; copied into each stack)
+│   ├── decisions/                owner-decisions-register.md (D-codes, rules R1…, open points)
+│   ├── QA/                       MASTER_TEST_PLAN.md
+│   ├── guides/                   GO_LIVE_CHECKLIST.md and other guides
+│   ├── migrations/               README.md only at go-live (D-241); post-go-live migrations go here
+│   ├── zoho/                     README.md, zoho-change-log.csv
+│   ├── external/                 questions for the AD bank, CA, lawyer
+│   ├── legal/                    lawyer notes (D-245)
+│   ├── checks/, evidence/, workflow/
+├── e2e/                          Playwright suite (tests/00-login … 14-qa-batch2, qa-*), seed-ui-test-users.sql
+├── reference_templates/          the original Word/Excel templates the documents replicate
+├── PHP_MySQL_Version/
+└── NODE_MySQL_Version/
+```
+
+**PHP stack**
+
+```
+PHP_MySQL_Version/
+├── public_html/                  WEB ROOT (the only URL-reachable folder)
+│   ├── index.php                 front controller: ~744 routes, middleware per route, then dispatch
+│   ├── _dev_router.php           for `php -S` locally
+│   └── assets/{css,js,img,fonts} app.css, app.js (sitewide browser validation)
+├── app/                          OUTSIDE the web root
+│   ├── bootstrap.php             autoloader, .env, error log, timezone Asia/Kolkata, session cookie
+│   ├── .env / .env.example
+│   ├── src/
+│   │   ├── Config/               Database.php (PDO), Env.php
+│   │   ├── Controllers/          89 controllers
+│   │   ├── Services/             business logic (Docx/ subfolder for Word builders)
+│   │   ├── Repositories/         120 repositories (all SQL lives here)
+│   │   ├── Middleware/           AssociateAuth, ClientAuth, CsrfCheck, OrderLockGuard, PermissionCheck,
+│   │   │                         SessionAuth, SuperAdminOnly, TestModeGate
+│   │   └── Helpers/              31 helpers: Router, Csrf, View, FieldValidator, PermittedLinks, OrderStorage,
+│   │                             RateLimiter, Csv, AmountInWords, FinancialYear, DbResilience, …
+│   ├── views/                    plain-PHP screen views, one folder per area (orders/, ca/, client_portal/, …)
+│   ├── templates/                Twig document templates: QT/ PI/ OC/ CI/ PL/ BLI/ BLE/ BUYERPO/ SUPPO/ FDN/
+│   │                             COOPREP/ ESI/ AMD/ ANNEXA/ CAFIN/ DOM/ IMP/ MTT/ + shared partials (_layout, _buyer_details …)
+│   ├── cron/                     8 job scripts (see 3.9)
+│   ├── tests/                    Unit/, Integration/, Support/, fixtures/, bootstrap.php; phpunit.xml
+│   ├── assets/fonts/
+│   ├── composer.json / composer.lock / vendor/
+├── scripts/                      backup_db.sh, backup_storage.sh, backup_test_restore.sh, backup_lib.sh, tests/
+├── storage/                      STORAGE_BASE_PATH in dev (assets, clients, associates, internal, logs, temp,
+│                                 pdf_image_cache, font_cache, test)
+└── docs/                         ARCHITECTURE.md, schema.sql, seed.sql, SOP/ (copy), QA/TEST_PLAN.md, guides/, gallery/
+```
+
+**Node stack**
+
+```
+NODE_MySQL_Version/
+├── app/
+│   ├── src/
+│   │   ├── server.js             Express app: global middleware, ~744 routes, error handlers, optional scheduler
+│   │   ├── config/               db.js (knex), env.js (.env loader)
+│   │   ├── controllers/          89 controllers (camelCase file names)
+│   │   ├── services/             business logic (docx/ subfolder, pdfRenderService.js)
+│   │   ├── repositories/         120 repositories
+│   │   ├── middleware/           associateAuth, clientAuth, csrfCheck, orderLockGuard, permissionCheck,
+│   │   │                         saveSessionBeforeRedirect, sessionAuth, superAdminOnly, testModeGate
+│   │   ├── helpers/
+│   │   └── jobs/                 the same jobs as PHP cron + scheduler.js
+│   ├── views/                    Nunjucks screen views (same folder names as PHP)
+│   ├── templates/                Nunjucks document templates (same codes as PHP)
+│   ├── public/{css,js,img,fonts} web assets; public/js/app.js
+│   ├── tests/                    unit/, integration/, manual/, fixtures/, support/; jest.config.js
+│   ├── assets/fonts/
+│   ├── .env / .env.example, package.json, package-lock.json
+├── scripts/                      the same backup scripts
+├── storage/                      dev storage (also products/)
+└── docs/                         same as PHP
+```
+
+### 3.4 Request flow
+
+Every request follows the same layers on both stacks.
+
+```
+Browser
+  │  HTTPS
+  ▼
+Front controller ── PHP: public_html/index.php → Router::dispatch()
+                    Node: src/server.js (Express)
+  │  1. Security headers on every response: X-Content-Type-Options nosniff, X-Frame-Options DENY,
+  │     Referrer-Policy strict-origin-when-cross-origin, HSTS (not in local)
+  │  2. Session start (PHP native session "nexacrest_session"; Node express-session in DB table `sessions`)
+  │  3. Test Mode gates (global): blockClientFacingInTestMode, blockAdminWritesInTestMode
+  ▼
+Route match (method + path, {id} params) and its middleware list, in order:
+  │  SessionAuth.required()  / ClientAuth / AssociateAuth   ← who is signed in
+  │  PermissionCheck.requires('key') / requiresAny([...])   ← RBAC
+  │  CsrfCheck.verify()                                       ← every POST
+  │  OrderLockGuard.check()                                   ← on order write routes
+  │  SuperAdminOnly                                          ← a few admin routes
+  │  beforeHandler: missing order/document → 404 (after permission checks, so no existence leak)
+  ▼
+Controller  (reads input, calls services, picks a view, sets flash, redirects)
+  ▼
+Service     (business rules: stage gates, payments, documents, Zoho, mail, money visibility …)
+  ▼
+Repository  (SQL only; PDO prepared statements / knex)
+  ▼
+MySQL
+  ▲
+View        (PHP: View::render('orders/show', data, 'layout/base');
+             Node: res.renderView('orders/show', data))  → HTML + app.js
+```
+
+Example route (PHP, `public_html/index.php`):
+
+```php
+$router->post('/suppliers/{id}/update', [$suppliersDirectory, 'update'],
+    [SessionAuth::required(), PermissionCheck::requires('manage_suppliers'), CsrfCheck::verify()]);
+```
+
+**What `SessionAuth::required()` checks, in order** (`app/src/Middleware/SessionAuth.php`, Node `middleware/sessionAuth.js`):
+
+| # | Check | Result if it fails |
+|---|---|---|
+| 1 | Signed in | Redirect `/login` |
+| 2 | Idle timeout (`company_settings.session_timeout_minutes`, default 30) | Logout, `/login` |
+| 3 | User still active (AUTH-10) | Logout |
+| 4 | `users.session_version` equals the value saved at login (L-26) | Logout (a password change ends every other session) |
+| 5 | Forced password change / password expiry (`password_expiry_days`) | Redirect `/force-password-change` |
+| 6 | Person in several departments has not chosen one (D-214) | Redirect `/choose-department` |
+| 7 | **Preview as** active and request is a POST (ACC-2) | Refused, nothing saved |
+| 8 | Own division not active and request is a POST (ACC-12) | 403 |
+| 9 | **Order access** for any `/orders/{id}/…` path: archived, assignment, division (`OrderAccessService::denialReasonForPath`, R5-24) | 403 |
+| 10 | **Module switch** off for this path in the current division(s) (D-257) | 403 "This part of the system is not in use here." |
+| 11 | Client / associate outside the user's divisions | 403 |
+| 12 | Report Division filter; order pages enter the **order's own division** (its numbering and settings) and re-check the module switch (ACC-11) | 403 if module off |
+
+**Database errors at the chokepoint:** `Router::dispatch` turns MySQL SQLSTATE `22001` (too long), `22007` (bad date/number) and `23000` (duplicate / missing reference) into a friendly flash message instead of a 500. A briefly unreachable database answers **503** (`DbResilience`, R7-N04). Node has matching error handlers at the end of `server.js`.
+
+**Links and buttons:** `Helpers/PermittedLinks` renders a link only where the viewer can open its target. `View::asset()` adds `?v=` to `app.js` / `app.css` so a deploy is picked up at once.
+
+### 3.5 Templates: Standard and Kanban
+
+| Item | Detail |
+|---|---|
+| Table | `ui_templates` (`standard` "Standard", `kanban` "Kanban Board"), each can be switched off by Admin |
+| Per-user choice | `users.ui_template_preference_id`; changed in My Account |
+| Default | `company_settings.default_ui_template` for new users and anyone who never chose |
+| Resolution | `UiTemplateService::resolve()` (PHP) / Node equivalent: user choice if active → company default → `standard` |
+| Views | e.g. `views/orders/index.php` (list) and `views/orders/index_kanban.php` (board); shared card `_card.php`, shared filters `_filters.php` |
+| Parity rule (1 Nov, hard) | Every filter, search, count, field, badge, action, link and money rule on a Standard list is on its Kanban board and vice versa. Orders board shows 25 per column, then "Show more". Enforced by `tests/Integration/KanbanParityTest.php` / `kanbanParity.test.js`. Switching view keeps the filters (`initSwitchViewKeepsFilters` in `app.js`). |
+
+### 3.6 `app.js` — sitewide browser behaviour and validation
+
+One file per stack, loaded by every layout: `PHP_MySQL_Version/public_html/assets/js/app.js` and `NODE_MySQL_Version/app/public/js/app.js` (about 1,490 lines each, kept identical in behaviour). CLAUDE.md rule: **every form is checked in the browser before submit, message beside the field; server checks stay too** (`Helpers/FieldValidator`). Extend `fieldError()` for a new rule; do not write per-page scripts.
+
+| Function | What it does |
+|---|---|
+| `initSubmitValidation()` | Capturing `submit` listener on the whole document. Runs `fieldError()` on every enabled, named, non-hidden field; shows each message inline; shows an error pop-up listing the problems; opens a closed step card holding the first invalid field and focuses it. Skipped for `novalidate` forms and `formnovalidate` buttons. |
+| `fieldError(el)` | The rule engine. HTML attributes (`required`, `type`, `min`/`max`, `minlength`, `pattern`) plus data attributes: `data-match` (and the conventions `<name>_confirm`, `confirm_password` → `new_password`), `data-required-if`, `data-required-when`, `data-required-unless` (file or reason), `data-not-more-than`, `data-allowed-from` (units allowed by a category), `data-refuse-when`, bank-detail rules (IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`), numeric field names. |
+| `markRequiredLabels()` / `initRequiredLabels()` | Adds one " *" to the label of each required field; removes it when the field stops being required. |
+| `initReasonFieldValidation()` | Reason fields need meaningful text. |
+| `initShowWhen()`, `initGstCalc()`, `initAutoReasons()`, `initOptionFills()`, `initPatternFromSelect()` | Show a field only for one choice; GST % → amount and total; "Not Applicable" fills its reason; fills from a picked option. |
+| `initRemittanceDifference()`, `initRemittanceInr()`, `initRemittanceStatements()` | Live remittance-difference reasons, bank charges and INR credited. |
+| `initFormDraftRestore()` | Keeps typed input after a refused submit. |
+| `initConfirmDialogs()`, `initLockedSteps()`, `initDatePickers()`, `initSlowDownloadLinks()`, `initTableScrollShadows()` | UI helpers. |
+
+Tests that enforce the conventions: `FormValidationConventionsTest` / `formValidationConventions.test.js` (confirm fields), `FormPlaceholderTest` / `formPlaceholder.test.js` (a placeholder on every typed input and textarea except date, file, checkbox, radio, hidden), `FormLabelConventionsTest` / `formLabelConventions.test.js` (labels, "*", "Choose…" on required drop-downs).
+
+### 3.7 The database
+
+**194 tables** in each stack's `docs/schema.sql` (175 `CREATE TABLE` + 19 `CREATE TABLE IF NOT EXISTS`), filled with reference data by `docs/seed.sql`. A new install is `schema.sql` then `seed.sql` (D-241). Engine InnoDB, `BIGINT UNSIGNED` ids, foreign keys throughout. 65 foreign keys point at `orders(id)` and 132 at `users(id)`.
+
+#### 3.7.1 Tables grouped by area
+
+| Area | Tables |
+|---|---|
+| **Configuration** | `company_settings` (key-value; every configurable business value), `dropdown_options` (many small lists), `ports`, `port_routes`, `incoterms`, `currencies`, `payment_presets`, `document_types`, `document_sections`, `tc_clauses`, `tc_clause_documents`, `email_templates`, `watermark_settings`, `docx_generation_settings`, `file_upload_contexts`, `company_holidays`, `hs_codes`, `hs_code_product_examples`, `reference_sequences`, `ui_templates`, `test_mode_settings`, `remittance_difference_reasons`, `stages_master` |
+| **Auth / RBAC / security** | `users`, `roles`, `permissions`, `role_permissions`, `user_permissions`, `password_reset_tokens`, `login_attempts`, `rate_limit_hits`, `two_fa_backup_codes`, `super_admin_delegations`, `field_protection_requests`, `self_approval_rules` |
+| **Departments & divisions** | `departments`, `department_designations`, `user_department_memberships`, `designations`, `divisions`, `division_modules`, `division_settings`, `client_divisions` |
+| **Signatures & assets** | `assets` (logos, seals, watermarks), `user_signature_assets`, `company_default_signatory`, `document_type_signatories` |
+| **Clients & intake** | `clients`, `client_logins`, `client_password_reset_tokens`, `client_intake_submissions`, `pi_intake_submissions`, `client_payment_reports`, `order_reorder_requests`, `order_reorder_request_products` |
+| **Products & pricing** | `products` (legacy product master), `product_images`, `catalog_products`, `catalog_product_images`, `catalog_product_suppliers`, `catalog_product_supplier_options`, `catalog_product_misc_charges`, `product_categories`, `product_category_attributes`, `spec_definitions`, `spec_options`, `product_spec_hidden`, `product_option_overrides`, `pricing_settings`, `price_requests` |
+| **Suppliers & logistics** | `suppliers`, `supplier_type_links`, `supplier_factory_addresses`, `logistics_partners` |
+| **Orders (Export) — core** | `orders`, `order_assignees`, `order_stages`, `order_products`, `order_department_owners`, `order_comments`, `order_comment_attachments`, `order_feedback`, `order_cancellations`, `order_annexure_products`, `order_annexure_images`, `order_annexure_terms`, `order_quality_documents` |
+| **Orders — stage data** | `order_production`, `order_supplier_po`, `order_supplier_po_documents`, `order_buyer_po_documents`, `order_oc_acknowledgments`, `order_freight`, `order_packing`, `order_crates`, `order_shipping`, `order_draft_bl_reviews`, `order_bl_endorsements`, `order_inspections`, `order_inspection_fees`, `order_shipment_gate_overrides`, `order_compliance_tasks`, `compliance_task_types` |
+| **Orders — money** | `order_payment_status`, `order_payment_receipts`, `order_payment_shortfalls`, `order_payment_milestones`, `order_lc_details`, `order_lc_amendments`, `order_cost_entries`, `order_vendor_bills`, `order_vendor_bill_payments`, `order_expenses`, `order_travel_expenses`, `order_export_benefit_schemes`, `order_zoho_invoices` |
+| **Documents & files** | `documents`, `document_revisions`, `document_reviews`, `document_cross_verifications`, `amendments`, `file_store` |
+| **Disputes & complaints** | `disputes`, `dispute_documents`, `dispute_replies`, `order_complaints`, `order_complaint_replies` |
+| **E-mail & notifications** | `email_log` (send queue + history), `notifications`, `daily_digest_log` |
+| **Audit & reports** | `audit_log`, `report_definitions` |
+| **CA / accounting** | `ca_expenses`, `ca_bank_statement_lines`, `ca_fy_locks`, `ca_export_benefits`, `gst_refund_claims`, `gst_refund_credits`, `compliance_alerts_sent` |
+| **Zoho** | `zoho_sync_log`, `zoho_api_usage`, `zoho_token_cache`, `zoho_pending_inactivations` |
+| **Procurement** | `purchase_requirements`, `purchase_quotes` |
+| **Coordination** | `department_task_types` |
+| **Agreements** | `agreements`, `agreement_alerts_sent` |
+| **Associates** | `associates`, `associate_tokens`, `associate_bank_accounts`, `associate_documents`, `associate_invitations`, `associate_events`, `associate_messages`, `associate_codes`, `associate_registration_links`, `associate_registrations`, `associate_price_access`, `associate_access_level_settings`, `associate_access_features`, `associate_access_log`, `commission_levels`, `commission_ladder_steps` |
+| **Team incentive** | `incentive_settings`, `incentive_roles`, `user_incentive_roles`, `order_incentives`, `order_incentive_people`, `order_incentive_roles`, `order_incentive_history`, `incentive_payouts`, `incentive_kept` |
+| **Reference library** | `internal_reference_docs`, `reference_library_documents`, `reference_library_categories` |
+| **Domestic Trade (DOM)** | `indian_states`, `gst_rates`, `domestic_orders`, `domestic_order_lines`, `domestic_payments`, `domestic_documents`, `domestic_counters` |
+| **Import & Distribution (IMP)** | `import_duty_rates`, `import_shipments`, `import_shipment_lines`, `import_payments`, `stock_balances`, `stock_movements` |
+| **Merchant Trade (MTT)** | `merchant_deals`, `merchant_deal_lines`, `merchant_payments`, `merchant_deal_documents`, `merchant_alerts_sent` |
+
+The schema file itself is organised in lettered sections in the order they were added (A Configuration, B Auth/RBAC, C Assets & files, D Stages, E Orders, F Documents, G Files, H E-mail, I Disputes, J Audit, … BQ UI templates, CE Vendor bills, CN Team incentives and associates, then D-257 divisions). The comment above each table explains *why* it exists — read it before changing a table.
+
+#### 3.7.2 Key relationships
+
+```
+divisions ──< orders >── clients ──< client_divisions >── divisions
+                │  └── client_logins, client_intake_submissions, associates (clients.associate_id)
+                │
+                ├──< order_products >── products / catalog_products (catalog_product_id) ── product_categories
+                ├──< order_stages >── stages_master          (current_stage_id → stages_master)
+                ├──  order_payment_status, order_payment_receipts, order_payment_shortfalls, order_payment_milestones
+                ├──  order_production, order_supplier_po >── suppliers
+                ├──  order_freight, order_packing ──< order_crates, order_shipping, order_lc_details
+                ├──< order_vendor_bills ──< order_vendor_bill_payments   (suppliers / logistics_partners)
+                ├──< order_cost_entries, order_expenses, order_travel_expenses
+                ├──< documents ──< document_revisions, document_reviews, document_cross_verifications
+                │        └── document_types; pdf_file_id / docx_file_id → file_store
+                ├──< file_store (also client_id, stage_id, linked_document_id → documents)
+                ├──< amendments (orders.active_amendment_id → amendments)
+                ├──< disputes, order_complaints, order_comments, email_log, audit_log (by table+id)
+                ├──< order_assignees >── users;  order_department_owners >── departments
+                ├──  order_incentives ──< order_incentive_people / roles; incentive_payouts
+                └──  order_zoho_invoices, order_export_benefit_schemes, order_compliance_tasks
+
+users >── roles ──< role_permissions >── permissions;  users ──< user_permissions (per-user overrides)
+users ──< user_department_memberships >── department_designations >── departments (>── divisions)
+users.division_id → divisions (NULL = company level)
+```
+
+Important design choices:
+
+| Choice | Why |
+|---|---|
+| **Order snapshot columns** (preset terms, incoterm, currency, ports, buyer/consignee/notify party copied onto `orders` at creation; the `*_id` columns are for traceability only) | Editing a preset, port or client must never rewrite what an old order shows or prints. A PI-intake correction updates that order's own snapshot only. A duplicated order re-reads today's values. |
+| **Frozen at the first PI approval** (D-262, §5.5) | After the PI, company details, T&C clauses, categories, tolerance, MD-approval flag and pricing FX rate come from `orders.frozen_snapshot_json`; `OrderSnapshotService::within()` overlays them for every document run. The MD can refresh company details deliberately (`POST /orders/{id}/company-details/refresh`). |
+| **Normalised stage tables, not JSON** | Reports need to query overdue payments, orders by stage, etc. |
+| **`company_settings` as key-value** | A new setting is a row, not a migration. No business value is hard-coded in templates. |
+| **Soft delete** | `file_store.is_active`, `clients.is_active`; contact records never hard-deleted. |
+| **Protected rows** | DB triggers (see 3.13). |
+
+### 3.8 Documents: generation, versions and snapshots
+
+| Step | PHP | Node |
+|---|---|---|
+| Gather data | `Services/DocumentDataAssembler.php` (all values from DB; nothing literal in templates) | `services/documentDataAssembler.js` |
+| Category profile | `CategoryDocumentProfile` (packing words, quality documents, clause set) | `categoryDocumentProfile.js` |
+| Render HTML | Twig `templates/<CODE>/…html.twig` | Nunjucks `templates/<CODE>/…njk` |
+| PDF | DOMPDF | `pdfRenderService.js` (Puppeteer / Chromium) |
+| Word | `Services/Docx/DocxDocumentBuilder` (PHPWord) | `services/docx/` (`docx`) |
+| Orchestration | `DocumentGenerationService` (stage gates, review, approval, `finalizeApproval`, watermark DRAFT→FINAL) | `documentGenerationService.js` |
+
+Versions: `documents` holds one row per document with `revision_number` and `status` (`draft`, `in_review`, `approved`, `sent`, `superseded`). Each revision is a row in `document_revisions` with `data_snapshot` (the field values used — immutable history), its own PDF/DOCX file ids and `is_current`. Since D-258 (DOC-2) `documents.render_context_json` keeps each revision's full render data so an approval re-render prints exactly what was reviewed. **Rule: no change that alters a generated document without showing the owner before/after and getting confirmation twice (CLAUDE.md, R6). All current PDFs are correct as they are.**
+
+### 3.9 Cron jobs and the scheduler
+
+There is no permanent worker on shared hosting, so background work runs as scheduled scripts. Run them in IST.
+
+| Job | PHP script (`app/cron/`) | Node (`src/jobs/`) | Schedule (IST) | What it does |
+|---|---|---|---|---|
+| Deferred e-mail dispatch | `dispatch_deferred_emails.php` | `dispatchDeferredEmails.js` | every 10 min | Sends approved / scheduled e-mails from `email_log` |
+| OC auto-confirm | `auto_confirm_oc_acknowledgments.php` | `autoConfirmOcAcknowledgments.js` | every 15 min | Confirms an OC the buyer did not acknowledge within 48 h |
+| Alerts | `check_alerts.php` | `checkAlerts.js` | daily 06:00 | LUT/RCMC expiry, freight/balance overdue, dispute response overdue, agreements (30/7/0 days), compliance (ECGC, eBRC, claim deadlines), merchant-trade alerts |
+| Zoho sync | `zoho_sync.php` | `zohoSync.js` | hourly | Pushes pending records to Zoho Books; one run at a time (`ZohoSyncLock`) |
+| Daily digest | `daily_digest.php` | `dailyDigest.js` | daily 08:15 | Per-person e-mail of waiting work, associate reminders, backup warnings |
+| Document copy clean-up | `document_copy_cleanup.php` | `documentCopyCleanup.js` | daily 02:15 | Removes old draft/superseded copies per Admin rules; does nothing while every rule is off (default) |
+| Zoho TEST clean-up | `zoho_cleanup_test_records.php` | `zohoCleanupTestRecords.js` | **by hand** | Removes `TEST-` records from Books (dry run unless `--apply`; `--log` writes change-log rows) |
+| Reorganise order files | `reorganize_order_files.php` | `reorganizeOrderFiles.js` | **by hand** | Moves files into the per-step folders (dry run unless `--apply`) |
+| Backups | `scripts/backup_db.sh`, `backup_storage.sh`, `backup_test_restore.sh` | same | 02:00, 02:30, 04:00 on the 1st | See 3.15 |
+
+PHP crontab (README):
+
+```
+CRON_TZ=Asia/Kolkata
+*/10 * * * *  php …/app/cron/dispatch_deferred_emails.php
+*/15 * * * *  php …/app/cron/auto_confirm_oc_acknowledgments.php
+0 6 * * *     php …/app/cron/check_alerts.php
+0 * * * *     php …/app/cron/zoho_sync.php
+15 8 * * *    php …/app/cron/daily_digest.php
+15 2 * * *    php …/app/cron/document_copy_cleanup.php
+```
+
+Node offers two options (never both, or jobs double-fire): external cron calling `node src/jobs/<name>.js` (recommended), or `RUN_JOBS_IN_PROCESS=true` in `.env` so `src/jobs/scheduler.js` runs them with `node-cron` inside the web process (Zoho sync with `noOverlap`).
+
+### 3.10 E-mail sending
+
+All business e-mail goes through **one chokepoint**: `MailSenderService::send()` (PHP `app/src/Services/MailSenderService.php`, Node `services/mailSenderService.js`; D-258 MAIL-2 moved every remaining sender onto it). The transport is SMTP (PHPMailer / Nodemailer) using `SMTP_*` from `.env` (Bluehost mail). **Zoho Mail is not used to send** (`ZohoMailService::IN_USE = false`).
+
+Order of checks inside `send()`:
+
+| # | Check | Effect | Applies to security e-mails (2FA codes, password reset)? |
+|---|---|---|---|
+| 1 | **Sending-off switch** `company_settings.mail_sending_enabled = 0` | Nothing is sent; the full message is written to the error log so staff can send it by hand. Documents are then marked sent when staff confirm (`markSentIfMailDisabled`). | No (always sent) |
+| 2 | **Test Mode** (`TestModeService::resolveEmailRecipient`) | Redirects to the Test Mode address; if none is set, the mail is **not** sent at all | No |
+| 3 | **Mail redirect** (`MailRedirectService`: `mail_redirect_enabled`, `mail_redirect_address`) | Rehearse real mail without Test Mode: all business mail goes to one address | No |
+| 4 | **CC list** (`mail_cc_emails`, `mail_default_cc_email`) | Added to every business mail | No |
+| 5 | Transport | SMTP; with no SMTP configured in dev, logged only | — |
+
+**Deferred send (two levels)** — `EmailDispatchService`:
+
+1. Level 1: a staff member requests a send (`requestSend`) with a template, the document and optionally a scheduled time. A row is written to `email_log` with status `pending_approval`. Only one active send per document (or per generic template per order).
+2. Level 2: a holder of `approve_email_send` approves (`approveSend`), rejects or cancels. Maker-checker applies unless a Self-approval rule allows it.
+3. The cron job `dispatch_deferred_emails` sends approved rows when due (`dispatch`). "Send now" override exists.
+4. If `mail_approval_queue_enabled = 0`, the request is auto-approved and sent at once (audit-logged `EMAIL_SEND_AUTO_APPROVED`).
+
+Payment-request e-mails include the Payment Action Link paragraph. Sending the OC starts the 48-hour acknowledgment clock.
+
+### 3.11 File storage
+
+| Item | Rule |
+|---|---|
+| Root | `STORAGE_BASE_PATH` in `.env`, **outside the web root**. Every path is `STORAGE_BASE_PATH/<parts from DB>`. |
+| Top folders | `assets/` (logos, signatures, seals, watermarks, e-mail headers), `clients/`, `associates/`, `products/` (Node), `internal/`, `temp/<session>/`, `logs/` (`error.log`), `pdf_image_cache/`, `font_cache/` (PHP), `test/` |
+| Order folder | `clients/<client no>/<order ref>/NN-step/` — `01-quotation/` (+ `annexure-images/`), `04-buyer-po/`, `05-proforma-invoice/` (+ `lc/`), `06-order-confirmation/`, `07-supplier-po/`, `09-freight/`, `10-packing-and-bl/`, `11-commercial-invoice/`, `12-financials/` (CAFIN), `13-closure/`, `payments/`, `amendments/<ref>/`, `disputes/<id>/`, `order-updates/`, `additional-documents/`, `checklists/`, `reference/`, `other/`. Received files go in a `received/` subfolder. Defined in `Helpers/OrderStorage::AREAS`. A generated document goes by its **document type**, not the stage the order was at. |
+| File names | Random 32-hex "UUID" names (`bin2hex(random_bytes(16))` in `FileUploadService`) — never guessable. The original name is kept in the DB. |
+| Index table | `file_store`: `client_id`, `order_id`, `stage_id`, `file_origin` (`GENERATED_AUTO` / `GENERATED_MANUAL` / `RECEIVED`), `received_from`, `document_type_label`, `linked_document_id` (every generated file points to its `documents` row — used to classify money and CAFIN files), `sent_to_client`, `internal_only`, `server_path`, `uuid_filename`, `original_filename`, size, MIME, `is_active` (soft delete), `removed_at` / `removed_reason` (clean-up removed the bytes). |
+| Downloads | Through controllers only (`/file-store/{id}/download`, `/documents/{id}/download`, `Helpers/StoredFileDownload`) with permission, money-visibility and CAFIN checks; `X-Content-Type-Options: nosniff` stops an uploaded HTML file running. |
+| Upload contexts | `file_upload_contexts` decides allowed types and sizes per context (`vendor_bill`, `expense_receipt`, `associate_agreement`, `agreement_file` …). |
+| Versions | Each document revision has its own PDF/DOCX `file_store` rows; superseded copies are kept until the clean-up rules (off by default) remove them; the PDF the buyer received is marked (`markSentToClient`). |
+
+**CAFIN never reaches the client** (CLAUDE.md, hard rule): `document_types.never_shown_to_buyer = 1` and category `internal`; the client portal, Buyer/Payment Action links and e-mail dispatch exclude never-shown-to-buyer types; every CAFIN download needs `view_cafin`; `FileStoreRepository` resolves drafts, superseded and older CAFIN copies to their type so a generic file route cannot leak one; general data exports leave CAFIN out.
+
+### 3.12 Zoho integration overview
+
+| Part | Code (PHP; Node has the camelCase twin) | Notes |
+|---|---|---|
+| Hard switches | `.env` `ZOHO_INTEGRATION_ENABLED`, `ZOHO_ENVIRONMENT` (`test`/`production`), `ZOHO_EINVOICE_ENABLED`; `ZohoGuard::assertRequestAllowed()` on every request | Missing/unknown value = off / test / off. No screen can change them. In `test`, only customers named `TEST-…` may be sent; in `production`, test and sample orders are never sent. |
+| Soft switches | Admin › Settings › Zoho Books: credentials (shown masked, `SecretSetting`), `zoho_books_enabled`, go-live date `zoho_books_sync_start_date`, `zoho_sync_clients`, `zoho_sync_products` (off) | Production sends nothing until the go-live date is set. |
+| API client | `ZohoBooksService` (OAuth self-client, `zoho.in` data centre by default); `setTransport()` lets tests use a fake Zoho | Looks a record up by its reference before posting, so a retry never duplicates (ZOH-2). |
+| Limits | `ZohoApiBudget`: `zoho_api_daily_limit` 800, `zoho_api_minute_limit` 30; one shared encrypted token for 50 min (`zoho_token_cache`); "too many requests" stops the run (D-239) | Usage shown on the Zoho Books Sync page. |
+| Running | `CaSyncService::fullSync` (hourly cron), *Sync now*, *Sync this order* (`POST /orders/{id}/zoho-sync`); `ZohoSyncLock` one run at a time; `DivisionZohoSync` for DOM/IMP/MTT | |
+| What is waiting | `ZohoPendingService` (order page, menu, Sync page, D-233) | |
+| Failures | `ZohoSyncFailureNotifier` e-mails holders of `ca_module_manage` once per failing run; every call in `zoho_sync_log` | |
+| Checking | `OrderZohoMatchService`, `GET /orders/{id}/zoho-check` — read-only: match / not sent / before go-live / different / missing in Books / only in Books | |
+| Master data | `ZohoMasterDataSync`: app → Zoho customers and items, linked by exact name, made inactive (never deleted) | D-238 |
+| Descriptions | `PaymentDescription` builds the same description for app and Books (D-212) | |
+| Records in Zoho | Contacts, invoices (CI, Debit Note, ESI), customer payments, bills and vendor payments, expenses, journals (GST refunds, export benefits, IGST credit) | Ids stored on the app rows (`zoho_*` columns). |
+| Human changes | Every change in Zoho by anyone → a row in `docs/zoho/zoho-change-log.csv` | TEST records removed before go-live, removal logged. |
+
+### 3.13 Security
+
+| Control | Where | Detail |
+|---|---|---|
+| **Passwords** | `AuthService`, `bcrypt` (Node) / `password_hash` (PHP) | Password checked *before* revealing account state (AUTH-04/05); dummy hash for unknown e-mails. Expiry (`password_expiry_days`) and forced change on first login / reset. |
+| **Lockout** | `login_attempts`, `failed_login_lockout_count` (5), `lockout_duration_minutes` (15) | Failed attempt recorded before counting (L-03). |
+| **2FA** | `TwoFactorService`, `two_fa_backup_codes`; `users.two_fa_enabled`, `two_fa_method` | E-mail code (always available) or SMS if `SMS_GATEWAY_API_KEY` is set (falls back to e-mail). In `APP_ENV=local` the code is shown on screen. Associates get an e-mailed code at login. |
+| **Sessions** | `bootstrap.php` / `server.js` | Cookie `nexacrest_session`, HttpOnly, Secure (not in local), SameSite=Lax, ends with the browser; idle timeout in app; `session_regenerate_id` at login. |
+| **Session versioning** | `users.session_version` | Saved at login; compared on every request; a password change bumps it so every other session (a stolen one too) is logged out (L-26). Deactivation also logs out at once (AUTH-10). |
+| **CSRF** | `Helpers/Csrf` + `Middleware/CsrfCheck` (Node `helpers/csrf.js`, `middleware/csrfCheck.js`) | One random 64-hex token per session, hidden field `_csrf`, `hash_equals` check on every POST route. A failed check redirects to the right login page; an over-size upload gives a clear 413 instead (UP-03). |
+| **RBAC** | `permissions`, `role_permissions`, `user_permissions`; `PermissionCheck` per route; `PermissionService::can()` in views | Plus `OrderAccessService` (one guard on every `/orders/{id}/*` route), `MoneyVisibility`, `GrantGuard`, `MakerCheckerGuard` / `SelfApprovalRules`. Route coverage is tested (`RouteMatrixTest`, `UngatedRoutesTest`). |
+| **Rate limits** | `Helpers/RateLimiter` + `rate_limit_hits` (IP + bucket sliding window) | Public quotation-details form (INT-05), quotation verify (10 per 30 min per submission), associate registration (5 per 15 min per IP). Login is protected by lockout instead. |
+| **Headers** | `Router::SECURITY_HEADERS`, Node first middleware | nosniff, X-Frame-Options DENY, Referrer-Policy, HSTS outside local. |
+| **Protected founder accounts trigger** | `trg_users_protected_bd` / `trg_users_protected_bu` on `users` | For `is_protected_account = 1`: no delete; no change of name, e-mail, phone, role, designation, signatory eligibility, super-admin flag, active flag or the protection flag. The app refuses first with a message; the trigger is the backstop. Password fields are *not* covered (self-service reset works). Real names/e-mails are set once at go-live by SQL that lifts the trigger briefly and puts it back (GO_LIVE_CHECKLIST). |
+| **Super Admin trigger** | `trg_users_super_admin_bd` / `_bu` | A Super Admin can never be deleted or deactivated. |
+| **Protected settings triggers** | `trg_company_settings_*`, `trg_tc_clauses_*`, `trg_payment_presets_*` | Protected rows cannot be deleted or blanked; lock/unlock needs a second person (`field_protection_requests`). |
+| **Tokens at rest** | `APP_ENCRYPTION_KEY` (`EncryptionService`); hashed token columns | Buyer/Payment Action link tokens encrypted or hashed; changing the key invalidates existing links. |
+| **Uploads** | `FileUploadService`, upload contexts | Random names, outside web root, nosniff on download. |
+| **Audit** | `audit_log` (`AuditLogRepository::log`) | Every significant action, with the active department; amounts masked for people who may not see them (`AuditMoneyMask`). |
+| **Test Mode / Preview** | `TestModeGate`, `SessionAuth` | Admin writes frozen in Test Mode; Preview-as is read-only. |
+| **Errors** | `bootstrap.php`, Node error handlers | Errors to `storage/logs/error.log`; shown on screen only in `APP_ENV=local`. |
+
+### 3.14 Environments and `.env`
+
+`.env` lives in `app/` (outside the web root) and is never committed. Copy `app/.env.example`. Every key, with its default and meaning, is listed once in §9.2. The ones that change behaviour most: `APP_ENV` (`local` shows errors and 2FA codes on screen and turns off the Secure cookie and HSTS: never on an internet-facing server), `DEV_SERVER` (red "DEV / TEST ENVIRONMENT" strip), `APP_ENCRYPTION_KEY` (encrypts action-link tokens; do not rotate casually) and the three Zoho hard switches (§3.12).
+
+Typical environments:
+
+| Environment | Settings |
+|---|---|
+| Developer machine | `APP_ENV=local`, MariaDB, `php -S` with `_dev_router.php` on 8080 / `npm start` on 3000, Zoho off |
+| Staging / UAT | `APP_ENV=production`, `DEV_SERVER=true`, `ZOHO_ENVIRONMENT=test` (TEST- customers only), often Mail redirect or Test Mode on |
+| Live (PHP on Bluehost) | `APP_ENV=production`, `DEV_SERVER=false`, MySQL 8, cron in `CRON_TZ=Asia/Kolkata`, `ZOHO_ENVIRONMENT=production` once go-live is approved, `ZOHO_EINVOICE_ENABLED=false` until e-invoicing is required |
+
+Timezone is fixed to **Asia/Kolkata** on both stacks (`date_default_timezone_set` in PHP; `TZ=Asia/Kolkata` in the Node start script).
+
+### 3.15 Backups overview
+
+Owner decision **D-260** (6 Nov 2026): keep everything **10 years**; a backup is only an extra copy and never touches live data.
+
+| Script (same in both stacks' `scripts/`) | What it does | Cron (IST) |
+|---|---|---|
+| `backup_db.sh` | `mysqldump --single-transaction` (no locks), gzip, encrypt, `.sha256` beside it → `BACKUP_DIR/db/nexacrest_db_YYYY-MM-DD_HHMMSS.sql.gz.enc` | 02:00 daily |
+| `backup_storage.sh` | Daily snapshot of every document → `BACKUP_DIR/storage/snapshots/nexacrest_files_YYYY-MM-DD/`; unchanged files stored once (hard links, `rsync --link-dest`); first run of each month also writes a full encrypted archive | 02:30 daily |
+| `backup_test_restore.sh` | Checks checksum, decrypts, loads the newest copy into a **separate scratch database**, counts tables, drops it; checks the newest archive opens | 04:00 on the 1st |
+| `backup_lib.sh` | Shared functions | — |
+
+Retention: database copies older than 120 days thinned to one per month; documents never need thinning. `BACKUP_DIR` must be outside the web root and outside `STORAGE_BASE_PATH` (scripts refuse otherwise). The encryption key file is `chmod 600`, and a copy must be kept away from the server. Off-site copy via `rclone copy --immutable` once `BACKUP_OFFSITE_TARGET` is set (not chosen yet). **Admin › Backups** (`manage_company_settings`: Admin, MD, ED, System Administrator; read-only, `BackupStatusService`) shows the last runs; the daily digest warns if a copy is older than 26 hours, failed, not encrypted, or the test-restore is older than 35 days. Restoring is manual: SOP 32 and §12.3 (set-up and restore steps). Self-test `bash scripts/tests/backup_scripts_test.sh` (also run by `BackupFacilityTest` / Jest).
+
+### 3.16 Where to look first (quick map)
+
+| Question | PHP | Node |
+|---|---|---|
+| Which URL does what, and who may call it? | `public_html/index.php` | `app/src/server.js` |
+| Is this person allowed on this order? | `Services/OrderAccessService.php` | `services/orderAccessService.js` |
+| What money may they see? | `Services/MoneyVisibility.php` | `services/moneyVisibility.js` |
+| Which division / module? | `Services/DivisionService.php` | `services/divisionService.js` |
+| What goes on a document? | `Services/DocumentDataAssembler.php` + `templates/<CODE>/` | `services/documentDataAssembler.js` + `templates/<CODE>/` |
+| Profit, CAFIN | `OrderProfitabilityService`, `CaFinancialSnapshotService` | camelCase twins |
+| Every e-mail | `MailSenderService`, `EmailDispatchService` | twins |
+| Zoho | `ZohoBooksService`, `ZohoGuard`, `CaSyncService` | twins |
+| Why is it like this? | `docs/decisions/owner-decisions-register.md` (search the D-code in the code comment) | same |
+
+## 4. Roles, permissions and access
+
+This section explains who may see and do what. Read it before you touch any
+permission, route or page. The rule of thumb is simple: **access is role +
+permission, never a person's name in code** (D-116). The data is in
+`roles`, `permissions`, `role_permissions`, `user_permissions`,
+`departments`, `department_designations` and `user_department_memberships`.
+
+### 4.1 How a permission check works
+
+Every protected route names a permission key in its route line:
+
+- PHP: `PHP_MySQL_Version/public_html/index.php`, e.g.
+  `PermissionCheck::requires('settle_orders')` (middleware in
+  `app/src/Middleware/PermissionCheck.php`).
+- Node: `NODE_MySQL_Version/app/src/server.js`, e.g.
+  `requirePermission('settle_orders')` (middleware in
+  `app/src/middleware/permissionCheck.js`).
+
+The check itself is `PermissionService::can()` (PHP
+`app/src/Services/PermissionService.php`, Node
+`app/src/services/permissionService.js`). In order:
+
+1. **Preview?** If the person is previewing a designation (4.4), the
+   previewed role is used and there is **no** Super Admin bypass and **no**
+   personal exception.
+2. **Effective role.** `ActiveDepartmentService::effectiveRoleId()` returns
+   the role of the department designation the person "logged in as". A
+   person with no department membership uses the role on their user record.
+3. **Super Admin.** A permanent Super Admin (`users.is_super_admin = 1`) or
+   someone with a live row in `super_admin_delegations` passes every check.
+4. **Role + personal exceptions.** `PermissionRepository::effectivePermissions()`
+   merges `role_permissions` with `user_permissions` (personal exceptions,
+   each with a reason and an optional `expires_at` "until" date).
+
+Holding a permission never overrides the state of the record (D-116). A
+Supplier PO still needs Stage 5 open; a closed order still refuses changes
+(`OrderLockGuard`); an action on a record that does not exist says "not
+found" (D-209).
+
+Two more filters sit on top of permissions:
+
+- **Order visibility by assignment (D-118).** Most people see only orders
+  in `order_assignees` for them. `view_all_orders` bypasses this.
+  `view_archived_orders` is needed for archived ones. Checked by
+  `OrderAccessService` on every order page and child route.
+- **Division scope (D-257).** `DivisionService` limits every list, report
+  and order route to the person's division, unless they hold
+  `see_all_divisions`.
+
+### 4.2 The 24 roles
+
+All roles are seeded in `docs/seed.sql` (both stacks). Only **Admin** is a
+system role (cannot be deleted). Each department designation is its own
+role (D-214).
+
+| # | Role | Department / designation | Seed permissions | In one line |
+|---|---|---|---|---|
+| 1 | Admin | none (keeps own role, D-214) | 93 | Full system access incl. users, roles and audit log. Lacks only `manage_approval_limits`. |
+| 2 | Managing Director | Company Management · director | 94 (all) | Full business authority; the only role with every key. |
+| 3 | Executive Director | Company Management · director | 87 | Same as MD except: `manage_pricing`, `manage_incentives`, `manage_divisions`, `manage_product_specifications`, `manage_associate_bank`, `pay_incentives`, `record_market_prices`. |
+| 4 | Export Executive | Sales & Export · executive ("Sales/Export Executive") | 22 | Day-to-day order work QT → OC, documents, records (not clears) payments. |
+| 5 | Accounts Executive | Accounts & Finance · executive | 29 | Payment tracking, clearing, supplier payments, INR actuals, CA view. |
+| 6 | Logistics Executive | Logistics · executive | 14 | Packing, freight, BL, shipping documents, logistics bills. |
+| 7 | Viewer / Auditor | Audit & Compliance · "Internal Auditor" | 11 | Read-only: orders, clients, reports, audit log, all money classes. |
+| 8 | CA / Chartered Accountant | Audit & Compliance · "External CA" | 10 | Read-only CA module, every order (read-only), CAFIN. No editing (D-114). |
+| 9 | Sales/Export Manager | Sales & Export · manager | 29 | Export Executive + approvals, all orders, assign owners. |
+| 10 | Sales Director | Sales & Export · director | 33 | Manager + cockpit, staff reports, email-send approval. |
+| 11 | Procurement Executive | Procurement · executive (limit ₹0) | 11 | Supplier PO, purchasing, market prices. Sees the order number, not the client. |
+| 12 | Procurement Manager | Procurement · manager (limit ₹5,00,000) | 15 | Executive + approve purchases within limit, all orders. |
+| 13 | Procurement Director | Procurement · director (no limit) | 17 | Manager + cockpit, agreements view. |
+| 14 | Logistics Manager | Logistics · manager | 18 | Executive + logistics partners directory, all orders. |
+| 15 | Logistics Director | Logistics · director | 20 | Manager + cockpit, agreements view. |
+| 16 | Finance Manager | Accounts & Finance · manager | 36 | Accounts + order financials, CAFIN generate, associate bank checks. |
+| 17 | Finance Director | Accounts & Finance · director | 41 | Manager + short-payment approval, payment-terms approval, cockpit. |
+| 18 | System Administrator | Administration · other | 17 | Users, settings, templates, lists. **No business money, no data export.** |
+| 19 | Order Coordinator | Order Desk · executive | 4 | Status of every order, sets department owners, cockpit. No prices. |
+| 20 | Operations Manager | Order Desk · manager | 5 | Coordinator + order assignees. No money (confirmed 1 Nov 2026). |
+| 21 | Export Compliance Executive | Export Compliance · executive | 8 | Compliance checklist, COO Prep Sheet, benefit claims, gov't documents (D-226). |
+| 22 | Export Compliance Manager | Export Compliance · manager | 13 | Executive on every order + approve documents, compliance task types. |
+| 23 | Export Compliance Director | Export Compliance · director | 14 | Manager + cockpit. |
+| 24 | Investor (view only) | none | 3 | `see_all_divisions`, `view_cockpit`, `view_reports` only (D-257). |
+
+Abbreviations used in the next table: ExpEx = Export Executive, AccEx =
+Accounts Executive, LogEx = Logistics Executive, Viewer = Viewer / Auditor,
+CA = CA / Chartered Accountant, SalesMgr/SalesDir, ProcEx/ProcMgr/ProcDir,
+LogMgr/LogDir, FinMgr/FinDir, SysAdmin = System Administrator, OrdCoord =
+Order Coordinator, OpsMgr = Operations Manager, ECEx/ECMgr/ECDir = Export
+Compliance Executive/Manager/Director.
+
+### 4.3 The 94 permissions
+
+Generated from the seed (`permissions` + `role_permissions`), grouped by the
+`category` column. "What it allows" is the first sentence of the seeded
+description. A Super Admin holds every key regardless of this table. Admin
+can change any role's ticks in **Admin › Permissions**
+(`/admin/permissions`), subject to the "nobody raises their own rights" rule
+(4.5).
+
+**Category: admin**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `data_export_run` | Download a full structure-only and data-only dump of the live database, to migrate all historical records into a fresh reinstall. | Admin, MD, ED |
+| `delete_assets` | Permanently remove a superseded (inactive) logo/signature/seal/watermark upload. | Admin, MD, ED, SysAdmin |
+| `manage_approval_limits` | Change a designation's purchase approval limit or make it a 'director' (no limit). | MD, ED |
+| `manage_assets` | Upload/replace logo, signature, seal, watermark. | Admin, MD, ED, SysAdmin |
+| `manage_company_settings` | Edit company_settings key-value configuration. | Admin, MD, ED, SysAdmin |
+| `manage_divisions` | Admin > Divisions: modules, number formats, division settings and activating a planned division. | Admin, MD |
+| `manage_email_templates` | Add or edit email templates used when composing a send (never delete — every past send keeps its own frozen copy in the email log regardless). | Admin, MD, ED, SysAdmin |
+| `manage_field_protection` | Request or approve locking/unlocking a protected field (company setting, T&C clause, or payment preset). | Admin, MD, ED, SysAdmin |
+| `manage_permissions` | Edit role/user permission matrix. | Admin, MD, ED, SysAdmin |
+| `manage_sample_data` | Load/clear the Sample Data Playground (test clients/orders only — never real data). | Admin, MD, ED, SysAdmin |
+| `manage_signatories` | Manage the designations list, mark a user as signatory-eligible, upload their signature/designation-seal images, and set the global and per-document-type default signatory. | Admin, MD, ED, SysAdmin |
+| `manage_task_types` | Set the standard and escalation days of each kind of department task. | Admin, MD, ED |
+| `manage_users` | Create/edit/deactivate user accounts and assign roles. | Admin, MD, ED, SysAdmin |
+| `see_all_divisions` | Company level: see every division's orders, clients and reports, and pick one division or "All divisions" in the header (the picker shows only when two or more divisions are active). | Admin, MD, ED, AccEx, Viewer, CA, FinMgr, FinDir, SysAdmin, Investor |
+| `view_audit_log` | View the immutable system audit trail. | Admin, MD, ED, Viewer, SysAdmin |
+
+**Category: Agreements**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `manage_agreements` | Add, edit, renew and terminate agreements with clients, suppliers, logistics partners, associates and staff; sees staff NDAs; gets the expiry reminders | Admin, MD, ED |
+| `view_agreements` | See the agreements register and download signed copies (not staff agreements) | Admin, MD, ED, SalesDir, ProcDir, LogDir, FinDir |
+
+**Category: Associates**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `manage_associates` | Associate register, agreements, rates, invitations, client links and their changes, portal access | Admin, MD, ED |
+| `manage_associate_bank` | See associates' full bank details and verify bank changes (two people) | Admin, MD, FinMgr, FinDir |
+| `view_associates` | See which client was introduced by which associate (no amounts, bank details or agreements) | Admin, MD, ED, ExpEx, SalesMgr, SalesDir |
+
+**Category: ca**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `ca_fy_lock_override` | Push through a single CA entry even while its financial year is locked — for a genuine backdated correction, never routine use. | Admin, MD, ED, AccEx, FinMgr, FinDir |
+| `ca_internal_doc_manage` | Toggle the internal-only CA Financial Annexure (govt export benefits + expenses) for an order and generate it. | Admin, MD, ED, FinMgr, FinDir |
+| `ca_module_manage` | Trigger a Zoho Books sync and view its log, and lock/unlock a financial year for CA data entry — kept separate from ca_module_view since these are administrative actions with a wider blast radius than routine data entry, not … | Admin, MD, ED, AccEx, FinMgr, FinDir |
+| `ca_module_view` | View the CA/Accounting module (independent of the order-pipeline system) — the INR settlement register and, as later phases land, revenue/expense/reconciliation reports. | Admin, MD, ED, AccEx, CA, FinMgr, FinDir |
+| `inr_actual_delete` | Remove a recorded INR actual amount (e.g. | Admin, MD, ED, FinMgr, FinDir |
+| `inr_actual_edit` | Record or correct the actual INR amount credited to the bank for a cleared advance/balance/freight payment. | Admin, MD, ED, AccEx, FinMgr, FinDir |
+| `inr_actual_view` | See the actual INR amount credited to the bank for a cleared advance/balance/freight payment. | Admin, MD, ED, AccEx, CA, FinMgr, FinDir |
+| `manage_order_financials` | View/add/edit an order's export benefit claims, other costs, and its profitability summary. | Admin, MD, ED, FinMgr, FinDir |
+| `view_cafin` | See and download the internal CA Financial Annexure (CAFIN): the CAFIN box on the order page and CAFIN in document lists. | Admin, MD, ED, AccEx, CA, FinMgr, FinDir |
+
+**Category: catalog**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `browse_product_catalog` | Browse the full product catalog list, not just search results. | Admin, MD, ED, ExpEx, AccEx, LogEx, SalesMgr, SalesDir, ProcEx, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir |
+| `manage_compliance_task_types` | Add or deactivate compliance task types (ECGC Cover, Pre-Shipment Inspection, etc.). | Admin, MD, ED, SysAdmin, ECMgr, ECDir |
+| `manage_dropdown_options` | Add, edit, and deactivate the admin-editable option lists used across the app (Container Type, Certificate of Origin Type, etc. | Admin, MD, ED, SysAdmin |
+| `manage_hs_codes` | Add, edit, and deactivate HS codes in the master list order creation picks from — kept separate from ordinary order-entry access so a new code always goes through a privileged person first. | Admin, MD, ED, SysAdmin |
+| `manage_logistics_partners` | Add, edit, and deactivate CHA and transportation partners in the directory order staff pick contacts from. | Admin, MD, ED, LogMgr, LogDir |
+| `manage_payment_presets` | Create, edit, deactivate payment presets (advance/balance %, balance-trigger wording). | Admin, MD, ED, SysAdmin |
+| `manage_ports` | Add, edit, and deactivate the Port of Loading / Port of Discharge options offered on the New Order form. | Admin, MD, ED, SysAdmin |
+| `manage_pricing` | Change the pricing settings, a product's pricing overrides, the associate commission levels and ladder, and an associate's commission level. | Admin, MD |
+| `manage_product_catalog` | Create, edit, and delete products, suppliers, images, and misc charges. | Admin, MD, ED |
+| `manage_product_specifications` | Change one product's specifications: hide a specification or option, change an option's value, add options or specifications for that product only, reset to the category. | Admin, MD |
+| `manage_suppliers` | Add, edit, deactivate and delete suppliers (and their types and factory addresses) in the Suppliers directory the Supplier PO picks from. | Admin, MD, ED, ProcEx, ProcMgr, ProcDir |
+| `record_market_prices` | Record supplier and market prices for products (dated, valid until, history) and mark the one used for pricing. | Admin, MD, ProcEx, ProcMgr, ProcDir |
+| `view_price_buildup` | See a product's cost, margin, minimum price, team-incentive reserve, every floor and quote price, and the pricing settings. | Admin, MD, ED |
+| `view_product_catalog` | Search and view individual products in the internal product catalog. | Admin, MD, ED, ExpEx, AccEx, LogEx, Viewer, SalesMgr, SalesDir, ProcEx, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir |
+| `view_product_pricing` | See product pricing, supplier list, and misc charges. | Admin, MD, ED, ExpEx, AccEx, SalesMgr, SalesDir, FinMgr, FinDir |
+
+**Category: clients**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `impersonate_client` | Start a staff-initiated client-portal session for a client who can't use the portal themselves. | Admin, MD, ED |
+| `view_clients` | See the Clients list and a client's detail page without being able to create, edit, or act on it. | Admin, MD, ED, Viewer |
+| `view_client_email_full` | See a client's full email address (vs a masked view). | Admin, MD, ED, ExpEx, AccEx, SalesMgr, SalesDir, FinMgr, FinDir |
+
+**Category: documents**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `approve_documents` | Approve/release a generated document to the buyer. | Admin, MD, ED, SalesMgr, SalesDir, ECMgr, ECDir |
+| `approve_email_send` | Level-2 approval for a deferred client email before it actually sends (Section 10 — Email & Deferred Send System). | Admin, MD, ED, SalesDir |
+| `cross_verify_documents` | Add an independent pass/fail quality check on any generated document — separate from the formal reviewer sign-off. | Admin, MD, ED, ExpEx, AccEx, LogEx, SalesMgr, SalesDir, LogMgr, LogDir, FinMgr, FinDir |
+| `download_pdf` | Download a generated PDF document. | Admin, MD, ED, ExpEx, AccEx, LogEx, SalesMgr, SalesDir, ProcEx, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir, ECEx, ECMgr, ECDir |
+| `edit_locked_data` | Edit a field that is normally locked after stage sign-off. | Admin, MD, ED |
+| `generate_compliance_documents` | Generate the COO Prep Sheet (for the Certificate of Origin application) without the general Generate documents permission. | Admin, MD, ED, ECEx, ECMgr, ECDir |
+| `generate_documents` | Generate QT/PI/OC/PL/CI/etc. | Admin, MD, ED, ExpEx, LogEx, SalesMgr, SalesDir, ProcEx, ProcMgr, ProcDir, LogMgr, LogDir |
+
+**Category: incentives**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `manage_incentives` | See and change the incentive settings, each order's incentive and profit basis, the associate register and every payout. | Admin, MD |
+| `pay_incentives` | See the incentive payouts list (person, order, amount) and record payments. | Admin, MD, AccEx, FinMgr, FinDir |
+| `view_own_incentives` | See your own incentive amounts once the buyer has fully paid. | Admin, MD, ED, ExpEx, AccEx, LogEx, SalesMgr, SalesDir, ProcEx, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir, ECEx, ECMgr, ECDir |
+
+**Category: money**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `view_buyer_payments` | What the buyer has paid and still owes: the payment snapshot, the remittances and their screenshots. | Admin, MD, ED, ExpEx, AccEx, Viewer, CA, SalesMgr, SalesDir, FinMgr, FinDir |
+| `view_logistics_costs` | CHA, transport and packing costs in the catalogue, freight rates, and logistics bills and their scans. | Admin, MD, ED, AccEx, LogEx, Viewer, CA, LogMgr, LogDir, FinMgr, FinDir |
+| `view_purchase_prices` | Supplier PO values, factory and supplier costs in the catalogue, supplier bills and their scans, and the Supplier PO document. | Admin, MD, ED, AccEx, Viewer, CA, ProcEx, ProcMgr, ProcDir, FinMgr, FinDir |
+| `view_selling_prices` | Unit prices, FOB and order values, and the sales documents that carry them (QT, PI, OC, CI, AMD, Debit Note). | Admin, MD, ED, ExpEx, AccEx, Viewer, CA, SalesMgr, SalesDir, FinMgr, FinDir, ECEx, ECMgr, ECDir |
+
+**Category: orders**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `approve_payment_terms` | Approve an order's payment terms when its preset is marked "Requires MD approval" — needed before the Quotation can be generated or sent. | Admin, MD, ED, SalesMgr, SalesDir, FinDir |
+| `approve_short_payment` | Approve a short payment — clear a buyer payment that is less than due, with a written reason | Admin, MD, ED, FinDir |
+| `assign_department_owner` | Choose who in a department owns an order for that department (a manager for their own department; MD/ED and Admin for any). | Admin, MD, ED, SalesMgr, SalesDir, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir, OrdCoord, OpsMgr, ECMgr, ECDir |
+| `assign_order_owner` | Add or remove which staff are assigned to an order (order_assignees). | Admin, MD, ED, SalesMgr, SalesDir, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir, OpsMgr, ECMgr, ECDir |
+| `clear_payments` | Confirm a buyer payment actually landed in the bank, unlocking the next stage gate — split out of manage_payments so the person who records a payment is never also the one who confirms it. | Admin, MD, ED, AccEx, FinMgr, FinDir |
+| `close_orders` | Close a fully-despatched order or mark one lost — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer close an order. | Admin, MD, ED, ExpEx, LogEx, SalesMgr, SalesDir, LogMgr, LogDir |
+| `edit_order_post_confirmation` | Edit order details or product rows once Order Confirmation has been issued (Stage 4+) — a reason is required and every use is logged. | Admin, MD, ED |
+| `manage_complaints` | View complaints, acknowledge/resolve them, and log one on a client's behalf. | Admin, MD, ED, SalesMgr, SalesDir |
+| `manage_compliance_checklist` | Work the order's compliance checklist (ECGC cover, inspection, fumigation, phytosanitary, due diligence …). | Admin, MD, ED, ExpEx, LogEx, SalesMgr, SalesDir, LogMgr, LogDir, ECEx, ECMgr, ECDir |
+| `manage_disputes` | View/raise/update a dispute's status, attach evidence, and enable/disable the client-facing dispute button. | Admin, MD, ED, SalesMgr, SalesDir |
+| `manage_export_benefit_claims` | Answer which export benefit schemes an order is eligible for and file the claims (scheme, reference no., amount claimed, date). | Admin, MD, ED, FinMgr, FinDir, ECEx, ECMgr, ECDir |
+| `manage_logistics_bills` | Add a CHA, transport or freight-forwarder bill to an order and remove one that has no payment on it. | Admin, MD, ED, AccEx, LogEx, LogMgr, LogDir, FinMgr, FinDir |
+| `manage_orders` | Create/edit orders and advance them through stage gates. | Admin, MD, ED, ExpEx, AccEx, LogEx, SalesMgr, SalesDir, LogMgr, LogDir, FinMgr, FinDir |
+| `manage_payments` | Record and clear an order's advance/balance payment (Stages 3 and 8) — QA-5 RBAC-03/04: split out of manage_orders so a Logistics-only user can no longer mark a buyer payment as cleared; kept with Accounts, who already owns … | Admin, MD, ED, ExpEx, AccEx, SalesMgr, SalesDir, FinMgr, FinDir |
+| `manage_shipping` | Record freight terms/payment and packing/BL/shipping actions (Stages 6-7 and 9) — QA-5 RBAC-04: split out of manage_orders so an Accounts-only user can no longer record a BL. | Admin, MD, ED, ExpEx, LogEx, SalesMgr, SalesDir, LogMgr, LogDir |
+| `manage_supplier_payments` | Mark a supplier payment as paid, and see the Outgoing (Supplier) side of Today's Payments — split out of manage_order_financials so Accounts can confirm supplier payments without the broader financials/profitability access. | Admin, MD, ED, AccEx, FinMgr, FinDir |
+| `manage_supplier_po` | Create and confirm the Supplier PO and record production status (steps 7a-7d). | Admin, MD, ED, ProcEx, ProcMgr, ProcDir |
+| `override_buyer_acknowledgment` | Record a buyer's OC acknowledgment manually (e.g. | Admin, MD, ED, ExpEx, AccEx, LogEx, SalesMgr, SalesDir, LogMgr, LogDir, FinMgr, FinDir |
+| `override_shipment_gates` | Override shipment gates — release the BL step with a written reason when the pre-shipment balance or the inspection is not cleared | Admin, MD, ED |
+| `respond_to_complaints` | Post a reply in a complaint's conversation thread — kept separate from manage_complaints so sales roles can answer without also managing its status, same split as respond_to_disputes. | Admin, MD, ED, ExpEx, SalesMgr, SalesDir |
+| `respond_to_disputes` | Post a reply in a dispute's reply thread — kept separate from manage_disputes so sales roles can answer without also managing dispute status or the button. | Admin, MD, ED, ExpEx, SalesMgr, SalesDir |
+| `settle_orders` | Mark an order fully settled once every rupee is in and out. | Admin, MD, ED, AccEx, FinMgr, FinDir |
+| `upload_order_documents` | Attach government and agency documents (ECGC policy, Certificate of Origin, phytosanitary / fumigation / inspection certificates, eBRC …) to an order in Step 14, without Manage orders. | Admin, MD, ED, ECEx, ECMgr, ECDir |
+| `view_all_orders` | See every order in the Orders list, Kanban board, and order detail page, not just ones assigned to you. | Admin, MD, ED, AccEx, Viewer, CA, SalesMgr, SalesDir, ProcMgr, ProcDir, LogMgr, LogDir, FinMgr, FinDir, OrdCoord, OpsMgr, ECMgr, ECDir |
+| `view_archived_orders` | See orders that have been archived out of the default listing. | Admin, MD, ED, ExpEx, AccEx, LogEx, SalesMgr, SalesDir, LogMgr, LogDir, FinMgr, FinDir |
+| `view_orders` | See the Orders list and an order's detail page without being able to create, edit, or act on it. | Admin, MD, ED, Viewer, CA, ProcEx, ProcMgr, ProcDir, OrdCoord, OpsMgr, ECEx, ECMgr, ECDir |
+
+**Category: procurement**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `approve_purchases` | Approve an award above the awarding designation's approval limit (up to this designation's own limit; no limit = any amount). | Admin, MD, ED, ProcMgr, ProcDir |
+| `manage_purchasing` | Record supplier quotes, compare and award, follow production, record receipt and the quality check. | Admin, MD, ED, ProcEx, ProcMgr, ProcDir |
+| `raise_purchase_requirements` | Ask Procurement for what an order needs (product, quantity, needed by) — no prices. | Admin, MD, ED, ExpEx, SalesMgr, SalesDir |
+
+**Category: reports**
+
+| Key | What it allows | Roles that hold it (seed) |
+|---|---|---|
+| `manage_report_definitions` | Create/edit/delete saved report definitions. | Admin, MD, ED, SysAdmin |
+| `view_cockpit` | Open, overdue and escalated work per department, orders by stage, supplier delays and overdue buyer payments — counts and status only. | Admin, MD, ED, SalesDir, ProcDir, LogDir, FinDir, OrdCoord, OpsMgr, ECDir, Investor |
+| `view_reports` | Run and view reports and dashboards. | Admin, MD, ED, ExpEx, AccEx, Viewer, SalesMgr, SalesDir, FinMgr, FinDir, Investor |
+| `view_staff_reports` | View the Staff Productivity report (documents generated and audit-log activity per user) — kept separate from view_reports since it shows individual staff activity, not just business data. | Admin, MD, ED, SalesDir, FinDir |
+
+### 4.4 Departments, designations, "Log in as" and "Preview as"
+
+**Why (D-214, built 1 Nov 2026).** Day to day nobody edits permissions. To
+give someone access, add them to a department. To take it away, end the
+membership. The chain is **department → designation → role → permissions**.
+
+**Departments (seed, `departments`).** `sees_whole_company` = 1 means the
+department is company-level (not tied to one division).
+
+| Code | Name | Company-wide | Designations (level → role) |
+|---|---|---|---|
+| MGMT | Company Management | yes | Managing Director (director), Executive Director (director) |
+| SALES | Sales & Export | no | Sales/Export Executive → Export Executive; Sales/Export Manager; Sales Director |
+| PROC | Procurement | no | Procurement Executive (limit ₹0); Procurement Manager (₹5,00,000); Procurement Director (no limit) |
+| LOG | Logistics | no | Logistics Executive; Logistics Manager; Logistics Director |
+| EXPORT_COMPLIANCE | Export Compliance (D-226) | no | Export Compliance Executive; Manager; Director |
+| FIN | Accounts & Finance | yes | Accounts Executive; Finance Manager; Finance Director |
+| AUDIT | Audit & Compliance | yes | Internal Auditor → Viewer / Auditor; External CA › CA / Chartered Accountant |
+| ADMIN | Administration | no | System Administrator |
+| OPS | Order Desk (optional, switched off) | no | Order Coordinator (executive); Operations Manager (manager) |
+
+Sales, Procurement, Logistics, Export Compliance and Order Desk belong to
+division EXP (Export); the others are company-level (seed line
+`UPDATE departments SET division_id …`).
+
+**Two different "designation" lists — do not confuse them.**
+
+1. `department_designations` — the ladder above. Each row has a `level`
+   (executive / manager / director / other), a `role_id`, an
+   `approval_limit_inr` (purchasing) and `incentive_eligible` (D-259).
+   Managed in **Admin › Departments** (`/admin/departments`,
+   `manage_permissions`).
+2. `designations` — the **signatory titles** printed under a signature on
+   documents (seed: "Director", "Founder & Managing Director", "Founder &
+   Executive Director"). Managed in **Admin › Signatories**
+   (`manage_signatories`), with `user_signature_assets` and
+   `document_type_signatories` (per document type default; the AMD defaults
+   to the MD, D-067).
+
+**Memberships.** `user_department_memberships` (user, designation,
+`starts_on`, `ends_on`, `is_default`). Added and ended on **Admin › Users →
+Edit › Departments**. An ended membership stays on record; from the next
+day it cannot be chosen, and if someone is working in it at that moment it
+stops at once.
+
+**"Log in as".** After password (and 2FA):
+
+- One membership → straight in, working as that department.
+- Several → `/choose-department` asks which; "Start here next time" sets
+  `is_default`.
+- No membership → the person works with the role on their user record.
+- The sidebar shows "Logged in as <designation> · <department>" in the
+  department colour, with **Switch department** (`POST /switch-department`).
+- Every audit-log row records the department the person was acting as.
+
+Code: `ActiveDepartmentService` (PHP `app/src/Services/ActiveDepartmentService.php`,
+Node `app/src/services/activeDepartmentService.js`), controller
+`DepartmentController` / `departmentController.js`, admin pages
+`DepartmentAdminController` / `departmentAdminController.js`.
+
+**"Preview as" (view-only).** On Admin › Departments, a holder of
+`manage_permissions` presses **Preview the app as this**
+(`POST /admin/preview-as`). The app is shown exactly as that designation
+sees it: the admin's own extra rights, Super Admin bypass and personal
+exceptions are all off. A yellow banner stays at the top. **A preview is
+look-only (D-258, 6 Nov 2026):** `SessionAuth` refuses every POST except
+`/preview/exit` and `/logout` with "You are previewing the app: nothing can
+be saved during a preview."
+
+**Personal exceptions.** Admin › Permissions › *Grant an extra permission*
+writes `user_permissions` with a reason and an optional **Until** date
+(`expires_at`). After that date it is listed as "ended" and no longer
+applies. Use it rarely, e.g. letting one Logistics person download the
+Commercial Invoice (it carries selling prices) with a reason and end date.
+
+### 4.5 Who may give rights; Super Admin; protected founder accounts
+
+**Nobody raises their own rights (owner decision A-8, 1 Nov 2026).**
+Enforced by `GrantGuard` (PHP `app/src/Services/GrantGuard.php`, Node
+`grantGuard.js`):
+
+- You cannot give a permission you do not hold yourself — not on a role,
+  not as a personal exception, not by giving someone a role or membership
+  that carries it.
+- You cannot change your own rights: your role's permissions, your own role,
+  or an exception/membership for yourself.
+- Removing a permission is always allowed.
+- A Super Admin is the exception, so nobody is ever locked out.
+
+So the System Administrator (who holds `manage_permissions` and
+`manage_users`) can never tick money permissions onto a role.
+
+**Super Admin.** `users.is_super_admin = 1` (permanent) or a time-limited
+row in `super_admin_delegations` (granted with a reason, revocable). Pages:
+`/super-admin` and `/admin/self-approval` (both `SuperAdminOnly`
+middleware). A Super Admin passes every permission check but **not** the
+maker-checker rules — those are governed by the self-approval rules (4.6).
+
+**Protected founder accounts.** The seed creates exactly two users: the
+Managing Director (md@email.com) and the Executive Director (ed@email.com),
+both `is_super_admin = 1` and `is_protected_account = 1`. The application
+refuses — for everyone, including other Super Admins — to:
+
+- edit their details or department memberships (`UserController`,
+  `DepartmentAdminController`);
+- deactivate, archive or delete them;
+- reset their password (only the person, via "Forgot password");
+- change their signatory eligibility or designation title
+  (`SignatoryController`);
+- remove their Super Admin status (`SuperAdminService` throws);
+- move them between divisions (D-258).
+
+The users list shows a **"Protected — founder"** tag. Any change must be
+made directly in the database by the owner's instruction.
+
+### 4.6 Self-approval rules and approval limits
+
+**Maker-checker.** Normally a second person approves what someone made
+(D-117, replaced by D-216/D-221). The single choke point is
+`MakerCheckerGuard` (PHP `app/src/Services/MakerCheckerGuard.php`, Node
+`makerCheckerGuard.js`) reading `self_approval_rules` via
+`SelfApprovalRules`.
+
+**Admin › Self-approval rules** (`/admin/self-approval`, Super Admins only)
+lists eight rules. For each, tick the roles whose holders may approve their
+**own** work. A person qualifies when any of their own roles (main role,
+acting department, any membership) is ticked. Seed default for every rule:
+**Managing Director and Executive Director**.
+
+| Rule key | Self-approval of… | Audit action when used |
+|---|---|---|
+| `payment_terms` | payment terms of an order they created | PAYMENT_TERMS_SELF_APPROVED |
+| `document_review` | a document they generated | DOCUMENT_SELF_REVIEWED (badge "self-review") |
+| `email_send` | an e-mail send they requested | EMAIL_SEND_SELF_APPROVED |
+| `cancellation` | approve/reject a cancellation they requested | ORDER_CANCELLATION_SELF_APPROVED / _REJECTED |
+| `purchase_award` | a purchase award they made (above their limit) | PURCHASE_AWARD_SELF_APPROVED |
+| `amendment` | MD-approve an amendment they requested | AMENDMENT_SELF_APPROVED |
+| `short_payment` | clear short a payment whose receipts they recorded | SHORT_PAYMENT_SELF_APPROVED |
+| `price_discount` | approve a line price below the floor that they set (D-240/D-245) | PRICE_DISCOUNT_SELF_APPROVED |
+
+There is **no other exception**: Admin, System Administrator and Super
+Admin self-approve only if one of their roles is ticked. A rule change is
+logged as SELF_APPROVAL_RULE_CHANGED. A self-review assigned while allowed is
+refused at approval if the rule was withdrawn in between.
+
+**Approval limits (purchasing, D-214 phase 3).** Each designation has
+`approval_limit_inr`; level `director` means no limit.
+
+| Designation | Approves an award up to |
+|---|---|
+| Procurement Executive | ₹0 — every award goes to an approver |
+| Procurement Manager | ₹5,00,000 |
+| Procurement Director, MD, ED | no limit |
+| Any manager-level designation with no limit set | ₹0 (waits — nobody self-approves on an unknown limit) |
+
+Example: a Procurement Manager awards a quote of 2,000 m² × ₹300 + 18% GST =
+₹7,08,000. That is above ₹5,00,000, so it waits for a holder of
+`approve_purchases` whose own limit covers it (Director or MD/ED).
+
+Only holders of `manage_approval_limits` (MD, ED, Super Admins) change a
+limit or make a designation "director", and never on a designation they hold
+themselves (QA R8-N10). Logged as APPROVAL_LIMIT_CHANGED.
+
+### 4.7 Money visibility (MoneySeparation, D-214 phase 2)
+
+One rule decides whether the signed-in person may see a kind of money:
+`MoneyVisibility` (PHP `app/src/Services/MoneyVisibility.php`, Node
+`moneyVisibility.js`). Every page, list, Kanban card, report, CSV, document
+download, file download and dossier ZIP asks it.
+
+| Money class | Permission | Default holders | Documents carrying it |
+|---|---|---|---|
+| Selling prices (unit prices, FOB, order values) | `view_selling_prices` | Sales, Finance, MD/ED, Admin, auditors, CA, Export Compliance | QT, BUYERPO, PI, OC, FDN (Debit Note), CI, AMD, COOPREP, ESI |
+| Buyer payments (paid / owed, remittances, screenshots) | `view_buyer_payments` | Sales, Finance, MD/ED, Admin, auditors, CA | CHECKLIST_2_FINANCE |
+| Purchase prices (Supplier PO values, supplier bills, factory cost) | `view_purchase_prices` | Procurement, Finance, MD/ED, Admin, auditors, CA | SUPPO |
+| Logistics costs (CHA, transport, packing, freight, logistics bills) | `view_logistics_costs` | Logistics, Finance, MD/ED, Admin, auditors, CA | BLI |
+| Order costs, expense receipts, profit | `manage_order_financials` | Admin, MD, ED, Finance Manager/Director | CAFIN also needs `view_cafin` |
+
+Rules worth remembering:
+
+- **Status is shown, amounts are hidden.** Logistics sees "Remittance
+  recorded on 3 Jun" without the amount; Sales sees "Supplier advance: paid
+  on 12 Jun" without the bill.
+- **Procurement sees the order number, not the client** (`seesClient()`):
+  the client name is left off the order page, list and board for anyone
+  acting as a Procurement designation. Logistics sees the client name.
+- **Every copy follows the rule** (D-229): drafts, superseded copies,
+  internal Word copies and older CAFINs carry `file_store.linked_document_id`
+  so they inherit the document's money class.
+- **Audit trails hide amounts** with "— hidden (no permission to see these
+  amounts)" (`AuditMoneyMask`).
+- Reports with selling prices or buyer payments open only for people who may
+  see them.
+- Test: `e2e/tests/12-money-matrix.spec.js` signs in as every role, opens
+  about 75 screens/CSVs and every file of a sample order, and fails if an
+  amount leaks.
+
+### 4.8 Division visibility (`see_all_divisions`, D-257)
+
+One company, several divisions (`divisions`): **EXP Export (active)**, DOM
+Domestic Trade, MTT Merchant Trade, IMP Import & Distribution (all
+**planned**). Every order has a `division_id` that never changes; users and
+departments have a division (empty = company level).
+
+- `see_all_divisions` (Admin, MD, ED, Accounts Executive, Viewer/Auditor, CA,
+  Finance Manager/Director, System Administrator, Investor) sees every
+  division and gets the header switcher with "All divisions".
+- Everyone else sees only their own division's orders, clients, reports,
+  counts, tasks, files and CSV exports.
+- **While only one division is active nothing shows:** no switcher, no
+  Division filter or field. Admin › Divisions (`manage_divisions`: Admin,
+  MD) is the only visible place.
+- Staff placed in a division that is not active can look but not save.
+- Code: `DivisionService` (PHP/Node), `DivisionController` /
+  `divisionController.js`; tables `divisions`, `division_modules`,
+  `division_settings`, `client_divisions`.
+
+### 4.9 The Investor (view only) role
+
+Role 24, added by D-257. It holds only `see_all_divisions`, `view_cockpit`
+and `view_reports`: dashboards, the management cockpit and reports across
+every division. Every page that changes anything is refused (tested route
+by route). It has no client-portal access and sees no order pages
+(it lacks `view_orders`).
+
+**Watch out: the seed Investor sees no money.** The role holds none of the
+four money permissions (4.7). `ReportController::refusedForMoney()` refuses
+every report that prints selling prices or buyer payments (per-client,
+aggregate, payments, today's payments, amendments, trends, ageing, products,
+performance) with "You do not have permission to see the amounts in this
+report.", and Order Profitability needs `manage_order_financials`. With the
+seed set-up an Investor can open the dashboard, the cockpit, Operations
+Queues, Conversion and Disputes — counts and status only. If the owner wants
+investors to see revenue or profit, add `view_selling_prices` (and perhaps
+`view_buyer_payments`) to the role in Admin › Permissions; that is a
+business decision, not a bug fix.
+
+### 4.10 The client portal (buyers)
+
+**Who:** buyers only, at `/client/login` (layout `views/layout/client.php` /
+`client.njk`, middleware `ClientAuth`). Logins are in `client_logins`; one
+e-mail per client is enforced by a unique index (D-129, D-210).
+
+**When the login exists.** It is created automatically when the advance is
+cleared or the LC is confirmed usable (Stage 3 → 4). A returning client
+keeps their login. Before that the buyer only uses no-login links:
+quotation details form (`/quotation-details`), PI details form
+(`/pi-details/{token}`), the Buyer Action Link, the Payment Action Link.
+
+**What a buyer sees** (SOP 12):
+
+| Screen | Content |
+|---|---|
+| My Orders | Every order grouped Active / Complete / Disputed / Lost / Cancelled. "Documents Sent" shows as **Complete**. Order history can be limited by `client_portal_show_order_history` (global) and a per-client override. |
+| Inside an order | OC acknowledgement (when pending); Documents (final approved/sent customer-facing PDFs only; can be hidden by `client_portal_show_document_downloads` + per-client override); Buyer PO upload (closes once the advance clears, D-127); Order Updates chat; Report a Payment (only after the PI is issued, never on cancelled/lost, D-206); Raise a Dispute (only if staff switched it on for that order); Report a Process Issue (always); Order Feedback (after documents are sent, D-133); Reorder This. |
+| My Account | Change password only. Forgot-password link valid 72 h, max 5 per client per hour, generic answer. |
+
+**CAFIN never reaches the client (standing rule, D-068, D-106).** The
+portal lists only `document_types.category = 'customer_facing'` documents in
+status approved or sent (`DocumentRepository::customerFacingForOrder()`),
+and every download re-checks the type, so CAFIN, the Supplier PO, BLI, COO
+Prep Sheet, AMD and checklists are refused **even by direct ID**. E-mail
+compose refuses internal document types; link pages offer only issued
+customer documents. Customer-facing types: QT, ANNEXA, BUYERPO, PI, OC, FDN,
+PL, CI, BLE, ESI.
+
+**Staff "Log in as this client".** Needs all three: permission
+`impersonate_client` (Admin, MD, ED), the client's own
+`allow_staff_impersonation` toggle, and the global
+`client_impersonation_enabled` setting (off by default). An amber banner
+shows on every portal page; every use is logged. Staff can also reset a
+client's portal password (one-time temporary password, D-122).
+
+### 4.11 The associate portal and access levels
+
+Associates are outside agents (India or abroad) who introduce buyers under
+an Associate Agreement (D-217, D-245). They are **not staff**: no staff
+login, no department. They use `/associate` with password + an e-mailed
+code (`/associate/login`, `/associate/login/code`, middleware
+`AssociateAuth`). A buyer login never opens it, and an associate never sees
+a buyer's portal.
+
+Never shown at any level: cost, margin, supplier prices, profit, CAFIN,
+buyer payment amounts, other associates.
+
+**Owner decisions of 6 Nov 2026 (business volume and FOB):**
+
+- An associate **may see their commission** (per order, and the portal's
+  "Earned this year / Waiting to be paid / Paid this year" commission
+  figures), but must **never see the total business they bring in**. The
+  portal has no lifetime or period order-value summary (no total FOB, no
+  total sales, no "your business with us" figure) on any page,
+  statement, notice or e-mail, and one must never be added.
+- Whether an associate sees the **FOB value of an individual order** is
+  governed **only by the Access-levels matrix** below (`fob_value`; for a
+  Custom associate, their own tick). No other setting or screen adds or
+  removes it.
+
+**Access levels (D-261, 6 Nov 2026).** Each associate has
+`associates.access_level` = starter / quoting / full / custom. The single
+decision point is `AssociateAccess::allows()` (PHP
+`app/src/Services/AssociateAccess.php`, Node `associateAccess.js`). Hidden
+features are refused on the server (lock page, HTTP 403: "Not available at
+your access level — please contact NexaCrest"); the FOB value and commission
+% are stripped server-side, and amounts are blanked in notices and e-mails.
+
+Default matrix (`AssociateAccess::DEFAULTS`; MD can change it in
+**Associates › Access levels**, stored in `associate_access_level_settings`;
+"Restore recommended defaults" puts these back):
+
+| Feature (key) | Starter | Quoting | Full |
+|---|---|---|---|
+| Profile, bank & agreement (`profile`) — always on | ✔ | ✔ | ✔ |
+| My clients (`clients`) | ✔ | ✔ | ✔ |
+| Clients' orders and stage (`orders`) | ✔ | ✔ | ✔ |
+| Show FOB order value (`fob_value`) | — | ✔ | ✔ |
+| Commission per order, amount (`commission`) | ✔ | ✔ | ✔ |
+| Commission % on screen (`commission_pct`) | — | ✔ | ✔ |
+| Registration links / personal code (`registration_links`) | ✔ | ✔ | ✔ |
+| Catalogue, no prices (`catalogue`) | — | ✔ | ✔ |
+| Get price / quoting (`get_price`) | — | ✔ | ✔ |
+| Price requests "Other" (`price_requests`) | — | ✔ | ✔ |
+| Messages (`messages`) | ✔ | ✔ | ✔ |
+| Documents of their orders (`order_documents`) | — | — | ✔ (switch only: the portal has no order-documents page yet, O-22) |
+| TDS certificates (`tds_certificates`) | ✔ | ✔ | ✔ |
+| Commission statement download (`commission_statement`) | — | ✔ | ✔ |
+| Amounts in messages and e-mails (`notice_amounts`) | — | — | ✔ |
+
+- **Custom** starts from Starter and uses the associate's own ticks in
+  `associate_access_features`.
+- New associates start on **Starter**; every associate that existed before
+  6 Nov 2026 stays **Full**.
+- Only the MD changes a level (associate page → Portal access, reason ≥ 10
+  characters, logged in `associate_access_log`).
+- After 3 completed, fully paid orders (setting) the MD sees "Ready for the
+  Quoting level?" on the associate page and the dashboard. Nothing upgrades
+  by itself.
+
+Staff permissions for associates: `manage_associates` (Admin, MD, ED),
+`view_associates` (Sales roles: who introduced which client, no amounts),
+`manage_associate_bank` (Admin, MD, Finance Manager/Director). Only the MD
+(or a Super Admin) can move or remove a client's associate, with a reason.
+
+## 5. The order life cycle, step by step
+
+This section follows one export order from the first enquiry to archive. It
+is built from `StageGateService`, `OrderController` (PHP
+`app/src/Controllers/OrderController.php`, Node
+`app/src/controllers/ordersController.js`), the order page view (PHP
+`app/views/orders/show.php`, Node `app/views/orders/show.njk`) and SOPs
+01–19. Domestic, Import and Merchant Trade orders follow their own, shorter
+flows (6.15).
+
+### 5.1 Two trackers on one page: 9 stages and 19 steps
+
+**The 9 stages** (`stages_master`, one `order_stages` row per stage per
+order) are the internal pipeline. Each stage row has a status: `locked` →
+`in_progress` → `gate_passed` (or `skipped`). Only
+`StageGateService::passAndUnlockNext()` passes a gate. It:
+
+- refuses unless the order is `active` and the stage is `in_progress`
+  (D-002; lost/complete orders refuse every gate);
+- is idempotent (passing an already passed gate returns true);
+- writes the audit row `ORDER_STAGE_GATE_PASSED`;
+- unlocks the next stage and sets `orders.current_stage_id`.
+
+Every gate action calls `StageGateService::isUnlocked()` **before** writing
+anything, so an out-of-order request is refused before any data is stored.
+
+| # | Stage (`stage_slug`) | What passes the gate | Gate action (route) |
+|---|---|---|---|
+| 1 | Enquiry & Quotation (`quotation`) | QT approved (mail off) or sent (mail on) — automatic | document approval / send |
+| 2 | Buyer Purchase Order (`buyer_po`) | Buyer's PO ref + received date confirmed | `POST /orders/{id}/buyer-po` (Step 4d) or the buyer via the Buyer Action Link |
+| 3 | Proforma Invoice (`pi`) | Advance cleared; on LC: LC confirmed usable | `…/payment/advance/clear` or `…/payment/lc/confirm-usable` (Step 5e) |
+| 4 | Order Confirmation (`oc_production`) | Buyer acknowledges the OC (portal, link, staff record, or 48 h auto-confirm) | `…/oc-acknowledgment` (Step 6c) / cron |
+| 5 | Supplier PO (`supplier_po`) | Supplier's signed PO confirmed | `…/supplier-po/signed` (Step 7d) |
+| 6 | Freight Payment (`freight`) | Freight cleared (CFR/CIF); **auto-skipped on FOB** | `…/payment/freight/clear` (Step 9d) |
+| 7 | Packing & BL Instruction (`bl_instruction`) | BL number + date recorded | `…/bl-issued` (Step 10f) |
+| 8 | Commercial Invoice & Balance (`commercial_invoice`) | Balance cleared (and CI approved/sent) | `…/payment/balance/clear` (Step 11d) |
+| 9 | Document Despatch & Closure (`closure`) | Courier tracking number entered (Close Order) | `…/close` (Step 13f) |
+
+**The 19 steps** are what staff see on the order page, in the real order of
+work, grouped in five coloured sections (D-007, D-028):
+
+| Section | Steps |
+|---|---|
+| A · Order Booking (blue) | 1 Prepare Quotation · 2 Send Quotation · 3 Client Accepts Quotation · 4 Buyer's PO · 5 Proforma Invoice & Payment · 6 Order Confirmation |
+| B · Procurement & Production (green) | 7 Supplier PO · 8 Production & Estimated Shipment |
+| C · Shipment & Balance (amber) | 9 Freight Payment · 10 Packing & BL Instruction · 11 Commercial Invoice & Balance |
+| D · Closure & Settlement (purple) | 12 Closure — Financials, Benefits & Costs · 13 Closure — Documents & Settlement · 19 Order Complete |
+| E · After-Sales & Records | Amendments · 14 Additional Documents · 16 Order Feedback · 17 Complaints · 18 Disputes |
+
+Step 15 is **Order Communication**, pinned above the sections with
+Products, Payment Overview and Document Review & Approval (D-029).
+
+**Page rules every step follows.**
+
+- **D-001 — a stage passes only once its own document is finished:**
+  approved while e-mail sending is off (`mail_sending_enabled = 0`, the
+  seed default), sent while it is on. Internal documents (Supplier PO, BLI)
+  need approval only. The gate button stays disabled and a note above it
+  lists what is missing (D-023). Code:
+  `DocumentGenerationService::isDocumentComplete()`.
+- **D-003/D-004 — steps and sub-steps run in sequence.** A sub-step is
+  locked ("Complete Step 5a first") until the one before is done or
+  skipped. Every Skip needs a reason and is audit-logged. Steps 1–3 are
+  independent; compliance cards never lock anything.
+- **D-005 — a later step done means the earlier ones are done.**
+- **D-006 — one door at a time.** After each action the page returns to
+  the step being worked on.
+- **Force-generate.** Generating a later document before its stage is
+  unlocked needs the "Force-Generate a Document" override, with a typed
+  reason (SOP 13).
+- **Regenerating an earlier document** after later stages passed needs a
+  confirmation and marks later stages "DATA MAY BE STALE" (D-027).
+
+**Order statuses** (`orders.status`): `active` → `shipped_docs_sent`
+(after Close Order; the buyer sees "Complete") → `complete` (Mark Fully
+Settled, locked). Side exits: `lost` (Mark Lost, locked) and `cancelled`
+(approved cancellation, locked). `disputed` exists in the enum, but a dispute
+never changes the order status. The only way to set it is the Admin
+override `POST /orders/{id}/override-status-lock` (`edit_locked_data`,
+reason required, audit `FIELD_EDIT`); code that lists open orders treats
+`disputed` like `active`. `is_locked = 1` on complete / lost / cancelled; every order-changing
+route goes through `OrderLockGuard` (D-019).
+
+### 5.2 Before the order: enquiry and intake
+
+**Path A — the buyer fills the public form.** `/quotation-details` (no
+login; rate-limited). It asks for company, billing (structured address),
+consignee, notify party, Incoterm, container type, port, CoO type — never
+product details. The submission lands in `client_intake_submissions` and in
+**Operations › Quotation Intake Review** (`/client-intake`, live count
+badge). Staff choose:
+
+- **Accept & Create Client** → creates the `clients` row (with its
+  **Buyer Inquiry Ref** `client_unique_number`, e.g. `NC/SC/26/2009001`)
+  and opens it. It creates **no** order.
+- **Reject** with a reason (≥ 10 characters).
+- **Resend Link** — a one-time self-correction link (7 days).
+
+If the buyer arrived through an associate's link or code, the associate is
+carried as a hidden field; the buyer verifies the e-mail with a 6-digit code
+(valid 30 minutes). Accept is refused until verified. On Accept the client
+is linked to the associate for 12 months (D-217). A buyer never sees an
+error caused by an associate code (D-246).
+
+**Path B — staff create the client** at **Clients › Add Client**
+(`/clients/create`). One e-mail per client (D-129, unique index). A client
+can be **duplicated** to a new Buyer Inquiry Ref (save refused if nothing
+changed).
+
+Code: `ClientIntakeController`, `ClientIntakeReviewController`,
+`ClientController` (Node `clientsController.js`), `AssociateIntakeService`.
+
+### 5.3 Creating the order
+
+From the client page, **Add Order** (`/orders/create`, `manage_orders`).
+On save (`OrderController::store`):
+
+- The order reference is reserved atomically: `NC/SC/ORD/{YY}/{DDMM}{NNN}`,
+  a daily counter, e.g. `NC/SC/ORD/26/0411001` = first order of 4 Nov 2026
+  (D-248, `ReferenceNumberService`, `reference_sequences`). Another
+  division prefixes its code.
+- **The order is standalone (D-186):** Incoterm, currency, ports, client
+  address/consignee/notify party, and the **payment preset's terms**
+  (`preset_name`, `advance_pct`, `payment_method`, `balance_pct`,
+  `balance_trigger_option`, `balance_days`, wording, `show_bl_instructions`)
+  are copied onto `orders`. Several splits can run at once (D-072). The
+  preset cannot be changed later on Edit Order — only by Amendment (D-022).
+- The creator becomes the first assignee (`order_assignees`, D-118). An
+  order always keeps at least one assignee.
+- Nine `order_stages` rows; Stage 1 `in_progress`.
+- A row for every active compliance task type and export-benefit scheme
+  (`order_compliance_tasks`, `order_export_benefit_schemes`, D-095).
+- The division is fixed (`orders.division_id`).
+- Insurance is cleared on CFR/FOB orders (D-049).
+- A client introduced by an associate links `orders.associate_id`; the
+  commission level is fixed at the PI (D-245).
+
+**Order lines** (`order_products`): line type **Goods** (HS code from
+`hs_codes`), **Service** (SAC code 99xxxx, invoiced on the separate Export
+Service Invoice), or **Charge** (D-215). On a USD order a goods line must be
+**picked from Products** while the pricing setting is on; the quote price of
+whoever sells (staff or the associate's level) fills in (D-245 P2). Below
+the seller's floor the line needs MD approval; below the product's minimum
+price it is refused (6.3).
+
+**Payment terms needing approval (D-075).** If the preset has "Requires MD
+approval" (seed: Established Buyer — Post-BL, Extended Terms — Post-BL, LC),
+Step 1 shows a yellow box and the QT cannot be generated or sent until a
+holder of `approve_payment_terms` approves (`…/payment-terms/approve`). The
+creator cannot approve their own order's terms unless the `payment_terms`
+self-approval rule allows it (D-216/D-221). Never on a cancelled or lost
+order (D-205).
+
+### 5.4 Step-by-step reference
+
+For each step: what the user does, the gate that must pass, what is stored,
+and the document produced. Document numbers use a 2-digit year (D-177),
+e.g. `SC/PI/26/0511001`.
+
+#### Step 1–3 · Quotation (Stage 1)
+
+| | |
+|---|---|
+| User does | 1a **Generate Quotation** (PDF; tick DOCX for an internal Word copy). Optional Annexure A (`/orders/{id}/annexure`: product specification, additional terms or both). Take the QT through review/approval (SOP 13). Step 2 has no button: send happens in Document Review (mail on) or approval counts as sent (mail off). Step 3 "Client accepts" is outside the system. |
+| Gate | Price check passes (no line below the seller's floor without MD approval; none below minimum; no product without a price). Payment terms approved if required. Stage 1 passes **automatically** when the QT is approved (mail off) or sent (mail on). |
+| Stored | `documents` (status draft → in_review → approved → sent), `document_reviews`, `file_store` (folder `01-quotation/generated/`), `orders.quotation_date`, `quotation_valid_until`. |
+| Document | **QT** Quotation `SC/QT/{YY}/{DDMM}{NNN}`; **ANNEXA** Annexure A. |
+
+#### Step 4 · Buyer's PO (Stage 2)
+
+| | |
+|---|---|
+| User does | 4a Generate Buyer PO (NexaCrest's PO-style acceptance document, with milestones and the order's own payment wording). 4b (optional) Send the **Buyer Action Link** — a no-login page where the buyer downloads the approved Buyer PO and uploads the signed copy with their PO number. 4c Attach the signed copy (staff or buyer). 4d **Confirm Buyer PO Received**: PO reference + date received (not future, not before order creation, D-148). |
+| Gate | Buyer PO document approved/sent. With `wet_signature_required_buyer_po` on (default), at least one signed copy attached (D-025). If the buyer completes 4b themselves, 4c/4d complete automatically. |
+| Stored | `orders.buyers_po_ref`, `buyer_po_received_on` (Day 1 of the associate's 10-day window); `order_buyer_po_documents` (every upload kept); token hash in `orders.buyer_action_token_hash` (encrypted, D-128). |
+| Document | **BUYERPO** `SC/PO/…` |
+
+#### Step 5 · Proforma Invoice & Payment (Stage 3)
+
+| Sub-step | Cash advance order | LC order |
+|---|---|---|
+| 5a | Generate PI Form Link (`/pi-details/{token}`) | same |
+| 5b | Apply the client's PI-stage confirmation (PI Intake Review `/pi-intake-review`), or **Skip PI Form** with a reason (D-009) | same |
+| 5c | **Generate Proforma Invoice** (price check again) | same |
+| 5d | **Record Advance Remittance** (`manage_payments`) | **Record LC Details**: issuing bank, LC no., amount, charges, copy |
+| 5e | **Mark Advance Cleared** (`clear_payments`) — gate | **Confirm LC Usable** (`clear_payments`) — gate |
+
+- **Gate:** PI approved/sent; the remittance recorded before it is cleared
+  (D-077); recording and clearing by different permissions (D-076).
+- **Recording a remittance (D-078, D-227, D-244).** The form pre-fills the
+  advance due and shows "Buyer to pay now". Enter the amount received, the
+  **INR credited by the bank** (the rate is worked out from it), and the
+  **bank reference (UTR/SWIFT, required, D-212)**. More than the order value
+  is refused. If the amount differs from what is due, pick a reason under
+  "Why is it different?" (`remittance_difference_reasons`): bank charges
+  (counted as received in full; charges become an order cost), buyer paid
+  less, or buyer paid more. A short payment is cleared only by a holder of
+  `approve_short_payment` with a reason.
+  *Example:* order USD 7,500, 40% advance = USD 3,000. The bank credits
+  ₹2,52,300 → rate 84.10. Description written by the app: "Advance received
+  from <buyer> for order NC/SC/ORD/26/0411001 · USD 3,000.00 at ₹84.10 ·
+  against Proforma Invoice SC/PI/26/0511001 · bank ref UTR…" (staff notes are
+  appended, never replace it).
+- **Clearing** unlocks Stage 4 and **creates the client portal login**.
+- **Stored:** `order_payment_status` (amount, received/cleared times, INR
+  actual, rate, bank and FIRC refs), `order_payment_receipts`,
+  `order_payment_shortfalls`, `order_lc_details`, `pi_intake_submissions`,
+  `client_payment_reports` (buyer self-reports — information only).
+- **Payment Action Link** (D-080): a no-login page for the buyer to send UTR,
+  amount, date and a required screenshot — one payment at a time (advance
+  at 5d, freight at 9c, balance at 11c). Information only; staff still
+  record from the bank statement.
+- **Document:** **PI** `SC/PI/…` with the amber "ADVANCE PAYABLE NOW" box
+  (D-050) or "NO ADVANCE PAYABLE" on LC (D-052).
+- **D-262 freeze** happens when the first PI is approved (5.5).
+
+#### Step 6 · Order Confirmation (Stage 4)
+
+| | |
+|---|---|
+| User does | 6a Generate OC → approve/send. 6b **Generate OC Confirmation Link** (a button, never automatic; 6b ticks only after it is pressed, D-242). 6c Record the buyer's acknowledgement: the buyer clicks "I have read Order Confirmation SC/OC/… — I acknowledge" on the link or portal, or staff record an e-mail/phone acknowledgement with an evidence note. With mail off, staff press **Mark Order Confirmation Sent to Buyer** to start the clock. |
+| Gate | OC issued (approved/sent). Then acknowledgement by any path. If none within `oc_ack_auto_confirm_hours` (48) after the OC was sent and the link generated, the cron `auto_confirm_oc_acknowledgments` confirms it. With `oc_ack_override_restricted` on, staff recording needs `override_buyer_acknowledgment`. |
+| Stored | `order_oc_acknowledgments`, `orders.oc_link_generated_at`. |
+| Document | **OC** `SC/OC/…` — order value, advance due, advance actually received, balance = value − actual advance (D-053). |
+
+From here edits to order details or lines need `edit_order_post_confirmation`
+and a reason (logged `ORDER_EDITED_POST_CONFIRMATION`).
+
+#### Step 7 · Supplier PO (Stage 5) — Procurement
+
+| | |
+|---|---|
+| User does | First card: **Compliance — with the Supplier PO** (Due Diligence, ECGC by default). Optional **Purchase Requirements** card (Sales raises, Procurement quotes/awards — 6.6). 7a **Save Supplier PO Terms** (supplier from the Suppliers directory, material spec, GST %, advance %, delivery location from the supplier's factory addresses) — creates the record and reference. 7b Generate Supplier PO. 7c Send the **Supplier Link** (no login, 60 days) and/or attach the acknowledgement, or **Skip — supplier did not acknowledge** with a reason. 7d **Confirm Supplier Signed & Returned PO** — gate. 7e **Supplier Advance Paid**: add the supplier's bill (Proforma or Tax invoice, D-091), then **₹ Mark Paid** with the UTR (`manage_supplier_payments`). At 0% advance 7e completes by itself (D-012). |
+| Gate | Supplier PO approved; with `wet_signature_required_supplier_po` on, an acknowledgement file or the skip. Needs `manage_supplier_po`. After the gate, **FOB orders auto-skip Stage 6** (`maybeAutoSkipFreightStage`, audit `ORDER_STAGE_GATE_SKIPPED`). |
+| Stored | `order_supplier_po` (with its own snapshot of the supplier, D-086), `order_supplier_po_documents`, `order_vendor_bills`, `order_vendor_bill_payments`, `order_compliance_tasks`. |
+| Document | **SUPPO** `SC/SPO/…` — internal, never to the buyer; the buyer never learns the supplier. |
+
+#### Step 8 · Production & Estimated Shipment
+
+| | |
+|---|---|
+| User does | 8a Post production status text, estimated shipment text and **Estimated Shipment Date** (`manage_supplier_po`). Changing the date posts a message to the client's Order Updates thread. Record the **Pre-Shipment Inspection result** (Passed/Failed, date, agency, report file; `manage_shipping`). Failed notifies MD, ED, Admin. |
+| Gate | Ticked only after a real entry (D-013). No stage gate. |
+| Stored | `order_production` (audit `PRODUCTION_STATUS_UPDATED`, `EST_SHIPMENT_DATE_UPDATED`), `order_inspections`, `order_inspection_fees`. A daily reminder fires 7 days before the estimated date when a PSI task is open. |
+
+#### Step 9 · Freight Payment (Stage 6) — CFR/CIF only
+
+| | |
+|---|---|
+| User does | 9a Save Freight Terms (confirmed rate, insurance on **CIF only**, freight forwarder from Logistics Partners; `manage_shipping`). 9b Generate **Debit Note**. 9c Record Freight Remittance (`manage_payments`). 9d **Mark Freight Cleared** (`clear_payments`) — gate. |
+| Gate | Debit Note approved/sent; remittance recorded. On **FOB** the card is greyed "Not applicable — FOB" (D-021). |
+| Stored | `order_freight`, freight columns of `order_payment_status`. Due date = Debit Note date + 3 calendar days; overdue alert the day after (D-051). |
+| Document | **FDN** "Debit Note" `SC/DN/…` (older ones `SC/FDN/…`); GST line "NIL — pure cost reimbursement" (D-062). |
+
+#### Step 10 · Packing & BL Instruction (Stage 7)
+
+| | |
+|---|---|
+| User does | First card: **Compliance — before shipment** (Fumigation, Phytosanitary, PSI). 10a **Supplier Balance Paid** (bill + payment; waits for 7e when an advance was planned). 10b Save Packing & Crates (crate HS code comes from the product, D-036). 10c Generate Packing List. 10d Save Shipping Details (line, vessel, voyage, ETD/ETA, containers, seals). 10e Generate BL Instruction Sheet. CHA **Draft BL review** loop (rounds, approve / request revision; never blocks). 10f **Confirm BL Issued** (BL no. + date, optional scan) — gate. Then **Shipping Bill** (number, date, customs exchange rate). |
+| Gate | PL approved/sent; BLI approved. **Shortfall tolerance:** if packed quantity is short by more than the tolerance %, the buyer's written approval must be uploaded (hard rule). **Shipment gates** (`ShipmentGateService`): the BL waits while (a) a **before-shipment** balance (Standard — New Buyer, Extended Terms — Before Shipment) is not cleared, or (b) a Pre-Shipment Inspection task (fixed key `pre_shipment_inspection`, D-262 gap 7) is not Passed. A holder of `override_shipment_gates` (MD, ED, Admin) may release with a reason ≥ 10 characters (`order_shipment_gate_overrides`). |
+| Stored | `order_packing`, `order_crates`, `order_shipping` (`bl_number`, shipping bill and customs rate), `order_draft_bl_reviews`. |
+| Document | **PL** `SC/PL/…`; **BLI** `SC/BLI/…` (internal). |
+
+#### Step 11 · Commercial Invoice & Balance (Stage 8)
+
+| | |
+|---|---|
+| User does | 11a Generate CI (actual shipped quantities; on CFR/CIF a reminder until the scanned BL is attached, D-037). 11b **Mark Scanned BL Copy Sent to Buyer** — on post-BL and LC orders this **starts the balance due date** = that day + balance days (D-218 G-2). 11c Record Balance Remittance. 11d **Mark Balance Cleared** — gate. |
+| Gate | CI approved/sent; every milestone cleared first; remittance recorded. **Before-shipment orders:** 11c/11d open from Step 9 onward; "Mark Balance Cleared (before shipment)" clears without passing Stage 8, and later "Complete Step 11 (unlocks Stage 9)" passes it once the CI is approved. |
+| Stored | balance columns of `order_payment_status`, `balance_due_date`. Overdue reminders daily after the due date. |
+| Document | **CI** `SC/CI/…` (balance clause follows the order's own terms, D-054; date today or backdated, never future, D-055). Optional **ESI** Export Service Invoice for service lines. The approved CI goes to Zoho Books at the shipping-bill rate (D-165). |
+
+#### Step 12 · Closure — Financials, Benefits & Costs
+
+Guided sub-steps (D-097), `manage_order_financials`:
+
+- 12a **Order Costs** (`order_cost_entries`, `order_expenses`,
+  `order_travel_expenses`, inspection fee, LC & bank-loan costs, courier).
+  Each cost says what it was paid from (D-103) and carries a D-212
+  description.
+- 12b **Export Benefit Eligibility** — answer every scheme (Eligible / Not
+  eligible) (`order_export_benefit_schemes`).
+- 12c **Review Profit & Complete Step 12** (`OrderProfitabilityService`).
+- 12d **Team Incentive** (MD; 6.5).
+
+Step 12 can be skipped with a reason; values stay blank, and "Reopen Step 12"
+exists (D-098).
+
+#### Step 13 · Closure — Documents & Settlement (Stage 9)
+
+| Sub-step | What | Permission |
+|---|---|---|
+| 13a | Generate **COO Prep Sheet** (can be done as soon as the BL is issued, before the balance clears) | `generate_documents` or `generate_compliance_documents` |
+| 13b | Record **original BLs received** from the CHA (1–10) | `manage_shipping` |
+| 13c | Save **BL Endorsement** details | `manage_shipping` |
+| 13d | Generate / print **BL Endorsement** (auto-approved, visible to the buyer) | `manage_shipping` |
+| 13e | Mark original BLs **endorsed** | `manage_shipping` |
+| 13f | **Close Order** — courier tracking no.; optional courier company, charges (₹0–1,00,000) and "paid from" (books a Courier Charges cost, D-243) — **Stage 9 gate** | `close_orders` |
+| 13g | **Government benefits — claimed & received** (one row per claim; skip with reason; correct/delete with reason, D-099/D-100) | `manage_order_financials` / `manage_export_benefit_claims` |
+| 13h | **Mark Fully Settled** — final lock | `settle_orders` |
+
+**Close Order gates:** BLI and COOPREP approved/sent (D-017); original BLs
+received and endorsed recorded (5 Nov 2026 decision, supersedes D-018). A
+holder of `edit_locked_data` may override with a reason ≥ 10 characters
+(`CLOSE_ORDER_DOCUMENT_GATE_OVERRIDE`). Result: status `shipped_docs_sent`;
+the buyer sees "Complete"; the order stays unlocked for benefits.
+
+**Mark Fully Settled is blocked, in this order, while:** (1) a benefit claim
+awaits receipt; (2) a compliance task is Not Started or Pending Approval
+(D-015); (3) a scheme is still Pending; (4) an Eligible scheme has no claim.
+Each can be overridden by `edit_locked_data` with a reason. A payment without
+a FIRC/eBRC reference is only a warning (D-234); unpaid vendor bills are only
+a warning (D-020). On success: status `complete`, `is_locked = 1`, and the
+**CAFIN is generated automatically** (D-108; a failure never blocks
+settlement).
+
+**Documents:** **COOPREP** (internal, no reference no., D-069), **BLE**
+`SC/BLE/…`, **CAFIN** `SC/CAFIN/…` (internal).
+
+#### Steps 14–19
+
+- **14 Additional Documents** — free-form uploads (`manage_orders` or
+  `upload_order_documents`); removing one needs a reason ≥ 10 characters
+  (D-152).
+- **15 Order Communication** — two-way chat with the client
+  (`order_comments`, attachments); with mail off the client is not e-mailed.
+- **16 Order Feedback** — 1–5 stars + testimonial, after documents are sent
+  (`order_feedback`); staff can record it for the client.
+- **17 Complaints**, **18 Disputes** — 5.9.
+- **19 Order Complete** — green once Mark Fully Settled is done.
+
+### 5.5 What freezes at PI approval (D-262 snapshot)
+
+When the **first PI of an order is approved** (`finalizeApproval` of a PI),
+`OrderSnapshotService::freeze()` (PHP
+`app/src/Services/OrderSnapshotService.php`, Node `orderSnapshotService.js`)
+writes onto the order: `orders.frozen_at`, `frozen_snapshot_json`,
+`quantity_tolerance_pct`, `payment_terms_requires_md_approval`,
+`pricing_fx_rate_at_pi`, plus `order_products.zoho_item_id` per line.
+
+| Frozen with the order | Effect of a later Admin change |
+|---|---|
+| T&C clauses of every document type (title, text, set, show/hide), validity days | Not printed on this order |
+| Quantity shortfall tolerance % | Packing gate and printed tolerance stay as agreed |
+| Company details: bank, branch, account, SWIFT, IFSC, LUT, RCMC, IEC/PAN, GSTIN, addresses, director, RBI purpose codes, disclaimer | Not printed on this order (incl. AMD, BLE, CAFIN) |
+| Product-category rows (packing words, quality documents, clause set) | Not applied |
+| Preset "Requires MD approval" flag | Neither blocks nor frees this order |
+| Pricing exchange rate (USD-per-unit commission/incentive on a non-USD order) | Commission and incentive unchanged |
+| Each line's Zoho item | CI goes to Books with the approved item |
+
+Every document run (`generate`, `finalizeApproval`, `markSuperseded`,
+`generateAmendment`, `generateCaInternalAnnexure`, `generateBlEndorsement`)
+runs inside `OrderSnapshotService::within()`, which overlays the frozen
+values (PHP: a static overlay restored in `finally`; Node:
+AsyncLocalStorage). Before the freeze nothing changes.
+
+Other things fixed at the PI: each priced line's figures and the
+associate's commission level (D-245). A vendor bill keeps the vendor's name,
+GSTIN, PAN; an associate payout keeps its GST % and GSTIN (gaps 8–9).
+
+**Real change, e.g. new bank account:** the MD uses **Refresh company
+details on this order** (Step 1; `POST /orders/{id}/company-details/refresh`;
+`manage_company_settings` + MD), reason ≥ 10 characters, audit
+`ORDER_COMPANY_DETAILS_REFRESHED`. Only company details change; documents
+already issued stay as they are. Tests: `OrderSelfContainedTest` /
+`orderSelfContained.test.js`.
+
+### 5.6 Incoterm effects (FOB / CFR / CIF)
+
+| | FOB | CFR | CIF |
+|---|---|---|---|
+| Who pays freight | Buyer, own forwarder | NexaCrest, recovered by Debit Note | NexaCrest, recovered by Debit Note |
+| Insurance | Buyer | **Buyer** (prints "NIL — buyer arranges insurance (CFR)") (D-049) | NexaCrest; insurance box shown only here |
+| Stage 6 / Step 9 | Auto-skipped; greyed "Not applicable — FOB" | Normal | Normal |
+| Indicative freight/insurance on the order | Hidden | Freight only | Freight + insurance |
+| Documents | Freight and insurance print "NIL" (D-048) | "Freight is paid separately by Debit Note"; Buyer PO row "Freight: invoiced separately … (insurance arranged by the buyer)" | "Freight & Insurance: invoiced separately by Debit Note before shipment" |
+| CI | Raised before shipment; no BL-copy reminder | Raised against the BL; reminder until scanned BL attached | same as CFR |
+| Profit | — | Freight leg in revenue; insurance excluded | Freight + insurance in revenue (converted to INR, D-225) |
+| Logistics bills | Allowed on every incoterm | A **Final** logistics bill waits for 9d freight cleared (D-090) | same |
+
+### 5.7 Payment presets
+
+`payment_presets` (Admin › Payment Presets, `manage_payment_presets`). All
+five seeded presets are **protected** — unlock through Field Protection
+first (D-073). Preset names are internal and never shown to the client.
+
+| Preset | Advance | Method | Balance | Balance trigger | Days | Needs MD approval | BLI rows |
+|---|---|---|---|---|---|---|---|
+| Standard — New Buyer (default) | 40% | Cash advance | 60% | Before shipment | 3 | No | Yes |
+| Established Buyer — Post-BL | 40% | Cash advance | 60% | Against BL | 7 | Yes | Yes |
+| Extended Terms — Before Shipment | 30% | Cash advance | 70% | Before shipment | 3 | No | Yes |
+| Extended Terms — Post-BL | 30% | Cash advance | 70% | Against BL | 7 | Yes | Yes |
+| Irrevocable Letter of Credit at Sight | 0% | LC | 100% | Against BL | 7 | Yes | Yes |
+
+Zero advance is only for LC (D-074). Buyer deadlines count **calendar
+days** (D-051).
+
+*Worked example (Standard — New Buyer, USD 10,000 FOB):* advance USD 4,000
+due by the PI's valid-until date; balance USD 6,000 due before shipment —
+the BL step stays locked until it is cleared. The PI prints the balance as
+payable within 3 calendar days of the Shipment Readiness Confirmation. *Established Buyer — Post-BL:*
+the balance USD 6,000 has no date until Step 11b; if the scanned BL is sent
+on 10 Dec, the balance is due 17 Dec.
+
+### 5.8 LC orders
+
+- Preset "Irrevocable Letter of Credit at Sight" (`payment_method = LC`).
+- The PI, QT and OC never show "0%": "NO ADVANCE PAYABLE — the full FOB
+  value … is payable by Letter of Credit" (D-052).
+- 5d **Record LC Details**, 5e **Confirm LC Usable** (passes Stage 3 and
+  creates the portal login). No Payment Action Link at 5d.
+- **LC dates** (issued, last shipment, presentation deadline, expiry) are
+  validated (none after expiry, none on/before issue) and each is reminded
+  once, 7 days before, by the daily alerts job.
+- **LC amendments** are listed (`order_lc_amendments`).
+- The bank's payment under the LC is recorded in **Step 12a → LC Payment
+  Received**; a bank loan against the LC too (`…/lc-received`,
+  `…/lc-details`). CAFIN counts LC money as received (D-112).
+- The balance due date starts at Step 11b (scanned BL sent).
+- An LC order does not wait for a before-shipment balance at the BL step.
+
+### 5.9 Amendments, complaints, disputes, cancellation, Mark Lost
+
+**Amendments** (SOP 10, `AmendmentController`, `AmendmentService`,
+`amendments`). Change **payment terms** after the PI is issued.
+
+1. Raise a request (`manage_orders`): reason ≥ 10 characters, requested by
+   importer or NexaCrest, only the terms that change, optional effective
+   date. Reference `SC/AMD/{YY}/…`.
+2. **MD-approve** (`approve_documents`) or reject; not your own request
+   unless the `amendment` self-approval rule allows.
+3. Generate the Payment Terms Amendment Agreement (**AMD**, signatory MD by
+   default).
+4. **Upload signed copy & activate** → the order's live terms update at once;
+   later documents carry an amendment note.
+
+No stage gate is affected. The buyer has no portal screen for it.
+
+**Complaints** (SOP 19): a process issue without intent to cancel. Always
+available to the buyer ("Report a Process Issue"). `manage_complaints`
+(status) and `respond_to_complaints` (reply). Tables `order_complaints`,
+`order_complaint_replies`.
+
+**Disputes** (SOP 11): the buyer wants to cancel / not proceed. Response due
+date = 10 **working** days (`company_holidays`, `WorkingDaysCalculator`).
+`manage_disputes` (log, status, evidence, client button) and
+`respond_to_disputes` (reply thread). The buyer can raise one only if
+"Show 'Raise a Dispute' button" is ticked for that order. A dispute never
+changes stage or status and never exempts the order from Close Order gates.
+Tables `disputes`, `dispute_documents`, `dispute_replies`.
+
+**Cancellation** (D-082, D-258), `order_cancellations`:
+
+1. **Request Cancellation** with a reason (`close_orders`).
+2. A holder of `edit_locked_data` approves (choosing *No refund*, *Refund
+   pending* or *Refund already completed*) or rejects. Not the requester,
+   unless the `cancellation` self-approval rule allows.
+3. Only while the order is `active` (or disputed). Status → `cancelled`,
+   locked.
+4. A refund is completed only by **Record refund paid** with date and bank
+   reference (D-212); amount > 0 and ≤ what the buyer paid.
+
+**Mark Lost** (`close_orders`, `…/mark-lost`, reason required). Refused when:
+the order is not `active`; a BL number exists (goods shipped — use Close
+Order); a cancellation is pending; any payment was received or the LC was
+confirmed (use Request Cancellation, D-258). Result: status `lost`, locked,
+reported as lost.
+
+### 5.10 Editing, duplicating, archiving
+
+- **Before Stage 4**: `manage_orders` edits details and lines.
+- **Stage 4+**: `edit_order_post_confirmation` + reason
+  (`ORDER_EDITED_POST_CONFIRMATION`).
+- **Locked** (complete / lost / cancelled): `edit_locked_data` + reason
+  (`ORDER_EDITED_WHILE_LOCKED`), checked first.
+- **Duplicate Order**: copies client, terms, ports and active lines into a
+  new order at Stage 1; nothing from the source's history.
+- **Client reorder request**: the buyer's "Reorder This" lands in
+  **Operations › Reorder Requests** (`order_reorder_requests`).
+- **Archive** (`POST /orders/{id}/archive`, `manage_orders`): sets
+  `is_archived = 1`, `ORDER_ARCHIVED` audit row. Visibility only — nothing is
+  deleted. Archived orders are listed at `/orders/archived`
+  (`view_archived_orders`) and can be unarchived.
+
+## 6. Modules
+
+One subsection per module. File paths follow one convention:
+
+| | PHP stack (`PHP_MySQL_Version/`) | Node stack (`NODE_MySQL_Version/`) |
+|---|---|---|
+| Routes | `public_html/index.php` | `app/src/server.js` |
+| Controllers | `app/src/Controllers/XController.php` | `app/src/controllers/xController.js` (Order → `ordersController.js`, Client → `clientsController.js`, Product → `productsController.js`) |
+| Services | `app/src/Services/X.php` | `app/src/services/x.js` |
+| Repositories | `app/src/Repositories/XRepository.php` | `app/src/repositories/xRepository.js` |
+| Views | `app/views/<area>/*.php` | `app/views/<area>/*.njk` |
+| Document templates | `app/templates/<TYPE>/` (Twig) | `app/templates/<TYPE>/` |
+| Scheduled jobs | `app/cron/*.php` | `app/src/jobs/*.js` (`scheduler.js`) |
+
+Below, "Code" names the PHP class; the Node file is the same name in
+camelCase per this table. Every list page that has a Kanban board must keep
+the same filters, counts, fields, actions and money rules on both templates
+(standing rule; `KanbanParityTest` / `kanbanParity.test.js`).
+
+---
+
+### 6.1 Clients and intake
+
+- **Purpose.** Hold one record per buyer; take enquiries from the public
+  form; take PI-stage details from the buyer before the PI.
+- **Screens.** Operations › Clients (`/clients`), Add Client
+  (`/clients/create`), client page (Duplicate, Client Portal Access,
+  Agreements card, associate line, GST registration once Domestic is
+  active); Operations › Quotation Intake Review (`/client-intake`);
+  Operations › PI Intake Review (`/pi-intake-review`). Public:
+  `/quotation-details`, `/pi-details/{token}`.
+- **Key rules.**
+  - One e-mail per client, enforced in code and by a unique index (D-129, D-210).
+  - Buyer Inquiry Ref (`client_unique_number`) is generated once per client
+    and reused on every order.
+  - Accept creates the client only, never an order. Reject needs ≥ 10 characters.
+  - The PI details form pre-fills everything the client gave at QT stage
+    (D-130); the client ticks a consent box; applying it is Step 5b.
+  - Fixed lists are drop-downs (country, Incoterm, container type, CoO
+    type with "Not sure") (D-060, D-147).
+  - Associate-introduced buyers: hidden code, e-mail verification, first
+    completed registration wins, 12-month protection (D-217, D-246).
+  - Consignee/notify party used on Buyer PO, BLI, COOPREP (D-061).
+- **Tables.** `clients`, `client_divisions`, `client_intake_submissions`,
+  `pi_intake_submissions`, `client_logins`, `client_password_reset_tokens`,
+  `associate_registrations`.
+- **Code.** `ClientController`, `ClientIntakeController`,
+  `ClientIntakeReviewController`, `PiIntakeController`,
+  `PiIntakeReviewController`, `ClientRepository`, `ClientIntakeRepository`,
+  `PiIntakeRepository`, `AssociateIntakeService`, `AssociateMatchService`.
+- **SOP / decisions.** SOP 01, 03 (PI form), 12; D-122, D-129, D-130,
+  D-147, D-217, D-246, D-253.
+
+### 6.2 Products, categories and specifications
+
+- **Purpose.** The internal product catalogue that order lines are picked
+  from; categories define line attributes, packing words, quality
+  documents and clause sets; specifications change the price.
+- **Screens.** Products (`/products`), Products › Categories, product page
+  (Market prices, Price options (specifications), Pricing ready? checklist),
+  Pricing › Specifications.
+- **Key rules.**
+  - Category **Natural Stone** is fixed; others may have up to 6 attributes
+    (e.g. Size, Grade, Colour); empty attributes print "To Be Confirmed" (D-215).
+  - An inactive category stays on existing lines.
+  - Specifications per category with options worth a %, USD per m², USD per
+    running metre, USD per container, or a quantity % applied last
+    (D-255). Base option changes nothing; a 0 option reads "Included in base
+    price" (D-256).
+  - Thick stone (≥ 50 mm, setting) is priced per CBM from the per-CBM supplier price.
+  - A product's own options can be hidden, overridden or added
+    (`manage_product_specifications`: Admin, MD). A used option can only
+    be deactivated.
+  - Category settings are frozen per order at PI approval (D-262).
+- **Tables.** `catalog_products`, `catalog_product_images`,
+  `catalog_product_suppliers`, `catalog_product_supplier_options`,
+  `catalog_product_misc_charges`, `product_categories`,
+  `product_category_attributes`, `spec_definitions`, `spec_options`,
+  `product_option_overrides`, `product_spec_hidden`, `hs_codes`,
+  `hs_code_product_examples`.
+- **Code.** `ProductController`, `ProductCategoryController`,
+  `SpecController`, `ProductService`, `ProductSpecs`,
+  `CategoryDocumentProfile`, `SpecRepository`, `ProductRepository`.
+- **Permissions.** `view_product_catalog`, `browse_product_catalog`,
+  `manage_product_catalog`, `manage_product_specifications`,
+  `view_product_pricing`, `manage_hs_codes`.
+- **SOP / decisions.** SOP 01 (order lines), 27; D-215, D-255, D-256, D-257 (Phase 0B/1).
+
+### 6.3 Pricing engine and price requests
+
+- **Purpose.** Work out a safe selling price per unit (FOB, USD) from the
+  supplier price, and stop anyone selling below it.
+- **Screens.** Admin › Pricing (`/pricing/settings`; MD edits, MD/ED view),
+  product page build-up, Procurement › Market prices
+  (`/products/{id}/market-prices`), order Products card **Price check**,
+  `/orders/{id}/products/{productId}/price-approval` (MD), Associates →
+  Price requests.
+- **The formula (D-245):** cost → minimum price (margin on the price) →
+  team-incentive reserve → staff floor → associate floor → quote price; every
+  value is global with a per-product override. Steps, worked examples and
+  who sees what: §7.1. The order-line check and MD approval: §7.2.
+
+- **Key rules.**
+  - Rounding half-up to the paisa; one engine on both stacks.
+  - Nobody goes below the **minimum price**, not even the MD.
+  - Below the seller's floor the line waits for the MD (`manage_pricing`)
+    to approve with a reason; that line's associate commission becomes 0
+    and the discount comes out of the incentive.
+  - The QT and PI are refused while a line fails the check.
+  - Prices, level and rate are fixed when the PI is issued.
+  - Cost never reaches the browser or an associate.
+  - Market prices are dated rows with valid-until; one is "used for
+    pricing"; stale/expired badges.
+  - **Price requests (associates):** Get price returns at once (number
+    `PR-YY-DD-NNNN`, quote, lowest price, valid 7 days, max 10 a day). An
+    "Other" request goes to staff, priced within 24 h by the MD. Staff can
+    type the request number on an order line.
+- **Tables.** `pricing_settings`, `commission_levels`,
+  `commission_ladder_steps`, `catalog_product_suppliers`, `price_requests`,
+  `associate_price_access`, `order_products` (frozen line figures).
+- **Code.** `PricingEngine`, `PricingService`, `OrderLinePricing`,
+  `PriceRequestService`, `PricingController`, `PriceRequestController`,
+  `PricingRepository`.
+- **Permissions.** `record_market_prices` (Procurement, MD),
+  `view_price_buildup` (MD, ED), `manage_pricing` (MD).
+- **SOP / decisions.** SOP 27, 24 (price requests); D-240 (replaced),
+  D-245, D-255, D-256.
+
+### 6.4 Associates and commission / TDS
+
+- **Purpose.** Outside agents who introduce buyers and earn commission.
+- **Screens.** Operations › Associates (`/associates`; register, associate
+  page with Portal access, Track record, Payouts, Price access), Associates
+  → Access levels, → Price requests, → Registrations; Reports › Associates
+  (`/reports/associates`); Associate TDS register (`/associates/tds`);
+  Settings › Associate TDS. Associate portal `/associate` (4.11).
+- **Key rules.**
+  - Commission is on the **final invoiced FOB of the goods**, line by line;
+    level fixed on the order at the PI; fixed level or ladder by counting
+    orders (invoiced FOB ≥ ₹5 lakh) (D-245 P3).
+  - Only orders in the 10 days from the client's first PO received; later
+    only the MD can force "associate: yes" with a reason.
+  - Earned only when the buyer has **paid in full**; no pro rata; nothing on
+    cancelled orders; due N days after full payment; paid next payout run
+    against the associate's invoice; held while a buyer claim is open.
+  - Take-back after payment only for fraud or breach (negative line on the
+    next payout).
+  - **TDS (D-235):** section 194H at 2% above ₹20,000 a financial year
+    with catch-up; never more than the payout; abroad needs TRC, Form 10F,
+    no-PE and Form 15CA/15CB. Rules and worked examples: §7.3.
+  - **Never the total business (owner, 6 Nov 2026):** commission yes; a
+    lifetime or period order-value total no. The FOB of one order shows only
+    as the Access-levels matrix says (4.11).
+  - **Bank details:** a change is a request; two different Finance people
+    check and verify; 7-day wait before first use; encrypted, masked;
+    payment only into a verified usable account.
+  - **KYC** checklist must be complete before any commission is paid
+    (D-252); Aadhaar last 4 digits only (D-251).
+  - Self-registration link (7 days), code change (up to 3, old codes keep
+    working) (D-253, D-254).
+- **Tables.** `associates`, `associate_codes`, `associate_invitations`,
+  `associate_registration_links`, `associate_registrations`,
+  `associate_bank_accounts`, `associate_documents`, `associate_events`,
+  `associate_messages`, `associate_tokens`, `associate_access_features`,
+  `associate_access_level_settings`, `associate_access_log`,
+  `associate_price_access`, `incentive_payouts`.
+- **Code.** `AssociateAdminController`, `AssociatePortalController`,
+  `AssociateRegistrationController`, `AssociateAccessController`,
+  `AssociateTdsController`, `AssociateService`, `AssociateCommission`,
+  `AssociateTds`, `AssociateKyc`, `AssociateCodeService`,
+  `AssociateAccess`, `AssociatePortalService`.
+- **SOP / decisions.** SOP 24, 20; D-175, D-176, D-217, D-235, D-245,
+  D-246, D-250–D-254, D-261.
+
+### 6.5 Team incentive (eligibility and caps)
+
+- **Purpose.** Share part of each order's profit with the staff who worked
+  it.
+- **Screens.** Team Incentives (`/incentives/settings`, MD), order **Step
+  12d · Team Incentive** (MD; ED read-only), Team Incentives › Ready to
+  lock, Incentive Payouts (`/incentives/payouts`, Accounts), My Incentives
+  (`/my-incentives`), Reports › Incentive & Commission Register / To pay /
+  Owed / Statement.
+- **Key rules (D-245 P4, D-259).**
+  - Basis = order profit **after** associate commission, never below ₹0.
+  - Global % of profit (15% to start) or fixed per unit; product override;
+    the MD may set a % or amount on one order with a reason.
+  - Roles and shares (`incentive_roles`, total 100%), the amount formula
+    and per-order overrides: §7.4.
+  - States: **Open → Ready to lock** (fully paid, no open claim) **→
+    Locked** (by the MD only; nothing locks by itself) **→ Paid** (never
+    changes). Unlock with a reason until paid.
+  - **Eligibility:** `users.incentive_eligible` (empty = follow
+    `department_designations.incentive_eligible`); only the MD changes it.
+  - **Caps** per role: `cap_per_order_inr`, `cap_per_month_inr` (month the
+    order locks into). Anything not eligible or above a cap is **kept by the
+    company**, never shared to others.
+  - Worked example of eligibility and caps: §7.4.
+  - Accounts pays with salary (payroll ref) or bank transfer (UTR); cannot
+    change any amount; paid ≤ payout; once all are paid the order's
+    incentive goes to Zoho as Commission Expense.
+- **Tables.** `incentive_settings`, `incentive_roles`, `user_incentive_roles`,
+  `order_incentives`, `order_incentive_roles`, `order_incentive_people`,
+  `order_incentive_history`, `incentive_kept`, `incentive_payouts`.
+- **Code.** `IncentiveController`, `IncentiveReportController`,
+  `IncentiveService`, `IncentiveReportService`, `IncentiveRepository`.
+- **Permissions.** `manage_incentives` (Admin, MD), `pay_incentives`
+  (Admin, MD, Accounts, Finance), `view_own_incentives`.
+- **SOP / decisions.** SOP 20; D-171–D-174 (superseded), D-208, D-245,
+  D-259. Tests `IncentiveEligibilityTest` / `incentiveEligibility.test.js`.
+
+### 6.6 Procurement (RFQ, POs, QC)
+
+- **Purpose.** Buy what an order needs, keep buying prices with
+  Procurement/Finance/management.
+- **Screens.** Order page "Purchase Requirements — for Procurement" card
+  (next to Step 7); Operations › Procurement (`/procurement`, queue);
+  Procurement › Supplier performance; Admin › Suppliers (`/suppliers`);
+  order Step 7 (Supplier PO); public Supplier Link page.
+- **Key rules.**
+  - Sales raises a requirement (product, quantity, needed-by) — never a
+    price (`raise_purchase_requirements`).
+  - Procurement records quotes (unit price, GST %, lead time, validity, ref)
+    — compared **cheapest with GST first**.
+  - **Award** checks the designation's approval limit (4.6); above it, an
+    approver with `approve_purchases` and a covering limit approves.
+  - Receipt with **quality check**: Passed / Passed with remarks / Failed.
+  - Cancel with a reason. Repeated clicks change nothing (idempotent).
+  - Supplier PO (Steps 7a–7d, production status): `manage_supplier_po`.
+    Supplier advance/balance: bill first, then pay with UTR (D-089), by
+    `manage_supplier_payments` (Accounts). Proforma vs tax invoice (D-091).
+  - Suppliers directory: several types per supplier; delete only if never
+    used (D-085). Vendor bank account encrypted, masked, typed twice, IFSC
+    checked; a no-login Vendor Details Link (D-088).
+- **Tables.** `purchase_requirements`, `purchase_quotes`, `suppliers`,
+  `supplier_type_links`, `supplier_factory_addresses`, `order_supplier_po`,
+  `order_supplier_po_documents`, `order_vendor_bills`,
+  `order_vendor_bill_payments`, `order_production`, `order_quality_documents`.
+- **Code.** `PurchasingController`, `PurchasingService`,
+  `PurchasingRepository`, `SupplierController`, `SupplierActionController`,
+  `VendorBillController`, `VendorDetailsController`, `OrderController`
+  (Supplier PO actions).
+- **SOP / decisions.** SOP 05, 22; D-011, D-012, D-085–D-094, D-214
+  (phase 3), D-216.
+
+### 6.7 Logistics and freight
+
+- **Purpose.** Freight terms, packing, shipping, BL, the CHA, and paying
+  logistics partners.
+- **Screens.** Order Steps 9, 10, 13b–13e; Logistics Partner Bills &
+  Payments card (every incoterm); Admin › Logistics Partners
+  (`/logistics-partners`); Admin › Ports (`/ports`) and Port Routes
+  (`/port-routes`, sailing days used to suggest lead times); Insights →
+  Freight Cost Report (`/reports/freight-cost`, `view_logistics_costs`).
+- **Key rules.**
+  - Partner service types: CHA, Transportation, CHA + Transportation,
+    Freight Forwarder (D-087).
+  - **Logistics adds bills, Accounts pays them** (D-232):
+    `manage_logistics_bills` (Logistics roles) adds; `manage_supplier_payments` pays.
+  - Each logistics bill is Advance or Final; a Final bill on CFR/CIF waits
+    for freight cleared (D-090).
+  - GST picked from a list (0/5/12/18/28%, 18% preselected), server
+    recalculates (D-092); reverse charge only for GTA road transport (D-093).
+  - Insurance CIF only; Debit Note 3 calendar days.
+  - Shortfall tolerance gate; shipment gates (5.4 Step 10).
+  - Original BLs and endorsement before Close Order (5 Nov 2026).
+- **Tables.** `logistics_partners`, `ports`, `port_routes`, `order_freight`,
+  `order_packing`, `order_crates`, `order_shipping`,
+  `order_draft_bl_reviews`, `order_bl_endorsements`, `order_inspections`,
+  `order_shipment_gate_overrides`, `order_vendor_bills`.
+- **Code.** `LogisticsPartnerController`, `PortController`,
+  `PortRouteController`, `OrderController` (freight/packing/shipping/BL
+  actions), `ShipmentGateService`, `VendorBillController`,
+  `CourierCharges`.
+- **Permissions.** `manage_shipping`, `manage_logistics_partners`,
+  `manage_logistics_bills`, `manage_ports`, `override_shipment_gates`.
+- **SOP / decisions.** SOP 06, 07, 09; D-021, D-036, D-037, D-048, D-049,
+  D-087, D-089–D-093, D-218, D-219, D-232.
+
+### 6.8 Documents and review / approval
+
+- **Purpose.** Generate every PDF/DOCX, take it through review, approval
+  and sending, keep every revision.
+- **Screens.** Order page: Document Review & Approval (pinned), each step's
+  Generate button, All Documents quick links; My Reviews (`/reviews`);
+  Email Send Approvals (`/email-approvals`); Admin › Watermarks, Signatories,
+  Assets, Field Protection; Settings › Document copies clean-up.
+- **Life cycle.** `draft → in_review → approved → sent`, later
+  `superseded`. All assigned reviewers approve → the app finalises (swaps
+  the DRAFT watermark for the final one). Only the latest revision can be
+  approved; approving one supersedes every sibling (re-rendered "INVALID
+  DOCUMENT — SUPERSEDED" from its own stored data, D-258). Sent/superseded
+  cannot go back to review. From the second send a "REVISION 02" stamp.
+- **Document types:** the full list, with category, reference format,
+  PDF/DOCX and who may see each, is in §8.1.
+
+- **Key rules.**
+  - **No PDF/document change without the owner's double confirmation**
+    (standing rule); all current PDFs are correct.
+  - The generator may not review their own document unless the
+    `document_review` self-approval rule allows (D-070, D-221).
+  - Internal documents never reach the buyer (D-068).
+  - No checkboxes on documents (D-046); signatures print as images with an
+    identifying line (D-058); PHP and Node give the same page breaks (D-057).
+  - Sending with mail on is two-level: Level 1 request, Level 2 approval
+    (`approve_email_send`), deferred window, cancel until dispatched
+    (D-123, D-142).
+  - Regenerating needs confirmation; later stages show "DATA MAY BE STALE".
+  - Copies clean-up never removes anything sent to the client or any
+    current copy (D-230).
+  - Every file stored by step folder `01-quotation/ … 13-closure/` with
+    random names (D-149).
+  - Cross-verification (independent pass/fail) by
+    `cross_verify_documents`.
+- **Tables.** `documents`, `document_types`, `document_reviews`,
+  `document_revisions`, `document_sections`, `document_cross_verifications`,
+  `document_type_signatories`, `company_default_signatory`,
+  `user_signature_assets`, `tc_clauses`, `tc_clause_documents`,
+  `watermark_settings`, `docx_generation_settings`, `file_store`,
+  `file_upload_contexts`, `assets`, `field_protection_requests`.
+- **Code.** `DocumentGenerationService`, `DocumentDataAssembler`
+  (protected by the PDF rule), `Services/Docx/*`, `ReviewWorkflowService`,
+  `DocumentController`, `ReviewController`, `AnnexureController`,
+  `WatermarkController`, `SignatoryController`, `FileStoreController`,
+  `DocumentCopyCleanupService`; Node also `pdfRenderService.js`.
+- **SOP / decisions.** SOP 13, 15; D-001, D-027, D-030, D-046–D-071,
+  D-138, D-149–D-152, D-229, D-230, D-262.
+
+### 6.9 Payments and remittances
+
+- **Purpose.** Record what the buyer paid, clear it against the bank, and
+  record what NexaCrest paid out — each with a correct description.
+- **Screens.** Order page: Payment Overview (Payment Snapshot, Payment
+  Ledger, Payment schedule), Steps 5d/5e, 9c/9d, 11c/11d, 7e, 10a, Logistics
+  Partner Bills; Reports › Payments, Today's Payments, Ageing, Missing eBRC;
+  Admin › Remittance difference reasons; public Payment Action Link.
+- **Key rules.**
+  - Record and clear are different permissions (`manage_payments` vs
+    `clear_payments`, D-076); clear only after recording (D-077).
+  - Amount + INR credited by the bank → rate worked out (D-244); one rate
+    field (D-079). Money only arrives in INR in the company's current
+    account (D-084).
+  - Difference > 1% needs a reason (D-078, D-227); short clears need
+    `approve_short_payment` and a reason saying what the short is (agreed
+    discount / settled claim / not paid).
+  - **Every money record has a correct description (D-212, hard rule):**
+    the app builds it from the facts (`PaymentDescription`); a bank
+    reference (UTR/SWIFT/FIRC) is required where money moved through a
+    bank; a reference already used is refused.
+  - **Milestones** (D-215): up to 4 between advance and balance, saved
+    before the advance clears; balance can't clear until all milestones
+    clear; the CI lists them.
+  - Amounts are shown only to people with the money rights (4.7).
+  - Repeated clicks record a payment once (D-210).
+  - The buyer can report a payment only after the PI is issued (D-206).
+- **Tables.** `order_payment_status`, `order_payment_receipts`,
+  `order_payment_shortfalls`, `order_payment_milestones`,
+  `client_payment_reports`, `order_lc_details`, `order_lc_amendments`,
+  `remittance_difference_reasons`, `order_vendor_bills`,
+  `order_vendor_bill_payments`, `order_cancellations` (refunds).
+- **Code.** `OrderController` (payment actions), `PaymentMilestoneController`,
+  `PaymentActionController`, `PaymentActionService`, `PartPaymentService`,
+  `PaymentDescription`, `RemittanceInr`, `RemittanceDifference`,
+  `BalanceDueService`, `OrderLedgerService`, `PaymentPresetController`,
+  `PaymentTermsApprovalService`.
+- **SOP / decisions.** SOP 03, 06, 08, ca-02; D-072–D-084, D-205, D-206,
+  D-212, D-218, D-227, D-243, D-244.
+
+### 6.10 CAFIN and the CA module
+
+- **Purpose.** Accounting work for the Chartered Accountant, kept apart
+  from the order pipeline: INR actuals, forex, FIRC/eBRC, Zoho sync,
+  expenses, bank reconciliation, FY lock, export benefits, GST refunds, and
+  the internal CA Financial Annexure (CAFIN) per order.
+- **Screens.** CA / Accounting (`/ca`): INR Settlement Register, revenue
+  reports (FY / calendar year), expenses, bank statement import and
+  matching, FY lock, export benefits, GST refunds; CA › Zoho Books Sync
+  (`/ca/zoho-sync`); order page CAFIN box (top), Order Financials (Step 12
+  tabs: Costs, Export Benefits, Zoho Expenses, Profitability, Internal
+  Annexure, D-033); CAFIN CSV export.
+- **Key rules.**
+  - INR actual is recorded the day a leg clears (`inr_actual_edit`);
+    deletion is separate (`inr_actual_delete`).
+  - **FY lock** stops changes to a closed year; `ca_fy_lock_override`
+    pushes one entry through, logged (`CaFyLockGuard`).
+  - CAFIN (sections A–F: order, supplier cost, expenses, benefits, profit,
+    open items) can be generated any time from the CAFIN box
+    (`ca_internal_doc_manage`) and is generated automatically at Mark Fully
+    Settled (D-107, D-108, D-110).
+  - Seeing/downloading CAFIN needs `view_cafin` **and** access to the order
+    (D-109, D-204). CSV files end `_INTERNAL`, every download logged (D-113).
+  - **CAFIN never reaches the client** — portal, links, e-mail compose and
+    downloads all refuse it, even by ID (D-106).
+  - CAFIN receipts show what the bank credited (D-236); LC money counts as
+    received (D-112).
+  - The CA role is read-only and sees every order (D-114).
+  - GST on purchases under LUT is a refund claimed per period (RFD-01), not
+    an order cost (D-213).
+- **Tables.** `ca_expenses`, `ca_export_benefits`, `ca_fy_locks`,
+  `ca_bank_statement_lines`, `gst_refund_claims`, `gst_refund_credits`,
+  `order_cost_entries`, `order_expenses`, `order_export_benefit_schemes`,
+  `order_travel_expenses`, `order_inspection_fees`, `order_payment_status`
+  (INR columns).
+- **Code.** `CaController`, `OrderFinancialsController`,
+  `OrderExpenseController`, `GstRefundController`,
+  `ComplianceTrackingController`, `CaSyncService`,
+  `CaFinancialSnapshotService`, `CafinExportService`, `CaFyLockGuard`,
+  `OrderProfitabilityService`, `BenefitSettlementService`,
+  `BankStatementCsvParser`; templates `app/templates/CAFIN/`.
+- **Permissions.** `ca_module_view`, `ca_module_manage`, `inr_actual_*`,
+  `ca_internal_doc_manage`, `view_cafin`, `manage_order_financials`,
+  `ca_fy_lock_override`, `manage_export_benefit_claims`.
+- **SOP / decisions.** SOP ca-01 … ca-09, 25; D-099–D-115, D-213, D-234,
+  D-236.
+
+### 6.11 Reports and dashboard
+
+- **Purpose.** Answer business questions and give each person their
+  starting view.
+- **Screens.** Dashboard (`/`): search, Active Orders by Stage, My
+  Approvals, Overdue Payments, Balance/Freight payment overdue, Compliance
+  Expiry Warnings (LUT/RCMC), Agreements expiring, Team incentives ready to
+  lock, Associates ready for Quoting, Recent Activity. Insights › Reports
+  (`/reports`).
+- **Reports** (route → permission):
+
+| Report | Route | Permission |
+|---|---|---|
+| Aggregate (save as Saved Report) | `/reports/aggregate` | `view_reports` (+ selling prices) |
+| Operations Queues / Conversion | `/reports/queues`, `/reports/conversion` | `view_reports` |
+| Payments / Today's Payments / Ageing | `/reports/payments`, `/todays-payments`, `/ageing` | `view_reports` + buyer payments |
+| Disputes / Amendments / Trends | `/reports/disputes`, `/amendments`, `/trends` | `view_reports` |
+| Sales Performance / Product Sales | `/reports/performance`, `/products` | `view_reports` |
+| Freight Cost | `/reports/freight-cost` | `view_logistics_costs` |
+| Supplier Performance | `/reports/suppliers` | `view_purchase_prices` |
+| Order Profitability (Profit by division when ≥ 2 active) | `/reports/order-profitability` | `manage_order_financials` |
+| Staff Productivity | `/reports/staff` | `view_staff_reports` |
+| Incentive & Commission Register, To pay, Owed, Statement | `/reports/incentives…` | incentive gate |
+| Associates | `/reports/associates` | `manage_associates` |
+| Missing eBRC / FIRC | `/reports/missing-ebrc` | `ca_module_view`, `manage_export_benefit_claims` or `manage_order_financials` |
+| Per-Client / Per-Order (Full Report) | `/reports/client/{id}`, `/reports/order/{id}` | `view_reports` |
+
+- **Key rules.** Reports show only orders the person may see (assignment,
+  archive, division — D-118, D-204); money reports need the money class
+  (4.7); CSV export only (no .xlsx, D-183); CSV cells neutralised against
+  formula injection (D-182); queries pass ONLY_FULL_GROUP_BY (standing
+  rule). Test Mode shows only test data.
+- **Tables.** `report_definitions`, plus reads from order tables.
+- **Code.** `ReportController`, `ReportRepository`, `DashboardController`,
+  `DashboardRepository`, `DivisionProfitService`, `IncentiveReportService`.
+- **SOP / decisions.** SOP 14; D-104, D-118, D-183, D-204.
+
+### 6.12 My Tasks and the management cockpit
+
+- **Purpose.** Hand work from one department to the next without anyone
+  remembering to do it.
+- **Screens.** My Tasks (`/my-tasks`), Insights › Management Cockpit
+  (`/cockpit`, `view_cockpit`), order side panel **Owners**, Admin › Task
+  Due Days (`/admin/task-types`, `manage_task_types`).
+- **Key rules.**
+  - Tasks are computed from order state (nothing stored per task): when a
+    step is done, the next department's task appears.
+  - Seeded task kinds (`department_task_types`, standard / escalate days):
+    Sales — raise purchase requirement (1/2); Procurement — quote & award
+    (3/3), approve award (1/2), chase supplier (0/3); Logistics — book
+    freight & CHA (2/3), send documents (2/3); Finance — clear buyer payment
+    (1/2), pay supplier/logistics bill (3/4); Export Compliance — checklist
+    item (5/3), apply COO (2/2), benefit eligibility (3/3), file claim
+    (7/7), eBRC follow-up (7/7).
+  - Overdue tasks are red; escalated ones show in the cockpit. Tasks never
+    show amounts.
+  - One owner per department per order (`assign_department_owner`); MD/ED,
+    Admin and the Order Coordinator choose for any department.
+  - Cockpit: open/overdue/escalated per department, orders without an
+    owner, orders by status, escalations, late suppliers — counts only.
+  - **Daily digest** 08:15 IST, one e-mail per person; counts as sent only
+    if mail really left.
+- **Tables.** `department_task_types`, `order_department_owners`,
+  `order_assignees`, `daily_digest_log`, `notifications`.
+- **Code.** `CoordinationController`, `DepartmentTaskRepository`,
+  `OrderAssignmentService`, `DailyDigestService`; cron
+  `daily_digest.php` / `dailyDigest.js`.
+- **SOP / decisions.** SOP 23, 25; D-214 (phase 4).
+
+### 6.13 E-mail templates
+
+- **Purpose.** Editable wording for every system e-mail.
+- **Screens.** Admin › Email Templates (`/email-templates`,
+  `manage_email_templates`); compose/preview from Document Review; Email
+  Send Approvals.
+- **Seeded templates (21):** `send_qt`, `send_pi`, `send_oc`, `send_ci`,
+  `send_pl`, `send_fdn`, `send_annexa`, `send_ble`, `send_buyerpo`,
+  `send_esi`, `balance_receipt_confirmation`, `bl_copy_sent`,
+  `payment_followup`, `shipment_readiness`, `buyer_action_link`,
+  `pi_form_link`, `quotation_correction_link`, `client_portal_invite`,
+  `client_portal_password_reset`, `staff_password_reset`,
+  `two_factor_code`.
+- **Key rules.**
+  - Templates are never deleted; each send keeps a frozen copy
+    (`email_log.body_snapshot`).
+  - A document is sent with its own template (D-142).
+  - Security templates fall back to built-in wording if missing or off.
+  - `mail_sending_enabled` (off in seed, D-155) covers every business
+    e-mail; only security mail bypasses it (D-258). `mail_approval_queue_enabled`
+    (on) gives the two-level send.
+  - E-mail only when someone must act or a client acts (D-135); recipients
+    are assignees + oversight (D-136); no hidden copies (D-137); Reply-To,
+    UTF-8, sender's own signature (D-141).
+  - Mail Redirect settings and Test Mode redirect are separate.
+  - Mail goes through Bluehost SMTP; Zoho Mail code is switched off (D-139).
+- **Tables.** `email_templates`, `email_log`, `notifications`.
+- **Code.** `EmailTemplateController`, `EmailDispatchController`,
+  `EmailDispatchService`, `EmailService`, `MailSenderService`,
+  `MailRedirectService`; cron `dispatch_deferred_emails` (every 10 min).
+- **SOP / decisions.** SOP 13, 15; D-123, D-135–D-142, D-155.
+
+### 6.14 Zoho Books sync
+
+- **Purpose.** Keep Zoho Books (the CA's ledger and GST filing tool) equal
+  to the app, order by order, without re-typing.
+- **Screens.** CA › Zoho Books Sync (`/ca/zoho-sync`: Sync now, Sync Log,
+  "Waiting for Zoho: N"), order "App vs Zoho" check
+  (`/orders/{id}/zoho-check`), Admin › Settings › Zoho Books (test
+  connection, `zoho_sync_clients`, `zoho_sync_products`).
+- **What goes.** CI and Debit Note as export invoices (same number and
+  date, at the shipping-bill customs rate, D-165/D-166); buyer payments as
+  customer payments (foreign amount at the actual rate); supplier and
+  logistics bills and vendor payments (with UTR); paid order expenses;
+  export benefits as journals; associate commission and team incentive as
+  expenses; Domestic/Import/Merchant records (6.15).
+- **Key rules.**
+  - Off unless switched on: `.env` `ZOHO_INTEGRATION_ENABLED`,
+    `ZOHO_ENVIRONMENT` (test/production), `ZOHO_EINVOICE_ENABLED` (D-161).
+  - Nothing dated before `zoho_books_sync_start_date` is sent (D-162).
+  - "Either sync completely or don't" (D-163); the app is the source for
+    what it sends and puts back changes made in Books; Books is the source
+    for expenses the CA books there (D-164).
+  - A saved record never goes to Books at once; it waits for the sync
+    (D-233); failure e-mails notify.
+  - API budget per organisation (`ZohoApiBudget`, D-239); one sync at a
+    time (`ZohoSyncLock`), no double posting.
+  - Test and sample orders never reach production Books.
+  - **Zoho change log (standing rule):** every change in Zoho by anyone is
+    a row in `docs/zoho/zoho-change-log.csv` (UTF-8 BOM; IDs Z-001…).
+    Test records start `TEST-` and are removed before go-live
+    (`zoho_cleanup_test_records`).
+- **Tables.** `zoho_sync_log`, `zoho_api_usage`, `zoho_token_cache`,
+  `zoho_pending_inactivations`, `order_zoho_invoices`; Zoho IDs on
+  clients, lines, bills, payments.
+- **Code.** `ZohoBooksService`, `CaSyncService`, `ZohoInvoiceData`,
+  `ZohoMasterDataSync`, `ZohoPendingService`, `ZohoRestoreService`,
+  `ZohoGuard`, `ZohoSyncLock`, `ZohoApiBudget`, `OrderZohoMatchService`,
+  `DivisionZohoSync`; cron `zoho_sync.php` / `zohoSync.js` (hourly).
+- **SOP / decisions.** SOP ca-03; docs/zoho/README.md; D-160–D-170,
+  D-212, D-233, D-238, D-239.
+
+### 6.15 Divisions: Domestic Trade, Import & Distribution, Merchant Trade
+
+All three are **built but planned** (D-257): nobody sees them until the MD
+activates the division in Admin › Divisions after the pre-flight checklist.
+Export is unchanged. Each keeps its company details when its first
+document is fixed (D-262). Each money entry has a D-212 description and a
+required bank reference. Each goes to Zoho Books with its own mapping.
+
+| | Domestic Trade (DOM) | Import & Distribution (IMP) | Merchant Trade (MTT) |
+|---|---|---|---|
+| What | Sell to Indian resellers in ₹ with GST | Import into India, hold stock, sell locally with GST | Buy abroad, sell abroad; goods never enter India (RBI merchanting) |
+| Menu | Orders › New order (domestic form) `/domestic/orders/create` | Operations › Imports & stock `/import` + local-sale orders | Operations › Merchant trade `/merchant` |
+| Stages | Enquiry → Quotation → OC → Purchase → Dispatch (tax invoice number fixed, e-way bill) → Tax invoice → Payment → Closed | Ordered (LC, import PO) → Shipped (bill of entry, customs rate, charges) → Cleared (duty + landed cost frozen) → In stock → Closed | Contracted (buy/sell lines, PO, BL / switch BL) → Shipped (sale invoice) → Settled (AD-bank checklist) → Closed |
+| Money rules | CGST+SGST same state, IGST otherwise; invoice `DOM/26-27/0001` (≤ 16 chars, per FY) | Landed cost = assessable value + BCD + SWS + charges; IGST is input credit, not cost; stock at weighted average, never below zero | Margin = ₹ received − ₹ paid at bank rates; RBI checks: 9 months total, 4-month outlay, USD 5,00,000 advance limit without LC/BG, documents with AD bank |
+| Settings (to confirm with CA/bank) | `dom_default_gst_rate` 18, `dom_eway_threshold_inr` 50000, `dom_e_invoice_applicable` 0, `dom_payment_terms_days` 30 | `imp_default_bcd_pct` 10, `imp_default_sws_pct` 10, `imp_default_igst_pct` 18, `imp_margin_pct` 20 | `mtt_max_months_total` 9, `mtt_max_outlay_months` 4, `mtt_advance_limit_usd` 500000, `mtt_usd_inr_rate` 84 |
+| Tables | `domestic_orders`, `domestic_order_lines`, `domestic_payments`, `domestic_documents`, `domestic_counters`, `gst_rates`, `indian_states` | `import_shipments`, `import_shipment_lines`, `import_payments`, `import_duty_rates`, `stock_balances`, `stock_movements` | `merchant_deals`, `merchant_deal_lines`, `merchant_payments`, `merchant_deal_documents`, `merchant_alerts_sent` |
+| Code | `DomesticOrderController`, `DomesticOrderService`, `DomesticDocumentService`, `GstCalculator`, `GstRateController` | `ImportController`, `ImportService`, `ImportDocumentService` | `MerchantTradeController`, `MerchantTradeService`, `MerchantDocumentService` |
+| SOP | 29 | 30 | 31 |
+
+Shared: `DivisionService`, `DivisionController`, `DivisionZohoSync`,
+`DivisionProfitService`; tables `divisions`, `division_modules`,
+`division_settings`. Module switches per division hide menus and refuse
+routes. Numbering: another division counts separately and prefixes its
+code unless its own `order_ref_format` places `{DIV}`. SOP 28; D-257,
+D-262.
+
+### 6.16 Backups
+
+- **Purpose.** Keep an extra, encrypted copy of the database and every
+  order document for 10 years, without touching live data (D-260).
+- **Screens.** Admin › Backups (`/admin/backups`,
+  `manage_company_settings`) — read-only status; BACKUP WARNING in the
+  daily digest.
+- **Key rules.** Scripts, schedule, encryption, retention, warnings and
+  restore are described once: overview §3.15, procedure §12.3. The page
+  only reports what the jobs wrote; it never runs or restores a backup.
+- **Code.** `BackupController`, `BackupStatusService`; tests
+  `scripts/tests/backup_scripts_test.sh`, `BackupFacilityTest` /
+  `backupFacility.test.js`.
+- **Related.** Data Export / Migration (`/admin/data-export`,
+  `data_export_run`: structure-only + data-only dump for a fresh
+  reinstall; SOP 18; `MysqlDumpService`).
+- **SOP / decisions.** SOP 32, 18; D-260.
+
+### 6.17 Admin pages
+
+Sidebar group **Admin** (each item appears only with its permission):
+
+| Page | Route | Permission | Notes |
+|---|---|---|---|
+| Company Settings | `/settings` | `manage_company_settings` | Company, bank, LUT/RCMC (expiry alerts), mail, Zoho, portal defaults, Associate TDS, remittance reasons, document clean-up. Secrets shown as "•••• ends in 1a2b". |
+| Holiday Calendar | `/holidays` | `manage_company_settings` | Working-day maths (disputes) |
+| HS Codes | `/hs-codes` | `manage_hs_codes` | |
+| Logistics Partners / Suppliers | `/logistics-partners`, `/suppliers` | `manage_logistics_partners` / `manage_suppliers` | |
+| Ports (+ Port Routes) | `/ports`, `/port-routes` | `manage_ports` | |
+| Payment Presets | `/payment-presets` | `manage_payment_presets` | Protected presets |
+| Compliance Task Types | `/compliance-task-types` | `manage_compliance_task_types` | Phase: with Supplier PO / before shipment |
+| Dropdown Option Lists | `/admin/dropdown-options` | `manage_dropdown_options` | Container type, CoO type, GST rates … |
+| Email Templates | `/email-templates` | `manage_email_templates` | 6.13 |
+| UI Templates | `/ui-templates` | `manage_company_settings` | Standard / Kanban; Standard can't be deactivated |
+| Watermarks, Assets, Signatories | `/watermarks`, `/company-assets`, `/signatories` | `manage_assets`, `manage_signatories` | |
+| Divisions, GST Rates, Import Duty Rates | `/admin/divisions`, `/admin/gst-rates`, `/admin/import-duty-rates` | `manage_divisions` | |
+| Departments, Task Due Days | `/admin/departments`, `/admin/task-types` | `manage_permissions`, `manage_task_types` | Preview as |
+| Permissions | `/admin/permissions` | `manage_permissions` | Role matrix, personal exceptions |
+| Users | `/users` | `manage_users` | Active / Inactive / Archived; delete only with no history |
+| Field Protection | `/admin/field-protection` | `manage_field_protection` | Lock/unlock needs a second person |
+| Team Incentives, Pricing | `/incentives/settings`, `/pricing/settings` | `manage_incentives`, `manage_pricing` | MD |
+| Admin Overrides | `/admin/overrides` | `edit_locked_data` | Log of reasoned overrides |
+| Sample Data | `/sample-data` | `manage_sample_data` | 6.18 |
+| Data Export / Migration | `/admin/data-export` | `data_export_run` | |
+| Backups | `/admin/backups` | `manage_company_settings` | |
+| Super Admin, Self-approval rules, Test Mode | `/super-admin`, `/admin/self-approval`, `/test-mode` | Super Admin only | |
+
+- **Test Mode** (SOP 16): portal and public form unavailable, business
+  mail redirected to one test address, new records prefixed `TEST-`,
+  reports show only test data, no audit rows for test records, admin
+  settings frozen (D-179), nothing reaches production Zoho. Disable is
+  blocked until test data is deleted. Code `TestModeService`,
+  `TestModeGate` middleware, table `test_mode_settings`.
+- **Code.** `SettingsController`, `UserController`,
+  `PermissionAdminController`, `DepartmentAdminController`,
+  `SuperAdminController`, `SelfApprovalController`,
+  `FieldProtectionController`, `AdminOverrideController`, and one
+  controller per list page.
+- **SOP / decisions.** SOP 15, 16, 21, 28; D-124, D-157, D-179–D-182,
+  D-214, D-221.
+
+### 6.18 Sample data playground
+
+- **Purpose.** Load realistic sample clients and orders to practise on, and
+  clear them any number of times, without touching real data.
+- **Screens.** Admin › Sample Data (`/sample-data`, `manage_sample_data`):
+  Load / Clear.
+- **What it loads** (fictional companies): Client A with two orders (A1 at
+  Stage 1; A2 at Stage 2 with a pending PI intake in PI Intake Review,
+  D-159); Client B — heavily instrumented FOB order left at Stage 8 (buyer
+  PO upload, PI intake applied, portal auto-provisioning, OC reject /
+  regenerate / approve, full amendment, Supplier PO acknowledgement, FOB
+  freight skip, shortfall with buyer approval); Client C — full 9-stage CIF
+  order with freight stage, followed by a dispute raised and resolved;
+  Client D — quoted then marked lost; Client E — four orders showing
+  Annexure A variety; Client F — a raw-block line (HS 25161100).
+- **Key rules.**
+  - It uses the **same services** as real users (OrderRepository,
+    StageGateService, DocumentGenerationService, AmendmentService …), so it
+    behaves exactly like the real system.
+  - Every record is flagged `is_sample_data = 1` and removed cleanly by
+    Clear. Loading twice is refused — clear first.
+  - Sample orders never reach production Zoho.
+  - Seed also includes sample vendors (Sample Stone Supplier, Sample CHA &
+    Transport, Sample Freight Forwarder) — deactivate after testing (D-158).
+  - Test Mode (6.17) is the safer, sandboxed alternative for rehearsals.
+- **Code.** `SampleDataController`, `SampleDataService`,
+  `SampleDataRepository`.
+- **SOP / decisions.** SOP 15, 16; D-158, D-159.
+
+## 7. Money rules and formulas
+
+This section explains every money calculation the app makes. Each rule is in **one service per stack**, and the PHP and Node versions use the same steps and the same rounding. When you change a formula, change both files and run the worked-example tests on both stacks (rule R1, parity).
+
+| Area | PHP (`PHP_MySQL_Version/app/src/Services/`) | Node (`NODE_MySQL_Version/app/src/services/`) |
+|---|---|---|
+| Price build-up (pure maths) | `PricingEngine.php` | `pricingEngine.js` |
+| Settings, overrides, supplier choice | `PricingService.php` | `pricingService.js` |
+| Specifications and options | `ProductSpecs.php` | `productSpecs.js` |
+| Order-line check, MD approval | `OrderLinePricing.php` | `orderLinePricing.js` |
+| Associate commission | `AssociateCommission.php` | `associateCommission.js` |
+| TDS on commission | `AssociateTds.php` | `associateTds.js` |
+| Team incentive | `IncentiveService.php` | `incentiveService.js` |
+| Profit (one calculation everywhere) | `OrderProfitabilityService.php` | `orderProfitabilityService.js` |
+| Buyer remittance INR and rate gaps | `RemittanceInr.php`, `RemittanceDifference.php` | `remittanceInr.js`, `remittanceDifference.js` |
+| CAFIN content | `CaFinancialSnapshotService.php` | `caFinancialSnapshotService.js` |
+| Domestic GST | `GstCalculator.php` | `gstCalculator.js` |
+| Import landed cost and duty | `ImportService.php` | `importService.js` |
+| Merchant trade margin | `MerchantTradeService.php` | `merchantTradeService.js` |
+| D-212 money descriptions | `PaymentDescription.php` (+ builders in the services above) | `paymentDescription.js` |
+| Rounding helper | `PricingEngine::round2`, PHP `round()` | `src/helpers/money.js` (`round2`, `format2`) |
+
+### 7.1 Pricing (D-245, D-255, D-256)
+
+**Why it exists.** Before D-245 (4 Nov 2026) staff typed selling prices with only a "reference price" to guide them (D-240). The owner wanted one rule that protects the margin, pays the team and the associate out of the price, and still leaves room to negotiate. Orders are always priced **FOB, per unit, in USD**.
+
+#### The seven steps
+
+`PricingEngine::build()` works on unrounded numbers. Only the results are rounded, to 2 decimals, half up, at the end.
+
+| Step | Formula | Notes |
+|---|---|---|
+| 1. Supplier price in USD | supplier price (₹) ÷ pricing exchange rate | The supplier price is the row marked **"used for pricing"** in Products › Market prices. |
+| 2. Cost | supplier USD + other costs to FOB | Other costs = % of the supplier USD (default 2.5 %), or a fixed USD amount per unit (per-product override). |
+| 3. Minimum price | cost ÷ (1 − margin %) | **Margin on the price, not markup.** 20 % margin on cost 1,000 gives 1,250, not 1,200. Nobody may sell below it, not even the MD. |
+| 4. Team-incentive reserve | % of (minimum − cost), or a fixed USD amount per unit | **0 when the incentive program is off** (`incentive_settings.program_enabled`, seeded `0`). |
+| 5. Staff floor | minimum + reserve | The lowest price any staff member may quote without MD approval. |
+| 6. Associate floor | staff floor ÷ (1 − commission %), or staff floor + fixed USD commission | One floor per commission level. |
+| 7. Quote price | floor × (1 + buffer %) | Default buffer 3 %. This is what fills in when a product is picked. |
+
+Validation in the engine: the exchange rate must be above 0; the margin must be 0 or more and below 100 (the settings form allows 0–90); a commission % must be below 100.
+
+**Worked example 1 (no options).** Supplier price ₹80,000, pricing rate ₹82.00, other costs 2.5 %, margin 20 %, incentive 15 % (program on), buffer 3 %, associate Level 2 = 5 %.
+
+| Step | Working | Result (USD) |
+|---|---|---|
+| Supplier USD | 80,000 ÷ 82 | 975.61 |
+| Cost | 975.6098 + 2.5 % | **1,000.00** |
+| Minimum | 1,000 ÷ 0.80 | **1,250.00** |
+| Reserve | 15 % × (1,250 − 1,000) | 37.50 |
+| Staff floor | 1,250 + 37.50 | **1,287.50** |
+| Staff quote | 1,287.50 × 1.03 = 1,326.125 | **1,326.13** (half up) |
+| Associate floor (5 %) | 1,287.50 ÷ 0.95 | 1,355.26 |
+| Associate quote | 1,355.263 × 1.03 | 1,395.92 |
+
+With the incentive program **off**, the reserve is 0: staff floor = 1,250.00, staff quote = 1,287.50.
+
+#### Global settings and per-product overrides
+
+Every %, amount and the buffer has a global value (Admin › Pricing, `pricing_settings`) and an optional override on the product (`catalog_products.pricing_margin_pct`, `pricing_other_cost_mode/value`, `pricing_incentive_mode/value`, `pricing_buffer_pct`). An empty override means "use the global value". The build-up lists the overrides in use ("margin 25%, buffer 5%").
+
+#### Who sees what
+
+| Permission | Default holders | Sees |
+|---|---|---|
+| `view_price_buildup` | MD, ED | Cost, margin, minimum, reserve, every floor and quote, Try a price, Pricing ready? |
+| `manage_pricing` | MD only | Changes pricing settings, product overrides, commission levels and ladder, an associate's level, approves below-floor lines |
+| Selling-price staff (Sales) | — | Only **Quote price** and **Your lowest price** (their floor) |
+| `record_market_prices` | Procurement Executive/Manager/Director, MD | Supplier prices only, never selling prices |
+| Associate | — | Their own quote and lowest price (through Get price) |
+| Client | — | Nothing of the build-up |
+
+Cost never reaches the browser of anyone without `view_price_buildup`: the order form fetches the quote and floor from the server (`OrderLinePricing::lineQuote`).
+
+#### Specifications and options (D-255)
+
+A product category has specifications (Grade, Thickness, Finish, Size, Edge, Quantity, Packing, Treatment, Calibration for Natural Stone) and options. The base option changes nothing. Every other option changes the **cost**, so margin, reserve, commission and buffer are always added on top and every option keeps the margin. `ProductSpecs::adjustments()` applies them in a fixed order:
+
+1. **% options** multiply the cost, one after another (e.g. Standard −8 %, 30 mm +35 %).
+2. **Fixed USD amounts** are added:
+   - USD per m²: added. On a CBM price it is converted: USD per m² × 1000 ÷ thickness (mm).
+   - USD per running metre: added only if the product is sold per running metre (unit RM, RMT, LM …); otherwise listed as "charged separately".
+   - USD per piece / per kg / per set (D-257 Phase 0B): added only if the product's selling unit matches (PCS/NOS, KG, SET); otherwise "charged separately".
+   - USD per container: never in the unit price; always "charged separately".
+3. **Quantity %** (kind `quantity`) comes last.
+
+If the options bring the cost to 0 or below, the engine refuses.
+
+A product follows its category. It can hide a specification or option, type its own value (empty = follow the category, so later category changes flow through), or add options or whole specifications for itself. That needs the permission "Manage a product's specifications" (Admin and MD at seed). Used options can only be deactivated.
+
+#### CBM at 50 mm and above
+
+From **50 mm** (setting `cbm_from_mm`, default 50; a product may set its own `cbm_from_mm`) the price is **per CBM** and starts from the product's separate **per-CBM supplier price** (`price_basis = 'cbm'`, `is_cbm_primary = 1`). On a CBM price:
+
+- thickness % options no longer apply;
+- per-m² amounts are converted ×1000 ÷ thickness;
+- no per-CBM supplier price, or an unlisted thickness of 50 mm or more → **manual price** (staff price it by hand);
+- an order line of 50 mm or more must have unit **CBM**, or the save is refused.
+
+**Worked example 2 (CBM).** ₹53,300 per CBM, 80 mm, Standard −8 %, Leather +USD 4.00 per m², 2–4 containers −2 %, other settings as in example 1.
+
+| Step | Working | USD |
+|---|---|---|
+| Supplier USD + 2.5 % | 53,300 ÷ 82 = 650.00 × 1.025 | 666.25 |
+| Standard −8 % | × 0.92 | 612.95 |
+| Leather, converted | 4.00 × 1000 ÷ 80 = 50.00 added | 662.95 |
+| 2–4 containers −2 % | × 0.98 | **cost 649.69** |
+| Minimum | ÷ 0.80 | 812.11 |
+| Staff floor | + 15 % × (812.11 − 649.69) | 836.48 |
+| Staff quote | × 1.03 | **861.57** per CBM |
+| Associate Level 2 | floor ÷ 0.95; quote × 1.03 | 880.50 / 906.92 |
+
+**SOP 27's per-CBM figures (quote USD 904.56, lowest USD 878.21) are also correct**, for different inputs that SOP 27 does not spell out. They are the **associate's** quote and lowest price at Level 2 (5 %), for a product with **other costs 0 %**, options Standard · 80 mm · Leather and **no quantity option** (test `D255PriceRequestsTest` / `d255PriceRequests.test.js`, mockup mock9/t1). Recomputed with `PricingEngine::build()`: 53,300 ÷ 82 = 650.00 → × 0.92 = 598.00 → + 50.00 = cost **648.00** → minimum 810.00 → reserve 24.30 → staff floor 834.30 (staff quote 859.33) → associate floor 834.30 ÷ 0.95 = **878.21** → associate quote × 1.03 = **904.56** per CBM (≈ USD 72.36 per m² at 80 mm). The USD 861.57 above is the **staff** quote with other costs 2.5 % and the 2–4 containers option. SOP 27 should name its inputs (doc fix, §14.5).
+
+#### Exact supplier prices (D-256)
+
+A supplier may quote one figure for a combination ("30 mm leather, ₹4,900 per m²"). Procurement records it as `price_basis = 'combo'` and names an option for some specifications ("any" for the rest). `PricingService::exactPrice()`:
+
+- uses it **as it is** for the options it names; the other options still apply;
+- the row naming **the most options** wins; on a tie, the **most recently quoted**;
+- **stale or expired** exact prices are ignored (the ordinary price is used);
+- a per-unit exact price is never used for a per-CBM request.
+
+SOP 27 example: exact ₹4,900 for "30 mm · Leather"; Premium · 30 mm · Leather · 2–4 containers → cost ₹4,900 ÷ 82 + 2.5 % − 2 % = USD 60.03; staff floor USD 77.28, staff quote USD 79.60.
+
+#### "Included in base price" (D-256)
+
+An option worth 0 is shown as **"Included in base price"** everywhere (option lists, Try a price, the associate's breakdown), never "+0%" or "+USD 0.00" (`ProductSpecs::changeLabel()`). In the build-up it is a line of kind `included` with no effect on cost.
+
+#### Staleness
+
+A supplier price is **expired** after its `valid_until` date, and **stale** when its quoted date (else last change) is more than `stale_days` (default 60) old. Stale prices still price, with a badge; stale exact prices are ignored.
+
+#### Pricing ready? and Try a price (D-256)
+
+`PricingService::readiness()` lists what a product still needs: supplier price per unit used for pricing; per-CBM price if it is sold at the CBM threshold or above; specifications; prices current; exact prices current; open to associates. The product list shows "Pricing: N to fix". **Try a price** runs the same engine on any option combination and saves nothing (build-up viewers only).
+
+### 7.2 Order-line pricing and MD approval (D-245 P2)
+
+`OrderLinePricing` checks each line against the floor of **whoever sells the order**:
+
+- **staff**, or
+- the **client's associate** (if the order is one the associate earns on), at their commission level. The level is the one fixed on the order at PI, else their fixed level, else the ladder step for their next counting order.
+
+**Which lines are checked.** Goods lines picked from Products on a **USD** order. Not checked: hand-typed lines, service and charge lines, TBC-price lines, non-USD orders. With "Goods lines must be picked from Products" on (`require_product_pick = 1`, seeded on), a typed goods line on a USD order is refused in the browser and on the server.
+
+**Line statuses.**
+
+| Status | Rule | What happens |
+|---|---|---|
+| OK | price ≥ floor | Nothing. |
+| Below floor | minimum ≤ price < floor | The line can be saved. It is sent to the MD (in-app notification, "Ask MD to approve line N"). QT and PI are blocked until approved. |
+| Below minimum | price < minimum | **Save refused** (`saveRefusal`). Nobody may approve it. To sell lower, the MD changes the product's margin (logged). |
+| No price | product has no build-up | Needs MD approval before QT/PI. |
+| Approved | MD approved this exact price and options | Passes. |
+
+Comparisons allow 0.0001 for floating noise.
+
+**MD approval** (`approve()`): reason 10–500 characters; refused if below the minimum; refused if the MD set the price personally and Admin › Self-approval rules (`price_discount`) do not allow it (seeded: MD and ED may self-approve). On approval the line stores who, when, the reason, the approved price and options, `price_approval_commission_zero` (an associate's line earns **0 commission**), and `price_approval_incentive_cut` (shown as an explanation only — the incentive is a % of real profit, which the lower price already reduced, so it is never subtracted twice). **Any later price or option change voids the approval.**
+
+**Fixed at PI.** When the PI is issued, `snapshotForPi()` stores each checked line's figures in `order_products.price_snapshot`, and `AssociateCommission::fixLevelAtPi()` fixes the associate's level on the order. Later changes to settings or supplier prices do not move that order. A line filled from a valid associate price request keeps the request's figures.
+
+**Documents gate.** `documentBlockReason()` refuses the QT and the PI while any checked line is below its floor, below the minimum, or has no price, unless MD-approved.
+
+### 7.3 Associate commission (D-245 P3, D-235, D-252)
+
+Associates are the only partner type and the only people outside the company who earn on orders.
+
+**Levels and ladder (seed).**
+
+| Level | Rate | Ladder step (counting orders) |
+|---|---|---|
+| Level 1 | 2 % | 1–5 |
+| Level 2 | 5 % | 6–10 |
+| Level 3 | 7 % | 11–20 |
+| Level 4 | 10 % | 21 onward |
+
+A level may also be a fixed USD amount per unit. Per associate the MD chooses **Ladder** or **Fixed level**. Ladder steps start at 1, have no gaps or overlaps, and only the last is open-ended (`PricingService::readLadderForm`). A used level can only be deactivated.
+
+**Counting order.** A fully paid order whose in-range invoiced FOB in INR is at least `associate_counting_threshold_inr` (₹5,00,000). A smaller order earns the current step and does not count.
+
+**Formula** (`AssociateCommission::forOrder()`):
+
+1. Basis = the **final invoiced FOB of the goods lines**, line by line. No freight, insurance, services or charges. A line the MD approved below the floor earns 0 and is out of range.
+2. Commission per line = FOB × level % (or quantity × USD amount).
+3. Only an **agreed discount** or a **settled buyer claim** lowers the basis (when a short payment is cleared, staff must say which). A shortfall marked **not paid by the buyer** means the order is not fully paid: **commission 0** (no pro rata).
+4. Convert to INR at the **realised rate**: (INR credited + rupees the bank kept as charges) ÷ foreign amount received, over advance, milestones, balance and LC money. Bank charges never lower the commission. Until every receipt has its INR, the rate is an estimate (recorded rate; nothing received → expected rate, else the pricing rate).
+5. A USD-per-unit level on a non-USD order converts at the USD rate: the PI-frozen pricing rate `orders.pricing_fx_rate_at_pi` (D-262), else the current pricing rate.
+
+**Payment timing.**
+
+| Setting | Default | Rule |
+|---|---|---|
+| `associate_commission_due_days` | 30 | Due date = date of full payment + 30 days. |
+| `associate_claim_hold` | 1 (on) | Held while a buyer claim opened on or before the due date is open. |
+| `associate_payout_run`, `associate_payout_day` | monthly, 5 | Paid in the first payout run on or after the due date (monthly day 1–28, or weekly day 1–7). |
+| KYC (D-252) | — | **Mark paid** is refused until the associate's KYC is complete. |
+
+Take-back after payment only for fraud or breach, with a reason (audited).
+
+**GST on top.** An associate with a GSTIN, whose tax invoice for the payout is on file, gets GST at `associate_gst_pct` (18 %) on top. Once paid, it is worked on the gross actually billed (paid + TDS), so the GST paid equals the GST on the Zoho bill. GSTIN and GST % are frozen on the payout at lock (D-262). In Zoho the bill carries the tax `zoho_gst_commission_tax_id`; without it the sync refuses that bill (D-256).
+
+**TDS (D-235, `AssociateTds::compute`).**
+
+| Case | Rule |
+|---|---|
+| Associate in India, FY total ≤ ₹20,000 | No TDS. |
+| The payout that takes the FY (April–March) past ₹20,000 | TDS on itself **plus a catch-up** on that year's earlier commission paid without TDS. |
+| Later payouts that FY | TDS on the full amount. |
+| Rate | 2 % under section 194H (setting `associate_tds_section`); **20 % under 206AA** if no PAN or the PAN card is not accepted. |
+| Rounding | TDS rounded to the **nearest rupee** (section 288B). |
+| Cap and carry (QA batch 4, MON-1) | TDS is never more than the payout. What the cap cuts off is stored as `tds_shortfall_inr` and **carried into the associate's next payout in the same FY**. |
+| Associate abroad | No TDS by default (`associate_tds_foreign = 0`), but Mark paid is refused until the TRC, Form 10F and no-PE declaration are accepted and the payout's Form 15CA (and 15CB, `associate_15cb_required = 1`) is attached. |
+
+About **section 195** (payments to non-residents): the code has **no section-195 rule**. With `associate_tds_foreign = 0` (seed) an abroad payout has no TDS once the TRC, Form 10F and no-PE declaration are accepted (Mark paid still needs Form 15CA/15CB). If `associate_tds_foreign` is switched on, an abroad payout runs through exactly the India logic above (same threshold, catch-up, `associate_tds_section` and rate), not a separate 195 / DTAA rate (`AssociateTds::compute`). Whether that is right is a CA question (`docs/external/CA_questions.md` Q4, §14.5); until it is answered, do not pay any associate abroad.
+
+**Worked example 3 (commission).** USD order, goods FOB USD 20,000, all in range, associate at Level 2 (5 %).
+
+| Item | Working | Result |
+|---|---|---|
+| Commission (USD) | 20,000 × 5 % | USD 1,000.00 |
+| Receipts | advance USD 6,000 credited ₹5,04,000; balance USD 14,000 credited ₹11,75,300 after ₹700 bank charges | — |
+| Realised rate | (5,04,000 + 11,75,300 + 700) ÷ 20,000 | ₹84.00 |
+| Commission (INR) | 1,000 × 84.00 | **₹84,000.00** |
+| Fully paid 10 Jan 2027 | due 9 Feb 2027; monthly run day 5 | paid in the run of **5 Mar 2027** |
+| TDS (PAN verified, first payout of the FY) | round(84,000 × 2 %) | ₹1,680 |
+| Net | 84,000 − 1,680 | ₹82,320.00 |
+| GST (GSTIN + tax invoice) | 18 % × (82,320 + 1,680) | ₹15,120.00 |
+| Bank payment | net + GST | **₹97,440.00** |
+
+**Catch-up example.** Earlier this FY: ₹15,000 paid, no TDS. New payout ₹10,000 → FY total ₹25,000 > ₹20,000 → TDS = round((10,000 + 15,000) × 2 %) = ₹500; net ₹9,500.
+
+**Shortfall carry example.** Earlier this FY: ₹19,900 paid, no TDS. New payout ₹400 → TDS due = round((400 + 19,900) × 2 %) = ₹406 → TDS = ₹400 (capped), net ₹0, ₹6 carried to the next payout.
+
+**Other rules.** Forcing "associate: yes" on an order is MD only with a 10–300 character reason. A buyer registration with no order within `associate_protection_months` (6) lapses in the daily job. The order's cost is always the **gross** commission; GST on commission is input credit (not a cost) and TDS is a liability.
+
+### 7.4 Team incentive (D-245 P4, D-259)
+
+**Amount** (`IncentiveService::calculate()`):
+
+```
+profit before = order profit before commission and incentive
+basis         = max(0, profit before − associate commission)
+amount        = MD's fixed ₹ for this order, or
+                MD's % of basis for this order, or
+                (program off) 0, or
+                global rule: % of basis (default 15 %) or USD per unit × quantity × USD rate
+```
+
+A product with its own incentive rule uses it for its lines, weighted by the line's share of the goods FOB. When the program is off, the MD may still set an amount by hand on one order (reason required).
+
+**Checks.** Warning if the margin after commission and incentive falls below the minimum margin (20 %). Refusal if the amount is more than the basis (the whole profit).
+
+**Role split (seed, `incentive_roles`).**
+
+| Role | Usual share |
+|---|---|
+| Sales | 30 % |
+| Sales Manager | 10 % |
+| Export Documentation | 15 % |
+| Export Compliance | 5 % |
+| Marketing | 15 % |
+| Logistics | 15 % |
+| Accounts | 10 % |
+
+Active shares must total 100 %. A used role can only be deactivated.
+
+**Per-order overrides** (`split()`): the MD ticks which roles get it. Unticked roles, and roles with nobody, spread their share **proportionally** over the ticked roles. Custom shares (totalling 100 %) win over usual shares. People per role: those set on the order, else the order's assignees with that role, else everyone with that role. Inside a role the amount is split equally. The last role and the last person take the rounding, so the parts add up to the amount exactly. One person may hold several roles.
+
+**Eligibility and caps (D-259, 6 Nov 2026).**
+
+- `users.incentive_eligible` (empty = follow the designation) overrides `department_designations.incentive_eligible` (default eligible). Only the MD changes either.
+- Caps per role: `incentive_roles.cap_per_order_inr` and `cap_per_month_inr` (empty = no cap). The monthly cap counts what the person already has locked in that role for the month the order would lock into.
+- A person not eligible gets nothing. Anything above a cap is **kept by the company**, never shared out to others. Kept amounts are stored per person (`incentive_kept`) and on the order (`team_by_share_inr`, `kept_not_eligible_inr`, `kept_capped_inr`).
+- Only orders not yet locked are affected. With no caps and everyone eligible, every figure is unchanged.
+
+**Worked example 4 (incentive).** Profit before commission & incentive ₹3,00,000; associate commission ₹84,000 (example 3).
+
+| Item | Working | ₹ |
+|---|---|---|
+| Basis | 3,00,000 − 84,000 | 2,16,000.00 |
+| Amount (global 15 %) | 2,16,000 × 15 % | **32,400.00** |
+| Sales 30 % | | 9,720.00 |
+| Sales Manager 10 % | | 3,240.00 |
+| Export Documentation 15 % | | 4,860.00 |
+| Export Compliance 5 % | | 1,620.00 |
+| Marketing 15 % | | 4,860.00 |
+| Logistics 15 % | | 4,860.00 |
+| Accounts 10 % (takes rounding) | | 3,240.00 |
+| If Marketing is unticked | Sales gets 30 ÷ 85 × 32,400 | 11,435.29 |
+| If Sales has a ₹8,000 per-order cap | Sales gets 8,000; company keeps | 1,720.00 |
+
+**Worked example 4b (eligibility and caps; the D-259 test case `IncentiveEligibilityTest` / `incentiveEligibility.test.js`).** Basis ₹4,00,000 × 15 % = ₹60,000 by share. Sales share ₹18,000, capped at ₹15,000 → ₹3,000 kept. Sales Manager (₹6,000) not eligible → ₹6,000 kept. Logistics ₹9,000, but only ₹6,000 left under its monthly cap → ₹3,000 kept. Paid ₹48,000; kept by the company ₹12,000.
+
+**States: open → ready → locked → paid.**
+
+| State | Rule |
+|---|---|
+| Open | Estimated; MD can change it any time. |
+| Ready to lock | Buyer fully paid every leg (advance or LC, milestones, balance, freight on CFR/CIF), no buyer claim open. |
+| Locked | Only the MD locks (one order, or "Lock all ready"). Nothing locks by itself. Associate commission locks with it. Lock writes the payouts and the Commission cost entries. The order row is claimed `SELECT … FOR UPDATE`, so two lock clicks write once. |
+| Paid | Accounts pays (Paid via + reference required, D-212). Never changes again. |
+
+Unlock needs a reason, and only until anything is paid. Staff are paid in the payout run after the lock date. The MD is reminded `lock_reminder_days` (3) before each run. Every change goes to `order_incentive_history`.
+
+### 7.5 Profit layers: estimated, locked, paid (D-245 P5)
+
+`OrderProfitabilityService::computeForOrder()` is the **one profit calculation** used by the order page (Step 12), the Order Profitability report, the CAFIN CSV and the incentive.
+
+**Base profit.**
+
+```
+revenue (INR) = goods FOB at the real settled rate per leg (else that leg's own rate)
+              + bank charges added back where INR credited is known
+              + freight leg on CFR/CIF (the Debit Note reimburses freight)
+              + payment milestones (QA batch 4, MON-2)
+              + LC extra
+cost (INR)    = supplier PO total payable
+              + freight and CIF insurance (order currency × rate, D-225; ocean freight bills replace the rate)
+              + logistics partner bills (tax invoices; proformas only for what was paid, never both)
+              + order cost entries (CHA, bank charges, commission, …)
+              + order expenses (real travel replaces the provisional travel %)
+              + Zoho Books expenses linked to the order (duplicate guard)
+profit        = revenue + export benefits − cost
+margin %      = profit ÷ revenue × 100
+```
+
+Insurance is a seller cost on **CIF only** (on FOB/CFR the buyer insures, D-049). A freight amount with no rate is left out and flagged "not counted yet", never added as rupees (D-225).
+
+**Incentive layer** (`incentiveLayer()`):
+
+```
+profit before commission & incentive
+ − associate commission     (Estimated / Locked / Paid / Held)
+ = profit for the incentive
+ − team incentive           (Estimated / Locked / Paid / Held)
+ = profit after
+```
+
+- **Open orders carry the estimate**, so profit is never overstated.
+- A **locked** figure replaces the estimate; it is never added on top. (Locked amounts are already inside the cost entries and are taken out before the layer is applied.)
+- Cancelled or lost orders carry 0.
+- Only holders of `manage_incentives`, `pay_incentives` or `view_price_buildup` see commission, incentive and profit after. Others see profit before (it would reveal their sum).
+- Reports offer **Include open (estimated)** or **Locked only**.
+- The **CAFIN PDF is deliberately unchanged**: it prints locked figures only. Changing it needs the owner's double confirmation.
+
+### 7.6 Exchange rates
+
+There are four different rates. Do not mix them up.
+
+| Rate | Where it comes from | Used for |
+|---|---|---|
+| **Pricing FX** (`pricing_settings.pricing_fx_rate`, seed 82.0000) | MD, Admin › Pricing. Go-live: today's market ₹/USD minus about 1.5 %, reviewed monthly or when the rupee moves more than 1 %. | Turning supplier ₹ into USD prices. Converting USD-per-unit commission/incentive on non-USD orders. Frozen at PI approval as `orders.pricing_fx_rate_at_pi` (D-262). |
+| **Recorded remittance rate** | Worked out: INR credited ÷ foreign amount (D-244). Typed only when "INR not known yet" is ticked. | Revenue, realised rate, D-212 descriptions. |
+| **Bank's rate on the advice** (optional) | Typed from the bank advice. | Checking the INR credited. |
+| **MTT USD rate** (`mtt_usd_inr_rate`, 84.0000) | Merchant Trade division setting. | Merchant margin in USD when neither leg is USD. |
+
+**Rate gap (D-244, `RemittanceInr`).** gap = amount × bank's rate − INR credited.
+
+- |gap| ≤ ₹1 → saved silently (rounding).
+- |gap| > ₹1 → the user must choose:
+  - **bank_charges** — the gap is booked at once as a **Bank Charges** order cost with a D-212 description; the receipt is valued at the bank's rate, so the charges count once (as cost) and profit adds them back to revenue. Only when less arrived.
+  - **typo** — refused, nothing saved.
+  - **other** — a 10–255 character reason kept on the receipt (audit `REMITTANCE_INR_GAP_EXPLAINED`).
+
+Example: USD 10,000 received, bank's rate ₹84.10 → expected ₹8,41,000; credited ₹8,40,250 → gap ₹750 → "bank charges" → ₹750 cost; revenue counts ₹8,41,000.
+
+**Amount differs from what is due (`RemittanceDifference`).** A difference of more than 1 % (at least 1 unit) on the first receipt of a leg, or anything above what is still due, needs a reason from an Admin-managed list: bank charges (the leg counts as paid in full, charges become an order cost and go to Zoho with the customer payment), short payment (cleared later with a manager's reason and a kind — agreed discount / settled claim / not paid), excess. `max_bank_charges_pct` (3) caps how much may be treated as bank charges.
+
+### 7.7 CAFIN logic and milestone money
+
+**CAFIN** (CA Financial Annexure, internal only) is the complete money snapshot of one order, built by `CaFinancialSnapshotService::build()`. Every value is formatted there, so PHP and Node print identical text.
+
+| Section | Content |
+|---|---|
+| A | Order details, products, money received from the buyer |
+| B | Supplier cost, bills and payments (Proforma vs Tax invoice, "asks ₹X now", "replaced by tax invoice, not a cost", D-111) |
+| C | Every expense: freight and insurance (C1), logistics bills (C2, tax invoices only), other order costs incl. Commission lines for incentive and associate commission (C3), order expenses, Zoho Books expenses (C5) |
+| D | Government benefits (RoDTEP, RoSCTL, drawback …) |
+| E | Profit, with the cash position. **CAFIN profit equals the order-page profit** (D-110). |
+| F | Open items for the CA |
+
+Rules: generated automatically at **13h Mark Fully Settled** (D-108; a failure never blocks settlement); can be generated any time from the CAFIN box (D-107, `ca_internal_doc_manage`: Admin, MD, ED, Finance Manager/Director); seeing and downloading needs `view_cafin` (D-109; seed: Admin, MD, ED, Accounts Executive, CA, Finance Manager, Finance Director); LC money counts as money received (D-112); CSV export with `_INTERNAL` file names (D-113). Prints locked incentive figures only (D-245 P5). Never to the client, never to Zoho (rule R10, §10).
+
+**Payment milestones (D-215).** Up to 4 milestones between advance and balance; advance + milestones + balance = 100 %; the balance is what is left. Each milestone is its own payment step (remittance with bank reference, clear, Zoho). The balance cannot be cleared until every milestone is cleared.
+
+Milestone INR in profit (`PaymentMilestoneRepository::inInr`):
+
+| Case | INR used | Estimated? |
+|---|---|---|
+| INR credited known | credited + bank charges | No |
+| Received, rate known | received × rate | Yes |
+| Not received | planned (FOB × %) × fallback rate (balance rate, else advance rate) | Yes |
+
+Example: FOB USD 20,000, milestone 2 = 30 % "on loading" → planned USD 6,000; received USD 6,000, credited ₹5,03,400 → ₹5,03,400 in revenue.
+
+### 7.8 Domestic GST (D-257 Phase 2)
+
+`GstCalculator::compute()` works in **whole paise (integers)**, so there is no floating-point error.
+
+- **Same state** (seller's GST state code = place of supply): **CGST + SGST**, each half the rate.
+- **Other state**: **IGST** at the full rate.
+- Per line: taxable = quantity (3 decimals) × rate (2 decimals), rounded to the paisa; each tax rounded to the paisa, half away from zero. Totals are sums of lines. An HSN summary groups by HSN + rate.
+- **Round-off**: the invoice total is rounded to the rupee; the difference is the "round off" line.
+- GSTIN check: format plus the base-36 check character (`isValidGstin`).
+- Rates: Admin › GST rates (`gst_rates`, seed HSN 6802 = 18 %); DOM default `dom_default_gst_rate` 18. To be confirmed by the CA.
+
+**Worked example 5 (GST).** Line 1: 10.000 × ₹1,234.50; line 2: 3 × ₹999.99; 18 %.
+
+| | Same state | Other state |
+|---|---|---|
+| Taxable | 12,345.00 + 2,999.97 = 15,344.97 | 15,344.97 |
+| Tax line 1 | CGST 1,111.05 + SGST 1,111.05 | IGST 2,222.10 |
+| Tax line 2 | 269.9973 → CGST 270.00 + SGST 270.00 | 539.9946 → IGST 539.99 |
+| Gross | 18,107.07 | 18,107.06 |
+| Round off | −0.07 | −0.06 |
+| Invoice total | **₹18,107.00** | **₹18,107.00** |
+
+Per-line rounding of each half means CGST + SGST can differ from IGST by a paisa. This is expected.
+
+### 7.9 Import: landed cost and duty (D-257 Phase 3)
+
+`ImportService::compute()` (integer paise; rates to 4 decimals):
+
+```
+value (INR)      = quantity × unit price (FC) × customs exchange rate
+freight, insurance, CHA + port + other are spread over the lines by value
+assessable value = value + freight share + insurance share
+BCD              = assessable × BCD %
+SWS              = BCD × SWS %            (social welfare surcharge, on the duty)
+IGST             = (assessable + BCD + SWS) × IGST %   — input credit, NOT a cost
+landed cost      = assessable + BCD + SWS + charges share
+landed per unit  = landed ÷ quantity (4 decimals)
+suggested price  = landed per unit ÷ (1 − imp_margin_pct)   (before GST)
+```
+
+Duty rates: the longest matching HSN prefix in Admin › Import duty rates (seed: 6802 → BCD 20 %, SWS 10 %, IGST 18 %), else IMP defaults (BCD 10, SWS 10, IGST 18). All to be confirmed by the CA and the customs agent. Duty and landed cost are **frozen** when the import moves to "cleared"; goods enter stock at landed cost (weighted average, never below zero).
+
+**Worked example 6 (import).** 100 units × USD 50 at ₹84.0000; freight ₹20,000; insurance ₹2,000; CHA/port/other ₹15,000; HSN 6802.
+
+| Item | ₹ |
+|---|---|
+| Value | 4,20,000.00 |
+| Assessable | 4,42,000.00 |
+| BCD 20 % | 88,400.00 |
+| SWS 10 % of BCD | 8,840.00 |
+| IGST 18 % of 5,39,240 (credit) | 97,063.20 |
+| Landed | 4,42,000 + 88,400 + 8,840 + 15,000 = **5,54,240.00** |
+| Landed per unit | 5,542.4000 |
+| Suggested price at 20 % | 5,542.40 ÷ 0.80 = **6,928.00** |
+
+### 7.10 Merchant trade margin (D-257 Phase 4)
+
+`MerchantTradeService::money()`: two legs, each in its own currency (buy = paid to the supplier, sell = received from the buyer).
+
+```
+margin (INR)   = INR received on the sell leg − INR paid on the buy leg
+leg rate       = leg INR ÷ leg FC
+USD rate       = sell leg rate if the sale is in USD, else buy leg rate if the purchase is in USD,
+                 else mtt_usd_inr_rate (84.0000)
+margin (USD)   = margin INR ÷ USD rate
+margin %       = margin INR ÷ sell INR × 100
+contract margin = sale − purchase (only when both legs share a currency)
+```
+
+**Worked example 7.** Buy USD 40,000 paid at ₹83.50 = ₹33,40,000; sell USD 46,000 received at ₹84.00 = ₹38,64,000. Margin ₹5,24,000 → USD 6,238.10 (at 84.00) → 13.56 %. Contract margin USD 6,000.
+
+RBI checks (to be confirmed with the AD bank): whole deal within 9 months, outlay within 4 months, no unbacked supplier advance above USD 5,00,000 (refused).
+
+### 7.11 Rounding parity between PHP and Node
+
+Floating point differs slightly between languages, so the code avoids relying on it.
+
+| Method | Where | Rule |
+|---|---|---|
+| Decimal-string half-up | `PricingEngine::round2`, `pricingEngine.round2`, `money.js round2` | Format to 9 decimals, then round on the string: 1,326.125 → 1,326.13; 75.225 → 75.23; −12.345 → −12.35. Matches PHP `round($x, 2)` (half away from zero). |
+| Integer paise | `GstCalculator`, `ImportService`, `MerchantTradeService` | Amounts parsed from strings into integers (`scaled()`), divided with `roundDiv()` (half away from zero), printed with `money()`. |
+| Rupee rounding | TDS | `round(x, 0)` (section 288B). |
+| Display | `format2()` (Node) = PHP `number_format(round($x,2),2)`; `GstCalculator::inr()` for Indian grouping (12,34,567.00) | |
+
+Why: the fresh-eyes review (M3, 5 Nov 2026) found Node's older `Math.round(x + EPSILON)` rounded some halves down and negative halves towards zero, so commission, incentive, TDS and CAFIN could differ by a paisa. Five worked example orders are checked to the paisa on both stacks: `PHP_MySQL_Version/app/tests/*/D245WorkedExamplesTest.php` and `NODE_MySQL_Version/app/tests/*/d245WorkedExamples.test.js`.
+
+### 7.12 The D-212 money description rule
+
+**Rule.** Every money record — payment received or made, bill, expense, cost, payout, refund, export benefit, journal — carries a description, **in the app and in Zoho**, that says:
+
+1. **what it is** (advance / balance / freight / LC / milestone / supplier advance / CHA final / incentive / benefit …);
+2. **for which order and party**;
+3. **what it settles** (invoice / bill / claim / payout no.);
+4. **the bank reference** (UTR / SWIFT / FIRC / scrip no.) whenever money moved through a bank.
+
+The app **builds** it from the facts, so it is never blank or wrong. Staff notes are **appended** ("· note: …"), never replace it. A money form refuses to save without the bank reference where one exists. Each new money flow needs tests that check the exact wording on both stacks.
+
+**Why.** The 31 Oct 2026 audit found buyer remittances and LC money with no bank reference, payouts with no payment reference, optional cost descriptions, and generic texts. In Zoho, the CA could not tell what a payment was for.
+
+**Sample texts** (placeholders in angle brackets). Amounts inside descriptions use `number_format` grouping on both stacks (₹185,400.00, not ₹1,85,400.00), so the app and Zoho texts match character for character:
+
+| Record | Text |
+|---|---|
+| Buyer advance (`PaymentDescription::buyerPayment`) | `Advance received from <Buyer> for order <ref> · USD 1,600.00 at ₹84.10 · against Proforma Invoice <PI no.> · bank ref <UTR>` |
+| Buyer balance with charges | `Balance received from <Buyer> for order <ref> · USD 14,000.00 at ₹83.95 · ₹700.00 bank charges deducted by the banks · against Commercial Invoice <CI no.> · bank ref <UTR>` |
+| LC money | `LC money received from <Buyer> for order <ref> · LC <no.> (<bank>) · USD 20,000.00, ₹1,679,300.00 credited after ₹700.00 bank charges · against Commercial Invoice <CI no.> · bank ref <ref>` |
+| Milestone | `Milestone 2 (30% on loading) received from <Buyer> for order <ref> · USD 6,000.00 at ₹83.90 · against Commercial Invoice <CI no.> · bank ref <UTR>` |
+| Bank charges cost (D-244) | `Bank charges deducted in rupees from <Buyer>'s <leg> remittance for order <ref>: USD x at the bank's rate ₹r = ₹y, credited ₹z, charges ₹g · bank ref <UTR>` |
+| Associate payment (`AssociateTds::paymentDescription`) | `Associate commission for <Associate> — order <ref> — gross ₹84,000.00, TDS u/s 194H ₹1,680.00 (2%), net paid ₹82,320.00 + GST ₹15,120.00 on the associate's tax invoice (input credit), total paid ₹97,440.00 · UTR <ref>` |
+| Associate payout cost | `Associate commission to <Associate> on order <ref> (payout no. <n>, settles their commission invoice for this order): ₹84,000.00 + GST ₹15,120.00, TDS ₹1,680.00 · bank ref <ref>` |
+| Inspection fee | `Pre-shipment inspection fee — <agency>, invoice <no.>` |
+| LC loan interest | `Bank loan interest (LC order) · LC <no.> · loan ₹1,000,000.00 at 9.5%` |
+| Travel % | `Travel expenses (factory visits) — 350 km to the factory, 1.5% of the order value USD 20,000.00 at ₹84.00` |
+| GST refund | `GST refund under LUT, Oct–Dec 2026, claim <ARN> · provisional · ₹185,400.00 credited 12 Feb 2027 · bank ref <ref>` (the Zoho journal line itself reads `GST refund under LUT, claim <ARN>`) |
+| Import supplier | `Import supplier advance of USD 5,000.00 (₹420,000.00 at 84.0000) to <Supplier> (<Country>) against import PO <ref>, SWIFT/UTR ref <ref>` |
+| Merchant trade | `Merchant trade supplier advance of USD … (₹… at …) to <Supplier> (<Country>) against merchant trade deal <ref>, PO <no.>, backed by letter of credit <ref>, SWIFT/UTR ref <ref>` |
+
+Incentive payouts need **Paid via** + **reference** (added to the Commission cost line and so to the Zoho expense). A staff-added cost needs a description of 10+ characters. An export benefit received needs its UTR / e-scrip no. A refund needs its paid date and bank reference. An expense typed in Zoho without a description is flagged red in the app.
+
+---
+
+## 8. Generated documents
+
+Documents are rendered from templates in `app/templates/<CODE>/` on both stacks (Twig `*.html.twig` in PHP, Nunjucks `*.njk` in Node, same structure; pipeline in §3.8). PDF: DOMPDF (PHP) and Puppeteer/Chromium (Node, `pdfRenderService.js`, `PUPPETEER_EXECUTABLE_PATH`). DOCX: `Services/Docx/DocxDocumentBuilder.php` (PHPWord) and `services/docx/` (Node). The data comes from `DocumentDataAssembler` (both stacks). PHP and Node print the same page breaks and page counts (D-057).
+
+### 8.1 Document types
+
+Seeded in `document_types` (`docs/seed.sql`). "Category" decides who may see it: only `customer_facing` types can reach the buyer (`DocumentRepository::customerFacingForOrder`). DOCX is an **internal-only** Word copy next to the PDF; the buyer never gets the DOCX (`docx_generation_settings`).
+
+| Code | Name | Reference | When generated | Data source | PDF | DOCX | Category · who may see it |
+|---|---|---|---|---|---|---|---|
+| QT | Quotation | `SC/QT/…` | Stage 1 | Order, lines, client, T&C | Yes | Yes | customer_facing · staff and buyer. Blocked while a checked line is below floor (D-245). |
+| ANNEXA | Annexure A | `SC/ANX/…` | Stage 1, with the QT | Lines, images, `annexure_product_note` | Yes | Yes | customer_facing · staff and buyer |
+| BUYERPO | Buyer PO — Order Acceptance | `SC/PO/…` | Stage 2 | Buyer PO, consignee | Yes | Yes | customer_facing · staff and buyer |
+| PI | Proforma Invoice | `SC/PI/…` | Stage 3 | Lines, payment terms, bank, milestones | Yes | Yes | customer_facing · staff and buyer. Blocked while a line is below floor. Its first approval freezes the order (§5.5). |
+| OC | Order Confirmation | `SC/OC/…` | Stage 4 | Order, advance actually received | Yes | Yes | customer_facing · staff and buyer |
+| SUPPO | Supplier PO — Material Procurement | `SC/SPO/…` | Stage 5 | `order_supplier_po`, lines | Yes | Yes | procurement · never to the buyer |
+| FDN | Debit Note (freight) | `SC/DN/…` (older `SC/FDN/…`) | Stage 6 (CFR/CIF) | `order_freight` | Yes | Yes | customer_facing · staff and buyer |
+| PL | Packing List | `SC/PL/…` | Stage 7 | Packing, packages | Yes | Yes | customer_facing · staff and buyer |
+| BLI | BL Instruction Sheet | `SC/BLI/…` | Stage 7 | BL preset, consignee | Yes | Yes | internal · never to the buyer |
+| CI | Commercial Invoice | `SC/CI/…` | Stage 8 | Invoiced lines, balance terms | Yes | Yes | customer_facing · staff and buyer |
+| ESI | Export Service Invoice | `SC/ESI/…` | When the order has service lines (D-215) | Service lines | Yes | Yes | customer_facing · staff and buyer |
+| COOPREP | Certificate of Origin Preparation | none (D-069) | Stage 8–9 (also `generate_compliance_documents`) | Consignee, lines | Yes | Yes | procurement · never to the buyer |
+| AMD | Payment Terms Amendment | `SC/AMD/…` | When payment terms are amended (`AmendmentService`) | Amendment | Yes | No | internal · the buyer signs a copy outside the portal; the signed upload activates it |
+| BLE | Bill of Lading Endorsement | `SC/BLE/…` | After the BL endorsement form is saved; approved at once (no review) | `OrderBlEndorsement` | Yes | **No** (PDF only: `generateBlEndorsement` stores no Word copy) | customer_facing · staff and buyer |
+| CAFIN | CA Financial Annexure (Internal Only) | `SC/CAFIN/…` | Any time (CAFIN box) and automatically at Mark Fully Settled | `CaFinancialSnapshotService` | Yes | No | internal · only `view_cafin` holders who can open the order. Never to the client. |
+| CHECKLIST, CHECKLIST_2_FINANCE, CHECKLIST_3_PACKING, CHECKLIST_4_SHIPPING | Cross-Verification Checklists 1–4 | none | Not generated: fixed in-app Reference Library pages | `internal_reference_docs` (Markdown) | No | No | internal · any signed-in staff at `/reference-docs/{code}`; editing needs `manage_company_settings` |
+| SOP_A_SALES, SOP_B_SALES, STAGEGATE, WALLREF | SOP Tier A/B, Stage Gate Reference, Wall Reference | none | Not generated: fixed in-app Reference Library pages | `internal_reference_docs`, placeholders from `company_settings` | No | No | internal · as the checklists |
+| DQT, DOC, GTI, DCH | Domestic quotation, order confirmation, GST tax invoice, delivery challan | Division numbering | Domestic Trade order stages (D-257 Phase 2) | `DomesticDocumentService` + `GstCalculator` | Yes | No | staff of the DOM division; the buyer receives the PDF |
+| IPO | Import purchase order | Division numbering | Import "ordered" stage (D-257 Phase 3) | `ImportDocumentService` | Yes | No | staff of IMP; downloaded from the import page |
+| MTT invoice / PO | Merchant trade sale invoice and purchase order | Division numbering | Merchant deal (D-257 Phase 4) | `MerchantDocumentService` | Yes | No | staff of MTT; downloaded from the deal page |
+
+Every Export format is `SC/<X>/{YY}/{DDMM}{NNN}` (2-digit year since 29 Oct 2026, D-177; daily counter). The Reference Library also holds custom entries (uploaded PDF/Word/Excel/text files, optionally filed under a category that requires a permission) managed by `ReferenceDocController`.
+
+Generating needs `generate_documents`; approving needs `approve_documents`; downloading needs `download_pdf` (CAFIN: `view_cafin`, D-109). The server checks the stage (`stageSequenceFor` / `STAGE_DOCUMENTS`), not only the UI.
+
+The client portal lists only customer-facing documents that are approved or sent (`client_portal_show_document_downloads`, default on). CAFIN, Supplier PO, BLI, COO Prep and the inspection report are blocked **even by ID** (D-068, D-106). E-mail compose refuses internal documents.
+
+### 8.2 Revisions, approval and superseded copies
+
+**Lifecycle:** draft → in review → approved → sent → (superseded).
+
+- **Generate** creates a draft with the DRAFT watermark. The revision number is reserved atomically (`ReferenceNumberService::nextDocumentRevisionNumber`), so two people regenerating at once never share one.
+- **Two revision numbers.** `revision_number` counts every generation (Rev.00, Rev.01 …, internal). `client_revision_number` counts how many of this type were actually **sent** to the buyer, so internal re-generation never shows the buyer a jump from Rev.00 to Rev.09.
+- **Approval.** When every assigned reviewer approves (none rejects), the document is finalized automatically: the same revision is re-rendered with the final watermark. Only the latest revision can be approved. An inactive user cannot review; the same reviewer cannot be added twice (D-070).
+- **Superseded.** Approving a revision supersedes every other revision of that type on that order. An approved or sent one is re-rendered with the red **"INVALID DOCUMENT — SUPERSEDED"** watermark and saved as `… (SUPERSEDED).pdf`; a draft or in-review one only changes status. Superseded copies are never deleted.
+- **Sending** (e-mail on): two levels — Level 1 submit, Level 2 approval by someone with `approve_email_send` (never the requester), then the deferred dispatch job. With `mail_sending_enabled = 0` (seed), approval **counts as sent** and staff send the PDF themselves. `mail_approval_queue_enabled = 0` removes Level 2.
+- **Drift.** Regenerating an earlier-stage document flags later documents "may be out of step".
+
+**`render_context_json` (QA batch 3, DOC-2; D-258).** `documents.render_context_json` stores the exact context a revision was rendered from. Approval re-renders and superseded copies are drawn from this stored context, with only the watermark changed — never from today's order data. So the superseded and final copies show what was really issued. Revisions made before 6 Nov 2026 have no stored context and use the older live-data path.
+
+**Order freeze (D-262).** When the first PI is approved, the order's clauses, tolerance, company details, MD-approval flag, pricing rate, category rows and Zoho items are frozen, and every later document run uses them. Details: §5.5.
+
+### 8.3 Signatory and seal
+
+`DocumentDataAssembler::signatoryBlock()` picks the signatory in this order:
+
+1. a per-document override chosen at generation;
+2. `document_type_signatories` for that type (seed: AMD → the MD with the designation seal; D-067);
+3. `company_default_signatory`;
+4. fallback: `company_settings.md_name` / `md_title` and the global signature asset.
+
+The user must be `is_signatory_eligible`. The block prints the user's signature image, their designation seal or the company seal (`assets` type `seal`), as images, not black boxes (D-058). Re-renders reuse the signatory stored with the revision (`signatoryFromSnapshot`). The name printed is `users.name`, which is why real names are entered only at go-live (§9.4). An optional disclaimer under the signature block (`show_generated_document_disclaimer`, off by default, D-066).
+
+### 8.4 Watermarks
+
+| Watermark | Source | Default |
+|---|---|---|
+| Draft | `watermark_settings` (global, draft mode) | "DRAFT — NOT FOR RELEASE", mode `both` (text + image), #a8701f, opacity 0.15, 45° |
+| Final | `watermark_settings` (global, final mode) | "NEXACREST INTERNATIONAL — ORIGINAL", mode `both`, grey, opacity 0.15, 45° |
+| Revision stamp | Added to the text from the buyer's 2nd send onward | "— REVISION 02" (customer-facing only) |
+| Invalid | Hard-coded in `invalidWatermark()` so it can never be weakened | "INVALID DOCUMENT — SUPERSEDED", red #C0152F, 54 pt, 35° |
+| CAFIN | Own template, not `_layout.html.twig` | Red "INTERNAL ONLY" banner top and bottom |
+
+Every page carries the reference and the watermark (D-065). A blank watermark setting means the default.
+
+### 8.5 Category-driven columns, quality documents and T&C clause sets (D-257 Phase 0B / 1)
+
+`CategoryDocumentProfile` reads the product categories of the order's goods lines.
+
+| On the document | Natural Stone order | Other category |
+|---|---|---|
+| Product columns | Dimensions, Finish, HS Code | The category's own attributes and the line's HS code |
+| Packages | "Wooden Crates", "Crate No.", "Net Weight (stone only)" | Category packing ("Wooden Boxes"), "Package No.", "Net Weight (goods only)" |
+| Documents to be provided | The standard 5 | The 5, then each quality document (e.g. "6. Mill Test Certificate 3.1") |
+| Supplier PO section 3 | "Material / Stone Type", ±2 mm / ±0.5 mm | "Material / Product Type", "As per the approved drawing / specification", Quality Documents Required |
+| T&C | Natural stone clause set | The category's clause set |
+
+**Clause sets.** Most clauses print on every order. Some belong to a set (natural stone, general goods, engineering goods) and print only when an order category uses it; an order with two categories prints both sets. The general and engineering wording is a starting text for the lawyer to review before the first non-stone sale.
+
+**Quality documents card.** Per category, up to 10 documents. On the order page: Pending → Received → Approved, file required for Received/Approved. Internal; never shown to the client.
+
+### 8.6 The Natural Stone identity tests
+
+The owner rule is that every current PDF is correct. So D-257 Phase 1 had to prove that a stone order prints **exactly** what it printed before.
+
+- `PHP_MySQL_Version/app/tests/Integration/StoneDocumentsUnchangedTest.php` and `NODE_MySQL_Version/app/tests/integration/stoneDocumentsUnchanged.test.js` render QT, PI, OC, CI, PL, SUPPO, BLI and COOPREP (PDF and Word text, FOB and CIF) and compare them with fixtures in `tests/fixtures/stone_documents`, captured **before** Phase 1 on a fresh schema + seed database.
+- Per-run parts are masked (references, dates, e-mails, Rev.N, Page N).
+- `CAPTURE_STONE_DOCS=1` rewrites the fixtures — **only ever from pre-change code**.
+- `CategoryDrivenDocumentsTest` / `categoryDrivenDocuments.test.js` test the non-stone output; `NaturalStoneClauseWordingTest` guards the stone clause wording.
+
+If one of these tests fails after your change, you changed a document. Stop and follow §8.7.
+
+### 8.7 Double confirmation for any document change
+
+Rule R6 (CLAUDE.md): before changing anything that ends up in a generated document — PDF or DOCX templates, `DocumentDataAssembler`, document builders, CAFIN content — show the owner **what the document shows now and what it will show after**, and get confirmation **twice**. Data may change; the format of client-facing documents must stay intact.
+
+Why: on 27 Oct 2026 a Supplier PO change was built and had to be reverted the same day ("revert immediately … all PDFs are correct", D-063). That mistake is also why pushes became ask-first (R3). Many decisions in register §3.3 record "confirmed twice" with before/after samples.
+
+---
+
+## 9. Settings and configuration
+
+Settings live in database tables (seeded by `docs/seed.sql`, identical keys on both stacks) and in `app/.env`. A division setting is read from the division first, then the company (D-257). Changing a setting never changes an order whose PI is approved (D-262).
+
+### 9.1 Admin settings areas and keys
+
+#### Company Settings (`company_settings`, `/settings`, `manage_company_settings`)
+
+Sensitive keys (bank, GSTIN, IEC/PAN, LUT, RCMC) and the reference formats are **protected**: editing needs reason + unlock + confirm, and unprotecting needs a peer-approved request (`field_protection_requests`). Real company identifiers are seeded; they are not repeated in this handbook.
+
+| Group | Keys (default) |
+|---|---|
+| Company | `legal_name`, `registered_office` (placeholder), `corporate_office`, `gstin`, `iec_pan`, `md_name` ("Managing Director"), `md_title`, `director_name`, `director_title`, `phone` (+91-0000000000), `email` (info@email.com) |
+| Bank | `bank_name`, `bank_branch`, `bank_account_no`, `swift_bic`, `ifsc`, `bank_address`, `bank_pincode` |
+| LUT / RCMC | `lut_number`, `lut_valid_fy`, `lut_expiry_date` (2027-03-31), `rcmc_number`, `rcmc_valid_until` (2027-03-31) |
+| RBI | `rbi_purpose_code_advance` P0103, `_balance` P0102, `_freight` P0602 |
+| Defaults | `default_currency` USD, `default_estimated_total_cbm` 8.2, `default_estimated_gross_weight_kg` 27000, `default_estimated_net_weight_kg` 26000, `default_ui_template` standard |
+| Tolerances | `quantity_shortfall_tolerance_pct` 5.00, `max_bank_charges_pct` 3, `non_usd_price_buffer_pct` 1.75 (advisory) |
+| Alerts | `lut_alert_days_x` 30, `lut_escalation_days_y` 15, `rcmc_alert_days_a` 30, `rcmc_escalation_days_b` 15, `fdn_overdue_days_c` 3 (calendar days since D-051, counted by `check_alerts`; the seed's description still says working days, §14.5), `fema_realization_alert_days` 270 |
+| Security | `session_timeout_minutes` 30, `failed_login_lockout_count` 5, `lockout_duration_minutes` 15, `password_min_length` 10, `password_complexity_json` (upper + number), `password_expiry_days` 90 |
+| Documents | `quotation_validity_days` 30, `pi_validity_days` 15, `revision_start_number` 1, `annexure_product_note`, `show_generated_document_disclaimer` 0, `generated_document_disclaimer_text`, `always_show_consignee_section` 1, `always_show_notify_party_section` 1 |
+| Shipping | `bl_type_instruction`, `bl_consignee_instruction` ("TO ORDER OF {company}") — protected |
+| Formats (protected) | `master_tracking_ref_format` NC/SC/{YY}/{DDMM}{NNN}, `order_ref_format` NC/SC/ORD/{YY}/{DDMM}{NNN} |
+| Disputes | `dispute_response_days_n` 10 (working days), `weekly_off_days` sunday |
+| Workflow / orders | `wet_signature_required_buyer_po` 1, `wet_signature_required_supplier_po` 1, `oc_ack_override_restricted` 0, `oc_ack_auto_confirm_hours` 48, `lead_time_display_unit` days |
+| Clients | `client_impersonation_enabled` 0, `client_portal_show_order_history` 1, `client_portal_show_document_downloads` 1 |
+| Compliance | `ecgc_policy_no` (empty), `ecgc_policy_cover_pct` 90, `ecgc_policy_valid_to` (empty), `ecgc_declaration_day` 10, `benefit_deadline_days_rodtep` 365, `_rosctl` 365, `_duty_drawback` 0, `_other` 0 |
+| System | `storage_base_path` — documentation only; the app reads `.env` |
+
+#### E-mail (in `company_settings`)
+
+| Key | Default | Meaning |
+|---|---|---|
+| `mail_sending_enabled` | 0 | Master switch for every non-security e-mail. Off in a fresh install; approval then counts as sent. 2FA and password resets always go. |
+| `mail_approval_queue_enabled` | 1 | Level-2 approval for buyer e-mails. |
+| `reply_to_email` | empty | Monitored reply address (falls back to `email`). |
+| `mail_redirect_enabled`, `mail_redirect_address` | 0, empty | Redirect all non-security mail to one address (Super Admin). |
+| `mail_cc_emails`, `mail_default_cc_email` | empty | CC on every non-security e-mail (Super Admin only). |
+| `zoho_mail_enabled` and `zoho_*` mail keys | 0, empty | Kept, but **not used**: all mail goes through SMTP (owner, 29 Oct 2026). |
+
+SMTP itself is in `.env` (§9.2). "Send Test Email" on the settings page tests it.
+
+#### Zoho Books (in `company_settings`, category `zoho_books`)
+
+`zoho_books_enabled` 0; `zoho_books_client_id`, `_client_secret`, `_refresh_token`, `_organization_id`, `_deposit_account_id` (empty, secrets masked "ends in 1a2b"); `zoho_books_sync_start_date` (go-live date; nothing earlier is sent); `zoho_books_restore_checked_at` (set by the app); `zoho_books_accounts_domain` accounts.zoho.in; `zoho_books_api_domain` www.zohoapis.in; `zoho_sync_clients` 0; `zoho_sync_products` 0; `zoho_api_daily_limit` 800; `zoho_api_minute_limit` 30. Books syncs only when `.env` `ZOHO_INTEGRATION_ENABLED=true` **and** `zoho_books_enabled = 1`. "Test Books Connection" only reads.
+
+#### Pricing (`pricing_settings`, Admin › Pricing, MD only, audited)
+
+| Key | Default | Meaning |
+|---|---|---|
+| `margin_pct` | 20.00 | Minimum margin, % of price |
+| `other_cost_pct` | 2.50 | Other costs to FOB, % of supplier price |
+| `pricing_fx_rate` | 82.0000 | ₹ per USD — **set on go-live day** |
+| `buffer_pct` | 3.00 | Negotiating buffer |
+| `incentive_mode` / `incentive_value` | pct / 15.0000 | Team-incentive reserve and global incentive rule |
+| `stale_days` | 60 | Supplier price stale after |
+| `require_product_pick` | 1 | Goods lines on USD orders must be picked from Products |
+| `cbm_from_mm` | 50 | Per-CBM pricing from this thickness |
+| `price_request_daily_limit` | 10 | Associate automatic price requests per day |
+| `price_request_valid_days` | 7 | Associate price validity |
+
+Also in Pricing: commission levels (`commission_levels`) and ladder (`commission_ladder_steps`) — §7.3; specifications per category; self-approval rule `price_discount` (MD, ED).
+
+#### Team incentive (`incentive_settings`, `incentive_roles`; Admin › Team Incentives, MD)
+
+`program_enabled` **0** (on or off as the owner decides at go-live), `lock_reminder_days` 3. Roles and shares §7.4; caps per role (`cap_per_order_inr`, `cap_per_month_inr`, empty); eligibility per designation and per person (D-259).
+
+#### Associate commission and TDS (`incentive_settings`)
+
+| Key | Default | Where |
+|---|---|---|
+| `associate_commission_due_days` | 30 | Associates › Commission settings (MD) |
+| `associate_claim_hold` | 1 | 〃 |
+| `associate_payout_run` / `associate_payout_day` | monthly / 5 | 〃 |
+| `associate_counting_threshold_inr` | 500000 | 〃 |
+| `associate_gst_pct` | 18.00 | 〃 |
+| `associate_protection_months` | 6 | 〃 (buyer registration) |
+| `associate_registration_link_days` | 7 | 〃 (D-253) |
+| `associate_code_changes_per_year` | 3 | 〃 (D-254) |
+| `associate_bank_wait_days` | 7 | Bank-detail change wait |
+| `associate_upgrade_after_orders` | 3 | Access level upgrade (D-261) |
+| `zoho_gst_commission_tax_id` | empty | Zoho GST tax for commission bills (D-256) |
+| `associate_tds_section` | 194H | Settings › Associate TDS (`manage_company_settings`, reason required) |
+| `associate_tds_pct` | 2.00 | 〃 |
+| `associate_tds_threshold_inr` | 20000 | 〃 |
+| `associate_tds_no_pan_pct` | 20.00 | 〃 (206AA) |
+| `associate_tds_foreign` | 0 | 〃 |
+| `associate_15cb_required` | 1 | 〃 |
+| `zoho_tds_tax_id` | empty | 〃 (blank = CA books the TDS) |
+
+Associate access levels (`associate_access_level_settings`, D-261): Starter, Quoting, Full — which portal features each sees (FOB value, commission %, catalogue, Get price, documents …).
+
+#### Divisions (`divisions`, `division_modules`, `division_settings`; Admin › Divisions, MD, `manage_divisions`)
+
+EXP Export is active; DOM, MTT, IMP are planned. The switcher appears only when two or more divisions are active.
+
+| Division | Keys (default) |
+|---|---|
+| DOM | `dom_default_gst_rate` 18, `dom_eway_threshold_inr` 50000, `dom_e_invoice_applicable` 0, `dom_payment_terms_days` 30, pricing `pricing_fx_rate` 1.0000, incentive `program_enabled` 0 |
+| IMP | `imp_default_bcd_pct` 10, `imp_default_sws_pct` 10, `imp_default_igst_pct` 18, `imp_margin_pct` 20, `imp_lc_bank`, `imp_default_cha` (empty), pricing rate 1.0000, incentive off; module `import_stock` |
+| MTT | `mtt_max_months_total` 9, `mtt_max_outlay_months` 4, `mtt_advance_limit_usd` 500000, `mtt_usd_inr_rate` 84.0000, `mtt_bank_documents` (7-item list), `mtt_ad_bank_approval` (empty), incentive off; module `merchant_trade` |
+
+#### GST and duty rates
+
+Admin › GST rates (`gst_rates`; seed HSN 6802 = 18 %) and Admin › Import duty rates (`import_duty_rates`; seed 6802 = BCD 20, SWS 10, IGST 18). Shown once DOM or IMP is active. All starting values to be confirmed by the CA.
+
+#### Document copies clean-up (`company_settings`, category `document_cleanup`)
+
+| Key | Default | Options |
+|---|---|---|
+| `doc_cleanup_draft_days` | 0 (off) | 0, 30, 90, 180 |
+| `doc_cleanup_superseded_days` | 0 (off) | 0, 90, 180, 365 |
+| `doc_cleanup_cafin_mode` | keep_all | keep_all, latest_only (older copies removed 30 days after a newer one) |
+
+Never removed: anything sent to the client, the current copy of every revision, the current internal Word copy, uploaded files, files of an order with an open dispute, documents in a CA-locked financial year. Daily job 02:15.
+
+#### Watermarks and DOCX
+
+`watermark_settings` (draft and final, §8.4); `docx_generation_settings` (DOCX on for QT, ANNEXA, PI, OC, BUYERPO, SUPPO, FDN, PL, BLI, CI, COOPREP, ESI).
+
+#### Remittance difference reasons
+
+`remittance_difference_reasons` — Admin-managed list for "Why is it different?" with treatment bank_charges / short / excess.
+
+#### Backups (Admin › Backups, read only, D-260)
+
+The page (`manage_company_settings`) only shows what the jobs report; the rules are the `BACKUP_*` keys in `.env` (§9.2). Schedule, retention and warnings: §3.15. Set-up and restore: §12.3.
+
+### 9.2 `.env` keys (both `app/.env.example` files)
+
+| Key | PHP | Node | Default / note |
+|---|---|---|---|
+| `APP_ENV` | ✓ | ✓ | `production`. `local` only on a dev machine (prints 2FA codes on screen). |
+| `DEV_SERVER` | ✓ | ✓ | `false`. `true` on any test server shows a red "DEV / TEST ENVIRONMENT" strip. |
+| `APP_URL` | ✓ | ✓ | Site URL. |
+| `PORT` | — | ✓ | 3000. |
+| `SESSION_SECRET_KEY` | — | ✓ | Random 32-byte value. |
+| `APP_ENCRYPTION_KEY` | ✓ | ✓ | Required; encrypts Buyer Action Link tokens. Changing it breaks existing links. |
+| `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`, `DB_CHARSET` | ✓ | ✓ | 127.0.0.1, 3306, nexacrest, nexacrest_app, —, utf8mb4 |
+| `DB_POOL_SIZE`, `SESSION_DB_POOL_SIZE` | — | ✓ (optional) | 10, 5 |
+| `STORAGE_BASE_PATH` | ✓ | ✓ | Absolute path outside the web root. |
+| `PUPPETEER_EXECUTABLE_PATH` | — | ✓ | `/usr/bin/chromium` |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_ENCRYPTION`, `SMTP_FROM_ADDRESS`, `SMTP_FROM_NAME` | ✓ | ✓ | Port 587, `tls` (STARTTLS required) or `ssl` (465). |
+| `ZOHO_INTEGRATION_ENABLED` | ✓ | ✓ | `false` = no Zoho call ever. Always written out. |
+| `ZOHO_ENVIRONMENT` | ✓ | ✓ | `test` = only `TEST-` customers; `production` = only real orders. |
+| `ZOHO_EINVOICE_ENABLED` | ✓ | ✓ | `false`. E-invoice / e-way bill / GST filing only with production. Never true while testing. |
+| `SMS_GATEWAY_PROVIDER`, `SMS_GATEWAY_API_KEY`, `SMS_GATEWAY_SENDER_ID` | ✓ | ✓ | Optional; blank = e-mail 2FA only. |
+| `RUN_JOBS_IN_PROCESS` | — | ✓ | `false` = OS cron runs the jobs. Never true and cron together (double-fires). |
+| `BACKUP_DIR` | ✓ | ✓ | Outside web root and storage (scripts refuse otherwise). |
+| `BACKUP_KEEP_YEARS` | ✓ | ✓ | 10 |
+| `BACKUP_THIN_AFTER_DAYS` | ✓ | ✓ | 120 (0 = keep every nightly copy) |
+| `BACKUP_ENCRYPTION_KEY_FILE` | ✓ | ✓ | chmod 600; keep a copy off the server. |
+| `BACKUP_OFFSITE_TARGET` | ✓ | ✓ | Empty until chosen; an rclone remote. |
+| `BACKUP_RESTORE_TEST_DB` | ✓ | ✓ | Default `<DB_DATABASE>_restore_test`; never the live DB. |
+
+Secrets (Zoho keys, passwords, tokens) go only in the server's environment or the masked Admin fields, never in chat or git (R17).
+
+### 9.3 Installation order (D-241)
+
+```bash
+mysql -u <user> -p -e "CREATE DATABASE nexacrest CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u <user> -p nexacrest < <stack>/docs/schema.sql
+mysql -u <user> -p nexacrest < <stack>/docs/seed.sql
+```
+
+Both files start with `SET NAMES utf8mb4;`. Do not remove it, or every em-dash and ₹ is stored garbled. The 120 development migrations were folded into these two files on 2 Nov 2026 and deleted (git history keeps them); `docs/migrations/` holds only its README until after go-live.
+
+The seed holds the literal `__STORAGE_BASE_PATH__`. Replace it in three tables with the same absolute path you put in `.env`:
+
+```sql
+UPDATE assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/abs/path/to/storage');
+UPDATE user_signature_assets SET server_path = REPLACE(server_path, '__STORAGE_BASE_PATH__', '/abs/path/to/storage');
+UPDATE reference_library_documents SET file_path = REPLACE(file_path, '__STORAGE_BASE_PATH__', '/abs/path/to/storage');
+```
+
+If you skip the second line nothing errors, but every signature and seal on every PDF prints blank. Then fill `.env` (§9.2), set up the scheduled jobs (§3.9) and run the real-values block below.
+
+### 9.4 README go-live SQL block (real values)
+
+The seed holds role placeholders only. The two founder logins are **protected accounts**: trigger `trg_users_protected_bu` refuses any change to their name, e-mail, phone, role, designation, signatory flag, Super Admin or active status, from the app or SQL. Once, right after import, as the database admin user:
+
+```sql
+DROP TRIGGER IF EXISTS trg_users_protected_bu;
+UPDATE users SET email = 'real-md@yourcompany.com', name = 'Real MD Name' WHERE email = 'md@email.com';
+UPDATE users SET email = 'real-ed@yourcompany.com', name = 'Real ED Name' WHERE email = 'ed@email.com';
+UPDATE company_settings SET setting_value = 'Real MD Name'       WHERE setting_key = 'md_name';
+UPDATE company_settings SET setting_value = 'Real Director Name' WHERE setting_key = 'director_name';
+UPDATE company_settings SET setting_value = 'info@yourcompany.com' WHERE setting_key = 'email';
+UPDATE company_settings SET setting_value = '+91-XXXXXXXXXX'     WHERE setting_key = 'phone';
+UPDATE company_settings SET setting_value = 'Real registered office address, City – PIN, India' WHERE setting_key = 'registered_office';
+UPDATE assets SET name = REPLACE(name, 'Managing Director', 'Real MD Name') WHERE name LIKE 'Managing Director%';
+-- then re-create trg_users_protected_bu exactly as printed in the stack README
+```
+
+Check with `SHOW TRIGGERS LIKE 'users';`. The block is safe to run again to fix a typo. Signature blocks print `users.name`, so this is what puts real names on PDFs. The full trigger text is in `PHP_MySQL_Version/README.md` ("First-time setup") and the Node README.
+
+Other go-live items (README "Placeholder values", `docs/guides/GO_LIVE_CHECKLIST.md`): each seeded Super Admin must set a new password at first login (forced); confirm `lut_expiry_date` and `rcmc_valid_until`; fill ECGC only if there is a policy; set `pricing_fx_rate`; upload the logo, MD signature, company seal and watermark on Company Assets; decide `program_enabled`; set `zoho_books_sync_start_date` before switching Zoho on.
+
+---
+
+## 10. Hard rules and restrictions
+
+These rules come from `CLAUDE.md` (project instructions) and register §2 (R1–R26). They override default habits. Read the register before asking the owner anything already decided (R18).
+
+| Rule | What it means | Why it exists |
+|---|---|---|
+| **Parity** (R1) | PHP and Node always behave the same; every change goes into both, and every UI change into all counterparts, without being asked. | The owner has not finally chosen a hosting stack; either must be a drop-in. Differences found in QA (e.g. a paisa in rounding) were real bugs. |
+| **Verify before pushing** (R2) | PHPUnit, Jest and the Playwright e2e suite (`e2e/`) against both stacks. Never push unverified code, even "to keep it safe". No skipped tests (R22). | Untested pushes broke working behaviour during development. |
+| **Ask before pushing** (R3) + **review pack** (R4) | Never push without asking. First a short summary (what is pushed, which files change, which functionality is affected), then the nine-part review pack listed in §16 step 13. | Changed from "push always" to ask-first on 27 Oct 2026 after the Supplier PO PDF mistake. The owner must be able to check a change without reading code. |
+| **One branch** (R5) | Work only on the agreed branch; never create a new one. | The owner will rename it to `main`. |
+| **No document change without double confirmation** (R6) | Show what the document shows now and after; get confirmation twice. All current PDFs are correct. | Documents go to buyers, banks and customs; a wrong word has legal and money effects (§8.7). |
+| **Standard and Kanban stay parallel** (1 Nov 2026) | Any user may choose either template, so every filter, search, count, field, badge, action, link and money rule exists on both, in the same change, on both stacks. `KanbanParityTest` / `kanbanParity.test.js` enforce it. | A user on one template must never miss something the other shows. |
+| **Mockups first** (R7) | For a larger UI redesign, show mockups and get confirmation (usually twice) before building. | Cheaper to change a picture than code on two stacks. |
+| **CAFIN never reaches the client** (R10) | Not by download, link, email or portal; not to Zoho. Enforced structurally: `internal` category, own template, `view_cafin`, portal blocks by ID, e-mail refuses it, `_INTERNAL` file names. | CAFIN shows cost, margin, benefits and commissions. |
+| **Supplier and buyer never cross** (R11) | Vendors and CHA never see the client's details, terms or amounts. Confirmed "already taken care" (D-063). | Commercial confidentiality. |
+| **Browser-side validation on every form** (R12) | One sitewide `fieldError()` in `public_html/assets/js/app.js` (PHP) and `public/js/app.js` (Node); HTML attributes for simple rules; message beside the field; server checks stay. "Re-enter" fields named `<name>_confirm` / `confirm_password` or `data-match`. `FormValidationConventionsTest` / `formValidationConventions.test.js`. | Users lost typed data on server-side refusals; one shared script keeps behaviour identical everywhere. |
+| **Placeholders on every input** (1 Nov 2026) | Every typed input and textarea has a placeholder with an example or format (not date, file, checkbox, radio, hidden). Labels, required "*", and "Choose…" on required drop-downs. `FormPlaceholderTest`, `FormLabelConventionsTest` (+ Node twins). | Staff should know the expected format without asking. |
+| **MySQL compatibility** (R13) | Host = MySQL 8, dev = MariaDB. No `ADD/DROP/CHANGE COLUMN IF [NOT] EXISTS`, no `CREATE INDEX IF NOT EXISTS`; guard with information_schema + PREPARE. ONLY_FULL_GROUP_BY. Migrations run-twice-safe, `SET NAMES utf8mb4` first, filename order. | MariaDB-only syntax fails on the live host. |
+| **SOP** (R14) | Edit `docs/SOP`, then copy to both stacks' `docs/SOP`. | Three copies must match. |
+| **Money descriptions** (D-212) | §7.12. | Zoho and the CA must know what every rupee is. |
+| **Zoho change log** (R15) | Every change in any Zoho app, by anyone, test or real, gets a row in `docs/zoho/zoho-change-log.csv` (UTF-8 with BOM) at the time, with the full column set in CLAUDE.md. Read-only checks too. Test records start `TEST-` and are removed before go-live (logged). | Zoho is the books of account; every change must be traceable and test data must not stay. |
+| **Zoho never affects core functionality** (R16) | With Zoho off, the app works exactly the same. Nothing from development or testing may reach the GST portal. | The business must run if Zoho is down or unconfigured. |
+| **Secrets never in chat or git** (R17) | Keys only in the server's environment / masked Admin fields. | Security. |
+| **Everyone sees only what they can use** (R23) | Links, menus and buttons only for permitted users; the server refuses regardless. | Least privilege, and clean screens. |
+| **IST everywhere** (R24) | Server, DB session, timestamps, documents. | Indian business and legal dates. |
+| **Order is self-contained** (R25, D-262) | Every amount and snapshot is stored on the order; a later master change never alters it. | Agreed orders must not move. |
+| **Reasons** (R26) | Every typed reason ≥ 10 characters; skips need a reason and are audited; nothing silently set to 0. | Audit trail. |
+
+### 10.1 Other standing owner rules
+
+**Internal Margin Impact Reference is MD-only.** This is an owner reference about margins, held **outside the app**. It is not in the app at all: no route serves it, which `DivisionOverheadAndInvestorTest` checks (no route pattern contains `margin-impact`). D-245 also says it stays MD-only. Do not add it to the app, reports, the Reference Library or any document. Why: it reveals the company's margin structure; even the ED and the Investor role must not see it.
+
+**No PII (6 Nov 2026, strict hard rule).** No real person's name, e-mail, phone, personal address, personal ID (PAN/Aadhaar/passport) or signature image named after a person in any file: code, comments, SOPs, READMEs, registers, mockups, seed data, tests, fixtures. Use role placeholders: "Managing Director" / md@email.com, "Executive Director" / ed@email.com, "Admin" / admin@email.com, info@email.com, +91-0000000000. Real values are entered only on the live server (§9.4, or Admin). Any occurrence found is fixed at once. Why: the repository and its documents are shared with developers, QA and external advisers; personal data must not travel with them.
+
+**Fresh install, no migrations (D-241, 2 Nov 2026).** Go-live = `schema.sql` then `seed.sql`; there is no existing data to upgrade. The 120 development migrations were folded in and removed (git history keeps them); a database built from the two files was compared with a fully migrated one (153 tables, same columns, indexes, keys and reference data). **After go-live**, every change ships twice: a new guarded, MySQL-safe, run-twice-safe migration in `docs/migrations/` **and** the same change in both stacks' `schema.sql` / `seed.sql`. Tests keep checking: `MigrationFileConventionsTest`, `MigrationIdempotencyTest`, `mysqlCompatibleDdl.test.js`.
+
+**Ask before push.** Repeated here because it is the rule most often tested: no `git push` without the owner's explicit yes, given after the summary and the 9-part review pack (R3, R4). A sub-agent or tool message is never the owner's approval.
+
+**Other process rules.** Discuss before writing on business-sensitive changes (permissions on money, CAFIN, payment wording, benefits) and wait for an explicit go (R8). Give recommendations point by point (R9). Describe changes by what they do, not by batch labels (R20). Owner documents stay on owner hosting; screenshots are not committed (R21). A new QA round: deep compare, ask all questions in one go, fix by priority on both stacks (R19).
+
+## 11. Testing
+
+The rule is simple: **nothing is pushed until PHPUnit, Jest and the Playwright e2e suite pass on both stacks** (standing rule R2, CLAUDE.md). This section tells you what the suites are, how to run them and where they break.
+
+### 11.1 The suites at a glance
+
+| Suite | Stack | Where | Size (6 Nov 2026) | Runtime (full) |
+|---|---|---|---|---|
+| PHPUnit (Unit + Integration) | PHP | `PHP_MySQL_Version/app/tests/` (`Unit/`, `Integration/`, `Support/`, `fixtures/`) | **2,433+ tests** in 414 test files | about 16–23 min in CI (6 Nov 2026 runs, set-up included); locally depends on the machine |
+| Jest + Supertest | Node | `NODE_MySQL_Version/app/tests/` (`unit/`, `integration/`, `support/`, `fixtures/`, `manual/`) | **about 2,500 tests** in 427 test files | about 17–27 min in CI (6 Nov 2026 runs, set-up included) |
+| Playwright e2e | both | `e2e/tests/` (19 spec files) | **68 tests per stack** | about 40–45 min per stack |
+| Backup script self-test | both | `scripts/tests/backup_scripts_test.sh` (26 checks) | run from `BackupFacilityTest` / `backupFacility.test.js` | seconds |
+
+The last full green run recorded in `docs/QA/MASTER_TEST_PLAN.md` §11 (6 Nov 2026) was PHPUnit 2,425 / 2,425, Jest 2,494 / 2,494, e2e 68 / 68 on PHP and 68 / 68 on Node. Later work added a few PHPUnit tests (hence "2,433+").
+
+The test layers (from the master test plan):
+
+| Layer | What it proves |
+|---|---|
+| L1 Static sweeps (Unit) | Conventions: forms, labels, placeholders, migrations, route tables |
+| L2 Route and integration | The real router and middleware run; database effects and audit rows are checked |
+| L3 Browser (e2e) | A real browser clicks like a person: roles, money matrix, forms, phone layouts |
+| L4 Exploratory crawl | A systematic walk of every page per role, template and screen size |
+
+Two hard rules about tests:
+
+- **No skipped tests** (R22, D-193). Fix a test or delete it. Tests that need a PDF tool fail loudly if the tool is missing; they never skip.
+- **Tests never send real mail and never depend on the developer's machine** (D-194). The PHPUnit bootstrap forces `SMTP_HOST` blank; Zoho calls go to a fake transport (`ZohoBooksService::setTransport()` / its Node twin).
+
+### 11.2 Running the suites locally
+
+**Prerequisites (both unit suites):**
+
+- MySQL 8 or MariaDB running, and the `mysql` command-line client on the PATH (the schema has triggers with `DELIMITER $$`, which only the CLI understands, so both suites shell out to it).
+- `app/.env` in each stack with a DB user that may **create and drop databases**. Only the database name is overridden by the tests.
+- `poppler-utils` (`pdftotext`, `pdfinfo`) and `unzip` — the document tests read the generated PDFs and the `.docx` XML.
+- Node stack: a Chromium binary for Puppeteer (`PUPPETEER_EXECUTABLE_PATH` in `app/.env`), or the PDF tests fail with "Document generation failed".
+
+**PHP (PHPUnit):**
+
+```bash
+cd PHP_MySQL_Version/app
+vendor/bin/phpunit                                        # everything (same as: composer test)
+vendor/bin/phpunit --testsuite Unit                       # only the static sweeps
+vendor/bin/phpunit tests/Integration/KanbanParityTest.php # one file
+vendor/bin/phpunit --filter testEveryBoardOffersWhatItsListOffers
+```
+
+**Node (Jest):**
+
+```bash
+cd NODE_MySQL_Version/app
+npm test                                   # = jest --runInBand (one file at a time — required)
+npx jest --runInBand kanbanParity          # one file, by name fragment
+NODE_OPTIONS=--max-old-space-size=6144 npx jest --runInBand   # what full runs used in development
+```
+
+Jest **refuses** to start with more than one worker (`tests/support/globalSetup.js`, QA Round 7 R7-N05): the files share one database, so parallel files give false failures.
+
+**e2e (Playwright)** — needs both dev servers running against real dev databases (not the test databases):
+
+```bash
+# PHP dev server (always through the router script)
+cd PHP_MySQL_Version/public_html && php -S 127.0.0.1:8080 _dev_router.php &
+
+# Node dev server — output MUST go to a file, 08-email-functionality reads it
+cd NODE_MySQL_Version/app && npm start > /path/to/node-server.log 2>&1 &
+
+cd e2e
+npm install                     # once
+npx playwright install chromium # once, or set PW_CHROMIUM_PATH
+npm run test:php                # BASE_URL=http://127.0.0.1:8080
+npm run test:node               # BASE_URL=http://127.0.0.1:3000 (set NODE_SERVER_LOG to the log path)
+npx playwright test tests/12-money-matrix.spec.js   # one spec
+```
+
+e2e settings come from the environment: `BASE_URL`, `PW_CHROMIUM_PATH`, `E2E_DB_USER`, `E2E_DB_PASSWORD`, `E2E_DB_NAME` (defaults `nexacrest_php_dev` / `nexacrest_node_dev`), `NODE_SERVER_LOG`, `PHP_ERROR_LOG`. One-time setup per dev database (all in `e2e/README.md`):
+
+1. Load `docs/schema.sql` then `docs/seed.sql`.
+2. Replace `__STORAGE_BASE_PATH__` in `assets`, `user_signature_assets` and `reference_library_documents`.
+3. Give the seeded MD login (md@email.com) a known password and clear `force_password_change`; set the same in `e2e/tests/support/auth.js`.
+4. Load `e2e/seed-ui-test-users.sql` (one user per role). Its password hash is PHP's `$2y$` form; for Node swap in the `$2b$` hash named in the file's header.
+
+### 11.3 Test databases and isolation
+
+| | PHP | Node |
+|---|---|---|
+| Database | `nexacrest_phpunit_test` | `nexacrest_node_jest` |
+| Built | once per PHPUnit process, in `tests/bootstrap.php` → `DbTestCase::rebuildDatabase()` (drop, create, `schema.sql`, `seed.sql`) | once per Jest run, in `tests/support/globalSetup.js` |
+| Dropped | at process shutdown | in `globalTeardown.js` |
+| Never touches | the dev/demo databases | the dev/demo databases |
+| Time zone | `Asia/Kolkata` (matches the app, R24) | `TZ=Asia/Kolkata` set in `jest.config.js` before workers start |
+
+**`DbTestCase`** (`PHP_MySQL_Version/app/tests/Support/DbTestCase.php`) is the base class for any PHP test that needs the database. Its Node twin is `tests/support/fixtures.js`. They provide the same helpers:
+
+- `createTestClient()`, `createTestOrder($clientId, 'FOB', 'Standard — New Buyer', 'USD', …)` — the order is built exactly like a real one: the client, incoterm, currency, port and preset are *snapshotted* onto the order (the standalone-order rule, R25), and the 9 stage rows, compliance tasks and benefit-scheme rows are created by the real repositories.
+- `createTestUser($roleName)`, `createTestDocument()`, `createTestFile()`, `stageStatuses()`.
+- `completeAssociateKyc()` (D-252: no commission until KYC is complete).
+- `allowHandTypedGoodsLines()` — switches off "goods lines must be picked from Products" (D-245 P2) for one test; `setUp()` switches it back on.
+- `setUp()` also resets the per-request caches (permissions, active department, incentive roles) and frees the eight fixed test client e-mails (clients.email is unique, R6-N16).
+
+**`clearDivisionTradeData()`** — the Domestic Trade, Import & Distribution and Merchant Trade tests leave rows in the shared test database. That made list/board tests that expect "nothing" depend on run order. Every such test class calls it in `tearDownAfterClass()` (Node: `afterAll`). It deletes all rows from the 14 division-trade tables, turns any order in another division back into a cancelled Export test order, and sets every division except Export back to `planned`. **Rule:** a new test that creates division-trade data, or activates a division, must call it.
+
+**The stone fixtures and `CAPTURE_STONE_DOCS`.** `StoneDocumentsUnchangedTest` / `stoneDocumentsUnchanged.test.js` compare every stone document with captured text in `tests/fixtures/stone_documents/` (§8.6). `CAPTURE_STONE_DOCS=1` rewrites the fixtures. **Only ever capture from code that is known to be correct and only after the owner has double-confirmed the document change (R6).** If this test fails, a stone document changed: treat it as a document change, not as a test to update.
+
+**The suite lock.** Each suite uses one fixed database name, so two runs of the same suite at the same time drop each other's database mid-run. In development every full run was wrapped in `flock` on a lock file, for example:
+
+```bash
+flock /path/to/test.lock vendor/bin/phpunit
+flock /path/to/test.lock npx jest --runInBand
+flock /path/to/test.lock npx playwright test
+```
+
+Use one lock file for everything that touches the same databases (unit suites and e2e). The master test plan's note "the shared test database is locked by another process" refers to this.
+
+### 11.4 The QA matrices and the UI crawl (built 5–6 Nov 2026, D-258)
+
+| Matrix | Files (PHP / Node / e2e) | What it does | Last result |
+|---|---|---|---|
+| **Roles and single permissions** | `e2e/tests/qa-roles-permissions-matrix.spec.js` + `e2e/support/qa-matrix.js` | Creates one user per staff role and one user per permission (on a role holding only that permission) — 118 users. Each signs in and opens every staff GET route with real IDs. Fails on any 5xx, error text in a page, or a page its gate should refuse that answered 200. Also checks an order of a planned division never shows to Export staff. Cleans up after itself. | 23,010 requests per stack, 0 wrong answers. About 6 min PHP, 4 min Node. |
+| **Incoterm × payment preset** | `QaIncotermPresetMatrixTest.php` / `qaIncotermPresetMatrix.test.js` | FOB, CFR, CIF × every seeded preset; generates every order document (QT, ANNEXA, BUYERPO, PI, OC, SUPPO, FDN, PL, BLI, CI, COOPREP) in PDF and Word. A business refusal ("record the freight first") is allowed; a crash is not. QT/PI/OC/CI must show the order total and the preset's split. `QA_REPORT=/path.json` writes the table. | 165 combinations per stack, 0 crashes, 0 wrong totals or wordings |
+| **Mail** | `QaMailMatrixTest.php` / `qaMailMatrix.test.js` | Every `send_<code>` template renders with a subject, the buyer as recipient and no unreplaced `{token}`; PI / Debit Note / CI mails carry the payment link; generic templates render or refuse with a business message; with the approval queue on and sending off, each send queues, is approved and dispatches; Supplier PO and CAFIN can never be mailed. | 0 problems on either stack |
+| **Payment wording** (older) | `PaymentTermsScenariosTest.php` / Node twin | PI and CI wording for all 15 incoterm × preset cells | green |
+| **Money matrix** | `e2e/tests/12-money-matrix.spec.js` + `support/moneyMatrixSeed.js` | One user per role; a sentinel order where every money class carries a distinctive amount; ~75 Standard + 12 Kanban screens, 18 files and the dossier ZIP per role. Fails on any amount a role may not see (D-229). | 0 violations |
+| **UI crawl** | `e2e/tests/qa-ui-crawl.spec.js` | Human-style walk: MD and main roles, Standard and Kanban, desktop and phone. Follows every same-site link (one page per route shape, up to `QA_CRAWL_MAX`, default 120), opens every step card and tab, records 4xx/5xx, console errors and horizontal overflow, and submits each form empty and with bad values (the browser must stop it). Every POST is aborted, so nothing is written. Options: `QA_CRAWL_ROLES`, `QA_CRAWL_MAX`, `QA_CRAWL_OUT`. | ~420 pages per run, 8 runs clean |
+
+The full specification of the matrices (role × route, single permission × route, mail switch combinations, template × list page, divisions) is in `docs/QA/MASTER_TEST_PLAN.md` §3 and §5. Its coverage-gap list (§8, G1–G18) shows what is still thin.
+
+### 11.5 Conventions tests (the ones that enforce the standing rules)
+
+These fail the build when a rule in CLAUDE.md is broken. If one fails after your change, **fix the change, not the test**.
+
+| Rule | PHP | Node |
+|---|---|---|
+| Standard and Kanban stay parallel (2026-11-01 hard rule) | `KanbanParityTest`, `KanbanCoverageTest`, and one `*KanbanBoardTest` per board | `kanbanParity.test.js`, `kanbanCoverage.test.js`, `*KanbanBoard.test.js` |
+| Browser-side validation, `*_confirm` / `data-match` fields | `FormValidationConventionsTest` (Unit) | `formValidationConventions.test.js` |
+| Placeholders on every typed input | `FormPlaceholderTest` (Unit), `FieldPlaceholdersTest` | `formPlaceholder.test.js` |
+| Labels, required `*`, "Choose…" on required drop-downs | `FormLabelConventionsTest` (Unit), `FieldLabelsTest` | `formLabelConventions.test.js` |
+| Every permission-gated route refuses the wrong user | `RouteMatrixTest` | `routeMatrix.test.js` |
+| Every route without a gate is deliberate | `UngatedRoutesTest` | `ungatedRoutes.test.js` |
+| Every route has a behaviour test (D-211) | `RouteBehaviourTest` | `routeBehaviour.test.js` |
+| Menu links match route permissions (R23) | `NavLinksMatchRoutePermissionsTest` | `navLinksMatchRoutePermissions.test.js` |
+| MySQL-safe migrations (R13) | `MigrationFileConventionsTest` (Unit), `MigrationIdempotencyTest` (runs each file twice) | `mysqlCompatibleDdl.test.js` |
+| No money leak (D-229) | `MoneyLeakClosuresTest`, `MoneySeparationTest` | `moneyLeakClosures.test.js` |
+| PHP and Node documents have the same page breaks (D-057) | `DocumentPageCountParityTest` | `tests/manual/documentPageCountParity.js` (run by hand) |
+| Stone documents unchanged (D-257 Phase 1) | `StoneDocumentsUnchangedTest` | `stoneDocumentsUnchanged.test.js` |
+
+**Stack parity itself** (same routes, methods, permission gates and guards on both stacks) has **no standing unit test**. It was proven once by the QA inventory (735 / 735 routes on 5 Nov 2026, kept as `e2e/support/qa-inventory.json`); the only standing parity tests are `KanbanParityTest` and `DocumentPageCountParityTest`. The route matrix tests on each side cover the gates; the twin test files are named alike (`FooBarTest.php` ↔ `fooBar.test.js`). Gap G14 in the master plan lists the few test files that still exist on one side only.
+
+### 11.6 Continuous integration
+
+`.github/workflows/tests.yml` (owner decision O-5 / D-216 C-5, 1 Nov 2026) runs on **every push and pull request**:
+
+- **PHP — PHPUnit:** Ubuntu, PHP 8.3 (`pdo_mysql, mbstring, gd, zip, intl, bcmath`), a MySQL 8.0 service, `composer install`, `.env` copied from `.env.example` with test values (APP_ENV=local, SMTP blank, Zoho off, a CI-only encryption key), `poppler-utils` + `unzip`, then `vendor/bin/phpunit`.
+- **Node — Jest:** Ubuntu, Node 22, the same MySQL 8.0 service, `npm ci` with `PUPPETEER_SKIP_DOWNLOAD`, the same `.env` approach plus `SESSION_SECRET_KEY`, then `npm test`.
+
+Why MySQL 8 in CI: the live host runs MySQL while development runs MariaDB, so CI catches MySQL-only differences and strict mode (R13). **CI does not run the e2e suite** — that needs running servers and seeded dev databases, so it stays a manual step before every push. No secrets are needed in CI.
+
+### 11.7 Known slow or fragile tests
+
+| Test | Problem | Cause / what to do |
+|---|---|---|
+| `12-money-matrix.spec.js` on **Node** | About 24 minutes (PHP: about 2; the test allows up to 90) | The order-profitability report is slow on a large dev database. It is the longest single test. It also leaves `money-matrix-role-N@nexacrest.test` users and `MM-SENTINEL-*` orders in the dev database. |
+| `qa-roles-permissions-matrix.spec.js` | Uses a snapshot route list | `qa-matrix.js` reads `e2e/support/qa-inventory.json` (or the file in `QA_INVENTORY`). It is the 5 Nov 2026 inventory (735 routes); routes added since are not driven until it is regenerated, and the script that generated it is not in the repository (§14.5). |
+| `qa-ui-crawl.spec.js` | ~6 min per template × size | One finding (travel-expense form "not focusable" on PHP) did not reproduce; `qa-order-cost-forms.spec.js` now covers it. A one-off focus failure here is usually timing. |
+| `08-email-functionality.spec.js` on Node | Fails at once | The Node server's output was not redirected to a file, or `NODE_SERVER_LOG` points elsewhere. |
+| Any document test on Node | "Document generation failed" | `PUPPETEER_EXECUTABLE_PATH` does not point at a real Chromium. The real reason is only in the server log. |
+| PDF / Word reading tests | Fail loudly | `pdftotext` / `unzip` missing (they never skip, D-193). |
+| List and board tests | Pass alone, fail in the full run | Another test left records behind. Add `clearDivisionTradeData()` (division data) or clean your own rows; never rely on run order. |
+| Jest full run | Out of memory on big runs | Use `NODE_OPTIONS=--max-old-space-size=6144`. |
+| Upload routes in PHPUnit | Cannot really upload | PHP cannot upload inside PHPUnit, so upload routes are tested by their refusals; Jest/Supertest tests the real upload (D-211). |
+| `stoneDocumentsUnchanged` | Slow (180 s timeout) | Renders 16+ documents. Do not raise the timeout to hide a real hang. |
+| Cross-browser | Only Chromium is automated | Safari / Firefox are a manual 5-step check (open point O-17). |
+| e2e login for 6 of 8 roles | Fails on a fresh clone | `e2e/seed-ui-test-users.sql` not loaded, or the PHP hash used on Node. |
+
+### 11.8 Adding a test for a new feature, on both stacks
+
+1. **Write the test first** (CLAUDE.md, "tests first"). Name the twins alike: `tests/Integration/WidgetApprovalTest.php` and `tests/integration/widgetApproval.test.js`. Put a one-line comment at the top of each naming the owner decision (D-xxx) and the twin file.
+2. **PHP:** extend `App\Tests\Support\DbTestCase`. Build data with `createTestClient()` / `createTestOrder()` / `createTestUser('Export Executive')`. Call the controller or service directly; check the database row, the audit row and the page text.
+3. **Node:** use `supertest` against `require('../../src/server')`, the helpers in `tests/support/fixtures.js`, and `db.queryOne()` for checks. Log in as a real user (see `kanbanParity.test.js` for the pattern), keep the CSRF token, and end with `afterAll(() => db.pool.end())`.
+4. **Check the refusals too:** a user without the permission gets 403 and nothing is written; a missing ID says "not found" and writes nothing (D-209); a disallowed state is refused (D-116).
+5. **Money:** assert the exact description wording (D-212) and that the save is refused without the bank reference.
+6. **Document output:** do not add or change a golden file without the owner's double confirmation (R6).
+7. **Clean up:** call `clearDivisionTradeData()` if you touched a non-Export division; use unique e-mails (`…-<random>@nexacrest.test`).
+8. **UI:** if the feature adds a page or form, the conventions tests will check labels, placeholders, validation and the Kanban twin. Add the page to `KanbanParityTest::pages()` and its Node twin if it is a list page. Add an e2e step if it is a critical path.
+9. **Run** the new test alone on both stacks, then the full suites and e2e under the lock (§16).
+
+---
+
+## 12. Operations
+
+### 12.1 Install and go-live
+
+The business view is `docs/guides/GO_LIVE_CHECKLIST.md` (tick it top to bottom on the day). The technical steps are in each stack's README, "First-time setup". In short:
+
+**1–3. Database, storage paths and real values.** Follow §9.3 (create the database, load `schema.sql` then `seed.sql`, replace `__STORAGE_BASE_PATH__`) and §9.4 (the real-values SQL that puts real names on the founder logins and on PDFs, then re-creates the protection trigger). No real name or e-mail is ever written into the repository.
+
+**4. `app/.env`** (copy from `app/.env.example`):
+
+| Key | Value on live |
+|---|---|
+| `APP_ENV` | `production` (`DEV_SERVER=false`, real `APP_URL`) |
+| `APP_ENCRYPTION_KEY` | a fresh random key; Node also needs `SESSION_SECRET_KEY` |
+| `DB_*` | the live database |
+| `STORAGE_BASE_PATH` | absolute path to `storage/`, outside the web root |
+| `SMTP_*` | Bluehost SMTP (D-139). Blank encryption means STARTTLS/TLS (D-140) |
+| `ZOHO_INTEGRATION_ENABLED` / `ZOHO_ENVIRONMENT` / `ZOHO_EINVOICE_ENABLED` | always written out. `false` / `test` / `false` until the live Books organisation is ready; then `true` / `production`; e-invoice stays `false` (D-161) |
+| `SMS_GATEWAY_*` | may stay empty (email 2FA only) |
+| `PUPPETEER_EXECUTABLE_PATH` (Node) | a real Chromium |
+| `RUN_JOBS_IN_PROCESS` (Node) | `false` if you use cron (never both) |
+| `BACKUP_*` | see §12.3 |
+
+**5. Web server.** PHP: point the document root at `public_html/` (`.htaccess` routes everything to `index.php`). Node: run `src/server.js` under PM2 (`pm2 start src/server.js --name nexacrest`, `pm2 save`, `pm2 startup`) behind Nginx.
+
+**6. Scheduled jobs**, in Indian time (`CRON_TZ=Asia/Kolkata`, R24): install every job in the table in §3.9, including the hourly Zoho sync (**must be installed**, D-233: records reach Books only on a sync) and the three backup scripts (§12.3).
+
+Example (PHP on Bluehost): `0 * * * * php /home/<cpaneluser>/nexacrest_webapp/app/cron/zoho_sync.php >> /home/<cpaneluser>/logs/zoho_sync.log 2>&1`. Node: `cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/zohoSync.js >> /var/log/nexacrest/zoho_sync.log 2>&1`. On Node, use **either** cron **or** `RUN_JOBS_IN_PROCESS=true` (node-cron inside the web process), never both, or every job fires twice.
+
+**7. Backups set-up** (§12.3), then **first login** (md@email.com / the seeded password `ChangeMe#2026`, forced change, then 2FA), company settings, company assets, pricing, commission and incentive settings, people, products, and a **dry run in Test Mode** (references get a `TEST-` prefix) with one order taken to closure. All in the go-live checklist, sections C–F.
+
+### 12.2 Daily and weekly checks
+
+**Daily** (MD / Admin / Accounts):
+
+- The daily digest arrived. A **BACKUP WARNING** line means act today.
+- **Zoho Sync Log** (`/ca/zoho-sync`): no failures. A failed run also e-mails every "Manage CA module" holder once.
+- "**Waiting for Zoho: N**" beside Zoho Sync in the menu is not growing (it should drop to 0 after each hourly sync).
+- The e-mail approval queue has no stuck items; no `failed` rows in the e-mail log.
+- Notifications: overdue balances, freight, LC dates, disputes.
+
+**Weekly:**
+
+- **Admin › Backups**: every job OK (database, documents, off-site when set, test-restore within 35 days).
+- Prices are not stale (default 60 days); "Pricing ready?" on products.
+- The incentive / commission "Ready to lock" list.
+- `storage/logs/error.log` on each server: anything new?
+- Free disk space for `storage/` and `BACKUP_DIR`.
+
+**Monthly:** the test-restore result on the 1st; the payout run (commission paid on the 5th by default).
+
+### 12.3 Backup and restore (SOP 32, D-260)
+
+**What and how long:**
+
+| What | When (IST) | Kept |
+|---|---|---|
+| Whole database (`mysqldump --single-transaction`, gzip, AES-256, `.sha256`) | 02:00 nightly | 10 years; copies older than 120 days thinned to the first of each month |
+| Every document (`rsync --link-dest` snapshot: an unchanged file is stored once) | 02:30 nightly | 10 years |
+| Full encrypted archive of documents | first night of each month | 10 years |
+| Test-restore into a scratch database, then dropped | 04:00 on the 1st | result in Admin › Backups |
+
+Why this design: the owner must keep records 9–10 years, the backup must never touch live data, and must not duplicate files. So the scripts only **read** the live system, refuse a `BACKUP_DIR` inside the storage folder, web root or app, never overwrite a backup, and only ever delete files named like a backup inside `BACKUP_DIR`.
+
+**Set-up (once):**
+
+1. `mkdir -p <BACKUP_DIR> && chmod 700 <BACKUP_DIR>`; `openssl rand -base64 48 > <keyfile> && chmod 600 <keyfile>`. **Keep a copy of the key away from the server** — without it no copy can be opened.
+2. In `app/.env`: `BACKUP_DIR`, `BACKUP_KEEP_YEARS=10`, `BACKUP_THIN_AFTER_DAYS=120`, `BACKUP_ENCRYPTION_KEY_FILE`, `BACKUP_OFFSITE_TARGET=` (empty until the owner picks a provider; then an rclone remote, copied with `--immutable`), `BACKUP_RESTORE_TEST_DB` (default `<DB_DATABASE>_restore_test`; on Bluehost create it in cPanel and give the app user rights).
+3. `chmod 700 scripts/*.sh`; add the three cron lines.
+4. Run `backup_db.sh` and `backup_storage.sh` by hand, then `backup_test_restore.sh`; Admin › Backups must show OK for each.
+
+**Restore** is never automatic and is done by the server administrator on the MD's instruction:
+
+- *One document:* copy the file from `BACKUP_DIR/storage/snapshots/nexacrest_files_YYYY-MM-DD/` back to the same path under `STORAGE_BASE_PATH`. Usually unnecessary: every document revision is kept (SUPERSEDED copies open from the order's history).
+- *Whole database:* stop the app → pick `BACKUP_DIR/db/nexacrest_db_YYYY-MM-DD_HHMMSS.sql.gz.enc` → `sha256sum -c` its `.sha256` → take a fresh backup of the current database first → `openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in <file> -pass file:<key> | gunzip | mysql -u <user> -p <db>` → restore documents from the **same night** → start the app and spot-check orders.
+- *All documents:* stop the app → `rsync -a <snapshot>/ STORAGE_BASE_PATH/` (or decrypt a monthly archive and `tar -xzf`) → start and check.
+
+### 12.4 Zoho
+
+**How the sync works.** Zoho Books is the CA's official ledger (D-160). The app never sends a record at the moment it is saved; the **hourly sync** (or *Sync now* on `/ca/zoho-sync`, *Sync this order*, *Send to Zoho Books* on a record) sends it (D-233). `CaSyncService::runFullSync()` / `caSyncService.runFullSync()` sends CIs and Debit Notes (export invoices), buyer payments and LC money (applied to the invoice), vendors, bills and vendor payments, expenses and paid costs, and received export benefits (journals); then it imports the expenses the CA books in Zoho. Since D-257 (6) the other divisions sync in the same job (`DivisionZohoSync` / `divisionZohoSync.js`).
+
+Safety rails:
+
+- `ZohoGuard` checks every request. Off → no call at all. `test` → only `TEST-` customers. Production → test and sample orders are skipped; nothing is sent before the go-live date (`zoho_books_sync_start_date`). Government features need production **and** e-invoice both true (D-161, R16).
+- One sync at a time (`ZohoSyncLock`, a database lock). Before posting a payment, expense, cost or journal the app looks it up in Books by reference, so a retry never duplicates (D-258 QA4).
+- API budget (D-239): `zoho_api_daily_limit` 800, `zoho_api_minute_limit` 30 (Admin › Settings › Zoho Books); the sync stops at once on "too many requests". Usage shows on the sync page.
+- Restore check (D-164): at most once every 23 h a scheduled run puts back records deleted or changed in Books; *Sync now* always checks.
+- *Check against Zoho Books* (`/orders/{id}/zoho-check` and the division equivalents) reads only and shows match / not sent / different / missing.
+- **CAFIN never goes to Zoho** (R10).
+
+**The Zoho change log** (CLAUDE.md, R15). Every change made in Zoho — by anyone, by hand or by script, test or real — gets a row in `docs/zoho/zoho-change-log.csv` (UTF-8 **with BOM**, so Excel opens it cleanly) at the time it is made. Read-only checks get a row too ("Read only - no change"). The columns are listed in CLAUDE.md (Log ID Z-001…, IST date/time, done by, on whose instruction, how, app, organisation, where, action, what exactly, before, after, why, test or real, must be removed before go-live, removed on/by, related app change, owner approval, notes). On the live site, the records the app creates itself are logged in the app's own Zoho Sync Log instead. Changing the app's own Zoho settings is an app change, not a Zoho change, and needs no row.
+
+**Removing the TEST- records before go-live.** On 6 Nov 2026, 48 rows were marked "must be removed before go-live" with no removal date (Z-629–Z-641, Z-648–Z-654, Z-656–Z-657, Z-659–Z-661, Z-663, Z-674–Z-688, Z-691–Z-693, Z-695–Z-698), all in the **test** organisation. After the owner has looked at them:
+
+```bash
+php app/cron/zoho_cleanup_test_records.php                     # dry run: lists only
+php app/cron/zoho_cleanup_test_records.php --apply --by "Admin" --log ../docs/zoho/zoho-change-log.csv
+node src/jobs/zohoCleanupTestRecords.js --apply --by "Admin" --log ../docs/zoho/zoho-change-log.csv
+```
+
+`--from-sync-log` also removes everything this database sent (refused when `ZOHO_ENVIRONMENT=production`). The script does not yet know the new-division Zoho IDs (open item ZOH-17), so check those records by hand. Fill "removed on / by" for every row. The live organisation starts clean.
+
+### 12.5 Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Signatures / seals blank on every PDF | `__STORAGE_BASE_PATH__` not replaced in `user_signature_assets` | Run the three `UPDATE`s (§12.1) |
+| Em-dashes and ₹ show as garbage | `seed.sql` / a migration loaded without `SET NAMES utf8mb4` | Reload; never remove that line |
+| PHP local: a URL gives 404 | `php -S` started without `_dev_router.php` | `php -S 127.0.0.1:8000 _dev_router.php` |
+| Node: "Document generation failed" | `PUPPETEER_EXECUTABLE_PATH` wrong | Point it at Chromium (`which chromium`); details in `storage/logs/error.log` |
+| No e-mails go out | E-mail sending is **off by default** (D-155), SMTP blank, or the send waits in the approval queue (D-123) | Admin › Settings: e-mail sending; check `SMTP_*`; approve the queue; check the dispatch cron |
+| E-mails go to the wrong address | Mail redirect or Test Mode is on | Switch off redirect / Test Mode. Security mail (2FA, resets, associate and buyer codes) is never redirected (MAIL-13) |
+| Records not in Zoho | Hourly sync not installed; before the go-live date; Zoho off; a TEST/sample order in production | Install the cron; set `zoho_books_sync_start_date`; read the Sync Log row |
+| "Another sync is running" | `ZohoSyncLock` | Wait for the running sync; one Sync Log row records the stop |
+| Sync stops with "too many requests" | Zoho API limit or the app's own budget | Wait; check usage on the sync page; review D-239 limits |
+| A buyer in two currencies is stopped by the sync | A Books customer has one currency | Ask the CA (open point O-15) |
+| Founder account cannot be edited | `trg_users_protected_bu` (by design) | Use the real-values SQL block |
+| A staff member can look but not save | Their division is not active, or Test Mode freezes that screen (D-179) | Move the user to an active division; leave Test Mode |
+| Node jobs run twice | Both cron and `RUN_JOBS_IN_PROCESS=true` | Pick one |
+| Alert / digest times are wrong | Cron runs in UTC | `CRON_TZ=Asia/Kolkata` or convert the times |
+| Users see old JS after a deploy | — | Should not happen: `app.js`/`app.css` carry a version stamp (D-189); hard-refresh if a proxy cached it |
+| Admin › Backups says "Not set up" | `BACKUP_DIR` empty, or the folder is inside storage / web root | Fix `app/.env`; the script refuses unsafe folders |
+| Locked out after failed logins | Account lockout | An admin resets; check `login_attempts` |
+
+### 12.6 Logs
+
+| Log | Where | What is in it |
+|---|---|---|
+| Application error log | `storage/logs/error.log` on **both** stacks (PHP `app/bootstrap.php`; Node `src/helpers/logger.js`) | Uncaught exceptions, fatal errors, DB connection failures, e-mail attempts on PHP. Not shown on screen in production. |
+| Node process output | `pm2 logs nexacrest` (or the file you redirect to) | Startup lines, `console.error` from e-mail on Node |
+| Cron / job logs | wherever the cron line redirects: e.g. `~/logs/zoho_sync.log` (Bluehost) or `/var/log/nexacrest/*.log` (VPS) | One summary line per run |
+| Backup logs | `backup_db.log`, `backup_storage.log`, `backup_test_restore.log` | Each run; Admin › Backups shows the last result |
+| Audit log | in the app: `/audit-log` and each order's audit log (`audit_log` table) | Every core action, denial (`PERMISSION_DENIED`), override, unlock, download of CAFIN. Amounts masked for people without the money permission (D-229) |
+| Zoho Sync Log | `/ca/zoho-sync` (`zoho_sync_log`) | Every sync part, success or failure, skipped parts |
+| E-mail log | the e-mail approval pages (`email_log`) | Queued, approved, sent, failed |
+| Zoho change log | `docs/zoho/zoho-change-log.csv` (repository) | Changes made in Zoho by people or scripts (§12.4) |
+
+---
+
+## 13. Decision history
+
+The full register is `docs/decisions/owner-decisions-register.md` (about 260 decisions, last updated 6 Nov 2026). It has: §2 standing rules R1–R26; §3 decisions by area (D-001…D-262); §4 an index of every test finding (QA rounds 1–6 and the 5–6 Nov programme); §5 open points (O-1…O-23); §6 sources and caveats. **How to use it:** check every new finding there first; if a decision covers it, apply it and cite the row ("per D-041"); never re-ask a decided point (R18 — the owner's words: "STICK TO THE DECISIONS WHICH WE HAD ALREADY TAKEN"); record each new decision the same day as a new D-row (numbers are never reused).
+
+### 13.1 The big "whys"
+
+| Design choice | Why | Codes |
+|---|---|---|
+| **The order is standalone.** Client, supplier, incoterm, currency, ports, preset and every amount are copied onto the order when used. Once the first PI is approved, T&C clauses, tolerances, company details, the MD-approval flag and the pricing rate are frozen onto it too (`orders.frozen_snapshot_json`). | A shipped order and its documents must never change because a master record was edited later. Documents re-rendered years later must print what was agreed. | R25, D-186, D-072, D-105, D-262 |
+| **Two stacks (PHP and Node) in strict parity.** Same schema and seed, same routes (~744), same behaviour, mirrored tests. | PHP runs on today's Bluehost shared hosting with no build step; Node is VPS-ready, so the company can move host at any time without redevelopment. Both can even share one database. | R1, D-057 |
+| **CAFIN never reaches the client.** CAFIN (the internal financial annexure for the CA) is blocked from the portal even by ID, refused by e-mail compose, checked on every download, never sent to Zoho, and needs `view_cafin`. | It holds cost, margin and profit. A single leak would damage supplier and buyer relationships. | R10, D-106–D-115, D-229 |
+| **No money leak anywhere.** Every amount belongs to a money class (selling prices, buyer payments, purchase prices, logistics costs…); a person sees only the classes they hold — on pages, files, ZIPs, audit logs, CSVs, reports. | Sales staff must not see costs; logistics must not see selling prices; associates see no prices by default. | D-214 phase 2, D-229, D-261 |
+| **Every money record has a correct description.** Built from the facts (what, which order and party, what it settles, bank reference); staff notes only add; money forms refuse to save without the bank reference. Same text in Zoho. | The CA and auditors must understand every entry years later without asking. | D-212 (hard rule) |
+| **Divisions hidden until two are active.** Export is the only active division; DOM, IMP and MTT are built but `planned`. The switcher, report Division filter and user Division field appear only once two divisions are active. | Prepare for new businesses without changing anything for today's Export users. | D-257 (0A), D-257 (5) |
+| **Stages pass only on approved documents, in order.** "One door at a time." | Export compliance and payment safety: no shipment before money and paperwork are right. | D-001–D-027 |
+| **Maker-checker.** A different person approves what someone made; recording and clearing a payment are different people. Self-approval only where Admin › Self-approval rules allow. | Fraud and error control. | D-117, D-076, D-221 |
+| **Zoho is optional and fenced off.** With Zoho off the app works exactly the same; nothing from testing reaches GST/government portals. | Books is the CA's ledger, but the business must never stop because of an integration. | R16, D-161, D-163 |
+| **Mail only when someone must act.** No audit-log e-mails; mail sending off by default; two-level send approval on by default. | One order once produced about 90 e-mails. | D-135, D-155, D-123 |
+| **Mockups first, documents double-confirmed.** | The owner wants to see before building; client-facing documents are legal papers and are correct as they are. | R6, R7, R8 |
+| **First install = `schema.sql` + `seed.sql`; after go-live every change is a migration.** | A clean start with no history to replay; a safe path for the live database later. | D-185, D-241 |
+| **Backups for 10 years, read-only on live.** | Statutory record keeping (9–10 years). | D-260 |
+
+### 13.2 Decisions by theme (condensed)
+
+**Process and stage gates (D-001–D-027).** A stage passes only when its document is approved (mail off) or sent (mail on) (D-001), only on an active order at a reached stage (D-002). Steps and sub-steps unlock strictly in order (D-003, D-004); a skip always needs a reason (R26). Step 4 Buyer PO: generate → link → signed copy required (D-008). Compliance runs in two phases (D-014). Close Order needs BLI and COOPREP approved or sent (D-017). FOB skips the freight stage (D-021, D-048). The payment preset cannot be changed on Edit Order (D-022). Regenerating an earlier document flags later ones "DATA MAY BE STALE" but cancels nothing (D-027, D-216 C-1).
+
+**Order page UI (D-028–D-045).** 19 numbered steps in five colour-coded sections; At a Glance strip; one save button per section; Order Financials as one card with five tabs (D-033); the Kanban/order-page redesign "Concept C" kept (D-045). Standard and Kanban stay parallel (hard rule, 1 Nov).
+
+**Documents (D-046–D-071, D-223, D-224, D-230, D-257 (1)).** No checkboxes on documents; fixed wording and layout; reference and watermark on every page; PI "ADVANCE PAYABLE NOW" box; LC orders never show "0%"; CI balance clause follows the order's own terms (D-054); PHP and Node documents have the same page counts (D-057); internal documents never go to the buyer (D-068). Documents follow the product category, but Natural Stone prints exactly as before (D-257 (1)).
+
+**Payments and terms (D-072–D-084, D-205, D-227, D-243, D-244).** Five protected presets (D-073); risky terms need MD/ED approval before the Quotation (D-075); recording and clearing by different people (D-076); amount and rate recorded together; buyer money arrives in INR in one current account (D-084); remittances record the INR the bank credited and the rate is worked out (D-244).
+
+**Suppliers, logistics, bills (D-085–D-094, D-232).** Bill first, then pay (D-089); proforma vs tax invoice "Option B" (D-091); GST always a % from a drop-down (D-092); Logistics enters logistics bills, Accounts pays (D-232).
+
+**Financials and benefits (D-095–D-105, D-213, D-225, D-234).** All finances order by order (D-101); benefits claimed and received at Step 13g (D-099); profit includes benefits and the CFR/CIF freight leg (D-104); GST refunds under LUT (D-213).
+
+**CA module and CAFIN (D-106–D-115, D-236).** See 13.1. The CA role is read-only and sees every order (D-114).
+
+**Roles, access, organisation (D-116–D-124, D-214–D-216, D-221, D-226, D-261).** Role + permission (Owner Decision #3); order visibility by assignment, `view_all_orders` for management (D-118); departments → designations → roles → permissions with Log in as, Preview as, My tasks and the cockpit (D-214); nobody grants what they do not hold (D-216); self-approval rules in Admin (D-221); associate portal access levels Starter / Quoting / Full / Custom (D-261).
+
+**Client portal and links (D-125–D-134, D-206, D-242, D-246, D-250).** One step at a time on the Buyer Action Link; one e-mail per client (D-129); feedback only after shipping documents; a buyer never sees an error caused by an associate code (D-246).
+
+**E-mail (D-135–D-142).** See 13.1. Bluehost SMTP; Zoho Mail is not used to send (D-139).
+
+**Forms (D-143–D-148, D-207, D-220, D-247).** Browser validation on every form (R12); typed values kept after an error (D-144); server enforces the same rules (D-145); fixed lists are drop-downs (D-147); placeholders everywhere (D-220); "Not saved" pop-up (D-247).
+
+**Files (D-149–D-154).** Order files stored by step folder (`01-quotation` … `13-closure`), `generated/` and `received/`, random names on disk; the server checks the real file type (D-151).
+
+**Zoho Books (D-160–D-170, D-233, D-238, D-239, D-257 (6)).** See §12.4.
+
+**Incentives and associates (D-171–D-176, D-208, D-217, D-235, D-245, D-251–D-256, D-259).** Team incentive program with on/off and minimum profit (D-171); associate system with its own portal and KYC (D-217, D-252); TDS worked out by the app (D-235); pricing build-up with margin, staff floor, associate floor and buffer — nobody sells below the minimum price (D-245); eligibility and caps (D-259).
+
+**References (D-177, D-178, D-248).** Two-digit year; atomic sequences; order reference `NC/SC/ORD/{YY}/{DDMM}{NNN}` (D-248).
+
+**Test Mode and security (D-179–D-183, D-209).** Test Mode freezes decision screens and never mails a real address (Owner Decision #4); login and session security (D-180); admin-set passwords shown once (D-181); "not found" changes nothing (D-209); deliberately not built (D-183).
+
+**Data and deployment (D-184–D-191, D-210, D-241, D-249, D-260).** MySQL-safe, run-twice-safe migrations (D-184); IST everywhere (D-188, R24); simultaneous saves handled (D-210); daily alert job reads once (D-249).
+
+**Testing and process (D-192–D-204, D-211, D-258).** Disposable test databases (D-192); no skips (D-193); every route has a behaviour test (D-211); the full QA programme found 107 untested bugs, fixed in batches QA1–QA4 (D-258); docs kept current with every change (D-198); work order on a QA round: highest priority first, batches pushed only after "push" (D-201).
+
+### 13.3 Standing rules in one list
+
+R1 parity · R2 verify before push · R3 ask before push · R4 nine-part review pack · R5 one branch (`claude/app-creation-review-lxxexc`, to be renamed `main`) · R6 documents need double confirmation · R7 mockups first · R8 discuss before writing business-sensitive changes · R9 recommendations point by point · R10 CAFIN never to the client · R11 supplier and buyer never cross · R12 browser validation · R13 MySQL-safe SQL · R14 SOP copied to both stacks · R15 Zoho change log · R16 Zoho never affects core · R17 secrets never in chat or git · R18 never re-ask · R19 QA round method · R20 describe changes by what they do · R21 owner material stays on owner hosting · R22 no skipped tests · R23 everyone sees only what they can use · R24 IST everywhere · R25 the order is self-contained · R26 reasons ≥ 10 characters, skips need a reason.
+
+### 13.4 Owner decisions of 6 Nov 2026 recorded here
+
+These two decisions were given while this handbook was written. They are not yet a numbered row in the register (§14.5).
+
+| Decision | What it means in the app | Where |
+|---|---|---|
+| **Associates may see their commission, never the total business they bring in.** | The associate portal shows commission per order and the commission totals (earned, waiting, paid this year). It never shows a lifetime or period order-value summary (total FOB, total sales, "your business with us") on any page, statement, notice or e-mail. Checked 6 Nov 2026: `views/associate_portal/home.php` / `commission.php` show commission figures only; keep it that way. | §4.11, §6.4 |
+| **Per-order FOB visibility is governed by the Access-levels matrix only.** | The FOB value of one order shows to an associate only when their level (or, for Custom, their own tick) has `fob_value` on (`AssociateAccess::allows()`, stripped server-side otherwise). No other setting or screen may add or remove it. | §4.11 |
+
+---
+
+## 14. Known limits and open items
+
+### 14.1 Deferred items (decided to wait)
+
+| Item | What is missing | Why it waits | Source |
+|---|---|---|---|
+| **O-22** | The QA programme items below | Priority call by the owner; ZOH-23 needs the CA | Register §5.1 |
+| ZOH-4 | A Books payment edited after it was applied | Rare; needs a design for re-applying | D-258 |
+| ZOH-10 | Re-send when a new-division record changes after sync | Divisions not active yet | D-258 |
+| ZOH-13 | Testing against a Zoho organisation without GST registration | Needs such an organisation | D-258 |
+| ZOH-17 | Clean-up script does not know the new-division Zoho IDs | Check those TEST- records by hand | §12.4 |
+| ZOH-21 | API call counter fully safe under parallel syncs | Mitigated by the one-sync lock | D-258 |
+| ZOH-23 | Stock-issue COGS journal for Import & Distribution | Needs the CA's account names | D-258 |
+| PAR-4 | Password-hash format differs across stacks (`$2y$` vs `$2b$`) | Each stack verifies its own; matters only if one database is shared | D-258 |
+| PAR-7 | Test coverage differs between stacks: a few test files exist on one side only (Node `buyerPoActionLink`, `govtExportBenefitsGate`, `smtpEncryptionSetting`; PHP `ReasonValidator`, `DeadlockRetryTest`, the migration-convention tests), and the division Zoho pushes, the restore check with bank charges, milestone rows in the match check and retry double-post protection have no fake-transport test on either stack | Partly covered by the QA batch 4 tests; the rest waits for a priority call | D-258, master plan G14 |
+| MAIL-10c | SMTP login difference between stacks | — | D-258 |
+| 2FA backup codes | Table `two_fa_backup_codes` exists; no screen uses it | Nothing is broken; email 2FA works | O-22, master plan §10.5 |
+| Associate order-documents page | The "Full" access level includes order documents, but there is no associate-portal page for them yet | Deferred with D-261 | O-22 |
+| A7 generated agreements | Agreements generated by the app | Waits for the lawyer's wording | D-257 (5)(d) |
+| **O-23** | Activating Domestic Trade, Import & Distribution or Merchant Trade | CA, AD bank and lawyer must confirm the starting values | §14.3 |
+| D-237 | Workflow templates (samples / air shipment), domestic GST sales engine beyond DOM, service-only orders | Owner: "do not ask for a couple of months" (not before Jan 2027) | D-237 |
+
+### 14.2 What is NOT built
+
+- **SMS 2FA** — `SmsService` exists but no provider is wired in; email 2FA only (D-183).
+- **Excel (.xlsx) reports** — CSV only (D-183).
+- **Scheduled e-mailing of saved reports** — saved reports run on demand only (D-183).
+- **Generic amendments** — only the payment-term fields of the spec's worked example can be amended (advance %, balance trigger and days, balance amount); not incoterm or currency (D-183).
+- **E-way bill** — disabled; **GST e-invoice** — blocked unless production and `ZOHO_EINVOICE_ENABLED` are both true (D-161).
+- **Zoho CRM** (O-21, not started) and **Zoho Sign** (O-3, paused by the owner). Zoho Mail code is kept but switched off in code (D-139).
+- **Off-site backup** — the provider is not chosen; copies stay on the server until `BACKUP_OFFSITE_TARGET` is set (D-260).
+- **Kanban boards** exist on 12 list pages; `/import` and `/merchant` are not yet in the parity test, and other lists (clients, products, suppliers, users, CA lists, incentives, domestic) have no board — the owner has not yet said whether they must (master plan G12).
+- **CFR golden documents** — only FOB and CIF stone documents are captured; adding CFR fixtures needs owner double confirmation (G8).
+- **Responsive leftovers** — scroll hints on tables, tap targets on text links (O-6).
+
+### 14.3 Pending answers from the CA, the bank and the lawyer (`docs/external/`)
+
+Prepared 6 Nov 2026. Each answer becomes a settings / SOP / checklist update in one small change.
+
+| Pack | Needed before | Questions |
+|---|---|---|
+| `CA_questions.md` | **Export go-live:** questions 1–6 | GST on commission to an associate abroad (reverse charge?) and in India (18%?); TDS 194H 2% with ₹20,000 threshold (20% without PAN); section 195 / DTAA for associates abroad; Form 15CA/15CB; Zoho tax codes for commission bills. **Until answered, do not pay any associate abroad.** |
+| | Domestic Trade | 18% GST for HSN 6802 and other HSNs; e-way bill limit ₹50,000; e-invoicing applicability; invoice format; 30-day terms |
+| | Import & Distribution | Basic duty 20%, SWS 10%, IGST 18%; assessable value; IGST credit timing; landed cost basis |
+| | divisions | Zoho account names (Imported Goods Stock, IGST Paid on Import, Merchanting Trade Sales / Purchases) |
+| | Merchant Trade | GST on merchanting |
+| `AD_bank_questions.md` | Merchant Trade / Import | 9-month whole-deal limit; 4-month outlay limit; advance above USD 500,000 needs LC/BG?; documents per deal; bank approval; switch BL; reporting; import LCs; documents for payments abroad |
+| | current Export business | FIRC per remittance vs eBRC on the DGFT portal |
+| `Lawyer_questions.md` | **Export go-live:** questions 1–3 | Associate agreement redraft; liquidated damages abroad; Sales Manager Schedule A (see `docs/legal/D-245-lawyer-notes.md`); associate access levels |
+| | first non-stone sale | Review the general / engineering T&C clauses (Product Characteristics, Specification & Drawings, Quantity Tolerance (Goods), Quality Documents, Conformity to Specification, Traceability & Test Certificates); missing clauses for engineering goods |
+| | new divisions | Domestic and Merchant Trade terms |
+
+Other open points needing outside answers: O-11 (workflow specification §13 questions: travel rule, Leg-2 Debit Note timing, "Client Closed", ECGC/LC/eBRC checks), O-15 (a buyer in two currencies in Books), O-19 (associate agreement and internal margin reference — lawyer).
+
+### 14.4 Placeholders to replace at go-live
+
+| Placeholder | Where | Replace with |
+|---|---|---|
+| md@email.com, ed@email.com, "Managing Director" | `users` (protected founder accounts), `company_settings.md_name`, `director_name`, asset names | Real names / e-mails via the real-values SQL (§12.1) |
+| info@email.com, +91-0000000000, "Registered office address, City – 000000, India" | `company_settings` `email`, `phone`, `registered_office` | Real company values |
+| Password `ChangeMe#2026` (both seeded Super Admins) | seed | Forced change at first login; deactivate the second if not needed |
+| `__STORAGE_BASE_PATH__` | `assets`, `user_signature_assets`, `reference_library_documents` | The absolute storage path |
+| LUT expiry and RCMC valid-until 31 Mar 2027 | `company_settings` | Confirm |
+| ECGC policy number / valid-to | empty | Fill only if there is a policy |
+| `pricing_fx_rate` 82.00 | Admin › Pricing | Today's market rate minus about 1.5% |
+| Other costs to FOB 2.5% | Admin › Pricing | Real figure from the first 3–5 shipments |
+| Logo, MD signature, seal, watermark | `/company-assets` | Real images (placeholders are labelled graphics) |
+| `APP_ENCRYPTION_KEY`, `SESSION_SECRET_KEY` | `.env` | Fresh random values |
+| `zoho_books_sync_start_date` | Settings | The go-live date (nothing is sent in production until set) |
+| `BACKUP_OFFSITE_TARGET` | `.env` | When the owner picks a provider |
+| Division settings "to be confirmed" | Admin › Divisions | CA / bank answers before activating a division |
+| General / engineering T&C wording | Admin › Overrides | Lawyer's wording before the first non-stone sale |
+| Dev-only credentials (e.g. the e2e default DB password) | `e2e/`, dev `.env` | Never used on live |
+
+### 14.5 Open questions
+
+Every "(verify)" item from the writing of this handbook was checked against the code on 6 Nov 2026. What the code does is stated in the relevant section. These points remain open: they need an outside answer or a fix in another document.
+
+| # | Question or doc fix | Owner of the answer | Where in this handbook |
+|---|---|---|---|
+| 1 | **Section 195 / DTAA for associates abroad.** The code has no section-195 rule; with `associate_tds_foreign` on it applies the 194H logic. Is that right, and at what rate? Until answered, do not pay any associate abroad. | CA (`docs/external/CA_questions.md` Q4) | §7.3 |
+| 2 | **SOP 27 per-CBM example** (USD 904.56 / 878.21) is arithmetically correct but does not name its inputs (associate Level 2, other costs 0 %, Standard · 80 mm · Leather, no quantity option). Add them to `docs/SOP/27-pricing.md` (all 3 copies). | Doc fix | §7.1 |
+| 3 | **D-183 is out of date on user editing.** `/users/{id}/edit` and `/users/{id}/update` exist on both stacks (name, e-mail, role; protected founder accounts refused). Update the register row. | Register fix | §6.17 |
+| 4 | **Seed description of `fdn_overdue_days_c`** still says "working days"; the code counts calendar days (D-051). Correct the description text in both `seed.sql` files (after go-live: with a migration). | Doc / seed fix | §9.1 |
+| 5 | **QA route inventory.** `e2e/support/qa-inventory.json` is the 5 Nov 2026 snapshot (735 routes); the stacks now have ~744. The generator script is not in the repository. Commit a generator or regenerate the file by hand when routes change. | Developer | §11.7 |
+| 6 | **The two owner decisions of 6 Nov 2026** (§13.4) need a numbered D-row in `docs/decisions/owner-decisions-register.md`. | Register fix | §13.4 |
+
+---
+
+## 15. Scope for enhancement
+
+Every recipe below follows the change checklist in §16: both stacks, both templates, tests first, docs, review pack, ask before push. After go-live, every schema or seed change ships as **a new migration file plus the same change in both stacks' `schema.sql` / `seed.sql`** (`docs/migrations/README.md`).
+
+### 15.1 Activate (or add) a division
+
+**Activate a planned one (DOM, IMP or MTT)** — mostly configuration (SOP 28):
+
+1. Get the CA / bank / lawyer answers for that division (§14.3) and put them into the division's settings.
+2. Zoho: create and confirm the needed accounts in the live Books organisation.
+3. Admin › Departments: set the Division of the departments that will work in it. Admin › Users: set the Division of its staff (company-level people stay "Company level").
+4. Admin › Divisions › (division): tick its modules; add its own settings — at least `order_ref_format` and every value that differs from Export.
+5. Work through **Before activating** (departments, staff, number format, modules, settings), tick the confirmation and press **Activate** (MD, `manage_divisions`; audit-logged).
+6. From now on the division switcher, "All divisions", the report Division filter, the user/department Division field, the Zoho division tag and the Profit-by-division section appear. Test a full record in that division in Test Mode first.
+7. A division with no orders can be set back to planned. Export always stays active.
+
+**Add a brand-new division** (code work, both stacks):
+
+1. Migration + seed: a `divisions` row (code, name, `planned`, sort order); `division_modules` rows for modules that must be off (no row = on); any `division_settings`.
+2. If it needs its own flow (like `/domestic`, `/import`, `/merchant`): tables, repositories, service, controller, views (Standard **and** Kanban), routes in `public_html/index.php` and `src/server.js` with permission gates; add the URL patterns to a module in `DivisionService::MODULES` / `divisionService.js`.
+3. Scope every query with `DivisionService::sql()` / `condition()` (and the Node equivalents) — lists, reports, dashboard, counts, files, CSVs.
+4. Numbering: its own counter; references start with its code unless the format has `{DIV}`.
+5. Documents: its own templates folder (as `DOM/`, `IMP/`, `MTT/`) — owner double confirmation.
+6. Zoho: extend `DivisionZohoSync` / `divisionZohoSync.js` with D-212 descriptions, duplicate guard, go-live date and a *Check against Zoho Books* page; log every TEST call in the change log.
+7. Tests: isolation (404 for other divisions), module switches, the full flow, Zoho payloads (mocked); call `clearDivisionTradeData()` (and add the new tables to it on both stacks).
+8. SOP chapter (like 29–31), README, register row.
+
+### 15.2 Add a product category (e.g. Engineering)
+
+1. **Products › Categories** → add the category (needs *Manage product catalogue*). Add its attributes (e.g. Material, Size) — these print as the document columns.
+2. **Settings: <category>**: default unit, allowed units, default HS code (from the HS master list), packing type, quality documents (max 10), T&C clause set.
+3. Check list values: units, supplier types, package types (Admin › Dropdowns).
+4. Clause set: if none fits, add clauses in Admin › Overrides with the set. **The general and engineering wording is a starting text — the lawyer reviews it before the first sale** (Lawyer_questions §B).
+5. Specifications and pricing (SOP 27): options that change the price (per piece / kg / set), CBM rule, supplier prices, "Pricing ready?" all ✓, associate access to the category.
+6. Run `StoneDocumentsUnchangedTest` / `stoneDocumentsUnchanged` — Natural Stone must not change.
+7. Generate every document for a sample order of the new category in Test Mode and show the owner; any change to how a category prints is a document change (R6).
+
+No code is needed for a category that fits the existing profile (`CategoryDocumentProfile` / `categoryDocumentProfile.js`). If the documents need a new column or section, that is a document-builder change: before/after and double confirmation.
+
+### 15.3 Add a document type
+
+1. **Owner first:** a mockup and before/after; double confirmation (R6). Decide: customer-facing, internal or procurement; reference format; whether it gates a stage; who reviews it; whether a Word copy is needed; may it ever reach the buyer?
+2. Migration + seed: a `document_types` row (`code`, `name`, `category`, `ref_format` with `{YY}`, `never_shown_to_buyer`, `revision_enabled`, `min_reviewers_default`), `document_sections`, `tc_clause_documents` links.
+3. Templates: PHP `app/templates/<CODE>/<name>.html.twig`; Node `app/templates/<CODE>/<name>.njk`. Only variables, no business literals (ARCHITECTURE §4).
+4. Generation: add the code to the template map, title and party labels in `DocumentGenerationService` (both stacks); feed data from `DocumentDataAssembler`; add a Word builder (`Services/Docx/DocxDocumentBuilder.php` / Node `services/docx`) if needed.
+5. Storage folder for its step; stage gate in `stageDocumentGate()` if it gates a stage; review / approval rules.
+6. E-mail: a `send_<code>` template in the seed if the buyer receives it; if internal, `never_shown_to_buyer = 1` so the portal, compose and payment links refuse it (as CAFIN, SUPPO).
+7. Money visibility: `MoneyVisibility::canSeeDocument()` must know which money class it carries.
+8. Tests: generation on both stacks, page-count parity (D-057), the mail matrix, the incoterm × preset matrix list of codes, a refusal test if internal, a golden file only after double confirmation.
+
+### 15.4 Add a role or permission
+
+**Permission:**
+
+1. Migration + seed: `permissions` row (`permission_key`, name, description, lowercase category) and `role_permissions` grants for the default roles. Data the app needs goes in the migration **and** `seed.sql`.
+2. Gate the routes on both stacks: `PermissionCheck::requires('key')` / `requiresAny([...])` in `public_html/index.php`; the same gate in `src/server.js`.
+3. Hide links, buttons and forms from non-holders (R23) via the permitted-links helpers; check object-level rules separately (holding a permission never bypasses the record's state, D-116).
+4. If it is a money permission, wire it into `MoneyVisibility` (pages, files, CSVs, audit masking).
+5. Tests: `RouteMatrixTest` / `routeMatrix` pick the gate up; add behaviour tests for "with" and "without"; run the roles/permissions matrix e2e. `GrantGuard` already stops people granting what they do not hold.
+
+**Role:** a `roles` row and its grants (migration + seed); place it under a department and designation (Admin › Departments) (D-214); add it to `e2e/seed-ui-test-users.sql` and `e2e/tests/support/auth.js` if e2e should cover it; the money matrix picks every seeded role up. Decide money classes and `see_all_divisions` deliberately.
+
+### 15.5 Add a report
+
+1. Query in `ReportRepository` (or a dedicated service) on both stacks. Must pass `ONLY_FULL_GROUP_BY`; scope by division (`DivisionService::sql()`); leave out test and sample orders where totals matter.
+2. Controller action in `ReportController` with a route gated by `view_reports` (or a narrower permission); refuse people who may not see the money in it ("You do not have permission to see the amounts in this report.", D-229).
+3. View with filters (labels, placeholders, validation); a CSV export via `?format=csv` using `Helpers/Csv` (formula-injection safe).
+4. Link it from the Reports page; the shared Division filter appears automatically when two divisions are active.
+5. Tests on both stacks: numbers by hand calculation, money refusal, CSV, division scope; add it to the money-matrix screens if it shows amounts.
+6. SOP 14 (Reports) and, for the CA, the ca-02 chapter.
+
+### 15.6 Add a Zoho flow
+
+1. Agree the accounting with the CA first (which Books object, which accounts and taxes).
+2. Build the payload in a service (e.g. `ZohoInvoiceData`, `CaSyncService`, `DivisionZohoSync`), calling `ZohoBooksService` — every request passes `ZohoGuard::assertRequestAllowed()` and counts against `ZohoApiBudget`.
+3. Description from `PaymentDescription` (D-212): what, order, party, what it settles, bank reference. Store the Books ID on the app record.
+4. Duplicate guard: look up by reference (or bank reference + amount) before posting; respect the go-live date; skip TEST/sample orders in production.
+5. Run inside the hourly sync and *Sync now*, under `ZohoSyncLock`; add a Sync Log row per outcome; include it in the "Waiting for Zoho" count (`ZohoPendingService`) and in *Check against Zoho Books*; consider the restore check (`ZohoRestoreService`).
+6. Tests with the fake transport (`setTransport()`), on both stacks: payload, description wording, duplicate guard, off/test/production behaviour.
+7. A live test only in the **test** organisation, with `TEST-` names, each call logged in `docs/zoho/zoho-change-log.csv`, and removed before go-live. Teach `zoho_cleanup_test_records` about the new object.
+8. SOP ca-03 Zoho sync.
+
+### 15.7 Add a setting
+
+1. Migration + seed: a `company_settings` row (`setting_key`, `setting_value`, `value_type` string/number/boolean/date/json, `category`, `description`, `is_sensitive`, `is_protected`). Pricing values go in `pricing_settings`; incentive values in the incentive settings. The Settings page groups rows by `category` automatically.
+2. Validation: `SettingValueValidator` (both stacks) by `value_type`; add a rule there for anything special (never a 500, D-207).
+3. Give the field a short worked example beneath it (as SOP 27 does) and a placeholder.
+4. Secrets: mask with `SecretSetting`; never in git or chat (R17).
+5. If divisions may override it, read it through the division overlay (`DivisionService::overrideFor()`), so a division's own value wins.
+6. If it affects a document, it falls under R6; if it must not change after the PI, add it to the order freeze (D-262).
+7. Tests: `SettingsValueValidationTest` pattern; behaviour with the value on and off; SOP 15 (Admin settings).
+
+### 15.8 Add a list page (Standard + Kanban)
+
+1. **Mockup first** if it is a new screen (R7).
+2. Controller action with filters, search and counts; scope by access and division; money per `MoneyVisibility`.
+3. Two views per stack: PHP `app/views/<area>/index.php` **and** `index_kanban.php` (with `_card.php`, `_filters.php`); Node `views/<area>/index.njk` **and** `index_kanban.njk` (`_card.njk`, `_filters.njk`). Choose with `UiTemplateService::showsBoard()` (Kanban user and no `?view=list`).
+4. The board must offer exactly what the list offers: every record link, action, filter, count, field, badge and money rule; "Switch to list view" / "Switch to board view"; paging ("Show more").
+5. Add the page to `pages()` in `KanbanParityTest.php` and `kanbanParity.test.js`, plus a `<Name>KanbanBoardTest` / `<name>KanbanBoard.test.js`.
+6. Menu link only for permitted users (`NavLinksMatchRoutePermissionsTest`); route gated on both stacks.
+7. Run the UI crawl on both templates and both screen sizes.
+
+### 15.9 Ideas already discussed with the owner
+
+| Idea | Status | Source |
+|---|---|---|
+| Workflow templates (sample orders, air-shipment orders) | Deferred to at least Jan 2027 | D-237 |
+| Domestic GST sales with e-invoice IRN and e-way bill | Deferred; DOM division built but planned | D-237, D-257 (2) |
+| Service-only orders | Deferred | D-237 |
+| Zoho CRM integration | Planned after Books, not started | O-21 |
+| Zoho Sign | Paused | O-3 |
+| Off-site backups | Provider to be chosen; rclone ready | D-260 |
+| Generated associate agreements (A7) | Waits for the lawyer | D-257 (5) |
+| Associate portal page for order documents (Full level) | Deferred | D-261, O-22 |
+| 2FA backup codes | Deferred | O-22 |
+| Kanban boards on more list pages | Owner to decide which | Master plan G12 |
+| Responsive polish (table scroll hints, tap targets) | Priority call pending | O-6 |
+| CFR golden documents | Needs double confirmation | Master plan G8 |
+| Gap list items G-7 (later), G-8 (leave) | Owner chose later / leave | D-218 |
+| Spec-versus-app gap list for the Workflow Specification | Offered, not yet answered | O-11 |
+| SMS 2FA, .xlsx export, scheduled report e-mails, generic amendments | Builder scope, not requested | D-183 |
+| Rename the branch to `main`; retry the fresh install on MySQL 8; Zoho token without Mail scopes | Owner housekeeping | O-20 |
+
+---
+
+## 16. How to work on this codebase
+
+This is the change checklist. It comes from CLAUDE.md and the standing rules; follow it for every change, however small.
+
+1. **Read the register first** (`docs/decisions/owner-decisions-register.md`). If a decision covers the point, apply it and cite it; never re-ask (R18). Note any open point (§5) you touch.
+2. **Mockups first** for a larger UI change (R7). Show images, get confirmation (usually twice) before building.
+3. **Double confirmation** before any change that ends up in a generated PDF or Word document — templates, the data assembler, document builders (R6). Show the owner what the document shows now and what it will show after; get "yes" twice. Same care for anything touching CAFIN, money permissions or payment wording (R8, R10). **CAFIN must never reach the client** — check the portal, e-mail, links, token pages, associate portal and Zoho for any new path.
+4. **Both stacks** (R1): PHP and Node, same routes, gates, wording and behaviour, in the same change.
+5. **Both templates**: every list-page change goes to Standard and Kanban (hard rule, 1 Nov).
+6. **Forms**: browser validation through `app.js` `fieldError()` (both stacks), placeholders on every typed input, labels, `*` and "Choose…" on required drop-downs, `*_confirm` / `data-match` on re-enter fields; server checks too (R12, D-220).
+7. **Money**: every new money record gets an app-built description and a required bank reference where money moved through a bank, in the app and in Zoho, with exact-wording tests on both stacks (D-212).
+8. **Database**: MySQL-safe (no `IF [NOT] EXISTS` on columns or indexes; information_schema + PREPARE), safe to run twice, `SET NAMES utf8mb4;`, passes `ONLY_FULL_GROUP_BY` (R13). Before go-live: edit `schema.sql` / `seed.sql` on both stacks. After go-live: a migration **and** the same change in both schema/seed files.
+9. **Tests first**, on both stacks (§11.8). No skips (R22).
+10. **The full run under the lock**: PHPUnit, Jest, and e2e against both stacks (R2), each wrapped in `flock` on one lock file so nothing else uses the test or dev databases at the same time. Explain any failure; never push red.
+11. **Zoho**: any change made in Zoho during the work gets a change-log row at the time (R15); test records start with `TEST-`.
+12. **Docs**: update `docs/SOP` and copy it to `PHP_MySQL_Version/docs/SOP` and `NODE_MySQL_Version/docs/SOP` (R14); both READMEs; ARCHITECTURE; the master test plan if coverage changed; the in-app help if a screen changed; a new D-row in the register the same day for any owner decision (D-198).
+13. **The review pack** (R4) — nine parts: (1) what changed, one plain line per fix; (2) before/after screenshots on both stacks for everything visible; (3) "try it yourself" steps: which user/role, which order, what to click, what should happen and what should now be refused; (4) roles affected; (5) test results on both stacks, failures explained; (6) risks and what was deliberately not changed; (7) live-site steps (migrations, in order); (8) files changed, grouped; (9) the decision asked: push / don't push / change first. Describe changes by what they do, not by internal labels (R20). Screenshots are not committed to git, and owner material is not published outside the owner's hosting (R21).
+14. **Ask before push** (R3): a short summary — what is pushed, which files change, which functionality is affected — plus the review pack. Push only after the owner says "push", on the one working branch (R5).
+15. **CI check**: after the push, confirm both jobs in `.github/workflows/tests.yml` (PHPUnit and Jest on MySQL 8) are green. A red CI after a green local run usually means a MySQL-only difference or strict mode — fix it before anything else.
+
+---
+
+## Appendix A. Index of code locations
+
+PHP paths are under `PHP_MySQL_Version/app/src/` (routes: `PHP_MySQL_Version/public_html/index.php`); Node paths are under `NODE_MySQL_Version/app/src/` (routes: `src/server.js`). Views are `app/views/<area>/` and document templates `app/templates/<CODE>/` on both stacks.
+
+| Module | PHP (main files) | Node (main files) | Handbook |
+|---|---|---|---|
+| Routing, middleware | `public_html/index.php`, `Helpers/Router.php`, `Middleware/SessionAuth.php`, `PermissionCheck.php`, `CsrfCheck.php`, `OrderLockGuard.php` | `server.js`, `middleware/sessionAuth.js`, `permissionCheck.js`, `csrfCheck.js`, `orderLockGuard.js` | §3.4 |
+| Auth, 2FA, passwords | `Controllers/AuthController.php`, `Services/AuthService.php`, `TwoFactorService.php`, `PasswordPolicyService.php` | `controllers/authController.js`, `services/authService.js`, `twoFactorService.js`, `passwordPolicyService.js` | §3.13 |
+| Roles, permissions, departments | `PermissionService.php`, `ActiveDepartmentService.php`, `GrantGuard.php`, `MakerCheckerGuard.php`, `SelfApprovalRules.php`, `SuperAdminService.php`; `PermissionAdminController`, `DepartmentAdminController`, `SelfApprovalController`, `SuperAdminController` | `permissionService.js`, `activeDepartmentService.js`, `grantGuard.js`, `makerCheckerGuard.js`, `selfApprovalRules.js`, `superAdminService.js`; matching `*Controller.js` | §4.1–4.6 |
+| Order access, money visibility | `OrderAccessService.php`, `MoneyVisibility.php`, `AuditMoneyMask.php` | `orderAccessService.js`, `moneyVisibility.js`, `auditMoneyMask.js` | §4.7 |
+| Divisions | `DivisionService.php`, `DivisionController.php`, `DivisionProfitService.php`, `DivisionZohoSync.php` | `divisionService.js`, `divisionController.js`, `divisionProfitService.js`, `divisionZohoSync.js` | §4.8, §6.15 |
+| Client portal | `ClientPortalController.php`, `ClientPortalService.php`, `Middleware/ClientAuth.php` | `clientPortalController.js`, `clientPortalService.js`, `middleware/clientAuth.js` | §4.10 |
+| Associates, commission, TDS | `AssociateAdminController.php`, `AssociatePortalController.php`, `AssociateRegistrationController.php`, `AssociateAccessController.php`, `AssociateTdsController.php`; `AssociateService.php`, `AssociateAccess.php`, `AssociateCommission.php`, `AssociateTds.php`, `AssociateKyc.php` | `associateAdminController.js`, `associatePortalController.js`, `associateRegistrationController.js`, `associateAccessController.js`, `associateTdsController.js`; `associateService.js`, `associateAccess.js`, `associateCommission.js`, `associateTds.js`, `associateKyc.js` | §4.11, §6.4, §7.3 |
+| Clients and intake | `ClientController.php`, `ClientIntakeController.php`, `ClientIntakeReviewController.php`, `PiIntakeController.php`, `PiIntakeReviewController.php`, `AssociateIntakeService.php` | `clientsController.js`, `clientIntakeController.js`, `clientIntakeReviewController.js`, `piIntakeController.js`, `piIntakeReviewController.js`, `associateIntakeService.js` | §5.2, §6.1 |
+| Orders, stages, gates | `OrderController.php`, `StageGateService.php`, `ShipmentGateService.php`, `OrderSnapshotService.php`, `OrderEditGuard.php`, `OrderDuplicationService.php`, `ReferenceNumberService.php` | `ordersController.js`, `stageGateService.js`, `shipmentGateService.js`, `orderSnapshotService.js`, `orderEditGuard.js`, `orderDuplicationService.js`, `referenceNumberService.js` | §5 |
+| Amendments, disputes, complaints | `AmendmentController.php`, `AmendmentService.php`, `DisputeController.php`, `ComplaintController.php`, `OrderComplaintService.php` | `amendmentController.js`, `amendmentService.js`, `disputeController.js`, `complaintController.js`, `orderComplaintService.js` | §5.9 |
+| Products, categories, specifications | `ProductController.php`, `ProductCategoryController.php`, `SpecController.php`, `ProductService.php`, `ProductSpecs.php`, `CategoryDocumentProfile.php` | `productsController.js`, `productCategoryController.js`, `specController.js`, `productService.js`, `productSpecs.js`, `categoryDocumentProfile.js` | §6.2 |
+| Pricing, price requests | `PricingController.php`, `PriceRequestController.php`, `PricingEngine.php`, `PricingService.php`, `OrderLinePricing.php`, `PriceRequestService.php` | `pricingController.js`, `priceRequestController.js`, `pricingEngine.js`, `pricingService.js`, `orderLinePricing.js`, `priceRequestService.js` | §6.3, §7.1–7.2 |
+| Team incentive | `IncentiveController.php`, `IncentiveReportController.php`, `IncentiveService.php`, `IncentiveReportService.php` | `incentiveController.js`, `incentiveReportController.js`, `incentiveService.js`, `incentiveReportService.js` | §6.5, §7.4 |
+| Procurement, suppliers | `PurchasingController.php`, `PurchasingService.php`, `SupplierController.php`, `SupplierActionController.php`, `VendorBillController.php`, `VendorDetailsController.php` | `purchasingController.js`, `purchasingService.js`, `supplierController.js`, `supplierActionController.js`, `vendorBillController.js`, `vendorDetailsController.js` | §6.6 |
+| Logistics | `LogisticsPartnerController.php`, `PortController.php`, `PortRouteController.php`, `ShipmentGateService.php`, `CourierCharges.php` | `logisticsPartnerController.js`, `portController.js`, `portRouteController.js`, `shipmentGateService.js`, `courierCharges.js` | §6.7 |
+| Documents, review, files | `DocumentGenerationService.php`, `DocumentDataAssembler.php`, `Services/Docx/`, `ReviewWorkflowService.php`, `DocumentController.php`, `ReviewController.php`, `FileStoreController.php`, `FileUploadService.php`, `Helpers/OrderStorage.php` | `documentGenerationService.js`, `documentDataAssembler.js`, `services/docx/`, `pdfRenderService.js`, `reviewWorkflowService.js`, `documentController.js`, `reviewController.js`, `fileStoreController.js`, `fileUploadService.js` | §3.8, §6.8, §8 |
+| Payments, remittances | `OrderController.php` (payment actions), `PaymentMilestoneController.php`, `PaymentActionController.php`, `PaymentDescription.php`, `RemittanceInr.php`, `RemittanceDifference.php`, `BalanceDueService.php`, `OrderLedgerService.php` | `ordersController.js`, `paymentMilestoneController.js`, `paymentActionController.js`, `paymentDescription.js`, `remittanceInr.js`, `remittanceDifference.js`, `balanceDueService.js`, `orderLedgerService.js` | §6.9, §7.6, §7.12 |
+| CA module, CAFIN, profit | `CaController.php`, `OrderFinancialsController.php`, `GstRefundController.php`, `CaFinancialSnapshotService.php`, `CafinExportService.php`, `CaFyLockGuard.php`, `OrderProfitabilityService.php`; templates `templates/CAFIN/` | `caController.js`, `orderFinancialsController.js`, `gstRefundController.js`, `caFinancialSnapshotService.js`, `cafinExportService.js`, `caFyLockGuard.js`, `orderProfitabilityService.js` | §6.10, §7.5, §7.7 |
+| Reports, dashboard | `ReportController.php`, `Repositories/ReportRepository.php`, `DashboardController.php` | `reportController.js`, `repositories/reportRepository.js`, `dashboardController.js` | §6.11 |
+| My Tasks, cockpit, digest | `CoordinationController.php`, `OrderAssignmentService.php`, `DailyDigestService.php`, `cron/daily_digest.php` | `coordinationController.js`, `orderAssignmentService.js`, `dailyDigestService.js`, `jobs/dailyDigest.js` | §6.12 |
+| E-mail | `MailSenderService.php`, `EmailDispatchService.php`, `MailRedirectService.php`, `EmailTemplateController.php`, `EmailDispatchController.php` | `mailSenderService.js`, `emailDispatchService.js`, `mailRedirectService.js`, `emailTemplateController.js`, `emailDispatchController.js` | §3.10, §6.13 |
+| Zoho Books | `ZohoBooksService.php`, `ZohoGuard.php`, `CaSyncService.php`, `ZohoInvoiceData.php`, `ZohoMasterDataSync.php`, `ZohoPendingService.php`, `ZohoRestoreService.php`, `ZohoSyncLock.php`, `ZohoApiBudget.php`, `OrderZohoMatchService.php` | camelCase twins (`zohoBooksService.js` …) | §3.12, §6.14, §12.4 |
+| Domestic Trade | `DomesticOrderController.php`, `DomesticOrderService.php`, `DomesticDocumentService.php`, `GstCalculator.php`, `GstRateController.php` | `domesticOrderController.js`, `domesticOrderService.js`, `domesticDocumentService.js`, `gstCalculator.js`, `gstRateController.js` | §6.15, §7.8 |
+| Import & Distribution | `ImportController.php`, `ImportService.php`, `ImportDocumentService.php` | `importController.js`, `importService.js`, `importDocumentService.js` | §6.15, §7.9 |
+| Merchant Trade | `MerchantTradeController.php`, `MerchantTradeService.php`, `MerchantDocumentService.php` | `merchantTradeController.js`, `merchantTradeService.js`, `merchantDocumentService.js` | §6.15, §7.10 |
+| Settings and admin pages | `SettingsController.php`, `UserController.php`, `FieldProtectionController.php`, `AdminOverrideController.php`, `TestModeController.php`, `TestModeService.php`, `UiTemplateService.php` | `settingsController.js`, `userController.js`, `fieldProtectionController.js`, `adminOverrideController.js`, `testModeController.js`, `testModeService.js`, `uiTemplateService.js` | §6.17, §9 |
+| Reference Library | `ReferenceDocController.php`, `Repositories/InternalReferenceDocRepository.php`, `ReferenceLibraryRepository.php` | `referenceDocController.js` and twin repositories | §8.1 |
+| Sample data, data export | `SampleDataController.php`, `SampleDataService.php`, `DataExportController.php`, `MysqlDumpService.php` | `sampleDataController.js`, `sampleDataService.js`, `dataExportController.js`, `mysqlDumpService.js` | §6.16, §6.18 |
+| Backups | `BackupController.php`, `BackupStatusService.php`; `PHP_MySQL_Version/scripts/backup_*.sh` | `backupController.js`, `backupStatusService.js`; `NODE_MySQL_Version/scripts/backup_*.sh` | §3.15, §12.3 |
+| Scheduled jobs | `app/cron/*.php` | `src/jobs/*.js`, `jobs/scheduler.js` | §3.9 |
+| Browser validation | `public_html/assets/js/app.js` | `app/public/js/app.js` | §3.6 |
+| Schema and seed | `PHP_MySQL_Version/docs/schema.sql`, `seed.sql` | `NODE_MySQL_Version/docs/schema.sql`, `seed.sql` | §3.7 |
+| Tests | `app/tests/Unit`, `app/tests/Integration`, `Support/DbTestCase.php` | `app/tests/unit`, `app/tests/integration`, `support/fixtures.js` | §11 |
+| Browser tests | `e2e/tests/*.spec.js`, `e2e/support/` (shared by both stacks) | same | §11 |
+
+---
+
+## Appendix B. Keeping this handbook current
+
+This handbook is the single, self-contained description of the application and the input for future development. It is only useful while it is true.
+
+**The rule (CLAUDE.md, 6 Nov 2026).** Every change that adds or changes a **feature, rule, setting, table or screen** also updates this handbook **in the same commit**, in all three copies:
+
+- `docs/APPLICATION_HANDBOOK.md` (the master),
+- `PHP_MySQL_Version/docs/APPLICATION_HANDBOOK.md`,
+- `NODE_MySQL_Version/docs/APPLICATION_HANDBOOK.md`.
+
+Edit the master, then copy it over both stack copies so the three files are identical (`cmp` must report nothing).
+
+**What to update, by kind of change:**
+
+| Change | Update |
+|---|---|
+| New or changed feature or screen | The module in §6, the order step in §5 if it is part of an order, the template note (Standard **and** Kanban), Appendix A if new files appear |
+| New or changed rule (business, money, access) | §4 (access), §5 (order flow), §7 (money), §10 (hard rules) as relevant, and the decision in §13 with its D-code |
+| New or changed setting | §9.1 (key, default, where) or §9.2 (`.env`) |
+| New or changed table | §3.7.1 (area table) and the module's "Tables" line; keep the table count (194 on 6 Nov 2026) right |
+| New role or permission | §4.2 / §4.3 and the counts (24 roles, 94 permissions on 6 Nov 2026) |
+| New route | The module's screens line; the route count (~744 on 6 Nov 2026) |
+| New document or document change | §8 (after the owner's double confirmation, R6) |
+| New Zoho flow | §3.12, §6.14, §12.4 |
+| New test suite, matrix or a change in test counts | §11 (PHPUnit 2,433, Jest ~2,500, e2e 68 + 68 on 6 Nov 2026) |
+| Something deferred, decided or answered | §13, §14 (move an answered open question out of §14.5) |
+
+**Style.** Plain, short English; tables over prose; file paths for both stacks; say *why* with the D-code. **No PII:** role names and role e-mails only (md@email.com, ed@email.com, admin@email.com, info@email.com, +91-0000000000). Before committing, run the PII check:
+
+```bash
+grep -inE "<the owner's list of real names, e-mails, phone and address fragments>" docs/APPLICATION_HANDBOOK.md
+```
+
+It must return nothing. Bump the version line on the title page for a larger revision (1.1, 1.2 …) and note the month.

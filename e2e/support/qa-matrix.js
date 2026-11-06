@@ -7,7 +7,7 @@
  *   - one per staff role   (qa-role-<roleId>@qa-matrix.test)
  *   - one per permission   (qa-perm-<key>@qa-matrix.test, on a role "QA-ONLY <key>" holding only that permission)
  * logs each in over HTTP and GETs the route list from docs/QA inventory
- * (scratchpad inventory.json, path given by QA_INVENTORY), with real ids
+ * (e2e/support/qa-inventory.json, or the path in QA_INVENTORY), with real ids
  * resolved from the DB. Every response is classified:
  *   BUG  – 5xx, PHP/Node error text in the page, or the gate says "deny" but the page answered 200
  *   NOTE – the gate says "allow" but the page refused (object-level / module / division rules; reviewed by hand)
@@ -230,7 +230,7 @@ async function divisionSample(users) {
 }
 
 function loadInventory() {
-  const p = process.env.QA_INVENTORY || '/tmp/claude-0/-home-user-order-system/449be023-f066-5c75-974a-90ffd9a587a6/scratchpad/qa/inventory.json';
+  const p = process.env.QA_INVENTORY || require('path').join(__dirname, 'qa-inventory.json');
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 

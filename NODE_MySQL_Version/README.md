@@ -1,5 +1,7 @@
 # NexaCrest Export Operations Webapp — Node/MySQL port (Phases A–E)
 
+**Start here for the full picture: [docs/APPLICATION_HANDBOOK.md](docs/APPLICATION_HANDBOOK.md)**
+
 This is a full ground-up rebuild of the NexaCrest export-operations webapp
 on Node.js/Express/MySQL, replacing the earlier PHP/MySQL delivery. It was
 built by re-reading the same three source documents (the spec, the schema,

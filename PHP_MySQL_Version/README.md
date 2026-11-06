@@ -1,5 +1,7 @@
 # NexaCrest Export Operations Webapp — Phase A + Phase B + Phase C + Phase D + Phase E
 
+**Start here for the full picture: [docs/APPLICATION_HANDBOOK.md](docs/APPLICATION_HANDBOOK.md)**
+
 Phase A: authentication, RBAC, company settings, asset management.
 Phase B: clients, orders, the Stage 1→4 gate pipeline (Quotation → Buyer PO
 → Proforma Invoice → Order Confirmation/Production), and the Twig →
