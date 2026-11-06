@@ -1,7 +1,7 @@
 'use strict';
 // C13 — When things change: a client moved to another associate (MD only, with a reason the
 // associate sees), a leaked code blocked and replaced, a suspended account, and an ended one.
-const { ACTORS, nav, associateSetup, PLAN_A } = require('./_common');
+const { ACTORS, nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.changes@email.com';
 const OTHER = 'associate.other.demo@email.com';
@@ -35,7 +35,7 @@ module.exports = {
       await d.type(row.locator('input[name="reason"]'), 'Buyer showed an earlier introduction by another associate', { delay: 20 });
       await d.clickNav(row.getByRole('button', { name: 'Change' }));
     } },
-    { as: 'associate', goto: '/associate', caption: 'You are told at once', say: 'You are told at once, with a notice and an e-mail that include the reason. The client no longer appears in your list. If you disagree, reply through Messages, with any proof you have.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Notices' })); await d.ring(d.page.locator('h2:has-text("Notices") + table')); await d.wait(2000); } },
+    { as: 'associate', goto: '/associate', caption: 'You are told at once', say: 'You are told at once, with a notice and an e-mail that include the reason. The client no longer appears in your list. If you disagree, reply through Messages, with any proof you have.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Notices' })); await d.ring(d.page.locator('h2:has-text("Notices") + .table-scroll table')); await d.wait(2000); } },
 
     { card: 'chapter', title: 'A code is blocked', subtitle: 'For example, after it leaked.', say: 'Part two. A blocked code.' },
     { as: 'md', goto: `/associates/${a.id}#portal`, caption: 'Staff: set a new code, block the old', say: 'Imagine your personal code was posted publicly, and strangers use it. NexaCrest can give you a new code, and block the old one, with a reason.', do: async (d) => {
@@ -75,6 +75,6 @@ module.exports = {
       'Code blocked: you get a new one; the leaked one stops working.',
       'Suspended: you can look, not act; earned commission stays.',
       'Ended: no new logins; earned commission settled per the agreement.',
-    ], next: 'C14 · What you never see', say: 'To recap. A client can only be moved by the Managing Director, with a reason you see. A leaked code is blocked and replaced. Suspended means you can look but not act. And Ended closes the portal, while earned commission is settled under your agreement. Next, C14: what associates never see, and why. See you there!' },
+    ], next: 'Part 3 · What you never see', say: 'To recap. A client can only be moved by the Managing Director, with a reason you see. A leaked code is blocked and replaced. Suspended means you can look but not act. And Ended closes the portal, while earned commission is settled under your agreement. Next, in part three: what associates never see, and why.' },
   ],
 };

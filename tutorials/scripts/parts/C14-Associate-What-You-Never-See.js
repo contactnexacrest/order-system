@@ -1,7 +1,7 @@
 'use strict';
 // C14 — What associates never see, and why: costs, margins, suppliers, other associates' clients,
 // staff screens and finance reports. Shown by trying, so the associate sees the door is closed.
-const { nav, associateSetup, PLAN_A } = require('./_common');
+const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.privacy@email.com';
 
@@ -49,6 +49,6 @@ module.exports = {
       'You see your clients, their orders, your prices and your commission.',
       'Never costs, suppliers, other associates or staff screens.',
       'Your own data is protected the same way.',
-    ], next: 'C15 · Questions and answers', say: 'So: you see everything you need, your clients, their orders, your prices and your commission, and nothing that is not yours. And your own data is protected the same way. Last video in this series: C15, questions and answers. See you there!' },
+    ], next: 'Part 4 · Questions and answers', say: 'So: you see everything you need, your clients, their orders, your prices and your commission, and nothing that is not yours. And your own data is protected the same way. And to finish, part four: questions and answers.' },
   ],
 };

@@ -1,7 +1,7 @@
 'use strict';
 // C03 — First steps after login: profile, tax details, KYC documents and bank account,
 // and how NexaCrest checks them (two people for the bank) before the account becomes active.
-const { nav, associateSetup, PLAN_A } = require('./_common');
+const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.invited@email.com';
 
@@ -14,7 +14,9 @@ module.exports = {
   minutes: '11',
 
   async setup(demo) {
-    const s = await associateSetup(demo, { email: EMAIL, name: 'Demo Associate', level: 'starter', status: 'invited' }, { withMd: true, withEd: true });
+    const s = await associateSetup(demo, { email: EMAIL, name: 'Demo Associate', level: 'starter', status: 'invited' }, { withMd: true });
+    demo.demoStaff('fm');
+    s.actors.fm = { label: 'Finance Manager', sub: 'NexaCrest staff · finance.manager@email.com', initials: 'FM', color: '#2E6B5E', cookies: await demo.staffCookies('fm') };
     s.files = { pan: demo.sampleFile('pan-card-sample.pdf', 'SAMPLE PAN CARD - TUTORIAL DEMO'), aadhaar: demo.sampleFile('aadhaar-sample.pdf', 'SAMPLE ID - TUTORIAL DEMO'),
       cheque: demo.sampleFile('cancelled-cheque-sample.pdf', 'SAMPLE CANCELLED CHEQUE - TUTORIAL DEMO'), agreement: demo.sampleFile('agreement-sample.pdf', 'SAMPLE SIGNED AGREEMENT - TUTORIAL DEMO') };
     return s;
@@ -75,18 +77,18 @@ module.exports = {
         await d.upload(d.page.locator('input[name="proof_file"]'), files.cheque);
         await d.clickNav(d.page.getByRole('button', { name: 'Send for checking' }));
       } },
-      { caption: 'Being checked by NexaCrest', say: 'Your account now shows: being checked by NexaCrest. Notice it is masked. Only the last digits are shown, even to you.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Bank details' })); await d.ring(d.page.locator('h2:has-text("Bank details") + p + table')); await d.wait(1500); } },
+      { caption: 'Being checked by NexaCrest', say: 'Your account now shows: being checked by NexaCrest. Notice it is masked. Only the last digits are shown, even to you.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Bank details' })); await d.ring(d.page.locator('table.list', { hasText: 'Being checked by NexaCrest' }).first()); await d.wait(1500); } },
 
       { card: 'chapter', title: 'Meanwhile, at NexaCrest', subtitle: 'Documents accepted, bank checked by two people, account activated.', say: 'Part four. Let us switch to NexaCrest and watch the checks.' },
       { as: 'md', goto: `/associates/${a.id}#documents`, caption: 'Staff: KYC and documents', say: 'This is your record, on the staff side. Every document you uploaded is here. Staff open each one, and accept it, or reject it with a reason that you see in your portal.', do: async (d) => { await d.scrollTo('#documents'); await d.wait(800); } },
       { caption: 'Accept each document', say: 'Here the Managing Director accepts them, one after another.', do: async (d) => {
         for (let i = 0; i < 4; i++) {
-          const form = d.page.locator('#documents form[action*="/review"]').first();
+          const form = d.page.locator('#documents tr', { hasText: 'Not checked yet' }).locator('form[action*="/review"]').first();
           if (!(await form.count())) break;
           await d.scrollTo(form);
           await d.select(form.locator('select[name="decision"]'), 'accept');
           await d.clickNav(form.getByRole('button', { name: 'Save' }));
-          await d.page.locator('#documents form[action*="/review"]').first().waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
+          await d.page.locator('#documents tr', { hasText: 'Not checked yet' }).locator('form[action*="/review"]').first().waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
         }
       } },
       { caption: 'Bank: first check', say: 'Now the bank account. The first person checks it, for example with a call-back to you, or a small test credit, and writes down how.', do: async (d) => {
@@ -94,7 +96,7 @@ module.exports = {
         await d.type(d.page.locator('#bank input[name="check_method"]'), 'Call-back to the associate, account confirmed', { delay: 25 });
         await d.clickNav(d.page.locator('#bank').getByRole('button', { name: 'First check' }));
       } },
-      { as: 'ed', goto: `/associates/${a.id}#bank`, caption: 'A second person verifies', say: 'And a second person, here the Executive Director, verifies it. One person alone can never change where your money goes.', do: async (d) => {
+      { as: 'fm', goto: `/associates/${a.id}#bank`, caption: 'A second person verifies', say: 'And a second person, here the Finance Manager, verifies it. One person alone can never change where your money goes.', do: async (d) => {
         await d.scrollTo('#bank');
         await d.clickNav(d.page.locator('#bank').getByRole('button', { name: 'Verify (second person)' }));
       } },
@@ -108,14 +110,14 @@ module.exports = {
 
       { card: 'chapter', title: 'You are active!', say: 'Part five. Back to you.' },
       { as: 'associate', goto: '/associate/profile#kyc', caption: 'All accepted', say: 'Back in your portal, the checklist shows your documents as accepted. If one was rejected, you would see the reason here, and simply upload it again.', do: async (d) => { await d.scrollTo('#kyc'); await d.ring(d.page.locator('#kyc table.list').first()); await d.wait(1500); } },
-      { goto: '/associate', caption: 'Active', say: 'And on your home page, the Invited warning is gone. Your account is active, and you can start inviting clients. That is exactly what we do in video C05.', do: async (d) => { await d.point('h1', 1500); } },
+      { goto: '/associate', caption: 'Active', say: 'And on your home page, the Invited warning is gone. Your account is active, and you can start inviting clients. That is exactly what we do in video C03.', do: async (d) => { await d.point('h1', 1500); } },
 
       { card: 'list', kicker: 'Recap', title: 'From Invited to Active', items: [
         'Profile: phone, PAN (India), GSTIN if registered, address.',
         'KYC: upload each document with its number; Aadhaar last 4 digits only.',
         'Bank: account typed twice, proof attached, checked by two people.',
         'NexaCrest accepts the documents and activates your account.',
-      ], next: 'C04 · The Starter tour', say: 'To recap. Fill in your profile. Upload your KYC documents. Add your bank account, typed twice, with proof. NexaCrest checks each document, two people check the bank, and your account becomes active. Commission can only be paid once all of this is accepted, so do it early. Next up, C04: a tour of the Starter level. See you there!' },
+      ], next: 'Video C03 · The Starter level and your first client', say: 'To recap. Fill in your profile. Upload your KYC documents. Add your bank account, typed twice, with proof. NexaCrest checks each document, two people check the bank, and your account becomes active. Commission can only be paid once all of this is accepted, so do it early. Next up, video C03: a tour of the Starter level, and your first client. See you there!' },
     ];
   },
 };

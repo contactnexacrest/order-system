@@ -19,6 +19,7 @@ function find(ids) {
   const files = fs.readdirSync(SCRIPTS).filter((f) => f.endsWith('.js') && !f.startsWith('_')).sort();
   const picked = [];
   for (const id of ids) {
+    if (id.includes('/')) { picked.push(id.replace(/\.js$/, '') + '.js'); continue; } // e.g. parts/C03-Associate-Profile-And-Bank (try one part alone)
     const m = files.filter((f) => f === `${id}.js` || f.startsWith(`${id}-`) || (id.length === 1 && f.startsWith(id)));
     if (!m.length) throw new Error(`No script for ${id}`);
     picked.push(...m);

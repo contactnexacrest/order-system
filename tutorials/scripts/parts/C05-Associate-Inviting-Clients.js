@@ -1,7 +1,7 @@
 'use strict';
 // C05 — Inviting a client: the buyer registration link (one buyer), the personal code and
 // quotation link (any buyer), the buyer's side, NexaCrest accepting, and the certificate.
-const { ACTORS, nav, associateSetup, PLAN_A } = require('./_common');
+const { ACTORS, nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.inviter@email.com';
 const BUYER = 'TEST Demo Harbour Stone BV';
@@ -105,7 +105,7 @@ module.exports = {
         'Or share your personal code / quotation link with any buyer.',
         'Buyer registers, verifies their e-mail, confirms you introduced them.',
         'NexaCrest accepts: client protected, certificate ready.',
-      ], next: 'C06 · Quoting: get a price', say: 'Great work! You created a link, met your personal code, and watched a buyer become your client. Next, in C06, we get a price for that buyer, straight from the catalogue. See you there!' },
+      ], next: 'Video C04 · Prices, special requests and access levels', say: 'Great work! You created a link, met your personal code, and watched a buyer become your client. Next, in video C04, we get a price for that buyer, straight from the catalogue. See you there!' },
     ];
   },
 };

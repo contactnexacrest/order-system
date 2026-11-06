@@ -1,7 +1,7 @@
 'use strict';
 // C02 — How you become an associate: the registration link, NexaCrest's review,
 // setting your password and the first login. Also the second door: NexaCrest adds you directly.
-const { ACTORS, nav } = require('./_common');
+const { ACTORS, nav } = require('../_common');
 
 const NEW = 'associate.new@email.com';
 const DIRECT = 'associate.direct@email.com';
@@ -124,7 +124,7 @@ module.exports = {
         'Or NexaCrest adds you directly and sends the password link.',
         'Password: at least 10 characters, letters and digits. Then the 6-digit code.',
         'Status Invited until your documents and bank are checked.',
-      ], next: 'C03 · First login, profile and bank details', say: 'Let us recap. Door one: a registration link, a short form, NexaCrest accepts, and a password link arrives by e-mail. Door two: NexaCrest adds you and sends the same link. Then your password, the six-digit code, and you are in, with the status Invited. In the next video, C03, we complete your profile, documents and bank details, so your account becomes active. See you there!' },
+      ], next: 'Part 2 · Profile, documents and bank', say: 'Let us recap. Door one: a registration link, a short form, NexaCrest accepts, and a password link arrives by e-mail. Door two: NexaCrest adds you and sends the same link. Then your password, the six-digit code, and you are in, with the status Invited. In part two of this video, we complete your profile, documents and bank details, so your account becomes active. See you there!' },
     ];
   },
 };

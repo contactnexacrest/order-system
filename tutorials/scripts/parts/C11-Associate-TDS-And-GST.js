@@ -3,7 +3,7 @@
 // 206AA without a verified PAN), GST on top when registered, and associates abroad (section 195,
 // DTAA: no TDS once TRC, Form 10F and the no-PE declaration are accepted; Form 15CA/15CB per payout).
 // Figures follow the current Admin settings (Settings → Associate TDS); re-check before recording.
-const { ACTORS, nav, associateSetup, PLAN_A } = require('./_common');
+const { ACTORS, nav, associateSetup, PLAN_A } = require('../_common');
 
 const INDIA = 'associate.india@email.com';
 const ABROAD = 'associate.abroad@email.com';
@@ -21,7 +21,7 @@ module.exports = {
 
   async setup(demo) {
     const s = await associateSetup(demo, { email: INDIA, name: 'Demo Associate India', level: 'full', address: 'Demo address, Jaipur', pan: 'ABCDE1234F' });
-    demo.buyerWithOrders({ associateId: s.a.id, company: 'TEST Demo Stone Buyer BV', country: 'Netherlands', email: 'buyer.demo@email.com', orders: [
+    demo.buyerWithOrders({ associateId: s.a.id, company: 'TEST Demo Stone Buyer BV', country: 'Netherlands', email: 'buyer.india@email.com', orders: [
       { reference: 'TEST-TUT-1101', payouts: [{ inr: 8000, fc: 96, month: ym(4), status: 'paid', paidOn: day(100), paidInr: 8000, ref: 'UTR-DEMO-001101' }] },
       { reference: 'TEST-TUT-1102', payouts: [{ inr: 15400, fc: 185, month: ym(1), status: 'paid', paidOn: day(15), paidInr: 14932, tds: 468, rate: 2, section: '194H', ref: 'UTR-DEMO-001102', note: 'TDS includes catch-up on earlier commission this year' }] },
     ] });
@@ -32,7 +32,7 @@ module.exports = {
   },
 
   steps: ({ a = PLAN_A } = {}) => [
-    { card: 'title', say: 'Tax. The word alone makes people nervous! Relax: NexaCrest works out the tax on your commission automatically, following the rules its chartered accountant sets. This video explains what happens, in plain words, so you can check your numbers with confidence.' },
+    { card: 'title', say: 'Tax. The word alone makes people nervous! Relax: NexaCrest works out the tax on your commission automatically, following the rules its chartered accountant sets. This video explains what happens, in plain words, so you can check your numbers with confidence. One note first: the rates and limits you will hear are the ones currently set in the app. They may change after the chartered accountant\'s review, and the portal always uses the latest settings.' },
 
     { card: 'chapter', title: 'In India: TDS', subtitle: 'Tax deducted at source, section 194H.', say: 'Part one. Associates in India, and TDS.' },
     { card: 'list', kicker: 'India · with PAN', title: 'The TDS rule', items: [
@@ -52,8 +52,8 @@ module.exports = {
     { card: 'list', kicker: 'India · no PAN', title: 'Why your PAN matters', items: [
       'No PAN on file, or not yet verified: TDS is 20% (section 206AA).',
       'Same ₹15,400 payment: ₹3,080 deducted instead of ₹468.',
-      'Add your PAN and upload the PAN card: video C03.',
-    ], say: 'Now, why does your PAN matter so much? Without a PAN on file, or before it is verified, the law requires twenty percent, under section 206AA. The same fifteen thousand four hundred rupee payment would lose three thousand and eighty rupees, instead of four hundred and sixty-eight. So add your PAN and upload the card early, exactly as shown in video C03.' },
+      'Add your PAN and upload the PAN card: video C02.',
+    ], say: 'Now, why does your PAN matter so much? Without a PAN on file, or before it is verified, the law requires twenty percent, under section 206AA. The same fifteen thousand four hundred rupee payment would lose three thousand and eighty rupees, instead of four hundred and sixty-eight. So add your PAN and upload the card early, exactly as shown in video C02.' },
     { goto: '/associate/profile', caption: 'PAN and GSTIN in your profile', say: 'Both live in your profile, under Contact and tax details: your PAN, and your GSTIN if you have one.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Contact and tax details' })); await d.ring(d.page.locator('form[action="/associate/profile"]')); await d.wait(1800); } },
 
     { card: 'chapter', title: 'GST on commission', subtitle: 'Only if you are GST-registered.', say: 'Part two. GST.' },
@@ -78,6 +78,6 @@ module.exports = {
       'No verified PAN: 20% (206AA). Add your PAN early!',
       'GST-registered: 18% GST on top, once your invoice is on file.',
       'Abroad: no TDS with TRC, Form 10F and No-PE; 15CA/15CB per payment.',
-    ], next: 'C12 · Messages and notices', say: 'In short. In India, no TDS up to twenty thousand rupees a year, then two percent, with a one-time catch-up. No verified PAN means twenty percent, so add it early. GST-registered? GST is added on top once your invoice is on file. Abroad: no TDS, as long as your residency papers are accepted. These figures follow the settings of NexaCrest\'s chartered accountant; if a rule changes, the portal follows automatically. Next, C12: messages and notices. See you there!' },
+    ], next: 'Video C06 · Messages, changes, privacy and answers', say: 'In short. In India, no TDS up to twenty thousand rupees a year, then two percent, with a one-time catch-up. No verified PAN means twenty percent, so add it early. GST-registered? GST is added on top once your invoice is on file. Abroad: no TDS, as long as your residency papers are accepted. Remember: these figures are as currently set in the app, and may change after the chartered accountant\'s review; if they do, the portal follows automatically. Next, video C06: messages, changes, privacy, and your questions answered. See you there!' },
   ],
 };

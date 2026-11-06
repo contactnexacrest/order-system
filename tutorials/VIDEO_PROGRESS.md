@@ -11,36 +11,64 @@ Status values: `script` (written, not recorded) · `recorded` (MP4 made, not yet
 
 ## Group C — Associates
 
-| No. | File name | Covers | Script | Status | Date | Notes |
-|---|---|---|---|---|---|---|
-| C01 | `C01-Associate-Welcome.mp4` | What an associate does; login with password + 6-digit code; Home; every tab; first message and the MD's reply; access levels; golden rules; log out | `scripts/C01-Associate-Welcome.js` | checked | 2026-11-06 | Pilot: 7.6 min, 50 MB, 1080p, audio −20 dB mean; frames reviewed |
-| C02 | `C02-Associate-Onboarding.mp4` | Associate registration link (MD) → form with browser checks → MD accepts → set password → first login (Invited); NexaCrest adds an associate directly | `scripts/C02-Associate-Onboarding.js` | script | | Actors: MD, future associate |
-| C03 | `C03-Associate-Profile-Bank-KYC.mp4` | Profile, PAN/GSTIN/address, KYC uploads (Aadhaar last 4), bank typed twice + proof; MD accepts documents, bank first check (MD) + verify (ED), status Active | `scripts/C03-Associate-Profile-And-Bank.js` | script | | Actors: associate, MD, ED |
-| C04 | `C04-Associate-Starter-Tour.mp4` | Starter level page by page: clients, protection, 10-day window, certificate, orders without FOB, order page, commission states, invoice upload, TDS certificates, locked page, way to Quoting | `scripts/C04-Associate-Starter-Tour.js` | script | | Demo buyer + order |
-| C05 | `C05-Associate-Inviting-Clients.mp4` | Buyer registration link; personal code, check letter, change code; buyer registers + verifies e-mail; MD accepts on Quotation intake; client list, certificate; protection rules | `scripts/C05-Associate-Inviting-Clients.js` | script | | Actors: associate, buyer, MD |
-| C06 | `C06-Associate-Get-A-Price.mp4` | Price access (MD); catalogue without prices; Get price; quote + lowest price; what changed the price; validity; request list; staff 90-day report; golden rules | `scripts/C06-Associate-Get-Price.js` | script | | Demo priced product |
-| C07 | `C07-Associate-Price-Request-Other.mp4` | "Other" request, required note (browser check), with our team in 24 h; MD prices it by hand; associate sees the price | `scripts/C07-Associate-Price-Request-Other.js` | script | | Actors: associate, MD |
-| C08 | `C08-Associate-Access-Levels-And-Upgrade.mp4` | Starter / Quoting / Full / Custom; level settings grid; upgrade suggestion; MD moves the associate up with a reason; what appears; Custom | `scripts/C08-Associate-Access-Levels.js` | script | | Actors: associate, MD |
-| C09 | `C09-Associate-Commission-Life-Cycle.mp4` | Expected → earned → due (30 days) → paid (monthly run); basis = invoiced FOB of goods; below-floor lines; order statement; commission page; period shown (setting); invoice upload; hold / release / claw-back | `scripts/C09-Associate-Commission-Life-Cycle.js` | script | | Demo orders + payouts in 3 states |
-| C10 | `C10-Associate-Statements-CSV-Print.mp4` | Statement (CSV) and printable statement; what is inside; levels | `scripts/C10-Associate-Statements.js` | script | | |
-| C11 | `C11-Associate-TDS-And-GST.mp4` | India 194H: ₹20,000 threshold, 2 %, catch-up (worked example), Form 16A; no PAN 20 % (206AA); GST 18 % on top when registered; abroad: section 195, DTAA, TRC + Form 10F + No-PE, Form 15CA/15CB | `scripts/C11-Associate-TDS-And-GST.js` | script | | Two associates: India and abroad. Figures follow Settings → Associate TDS; re-check before recording |
-| C12 | `C12-Associate-Messages-And-Notices.mp4` | Notices, "(n new)", bold unread, e-mail copies, amounts by level; message → MD reply → notice | `scripts/C12-Associate-Messages-And-Notices.js` | script | | Actors: associate, MD |
-| C13 | `C13-Associate-Client-Moved-Suspended-Code.mp4` | Client moved by the MD (reason shown); leaked code blocked + new code; Suspended banner; Ended — login refused | `scripts/C13-Associate-When-Things-Change.js` | script | | Actors: associate, MD |
-| C14 | `C14-Associate-What-You-Never-See.mp4` | No costs / suppliers / margins / formulas; staff pages closed; only own orders; associate privacy (masked bank, Aadhaar last 4, two-person bank check) | `scripts/C14-Associate-What-You-Never-See.js` | script | | |
-| C15 | `C15-Associate-Questions-And-Answers.mp4` | 11 frequent questions with answers; series overview | `scripts/C15-Associate-FAQ.js` | script | | |
+C02–C15 were each 2–5 minutes, so they are joined into five videos of 8–11 minutes (decided 6 Nov 2026).
+The part scripts live in `scripts/parts/`; the top-level script joins them with `lib/merge.js`
+(each part keeps its own demo data and actors, opens with a "Part n of m" title card, and numbers
+its chapters from 1). Cross-references in the narration use the new numbers below.
 
-## Group A, D, B, E
+| No. | File name | Joins (parts) | Covers | Est. | Status | Date | Notes |
+|---|---|---|---|---|---|---|---|
+| C01 | `C01-Associate-Welcome.mp4` | — | What an associate does; login with password + 6-digit code; Home; every tab; first message and the MD's reply; access levels; golden rules; log out | 7.6 | sent | 2026-11-06 | Narration now points to C02/C03 (was C03/C05): **re-record** after the series so the references match |
+| C02 | `C02-Associate-Becoming-An-Associate.mp4` | C02 Onboarding + C03 Profile/Bank | Registration link (MD) → form with browser checks → MD accepts → set password → first login (Invited); NexaCrest adds an associate directly; profile, PAN/GSTIN/address, KYC uploads (Aadhaar last 4), bank typed twice + proof; MD accepts documents, bank check (MD) + verify (ED), Active | 9.1 | checked | 2026-11-06 | 9.35 min, 70 MB, audio −20 dB mean, frames reviewed. Actors: MD, Finance Manager (second bank check; ED lacks `manage_associate_bank`), future associate |
+| C03 | `C03-Associate-Starter-Level-And-First-Client.mp4` | C04 Starter tour + C05 Inviting clients | Starter page by page (clients, protection, 10-day window, certificate, orders without FOB, commission states, invoice upload, TDS certificates, locked page); buyer registration link, personal code, buyer registers, MD accepts on Quotation intake | 7.8 | script | | Demo buyer + order; actors associate, buyer, MD |
+| C04 | `C04-Associate-Prices-Requests-And-Levels.mp4` | C06 Get price + C07 "Other" + C08 Access levels | Price access; catalogue; Get price, quote + lowest price; validity; "Other" request priced by hand by the MD; Starter / Quoting / Full / Custom, upgrade suggestion, MD moves the associate up with a reason | 8.1 | script | | Demo priced product |
+| C05 | `C05-Associate-Commission-Statements-And-Tax.mp4` | C09 Commission + C10 Statements + C11 TDS/GST | Expected → earned → due → paid; basis = invoiced FOB of goods; invoice upload; hold / release / claw-back; CSV + printable statement; 194H threshold and catch-up, no PAN 206AA, GST on top, abroad (195, DTAA, TRC, 10F, No-PE, 15CA/15CB) | 9.7 | script | | Tax figures "as currently set in the app, may change after the CA's review" (said in the narration) |
+| C06 | `C06-Associate-Messages-Changes-Privacy-And-FAQ.mp4` | C12 Messages + C13 Changes + C14 Never see + C15 FAQ | Notices and messages; client moved, leaked code blocked, Suspended, Ended; what associates never see; 11 questions and answers; series overview | 10.4 | script | | Last of the series |
 
-Titles follow the owner-approved work plan of 6 Nov 2026 (held in the session that set it up).
-Add one row per video here before writing its script, with the same naming pattern:
-`<Group><No.>-<Audience>-<Topic-In-Words>.mp4`, e.g. `A01-…`, `D01-…`, `B01-…`, `E01-…`.
+## Group A — Everyone (overview)
 
-| Group | Audience | Videos | Status |
+| No. | File name | Covers | Status |
 |---|---|---|---|
-| A | (from the work plan) | to be listed | not started |
-| D | (from the work plan) | to be listed | not started |
-| B | (from the work plan) | to be listed | not started |
-| E | (from the work plan) | to be listed | not started |
+| A01 | `A01-Everyone-NexaCrest-In-Ten-Minutes.mp4` | What NexaCrest does; the portals (staff, client, associate); roles and departments in one picture; the 9 stages / 19 steps; Standard vs Kanban; where help lives | not started |
+| A02 | `A02-Everyone-One-Order-End-To-End.mp4` (may split into Part 1 / Part 2) | One demo export order from enquiry to closure, switching between every role that touches it (Export Executive, Sales Manager, MD/ED, Accounts, Procurement, Logistics, Compliance, buyer, associate) | not started |
+
+## Group D — Clients (buyers): every scenario
+
+The 18 buyer scenarios, grouped into five videos of 8–12 minutes.
+
+| No. | File name | Scenarios | Status |
+|---|---|---|---|
+| D01 | `D01-Client-From-Enquiry-To-Proforma.mp4` | 1 quotation details form (no login) · 2 receiving the quotation · 3 Buyer Action Link (accept / ask) · 4 PI details form · 5 uploading the buyer's PO | not started |
+| D02 | `D02-Client-Paying-And-Your-Login.mp4` | 6 Payment Action Link and paying the advance · 7 LC instead of advance · 8 login created when the advance clears (first login) · 9 forgot password | not started |
+| D03 | `D03-Client-Inside-Your-Order.mp4` | 10 My Orders (Active / Complete / Disputed / Lost / Cancelled) · 11 Order Confirmation acknowledgement · 12 documents you may download (never internal ones) · 13 Order Updates chat | not started |
+| D04 | `D04-Client-Balance-Shipping-And-Closing.mp4` | 14 reporting the balance payment · 15 shipping documents and Commercial Invoice · 16 order feedback · 17 Reorder This | not started |
+| D05 | `D05-Client-When-Something-Goes-Wrong.mp4` | 18 amendment, dispute (when switched on), process issue, cancelled / lost orders, staff "Log in as this client" banner | not started |
+
+## Group B — Staff, by role
+
+About 24 roles, one part per role or close pair, 8–12 minutes each; listed in the order of the order life cycle.
+
+| No. | File name | Roles | Status |
+|---|---|---|---|
+| B01 | `B01-Staff-Export-Executive-Part-1.mp4` / `-Part-2` | Export Executive (QT → PI → OC, documents, recording payments) | not started |
+| B02 | `B02-Staff-Sales-Manager-And-Director.mp4` | Sales/Export Manager, Sales Director (approvals, assignment, cockpit, e-mail approval) | not started |
+| B03 | `B03-Staff-Accounts-Executive.mp4` | Accounts Executive (clearing, supplier payments, INR actuals, remittances) | not started |
+| B04 | `B04-Staff-Finance-Manager-And-Director.mp4` | Finance Manager, Finance Director (order financials, CAFIN, associate bank checks, short-payment approval) | not started |
+| B05 | `B05-Staff-Procurement.mp4` | Procurement Executive / Manager / Director (RFQ, quotes, POs, limits, QC) | not started |
+| B06 | `B06-Staff-Logistics.mp4` | Logistics Executive / Manager / Director (packing, freight, BL, partners) | not started |
+| B07 | `B07-Staff-Export-Compliance.mp4` | Export Compliance Executive / Manager / Director (checklist, COO prep, benefit claims) | not started |
+| B08 | `B08-Staff-Order-Desk.mp4` | Order Coordinator, Operations Manager (status, owners, My tasks, cockpit) | not started |
+| B09 | `B09-Staff-MD-And-ED.mp4` (Part 1 / Part 2) | Managing Director, Executive Director (approvals, pricing, associates, incentives, settings) | not started |
+| B10 | `B10-Staff-Admin-And-System-Administrator.mp4` | Admin, System Administrator (users, roles, departments, settings, templates, backups) | not started |
+| B11 | `B11-Staff-CA-Auditor-And-Investor.mp4` | CA, Viewer / Auditor, Investor (read-only views, CA module, reports) | not started |
+
+## Group E — Divisions
+
+| No. | File name | Covers | Status |
+|---|---|---|---|
+| E01 | `E01-Divisions-Domestic-Trade.mp4` | DOM: sale to Indian resellers in INR, GST tax invoices (planned division, shown in a test switch-on) | not started |
+| E02 | `E02-Divisions-Import-And-Distribution.mp4` | IMP: import, customs duty, landed cost, stock, local sale | not started |
+| E03 | `E03-Divisions-Merchant-Trade.mp4` | MTT: buy abroad, sell abroad, both legs in foreign currency; plus Admin › Divisions activation checklist | not started |
 
 ## Resume notes (for a new session)
 
@@ -55,17 +83,13 @@ Add one row per video here before writing its script, with the same naming patte
 5. Check every new MP4: `ffprobe` (duration ≤ 15 min, an audio stream), pull 3 frames with
    `ffmpeg -ss <t> -i <mp4> -frames:v 1 frame.png` and look at them; fix anything ugly; then set the
    status above to `checked` with the date.
-6. Scripts C02–C15 were written from the views and controllers but not yet recorded: the first
+6. Try one part alone: `node tutorials/run.js parts/C05-Associate-Inviting-Clients` (on failure a screenshot is saved as `raw/<code>-fail.png`; `TUT_DEBUG=1` logs every page load).
+7. The part scripts (`scripts/parts/`) were written from the views and controllers; until a video is recorded: the first
    recording of each may need a selector fixed. A failing step names itself (`Step 7 (…): …`).
-7. Demo data clean-up is automatic (`restoreDb` snapshot, or demo associates deleted). If a run is
+8. Demo data clean-up is automatic (`restoreDb` snapshot, or demo associates deleted). If a run is
    killed half-way, restore with `node -e "require('./tutorials/lib/demo').restore()"` (same TUT_WORK) — only if nothing else has written to the dev database since the snapshot.
 
-## Length check (6 Nov 2026, `--plan` at the final voice pace; C01's estimate matched its real length)
+## Length check
 
-C01 7.6 · C02 4.4 · C03 4.7 · C04 3.9 · C05 3.8 · C06 3.0 · C07 2.0 · C08 3.1 · C09 3.4 · C10 1.6 ·
-C11 4.5 · C12 2.2 · C13 2.5 · C14 2.4 · C15 3.4 minutes (total about 53).
-C02–C15 are under the 8–12 minute target. Option (recommended): join them into five videos of
-8–11 minutes — C02+C03 (becoming an associate and getting active), C04+C05 (Starter tour and
-inviting clients), C06+C07+C08 (prices, "Other", access levels), C09+C10+C11 (commission,
-statements, TDS/GST), C12+C13+C14+C15 (messages, changes, privacy, Q&A). Joining is a matter of
-concatenating the step lists in one script file, with one title and one recap.
+6 Nov 2026, `--plan` (C01's estimate matched its real length): C01 7.6 · C02 9.1 · C03 7.8 · C04 8.1 ·
+C05 9.7 · C06 10.4 minutes (Group C about 53 minutes).

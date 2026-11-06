@@ -2,7 +2,7 @@
 // C09 — Commission from start to finish: expected → earned (buyer paid in full) → due 30 days
 // later → paid in the monthly payout run, against the associate's invoice; held and clawed back;
 // and the commission period shown in the portal (owner setting).
-const { nav, associateSetup, PLAN_A } = require('./_common');
+const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.commission@email.com';
 const ym = (monthsAgo) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - monthsAgo); return d.toISOString().slice(0, 7); };
@@ -19,7 +19,7 @@ module.exports = {
 
   async setup(demo) {
     const s = await associateSetup(demo, { email: EMAIL, name: 'Demo Associate', level: 'full', address: 'Demo address, Jaipur', pan: 'ABCDE1234F' });
-    s.buyer = demo.buyerWithOrders({ associateId: s.a.id, company: 'TEST Demo Stone Buyer BV', country: 'Netherlands', email: 'buyer.demo@email.com', orders: [
+    s.buyer = demo.buyerWithOrders({ associateId: s.a.id, company: 'TEST Demo Stone Buyer BV', country: 'Netherlands', email: 'buyer.commission@email.com', orders: [
       { reference: 'TEST-TUT-0901', lines: [{ description: 'Granite slabs, polished, 20 mm', qty: 500, unit: 'm2', price: 34 }],
         payouts: [{ inr: 28305, fc: 340, month: ym(2), status: 'paid', paidOn: day(40), paidInr: 28305, ref: 'UTR-DEMO-000001', due: day(45), note: 'Level 2 (2%) on invoiced FOB' }] },
       { reference: 'TEST-TUT-0902', lines: [{ description: 'Granite tiles, flamed, 30 mm', qty: 300, unit: 'm2', price: 41 }],
@@ -81,6 +81,6 @@ module.exports = {
       'Earned when the buyer pays in full; due 30 days later; monthly payout run.',
       'Upload your invoice per line; payment only to your verified bank.',
       'Hold shows a reason; paid shows the date and bank reference.',
-    ], next: 'C10 · Statements, CSV and printing', say: 'In one breath: the level is fixed at the Proforma Invoice, the basis is the invoiced FOB of the goods, it is earned at full payment, due thirty days later, and paid in the monthly run, against your invoice, to your verified bank. Next, C10: statements, CSV and printing. See you there!' },
+    ], next: 'Part 2 · Statements, CSV and printing', say: 'In one breath: the level is fixed at the Proforma Invoice, the basis is the invoiced FOB of the goods, it is earned at full payment, due thirty days later, and paid in the monthly run, against your invoice, to your verified bank. Next, in part two: statements, CSV and printing.' },
   ],
 };

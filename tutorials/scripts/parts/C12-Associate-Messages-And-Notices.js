@@ -1,7 +1,7 @@
 'use strict';
 // C12 — Messages and notices: a conversation with NexaCrest, the notices on Home, the "(n new)"
 // counter, e-mail copies, and what notices may show at each access level.
-const { nav, associateSetup, PLAN_A } = require('./_common');
+const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.messages@email.com';
 
@@ -25,7 +25,7 @@ module.exports = {
     { card: 'title', say: 'Good communication makes great partnerships. In this video: messages, your direct line to NexaCrest, and notices, the little updates that tell you what is happening, without you having to ask.' },
     { card: 'chapter', title: 'Notices', subtitle: 'Updates that come to you.', say: 'Part one. Notices.' },
     { as: 'associate', goto: '/associate', caption: 'Home (2 new)', say: 'See the Home tab? It says two new. That counter shows notices you have not seen yet.', do: async (d) => { await d.point(nav(d, 'Home'), 1800); } },
-    { caption: 'New notices are bold', say: 'Scroll to Notices. New ones are in bold: a client registered, an order moved forward. Each with its date. When you have looked at them, they turn normal, and the counter goes back to zero.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Notices' })); await d.ring(d.page.locator('h2:has-text("Notices") + table')); await d.wait(2200); } },
+    { caption: 'New notices are bold', say: 'Scroll to Notices. New ones are in bold: a client registered, an order moved forward. Each with its date. When you have looked at them, they turn normal, and the counter goes back to zero.', do: async (d) => { await d.scrollTo(d.page.getByRole('heading', { name: 'Notices' })); await d.ring(d.page.locator('h2:has-text("Notices") + .table-scroll table')); await d.wait(2200); } },
     { card: 'list', kicker: 'Notices', title: 'What you are told about', items: [
       'A buyer registered through your link or code, and was accepted.',
       'An order of your client moved to a new stage.',
@@ -55,6 +55,6 @@ module.exports = {
       'Mention the order number or the client name.',
       'One topic per message.',
       'Never send passwords, codes or full bank numbers in a message.',
-    ], next: 'C13 · When things change', say: 'Three tips for fast answers. Mention the order number or the client. One topic per message. And never send passwords, login codes or full bank numbers in a message; NexaCrest will never ask for them. Next, C13: what happens when things change. See you there!' },
+    ], next: 'Part 2 · When things change', say: 'Three tips for fast answers. Mention the order number or the client. One topic per message. And never send passwords, login codes or full bank numbers in a message; NexaCrest will never ask for them. Next, in part two: what happens when things change.' },
   ],
 };

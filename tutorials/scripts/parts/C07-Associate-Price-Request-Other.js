@@ -1,7 +1,7 @@
 'use strict';
 // C07 — "Other": the buyer needs something not listed. The request goes to NexaCrest, is priced
 // by hand within 24 hours, and comes back to the associate. Includes the browser-side check.
-const { nav, associateSetup, PLAN_A } = require('./_common');
+const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.other@email.com';
 
@@ -56,7 +56,7 @@ module.exports = {
         'Describe the need (at least 10 characters).',
         'NexaCrest prices it within 24 hours: e-mail + notice.',
         'Does not use your daily price requests.',
-      ], next: 'C08 · Access levels and upgrades', say: 'That is Other in four steps. Tick the box, describe the need, NexaCrest prices it within a day, and it does not use your daily limit. Next, C08: the access levels, and how you move up. See you there!' },
+      ], next: 'Part 3 · Access levels and upgrades', say: 'That is Other in four steps. Tick the box, describe the need, NexaCrest prices it within a day, and it does not use your daily limit. Next, in part three: the access levels, and how you move up.' },
     ];
   },
 };

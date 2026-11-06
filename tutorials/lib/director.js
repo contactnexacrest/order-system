@@ -44,6 +44,7 @@ class Director {
     });
     await this.context.addInitScript(initScript(cfg.BRAND, cfg.VIEW.zoom));
     this.page = await this.context.newPage();
+    if (process.env.TUT_DEBUG) this.page.on('response', (r) => { if (r.request().resourceType() === 'document') console.log('[nav]', r.request().method(), r.status(), r.url()); });
     // "Are you sure?" browser dialogs (data-confirm) are accepted; the narration says so.
     this.page.on('dialog', (dlg) => { this.lastDialog = dlg.message(); dlg.accept().catch(() => {}); });
     this.t0 = Date.now();
@@ -69,6 +70,7 @@ class Director {
       try {
         await this.step(s);
       } catch (e) {
+        try { const f = require('path').join(cfg.WORK, 'raw', `${this.script.code}-fail.png`); await this.page.screenshot({ path: f }); console.error(`screenshot of the failed step: ${f}`); } catch (_) { /* page gone */ }
         e.message = `Step ${i + 1} (${(s.say || s.card || s.as || '').toString().slice(0, 60)}): ${e.message}`;
         throw e;
       }
@@ -76,9 +78,15 @@ class Director {
   }
 
   async step(s) {
+    // A card replaces the page: a following step with no navigation of its own returns to the page
+    // that was showing before the card (same person), so it acts on the app, not on the card.
+    const back = this.onCard && !s.card && !s.goto && (!s.as || s.as === this.actor)
+      && !(s.do && /d\.goto\(/.test(s.do.toString())) && /^https?:/.test(this.beforeCard || "") ? this.beforeCard : null;
     if (s.as) await this.as(s.as);
     if (s.card) await this.card(s);
+    else if (back) await this.goto(new URL(back).pathname + new URL(back).search + new URL(back).hash);
     if (s.goto) await this.goto(s.goto);
+    if (!s.card && (s.goto || back || s.do)) this.onCard = false;
     const start = this.now();
     const ms = s._tts ? s._tts.seconds * 1000 : 0;
     if (s._tts) this.clips.push({ start, seconds: s._tts.seconds, file: s._tts.file, text: s.say });
@@ -110,6 +118,9 @@ class Director {
   }
 
   async card(s) {
+    if (s.resetChapter) this.chapter = 0;
+    if (!this.onCard) this.beforeCard = this.page.url();
+    this.onCard = true;
     const html = s.card === 'title' ? cards.titleCard({ ...this.script, ...s })
       : s.card === 'chapter' ? cards.chapterCard({ number: ++this.chapter, ...s })
         : cards.listCard(s);
@@ -118,7 +129,12 @@ class Director {
 
   // ---------- human-speed actions ----------
   async goto(url) {
+    // Same page with only a different #anchor would not reload (Playwright treats it as a hash
+    // change), so after switching person the old person's page and form tokens would stay. Reload.
+    const cur = new URL(this.page.url() === 'about:blank' ? 'http://x/' : this.page.url());
+    const next = new URL(url, cur.origin === 'null' ? 'http://x' : cur.origin);
     await this.page.goto(url, { waitUntil: 'load' });
+    if (/^https?:/.test(cur.href) && cur.pathname === next.pathname && cur.search === next.search) await this.page.reload({ waitUntil: 'load' });
     await this.restore();
   }
 

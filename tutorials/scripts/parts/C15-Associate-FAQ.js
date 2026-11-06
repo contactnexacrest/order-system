@@ -1,6 +1,6 @@
 'use strict';
 // C15 — Questions and answers: the questions associates ask most, each answered with the screen.
-const { nav, associateSetup, PLAN_A } = require('./_common');
+const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.faq@email.com';
 
@@ -41,10 +41,12 @@ module.exports = {
     qa('Who do I contact?', { items: ['Messages: your relationship manager and the associates team.', 'Mention the order number or client.', 'Never send passwords, codes or full bank numbers.'],
       say: 'And question eleven. Who do I contact? Messages, in your portal. Your relationship manager and the associates team read them. Mention the order number or client, and never send passwords, codes or full bank numbers.' }),
     { card: 'list', kicker: 'The series', title: 'All associate videos', items: [
-      'C01 Welcome · C02 Becoming an associate · C03 Profile, documents, bank',
-      'C04 Starter tour · C05 Inviting clients · C06 Get a price · C07 "Other"',
-      'C08 Access levels · C09 Commission · C10 Statements · C11 TDS and GST',
-      'C12 Messages · C13 When things change · C14 What you never see · C15 Q&A',
-    ], say: 'That is the end of the associate series. Fifteen videos, from your first login to your first commission. Come back to any of them whenever you need. Thank you for watching, and welcome to the NexaCrest team. Happy selling!' },
+      'C01 Welcome: login, home page and every tab',
+      'C02 Becoming an associate: registration, profile, documents, bank',
+      'C03 The Starter level and inviting your first client',
+      'C04 Prices, "Other" requests and access levels',
+      'C05 Commission, statements, TDS and GST',
+      'C06 Messages, changes, privacy, questions and answers',
+    ], say: 'That is the end of the associate series. Six videos, from your first login to your first commission. Come back to any of them whenever you need. Thank you for watching, and welcome to the NexaCrest team. Happy selling!' },
   ],
 };

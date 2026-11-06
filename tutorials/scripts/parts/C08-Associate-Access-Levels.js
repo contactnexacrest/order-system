@@ -1,7 +1,7 @@
 'use strict';
 // C08 — Access levels: Starter, Quoting, Full and Custom; the level settings; how the MD moves
 // an associate up (with a reason), and what changes on the associate's screen.
-const { nav, associateSetup, PLAN_A } = require('./_common');
+const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.levels@email.com';
 
@@ -44,7 +44,7 @@ module.exports = {
     { card: 'chapter', title: 'What changes for you', say: 'Part three. What the associate sees now.' },
     { as: 'associate', goto: '/associate', caption: 'Catalogue appears', say: 'Back in the portal, open any page, and there it is: the Catalogue tab.', do: async (d) => { await d.point(nav(d, 'Catalogue'), 1800); } },
     { goto: '/associate/orders', caption: 'Order value appears', say: 'And on Orders, the order value column is now visible. Same data, more detail.', do: async (d) => { await d.ring(d.page.locator('table.list tr').first()); await d.wait(1500); } },
-    { goto: '/associate/commission', caption: 'Statements appear', say: 'On Commission, the statement buttons appear: a CSV file and a printable statement. Video C10 shows them.', do: async (d) => { const b = d.page.getByRole('link', { name: 'Statement (CSV)' }); if (await b.count()) await d.point(b, 1500); } },
+    { goto: '/associate/commission', caption: 'Statements appear', say: 'On Commission, the statement buttons appear: a CSV file and a printable statement. Video C05 shows them.', do: async (d) => { const b = d.page.getByRole('link', { name: 'Statement (CSV)' }); if (await b.count()) await d.point(b, 1500); } },
 
     { card: 'chapter', title: 'Custom', subtitle: 'For special cases.', say: 'Part four. The Custom level.' },
     { as: 'md', goto: `/associates/${a.id}#portal-access`, caption: 'Custom: tick features one by one', say: 'For a special case, the Managing Director chooses Custom, and ticks exactly the features this one associate should see. A Custom associate starts from Starter, for anything not ticked.', do: async (d) => {
@@ -57,6 +57,6 @@ module.exports = {
       'Only the Managing Director changes it, always with a reason.',
       'Opening a locked page simply says "Not available at your access level".',
       'Good results, completed and paid orders, are the way up.',
-    ], next: 'C09 · Your commission, start to finish', say: 'In short: your level changes what you see, never what you earn. Only the Managing Director changes it, always with a reason. A locked page simply tells you so. And the way up is good results: completed, fully paid orders. Next, C09: your commission, from start to finish. See you there!' },
+    ], next: 'Video C05 · Commission, statements, TDS and GST', say: 'In short: your level changes what you see, never what you earn. Only the Managing Director changes it, always with a reason. A locked page simply tells you so. And the way up is good results: completed, fully paid orders. Next, video C05: your commission, from start to finish. See you there!' },
   ],
 };

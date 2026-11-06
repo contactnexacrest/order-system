@@ -28,7 +28,7 @@ function hash(password) {
   return execFileSync('php', ['-r', `echo password_hash(${JSON.stringify(password)}, PASSWORD_BCRYPT, ['cost'=>10]);`]).toString().trim();
 }
 
-const made = { associates: new Set() };
+const made = { associates: new Set(), staff: new Set() };
 
 /**
  * A ready-to-use demo associate (active, portal on, no forced password change).
@@ -69,7 +69,7 @@ function removeAssociates(emails) {
   sql(`DELETE FROM associates WHERE id IN (${list})`, 'delete associates');
 }
 
-function cleanup() { removeAssociates([...made.associates]); made.associates.clear(); }
+function cleanup() { removeAssociates([...made.associates]); made.associates.clear(); removeStaff([...made.staff]); made.staff.clear(); }
 
 // Whole-database snapshot for videos that create clients, orders or payouts.
 function snapshot() {
@@ -110,6 +110,30 @@ const STAFF = {
   md: { email: 'md@email.com', password: process.env.TUT_STAFF_PASSWORD || 'PlaywrightTest#2026' },
   ed: { email: 'ed@email.com', password: process.env.TUT_STAFF_PASSWORD || 'PlaywrightTest#2026' },
 };
+// Demo staff for a role that has no seed account with a role e-mail (e.g. Finance Manager).
+// Created on demand with the tutorial staff password; removed by removeStaff() / cleanup().
+const DEMO_STAFF = { fm: { email: 'finance.manager@email.com', role: 'Finance Manager', name: 'Finance Manager' } };
+function demoStaff(key) {
+  const d = DEMO_STAFF[key];
+  const h = hash(STAFF.md.password);
+  const role = `(SELECT id FROM roles WHERE name = ${q(d.role)})`;
+  if (sql(`SELECT id FROM users WHERE email = ${q(d.email)}`)) {
+    sql(`UPDATE users SET password_hash = ${q(h)}, role_id = ${role}, is_active = 1, is_archived = 0, force_password_change = 0, two_fa_enabled = 0, failed_login_count = 0, locked_until = NULL WHERE email = ${q(d.email)}`);
+  } else {
+    sql(`INSERT INTO users (name, email, password_hash, role_id, is_active, force_password_change, two_fa_enabled, is_super_admin)
+         VALUES (${q(d.name)}, ${q(d.email)}, ${q(h)}, ${role}, 1, 0, 0, 0)`);
+  }
+  STAFF[key] = { email: d.email, password: STAFF.md.password };
+  made.staff.add(d.email);
+  return d;
+}
+// Deletes a demo staff login; if records still point at it, it is switched off instead.
+function removeStaff(emails) {
+  for (const e of emails) {
+    const r = spawnSync('mysql', ['-u', cfg.DB.user, `-p${cfg.DB.password}`, cfg.DB.database, '-e', `DELETE FROM users WHERE email = ${q(e)}`]);
+    if (r.status !== 0) sql(`UPDATE users SET is_active = 0, is_archived = 1 WHERE email = ${q(e)}`);
+  }
+}
 async function staffCookies(key = 'md') {
   const s = STAFF[key];
   return withHiddenPage(async (page) => {
@@ -178,4 +202,4 @@ function pricedProduct(associateId, name = 'Black Galaxy Granite (demo)') {
     echo $p;`));
 }
 
-module.exports = { pricedProduct, buyerWithOrders, sampleFile, sql, php, q, associate, removeAssociates, cleanup, snapshot, restore, associateCookies, staffCookies, STAFF };
+module.exports = { demoStaff, removeStaff, pricedProduct, buyerWithOrders, sampleFile, sql, php, q, associate, removeAssociates, cleanup, snapshot, restore, associateCookies, staffCookies, STAFF };

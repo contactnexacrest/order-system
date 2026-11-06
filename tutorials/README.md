@@ -55,6 +55,9 @@ The finished MP4 (plus an `.srt` subtitle file) goes to `$TUT_OUT`.
 * `lib/overlay.js` — actor badge, caption pill, highlight ring, cursor and click ripple; hides the
   dev banner and "Development only" helpers (login codes, links) — the script reads them invisibly,
   the narration says they arrive by e-mail, as on the live site.
+* `lib/merge.js` — joins several short part scripts (`scripts/parts/`) into one 8–12 minute video:
+  each part keeps its own demo data and actors, opens with a "Part n of m" title card and numbers its
+  chapters from 1. A top-level script is then just `merge({ code, file, title, … }, [part1, part2])`.
 * `lib/cards.js` — title, chapter and recap cards in the brand colours (Poppins, navy and gold).
 * `lib/tts.js` — Piper narration, cached by text; abbreviations are spoken letter by letter
   (TDS, GST…) while the subtitles keep the normal spelling.

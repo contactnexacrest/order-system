@@ -1,7 +1,7 @@
 'use strict';
 // C06 — Quoting: the catalogue (no prices), Get price for a chosen specification, the quote
 // price and the lowest you may agree, the daily limit, and what NexaCrest controls.
-const { nav, associateSetup, PLAN_A } = require('./_common');
+const { nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.quoting@email.com';
 
@@ -56,6 +56,6 @@ module.exports = {
       'Offer the quote price; you may go down to the lowest price, not below.',
       'The final price is confirmed on the Proforma Invoice.',
       'Something not listed? Use "Other" (next video).',
-    ], next: 'C07 · Price requests: "Other"', say: 'A few golden rules. Prices are for you only, so never forward the page or a screenshot. Offer the quote price, and go down to the lowest price if you must, never below. The final price is always confirmed on the Proforma Invoice. And if the buyer wants something not in the list, that is what Other is for, in the next video, C07. See you there!' },
+    ], next: 'Part 2 · Price requests: "Other"', say: 'A few golden rules. Prices are for you only, so never forward the page or a screenshot. Offer the quote price, and go down to the lowest price if you must, never below. The final price is always confirmed on the Proforma Invoice. And if the buyer wants something not in the list, that is what Other is for, coming up next, in part two.' },
   ],
 };
