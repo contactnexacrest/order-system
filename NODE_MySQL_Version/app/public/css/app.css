@@ -531,6 +531,11 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .stat-tile.warn .num{color:var(--gold-strong);}
 .stat-tile.danger{border-top-color:var(--danger);}
 .stat-tile.danger .num{color:var(--danger);}
+/* Associate home money boxes and Associate › Track record (.stat-row): same look as .stat-tile. */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin:0.5rem 0 1rem;}
+.stat-row .stat{border:1px solid var(--line);border-top:3px solid var(--gold);border-radius:12px;padding:0.9rem 1.1rem;background:#fff;}
+.stat-row .stat-label{font-size:0.78rem;color:var(--ink-soft);font-weight:600;}
+.stat-row .stat-value{font-size:1.5rem;font-weight:800;color:var(--navy);line-height:1.2;margin-top:0.25rem;overflow-wrap:anywhere;}
 .search-box{display:flex;gap:0.5rem;margin-bottom:1rem;}
 .search-box input{margin-top:0;}
 .masked-value{font-family:monospace;letter-spacing:0.03em;color:var(--ink-soft);}
