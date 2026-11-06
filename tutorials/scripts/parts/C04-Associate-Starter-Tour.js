@@ -38,7 +38,7 @@ module.exports = {
       await d.clickNav(d.page.locator('table.list a').first());
       await d.point('h1', 800); await d.scrollTo(d.page.getByRole('heading', { name: 'What happened' }));
     } },
-    { caption: 'Commission: expected, earned, paid', say: 'The commission cell moves through simple states. Expected, while the order is running. Earned, once the buyer has paid in full. And Paid, once it is in your bank. Never on the advance alone: only after full payment.', do: async (d) => { await d.scrollTo('table.kv'); await d.ring(d.page.locator('table.kv tr', { hasText: 'Commission' })); await d.wait(1500); } },
+    { caption: 'Commission: expected, earned, paid', say: 'The commission cell moves through simple states. Expected, while the order is running. Earned, once the buyer has paid in full. And Paid, once it is in your bank. Never on the advance alone: only after full payment.', do: async (d) => { await d.scrollTo('table.kv'); await d.ring(d.page.locator('table.kv tr', { hasText: 'Commission' }).first()); await d.wait(1500); } },
 
     { card: 'chapter', title: 'Commission and TDS', subtitle: 'Your money page.', say: 'Part three. The Commission page.' },
     { goto: '/associate/commission', caption: 'My commission', say: 'On the Commission page: earned, paid and waiting, for the recent months. Then one line per commission, with the month it is paid in, the order, the client, the amount and the status.', do: async (d) => { await d.point('h1', 800); await d.ring(d.page.locator('table.list').first()); await d.wait(1500); } },

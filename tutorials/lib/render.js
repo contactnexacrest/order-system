@@ -116,16 +116,21 @@ function buildSrt(clips, file) {
   fs.writeFileSync(file, out.join('\n'));
 }
 
-async function buildVideo({ webm, clips, out, workDir }) {
-  const seconds = durationOf(webm);
-  fs.writeFileSync(path.join(workDir, 'clips.json'), JSON.stringify({ webm, clips }, null, 1));
+async function buildVideo({ webm, clips: rawClips, out, workDir }) {
+  fs.writeFileSync(path.join(workDir, 'clips.json'), JSON.stringify({ webm, clips: rawClips }, null, 1));
+  // The browser shows a blank page for a few seconds before the first card; start the video
+  // half a second before the first line instead (narration and subtitles move with it).
+  const first = rawClips.length ? Math.min(...rawClips.map((c) => c.start)) : 0;
+  const lead = Math.max(0, first - 0.5);
+  const clips = rawClips.map((c) => ({ ...c, start: c.start - lead }));
+  const seconds = durationOf(webm) - lead;
   const wav = path.join(workDir, 'narration.wav');
   const ass = path.join(workDir, 'subs.ass');
   buildAudio(clips, seconds, wav);
   buildAss(clips, ass);
   buildSrt(clips, out.replace(/\.mp4$/, '.srt'));
   const assArg = ass.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'");
-  execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', webm, '-i', wav,
+  execFileSync('ffmpeg', ['-y', '-v', 'error', '-ss', lead.toFixed(3), '-i', webm, '-i', wav,
     '-vf', `fps=30,scale=${cfg.VIDEO.width}:${cfg.VIDEO.height}:flags=lanczos,ass='${assArg}'`,
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p', '-profile:v', 'high',
     '-c:a', 'aac', '-b:a', '160k', '-ar', '44100', '-ac', '2',

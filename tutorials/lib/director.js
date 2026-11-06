@@ -144,7 +144,8 @@ class Director {
     await this.overlay({ actor: a ? { label: a.label, sub: a.sub, initials: a.initials, color: a.color } : null, mx: this.mouse.x, my: this.mouse.y });
   }
 
-  loc(target) { return typeof target === 'string' ? this.page.locator(target).first() : target; }
+  // Always the first match, so a selector that also matches a second row never stops a recording.
+  loc(target) { return typeof target === 'string' ? this.page.locator(target).first() : target.first(); }
 
   async moveTo(target, { steps = 28 } = {}) {
     const l = this.loc(target);

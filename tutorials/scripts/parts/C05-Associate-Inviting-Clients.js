@@ -5,6 +5,8 @@ const { ACTORS, nav, associateSetup, PLAN_A } = require('../_common');
 
 const EMAIL = 'associate.inviter@email.com';
 const BUYER = 'TEST Demo Harbour Stone BV';
+// The buyer needs its own e-mail domain: the app treats buyers sharing a domain as one company,
+// and other demo buyers (e.g. in C04, recorded in the same video) use @email.com.
 
 module.exports = {
   code: 'C05',
@@ -17,7 +19,7 @@ module.exports = {
 
   async setup(demo) {
     const s = await associateSetup(demo, { email: EMAIL, name: 'Demo Associate', level: 'starter', address: 'Demo address, Jaipur', pan: 'ABCDE1234F' });
-    s.actors.buyer = { ...ACTORS.client('buyer.demo@email.com'), cookies: [] };
+    s.actors.buyer = { ...ACTORS.client('purchasing@harbour-stone.example'), cookies: [] };
     return s;
   },
 
@@ -64,7 +66,7 @@ module.exports = {
         await d.type(d.page.locator('input[name="contact_person"]'), 'Purchasing Manager', { delay: 30 });
       } },
       { caption: 'E-mail, tax number, terms', say: 'Their e-mail, their VAT number, where the goods should go, and the delivery terms they prefer. Then, Submit Request.', do: async (d) => {
-        await d.type(d.page.locator('input[name="email"]'), 'buyer.demo@email.com', { delay: 30 });
+        await d.type(d.page.locator('input[name="email"]'), 'purchasing@harbour-stone.example', { delay: 30 });
         await d.type(d.page.locator('input[name="vat_eori_tax_no"]'), 'NL000000000B01', { delay: 30 });
         await d.select(d.page.locator('#country_of_destination_select'), { label: 'Netherlands' });
         await d.select(d.page.locator('#incoterm_select'), { label: 'CIF' });
