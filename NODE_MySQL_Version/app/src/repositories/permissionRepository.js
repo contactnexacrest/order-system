@@ -46,6 +46,22 @@ async function effectivePermissions(userId, roleId, roleOnly = false) {
   return effective;
 }
 
+const CANDIDATES_SQL = `SELECT u.id, u.role_id FROM users u
+  WHERE u.is_active = 1 AND (
+    u.is_super_admin = 1
+    OR EXISTS (SELECT 1 FROM super_admin_delegations s WHERE s.delegate_user_id = u.id AND s.revoked_at IS NULL)
+    OR EXISTS (SELECT 1 FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
+               WHERE rp.role_id = u.role_id AND rp.is_enabled = 1 AND p.permission_key = :k1)
+    OR EXISTS (SELECT 1 FROM user_department_memberships m
+               JOIN department_designations dd ON dd.id = m.designation_id
+               JOIN role_permissions rp ON rp.role_id = dd.role_id AND rp.is_enabled = 1
+               JOIN permissions p ON p.id = rp.permission_id
+               WHERE m.user_id = u.id AND p.permission_key = :k2)
+    OR EXISTS (SELECT 1 FROM user_permissions up JOIN permissions p ON p.id = up.permission_id
+               WHERE up.user_id = u.id AND up.is_enabled = 1 AND p.permission_key = :k3)
+  )
+  ORDER BY u.id`;
+
 /**
  * Active users who effectively hold a given permission — role grant, minus
  * any per-user force-disable, plus a per-user grant override, and always
@@ -60,7 +76,11 @@ async function effectivePermissions(userId, roleId, roleOnly = false) {
  * @returns {Promise<Array<number>>} user ids
  */
 async function usersWithPermission(permissionKey) {
-  const activeUsers = await db.query('SELECT id, role_id FROM users WHERE is_active = 1');
+  // Only people who could hold it are checked one by one (CI 6 Nov 2026: with thousands of
+  // users, checking everyone made the daily alert job take ~30 s per run). Anyone who holds the
+  // permission is a Super Admin or delegate, has a personal grant, or has a role (own or through
+  // a department) that grants it — the exact rules below then decide, unchanged.
+  const activeUsers = await db.query(CANDIDATES_SQL, { k1: permissionKey, k2: permissionKey, k3: permissionKey });
   const matched = [];
   for (const u of activeUsers) {
     if (await superAdminService.isEffective(u.id)) {

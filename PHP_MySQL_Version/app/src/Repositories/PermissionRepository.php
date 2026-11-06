@@ -70,9 +70,29 @@ final class PermissionRepository
      */
     public static function usersWithPermission(string $permissionKey): array
     {
-        $activeUsers = Database::connection()
-            ->query('SELECT id, role_id FROM users WHERE is_active = 1')
-            ->fetchAll();
+        // Only people who could hold it are checked one by one (CI 6 Nov 2026: with thousands of
+        // users, checking everyone made the daily alert job slow). Anyone who holds the permission
+        // is a Super Admin or delegate, has a personal grant, or has a role (own or through a
+        // department) that grants it — the exact rules below then decide, unchanged.
+        $stmt = Database::connection()->prepare(
+            'SELECT u.id, u.role_id FROM users u
+             WHERE u.is_active = 1 AND (
+               u.is_super_admin = 1
+               OR EXISTS (SELECT 1 FROM super_admin_delegations s WHERE s.delegate_user_id = u.id AND s.revoked_at IS NULL)
+               OR EXISTS (SELECT 1 FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
+                          WHERE rp.role_id = u.role_id AND rp.is_enabled = 1 AND p.permission_key = :k1)
+               OR EXISTS (SELECT 1 FROM user_department_memberships m
+                          JOIN department_designations dd ON dd.id = m.designation_id
+                          JOIN role_permissions rp ON rp.role_id = dd.role_id AND rp.is_enabled = 1
+                          JOIN permissions p ON p.id = rp.permission_id
+                          WHERE m.user_id = u.id AND p.permission_key = :k2)
+               OR EXISTS (SELECT 1 FROM user_permissions up JOIN permissions p ON p.id = up.permission_id
+                          WHERE up.user_id = u.id AND up.is_enabled = 1 AND p.permission_key = :k3)
+             )
+             ORDER BY u.id'
+        );
+        $stmt->execute(['k1' => $permissionKey, 'k2' => $permissionKey, 'k3' => $permissionKey]);
+        $activeUsers = $stmt->fetchAll();
         $matched = [];
         foreach ($activeUsers as $u) {
             $userId = (int) $u['id'];
