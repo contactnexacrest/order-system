@@ -160,7 +160,7 @@ mysql -u nexacrest_app -p<password> <db_name> -e "
 mysql -u nexacrest_app -p<password> <db_name> -e "
   UPDATE users SET password_hash = '<a fresh bcrypt hash of your chosen password>',
          force_password_change = 0, is_active = 1
-  WHERE email = 'gulmohar.sontakke@nexacrestinternational.com';
+  WHERE email = 'md@email.com';
 "
 ```
 

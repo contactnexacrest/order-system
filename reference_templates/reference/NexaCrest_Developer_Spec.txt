@@ -128,7 +128,7 @@ All section content tables have standard border: single, colour #D0D8E4, sz=2.
   Right: GS signature (gs_signature.png) 120×40 px
          Director seal (director_seal.png) 90×90 px
 Separator line (navy, sz=2) between seals and name block.
-Name block: Gulmohar Sontakke | Founder & Managing Director | NexaCrest International Private Limited
+Name block: Managing Director | Founder & Managing Director | NexaCrest International Private Limited
 
 2.5 SECTION 8 / LEGAL TERMS (ALL BUYER DOCUMENTS)
 ----------------------------------------------------
@@ -542,7 +542,7 @@ DO NOT regenerate from earlier versions. These are the authoritative final files
   Commercial Invoice No.:
   Date of Endorsement:
   Authorised Signatory: [GS signature + company seal]
-  Fixed: Gulmohar Sontakke | Founder & Managing Director |
+  Fixed: Managing Director | Founder & Managing Director |
          NexaCrest International Private Limited |
          GSTIN: 29AAKCN8733G1ZZ | IEC: AAKCN8733G
 

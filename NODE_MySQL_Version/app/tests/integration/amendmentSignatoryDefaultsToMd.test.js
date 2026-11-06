@@ -42,7 +42,7 @@ describe('Amendment document type signatory defaults to the MD, overridable (Q2)
   test('AMD document type defaults to the Managing Director signatory', async () => {
     const block = await documentDataAssembler.signatoryBlock(await amdDocumentTypeId());
 
-    expect(block.name).toBe('Gulmohar Sontakke');
+    expect(block.name).toBe('Managing Director');
     expect(block.designation).toBe('Founder & Managing Director');
     expect(block.used_designation_seal).toBe(true);
   });
@@ -56,7 +56,7 @@ describe('Amendment document type signatory defaults to the MD, overridable (Q2)
     );
 
     const superAdmin = await db.queryOne(
-      "SELECT id FROM users WHERE email = 'gulmohar.sontakke@nexacrestinternational.com'"
+      "SELECT id FROM users WHERE email = 'md@email.com'"
     );
 
     const financeHeadDesignationId = await signatoryRepository.createDesignation('Finance Head', superAdmin.id);

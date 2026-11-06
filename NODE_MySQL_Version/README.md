@@ -147,6 +147,50 @@ storage/
    in `storage/assets/` in this package, at the exact relative paths this
    UPDATE points at.
 
+   **Set the real logins and company details (go-live).** The seed holds role
+   placeholders only — no real names or e-mails are kept in the repository.
+   The two founder logins are *protected accounts*: a database trigger
+   refuses any change to their name or e-mail, from the app or from SQL. So,
+   once, right after importing (as the database admin user), lift the
+   trigger, put in the real values, and put the trigger back exactly as it
+   was:
+   ```sql
+   DROP TRIGGER IF EXISTS trg_users_protected_bu;
+   UPDATE users SET email = 'real-md@yourcompany.com', name = 'Real MD Name' WHERE email = 'md@email.com';
+   UPDATE users SET email = 'real-ed@yourcompany.com', name = 'Real ED Name' WHERE email = 'ed@email.com';
+   UPDATE company_settings SET setting_value = 'Real MD Name'           WHERE setting_key = 'md_name';
+   UPDATE company_settings SET setting_value = 'Real Director Name'     WHERE setting_key = 'director_name';
+   UPDATE company_settings SET setting_value = 'info@yourcompany.com'   WHERE setting_key = 'email';
+   UPDATE assets SET name = REPLACE(name, 'Managing Director', 'Real MD Name') WHERE name LIKE 'Managing Director%';
+   DELIMITER $$
+   CREATE TRIGGER trg_users_protected_bu BEFORE UPDATE ON users
+   FOR EACH ROW
+   BEGIN
+     IF OLD.is_protected_account = 1 AND (
+          NOT (OLD.name <=> NEW.name) OR
+          NOT (OLD.email <=> NEW.email) OR
+          NOT (OLD.phone <=> NEW.phone) OR
+          NOT (OLD.role_id <=> NEW.role_id) OR
+          NOT (OLD.designation_id <=> NEW.designation_id) OR
+          NOT (OLD.is_signatory_eligible <=> NEW.is_signatory_eligible) OR
+          NOT (OLD.is_super_admin <=> NEW.is_super_admin) OR
+          NOT (OLD.is_active <=> NEW.is_active) OR
+          NOT (OLD.is_protected_account <=> NEW.is_protected_account)
+        ) THEN
+       SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot change a protected founder account — its identity, role, designation, eligibility and Super Admin/active status can never be edited through the application.';
+     END IF;
+   END$$
+   DELIMITER ;
+   ```
+   Check it is back with `SHOW TRIGGERS LIKE 'users';` (you should see
+   `trg_users_protected_bu`). The three company settings can also be changed
+   later in Admin › Company settings; the two founder logins can't — the app
+   refuses on purpose — so use this block for them (it is safe to run again
+   later to correct a typo). Signature blocks on documents print the
+   signatory's `users.name` (and `md_name` where no signatory is chosen), so
+   these lines are what make the real names appear on PDFs. You then log in
+   with the real e-mail and the seeded password below. This step is also on
+   the go-live checklist.
 4. **Install Chromium** (for PDF generation):
    ```bash
    sudo apt install -y chromium              # Ubuntu — binary is /usr/bin/chromium
@@ -233,8 +277,8 @@ storage/
 
 9. **Log in** at `https://www.example.com/login` with a seeded account
    (both are Super Admin, both the same password):
-   - Email: `gulmohar.sontakke@nexacrestinternational.com`
-   - Email: `arti.sontakke@nexacrestinternational.com`
+   - Email: `md@email.com`
+   - Email: `ed@email.com`
    - Password: `ChangeMe#2026`
 
    You'll be forced onto `/force-password-change` immediately (by design —

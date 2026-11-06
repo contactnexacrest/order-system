@@ -17,9 +17,9 @@ const PASSWORD = 'PlaywrightTest#2026';
 // so their *behavior* is identical, but each is still its own literal
 // role and login, tested as such rather than assumed from the others.
 const ROLES = {
-  admin: { email: 'gulmohar.sontakke@nexacrestinternational.com', name: 'Gulmohar Sontakke' },
+  admin: { email: 'md@email.com', name: 'Managing Director' },
   adminRole: { email: 'ui-test-admin@nexacrest.test', name: 'UI Test Admin' },
-  executiveDirector: { email: 'arti.sontakke@nexacrestinternational.com', name: 'Arti Sontakke' },
+  executiveDirector: { email: 'ed@email.com', name: 'Executive Director' },
   exportExecutive: { email: 'ui-test-export-exec@nexacrest.test', name: 'UI Test Export Exec' },
   accountsExecutive: { email: 'ui-test-accounts-exec@nexacrest.test', name: 'UI Test Accounts Exec' },
   logisticsExecutive: { email: 'ui-test-logistics-exec@nexacrest.test', name: 'UI Test Logistics Exec' },

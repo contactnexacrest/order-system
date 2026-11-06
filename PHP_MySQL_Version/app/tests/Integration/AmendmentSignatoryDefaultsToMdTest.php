@@ -36,7 +36,7 @@ final class AmendmentSignatoryDefaultsToMdTest extends DbTestCase
     {
         $block = DocumentDataAssembler::signatoryBlock($this->amdDocumentTypeId());
 
-        self::assertSame('Gulmohar Sontakke', $block['name']);
+        self::assertSame('Managing Director', $block['name']);
         self::assertSame('Founder & Managing Director', $block['designation']);
         self::assertTrue($block['used_designation_seal'], 'AMD is seeded to show the resolved signatory\'s own designation seal, not just the company seal.');
     }
@@ -54,7 +54,7 @@ final class AmendmentSignatoryDefaultsToMdTest extends DbTestCase
         $original->execute(['dt' => $amdTypeId]);
         $originalRow = $original->fetch();
 
-        $superAdminId = (int) $pdo->query("SELECT id FROM users WHERE email = 'gulmohar.sontakke@nexacrestinternational.com'")->fetchColumn();
+        $superAdminId = (int) $pdo->query("SELECT id FROM users WHERE email = 'md@email.com'")->fetchColumn();
 
         $financeHeadDesignationId = SignatoryRepository::createDesignation('Finance Head', $superAdminId);
         $financeHeadUserId = $this->createTestUser('Export Executive');

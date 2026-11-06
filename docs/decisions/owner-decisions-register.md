@@ -2,7 +2,7 @@
 
 **Last updated 6 Nov 2026**
 
-Owner: Gulmohar Sontakke, Founder & MD, NexaCrest International. Applies to both stacks (`PHP_MySQL_Version` and `NODE_MySQL_Version`). All dates are 2026.
+Owner: Managing Director, Founder & MD, NexaCrest International. Applies to both stacks (`PHP_MySQL_Version` and `NODE_MySQL_Version`). All dates are 2026.
 
 ## How to use this register
 

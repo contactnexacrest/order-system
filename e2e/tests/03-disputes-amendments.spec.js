@@ -153,9 +153,9 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
     await expect(page.locator('.alert')).toContainText('added as an assignee');
 
     await generateDocument(page, orderId, 'QT', 'generated');
-    await adminAssignSelfAndApprove(page, 'QT', 'Gulmohar Sontakke');
+    await adminAssignSelfAndApprove(page, 'QT', 'Managing Director');
     await generateDocument(page, orderId, 'BUYERPO', 'generated');
-    await adminAssignSelfAndApprove(page, 'BUYERPO', 'Gulmohar Sontakke');
+    await adminAssignSelfAndApprove(page, 'BUYERPO', 'Managing Director');
 
     await openStage(page, 2);
     const uploadForm = page.locator(`form[action="/orders/${orderId}/buyer-po/documents"]`);
@@ -177,7 +177,7 @@ test.describe.serial('Disputes and Amendments — order lifecycle side-flows', (
     await piSkip.getByRole('button', { name: /Skip PI Form/ }).click();
     await expect(page.locator('.alert')).toContainText('PI-stage form skipped');
     await generateDocument(page, orderId, 'PI', 'generated');
-    await adminAssignSelfAndApprove(page, 'PI', 'Gulmohar Sontakke');
+    await adminAssignSelfAndApprove(page, 'PI', 'Managing Director');
 
     await openStage(page, 3);
     const recordForm = page.locator(`form[action="/orders/${orderId}/payment/advance"]`);

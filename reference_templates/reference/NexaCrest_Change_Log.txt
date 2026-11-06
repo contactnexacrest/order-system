@@ -2342,7 +2342,7 @@ All 4 images replaced with new JPEG versions (white background, smaller files):
   company_seal.png      — 174,806 bytes  — Round "Seamless. Secure. Trusted" seal
                           (was 1,159,328 bytes RGBA PNG — now JPEG, 85% smaller)
   gs_signature.png      — 11,086 bytes   — GS handwritten signature (unchanged)
-  director_seal.png     — 249,682 bytes  — DIRECTOR / GULMOHAR SONTAKKE seal
+  director_seal.png     — 249,682 bytes  — DIRECTOR / MANAGING DIRECTOR seal
                           (was 1,524,669 bytes RGBA PNG — now JPEG, 84% smaller)
 
   APP ACTION: Update image assets in app with new JPEG versions from assets/ folder

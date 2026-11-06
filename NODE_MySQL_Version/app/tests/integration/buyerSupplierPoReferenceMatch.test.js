@@ -32,10 +32,10 @@ describe('Buyer PO / Supplier PO — reference document match', () => {
       corporate_office: 'Evolve Work Studio, 4th Floor, The Hub @ Raj Serenity, Khatha No. 10, Begur Koppa Road, Yelenahalli, Bengaluru – 560068, Karnataka, India',
       gstin: '29AAKCN8733G1ZZ',
       iec_pan: 'AAKCN8733G',
-      md_name: 'Gulmohar Sontakke',
+      md_name: 'Managing Director',
       md_title: 'Founder & Managing Director',
       phone: '+91-7676463030',
-      email: 'gulmohar.sontakke@nexacrestinternational.com',
+      email: 'md@email.com',
     },
     meta: { document_reference: 'SC/PO/2026/3009001', client_revision_label: 'Rev.00', generated_date: '30 September 2026' },
     order: {
@@ -52,7 +52,7 @@ describe('Buyer PO / Supplier PO — reference document match', () => {
     },
     products: [{ description: 'Test Granite Slab', quantity: 100, unit: 'm²', unit_price: 25.5 }],
     financial: { fob_value: '2,550.00', advance_pct: 40, balance_pct: 60, balance_terms_text: 'within 3 working days.' },
-    signatory: { name: 'Gulmohar Sontakke', designation: 'Founder & Managing Director', signature_data_uri: null, seal_data_uri: null },
+    signatory: { name: 'Managing Director', designation: 'Founder & Managing Director', signature_data_uri: null, seal_data_uri: null },
     terms: ['PAYMENT TERMS FINALITY: test clause text.', 'DISPUTE RESOLUTION: test clause text.'],
   };
 

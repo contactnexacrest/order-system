@@ -171,7 +171,7 @@ INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES
 -- means you'll be made to set a new one on first login regardless.
 -- ================================================================
 INSERT INTO users (name, email, phone, password_hash, role_id, is_active, force_password_change, two_fa_enabled)
-SELECT 'Gulmohar Sontakke', 'gulmohar.sontakke@nexacrestinternational.com', NULL,
+SELECT 'Managing Director', 'md@email.com', NULL,
        '$2y$12$SRa3a47hKlgsRGskEZfWJerGPgxLI8jSnVlckkHENnfs9VRao/You',
        r.id, 1, 1, 0
 FROM roles r WHERE r.name = 'Managing Director';
@@ -631,12 +631,12 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('corporate_office',      'Evolve Work Studio, 4th Floor, The Hub @ Raj Serenity, Khatha No. 10, Begur Koppa Road, Yelenahalli, Bengaluru – 560068, Karnataka, India', 'string', 'company', 'Corporate/working office address, if different.', 0),
   ('gstin',                 '29AAKCN8733G1ZZ',                          'string', 'company', 'GST Identification Number.', 1),
   ('iec_pan',               'AAKCN8733G',                               'string', 'company', 'Import Export Code / PAN.', 1),
-  ('md_name',               'Gulmohar Sontakke',                        'string', 'company', 'Founder & Managing Director name, for document signature blocks.', 0),
+  ('md_name',               'Managing Director',                        'string', 'company', 'Founder & Managing Director name, for document signature blocks.', 0),
   ('md_title',              'Founder & Managing Director',              'string', 'company', 'MD title as shown on documents.', 0),
-  ('director_name',         'Gulmohar Sontakke',                        'string', 'company', 'Director name, if a director signature is used on any document (open question — confirm whether this is needed; QT/PI/OC templates only show the MD signature block).', 0),
+  ('director_name',         'Managing Director',                        'string', 'company', 'Director name, if a director signature is used on any document (open question — confirm whether this is needed; QT/PI/OC templates only show the MD signature block).', 0),
   ('director_title',        'Director',                                 'string', 'company', 'Director title as shown on documents.', 0),
   ('phone',                 '+91-7676463030',                           'string', 'company', 'Company contact phone number.', 0),
-  ('email',                 'gulmohar.sontakke@nexacrestinternational.com', 'string', 'company', 'Company contact email address.', 0),
+  ('email',                 'info@email.com', 'string', 'company', 'Company contact email address.', 0),
   ('bank_name',             'State Bank of India',                      'string', 'bank',    'Bank name for buyer remittances.', 1),
   ('bank_branch',           'Start Up Hub Branch, Koramangala, Bengaluru', 'string', 'bank',  'Bank branch name.', 1),
   ('bank_account_no',       '44523788330',                              'string', 'bank',    'Bank account number.', 1),
@@ -906,19 +906,19 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
 -- (Set 1's embedded media) rather than generic placeholders.
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'logo', 'NexaCrest Logo', '__STORAGE_BASE_PATH__/assets/logos/logo.jpg', 'image/jpeg', 1, u.id
-FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+FROM users u WHERE u.email = 'md@email.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
-SELECT 'signature', 'Gulmohar Sontakke — Signature (legacy global slot, superseded by user_signature_assets)', '__STORAGE_BASE_PATH__/assets/signatures/gulmohar_sontakke_signature_default.png', 'image/png', 1, u.id
-FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+SELECT 'signature', 'Managing Director — Signature (legacy global slot, superseded by user_signature_assets)', '__STORAGE_BASE_PATH__/assets/signatures/md_signature_default.png', 'image/png', 1, u.id
+FROM users u WHERE u.email = 'md@email.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'seal', 'Company Seal', '__STORAGE_BASE_PATH__/assets/seals/company_seal.png', 'image/png', 1, u.id
-FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+FROM users u WHERE u.email = 'md@email.com';
 
 INSERT INTO assets (asset_type, name, server_path, mime_type, is_active, uploaded_by)
 SELECT 'watermark', 'Watermark — Logo', '__STORAGE_BASE_PATH__/assets/watermarks/watermark_logo.jpg', 'image/jpeg', 1, u.id
-FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+FROM users u WHERE u.email = 'md@email.com';
 
 -- 90-item backlog #7: the two watermark_settings rows above are seeded
 -- with mode='both' but this INSERT never set their image_asset_id (it
@@ -936,11 +936,11 @@ WHERE ws.mode IN ('image', 'both') AND ws.image_asset_id IS NULL;
 -- SIGNATORIES & DESIGNATIONS (Section M, added 2026-09-20)
 -- The company seal above stays the single shared company asset. The two
 -- Directors below each carry their own real signature/designation-seal
--- images, extracted from the source documents (Gulmohar Sontakke) and
--- supplied directly by the company (Arti Sontakke).
+-- images, extracted from the source documents (Managing Director) and
+-- supplied directly by the company (Executive Director).
 -- ================================================================
 -- 'Director' kept as a generic, unused-by-default title for any future
--- signatory who isn't a protected founder account. Gulmohar and Arti each
+-- signatory who isn't a protected founder account. The Managing Director and the Executive Director each
 -- get their own specific designation below instead, since that title is
 -- what's printed on generated documents next to their signature/seal.
 INSERT INTO designations (title, is_active) VALUES
@@ -948,52 +948,52 @@ INSERT INTO designations (title, is_active) VALUES
   ('Founder & Managing Director', 1),
   ('Founder & Executive Director', 1);
 
--- Gulmohar Sontakke already exists as the seeded Admin login
--- (gulmohar.sontakke@nexacrestinternational.com) — mark her signatory-eligible with her
+-- The Managing Director already exists as the seeded Admin login
+-- (md@email.com) — mark the account signatory-eligible with its
 -- own designation and set her as the company's global default signatory,
 -- matching the existing company_settings.md_name/md_title.
 UPDATE users u
 JOIN designations d ON d.title = 'Founder & Managing Director'
 SET u.designation_id = d.id, u.is_signatory_eligible = 1
-WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+WHERE u.email = 'md@email.com';
 
 -- Role: Executive Director, matching her real designation — she IS one of
 -- the company's two founders and will be marked is_protected_account below
 -- (Section Z), so this is a one-time correction, not something meant to be
 -- revisited from the Users screen the way an ordinary account's role would be.
 INSERT INTO users (name, email, phone, password_hash, role_id, designation_id, is_signatory_eligible, is_active, force_password_change, two_fa_enabled)
-SELECT 'Arti Sontakke', 'arti.sontakke@nexacrestinternational.com', NULL,
+SELECT 'Executive Director', 'ed@email.com', NULL,
        '$2y$12$SRa3a47hKlgsRGskEZfWJerGPgxLI8jSnVlckkHENnfs9VRao/You',
        r.id, d.id, 1, 1, 1, 0
 FROM roles r, designations d WHERE r.name = 'Executive Director' AND d.title = 'Founder & Executive Director';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
-SELECT u.id, 'signature', 'Default', '__STORAGE_BASE_PATH__/assets/signatures/gulmohar_sontakke_signature_default.png', 'image/png', 1, 1, u.id
-FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+SELECT u.id, 'signature', 'Default', '__STORAGE_BASE_PATH__/assets/signatures/md_signature_default.png', 'image/png', 1, 1, u.id
+FROM users u WHERE u.email = 'md@email.com';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
-SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/designation_seals/gulmohar_sontakke_director_seal.png', 'image/png', 1, 1, u.id
-FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/designation_seals/md_director_seal.png', 'image/png', 1, 1, u.id
+FROM users u WHERE u.email = 'md@email.com';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
-SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/designation_seals/arti_sontakke_director_seal.webp', 'image/webp', 1, 1,
-       (SELECT id FROM users WHERE email = 'gulmohar.sontakke@nexacrestinternational.com')
-FROM users u WHERE u.email = 'arti.sontakke@nexacrestinternational.com';
+SELECT u.id, 'designation_seal', 'Director Seal', '__STORAGE_BASE_PATH__/assets/designation_seals/ed_director_seal.webp', 'image/webp', 1, 1,
+       (SELECT id FROM users WHERE email = 'md@email.com')
+FROM users u WHERE u.email = 'ed@email.com';
 
 INSERT INTO user_signature_assets (user_id, asset_kind, label, server_path, mime_type, is_default_for_kind, is_active, uploaded_by)
-SELECT u.id, 'signature', 'Default', '__STORAGE_BASE_PATH__/assets/signatures/arti_sontakke_signature_default.png', 'image/png', 1, 1, u.id
-FROM users u WHERE u.email = 'arti.sontakke@nexacrestinternational.com';
+SELECT u.id, 'signature', 'Default', '__STORAGE_BASE_PATH__/assets/signatures/ed_signature_default.png', 'image/png', 1, 1, u.id
+FROM users u WHERE u.email = 'ed@email.com';
 
 -- ================================================================
 -- SUPER ADMIN TIER (Section N, added 2026-09-20)
 -- Both founders are the initial permanent Super Admins — real-world
--- Gulmohar Sontakke is NexaCrest's Founder & Managing Director and Arti
--- Sontakke its Founder & Executive Director, the obvious first holders of
+-- The Managing Director is NexaCrest's Founder & MD and the Executive
+-- Director its Founder & ED, the obvious first holders of
 -- the unrestricted tier. Promote/demote further (non-founder) holders
 -- from /super-admin once logged in.
 -- ================================================================
 UPDATE users SET is_super_admin = 1
-WHERE email IN ('gulmohar.sontakke@nexacrestinternational.com', 'arti.sontakke@nexacrestinternational.com');
+WHERE email IN ('md@email.com', 'ed@email.com');
 
 -- ================================================================
 -- PROTECTED FOUNDER ACCOUNTS (Section Z, added 2026-09-23)
@@ -1007,11 +1007,11 @@ WHERE email IN ('gulmohar.sontakke@nexacrestinternational.com', 'arti.sontakke@n
 -- this seed script included.
 -- ================================================================
 UPDATE users SET is_protected_account = 1
-WHERE email IN ('gulmohar.sontakke@nexacrestinternational.com', 'arti.sontakke@nexacrestinternational.com');
+WHERE email IN ('md@email.com', 'ed@email.com');
 
--- Global default signatory = Gulmohar Sontakke (matches legacy md_name).
+-- Global default signatory = the Managing Director (matches legacy md_name).
 INSERT INTO company_default_signatory (id, user_id, updated_by)
-SELECT 1, u.id, u.id FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+SELECT 1, u.id, u.id FROM users u WHERE u.email = 'md@email.com';
 
 -- The personal designation seal is DocumentDataAssembler::signatoryBlock()'s
 -- default for every document type (confirmed against the real source
@@ -1023,7 +1023,7 @@ SELECT 1, u.id, u.id FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestin
 INSERT INTO document_type_signatories (document_type_id, user_id, use_designation_seal, updated_by)
 SELECT dt.id, u.id, 1, u.id
 FROM document_types dt, users u
-WHERE dt.code = 'AMD' AND u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+WHERE dt.code = 'AMD' AND u.email = 'md@email.com';
 
 -- ================================================================
 -- INTERNAL REFERENCE LIBRARY (Section R, added 2026-09-21)
@@ -1148,7 +1148,7 @@ Use this checklist when preparing and issuing: Quotation → PI → Order Confir
 - If Annexure A is attached — Annexure shows correct document number (QT or PI number) (Quotation: QT number on Annexure. PI: PI number on Annexure. Never carry over old number.)
 - If Annexure A is attached — product descriptions in Annexure match product table exactly (Any mismatch = confusion for buyer. Fix before sending.)
 - If Annexure A is attached — Annexure reference line present in T&C of QT/PI
-- If Annexure A is attached — Annexure is signed and sealed by Gulmohar Sontakke (Unsigned Annexure is a hanging document with no legal authority. Never send unsigned.) ⚠ An unsigned Annexure can be modified by anyone — always sign before sending
+- If Annexure A is attached — Annexure is signed and sealed by the Managing Director (Unsigned Annexure is a hanging document with no legal authority. Never send unsigned.) ⚠ An unsigned Annexure can be modified by anyone — always sign before sending
 - If Annexure A is attached — Annexure PDF is merged with main QT/PI PDF into ONE file before sending to buyer (Export QT/PI to PDF → Export Annexure to PDF → Merge into one PDF → Send ONE file to buyer. Never send as two separate files.) ⚠ Buyer must receive a single PDF — not two separate documents
 - If NO Annexure — delete the Annexure reference line from T&C before sending ⚠ Sending a document that says Annexure is attached when it is not = unprofessional and confusing
 
@@ -1321,7 +1321,7 @@ Use this checklist from Packing List finalisation through BL endorsement and doc
 
 ## F. 60% Balance Confirmed Cleared — BL Endorsement
 - ONLY after Accounts confirms 60% balance T/T is CLEARED in NexaCrest SBI account. Do not endorse or courier BL originals based on buyer''s remittance copy alone. Wait for bank clearance confirmation — then proceed.
-- BL ENDORSEMENT — on the BACK of each of the 3 original BLs: apply NexaCrest rubber company stamp; sign over the stamp: Gulmohar Sontakke (wet signature or rubber signature stamp); write date of endorsement; write: For NexaCrest International Private Limited. All 3 originals must be endorsed before couriering. Check all 3 — not just one.
+- BL ENDORSEMENT — on the BACK of each of the 3 original BLs: apply NexaCrest rubber company stamp; sign over the stamp: the Managing Director (wet signature or rubber signature stamp); write date of endorsement; write: For NexaCrest International Private Limited. All 3 originals must be endorsed before couriering. Check all 3 — not just one.
 - All 3 original BLs endorsed (stamp + signature + date on back of each)
 - Endorsed originals couriered to buyer with tracking number recorded
 
@@ -1430,7 +1430,7 @@ FROM document_types dt WHERE dt.code = 'SOP_B_SALES';
 -- ================================================================
 INSERT INTO hs_codes (code, description, is_active, created_by)
 SELECT '680293', 'Worked monumental or building stone (granite, etc.) and articles thereof', 1, u.id
-FROM users u WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+FROM users u WHERE u.email = 'md@email.com';
 
 -- ================================================================
 -- HS CODE BULK IMPORT + PRODUCT GUIDE (Section AL) — the business's own
@@ -1459,7 +1459,7 @@ FROM (
   UNION ALL SELECT '68029900', 'Other worked stone', NULL
 ) v
 CROSS JOIN users u
-WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com'
+WHERE u.email = 'md@email.com'
   AND NOT EXISTS (SELECT 1 FROM hs_codes existing WHERE existing.code = v.code);
 
 INSERT INTO hs_code_product_examples (product_description, code_reference, note, sort_order, created_by)
@@ -1477,7 +1477,7 @@ FROM (
   UNION ALL SELECT 10, 'Granite vase', '68029300', 'Carved 3D article'
 ) v
 CROSS JOIN users u
-WHERE u.email = 'gulmohar.sontakke@nexacrestinternational.com';
+WHERE u.email = 'md@email.com';
 
 -- Client-verification reference documents (Factory/Quarry SOPs and
 -- agreement templates) plus the company's own blank legal-document
