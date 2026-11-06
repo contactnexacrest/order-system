@@ -627,7 +627,7 @@ INSERT INTO file_upload_contexts (context_key, allowed_extensions, max_size_byte
 -- templates against those actual documents.
 INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
   ('legal_name',            'NexaCrest International Private Limited', 'string', 'company', 'Full legal company name as it appears on all documents.', 0),
-  ('registered_office',     'No. 33, T Ramaiah Garden, 2 Hulimavu Village, Hulimavu, Bangalore South, Bengaluru, Karnataka – 560076, India', 'string', 'company', 'Registered office address.', 0),
+  ('registered_office',     'Registered office address, City – 000000, India', 'string', 'company', 'Registered office address.', 0),
   ('corporate_office',      'Evolve Work Studio, 4th Floor, The Hub @ Raj Serenity, Khatha No. 10, Begur Koppa Road, Yelenahalli, Bengaluru – 560068, Karnataka, India', 'string', 'company', 'Corporate/working office address, if different.', 0),
   ('gstin',                 '29AAKCN8733G1ZZ',                          'string', 'company', 'GST Identification Number.', 1),
   ('iec_pan',               'AAKCN8733G',                               'string', 'company', 'Import Export Code / PAN.', 1),

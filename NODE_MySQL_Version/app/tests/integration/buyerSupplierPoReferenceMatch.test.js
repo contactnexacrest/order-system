@@ -28,7 +28,7 @@ describe('Buyer PO / Supplier PO — reference document match', () => {
   const baseContext = {
     company: {
       legal_name: 'NexaCrest International Private Limited',
-      registered_office: 'No. 33, T Ramaiah Garden, 2 Hulimavu Village, Hulimavu, Bangalore South, Bengaluru, Karnataka – 560076, India',
+      registered_office: 'Registered office address, City – 000000, India',
       corporate_office: 'Evolve Work Studio, 4th Floor, The Hub @ Raj Serenity, Khatha No. 10, Begur Koppa Road, Yelenahalli, Bengaluru – 560068, Karnataka, India',
       gstin: '29AAKCN8733G1ZZ',
       iec_pan: 'AAKCN8733G',
