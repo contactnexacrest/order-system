@@ -49,7 +49,7 @@ Prepared 5 Nov 2026 (Phase 0C.1), updated 6 Nov 2026. Work through it top to bot
 
 ## C. First login and company setup
 
-- [ ] Put in the real logins and company details: the seed has role placeholders only (md@email.com, ed@email.com, "Managing Director", info@email.com). Run the "Set the real logins and company details" SQL in the README (First-time setup): it lifts the founder-account protection trigger for a moment, sets the real names and e-mails, and puts the trigger back (check with `SHOW TRIGGERS LIKE 'users';`). The company settings can also be changed in Admin › Company settings; the founder logins only through this SQL. No real name or e-mail is ever written into the repository.
+- [ ] Put in the real logins and company details: the seed has role placeholders only (md@email.com, ed@email.com, "Managing Director", info@email.com, phone +91-0000000000). Run the "Set the real logins and company details" SQL in the README (First-time setup): it lifts the founder-account protection trigger for a moment, sets the real names and e-mails, and puts the trigger back (check with `SHOW TRIGGERS LIKE 'users';`). The company settings can also be changed in Admin › Company settings; the founder logins only through this SQL. No real name or e-mail is ever written into the repository.
 - [ ] Log in with the real MD e-mail and the seeded password, and set a new password. Turn on 2FA.
 - [ ] **Company settings** (`/settings`): the real company details are already seeded — check each once (README, "Placeholder values you must replace before going live"):
   - [ ] director name, bank details and pincode;

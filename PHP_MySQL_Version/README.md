@@ -149,6 +149,7 @@ correctly once the password is changed.
    UPDATE company_settings SET setting_value = 'Real MD Name'           WHERE setting_key = 'md_name';
    UPDATE company_settings SET setting_value = 'Real Director Name'     WHERE setting_key = 'director_name';
    UPDATE company_settings SET setting_value = 'info@yourcompany.com'   WHERE setting_key = 'email';
+   UPDATE company_settings SET setting_value = '+91-XXXXXXXXXX'         WHERE setting_key = 'phone';   -- the real company phone (seeded as +91-0000000000)
    UPDATE assets SET name = REPLACE(name, 'Managing Director', 'Real MD Name') WHERE name LIKE 'Managing Director%';
    DELIMITER $$
    CREATE TRIGGER trg_users_protected_bu BEFORE UPDATE ON users

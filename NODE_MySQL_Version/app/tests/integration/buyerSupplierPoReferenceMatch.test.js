@@ -34,7 +34,7 @@ describe('Buyer PO / Supplier PO — reference document match', () => {
       iec_pan: 'AAKCN8733G',
       md_name: 'Managing Director',
       md_title: 'Founder & Managing Director',
-      phone: '+91-7676463030',
+      phone: '+91-0000000000',
       email: 'md@email.com',
     },
     meta: { document_reference: 'SC/PO/2026/3009001', client_revision_label: 'Rev.00', generated_date: '30 September 2026' },
