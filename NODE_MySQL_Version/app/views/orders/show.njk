@@ -557,7 +557,7 @@
         <tr data-compliance-row>
           <td>{{ ct.task_type_name }}
             <input type="hidden" name="tasks[{{ i }}][task_type_id]" value="{{ ct.task_type_id }}">
-            {% if ct.task_type_name == 'Pre-Shipment Inspection' and inspection %}{# Gap list G-3 #}<br><span class="badge {{ 'badge-active' if inspection.result == 'passed' else 'badge-lost' }}">{{ 'Passed' if inspection.result == 'passed' else 'Failed' }}</span> <small class="muted">{{ inspection.inspected_on | shortDate }} · {{ inspection.agency_name }}</small>{% endif %}
+            {% if (ct.task_key == 'pre_shipment_inspection' or (not ct.task_key and ct.task_type_name == 'Pre-Shipment Inspection')) and inspection %}{# Gap list G-3; D-262 fixed task key #}<br><span class="badge {{ 'badge-active' if inspection.result == 'passed' else 'badge-lost' }}">{{ 'Passed' if inspection.result == 'passed' else 'Failed' }}</span> <small class="muted">{{ inspection.inspected_on | shortDate }} · {{ inspection.agency_name }}</small>{% endif %}
             {% if ct.resolved_at %}<br><span class="muted small">{{ ct.resolved_at }}{% if ct.resolved_by_name %} by {{ ct.resolved_by_name }}{% endif %}</span>{% endif %}
           </td>
           <td>
@@ -1635,6 +1635,25 @@
 
   <details class="step-card" id="step-1-quotation-prepare"{{ stepCardOpen('s1') }}>
     <summary>{{ stepStatusIcon(stepStates['s1']) }}<span class="step-group-num">STEP 1</span><h2>Prepare Quotation</h2></summary>
+    {# D-262: since the PI was approved the order keeps its own copy of the T&C, tolerance and company details. #}
+    {% if frozenSnapshot %}
+      {% set __fc = frozenSnapshot.company or {} %}
+      <div id="company-details-snapshot" class="notice">
+        <p class="small"><strong>Kept with this order since the PI was approved ({{ order.frozen_at | shortDate }}):</strong>
+          the T&amp;C, tolerance {{ frozenTolerance }}% and validity days, the payment terms approval rule and the company details —
+          bank {{ __fc.bank_name or '' }} a/c {{ __fc.bank_account_no or '' }},
+          LUT {{ __fc.lut_number or '' }}.
+          Later changes in Settings do not change this order's documents.{% if frozenSnapshot.company_refreshed_at %} Company details refreshed {{ frozenSnapshot.company_refreshed_at | shortDate }}.{% endif %}</p>
+        {% if viewerIsMd %}
+          <form method="post" action="/orders/{{ order.id }}/company-details/refresh" class="inline-form">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <label>Reason for using today's company details *
+              <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Bank account changed to the new SBI current account"></label>
+            <button type="submit" class="btn-sm" data-confirm="Use today's company details (bank, LUT, IEC, address) on this order's next documents?">Refresh company details on this order</button>
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
     {# Owner decision D-245 P2: a line below its floor (or without a price) needs the MD's approval before the Quotation. #}
     {% if qtBlockReason %}
       <p class="notice notice-error">The Quotation cannot be generated yet: {{ qtBlockReason }} (<a href="#price-check" data-focus-link>Price check</a>)</p>

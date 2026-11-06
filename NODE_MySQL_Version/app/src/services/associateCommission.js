@@ -287,6 +287,8 @@ async function realisedRate(order) {
  */
 async function usdRate(order) {
   if (String(order.currency_code || '').toUpperCase() === 'USD') return (await realisedRate(order)).rate;
+  // D-262 / D-245: the pricing exchange rate frozen with the order when its PI was approved.
+  if (order.pricing_fx_rate_at_pi !== null && order.pricing_fx_rate_at_pi !== undefined && Number(order.pricing_fx_rate_at_pi) > 0) return Number(order.pricing_fx_rate_at_pi);
   return Number((await pricingRepository.settings()).pricing_fx_rate || 0);
 }
 
@@ -362,12 +364,19 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
  */
 async function gstFor(payout) {
   if ((payout.payee_kind || '') !== 'associate' || Number(payout.amount_inr) <= 0) return 0;
-  const a = await require('../repositories/associateRepository').find(Number(payout.associate_id));
-  if (!a || String(a.gstin || '').trim() === '' || !(await require('../repositories/associateDocumentRepository').invoiceForPayout(Number(payout.id)))) return 0;
+  // D-262: the GSTIN and GST % frozen on the payout when it was locked; live only for payouts made before that.
+  let gstin;
+  if (payout.associate_gstin !== null && payout.associate_gstin !== undefined) gstin = String(payout.associate_gstin);
+  else {
+    const a = await require('../repositories/associateRepository').find(Number(payout.associate_id));
+    gstin = String((a && a.gstin) || '');
+  }
+  if (gstin.trim() === '' || !(await require('../repositories/associateDocumentRepository').invoiceForPayout(Number(payout.id)))) return 0;
   const base = payout.paid_inr !== null && payout.paid_inr !== undefined
     ? Number(payout.paid_inr) + Number(payout.tds_inr || 0)
     : Number(payout.amount_inr);
-  return round2(base * (await settings()).gst_pct / 100);
+  const pct = payout.gst_pct !== null && payout.gst_pct !== undefined ? Number(payout.gst_pct) : (await settings()).gst_pct;
+  return round2(base * pct / 100);
 }
 
 /** Owner rule D-212: what a commission payout is — for which order and associate, what it settles, and the bank reference once paid. */

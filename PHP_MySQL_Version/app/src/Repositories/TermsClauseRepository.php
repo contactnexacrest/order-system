@@ -30,7 +30,47 @@ final class TermsClauseRepository
      *
      * @return array<int, array{title:string, text:string, is_locked:bool}>
      */
-    public static function forDocumentTypeCodeAndGroup(string $documentTypeCode, string $clauseGroup, ?string $balanceTriggerOption, ?array $clauseSets = null): array
+    /** @var array<string, list<array<string,mixed>>>|null D-262: an order's frozen clauses while its documents are made */
+    private static ?array $snapshot = null;
+
+    /**
+     * Sets the frozen clauses read instead of tc_clauses (null clears them).
+     *
+     * @param array<string, list<array<string,mixed>>>|null $rows "CODE|group" => the rows the live query returned
+     * @return array<string, list<array<string,mixed>>>|null the previous snapshot, to restore
+     */
+    public static function setSnapshot(?array $rows): ?array
+    {
+        $previous = self::$snapshot;
+        self::$snapshot = $rows === [] ? null : $rows;
+        return $previous;
+    }
+
+    /**
+     * D-262: every document type's clauses in every group, exactly as the live query returns them —
+     * what an order keeps when its PI is approved.
+     *
+     * @return array<string, list<array<string,mixed>>>
+     */
+    public static function captureAll(): array
+    {
+        $pdo = Database::connection();
+        $codes = $pdo->query('SELECT code FROM document_types ORDER BY code')->fetchAll(\PDO::FETCH_COLUMN);
+        $groups = $pdo->query('SELECT DISTINCT clause_group FROM tc_clauses ORDER BY clause_group')->fetchAll(\PDO::FETCH_COLUMN);
+        $out = [];
+        foreach ($codes as $code) {
+            foreach ($groups as $group) {
+                $rows = self::liveRows((string) $code, (string) $group);
+                if ($rows !== []) {
+                    $out[$code . '|' . $group] = $rows;
+                }
+            }
+        }
+        return $out;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function liveRows(string $documentTypeCode, string $clauseGroup): array
     {
         $stmt = Database::connection()->prepare(
             'SELECT c.clause_title, c.clause_text, c.is_locked, c.visibility_rule, c.clause_set
@@ -41,7 +81,14 @@ final class TermsClauseRepository
              ORDER BY c.clause_order'
         );
         $stmt->execute(['code' => $documentTypeCode, 'clause_group' => $clauseGroup]);
-        $rows = $stmt->fetchAll();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public static function forDocumentTypeCodeAndGroup(string $documentTypeCode, string $clauseGroup, ?string $balanceTriggerOption, ?array $clauseSets = null): array
+    {
+        $rows = self::$snapshot !== null
+            ? (self::$snapshot[$documentTypeCode . '|' . $clauseGroup] ?? [])
+            : self::liveRows($documentTypeCode, $clauseGroup);
 
         // D-257 Phase 1: a clause with a clause set prints only when one of the
         // order's categories uses that set; an empty set = every order (today's

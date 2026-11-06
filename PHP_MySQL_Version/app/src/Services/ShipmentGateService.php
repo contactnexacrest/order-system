@@ -25,6 +25,15 @@ use App\Repositories\OrderRepository;
 final class ShipmentGateService
 {
     public const INSPECTION_TASK = 'Pre-Shipment Inspection';
+    /** D-262: the fixed code of the inspection task (renaming the task never switches the gate off). */
+    public const INSPECTION_TASK_KEY = 'pre_shipment_inspection';
+
+    /** @param array<string,mixed> $task a checklist row (OrderComplianceTaskRepository::forOrder) */
+    public static function isInspectionTask(array $task): bool
+    {
+        return ($task['task_key'] ?? null) === self::INSPECTION_TASK_KEY
+            || (($task['task_key'] ?? null) === null && ($task['task_type_name'] ?? null) === self::INSPECTION_TASK);
+    }
 
     public const MESSAGES = [
         'balance' => 'This order\'s balance is due before shipment: record and clear the balance (Steps 11c and 11d) before recording the Bill of Lading.',
@@ -51,7 +60,7 @@ final class ShipmentGateService
     public static function inspectionApplies(int $orderId): bool
     {
         foreach (OrderComplianceTaskRepository::forOrder($orderId) as $task) {
-            if ($task['task_type_name'] === self::INSPECTION_TASK && $task['status'] !== 'skipped') {
+            if (self::isInspectionTask($task) && $task['status'] !== 'skipped') {
                 return true;
             }
         }
@@ -103,7 +112,7 @@ final class ShipmentGateService
         )->execute(['o' => $orderId, 'r' => $result, 'd' => $date, 'a' => $agency, 'f' => $fileId, 'n' => $note, 'u' => $userId]);
         \App\Repositories\AuditLogRepository::log($userId, 'INSPECTION_RESULT_RECORDED', 'orders', $orderId, 'inspection_result', $before['result'] ?? null, $result, $note);
         foreach (OrderComplianceTaskRepository::forOrder($orderId) as $task) {
-            if ($task['task_type_name'] === self::INSPECTION_TASK) {
+            if (self::isInspectionTask($task)) {
                 OrderComplianceTaskRepository::setStatus($orderId, (int) $task['task_type_id'], $result === 'passed' ? 'approved' : 'pending_approval', null, $userId);
             }
         }

@@ -24,8 +24,27 @@ final class CompanySettingsRepository
         return $stmt->fetchAll();
     }
 
+    /** @var array<string, ?string> D-262: an order's frozen company values while its documents are made (OrderSnapshotService::within). */
+    private static array $overlay = [];
+
+    /**
+     * Sets the frozen values get() returns first (an empty array clears them).
+     *
+     * @param array<string, ?string> $values
+     * @return array<string, ?string> the previous overlay, to restore
+     */
+    public static function setOverlay(array $values): array
+    {
+        $previous = self::$overlay;
+        self::$overlay = $values;
+        return $previous;
+    }
+
     public static function get(string $key): ?string
     {
+        if (self::$overlay !== [] && array_key_exists($key, self::$overlay)) {
+            return self::$overlay[$key] === null ? null : (string) self::$overlay[$key];
+        }
         // D-257: a division's own value first (only while the request works in one division), then the company value.
         $own = \App\Services\DivisionService::overrideFor('company', $key);
         if ($own !== null) {

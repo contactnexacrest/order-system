@@ -11,6 +11,11 @@ async function all() {
 }
 
 async function get(key) {
+  // D-262: an order's frozen company values while its documents are made (orderSnapshotService.within).
+  const frozen = require('../helpers/orderSnapshotContext').current();
+  if (frozen && frozen.company && Object.prototype.hasOwnProperty.call(frozen.company, key)) {
+    return frozen.company[key] === null || frozen.company[key] === undefined ? null : String(frozen.company[key]);
+  }
   // D-257: a division's own value first (only while the request works in one division), then the company value.
   const own = await require('../services/divisionService').overrideFor('company', key);
   if (own !== null) return own;

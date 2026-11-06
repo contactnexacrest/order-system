@@ -38,7 +38,7 @@ function dmy(d) {
 async function context(dealId, kind) {
   const d = await repo.find(dealId);
   if (!d || !KINDS[kind]) throw new Error('Deal not found.');
-  const company = async (k) => String((await companySettingsRepository.companyValue(k)) || '');
+  const company = require('./orderSnapshotService').companyReader(d.company_snapshot_json); // D-262: frozen at the first PO / invoice
   const invoice = kind === 'invoice';
   const currency = String(invoice ? d.sale_currency : d.purchase_currency);
   let total = 0n;

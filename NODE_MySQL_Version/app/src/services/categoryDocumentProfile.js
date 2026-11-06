@@ -93,7 +93,7 @@ async function forOrder(orderId) {
   const categories = [];
   for (const r of rows) {
     if (!r.cid) continue;
-    const c = await productCategoryRepository.find(Number(r.cid));
+    const c = await require('./orderSnapshotService').category(orderId, Number(r.cid)); // D-262: frozen with the order once its PI is approved
     if (c) categories.push(c);
   }
   return fromCategories(categories);

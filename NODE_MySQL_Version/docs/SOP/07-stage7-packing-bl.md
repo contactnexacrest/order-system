@@ -14,7 +14,9 @@ path an order took through Stage 5/6, they arrive here identically.
 
 - **The shortfall tolerance check runs automatically.** The moment staff
   open this section, the system already knows the ordered quantity (from
-  the order's product lines) and the configured tolerance percentage, and
+  the order's product lines) and the tolerance percentage — the one kept
+  with the order when its PI was approved (owner decision D-262), or the
+  configured setting for an order whose PI is not approved yet — and
   computes the shortfall live as staff enter the actual quantity packed —
   staff never calculate this by hand:
 

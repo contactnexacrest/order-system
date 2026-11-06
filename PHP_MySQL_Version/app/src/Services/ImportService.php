@@ -670,6 +670,9 @@ final class ImportService
     public static function markPoGenerated(int $id, int $userId): void
     {
         ImportRepository::update($id, ['ipo_generated_at' => date('Y-m-d H:i:s')], $userId);
+        // D-262: the company details the import PO prints are kept from its first generation.
+        \App\Config\Database::connection()->prepare('UPDATE import_shipments SET company_snapshot_json = :j WHERE id = :id AND company_snapshot_json IS NULL')
+            ->execute(['j' => OrderSnapshotService::companyValuesJson(), 'id' => $id]);
     }
 
     // ------------------------------------------------------------ stages

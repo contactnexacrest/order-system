@@ -796,6 +796,8 @@ $router->post('/orders/{id}/payment/lc/confirm-usable', [$orders, 'confirmLcUsab
 // Gap list G-4 (owner, 1 Nov 2026): the LC's dates and its amendments.
 $router->post('/orders/{id}/lc-dates', [$orders, 'saveLcDates'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/lc-amendments', [$orders, 'addLcAmendment'], [SessionAuth::required(), PermissionCheck::requires('manage_payments'), OrderLockGuard::check(), CsrfCheck::verify()]);
+// D-262: the MD's "Refresh company details on this order" (bank, LUT, IEC, address …), with a reason.
+$router->post('/orders/{id}/company-details/refresh', [$orders, 'refreshCompanyDetails'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/payment-terms/approve', [$orders, 'approvePaymentTerms'], [SessionAuth::required(), PermissionCheck::requires('approve_payment_terms'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/production-status', [$orders, 'updateProductionStatus'], [SessionAuth::required(), PermissionCheck::requires('manage_supplier_po'), OrderLockGuard::check(), CsrfCheck::verify()]);
 $router->post('/orders/{id}/dispute-visibility', [$orders, 'setDisputeButtonVisible'], [SessionAuth::required(), PermissionCheck::requires('manage_disputes'), OrderLockGuard::check(), CsrfCheck::verify()]);

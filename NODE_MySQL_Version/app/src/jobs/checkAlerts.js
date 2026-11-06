@@ -345,7 +345,7 @@ async function run() {
        AND EXISTS (
          SELECT 1 FROM compliance_task_types tt
          LEFT JOIN order_compliance_tasks oct ON oct.task_type_id = tt.id AND oct.order_id = o.id
-         WHERE tt.name = 'Pre-Shipment Inspection' AND tt.is_active = 1
+         WHERE (tt.task_key = 'pre_shipment_inspection' OR (tt.task_key IS NULL AND tt.name = 'Pre-Shipment Inspection')) AND tt.is_active = 1
            AND COALESCE(oct.status, 'not_started') != 'skipped'
        )`
   );

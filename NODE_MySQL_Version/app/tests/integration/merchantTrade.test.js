@@ -200,7 +200,8 @@ describe('D-257 Phase 4 — Merchant Trade', () => {
 
     expect(await step(() => M.recordPayment(id, { leg: 'buy', moved_on: daysAgo(35), amount_fc: '8000', fx_rate: '91.20', bank_reference: `SWIFT-MTT-A-${id}` }, mttStaff.id))).toBeNull();
     expect((await repo.payments(id))[0].description).toBe(`Merchant trade supplier advance of EUR 8,000.00 (₹7,29,600.00 at 91.20) to TEST-Anatolia Marble (Turkey) against merchant trade deal ${d.reference}, PO ${d.po_no}, SWIFT/UTR ref SWIFT-MTT-A-${id}`);
-    await db.execute("UPDATE division_settings SET setting_value = '10000' WHERE division_id = 3 AND setting_key = 'mtt_advance_limit_usd'");
+    // D-262: the deal keeps the RBI settings it was made under, so the lower limit is set on the deal's own copy.
+    await db.execute("UPDATE merchant_deals SET rbi_settings_json = JSON_SET(rbi_settings_json, '$.mtt_advance_limit_usd', '10000') WHERE id = :id", { id });
     const second = { leg: 'buy', moved_on: daysAgo(34), amount_fc: '8000', fx_rate: '91.20', bank_reference: `SWIFT-MTT-B-${id}` };
     expect(await step(() => M.recordPayment(id, second, mttStaff.id))).toBe('This would make the advance to the supplier USD 17,371.42, above the USD 10,000.00 limit for an advance not backed by an LC or bank guarantee (RBI merchanting rule, to be confirmed with the AD bank). Record the LC or bank guarantee first.');
     expect(await M.saveBacking(id, { advance_backing: 'lc' }, mttStaff.id)).toBe('Enter the LC or bank guarantee number.');

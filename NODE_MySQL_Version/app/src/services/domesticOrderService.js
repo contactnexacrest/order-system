@@ -494,6 +494,9 @@ async function fixTaxInvoice(orderId, userId, trx) {
     round_off: t.round_off,
     invoice_total: t.invoice_total,
   }, userId, trx);
+  // D-262: the company details the invoice prints are kept with it.
+  await (trx || db).execute('UPDATE domestic_orders SET company_snapshot_json = :j WHERE order_id = :o AND company_snapshot_json IS NULL',
+    { j: await require('./orderSnapshotService').companyValuesJson(), o: orderId });
 }
 
 /** Moves the order to its next stage when nothing stops it. @returns {Promise<string|null>} why not, or null */

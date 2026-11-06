@@ -147,6 +147,17 @@ Pricing (margin, buffer, pricing exchange rate, team-incentive reserve, stale da
 (MD only) — see [Pricing](./27-pricing.md). The D-240 reference-price
 note settings and the "Approve price discount" permission were removed by D-245 P2.
 
+### Changing a setting does not change orders already agreed (owner decision D-262)
+
+A change under Admin (T&C clauses, company details, the shortfall tolerance, validity days,
+a product category, a payment preset's "Requires MD approval", the pricing exchange rate, a
+product's Zoho item) applies to new orders and to orders whose PI is not yet approved. An
+order whose PI is approved keeps its own copy — see [Stage 3](./03-stage3-pi-advance.md).
+Other masters behave the same way: renaming the "Pre-Shipment Inspection" compliance task
+never switches its gate off (the task has a fixed code); a vendor bill keeps the vendor's
+name, GSTIN and PAN it was recorded with; an associate payout keeps the GST % and the
+associate's GSTIN it was locked with.
+
 ### Scheduled jobs (set up once on the server)
 
 | Job | When | What it does |

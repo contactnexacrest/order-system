@@ -247,6 +247,23 @@ Two independent switches in Company Settings:
   a failed immediate attempt (e.g. SMTP still not configured) shows up as
   an error right away rather than silently sitting in the queue forever.
 
+### Which settings a document prints (owner decision D-262, 6 Nov 2026)
+
+Until an order's first PI is approved, its documents print today's settings (clauses,
+tolerance, validity days, company details, category). From the moment the PI is approved,
+every document of that order — including re-renders at approval, superseded copies,
+amendments (AMD), the BL endorsement (BLE) and the CA internal annexure (CAFIN, which never
+reaches the client) — prints the values kept with the order, so a later change in Admin
+never changes a document of an order already agreed with the buyer. See
+[Stage 3](./03-stage3-pi-advance.md) for what is kept and for the MD's
+"Refresh company details on this order".
+
+Domestic Trade, Import and Merchant Trade records keep the company details they were made
+with in the same way: a Domestic Trade sale when its tax invoice number is fixed, an Import
+shipment when its PO is generated, a Merchant Trade deal when its PO or sale invoice is
+first generated. A Merchant Trade deal also keeps the RBI limits, the USD rate and the AD
+bank's document checklist from the day it was created.
+
 ## Additional Documents (free-form attachments)
 
 Separate from everything above — these are staff-uploaded extras that don't

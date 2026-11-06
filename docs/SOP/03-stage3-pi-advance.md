@@ -421,6 +421,34 @@ When the client sends their details, the order team is notified. Like every
 client self-report this is **information only** — staff still check the bank
 statement and record the remittance in 5d / 9c / 11c themselves.
 
+### The order keeps its own terms once the PI is approved (owner decision D-262, 6 Nov 2026)
+
+The moment the **first PI of an order is approved**, the order keeps its own copy of
+everything a later change in Admin could otherwise alter. From then on, every document of
+that order (OC, CI, PL, COO, AMD, BLE, CAFIN and the rest, and any re-issue) prints these
+kept values, and the order's gates and money use them:
+
+| Kept with the order | What a later change in Admin no longer does to this order |
+|---|---|
+| The T&C clauses (title, text, set, show/hide) for every document type | An edited or retired clause is not printed on its documents |
+| The quantity shortfall tolerance % and the quotation / PI validity days | The tolerance printed and the packing gate (Step 7) stay at what the buyer agreed to |
+| The company details: bank, branch, account, SWIFT, IFSC, LUT, RCMC, IEC/PAN, GSTIN, addresses, director, phone, e-mail, RBI purpose codes, disclaimer | A new bank account or LUT number is not printed on this order |
+| The product category settings (packing words, quality documents, clause set) | A category edit does not change its packing words or quality documents |
+| The payment preset's "Requires MD approval" flag (the preset name was already kept) | Ticking or unticking the flag later neither blocks nor frees this order |
+| The pricing exchange rate (for a USD-per-unit commission or incentive on a non-USD order, D-245) | A new rate does not change the commission or incentive of this order |
+| Each line's Zoho item | The CI goes to Zoho Books with the item it was approved with |
+
+**Before the PI is approved** nothing is kept yet: a quotation and an unapproved PI follow
+today's settings, exactly as before. A new order therefore prints exactly as it always did.
+
+**A real change (for example a new bank account).** The Managing Director can open the
+order, Step 1, and use **Refresh company details on this order** in the box "Kept with this
+order since the PI was approved". A reason of at least 10 characters is required. Only the
+company details are replaced with today's (bank, LUT, IEC, address and the rest); the
+clauses, tolerance and validity days stay as kept. The change is written to the audit log
+with the old and new values and the reason. Documents already issued are not changed; the
+next document prints the new details.
+
 ## Payment Snapshot and Payment Ledger
 
 Two read-only panels sit right above Payment Status on the order page, and

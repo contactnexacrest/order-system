@@ -1196,7 +1196,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
         <tr data-compliance-row>
           <td><?= htmlspecialchars($ct['task_type_name']) ?>
             <input type="hidden" name="tasks[<?= (int) $__i ?>][task_type_id]" value="<?= (int) $ct['task_type_id'] ?>">
-            <?php if ($ct['task_type_name'] === \App\Services\ShipmentGateService::INSPECTION_TASK && $inspection): // Gap list G-3 ?><br><span class="badge <?= $inspection['result'] === 'passed' ? 'badge-active' : 'badge-lost' ?>"><?= $inspection['result'] === 'passed' ? 'Passed' : 'Failed' ?></span> <small class="muted"><?= htmlspecialchars(\App\Helpers\Dates::short((string) $inspection['inspected_on'])) ?> · <?= htmlspecialchars((string) $inspection['agency_name']) ?></small><?php endif; ?>
+            <?php if (\App\Services\ShipmentGateService::isInspectionTask($ct) && $inspection): // Gap list G-3; D-262 fixed task key ?><br><span class="badge <?= $inspection['result'] === 'passed' ? 'badge-active' : 'badge-lost' ?>"><?= $inspection['result'] === 'passed' ? 'Passed' : 'Failed' ?></span> <small class="muted"><?= htmlspecialchars(\App\Helpers\Dates::short((string) $inspection['inspected_on'])) ?> · <?= htmlspecialchars((string) $inspection['agency_name']) ?></small><?php endif; ?>
             <?php if ($ct['resolved_at']): ?><br><span class="muted small"><?= htmlspecialchars($ct['resolved_at']) ?><?php if ($ct['resolved_by_name']): ?> by <?= htmlspecialchars($ct['resolved_by_name']) ?><?php endif; ?></span><?php endif; ?>
           </td>
           <td>
@@ -2305,6 +2305,27 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
 
   <details class="step-card" id="step-1-quotation-prepare"<?= $stepCardOpen('1') ?>>
     <summary><?= $stepStatusIcon($stepStates['1']) ?><span class="step-group-num">STEP 1</span><h2>Prepare Quotation</h2></summary>
+    <?php
+      // D-262: since the PI was approved the order keeps its own copy of the T&C, tolerance and company details.
+      $__frozen = !empty($order['frozen_at']) ? (json_decode((string) ($order['frozen_snapshot_json'] ?? ''), true) ?: []) : null;
+    ?>
+    <?php if ($__frozen !== null): ?>
+      <div id="company-details-snapshot" class="notice">
+        <p class="small"><strong>Kept with this order since the PI was approved (<?= htmlspecialchars(\App\Helpers\Dates::short((string) $order['frozen_at'])) ?>):</strong>
+          the T&amp;C, tolerance <?= htmlspecialchars(rtrim(rtrim((string) ($order['quantity_tolerance_pct'] ?? ''), '0'), '.')) ?>% and validity days, the payment terms approval rule and the company details —
+          bank <?= htmlspecialchars((string) ($__frozen['company']['bank_name'] ?? '')) ?> a/c <?= htmlspecialchars((string) ($__frozen['company']['bank_account_no'] ?? '')) ?>,
+          LUT <?= htmlspecialchars((string) ($__frozen['company']['lut_number'] ?? '')) ?>.
+          Later changes in Settings do not change this order's documents.<?= !empty($__frozen['company_refreshed_at']) ? ' Company details refreshed ' . htmlspecialchars(\App\Helpers\Dates::short((string) $__frozen['company_refreshed_at'])) . '.' : '' ?></p>
+        <?php if (\App\Services\IncentiveService::isMd(\App\Services\AuthService::currentUser())): ?>
+          <form method="post" action="/orders/<?= (int) $order['id'] ?>/company-details/refresh" class="inline-form">
+            <?= Csrf::field() ?>
+            <label>Reason for using today's company details *
+              <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Bank account changed to the new SBI current account"></label>
+            <button type="submit" class="btn-sm" data-confirm="Use today's company details (bank, LUT, IEC, address) on this order's next documents?">Refresh company details on this order</button>
+          </form>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
     <?php // Owner decision D-245 P2: a line below its floor (or without a price) needs the MD's approval before the Quotation. ?>
     <?php if ($linePricing['blocking'] !== []): ?>
       <p class="notice notice-error">The Quotation cannot be generated yet: <?= htmlspecialchars((string) \App\Services\OrderLinePricing::documentBlockReason((int) $order['id'], 'QT')) ?> (<a href="#price-check" data-focus-link>Price check</a>)</p>
@@ -3592,7 +3613,10 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
     <?php else: ?>
       <?php
         $orderedSummary = \App\Repositories\OrderProductRepository::orderedQuantitySummary((int) $order['id']);
-        $shortfallTolerance = \App\Repositories\CompanySettingsRepository::get('quantity_shortfall_tolerance_pct') ?? '5';
+        // D-262: the tolerance frozen with the order once its PI is approved, else today's setting.
+        $shortfallTolerance = ($order['quantity_tolerance_pct'] ?? null) !== null
+            ? rtrim(rtrim((string) $order['quantity_tolerance_pct'], '0'), '.')
+            : (\App\Repositories\CompanySettingsRepository::get('quantity_shortfall_tolerance_pct') ?? '5');
       ?>
       <?php if ($orderedSummary['comparable']): ?>
         <p class="muted small">Ordered quantity: <strong><?= htmlspecialchars(rtrim(rtrim(number_format((float) $orderedSummary['total'], 3), '0'), '.')) ?> <?= htmlspecialchars((string) $orderedSummary['unit']) ?></strong> &middot; Shortfall tolerance: <strong><?= htmlspecialchars($shortfallTolerance) ?>%</strong> — the shortfall below is computed automatically from this. A shortfall over tolerance is blocked until the buyer's written approval is uploaded.</p>

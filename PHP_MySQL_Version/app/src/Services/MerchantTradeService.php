@@ -345,11 +345,41 @@ final class MerchantTradeService
         return $out;
     }
 
+    /**
+     * D-262: the RBI settings (limits, USD rate) a deal was made under — frozen when it was created;
+     * today's settings only for a deal made before that.
+     *
+     * @return array<string,string>
+     */
+    public static function dealRbiSettings(array $deal): array
+    {
+        $frozen = json_decode((string) ($deal['rbi_settings_json'] ?? ''), true);
+        $live = self::rbiSettings();
+        if (!is_array($frozen)) {
+            return $live;
+        }
+        foreach (array_keys($live) as $k) {
+            if (isset($frozen[$k]) && $frozen[$k] !== '') {
+                $live[$k] = (string) $frozen[$k];
+            }
+        }
+        return $live;
+    }
+
+    /** D-262: the AD bank's document checklist the deal was made under. @return array<string,string> */
+    public static function dealBankDocuments(array $deal): array
+    {
+        $frozen = json_decode((string) ($deal['rbi_settings_json'] ?? ''), true);
+        return is_array($frozen) && is_array($frozen['bank_documents'] ?? null) && $frozen['bank_documents'] !== []
+            ? array_map('strval', $frozen['bank_documents'])
+            : self::bankDocuments();
+    }
+
     /** The RBI checks of a stored deal, today. */
     public static function checksFor(array $deal, ?string $today = null): array
     {
-        return self::rbiChecks($deal, MerchantTradeRepository::payments((int) $deal['id']), self::bankDocuments(),
-            MerchantTradeRepository::documents((int) $deal['id']), self::rbiSettings(), $today ?? date('Y-m-d'));
+        return self::rbiChecks($deal, MerchantTradeRepository::payments((int) $deal['id']), self::dealBankDocuments($deal),
+            MerchantTradeRepository::documents((int) $deal['id']), self::dealRbiSettings($deal), $today ?? date('Y-m-d'));
     }
 
     /** The worst level of a deal's checks: breach > warn > ok/info. */
@@ -362,7 +392,7 @@ final class MerchantTradeService
     /** The deal's money and margin from the database. */
     public static function figures(array $deal): array
     {
-        return self::money($deal, MerchantTradeRepository::lines((int) $deal['id']), MerchantTradeRepository::payments((int) $deal['id']), self::setting('mtt_usd_inr_rate'));
+        return self::money($deal, MerchantTradeRepository::lines((int) $deal['id']), MerchantTradeRepository::payments((int) $deal['id']), self::dealRbiSettings($deal)['mtt_usd_inr_rate']);
     }
 
     // ------------------------------------------------------------ helpers
@@ -431,6 +461,9 @@ final class MerchantTradeService
         $fields['reference'] = self::nextReference('MTT-DEAL', '');
         $fields['po_no'] = self::nextReference('MTT-PO', 'PO');
         $id = MerchantTradeRepository::insert($fields, $userId);
+        // D-262: the deal keeps the RBI settings and the bank's checklist it was made under.
+        \App\Config\Database::connection()->prepare('UPDATE merchant_deals SET rbi_settings_json = :j WHERE id = :id')
+            ->execute(['j' => json_encode(self::rbiSettings() + ['bank_documents' => self::bankDocuments()], JSON_UNESCAPED_UNICODE), 'id' => $id]);
         AuditLogRepository::log($userId, 'MERCHANT_DEAL_CREATED', 'merchant_deals', $id, 'reference', null, $fields['reference']);
         return [$id, null];
     }
@@ -559,7 +592,7 @@ final class MerchantTradeService
     public static function saveDocument(int $id, string $docKey, string $date, int $userId): ?string
     {
         $d = MerchantTradeRepository::find($id);
-        $docs = self::bankDocuments();
+        $docs = $d !== null ? self::dealBankDocuments($d) : self::bankDocuments();
         $error = match (true) {
             $d === null => 'Deal not found.',
             $d['stage'] === 'closed' => 'The deal is closed.',
@@ -629,9 +662,9 @@ final class MerchantTradeService
             if ($leg === 'buy' && $isAdvance && $d['advance_backing'] === 'none') {
                 $usd = 0;
                 foreach (self::advances(array_merge($payments, [$new])) as $p) {
-                    $usd += self::usdCents($d, $p, self::setting('mtt_usd_inr_rate'));
+                    $usd += self::usdCents($d, $p, self::dealRbiSettings($d)['mtt_usd_inr_rate']);
                 }
-                $limit = GstCalculator::scaled(self::setting('mtt_advance_limit_usd'), 2);
+                $limit = GstCalculator::scaled(self::dealRbiSettings($d)['mtt_advance_limit_usd'], 2);
                 if ($usd > $limit) {
                     $pdo->rollBack();
                     return 'This would make the advance to the supplier USD ' . ImportService::fc($usd) . ', above the USD ' . ImportService::fc($limit)
@@ -680,6 +713,14 @@ final class MerchantTradeService
     public static function markPoGenerated(int $id, int $userId): void
     {
         MerchantTradeRepository::update($id, ['po_generated_at' => date('Y-m-d H:i:s')], $userId);
+        self::freezeCompany($id);
+    }
+
+    /** D-262: the deal keeps the company details its first document printed (PO or sale invoice). */
+    private static function freezeCompany(int $id): void
+    {
+        \App\Config\Database::connection()->prepare('UPDATE merchant_deals SET company_snapshot_json = :j WHERE id = :id AND company_snapshot_json IS NULL')
+            ->execute(['j' => OrderSnapshotService::companyValuesJson(), 'id' => $id]);
     }
 
     /** Fixes the sale invoice number the first time the invoice is generated (it needs the BL). Returns why not, or null. */
@@ -701,6 +742,7 @@ final class MerchantTradeService
             $fields['invoice_date'] = date('Y-m-d');
         }
         MerchantTradeRepository::update($id, $fields, $userId);
+        self::freezeCompany($id);
         if (isset($fields['sale_invoice_no'])) {
             AuditLogRepository::log($userId, 'MERCHANT_INVOICE_FIXED', 'merchant_deals', $id, 'sale_invoice_no', null, $fields['sale_invoice_no']);
         }
@@ -742,7 +784,7 @@ final class MerchantTradeService
                 }
                 break;
             case 'settled':
-                $missing = array_diff_key(self::bankDocuments(), MerchantTradeRepository::documents($id));
+                $missing = array_diff_key(self::dealBankDocuments($d), MerchantTradeRepository::documents($id));
                 if ($missing !== []) {
                     $out[] = 'Documents still to give the AD bank: ' . implode('; ', $missing) . '.';
                 }

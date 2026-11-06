@@ -640,7 +640,7 @@ async function markPaid(req, res) {
       // Fresh-eyes review L2: on the gross billed (paid + TDS), as recorded just now.
       const gst = await associateCommission.gstFor({ ...payout, paid_inr: paidInr, tds_inr: Number(tds || 0) });
       if (gst > 0) {
-        await db.execute('UPDATE incentive_payouts SET gst_pct = :p, gst_inr = :g WHERE id = :id', { p: (await associateCommission.settings()).gst_pct, g: gst, id });
+        await db.execute('UPDATE incentive_payouts SET gst_pct = COALESCE(gst_pct, :p), gst_inr = :g WHERE id = :id', { p: (await associateCommission.settings()).gst_pct, g: gst, id });
       }
       await associateService.onPayoutPaid(id, req.user.id);
     }

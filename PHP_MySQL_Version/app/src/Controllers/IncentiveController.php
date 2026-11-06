@@ -638,7 +638,7 @@ final class IncentiveController
                 // Fresh-eyes review L2: on the gross billed (paid + TDS), as recorded just now.
                 $gst = \App\Services\AssociateCommission::gstFor(['paid_inr' => $paidInr, 'tds_inr' => (float) ($tds ?? 0)] + $payout);
                 if ($gst > 0) {
-                    \App\Config\Database::connection()->prepare('UPDATE incentive_payouts SET gst_pct = :p, gst_inr = :g WHERE id = :id')
+                    \App\Config\Database::connection()->prepare('UPDATE incentive_payouts SET gst_pct = COALESCE(gst_pct, :p), gst_inr = :g WHERE id = :id')
                         ->execute(['p' => \App\Services\AssociateCommission::settings()['gst_pct'], 'g' => $gst, 'id' => $id]);
                 }
                 \App\Services\AssociateService::onPayoutPaid($id, (int) $user['id']);

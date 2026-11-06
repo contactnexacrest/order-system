@@ -61,7 +61,7 @@ async function context(orderId, code, reference) {
   const dom = await repo.find(orderId);
   if (!order || !dom || !D.DOCUMENTS[code]) throw new Error('Not a domestic order or document.');
   const t = await D.totals(orderId);
-  const company = async (k) => String((await companySettingsRepository.companyValue(k)) || '');
+  const company = require('./orderSnapshotService').companyReader(dom.company_snapshot_json); // D-262: frozen at dispatch
   const state = async (c) => (c ? `${await repo.stateName(c)} (${c})` : '');
   const isInvoice = code === 'GTI';
   return {

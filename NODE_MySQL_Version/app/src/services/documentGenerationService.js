@@ -20,6 +20,7 @@ const orderSupplierPoRepository = require('../repositories/orderSupplierPoReposi
 const termsClauseRepository = require('../repositories/termsClauseRepository');
 const userRepository = require('../repositories/userRepository');
 const documentDataAssembler = require('./documentDataAssembler');
+const orderSnapshotService = require('./orderSnapshotService');
 const emailDispatchService = require('./emailDispatchService');
 const markdownLite = require('../helpers/markdownLite');
 const { renderPdfFromHtml } = require('./pdfRenderService');
@@ -134,7 +135,12 @@ function fontsBlock() {
   return fontsBlockCache;
 }
 
+/** D-262: runs with the order's frozen company values and clauses once its PI is approved (no-op before). */
 async function generate(orderId, documentTypeCode, generatedByUserId, signatoryOverrideUserId = null, generateDocx = false, allowOverride = false, documentDate = null) {
+  return orderSnapshotService.within(orderId, () => generateUnfrozen(orderId, documentTypeCode, generatedByUserId, signatoryOverrideUserId, generateDocx, allowOverride, documentDate));
+}
+
+async function generateUnfrozen(orderId, documentTypeCode, generatedByUserId, signatoryOverrideUserId = null, generateDocx = false, allowOverride = false, documentDate = null) {
   const docType = await findDocumentType(documentTypeCode);
   if (!docType) {
     throw new Error(`Unknown document type: ${documentTypeCode}`);
@@ -711,6 +717,15 @@ async function fromStoredContext(documentId, watermark) {
  */
 async function finalizeApproval(documentId) {
   const document = await documentRepository.find(documentId);
+  const orderId = document && document.order_id !== null && document.order_id !== undefined ? Number(document.order_id) : null;
+  if (orderId === null) return finalizeApprovalUnfrozen(documentId);
+  await orderSnapshotService.within(orderId, () => finalizeApprovalUnfrozen(documentId));
+  // D-262: the order keeps its own copy of what printed it from the moment its PI is first approved.
+  if (document.document_type_code === 'PI') await orderSnapshotService.freeze(orderId);
+}
+
+async function finalizeApprovalUnfrozen(documentId) {
+  const document = await documentRepository.find(documentId);
   if (!document) {
     throw new Error(`Document ${documentId} not found`);
   }
@@ -883,6 +898,13 @@ function invalidWatermark() {
  */
 async function markSuperseded(documentId) {
   const document = await documentRepository.find(documentId);
+  const orderId = document && document.order_id !== null && document.order_id !== undefined ? Number(document.order_id) : null;
+  if (orderId === null) return markSupersededUnfrozen(documentId);
+  return orderSnapshotService.within(orderId, () => markSupersededUnfrozen(documentId));
+}
+
+async function markSupersededUnfrozen(documentId) {
+  const document = await documentRepository.find(documentId);
   if (!document || document.order_id === null) {
     return;
   }
@@ -1010,6 +1032,14 @@ async function supersedeOtherApprovedRevisions(documentId) {
  * this function just renders whatever status the amendment is in.
  */
 async function generateAmendment(amendmentId, generatedByUserId) {
+  const row = await db.queryOne('SELECT order_id FROM amendments WHERE id = :id', { id: amendmentId });
+  const orderId = row ? Number(row.order_id || 0) : 0;
+  return orderId > 0
+    ? orderSnapshotService.within(orderId, () => generateAmendmentUnfrozen(amendmentId, generatedByUserId))
+    : generateAmendmentUnfrozen(amendmentId, generatedByUserId);
+}
+
+async function generateAmendmentUnfrozen(amendmentId, generatedByUserId) {
   const amendment = await amendmentRepository.find(amendmentId);
   if (!amendment) {
     throw new Error(`Amendment ${amendmentId} not found`);
@@ -1171,6 +1201,10 @@ async function generateAmendment(amendmentId, generatedByUserId) {
  * lifecycle state.
  */
 async function generateCaInternalAnnexure(orderId, generatedByUserId) {
+  return orderSnapshotService.within(orderId, () => generateCaInternalAnnexureUnfrozen(orderId, generatedByUserId));
+}
+
+async function generateCaInternalAnnexureUnfrozen(orderId, generatedByUserId) {
   const order = await orderRepository.find(orderId);
   if (!order) {
     throw new Error(`Order ${orderId} not found`);
@@ -1264,6 +1298,10 @@ async function generateCaInternalAnnexure(orderId, generatedByUserId) {
  * must save BL Number/Vessel-Voyage/Ports/Date of Endorsement first).
  */
 async function generateBlEndorsement(orderId, generatedByUserId) {
+  return orderSnapshotService.within(orderId, () => generateBlEndorsementUnfrozen(orderId, generatedByUserId));
+}
+
+async function generateBlEndorsementUnfrozen(orderId, generatedByUserId) {
   const order = await orderRepository.find(orderId);
   if (!order) {
     throw new Error(`Order ${orderId} not found`);

@@ -19,6 +19,14 @@ const stageGateService = require('./stageGateService');
  */
 
 const INSPECTION_TASK = 'Pre-Shipment Inspection';
+/** D-262: the fixed code of the inspection task (renaming the task never switches the gate off). */
+const INSPECTION_TASK_KEY = 'pre_shipment_inspection';
+
+/** A checklist row (orderComplianceTaskRepository.forOrder) that is the pre-shipment inspection. */
+function isInspectionTask(task) {
+  const key = task && task.task_key !== undefined ? task.task_key : null;
+  return key === INSPECTION_TASK_KEY || ((key === null || key === undefined) && task && task.task_type_name === INSPECTION_TASK);
+}
 
 const MESSAGES = {
   balance: 'This order\'s balance is due before shipment: record and clear the balance (Steps 11c and 11d) before recording the Bill of Lading.',
@@ -41,7 +49,7 @@ async function balanceOpenEarly(orderId) {
 
 async function inspectionApplies(orderId) {
   for (const task of await orderComplianceTaskRepository.forOrder(orderId)) {
-    if (task.task_type_name === INSPECTION_TASK && task.status !== 'skipped') {
+    if (isInspectionTask(task) && task.status !== 'skipped') {
       return true;
     }
   }
@@ -87,7 +95,7 @@ async function saveInspection(order, result, date, agency, fileId, note, userId)
   );
   await auditLogRepository.log(userId, 'INSPECTION_RESULT_RECORDED', 'orders', orderId, 'inspection_result', before ? before.result : null, result, note);
   for (const task of await orderComplianceTaskRepository.forOrder(orderId)) {
-    if (task.task_type_name === INSPECTION_TASK) {
+    if (isInspectionTask(task)) {
       await orderComplianceTaskRepository.setStatus(orderId, Number(task.task_type_id), result === 'passed' ? 'approved' : 'pending_approval', null, userId);
     }
   }
@@ -120,6 +128,6 @@ function gatesLabel(gates) {
 }
 
 module.exports = {
-  INSPECTION_TASK, MESSAGES, isPreShipmentBalance, balanceOpenEarly, inspectionApplies, inspection, blockers, saveInspection,
+  INSPECTION_TASK, INSPECTION_TASK_KEY, isInspectionTask, MESSAGES, isPreShipmentBalance, balanceOpenEarly, inspectionApplies, inspection, blockers, saveInspection,
   recordOverride, overrides, gatesLabel,
 };

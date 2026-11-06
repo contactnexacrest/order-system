@@ -67,7 +67,7 @@ final class DomesticDocumentService
                 'tax_total' => GstCalculator::inr($h['tax_total']),
             ];
         }
-        $company = static fn (string $k): string => (string) (CompanySettingsRepository::companyValue($k) ?? '');
+        $company = OrderSnapshotService::companyReader($dom['company_snapshot_json'] ?? null); // D-262: frozen at dispatch
         $state = static fn (?string $c): string => $c ? DomesticOrderRepository::stateName($c) . ' (' . $c . ')' : '';
         $date = static fn (?string $d): string => $d ? (new \DateTimeImmutable($d))->format('d M Y') : '';
         $isInvoice = $code === 'GTI';

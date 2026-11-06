@@ -62,6 +62,19 @@ async function create(orderId, vendorKind, data, userId) {
       created_by: userId,
     }
   );
+  // D-262: the vendor's name, GSTIN and PAN as they are now — the supplier PO's own copy, or the
+  // logistics partner's — so the Zoho bill of a past order never changes with the master.
+  await db.execute(
+    `UPDATE order_vendor_bills b
+       LEFT JOIN order_supplier_po po ON po.id = b.supplier_po_id
+       LEFT JOIN suppliers s ON s.id = po.supplier_id
+       LEFT JOIN logistics_partners lp ON lp.id = b.logistics_partner_id
+        SET b.vendor_name_snapshot = CASE WHEN b.vendor_kind = 'supplier' THEN COALESCE(po.supplier_legal_name, s.supplier_legal_name) ELSE lp.partner_name END,
+            b.vendor_gstin_snapshot = CASE WHEN b.vendor_kind = 'supplier' THEN COALESCE(po.supplier_gstin, s.gstin) ELSE lp.gstin END,
+            b.vendor_pan_snapshot = CASE WHEN b.vendor_kind = 'supplier' THEN COALESCE(po.supplier_pan, s.pan) ELSE lp.pan END
+      WHERE b.id = :id`,
+    { id: result.insertId }
+  );
   await refreshOrder(orderId);
   return result.insertId;
 }

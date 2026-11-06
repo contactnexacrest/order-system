@@ -1387,7 +1387,7 @@ async function show(req, res) {
   // rather than a second, duplicate flag — not yet marked 'skipped'
   // (not applicable) means it's still relevant.
   const complianceTasksForOrder = await orderComplianceTaskRepository.forOrder(orderId);
-  const pendingInspectionTask = complianceTasksForOrder.some((t) => t.task_type_name === 'Pre-Shipment Inspection' && t.status !== 'skipped');
+  const pendingInspectionTask = complianceTasksForOrder.some((t) => require('../services/shipmentGateService').isInspectionTask(t) && t.status !== 'skipped');
   const canManageOrderFinancialsForInspection = !!req.permissions.manage_order_financials;
   const exportBenefitSchemesForOrder = await orderExportBenefitSchemeRepository.forOrder(orderId);
 
@@ -1662,7 +1662,14 @@ async function show(req, res) {
       freight: await orderFreightRepository.find(orderId),
       packing: await orderPackingRepository.find(orderId),
       orderedQuantitySummary: await orderProductRepository.orderedQuantitySummary(orderId),
-      shortfallTolerance: (await companySettingsRepository.get('quantity_shortfall_tolerance_pct')) ?? '5',
+      // D-262: the tolerance frozen with the order once its PI is approved, else today's setting.
+      shortfallTolerance: order.quantity_tolerance_pct !== null && order.quantity_tolerance_pct !== undefined
+        ? String(Number(order.quantity_tolerance_pct))
+        : ((await companySettingsRepository.get('quantity_shortfall_tolerance_pct')) ?? '5'),
+      // D-262: since the PI was approved the order keeps its own copy of the T&C, tolerance and company details.
+      frozenSnapshot: order.frozen_at ? ((await require('../services/orderSnapshotService').snapshot(orderId)) || {}) : null,
+      frozenTolerance: order.quantity_tolerance_pct !== null && order.quantity_tolerance_pct !== undefined ? String(Number(order.quantity_tolerance_pct)) : '',
+      viewerIsMd: await require('../services/incentiveService').isMd(req.user),
       crates: await orderCrateRepository.forOrder(orderId),
       shipping: await orderShippingRepository.find(orderId),
       draftBlReviews: await orderDraftBlReviewRepository.forOrder(orderId),
@@ -2965,6 +2972,22 @@ async function recordFeedback(req, res) {
  * the payment terms of an order on a "Requires MD approval" preset — the
  * Quotation can't be generated or sent until they do.
  */
+/**
+ * D-262: the MD replaces this order's frozen company details (bank, LUT, IEC, address …) with
+ * today's, for a real change such as a new bank account. A reason is required and logged.
+ */
+async function refreshCompanyDetails(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  if (!(await require('../services/incentiveService').isMd(req.user))) {
+    res.status(403).send('Only the Managing Director can refresh the company details on an order.');
+    return;
+  }
+  const error = await require('../services/orderSnapshotService').refreshCompany(orderId, req.user.id, String((req.body && req.body.reason) || ''));
+  if (error !== null) flash.set(req, 'error', error);
+  else flash.set(req, 'success', "This order now uses today's company details (bank, LUT, IEC, address). Documents already issued are unchanged; the next ones print the new details.");
+  res.redirect(`/orders/${orderId}#company-details-snapshot`);
+}
+
 async function approvePaymentTerms(req, res) {
   const orderId = parseInt(req.params.id, 10);
   const order = await orderRepository.find(orderId);
@@ -3528,7 +3551,8 @@ async function savePacking(req, res) {
   const actualQty = actualQtyRaw !== '' ? parseFloat(actualQtyRaw) : null;
 
   const summary = await orderProductRepository.orderedQuantitySummary(orderId);
-  const tolerance = parseFloat((await companySettingsRepository.get('quantity_shortfall_tolerance_pct')) ?? '5');
+  // D-262: the tolerance frozen with the order once its PI is approved (what the buyer agreed to), else today's setting.
+  const tolerance = await require('../services/orderSnapshotService').tolerancePct(await orderRepository.find(orderId));
   let shortfallPct = null;
 
   if (summary.comparable && actualQty !== null && summary.total > 0) {
@@ -5191,6 +5215,7 @@ module.exports = {
   savePacking, saveShipping, uploadDraftBl, reviewDraftBl, recordBlIssued, attachBlCopy, recordShippingBill, recordScannedBlSent,
   recordBalancePayment, clearBalancePayment, recordBlOriginalsReceived, recordBlEndorsed,
   saveBlEndorsement, generateBlEndorsement,
+  refreshCompanyDetails,
   approvePaymentTerms, closeOrder, markFullySettled, overrideStatusLock, markLost, updateComplianceTask, markAllComplianceTasksNotApplicable,
   requestCancellation, approveCancellation, rejectCancellation, completeCancellationRefund,
   recordAdvanceInrActual, deleteAdvanceInrActual, recordBalanceInrActual, deleteBalanceInrActual,

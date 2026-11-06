@@ -22,8 +22,8 @@ async function forDocumentTypeCode(documentTypeCode) {
  *
  * @returns {Promise<Array<{title:string,text:string,is_locked:boolean}>>}
  */
-async function forDocumentTypeCodeAndGroup(documentTypeCode, clauseGroup, balanceTriggerOption, clauseSets = null) {
-  const rows = await db.query(
+async function liveRows(documentTypeCode, clauseGroup) {
+  return db.query(
     `SELECT c.clause_title, c.clause_text, c.is_locked, c.visibility_rule, c.clause_set
      FROM tc_clauses c
      JOIN tc_clause_documents cd ON cd.clause_id = c.id
@@ -32,6 +32,35 @@ async function forDocumentTypeCodeAndGroup(documentTypeCode, clauseGroup, balanc
      ORDER BY c.clause_order`,
     { code: documentTypeCode, clause_group: clauseGroup }
   );
+}
+
+/**
+ * D-262: every document type's clauses in every group, exactly as the live query
+ * returns them — what an order keeps when its PI is approved. Port of captureAll().
+ */
+async function captureAll() {
+  const codes = (await db.query('SELECT code FROM document_types ORDER BY code')).map((r) => r.code);
+  const groups = (await db.query('SELECT DISTINCT clause_group FROM tc_clauses ORDER BY clause_group')).map((r) => r.clause_group);
+  const out = {};
+  for (const code of codes) {
+    for (const group of groups) {
+      const rows = await liveRows(code, group);
+      if (rows.length) {
+        out[`${code}|${group}`] = rows.map((r) => ({
+          clause_title: r.clause_title, clause_text: r.clause_text, is_locked: r.is_locked, visibility_rule: r.visibility_rule, clause_set: r.clause_set,
+        }));
+      }
+    }
+  }
+  return out;
+}
+
+async function forDocumentTypeCodeAndGroup(documentTypeCode, clauseGroup, balanceTriggerOption, clauseSets = null) {
+  // D-262: an order's frozen clauses while its documents are made (orderSnapshotService.within).
+  const frozen = require('../helpers/orderSnapshotContext').current();
+  const rows = frozen && frozen.terms
+    ? (frozen.terms[`${documentTypeCode}|${clauseGroup}`] || [])
+    : await liveRows(documentTypeCode, clauseGroup);
 
   // D-257 Phase 1: a clause with a clause set prints only when one of the order's
   // categories uses that set; an empty set = every order (today's clauses). No
@@ -56,4 +85,4 @@ function inClauseSets(clauseSet, orderSets) {
   return own.length === 0 || own.some((v) => orderSets.includes(v));
 }
 
-module.exports = { forDocumentTypeCode, forDocumentTypeCodeAndGroup, inClauseSets };
+module.exports = { forDocumentTypeCode, forDocumentTypeCodeAndGroup, inClauseSets, captureAll };

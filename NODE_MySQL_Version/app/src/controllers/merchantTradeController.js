@@ -124,7 +124,7 @@ async function showData(d, permissions, seesClient = true) {
   const stage = d.stage;
   const pos = M.STAGE_KEYS.indexOf(stage);
   const next = stage !== 'closed' ? M.STAGE_KEYS[pos + 1] : null;
-  const docs = await M.bankDocuments();
+  const docs = await M.dealBankDocuments(d);
   const received = await repo.documents(id);
   return {
     d,

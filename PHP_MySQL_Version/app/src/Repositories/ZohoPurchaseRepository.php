@@ -28,9 +28,10 @@ final class ZohoPurchaseRepository
                (o.is_test_data = 1 OR o.is_sample_data = 1 OR c.is_test_data = 1 OR c.is_sample_data = 1
                 OR COALESCE(s.is_test_data, 0) = 1 OR COALESCE(s.is_sample_data, 0) = 1) AS is_test_or_sample,
                COALESCE(s.id, lp.id) AS vendor_id,
-               COALESCE(s.supplier_legal_name, lp.partner_name) AS vendor_name,
-               COALESCE(s.gstin, lp.gstin) AS vendor_gstin,
-               COALESCE(s.pan, lp.pan) AS vendor_pan,
+               -- D-262: the vendor as recorded with the bill (else the copy on the supplier PO), never a later master edit.
+               COALESCE(b.vendor_name_snapshot, IF(b.vendor_kind = 'supplier', po.supplier_legal_name, NULL), s.supplier_legal_name, lp.partner_name) AS vendor_name,
+               COALESCE(b.vendor_gstin_snapshot, IF(b.vendor_kind = 'supplier', po.supplier_gstin, NULL), s.gstin, lp.gstin) AS vendor_gstin,
+               COALESCE(b.vendor_pan_snapshot, IF(b.vendor_kind = 'supplier', po.supplier_pan, NULL), s.pan, lp.pan) AS vendor_pan,
                COALESCE(s.zoho_contact_id, lp.zoho_contact_id) AS vendor_zoho_contact_id,
                po.supplier_po_reference
         FROM order_vendor_bills b

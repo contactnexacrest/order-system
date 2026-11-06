@@ -1212,6 +1212,8 @@ app.post('/orders/:id/payment/lc', requireAuth, requirePermission('manage_paymen
 app.post('/orders/:id/lc-dates', requireAuth, requirePermission('manage_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.saveLcDates));
 app.post('/orders/:id/lc-amendments', requireAuth, requirePermission('manage_payments'), upload.single('amendment_file'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.addLcAmendment));
 app.post('/orders/:id/payment/lc/confirm-usable', requireAuth, requirePermission('clear_payments'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.confirmLcUsable));
+// D-262: the MD's "Refresh company details on this order" (bank, LUT, IEC, address …), with a reason.
+app.post('/orders/:id/company-details/refresh', requireAuth, requirePermission('manage_company_settings'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.refreshCompanyDetails));
 app.post('/orders/:id/payment-terms/approve', requireAuth, requirePermission('approve_payment_terms'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.approvePaymentTerms));
 app.post('/orders/:id/production-status', requireAuth, requirePermission('manage_supplier_po'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.updateProductionStatus));
 app.post('/orders/:id/dispute-visibility', requireAuth, requirePermission('manage_disputes'), checkOrderLock, verifyCsrf, asyncHandler(ordersController.setDisputeButtonVisible));

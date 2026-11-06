@@ -164,7 +164,8 @@ final class ZohoInvoiceData
             ];
             // Owner decision 2 Nov 2026 (D-240): the Zoho item of the Products-menu product the line was picked
             // from. Added only when there is one, so invoices already in Books keep their fingerprint.
-            $itemId = self::zohoItemId($product['catalog_product_id'] ?? null);
+            // D-262: the item frozen with the line when the PI was approved; the catalogue only before that.
+            $itemId = !empty($product['zoho_item_id']) ? (string) $product['zoho_item_id'] : self::zohoItemId($product['catalog_product_id'] ?? null);
             if ($itemId !== null) {
                 $line['item_id'] = $itemId;
             }

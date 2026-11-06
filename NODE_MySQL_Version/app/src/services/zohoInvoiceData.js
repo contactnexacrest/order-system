@@ -131,7 +131,10 @@ async function ciLines(orderId, label) {
     };
     // Owner decision 2 Nov 2026 (D-240): the Zoho item of the Products-menu product the line was picked
     // from. Added only when there is one, so invoices already in Books keep their fingerprint.
-    if (product.catalog_product_id) {
+    // D-262: the item frozen with the line when the PI was approved; the catalogue only before that.
+    if (product.zoho_item_id) {
+      line.item_id = String(product.zoho_item_id);
+    } else if (product.catalog_product_id) {
       const catalogProduct = await require('../repositories/productRepository').find(Number(product.catalog_product_id));
       if (catalogProduct && catalogProduct.zoho_item_id) line.item_id = String(catalogProduct.zoho_item_id);
     }

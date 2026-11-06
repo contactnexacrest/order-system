@@ -6138,3 +6138,39 @@ CREATE TABLE associate_access_log (
   FOREIGN KEY (changed_by) REFERENCES users(id),
   INDEX idx_associate_access_log_assoc (associate_id, created_at)
 ) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+-- Owner decision D-262 (6 Nov 2026, double-confirmed): an order is self-contained.
+-- When its PI is first approved the order keeps its own copy of everything that
+-- printed or decided it — T&C clause texts and sets, the tolerance and validity days,
+-- the company details (bank, LUT, RCMC, IEC, address, director), the category profile,
+-- the payment preset's name and "requires MD approval" flag, and the USD rate for
+-- USD-per-unit commission/incentive on a non-USD order. A later edit to any of those
+-- masters never changes an existing order. Before the PI is approved an order reads the
+-- live values, as before. The MD can refresh the company details on one order (with a
+-- reason, logged) for a real bank change.
+-- ---------------------------------------------------------------------------
+ALTER TABLE orders
+  ADD COLUMN frozen_at DATETIME NULL,
+  ADD COLUMN frozen_snapshot_json JSON NULL,
+  ADD COLUMN quantity_tolerance_pct DECIMAL(5,2) NULL,
+  ADD COLUMN payment_terms_requires_md_approval TINYINT(1) NULL,
+  ADD COLUMN pricing_fx_rate_at_pi DECIMAL(12,4) NULL;
+-- The product's Zoho item when the line was frozen (the CI's Zoho invoice never changes with the catalogue).
+ALTER TABLE order_products ADD COLUMN zoho_item_id VARCHAR(64) NULL;
+-- A fixed code for the checklist rows the app acts on (renaming a task type never switches its gate off).
+ALTER TABLE compliance_task_types ADD COLUMN task_key VARCHAR(40) NULL, ADD UNIQUE KEY uq_compliance_task_key (task_key);
+-- The vendor's name, GSTIN and PAN when the bill was recorded (Zoho bills of past orders never change with the master).
+ALTER TABLE order_vendor_bills
+  ADD COLUMN vendor_name_snapshot VARCHAR(255) NULL,
+  ADD COLUMN vendor_gstin_snapshot VARCHAR(20) NULL,
+  ADD COLUMN vendor_pan_snapshot VARCHAR(20) NULL;
+-- The associate's GSTIN at lock (gst_pct is set at lock too) — a payout's GST never follows a later master edit.
+ALTER TABLE incentive_payouts ADD COLUMN associate_gstin VARCHAR(20) NULL;
+-- Merchant trade: the RBI settings and USD rate a deal was made under; the company details its documents print.
+ALTER TABLE merchant_deals
+  ADD COLUMN rbi_settings_json JSON NULL,
+  ADD COLUMN company_snapshot_json JSON NULL;
+-- Domestic Trade / Import: the company details frozen when the tax invoice / import PO is fixed.
+ALTER TABLE domestic_orders ADD COLUMN company_snapshot_json JSON NULL;
+ALTER TABLE import_shipments ADD COLUMN company_snapshot_json JSON NULL;

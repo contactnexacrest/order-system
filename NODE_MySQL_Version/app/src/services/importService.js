@@ -534,6 +534,9 @@ async function markPoGenerated(id, userId) {
   const now = new Date();
   const p = (n) => String(n).padStart(2, '0');
   await repo.update(id, { ipo_generated_at: `${todayIst()} ${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}` }, userId);
+  // D-262: the company details the import PO prints are kept from its first generation.
+  await db.execute('UPDATE import_shipments SET company_snapshot_json = :j WHERE id = :id AND company_snapshot_json IS NULL',
+    { j: await require('./orderSnapshotService').companyValuesJson(), id });
 }
 
 // ------------------------------------------------------------ stages

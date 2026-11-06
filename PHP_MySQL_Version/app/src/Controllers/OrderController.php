@@ -1390,7 +1390,7 @@ final class OrderController
         $complianceTasksForOrder = OrderComplianceTaskRepository::forOrder($orderId);
         $pendingInspectionTask = false;
         foreach ($complianceTasksForOrder as $task) {
-            if ($task['task_type_name'] === 'Pre-Shipment Inspection' && $task['status'] !== 'skipped') {
+            if (\App\Services\ShipmentGateService::isInspectionTask($task) && $task['status'] !== 'skipped') {
                 $pendingInspectionTask = true;
                 break;
             }
@@ -2551,6 +2551,28 @@ final class OrderController
     }
 
     /**
+     * D-262: the MD replaces this order's frozen company details (bank, LUT, IEC, address …) with
+     * today's, for a real change such as a new bank account. A reason is required and logged.
+     */
+    public function refreshCompanyDetails(array $params): void
+    {
+        $orderId = (int) $params['id'];
+        $user = AuthService::currentUser();
+        if (!\App\Services\IncentiveService::isMd($user)) {
+            http_response_code(403);
+            echo 'Only the Managing Director can refresh the company details on an order.';
+            return;
+        }
+        $error = \App\Services\OrderSnapshotService::refreshCompany($orderId, (int) $user['id'], (string) ($_POST['reason'] ?? ''));
+        if ($error !== null) {
+            Flash::set('error', $error);
+        } else {
+            Flash::set('success', 'This order now uses today\'s company details (bank, LUT, IEC, address). Documents already issued are unchanged; the next ones print the new details.');
+        }
+        header("Location: /orders/{$orderId}#company-details-snapshot");
+    }
+
+    /**
      * QA Round 5, R5-03 (owner decision 2026-10-28, Option A): MD/ED approve
      * the payment terms of an order on a "Requires MD approval" preset —
      * the Quotation can't be generated or sent until they do.
@@ -3306,7 +3328,8 @@ final class OrderController
         $actualQty = $actualQtyRaw !== '' ? (float) $actualQtyRaw : null;
 
         $summary = OrderProductRepository::orderedQuantitySummary($orderId);
-        $tolerance = (float) (CompanySettingsRepository::get('quantity_shortfall_tolerance_pct') ?? 5);
+        // D-262: the tolerance frozen with the order once its PI is approved (what the buyer agreed to), else today's setting.
+        $tolerance = \App\Services\OrderSnapshotService::tolerancePct(OrderRepository::find($orderId) ?? []);
         $shortfallPct = null;
 
         if ($summary['comparable'] && $actualQty !== null && $summary['total'] > 0) {

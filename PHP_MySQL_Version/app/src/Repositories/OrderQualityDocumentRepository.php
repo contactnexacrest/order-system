@@ -50,7 +50,7 @@ final class OrderQualityDocumentRepository
         $out = [];
         sort($categoryIds);
         foreach ($categoryIds as $cid) {
-            $category = ProductCategoryRepository::find($cid);
+            $category = \App\Services\OrderSnapshotService::category($orderId, $cid); // D-262: frozen with the order
             if ($category === null) {
                 continue;
             }

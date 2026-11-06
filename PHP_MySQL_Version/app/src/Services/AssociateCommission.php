@@ -434,6 +434,10 @@ final class AssociateCommission
         if (strtoupper((string) ($order['currency_code'] ?? '')) === 'USD') {
             return self::realisedRate($order)['rate'];
         }
+        // D-262 / D-245: the pricing exchange rate frozen with the order when its PI was approved.
+        if (isset($order['pricing_fx_rate_at_pi']) && $order['pricing_fx_rate_at_pi'] !== null && (float) $order['pricing_fx_rate_at_pi'] > 0) {
+            return (float) $order['pricing_fx_rate_at_pi'];
+        }
         return (float) (PricingRepository::settings()['pricing_fx_rate'] ?? 0);
     }
 
@@ -447,14 +451,18 @@ final class AssociateCommission
         if (($payout['payee_kind'] ?? '') !== 'associate' || (float) $payout['amount_inr'] <= 0) {
             return 0.0;
         }
-        $a = AssociateRepository::find((int) $payout['associate_id']);
-        if ($a === null || trim((string) ($a['gstin'] ?? '')) === '' || \App\Repositories\AssociateDocumentRepository::invoiceForPayout((int) $payout['id']) === null) {
+        // D-262: the GSTIN and GST % frozen on the payout when it was locked; live only for payouts made before that.
+        $gstin = array_key_exists('associate_gstin', $payout) && $payout['associate_gstin'] !== null
+            ? (string) $payout['associate_gstin']
+            : (string) (AssociateRepository::find((int) $payout['associate_id'])['gstin'] ?? '');
+        if (trim($gstin) === '' || \App\Repositories\AssociateDocumentRepository::invoiceForPayout((int) $payout['id']) === null) {
             return 0.0;
         }
         $base = isset($payout['paid_inr']) && $payout['paid_inr'] !== null
             ? (float) $payout['paid_inr'] + (float) ($payout['tds_inr'] ?? 0)
             : (float) $payout['amount_inr'];
-        return round($base * self::settings()['gst_pct'] / 100, 2);
+        $pct = isset($payout['gst_pct']) && $payout['gst_pct'] !== null ? (float) $payout['gst_pct'] : self::settings()['gst_pct'];
+        return round($base * $pct / 100, 2);
     }
 
     /**

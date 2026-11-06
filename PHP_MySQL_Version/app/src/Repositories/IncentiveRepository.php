@@ -308,10 +308,14 @@ final class IncentiveRepository
     {
         $pdo = Database::connection();
         $pdo->prepare(
-            'INSERT INTO incentive_payouts (order_id, payee_kind, user_id, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month, payout_run_on, locked_on)
-             VALUES (:order_id, :payee_kind, :user_id, :associate_id, :role, :amount_inr, :amount_fc, :currency_code, :incentive_month, :payout_run_on, :locked_on)'
+            'INSERT INTO incentive_payouts (order_id, payee_kind, user_id, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month, payout_run_on, locked_on, gst_pct, associate_gstin)
+             VALUES (:order_id, :payee_kind, :user_id, :associate_id, :role, :amount_inr, :amount_fc, :currency_code, :incentive_month, :payout_run_on, :locked_on, :gst_pct, :associate_gstin)'
         )->execute([
             'payout_run_on' => $row['payout_run_on'] ?? null, 'locked_on' => $row['locked_on'] ?? null,
+            // D-262: an associate payout keeps the GST % and the associate's GSTIN it was locked with.
+            'gst_pct' => ($row['payee_kind'] ?? '') === 'associate' ? \App\Services\AssociateCommission::settings()['gst_pct'] : null,
+            'associate_gstin' => ($row['payee_kind'] ?? '') === 'associate' && !empty($row['associate_id'])
+                ? ((($g = trim((string) (AssociateRepository::find((int) $row['associate_id'])['gstin'] ?? ''))) !== '') ? $g : null) : null,
             'order_id' => $row['order_id'], 'payee_kind' => $row['payee_kind'], 'user_id' => $row['user_id'] ?? null,
             'associate_id' => $row['associate_id'] ?? null, 'role' => $row['role'], 'amount_inr' => $row['amount_inr'],
             'amount_fc' => $row['amount_fc'] ?? null, 'currency_code' => $row['currency_code'] ?? null, 'incentive_month' => $row['incentive_month'],

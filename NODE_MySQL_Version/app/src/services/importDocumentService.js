@@ -35,7 +35,7 @@ function dmy(d) {
 async function context(shipmentId) {
   const s = await repo.find(shipmentId);
   if (!s) throw new Error('Import not found.');
-  const company = async (k) => String((await companySettingsRepository.companyValue(k)) || '');
+  const company = require('./orderSnapshotService').companyReader(s.company_snapshot_json); // D-262: frozen at the first PO
   let total = 0n;
   const items = (await repo.lines(shipmentId)).map((l, i) => {
     const cents = I.lineValueCents(String(l.quantity), String(l.unit_price_fc));

@@ -241,10 +241,20 @@ async function replaceOrderPeople(orderId, people) {
 }
 
 async function addPayout(row, c = db) {
+  // D-262: an associate payout keeps the GST % and the associate's GSTIN it was locked with.
+  const isAssociate = (row.payee_kind || '') === 'associate';
+  let gstin = null;
+  if (isAssociate && row.associate_id) {
+    const a = await require('./associateRepository').find(Number(row.associate_id));
+    const g = String((a && a.gstin) || '').trim();
+    gstin = g !== '' ? g : null;
+  }
   const result = await c.execute(
-    `INSERT INTO incentive_payouts (order_id, payee_kind, user_id, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month, payout_run_on, locked_on)
-     VALUES (:order_id, :payee_kind, :user_id, :associate_id, :role, :amount_inr, :amount_fc, :currency_code, :incentive_month, :payout_run_on, :locked_on)`,
+    `INSERT INTO incentive_payouts (order_id, payee_kind, user_id, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month, payout_run_on, locked_on, gst_pct, associate_gstin)
+     VALUES (:order_id, :payee_kind, :user_id, :associate_id, :role, :amount_inr, :amount_fc, :currency_code, :incentive_month, :payout_run_on, :locked_on, :gst_pct, :associate_gstin)`,
     {
+      gst_pct: isAssociate ? (await require('../services/associateCommission').settings()).gst_pct : null,
+      associate_gstin: gstin,
       payout_run_on: row.payout_run_on ?? null,
       locked_on: row.locked_on ?? null,
       order_id: row.order_id,

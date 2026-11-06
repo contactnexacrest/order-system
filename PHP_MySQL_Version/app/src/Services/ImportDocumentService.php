@@ -25,7 +25,7 @@ final class ImportDocumentService
         if ($s === null) {
             throw new \RuntimeException('Import not found.');
         }
-        $company = static fn (string $k): string => (string) (CompanySettingsRepository::companyValue($k) ?? '');
+        $company = OrderSnapshotService::companyReader($s['company_snapshot_json'] ?? null); // D-262: frozen at the first PO
         $lines = [];
         $total = 0;
         foreach (ImportRepository::lines($shipmentId) as $i => $l) {

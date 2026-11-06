@@ -32,6 +32,12 @@ final class DocumentGenerationService
 {
     public static function generate(int $orderId, string $documentTypeCode, int $generatedByUserId, ?int $signatoryOverrideUserId = null, bool $generateDocx = false, bool $allowOverride = false, ?string $documentDate = null): array
     {
+        // D-262: once the PI is approved the order's own copy of the clauses and company details is used.
+        return OrderSnapshotService::within($orderId, fn (): array => self::generateUnfrozen($orderId, $documentTypeCode, $generatedByUserId, $signatoryOverrideUserId, $generateDocx, $allowOverride, $documentDate));
+    }
+
+    private static function generateUnfrozen(int $orderId, string $documentTypeCode, int $generatedByUserId, ?int $signatoryOverrideUserId = null, bool $generateDocx = false, bool $allowOverride = false, ?string $documentDate = null): array
+    {
         $pdo = Database::connection();
 
         $docType = self::findDocumentType($documentTypeCode);
@@ -656,6 +662,23 @@ final class DocumentGenerationService
     public static function finalizeApproval(int $documentId): void
     {
         $document = DocumentRepository::find($documentId);
+        $orderId = $document !== null && $document['order_id'] !== null ? (int) $document['order_id'] : null;
+        if ($orderId === null) {
+            self::finalizeApprovalUnfrozen($documentId);
+            return;
+        }
+        OrderSnapshotService::within($orderId, static function () use ($documentId): void {
+            self::finalizeApprovalUnfrozen($documentId);
+        });
+        // D-262: the order keeps its own copy of what printed it from the moment its PI is first approved.
+        if (($document['document_type_code'] ?? null) === 'PI') {
+            OrderSnapshotService::freeze($orderId);
+        }
+    }
+
+    private static function finalizeApprovalUnfrozen(int $documentId): void
+    {
+        $document = DocumentRepository::find($documentId);
         if (!$document) {
             throw new \RuntimeException("Document {$documentId} not found");
         }
@@ -856,6 +879,19 @@ final class DocumentGenerationService
     public static function markSuperseded(int $documentId): void
     {
         $document = DocumentRepository::find($documentId);
+        $orderId = $document !== null && $document['order_id'] !== null ? (int) $document['order_id'] : null;
+        if ($orderId === null) {
+            self::markSupersededUnfrozen($documentId);
+            return;
+        }
+        OrderSnapshotService::within($orderId, static function () use ($documentId): void {
+            self::markSupersededUnfrozen($documentId);
+        });
+    }
+
+    private static function markSupersededUnfrozen(int $documentId): void
+    {
+        $document = DocumentRepository::find($documentId);
         if (!$document || $document['order_id'] === null) {
             return;
         }
@@ -989,6 +1025,16 @@ final class DocumentGenerationService
      * status the amendment is in.
      */
     public static function generateAmendment(int $amendmentId, int $generatedByUserId): array
+    {
+        $stmt = Database::connection()->prepare('SELECT order_id FROM amendments WHERE id = :id');
+        $stmt->execute(['id' => $amendmentId]);
+        $orderId = (int) ($stmt->fetchColumn() ?: 0);
+        return $orderId > 0
+            ? OrderSnapshotService::within($orderId, fn (): array => self::generateAmendmentUnfrozen($amendmentId, $generatedByUserId))
+            : self::generateAmendmentUnfrozen($amendmentId, $generatedByUserId);
+    }
+
+    private static function generateAmendmentUnfrozen(int $amendmentId, int $generatedByUserId): array
     {
         $amendment = AmendmentRepository::find($amendmentId);
         if (!$amendment) {
@@ -1164,6 +1210,11 @@ final class DocumentGenerationService
      */
     public static function generateCaInternalAnnexure(int $orderId, int $generatedByUserId): array
     {
+        return OrderSnapshotService::within($orderId, fn (): array => self::generateCaInternalAnnexureUnfrozen($orderId, $generatedByUserId));
+    }
+
+    private static function generateCaInternalAnnexureUnfrozen(int $orderId, int $generatedByUserId): array
+    {
         $order = OrderRepository::find($orderId);
         if (!$order) {
             throw new \RuntimeException("Order {$orderId} not found");
@@ -1264,6 +1315,11 @@ final class DocumentGenerationService
      * must save BL Number/Vessel-Voyage/Ports/Date of Endorsement first).
      */
     public static function generateBlEndorsement(int $orderId, int $generatedByUserId): array
+    {
+        return OrderSnapshotService::within($orderId, fn (): array => self::generateBlEndorsementUnfrozen($orderId, $generatedByUserId));
+    }
+
+    private static function generateBlEndorsementUnfrozen(int $orderId, int $generatedByUserId): array
     {
         $order = OrderRepository::find($orderId);
         if (!$order) {

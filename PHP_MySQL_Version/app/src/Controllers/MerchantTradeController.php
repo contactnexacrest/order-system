@@ -135,7 +135,7 @@ final class MerchantTradeController
             'figures' => MerchantTradeService::figures($d),
             'payments' => MerchantTradeRepository::payments($id),
             'checks' => MerchantTradeService::checksFor($d),
-            'docs' => MerchantTradeService::bankDocuments(),
+            'docs' => MerchantTradeService::dealBankDocuments($d), // D-262: the checklist the deal was made under
             'received' => MerchantTradeRepository::documents($id),
             'blockers' => MerchantTradeService::blockers($id),
             'canEdit' => self::can('manage_purchasing'),

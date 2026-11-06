@@ -220,7 +220,8 @@ final class MerchantTradeTest extends DbTestCase
         self::assertNull(M::recordPayment($id, ['leg' => 'buy', 'moved_on' => self::daysAgo(35), 'amount_fc' => '8000', 'fx_rate' => '91.20', 'bank_reference' => "SWIFT-MTT-A-{$id}"], $this->mttStaff));
         self::assertSame("Merchant trade supplier advance of EUR 8,000.00 (₹7,29,600.00 at 91.20) to TEST-Anatolia Marble (Turkey) against merchant trade deal {$d['reference']}, PO {$d['po_no']}, SWIFT/UTR ref SWIFT-MTT-A-{$id}",
             MerchantTradeRepository::payments($id)[0]['description']);
-        Database::connection()->exec("UPDATE division_settings SET setting_value = '10000' WHERE division_id = 3 AND setting_key = 'mtt_advance_limit_usd'");
+        // D-262: the deal keeps the RBI settings it was made under, so the lower limit is set on the deal's own copy.
+        Database::connection()->prepare("UPDATE merchant_deals SET rbi_settings_json = JSON_SET(rbi_settings_json, '$.mtt_advance_limit_usd', '10000') WHERE id = :id")->execute(['id' => $id]);
         $second = ['leg' => 'buy', 'moved_on' => self::daysAgo(34), 'amount_fc' => '8000', 'fx_rate' => '91.20', 'bank_reference' => "SWIFT-MTT-B-{$id}"];
         self::assertSame('This would make the advance to the supplier USD 17,371.42, above the USD 10,000.00 limit for an advance not backed by an LC or bank guarantee (RBI merchanting rule, to be confirmed with the AD bank). Record the LC or bank guarantee first.',
             M::recordPayment($id, $second, $this->mttStaff));

@@ -278,9 +278,37 @@ async function rbiSettings() {
   return out;
 }
 
+function frozenRbi(deal) {
+  const raw = deal ? deal.rbi_settings_json : null;
+  if (raw === null || raw === undefined || raw === '') return null;
+  if (typeof raw === 'object') return raw;
+  try { const v = JSON.parse(raw); return v && typeof v === 'object' ? v : null; } catch (e) { return null; }
+}
+
+/** D-262: the RBI settings the deal was made under (frozen at creation), else today's. */
+async function dealRbiSettings(deal) {
+  const frozen = frozenRbi(deal);
+  const live = await rbiSettings();
+  if (!frozen) return live;
+  for (const k of Object.keys(live)) {
+    if (frozen[k] !== undefined && frozen[k] !== null && frozen[k] !== '') live[k] = String(frozen[k]);
+  }
+  return live;
+}
+
+/** D-262: the AD bank's document checklist the deal was made under. */
+async function dealBankDocuments(deal) {
+  const frozen = frozenRbi(deal);
+  const bd = frozen ? frozen.bank_documents : null;
+  if (bd && typeof bd === 'object' && !Array.isArray(bd) && Object.keys(bd).length > 0) {
+    return Object.fromEntries(Object.entries(bd).map(([k, v]) => [k, String(v)]));
+  }
+  return bankDocuments();
+}
+
 /** The RBI checks of a stored deal, today. */
 async function checksFor(deal, today = null) {
-  return rbiChecks(deal, await repo.payments(Number(deal.id)), await bankDocuments(), await repo.documents(Number(deal.id)), await rbiSettings(), today || todayIst());
+  return rbiChecks(deal, await repo.payments(Number(deal.id)), await dealBankDocuments(deal), await repo.documents(Number(deal.id)), await dealRbiSettings(deal), today || todayIst());
 }
 
 /** The worst level of a deal's checks: breach > warn > ok/info. */
@@ -292,7 +320,7 @@ function worstLevel(checks) {
 
 /** The deal's money and margin from the database. */
 async function figures(deal, executor) {
-  return money(deal, await repo.lines(Number(deal.id), executor), await repo.payments(Number(deal.id), executor), await setting('mtt_usd_inr_rate'));
+  return money(deal, await repo.lines(Number(deal.id), executor), await repo.payments(Number(deal.id), executor), (await dealRbiSettings(deal)).mtt_usd_inr_rate);
 }
 
 // ------------------------------------------------------------ helpers
@@ -344,6 +372,9 @@ async function create(input, userId) {
   fields.reference = await nextReference('MTT-DEAL', '');
   fields.po_no = await nextReference('MTT-PO', 'PO');
   const id = await repo.insert(fields, userId);
+  // D-262: the deal keeps the RBI settings and the bank's checklist it was made under.
+  await db.execute('UPDATE merchant_deals SET rbi_settings_json = :j WHERE id = :id',
+    { j: JSON.stringify({ ...(await rbiSettings()), bank_documents: await bankDocuments() }), id });
   await auditLogRepository.log(userId, 'MERCHANT_DEAL_CREATED', 'merchant_deals', id, 'reference', null, fields.reference);
   return [id, null];
 }
@@ -439,7 +470,7 @@ async function saveShipment(id, input, userId) {
 /** Ticks (or unticks, date '') one document of the AD bank's checklist. */
 async function saveDocument(id, key, date, userId) {
   const d = await repo.find(id);
-  const docs = await bankDocuments();
+  const docs = d ? await dealBankDocuments(d) : await bankDocuments();
   let error = null;
   if (!d) error = 'Deal not found.';
   else if (d.stage === 'closed') error = 'The deal is closed.';
@@ -496,11 +527,12 @@ async function recordPayment(id, input, userId) {
   const fx = str(input.fx_rate);
   const ref = str(input.bank_reference);
   const note = str(input.note);
-  const usdRate = await setting('mtt_usd_inr_rate');
-  const limit = G.scaled(await setting('mtt_advance_limit_usd'), 2);
   const result = await db.transaction(async (trx) => {
     const d = await repo.lock(id, trx);
     if (!d) return 'Deal not found.';
+    const rbi = await dealRbiSettings(d);
+    const usdRate = rbi.mtt_usd_inr_rate;
+    const limit = G.scaled(rbi.mtt_advance_limit_usd, 2);
     const error = await paymentError(d, leg, date, amount, fx, ref, note, trx);
     if (error !== null) return error;
     const payments = await repo.payments(id, trx);
@@ -536,6 +568,13 @@ function nowIst() {
 
 async function markPoGenerated(id, userId) {
   await repo.update(id, { po_generated_at: nowIst() }, userId);
+  await freezeCompany(id);
+}
+
+/** D-262: the deal keeps the company details its first document printed (PO or sale invoice). */
+async function freezeCompany(id) {
+  await db.execute('UPDATE merchant_deals SET company_snapshot_json = :j WHERE id = :id AND company_snapshot_json IS NULL',
+    { j: await require('./orderSnapshotService').companyValuesJson(), id });
 }
 
 /** Fixes the sale invoice number the first time the invoice is generated (it needs the BL). Returns why not, or null. */
@@ -550,6 +589,7 @@ async function fixInvoice(id, userId) {
     fields.invoice_date = todayIst();
   }
   await repo.update(id, fields, userId);
+  await freezeCompany(id);
   if (fields.sale_invoice_no) await auditLogRepository.log(userId, 'MERCHANT_INVOICE_FIXED', 'merchant_deals', id, 'sale_invoice_no', null, fields.sale_invoice_no);
   return null;
 }
@@ -570,7 +610,7 @@ async function blockers(id) {
     if (f.received_cents < f.sale_cents) out.push(`Still to receive from the buyer: ${d.sale_currency} ${I.fc(f.sale_cents - f.received_cents)}.`);
     if (f.paid_cents < f.purchase_cents) out.push(`Still to pay the supplier: ${d.purchase_currency} ${I.fc(f.purchase_cents - f.paid_cents)}.`);
   } else if (d.stage === 'settled') {
-    const docs = await bankDocuments();
+    const docs = await dealBankDocuments(d);
     const have = await repo.documents(id);
     const missing = Object.keys(docs).filter((k) => !(k in have)).map((k) => docs[k]);
     if (missing.length > 0) out.push(`Documents still to give the AD bank: ${missing.join('; ')}.`);
@@ -639,6 +679,6 @@ async function reportRows() {
 module.exports = {
   CODE, STAGES, STAGE_KEYS, LEGS, BACKING, DEFAULTS, INCOTERMS, WARN_DAYS,
   divisionId, isActive, setting, bankDocuments, docKey, addMonths, daysBetween, dmy, money, usdCents, advances, outlayPeriods, rbiChecks,
-  rbiSettings, checksFor, worstLevel, figures, headerFields, create, saveHeader, addLine, removeLine, saveBacking, saveShipment, saveDocument,
+  rbiSettings, dealRbiSettings, dealBankDocuments, checksFor, worstLevel, figures, headerFields, create, saveHeader, addLine, removeLine, saveBacking, saveShipment, saveDocument,
   paymentDescription, recordPayment, markPoGenerated, fixInvoice, blockers, advance, runAlerts, reportDivisionIds, reportRows,
 };

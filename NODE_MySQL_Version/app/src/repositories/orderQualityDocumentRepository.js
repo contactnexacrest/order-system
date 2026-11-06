@@ -35,7 +35,7 @@ async function forOrder(orderId) {
   const out = [];
   ids.sort((a, b) => a - b);
   for (const cid of ids) {
-    const category = await productCategoryRepository.find(cid);
+    const category = await require('../services/orderSnapshotService').category(orderId, cid); // D-262: frozen with the order
     if (!category) continue;
     for (const doc of productCategoryRepository.qualityDocuments(category)) {
       const r = stored[`${cid}|${doc.toLowerCase()}`] || null;

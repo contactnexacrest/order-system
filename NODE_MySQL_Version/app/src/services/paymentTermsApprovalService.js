@@ -13,7 +13,9 @@ const auditLogRepository = require('../repositories/auditLogRepository');
  */
 async function state(orderId) {
   const row = await db.queryOne(
-    `SELECT pp.requires_md_approval, pp.preset_name, o.payment_terms_approved_at, u.name AS approved_by_name
+    // D-262: the flag frozen with the order once its PI is approved, and the preset name the order was made with.
+    `SELECT COALESCE(o.payment_terms_requires_md_approval, pp.requires_md_approval) AS requires_md_approval,
+            COALESCE(o.preset_name, pp.preset_name) AS preset_name, o.payment_terms_approved_at, u.name AS approved_by_name
      FROM orders o
      JOIN payment_presets pp ON pp.id = o.payment_preset_id
      LEFT JOIN users u ON u.id = o.payment_terms_approved_by

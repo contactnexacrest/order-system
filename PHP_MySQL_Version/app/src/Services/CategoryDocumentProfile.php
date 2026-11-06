@@ -60,7 +60,7 @@ final class CategoryDocumentProfile
         $stmt->execute(['o' => $orderId]);
         $categories = [];
         foreach (array_filter(array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN))) as $cid) {
-            $c = ProductCategoryRepository::find($cid);
+            $c = OrderSnapshotService::category($orderId, $cid); // D-262: frozen with the order once its PI is approved
             if ($c !== null) {
                 $categories[] = $c;
             }

@@ -29,7 +29,7 @@ final class MerchantDocumentService
         if ($d === null || !isset(self::KINDS[$kind])) {
             throw new \RuntimeException('Deal not found.');
         }
-        $company = static fn (string $k): string => (string) (CompanySettingsRepository::companyValue($k) ?? '');
+        $company = OrderSnapshotService::companyReader($d['company_snapshot_json'] ?? null); // D-262: frozen at the first PO / invoice
         $invoice = $kind === 'invoice';
         $currency = (string) ($invoice ? $d['sale_currency'] : $d['purchase_currency']);
         $lines = [];
