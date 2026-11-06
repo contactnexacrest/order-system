@@ -9,7 +9,8 @@ pipeline, because they can happen at almost any point in an order's life
 - **Editing an order's core details** after it was created — Incoterm,
   currency, ports, COO type, container type, special requirements,
   estimated weight/volume, indicative freight/insurance, and the buyer's
-  own PO reference.
+  own PO reference. (**The Incoterm is locked once Stage 6 is skipped,
+  in progress or passed** — D-258, 6 Nov 2026.)
 - **Duplicating a product line** on an order — a quick way to add a near-
   identical line when only the name or dimensions differ.
 - **Duplicating a whole order** — a repeat order for the same client,

@@ -25,6 +25,8 @@ together with the application.
   COO Prep Sheet (13a) from Stage 8, before the balance clears; the
   Export Compliance department (filter chip, compliance checklist, 13a);
   "Sync this order to Zoho now".
+  Updated 6 Nov 2026 (D-258, ORD-14): Close Order (13f) needs the original
+  BLs received (11a) and endorsed (13e).
 
 The specification (v3) reflects the decisions up to 30 Oct 2026. The
 decisions taken since — D-212 (money descriptions) to D-241 (gap list, CFR
@@ -33,8 +35,8 @@ wording, freight in rupees, Export Compliance, remittance differences,
 Agreements register, money safety, document copies clean-up, associate TDS,
 ECGC / eBRC tracking, Logistics entering logistics bills, Zoho client / product
 sync and call limits, the reference price with discount approval (since
-replaced by D-245 pricing), go-live without migrations, and D-245 pricing,
-commission and team incentive) — are in `docs/decisions/owner-decisions-register.md`
+replaced by D-245 pricing), go-live without migrations, D-245 pricing,
+commission and team incentive, D-257 divisions and D-258 the QA programme) — are in `docs/decisions/owner-decisions-register.md`
 and in the guide and the SOP; where they differ from the specification,
 the register wins.
 

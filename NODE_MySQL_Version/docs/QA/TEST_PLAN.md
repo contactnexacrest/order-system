@@ -26,7 +26,7 @@ through those dedicated suites rather than duplicated here.
   of the original inventory) hang directly off
   `orders.id` (the order-lifecycle-dependent tables — see
   `_inventory_raw.md` §3 for the full list).
-- **8 roles, 63 permissions** (`docs/seed.sql`), plus two mechanisms that
+- **8 roles, 63 permissions** at the time of this inventory (**now 24 roles and 94 permissions** — see section 14) (`docs/seed.sql`), plus two mechanisms that
   sit outside the role/permission matrix entirely and must be tested
   separately: per-user permission overrides (`user_permissions`) and the
   Super Admin tier (`users.is_super_admin`, `super_admin_delegations`),
@@ -496,8 +496,34 @@ Totals at go-live (2 Nov 2026): PHPUnit 2,191 tests; Jest 392 suites / 2,258 tes
 | Test | What it proves |
 |---|---|
 | `divisionIsolation.test.js` | A second division (DOM) made active inside the test only: each division's staff never see the other's orders (list, board, archive, order page, child routes, single-order report), clients, reports (payments, countries), dashboard search, tasks/cockpit, CAFIN CSV order list or waiting-email badge; company-level people see both, pick one in the switcher, and "All"; a new order asks for the division on "All"; the switcher, report Division filter and user/department Division field appear only with two or more active divisions; numbering is separate (DOM/…) and Export's next number unchanged; a division setting overrides the company value only in that division; a module switched off hides its menu and refuses its address (403); Export's QT/PI/OC/CI/PL document data is identical with and without a division scope; a planned division is not activated before its pre-flight checklist is complete. |
+| `d257ProductNeutral.test.js` | Phase 0B: category settings (units, HS default, packing, quality documents, clause set); Natural Stone unchanged; a test-only Engineering category priced per piece end to end; the quality-document checklist. |
+| `freshReviewFixes.test.js` | Phase 0C.6 review fixes: USD-fixed commission/incentive rate, lock/unlock race, level after a client moves, PHP-equal rounding, option change voids the PI approval, GST in the commission payment text. |
+| `categoryDrivenDocuments.test.js` | Phase 1: a non-stone category prints its own packing words, quality documents and T&C clauses on QT, PI, OC, CI, PL and the supplier PO; mixed orders. |
+| `stoneDocumentsUnchanged.test.js` | Natural Stone QT, PI, OC, CI, PL, SUPPO, BLI and COO-prep (FOB and CIF, PDF and Word, 32 copies) render text-identical to the stored fixtures, on a fresh schema + seed database. Fixtures changed once, on purpose, by the owner-approved DOC-1/DOC-3 (Word only). |
+| `domesticTrade.test.js` | Phase 2: GST maths (CGST + SGST / IGST, paise rounding, round-off), planned-state guarantees, one domestic order end to end, isolation, Zoho payload and Division tag, Admin › Divisions set-up. |
+| `importDistribution.test.js` | Phase 3: landed cost and duty maths, stock never below zero (two issues at once), import end to end then a local sale from stock, isolation, list/board parity. |
+| `merchantTrade.test.js` | Phase 4: deal end to end, RBI checks and reminders, margin in ₹ and USD, payment race, invoice number `MTT/I/…` (16 characters), isolation, planned state. |
+| `divisionOverheadAndInvestor.test.js` | Phase 5: overhead shared by revenue only with two or more active divisions (report unchanged with one); the Investor role walks every route — read only. |
+| `divisionZohoSync.test.js` | D-257 (6): the new divisions' invoices, bills, payments, duty, clearance charges and IGST journal reach Zoho (mocked), duplicate guard, Sync Log rows, the per-record check against Books. |
 
-No existing test was changed.
+Existing tests changed on purpose are listed in section 14.
+
+## 14. Added since (5–6 Nov 2026: the full QA programme, D-258)
+
+The master plan for this round is the root [`docs/QA/MASTER_TEST_PLAN.md`](../../../docs/QA/MASTER_TEST_PLAN.md) (inventory, matrices, gaps). **Current size:** 190 tables, 24 roles, **94 permissions** (section 2 above still lists the 30 Oct grant table — `docs/seed.sql` is the source of truth), 735 routes (242 GET, 493 POST).
+
+| Test | What it proves |
+|---|---|
+| `qaBatch1AccessUi.test.js`, e2e `13-qa-batch1` | Access and UI fixes ACC-1…18 and UI-1…15: encoded ids refused, Preview as read-only, Super Admin rules, division filters on CA lists and queues, the payment-difference reason, confirm prompts with names, working bank-reference patterns. |
+| `qaBatch2.test.js`, e2e `14-qa-batch2` | Orders ORD-01…15 (cancellation and refund rules, Mark Lost after money, incoterm and LC locks, intake Export only, payment races) and ACC-4 (Merchant Trade selling side hidden from Procurement). |
+| `qaBatch3DocsMail.test.js` | Documents DOC-1…7 (date format, revisions from their stored data, Word = PDF, Buyer PO / QT payment terms and all lines) and e-mail MAIL-1…13 (overdue freight alert, the sending-off switch on every business mail, honest send messages). |
+| `qaBatch4.test.js` | Money MON-1…8 (TDS cap and carry-forward, milestone money in profit and CAFIN, rounding, bank charges, benefits in INR), ORD-09 (balance net of write-offs), ORD-14 (closure needs the original BLs), Zoho sync lock and look-up before posting. |
+| `qaIncotermPresetMatrix.test.js` | FOB / CFR / CIF × every payment preset taken through the documents: no exception, totals consistent, wording matching the preset (165 combinations per stack). Runs on its own fresh database. |
+| `qaMailMatrix.test.js` | Every e-mail template and send condition (approval first, deferred, Test Mode redirect, sending off, missing recipient, attachments): recipient, subject, no literal `{token}`, CAFIN never attached for a client. Runs on its own fresh database. |
+| e2e `qa-roles-permissions-matrix.spec.js` | Every role and every single permission (118 test users) against every staff GET route: allowed exactly when its gate says, no error page, no money or CAFIN for roles without money rights (23,010 requests per stack, 0 wrong). |
+| e2e `qa-ui-crawl.spec.js` | A human-style click-through of about 420 pages per run, both templates (Standard and Kanban), desktop and phone: every link, tab and step card; forms submitted empty and with bad values; console errors, 4xx/5xx, broken links and overflow. |
+
+Existing tests changed on purpose in this round (each listed in the register row): the cancellation-workflow approve test (a refund needs money received), the Merchant Trade staff role (ACC-4), the payment-terms Word wording (DOC-3), vendor payment descriptions with " · bank ref" (ZOH-18), closure fixtures that now record the original BLs (ORD-14), and the Zoho clients/products isolation.
 
 ## Appendix
 

@@ -76,7 +76,8 @@ From **Disputes** on the order page:
 
 **Log Dispute** — notice date, who it's from (free text, e.g. "Buyer, via
 email"), a mandatory description, and optionally assign it to a specific
-staff member.
+staff member. The notice date must be a real date, today or earlier, and
+the assignee must be an active user (D-258, 6 Nov 2026).
 
 For each logged dispute, staff can then update its **Status** (with
 resolution notes once resolved) and **Attach Document** — any evidence or

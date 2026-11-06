@@ -6,6 +6,8 @@ Prepared 5 Nov 2026 (Phase 0C.1). Work through it top to bottom on go-live day, 
 
 - [ ] **CA:** confirm GST on commission for associates **abroad** (reverse charge, 15CA/15CB, TDS section 195). Until confirmed, do not pay any associate abroad.
 - [ ] **Lawyer:** the Associate agreement and the manager's Schedule A are final (see `docs/legal/D-245-lawyer-notes.md`). Signed copies are ready for upload.
+- [ ] **Lawyer, before the first non-stone sale:** review the new general / engineering T&C clauses (Product Characteristics, Specification & Drawings, Quantity Tolerance (Goods), Quality Documents, and the two supplier PO clauses — SOP 27, "Documents follow the category").
+- [ ] **Only before activating Domestic Trade, Import & Distribution or Merchant Trade** (not needed for Export go-live): the CA confirms GST rates by HSN, the e-way bill limit, e-invoicing, import duty rates and the Zoho account names; the AD bank confirms the merchanting rules and gives its merchanting approval (SOPs 29, 30, 31; register O-23).
 - [ ] **Zoho:**
   - [ ] the live organisation is set up: bank (deposit) account, GST, TDS taxes, chart of accounts;
   - [x] the GST commission-bill test has passed in the **test** organisation, logged in `docs/zoho/zoho-change-log.csv` (done 5 Nov 2026, Z-690 to Z-693);
@@ -35,7 +37,7 @@ Prepared 5 Nov 2026 (Phase 0C.1). Work through it top to bottom on go-live day, 
   - [ ] Zoho: `ZOHO_INTEGRATION_ENABLED=true` and `ZOHO_ENVIRONMENT=production` only when the live Zoho organisation is ready;
   - [ ] `ZOHO_EINVOICE_ENABLED=false`.
 - [ ] Point the web root at `public_html/` (PHP), or start the Node service.
-- [ ] Set up the scheduled jobs (README: "Bluehost cron setup" or "Background jobs"): daily digest and alerts, Zoho sync, backups.
+- [ ] Set up the scheduled jobs (README: "Bluehost cron setup" or "Background jobs"): daily digest and alerts, Zoho sync, backups. Run them in Indian time (`CRON_TZ=Asia/Kolkata`): alerts at 06:00, digest at 08:15.
 - [ ] Set up the **database and storage backups** (README, Section 14). Test one restore.
 
 ## C. First login and company setup
@@ -82,7 +84,7 @@ Prepared 5 Nov 2026 (Phase 0C.1). Work through it top to bottom on go-live day, 
 ## F. Dry run (still on the live server, using test mode)
 
 - [ ] Switch on **test mode** (references get a `TEST-` prefix).
-- [ ] Create one order end to end: quotation → PI → advance (enter the **INR credited by the bank**) → supplier PO → freight → BL → commercial invoice → balance → closure. Generate every document and check the PDFs.
+- [ ] Create one order end to end: quotation → PI → advance (enter the **INR credited by the bank**) → supplier PO → freight → BL → commercial invoice → balance → original BLs received and endorsed → closure (Close Order needs both). Generate every document and check the PDFs.
 - [ ] Check CAFIN, the profit report, and the incentive and commission register (estimated, then locked).
 - [ ] Check a sales staff login: no cost, margin or commission visible. Check the client portal: no CAFIN, no internal prices.
 - [ ] Check that Zoho received exactly what was expected (only if Zoho is switched on). Log it in the Zoho change log.

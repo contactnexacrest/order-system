@@ -111,6 +111,10 @@ Everything starts from the **Reports** hub:
   order for any date range, with a totals row. Visible only to Super
   Admin and roles granted **Manage order financials**; see [Order
   Financials](./ca-08-order-financials.md#the-order-profitability-report).
+  With two or more active divisions, the "All divisions" view adds a
+  **Profit by division** section with company overhead shared by revenue
+  (see [Divisions](./28-divisions.md)). Payment-milestone money counts as
+  revenue (D-258, 6 Nov 2026).
 - **Associates report** (`/reports/associates`, owner decision D-217) —
   per financial year: performance per associate (clients, orders, FOB
   value, commission paid, TDS, waiting), commission waiting (ageing, with

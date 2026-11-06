@@ -832,23 +832,44 @@ parity rule).
 
 1. **`send_esi` template missing.** ESI is buyer-sendable, but sending it
    through the queue would fail (`EmailDispatchService::buildPreview`).
+   **Done 6 Nov:** `send_esi` added (MAIL-7, D-258 QA3).
 2. **`EmailService::sendPlainText` does not check `mail_sending_enabled`.**
    With mail "off", invites, link e-mails and notifications still go out
    over SMTP. This is the same on both stacks. Confirm whether intended.
+   **Done 6 Nov:** every business e-mail now goes through the one sender that
+   obeys the switch (MAIL-2, D-258 QA3).
 3. **Uncommitted work in the tree (excluded from counts):** four new PHP
    routes (`GET /domestic/orders/{id}/zoho-check`,
    `POST /import/{id}/duty-payment`, `GET /import/{id}/zoho-check`,
    `GET /merchant/{id}/zoho-check`) with no Node counterpart yet. The view
    `import/show.php` already posts to `/import/{id}/duty-payment`. Re-run
    the inventory once this lands, and fail the build if the two stacks
-   differ.
+   differ. **Done 6 Nov:** landed on both stacks with the Zoho round
+   (D-257 (6)); the route tables match (735 routes).
 4. **Associate login code and buyer verification code are sent as
    ordinary e-mail**, so they are redirected and CC'd when mail redirect
-   is on.
+   is on. **Done 6 Nov:** they now count as security mail (MAIL-13).
 5. **`two_fa_backup_codes` is unused** by app code on both stacks, so
-   there is no 2FA backup-code path.
+   there is no 2FA backup-code path. **Still open** (no backup codes are
+   offered; nothing is broken).
 6. **The permission category `Admin` (capital A)** on
    `manage_approval_limits` splits the admin group in the permission
-   editor.
+   editor. **Still open** (cosmetic; a seed change).
 7. **The permission count is 94, not 154.** Update any document that
-   says 154.
+   says 154. **Done 6 Nov:** READMEs, TEST_PLAN and the register now say 94;
+   no document said 154 (older sections quoting 60 or 63 are dated history).
+
+## 11. Results of this round (6 Nov 2026)
+
+- **Code review (Q2):** 107 bugs no test covered — ORD 15, MON 8, DOC 7,
+  MAIL 13, ACC 18, UI 15, ZOH 24, PAR 7. Fixed in batches QA1–QA4 (register
+  D-258); the deferred items are register open point O-22.
+- **Roles and single permissions:** 118 test users × every staff GET route,
+  23,010 requests per stack, 0 wrong answers, 0 errors.
+- **Incoterm × preset:** 165 combinations per stack, 0 crashes, 0 wrong
+  totals or wordings.
+- **Mail matrix:** 0 problems on either stack.
+- **UI crawl:** about 420 pages per run, Standard and Kanban, desktop and
+  phone, both stacks. One finding: hidden required fields on the order
+  page's travel-expense form made the browser report "not focusable" on
+  PHP — handed to a separate fix (see register D-258).

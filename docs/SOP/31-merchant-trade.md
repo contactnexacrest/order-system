@@ -34,6 +34,16 @@ Menu **Operations › Merchant trade** (people who see purchase prices). *New de
 | **Settled** | Tick each document of the **AD bank's checklist** with the date the bank received it. | Every document with the bank |
 | **Closed** | Done. The closing date counts for the 9-month check. | — |
 
+## Who sees the selling side (6 Nov 2026, D-258)
+
+The sale prices, sale totals, margin, the buyer's name and the buyer's
+payments are shown only to people with the selling-side money rights.
+Procurement sees the purchase side only: on the deal page, the list, the
+board and the reports. Without those rights a user cannot edit the deal
+header, add lines, or generate and number the sale invoice. The PO can
+still be downloaded; only someone with *Manage purchasing* marks it as
+generated.
+
 ## Money on both legs (rule D-212)
 Each entry is **paid to the supplier** (buy leg, purchase currency) or **received from the buyer** (sell leg, sale currency), with the amount, the bank's rate and the **SWIFT / UTR reference (required)**. The app writes the description, for example:
 - *"Merchant trade supplier advance of EUR 8,000.00 (₹7,29,600.00 at 91.20) to Anatolia Marble (Turkey) against merchant trade deal MTT/26-27/0001, PO MTT/PO/26-27/0001, SWIFT/UTR ref …"* — a supplier payment before any money from the buyer is an **advance**; when it is backed by an LC or bank guarantee the description says so.

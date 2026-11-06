@@ -54,6 +54,9 @@ the role behind it. From this page Admin can:
 - **Preview the app as this** — see the app exactly as that designation
   sees it. Admin's own extra rights are off during a preview. A yellow
   banner stays at the top; **Exit preview** returns to Admin.
+  **A preview is look-only (6 Nov 2026, D-258):** nothing can be saved,
+  approved or sent while previewing — every save is refused except
+  **Exit preview** and log out.
 
 A department or designation switched off can no longer be chosen at
 "Log in as"; people in it fall back to their other departments.

@@ -48,7 +48,10 @@ the scheme (RODTEP is the default; Admin can add more schemes under
 Settings → Dropdown Options → `export_benefit_scheme`), optionally the
 order it relates to (type the order reference — a claim doesn't have to
 be tied to one order), the shipping bill/scroll number if you have it,
-the amount claimed, the currency, and the claim date.
+the amount claimed and the claim date. **Benefits are always in INR**
+(6 Nov 2026, D-258): the currency is fixed to INR, because RoDTEP,
+Drawback and RoSCTL are credited in rupees, so profit and CAFIN count
+them correctly.
 
 ## Marking a claim received
 

@@ -70,3 +70,15 @@ The salary, probation and other employment terms are unchanged.
 ## 4. To check with the CA
 
 **GST for associates outside India:** confirm how GST applies (likely reverse charge on an import of services) before the first payout to an associate based abroad.
+
+## 5. New T&C clauses for goods other than natural stone (D-257 Phase 1, 5 Nov 2026)
+
+When an order is for a category other than Natural Stone, the QT, PI, OC, CI and supplier PO now print that category's clause set instead of the stone clauses. The starting wording, written by us and **not yet reviewed**, is in `docs/seed.sql` (table `tc_clauses`, clause sets for general and engineering goods):
+
+- Product Characteristics
+- Specification & Drawings
+- Quantity Tolerance (Goods)
+- Quality Documents
+- on the supplier PO: Conformity to Specification, and Traceability & Test Certificates
+
+Please review them before the first non-stone sale. The stone clauses are unchanged. The wording can be changed in Admin › Overrides without a code change.

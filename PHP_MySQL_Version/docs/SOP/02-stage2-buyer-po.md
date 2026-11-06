@@ -21,6 +21,11 @@ Step 4 on the order page has four sub-steps, done in order:
    Quotation, with a blank "Buyer Acceptance" section at the end for the
    buyer to sign and return. This is the document that gets sent out —
    generating it does **not** pass the gate.
+   Its payment terms come from the order itself (6 Nov 2026, D-258, owner
+   double-confirmed): an LC order shows the LC terms (never "0% advance"),
+   payment milestones are listed, the balance uses the order's own balance
+   wording, and quantity, unit and price list every product line. The QT
+   lists the milestones too.
 
 2. **4b · Send Buyer PO Action Link** *(optional)* — generates a
    no-login link (emailed to the client when they have an email on file,

@@ -63,6 +63,15 @@ created by accident.
   one revision of a document type can ever be the valid one at a time; a
   superseded copy is never deleted (same soft-delete-only rule as every
   other generated file) but is unmistakable the moment anyone opens it.
+  **The superseded and final copies show what was really issued (6 Nov
+  2026, D-258):** they are drawn again from the data stored when that
+  revision was made, with only the watermark changed — never from today's
+  order data. (Revisions made before 6 Nov keep the older behaviour.)
+- **A sent or superseded document cannot go back to review** (no new
+  reviewers, no reject back to draft). An approved but unsent one still can.
+- **The Word copy matches the PDF:** the same client revision label, the
+  file name `… Rev.<client revision> (internal).docx`, and the same
+  payment wording.
 - **A buyer-facing document past its first issue is stamped with its own
   revision number.** From the second time a document type is actually sent
   to a buyer onward, its watermark carries "— REVISION 02" (etc.) alongside
@@ -219,6 +228,17 @@ Two independent switches in Company Settings:
   starts at approval, and staff send the PDF themselves outside the app.
   Turn it on only once the SMTP server in `.env` works (use **Send Test
   Email** on Company Settings).
+  **Since 6 Nov 2026 (D-258) the switch really covers every business
+  e-mail:** document mails, the four buyer link mails (payment, buyer
+  action, registration, Buyer PO), notifications, alerts and digests,
+  portal invitations and supplier mails all go through the one sender that
+  obeys it, Test Mode and the redirect. Only security mail (2FA codes,
+  password resets, associate login and verification codes) bypasses it.
+  The screen now says honestly whether an e-mail really went; while sending
+  is off, the e-mail log keeps the full text so staff can send it
+  themselves. A document already sent can be sent again without
+  restarting the OC clock, and a missing attachment stops the send instead
+  of sending without it.
 - **`mail_approval_queue_enabled`** — on by default, preserving the two-level
   flow above exactly. Turned **off**, Level 1's submit button sends the
   email immediately instead of queuing it for a second approver — useful

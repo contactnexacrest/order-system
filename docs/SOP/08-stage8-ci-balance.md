@@ -178,3 +178,5 @@ still owed, except by a manager with **Approve short payment**, who writes
 the reason (not the person who recorded the receipts, unless their role is
 ticked in Admin → Self-approval rules); the shortfall is then recorded as written off and shown on the
 order. When it is written off, the manager also says **what the short is** — an agreed discount, a settled buyer claim, or not paid by the buyer (D-245 P3); this decides an associate's commission (chapter 24). See chapter 03, "Paid in parts", for the details.
+
+**The balance asked for is net of what was written off (6 Nov 2026, D-258, owner double-confirmed).** The Commercial Invoice, the buyer's payment page, the Buyer Action page and the staff checks all use one formula: total − money received − amounts written off on earlier legs and milestones. Example: FOB 10,000, advance 3,000 paid, a 3,000 milestone paid 2,900 with 100 written off as an agreed discount → the balance asked is 4,000. If the 100 is not written off, the balance stays 4,100.

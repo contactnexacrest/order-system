@@ -292,6 +292,11 @@ while it has something genuinely unresolved on it.
 
 ## Marking an order lost
 
+**Not once money has come in (6 Nov 2026, D-258):** Mark Lost is refused
+when any payment has been received, the LC is confirmed, or a cancellation
+is pending — use **Request Cancellation** instead, so the refund goes
+through approval.
+
 Any **active** order, at any stage, can be marked **lost** instead of
 progressing further — the buyer walked away, the deal fell through,
 whatever the reason (mandatory, free text). This locks the order the
@@ -319,6 +324,16 @@ shows "Cancellation requested by … — awaiting approval." A person with
 refund: **No refund applicable**, **Refund pending** or **Refund already
 completed**. Or they press **Reject Cancellation** and give the reason.
 Once a pending refund has been sent, press **Mark Refund Completed**.
+
+**Rules since 6 Nov 2026 (D-258):**
+- A cancellation can only be approved while the order is still active or
+  disputed. An old request left pending after the order shipped, settled
+  or was marked lost can no longer cancel it.
+- Approving never marks the refund completed by itself. The refund is
+  completed only through **Record refund paid**, with the date and the
+  bank reference (UTR / SWIFT), so it carries a full money description.
+- The refund amount must be more than zero and not more than the buyer has
+  actually paid.
 
 The person who requested the cancellation cannot approve or reject it
 ("You requested this cancellation — a different privileged person must

@@ -32,6 +32,16 @@ Nothing looks different. There is **no division switcher, no "All divisions", no
 
 A division with no orders can be set back to planned. **Export always stays active.**
 
+Staff placed in a division that is not active can look but cannot save anything (only log out and change their own password). Moving a user between divisions is refused for yourself (unless Super Admin), for protected accounts, and for moves outside your own divisions (D-258, 6 Nov 2026).
+
+## Investor (view only)
+
+The **Investor (view only)** role sees dashboards, the management cockpit and reports for every division, and nothing else. Every page that changes anything is refused (tested route by route, D-257 Phase 5). It has no access to the client portal.
+
+## Profit by division and shared overhead
+
+Once two or more divisions are active, **Reports › Order Profitability** viewed as "All divisions" gets a **Profit by division** section: each division's revenue and profit, its own costs, and its share of company overhead (company costs not tied to an order or a division), shared out in proportion to revenue. With one division the report is exactly as before. CAFIN is not changed by this.
+
 ## Facts that depend on the CA or the bank
 
 Values such as GST rates by HSN, e-invoice and e-way bill thresholds, and merchanting limits start from **standard Indian rules**. Each is an editable division setting and is **to be confirmed by the CA / bank** before the division goes live.

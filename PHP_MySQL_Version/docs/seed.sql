@@ -2040,7 +2040,7 @@ SELECT k.rule_key, r.id
    AND NOT EXISTS (SELECT 1 FROM audit_log a WHERE a.action_type = 'SELF_APPROVAL_RULE_CHANGED' AND a.field_name = k.rule_key);
 
 INSERT INTO permissions (permission_key, name, description, category)
-SELECT 'manage_approval_limits', 'Manage approval limits', 'Change a designation''s purchase approval limit or make it a ''director'' (no limit). Never on a designation one holds oneself. QA Round 8, R8-N10.', 'Admin'
+SELECT 'manage_approval_limits', 'Manage approval limits', 'Change a designation''s purchase approval limit or make it a ''director'' (no limit). Never on a designation one holds oneself. QA Round 8, R8-N10.', 'admin'
  WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE permission_key = 'manage_approval_limits');
 
 INSERT INTO role_permissions (role_id, permission_id)

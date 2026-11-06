@@ -89,7 +89,9 @@ of its own date (previously "3 working days" — every buyer payment
 obligation across the system now counts in Calendar Days, not Working
 Days, for consistency). The "by [date]" it prints is that date plus 3
 calendar days, and the overdue-freight alert to MD/Admin fires the day
-after it (owner decision 2026-10-28 — both used to count working days, so
+after it (it now really fires and shows on the dashboard panel — it finds
+the latest issued Debit Note itself, counted from the date printed on it;
+locked, cancelled and lost orders are left out; D-258, 6 Nov 2026) (owner decision 2026-10-28 — both used to count working days, so
 the printed date could fall later than the 3 Calendar Days stated beside
 it). Its GST/IGST line always reads "NIL — Freight
 recovery is a pure cost reimbursement, not a taxable service supply." This
