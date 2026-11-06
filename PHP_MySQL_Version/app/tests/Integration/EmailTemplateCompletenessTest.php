@@ -28,9 +28,17 @@ use App\Tests\Support\DbTestCase;
  */
 final class EmailTemplateCompletenessTest extends DbTestCase
 {
+    /** @var list<array<string,mixed>> */
+    private array $templateSnapshot = [];
+
     protected function setUp(): void
     {
         parent::setUp();
+        $keys = array_keys(self::seededDefaults());
+        $in = implode(',', array_fill(0, count($keys), '?'));
+        $stmt = Database::connection()->prepare("SELECT id, subject, body, is_active FROM email_templates WHERE template_key IN ($in)");
+        $stmt->execute($keys);
+        $this->templateSnapshot = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         $_POST = [];
         $_SESSION = [];
         http_response_code(200);
@@ -49,12 +57,11 @@ final class EmailTemplateCompletenessTest extends DbTestCase
      */
     protected function tearDown(): void
     {
-        foreach (self::seededDefaults() as $key => [$subject, $body]) {
-            $template = EmailTemplateRepository::find($key);
-            if ($template) {
-                EmailTemplateRepository::update((int) $template['id'], $subject, $body, null, 1);
-                EmailTemplateRepository::setActive((int) $template['id'], true, 1);
-            }
+        // Restore each row exactly as it was before this test (a snapshot, not hard-coded seed text,
+        // so later wording changes in seed.sql — e.g. QA MAIL-11 — never leak stale text to other tests).
+        foreach ($this->templateSnapshot as $row) {
+            Database::connection()->prepare('UPDATE email_templates SET subject = :s, body = :b, is_active = :a WHERE id = :id')
+                ->execute(['s' => $row['subject'], 'b' => $row['body'], 'a' => $row['is_active'], 'id' => $row['id']]);
         }
         parent::tearDown();
     }

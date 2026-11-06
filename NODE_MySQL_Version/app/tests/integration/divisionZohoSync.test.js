@@ -189,6 +189,7 @@ describe('D-257 Zoho: the new divisions sync like Export', () => {
   });
 
   afterAll(async () => {
+    await require('../support/fixtures').clearDivisionTradeData(); // leave no division-trade records for later files
     await db.pool.end();
   });
 

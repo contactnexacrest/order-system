@@ -94,7 +94,7 @@ final class FileStoreController
         $safeDownloadName = preg_replace('/[\x00-\x1F\x7F"]/', '', $safeDownloadName) ?? $safeDownloadName;
         header('Content-Type: ' . $file['mime_type']);
         header('Content-Disposition: attachment; filename="' . $safeDownloadName . '"');
-        header('Content-Length: ' . (string) $file['file_size_bytes']);
+        header('Content-Length: ' . (string) (filesize((string) $file['server_path']) ?: $file['file_size_bytes'])); // the real size on disk, so a stale size in the database can never break the download
         readfile($file['server_path']);
     }
 }

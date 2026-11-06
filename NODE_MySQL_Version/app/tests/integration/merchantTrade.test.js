@@ -37,6 +37,7 @@ describe('D-257 Phase 4 — Merchant Trade', () => {
   let expStaff;
 
   afterAll(async () => {
+    await require('../support/fixtures').clearDivisionTradeData(); // leave no division-trade records for later files
     await db.pool.end();
   });
 

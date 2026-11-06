@@ -231,4 +231,20 @@ async function completeAssociateKyc(associateId) {
   }
 }
 
-module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument, allowHandTypedGoodsLines, completeAssociateKyc };
+/**
+ * QA final run (parity with DbTestCase::clearDivisionTradeData): the new-division tests leave their
+ * records in the shared test database, which made list/board tests that expect "none" depend on run
+ * order. Called once after each such test file.
+ */
+async function clearDivisionTradeData() {
+  const db = require('../../src/config/db');
+  for (const table of ['merchant_alerts_sent', 'merchant_deal_documents', 'merchant_payments', 'merchant_deal_lines', 'merchant_deals',
+    'stock_movements', 'stock_balances', 'import_payments', 'import_shipment_lines', 'import_shipments',
+    'domestic_payments', 'domestic_documents', 'domestic_order_lines', 'domestic_orders']) {
+    await db.pool.query(`DELETE FROM ${table}`);
+  }
+  await db.pool.query("UPDATE orders SET status = 'cancelled', division_id = 1 WHERE division_id <> 1");
+  await db.pool.query("UPDATE divisions SET status = 'planned' WHERE id <> 1");
+}
+
+module.exports = { createTestClient, createTestOrder, createTestClientLogin, createTestFile, createTestDocument, allowHandTypedGoodsLines, completeAssociateKyc, clearDivisionTradeData };

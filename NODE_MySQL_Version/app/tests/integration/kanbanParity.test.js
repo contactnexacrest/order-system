@@ -31,6 +31,7 @@ describe('Standard / Kanban parity (owner hard rule 2026-11-01)', () => {
   let agent;
 
   afterAll(async () => {
+    await require('../support/fixtures').clearDivisionTradeData(); // leave no division-trade records for later files
     await db.pool.end();
   });
 

@@ -24,6 +24,12 @@ use App\Tests\Support\DbTestCase;
  */
 final class DivisionZohoSyncTest extends DbTestCase
 {
+    public static function tearDownAfterClass(): void
+    {
+        self::clearDivisionTradeData(); // leave no division-trade records for later test classes
+        parent::tearDownAfterClass();
+    }
+
     /** @var list<array{method:string, url:string, payload:array}> */
     private array $requests = [];
     private array $contacts = [];

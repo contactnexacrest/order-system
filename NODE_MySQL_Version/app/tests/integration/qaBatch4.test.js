@@ -93,6 +93,7 @@ describe('QA fix batch 4: money, Zoho, ORD-09, ORD-14', () => {
   });
 
   afterAll(async () => {
+    await require('../support/fixtures').clearDivisionTradeData(); // leave no division-trade records for later files
     await db.pool.end();
   });
 

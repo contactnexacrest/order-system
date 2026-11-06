@@ -6,6 +6,8 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 const repo = require('../repositories/importRepository');
 const divisionService = require('../services/divisionService');
 const G = require('../services/gstCalculator');
+/** A money column that is still empty (e.g. no landed cost before clearance) shows as 0.00, as on PHP; String(null) would crash the formatter. */
+const nz = (v) => (v === null || v === undefined || v === '' ? '0' : String(v));
 const I = require('../services/importService');
 const importDocumentService = require('../services/importDocumentService');
 const uiTemplateService = require('../services/uiTemplateService');
@@ -129,12 +131,12 @@ async function showData(s, permissions) {
       bcd: G.inr(figures.bcd_total), sws: G.inr(figures.sws_total), igst: G.inr(figures.igst_total), charges: G.inr(figures.charges_total), landed: G.inr(figures.landed_total),
     },
     lcAmountFmt: s.lc_amount_fc !== null && s.lc_amount_fc !== undefined ? fcOf(s.lc_amount_fc) : '',
-    lcMarginFmt: s.lc_margin_inr !== null && s.lc_margin_inr !== undefined ? G.inr(String(s.lc_margin_inr)) : '',
+    lcMarginFmt: s.lc_margin_inr !== null && s.lc_margin_inr !== undefined ? G.inr(nz(s.lc_margin_inr)) : '',
     lcBankDefault: s.lc_bank || (await I.setting('imp_lc_bank')),
     chaDefault: s.cha_name || (await I.setting('imp_default_cha')),
-    igstFmt: s.igst_total !== null && s.igst_total !== undefined ? G.inr(String(s.igst_total)) : '',
+    igstFmt: s.igst_total !== null && s.igst_total !== undefined ? G.inr(nz(s.igst_total)) : '',
     dutyTotalFmt: s.bcd_total !== null && s.bcd_total !== undefined ? G.inr((Number(s.bcd_total) + Number(s.sws_total) + Number(s.igst_total)).toFixed(2)) : '',
-    payments: (await repo.payments(id)).map((p) => ({ ...p, kind_label: I.PAYMENT_KINDS[p.kind] || p.kind, amount_fmt: fcOf(p.amount_fc), inr_fmt: G.inr(String(p.amount_inr)) })),
+    payments: (await repo.payments(id)).map((p) => ({ ...p, kind_label: I.PAYMENT_KINDS[p.kind] || p.kind, amount_fmt: fcOf(p.amount_fc), inr_fmt: G.inr(nz(p.amount_inr)) })),
     poFmt: I.fc(poCents),
     paidFmt: I.fc(paidCents),
     products: await repo.products(),
@@ -223,19 +225,19 @@ async function reportsData() {
     for (const l of await repo.lines(Number(s.id))) {
       landed.push({
         ...l, reference: s.reference, boe_no: s.boe_no, shipment_id: Number(s.id), qty_fmt: num(l.quantity),
-        value_fmt: G.inr(String(l.value_inr)), assessable_fmt: G.inr(String(l.assessable_inr)), bcd_fmt: G.inr(String(l.bcd_inr)),
-        sws_fmt: G.inr(String(l.sws_inr)), landed_fmt: G.inr(String(l.landed_inr)),
+        value_fmt: G.inr(nz(l.value_inr)), assessable_fmt: G.inr(nz(l.assessable_inr)), bcd_fmt: G.inr(nz(l.bcd_inr)),
+        sws_fmt: G.inr(nz(l.sws_inr)), landed_fmt: G.inr(nz(l.landed_inr)),
       });
     }
     duty.push({
-      ...s, assessable_fmt: G.inr(String(s.assessable_total)), bcd_fmt: G.inr(String(s.bcd_total)), sws_fmt: G.inr(String(s.sws_total)), igst_fmt: G.inr(String(s.igst_total)),
+      ...s, assessable_fmt: G.inr(nz(s.assessable_total)), bcd_fmt: G.inr(nz(s.bcd_total)), sws_fmt: G.inr(nz(s.sws_total)), igst_fmt: G.inr(nz(s.igst_total)),
     });
   }
   return {
     landed,
     duty,
-    stock: (await I.stockReport()).map((r) => ({ ...r, qty_fmt: num(r.qty_on_hand), value_fmt: G.inr(String(r.value_inr)), suggested_fmt: G.inr(r.suggested_price_inr) })),
-    movements: (await repo.movements(ids, 50)).map((m) => ({ ...m, qty_fmt: num(m.quantity), value_fmt: G.inr(String(m.value_inr)) })),
+    stock: (await I.stockReport()).map((r) => ({ ...r, qty_fmt: num(r.qty_on_hand), value_fmt: G.inr(nz(r.value_inr)), suggested_fmt: G.inr(nz(r.suggested_price_inr)) })),
+    movements: (await repo.movements(ids, 50)).map((m) => ({ ...m, qty_fmt: num(m.quantity), value_fmt: G.inr(nz(m.value_inr)) })),
     margin: await I.setting('imp_margin_pct'),
   };
 }

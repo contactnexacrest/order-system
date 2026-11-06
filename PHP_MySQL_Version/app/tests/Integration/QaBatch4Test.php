@@ -29,6 +29,12 @@ use App\Tests\Support\DbTestCase;
  */
 final class QaBatch4Test extends DbTestCase
 {
+    public static function tearDownAfterClass(): void
+    {
+        self::clearDivisionTradeData(); // leave no division-trade records for later test classes
+        parent::tearDownAfterClass();
+    }
+
     private int $admin;
 
     protected function setUp(): void

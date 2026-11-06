@@ -19,7 +19,7 @@ async function sendStoredFile(res, fileId) {
   safeDownloadName = safeDownloadName.replace(/[\x00-\x1F\x7F"]/g, '');
   res.setHeader('Content-Type', file.mime_type);
   res.setHeader('Content-Disposition', `attachment; filename="${safeDownloadName}"`);
-  res.setHeader('Content-Length', String(file.file_size_bytes));
+  res.setHeader('Content-Length', String((() => { try { return require('fs').statSync(file.server_path).size; } catch (e) { return file.file_size_bytes; } })())); // the real size on disk, so a stale size in the database can never break the download
   fs.createReadStream(file.server_path).pipe(res);
 }
 

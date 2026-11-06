@@ -32,6 +32,7 @@ const { createTestClient, createTestOrder } = require('../support/fixtures');
  */
 describe('QA batch 2 — orders, workflow, Merchant Trade money and division pages', () => {
   afterAll(async () => {
+    await require('../support/fixtures').clearDivisionTradeData(); // leave no division-trade records for later files
     await db.pool.end();
   });
 

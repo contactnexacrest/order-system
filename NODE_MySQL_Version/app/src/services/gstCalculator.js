@@ -20,6 +20,7 @@ const GSTIN_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 /** "12.5" with 3 decimals => 12500n, exactly (no floating point). */
 function scaled(value, decimals) {
   let v = String(value === null || value === undefined ? '' : value).trim();
+  if (v === 'null' || v === 'undefined') v = ''; // String(null) from a still-empty column counts as 0, as PHP's cast does
   const negative = v.startsWith('-');
   v = v.replace(/^[+-]+/, '');
   const [whole, fracRaw = ''] = v.split('.', 2);

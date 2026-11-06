@@ -46,6 +46,7 @@ describe('D-257 Phase 3 — Import & Distribution', () => {
   let productB;
 
   afterAll(async () => {
+    await require('../support/fixtures').clearDivisionTradeData(); // leave no division-trade records for later files
     await db.pool.end();
   });
 

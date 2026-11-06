@@ -38,13 +38,19 @@ describe('Email Templates completeness — 7 system emails now admin-editable (9
    * after every test keeps this file's own mutations from ever being
    * observable outside the one test that made them.
    */
+  // Restore each row exactly as it was before the test (a snapshot, not hard-coded seed text,
+  // so later wording changes in seed.sql — e.g. QA MAIL-11 — never leak stale text to other tests).
+  let templateSnapshot = [];
+  beforeEach(async () => {
+    const keys = Object.keys(seededDefaults());
+    const [rows] = await db.pool.query(
+      `SELECT id, subject, body, is_active FROM email_templates WHERE template_key IN (${keys.map(() => '?').join(',')})`, keys);
+    templateSnapshot = rows;
+  });
   afterEach(async () => {
-    for (const [key, [subject, body]] of Object.entries(seededDefaults())) {
-      const template = await emailTemplateRepository.find(key);
-      if (template) {
-        await emailTemplateRepository.update(template.id, subject, body, null, 1);
-        await emailTemplateRepository.setActive(template.id, true, 1);
-      }
+    for (const row of templateSnapshot) {
+      await db.pool.query('UPDATE email_templates SET subject = ?, body = ?, is_active = ? WHERE id = ?',
+        [row.subject, row.body, row.is_active, row.id]);
     }
   });
 

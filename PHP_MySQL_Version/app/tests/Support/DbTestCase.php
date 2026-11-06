@@ -384,4 +384,23 @@ abstract class DbTestCase extends TestCase
         }
         return $out;
     }
+
+    /**
+     * QA final run: the new-division tests (Domestic Trade, Import & Distribution, Merchant Trade) leave
+     * their records in the shared test database, which made list/board tests that expect "none" depend on
+     * run order. Called once after each such test class: removes every division-trade record (Export tests
+     * never use these tables) and returns any order still on a planned division to an ordinary cancelled
+     * Export test order.
+     */
+    protected static function clearDivisionTradeData(): void
+    {
+        $pdo = \App\Config\Database::connection();
+        foreach (['merchant_alerts_sent', 'merchant_deal_documents', 'merchant_payments', 'merchant_deal_lines', 'merchant_deals',
+                  'stock_movements', 'stock_balances', 'import_payments', 'import_shipment_lines', 'import_shipments',
+                  'domestic_payments', 'domestic_documents', 'domestic_order_lines', 'domestic_orders'] as $table) {
+            $pdo->exec("DELETE FROM {$table}");
+        }
+        $pdo->exec("UPDATE orders SET status = 'cancelled', division_id = 1 WHERE division_id <> 1");
+        $pdo->exec("UPDATE divisions SET status = 'planned' WHERE id <> 1");
+    }
 }

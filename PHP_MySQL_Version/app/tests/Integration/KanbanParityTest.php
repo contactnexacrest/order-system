@@ -33,6 +33,12 @@ use App\Tests\Support\DbTestCase;
  */
 final class KanbanParityTest extends DbTestCase
 {
+    public static function tearDownAfterClass(): void
+    {
+        self::clearDivisionTradeData(); // leave no division-trade records for later test classes
+        parent::tearDownAfterClass();
+    }
+
     private int $userId;
 
     protected function setUp(): void

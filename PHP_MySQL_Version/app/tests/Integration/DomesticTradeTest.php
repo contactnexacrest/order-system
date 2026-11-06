@@ -35,6 +35,12 @@ use App\Tests\Support\DbTestCase;
  */
 final class DomesticTradeTest extends DbTestCase
 {
+    public static function tearDownAfterClass(): void
+    {
+        self::clearDivisionTradeData(); // leave no division-trade records for later test classes
+        parent::tearDownAfterClass();
+    }
+
     private const DOM = 2;
     private const BUYER_GSTIN = '29AAPFU0939F1ZR'; // Karnataka, like NexaCrest (seed GSTIN 29…)
 
