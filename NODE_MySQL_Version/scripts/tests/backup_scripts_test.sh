@@ -43,7 +43,7 @@ BACKUP_TODAY=2026-11-06 bash "$SCRIPTS/backup_db.sh" > "$T/out_db" 2>&1
 DBF="$(ls "$T/bk/db" | grep -E '^nexacrest_db_2026-11-06_[0-9]{6}\.sql\.gz\.enc$' | head -n1)"
 check "db copy is encrypted (.enc) and no plain copy is left" '[ -n "$DBF" ] && ! ls "$T/bk/db" | grep -qE "\.sql\.gz$"'
 check "db copy has a valid sha256" '(cd "$T/bk/db" && sha256sum -c --quiet "$DBF.sha256")'
-check "db copy decrypts to the dump" 'openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$T/bk/db/$DBF" -pass "file:$T/key" | gunzip | grep -q "INSERT INTO orders"'
+check "db copy decrypts to the dump" 'DUMP="$(openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$T/bk/db/$DBF" -pass "file:$T/key" | gunzip)" && printf "%s\n" "$DUMP" | grep -q "INSERT INTO orders"'
 check "db status file says ok + encrypted" 'grep -q "\"result\":\"ok\"" "$T/bk/status/db.json" && grep -q "\"encrypted\":\"yes\"" "$T/bk/status/db.json"'
 check "password with # read from .env (not cut as a comment)" 'grep -q "p@ss # not a comment" <(source "$SCRIPTS/backup_lib.sh"; env_get DB_PASSWORD)'
 
@@ -55,7 +55,8 @@ check "two daily snapshots exist" '[ -f "$S1/orders/1/ci.pdf" ] && [ -f "$S2/ord
 check "unchanged file stored once (same inode, link count 2)" '[ "$(stat -c %i "$S1/orders/1/ci.pdf")" = "$(stat -c %i "$S2/orders/1/ci.pdf")" ] && [ "$(stat -c %h "$S2/orders/1/ci.pdf")" = 2 ]'
 check "second snapshot adds no space for unchanged files" '[ "$(du -sb "$S1" "$S2" | awk "{s+=\$1} END{print s}")" -lt "$(( $(du -sb "$S1" | cut -f1) + 20000 ))" ] || [ "$(du -sbc "$S1" "$S2" | tail -n1 | cut -f1)" -lt "$(( $(du -sb "$S1" | cut -f1) * 2 ))" ]'
 check "one monthly archive for November, encrypted + checksummed" '[ "$(ls "$T/bk/storage/archives" | grep -cE "^nexacrest_files_full_2026-11-[0-9]{2}\.tar\.gz\.enc$")" = 1 ] && (cd "$T/bk/storage/archives" && sha256sum -c --quiet *.sha256)'
-check "archive decrypts and lists the documents" 'openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$(ls "$T"/bk/storage/archives/*.enc)" -pass "file:$T/key" | tar -tzf - | grep -q "orders/2/po.pdf"'
+# Read the whole listing first: "grep -q" on a pipe stops early and tar then reports "stdout: write error" on some systems (CI).
+check "archive decrypts and lists the documents" 'LIST="$(openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$(ls "$T"/bk/storage/archives/*.enc)" -pass "file:$T/key" | tar -tzf -)" && printf "%s\n" "$LIST" | grep -q "orders/2/po.pdf"'
 check "live documents untouched (content + timestamps identical)" '[ "$(tree_sum "$T/live")" = "$LIVE_BEFORE" ]'
 echo "changed" >> "$T/live/orders/2/po.pdf"; LIVE_BEFORE="$(tree_sum "$T/live")"
 BACKUP_TODAY=2026-11-07 bash "$SCRIPTS/backup_storage.sh" > "$T/out_s3" 2>&1
