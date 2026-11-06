@@ -488,10 +488,8 @@ Do these in order on the **live** server. Each step names who does it.
 
 1. **Developer / host:** install the database from the stack's
    `docs/schema.sql` then `docs/seed.sql` (a first installation needs no
-   migration — they are already included, D-241); on an existing database,
-   back it up and run any newer file in `docs/migrations` (see the README
-   there). Deploy the code and restart the Node app (PHP needs no
-   restart).
+   migration — they are already included, D-241). Deploy the code and
+   restart the Node app (PHP needs no restart).
 2. **CA:** in the real Zoho Books organisation, check that the Chart of
    Accounts has every account the sync uses, spelled exactly like this
    (add any that are missing, or ask the developer to map to another):

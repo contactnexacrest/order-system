@@ -1,6 +1,6 @@
 # Go-live checklist (Export division)
 
-Prepared 5 Nov 2026 (Phase 0C.1). Work through it top to bottom on go-live day, and tick each line. The technical install steps are in each stack's `README.md` under "First-time setup". This list is the business view of the same process.
+Prepared 5 Nov 2026 (Phase 0C.1), updated 6 Nov 2026. Work through it top to bottom on go-live day, and tick each line. The technical install steps are in each stack's `README.md` under "First-time setup". This list is the business view of the same process.
 
 ## A. Before the day (one to two weeks ahead)
 
@@ -27,7 +27,7 @@ Prepared 5 Nov 2026 (Phase 0C.1). Work through it top to bottom on go-live day, 
 ## B. Install (go-live day)
 
 - [ ] Create the database (utf8mb4). Import `docs/schema.sql`, then `docs/seed.sql`. **No migrations.**
-- [ ] Run the three storage-path `UPDATE`s (README, step 2).
+- [ ] Run the three storage-path `UPDATE`s (README, "First-time setup").
 - [ ] Fill in `app/.env`:
   - [ ] database;
   - [ ] `STORAGE_BASE_PATH`;
@@ -50,12 +50,12 @@ Prepared 5 Nov 2026 (Phase 0C.1). Work through it top to bottom on go-live day, 
 ## C. First login and company setup
 
 - [ ] Log in with the seeded MD account and set a new password. Turn on 2FA.
-- [ ] **Company settings** (`/settings`): replace every value marked PLACEHOLDER. These include:
+- [ ] **Company settings** (`/settings`): the real company details are already seeded — check each once (README, "Placeholder values you must replace before going live"):
   - [ ] director name, bank details and pincode;
-  - [ ] **LUT number, financial year and expiry**;
-  - [ ] **RCMC number and valid-until date**;
+  - [ ] **LUT number, financial year and expiry** (expiry seeded as 31 Mar 2027 — confirm);
+  - [ ] **RCMC number and valid-until date** (seeded as 31 Mar 2027 — confirm);
   - [ ] IEC/PAN, SWIFT;
-  - [ ] ECGC policy, if any.
+  - [ ] ECGC policy, if any (empty until filled).
 - [ ] **Company assets** (`/company-assets`): real logo, MD signature, company seal, watermark.
 - [ ] **Admin › Pricing:**
   - [ ] **pricing exchange rate** = today's market rate minus about 1.5%;
@@ -71,6 +71,8 @@ Prepared 5 Nov 2026 (Phase 0C.1). Work through it top to bottom on go-live day, 
   - [ ] TDS settings.
 - [ ] **Commission levels and ladder:** check 2 / 5 / 7 / 10% and the ladder steps.
 - [ ] **Team incentive roles:** check the split (Sales 30, Sales Manager 10, Export Documentation 15, Export Compliance 5, Marketing 15, Logistics 15, Accounts 10). The incentive program is on or off, as you decide.
+- [ ] **Team incentive eligibility and caps** (SOP 20, D-259): mark any designation that is not eligible (Admin › Departments), switch off single people if needed (Edit user, MD only), and set the per-role caps per order / per month (Admin › Team Incentives). Empty means no cap.
+- [ ] **Associate access levels** (SOP 24, D-261): check the level matrix (Associates › Access levels). New associates start on Starter: no prices, no FOB value, no commission %.
 - [ ] **Specifications** (Natural Stone): check the starting values. Products' own changes come where needed.
 - [ ] **Admin › Divisions:** only Export is active. Leave the others "planned".
 
@@ -86,7 +88,7 @@ Prepared 5 Nov 2026 (Phase 0C.1). Work through it top to bottom on go-live day, 
 
 - [ ] For every product: **"Pricing ready?"** shows all ✓ (supplier price, CBM price if sold at 50 mm or more, specifications, prices current, open to associates).
 - [ ] **"Try a price"** on 2–3 products gives the figures you expect.
-- [ ] Give associates access only to the categories and forms they should price. Check the daily limit (10) and validity (7 days).
+- [ ] Give associates access only to the categories and forms they should price. Check the daily limit (10) and validity (7 days). An associate also needs the Quoting (or Full) level to see Get price.
 
 ## F. Dry run (still on the live server, using test mode)
 

@@ -63,8 +63,8 @@ correctly once the password is changed.
 
 ## What's in this folder
 
-- `docs/schema.sql` — full database schema (153 tables, 279 foreign keys as
-  of 2026-11-02 — see `docs/schema.sql`'s own trailing `-- SECTION X …
+- `docs/schema.sql` — full database schema (194 tables, 373 foreign keys as
+  of 2026-11-06 — see `docs/schema.sql`'s own trailing `-- SECTION X …
   added YYYY-MM-DD` comments for the running changelog; 52 tables/76 FKs
   at the time of this Phase D delivery specifically), validated against a
   live MariaDB instance after every change in this delivery, including the
@@ -148,6 +148,10 @@ correctly once the password is changed.
    until NexaCrest must e-invoice. Mail always goes through the SMTP
    server (Bluehost) — Zoho Mail is not used to send. See SOP
    [ca-03 Zoho Books Sync](docs/SOP/ca-03-zoho-sync.md).
+   **Settings in `app/.env` to check before go-live** (the template `app/.env.example` explains each):
+   `APP_ENV=production`, `DEV_SERVER=false`, `APP_URL`, a fresh `APP_ENCRYPTION_KEY`, `DB_*`,
+   `STORAGE_BASE_PATH`, `SMTP_*`, the three `ZOHO_*` switches, `SMS_GATEWAY_*` (may stay empty)
+   and the `BACKUP_*` lines (see "Backups").
 4. **Dependencies — already included, nothing to run.** `app/vendor/` in
    this delivery is a real, working copy of DOMPDF, PHPWord, Twig, and
    PHPMailer — the document generation pipeline needs all four.
@@ -339,7 +343,7 @@ Send to Buyer" section appears per generated document, plus new
 
 ### Bluehost cron setup
 
-Five scheduled jobs, all plain PHP scripts meant to be run via
+Six scheduled jobs, all plain PHP scripts meant to be run via
 cPanel → Cron Jobs (Bluehost's equivalent of a systemd timer — there is no
 persistent worker process on shared hosting, which is exactly why these
 exist as polling scripts rather than a queue consumer):
@@ -812,34 +816,31 @@ chasing, and how many did we actually lose" — `orders.status` only had
 
 ## Placeholder values you must replace before going live
 
-Everything in `company_settings` marked `PLACEHOLDER` in `docs/seed.sql` —
-`director_name`, `bank_pincode`, `lut_expiry_date` (assumed FY-end; confirm
-the real date) — plus the login email/password above, and all four asset
-images (logo, MD signature, company seal, watermark)
-currently showing a labeled placeholder graphic. Replace assets from the
-in-app **Assets** screen (`/company-assets`) — no code changes needed, just
-upload the real file. Replace settings from the **Company Settings** screen
-(`/settings`).
+Checked against `docs/seed.sql` on 6 Nov 2026. The company details (legal name, addresses, GSTIN, IEC/PAN, bank,
+SWIFT, LUT number, RCMC number, director name) are already seeded with the real values; check them once on
+**Company Settings** (`/settings`). Still to do on the live install (also in `docs/guides/GO_LIVE_CHECKLIST.md`):
 
-Reference formats in `company_settings` (protected): `master_tracking_ref_format`
-(the client number, NC/SC/{YY}/{DDMM}{NNN}) and `order_ref_format` (owner decision
-4 Nov 2026, D-248: NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter). The unused
-`client_number_format` setting was removed.
+- **Logins:** the two seeded Super Admin accounts share the password `ChangeMe#2026`; each must set a new one
+  at first login (forced). Deactivate the second one if it is not needed.
+- **Dates to confirm:** `lut_expiry_date` and `rcmc_valid_until` are seeded as 31 Mar 2027 — confirm them.
+- **ECGC:** `ecgc_policy_no` and `ecgc_policy_valid_to` are empty; fill them only if there is a policy.
+- **Pricing exchange rate:** `pricing_fx_rate` is seeded as 82.00 — set today's market rate minus about 1.5%
+  under **Admin › Pricing** on go-live day.
+- **Images:** the four company assets (logo, MD signature, company seal, watermark) show a labelled
+  placeholder graphic until you upload the real files on **Company Assets** (`/company-assets`).
+- **Storage path:** the `__STORAGE_BASE_PATH__` rows are fixed by the three `UPDATE`s in "First-time setup";
+  the `storage_base_path` setting is documentation only.
 
-New in Phase C, also placeholder: `rcmc_number` and `rcmc_valid_until` in
-`company_settings` (category `capexil`) — the COO Prep Sheet's Section 4
-needs your real CAPEXIL RCMC certificate number and its expiry date; the
-alert-threshold settings for it (`rcmc_alert_days_a`/`rcmc_escalation_days_b`)
-were already seeded in Phase A but the actual number/date fields were
-missing until now (a genuine gap in the original 51-table design — added
-this phase, not a placeholder left from before).
-
-One still-open item carried over from Phase A: whether a Director
-signature (in addition to the MD signature) is actually needed anywhere in
-the document set — flagged in `company_settings.director_name`'s
-description, not yet resolved.
+Reference formats in `company_settings` (protected): `master_tracking_ref_format` (the client number,
+NC/SC/{YY}/{DDMM}{NNN}) and `order_ref_format` (D-248: NC/SC/ORD/{YY}/{DDMM}{NNN}, a daily counter).
 
 ## What's deliberately not built yet (by phase, not by mistake)
+
+> **Update 6 Nov 2026:** this list was written phase by phase. Since then several items were built:
+> payment presets have their own Admin page (`/payment-presets`) and T&C clause text is edited under
+> Admin › Overrides; the alert job e-mails as well as notifying in the app; the Buyer PO and supplier
+> PO have upload flows; most document types now also have a Word copy; users can be edited from
+> `/users`. Items below that are not covered by this note still stand.
 
 - Actually sending Phase D's deferred emails requires real SMTP
   credentials in `.env` — with none configured, `EmailService::sendWithAttachment()`
@@ -1830,9 +1831,8 @@ route-for-route identical. Full suite on both stacks at the time of
 writing: 1,803 PHPUnit / 1,868 Jest tests (336 suites), and the 48-test
 Playwright e2e suite green on both `BASE_URL`s.
 
-**Upgrading an existing database:** run `2026-10-29a` to `2026-10-29f` and
-`2026-10-30a` from `docs/migrations/` (run order in the repository's
-`docs/migrations/README.md`). Before switching Zoho on, set the go-live
+**Database:** these changes are part of `docs/schema.sql` / `docs/seed.sql` — the first live install runs
+no migration (D-241; the file names above are history). Before switching Zoho on, set the go-live
 date in Admin → Company Settings (Zoho Books).
 
 What changed, by area (owner decisions; every item is in both stacks):
@@ -2009,9 +2009,8 @@ name ends in `_INTERNAL`. The CSV helper now leaves a plain negative number
   "not found" after the route's own checks; money, quantity, rate, date and
   range limits; incentive payout and buyer payment-report checks.
 - **Simultaneous and repeated saves (Batch 3).**
-  - `clients.email` is unique (index `uq_clients_email`, migration
-    `docs/migrations/2026-10-31a-client-email-unique.sql` — run the
-    duplicate-email check first). Two saves of one email at once: the second
+  - `clients.email` is unique (index `uq_clients_email`, in `docs/schema.sql`;
+    history: it came from migration `2026-10-31a-client-email-unique`, D-241). Two saves of one email at once: the second
     gets "Another client already uses this email".
   - A repeated click records and logs once: a payment leg with the same
     amount, day and rate; a payout already paid; payment terms already
@@ -2407,7 +2406,7 @@ Part of schema.sql / seed.sql (D-241). **Products menu:** a product may carry a 
 
 Everything below is in `docs/schema.sql` / `docs/seed.sql` (no migrations, D-241). **Nothing changes for today's users:** only Export is active, and no division label, switcher or filter shows until a second division is activated.
 
-**Size now (both stacks):** 190 tables, 24 roles, **94 permissions** (older sections above quote 60 or 63 — those were the counts at the time), 735 routes (242 GET, 493 POST).
+**Size now (both stacks, rechecked 6 Nov 2026 after access levels, incentive caps and backups):** 194 tables, 24 roles, **94 permissions** (older sections above quote 60 or 63 — those were the counts at the time), 744 routes (247 GET, 497 POST).
 
 - **Divisions (D-257, SOP 28):** every order, user, department, client, associate and price request belongs to a division. Export (EXP) is active; Domestic Trade (DOM), Import & Distribution (IMP) and Merchant Trade (MTT) are built but **planned**. Admin › Divisions (MD only, `manage_divisions`) shows each division's modules, own settings and number formats, a set-up section (create its departments, move staff) and an **Activate** button with a pre-flight checklist. Company-level users get `see_all_divisions`. New role **Investor (view only)**. Settings read the division's own value first, then the company value. Staff of a division that is not active cannot save anything.
 - **Product categories (D-257 0B, SOP 27):** each category has units, HS code, packing type, quality documents and a T&C clause set; per-piece / per-kg / per-set prices; a quality-document checklist on the order. Documents take their packing words, quality documents and T&C clauses from the category (Phase 1). **Natural Stone documents are pinned** and proven text-identical by `StoneDocumentsUnchangedTest` / `stoneDocumentsUnchanged.test.js`.
@@ -2418,5 +2417,9 @@ Everything below is in `docs/schema.sql` / `docs/seed.sql` (no migrations, D-241
 - **Zoho Books for the new divisions (D-257 (6), SOP ca-03):** invoices, bills, receipts, payments, customs duty, clearance charges and the IGST credit journal sync automatically in the hourly Zoho job; *Check against Zoho Books* on each domestic order, import and deal. Live-tested in the TEST organisation (change log Z-643 to Z-698), including go-live item 0C.2 (the GST commission bill). **Only one sync runs at a time** (database lock), and payments, expenses and journals are looked up in Books before posting, so a retry never duplicates (D-258).
 - **QA programme (D-258, `docs/QA/MASTER_TEST_PLAN.md`):** 107 bugs that no test covered were found and fixed in four batches (access, UI, orders, documents, e-mail, money, Zoho, stack parity); the deferred few are listed in the register (O-22). New tests: `QaBatch1AccessUi`, `QaBatch2`, `QaBatch3DocsMail`, `QaBatch4`, `DivisionIsolation`, `DomesticTrade`, `ImportDistribution`, `MerchantTrade`, `DivisionZohoSync`, `DivisionOverheadAndInvestor`, `CategoryDrivenDocuments`, `StoneDocumentsUnchanged`, `D257ProductNeutral`, `FreshReviewFixes`, the incoterm × preset and mail matrices (`QaIncotermPresetMatrix`, `QaMailMatrix`), and e2e `13-qa-batch1`, `14-qa-batch2`, `qa-roles-permissions-matrix`, `qa-ui-crawl`.
 - **Behaviour changes staff will notice** (all in the SOPs): Preview as is look-only; a payment with a different amount can be saved again; Mark Lost is refused once money has come in; a cancellation refund needs *Record refund paid* with the bank reference; Close Order needs the original BLs received and endorsed (ORD-14); the CI balance is net of amounts written off (ORD-09); export benefits are always in INR; the *sending off* switch now covers every business e-mail; old document revisions show what was really issued; the Word copy matches the PDF; Node prints dates as "05 November 2026" like PHP.
-- **Cron:** unchanged list of jobs; run them in IST (`CRON_TZ=Asia/Kolkata`). The daily alert job runs at 06:00 IST on both stacks.
+- **Team incentive eligibility and caps (D-259, SOP 20):** an MD-only "Eligible for team incentive" switch per person (Add / Edit user) and per designation (Admin › Departments), and caps per role per order and per month (Admin › Team Incentives). What a person does not get stays with the company; only orders not yet locked change.
+- **Associate access levels (D-261, SOP 24):** Starter / Quoting / Full / Custom per associate (MD only, with a reason), the level matrix under Associates › Access levels (FOB value and commission % off for Starter by default), a track record panel and an upgrade suggestion after 3 completed, fully paid orders. New associates start on Starter.
+- **Backups (D-260, SOP 32):** see "Backups" above — encrypted database and document copies kept 10 years, Admin › Backups, a digest warning when a copy is late.
+- **Questions for the CA, AD bank and lawyer:** `docs/external/`.
+- **Cron:** the same app jobs plus the three backup lines (database, documents, monthly test-restore); run them in IST (`CRON_TZ=Asia/Kolkata`). The daily alert job runs at 06:00 IST on both stacks.
 - **Go-live:** `docs/guides/GO_LIVE_CHECKLIST.md`. Still pending from others: the CA (GST for associates abroad; DOM/IMP GST, e-way bill, e-invoice and duty rates; Zoho account names), the AD bank (merchanting rules and approval) and the lawyer (Associate agreement, Schedule A, the new non-stone T&C clauses).

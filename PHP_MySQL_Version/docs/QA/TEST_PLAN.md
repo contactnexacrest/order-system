@@ -510,7 +510,7 @@ Existing tests changed on purpose are listed in section 14.
 
 ## 14. Added since (5–6 Nov 2026: the full QA programme, D-258)
 
-The master plan for this round is the root [`docs/QA/MASTER_TEST_PLAN.md`](../../../docs/QA/MASTER_TEST_PLAN.md) (inventory, matrices, gaps). **Current size:** 190 tables, 24 roles, **94 permissions** (section 2 above still lists the 30 Oct grant table — `docs/seed.sql` is the source of truth), 735 routes (242 GET, 493 POST).
+The master plan for this round is the root [`docs/QA/MASTER_TEST_PLAN.md`](../../../docs/QA/MASTER_TEST_PLAN.md) (inventory, matrices, gaps). **Current size (6 Nov 2026):** 194 tables, 24 roles, **94 permissions** (section 2 above still lists the 30 Oct grant table — `docs/seed.sql` is the source of truth), 744 routes (247 GET, 497 POST). **Last full run (6 Nov 2026):** PHPUnit 2,425 tests, Jest 2,494 tests, browser suite 68 tests per stack — all passing.
 
 | Test | What it proves |
 |---|---|
@@ -522,6 +522,11 @@ The master plan for this round is the root [`docs/QA/MASTER_TEST_PLAN.md`](../..
 | `QaMailMatrixTest` | Every e-mail template and send condition (approval first, deferred, Test Mode redirect, sending off, missing recipient, attachments): recipient, subject, no literal `{token}`, CAFIN never attached for a client. Runs on its own fresh database. |
 | e2e `qa-roles-permissions-matrix.spec.js` | Every role and every single permission (118 test users) against every staff GET route: allowed exactly when its gate says, no error page, no money or CAFIN for roles without money rights (23,010 requests per stack, 0 wrong). |
 | e2e `qa-ui-crawl.spec.js` | A human-style click-through of about 420 pages per run, both templates (Standard and Kanban), desktop and phone: every link, tab and step card; forms submitted empty and with bad values; console errors, 4xx/5xx, broken links and overflow. |
+
+| `IncentiveEligibilityTest` / `incentiveEligibility.test.js` | D-259: person and designation eligibility (MD only), caps per order and per month, kept-by-company lines, worked example ₹60,000 → ₹48,000 paid; no caps and everyone eligible gives the same figures as before; locked orders unchanged |
+| `BackupFacilityTest` / `backupFacility.test.js`, `scripts/tests/backup_scripts_test.sh` | D-260: encrypted database copy with checksum, documents stored once (hard links), live files untouched, guard against a backup folder inside the live folders, 10-year retention and thinning, test-restore refuses the live database; Admin › Backups and the digest warning |
+| `AssociateAccessLevelsTest` / `associateAccessLevels.test.js` | D-261: each level's allowed and refused pages (lock page, 403), FOB value and commission % hidden at Starter until the matrix enables them, Custom ticks, existing associates Full and new ones Starter, MD-only changes with a reason, amounts masked in notices, upgrade suggestion after 3 completed paid orders |
+| `QaFinalRunTest` / `qaFinalRun.test.js` | Associate personal codes grow from 1 to 3 random letters when a name part runs out of codes |
 
 Existing tests changed on purpose in this round (each listed in the register row): the cancellation-workflow approve test (a refund needs money received), the Merchant Trade staff role (ACC-4), the payment-terms Word wording (DOC-3), vendor payment descriptions with " · bank ref" (ZOH-18), closure fixtures that now record the original BLs (ORD-14), and the Zoho clients/products isolation.
 

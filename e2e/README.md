@@ -92,6 +92,23 @@ rendered pages, not a direct controller/HTTP call.
   database). It leaves `money-matrix-role-N@nexacrest.test` users and
   `MM-SENTINEL-*` orders in the dev database.
 
+- `13-qa-batch1.spec.js`, `14-qa-batch2.spec.js` — browser checks for the QA
+  fix batches (D-258): a payment with a different amount can be saved again
+  (UI-1), bank-reference patterns work, the switch BL number appears once its
+  box is ticked, India is refused as an import country.
+- `qa-order-cost-forms.spec.js` — the order page's "+ Add a cost" shows only
+  the chosen form, and the Travel form is checked in the browser.
+- `qa-roles-permissions-matrix.spec.js` — every role and every single
+  permission (118 test users) against every staff GET route: allowed exactly
+  when its gate says, no error page. About 6 minutes on PHP, 4 on Node.
+- `qa-ui-crawl.spec.js` — a human-style click-through of every reachable page,
+  link, tab and step card, in both templates (Standard, Kanban) and both sizes
+  (desktop, phone); forms submitted empty and with bad values. About 6
+  minutes per template and size.
+
+The whole suite is 68 tests per stack (last full run 6 Nov 2026: 68 / 68 on
+PHP and on Node, about 40–45 minutes each).
+
 Support files: `support/auth.js` (staff and client logins),
 `support/db.js` (direct dev-database setup: client logins, mail switch,
 a verified associate bank account; `runSql`, `dbName`, `bcryptHash` for

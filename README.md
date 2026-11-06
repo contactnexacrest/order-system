@@ -24,10 +24,11 @@ Three separate sign-ins, never mixed:
 - **Buyers** (`/client`) — the client portal: their own orders, documents,
   payments and feedback (SOP chapter 12).
 - **Associates** (`/associate`) — outside agents who introduce buyers: their
-  own clients, orders, commission and payments, never prices, costs or
-  documents (SOP chapter 24).
+  own clients, orders, commission and payments; what each one sees is set by
+  their access level (Starter, Quoting, Full or Custom). Never costs, margins
+  or supplier prices (SOP chapter 24).
 
-What the app does at go-live (2 Nov 2026), in brief — details in the SOP:
+What the app does at go-live (updated 6 Nov 2026), in brief — details in the SOP:
 
 - The nine-stage export order with every document (PDF and Word), review and
   approval, and the client portal (SOP chapters 01–13).
@@ -47,6 +48,16 @@ What the app does at go-live (2 Nov 2026), in brief — details in the SOP:
 - Zoho Books: hourly sync (with optional client and product sync), a
   "Waiting for Zoho" count, call limits for this app and failure e-mails
   (CA chapter ca-03).
+- Divisions: today's system is the Export division. Domestic Trade, Import &
+  Distribution and Merchant Trade are built but stay off until switched on in
+  Admin › Divisions (chapters 28–31).
+- Product categories decide units, HS code, packing, quality documents and T&C;
+  Natural Stone documents are unchanged (chapter 27).
+- Team incentive eligibility (per person and designation) and caps; the
+  company keeps what is not paid out (chapter 20).
+- Associate access levels set by the MD (chapter 24).
+- 10-year encrypted backups of the database and every document, with a
+  monthly test-restore and Admin › Backups (chapter 32).
 
 Where to look:
 
@@ -57,7 +68,11 @@ Where to look:
   `ARCHITECTURE.html` (open it in a browser).
 - **Database install and changes:** go-live = each stack's `docs/schema.sql` then
   `docs/seed.sql`, no migrations (D-241). How a change ships after go-live:
-  `docs/migrations/README.md`; read-only checks in `docs/checks/`.
+  `docs/migrations/README.md`. `docs/checks/` holds read-only checks for a
+  database that already held data before an earlier release; the first live
+  install starts empty, so they are not needed there.
+- **Go-live day:** `docs/guides/GO_LIVE_CHECKLIST.md`; questions still open with
+  the CA, AD bank and lawyer: `docs/external/`.
 - **Staff manual (SOP):** `docs/SOP/` (copied into each stack's
   `docs/SOP`, where the in-app SOP reads it).
 - **Owner decisions:** `docs/decisions/owner-decisions-register.md` — every

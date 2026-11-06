@@ -1,6 +1,6 @@
 -- ================================================================
--- NEXACREST EXPORT OPERATIONS WEBAPP — MySQL SCHEMA (PROPOSAL)
--- Version: 1.0 draft — for review before any code is written
+-- NEXACREST EXPORT OPERATIONS WEBAPP — MySQL SCHEMA
+-- Version: 1.0 (go-live) — the complete database for a fresh install, loaded with seed.sql; no migrations (D-241)
 -- Engine: InnoDB throughout (FK support, transactions)
 -- Charset: utf8mb4 (handles diacritics in buyer names/addresses,
 --          the ⬛/⬜/☐ style markers, and multi-currency symbols)

@@ -153,13 +153,29 @@ note settings and the "Approve price discount" permission were removed by D-245 
 |---|---|---|
 | Deferred e-mail dispatch | every 10 minutes | Sends approved e-mails that are due |
 | OC auto-confirm | every 15 minutes | Confirms an Order Confirmation the buyer has not answered within 48 hours of it being sent (e-mail off: from **Mark Order Confirmation Sent to Buyer**) |
-| Alerts | daily | LUT / RCMC expiry, freight and balance payments overdue, the LC's last shipment date, document deadline and expiry (7 days before), quotation / PI validity expired, dispute replies overdue |
+| Alerts | daily 06:00 IST | LUT / RCMC expiry, freight and balance payments overdue, the LC's last shipment date, document deadline and expiry (7 days before), quotation / PI validity expired, dispute replies overdue |
 | Zoho Books sync | hourly | Sends and checks the records that go to Zoho Books ([CA-03](./ca-03-zoho-sync.md)) |
 | Daily digest | 08:15 IST | One e-mail per person with their open tasks and documents to review; also the associates' reminders (protection and agreement ending in 30 and 7 days) |
 | Document copies clean-up | daily 02:15 | Removes the document copies switched on under **Document copies clean-up** (below); nothing while every rule is off |
+| Database backup | daily 02:00 IST | Encrypted copy of the database, kept 10 years ([SOP 32](./32-backups-restore.md)) |
+| Documents backup | daily 02:30 IST | Copy of every order document, each file stored once ([SOP 32](./32-backups-restore.md)) |
+| Backup test-restore | 1st of the month, 04:00 IST | Proves the newest copy can be restored, into a separate scratch database ([SOP 32](./32-backups-restore.md)) |
 
 The server set-up is in each stack's README ("Bluehost cron setup" for PHP,
 "Background jobs" for Node).
+
+### Admin pages added 5–6 Nov 2026
+
+Each one has its own chapter; this list is only where to find them.
+
+| Page | Who | Chapter |
+|---|---|---|
+| **Admin › Divisions** (activation check list, division settings) | MD | [SOP 28](./28-divisions.md) |
+| **Admin › GST rates** (shown once Domestic Trade or Import & Distribution is active) | MD | [SOP 29](./29-domestic-trade.md) |
+| **Admin › Import duty rates** (shown once Import & Distribution is active) | MD | [SOP 30](./30-import-distribution.md) |
+| **Team Incentives** — eligibility per designation and caps per role | MD | [SOP 20](./20-incentives.md) |
+| **Associates › Access levels** — what Starter, Quoting and Full show | MD | [SOP 24](./24-associates.md) |
+| **Admin › Backups** — last database and documents copies, test-restore, settings (read only) | Manage company settings | [SOP 32](./32-backups-restore.md) |
 
 ### Associate TDS (owner, 2 Nov 2026, D-235)
 

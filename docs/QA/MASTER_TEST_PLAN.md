@@ -710,10 +710,11 @@ Node page by page (link sets, form field sets, record counts).
 ## 6. Data set-up
 
 1. **Schema and seed:** `docs/schema.sql` + `docs/seed.sql` (identical in
-   substance on both stacks; only comments differ). Then apply
-   `docs/migrations` in order to an empty database, and again on top of a
-   seeded one, to prove they can be re-run (`MigrationIdempotencyTest`).
-   Use MySQL 8 strict mode with ONLY_FULL_GROUP_BY as well as MariaDB.
+   substance on both stacks; only comments differ). This is the whole
+   database for the first live install: no migration (D-241). The migrations
+   folder holds only its README until after go-live; `MigrationIdempotencyTest`
+   checks any future file. Use MySQL 8 strict mode with ONLY_FULL_GROUP_BY as
+   well as MariaDB.
 2. **Users:** one per role (24), plus a role with no permissions, plus
    synthetic single-permission and all-but-one roles (generated, 81 × 2).
    Also a Super Admin and a delegated Super Admin, users in two divisions,
@@ -870,6 +871,9 @@ parity rule).
   totals or wordings.
 - **Mail matrix:** 0 problems on either stack.
 - **UI crawl:** about 420 pages per run, Standard and Kanban, desktop and
-  phone, both stacks. One finding: hidden required fields on the order
-  page's travel-expense form made the browser report "not focusable" on
-  PHP — handed to a separate fix (see register D-258).
+  phone, both stacks. One finding (order page travel-expense form "not
+  focusable" on PHP) did not reproduce in two re-runs; a browser test
+  (`qa-order-cost-forms.spec.js`) now covers those forms. All 8 runs clean.
+- **Last full run (6 Nov 2026, after incentive caps, backups and associate
+  access levels):** PHPUnit 2,425 / 2,425, Jest 2,494 / 2,494, browser suite
+  68 / 68 on PHP and 68 / 68 on Node.

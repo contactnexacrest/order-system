@@ -32,3 +32,14 @@
   the accounts *Imported Goods Stock*, *IGST Paid on Import*, *Merchanting
   Trade Sales* and *Merchanting Trade Purchases* (names to be confirmed by
   the CA).
+- **Before go-live: remove the TEST records (checked 6 Nov 2026).** 48 rows of
+  `zoho-change-log.csv` are marked "must be removed before go-live" and have no
+  "removed on" date yet: Z-629–Z-641 (owner test matrix, 31 Oct), Z-648–Z-654,
+  Z-656–Z-657, Z-659–Z-661, Z-663, Z-674–Z-688, Z-691–Z-693 and Z-695–Z-698
+  (division sync and the GST commission bill, 5 Nov). All are in the TEST
+  organisation 60093754195, not the live one. Once the owner has looked at
+  them, remove them: the clean-up script (`app/cron/zoho_cleanup_test_records`,
+  dry run first) finds `TEST-` contacts, invoices, bills, payments and journals;
+  check the new-division records by hand too (the script does not yet know
+  their new Zoho IDs — register O-22, ZOH-17). Fill in "removed on / by" for each
+  row. The live organisation starts clean.
