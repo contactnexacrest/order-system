@@ -26,6 +26,8 @@ function shell(body, extraCss = '') {
 *{box-sizing:border-box;margin:0}
 html{zoom:${cfg.VIEW.zoom || 1}}
 html,body{width:100%;height:100%;overflow:hidden}
+/* A card never takes the app overlay (its body zoom, badge, caption): it can be injected for a moment while the next card loads. */
+body{zoom:1!important}#tut-root{display:none!important}
 body{font-family:Poppins,system-ui,sans-serif;color:#fff;background:radial-gradient(ellipse at 20% 10%,#0b46c4 0%,${B.navy} 38%,${B.navyStrong} 100%);display:flex;align-items:center;justify-content:center}
 .wrap{width:1080px;position:relative}
 .logo{width:74px;height:74px;border-radius:16px;background:#fff center/cover no-repeat;box-shadow:0 8px 30px rgba(0,0,0,.35)}

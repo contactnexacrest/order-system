@@ -17,7 +17,7 @@ module.exports = {
 
   async setup(demo) {
     const s = await associateSetup(demo, { email: EMAIL, name: 'Demo Associate', level: 'quoting', address: 'Demo address, Jaipur', pan: 'ABCDE1234F' });
-    demo.buyerWithOrders({ associateId: s.a.id, company: 'TEST Demo Stone Buyer BV', country: 'Netherlands', email: 'buyer.statement@email.com', orders: [
+    demo.buyerWithOrders({ associateId: s.a.id, company: 'TEST Demo Stone Buyer BV', country: 'Netherlands', email: 'purchasing@statement-demo.example', orders: [
       { reference: 'TEST-TUT-1001', payouts: [{ inr: 28305, fc: 340, month: ym(3), status: 'paid', paidOn: day(70), paidInr: 28305, ref: 'UTR-DEMO-000101' }] },
       { reference: 'TEST-TUT-1002', payouts: [{ inr: 15400, fc: 185, month: ym(1), status: 'paid', paidOn: day(20), paidInr: 15092, tds: 308, rate: 2, section: '194H', ref: 'UTR-DEMO-000102' }] },
       { reference: 'TEST-TUT-1003', payouts: [{ inr: 20520, fc: 246, month: ym(0), status: 'due', due: day(-20) }] },

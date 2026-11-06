@@ -19,7 +19,7 @@ module.exports = {
 
   async setup(demo) {
     const s = await associateSetup(demo, { email: EMAIL, name: 'Demo Associate', level: 'full', address: 'Demo address, Jaipur', pan: 'ABCDE1234F' });
-    s.buyer = demo.buyerWithOrders({ associateId: s.a.id, company: 'TEST Demo Stone Buyer BV', country: 'Netherlands', email: 'buyer.commission@email.com', orders: [
+    s.buyer = demo.buyerWithOrders({ associateId: s.a.id, company: 'TEST Demo Stone Buyer BV', country: 'Netherlands', email: 'purchasing@commission-demo.example', orders: [
       { reference: 'TEST-TUT-0901', lines: [{ description: 'Granite slabs, polished, 20 mm', qty: 500, unit: 'm2', price: 34 }],
         payouts: [{ inr: 28305, fc: 340, month: ym(2), status: 'paid', paidOn: day(40), paidInr: 28305, ref: 'UTR-DEMO-000001', due: day(45), note: 'Level 2 (2%) on invoiced FOB' }] },
       { reference: 'TEST-TUT-0902', lines: [{ description: 'Granite tiles, flamed, 30 mm', qty: 300, unit: 'm2', price: 41 }],

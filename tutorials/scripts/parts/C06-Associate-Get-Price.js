@@ -31,7 +31,7 @@ module.exports = {
     { caption: '10 of 10 left today', say: 'At the top: how many price requests you have left today. Use them wisely, NexaCrest keeps an eye on how many prices turn into orders.', do: async (d) => { await d.point(d.page.locator('p.muted').first(), 1500); } },
 
     { card: 'chapter', title: 'Get price', subtitle: 'Choose the options. Get the price.', say: 'Part three. Let us get a price.' },
-    { caption: 'Get price', say: 'Press Get price next to the product.', do: async (d) => { await d.clickNav(d.page.getByRole('link', { name: 'Get price' }).first()); } },
+    { caption: 'Get price', say: 'Press Get price next to the product.', do: async (d) => { await d.clickNav(d.page.locator('tr', { hasText: 'Black Galaxy Granite (demo)' }).getByRole('link', { name: 'Get price' })); } },
     { caption: 'Only this product\'s options', say: 'You only see the options this product really offers. Each drop-down starts at the standard choice. Let us pick what our buyer asked for.', do: async (d) => { await d.ring(d.page.locator('form.field-grid')); await d.wait(1500); } },
     { caption: 'Thickness, finish, quantity', say: 'Thirty millimetres thick, a leather finish, and two to four containers.', do: async (d) => {
       const pick = async (label, option) => {
@@ -55,7 +55,7 @@ module.exports = {
       'Prices are for you only: never forward the page or a screenshot.',
       'Offer the quote price; you may go down to the lowest price, not below.',
       'The final price is confirmed on the Proforma Invoice.',
-      'Something not listed? Use "Other" (next video).',
+      'Something not listed? Use "Other" (next part).',
     ], next: 'Part 2 · Price requests: "Other"', say: 'A few golden rules. Prices are for you only, so never forward the page or a screenshot. Offer the quote price, and go down to the lowest price if you must, never below. The final price is always confirmed on the Proforma Invoice. And if the buyer wants something not in the list, that is what Other is for, coming up next, in part two.' },
   ],
 };

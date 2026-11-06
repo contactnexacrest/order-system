@@ -23,8 +23,8 @@ module.exports = {
   steps: ({ a = PLAN_A, productId = 0 } = {}) => {
     const st = {};
     return [
-      { card: 'title', say: 'Sometimes a buyer wants something that is not in the list. A special size, an unusual finish, a one-off project. No problem! In this video you send an Other price request, and we watch NexaCrest price it for you.' },
-      { as: 'associate', goto: `/associate/catalogue/${productId}`, caption: 'Get price', say: 'We start on the Get price page of our demo product, exactly like in the last video.', do: async (d) => { await d.point('h1', 1200); } },
+      { card: 'title', say: 'Sometimes a buyer wants something that is not in the list. A special size, an unusual finish, a one-off project. No problem! In this part you send an Other price request, and we watch NexaCrest price it for you.' },
+      { as: 'associate', goto: `/associate/catalogue/${productId}`, caption: 'Get price', say: 'We start on the Get price page of our demo product, exactly like a moment ago.', do: async (d) => { await d.point('h1', 1200); } },
       { caption: 'The buyer needs something not listed', say: 'This time we tick the box: the buyer needs something not listed here. Our team prices it within twenty-four hours.', do: async (d) => { await d.check(d.page.locator('input[name="other"]')); await d.ring(d.page.locator('label', { hasText: 'not listed' })); await d.wait(1200); } },
       { caption: 'Notes are required now', say: 'Now the notes become required. Watch what happens if we press Get price without them. The message appears right beside the field: tell our team what the buyer needs, at least ten characters.', do: async (d) => {
         await d.click(d.page.getByRole('button', { name: 'Get price' }));

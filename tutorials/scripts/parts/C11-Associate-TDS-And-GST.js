@@ -21,7 +21,7 @@ module.exports = {
 
   async setup(demo) {
     const s = await associateSetup(demo, { email: INDIA, name: 'Demo Associate India', level: 'full', address: 'Demo address, Jaipur', pan: 'ABCDE1234F' });
-    demo.buyerWithOrders({ associateId: s.a.id, company: 'TEST Demo Stone Buyer BV', country: 'Netherlands', email: 'buyer.india@email.com', orders: [
+    demo.buyerWithOrders({ associateId: s.a.id, company: 'TEST Demo Stone Buyer BV', country: 'Netherlands', email: 'purchasing@tax-demo.example', orders: [
       { reference: 'TEST-TUT-1101', payouts: [{ inr: 8000, fc: 96, month: ym(4), status: 'paid', paidOn: day(100), paidInr: 8000, ref: 'UTR-DEMO-001101' }] },
       { reference: 'TEST-TUT-1102', payouts: [{ inr: 15400, fc: 185, month: ym(1), status: 'paid', paidOn: day(15), paidInr: 14932, tds: 468, rate: 2, section: '194H', ref: 'UTR-DEMO-001102', note: 'TDS includes catch-up on earlier commission this year' }] },
     ] });
@@ -32,7 +32,7 @@ module.exports = {
   },
 
   steps: ({ a = PLAN_A } = {}) => [
-    { card: 'title', say: 'Tax. The word alone makes people nervous! Relax: NexaCrest works out the tax on your commission automatically, following the rules its chartered accountant sets. This video explains what happens, in plain words, so you can check your numbers with confidence. One note first: the rates and limits you will hear are the ones currently set in the app. They may change after the chartered accountant\'s review, and the portal always uses the latest settings.' },
+    { card: 'title', say: 'Tax. The word alone makes people nervous! Relax: NexaCrest works out the tax on your commission automatically, following the rules its chartered accountant sets. This part explains what happens, in plain words, so you can check your numbers with confidence. One note first: the rates and limits you will hear are the ones currently set in the app. They may change after the chartered accountant\'s review, and the portal always uses the latest settings.' },
 
     { card: 'chapter', title: 'In India: TDS', subtitle: 'Tax deducted at source, section 194H.', say: 'Part one. Associates in India, and TDS.' },
     { card: 'list', kicker: 'India · with PAN', title: 'The TDS rule', items: [

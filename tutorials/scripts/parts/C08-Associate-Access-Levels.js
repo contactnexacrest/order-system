@@ -18,7 +18,7 @@ module.exports = {
   },
 
   steps: ({ a = PLAN_A } = {}) => [
-    { card: 'title', say: 'Why does one associate see a Catalogue tab, and another does not? It is all about access levels. In this video we look at the four levels, who decides, and we watch an associate move up, live.' },
+    { card: 'title', say: 'Why does one associate see a Catalogue tab, and another does not? It is all about access levels. In this part we look at the four levels, who decides, and we watch an associate move up, live.' },
     { card: 'list', kicker: 'The levels', title: 'Four levels', items: [
       'Starter: clients, orders and stage, commission, links, messages, TDS certificates.',
       'Quoting: + order value, commission %, catalogue, get price, "Other", statements.',

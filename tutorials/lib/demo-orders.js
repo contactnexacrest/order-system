@@ -22,7 +22,9 @@ async function main() {
   for (const ord of o.orders || []) {
     const orderId = await createTestOrder(clientId, 'FOB', 'Standard — New Buyer', ord.currency || 'USD');
     const ref = ord.reference || `TEST-TUT-${String(orderId).padStart(4, '0')}`;
-    await db.execute('UPDATE orders SET order_reference = :r, status = :s WHERE id = :id', { r: ref, s: ord.status || 'active', id: orderId });
+    // The fixture always uses sequence 1; move each order on so the next one for this buyer fits.
+    await db.execute('UPDATE orders SET order_reference = :r, status = :s, sequence_no = :q WHERE id = :id',
+      { r: ref, s: ord.status || 'active', q: out.orders.length + 2, id: orderId });
     let n = 0;
     for (const l of ord.lines || [{ description: 'Granite slabs, polished, 20 mm', qty: 300, unit: 'm2', price: 32 }]) {
       n += 1;
