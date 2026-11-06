@@ -91,6 +91,10 @@ const SUBJECTS = {
 
 /** A notice in the associate's portal and, where useful, an e-mail. */
 async function notify(associate, event, message, clientId = null, orderId = null, invitationId = null, userId = null, email = true) {
+  // D-261: amounts (and the commission %) only where the associate's access level shows them.
+  if (associate && associate.id) {
+    message = await require('./associateAccess').maskNotice(associate, message);
+  }
   await associateEventRepository.add(Number(associate.id), event, message, clientId, orderId, invitationId, userId, true);
   if (email && associate.email) {
     try {

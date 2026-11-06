@@ -3,18 +3,20 @@
    associate (portal) and to staff with "Manage associates". PHP twin: _statement.php. Expects c = associateCommission.forOrder(). #}
 <div class="statement">
   <table class="list">
-    <tr><th>Line</th><th class="r">Invoiced FOB ({{ c.currency }})</th><th>Price check</th><th class="r">Commission ({{ c.currency }})</th></tr>
+    {# D-261: the associate portal hides the FOB value unless their access level shows it #}
+    {% set showFob = c.show_fob !== false %}
+    <tr><th>Line</th>{% if showFob %}<th class="r">Invoiced FOB ({{ c.currency }})</th>{% endif %}<th>Price check</th><th class="r">Commission ({{ c.currency }})</th></tr>
     {% for l in c.lines %}
-      <tr><td>{{ l.line_no }} · {{ l.description | truncate(60, true, '') }}</td><td class="r">{{ l.fob | money }}</td>
+      <tr><td>{{ l.line_no }} · {{ l.description | truncate(60, true, '') }}</td>{% if showFob %}<td class="r">{{ l.fob | money }}</td>{% endif %}
         <td>{% if l.in_range %}<span class="badge badge-active">In range</span>{% else %}<span class="badge badge-pending">Below floor, approved — no commission</span>{% endif %}</td><td class="r">{{ l.commission | money }}</td></tr>
     {% endfor %}
     {% if c.lines.length == 0 %}<tr><td colspan="4" class="muted">No goods lines yet.</td></tr>{% endif %}
-    <tr><td><b>Total</b></td><td class="r"><b>{{ c.goods_fc | money }}</b></td><td></td><td class="r"><b>{{ c.amount_fc | money }}</b></td></tr>
+    <tr><td><b>Total</b></td>{% if showFob %}<td class="r"><b>{{ c.goods_fc | money }}</b></td>{% endif %}<td></td><td class="r"><b>{{ c.amount_fc | money }}</b></td></tr>
   </table>
   <table class="kv" style="margin-top:8px">
-    <tr><th>Commission level</th><td>{{ c.level_label }}{{ ' — fixed when the Proforma Invoice was issued' if c.level_fixed else ' — for now; fixed when the Proforma Invoice is issued' }}</td></tr>
-    {% if (c.reduction_fc | float) > 0 %}<tr><th>Agreed discount / settled claim</th><td>− {{ c.currency }} {{ c.reduction_fc | money }} (lowers the basis)</td></tr>{% endif %}
-    <tr><th>Basis</th><td>{{ c.currency }} {{ c.basis_fc | money }} × ₹{{ c.rate_inr | fixed4 }}{{ ' (estimated — rupees credited not recorded yet)' if c.rate_estimated else ' realised' }} = ₹{{ c.basis_inr | money }}</td></tr>
+    {% if c.show_pct !== false and c.level_label !== null %}<tr><th>Commission level</th><td>{{ c.level_label }}{{ ' — fixed when the Proforma Invoice was issued' if c.level_fixed else ' — for now; fixed when the Proforma Invoice is issued' }}</td></tr>{% endif %}
+    {% if showFob and (c.reduction_fc | float) > 0 %}<tr><th>Agreed discount / settled claim</th><td>− {{ c.currency }} {{ c.reduction_fc | money }} (lowers the basis)</td></tr>{% endif %}
+    {% if showFob %}<tr><th>Basis</th><td>{{ c.currency }} {{ c.basis_fc | money }} × ₹{{ c.rate_inr | fixed4 }}{{ ' (estimated — rupees credited not recorded yet)' if c.rate_estimated else ' realised' }} = ₹{{ c.basis_inr | money }}</td></tr>{% endif %}
     <tr><th>Commission</th><td><b>{{ c.currency }} {{ c.amount_fc | money }} · ₹{{ c.amount_inr | money }}</b>{{ ' — none: the buyer did not pay the order in full' if c.state == 'unpaid' }}</td></tr>
     <tr><th>GST</th><td>{% if c.gstin %}GST {{ c.gst_pct | pct2 }}% added on top once your tax invoice is on file{% else %}none (not GST-registered){% endif %}</td></tr>
     <tr><th>Full payment</th><td>{{ ((c.fully_paid_on | shortDate) + ' ✓') if c.fully_paid_on else 'not yet' }}</td></tr>

@@ -110,7 +110,7 @@ final class AssociateRegistrationController
             'name' => $r['name'], 'based_in' => $r['based_in'], 'country' => $r['country'], 'currency_code' => $r['based_in'] === 'india' ? 'INR' : 'USD',
             'email' => $r['email'], 'phone' => $r['phone'], 'status' => 'invited', 'notes' => 'Registered themselves through an associate registration link (D-253).',
         ], $userId);
-        AssociateRepository::setFields($id, ['city' => $r['city']]);
+        AssociateRepository::setFields($id, ['city' => $r['city'], 'access_level' => 'starter']); // D-261: a new associate starts on Starter
         if (!AssociateRegistrationRepository::decide((int) $r['id'], 'accepted', null, $userId, $id)) {
             Flash::set('error', 'This registration was already reviewed.');
             header('Location: /associates/registrations');

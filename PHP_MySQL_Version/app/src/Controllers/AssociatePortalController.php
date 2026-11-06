@@ -49,7 +49,8 @@ final class AssociatePortalController
     private static function render(string $view, array $data = []): void
     {
         $a = self::me();
-        View::render('associate_portal/' . $view, $data + ['me' => $a, 'unread' => $a ? AssociateEventRepository::unreadNotices((int) $a['id']) : 0], self::LAYOUT);
+        View::render('associate_portal/' . $view, $data + ['me' => $a, 'unread' => $a ? AssociateEventRepository::unreadNotices((int) $a['id']) : 0,
+            'access' => $a ? \App\Services\AssociateAccess::features($a) : []], self::LAYOUT); // D-261: what the access level shows
     }
 
     // ---------------------------------------------------------------- login
@@ -151,7 +152,7 @@ final class AssociatePortalController
         self::render('home', [
             'totals' => AssociatePortalRepository::totals($id),
             'clients' => AssociatePortalRepository::clients($id),
-            'orders' => array_slice(AssociatePortalRepository::orders($id), 0, 5),
+            'orders' => self::visibleOrders(array_slice(AssociatePortalRepository::orders($id), 0, 5)),
             'events' => AssociateEventRepository::forAssociate($id, null, 10),
             'invitations' => AssociateInvitationRepository::forAssociate($id),
         ]);
@@ -173,6 +174,13 @@ final class AssociatePortalController
             'codeChangesUsed' => AssociateCodeService::changesInLastYear($id),
         ]);
         unset($_SESSION['_associate_new_link']);
+    }
+
+    /** D-261: orders with what the associate's access level does not show taken out on the server (FOB value, commission %). */
+    private static function visibleOrders(array $orders): array
+    {
+        $me = self::me();
+        return array_map(static fn (array $o): array => \App\Services\AssociateAccess::filterOrder($me, $o), $orders);
     }
 
     public static function codeLink(array $a): ?string
@@ -277,7 +285,7 @@ final class AssociatePortalController
 
     public function orders(array $params): void
     {
-        self::render('orders', ['orders' => AssociatePortalRepository::orders((int) self::me()['id'])]);
+        self::render('orders', ['orders' => self::visibleOrders(AssociatePortalRepository::orders((int) self::me()['id']))]);
     }
 
     public function order(array $params): void
@@ -289,7 +297,7 @@ final class AssociatePortalController
             echo 'Order not found.';
             return;
         }
-        self::render('order', ['o' => $rows[0], 'events' => array_values(array_filter(AssociateEventRepository::forAssociate($id), static fn (array $e): bool => (int) $e['order_id'] === (int) $rows[0]['id']))]);
+        self::render('order', ['o' => self::visibleOrders([$rows[0]])[0], 'events' => array_values(array_filter(AssociateEventRepository::forAssociate($id), static fn (array $e): bool => (int) $e['order_id'] === (int) $rows[0]['id']))]);
     }
 
     public function commission(array $params): void
@@ -550,6 +558,11 @@ final class AssociatePortalController
         if ($doc === null || (int) $doc['associate_id'] !== (int) $a['id']) {
             http_response_code(404);
             echo 'Document not found.';
+            return;
+        }
+        // D-261: TDS paperwork (Form 16A / 15CA / 15CB) only with "TDS certificates".
+        if (in_array((string) $doc['kind'], \App\Services\AssociateAccess::TDS_KINDS, true) && !\App\Services\AssociateAccess::allows($a, 'tds_certificates')) {
+            \App\Middleware\AssociateAuth::notAvailable($a);
             return;
         }
         AssociateAdminController::sendFile((string) $doc['server_path'], (string) $doc['original_filename'], (string) ($doc['mime_type'] ?? 'application/octet-stream'));

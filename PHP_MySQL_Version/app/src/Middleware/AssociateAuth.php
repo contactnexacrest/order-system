@@ -17,6 +17,13 @@ final class AssociateAuth
 {
     private const LAST_ACTIVITY_KEY = '_associate_last_activity_ts';
 
+    /** D-261 (mockup 5): the friendly lock page for a feature the associate's level does not show. */
+    public static function notAvailable(array $associate): void
+    {
+        http_response_code(403);
+        \App\Helpers\View::render('associate_portal/not_available', ['me' => $associate, 'unread' => 0], 'layout/associate');
+    }
+
     public static function required(): callable
     {
         return function (array $params): bool {
@@ -43,6 +50,13 @@ final class AssociateAuth
             if ($viewAs && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 http_response_code(403);
                 echo 'Read-only: you are viewing this portal as staff.';
+                return false;
+            }
+            // D-261: a feature this associate's access level does not show is refused here, in one
+            // place for every portal page (the menu hides it too). Staff "view as" sees the same.
+            $path = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?? '/');
+            if (!\App\Services\AssociateAccess::allowsPath($a, (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'), $path, $_GET, $_POST)) {
+                self::notAvailable($a);
                 return false;
             }
             return true;

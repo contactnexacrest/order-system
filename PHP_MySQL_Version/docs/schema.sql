@@ -6103,3 +6103,40 @@ CREATE TABLE incentive_kept (
   INDEX idx_incentive_kept_order (order_id),
   INDEX idx_incentive_kept_month (incentive_month)
 ) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+-- D-261 (owner approval 6 Nov 2026, mockups mock13): associate portal access
+-- levels. Each associate is on Starter, Quoting, Full or Custom. What each
+-- level shows is the MD's matrix (associate_access_level_settings); a Custom
+-- associate has their own ticks (associate_access_features). An associate
+-- added in the app starts on Starter; the column default stays 'full' so the
+-- associates that already existed keep today's portal. Every change is logged.
+-- ---------------------------------------------------------------------------
+ALTER TABLE associates
+  ADD COLUMN access_level ENUM('starter','quoting','full','custom') NOT NULL DEFAULT 'full',
+  ADD COLUMN upgrade_dismissed_at_count INT UNSIGNED NULL;
+CREATE TABLE associate_access_level_settings (
+  level        ENUM('starter','quoting','full') NOT NULL,
+  feature_key  VARCHAR(40) NOT NULL,
+  allowed      TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (level, feature_key)
+) ENGINE=InnoDB;
+CREATE TABLE associate_access_features (
+  associate_id BIGINT UNSIGNED NOT NULL,
+  feature_key  VARCHAR(40) NOT NULL,
+  allowed      TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (associate_id, feature_key),
+  FOREIGN KEY (associate_id) REFERENCES associates(id)
+) ENGINE=InnoDB;
+CREATE TABLE associate_access_log (
+  id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  associate_id BIGINT UNSIGNED NULL,                 -- NULL: a change to the level settings (all associates on a level)
+  changed_by   BIGINT UNSIGNED NULL,
+  old_value    TEXT NULL,
+  new_value    TEXT NULL,
+  reason       VARCHAR(500) NOT NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (associate_id) REFERENCES associates(id),
+  FOREIGN KEY (changed_by) REFERENCES users(id),
+  INDEX idx_associate_access_log_assoc (associate_id, created_at)
+) ENGINE=InnoDB;

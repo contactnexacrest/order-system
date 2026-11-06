@@ -243,6 +243,7 @@ final class AssociateAdminController
         }
         if ($id === null) {
             $id = AssociateRepository::create($data, (int) $user['id']);
+            AssociateRepository::setFields($id, ['access_level' => 'starter']); // D-261: a new associate starts on Starter
             AuditLogRepository::log((int) $user['id'], 'ASSOCIATE_ADDED', 'associates', $id, null, null, (string) $data['name']);
             AssociateEventRepository::add($id, 'registered', 'Associate registered by ' . $user['name'] . '.', null, null, null, (int) $user['id'], false);
             Flash::set('success', "Associate \"{$data['name']}\" added. Next: upload their KYC, have Accounts verify their bank, then send portal access and set them Active.");
@@ -322,6 +323,13 @@ final class AssociateAdminController
                 'rm' => !empty($a['relationship_manager_id']) ? UserRepository::findById((int) $a['relationship_manager_id']) : null,
                 'codeLink' => AssociatePortalController::codeLink($a),
                 'tdsPct' => AssociateService::tdsPct(),
+                // D-261: portal access level, track record and the "Ready for Quoting?" suggestion.
+                'portalAccess' => (static function () use ($a, $id): array {
+                    $track = \App\Services\AssociateAccess::trackRecord($id);
+                    return ['track' => $track, 'history' => \App\Services\AssociateAccess::history($id, 20),
+                        'isMd' => IncentiveService::isMd(self::user()), 'upgradeAfter' => \App\Services\AssociateAccess::upgradeAfter(),
+                        'suggest' => \App\Services\AssociateAccess::suggestUpgrade($a, $track['completed_paid'])];
+                })(),
             ];
         }
         View::render('associates/show', $data, 'layout/base');

@@ -60,6 +60,10 @@ final class AssociateService
     /** A notice in the associate's portal and, where useful, an e-mail. */
     public static function notify(array $associate, string $event, string $message, ?int $clientId = null, ?int $orderId = null, ?int $invitationId = null, ?int $userId = null, bool $email = true): void
     {
+        // D-261: amounts (and the commission %) only where the associate's access level shows them.
+        if (!empty($associate['id'])) {
+            $message = AssociateAccess::maskNotice($associate, $message);
+        }
         AssociateEventRepository::add((int) $associate['id'], $event, $message, $clientId, $orderId, $invitationId, $userId, true);
         if ($email && !empty($associate['email'])) {
             EmailService::sendPlainText((string) $associate['email'], 'NexaCrest associate portal — ' . self::subjectFor($event),

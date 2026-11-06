@@ -23,6 +23,7 @@ const associateService = require('../services/associateService');
 const fileUploadService = require('../services/fileUploadService');
 const incentiveService = require('../services/incentiveService');
 const { validateBank, sendFile } = require('./associateAdminController');
+const associateAccess = require('../services/associateAccess');
 
 /**
  * Port of AssociatePortalController.php. Owner decision 1 Nov 2026 ("AS all
@@ -45,7 +46,14 @@ async function layoutData(req, a) {
     me: a && a.id ? a : null,
     unread: a && a.id ? await associateEventRepository.unreadNotices(Number(a.id)) : 0,
     viewAs: associatePortalService.viewAsStaffId(req) !== null,
+    access: a && a.id ? await associateAccess.features(a) : null, // D-261: what the access level shows
   };
+}
+
+/** D-261: orders with what the associate's access level does not show taken out on the server (FOB value, commission %). */
+async function visibleOrders(a, orders) {
+  const access = await associateAccess.features(a);
+  return orders.map((o) => associateAccess.filterOrder(access, o));
 }
 
 async function render(req, res, view, data = {}) {
@@ -155,7 +163,7 @@ async function home(req, res) {
     statuses: associateRepository.STATUSES,
     totals: await associatePortalRepository.totals(id),
     clients: await associatePortalRepository.clients(id),
-    orders: (await associatePortalRepository.orders(id)).slice(0, 5),
+    orders: await visibleOrders(await me(req), (await associatePortalRepository.orders(id)).slice(0, 5)),
     events: await associateEventRepository.forAssociate(id, null, 10),
     invitations,
     openInvitations: invitations.filter((i) => ['created', 'opened', 'registered'].includes(i.status)).length,
@@ -284,7 +292,7 @@ async function chooseCode(req, res) {
 
 async function orders(req, res) {
   const a = await me(req);
-  await render(req, res, 'orders', { orders: await associatePortalRepository.orders(Number(a.id)) });
+  await render(req, res, 'orders', { orders: await visibleOrders(a, await associatePortalRepository.orders(Number(a.id))) });
 }
 
 async function order(req, res) {
@@ -296,7 +304,7 @@ async function order(req, res) {
     return;
   }
   const events = (await associateEventRepository.forAssociate(id)).filter((e) => Number(e.order_id) === Number(rows[0].id));
-  await render(req, res, 'order', { o: rows[0], events });
+  await render(req, res, 'order', { o: (await visibleOrders(await me(req), [rows[0]]))[0], events });
 }
 
 async function commission(req, res) {
@@ -492,6 +500,11 @@ async function downloadDocument(req, res) {
   const doc = await associateDocumentRepository.find(parseInt(req.params.id, 10));
   if (!doc || Number(doc.associate_id) !== Number(a.id)) {
     notFound(res, 'Document not found.');
+    return;
+  }
+  // D-261: TDS paperwork (Form 16A / 15CA / 15CB) only with "TDS certificates".
+  if (associateAccess.TDS_KINDS.includes(String(doc.kind)) && !(await associateAccess.allows(a, 'tds_certificates'))) {
+    await require('../middleware/associateAuth').notAvailable(req, res, a);
     return;
   }
   sendFile(res, doc.server_path, doc.original_filename, doc.mime_type || 'application/octet-stream');

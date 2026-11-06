@@ -13,6 +13,7 @@ $__codeChosen = false;
     <div class="alert alert-success">Your new buyer registration link — copy it and send it to your buyer (valid 30 days, for one registration):<br><code style="user-select:all"><?= htmlspecialchars($newLink) ?></code></div>
   <?php endif; ?>
 
+  <?php if (!empty($access['registration_links'])): // D-261 ?>
   <div class="section">
     <h2>Invite a client</h2>
     <?php if ($me['status'] !== 'active'): ?><p class="muted">You can invite clients once your account is active.</p><?php else: ?>
@@ -62,6 +63,7 @@ $__codeChosen = false;
     </div>
     <?php endif; ?>
   </div>
+  <?php endif; ?>
 
   <div class="section">
     <h2>Registered clients (<?= count($clients) ?>)</h2>
@@ -77,6 +79,7 @@ $__codeChosen = false;
     </table>
   </div>
 
+  <?php if (!empty($access['registration_links'])): // D-261 ?>
   <div class="section">
     <h2>My buyer registration links and codes used</h2>
     <table class="list">
@@ -90,4 +93,5 @@ $__codeChosen = false;
       <?php if ($invitations === []): ?><tr><td colspan="6" class="muted">None yet.</td></tr><?php endif; ?>
     </table>
   </div>
+  <?php endif; ?>
 </div>

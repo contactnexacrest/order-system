@@ -2555,3 +2555,24 @@ JOIN (SELECT 'company' AS scope, 'mtt_max_months_total' AS k, '9' AS v
       UNION ALL SELECT 'company', 'mtt_bank_documents', 'Sale contract or buyer''s order|Purchase contract or supplier''s proforma|Supplier''s invoice|Bill of lading|Our sale invoice|Inward remittance advice (sell leg)|Outward remittance SWIFT copy (buy leg)'
       UNION ALL SELECT 'incentive', 'program_enabled', '0') s
 WHERE d.code = 'MTT';
+
+-- ---------------------------------------------------------------------------
+-- D-261 (owner approval 6 Nov 2026): associate access levels — the recommended
+-- defaults of mockup 6. Starter: clients, orders and stage, commission per
+-- order (amount only), registration links, messages, TDS certificates.
+-- Quoting adds the catalogue, Get price, price requests, the FOB value, the
+-- commission % and the statement download. Full adds order documents and
+-- amounts in notices / e-mails. "Profile, bank & agreement" is always on.
+-- After 3 completed, fully paid orders the MD is asked "Ready for Quoting?".
+-- ---------------------------------------------------------------------------
+INSERT IGNORE INTO associate_access_level_settings (level, feature_key, allowed) VALUES
+  ('starter','clients',1),('starter','orders',1),('starter','fob_value',0),('starter','commission',1),('starter','commission_pct',0),
+  ('starter','registration_links',1),('starter','catalogue',0),('starter','get_price',0),('starter','price_requests',0),('starter','messages',1),
+  ('starter','order_documents',0),('starter','tds_certificates',1),('starter','commission_statement',0),('starter','notice_amounts',0),
+  ('quoting','clients',1),('quoting','orders',1),('quoting','fob_value',1),('quoting','commission',1),('quoting','commission_pct',1),
+  ('quoting','registration_links',1),('quoting','catalogue',1),('quoting','get_price',1),('quoting','price_requests',1),('quoting','messages',1),
+  ('quoting','order_documents',0),('quoting','tds_certificates',1),('quoting','commission_statement',1),('quoting','notice_amounts',0),
+  ('full','clients',1),('full','orders',1),('full','fob_value',1),('full','commission',1),('full','commission_pct',1),
+  ('full','registration_links',1),('full','catalogue',1),('full','get_price',1),('full','price_requests',1),('full','messages',1),
+  ('full','order_documents',1),('full','tds_certificates',1),('full','commission_statement',1),('full','notice_amounts',1);
+INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('associate_upgrade_after_orders', '3');

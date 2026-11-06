@@ -52,6 +52,8 @@ async function index(req, res) {
   }
 
   // Owner decision D-245 P4: the MD sees how many orders are ready to lock (nothing locks by itself).
+  // D-261: the MD is asked "Ready for the Quoting level?" for Starter associates with enough completed, fully paid orders.
+  data.associateUpgrades = (await require('../services/incentiveService').isMd(req.user)) ? await require('../services/associateAccess').upgradeSuggestions() : [];
   data.incentiveReadyCount = (permissions.manage_pricing && permissions.manage_incentives)
     ? (await require('../services/incentiveService').readyToLock()).length : null;
   if (data.incentiveReadyCount) {

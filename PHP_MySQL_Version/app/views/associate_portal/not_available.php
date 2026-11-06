@@ -1,0 +1,6 @@
+<?php // D-261 (mockup 5): a feature this associate's access level does not show, opened directly (e.g. an old bookmark). ?>
+<div class="card" data-access-locked>
+  <h1>&#128274; Not available at your access level</h1>
+  <p>This part of the Associate Portal is not open for your account yet. Please contact NexaCrest if you think you need it.</p>
+  <p class="btn-row"><a class="btn-sm" href="/associate">Back to home</a><?php if (\App\Services\AssociateAccess::allows($me, 'messages')): ?> <a class="btn-sm btn-secondary" href="/associate/messages">Message NexaCrest</a><?php endif; ?></p>
+</div>

@@ -12,18 +12,19 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
 ?>
 <div class="statement">
   <table class="list">
-    <tr><th>Line</th><th class="r">Invoiced FOB (<?= $__cur ?>)</th><th>Price check</th><th class="r">Commission (<?= $__cur ?>)</th></tr>
+    <?php $__fob = $c['show_fob'] ?? true; // D-261: the associate portal hides the FOB value unless their access level shows it ?>
+    <tr><th>Line</th><?php if ($__fob): ?><th class="r">Invoiced FOB (<?= $__cur ?>)</th><?php endif; ?><th>Price check</th><th class="r">Commission (<?= $__cur ?>)</th></tr>
     <?php foreach ($c['lines'] as $l): ?>
-      <tr><td><?= (int) $l['line_no'] ?> · <?= htmlspecialchars(mb_substr($l['description'], 0, 60)) ?></td><td class="r"><?= $__n($l['fob']) ?></td>
+      <tr><td><?= (int) $l['line_no'] ?> · <?= htmlspecialchars(mb_substr($l['description'], 0, 60)) ?></td><?php if ($__fob): ?><td class="r"><?= $__n($l['fob']) ?></td><?php endif; ?>
         <td><?= $l['in_range'] ? '<span class="badge badge-active">In range</span>' : '<span class="badge badge-pending">Below floor, approved — no commission</span>' ?></td><td class="r"><?= $__n($l['commission']) ?></td></tr>
     <?php endforeach; ?>
     <?php if ($c['lines'] === []): ?><tr><td colspan="4" class="muted">No goods lines yet.</td></tr><?php endif; ?>
-    <tr><td><b>Total</b></td><td class="r"><b><?= $__n($c['goods_fc']) ?></b></td><td></td><td class="r"><b><?= $__n($c['amount_fc']) ?></b></td></tr>
+    <tr><td><b>Total</b></td><?php if ($__fob): ?><td class="r"><b><?= $__n($c['goods_fc']) ?></b></td><?php endif; ?><td></td><td class="r"><b><?= $__n($c['amount_fc']) ?></b></td></tr>
   </table>
   <table class="kv" style="margin-top:8px">
-    <tr><th>Commission level</th><td><?= htmlspecialchars($c['level_label']) ?><?= $c['level_fixed'] ? ' — fixed when the Proforma Invoice was issued' : ' — for now; fixed when the Proforma Invoice is issued' ?></td></tr>
-    <?php if ((float) $c['reduction_fc'] > 0): ?><tr><th>Agreed discount / settled claim</th><td>− <?= $__cur ?> <?= $__n($c['reduction_fc']) ?> (lowers the basis)</td></tr><?php endif; ?>
-    <tr><th>Basis</th><td><?= $__cur ?> <?= $__n($c['basis_fc']) ?> × ₹<?= number_format((float) $c['rate_inr'], 4) ?><?= $c['rate_estimated'] ? ' (estimated — rupees credited not recorded yet)' : ' realised' ?> = ₹<?= $__n($c['basis_inr']) ?></td></tr>
+    <?php if (($c['show_pct'] ?? true) && $c['level_label'] !== null): ?><tr><th>Commission level</th><td><?= htmlspecialchars($c['level_label']) ?><?= $c['level_fixed'] ? ' — fixed when the Proforma Invoice was issued' : ' — for now; fixed when the Proforma Invoice is issued' ?></td></tr><?php endif; ?>
+    <?php if ($__fob && (float) $c['reduction_fc'] > 0): ?><tr><th>Agreed discount / settled claim</th><td>− <?= $__cur ?> <?= $__n($c['reduction_fc']) ?> (lowers the basis)</td></tr><?php endif; ?>
+    <?php if ($__fob): ?><tr><th>Basis</th><td><?= $__cur ?> <?= $__n($c['basis_fc']) ?> × ₹<?= number_format((float) $c['rate_inr'], 4) ?><?= $c['rate_estimated'] ? ' (estimated — rupees credited not recorded yet)' : ' realised' ?> = ₹<?= $__n($c['basis_inr']) ?></td></tr><?php endif; ?>
     <tr><th>Commission</th><td><b><?= $__cur ?> <?= $__n($c['amount_fc']) ?> · ₹<?= $__n($c['amount_inr']) ?></b><?= $c['state'] === 'unpaid' ? ' — none: the buyer did not pay the order in full' : '' ?></td></tr>
     <tr><th>GST</th><td><?= trim($c['gstin']) !== '' ? 'GST ' . rtrim(rtrim(number_format((float) $c['gst_pct'], 2), '0'), '.') . '% added on top once your tax invoice is on file' : 'none (not GST-registered)' ?></td></tr>
     <tr><th>Full payment</th><td><?= $c['fully_paid_on'] ? $__d($c['fully_paid_on']) . ' ✓' : 'not yet' ?></td></tr>

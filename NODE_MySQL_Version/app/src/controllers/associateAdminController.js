@@ -236,6 +236,7 @@ async function save(req, res) {
   let savedId = id;
   if (id === null) {
     savedId = await associateRepository.create(data, user.id);
+    await associateRepository.setFields(savedId, { access_level: 'starter' }); // D-261: a new associate starts on Starter
     await auditLogRepository.log(user.id, 'ASSOCIATE_ADDED', 'associates', savedId, null, null, data.name);
     await associateEventRepository.add(savedId, 'registered', `Associate registered by ${user.name}.`, null, null, null, user.id, false);
     flash.set(req, 'success', `Associate "${data.name}" added. Next: upload their KYC, have Accounts verify their bank, then send portal access and set them Active.`);
@@ -337,6 +338,19 @@ async function show(req, res) {
       codeLink: a.personal_code ? `${associateService.appUrl()}/quotation-details?code=${encodeURIComponent(a.personal_code)}` : null,
       tdsPct: await associateService.tdsPct(),
       tdsPctText: trimPct(await associateService.tdsPct()),
+      // D-261: portal access level, track record and the "Ready for Quoting?" suggestion.
+      portalAccess: await (async () => {
+        const access = require('../services/associateAccess');
+        const track = await access.trackRecord(id);
+        const feats = await access.features(a);
+        return {
+          track, history: await access.history(id, 20), isMd: await incentiveService.isMd(req.user), upgradeAfter: await access.upgradeAfter(),
+          suggest: await access.suggestUpgrade(a, track.completed_paid), level: access.level(a), describe: await access.describe(a),
+          levels: access.ALL_LEVELS, features: Object.entries(access.FEATURES).filter(([k]) => k !== 'profile').map(([k, [label, help]]) => ({ key: k, label, help, on: !!feats[k] })),
+          valueText: Object.entries(track.value).map(([c, v]) => `${c} ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(' · '),
+          old: require('../helpers/flash').pullOld(req),
+        };
+      })(),
     });
   }
   data.agreementCard = await require('./agreementController').partyCard(req, 'associate', a.id);

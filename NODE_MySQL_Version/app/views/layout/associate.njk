@@ -26,11 +26,12 @@
   {% if me and me.id %}
   <nav class="topbar-nav">
     <a href="/associate">Home{{ (' (' ~ unread ~ ' new)') if unread else '' }}</a>
-    <a href="/associate/clients">My clients</a>
-    <a href="/associate/orders">Orders</a>
-    <a href="/associate/catalogue">Catalogue</a>
-    <a href="/associate/commission">Commission</a>
-    <a href="/associate/messages">Messages</a>
+    {# D-261: only what the access level shows (the server refuses the rest too) #}
+    {% if not access or access.clients %}<a href="/associate/clients">My clients</a>{% endif %}
+    {% if not access or access.orders %}<a href="/associate/orders">Orders</a>{% endif %}
+    {% if not access or access.catalogue %}<a href="/associate/catalogue">Catalogue</a>{% endif %}
+    {% if not access or access.commission or access.tds_certificates %}<a href="/associate/commission">Commission</a>{% endif %}
+    {% if not access or access.messages %}<a href="/associate/messages">Messages</a>{% endif %}
     <a href="/associate/profile">Profile</a>
     {% if viewAs %}<form method="post" action="/associate/logout" style="margin-left:auto"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="topbar-nav-logout">End staff view</button></form>{% else %}
     <form method="post" action="/associate/logout" style="margin-left:auto"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="topbar-nav-logout">Log out</button></form>{% endif %}

@@ -79,6 +79,7 @@
       </table>
     {% endif %}
   </div>
+  {% if portalAccess %}{% include "associates/_portal_access.njk" %}{% endif %}{# D-261 #}
   {% endif %}
 
   <div class="section" id="clients">

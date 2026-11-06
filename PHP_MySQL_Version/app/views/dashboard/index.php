@@ -3,6 +3,15 @@
   <p>Signed in as <strong><?= htmlspecialchars($user['name']) ?></strong> (<?= htmlspecialchars($user['email']) ?>).</p>
 </div>
 
+<?php if (!empty($associateUpgrades)): // D-261: only the MD sees this ?>
+<div class="card page-wide" id="associate-upgrades">
+  <h2 style="margin-top:0;">Associates ready for the Quoting level? (<?= count($associateUpgrades) ?>)</h2>
+  <ul>
+    <?php foreach ($associateUpgrades as $__u): ?><li><a href="/associates/<?= (int) $__u['id'] ?>#portal-access"><?= htmlspecialchars($__u['name']) ?></a> — <?= (int) $__u['completed_paid'] ?> completed, fully paid orders</li><?php endforeach; ?>
+  </ul>
+  <p class="small muted">Nothing upgrades by itself — review their access on the associate page.</p>
+</div>
+<?php endif; ?>
 <?php if (($incentiveReadyCount ?? null) !== null && $incentiveReadyCount > 0): // Owner decision D-245 P4 ?>
 <div class="card page-wide" id="incentives-ready">
   <h2 style="margin-top:0;">Team incentives ready to lock (<?= (int) $incentiveReadyCount ?>)</h2>

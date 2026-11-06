@@ -1121,6 +1121,12 @@ app.post('/associates/registrations/links/:id/cancel', requireAuth, requirePermi
 app.post('/associates/registrations/settings', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateRegistrationController.saveSettings));
 app.post('/associates/registrations/:id/accept', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateRegistrationController.accept));
 app.post('/associates/registrations/:id/reject', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateRegistrationController.reject));
+// D-261 (owner approval 6 Nov 2026): associate portal access levels — only the MD changes them (checked in the service).
+const associateAccessController = require('./controllers/associateAccessController');
+app.get('/associates/access-levels', requireAuth, requirePermissionAny(['view_associates', 'manage_associates']), asyncHandler(associateAccessController.levels));
+app.post('/associates/access-levels', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAccessController.saveLevels));
+app.post('/associates/:id/access', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAccessController.setLevel));
+app.post('/associates/:id/access/not-yet', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAccessController.notYet));
 app.get('/associates/ladder', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.ladder));
 app.post('/associates/ladder', requireAuth, requirePermission('manage_associates'), verifyCsrf, asyncHandler(associateAdminController.saveLadder));
 app.get('/reports/associates', requireAuth, requirePermission('manage_associates'), asyncHandler(associateAdminController.report));

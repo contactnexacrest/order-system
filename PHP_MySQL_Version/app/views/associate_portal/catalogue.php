@@ -17,7 +17,7 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
         <td><b><?= View::e($p['name']) ?></b><?php if ($p['description'] !== ''): ?><br><small class="muted"><?= View::e(mb_substr($p['description'], 0, 160)) ?></small><?php endif; ?></td>
         <td><?= View::e($p['forms'] !== [] ? implode(', ', $p['forms']) : '—') ?></td>
         <td><?= View::e($p['finishes'] !== [] ? implode(', ', $p['finishes']) : '—') ?></td>
-        <td><a class="btn-sm" href="/associate/catalogue/<?= (int) $p['id'] ?>">Get price</a></td>
+        <td><?php if (!empty($access['get_price'])): // D-261 ?><a class="btn-sm" href="/associate/catalogue/<?= (int) $p['id'] ?>">Get price</a><?php endif; ?></td>
       </tr>
     <?php endforeach; ?>
     <?php if ($products === []): ?><tr><td colspan="4" class="muted">No products are open to you yet — NexaCrest chooses which categories you can offer.</td></tr><?php endif; ?>

@@ -1,0 +1,45 @@
+{# D-261 (owner approval 6 Nov 2026, mockups 1 and 2): the associate's Portal access level and Track record,
+   on the staff associate page. Only the MD changes the level. Expects a, portalAccess. PHP twin: _portal_access.php. #}
+{% set pa = portalAccess %}
+<div class="section" id="portal-access">
+  <h2>Portal access <small class="muted">— now: {{ pa.describe }}</small></h2>
+  {% if pa.suggest %}
+    <div class="alert alert-info" data-upgrade-suggestion><b>Ready for the Quoting level?</b> {{ a.name }} has {{ pa.track.completed_paid }} completed, fully paid orders. Nothing upgrades by itself.
+      {% if pa.isMd %}<form method="post" action="/associates/{{ a.id }}/access/not-yet" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><button type="submit" class="btn-sm btn-secondary">Not yet</button></form>{% endif %}</div>
+  {% endif %}
+  {% if not pa.isMd %}<p class="muted small">Only the MD can change this.</p>{% endif %}
+  <form method="post" action="/associates/{{ a.id }}/access" data-portal-access>
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <fieldset{% if not pa.isMd %} disabled{% endif %}>
+      <legend>Level *</legend>
+      {% for key, label in pa.levels %}
+        <label class="checkbox-label"><input type="radio" name="access_level" value="{{ key }}" required{% if pa.level == key %} checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+      <p class="small muted">Starter: clients, orders and stage, commission, registration links — no prices and no quoting. Quoting adds the catalogue and Get price. Full is the whole portal. What each level shows is set in <a href="/associates/access-levels">Level settings ›</a></p>
+      <details{% if pa.level == 'custom' %} open{% endif %}><summary>Custom — tick features one by one (used only when Custom is chosen)</summary>
+        {% for f in pa.features %}
+          <label class="checkbox-label"><input type="checkbox" name="feature[]" value="{{ f.key }}"{% if f.on %} checked{% endif %}> {{ f.label }} <small class="muted">{{ f.help }}</small></label>
+        {% endfor %}
+      </details>
+      <label class="full">Reason for the change *
+        <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. 3 orders completed and paid — may now quote" value="{{ pa.old.reason or '' }}"></label>
+      <button type="submit" class="btn-sm">Save portal access</button>
+    </fieldset>
+  </form>
+  {% if pa.history.length %}
+    <table class="list"><tr><th>When</th><th>By</th><th>From</th><th>To</th><th>Reason</th></tr>
+      {% for h in pa.history %}<tr><td>{{ h.created_at | shortDate }}</td><td>{{ h.changed_by_name or '—' }}</td><td>{{ h.old_value }}</td><td>{{ h.new_value }}</td><td>{{ h.reason }}</td></tr>{% endfor %}
+    </table>
+  {% endif %}
+</div>
+
+<div class="section" id="track-record">
+  <h2>Track record</h2>
+  <div class="stat-row">
+    <div class="stat"><div class="stat-label">Clients brought in</div><div class="stat-value">{{ pa.track.clients }}</div></div>
+    <div class="stat"><div class="stat-label">Orders</div><div class="stat-value">{{ pa.track.orders }}</div></div>
+    <div class="stat"><div class="stat-label">Order value</div><div class="stat-value">{{ pa.valueText or '—' }}</div></div>
+    <div class="stat"><div class="stat-label">Completed &amp; fully paid</div><div class="stat-value">{{ pa.track.completed_paid }}</div></div>
+  </div>
+  <p class="small muted">The MD is asked about the Quoting level after {{ pa.upgradeAfter }} completed, fully paid orders.</p>
+</div>

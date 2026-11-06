@@ -83,6 +83,7 @@ $__sourceLabel = ['link' => 'buyer registration link', 'code' => 'personal code'
       </table>
     <?php endif; ?>
   </div>
+  <?php if (isset($portalAccess)) { require __DIR__ . '/_portal_access.php'; } // D-261 ?>
   <?php endif; ?>
 
   <div class="section" id="clients">

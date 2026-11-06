@@ -492,3 +492,23 @@ financial year**. The payout's TDS note says how much was carried
 ("capped at the payout; ₹X TDS carried to the next payout"), and the next
 payout's TDS includes it ("includes ₹X TDS carried from an earlier payout").
 If Accounts changes the TDS by hand (with a reason), nothing is carried.
+
+## Access levels — what each associate sees (owner decision 6 Nov 2026, D-261)
+
+A new associate does not get the whole portal at once. The MD decides how much each associate sees, and opens more as their track record grows.
+
+**The levels**
+- **Starter** — the level every associate added from now on starts on. They see their profile, bank and agreement; their clients; those clients' orders and the stage each is at; their commission per order (the amount only, not the %); registration links and their personal code; messages; TDS certificates. No prices, no catalogue and no quoting.
+- **Quoting** — Starter plus the catalogue and **Get price** (only for the categories opened on Price access), price requests ("Other"), the order value (FOB), the commission % and the commission statement download.
+- **Full** — the whole portal, including order amounts in notices and e-mails. Every associate who was set up before 6 Nov 2026 is on Full, so nothing changed for them.
+- **Custom** — the MD ticks features one by one for this associate only.
+
+**Changing an associate's level (MD only)** — open the associate, go to **Portal access**, choose the level (or Custom and the ticks), give the reason (at least 10 characters) and save. The history under the card shows who changed what, when and why. Other staff see the card greyed out.
+
+**Changing what a level shows (MD only)** — **Associates › Access levels** has one row per feature and a tick for Starter, Quoting and Full. A change applies to every associate on that level at once; an associate on Custom keeps their own ticks. A reason is needed, every change is logged, and **Restore recommended defaults** puts the starting ticks back. "Show FOB order value" is off for Starter by default.
+
+**When to open more** — the associate page has a **Track record** panel: clients brought in, orders, order value, and orders completed and fully paid. After **3** completed, fully paid orders (a setting) the MD sees "Ready for the Quoting level?" on the associate page and on the dashboard. Nothing upgrades by itself: change the level, or click **Not yet** and you are asked again after their next completed, fully paid order.
+
+**What the associate sees when something is hidden** — the menu does not show it, and if they open it anyway (for example an old bookmark) they get "Not available at your access level — please contact NexaCrest". The order value and the % are taken out on the server, not just hidden on the screen, and amounts (and the %) are blanked in their notices and e-mails where their level does not show them.
+
+Cost, margin, supplier prices and CAFIN are never shown to an associate at any level.

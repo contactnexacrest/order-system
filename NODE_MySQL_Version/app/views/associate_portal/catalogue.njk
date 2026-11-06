@@ -11,7 +11,7 @@
         <td><b>{{ p.name }}</b>{% if p.description %}<br><small class="muted">{{ p.description | truncate(160, true, '') }}</small>{% endif %}</td>
         <td>{{ p.forms | join(', ') if p.forms.length else '—' }}</td>
         <td>{{ p.finishes | join(', ') if p.finishes.length else '—' }}</td>
-        <td><a class="btn-sm" href="/associate/catalogue/{{ p.id }}">Get price</a></td>
+        <td>{% if access.get_price %}<a class="btn-sm" href="/associate/catalogue/{{ p.id }}">Get price</a>{% endif %}</td>
       </tr>
     {% endfor %}
     {% if not products.length %}<tr><td colspan="4" class="muted">No products are open to you yet — NexaCrest chooses which categories you can offer.</td></tr>{% endif %}

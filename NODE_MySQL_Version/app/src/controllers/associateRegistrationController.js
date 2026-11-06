@@ -94,7 +94,7 @@ async function accept(req, res) {
     name: r.name, based_in: r.based_in, country: r.country, currency_code: r.based_in === 'india' ? 'INR' : 'USD',
     email: r.email, phone: r.phone, status: 'invited', notes: 'Registered themselves through an associate registration link (D-253).',
   }, userId);
-  await associateRepository.setFields(id, { city: r.city });
+  await associateRepository.setFields(id, { city: r.city, access_level: 'starter' }); // D-261: a new associate starts on Starter
   if (!await associateRegistrationRepository.decide(Number(r.id), 'accepted', null, userId, id)) {
     flash.set(req, 'error', 'This registration was already reviewed.');
     res.redirect('/associates/registrations');

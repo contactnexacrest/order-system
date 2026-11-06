@@ -4,12 +4,12 @@
     <tr><th>Client</th><td><?= htmlspecialchars((string) $o['company_legal_name']) ?></td></tr>
     <tr><th>Ordered on</th><td><?= htmlspecialchars(\App\Helpers\Dates::short(substr((string) $o['created_at'], 0, 10))) ?><?= $o['buyer_po_received_on'] ? ' · purchase order received ' . htmlspecialchars(\App\Helpers\Dates::short((string) $o['buyer_po_received_on'])) : '' ?></td></tr>
     <tr><th>Products</th><td><?= htmlspecialchars((string) $o['products']) ?></td></tr>
-    <tr><th>Product value (FOB)</th><td><?= htmlspecialchars((string) $o['currency_code']) ?> <?= number_format((float) $o['fob_value'], 2) ?></td></tr>
+    <?php if (!empty($access['fob_value'])): // D-261 ?><tr><th>Product value (FOB)</th><td><?= htmlspecialchars((string) $o['currency_code']) ?> <?= number_format((float) $o['fob_value'], 2) ?></td></tr><?php endif; ?>
     <tr><th>Stage</th><td><?= htmlspecialchars((string) $o['stage']) ?></td></tr>
     <tr><th>Buyer paid in full</th><td><?= $o['buyer_paid_in_full'] ? 'Yes' : 'Not yet' ?></td></tr>
-    <tr><th>Commission</th><td><?php require __DIR__ . '/_commission_cell.php'; ?></td></tr>
+    <?php if (!empty($access['commission'])): ?><tr><th>Commission</th><td><?php require __DIR__ . '/_commission_cell.php'; ?></td></tr><?php endif; ?>
   </table>
-  <?php if (!empty($o['commission']['detail'])): $c = $o['commission']['detail']; ?>
+  <?php if (!empty($access['commission']) && !empty($o['commission']['detail'])): $c = $o['commission']['detail']; ?>
   <h2>Commission statement</h2>
   <?php require __DIR__ . '/_statement.php'; ?>
   <?php endif; ?>

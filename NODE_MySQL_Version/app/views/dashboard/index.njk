@@ -3,6 +3,15 @@
   <p>Signed in as <strong>{{ user.name }}</strong> ({{ user.email }}).</p>
 </div>
 
+{% if associateUpgrades and associateUpgrades.length %}{# D-261: only the MD sees this #}
+<div class="card page-wide" id="associate-upgrades">
+  <h2 style="margin-top:0;">Associates ready for the Quoting level? ({{ associateUpgrades.length }})</h2>
+  <ul>
+    {% for u in associateUpgrades %}<li><a href="/associates/{{ u.id }}#portal-access">{{ u.name }}</a> — {{ u.completed_paid }} completed, fully paid orders</li>{% endfor %}
+  </ul>
+  <p class="small muted">Nothing upgrades by itself — review their access on the associate page.</p>
+</div>
+{% endif %}
 {% if incentiveReadyCount %}{# Owner decision D-245 P4 #}
 <div class="card page-wide" id="incentives-ready">
   <h2 style="margin-top:0;">Team incentives ready to lock ({{ incentiveReadyCount }})</h2>

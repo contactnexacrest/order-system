@@ -692,6 +692,12 @@ $router->post('/associates/registrations/links/{id}/cancel', [$associateRegistra
 $router->post('/associates/registrations/settings', [$associateRegistration, 'saveSettings'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->post('/associates/registrations/{id}/accept', [$associateRegistration, 'accept'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->post('/associates/registrations/{id}/reject', [$associateRegistration, 'reject'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+// D-261 (owner approval 6 Nov 2026): associate portal access levels — only the MD changes them (checked in the service).
+$associateAccess = new \App\Controllers\AssociateAccessController();
+$router->get('/associates/access-levels', [$associateAccess, 'levels'], [SessionAuth::required(), PermissionCheck::requiresAny(['view_associates', 'manage_associates'])]);
+$router->post('/associates/access-levels', [$associateAccess, 'saveLevels'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/access', [$associateAccess, 'setLevel'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
+$router->post('/associates/{id}/access/not-yet', [$associateAccess, 'notYet'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->get('/associates/ladder', [$associateAdmin, 'ladder'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);
 $router->post('/associates/ladder', [$associateAdmin, 'saveLadder'], [SessionAuth::required(), PermissionCheck::requires('manage_associates'), CsrfCheck::verify()]);
 $router->get('/reports/associates', [$associateAdmin, 'report'], [SessionAuth::required(), PermissionCheck::requires('manage_associates')]);

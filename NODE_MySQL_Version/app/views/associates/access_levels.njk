@@ -1,0 +1,42 @@
+{# D-261 (owner approval 6 Nov 2026, mockup 6): Admin › Associates › Access levels — what Starter, Quoting and Full
+   show in the Associate Portal. Only the MD changes it; a reason is needed and every change is logged. PHP twin: access_levels.php. #}
+<div class="card page-wide">
+  <p class="muted small"><a href="/associates">&larr; Associates</a></p>
+  <h1>Associate access levels</h1>
+  <p class="muted">Tick what each level shows in the Associate Portal. <b>Changes apply to every associate on that level at once. An associate on Custom keeps their own ticks.</b>
+    Hidden features are refused by the server too, not only hidden from the menu. Cost, margin, supplier prices and CAFIN are never shown at any level.</p>
+  {% if not isMd %}<p class="alert alert-info">Only the MD can change the level settings.</p>{% endif %}
+  <form method="post" action="/associates/access-levels" data-access-levels>
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <table class="list">
+      <tr><th>Feature</th>{% for l, label in levels %}<th class="c">{{ label }}</th>{% endfor %}</tr>
+      {% for f in features %}
+        <tr{% if f.key == 'fob_value' %} class="row-highlight"{% endif %}><td><b>{{ f.label }}</b><br><small class="muted">{{ f.help }}</small></td>
+          {% for l, label in levels %}
+            <td class="c">{% if f.key == 'profile' %}<input type="checkbox" checked disabled aria-label="{{ f.label }} — always on"> <small class="muted">locked</small>
+            {% else %}<input type="checkbox" name="tick[{{ l }}][]" value="{{ f.key }}" aria-label="{{ label }}: {{ f.label }}"{% if matrix[l][f.key] %} checked{% endif %}{% if not isMd %} disabled{% endif %}>{% endif %}</td>
+          {% endfor %}</tr>
+      {% endfor %}
+    </table>
+    {% if isMd %}
+    <label class="full">Reason for the change *
+      <input type="text" name="reason" required minlength="10" maxlength="500" placeholder="e.g. Starter associates may now see the FOB value" value="{{ old.reason or '' }}"></label>
+    <div class="btn-row">
+      <button type="submit" name="action" value="save" class="btn-sm">Save level settings</button>
+      <button type="submit" name="action" value="restore" class="btn-sm btn-secondary" data-confirm="Put the recommended defaults back for all three levels?">Restore recommended defaults</button>
+    </div>
+    <p class="small muted">Every change is logged: who, when, which ticks changed, and the reason.</p>
+    {% endif %}
+  </form>
+
+  <h2>Associates per level</h2>
+  <table class="list"><tr><th>Level</th><th class="r">Associates</th></tr>
+    {% for l, label in allLevels %}<tr><td>{{ label }}</td><td class="r">{{ counts[l] or 0 }}</td></tr>{% endfor %}
+  </table>
+
+  <h2>History</h2>
+  <table class="list"><tr><th>When</th><th>By</th><th>Change</th><th>Reason</th></tr>
+    {% for h in history %}<tr><td>{{ h.created_at | shortDate }}</td><td>{{ h.changed_by_name or '—' }}</td><td>{{ h.new_value }}</td><td>{{ h.reason }}</td></tr>{% endfor %}
+    {% if history.length == 0 %}<tr><td colspan="4" class="muted">No changes yet — the recommended defaults are in use.</td></tr>{% endif %}
+  </table>
+</div>

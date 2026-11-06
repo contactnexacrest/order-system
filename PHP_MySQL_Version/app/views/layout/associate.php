@@ -25,11 +25,12 @@
   <?php if (!empty($me)): ?>
   <nav class="topbar-nav">
     <a href="/associate">Home<?= !empty($unread) ? ' (' . (int) $unread . ' new)' : '' ?></a>
-    <a href="/associate/clients">My clients</a>
-    <a href="/associate/orders">Orders</a>
-    <a href="/associate/catalogue">Catalogue</a>
-    <a href="/associate/commission">Commission</a>
-    <a href="/associate/messages">Messages</a>
+    <?php $__can = static fn (string $f): bool => \App\Services\AssociateAccess::allows($me, $f); // D-261: only what the access level shows ?>
+    <?php if ($__can('clients')): ?><a href="/associate/clients">My clients</a><?php endif; ?>
+    <?php if ($__can('orders')): ?><a href="/associate/orders">Orders</a><?php endif; ?>
+    <?php if ($__can('catalogue')): ?><a href="/associate/catalogue">Catalogue</a><?php endif; ?>
+    <?php if ($__can('commission') || $__can('tds_certificates')): ?><a href="/associate/commission">Commission</a><?php endif; ?>
+    <?php if ($__can('messages')): ?><a href="/associate/messages">Messages</a><?php endif; ?>
     <a href="/associate/profile">Profile</a>
     <?php if ($__viewAs): ?><form method="post" action="/associate/logout" style="margin-left:auto"><?= \App\Helpers\Csrf::field() ?><button type="submit" class="topbar-nav-logout">End staff view</button></form><?php else: ?>
     <form method="post" action="/associate/logout" style="margin-left:auto"><?= \App\Helpers\Csrf::field() ?><button type="submit" class="topbar-nav-logout">Log out</button></form><?php endif; ?>

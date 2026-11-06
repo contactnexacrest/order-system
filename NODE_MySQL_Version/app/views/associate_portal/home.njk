@@ -7,21 +7,25 @@
     {# Owner decision D-253 / D-252: after the first login the associate completes the profile and the KYC documents. #}
     <div class="alert alert-warning">Please complete <a href="/associate/profile#kyc">your profile and documents</a>{% if kycMissing.length %} — still needed or being checked: {{ kycMissing | join(', ') }}{% endif %}{% if not me.address %}{{ '; ' if kycMissing.length else ' — ' }}your address{% endif %}. Commission is paid once your documents are accepted.</div>
   {% endif %}
+  {% if access.commission %}{# D-261 #}
   <div class="stat-row">
     <div class="stat"><div class="stat-label">Earned this year</div><div class="stat-value">₹{{ totals.earned_year | money }}</div></div>
     <div class="stat"><div class="stat-label">Waiting to be paid</div><div class="stat-value">₹{{ totals.waiting | money }}</div></div>
     <div class="stat"><div class="stat-label">Paid this year</div><div class="stat-value">₹{{ totals.paid_year | money }}</div></div>
     {% if totals.held > 0 %}<div class="stat"><div class="stat-label">On hold</div><div class="stat-value">₹{{ totals.held | money }}</div></div>{% endif %}
   </div>
-  <p>Clients: <b>{{ clients.length }}</b> · Buyer registration links open: <b>{{ openInvitations }}</b>
-    {% if me.personal_code %} · Your personal code: <b>{{ me.personal_code }}</b>{% endif %}</p>
-  <p><a class="btn-sm" href="/associate/clients">Invite a client</a></p>
+  {% endif %}
+  <p>{% if access.clients %}Clients: <b>{{ clients.length }}</b>{% endif %}{% if access.registration_links %} · Buyer registration links open: <b>{{ openInvitations }}</b>
+    {% if me.personal_code %} · Your personal code: <b>{{ me.personal_code }}</b>{% endif %}{% endif %}</p>
+  {% if access.registration_links %}<p><a class="btn-sm" href="/associate/clients">Invite a client</a></p>{% endif %}
 
+  {% if access.orders %}{# D-261 #}
   <h2>Latest orders</h2>
-  <table class="list"><tr><th>Order</th><th>Client</th><th>Stage</th><th>Commission</th></tr>
-    {% for o in orders %}<tr><td><a href="/associate/orders/{{ o.id }}">{{ o.order_reference }}</a></td><td>{{ o.company_legal_name }}</td><td>{{ o.stage }}</td><td>{% include "associate_portal/_commission_cell.njk" %}</td></tr>{% endfor %}
+  <table class="list"><tr><th>Order</th><th>Client</th><th>Stage</th>{% if access.commission %}<th>Commission</th>{% endif %}</tr>
+    {% for o in orders %}<tr><td><a href="/associate/orders/{{ o.id }}">{{ o.order_reference }}</a></td><td>{{ o.company_legal_name }}</td><td>{{ o.stage }}</td>{% if access.commission %}<td>{% include "associate_portal/_commission_cell.njk" %}</td>{% endif %}</tr>{% endfor %}
     {% if orders.length == 0 %}<tr><td colspan="4" class="muted">No orders yet.</td></tr>{% endif %}
   </table>
+  {% endif %}
 
   <h2>Notices</h2>
   <table class="list">

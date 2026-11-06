@@ -7,7 +7,8 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
 ?>
 <div class="card page-wide">
   <h1>My commission</h1>
-  <?php if (!$print): ?><p><a class="btn-sm btn-secondary" href="/associate/commission?format=csv">Statement (CSV)</a> <a class="btn-sm btn-secondary" href="/associate/commission?print=1" target="_blank" rel="noopener">Printable statement</a></p><?php endif; ?>
+  <?php if (!empty($access['commission'])): // D-261 ?>
+  <?php if (!$print && !empty($access['commission_statement'])): ?><p><a class="btn-sm btn-secondary" href="/associate/commission?format=csv">Statement (CSV)</a> <a class="btn-sm btn-secondary" href="/associate/commission?print=1" target="_blank" rel="noopener">Printable statement</a></p><?php endif; ?>
   <p>Waiting to be paid: <b>₹<?= $__m($totals['waiting']) ?></b> · Paid this year: <b>₹<?= $__m($totals['paid_year']) ?></b><?= $totals['held'] > 0 ? ' · On hold: <b>₹' . $__m($totals['held']) . '</b>' : '' ?></p>
   <p class="muted small">Each commission is paid in the incentive month shown, against your invoice. Upload your invoice for each line below. Payments go only to your verified bank account.</p>
   <table class="list">
@@ -31,7 +32,8 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
     <?php endforeach; ?>
     <?php if ($payouts === []): ?><tr><td colspan="7" class="muted">No commission yet. It is earned once a buyer has paid an order in full.</td></tr><?php endif; ?>
   </table>
-  <?php if (!$print): ?>
+  <?php endif; ?>
+  <?php if (!$print && !empty($access['tds_certificates'])): ?>
   <h2>TDS certificates (Form 16A) and remittance forms from NexaCrest</h2>
   <p class="small muted">NexaCrest deducts TDS on commission as the law requires and issues your Form 16A each quarter; it appears here.</p>
   <table class="list">
@@ -39,5 +41,5 @@ $__d = static fn ($v): string => $v ? \App\Helpers\Dates::short(substr((string) 
       <tr><td><?= $__d($d['created_at']) ?></td><td><a href="/associate/documents/<?= (int) $d['id'] ?>"><?= htmlspecialchars(AssociateDocumentRepository::KINDS[$d['kind']]) ?></a></td><td><?= htmlspecialchars((string) ($d['reference'] ?? '')) ?></td></tr>
     <?php endforeach; ?>
   </table>
-  <?php else: ?><script>window.addEventListener('load', () => window.print());</script><?php endif; ?>
+  <?php elseif ($print): ?><script>window.addEventListener('load', () => window.print());</script><?php endif; ?>
 </div>

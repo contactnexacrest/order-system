@@ -44,6 +44,7 @@ const RULES = [
   [/^\/associates\/\d+\/price-access(?:[/?#]|$)/, ['manage_pricing']],
   [/^\/associates\/\d+\/bank\/\d+\/number(?:[/?#]|$)/, ['manage_associate_bank']],
   [/^\/associates\/\d+\/documents\/\d+(?:[/?#]|$)/, ['manage_associates', 'manage_associate_bank']],
+  [/^\/associates\/access-levels(?:[/?#]|$)/, ['view_associates', 'manage_associates']], // D-261
   [/^\/associates\/(?:new|ladder|registrations|\d+\/(?:edit|view-as|agreement))(?:[/?#]|$)/, ['manage_associates']],
   [/^\/associates(?:[/?#]|$)/, ['view_associates', 'manage_associates', 'manage_associate_bank']],
   // Owner decision D-245 P5: incentive & commission reports.
