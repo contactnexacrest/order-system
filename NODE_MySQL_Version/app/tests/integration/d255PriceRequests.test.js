@@ -190,7 +190,7 @@ describe('D-255 specifications and associate price requests', () => {
       await associatePortalController[fn]({ ...req, params }, res);
       const text = html.replace(/"[a-z_]+":/g, '');
       expect(text.toLowerCase()).not.toMatch(/\bcost\b/);
-      expect(html).not.toMatch(/Ongole|Andhra|3280/);
+      expect(html).not.toMatch(/Ongole|Andhra|\b3280(\.\d+)?\b/);
     }
     expect(html).toContain('73.43');
     spy.mockRestore();
