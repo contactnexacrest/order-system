@@ -18,7 +18,7 @@
       ?></td></tr>
       <tr><th>Total Order Value</th><td><?= htmlspecialchars($order['currency_code'] ?? '') ?> <?= number_format((float) $totalFobValue, 2) ?></td></tr>
       <tr><th>Incoterm</th><td><?= htmlspecialchars($order['incoterm_code'] ?? '—') ?></td></tr>
-      <tr><th>Port of Discharge</th><td><?= htmlspecialchars($order['port_of_discharge_name'] ?? '—') ?></td></tr>
+      <tr><th>Port of Discharge</th><td><?= htmlspecialchars((string) (($order['port_of_discharge_name'] ?? '') ?: (($order['port_of_discharge_city'] ?? '') ?: (($order['port_of_discharge_text'] ?? '') ?: '—')))) ?></td></tr>
     </table>
     <?php if (!$downloadsHidden): ?><p class="muted small">The full Order Confirmation document is available to download above under Documents.</p><?php endif; ?>
     <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/acknowledge-oc">
@@ -66,7 +66,9 @@
     <?php else: ?>
       <p class="muted">No Buyer PO copy on file yet.</p>
     <?php endif; ?>
-    <?php if ($advanceCleared): ?>
+    <?php if (in_array($order['status'] ?? '', ['cancelled', 'lost'], true)): ?>
+      <p class="muted small">This order is <?= htmlspecialchars((string) $order['status']) ?>, so a Buyer PO can no longer be uploaded.</p>
+    <?php elseif ($advanceCleared): ?>
       <p class="muted small">The advance payment has already cleared, so self-service upload is now closed here. Contact your NexaCrest representative if you need to submit an updated copy.</p>
     <?php else: ?>
       <form method="post" action="/client/orders/<?= (int) $order['id'] ?>/buyer-po" enctype="multipart/form-data">

@@ -29,9 +29,11 @@
             <label>Qty<input type="text" name="product_quantity[{{ loop.index0 }}]" value="{{ p.quantity or '' }}" placeholder="e.g. 100"></label>
             <label><input type="checkbox" name="product_quantity_tbc[{{ loop.index0 }}]" value="1" style="display:inline-block;width:auto;" {{ 'checked' if p.quantity_is_tbc }}> Qty To Be Confirmed</label>
             <label>Unit
-              <select name="product_unit[{{ loop.index0 }}]">
+              {# Buyer-portal fixes (7 Nov 2026): p.unitPick / p.unitUnknown come from the controller (unit matched whatever its case or spacing; an unknown unit asks the buyer to pick). #}
+              <select name="product_unit[{{ loop.index0 }}]"{% if p.unitUnknown %} required{% endif %}>
+                {% if p.unitUnknown %}<option value="" selected>Choose… (your earlier unit: {{ p.unitText }})</option>{% endif %}
                 {% for o in units %}
-                  <option value="{{ o.option_value }}" {% if p.unit == o.option_value or (not p.unit and o.is_default) %}selected{% endif %}>{{ o.option_value }}</option>
+                  <option value="{{ o.option_value }}" {% if p.unitPick == o.option_value or (not p.unitText and o.is_default) %}selected{% endif %}>{{ o.option_value }}</option>
                 {% endfor %}
               </select>
             </label>

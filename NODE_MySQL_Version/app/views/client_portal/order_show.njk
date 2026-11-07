@@ -13,7 +13,7 @@
       </td></tr>
       <tr><th>Total Order Value</th><td>{{ order.currency_code or '' }} {{ totalFobValue | money }}</td></tr>
       <tr><th>Incoterm</th><td>{{ order.incoterm_code or '—' }}</td></tr>
-      <tr><th>Port of Discharge</th><td>{{ order.port_of_discharge_name or '—' }}</td></tr>
+      <tr><th>Port of Discharge</th><td>{{ order.port_of_discharge_name or order.port_of_discharge_city or order.port_of_discharge_text or '—' }}</td></tr>
     </table>
     {% if not downloadsHidden %}<p class="muted small">The full Order Confirmation document is available to download above under Documents.</p>{% endif %}
     <form method="post" action="/client/orders/{{ order.id }}/acknowledge-oc">
@@ -60,7 +60,9 @@
     {% else %}
       <p class="muted">No Buyer PO copy on file yet.</p>
     {% endif %}
-    {% if advanceCleared %}
+    {% if order.status == 'cancelled' or order.status == 'lost' %}
+      <p class="muted small">This order is {{ order.status }}, so a Buyer PO can no longer be uploaded.</p>
+    {% elif advanceCleared %}
       <p class="muted small">The advance payment has already cleared, so self-service upload is now closed here. Contact your NexaCrest representative if you need to submit an updated copy.</p>
     {% else %}
       <form method="post" action="/client/orders/{{ order.id }}/buyer-po" enctype="multipart/form-data">

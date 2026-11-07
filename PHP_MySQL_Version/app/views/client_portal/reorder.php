@@ -31,10 +31,25 @@
           <label>Qty<input type="text" name="product_quantity[<?= $idx ?>]" value="<?= htmlspecialchars((string) ($p['quantity'] ?? '')) ?>" placeholder="e.g. 100"></label>
           <label><input type="checkbox" name="product_quantity_tbc[<?= $idx ?>]" value="1" style="display:inline-block;width:auto;" <?= !empty($p['quantity_is_tbc']) ? 'checked' : '' ?>> Qty To Be Confirmed</label>
           <label>Unit
-            <select name="product_unit[<?= $idx ?>]">
-              <?php $__unitVal = (string) ($p['unit'] ?? ''); ?>
+            <?php
+              // Buyer-portal fixes (7 Nov 2026): the earlier order's unit is matched whatever its case or
+              // spacing ("sqm" = "SQM"); a unit not in the list is never swapped for the default (PCS) —
+              // the buyer is asked to pick, with the earlier unit shown.
+              $__unitVal = trim((string) ($p['unit'] ?? ''));
+              $__unitKey = static fn ($v): string => strtoupper((string) preg_replace('/\s+/', '', (string) $v));
+              $__unitPick = null;
+              foreach ($units as $o) {
+                  if ($__unitVal !== '' && $__unitKey($o['option_value']) === $__unitKey($__unitVal)) {
+                      $__unitPick = (string) $o['option_value'];
+                      break;
+                  }
+              }
+              $__unitUnknown = $__unitVal !== '' && $__unitPick === null;
+            ?>
+            <select name="product_unit[<?= $idx ?>]"<?= $__unitUnknown ? ' required' : '' ?>>
+              <?php if ($__unitUnknown): ?><option value="" selected>Choose… (your earlier unit: <?= htmlspecialchars($__unitVal) ?>)</option><?php endif; ?>
               <?php foreach ($units as $o): ?>
-                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__unitVal === $o['option_value'] || ($__unitVal === '' && $o['is_default'])) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
+                <option value="<?= htmlspecialchars($o['option_value']) ?>" <?= ($__unitPick === $o['option_value'] || ($__unitVal === '' && $o['is_default'])) ? 'selected' : '' ?>><?= htmlspecialchars($o['option_value']) ?></option>
               <?php endforeach; ?>
             </select>
           </label>
