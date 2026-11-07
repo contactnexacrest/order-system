@@ -175,7 +175,14 @@ const MOVES = {
     App\\Services\\BalanceDueService::startFromScannedBl(${o}, date('Y-m-d'));
     $p = Pay::find(${o});
     Pay::recordBalanceReceived(${o}, (float) $p['balance_amount'], date('Y-m-d'));
-    Pay::setLegBankReference(${o}, 'balance', 'UTR SAMPLE0000789');`,
+    Pay::setLegBankReference(${o}, 'balance', 'UTR SAMPLE0000789');
+    // D-264: Accounts records each receipt with the rupees the bank credited (from the bank advice),
+    // so the associate's commission can be fixed at the realised rate when the balance is cleared.
+    $rcpt = $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, inr_credited, bank_rate, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    if (!$pdo->query('SELECT COUNT(*) FROM order_payment_receipts WHERE order_id = ' . (int) ${o} . " AND leg = 'advance'")->fetchColumn()) {
+      $rcpt->execute([${o}, 'advance', (float) $p['advance_amount'], date('Y-m-d'), 84.10, 'UTR SAMPLE0000123', round((float) $p['advance_amount'] * 84.10, 2), 84.10, $uid('accounts@email.com')]);
+    }
+    $rcpt->execute([${o}, 'balance', (float) $p['balance_amount'], date('Y-m-d'), 84.40, 'UTR SAMPLE0000789', round((float) $p['balance_amount'] * 84.40, 2), 84.40, $uid('accounts@email.com')]);`,
   // Stage 9 up to closing: COO prep sheet approved, original BLs received from the CHA and endorsed.
   closeReady: (o) => `
     $docApproved(${o}, 'COOPREP', $uid('compliance@email.com'), $uid('md@email.com'));

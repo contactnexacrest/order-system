@@ -67,6 +67,12 @@ module.exports = {
       await d.clickNav(f.locator('button[type=submit]').last());
     } },
     { caption: 'Stage 9 unlocked', say: 'Balance cleared. Stage eight passes, and the last stage opens: sending the original documents, and closing the order.', do: async (d) => { await d.point('.alert', 1500); } },
+    { card: 'list', kicker: 'Done by itself', title: 'The associate\'s commission is fixed', items: [
+      'Fixed automatically the moment the buyer has paid in full.',
+      'At the exchange rate of all the buyer\'s payments; it never changes after that.',
+      'A payout is created and the associate is told; it is due after 30 days, or on hold while a buyer claim is open.',
+      'Only the team incentive still waits for the Managing Director\'s lock.',
+    ], say: 'And something happened by itself at that moment. Because the buyer has now paid in full, the associate\'s commission was fixed automatically, at the exchange rate of all the buyer\'s payments, so it never changes afterwards. The payout was created and the associate was told. It becomes due after thirty days, or goes on hold while a buyer claim is open. Only the team incentive still waits for the Managing Director to lock it.' },
 
     // ---------- 5. Closure ----------
     { card: 'chapter', title: 'Closing the order', subtitle: 'Stage 9 · Original documents to the buyer.', say: 'Chapter five. Closing the order.', do: async () => { A.move(demo, 'closeReady', order); } },
@@ -77,7 +83,7 @@ module.exports = {
       await d.clickNav(f.locator('button[type=submit]').first());
     } },
     { caption: 'All nine stages done', say: 'And there it is: all nine stages are done, and the buyer now sees the order as complete. The order stays open for the last loose ends: government export benefits, and the final financial review.', do: async (d) => { await d.point('.alert', 1500); await d.scrollTo('.process-stepper'); await d.point('.process-stepper', 1800); } },
-    { as: 'associate', goto: '/associate/orders', caption: 'What the associate sees', say: 'And the associate? They followed the order in their own portal the whole time. The buyer has paid in full, so NexaCrest now confirms the associate\'s commission, and it is paid in the next payout run. The associate sees their commission, but never our costs or margins.', do: async (d) => { await d.point(d.page.locator('tr').filter({ hasText: 'Harbourline' }).first(), 2500); } },
+    { as: 'associate', goto: '/associate/orders', caption: 'What the associate sees', say: 'And the associate? They followed the order in their own portal the whole time. The buyer has paid in full, so their commission is now marked fixed, shown in the order\'s currency, and it is paid in the next payout run after it falls due. An associate based in India also sees one line with the fixed rupee amount they will receive. They never see our costs or margins.', do: async (d) => { await d.point(d.page.locator('tr').filter({ hasText: 'Harbourline' }).first(), 2500); } },
     { card: 'list', kicker: 'After closing', title: 'The last steps', items: [
       'Step 12: costs, export benefit eligibility and the profit review (Finance).',
       'Step 13g: government benefits claimed and received.',
