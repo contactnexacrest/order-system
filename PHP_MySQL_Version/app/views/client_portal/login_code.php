@@ -1,0 +1,20 @@
+<?php use App\Helpers\Csrf; ?>
+<div class="card card-narrow">
+  <h1>Your login code</h1>
+  <p>We have e-mailed a 6-digit code to your login address. Enter it below to finish signing in. The code is valid for 10 minutes.</p>
+  <?php if (!empty($devCode)): ?>
+    <div class="alert alert-dev">DEV MODE ONLY (APP_ENV=local) — code is: <strong><?= htmlspecialchars($devCode) ?></strong></div>
+  <?php endif; ?>
+  <form method="post" action="/client/login/code">
+    <?= Csrf::field() ?>
+    <label>Code *
+      <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required autofocus placeholder="e.g. 123456">
+    </label>
+    <button type="submit">Verify</button>
+  </form>
+  <form method="post" action="/client/login/code/resend" class="inline-form" style="margin-top:12px">
+    <?= Csrf::field() ?>
+    <button type="submit" class="btn-link">Send me a new code</button> <span class="muted small">(at most once a minute)</span>
+  </form>
+  <p class="small"><a href="/client/login">Back to sign in</a></p>
+</div>

@@ -40,6 +40,21 @@
     </form>
   </div>
 
+  <?php if (!empty($backupEligible)): ?>
+  <div class="section" id="backup-codes">
+    <h2>Emergency backup codes</h2>
+    <p class="small">Every login needs a 6-digit code e-mailed to you. If e-mail ever stops working, a backup code lets you sign in instead. Each code works once; using one is recorded and the company-settings holders are told. Keep them somewhere safe and offline.</p>
+    <p data-backup-remaining>Backup codes left: <b><?= (int) ($backupRemaining ?? 0) ?></b> of <?= \App\Services\BackupCodeService::COUNT ?></p>
+    <form method="post" action="/account/backup-codes" data-confirm="Make a new set of backup codes? The codes you have now will stop working.">
+      <?= Csrf::field() ?>
+      <label>Current password *
+        <input type="password" name="current_password" required placeholder="Your current password">
+      </label>
+      <button type="submit" class="btn-sm">Make new backup codes</button>
+    </form>
+  </div>
+  <?php endif; ?>
+
   <div class="section">
     <h2>Change Password</h2>
     <form method="post" action="/account/password">

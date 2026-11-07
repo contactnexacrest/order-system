@@ -27,7 +27,7 @@
           {% if u.force_password_change %}<br><small class="muted">Must change password</small>{% endif %}
           {% if u.locked_until %}<br><small class="muted">Locked until {{ u.locked_until }}</small>{% endif %}
         </td>
-        <td>{{ 'On' if u.two_fa_enabled else '—' }}</td>
+        <td>Required</td>
         <td>{{ u.last_login_at or 'Never' }}</td>
         <td>
           {% if u.is_protected_account %}

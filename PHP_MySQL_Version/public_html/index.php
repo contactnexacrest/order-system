@@ -182,6 +182,8 @@ $router->get('/login', [$auth, 'showLogin']);
 $router->post('/login', [$auth, 'login'], [CsrfCheck::verify()]);
 $router->get('/2fa', [$auth, 'show2fa']);
 $router->post('/2fa', [$auth, 'verify2fa'], [CsrfCheck::verify()]);
+$router->post('/2fa/resend', [$auth, 'resend2fa'], [CsrfCheck::verify()]);   // D-265
+$router->post('/2fa/backup', [$auth, 'verify2faBackup'], [CsrfCheck::verify()]); // D-265
 // QA-5 AUTH-15: was a bare GET with no CSRF check — a plain
 // <img src="…/logout"> on any page the victim's browser loaded would
 // silently end their session (logout CSRF), usable to repeatedly force out
@@ -245,6 +247,9 @@ $router->post('/vendor-details/{token}', [$vendorDetails, 'submit'], [CsrfCheck:
 // advance-cleared gate (ClientPortalService::provisionIfNeeded).
 $router->get('/client/login', [$clientPortal, 'showLogin']);
 $router->post('/client/login', [$clientPortal, 'login'], [CsrfCheck::verify()]);
+$router->get('/client/login/code', [$clientPortal, 'showLoginCode']);                                  // D-265
+$router->post('/client/login/code', [$clientPortal, 'verifyLoginCode'], [CsrfCheck::verify()]);      // D-265
+$router->post('/client/login/code/resend', [$clientPortal, 'resendLoginCode'], [CsrfCheck::verify()]); // D-265
 $router->post('/client/logout', [$clientPortal, 'logout'], [CsrfCheck::verify()]);
 $router->post('/client/end-impersonation', [$clientPortal, 'endImpersonation'], [CsrfCheck::verify()]);
 $router->get('/client/set-password/{token}', [$clientPortal, 'showSetPassword']);
@@ -365,6 +370,7 @@ $router->post('/account/signature', [$account, 'updateSignature'], [SessionAuth:
 $router->post('/account/notifications', [$account, 'updateNotificationPreference'], [SessionAuth::required(), CsrfCheck::verify()]);
 $router->post('/account/ui-template', [$account, 'updateUiTemplate'], [SessionAuth::required(), CsrfCheck::verify()]);
 $router->post('/account/password', [$account, 'updatePassword'], [SessionAuth::required(), CsrfCheck::verify()]);
+$router->post('/account/backup-codes', [$account, 'generateBackupCodes'], [SessionAuth::required(), CsrfCheck::verify()]); // D-265
 
 $router->get('/watermarks', [$watermarks, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/watermarks/{which}', [$watermarks, 'update'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);

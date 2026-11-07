@@ -65,7 +65,9 @@ describe('Staff and client-portal sessions are isolated across login/logout (QA-
     const req = fakeReq();
     req.session[clientPortalService.SESSION_CLIENT_ID] = client.id;
 
-    const result = await authService.attemptLogin(req, staff.email, KNOWN_PASSWORD);
+    const step1 = await authService.attemptLogin(req, staff.email, KNOWN_PASSWORD);
+    expect(step1.status).toBe('requires_2fa'); // D-265: then the e-mailed code
+    const result = await authService.completeTwoFactor(req, step1.dev_code);
 
     expect(result.status).toBe('ok');
     expect(authService.currentUserId(req)).toBe(staff.id);
@@ -78,7 +80,9 @@ describe('Staff and client-portal sessions are isolated across login/logout (QA-
     const req = fakeReq();
     req.session[authService.SESSION_USER_ID] = staff.id;
 
-    const result = await clientPortalService.attemptLogin(req, client.email, KNOWN_PASSWORD);
+    const step1 = await clientPortalService.attemptLogin(req, client.email, KNOWN_PASSWORD);
+    expect(step1.status).toBe('requires_code'); // D-265: then the e-mailed code
+    const result = await clientPortalService.completeLogin(req, step1.dev_code);
 
     expect(result.status).toBe('ok');
     expect(clientPortalService.currentClientId(req)).toBe(client.id);

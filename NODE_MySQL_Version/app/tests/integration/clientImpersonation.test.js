@@ -254,7 +254,9 @@ describe('Client impersonation (Section AV)', () => {
       { cid: clientId, hash }
     );
 
-    const result = await clientPortalService.attemptLogin(req, email, password);
+    const step1 = await clientPortalService.attemptLogin(req, email, password);
+    expect(step1.status).toBe('requires_code'); // D-265: then the e-mailed code
+    const result = await clientPortalService.completeLogin(req, step1.dev_code);
 
     expect(result.status).toBe('ok');
     expect(clientPortalService.currentClientId(req)).toBe(clientId);

@@ -170,6 +170,27 @@ final class ClientPortalService
         }
 
         ClientLoginRepository::resetFailedLogins((int) $login['client_id']);
+        // Owner decision D-265 (7 Nov 2026): a buyer, too, enters a 6-digit code e-mailed
+        // to their login address at every sign-in. Staff "Log in as this client" is unaffected.
+        $devCode = TwoFactorService::issueCodeFor((int) $login['client_id'], 'email', (string) $login['client_email'], 'client');
+        return ['status' => 'requires_code', 'dev_code' => $devCode];
+    }
+
+    /** D-265 step 2: the e-mailed code. Signs the buyer in when it matches. */
+    public static function completeLogin(string $code): array
+    {
+        $clientId = TwoFactorService::pendingUserId('client');
+        if (!$clientId) {
+            return ['status' => 'no_pending'];
+        }
+        if (!TwoFactorService::verify($code, 'client')) {
+            AuditLogRepository::log(null, 'CLIENT_LOGIN_CODE_FAILED', 'clients', $clientId);
+            return ['status' => TwoFactorService::pendingUserId('client') ? 'invalid_code' : 'no_pending'];
+        }
+        $login = ClientLoginRepository::findByClientId($clientId);
+        if ($login === null || !$login['is_active']) {
+            return ['status' => 'no_pending'];
+        }
         session_regenerate_id(true);
         // 90-item backlog #6: session_regenerate_id() only rotates the
         // session ID — unlike Node's req.session.regenerate(), it leaves
@@ -185,10 +206,10 @@ final class ClientPortalService
         // staff-only admin URL the client can't reach. A real login must
         // always start a clean, non-impersonated identity.
         unset($_SESSION[self::SESSION_IMPERSONATED_BY]);
-        $_SESSION[self::SESSION_CLIENT_ID] = (int) $login['client_id'];
+        $_SESSION[self::SESSION_CLIENT_ID] = $clientId;
         $_SESSION[self::SESSION_PASSWORD_FP] = self::passwordFingerprint((string) $login['password_hash']);
-        ClientLoginRepository::updateLastLogin((int) $login['client_id']);
-        AuditLogRepository::log(null, 'CLIENT_LOGIN_SUCCESS', 'clients', (int) $login['client_id']);
+        ClientLoginRepository::updateLastLogin($clientId);
+        AuditLogRepository::log(null, 'CLIENT_LOGIN_SUCCESS', 'clients', $clientId);
 
         return ['status' => 'ok', 'force_password_change' => (bool) $login['force_password_change']];
     }

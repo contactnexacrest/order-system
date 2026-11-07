@@ -717,9 +717,10 @@ NC/SC/{YY}/{DDMM}{NNN}) and `order_ref_format` (D-248: NC/SC/ORD/{YY}/{DDMM}{NNN
   it replaces; wiring the same conditions to outbound email is a small,
   mechanical follow-up against `emailService`, not built here to keep this
   phase bounded.
-- **SMS 2FA** has a service class and gating logic but no provider wired
-  in — returns `false` until you pick a provider and add credentials.
-  Email 2FA works fully.
+- **Login codes are e-mail only** (owner decision D-265, 7 Nov 2026): every
+  staff member and every buyer gets a 6-digit code by e-mail at each login;
+  MD / ED / Admin can make backup codes on My Account. `smsService` is kept
+  but not used for login codes.
 - **DOCX generation stays QT/PI/OC-only** — the other 8 document types are
   PDF-only, matching the PHP build (none of their templates carry the
   "content-parity internal Word copy" requirement QT/PI/OC had).

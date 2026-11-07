@@ -111,7 +111,9 @@ final class ClientPasswordAdminResetTest extends DbTestCase
         self::assertSame(1, $this->auditLogCount('CLIENT_PASSWORD_ADMIN_RESET', $clientId));
 
         $client = ClientRepository::find($clientId);
-        $result = ClientPortalService::attemptLogin((string) $client['email'], $tempPassword);
+        $step1 = ClientPortalService::attemptLogin((string) $client['email'], $tempPassword);
+        self::assertSame('requires_code', $step1['status'], 'the exact temporary password shown to staff must be accepted (D-265: then the e-mailed code)');
+        $result = ClientPortalService::completeLogin($step1['dev_code']);
         self::assertSame('ok', $result['status'], 'the exact temporary password shown to staff must actually log the client in');
         self::assertTrue($result['force_password_change']);
     }

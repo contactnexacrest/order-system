@@ -76,27 +76,69 @@ final class AuthController
 
     public function show2fa(array $params): void
     {
-        if (!\App\Services\TwoFactorService::pendingUserId()) {
+        $pending = \App\Services\TwoFactorService::pendingUserId();
+        if (!$pending) {
             header('Location: /login');
             return;
         }
         View::render('auth/two_factor', [
             'devCode' => $_SESSION['_2fa_dev_code'] ?? '',
+            // D-265: the emergency backup-code form only for Super Admin / company-settings holders.
+            'backupAllowed' => \App\Services\BackupCodeService::eligible($pending),
+            'rememberDays' => \App\Services\RememberBrowserService::days(),
         ], 'layout/bare');
     }
 
     public function verify2fa(array $params): void
     {
         $code = trim((string) ($_POST['code'] ?? ''));
-        $result = AuthService::completeTwoFactor($code);
+        $result = AuthService::completeTwoFactor($code, ($_POST['remember_browser'] ?? '') === '1');
+        self::afterCode($result);
+    }
 
+    /** D-265: an emergency backup code instead of the e-mailed code. */
+    public function verify2faBackup(array $params): void
+    {
+        $result = AuthService::completeWithBackupCode((string) ($_POST['backup_code'] ?? ''));
+        if ($result['status'] === 'not_allowed') {
+            Flash::set('error', 'Backup codes can only be used by the accounts that hold them.');
+            header('Location: /2fa');
+            return;
+        }
+        self::afterCode($result, 'Invalid or already used backup code.');
+    }
+
+    /** D-265: a new code by e-mail, at most once a minute. */
+    public function resend2fa(array $params): void
+    {
+        $r = \App\Services\TwoFactorService::resend();
+        if ($r['status'] === 'none') {
+            header('Location: /login');
+            return;
+        }
+        if ($r['status'] === 'too_soon') {
+            Flash::set('error', 'Please wait ' . $r['wait'] . ' second(s) before asking for a new code.');
+        } else {
+            $_SESSION['_2fa_dev_code'] = $r['dev_code'] ?? '';
+            Flash::set('success', 'A new code has been sent to your e-mail.');
+        }
+        header('Location: /2fa');
+    }
+
+    private static function afterCode(array $result, string $error = 'Invalid or expired verification code.'): void
+    {
         if ($result['status'] === 'ok') {
             unset($_SESSION['_2fa_dev_code']);
             header('Location: ' . self::afterLogin((bool) $result['force_password_change']));
             return;
         }
-
-        Flash::set('error', 'Invalid or expired verification code.');
+        if (!\App\Services\TwoFactorService::pendingUserId()) {
+            unset($_SESSION['_2fa_dev_code']);
+            Flash::set('error', 'That code can no longer be used. Please sign in again to get a new one.');
+            header('Location: /login');
+            return;
+        }
+        Flash::set('error', $error);
         header('Location: /2fa');
     }
 

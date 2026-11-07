@@ -35,6 +35,7 @@ const auditLogRepository = require('../repositories/auditLogRepository');
 const permissionRepository = require('../repositories/permissionRepository');
 const notificationRepository = require('../repositories/notificationRepository');
 const clientPortalService = require('../services/clientPortalService');
+const twoFactorService = require('../services/twoFactorService');
 const buyerActionService = require('../services/buyerActionService');
 const documentGenerationService = require('../services/documentGenerationService');
 const orderCommentService = require('../services/orderCommentService');
@@ -76,12 +77,10 @@ async function login(req, res) {
   const result = await clientPortalService.attemptLogin(req, email, password);
 
   switch (result.status) {
-    case 'ok':
-      if (result.force_password_change) {
-        res.redirect('/client/account');
-        return;
-      }
-      res.redirect('/client');
+    case 'requires_code':
+      // D-265: the buyer finishes signing in with the 6-digit code e-mailed to them.
+      req.session._client_2fa_dev_code = result.dev_code || '';
+      res.redirect('/client/login/code');
       return;
     case 'locked_out':
       flash.set(req, 'error', `Too many failed attempts. Try again after ${result.locked_until}.`);
@@ -93,6 +92,47 @@ async function login(req, res) {
       flash.set(req, 'error', 'Incorrect email or password.');
   }
   res.redirect('/client/login');
+}
+
+/** D-265: the code screen. */
+function showLoginCode(req, res) {
+  if (!twoFactorService.pendingUserId(req, 'client')) {
+    res.redirect('/client/login');
+    return;
+  }
+  res.renderView('client_portal/login_code', { devCode: req.session._client_2fa_dev_code || '' }, 'layout/bare');
+}
+
+async function verifyLoginCode(req, res) {
+  const result = await clientPortalService.completeLogin(req, String(req.body.code || '').trim());
+  if (result.status === 'ok') {
+    delete req.session._client_2fa_dev_code;
+    res.redirect(result.force_password_change ? '/client/account' : '/client');
+    return;
+  }
+  if (result.status === 'invalid_code') {
+    flash.set(req, 'error', 'Invalid or expired code.');
+    res.redirect('/client/login/code');
+    return;
+  }
+  delete req.session._client_2fa_dev_code;
+  flash.set(req, 'error', 'That code can no longer be used. Please sign in again to get a new one.');
+  res.redirect('/client/login');
+}
+
+async function resendLoginCode(req, res) {
+  const r = await twoFactorService.resend(req, 'client');
+  if (r.status === 'none') {
+    res.redirect('/client/login');
+    return;
+  }
+  if (r.status === 'too_soon') {
+    flash.set(req, 'error', `Please wait ${r.wait} second(s) before asking for a new code.`);
+  } else {
+    req.session._client_2fa_dev_code = r.dev_code || '';
+    flash.set(req, 'success', 'A new code has been sent to your e-mail.');
+  }
+  res.redirect('/client/login/code');
 }
 
 async function logout(req, res) {
@@ -859,7 +899,7 @@ async function changePassword(req, res) {
 }
 
 module.exports = {
-  showLogin, login, logout, endImpersonation, showForgotPassword, forgotPassword, showSetPassword, setPassword, dashboard, showOrder,
+  showLogin, login, showLoginCode, verifyLoginCode, resendLoginCode, logout, endImpersonation, showForgotPassword, forgotPassword, showSetPassword, setPassword, dashboard, showOrder,
   showReorderForm, submitReorder,
   downloadDocument, showAccount, changePassword, reportPayment, acknowledgeOc, raiseDispute,
   raiseComplaint, postComplaintReply,

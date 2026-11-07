@@ -15,7 +15,7 @@ const { test, expect } = require('@playwright/test');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { PASSWORD } = require('./support/auth');
+const { PASSWORD, loginAs } = require('./support/auth');
 const { runSql, dbName, bcryptHash } = require('./support/db');
 
 const CLASSES = ['selling', 'buyer_payments', 'purchase', 'logistics', 'financials', 'incentives'];
@@ -116,10 +116,7 @@ test('Money matrix: every role sees only the money its permissions allow', async
     await waitForServer();
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.goto('/login');
-    await page.getByLabel('Email').fill(user.email);
-    await page.getByLabel('Password').fill(PASSWORD);
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await loginAs(page, user.email, PASSWORD); // D-265: password, then the e-mailed code
     await page.waitForLoadState('domcontentloaded');
     if (/\/choose-department/.test(page.url())) {
       await page.locator('form button[type=submit], form input[type=submit]').first().click();

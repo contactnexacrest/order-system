@@ -5,79 +5,102 @@ const bcrypt = require('bcrypt');
 const env = require('../config/env');
 const emailService = require('./emailService');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
-const smsService = require('./smsService');
 
-// Port of App\Services\TwoFactorService. Session-scoped to the in-progress
-// login attempt (not users.two_fa_secret, which is the persistent per-user
-// config) — same distinction as the PHP original. Every function takes
-// `req` since Express has no $_SESSION global.
+// Port of App\Services\TwoFactorService — the 6-digit login code e-mailed at
+// every sign-in (owner decision D-265, 7 Nov 2026): every staff member, every
+// buyer. Associates keep their own code (associatePortalService), unchanged.
+//
+// The code is short-lived and single-use, so it lives in the session, scoped to
+// the sign-in in progress. Each portal has its own pending slot ('staff' /
+// 'client'), so a staff sign-in and a buyer sign-in in one browser never mix.
+// Rules (as the associate code): valid 10 minutes, 5 tries, a new code at most
+// once a minute; always by e-mail (SMS stays off), sent as security mail.
 
-const SESSION_KEY = '_2fa_pending';
-const CODE_TTL_SECONDS = 300; // 5 minutes
+const CODE_TTL_SECONDS = 600; // 10 minutes
 const MAX_VERIFY_ATTEMPTS = 5;
+const RESEND_AFTER_SECONDS = 60;
+const SESSION_KEYS = { staff: '_2fa_pending', client: '_client_2fa_pending' };
 
-async function issueCodeFor(req, userId, method, destination) {
+function key(scope) {
+  return SESSION_KEYS[scope] || SESSION_KEYS.staff;
+}
+
+/** Sends a new code by e-mail. Returns the code only in local dev (APP_ENV=local), else ''. */
+async function issueCodeFor(req, subjectId, method, destination, scope = 'staff') {
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-
-  req.session[SESSION_KEY] = {
-    user_id: userId,
-    method,
+  const now = Date.now();
+  req.session[key(scope)] = {
+    user_id: subjectId,
+    method: 'email',
+    destination,
     code_hash: await bcrypt.hash(code, 10),
-    expires_at: Date.now() + CODE_TTL_SECONDS * 1000,
+    issued_at: now,
+    expires_at: now + CODE_TTL_SECONDS * 1000,
     attempts: 0,
   };
+  // 90-item backlog #37: admin-editable (Admin > Settings > Email Templates), with this
+  // wording as the fallback, since a login code must never silently fail to go out.
+  const rendered = await emailTemplateRepository.renderOrDefault(
+    'two_factor_code',
+    { '{code}': code },
+    'Your NexaCrest login verification code',
+    'Your verification code is: {code}\nThis code expires in 10 minutes. If you did not request this, contact your administrator.'
+  );
+  await emailService.sendPlainText(destination, rendered.subject, rendered.body, { isSecurityEmail: true });
 
-  if (method === 'sms' && smsService.isAvailable()) {
-    await smsService.send(destination, `NexaCrest login code: ${code} (expires in 5 min)`);
-  } else {
-    // 90-item backlog #37: subject/body used to be hardcoded here — now
-    // admin-editable (Admin > Settings > Email Templates), with this
-    // exact original wording as the fallback if the template is ever
-    // missing/deactivated, since a login code must never silently fail
-    // to go out.
-    const rendered = await emailTemplateRepository.renderOrDefault(
-      'two_factor_code',
-      { '{code}': code },
-      'Your NexaCrest login verification code',
-      'Your verification code is: {code}\nThis code expires in 5 minutes. If you did not request this, contact your administrator.'
-    );
-    await emailService.sendPlainText(destination, rendered.subject, rendered.body, { isSecurityEmail: true });
-  }
-
-  // Local dev only — surfaces the code so the flow can be tested without a
-  // real SMTP/SMS provider wired up. Never happens outside APP_ENV=local.
-  if (env.isLocal()) return code;
-  return '';
+  // Local dev only: the code is shown on screen so the flow can be tried without a mail server.
+  return env.isLocal() ? code : '';
 }
 
-function pendingUserId(req) {
-  return req.session[SESSION_KEY]?.user_id ?? null;
+function pendingUserId(req, scope = 'staff') {
+  const p = req.session[key(scope)];
+  return p ? Number(p.user_id) : null;
 }
 
-async function verify(req, submittedCode) {
-  const pending = req.session[SESSION_KEY];
-  if (!pending) return false;
+/** A new code for the sign-in in progress, at most once a minute. */
+async function resend(req, scope = 'staff') {
+  const p = req.session[key(scope)];
+  if (!p) return { status: 'none' };
+  const wait = Math.ceil((Number(p.issued_at) + RESEND_AFTER_SECONDS * 1000 - Date.now()) / 1000);
+  if (wait > 0) return { status: 'too_soon', wait };
+  const devCode = await issueCodeFor(req, Number(p.user_id), 'email', String(p.destination), scope);
+  return { status: 'sent', dev_code: devCode };
+}
 
-  if (pending.attempts >= MAX_VERIFY_ATTEMPTS) {
-    delete req.session[SESSION_KEY];
+/** Counts a try against the pending sign-in; false (and the sign-in ends) once 5 tries are used or it expired. */
+function useTry(req, scope) {
+  const k = key(scope);
+  const p = req.session[k];
+  if (!p) return false;
+  if (p.attempts >= MAX_VERIFY_ATTEMPTS || Date.now() > p.expires_at) {
+    delete req.session[k];
     return false;
   }
-  if (Date.now() > pending.expires_at) {
-    delete req.session[SESSION_KEY];
-    return false;
-  }
+  p.attempts += 1;
+  return true;
+}
 
-  pending.attempts += 1;
-
-  if (await bcrypt.compare(submittedCode, pending.code_hash)) {
-    delete req.session[SESSION_KEY];
+async function verify(req, submittedCode, scope = 'staff') {
+  if (!useTry(req, scope)) return false;
+  const k = key(scope);
+  if (await bcrypt.compare(String(submittedCode).trim(), req.session[k].code_hash)) {
+    delete req.session[k];
     return true;
   }
+  if (req.session[k].attempts >= MAX_VERIFY_ATTEMPTS) delete req.session[k];
   return false;
 }
 
-function clear(req) {
-  delete req.session[SESSION_KEY];
+/** A backup-code try counts against the same 5 tries; the caller checks the backup code itself. */
+function countBackupTry(req, scope = 'staff') {
+  return useTry(req, scope);
 }
 
-module.exports = { issueCodeFor, pendingUserId, verify, clear };
+function clear(req, scope = 'staff') {
+  delete req.session[key(scope)];
+}
+
+module.exports = {
+  issueCodeFor, pendingUserId, resend, verify, countBackupTry, clear,
+  CODE_TTL_SECONDS, MAX_VERIFY_ATTEMPTS, RESEND_AFTER_SECONDS,
+};

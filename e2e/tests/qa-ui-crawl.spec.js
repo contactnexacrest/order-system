@@ -146,7 +146,7 @@ for (const template of ['standard', 'kanban']) {
         // Data-safe: nothing the crawl submits ever reaches the server.
         await context.route('**/*', (route) => {
           const r = route.request();
-          if (r.method() !== 'GET' && !/\/login$/.test(r.url())) return route.abort();
+          if (r.method() !== 'GET' && !/\/(login|2fa)$/.test(r.url())) return route.abort(); // D-265: the sign-in code too
           return route.continue();
         });
         const page = await context.newPage();

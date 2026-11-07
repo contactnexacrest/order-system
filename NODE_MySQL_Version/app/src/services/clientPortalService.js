@@ -14,6 +14,7 @@ const clientRepository = require('../repositories/clientRepository');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
 const loginAttemptRepository = require('../repositories/loginAttemptRepository');
 const emailService = require('./emailService');
+const twoFactorService = require('./twoFactorService');
 
 /**
  * Port of App\Services\ClientPortalService. Client portal auth — a
@@ -141,8 +142,24 @@ async function attemptLogin(req, email, password) {
   }
 
   await clientLoginRepository.resetFailedLogins(login.client_id);
+  // Owner decision D-265 (7 Nov 2026): a buyer, too, enters a 6-digit code e-mailed
+  // to their login address at every sign-in. Staff "Log in as this client" is unaffected.
+  const devCode = await twoFactorService.issueCodeFor(req, Number(login.client_id), 'email', String(login.client_email), 'client');
+  return { status: 'requires_code', dev_code: devCode };
+}
+
+/** D-265 step 2: the e-mailed code. Signs the buyer in when it matches. */
+async function completeLogin(req, code) {
+  const clientId = twoFactorService.pendingUserId(req, 'client');
+  if (!clientId) return { status: 'no_pending' };
+  if (!(await twoFactorService.verify(req, code, 'client'))) {
+    await auditLogRepository.log(null, 'CLIENT_LOGIN_CODE_FAILED', 'clients', clientId);
+    return { status: twoFactorService.pendingUserId(req, 'client') ? 'invalid_code' : 'no_pending' };
+  }
+  const login = await clientLoginRepository.findByClientId(clientId);
+  if (!login || !login.is_active) return { status: 'no_pending' };
   await regeneratePreserving(req, [STAFF_SESSION_KEY], () => {
-    req.session[SESSION_CLIENT_ID] = login.client_id;
+    req.session[SESSION_CLIENT_ID] = Number(login.client_id);
     req.session[SESSION_PASSWORD_FP] = passwordFingerprint(login.password_hash);
   });
   await clientLoginRepository.updateLastLogin(login.client_id);
@@ -269,6 +286,7 @@ module.exports = {
   SESSION_CLIENT_ID,
   provisionIfNeeded,
   attemptLogin,
+  completeLogin,
   currentClientId,
   currentClient,
   logout,

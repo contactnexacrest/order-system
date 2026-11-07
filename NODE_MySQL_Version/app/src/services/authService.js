@@ -7,8 +7,9 @@ const userRepository = require('../repositories/userRepository');
 const loginAttemptRepository = require('../repositories/loginAttemptRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const companySettingsRepository = require('../repositories/companySettingsRepository');
-const smsService = require('./smsService');
 const twoFactorService = require('./twoFactorService');
+const backupCodeService = require('./backupCodeService');
+const rememberBrowserService = require('./rememberBrowserService');
 
 // Port of App\Services\AuthService. Every function takes `req` where the PHP
 // original touched $_SESSION, since Express sessions are per-request objects,
@@ -84,25 +85,19 @@ async function attemptLogin(req, email, password) {
   await userRepository.resetFailedLogins(user.id);
   await loginAttemptRepository.record(user.id, email, ip, true);
 
-  if (user.two_fa_enabled) {
-    let method = user.two_fa_method || 'email';
-    let destination = method === 'sms' ? (user.phone || '') : user.email;
-
-    if (method === 'sms' && !smsService.isAvailable()) {
-      method = 'email';
-      destination = user.email;
-    }
-
-    const devCode = await twoFactorService.issueCodeFor(req, user.id, method, destination);
-    return { status: 'requires_2fa', method, dev_code: devCode };
+  // Owner decision D-265 (7 Nov 2026): every staff member, every role, enters a
+  // 6-digit code e-mailed at each login. It cannot be switched off per person;
+  // only a browser the person chose to remember (Admin setting, default off) skips it.
+  if (await rememberBrowserService.isRemembered(req, user)) {
+    await establishSession(req, user.id);
+    await auditLogRepository.log(user.id, 'LOGIN_SUCCESS_REMEMBERED_BROWSER', 'users', user.id, null, null, null, null, ip);
+    return { status: 'ok', force_password_change: !!user.force_password_change };
   }
-
-  await establishSession(req, user.id);
-  await auditLogRepository.log(user.id, 'LOGIN_SUCCESS', 'users', user.id, null, null, null, null, ip);
-  return { status: 'ok', force_password_change: !!user.force_password_change };
+  const devCode = await twoFactorService.issueCodeFor(req, user.id, 'email', user.email);
+  return { status: 'requires_2fa', method: 'email', dev_code: devCode };
 }
 
-async function completeTwoFactor(req, submittedCode) {
+async function completeTwoFactor(req, submittedCode, rememberBrowser = false, res = null) {
   const userId = twoFactorService.pendingUserId(req);
   if (!userId) return { status: 'no_pending_2fa' };
 
@@ -111,9 +106,32 @@ async function completeTwoFactor(req, submittedCode) {
     return { status: 'invalid_code' };
   }
 
+  return finishCodeLogin(req, res, userId, 'LOGIN_SUCCESS_2FA', rememberBrowser);
+}
+
+/** D-265: an emergency backup code instead of the e-mailed one (Super Admin / company-settings holders only). */
+async function completeWithBackupCode(req, backupCode, res = null) {
+  const userId = twoFactorService.pendingUserId(req);
+  if (!userId) return { status: 'no_pending_2fa' };
+  if (!(await backupCodeService.eligible(userId))) return { status: 'not_allowed' };
+  if (!twoFactorService.countBackupTry(req) || !(await backupCodeService.consume(userId, backupCode))) {
+    await auditLogRepository.log(userId, 'LOGIN_BACKUP_CODE_FAILED', 'users', userId);
+    return { status: 'invalid_code' };
+  }
+  twoFactorService.clear(req);
+  await backupCodeService.recordUse(userId);
+  return finishCodeLogin(req, res, userId, 'LOGIN_SUCCESS_BACKUP_CODE', false);
+}
+
+async function finishCodeLogin(req, res, userId, auditAction, rememberBrowser) {
   const user = await userRepository.findById(userId);
   await establishSession(req, userId);
-  await auditLogRepository.log(userId, 'LOGIN_SUCCESS_2FA', 'users', userId);
+  await auditLogRepository.log(userId, auditAction, 'users', userId);
+  const days = await rememberBrowserService.days();
+  if (rememberBrowser && days > 0 && user) {
+    await rememberBrowserService.remember(res, user);
+    await auditLogRepository.log(userId, 'LOGIN_BROWSER_REMEMBERED', 'users', userId, null, null, null, `For ${days} day(s)`);
+  }
   return { status: 'ok', force_password_change: !!(user && user.force_password_change) };
 }
 
@@ -171,6 +189,6 @@ async function changePassword(req, userId, newPassword) {
 }
 
 module.exports = {
-  attemptLogin, completeTwoFactor, currentUserId, sessionVersion, refreshSessionVersion, currentUser, logout, changePassword,
+  attemptLogin, completeTwoFactor, completeWithBackupCode, currentUserId, sessionVersion, refreshSessionVersion, currentUser, logout, changePassword,
   SESSION_USER_ID,
 };

@@ -90,8 +90,10 @@ describe('Client login email ambiguity guard (QA-5 CP-08)', () => {
     const distinctEmail = `distinct-${Math.random().toString(16).slice(2, 10)}@nexacrest.test`;
     await db.execute('UPDATE clients SET email = :email WHERE id = :id', { email: distinctEmail, id: clientB });
 
-    const result = await clientPortalService.attemptLogin(fakeReq(), distinctEmail, PASSWORD_B);
+    const req = fakeReq();
+    const result = await clientPortalService.attemptLogin(req, distinctEmail, PASSWORD_B);
 
-    expect(result.status).toBe('ok');
+    expect(result.status).toBe('requires_code'); // D-265: then the e-mailed code
+    expect((await clientPortalService.completeLogin(req, result.dev_code)).status).toBe('ok');
   });
 });

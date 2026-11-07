@@ -664,6 +664,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
   ('fema_realization_alert_days', '270', 'number', 'alerts', 'Days after a settlement leg is marked cleared before the CA / Accounting module flags its FIRC/eBRC reference as still missing — 270 days (9 months) mirrors the RBI/FEMA export-proceeds realization period as a practical proof-of-realization deadline, not a legal shipment-date calculation (this system does not track the shipment date this rule technically runs from).', 0),
   ('session_timeout_minutes', '30', 'number', 'security', 'Idle session timeout, in minutes.', 0),
   ('failed_login_lockout_count', '5', 'number', 'security', 'Failed login attempts before account lockout.', 0),
+  ('login_remember_browser_days', '0', 'number', 'security', 'D-265: staff may tick "Remember this browser" on the login-code screen and skip the e-mailed code on that browser for this many days (most 90). 0 = off: the code is asked at every login (recommended). A password change or reset forgets every remembered browser.', 0),
   ('lockout_duration_minutes', '15', 'number', 'security', 'How long an account stays locked after too many failed attempts. (Addition beyond the spec''s named key list — needed to make failed_login_lockout_count actually enforceable; flagging per architecture doc practice.)', 0),
   ('password_min_length',   '10', 'number', 'security', 'Minimum password length.', 0),
   ('password_complexity_json', '{"require_upper":true,"require_number":true,"require_symbol":false}', 'json', 'security', 'Password complexity rules enforced on password change.', 0),
@@ -877,7 +878,7 @@ INSERT INTO email_templates (template_key, subject, body, footer) VALUES
 -- SYSTEM_TEMPLATE_TOKENS.
 INSERT INTO email_templates (template_key, subject, body, footer) VALUES
   ('two_factor_code', 'Your NexaCrest login verification code',
-   'Your verification code is: {code}\nThis code expires in 5 minutes. If you did not request this, contact your administrator.',
+   'Your verification code is: {code}\nThis code expires in 10 minutes. If you did not request this, contact your administrator.',
    NULL),
   ('client_portal_invite', 'Your NexaCrest order portal access',
    'Hello,\n\nYour advance payment has been received and cleared — thank you.\n\nYou can now log in to track your order and download your documents (Quotation, Proforma Invoice, and everything issued from here onward) at any time.\n\nTo set up your login, open this link within 72 hours:\n{set_password_link}\n\nYour login email will be: {email}\n\nNexaCrest International Private Limited',

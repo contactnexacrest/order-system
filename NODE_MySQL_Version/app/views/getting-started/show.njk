@@ -225,7 +225,7 @@ details.gs-conv .gs-body{padding:0 16px 15px 42px; font-size:13.6px; color:var(-
         <div class="gs-callout tip">
           <p><b>Three things that catch people out the first time:</b></p>
           <p>1. Your very first login <b>forces a password change</b> — whatever you were given to start, you're not meant to keep.</p>
-          <p>2. A second step may ask for a <b>6-digit code emailed to you</b> — this is two-factor authentication, and it isn't optional.</p>
+          <p>2. Every login then asks for a <b>6-digit code e-mailed to you</b> (valid 10 minutes; &ldquo;Send me a new code&rdquo; once a minute). It is not optional.</p>
           <p>3. <b>Forgot your password?</b> The link is right there. You'll see the same message whether or not the email matches a real account — that's deliberate, not a bug.</p>
         </div>
       </section>
@@ -328,7 +328,7 @@ details.gs-conv .gs-body{padding:0 16px 15px 42px; font-size:13.6px; color:var(-
       <section id="checklist" class="gs-section">
         <div class="gs-sec-head"><span class="num">10</span><div><h2>Your First Week</h2><div class="gs-sec-sub">Tap each one off as you go — this is remembered on this device</div></div></div>
         <div class="gs-checklist" id="gs-checklist">
-          <div class="gs-citem" data-id="c1"><div class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div><div class="txt"><b>Log in and set your real password</b><span>Confirm you're receiving your 2FA codes too.</span></div></div>
+          <div class="gs-citem" data-id="c1"><div class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div><div class="txt"><b>Log in and set your real password</b><span>Confirm the 6-digit login codes reach your e-mail (MD, ED, Admin: also make your backup codes on My Account).</span></div></div>
           <div class="gs-citem" data-id="c2"><div class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div><div class="txt"><b>Click through the whole sidebar once</b><span>Nothing breaks from looking — every screen here is safe to just open.</span></div></div>
           <div class="gs-citem" data-id="c3"><div class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div><div class="txt"><b>Open one real order, top to bottom</b><span>Follow its 9-stage tracker from start to wherever it currently sits.</span></div></div>
           <div class="gs-citem" data-id="c4"><div class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></div><div class="txt"><b>Find and bookmark SOP / Operations Guide</b><span>It's this exact manual, reachable from inside the app any time.</span></div></div>

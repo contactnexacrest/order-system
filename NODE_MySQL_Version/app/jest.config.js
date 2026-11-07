@@ -14,7 +14,7 @@ module.exports = {
   testEnvironment: 'node',
   rootDir: __dirname,
   setupFiles: ['<rootDir>/tests/support/testEnv.js'],
-  setupFilesAfterEnv: ['<rootDir>/tests/support/pricingRuleReset.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/support/pricingRuleReset.js', '<rootDir>/tests/support/loginCodeAuto.js'],
   moduleNameMapper: {
     '^puppeteer-core$': '<rootDir>/tests/support/mocks/puppeteerCoreStub.js',
   },

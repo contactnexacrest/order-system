@@ -915,9 +915,10 @@ NC/SC/{YY}/{DDMM}{NNN}) and `order_ref_format` (D-248: NC/SC/ORD/{YY}/{DDMM}{NNN
   `EmailService::sendPlainText()` whenever that's wanted; cut here to keep
   this phase bounded rather than building a second templated-email path
   alongside the buyer-facing deferred-send pipeline.
-- SMS 2FA has a service class and gating logic (`SmsService`) but no actual
-  provider wired in — it's a placeholder that returns `false` until you
-  pick a provider and add the API key. Email 2FA is fully working.
+- Login codes are e-mail only (owner decision D-265, 7 Nov 2026): every
+  staff member and every buyer gets a 6-digit code by e-mail at each login;
+  MD / ED / Admin can make backup codes on My Account. `SmsService` is kept
+  but not used for login codes.
 - Editing/voiding a generated document, and a proper file-upload flow for
   the Buyer PO itself (Stage 2 currently just records its reference number,
   per your Phase B scope answer) — flagged as open questions, not bugs.

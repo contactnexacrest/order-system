@@ -28,7 +28,7 @@
           <?php if ($u['force_password_change']): ?><br><small class="muted">Must change password</small><?php endif; ?>
           <?php if ($u['locked_until']): ?><br><small class="muted">Locked until <?= htmlspecialchars($u['locked_until']) ?></small><?php endif; ?>
         </td>
-        <td><?= $u['two_fa_enabled'] ? 'On' : '—' ?></td>
+        <td>Required</td>
         <td><?= htmlspecialchars($u['last_login_at'] ?? 'Never') ?></td>
         <td>
           <?php if ((int) $u['is_protected_account'] === 1): ?>

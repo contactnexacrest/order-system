@@ -37,6 +37,9 @@ async function updatePassword(userId, passwordHash, forceChange = false) {
     'UPDATE users SET password_hash = :hash, force_password_change = :force, password_changed_at = NOW(), session_version = session_version + 1 WHERE id = :id',
     { hash: passwordHash, force: forceChange ? 1 : 0, id: userId }
   );
+  // D-265: a password change or reset forgets every remembered browser of this person
+  // (rememberBrowserService.forgetAll, inlined here to keep this repository free of service requires).
+  await db.execute('DELETE FROM login_remembered_browsers WHERE user_id = :u', { u: userId });
 }
 
 async function flagPasswordExpired(userId) {
