@@ -31,7 +31,7 @@ its chapters from 1). Cross-references in the narration use the new numbers belo
 
 | No. | File name | Covers | Status |
 |---|---|---|---|
-| A01 | `A01-Everyone-NexaCrest-In-Ten-Minutes.mp4` | What NexaCrest does; the portals (staff, client, associate); roles and departments in one picture; the 9 stages / 19 steps; Standard vs Kanban; where help lives | checked 2026-11-07: 9.39 min, 68.5 MB, audio −20.3 dB, 18 frames + transition strips reviewed, no card flash. Runs on Admin › Sample Data (old dev test orders set aside inside the DB snapshot; `scripts/_overview.js`). |
+| A01 | `A01-Everyone-NexaCrest-In-Ten-Minutes.mp4` | What NexaCrest does; the portals (staff, client, associate); roles and departments in one picture; the 9 stages / 19 steps; Standard vs Kanban; where help lives | checked 2026-11-07 (re-recorded with the new card footer): 9.43 min, audio -20.3 dB |
 | A02 | `A02-1-Everyone-One-Order-From-Enquiry-To-Confirmation.mp4` (6.8 min) + `A02-2-Everyone-One-Order-From-Factory-To-Closure.mp4` (5.1 min) | One sample CIF order from enquiry to closure, switching between every role that touches it (associate, Export Executive, Sales Manager, MD, Accounts, Finance Manager, Procurement, Logistics, Export Compliance, the buyer in the portal); routine steps done off camera during cards (scripts/_a02.js); CAFIN named as management-only, never shown to the buyer | recorded + checked 7 Nov 2026 (audio −20.5/−20.7 dB, frames, card changes) |
 
 ## Group D — Clients (buyers): every scenario
@@ -40,8 +40,8 @@ The 18 buyer scenarios, grouped into five videos of 8–12 minutes.
 
 | No. | File name | Scenarios | Status |
 |---|---|---|---|
-| D01 | `D01-Client-From-Enquiry-To-Proforma.mp4` | 1 quotation details form (no login) · 2 receiving the quotation · 3 Buyer Action Link (accept / ask) · 4 PI details form · 5 uploading the buyer's PO | not started |
-| D02 | `D02-Client-Paying-And-Your-Login.mp4` | 6 Payment Action Link and paying the advance · 7 LC instead of advance · 8 login created when the advance clears (first login) · 9 forgot password | not started |
+| D01 | `D01-Client-From-Enquiry-To-Proforma.mp4` | 1 quotation details form (no login) · 2 receiving the quotation (e-mail card) · 3+5 Buyer Action Link: download our PO, upload the signed copy with the PO number; questions by replying to the e-mail · 4 PI details form (sections 1–6, lock confirmation) · the PI e-mail and the link moving on to the advance | checked 2026-11-07: 7.46 min, audio -20.2 dB, no card flash |
+| D02 | `D02-Client-Paying-And-Your-Login.mp4` | 6 Payment Action Link (advance, proof upload; same link for freight and balance) · 8 login created when the advance clears, set password, sign in, My Account · 9 forgot password (generic message, reset link) · 7 Letter of Credit (PI wording, Buyer Action Link waiting, LC recorded and confirmed usable, both orders in the portal) | checked 2026-11-07: 6.57 min, audio -20.1 dB, no card flash |
 | D03 | `D03-Client-Inside-Your-Order.mp4` | 10 My Orders (Active / Complete / Disputed / Lost / Cancelled) · 11 Order Confirmation acknowledgement · 12 documents you may download (never internal ones) · 13 Order Updates chat | not started |
 | D04 | `D04-Client-Balance-Shipping-And-Closing.mp4` | 14 reporting the balance payment · 15 shipping documents and Commercial Invoice · 16 order feedback · 17 Reorder This | not started |
 | D05 | `D05-Client-When-Something-Goes-Wrong.mp4` | 18 amendment, dispute (when switched on), process issue, cancelled / lost orders, staff "Log in as this client" banner | not started |

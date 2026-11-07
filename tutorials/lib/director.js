@@ -82,7 +82,9 @@ class Director {
     // that was showing before the card (same person), so it acts on the app, not on the card.
     const back = this.onCard && !s.card && !s.goto && (!s.as || s.as === this.actor)
       && !(s.do && /d\.goto\(/.test(s.do.toString())) && /^https?:/.test(this.beforeCard || "") ? this.beforeCard : null;
-    if (s.as) await this.as(s.as);
+    // When the step opens a page, the new badge appears with that page (restore() after goto), not a moment before it.
+    const navigates = !!(s.goto || back || (s.do && /d\.goto\(/.test(s.do.toString())));
+    if (s.as) await this.as(s.as, { show: s.card || !navigates });
     if (s.card) await this.card(s);
     else if (back) await this.goto(new URL(back).pathname + new URL(back).search + new URL(back).hash);
     if (s.goto) await this.goto(s.goto);
@@ -104,7 +106,7 @@ class Director {
   async overlay(patch) { await this.page.evaluate((p) => window.__tut && window.__tut.set(p), patch).catch(() => {}); }
   async caption(text) { await this.overlay({ caption: text || '' }); }
 
-  async as(key) {
+  async as(key, { show = true } = {}) {
     const a = this.actors[key];
     if (!a) throw new Error(`Unknown actor ${key}`);
     // Keep the session of the actor we leave, so switching back needs no new login.
@@ -114,7 +116,7 @@ class Director {
       await this.context.clearCookies();
       await this.context.addCookies(a.cookies);
     }
-    await this.overlay({ actor: { label: a.label, sub: a.sub, initials: a.initials, color: a.color } });
+    if (show) await this.overlay({ actor: { label: a.label, sub: a.sub, initials: a.initials, color: a.color } });
   }
 
   async card(s) {
@@ -123,7 +125,8 @@ class Director {
     this.onCard = true;
     const html = s.card === 'title' ? cards.titleCard({ ...this.script, ...s })
       : s.card === 'chapter' ? cards.chapterCard({ number: ++this.chapter, ...s })
-        : cards.listCard(s);
+        : s.card === 'email' ? cards.emailCard(s)
+          : cards.listCard(s);
     await this.page.setContent(html, { waitUntil: 'load' });
   }
 

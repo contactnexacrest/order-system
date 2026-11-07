@@ -78,4 +78,26 @@ function listCard({ kicker, title, items = [], next }) {
 .next{margin-top:34px;font-size:20px;color:#dbe4ff;border-top:1px solid rgba(255,255,255,.2);padding-top:22px}`);
 }
 
-module.exports = { titleCard, chapterCard, listCard };
+
+// An e-mail as the buyer receives it (the app's own wording), for steps that start in the inbox.
+function emailCard({ from = 'NexaCrest International <info@email.com>', to, subject, lines = [], attach = [], link }) {
+  const body = lines.map((t, i) => `<p class="in d${Math.min(i + 2, 5)}">${esc(t)}</p>`).join('');
+  const att = attach.map((a) => `<span class="att">&#128206; ${esc(a)}</span>`).join('');
+  return shell(`<div class="wrap">
+  <div class="kicker in">In the buyer's inbox</div>
+  <div class="mail in d1">
+    <div class="hdr"><div><b>From</b> ${esc(from)}</div><div><b>To</b> ${esc(to)}</div><div class="subj">${esc(subject)}</div></div>
+    <div class="body">${body}${link ? `<p class="lnk in d4">${esc(link)}</p>` : ''}${att ? `<div class="atts in d5">${att}</div>` : ''}</div>
+  </div>
+</div>`, `.mail{margin-top:22px;background:#fff;color:#1f2937;border-radius:14px;box-shadow:0 16px 50px rgba(0,0,0,.35);overflow:hidden}
+.hdr{background:#f3f5fb;padding:18px 28px;font-size:17px;line-height:1.7;color:#4b5563;border-bottom:1px solid #e5e7eb}
+.hdr b{color:#111827;display:inline-block;width:58px}
+.subj{font-size:24px;font-weight:600;color:#111827;margin-top:6px}
+.body{padding:22px 28px 26px;font-size:20px;line-height:1.5}
+.body p{margin:0 0 12px}
+.lnk{color:#1d4ed8;text-decoration:underline;word-break:break-all}
+.atts{margin-top:14px;display:flex;gap:12px;flex-wrap:wrap}
+.att{background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:6px 12px;font-size:17px;color:#1e3a8a}`);
+}
+
+module.exports = { titleCard, chapterCard, listCard, emailCard };
