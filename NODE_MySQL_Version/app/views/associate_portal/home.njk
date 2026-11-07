@@ -9,10 +9,11 @@
   {% endif %}
   {% if access.commission %}{# D-261 #}
   <div class="stat-row">
-    <div class="stat"><div class="stat-label">Earned in the last {{ totals.months }} months</div><div class="stat-value">₹{{ totals.earned | money }}</div></div>
-    <div class="stat"><div class="stat-label">Waiting to be paid</div><div class="stat-value">₹{{ totals.waiting | money }}</div></div>
-    <div class="stat"><div class="stat-label">Paid in the last {{ totals.months }} months</div><div class="stat-value">₹{{ totals.paid | money }}</div></div>
-    {% if totals.held > 0 %}<div class="stat"><div class="stat-label">On hold</div><div class="stat-value">₹{{ totals.held | money }}</div></div>{% endif %}
+    {# D-264: the order currency (USD) is the figure an associate sees; rupees only on a fixed line, for an associate in India. #}
+    <div class="stat"><div class="stat-label">Earned in the last {{ totals.months }} months</div><div class="stat-value">{{ totalsText.earned }}</div></div>
+    <div class="stat"><div class="stat-label">Waiting to be paid</div><div class="stat-value">{{ totalsText.waiting }}</div></div>
+    <div class="stat"><div class="stat-label">Paid in the last {{ totals.months }} months</div><div class="stat-value">{{ totalsText.paid }}</div></div>
+    {% if totals.held > 0 %}<div class="stat"><div class="stat-label">On hold</div><div class="stat-value">{{ totalsText.held }}</div></div>{% endif %}
   </div>
   {% endif %}
   <p>{% if access.clients %}Clients: <b>{{ clients.length }}</b>{% endif %}{% if access.registration_links %} · Buyer registration links open: <b>{{ openInvitations }}</b>

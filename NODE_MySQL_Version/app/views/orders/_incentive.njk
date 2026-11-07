@@ -19,6 +19,7 @@
   <summary><h2>Step 12d &middot; Team Incentive</h2>
     <span class="fin-sub-summary">&#8377;{{ (inc.team_total_inr if locked else calc.team_total) | money }} · {{ stateText[st] }}</span></summary>
   <p class="muted small">Only the MD, the ED and people with "Manage team incentives" see this box{{ ' (read-only for you — only the MD changes or locks it)' if not incentiveCanEdit }}. The team sees only their own amounts, once the order is locked.{{ ' The team incentive program is off: no global incentive — the MD may still set one by hand for this order.' if not teamOn }}</p>
+  {% if associateFixed %}{% include "orders/_associate_fixed.njk" %}{% endif %}{# D-264 #}
   <p><span class="badge {{ stateClass[st] }}">{{ stateText[st] }}</span>
     {% if st == 'open' %}<small class="muted">{{ incentiveReadyReason }}</small>{% endif %}</p>
 

@@ -82,7 +82,7 @@ final class AssociatePortalRepository
     {
         $sql = 'SELECT o.id, o.order_reference, o.status, o.created_at, o.client_id, sm.stage_number AS current_stage_number, o.buyer_po_received_on, o.associate_rate_pct, o.associate_rate_source,
                        c.company_legal_name, o.currency_code, oi.locked_at, oi.fully_paid_on, oi.associate_id AS paid_associate_id, oi.associate_amount_fc,
-                       oi.associate_rate_pct AS locked_rate, oi.associate_mode, oi.incentive_month
+                       oi.associate_rate_pct AS locked_rate, oi.associate_mode, oi.incentive_month, oi.associate_fixed_at
                   FROM orders o JOIN clients c ON c.id = o.client_id
                   LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
                   LEFT JOIN order_incentives oi ON oi.order_id = o.id
@@ -131,7 +131,8 @@ final class AssociatePortalRepository
             return $none('No commission — order cancelled');
         }
         $repeat = 'No commission — repeat order (outside the 10 days from the first Buyer PO)';
-        if (!empty($o['locked_at'])) {
+        // D-264: fixed by itself when the buyer paid in full (or with the MD's lock, before D-264).
+        if (!empty($o['locked_at']) || !empty($o['associate_fixed_at'])) {
             if ((int) ($o['paid_associate_id'] ?? 0) !== $associateId) {
                 return $none($repeat);
             }
@@ -142,16 +143,13 @@ final class AssociatePortalRepository
             $payout->execute(['o' => $o['id'], 'a' => $associateId]);
             $p = $payout->fetch() ?: ['status' => 'due', 'paid_on' => null, 'due_on' => null, 'payout_run_on' => null, 'order_id' => $o['id'], 'payee_kind' => 'associate', 'amount_inr' => 0];
             $claim = !empty($p['due_on']) && AssociateCommission::settings()['claim_hold'] && AssociateCommission::claimOpen((int) $o['id'], (string) $p['due_on']);
-            $label = match (true) {
-                $p['status'] === 'paid' => 'Paid on ' . \App\Helpers\Dates::short((string) $p['paid_on']),
-                $p['status'] === 'held' => 'On hold',
-                $claim => 'Earned — waiting while a buyer claim on the order is open',
-                !empty($p['due_on']) => 'Earned — due ' . \App\Helpers\Dates::short((string) $p['due_on']) . ', paid in the ' . \App\Helpers\Dates::short((string) $p['payout_run_on']) . ' payout run',
-                default => 'Earned — to be paid in the ' . IncentiveService::monthLabel((string) $o['incentive_month']) . ' payout',
-            };
+            $label = self::payoutLabel($p, $claim, (string) ($o['incentive_month'] ?? ''));
             return ['state' => $p['status'] === 'paid' ? 'paid' : ($p['status'] === 'held' || $claim ? 'held' : 'earned'), 'label' => $label,
-                'rate' => $o['locked_rate'] !== null ? (float) $o['locked_rate'] : null, 'source' => $o['associate_rate_source'] ?? null, 'amount' => (float) $o['associate_amount_fc'],
-                'level' => self::levelText($o, $associateId), 'detail' => AssociateCommission::forOrder((int) $o['id'])];
+                'rate' => $o['locked_rate'] !== null ? (float) $o['locked_rate'] : null, 'source' => $o['associate_rate_source'] ?? null, 'amount' => (float) ($p['amount_fc'] ?? $o['associate_amount_fc']),
+                'level' => self::levelText($o, $associateId), 'detail' => AssociateCommission::forOrder((int) $o['id']),
+                // D-264: what an associate in India is paid, fixed in rupees (never shown to an associate abroad).
+                'fixed_inr' => isset($p['amount_inr']) ? (float) $p['amount_inr'] : null, 'fixed_rate' => isset($p['fixed_rate']) && $p['fixed_rate'] !== null ? (float) $p['fixed_rate'] : null,
+                'fixed_on' => $p['fixed_on'] ?? null, 'currency' => (string) $o['currency_code']];
         }
         if (($o['associate_mode'] ?? 'auto') === 'no') {
             return $none('No commission on this order (decided by NexaCrest)');
@@ -169,6 +167,24 @@ final class AssociatePortalRepository
             : 'Not yet earned — waiting for the buyer\'s full payment';
         return ['state' => 'expected', 'label' => $label, 'rate' => $c['rate'], 'source' => $o['associate_rate_source'] ?? null, 'amount' => $c['amount_fc'],
             'level' => $c['level_label'] . ($c['level_fixed'] ? '' : ' (for now — fixed when the Proforma Invoice is issued)'), 'detail' => $c];
+    }
+
+    /**
+     * D-264: a fixed commission is "Fixed — due …" until its due date, then "Due — paid in the … payout run";
+     * held (a buyer claim, or by NexaCrest) or paid.
+     */
+    public static function payoutLabel(array $p, bool $claim, string $incentiveMonth = '', ?string $today = null): string
+    {
+        $today ??= date('Y-m-d');
+        $d = static fn ($v): string => \App\Helpers\Dates::short(substr((string) $v, 0, 10));
+        return match (true) {
+            $p['status'] === 'paid' => 'Paid on ' . $d($p['paid_on']),
+            $p['status'] === 'held' => 'On hold' . (!empty($p['hold_reason']) ? ' — ' . $p['hold_reason'] : ''),
+            $claim => 'Fixed — waiting while a buyer claim on the order is open',
+            !empty($p['due_on']) && $today < (string) $p['due_on'] => 'Fixed — due ' . $d($p['due_on']) . ', paid in the ' . $d($p['payout_run_on']) . ' payout run',
+            !empty($p['payout_run_on']) => 'Due — paid in the ' . $d($p['payout_run_on']) . ' payout run',
+            default => 'Fixed — to be paid in the ' . IncentiveService::monthLabel($incentiveMonth) . ' payout',
+        };
     }
 
     /** "Level 2 — 5%", as fixed on the order (or the rate kept on it). */
@@ -227,19 +243,42 @@ final class AssociatePortalRepository
         $months ??= \App\Services\AssociateCommission::portalMonths();
         $from = self::portalFromMonth($months, $today);
         $t = ['earned' => 0.0, 'waiting' => 0.0, 'paid' => 0.0, 'held' => 0.0];
+        // D-264: the associate sees the order currency (USD) as the main figure — per currency.
+        $fc = ['earned' => [], 'waiting' => [], 'paid' => [], 'held' => []];
+        $add = static function (array &$m, string $cur, float $v): void {
+            $m[$cur] = round(($m[$cur] ?? 0.0) + $v, 2);
+        };
         foreach (self::payouts($associateId) as $p) {
             $amount = (float) $p['amount_inr'];
+            $cur = (string) ($p['currency_code'] ?: 'INR');
+            $amountFc = $p['amount_fc'] !== null ? (float) $p['amount_fc'] : $amount;
             if ((string) $p['incentive_month'] >= $from) {
                 $t['earned'] += $amount;
+                $add($fc['earned'], $cur, $amountFc);
             }
             if ($p['status'] === 'due') {
                 $t['waiting'] += $amount;
+                $add($fc['waiting'], $cur, $amountFc);
             } elseif ($p['status'] === 'held') {
                 $t['held'] += $amount;
+                $add($fc['held'], $cur, $amountFc);
             } elseif ($p['status'] === 'paid' && substr((string) $p['paid_on'], 0, 7) >= $from) {
                 $t['paid'] += (float) $p['paid_inr'];
+                $add($fc['paid'], $cur, $amountFc);
             }
         }
-        return array_map(static fn (float $v): float => round($v, 2), $t) + ['months' => $months];
+        return array_map(static fn (float $v): float => round($v, 2), $t) + ['months' => $months, 'fc' => $fc];
+    }
+
+    /** D-264: "USD 1,250.00" (several currencies joined with " + "; "USD 0.00" when there is nothing). */
+    public static function fcText(array $byCurrency, string $default = 'USD'): string
+    {
+        $parts = [];
+        foreach ($byCurrency as $cur => $v) {
+            if (abs((float) $v) >= 0.005) {
+                $parts[] = $cur . ' ' . number_format((float) $v, 2);
+            }
+        }
+        return $parts === [] ? $default . ' 0.00' : implode(' + ', $parts);
     }
 }

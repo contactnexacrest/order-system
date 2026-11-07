@@ -645,6 +645,7 @@ final class OrderFinancialsController
             return;
         }
         OrderLcDetailRepository::recordReceived($orderId, $receivedAt, (float) $amount, (float) $inr, (float) $charges, (int) $user['id'], $bankRef);
+        \App\Services\AssociatePayoutService::afterPaymentChange($orderId, (int) $user['id']); // D-264: fixed by itself once the buyer has paid in full
         AuditLogRepository::log((int) $user['id'], 'ORDER_LC_PAYMENT_RECEIVED', 'order_lc_details', $orderId, 'lc_received_amount', $lc['lc_received_amount'], $amount, "{$currency} {$amount} on {$receivedAt}: ₹{$inr} credited, ₹{$charges} bank charges");
         $back('success', "LC payment recorded: {$currency} {$amount}, ₹{$inr} credited.");
     }

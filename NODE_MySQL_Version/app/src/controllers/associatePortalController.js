@@ -53,7 +53,26 @@ async function layoutData(req, a) {
 /** D-261: orders with what the associate's access level does not show taken out on the server (FOB value, commission %). */
 async function visibleOrders(a, orders) {
   const access = await associateAccess.features(a);
-  return orders.map((o) => associateAccess.filterOrder(access, o));
+  const payoutService = require('../services/associatePayoutService');
+  const india = payoutService.isIndia(a);
+  return orders.map((o) => {
+    const v = associateAccess.filterOrder(access, o);
+    // D-264: an associate in India sees the fixed rupee amount once it is fixed; abroad, never rupees.
+    const cm = v.commission;
+    if (india && cm && cm.fixed_inr && cm.fixed_rate && cm.state !== 'paid') {
+      cm.fixed_line = payoutService.fixedRupeeLine(cm.fixed_inr, cm.fixed_rate, cm.currency, cm.fixed_on);
+    }
+    if (cm && cm.detail && cm.detail.fixed && india && cm.detail.state !== 'unpaid') {
+      cm.detail.fixed_line = payoutService.fixedRupeeLine(cm.detail.amount_inr, cm.detail.fixed_rate, cm.detail.currency, cm.detail.fixed_at);
+    }
+    return v;
+  });
+}
+
+/** D-264: the portal totals as text in the order currency ("USD 1,250.00"). */
+function totalsText(totals) {
+  const { fcText } = associatePortalRepository;
+  return { earned: fcText(totals.fc.earned), waiting: fcText(totals.fc.waiting), paid: fcText(totals.fc.paid), held: fcText(totals.fc.held) };
 }
 
 async function render(req, res, view, data = {}) {
@@ -167,7 +186,7 @@ async function home(req, res) {
   const invitations = await associateInvitationRepository.forAssociate(id);
   await render(req, res, 'home', {
     statuses: associateRepository.STATUSES,
-    totals: await associatePortalRepository.totals(id),
+    ...(await (async () => { const totals = await associatePortalRepository.totals(id); return { totals, totalsText: totalsText(totals) }; })()),
     clients: await associatePortalRepository.clients(id),
     orders: await visibleOrders(await me(req), (await associatePortalRepository.orders(id)).slice(0, 5)),
     events: await associateEventRepository.forAssociate(id, null, 10),
@@ -319,9 +338,17 @@ async function commission(req, res) {
   // D-263: the portal shows only the last N months of commission (plus anything still unpaid).
   const months = require('../services/associateCommission').portalMonths(await require('../repositories/incentiveRepository').settings());
   const payouts = await associatePortalRepository.portalPayouts(id, months);
+  const payoutService = require('../services/associatePayoutService');
+  const india = payoutService.isIndia(a);
   if (req.query.format === 'csv') {
-    csv.stream(res, 'commission-statement.csv', ['Incentive month', 'Order', 'Client', 'Amount (order currency)', 'Currency', 'Amount INR', 'Status', 'Paid on', 'Paid INR', 'TDS INR', 'Reference', 'Note'],
-      payouts.map((p) => [p.incentive_month, p.order_reference, p.company_legal_name, p.amount_fc, p.currency_code, p.amount_inr, p.status, p.paid_on, p.paid_inr, p.tds_inr, p.paid_reference || '', p.note || p.hold_reason || '']));
+    // D-264: the order currency for every associate; rupees (fixed amount, TDS, paid) only for an associate in India.
+    if (india) {
+      csv.stream(res, 'commission-statement.csv', ['Incentive month', 'Order', 'Client', 'Commission (order currency)', 'Currency', 'You are paid (INR, fixed)', 'Fixed at (INR per unit)', 'Fixed on', 'Status', 'Paid on', 'Paid INR', 'TDS INR', 'Reference', 'Note'],
+        payouts.map((p) => [p.incentive_month, p.order_reference, p.company_legal_name, p.amount_fc, p.currency_code, p.amount_inr, p.fixed_rate, p.fixed_on, p.status, p.paid_on, p.paid_inr, p.tds_inr, p.paid_reference || '', p.note || p.hold_reason || '']));
+      return;
+    }
+    csv.stream(res, 'commission-statement.csv', ['Incentive month', 'Order', 'Client', 'Commission', 'Currency', 'Status', 'Paid on', 'Reference', 'Note'],
+      payouts.map((p) => [p.incentive_month, p.order_reference, p.company_legal_name, p.amount_fc, p.currency_code, p.status, p.paid_on, p.paid_reference || '', p.note || p.hold_reason || '']));
     return;
   }
   const invoiceByPayout = {};
@@ -330,12 +357,18 @@ async function commission(req, res) {
     // Owner decision 2 Nov 2026 (D-235): gross / TDS (section, rate) / net.
     p.gross_inr = Number(p.paid_inr || 0) + Number(p.tds_inr || 0);
     p.tdsRateLabel = Number(p.tds_rate || 0) > 0 ? require('../services/associateTds').pct(Number(p.tds_rate)) : '';
+    p.status_label = Number(p.amount_inr) < 0 && p.status === 'due' ? 'To be deducted' : associatePortalRepository.payoutLabel(p, false, String(p.incentive_month));
+    if (india && p.fixed_rate !== null && p.fixed_rate !== undefined && p.status !== 'paid' && Number(p.amount_inr) > 0) {
+      p.fixed_line = payoutService.fixedRupeeLine(p.amount_inr, p.fixed_rate, p.currency_code, p.fixed_on);
+    }
     const inv = await associateDocumentRepository.invoiceForPayout(Number(p.id));
     if (inv) invoiceByPayout[p.id] = { id: Number(inv.id), reference: inv.reference };
   }
   await render(req, res, 'commission', {
     payouts,
-    totals: await associatePortalRepository.totals(id, months),
+    ...(await (async () => { const totals = await associatePortalRepository.totals(id, months); return { totals, totalsText: totalsText(totals) }; })()),
+    isIndia: india,
+    howFixed: await payoutService.howFixedBox(a),
     print: req.query.print === '1',
     invoiceByPayout,
     documents: await associateDocumentRepository.forAssociate(id),

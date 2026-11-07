@@ -810,6 +810,7 @@ async function recordLcReceived(req, res) {
     return;
   }
   await orderLcDetailRepository.recordReceived(orderId, receivedAt, Number(amount), Number(inr), Number(charges), req.user.id, bankRef);
+  await require('../services/associatePayoutService').afterPaymentChange(orderId, req.user.id); // D-264: fixed by itself once the buyer has paid in full
   await auditLogRepository.log(req.user.id, 'ORDER_LC_PAYMENT_RECEIVED', 'order_lc_details', orderId, 'lc_received_amount', lc.lc_received_amount, amount, `${currency} ${amount} on ${receivedAt}: ₹${inr} credited, ₹${charges} bank charges`);
   back('success', `LC payment recorded: ${currency} ${amount}, ₹${inr} credited.`);
 }

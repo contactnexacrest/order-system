@@ -243,6 +243,39 @@ Owner decision D-245 P3 (4 Nov 2026) replaces the client numbering
   ladder" shows the counting-order number and the threshold to staff only;
   the associate sees just "yes" or "no" (D-263).
 
+### Fixed at full payment — never changes (owner decision 7 Nov 2026, D-264)
+
+- **Automatic.** When the buyer has paid the order in full — the last buyer
+  receipt cleared **with its rupees credited recorded** (advance, balance,
+  freight, milestones, LC) — the app fixes the associate's commission by
+  itself: in the order currency and in rupees at the rate of **all** the
+  buyer's payments (rupees credited plus bank charges ÷ foreign amount). The
+  payout is created at once (due N days after full payment, paid in the
+  payout run), the associate gets a notice and an e-mail, and the order's
+  profit uses the fixed amount. Nobody has to lock it. If a receipt's rupees
+  are recorded later, the daily job fixes it then.
+- **It never changes.** A later move in the exchange rate does not raise or
+  lower it. If a buyer claim is opened the payout goes **On hold** by itself
+  (and back when the claim is resolved). A settled claim or agreed discount
+  works it out again **at the same fixed rate**.
+- **MD correction.** Order page › Incentive card › **Change commission**
+  (MD only, before it is paid): the new amount in the order currency and a
+  reason (10–500 characters); rupees at the same fixed rate; audit-logged;
+  the associate is told.
+- **Team incentive.** Unchanged: the MD locks it on "Ready to lock" (D-245).
+  Locking or unlocking the team never touches the fixed commission.
+- **What the associate sees.** The order currency (USD) everywhere. An
+  associate **in India** also sees, once fixed: "You will be paid ₹X (fixed
+  at ₹R per USD on <date>; will not change)". An associate **abroad** never
+  sees rupees. The portal explains this in a box at the top of My commission.
+- **Paid in.** India → always INR (the field is locked). Abroad → USD, EUR or
+  GBP (default USD); INR is refused.
+- **Bank charges** are never deducted. Abroad, Commission settings choose
+  **OUR** (default: NexaCrest pays its own and the intermediary bank's
+  charges) or **SHA**. An associate abroad is paid once the amount due in a
+  run reaches the **minimum payout abroad** (default USD 100); smaller amounts
+  carry to the next run with a note.
+
 ## Paying (Accounts)
 
 On **Incentive Payouts** (chapter 20), an associate's line can be paid only
@@ -252,6 +285,18 @@ refused ("This associate has no verified bank account usable on …") and
 "bank transfer" and the **UTR**; the app fills in the TDS and the net amount
 (below). The associate is e-mailed the gross, the TDS (section and rate) and
 the net paid, with the bank reference.
+
+**What the payment cost (D-264).** For an associate **in India** add our bank
+charges if any (optional — paid by NexaCrest, not deducted). For an associate
+**abroad** enter the **rupees the bank debited** (required, from the bank
+advice) and our + intermediary charges. The difference against the fixed
+commission (exchange difference + charges) is shown under **Associate payout
+costs** on Incentive Payouts and in its CSV, with its description, e.g.
+"Associate commission payout — NC-EXP-0142 — Demo Associate — USD 1,250.00
+sent, SWIFT ref FT2612050001; exchange difference ₹812.50 and transfer
+charges ₹1,850.00". It is a company cost of the month: the order keeps the
+fixed commission. (It is not sent to Zoho yet.) **Mark all paid** skips
+payouts to associates abroad — record each with its rupees debited.
 
 ### TDS on associate commission (owner decision 2 Nov 2026, D-235)
 

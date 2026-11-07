@@ -159,9 +159,13 @@ describe('Associate commission period and no business totals (D-263)', () => {
       oldHeld: await payout(a, o.order, '2024-05', 'held', 1600),
     };
     const t12 = await associatePortalRepository.totals(Number(a.id), 12, '2026-11-15');
-    expect(t12).toEqual({ earned: 300, paid: 90 + 180 + 360, waiting: 800, held: 1600, months: 12 });
+    const { fc: fc12, ...rest12 } = t12; // D-264: the per-currency totals are checked in associatePaymentsD264.test.js
+    expect(fc12).toBeTruthy();
+    expect(rest12).toEqual({ earned: 300, paid: 90 + 180 + 360, waiting: 800, held: 1600, months: 12 });
     const t3 = await associatePortalRepository.totals(Number(a.id), 3, '2026-11-15');
-    expect(t3).toEqual({ earned: 100, paid: 90, waiting: 800, held: 1600, months: 3 });
+    const { fc: fc3, ...rest3 } = t3;
+    expect(fc3).toBeTruthy();
+    expect(rest3).toEqual({ earned: 100, paid: 90, waiting: 800, held: 1600, months: 3 });
     const list12 = (await associatePortalRepository.portalPayouts(Number(a.id), 12, '2026-11-15')).map((p) => Number(p.id)).sort();
     expect(list12).toEqual([ids.now, ids.june, ids.oldDue, ids.oldHeld].sort());
     const list3 = (await associatePortalRepository.portalPayouts(Number(a.id), 3, '2026-11-15')).map((p) => Number(p.id)).sort();

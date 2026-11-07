@@ -219,6 +219,7 @@ async function clear(req, res) {
   await paymentMilestoneRepository.markCleared(Number(m.id), clearedOn, req.user.id);
   await auditLogRepository.log(req.user.id, 'MILESTONE_PAYMENT_CLEARED', 'order_payment_milestones', Number(m.id), 'cleared_on', null, clearedOn);
   const shortNote = partCheck.short ? ` ${await partPaymentService.recordShortfall(orderId, 'milestone', m, partCheck.short, req.user)}` : '';
+  await require('../services/associatePayoutService').afterPaymentChange(orderId, req.user.id); // D-264: fixed by itself once the buyer has paid in full
   flash.set(req, 'success', `Milestone ${m.seq} cleared. It goes to Zoho Books with the next revenue sync.${shortNote}`);
   back(res, orderId);
 }

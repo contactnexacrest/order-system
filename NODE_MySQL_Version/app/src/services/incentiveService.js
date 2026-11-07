@@ -661,14 +661,21 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
   const commissionSet = await associateCommission.settings();
   const due = calc.associate ? await associateCommission.dueOn(paidOn, commissionSet) : null;
   const runOn = due ? await associateCommission.payoutRunOn(due, commissionSet) : null;
-  const a = calc.associate;
-  const earned = !!(a && a.state !== 'unpaid' && a.amount_fc > 0);
+  let a = calc.associate;
+  let earned = !!(a && a.state !== 'unpaid' && a.amount_fc > 0);
+  let assocFixed = false;
   const order = await orderRepository.find(orderId);
   const claimed = await db.transaction(async (c) => {
     await c.execute('INSERT IGNORE INTO order_incentives (order_id, updated_by) VALUES (:id, :u)', { id: orderId, u: userId });
-    const claim = await c.queryOne('SELECT locked_at FROM order_incentives WHERE order_id = :id FOR UPDATE', { id: orderId });
+    const claim = await c.queryOne('SELECT locked_at, associate_fixed_at FROM order_incentives WHERE order_id = :id FOR UPDATE', { id: orderId });
+    // D-264: an associate commission fixed by itself at full payment stays as it is; the lock adds the team's part only.
+    assocFixed = !!(claim && claim.associate_fixed_at);
+    if (assocFixed) {
+      a = null;
+      earned = false;
+    }
     // The same guard on the payouts: an order never gets a second set (one per order, payee and role).
-    const existing = await c.queryOne('SELECT COUNT(*) AS n FROM incentive_payouts WHERE order_id = :id AND clawback_of_payout_id IS NULL', { id: orderId });
+    const existing = await c.queryOne("SELECT COUNT(*) AS n FROM incentive_payouts WHERE order_id = :id AND clawback_of_payout_id IS NULL AND (payee_kind = 'staff' OR :af = 0)", { id: orderId, af: assocFixed ? 1 : 0 });
     if ((claim && claim.locked_at) || Number(existing.n) > 0) return false;
     let teamEntryId = null;
     // D-259: what each person gets after eligibility and caps; what the company keeps is recorded per line.
@@ -695,14 +702,15 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
         amount_inr: a.amount_inr, amount_fc: a.amount_fc, currency_code: a.currency, incentive_month: String(runOn).slice(0, 7),
         payout_run_on: runOn, locked_on: today,
       }, c);
-      await c.execute('UPDATE incentive_payouts SET due_on = :d WHERE id = :id', { d: due, id: payoutId });
+      // D-264: the rate is fixed with it (only reached when the commission was not already fixed at full payment).
+      await c.execute('UPDATE incentive_payouts SET due_on = :d, fixed_rate = :r, fixed_on = :f WHERE id = :id', { d: due, r: Math.round(Number(a.rate_inr) * 1e6) / 1e6, f: today, id: payoutId });
       // AS-3: a suspended associate's commission is held until the MD releases it.
       if (a.status === 'suspended') {
         await incentiveRepository.holdPayout(payoutId, 'The associate is suspended.', c);
       }
       associateEntryId = await incentiveRepository.addCostEntry(orderId, 'associate', associateCostDescription(a), a.amount_inr, paidOn, userId, c);
     }
-    await incentiveRepository.saveOrder(orderId, {
+    const teamFields = {
       locked_at: nowSql(),
       locked_by: userId,
       unlock_reason: null,
@@ -713,6 +721,10 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
       team_by_share_inr: calc.team_by_share !== undefined ? calc.team_by_share : calc.team_total,
       kept_not_eligible_inr: calc.kept_not_eligible || 0,
       kept_capped_inr: calc.kept_capped || 0,
+      team_cost_entry_id: teamEntryId,
+    };
+    await incentiveRepository.saveOrder(orderId, assocFixed ? teamFields : {
+      ...teamFields,
       associate_id: a ? a.id : null,
       associate_order_number: a && a.counts ? a.counting_number : null,
       associate_rate_pct: a ? a.rate : null,
@@ -723,11 +735,12 @@ async function lock(orderId, paidOn, userId, calc = null, note = null) {
       associate_basis_inr: a ? a.basis_inr : null,
       associate_counts: a ? (a.counts ? 1 : 0) : null,
       associate_due_on: earned ? due : null,
-      team_cost_entry_id: teamEntryId,
       associate_cost_entry_id: associateEntryId,
+      associate_fixed_at: earned ? nowSql() : null,
+      associate_fixed_rate: earned ? Math.round(Number(a.rate_inr) * 1e6) / 1e6 : null,
     }, userId, c);
     await incentiveRepository.addHistory(orderId, 'lock', null, `Team ₹${fmt2(calc.team_total)}`
-      + (a ? `; associate ${earned ? `₹${fmt2(a.amount_inr)}` : 'none'}` : '') + `; staff payout run ${staffRun}`, note, userId, c);
+      + (assocFixed ? '; associate already fixed at full payment' : (a ? `; associate ${earned ? `₹${fmt2(a.amount_inr)}` : 'none'}` : '')) + `; staff payout run ${staffRun}`, note, userId, c);
     return true;
   });
   if (!claimed) return false;
@@ -783,8 +796,20 @@ async function unlock(orderId, userId, reason = '') {
     const paidNow = await c.queryOne("SELECT COUNT(*) AS n FROM incentive_payouts WHERE order_id = :id AND status = 'paid' FOR UPDATE", { id: orderId });
     if (!relock || !relock.locked_at) return 'This order\'s incentive is not locked.';
     if (Number(paidNow.n) > 0) return 'Part of this order\'s incentive is already paid, so it can no longer be unlocked.';
-    await incentiveRepository.deleteOrderPayouts(orderId, c);
     await incentiveRepository.deleteOrderKept(orderId, c);
+    const fixedFirst = await c.queryOne("SELECT COUNT(*) AS n FROM order_incentive_history WHERE order_id = :o AND action = 'associate_fixed'", { o: orderId });
+    if (row.associate_fixed_at && Number(fixedFirst.n) > 0) {
+      // D-264: the associate's commission was fixed by itself at full payment — unlocking the team incentive leaves it as it is.
+      await c.execute("DELETE FROM incentive_payouts WHERE order_id = :id AND payee_kind = 'staff' AND status <> 'paid'", { id: orderId });
+      await c.execute("DELETE FROM order_cost_entries WHERE order_id = :id AND incentive_kind = 'team'", { id: orderId });
+      await incentiveRepository.saveOrder(orderId, {
+        locked_at: null, locked_by: null, unlock_reason: why, incentive_month: null, profit_basis_inr: null, team_total_inr: null,
+        team_by_share_inr: null, kept_not_eligible_inr: null, kept_capped_inr: null, team_cost_entry_id: null,
+      }, userId, c);
+      await incentiveRepository.addHistory(orderId, 'unlock', `Locked ${short(String(row.locked_at).slice(0, 10))}, team ₹${fmt2(row.team_total_inr)}`, "Open (the associate's fixed commission is kept)", why, userId, c);
+      return null;
+    }
+    await incentiveRepository.deleteOrderPayouts(orderId, c);
     await c.execute('DELETE FROM order_cost_entries WHERE order_id = :id AND incentive_kind IS NOT NULL', { id: orderId });
     await incentiveRepository.saveOrder(orderId, {
       locked_at: null, locked_by: null, unlock_reason: why, fully_paid_on: null, incentive_month: null, profit_basis_inr: null, team_total_inr: null,
@@ -792,7 +817,8 @@ async function unlock(orderId, userId, reason = '') {
       associate_id: null, associate_order_number: null, associate_rate_pct: null,
       associate_amount_fc: null, associate_currency: null, associate_amount_inr: null,
       associate_basis_fc: null, associate_basis_inr: null, associate_counts: null, associate_due_on: null,
-      team_cost_entry_id: null, associate_cost_entry_id: null,
+      team_cost_entry_id: null, associate_cost_entry_id: null, associate_fixed_at: null, associate_fixed_rate: null,
+      associate_override_fc: null, associate_override_reason: null,
     }, userId, c);
     await incentiveRepository.addHistory(orderId, 'unlock', `Locked ${short(String(row.locked_at).slice(0, 10))}, team ₹${fmt2(row.team_total_inr)}`, 'Open', why, userId, c);
     return null;

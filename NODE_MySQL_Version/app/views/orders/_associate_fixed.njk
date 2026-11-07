@@ -1,0 +1,21 @@
+{# Port of _associate_fixed.php. Owner decision D-264 (7 Nov 2026): the associate's commission, fixed by itself when the buyer
+   paid in full — the fixed amount and rate, where its payout stands, and (MD only, before it is paid) "Change commission"
+   with a reason. Expects associateFixed (set by the orders controller), order, incentiveCanEdit, csrfToken. #}
+{% set af = associateFixed %}
+<div class="info-box" data-associate-fixed style="margin:8px 0">
+  <b>Associate commission fixed</b> — {{ af.currency }} {{ af.amount_fc | money }} = &#8377;{{ af.amount_inr | money }}
+  at &#8377;{{ af.rate | money }} per {{ af.currency }} (the rate of all the buyer's payments), fixed on {{ af.fixed_on | shortDate }}.
+  This is the cost in the order's profit and it does not change.
+  {% if af.label %}<br><small>{{ af.label }}</small>{% endif %}
+  {% if af.override_reason !== null %}<br><small class="muted">Changed by the MD: {{ af.override_reason }}</small>{% endif %}
+  {% if incentiveCanEdit and af.canChange %}
+    <details style="margin-top:6px"><summary class="small">Change commission (MD, before it is paid)</summary>
+      <form method="post" action="/orders/{{ order.id }}/incentive/associate-commission" class="field-grid" style="margin-top:6px">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>New commission ({{ af.currency }}) *<input type="number" name="associate_amount_fc" required min="0" step="0.01" value="{{ af.amount_fc | fixed2 }}" placeholder="e.g. 1250.00"><span class="help-line">Worked out in rupees at the same fixed rate.</span></label>
+        <label>Reason * <input type="text" name="associate_change_reason" required minlength="10" maxlength="500" placeholder="e.g. Agreed with the associate after the buyer's late claim"></label>
+        <div class="btn-row"><button type="submit" class="btn-sm">Change commission</button></div>
+      </form>
+    </details>
+  {% endif %}
+</div>

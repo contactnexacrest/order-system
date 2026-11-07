@@ -150,6 +150,11 @@ async function edit(req, res) {
   if (a) await form(req, res, a);
 }
 
+/** D-264: the currencies an associate abroad can be paid in — the active currencies other than INR. */
+async function abroadCurrencyCodes() {
+  return (await lookupRepository.currencies()).map((c) => String(c.code || '')).filter((c) => c !== '' && c !== 'INR');
+}
+
 async function save(req, res) {
   const user = req.user;
   const id = req.params.id !== undefined ? parseInt(req.params.id, 10) : null;
@@ -173,8 +178,14 @@ async function save(req, res) {
   if (!['india', 'abroad'].includes(data.based_in)) {
     errors.push('Choose whether the associate is in India or abroad.');
   }
-  if (!/^[A-Z]{3}$/.test(String(data.currency_code ?? ''))) {
-    errors.push('Choose the currency the associate is paid in.');
+  // D-264: an associate in India is always paid in rupees; one abroad in an active trading currency (USD, EUR, GBP …).
+  // Without the browser script both "Paid in" selects are sent: the last one (abroad) is the one meant.
+  if (Array.isArray(body.currency_code)) data.currency_code = String(body.currency_code[body.currency_code.length - 1] || '').trim() || null;
+  const abroadCurrencies = await abroadCurrencyCodes();
+  if (data.based_in === 'india') {
+    data.currency_code = 'INR';
+  } else if (!abroadCurrencies.includes(String(data.currency_code || ''))) {
+    errors.push(`Choose the currency the associate abroad is paid in (${abroadCurrencies.join(', ')}).`);
   }
   if (data.email !== null && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email) || len(data.email) > 190)) {
     errors.push('Enter a valid email address, or leave it empty.');
@@ -861,6 +872,11 @@ async function saveLadder(req, res) {
     const months = int(body.associate_protection_months);
     const gst = isNum(body.associate_gst_pct) ? Number(body.associate_gst_pct) : null;
     const portalMonths = int(body.associate_portal_commission_months);
+    // D-264: left as they are when not on the form.
+    const current = await associateCommission.settings();
+    const abroadCharges = String(body.associate_abroad_charges ?? current.abroad_charges);
+    const abroadMinRaw = body.associate_abroad_min_payout_usd ?? current.abroad_min_usd;
+    const abroadMin = isNum(abroadMinRaw) ? Number(abroadMinRaw) : null;
     let error = null;
     if (days === null || days < 0 || days > 365) error = 'Enter the days after full payment as 0 to 365.';
     else if (!['monthly', 'weekly'].includes(run)) error = 'Choose a monthly or a weekly payout run.';
@@ -869,6 +885,8 @@ async function saveLadder(req, res) {
     else if (months === null || months < 1 || months > 60) error = 'Enter the buyer registration period as 1 to 60 months.';
     else if (gst === null || gst < 0 || gst > 28) error = 'Enter the GST on commission as 0 to 28 %.';
     else if (!associateCommission.PORTAL_MONTH_CHOICES.includes(portalMonths)) error = 'Choose the commission period shown to associates: 3, 6, 9, 12, 15, 18 or 24 months.';
+    else if (!['OUR', 'SHA'].includes(abroadCharges)) error = 'Choose who pays the bank charges of a transfer abroad (OUR or SHA).';
+    else if (abroadMin === null || abroadMin < 0 || abroadMin > 100000) error = 'Enter the minimum payout abroad in US dollars (0 to 100,000).';
     if (error) {
       flash.set(req, 'error', error);
       res.redirect('/associates/ladder');
@@ -882,6 +900,8 @@ async function saveLadder(req, res) {
     values.associate_protection_months = String(months);
     values.associate_gst_pct = gst.toFixed(2);
     values.associate_portal_commission_months = String(portalMonths);
+    values.associate_abroad_charges = abroadCharges;
+    values.associate_abroad_min_payout_usd = abroadMin.toFixed(2);
     // D-256: the Zoho Books GST tax booked on an associate's commission bill when GST is paid on top.
     const gstTax = String(body.zoho_gst_commission_tax_id ?? '').trim();
     if (gstTax !== '' && !/^[0-9A-Za-z_-]{1,40}$/.test(gstTax)) {
@@ -962,6 +982,7 @@ async function report(req, res) {
 }
 
 module.exports = {
+  abroadCurrencyCodes,
   reviewDocument,
   can, validateBank, sendFile, index, create, edit, save, show, changeStatus, invitePortal, disablePortal, setCode, viewAs, downloadAgreement,
   linkClient, unlinkClient, addBank, firstCheck, verifyBank, rejectBank, bankNumber, uploadDocument, downloadDocument, reply,

@@ -433,6 +433,23 @@ final class IncentiveController
         self::back($orderId, 'success', 'Incentive unlocked. Change it, then lock it again.');
     }
 
+    /** D-264: the MD corrects a fixed associate commission before it is paid, with a reason. */
+    public function changeAssociateCommission(array $params): void
+    {
+        $user = AuthService::currentUser();
+        $orderId = (int) $params['id'];
+        if (!self::canManagePricing()) {
+            self::back($orderId, 'error', 'Only the MD can change an associate\'s commission.');
+            return;
+        }
+        $error = \App\Services\AssociatePayoutService::changeCommission($orderId, trim((string) ($_POST['associate_amount_fc'] ?? '')), (string) ($_POST['associate_change_reason'] ?? ''), $user);
+        if ($error !== null) {
+            self::back($orderId, 'error', $error);
+            return;
+        }
+        self::back($orderId, 'success', 'Commission changed at the same fixed rate. The associate has been told.');
+    }
+
     /** Owner decision D-245 P4: the orders ready to lock (buyer fully paid, no claim open). */
     public function ready(array $params): void
     {
@@ -483,11 +500,11 @@ final class IncentiveController
         $rows = IncentiveRepository::payoutsForMonth($month);
         if (($_GET['format'] ?? '') === 'csv') {
             \App\Helpers\Csv::stream('incentives-' . $month . '.csv',
-                ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)', 'TDS section', 'TDS rate %', 'TDS reason'],
+                ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)', 'TDS section', 'TDS rate %', 'TDS reason', 'Fixed at (INR per unit)', 'Bank debited (INR)', 'Bank charges (INR)', 'Payout difference (INR)'],
                 array_map(static fn (array $r): array => [$r['user_name'] ?? $r['associate_name'], $r['payee_kind'], $r['buyer_inquiry_ref'] ?: $r['order_reference'],
                     $r['payee_kind'] === 'associate' ? 'Associate (agreement)' : IncentiveRepository::roleLabel((string) $r['role']),
                     $r['amount_inr'], $r['amount_fc'], $r['currency_code'], $r['status'], $r['paid_on'], $r['paid_inr'], $r['tds_inr'],
-                    $r['tds_section'] ?? null, $r['tds_rate'] ?? null, $r['tds_reason'] ?? null], $rows));
+                    $r['tds_section'] ?? null, $r['tds_rate'] ?? null, $r['tds_reason'] ?? null, $r['fixed_rate'] ?? null, $r['bank_debited_inr'] ?? null, $r['bank_charges_inr'] ?? null, $r['payout_difference_inr'] ?? null], $rows));
         }
         // Owner decision 2 Nov 2026 (D-235): the TDS worked out for each associate payout still due, as of today.
         $tdsCalc = [];
@@ -501,6 +518,8 @@ final class IncentiveController
             'month' => $month,
             'months' => array_values(array_unique(array_merge([$month], $months))),
             'rows' => $rows,
+            // D-264: what paying associates cost against their fixed commission — a company cost of the month, not on the orders.
+            'payoutCosts' => \App\Services\AssociatePayoutService::payoutCostsForMonth($month),
         ], 'layout/base');
     }
 
@@ -616,9 +635,39 @@ final class IncentiveController
                 header('Location: /incentives/payouts?month=' . rawurlencode($month));
                 return;
             }
+            // D-264: what the payment really cost — abroad, the rupees the bank debited (required) and the charges;
+            // in India, the bank charges (optional). Never deducted from the commission.
+            $bankDebited = null;
+            $bankCharges = null;
+            if ($payout['payee_kind'] === 'associate') {
+                $india = \App\Services\AssociatePayoutService::isIndia(\App\Repositories\AssociateRepository::find((int) $payout['associate_id']));
+                $chargesRaw = isset($params['payoutId']) ? trim((string) ($_POST['bank_charges_inr'] ?? '')) : '';
+                if ($chargesRaw !== '' && (!is_numeric($chargesRaw) || (float) $chargesRaw < 0 || (float) $chargesRaw > 10000000)) {
+                    Flash::set('error', 'Enter the bank charges in rupees (0 or more), or leave them empty.');
+                    header('Location: /incentives/payouts?month=' . rawurlencode($month));
+                    return;
+                }
+                $bankCharges = $chargesRaw !== '' ? round((float) $chargesRaw, 2) : null;
+                if (!$india) {
+                    $debitedRaw = isset($params['payoutId']) ? trim((string) ($_POST['bank_debited_inr'] ?? '')) : '';
+                    if ($debitedRaw === '' || !is_numeric($debitedRaw) || (float) $debitedRaw <= 0 || (float) $debitedRaw > 1000000000) {
+                        if (isset($params['payoutId'])) {
+                            Flash::set('error', 'Enter the rupees the bank debited for this transfer abroad (from the bank advice).');
+                            header('Location: /incentives/payouts?month=' . rawurlencode($month));
+                            return;
+                        }
+                        $skippedAbroad = ($skippedAbroad ?? 0) + 1;
+                        continue;
+                    }
+                    $bankDebited = round((float) $debitedRaw, 2);
+                }
+            }
             // QA Round 6, R6-N17: a second click records and logs nothing more.
             if (!IncentiveService::markPaid($id, $paidOn, $paidInr, $tds, (int) $user['id'], $paidVia, $paidReference)) {
                 continue;
+            }
+            if ($payout['payee_kind'] === 'associate') {
+                \App\Services\AssociatePayoutService::recordPaymentCosts($id, $bankDebited, $bankCharges);
             }
             AuditLogRepository::log((int) $user['id'], 'INCENTIVE_PAID', 'incentive_payouts', $id, 'status', 'due', 'paid');
             if ($tdsCalc !== null) {
@@ -649,11 +698,13 @@ final class IncentiveController
         if ($count === 0) {
             Flash::set('warning', 'Nothing was recorded — no payout due for payment was selected.' . (!empty($skipped) ? " {$skipped} associate payout(s) skipped: no verified bank account yet." : '')
                 . (!empty($skippedDue) ? " {$skippedDue} associate payout(s) skipped: not due yet, or held while a buyer claim is open." : '')
-                . (!empty($skippedDocs) ? " {$skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA" . (\App\Services\AssociateTds::settings()['cb_required'] ? '/15CB' : '') . ' not yet on file — pay them one by one.' : ''));
+                . (!empty($skippedDocs) ? " {$skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA" . (\App\Services\AssociateTds::settings()['cb_required'] ? '/15CB' : '') . ' not yet on file — pay them one by one.' : '')
+                . (!empty($skippedAbroad) ? " {$skippedAbroad} payout(s) to associates abroad skipped: record each one with the rupees the bank debited." : ''));
         } else {
             Flash::set('success', ($count === 1 ? 'Payment recorded.' : "{$count} payments recorded.") . (!empty($skipped) ? " {$skipped} associate payout(s) skipped: no verified bank account yet." : '')
                 . (!empty($skippedDue) ? " {$skippedDue} associate payout(s) skipped: not due yet, or held while a buyer claim is open." : '')
-                . (!empty($skippedDocs) ? " {$skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA" . (\App\Services\AssociateTds::settings()['cb_required'] ? '/15CB' : '') . ' not yet on file — pay them one by one.' : ''));
+                . (!empty($skippedDocs) ? " {$skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA" . (\App\Services\AssociateTds::settings()['cb_required'] ? '/15CB' : '') . ' not yet on file — pay them one by one.' : '')
+                . (!empty($skippedAbroad) ? " {$skippedAbroad} payout(s) to associates abroad skipped: record each one with the rupees the bank debited." : ''));
         }
         header('Location: /incentives/payouts?month=' . rawurlencode($month));
     }

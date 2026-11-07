@@ -430,8 +430,14 @@ async function incentiveLayer(orderId, base) {
   } else {
     const calc = await require('./incentiveService').calculate(orderId, base);
     const a = calc.associate;
-    commission = a && a.state !== 'unpaid' ? round2(Number(a.amount_inr)) : 0;
-    commissionState = a ? 'estimated' : null;
+    if (row && row.associate_fixed_at) {
+      // D-264: fixed by itself at full payment — the fixed amount (its cost line), never an estimate.
+      commission = lockedAssoc;
+      commissionState = await payoutState(orderId, 'associate', true);
+    } else {
+      commission = a && a.state !== 'unpaid' ? round2(Number(a.amount_inr)) : 0;
+      commissionState = a ? 'estimated' : null;
+    }
     incentive = round2(Number(calc.team_total));
     incentiveState = 'estimated';
   }

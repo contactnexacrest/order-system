@@ -201,9 +201,9 @@ final class AssociateCommissionPeriodTest extends DbTestCase
             'oldHeld' => $this->payout($a, $o['order'], '2024-05', 'held', 1600),
         ];
         self::assertSame(['earned' => 300.0, 'waiting' => 800.0, 'paid' => 630.0, 'held' => 1600.0, 'months' => 12],
-            AssociatePortalRepository::totals((int) $a['id'], 12, '2026-11-15'));
+            array_diff_key(AssociatePortalRepository::totals((int) $a['id'], 12, '2026-11-15'), ['fc' => 1]));
         self::assertSame(['earned' => 100.0, 'waiting' => 800.0, 'paid' => 90.0, 'held' => 1600.0, 'months' => 3],
-            AssociatePortalRepository::totals((int) $a['id'], 3, '2026-11-15'));
+            array_diff_key(AssociatePortalRepository::totals((int) $a['id'], 3, '2026-11-15'), ['fc' => 1]));
         $list = static function (array $rows): array {
             $ids = array_map(static fn (array $p): int => (int) $p['id'], $rows);
             sort($ids);

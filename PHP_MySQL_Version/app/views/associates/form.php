@@ -14,11 +14,14 @@ $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'
       <label>Name *<input type="text" name="name" required maxlength="150" value="<?= $__v('name') ?>" placeholder="e.g. Full name as on PAN card"></label>
       <label>Based in *<select name="based_in" required><option value="india"<?= ($__a['based_in'] ?? 'india') === 'india' ? ' selected' : '' ?>>India</option><option value="abroad"<?= ($__a['based_in'] ?? '') === 'abroad' ? ' selected' : '' ?>>Abroad</option></select></label>
       <label>Country<input type="text" name="country" maxlength="80" value="<?= $__v('country') ?>" placeholder="e.g. Netherlands"></label>
-      <label>Paid in (currency) *<select name="currency_code" required>
-        <?php foreach ($currencies as $cur): $__code = (string) ($cur['code'] ?? $cur['currency_code'] ?? ''); ?>
-          <option value="<?= htmlspecialchars($__code) ?>"<?= ($__a['currency_code'] ?? 'INR') === $__code ? ' selected' : '' ?>><?= htmlspecialchars($__code) ?></option>
+      <?php // D-264: India → always INR (no conversion, TDS in rupees); abroad → an active trading currency, USD by default. ?>
+      <label data-show-when="based_in=india">Paid in (currency) *<select name="currency_code" required><option value="INR" selected>INR — Indian rupee</option></select><span class="help-line">Fixed for associates based in India: always INR, by NEFT / RTGS / IMPS to the verified account. No currency conversion, TDS in rupees.</span></label>
+      <label data-show-when="based_in=abroad">Paid in (currency) *<select name="currency_code" required><option value="">Choose…</option>
+        <?php $__cur = ($__a['based_in'] ?? 'india') === 'abroad' && ($__a['currency_code'] ?? '') !== 'INR' ? (string) $__a['currency_code'] : 'USD'; ?>
+        <?php foreach ($currencies as $cur): $__code = (string) ($cur['code'] ?? $cur['currency_code'] ?? ''); if ($__code === '' || $__code === 'INR') { continue; } ?>
+          <option value="<?= htmlspecialchars($__code) ?>"<?= $__cur === $__code ? ' selected' : '' ?>><?= htmlspecialchars($__code) ?></option>
         <?php endforeach; ?>
-      </select></label>
+      </select><span class="help-line">Abroad: paid in this currency by SWIFT — match the associate's bank account. The amount is fixed in this currency when the buyer completes payment.</span></label>
       <label>E-mail (portal login)<input type="email" name="email" maxlength="190" value="<?= $__v('email') ?>" placeholder="e.g. name@company.com"></label>
       <label>Phone<input type="tel" name="phone" maxlength="40" value="<?= $__v('phone') ?>" placeholder="e.g. +91 98765 43210"></label>
       <label>PAN (India)<input type="text" name="pan" maxlength="10" pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]" title="As on the PAN card, e.g. ABCDE1234F" value="<?= $__v('pan') ?>" placeholder="e.g. ABCDE1234F"></label>

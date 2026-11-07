@@ -2246,6 +2246,7 @@ final class OrderController
 
         OrderPaymentStatusRepository::markAdvanceCleared($orderId, $clearedAt, (int) $user['id']);
         $shortNote = $partCheck['short'] !== null ? ' ' . \App\Services\PartPaymentService::recordShortfall($orderId, 'advance', null, $partCheck['short'], $user) : '';
+        \App\Services\AssociatePayoutService::afterPaymentChange($orderId, (int) $user['id']); // D-264: fixed by itself once the buyer has paid in full
         OrderPaymentStatusRepository::setBalanceAmount($orderId, $balanceAmount, $balanceDueDate);
         // External QA report L-23: advance payment clearing was never audit-logged.
         AuditLogRepository::log((int) $user['id'], 'ADVANCE_PAYMENT_CLEARED', 'order_payment_status', $orderId, 'advance_cleared_at', null, $clearedAt);
@@ -3289,6 +3290,7 @@ final class OrderController
         $clearedAt = trim((string) ($_POST['freight_cleared_at'] ?? '')) ?: date('Y-m-d');
         OrderPaymentStatusRepository::markFreightCleared($orderId, $clearedAt, (int) $user['id']);
         $shortNote = $partCheck['short'] !== null ? ' ' . \App\Services\PartPaymentService::recordShortfall($orderId, 'freight', null, $partCheck['short'], $user) : '';
+        \App\Services\AssociatePayoutService::afterPaymentChange($orderId, (int) $user['id']); // D-264: fixed by itself once the buyer has paid in full
         StageGateService::passAndUnlockNext($orderId, 6, (int) $user['id']);
         Flash::set('success', 'Freight payment cleared. Stage 7 (Packing & BL Instruction) unlocked.' . $shortNote);
         header("Location: /orders/{$orderId}");
@@ -3936,6 +3938,7 @@ final class OrderController
         $clearedAt = trim((string) ($_POST['balance_cleared_at'] ?? '')) ?: date('Y-m-d');
         OrderPaymentStatusRepository::markBalanceCleared($orderId, $clearedAt, (int) $user['id']);
         $shortNote = $partCheck['short'] !== null ? ' ' . \App\Services\PartPaymentService::recordShortfall($orderId, 'balance', null, $partCheck['short'], $user) : '';
+        \App\Services\AssociatePayoutService::afterPaymentChange($orderId, (int) $user['id']); // D-264: fixed by itself once the buyer has paid in full
         // External QA report L-23: balance payment clearing was never audit-logged.
         AuditLogRepository::log((int) $user['id'], 'BALANCE_PAYMENT_CLEARED', 'order_payment_status', $orderId, 'balance_cleared_at', null, $clearedAt);
         if ($early) {

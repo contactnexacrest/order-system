@@ -169,7 +169,9 @@ final class AssociateTdsTest extends DbTestCase
         $this->doc((int) $a['id'], 'form_15ca', (int) $p['id'], 'received');
         self::assertStringStartsWith('Before paying an associate based abroad, these must be on file: Form 15CB.', $this->pay($p)['message']);
         $this->doc((int) $a['id'], 'form_15cb', (int) $p['id'], 'received');
-        self::assertSame('Payment recorded.', $this->pay($p)['message']);
+        // D-264: abroad, the rupees the bank debited are recorded with the payment.
+        self::assertSame('Enter the rupees the bank debited for this transfer abroad (from the bank advice).', $this->pay($p)['message']);
+        self::assertSame('Payment recorded.', $this->pay($p, ['bank_debited_inr' => '40000.00'])['message']);
         $r = IncentiveRepository::findPayout((int) $p['id']);
         self::assertSame(['40000.00', '0.00', 'abroad — no TDS (TRC/10F/no-PE on file)'], [$r['paid_inr'], $r['tds_inr'], $r['tds_reason']]);
     }

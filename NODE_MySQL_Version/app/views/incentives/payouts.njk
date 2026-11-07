@@ -46,6 +46,12 @@
                     {% if tdsSettings.cb_required %}<label class="small">Form 15CB <input type="file" name="form_15cb_file" accept=".pdf,.jpg,.jpeg,.png"></label>{% endif %}
                   {% endif %}
                 {% endif %}
+                {% if r.payee_kind == 'associate' %}{# D-264: what the payment cost — never deducted from the commission #}
+                  {% if r.based_in != 'india' %}
+                    <input type="number" name="bank_debited_inr" required min="0.01" step="0.01" placeholder="Rupees debited, e.g. 105125.00" aria-label="Rupees debited by the bank (₹)" title="Rupees the bank debited for {{ r.currency_code }} {{ r.amount_fc | money }} (from the bank advice)" style="width:11em">
+                  {% endif %}
+                  <input type="number" name="bank_charges_inr" min="0" step="0.01" placeholder="{{ 'Our + intermediary charges ₹' if r.based_in != 'india' else 'Our bank charges ₹' }}" aria-label="Bank charges (₹)" title="Paid by NexaCrest — not deducted from the commission" style="width:11em">
+                {% endif %}
                 <select name="paid_via" required aria-label="Paid via" title="Paid via"><option value="">Paid via…</option>{% for k, v in paidVia %}<option value="{{ k }}">{{ v | capitalize }}</option>{% endfor %}</select>
                 <input type="text" name="paid_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="Payroll Nov-2026 / UTR / cheque no." aria-label="Payment reference" title="Payment reference: payroll month, UTR or cheque no. (rule D-212)" style="width:13em">
                 <button type="submit" class="btn-sm">Mark paid</button>
@@ -58,6 +64,15 @@
     {% if rows.length == 0 %}<tr><td colspan="6" class="muted">No incentives for this month.</td></tr>{% endif %}
   </table>
 
+  {% if payoutCosts and payoutCosts.length %}
+  <h2>Associate payout costs — {{ incentive.monthLabel(month) }}</h2>
+  <p class="small muted">D-264: what paying associates cost on top of their fixed commission (exchange difference and transfer charges). A company cost of the month — the orders keep the fixed commission.</p>
+  <table class="list" data-payout-costs>
+    <tr><th>Payout</th><th class="r">Payout difference (₹)</th></tr>
+    {% for pc in payoutCosts %}<tr><td>{{ pc.description }}</td><td class="r">{{ pc.payout_difference_inr | money }}</td></tr>{% endfor %}
+    <tr><td><b>Total</b></td><td class="r"><b>{{ payoutCostsTotal | money }}</b></td></tr>
+  </table>
+  {% endif %}
   <p><strong>Total {{ incentive.monthLabel(month) }} incentive:</strong> staff &#8377;{{ staffTotal | money0 }} · associates &#8377;{{ associateInr | money0 }}{% for f in associateFc %} ({{ f.currency }} {{ f.amount | money }}){% endfor %}</p>
   <div class="btn-row">
     {% if dueIds.length %}

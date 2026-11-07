@@ -2,3 +2,4 @@
 {% set cm = o.commission %}
 {% if cm.amount !== null and cm.amount !== undefined %}{{ o.currency_code }} {{ cm.amount | money }}{% if cm.level %} <small class="muted">({{ cm.level }})</small>{% endif %}<br>{% endif %}
 <span class="badge {{ {'paid': 'badge-active', 'earned': 'badge-active', 'held': 'badge-lost', 'expected': 'badge-pending'}[cm.state] or 'badge-inactive' }}">{{ cm.label }}</span>
+{% if cm.fixed_line %}<br><small data-fixed-rupees>{{ cm.fixed_line }}</small>{% endif %}{# D-264: India only, once fixed (set by the portal controller) #}

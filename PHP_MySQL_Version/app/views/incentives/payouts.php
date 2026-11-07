@@ -69,6 +69,12 @@ foreach ($rows as $r) {
                     <?php if (\App\Services\AssociateTds::settings()['cb_required']): ?><label class="small">Form 15CB <input type="file" name="form_15cb_file" accept=".pdf,.jpg,.jpeg,.png"></label><?php endif; ?>
                   <?php endif; ?>
                 <?php endif; ?>
+                <?php if ($r['payee_kind'] === 'associate'): // D-264: what the payment cost — never deducted from the commission ?>
+                  <?php if ($r['based_in'] !== 'india'): ?>
+                    <input type="number" name="bank_debited_inr" required min="0.01" step="0.01" placeholder="Rupees debited, e.g. 105125.00" aria-label="Rupees debited by the bank (₹)" title="Rupees the bank debited for <?= htmlspecialchars((string) $r['currency_code']) ?> <?= number_format((float) $r['amount_fc'], 2) ?> (from the bank advice)" style="width:11em">
+                  <?php endif; ?>
+                  <input type="number" name="bank_charges_inr" min="0" step="0.01" placeholder="<?= $r['based_in'] !== 'india' ? 'Our + intermediary charges ₹' : 'Our bank charges ₹' ?>" aria-label="Bank charges (₹)" title="Paid by NexaCrest — not deducted from the commission" style="width:11em">
+                <?php endif; ?>
                 <select name="paid_via" required aria-label="Paid via" title="Paid via"><option value="">Paid via…</option><?php foreach (IncentiveRepository::PAID_VIA as $__k => $__v): ?><option value="<?= $__k ?>"><?= htmlspecialchars(ucfirst($__v)) ?></option><?php endforeach; ?></select>
                 <input type="text" name="paid_reference" required minlength="4" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9 .\/_#:\(\)\-]*" placeholder="Payroll Nov-2026 / UTR / cheque no." aria-label="Payment reference" title="Payment reference: payroll month, UTR or cheque no. (rule D-212)" style="width:13em">
                 <button type="submit" class="btn-sm">Mark paid</button>
@@ -81,6 +87,15 @@ foreach ($rows as $r) {
     <?php if ($rows === []): ?><tr><td colspan="6" class="muted">No incentives for this month.</td></tr><?php endif; ?>
   </table>
 
+  <?php if (!empty($payoutCosts)): ?>
+  <h2>Associate payout costs — <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?></h2>
+  <p class="small muted">D-264: what paying associates cost on top of their fixed commission (exchange difference and transfer charges). A company cost of the month — the orders keep the fixed commission.</p>
+  <table class="list" data-payout-costs>
+    <tr><th>Payout</th><th class="r">Payout difference (₹)</th></tr>
+    <?php foreach ($payoutCosts as $__pc): ?><tr><td><?= htmlspecialchars((string) $__pc['description']) ?></td><td class="r"><?= number_format((float) $__pc['payout_difference_inr'], 2) ?></td></tr><?php endforeach; ?>
+    <tr><td><b>Total</b></td><td class="r"><b><?= number_format(array_sum(array_map(static fn (array $x): float => (float) $x['payout_difference_inr'], $payoutCosts)), 2) ?></b></td></tr>
+  </table>
+  <?php endif; ?>
   <p><strong>Total <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?> incentive:</strong> staff &#8377;<?= number_format($__staff, 0) ?> · associates &#8377;<?= number_format($__assocInr, 0) ?><?php foreach ($__assocFc as $cur => $amt): ?> (<?= htmlspecialchars($cur) ?> <?= number_format($amt, 2) ?>)<?php endforeach; ?></p>
   <div class="btn-row">
     <?php if ($__dueIds !== []): ?>

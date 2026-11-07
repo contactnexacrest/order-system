@@ -59,6 +59,10 @@ async function settings() {
     zoho_gst_tax_id: String(s.zoho_gst_commission_tax_id ?? '').trim(),
     registration_months: months > 0 ? months : 6,
     portal_months: portalMonths(s),
+    // D-264: who pays the bank charges of a transfer abroad (OUR = NexaCrest pays its own and the intermediary bank's; SHA = the
+    // associate's bank may charge on receipt) and the smallest amount sent abroad (smaller amounts carry to the next run).
+    abroad_charges: String(s.associate_abroad_charges ?? 'OUR').toUpperCase() === 'SHA' ? 'SHA' : 'OUR',
+    abroad_min_usd: Math.max(0, Number(s.associate_abroad_min_payout_usd ?? 100) || 0),
   };
 }
 
@@ -138,7 +142,7 @@ async function earningAssociate(order, incentiveRow = null) {
 async function countingOrders(associateId, excludeOrderId = null) {
   const row = await db.queryOne(
     `SELECT COUNT(*) AS n FROM order_incentives oi JOIN orders o ON o.id = oi.order_id
-      WHERE oi.associate_id = :a AND oi.associate_counts = 1 AND oi.locked_at IS NOT NULL AND oi.order_id <> :x
+      WHERE oi.associate_id = :a AND oi.associate_counts = 1 AND (oi.locked_at IS NOT NULL OR oi.associate_fixed_at IS NOT NULL) AND oi.order_id <> :x
         AND o.status NOT IN ('cancelled','lost')`,
     { a: associateId, x: excludeOrderId || 0 }
   );
@@ -319,7 +323,11 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
   const fixed = level !== null;
   if (!level) [level] = await levelForAssociate(a, orderId);
   const currency = String(order.currency_code || 'INR');
-  const realised = await realisedRate(order);
+  // D-264: once the commission is fixed, the rate it was fixed at is used for ever (also after a settlement);
+  // an MD correction before payment replaces the amount in the order currency.
+  const fixedRow = await incentiveRepository.forOrder(orderId);
+  const fixedRate = fixedRow && fixedRow.associate_fixed_at && fixedRow.associate_fixed_rate !== null ? Number(fixedRow.associate_fixed_rate) : null;
+  const realised = fixedRate !== null ? { rate: fixedRate, estimated: false } : await realisedRate(order);
   // Fresh-eyes review H1: a "USD x per unit" level is in US dollars whatever the order
   // currency. On a non-USD order it is converted at the USD rate (usdRate) to rupees,
   // and from there to the order currency for the figures shown in it.
@@ -345,10 +353,15 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
   }
   const settle = await settlements(orderId);
   const basis = Math.max(0, inRange - settle.reduction);
-  const commissionFc = inRange > 0 ? round2(linesCommission * basis / inRange) : 0;
-  const commissionInr = convertUsd
+  let commissionFc = inRange > 0 ? round2(linesCommission * basis / inRange) : 0;
+  let commissionInr = convertUsd
     ? (inRange > 0 && usdToFc > 0 ? round2(linesCommission / usdToFc * basis / inRange * usdRateValue) : 0)
     : round2(commissionFc * realised.rate);
+  const override = fixedRate !== null && fixedRow.associate_override_fc !== null && fixedRow.associate_override_fc !== undefined ? round2(Number(fixedRow.associate_override_fc)) : null;
+  if (override !== null) {
+    commissionFc = override;
+    commissionInr = round2(override * fixedRate);
+  }
   const fullyPaidOn = await require('./incentiveService').fullyPaidOn(orderId);
   const state = settle.unpaid ? 'unpaid' : (fullyPaidOn !== null ? 'paid' : 'awaiting');
   const due = fullyPaidOn !== null ? await dueOn(fullyPaidOn, set) : null;
@@ -370,6 +383,8 @@ async function forOrder(orderId, order = null, incentiveRow = null) {
     counts, threshold_inr: set.threshold_inr,
     counting_number: counts ? (await countingOrders(Number(a.id), orderId)) + 1 : null,
     gst_pct: set.gst_pct,
+    fixed: fixedRate !== null, fixed_at: fixedRate !== null ? fixedRow.associate_fixed_at : null, fixed_rate: fixedRate,
+    override: override !== null, override_reason: override !== null ? String(fixedRow.associate_override_reason || '') : null,
   };
 }
 

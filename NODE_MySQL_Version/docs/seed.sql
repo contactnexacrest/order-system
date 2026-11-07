@@ -2580,3 +2580,6 @@ INSERT IGNORE INTO associate_access_level_settings (level, feature_key, allowed)
 INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('associate_upgrade_after_orders', '3');
 -- D-263 (owner 6 Nov 2026): how many months of commission an associate sees in the portal (3/6/9/12/15/18/24).
 INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('associate_portal_commission_months', '12');
+-- Owner decision D-264: abroad transfers — NexaCrest pays its own and the intermediary bank's charges (OUR) by default;
+-- an associate abroad is paid once the amount due reaches USD 100 (smaller amounts carry to the next run).
+INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('associate_abroad_charges', 'OUR'), ('associate_abroad_min_payout_usd', '100');

@@ -7,11 +7,13 @@
     <div class="alert alert-warning">Please complete <a href="/associate/profile#kyc">your profile and documents</a><?= $__kycMissing !== [] ? ' — still needed or being checked: ' . htmlspecialchars(implode(', ', $__kycMissing)) : '' ?><?= empty($me['address']) ? ($__kycMissing !== [] ? '; ' : ' — ') . 'your address' : '' ?>. Commission is paid once your documents are accepted.</div>
   <?php endif; ?>
   <?php if (!empty($access['commission'])): // D-261 ?>
+  <?php // D-264: the order currency (USD) is the figure an associate sees; rupees only on a fixed line, for an associate in India. ?>
+  <?php $__fc = static fn (string $k): string => htmlspecialchars(\App\Repositories\AssociatePortalRepository::fcText($totals['fc'][$k] ?? [])); ?>
   <div class="stat-row">
-    <div class="stat"><div class="stat-label">Earned in the last <?= (int) $totals['months'] ?> months</div><div class="stat-value"><?= $__m($totals['earned']) ?></div></div>
-    <div class="stat"><div class="stat-label">Waiting to be paid</div><div class="stat-value"><?= $__m($totals['waiting']) ?></div></div>
-    <div class="stat"><div class="stat-label">Paid in the last <?= (int) $totals['months'] ?> months</div><div class="stat-value"><?= $__m($totals['paid']) ?></div></div>
-    <?php if ($totals['held'] > 0): ?><div class="stat"><div class="stat-label">On hold</div><div class="stat-value"><?= $__m($totals['held']) ?></div></div><?php endif; ?>
+    <div class="stat"><div class="stat-label">Earned in the last <?= (int) $totals['months'] ?> months</div><div class="stat-value"><?= $__fc('earned') ?></div></div>
+    <div class="stat"><div class="stat-label">Waiting to be paid</div><div class="stat-value"><?= $__fc('waiting') ?></div></div>
+    <div class="stat"><div class="stat-label">Paid in the last <?= (int) $totals['months'] ?> months</div><div class="stat-value"><?= $__fc('paid') ?></div></div>
+    <?php if ($totals['held'] > 0): ?><div class="stat"><div class="stat-label">On hold</div><div class="stat-value"><?= $__fc('held') ?></div></div><?php endif; ?>
   </div>
   <?php endif; ?>
   <p><?php if (!empty($access['clients'])): ?>Clients: <b><?= count($clients) ?></b><?php endif; ?><?php if (!empty($access['registration_links'])): ?> · Buyer registration links open: <b><?= count(array_filter($invitations, static fn (array $i): bool => in_array($i['status'], ['created', 'opened', 'registered'], true))) ?></b>

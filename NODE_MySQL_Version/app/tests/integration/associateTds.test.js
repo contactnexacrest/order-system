@@ -169,7 +169,9 @@ describe('TDS on associate commission (D-235)', () => {
     await doc(Number(a.id), 'form_15ca', Number(p.id), 'received');
     expect((await pay(p)).message).toMatch(/^Before paying an associate based abroad, these must be on file: Form 15CB\./);
     await doc(Number(a.id), 'form_15cb', Number(p.id), 'received');
-    expect((await pay(p)).message).toBe('Payment recorded.');
+    // D-264: abroad, the rupees the bank debited are recorded with the payment.
+    expect((await pay(p)).message).toBe('Enter the rupees the bank debited for this transfer abroad (from the bank advice).');
+    expect((await pay(p, { bank_debited_inr: '40000.00' })).message).toBe('Payment recorded.');
     const r = await incentiveRepository.findPayout(Number(p.id));
     expect([String(r.paid_inr), String(r.tds_inr), r.tds_reason]).toEqual(['40000.00', '0.00', 'abroad — no TDS (TRC/10F/no-PE on file)']);
   });

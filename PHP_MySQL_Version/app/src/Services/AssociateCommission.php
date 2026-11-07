@@ -59,6 +59,10 @@ final class AssociateCommission
             'zoho_gst_tax_id' => trim((string) ($s['zoho_gst_commission_tax_id'] ?? '')),
             'registration_months' => AssociateService::protectionMonths(),
             'portal_months' => self::portalMonths($s),
+            // D-264: who pays the bank charges of a transfer abroad (OUR = NexaCrest pays its own and the intermediary bank's; SHA = the
+            // associate's bank may charge on receipt) and the smallest amount sent abroad (smaller amounts carry to the next run).
+            'abroad_charges' => strtoupper((string) ($s['associate_abroad_charges'] ?? 'OUR')) === 'SHA' ? 'SHA' : 'OUR',
+            'abroad_min_usd' => max(0.0, (float) ($s['associate_abroad_min_payout_usd'] ?? 100)),
         ];
     }
 
@@ -152,7 +156,7 @@ final class AssociateCommission
     {
         $stmt = Database::connection()->prepare(
             "SELECT COUNT(*) FROM order_incentives oi JOIN orders o ON o.id = oi.order_id
-              WHERE oi.associate_id = :a AND oi.associate_counts = 1 AND oi.locked_at IS NOT NULL AND oi.order_id <> :x
+              WHERE oi.associate_id = :a AND oi.associate_counts = 1 AND (oi.locked_at IS NOT NULL OR oi.associate_fixed_at IS NOT NULL) AND oi.order_id <> :x
                 AND o.status NOT IN ('cancelled','lost')"
         );
         $stmt->execute(['a' => $associateId, 'x' => $excludeOrderId ?? 0]);
@@ -392,7 +396,11 @@ final class AssociateCommission
             [$level] = self::levelForAssociate($a, $orderId);
         }
         $currency = (string) ($order['currency_code'] ?? 'INR');
-        $realised = self::realisedRate($order);
+        // D-264: once the commission is fixed, the rate it was fixed at is used for ever (also after a settlement);
+        // an MD correction before payment replaces the amount in the order currency.
+        $fixedRow = IncentiveRepository::forOrder($orderId);
+        $fixedRate = $fixedRow !== null && !empty($fixedRow['associate_fixed_at']) && $fixedRow['associate_fixed_rate'] !== null ? (float) $fixedRow['associate_fixed_rate'] : null;
+        $realised = $fixedRate !== null ? ['rate' => $fixedRate, 'estimated' => false] : self::realisedRate($order);
         // Fresh-eyes review H1: a "USD x per unit" level is in US dollars whatever the order
         // currency. On a non-USD order it is converted at the USD rate (usdRate) to rupees,
         // and from there to the order currency for the figures shown in it.
@@ -424,6 +432,11 @@ final class AssociateCommission
         $commissionInr = $convertUsd
             ? ($inRange > 0 && $usdToFc > 0 ? round($linesCommission / $usdToFc * $basis / $inRange * $usdRate, 2) : 0.0)
             : round($commissionFc * $realised['rate'], 2);
+        $override = $fixedRate !== null && $fixedRow['associate_override_fc'] !== null ? round((float) $fixedRow['associate_override_fc'], 2) : null;
+        if ($override !== null) {
+            $commissionFc = $override;
+            $commissionInr = round($override * $fixedRate, 2);
+        }
         $fullyPaidOn = IncentiveService::fullyPaidOn($orderId);
         $state = $settle['unpaid'] ? 'unpaid' : ($fullyPaidOn !== null ? 'paid' : 'awaiting');
         $dueOn = $fullyPaidOn !== null ? self::dueOn($fullyPaidOn, $set) : null;
@@ -446,6 +459,8 @@ final class AssociateCommission
             'counts' => $counts, 'threshold_inr' => $set['threshold_inr'],
             'counting_number' => $counts ? self::countingOrders((int) $a['id'], $orderId) + 1 : null,
             'gst_pct' => $set['gst_pct'],
+            'fixed' => $fixedRate !== null, 'fixed_at' => $fixedRate !== null ? (string) $fixedRow['associate_fixed_at'] : null, 'fixed_rate' => $fixedRate,
+            'override' => $override !== null, 'override_reason' => $override !== null ? (string) $fixedRow['associate_override_reason'] : null,
         ];
     }
 

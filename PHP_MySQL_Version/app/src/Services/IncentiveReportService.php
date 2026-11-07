@@ -219,7 +219,8 @@ final class IncentiveReportService
                 'kept_not_eligible_inr' => $ne, 'kept_capped_inr' => $cap, 'kept_only' => $p['amount'] <= 0];
         }
         $a = $calc['associate'];
-        if ($a !== null && ($a['state'] ?? '') !== 'unpaid' && (float) $a['amount_inr'] > 0) {
+        // D-264: a commission fixed at full payment already has its payout row (shown with the locked rows).
+        if ($a !== null && empty($a['fixed']) && ($a['state'] ?? '') !== 'unpaid' && (float) $a['amount_inr'] > 0) {
             $rows[] = $base + ['payee_kind' => 'associate', 'user_id' => null, 'associate_id' => (int) $a['id'], 'payee' => (string) $a['name'],
                 'role' => 'Associate commission', 'amount_inr' => round((float) $a['amount_inr'], 2),
                 'due_on' => $a['due_on'] ?? null, 'payout_run_on' => $a['payout_run_on'] ?? null,

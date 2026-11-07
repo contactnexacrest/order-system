@@ -682,12 +682,15 @@ final class IncentiveService
         $pdo->beginTransaction();
         try {
             $pdo->prepare('INSERT IGNORE INTO order_incentives (order_id, updated_by) VALUES (:id, :u)')->execute(['id' => $orderId, 'u' => $userId]);
-            $claim = $pdo->prepare('SELECT locked_at FROM order_incentives WHERE order_id = :id FOR UPDATE');
+            $claim = $pdo->prepare('SELECT locked_at, associate_fixed_at FROM order_incentives WHERE order_id = :id FOR UPDATE');
             $claim->execute(['id' => $orderId]);
+            $claimRow = $claim->fetch() ?: [];
+            // D-264: an associate commission fixed by itself at full payment stays as it is; the lock adds the team's part only.
+            $assocFixed = !empty($claimRow['associate_fixed_at']);
             // The same guard on the payouts: an order never gets a second set (one per order, payee and role).
-            $existing = $pdo->prepare('SELECT COUNT(*) FROM incentive_payouts WHERE order_id = :id AND clawback_of_payout_id IS NULL');
-            $existing->execute(['id' => $orderId]);
-            if (!empty($claim->fetchColumn()) || (int) $existing->fetchColumn() > 0) {
+            $existing = $pdo->prepare("SELECT COUNT(*) FROM incentive_payouts WHERE order_id = :id AND clawback_of_payout_id IS NULL AND (payee_kind = 'staff' OR :af = 0)");
+            $existing->execute(['id' => $orderId, 'af' => $assocFixed ? 1 : 0]);
+            if (!empty($claimRow['locked_at']) || (int) $existing->fetchColumn() > 0) {
                 $pdo->rollBack();
                 return false;
             }
@@ -712,7 +715,7 @@ final class IncentiveService
                     . ' — ' . self::ruleText($calc) . ', locked ' . \App\Helpers\Dates::short($today) . ', paid in the ' . \App\Helpers\Dates::short($staffRun) . ' payout run', $calc['team_total'], $paidOn, $userId);
             }
             $associateEntryId = null;
-            $a = $calc['associate'];
+            $a = $assocFixed ? null : $calc['associate'];
             // Owner decision D-245 P3: due N days after full payment, paid in the payout run that follows.
             $commissionSet = AssociateCommission::settings();
             $dueOn = $a !== null ? AssociateCommission::dueOn($paidOn, $commissionSet) : null;
@@ -722,14 +725,16 @@ final class IncentiveService
                 $payoutId = IncentiveRepository::addPayout(['order_id' => $orderId, 'payee_kind' => 'associate', 'associate_id' => $a['id'], 'role' => 'associate',
                     'amount_inr' => $a['amount_inr'], 'amount_fc' => $a['amount_fc'], 'currency_code' => $a['currency'], 'incentive_month' => substr((string) $runOn, 0, 7),
                     'payout_run_on' => $runOn, 'locked_on' => $today]);
-                Database::connection()->prepare('UPDATE incentive_payouts SET due_on = :d WHERE id = :id')->execute(['d' => $dueOn, 'id' => $payoutId]);
+                // D-264: the rate is fixed with it (only reached when the commission was not already fixed at full payment).
+                Database::connection()->prepare('UPDATE incentive_payouts SET due_on = :d, fixed_rate = :r, fixed_on = :f WHERE id = :id')
+                    ->execute(['d' => $dueOn, 'r' => round((float) $a['rate_inr'], 6), 'f' => $today, 'id' => $payoutId]);
                 // AS-3: a suspended associate's commission is held until the MD releases it.
                 if ($a['status'] === 'suspended') {
                     IncentiveRepository::holdPayout($payoutId, 'The associate is suspended.');
                 }
                 $associateEntryId = IncentiveRepository::addCostEntry($orderId, 'associate', self::associateCostDescription($a), $a['amount_inr'], $paidOn, $userId);
             }
-            IncentiveRepository::saveOrder($orderId, [
+            $teamFields = [
                 'locked_at' => date('Y-m-d H:i:s'),
                 'locked_by' => $userId,
                 'unlock_reason' => null,
@@ -740,6 +745,9 @@ final class IncentiveService
                 'team_by_share_inr' => $calc['team_by_share'] ?? $calc['team_total'],
                 'kept_not_eligible_inr' => $calc['kept_not_eligible'] ?? 0.0,
                 'kept_capped_inr' => $calc['kept_capped'] ?? 0.0,
+                'team_cost_entry_id' => $teamEntryId,
+            ];
+            IncentiveRepository::saveOrder($orderId, $assocFixed ? $teamFields : $teamFields + [
                 'associate_id' => $a['id'] ?? null,
                 'associate_order_number' => $a !== null && $a['counts'] ? $a['counting_number'] : null,
                 'associate_rate_pct' => $a['rate'] ?? null,
@@ -750,11 +758,12 @@ final class IncentiveService
                 'associate_basis_inr' => $a['basis_inr'] ?? null,
                 'associate_counts' => $a !== null ? ($a['counts'] ? 1 : 0) : null,
                 'associate_due_on' => $earned ? $dueOn : null,
-                'team_cost_entry_id' => $teamEntryId,
                 'associate_cost_entry_id' => $associateEntryId,
+                'associate_fixed_at' => $earned ? date('Y-m-d H:i:s') : null,
+                'associate_fixed_rate' => $earned ? round((float) $a['rate_inr'], 6) : null,
             ], $userId);
             IncentiveRepository::addHistory($orderId, 'lock', null, 'Team ₹' . number_format($calc['team_total'], 2)
-                . ($a !== null ? '; associate ' . ($earned ? '₹' . number_format((float) $a['amount_inr'], 2) : 'none') : '') . '; staff payout run ' . $staffRun, $note, $userId);
+                . ($assocFixed ? '; associate already fixed at full payment' : ($a !== null ? '; associate ' . ($earned ? '₹' . number_format((float) $a['amount_inr'], 2) : 'none') : '')) . '; staff payout run ' . $staffRun, $note, $userId);
             $pdo->commit();
         } catch (\Throwable $e) {
             $pdo->rollBack();
@@ -832,8 +841,20 @@ final class IncentiveService
             $pdo->rollBack();
             return 'Part of this order\'s incentive is already paid, so it can no longer be unlocked.';
         }
-        IncentiveRepository::deleteOrderPayouts($orderId);
         IncentiveRepository::deleteOrderKept($orderId);
+        if (!empty($row['associate_fixed_at']) && empty($row['associate_cost_entry_id']) === false && self::associateFixedBeforeLock($orderId)) {
+            // D-264: the associate's commission was fixed by itself at full payment — unlocking the team incentive leaves it as it is.
+            $pdo->prepare("DELETE FROM incentive_payouts WHERE order_id = :id AND payee_kind = 'staff' AND status <> 'paid'")->execute(['id' => $orderId]);
+            $pdo->prepare("DELETE FROM order_cost_entries WHERE order_id = :id AND incentive_kind = 'team'")->execute(['id' => $orderId]);
+            IncentiveRepository::saveOrder($orderId, [
+                'locked_at' => null, 'locked_by' => null, 'unlock_reason' => $reason, 'incentive_month' => null, 'profit_basis_inr' => null, 'team_total_inr' => null,
+                'team_by_share_inr' => null, 'kept_not_eligible_inr' => null, 'kept_capped_inr' => null, 'team_cost_entry_id' => null,
+            ], $userId);
+            IncentiveRepository::addHistory($orderId, 'unlock', 'Locked ' . \App\Helpers\Dates::short(substr((string) $row['locked_at'], 0, 10)) . ', team ₹' . number_format((float) $row['team_total_inr'], 2), 'Open (the associate\'s fixed commission is kept)', $reason, $userId);
+            $pdo->commit();
+            return null;
+        }
+        IncentiveRepository::deleteOrderPayouts($orderId);
         $pdo->prepare('DELETE FROM order_cost_entries WHERE order_id = :id AND incentive_kind IS NOT NULL')->execute(['id' => $orderId]);
         IncentiveRepository::saveOrder($orderId, [
             'locked_at' => null, 'locked_by' => null, 'unlock_reason' => $reason, 'fully_paid_on' => null, 'incentive_month' => null, 'profit_basis_inr' => null, 'team_total_inr' => null,
@@ -841,11 +862,20 @@ final class IncentiveService
             'associate_id' => null, 'associate_order_number' => null, 'associate_rate_pct' => null,
             'associate_amount_fc' => null, 'associate_currency' => null, 'associate_amount_inr' => null,
             'associate_basis_fc' => null, 'associate_basis_inr' => null, 'associate_counts' => null, 'associate_due_on' => null,
-            'team_cost_entry_id' => null, 'associate_cost_entry_id' => null,
+            'team_cost_entry_id' => null, 'associate_cost_entry_id' => null, 'associate_fixed_at' => null, 'associate_fixed_rate' => null,
+            'associate_override_fc' => null, 'associate_override_reason' => null,
         ], $userId);
         IncentiveRepository::addHistory($orderId, 'unlock', 'Locked ' . \App\Helpers\Dates::short(substr((string) $row['locked_at'], 0, 10)) . ', team ₹' . number_format((float) $row['team_total_inr'], 2), 'Open', $reason, $userId);
         $pdo->commit();
         return null;
+    }
+
+    /** D-264: whether the associate's commission was fixed by itself at full payment (before the MD locked the team incentive). */
+    private static function associateFixedBeforeLock(int $orderId): bool
+    {
+        $stmt = Database::connection()->prepare("SELECT COUNT(*) FROM order_incentive_history WHERE order_id = :o AND action = 'associate_fixed'");
+        $stmt->execute(['o' => $orderId]);
+        return (int) $stmt->fetchColumn() > 0;
     }
 
     /**

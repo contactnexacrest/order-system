@@ -1505,6 +1505,20 @@ async function show(req, res) {
       // off, for an associate's commission; D-245 P4: also for the MD, who may set an incentive by hand.
       incentiveProgramOn: !!(await incentiveService.settings()).enabled,
     };
+    // D-264: the associate's commission, fixed by itself when the buyer paid in full.
+    const fixedRow = incentiveView.incentiveRow;
+    if (fixedRow && fixedRow.associate_fixed_at) {
+      const ac = require('../services/associateCommission');
+      const ap = incentiveView.incentivePayouts.find((x) => x.payee_kind === 'associate' && (x.clawback_of_payout_id === null || x.clawback_of_payout_id === undefined)) || null;
+      const claim = !!(ap && ap.due_on) && (await ac.settings()).claim_hold && await ac.claimOpen(orderId, String(ap.due_on).slice(0, 10));
+      incentiveView.associateFixed = {
+        currency: String(fixedRow.associate_currency), amount_fc: Number(fixedRow.associate_amount_fc), amount_inr: Number(fixedRow.associate_amount_inr),
+        rate: Number(fixedRow.associate_fixed_rate), fixed_on: String(fixedRow.associate_fixed_at).slice(0, 10),
+        label: ap ? require('../repositories/associatePortalRepository').payoutLabel(ap, claim, String(ap.incentive_month || '')) : null,
+        override_reason: fixedRow.associate_override_fc !== null && fixedRow.associate_override_fc !== undefined ? String(fixedRow.associate_override_reason || '') : null,
+        canChange: !!ap && ap.status !== 'paid',
+      };
+    }
   }
   const incRow = incentiveView.incentiveRow;
   const showIncentiveStep = incentiveSee && (!!incentiveView.incentiveProgramOn
@@ -2484,6 +2498,7 @@ async function clearAdvancePayment(req, res) {
 
   await orderPaymentStatusRepository.markAdvanceCleared(orderId, clearedAt, user.id);
   const shortNote = partCheck.short ? ` ${await partPaymentService.recordShortfall(orderId, 'advance', null, partCheck.short, user)}` : '';
+  await require('../services/associatePayoutService').afterPaymentChange(orderId, user.id); // D-264: fixed by itself once the buyer has paid in full
   await orderPaymentStatusRepository.setBalanceAmount(orderId, balanceAmount, balanceDueDate);
   // External QA report L-23: advance payment clearing was never audit-logged.
   await auditLogRepository.log(user.id, 'ADVANCE_PAYMENT_CLEARED', 'order_payment_status', orderId, 'advance_cleared_at', null, clearedAt);
@@ -3513,6 +3528,7 @@ async function clearFreightPayment(req, res) {
   const clearedAt = str(req.body.freight_cleared_at) || todayYmd();
   await orderPaymentStatusRepository.markFreightCleared(orderId, clearedAt, user.id);
   const shortNote = partCheck.short ? ` ${await partPaymentService.recordShortfall(orderId, 'freight', null, partCheck.short, user)}` : '';
+  await require('../services/associatePayoutService').afterPaymentChange(orderId, user.id); // D-264: fixed by itself once the buyer has paid in full
   await stageGateService.passAndUnlockNext(orderId, 6, user.id);
   flash.set(req, 'success', `Freight payment cleared. Stage 7 (Packing & BL Instruction) unlocked.${shortNote}`);
   res.redirect(`/orders/${orderId}`);
@@ -4159,6 +4175,7 @@ async function clearBalancePayment(req, res) {
   const clearedAt = str(req.body.balance_cleared_at) || todayYmd();
   await orderPaymentStatusRepository.markBalanceCleared(orderId, clearedAt, user.id);
   const shortNote = partCheck.short ? ` ${await partPaymentService.recordShortfall(orderId, 'balance', null, partCheck.short, user)}` : '';
+  await require('../services/associatePayoutService').afterPaymentChange(orderId, user.id); // D-264: fixed by itself once the buyer has paid in full
   // External QA report L-23: balance payment clearing was never audit-logged.
   await auditLogRepository.log(user.id, 'BALANCE_PAYMENT_CLEARED', 'order_payment_status', orderId, 'balance_cleared_at', null, clearedAt);
   if (early) {

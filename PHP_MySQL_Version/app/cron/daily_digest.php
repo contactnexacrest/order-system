@@ -20,5 +20,8 @@ $reminders = \App\Services\AssociateService::dailyReminders();
 echo "Associate reminders: {$reminders} sent.\n";
 
 // Owner decision D-245 P4: N days before each payout run, remind the MD of orders ready to lock but not locked.
+// D-264: associate commission fixed at full payment (catch-up), held / released for buyer claims, worked out again after a settlement, small abroad amounts carried.
+$associatePayouts = \App\Services\AssociatePayoutService::daily();
+echo 'Associate commission: ' . json_encode($associatePayouts) . "\n";
 $lockReminders = \App\Services\IncentiveService::lockReminders();
 echo "Incentive lock reminders: {$lockReminders} sent.\n";

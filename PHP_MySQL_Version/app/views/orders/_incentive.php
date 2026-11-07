@@ -31,6 +31,7 @@ $__rule = $__c['rule'];
   <summary><h2>Step 12d &middot; Team Incentive</h2>
     <span class="fin-sub-summary"><?= $__locked ? $__money((float) $__inc['team_total_inr']) : $__money($__c['team_total']) ?> · <?= htmlspecialchars($__stateText[$__state]) ?></span></summary>
   <p class="muted small">Only the MD, the ED and people with "Manage team incentives" see this box<?= empty($incentiveCanEdit) ? ' (read-only for you — only the MD changes or locks it)' : '' ?>. The team sees only their own amounts, once the order is locked.<?= !$__teamOn ? ' The team incentive program is off: no global incentive — the MD may still set one by hand for this order.' : '' ?></p>
+  <?php if ($__inc !== null && !empty($__inc['associate_fixed_at'])) { require __DIR__ . '/_associate_fixed.php'; } // D-264 ?>
   <p><span class="badge <?= $__stateClass[$__state] ?>"><?= htmlspecialchars($__stateText[$__state]) ?></span>
     <?php if ($__state === 'open'): ?><small class="muted"><?= htmlspecialchars((string) IncentiveService::readyReason($__oid)) ?></small><?php endif; ?></p>
 

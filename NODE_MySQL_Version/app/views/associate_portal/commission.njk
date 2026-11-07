@@ -4,16 +4,19 @@
   <h1>My commission</h1>
   {% if access.commission %}{# D-261 #}
   {% if not print and access.commission_statement %}<p><a class="btn-sm btn-secondary" href="/associate/commission?format=csv">Statement (CSV)</a> <a class="btn-sm btn-secondary" href="/associate/commission?print=1" target="_blank" rel="noopener">Printable statement</a></p>{% endif %}
-  <p>Earned in the last {{ totals.months }} months: <b>₹{{ totals.earned | money }}</b> · Paid in the last {{ totals.months }} months: <b>₹{{ totals.paid | money }}</b> · Waiting to be paid: <b>₹{{ totals.waiting | money }}</b>{% if totals.held > 0 %} · On hold: <b>₹{{ totals.held | money }}</b>{% endif %}</p>
+  {# D-264: the order currency is the figure every associate sees; rupees only for an associate in India, once fixed. #}
+  {% if not print %}<div class="alert alert-info" data-how-fixed><b>{{ howFixed.title }}</b><br>{{ howFixed.text }}</div>{% endif %}
+  <p>Earned in the last {{ totals.months }} months: <b>{{ totalsText.earned }}</b> · Paid in the last {{ totals.months }} months: <b>{{ totalsText.paid }}</b> · Waiting to be paid: <b>{{ totalsText.waiting }}</b>{% if totals.held > 0 %} · On hold: <b>{{ totalsText.held }}</b>{% endif %}</p>
   <p class="muted small" data-commission-period>This shows the commission of the last {{ totals.months }} months, and any commission still waiting to be paid.</p>
   <p class="muted small">Each commission is paid in the incentive month shown, against your invoice. Upload your invoice for each line below. Payments go only to your verified bank account.</p>
   <table class="list">
     <tr><th>Month</th><th>Order</th><th>Client</th><th>Amount</th><th>Status</th><th>Paid</th>{% if not print %}<th>Your invoice</th>{% endif %}</tr>
     {% for p in payouts %}{% set inv = invoiceByPayout[p.id] %}
       <tr><td>{{ p.month_label }}</td><td>{{ p.order_reference }}{% if p.note %}<br><small class="muted">{{ p.note }}</small>{% endif %}</td><td>{{ p.company_legal_name }}</td>
-        <td>{% if p.amount_fc !== null and p.amount_fc !== undefined %}{{ p.currency_code }} {{ p.amount_fc | money }}<br>{% endif %}<small>₹{{ p.amount_inr | money }}</small></td>
-        <td>{% if p.status == 'due' %}{{ 'To be deducted' if (p.amount_inr | float) < 0 else 'Waiting' }}{% elif p.status == 'paid' %}Paid{% elif p.status == 'held' %}On hold{% else %}{{ p.status }}{% endif %}{% if p.hold_reason %}<br><small>{{ p.hold_reason }}</small>{% endif %}</td>
-        <td>{% if p.status == 'paid' %}{{ p.paid_on | shortDate }}{% if (p.tds_inr | float) > 0 %}<br><small data-tds-breakdown>Gross ₹{{ p.gross_inr | money }} · TDS ₹{{ p.tds_inr | money }}{% if p.tds_section %} (u/s {{ p.tds_section }}{% if p.tdsRateLabel %} at {{ p.tdsRateLabel }}{% endif %}){% endif %}</small><br>Net paid ₹{{ p.paid_inr | money }}{% else %} · ₹{{ p.paid_inr | money }}{% endif %}{% if p.paid_reference %}<br><small>Ref {{ p.paid_reference }}</small>{% endif %}{% else %}—{% endif %}</td>
+        <td>{% if p.amount_fc !== null and p.amount_fc !== undefined %}{{ p.currency_code }} {{ p.amount_fc | money }}{% endif %}{% if p.fixed_rate !== null and p.fixed_rate !== undefined %} <span class="badge badge-active">Fixed</span>{% endif %}
+          {% if p.fixed_line %}<br><small data-fixed-rupees>{{ p.fixed_line }}</small>{% elif isIndia and (p.fixed_rate === null or p.fixed_rate === undefined) %}<br><small>₹{{ p.amount_inr | money }}</small>{% endif %}</td>
+        <td>{{ p.status_label }}</td>
+        <td>{% if p.status == 'paid' and not isIndia %}{{ p.paid_on | shortDate }} · {{ p.currency_code }} {{ p.amount_fc | money }} sent{% if p.paid_reference %}<br><small>Ref {{ p.paid_reference }}</small>{% endif %}{% elif p.status == 'paid' %}{{ p.paid_on | shortDate }}{% if (p.tds_inr | float) > 0 %}<br><small data-tds-breakdown>Gross ₹{{ p.gross_inr | money }} · TDS ₹{{ p.tds_inr | money }}{% if p.tds_section %} (u/s {{ p.tds_section }}{% if p.tdsRateLabel %} at {{ p.tdsRateLabel }}{% endif %}){% endif %}</small><br>Net paid ₹{{ p.paid_inr | money }}{% else %} · ₹{{ p.paid_inr | money }}{% endif %}{% if p.paid_reference %}<br><small>Ref {{ p.paid_reference }}</small>{% endif %}{% else %}—{% endif %}</td>
         {% if not print %}<td>
           {% if inv %}<a href="/associate/documents/{{ inv.id }}">{{ inv.reference or 'Invoice' }}</a>
           {% elif (p.amount_inr | float) > 0 and p.status != 'paid' %}

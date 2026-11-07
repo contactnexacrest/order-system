@@ -395,6 +395,16 @@ async function recalculate(req, res) {
   return back(req, res, orderId, 'success', 'Incentive unlocked. Change it, then lock it again.');
 }
 
+/** D-264: the MD corrects a fixed associate commission before it is paid, with a reason. */
+async function changeAssociateCommission(req, res) {
+  const orderId = parseInt(req.params.id, 10);
+  if (!canManagePricing(req)) return back(req, res, orderId, 'error', 'Only the MD can change an associate\'s commission.');
+  const body = req.body || {};
+  const error = await require('../services/associatePayoutService').changeCommission(orderId, String(body.associate_amount_fc ?? '').trim(), String(body.associate_change_reason || ''), req.user);
+  if (error !== null) return back(req, res, orderId, 'error', error);
+  return back(req, res, orderId, 'success', 'Commission changed at the same fixed rate. The associate has been told.');
+}
+
 /** Owner decision D-245 P4: the orders ready to lock (buyer fully paid, no claim open). */
 async function ready(req, res) {
   const rows = [];
@@ -455,10 +465,11 @@ async function payouts(req, res) {
   const rows = await incentiveRepository.payoutsForMonth(month);
   if ((req.query || {}).format === 'csv') {
     csv.stream(res, `incentives-${month}.csv`,
-      ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)', 'TDS section', 'TDS rate %', 'TDS reason'],
+      ['Person', 'Kind', 'Order', 'Role', 'Amount (INR)', 'Amount (currency)', 'Currency', 'Status', 'Paid on', 'Paid (INR)', 'TDS (INR)', 'TDS section', 'TDS rate %', 'TDS reason', 'Fixed at (INR per unit)', 'Bank debited (INR)', 'Bank charges (INR)', 'Payout difference (INR)'],
       rows.map((r) => [r.user_name ?? r.associate_name, r.payee_kind, r.buyer_inquiry_ref || r.order_reference,
         r.payee_kind === 'associate' ? 'Associate (agreement)' : incentiveRepository.roleLabel(r.role),
-        r.amount_inr, r.amount_fc, r.currency_code, r.status, r.paid_on, r.paid_inr, r.tds_inr, r.tds_section ?? null, r.tds_rate ?? null, r.tds_reason ?? null]));
+        r.amount_inr, r.amount_fc, r.currency_code, r.status, r.paid_on, r.paid_inr, r.tds_inr, r.tds_section ?? null, r.tds_rate ?? null, r.tds_reason ?? null,
+        r.fixed_rate ?? null, r.bank_debited_inr ?? null, r.bank_charges_inr ?? null, r.payout_difference_inr ?? null]));
     return;
   }
   let staffTotal = 0;
@@ -485,7 +496,11 @@ async function payouts(req, res) {
     }
   }
   const tdsSettings = await associateTds.settings();
+  // D-264: what paying associates cost against their fixed commission — a company cost of the month, not on the orders.
+  const payoutCosts = await require('../services/associatePayoutService').payoutCostsForMonth(month);
   res.renderView('incentives/payouts', {
+    payoutCosts,
+    payoutCostsTotal: Math.round(payoutCosts.reduce((t, x) => t + Number(x.payout_difference_inr), 0) * 100) / 100,
     paidVia: incentiveRepository.PAID_VIA,
     staffTotal,
     associateInr,
@@ -530,6 +545,7 @@ async function markPaid(req, res) {
   let skipped = 0;
   let skippedDocs = 0;
   let skippedDue = 0;
+  let skippedAbroad = 0;
   for (const id of ids) {
     const payout = await incentiveRepository.findPayout(id);
     if (!payout || payout.status !== 'due' || Number(payout.amount_inr) < 0) {
@@ -616,9 +632,40 @@ async function markPaid(req, res) {
       res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
       return;
     }
+    // D-264: what the payment really cost — abroad, the rupees the bank debited (required) and the charges;
+    // in India, the bank charges (optional). Never deducted from the commission.
+    let bankDebited = null;
+    let bankCharges = null;
+    if (payout.payee_kind === 'associate') {
+      const payoutService = require('../services/associatePayoutService');
+      const india = payoutService.isIndia(await require('../repositories/associateRepository').find(Number(payout.associate_id)));
+      const chargesRaw = single ? String(body.bank_charges_inr ?? '').trim() : '';
+      if (chargesRaw !== '' && (!Number.isFinite(Number(chargesRaw)) || Number(chargesRaw) < 0 || Number(chargesRaw) > 10000000)) {
+        flash.set(req, 'error', 'Enter the bank charges in rupees (0 or more), or leave them empty.');
+        res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+        return;
+      }
+      bankCharges = chargesRaw !== '' ? Math.round(Number(chargesRaw) * 100) / 100 : null;
+      if (!india) {
+        const debitedRaw = single ? String(body.bank_debited_inr ?? '').trim() : '';
+        if (debitedRaw === '' || !Number.isFinite(Number(debitedRaw)) || Number(debitedRaw) <= 0 || Number(debitedRaw) > 1000000000) {
+          if (single) {
+            flash.set(req, 'error', 'Enter the rupees the bank debited for this transfer abroad (from the bank advice).');
+            res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
+            return;
+          }
+          skippedAbroad++;
+          continue;
+        }
+        bankDebited = Math.round(Number(debitedRaw) * 100) / 100;
+      }
+    }
     // QA Round 6, R6-N17: a second click records and logs nothing more.
     if (!(await incentiveService.markPaid(id, paidOn, paidInr, tds, req.user.id, paidVia, paidReference))) {
       continue;
+    }
+    if (payout.payee_kind === 'associate') {
+      await require('../services/associatePayoutService').recordPaymentCosts(id, bankDebited, bankCharges);
     }
     await auditLogRepository.log(req.user.id, 'INCENTIVE_PAID', 'incentive_payouts', id, 'status', 'due', 'paid');
     if (tdsCalc) {
@@ -649,10 +696,11 @@ async function markPaid(req, res) {
   // QA Round 6, R6-N11: nothing selected (or all already paid) is not a success.
   const dueNote = skippedDue ? ` ${skippedDue} associate payout(s) skipped: not due yet, or held while a buyer claim is open.` : '';
   const docsNote = skippedDocs ? ` ${skippedDocs} payout(s) to associates abroad skipped: TRC / Form 10F / no-PE / Form 15CA${(await associateTds.settings()).cb_required ? '/15CB' : ''} not yet on file — pay them one by one.` : '';
+  const abroadNote = skippedAbroad ? ` ${skippedAbroad} payout(s) to associates abroad skipped: record each one with the rupees the bank debited.` : '';
   if (count === 0) {
-    flash.set(req, 'warning', `Nothing was recorded — no payout due for payment was selected.${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}${dueNote}${docsNote}`);
+    flash.set(req, 'warning', `Nothing was recorded — no payout due for payment was selected.${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}${dueNote}${docsNote}${abroadNote}`);
   } else {
-    flash.set(req, 'success', `${count === 1 ? 'Payment recorded.' : `${count} payments recorded.`}${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}${docsNote}`);
+    flash.set(req, 'success', `${count === 1 ? 'Payment recorded.' : `${count} payments recorded.`}${skipped ? ` ${skipped} associate payout(s) skipped: no verified bank account yet.` : ''}${docsNote}${abroadNote}`);
   }
   res.redirect(`/incentives/payouts?month=${encodeURIComponent(month)}`);
 }
@@ -688,6 +736,7 @@ async function storeRemittanceForms(req, payout) {
 }
 
 module.exports = {
+  changeAssociateCommission,
   settings,
   saveSettings,
   deleteRole,

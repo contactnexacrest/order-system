@@ -6174,3 +6174,17 @@ ALTER TABLE merchant_deals
 -- Domestic Trade / Import: the company details frozen when the tax invoice / import PO is fixed.
 ALTER TABLE domestic_orders ADD COLUMN company_snapshot_json JSON NULL;
 ALTER TABLE import_shipments ADD COLUMN company_snapshot_json JSON NULL;
+-- Owner decision D-264 (7 Nov 2026): an associate's commission is fixed automatically when the buyer
+-- has paid in full — in rupees at the rate of all the buyer's payments — and never changes afterwards
+-- (an MD correction before payment is kept apart with its reason). The payout records what it cost to pay.
+ALTER TABLE order_incentives
+  ADD COLUMN associate_fixed_at DATETIME NULL,
+  ADD COLUMN associate_fixed_rate DECIMAL(14,6) NULL,
+  ADD COLUMN associate_override_fc DECIMAL(14,2) NULL,
+  ADD COLUMN associate_override_reason VARCHAR(500) NULL;
+ALTER TABLE incentive_payouts
+  ADD COLUMN fixed_rate DECIMAL(14,6) NULL,
+  ADD COLUMN fixed_on DATE NULL,
+  ADD COLUMN bank_debited_inr DECIMAL(14,2) NULL,
+  ADD COLUMN bank_charges_inr DECIMAL(14,2) NULL,
+  ADD COLUMN payout_difference_inr DECIMAL(14,2) NULL;

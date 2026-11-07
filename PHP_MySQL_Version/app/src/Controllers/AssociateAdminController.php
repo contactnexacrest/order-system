@@ -182,8 +182,11 @@ final class AssociateAdminController
         if (!in_array($data['based_in'], ['india', 'abroad'], true)) {
             $errors[] = 'Choose whether the associate is in India or abroad.';
         }
-        if (!preg_match('/^[A-Z]{3}$/', (string) $data['currency_code'])) {
-            $errors[] = 'Choose the currency the associate is paid in.';
+        // D-264: an associate in India is always paid in rupees; one abroad in an active trading currency (USD, EUR, GBP …).
+        if ($data['based_in'] === 'india') {
+            $data['currency_code'] = 'INR';
+        } elseif (!in_array((string) $data['currency_code'], self::abroadCurrencies(), true)) {
+            $errors[] = 'Choose the currency the associate abroad is paid in (' . implode(', ', self::abroadCurrencies()) . ').';
         }
         if ($data['email'] !== null && (!filter_var($data['email'], FILTER_VALIDATE_EMAIL) || mb_strlen((string) $data['email']) > 190)) {
             $errors[] = 'Enter a valid email address, or leave it empty.';
@@ -876,6 +879,12 @@ final class AssociateAdminController
      * threshold, buyer registration, GST — the MD changes these (manage_pricing); TDS and
      * the bank waiting days as before. Commission levels and the ladder: Admin → Pricing.
      */
+    /** @return list<string> D-264: the currencies an associate abroad can be paid in — the active currencies other than INR. */
+    public static function abroadCurrencies(): array
+    {
+        return array_values(array_filter(array_map(static fn (array $c): string => (string) ($c['code'] ?? ''), \App\Repositories\LookupRepository::currencies()), static fn (string $c): bool => $c !== '' && $c !== 'INR'));
+    }
+
     public function ladder(array $params): void
     {
         View::render('associates/ladder', [
@@ -908,6 +917,10 @@ final class AssociateAdminController
             $months = filter_var($_POST['associate_protection_months'] ?? '', FILTER_VALIDATE_INT);
             $gst = filter_var($_POST['associate_gst_pct'] ?? '', FILTER_VALIDATE_FLOAT);
             $portalMonths = filter_var($_POST['associate_portal_commission_months'] ?? '', FILTER_VALIDATE_INT);
+            // D-264: left as they are when not on the form.
+            $current = \App\Services\AssociateCommission::settings();
+            $abroadCharges = (string) ($_POST['associate_abroad_charges'] ?? $current['abroad_charges']);
+            $abroadMin = filter_var($_POST['associate_abroad_min_payout_usd'] ?? $current['abroad_min_usd'], FILTER_VALIDATE_FLOAT);
             $error = match (true) {
                 $days === false || $days < 0 || $days > 365 => 'Enter the days after full payment as 0 to 365.',
                 !in_array($run, ['monthly', 'weekly'], true) => 'Choose a monthly or a weekly payout run.',
@@ -916,6 +929,8 @@ final class AssociateAdminController
                 $months === false || $months < 1 || $months > 60 => 'Enter the buyer registration period as 1 to 60 months.',
                 $gst === false || $gst < 0 || $gst > 28 => 'Enter the GST on commission as 0 to 28 %.',
                 !in_array($portalMonths, \App\Services\AssociateCommission::PORTAL_MONTH_CHOICES, true) => 'Choose the commission period shown to associates: 3, 6, 9, 12, 15, 18 or 24 months.',
+                !in_array($abroadCharges, ['OUR', 'SHA'], true) => 'Choose who pays the bank charges of a transfer abroad (OUR or SHA).',
+                $abroadMin === false || $abroadMin < 0 || $abroadMin > 100000 => 'Enter the minimum payout abroad in US dollars (0 to 100,000).',
                 default => null,
             };
             if ($error !== null) {
@@ -931,6 +946,8 @@ final class AssociateAdminController
             $values['associate_protection_months'] = (string) $months;
             $values['associate_gst_pct'] = number_format($gst, 2, '.', '');
             $values['associate_portal_commission_months'] = (string) $portalMonths;
+            $values['associate_abroad_charges'] = $abroadCharges;
+            $values['associate_abroad_min_payout_usd'] = number_format((float) $abroadMin, 2, '.', '');
             // D-256: the Zoho Books GST tax booked on an associate's commission bill when GST is paid on top.
             $gstTax = trim((string) ($_POST['zoho_gst_commission_tax_id'] ?? ''));
             if ($gstTax !== '' && preg_match('/^[0-9A-Za-z_\-]{1,40}$/', $gstTax) !== 1) {

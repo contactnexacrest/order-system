@@ -1160,6 +1160,8 @@ app.post('/orders/:id/incentive/people', requireAuth, requirePermission('manage_
 app.post('/orders/:id/incentive/recalculate', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.recalculate));
 // Owner decision D-245 P4: the MD locks an order's incentive (nothing locks by itself), one or all ready; unlock (above) needs a reason.
 app.post('/orders/:id/incentive/lock', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.lock));
+// D-264: the MD corrects a fixed associate commission before it is paid (reason, audited, associate told).
+app.post('/orders/:id/incentive/associate-commission', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.changeAssociateCommission));
 app.get('/incentives/ready', requireAuth, requirePermission('manage_incentives'), asyncHandler(incentiveController.ready));
 app.post('/incentives/ready/lock-all', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.lockAll));
 app.post('/incentives/roles/:key/delete', requireAuth, requirePermission('manage_incentives'), verifyCsrf, asyncHandler(incentiveController.deleteRole));

@@ -244,6 +244,7 @@ final class PaymentMilestoneController
         PaymentMilestoneRepository::markCleared((int) $m['id'], $clearedOn, $userId);
         AuditLogRepository::log($userId, 'MILESTONE_PAYMENT_CLEARED', 'order_payment_milestones', (int) $m['id'], 'cleared_on', null, $clearedOn);
         $shortNote = $partCheck['short'] !== null ? ' ' . \App\Services\PartPaymentService::recordShortfall($orderId, 'milestone', $m, $partCheck['short'], $user) : '';
+        \App\Services\AssociatePayoutService::afterPaymentChange($orderId, $userId); // D-264
         Flash::set('success', "Milestone {$m['seq']} cleared. It goes to Zoho Books with the next revenue sync." . $shortNote);
         self::back($orderId);
     }

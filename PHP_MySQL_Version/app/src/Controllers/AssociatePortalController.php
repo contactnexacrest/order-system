@@ -313,9 +313,16 @@ final class AssociatePortalController
         $payouts = AssociatePortalRepository::portalPayouts($id, $months);
         if (($_GET['format'] ?? '') === 'csv') {
             // QA Round 8, R8-N03: through the shared CSV writer, so a cell like =HYPERLINK(...) is plain text in Excel.
+            // D-264: the order currency for every associate; rupees (fixed amount, TDS, paid) only for an associate in India.
+            if (\App\Services\AssociatePayoutService::isIndia(self::me())) {
+                \App\Helpers\Csv::send('commission-statement.csv',
+                    ['Incentive month', 'Order', 'Client', 'Commission (order currency)', 'Currency', 'You are paid (INR, fixed)', 'Fixed at (INR per unit)', 'Fixed on', 'Status', 'Paid on', 'Paid INR', 'TDS INR', 'Reference', 'Note'],
+                    array_map(static fn (array $p): array => [$p['incentive_month'], $p['order_reference'], $p['company_legal_name'], $p['amount_fc'], $p['currency_code'], $p['amount_inr'], $p['fixed_rate'], $p['fixed_on'], $p['status'], $p['paid_on'], $p['paid_inr'], $p['tds_inr'], $p['paid_reference'] ?? '', $p['note'] ?? $p['hold_reason'] ?? ''], $payouts));
+                return;
+            }
             \App\Helpers\Csv::send('commission-statement.csv',
-                ['Incentive month', 'Order', 'Client', 'Amount (order currency)', 'Currency', 'Amount INR', 'Status', 'Paid on', 'Paid INR', 'TDS INR', 'Reference', 'Note'],
-                array_map(static fn (array $p): array => [$p['incentive_month'], $p['order_reference'], $p['company_legal_name'], $p['amount_fc'], $p['currency_code'], $p['amount_inr'], $p['status'], $p['paid_on'], $p['paid_inr'], $p['tds_inr'], $p['paid_reference'] ?? '', $p['note'] ?? $p['hold_reason'] ?? ''], $payouts));
+                ['Incentive month', 'Order', 'Client', 'Commission', 'Currency', 'Status', 'Paid on', 'Reference', 'Note'],
+                array_map(static fn (array $p): array => [$p['incentive_month'], $p['order_reference'], $p['company_legal_name'], $p['amount_fc'], $p['currency_code'], $p['status'], $p['paid_on'], $p['paid_reference'] ?? '', $p['note'] ?? $p['hold_reason'] ?? ''], $payouts));
             return;
         }
         self::render('commission', ['payouts' => $payouts, 'totals' => AssociatePortalRepository::totals($id, $months), 'print' => ($_GET['print'] ?? '') === '1',

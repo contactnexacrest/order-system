@@ -234,8 +234,14 @@ final class OrderProfitabilityService
         } else {
             $calc = IncentiveService::calculate($orderId, $base);
             $a = $calc['associate'];
-            $commission = ($a !== null && ($a['state'] ?? '') !== 'unpaid') ? round((float) $a['amount_inr'], 2) : 0.0;
-            $commissionState = $a !== null ? 'estimated' : null;
+            if ($row !== null && !empty($row['associate_fixed_at'])) {
+                // D-264: fixed by itself at full payment — the fixed amount (its cost line), never an estimate.
+                $commission = $lockedAssoc;
+                $commissionState = self::payoutState($orderId, 'associate', true);
+            } else {
+                $commission = ($a !== null && ($a['state'] ?? '') !== 'unpaid') ? round((float) $a['amount_inr'], 2) : 0.0;
+                $commissionState = $a !== null ? 'estimated' : null;
+            }
             $incentive = round((float) $calc['team_total'], 2);
             $incentiveState = 'estimated';
         }

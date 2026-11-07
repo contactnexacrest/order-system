@@ -191,7 +191,8 @@ async function estimatedRows(orderId) {
       kept_not_eligible_inr: ne, kept_capped_inr: cap, kept_only: Number(p.amount) <= 0 });
   }
   const a = calc.associate;
-  if (a && a.state !== 'unpaid' && Number(a.amount_inr) > 0) {
+  // D-264: a commission fixed at full payment already has its payout row (shown with the locked rows).
+  if (a && !a.fixed && a.state !== 'unpaid' && Number(a.amount_inr) > 0) {
     rows.push({ ...base, payee_kind: 'associate', user_id: null, associate_id: Number(a.id), payee: String(a.name),
       role: 'Associate commission', amount_inr: round2(a.amount_inr), due_on: ymd(a.due_on), payout_run_on: ymd(a.payout_run_on),
       kept_not_eligible_inr: 0, kept_capped_inr: 0 });

@@ -15,6 +15,8 @@ async function run() {
   // Owner decision 1 Nov 2026 (AS-5, guarantee 7): associates' protection and agreement reminders (30 and 7 days), expired links.
   result.associateReminders = await require('../services/associateService').dailyReminders();
   // Owner decision D-245 P4: N days before each payout run, remind the MD of orders ready to lock but not locked.
+  // D-264: associate commission fixed at full payment (catch-up), held / released for buyer claims, worked out again after a settlement, small abroad amounts carried.
+  result.associatePayouts = await require('../services/associatePayoutService').daily();
   result.incentiveLockReminders = await require('../services/incentiveService').lockReminders();
   return result;
 }

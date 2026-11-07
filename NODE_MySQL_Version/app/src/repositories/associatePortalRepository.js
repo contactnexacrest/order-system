@@ -69,7 +69,7 @@ async function cameVia(client) {
 async function orders(associateId, orderId = null) {
   let sql = `SELECT o.id, o.order_reference, o.status, o.created_at, o.client_id, sm.stage_number AS current_stage_number, o.buyer_po_received_on, o.associate_rate_pct, o.associate_rate_source,
                     c.company_legal_name, o.currency_code, oi.locked_at, oi.fully_paid_on, oi.associate_id AS paid_associate_id, oi.associate_amount_fc,
-                    oi.associate_rate_pct AS locked_rate, oi.associate_mode, oi.incentive_month
+                    oi.associate_rate_pct AS locked_rate, oi.associate_mode, oi.incentive_month, oi.associate_fixed_at
                FROM orders o JOIN clients c ON c.id = o.client_id
                LEFT JOIN stages_master sm ON sm.id = o.current_stage_id
                LEFT JOIN order_incentives oi ON oi.order_id = o.id
@@ -110,7 +110,8 @@ async function commission(associateId, o) {
   const orderRepository = require('./orderRepository');
   const none = (label) => ({ state: 'none', label, rate: null, source: null, amount: null, level: null, detail: null });
   if (['cancelled', 'lost'].includes(o.status)) return none('No commission — order cancelled');
-  if (o.locked_at) {
+  // D-264: fixed by itself when the buyer paid in full (or with the MD's lock, before D-264).
+  if (o.locked_at || o.associate_fixed_at) {
     if (Number(o.paid_associate_id || 0) !== Number(associateId)) return none(NONE_REPEAT);
     if (Number(o.associate_amount_fc) <= 0) return none('No commission — the buyer did not pay this order in full');
     const p = (await db.queryOne(
@@ -118,19 +119,18 @@ async function commission(associateId, o) {
       { o: o.id, a: associateId }
     )) || { status: 'due', paid_on: null, due_on: null, payout_run_on: null };
     const claim = !!p.due_on && (await associateCommission.settings()).claim_hold && await associateCommission.claimOpen(Number(o.id), p.due_on);
-    let label;
-    if (p.status === 'paid') label = `Paid on ${dates.short(String(p.paid_on))}`;
-    else if (p.status === 'held') label = 'On hold';
-    else if (claim) label = 'Earned — waiting while a buyer claim on the order is open';
-    else if (p.due_on) label = `Earned — due ${dates.short(String(p.due_on))}, paid in the ${dates.short(String(p.payout_run_on))} payout run`;
-    else label = `Earned — to be paid in the ${incentive().monthLabel(String(o.incentive_month))} payout`;
+    const label = payoutLabel(p, claim, String(o.incentive_month || ''));
     const order = await orderRepository.find(Number(o.id));
     const fixed = order ? associateCommission.fixedLevel(order, associateId) : null;
     const level = fixed ? associateCommission.levelLabel(fixed)
       : (o.locked_rate !== null && o.locked_rate !== undefined ? `${Number(o.locked_rate).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%` : null);
     return { state: p.status === 'paid' ? 'paid' : (p.status === 'held' || claim ? 'held' : 'earned'), label,
       rate: o.locked_rate !== null && o.locked_rate !== undefined ? Number(o.locked_rate) : null, source: o.associate_rate_source ?? null,
-      amount: Number(o.associate_amount_fc), level, detail: await associateCommission.forOrder(Number(o.id)) };
+      amount: Number(p.amount_fc !== undefined && p.amount_fc !== null ? p.amount_fc : o.associate_amount_fc), level, detail: await associateCommission.forOrder(Number(o.id)),
+      // D-264: what an associate in India is paid, fixed in rupees (never shown to an associate abroad).
+      fixed_inr: p.amount_inr !== undefined && p.amount_inr !== null ? Number(p.amount_inr) : null,
+      fixed_rate: p.fixed_rate !== undefined && p.fixed_rate !== null ? Number(p.fixed_rate) : null,
+      fixed_on: p.fixed_on || null, currency: String(o.currency_code) };
   }
   if ((o.associate_mode || 'auto') === 'no') return none('No commission on this order (decided by NexaCrest)');
   if ((o.associate_rate_source ?? null) === 'none') return none('No commission under your agreement');
@@ -142,6 +142,30 @@ async function commission(associateId, o) {
     : 'Not yet earned — waiting for the buyer\'s full payment';
   return { state: 'expected', label, rate: c.rate, source: o.associate_rate_source ?? null, amount: c.amount_fc,
     level: c.level_label + (c.level_fixed ? '' : ' (for now — fixed when the Proforma Invoice is issued)'), detail: c };
+}
+
+/**
+ * D-264: a fixed commission is "Fixed — due …" until its due date, then "Due — paid in the … payout run";
+ * held (a buyer claim, or by NexaCrest) or paid.
+ */
+function payoutLabel(p, claim, incentiveMonth = '', today = null) {
+  const t = today || new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+  const d = (v) => dates.short(String(v).slice(0, 10));
+  if (p.status === 'paid') return `Paid on ${d(p.paid_on)}`;
+  if (p.status === 'held') return 'On hold' + (p.hold_reason ? ` — ${p.hold_reason}` : '');
+  if (claim) return 'Fixed — waiting while a buyer claim on the order is open';
+  if (p.due_on && t < String(p.due_on).slice(0, 10)) return `Fixed — due ${d(p.due_on)}, paid in the ${d(p.payout_run_on)} payout run`;
+  if (p.payout_run_on) return `Due — paid in the ${d(p.payout_run_on)} payout run`;
+  return `Fixed — to be paid in the ${incentive().monthLabel(String(incentiveMonth))} payout`;
+}
+
+/** D-264: "USD 1,250.00" (several currencies joined with " + "; "USD 0.00" when there is nothing). */
+function fcText(byCurrency, def = 'USD') {
+  const parts = [];
+  for (const [cur, v] of Object.entries(byCurrency || {})) {
+    if (Math.abs(Number(v)) >= 0.005) parts.push(`${cur} ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  }
+  return parts.length ? parts.join(' + ') : `${def} 0.00`;
 }
 
 /** The associate's payouts (commission lines), newest first. */
@@ -180,16 +204,21 @@ async function totals(associateId, months = null, today = null) {
   if (months === null || months === undefined) months = require('../services/associateCommission').portalMonths(await require('./incentiveRepository').settings());
   const from = portalFromMonth(months, today);
   const t = { earned: 0, waiting: 0, paid: 0, held: 0 };
+  // D-264: the associate sees the order currency (USD) as the main figure — per currency.
+  const fc = { earned: {}, waiting: {}, paid: {}, held: {} };
+  const add = (m, cur, v) => { m[cur] = Math.round(((m[cur] || 0) + v) * 100) / 100; };
   for (const p of await payouts(associateId)) {
     const amount = Number(p.amount_inr);
-    if (String(p.incentive_month) >= from) t.earned += amount;
-    if (p.status === 'due') t.waiting += amount;
-    else if (p.status === 'held') t.held += amount;
-    else if (p.status === 'paid' && String(p.paid_on || '').slice(0, 7) >= from) t.paid += Number(p.paid_inr);
+    const cur = String(p.currency_code || 'INR');
+    const amountFc = p.amount_fc !== null && p.amount_fc !== undefined ? Number(p.amount_fc) : amount;
+    if (String(p.incentive_month) >= from) { t.earned += amount; add(fc.earned, cur, amountFc); }
+    if (p.status === 'due') { t.waiting += amount; add(fc.waiting, cur, amountFc); }
+    else if (p.status === 'held') { t.held += amount; add(fc.held, cur, amountFc); }
+    else if (p.status === 'paid' && String(p.paid_on || '').slice(0, 7) >= from) { t.paid += Number(p.paid_inr); add(fc.paid, cur, amountFc); }
   }
   for (const k of Object.keys(t)) t[k] = Math.round(t[k] * 100) / 100;
-  return { ...t, months };
+  return { ...t, months, fc };
 }
 
 module.exports = {
-  cameVia, stageLabel, clients, orders, commission, payouts, portalFromMonth, portalPayouts, totals };
+  cameVia, stageLabel, clients, orders, commission, payouts, portalFromMonth, portalPayouts, totals, payoutLabel, fcText };

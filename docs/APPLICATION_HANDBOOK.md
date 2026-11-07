@@ -2184,6 +2184,23 @@ the same filters, counts, fields, actions and money rules on both templates
     month, paid by payment date; commission still due or on hold always
     shows. Staff screens are unlimited (`AssociatePortalRepository::payouts`
     vs `portalPayouts` / `totals($id, $months)`).
+  - **Fixed at full payment (D-264, 7 Nov 2026):** when the buyer has paid in
+    full (last receipt cleared with its rupees recorded) `AssociatePayoutService::autoFix`
+    / `associatePayoutService.autoFix` fixes the commission in the order currency and in
+    rupees at the rate of all the buyer's payments (`order_incentives.associate_fixed_at`,
+    `associate_fixed_rate`; `incentive_payouts.fixed_rate`, `fixed_on`), creates the
+    payout, tells the associate and puts the fixed amount in the order's profit. Hooks:
+    after clearing advance / freight / balance / milestone and recording LC money; the
+    daily job (`daily_digest` / `dailyDigest`) catches up, holds / releases for buyer
+    claims, works settlements out again at the same fixed rate, and carries abroad
+    amounts below the minimum (default USD 100) to the next run. The MD may change the
+    amount before payment with a reason (`POST /orders/{id}/incentive/associate-commission`;
+    `associate_override_fc`). The MD's lock covers the team incentive only. The portal
+    shows the order currency; India adds one fixed-rupee line; abroad never rupees.
+    "Paid in": India always INR, abroad USD/EUR/GBP. Paying records `bank_debited_inr`
+    (abroad, required), `bank_charges_inr` and `payout_difference_inr` — "Associate
+    payout costs" of the month (Incentive Payouts), a company cost, not on the order;
+    not synced to Zoho yet.
   - **Bank details:** a change is a request; two different Finance people
     check and verify; 7-day wait before first use; encrypted, masked;
     payment only into a verified usable account.
@@ -3407,6 +3424,8 @@ Also in Pricing: commission levels (`commission_levels`) and ladder (`commission
 | `associate_counting_threshold_inr` | 500000 | 〃 |
 | `associate_gst_pct` | 18.00 | 〃 |
 | `associate_portal_commission_months` | 12 | 〃 — commission period shown to associates: 3, 6, 9, 12, 15, 18 or 24 months (D-263) |
+| `associate_abroad_charges` | OUR | 〃 — bank charges of a transfer abroad: OUR (NexaCrest pays its own and the intermediary bank's) or SHA (D-264) |
+| `associate_abroad_min_payout_usd` | 100 | 〃 — smallest payout abroad; less carries to the next run (D-264) |
 | `associate_protection_months` | 6 | 〃 (buyer registration) |
 | `associate_registration_link_days` | 7 | 〃 (D-253) |
 | `associate_code_changes_per_year` | 3 | 〃 (D-254) |

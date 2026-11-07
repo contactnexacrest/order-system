@@ -10,11 +10,14 @@
       <label>Name *<input type="text" name="name" required maxlength="150" value="{{ a0.name }}" placeholder="e.g. Full name as on PAN card"></label>
       <label>Based in *<select name="based_in" required><option value="india"{{ ' selected' if (a0.based_in or 'india') == 'india' else '' }}>India</option><option value="abroad"{{ ' selected' if a0.based_in == 'abroad' else '' }}>Abroad</option></select></label>
       <label>Country<input type="text" name="country" maxlength="80" value="{{ a0.country }}" placeholder="e.g. Netherlands"></label>
-      <label>Paid in (currency) *<select name="currency_code" required>
-        {% for cur in currencies %}{% set __code = cur.code or cur.currency_code or '' %}
-          <option value="{{ __code }}"{{ ' selected' if (a0.currency_code or 'INR') == __code else '' }}>{{ __code }}</option>
-        {% endfor %}
-      </select></label>
+      {# D-264: India → always INR (no conversion, TDS in rupees); abroad → an active trading currency, USD by default. #}
+      <label data-show-when="based_in=india">Paid in (currency) *<select name="currency_code" required><option value="INR" selected>INR — Indian rupee</option></select><span class="help-line">Fixed for associates based in India: always INR, by NEFT / RTGS / IMPS to the verified account. No currency conversion, TDS in rupees.</span></label>
+      <label data-show-when="based_in=abroad">Paid in (currency) *<select name="currency_code" required><option value="">Choose…</option>
+        {% set __cur = a0.currency_code if (a0.based_in == 'abroad' and a0.currency_code and a0.currency_code != 'INR') else 'USD' %}
+        {% for cur in currencies %}{% set __code = cur.code or cur.currency_code or '' %}{% if __code and __code != 'INR' %}
+          <option value="{{ __code }}"{{ ' selected' if __cur == __code else '' }}>{{ __code }}</option>
+        {% endif %}{% endfor %}
+      </select><span class="help-line">Abroad: paid in this currency by SWIFT — match the associate's bank account. The amount is fixed in this currency when the buyer completes payment.</span></label>
       <label>E-mail (portal login)<input type="email" name="email" maxlength="190" value="{{ a0.email }}" placeholder="e.g. name@company.com"></label>
       <label>Phone<input type="tel" name="phone" maxlength="40" value="{{ a0.phone }}" placeholder="e.g. +91 98765 43210"></label>
       <label>PAN (India)<input type="text" name="pan" maxlength="10" pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]" title="As on the PAN card, e.g. ABCDE1234F" value="{{ a0.pan }}" placeholder="e.g. ABCDE1234F"></label>

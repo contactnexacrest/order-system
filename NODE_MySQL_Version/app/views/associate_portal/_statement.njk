@@ -16,8 +16,11 @@
   <table class="kv" style="margin-top:8px">
     {% if c.show_pct !== false and c.level_label !== null %}<tr><th>Commission level</th><td>{{ c.level_label }}{{ ' — fixed when the Proforma Invoice was issued' if c.level_fixed else ' — for now; fixed when the Proforma Invoice is issued' }}</td></tr>{% endif %}
     {% if showFob and (c.reduction_fc | float) > 0 %}<tr><th>Agreed discount / settled claim</th><td>− {{ c.currency }} {{ c.reduction_fc | money }} (lowers the basis)</td></tr>{% endif %}
-    {% if showFob %}<tr><th>Basis</th><td>{{ c.currency }} {{ c.basis_fc | money }} × ₹{{ c.rate_inr | fixed4 }}{{ ' (estimated — rupees credited not recorded yet)' if c.rate_estimated else ' realised' }} = ₹{{ c.basis_inr | money }}</td></tr>{% endif %}
-    <tr><th>Commission</th><td><b>{{ c.currency }} {{ c.amount_fc | money }} · ₹{{ c.amount_inr | money }}</b>{{ ' — none: the buyer did not pay the order in full' if c.state == 'unpaid' }}</td></tr>
+    {# D-264: in the portal the order currency is the figure; rupees only for an associate in India, once fixed (c.fixed_line, set by the portal controller) #}
+    {% if showFob and not c.portal %}<tr><th>Basis</th><td>{{ c.currency }} {{ c.basis_fc | money }} × ₹{{ c.rate_inr | fixed4 }}{{ ' fixed' if c.fixed else (' (estimated — rupees credited not recorded yet)' if c.rate_estimated else ' realised') }} = ₹{{ c.basis_inr | money }}</td></tr>{% elif showFob %}<tr><th>Basis</th><td>{{ c.currency }} {{ c.basis_fc | money }}</td></tr>{% endif %}
+    <tr><th>Commission</th><td><b>{{ c.currency }} {{ c.amount_fc | money }}{% if not c.portal %} · ₹{{ c.amount_inr | money }}{% endif %}</b>{% if c.fixed %} <span class="badge badge-active">Fixed</span>{% elif c.state != 'unpaid' %} <span class="badge badge-pending">Estimate</span>{% endif %}{{ ' — none: the buyer did not pay the order in full' if c.state == 'unpaid' }}
+      {% if c.portal and c.fixed_line %}<br><span data-fixed-rupees>{{ c.fixed_line }}</span>{% endif %}
+      {% if not c.portal and c.override %}<br><small class="muted">Changed by the MD: {{ c.override_reason }}</small>{% endif %}</td></tr>
     <tr><th>GST</th><td>{% if c.gstin %}GST {{ c.gst_pct | pct2 }}% added on top once your tax invoice is on file{% else %}none (not GST-registered){% endif %}</td></tr>
     <tr><th>Full payment</th><td>{{ ((c.fully_paid_on | shortDate) + ' ✓') if c.fully_paid_on else 'not yet' }}</td></tr>
     <tr><th>Due / payout run</th><td>{% if c.due_on %}due {{ c.due_on | shortDate }} · paid in the {{ c.payout_run_on | shortDate }} payout run{% else %}once the buyer has paid in full{% endif %}{% if c.claim_hold %} — <b>held while a buyer claim is open</b>{% endif %}</td></tr>
