@@ -934,6 +934,66 @@ final class ZohoBooksService
     }
 
     /**
+     * Owner decision D-264 (7 Nov 2026, "yes add the payout difference to zoho"): what paying an
+     * associate cost against the fixed commission — abroad the exchange difference plus the transfer
+     * charges, in India the transfer charges — as one Books journal per payout: "Associate payout
+     * costs" (the account chosen in Associates › Commission settings) debited and the bank the
+     * commission was paid from (the deposit account, as for the commission payment) credited. A
+     * negative difference (the rupee came out cheaper) books the same two accounts the other way round,
+     * which lowers the payout costs. The notes are the description the app builds (rule D-212). With
+     * $journalId (already in Books) the same journal is updated.
+     *
+     * @param array<string,mixed> $payout an incentive_payouts row (paid, associate, payout_difference_inr ≠ 0)
+     * @throws \RuntimeException on any failure
+     * @return string the Zoho journal_id
+     */
+    public static function pushPayoutCostJournal(array $payout, string $costsAccountId, ?string $journalId = null): string
+    {
+        $order = \App\Repositories\OrderRepository::find((int) $payout['order_id']);
+        $client = $order !== null ? \App\Repositories\ClientRepository::find((int) $order['client_id']) : null;
+        $buyer = (string) ($client['company_legal_name'] ?? '');
+        ZohoGuard::assertCustomerAllowed($buyer);
+        $payload = self::payoutCostJournalPayload($payout, $costsAccountId, (string) self::config()['depositAccountId'], $order, str_starts_with($buyer, ZohoGuard::TEST_PREFIX));
+        $config = self::config();
+        $accessToken = self::getAccessToken($config['accountsDomain'], $config['clientId'], $config['clientSecret'], $config['refreshToken']);
+        // QA batch 4, ZOH-2: a journal an earlier run already put in Books is adopted (then updated), never posted twice.
+        $journalId ??= self::findExistingByReference($config, $accessToken, 'journals', 'journals', 'journal_id', $payload['reference_number'], [], static fn (array $row): bool => true);
+        $url = "https://{$config['apiDomain']}/books/v3/journals" . ($journalId !== null ? '/' . rawurlencode($journalId) : '') . '?organization_id=' . rawurlencode($config['organizationId']);
+        $response = self::request($journalId !== null ? 'PUT' : 'POST', $url, $payload, self::authHeaders($accessToken));
+        $decoded = json_decode($response['body'], true);
+        $id = $decoded['journal']['journal_id'] ?? null;
+        if ($response['status'] < 200 || $response['status'] >= 300 || $id === null) {
+            throw new \RuntimeException('Zoho Books journal for the associate payout cost of ' . $payload['reference_number'] . ' (₹' . number_format(abs((float) $payout['payout_difference_inr']), 2, '.', '') . ') failed (HTTP ' . $response['status'] . '): ' . substr($response['body'], 0, 500));
+        }
+        return (string) $id;
+    }
+
+    /**
+     * D-264: the journal itself — kept apart so the sides, amount and words are tested exactly.
+     *
+     * @param array<string,mixed> $payout
+     * @return array<string,mixed>
+     */
+    public static function payoutCostJournalPayload(array $payout, string $costsAccountId, string $bankAccountId, ?array $order = null, bool $test = false): array
+    {
+        $order ??= \App\Repositories\OrderRepository::find((int) $payout['order_id']);
+        $difference = round((float) $payout['payout_difference_inr'], 2);
+        $amount = abs($difference);
+        $description = AssociatePayoutService::payoutCostDescription($payout, $order);
+        $costSide = $difference >= 0 ? 'debit' : 'credit';
+        $bankSide = $difference >= 0 ? 'credit' : 'debit';
+        return [
+            'journal_date' => (string) $payout['paid_on'],
+            'reference_number' => 'APC-' . ($order['order_reference'] ?? $payout['order_id']) . '-' . $payout['id'],
+            'notes' => ($test ? ZohoGuard::TEST_PREFIX . ' ' : '') . $description,
+            'line_items' => [
+                ['account_id' => $costsAccountId, 'debit_or_credit' => $costSide, 'amount' => $amount, 'description' => $description],
+                ['account_id' => $bankAccountId, 'debit_or_credit' => $bankSide, 'amount' => $amount, 'description' => $difference >= 0 ? 'Associate payout costs paid from the bank' : 'Associate payout cost saving (the rupee came out cheaper)'],
+            ],
+        ];
+    }
+
+    /**
      * Clean-up before go-live: every Books journal whose notes start with
      * TEST- (export benefits of TEST- orders).
      *

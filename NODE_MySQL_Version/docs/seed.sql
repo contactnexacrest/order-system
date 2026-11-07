@@ -2582,4 +2582,4 @@ INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('asso
 INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('associate_portal_commission_months', '12');
 -- Owner decision D-264: abroad transfers — NexaCrest pays its own and the intermediary bank's charges (OUR) by default;
 -- an associate abroad is paid once the amount due reaches USD 100 (smaller amounts carry to the next run).
-INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('associate_abroad_charges', 'OUR'), ('associate_abroad_min_payout_usd', '100');
+INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('associate_abroad_charges', 'OUR'), ('associate_abroad_min_payout_usd', '100'), ('zoho_payout_costs_account_id', '');

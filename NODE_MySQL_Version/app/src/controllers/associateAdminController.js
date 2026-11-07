@@ -910,6 +910,14 @@ async function saveLadder(req, res) {
       return;
     }
     values.zoho_gst_commission_tax_id = gstTax;
+    // D-264: the Zoho Books account of the associate payout costs (the exchange difference and transfer charges).
+    const costsAccount = String(body.zoho_payout_costs_account_id ?? '').trim();
+    if (costsAccount !== '' && !/^[0-9A-Za-z_-]{1,40}$/.test(costsAccount)) {
+      flash.set(req, 'error', 'Zoho account for associate payout costs: enter the account id from Zoho Books (letters, digits, - and _ only), or leave it empty.');
+      res.redirect('/associates/ladder');
+      return;
+    }
+    values.zoho_payout_costs_account_id = costsAccount;
   }
   const before = await incentiveRepository.settings();
   for (const [k, v] of Object.entries(values)) {

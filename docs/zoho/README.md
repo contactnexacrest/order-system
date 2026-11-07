@@ -32,6 +32,14 @@
   the accounts *Imported Goods Stock*, *IGST Paid on Import*, *Merchanting
   Trade Sales* and *Merchanting Trade Purchases* (names to be confirmed by
   the CA).
+- **Associate payout costs (D-264, 7 Nov 2026) — live check pending.** Each
+  paid associate payout with an exchange difference or transfer charges goes to
+  Books as one journal (*Associate payout costs* against the bank; reference
+  `APC-<order>-<payout id>`). Tested with a mocked Zoho only; the live check in
+  the TEST organisation (log every record here, then remove it) is still to do
+  once the Zoho keys are available in this environment. Before go-live the CA
+  creates the expense account and its id is entered in Associates › Commission
+  settings.
 - **Before go-live: remove the TEST records (checked 6 Nov 2026).** 48 rows of
   `zoho-change-log.csv` are marked "must be removed before go-live" and have no
   "removed on" date yet: Z-629–Z-641 (owner test matrix, 31 Oct), Z-648–Z-654,

@@ -57,6 +57,8 @@ final class AssociateCommission
             'threshold_inr' => (float) ($s['associate_counting_threshold_inr'] ?? 500000),
             'gst_pct' => (float) ($s['associate_gst_pct'] ?? 18),
             'zoho_gst_tax_id' => trim((string) ($s['zoho_gst_commission_tax_id'] ?? '')),
+            // D-264: the Zoho Books account the associate payout costs go to (empty = they are not sent).
+            'zoho_payout_costs_account_id' => trim((string) ($s['zoho_payout_costs_account_id'] ?? '')),
             'registration_months' => AssociateService::protectionMonths(),
             'portal_months' => self::portalMonths($s),
             // D-264: who pays the bank charges of a transfer abroad (OUR = NexaCrest pays its own and the intermediary bank's; SHA = the

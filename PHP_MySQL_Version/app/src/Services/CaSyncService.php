@@ -84,6 +84,7 @@ final class CaSyncService
             'expenses' => ['imported' => 0, 'updated' => 0, 'removed' => 0, 'failed' => 0, 'skipped' => 0],
             'benefits' => ['journals' => 0, 'removed' => 0, 'failed' => 0, 'skipped' => 0],
             'gst_refunds' => ['journals' => 0, 'failed' => 0, 'skipped' => 0],
+            'payout_costs' => ['journals' => 0, 'failed' => 0, 'skipped' => 0],
             'divisions' => ['sent' => 0, 'failed' => 0, 'skipped' => 0],
             'stopped' => null,
         ];
@@ -134,6 +135,8 @@ final class CaSyncService
             $result['expenses'] = self::importPendingExpenses($triggeredBy, $triggeredByUserId);
             $result['benefits'] = self::syncBenefits($triggeredBy, $triggeredByUserId);
             $result['gst_refunds'] = self::syncGstRefunds($triggeredBy, $triggeredByUserId);
+            // D-264: the associate payout costs (a company cost, never on an order) — full sync only, like the GST refunds.
+            $result['payout_costs'] = self::syncPayoutCosts($triggeredBy, $triggeredByUserId);
             // D-257 Zoho: Domestic Trade, Import & Distribution and Merchant Trade money.
             $result['divisions'] = DivisionZohoSync::run($triggeredBy, $triggeredByUserId);
             if ($dailyCheck) {
@@ -248,6 +251,86 @@ final class CaSyncService
             $result['skipped'] = 1;
         }
         return $result;
+    }
+
+    /** D-264: shown on the Sync Log and the payouts page while the Zoho account is not chosen. */
+    public const PAYOUT_COSTS_UNMAPPED = 'Associate payout costs not sent to Zoho Books: choose the Zoho account for associate payout costs in Associates › Commission settings, then sync again.';
+
+    /**
+     * Owner decision D-264 (7 Nov 2026, "yes add the payout difference to zoho"): each paid associate
+     * payout whose payout difference is not zero goes to Books once, as a journal (Associate payout
+     * costs against the bank); updated if what was recorded changes. Payouts paid before the go-live
+     * date stay with the CA. Without the Zoho account chosen nothing is sent — one Sync Log line says so.
+     *
+     * @return array{journals:int, failed:int, skipped:int}
+     */
+    public static function syncPayoutCosts(string $triggeredBy, ?int $triggeredByUserId): array
+    {
+        $result = ['journals' => 0, 'failed' => 0, 'skipped' => 0];
+        if (!ZohoBooksService::isEnabled()) {
+            ZohoSyncLogRepository::log('associate_payout_cost', null, null, null, 'skipped', null, self::offReason() . ' — nothing synced.', $triggeredBy, $triggeredByUserId);
+            $result['skipped'] = 1;
+            return $result;
+        }
+        $startDate = ZohoBooksService::syncStartDate();
+        if ($startDate === null && ZohoGuard::isProduction()) {
+            ZohoSyncLogRepository::log('associate_payout_cost', null, null, null, 'error', null, self::NO_START_DATE, $triggeredBy, $triggeredByUserId);
+            $result['failed'] = 1;
+            return $result;
+        }
+        $pending = [];
+        foreach (self::payoutCostsToSync($startDate) as $p) {
+            $hash = self::payoutCostHash($p);
+            if ($p['zoho_cost_journal_id'] !== null && $p['zoho_cost_hash'] === $hash) {
+                continue;
+            }
+            $p['_hash'] = $hash;
+            $pending[] = $p;
+        }
+        if ($pending === []) {
+            ZohoSyncLogRepository::log('associate_payout_cost', null, null, null, 'skipped', null, 'Nothing pending — every associate payout cost is already in Zoho Books.', $triggeredBy, $triggeredByUserId);
+            $result['skipped'] = 1;
+            return $result;
+        }
+        $account = AssociateCommission::settings()['zoho_payout_costs_account_id'];
+        if ($account === '') {
+            ZohoSyncLogRepository::log('associate_payout_cost', null, null, null, 'skipped', null, self::PAYOUT_COSTS_UNMAPPED . ' (' . count($pending) . ' waiting.)', $triggeredBy, $triggeredByUserId);
+            $result['skipped'] = 1;
+            return $result;
+        }
+        foreach ($pending as $p) {
+            $journalId = $p['zoho_cost_journal_id'] !== null ? (string) $p['zoho_cost_journal_id'] : null;
+            try {
+                $newId = ZohoBooksService::pushPayoutCostJournal($p, $account, $journalId);
+                \App\Config\Database::connection()->prepare('UPDATE incentive_payouts SET zoho_cost_journal_id = :j, zoho_cost_hash = :h WHERE id = :id')
+                    ->execute(['j' => $newId, 'h' => $p['_hash'], 'id' => $p['id']]);
+                ZohoSyncLogRepository::log('associate_payout_cost', 'order', (int) $p['order_id'], 'journal', 'success', $newId, ($journalId !== null ? 'Updated' : 'Sent') . ' as Zoho Books journal: ' . AssociatePayoutService::payoutCostDescription($p) . '.', $triggeredBy, $triggeredByUserId);
+                $result['journals']++;
+            } catch (\Throwable $e) {
+                ZohoSyncStop::rethrow($e); // D-239: a spent allowance / rate limit stops the whole run
+                ZohoSyncLogRepository::log('associate_payout_cost', 'order', (int) $p['order_id'], 'journal', 'error', $journalId, $e->getMessage(), $triggeredBy, $triggeredByUserId);
+                $result['failed']++;
+            }
+        }
+        return $result;
+    }
+
+    /** @return list<array<string,mixed>> paid associate payouts with a payout difference, from the go-live date */
+    public static function payoutCostsToSync(?string $startDate): array
+    {
+        $stmt = \App\Config\Database::connection()->prepare(
+            "SELECT * FROM incentive_payouts WHERE payee_kind = 'associate' AND status = 'paid' AND payout_difference_inr IS NOT NULL AND payout_difference_inr <> 0
+               AND clawback_of_payout_id IS NULL AND (:s IS NULL OR paid_on >= :s2) ORDER BY id"
+        );
+        $stmt->execute(['s' => $startDate, 's2' => $startDate]);
+        return $stmt->fetchAll();
+    }
+
+    /** What the journal is made of — a change sends the journal again (updated, never a second one). */
+    public static function payoutCostHash(array $p): string
+    {
+        return hash('sha256', (string) json_encode([number_format((float) $p['payout_difference_inr'], 2, '.', ''), (string) $p['paid_on'], (string) ($p['paid_reference'] ?? ''),
+            number_format((float) ($p['bank_charges_inr'] ?? 0), 2, '.', ''), number_format((float) ($p['amount_fc'] ?? 0), 2, '.', ''), (string) ($p['currency_code'] ?? '')]));
     }
 
     /**

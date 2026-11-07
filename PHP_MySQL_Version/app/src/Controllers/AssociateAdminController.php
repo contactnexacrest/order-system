@@ -956,6 +956,14 @@ final class AssociateAdminController
                 return;
             }
             $values['zoho_gst_commission_tax_id'] = $gstTax;
+            // D-264: the Zoho Books account of the associate payout costs (the exchange difference and transfer charges).
+            $costsAccount = trim((string) ($_POST['zoho_payout_costs_account_id'] ?? ''));
+            if ($costsAccount !== '' && preg_match('/^[0-9A-Za-z_\-]{1,40}$/', $costsAccount) !== 1) {
+                Flash::set('error', 'Zoho account for associate payout costs: enter the account id from Zoho Books (letters, digits, - and _ only), or leave it empty.');
+                header('Location: /associates/ladder');
+                return;
+            }
+            $values['zoho_payout_costs_account_id'] = $costsAccount;
         }
         $before = IncentiveRepository::settings();
         foreach ($values as $k => $v) {

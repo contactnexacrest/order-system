@@ -295,7 +295,11 @@ costs** on Incentive Payouts and in its CSV, with its description, e.g.
 "Associate commission payout — NC-EXP-0142 — Demo Associate — USD 1,250.00
 sent, SWIFT ref FT2612050001; exchange difference ₹812.50 and transfer
 charges ₹1,850.00". It is a company cost of the month: the order keeps the
-fixed commission. (It is not sent to Zoho yet.) **Mark all paid** skips
+fixed commission. It goes to Zoho Books at the next sync as one journal
+(*Associate payout costs* debited, the bank credited; a saving the other way
+round), once the MD has entered the Zoho account under Associates › Commission
+settings → *Zoho account for associate payout costs*; until then the payouts
+page and the Sync Log say it is waiting. **Mark all paid** skips
 payouts to associates abroad — record each with its rupees debited.
 
 ### TDS on associate commission (owner decision 2 Nov 2026, D-235)

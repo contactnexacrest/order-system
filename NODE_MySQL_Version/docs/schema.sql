@@ -6188,3 +6188,8 @@ ALTER TABLE incentive_payouts
   ADD COLUMN bank_debited_inr DECIMAL(14,2) NULL,
   ADD COLUMN bank_charges_inr DECIMAL(14,2) NULL,
   ADD COLUMN payout_difference_inr DECIMAL(14,2) NULL;
+-- D-264 (owner, 7 Nov 2026: "yes add the payout difference to zoho"): the payout difference goes to Zoho Books as one
+-- journal per payout (Associate payout costs against the bank) — its journal id and what was sent.
+ALTER TABLE incentive_payouts
+  ADD COLUMN zoho_cost_journal_id VARCHAR(40) NULL,
+  ADD COLUMN zoho_cost_hash CHAR(64) NULL;

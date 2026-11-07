@@ -696,6 +696,49 @@ async function pushGstRefundJournal(credit) {
   return String(id);
 }
 
+/**
+ * Port of ZohoBooksService::payoutCostJournalPayload() (D-264): the journal for one associate payout's
+ * payout difference — "Associate payout costs" debited and the bank (the deposit account the commission is
+ * paid from) credited; a negative difference books the same two accounts the other way round.
+ */
+async function payoutCostJournalPayload(payout, costsAccountId, bankAccountId, order = null, test = false) {
+  const associatePayoutService = require('./associatePayoutService');
+  order = order || await require('../repositories/orderRepository').find(Number(payout.order_id));
+  const difference = round(Number(payout.payout_difference_inr), 2);
+  const amount = Math.abs(difference);
+  const description = await associatePayoutService.payoutCostDescription(payout, order);
+  return {
+    journal_date: String(payout.paid_on).slice(0, 10),
+    reference_number: `APC-${(order && order.order_reference) || payout.order_id}-${payout.id}`,
+    notes: `${test ? `${zohoGuard.TEST_PREFIX} ` : ''}${description}`,
+    line_items: [
+      { account_id: costsAccountId, debit_or_credit: difference >= 0 ? 'debit' : 'credit', amount, description },
+      { account_id: bankAccountId, debit_or_credit: difference >= 0 ? 'credit' : 'debit', amount, description: difference >= 0 ? 'Associate payout costs paid from the bank' : 'Associate payout cost saving (the rupee came out cheaper)' },
+    ],
+  };
+}
+
+/** Port of ZohoBooksService::pushPayoutCostJournal() (D-264, owner 7 Nov 2026: "yes add the payout difference to zoho"). */
+async function pushPayoutCostJournal(payout, costsAccountId, journalId = null) {
+  const order = await require('../repositories/orderRepository').find(Number(payout.order_id));
+  const client = order ? await clientRepository.find(Number(order.client_id)) : null;
+  const buyer = String((client && client.company_legal_name) || '');
+  zohoGuard.assertCustomerAllowed(buyer);
+  const config = await loadConfig();
+  const payload = await payoutCostJournalPayload(payout, costsAccountId, config.depositAccountId, order, buyer.startsWith(zohoGuard.TEST_PREFIX));
+  const accessToken = await getAccessToken(config.accountsDomain, config.clientId, config.clientSecret, config.refreshToken);
+  // QA batch 4, ZOH-2: a journal an earlier run already put in Books is adopted (then updated), never posted twice.
+  if (journalId === null) journalId = await findExistingByReference(config, accessToken, 'journals', 'journals', 'journal_id', payload.reference_number, {}, () => true);
+  const url = `https://${config.apiDomain}/books/v3/journals${journalId !== null ? `/${encodeURIComponent(journalId)}` : ''}?organization_id=${encodeURIComponent(config.organizationId)}`;
+  const res = await request(journalId !== null ? 'PUT' : 'POST', url, payload, authHeaders(accessToken));
+  const decoded = safeJson(res.body);
+  const id = decoded && decoded.journal && decoded.journal.journal_id;
+  if (!res.ok || id === undefined || id === null) {
+    throw new Error(`Zoho Books journal for the associate payout cost of ${payload.reference_number} (₹${Math.abs(Number(payout.payout_difference_inr)).toFixed(2)}) failed (HTTP ${res.status}): ${res.body.slice(0, 500)}`);
+  }
+  return String(id);
+}
+
 /** Clean-up before go-live: every Books journal whose notes start with TEST- (export benefits of TEST- orders). */
 async function listTestJournals() {
   const config = await loadConfig();
@@ -2481,7 +2524,7 @@ module.exports = {
   associatePaymentPayload,
   // Owner 2 Nov 2026: exported for the bank-charges payload test (remittanceDifference.test.js).
   paymentPayload,
-  BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS, COST_ACCOUNTS, BENEFIT_INCOME_ACCOUNT, BENEFIT_SCRIP_ACCOUNT, GST_REFUND_ACCOUNT, pushGstRefundJournal,
+  BILL_ACCOUNTS, EXPENSE_ACCOUNTS, PAID_THROUGH_ACCOUNTS, COST_ACCOUNTS, BENEFIT_INCOME_ACCOUNT, BENEFIT_SCRIP_ACCOUNT, GST_REFUND_ACCOUNT, pushGstRefundJournal, payoutCostJournalPayload, pushPayoutCostJournal,
   isEnabled, syncStartDate, pushRevenuePayment, applyPaymentToInvoice, pushInvoice, pushBill, pushVendorPayment, applyVendorPayment, pushExpense,
   pushCostEntry, pushAssociateCommission, associateCommission, pushBenefitJournal, listTestJournals, contactRecords, readRecord, totalsById, invoiceByNumber,
   restoreVendorPayment, restoreRevenuePayment,

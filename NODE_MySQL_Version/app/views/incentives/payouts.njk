@@ -67,10 +67,11 @@
   {% if payoutCosts and payoutCosts.length %}
   <h2>Associate payout costs — {{ incentive.monthLabel(month) }}</h2>
   <p class="small muted">D-264: what paying associates cost on top of their fixed commission (exchange difference and transfer charges). A company cost of the month — the orders keep the fixed commission.</p>
+  {% if payoutCostsUnmapped %}<div class="alert alert-warning small" data-payout-costs-unmapped>{{ payoutCostsUnmapped }}</div>{% endif %}
   <table class="list" data-payout-costs>
-    <tr><th>Payout</th><th class="r">Payout difference (₹)</th></tr>
-    {% for pc in payoutCosts %}<tr><td>{{ pc.description }}</td><td class="r">{{ pc.payout_difference_inr | money }}</td></tr>{% endfor %}
-    <tr><td><b>Total</b></td><td class="r"><b>{{ payoutCostsTotal | money }}</b></td></tr>
+    <tr><th>Payout</th><th class="r">Payout difference (₹)</th><th>Zoho Books</th></tr>
+    {% for pc in payoutCosts %}<tr><td>{{ pc.description }}</td><td class="r">{{ pc.payout_difference_inr | money }}</td><td class="small">{% if (pc.payout_difference_inr | float) == 0 %}—{% elif pc.zoho_cost_journal_id %}Journal {{ pc.zoho_cost_journal_id }}{% else %}Goes at the next sync{% endif %}</td></tr>{% endfor %}
+    <tr><td><b>Total</b></td><td class="r"><b>{{ payoutCostsTotal | money }}</b></td><td></td></tr>
   </table>
   {% endif %}
   <p><strong>Total {{ incentive.monthLabel(month) }} incentive:</strong> staff &#8377;{{ staffTotal | money0 }} · associates &#8377;{{ associateInr | money0 }}{% for f in associateFc %} ({{ f.currency }} {{ f.amount | money }}){% endfor %}</p>

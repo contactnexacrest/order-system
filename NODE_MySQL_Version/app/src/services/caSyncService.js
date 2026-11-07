@@ -41,6 +41,7 @@ function emptyResult() {
     expenses: { imported: 0, updated: 0, removed: 0, failed: 0, skipped: 0 },
     benefits: { journals: 0, removed: 0, failed: 0, skipped: 0 },
     gst_refunds: { journals: 0, failed: 0, skipped: 0 },
+    payout_costs: { journals: 0, failed: 0, skipped: 0 },
     divisions: { sent: 0, failed: 0, skipped: 0 },
     stopped: null,
   };
@@ -82,6 +83,8 @@ async function fullSync(triggeredBy, triggeredByUserId) {
     result.expenses = await importPendingExpenses(triggeredBy, triggeredByUserId);
     result.benefits = await syncBenefits(triggeredBy, triggeredByUserId);
     result.gst_refunds = await syncGstRefunds(triggeredBy, triggeredByUserId);
+    // D-264: the associate payout costs (a company cost, never on an order) — full sync only, like the GST refunds.
+    result.payout_costs = await syncPayoutCosts(triggeredBy, triggeredByUserId);
     // D-257 Zoho: Domestic Trade, Import & Distribution and Merchant Trade money.
     result.divisions = await require('./divisionZohoSync').run(triggeredBy, triggeredByUserId);
     if (dailyCheck) {
@@ -727,6 +730,77 @@ async function syncGstRefunds(triggeredBy, triggeredByUserId) {
   return result;
 }
 
+/** D-264: shown on the Sync Log and the payouts page while the Zoho account is not chosen. */
+const PAYOUT_COSTS_UNMAPPED = 'Associate payout costs not sent to Zoho Books: choose the Zoho account for associate payout costs in Associates › Commission settings, then sync again.';
+
+/** Paid associate payouts with a payout difference, from the go-live date. */
+async function payoutCostsToSync(startDate) {
+  return db.query(
+    `SELECT * FROM incentive_payouts WHERE payee_kind = 'associate' AND status = 'paid' AND payout_difference_inr IS NOT NULL AND payout_difference_inr <> 0
+       AND clawback_of_payout_id IS NULL AND (:s IS NULL OR paid_on >= :s2) ORDER BY id`,
+    { s: startDate, s2: startDate }
+  );
+}
+
+/** What the journal is made of — a change sends the journal again (updated, never a second one). Same JSON as PHP. */
+function payoutCostHash(p) {
+  const f2 = (v) => Number(v || 0).toFixed(2);
+  return crypto.createHash('sha256').update(JSON.stringify([f2(p.payout_difference_inr), String(p.paid_on).slice(0, 10), String(p.paid_reference || ''), f2(p.bank_charges_inr), f2(p.amount_fc), String(p.currency_code || '')])).digest('hex');
+}
+
+/**
+ * Port of CaSyncService::syncPayoutCosts() (D-264, owner 7 Nov 2026: "yes add the payout difference to zoho"):
+ * each paid associate payout whose payout difference is not zero goes to Books once, as a journal
+ * (Associate payout costs against the bank); updated if what was recorded changes. Without the Zoho
+ * account chosen nothing is sent — one Sync Log line says so.
+ */
+async function syncPayoutCosts(triggeredBy, triggeredByUserId) {
+  const result = { journals: 0, failed: 0, skipped: 0 };
+  if (!(await zohoBooksService.isEnabled())) {
+    await zohoSyncLogRepository.log('associate_payout_cost', null, null, null, 'skipped', null, `${offReason()} — nothing synced.`, triggeredBy, triggeredByUserId);
+    result.skipped = 1;
+    return result;
+  }
+  const startDate = await zohoBooksService.syncStartDate();
+  if (startDate === null && zohoGuard.isProduction()) {
+    await zohoSyncLogRepository.log('associate_payout_cost', null, null, null, 'error', null, NO_START_DATE, triggeredBy, triggeredByUserId);
+    result.failed = 1;
+    return result;
+  }
+  const pending = [];
+  for (const p of await payoutCostsToSync(startDate)) {
+    const hash = payoutCostHash(p);
+    if (p.zoho_cost_journal_id !== null && p.zoho_cost_journal_id !== undefined && p.zoho_cost_hash === hash) continue;
+    pending.push({ ...p, _hash: hash });
+  }
+  if (pending.length === 0) {
+    await zohoSyncLogRepository.log('associate_payout_cost', null, null, null, 'skipped', null, 'Nothing pending — every associate payout cost is already in Zoho Books.', triggeredBy, triggeredByUserId);
+    result.skipped = 1;
+    return result;
+  }
+  const account = (await require('./associateCommission').settings()).zoho_payout_costs_account_id;
+  if (account === '') {
+    await zohoSyncLogRepository.log('associate_payout_cost', null, null, null, 'skipped', null, `${PAYOUT_COSTS_UNMAPPED} (${pending.length} waiting.)`, triggeredBy, triggeredByUserId);
+    result.skipped = 1;
+    return result;
+  }
+  const associatePayoutService = require('./associatePayoutService');
+  for (const p of pending) {
+    const journalId = p.zoho_cost_journal_id ? String(p.zoho_cost_journal_id) : null;
+    try {
+      const newId = await zohoBooksService.pushPayoutCostJournal(p, account, journalId);
+      await db.execute('UPDATE incentive_payouts SET zoho_cost_journal_id = :j, zoho_cost_hash = :h WHERE id = :id', { j: newId, h: p._hash, id: p.id });
+      await zohoSyncLogRepository.log('associate_payout_cost', 'order', Number(p.order_id), 'journal', 'success', newId, `${journalId !== null ? 'Updated' : 'Sent'} as Zoho Books journal: ${await associatePayoutService.payoutCostDescription(p)}.`, triggeredBy, triggeredByUserId);
+      result.journals += 1;
+    } catch (e) {
+      zohoApiBudget.rethrow(e); // D-239: a spent allowance / rate limit stops the whole run
+      await zohoSyncLogRepository.log('associate_payout_cost', 'order', Number(p.order_id), 'journal', 'error', journalId, e.message, triggeredBy, triggeredByUserId);
+      result.failed += 1;
+    }
+  }
+  return result;
+}
+
 /**
  * Owner 2 Nov 2026 (point 16): "Sync this order to Zoho now" on the order page.
  * Same pushes and duplicate guards as runFullSync(), limited to one order's
@@ -763,4 +837,4 @@ async function forOrder(orderId, triggeredByUserId) {
   return result;
 }
 
-module.exports = { runFullSync, runForOrder, syncPendingRevenue, syncPurchases, importPendingExpenses, syncBenefits, syncGstRefunds };
+module.exports = { runFullSync, runForOrder, syncPendingRevenue, syncPurchases, importPendingExpenses, syncBenefits, syncGstRefunds, syncPayoutCosts, payoutCostsToSync, payoutCostHash, PAYOUT_COSTS_UNMAPPED };

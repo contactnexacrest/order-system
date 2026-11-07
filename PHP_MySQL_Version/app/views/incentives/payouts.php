@@ -90,10 +90,11 @@ foreach ($rows as $r) {
   <?php if (!empty($payoutCosts)): ?>
   <h2>Associate payout costs — <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?></h2>
   <p class="small muted">D-264: what paying associates cost on top of their fixed commission (exchange difference and transfer charges). A company cost of the month — the orders keep the fixed commission.</p>
+  <?php if (\App\Services\AssociateCommission::settings()['zoho_payout_costs_account_id'] === ''): ?><div class="alert alert-warning small" data-payout-costs-unmapped><?= htmlspecialchars(\App\Services\CaSyncService::PAYOUT_COSTS_UNMAPPED) ?></div><?php endif; ?>
   <table class="list" data-payout-costs>
-    <tr><th>Payout</th><th class="r">Payout difference (₹)</th></tr>
-    <?php foreach ($payoutCosts as $__pc): ?><tr><td><?= htmlspecialchars((string) $__pc['description']) ?></td><td class="r"><?= number_format((float) $__pc['payout_difference_inr'], 2) ?></td></tr><?php endforeach; ?>
-    <tr><td><b>Total</b></td><td class="r"><b><?= number_format(array_sum(array_map(static fn (array $x): float => (float) $x['payout_difference_inr'], $payoutCosts)), 2) ?></b></td></tr>
+    <tr><th>Payout</th><th class="r">Payout difference (₹)</th><th>Zoho Books</th></tr>
+    <?php foreach ($payoutCosts as $__pc): ?><tr><td><?= htmlspecialchars((string) $__pc['description']) ?></td><td class="r"><?= number_format((float) $__pc['payout_difference_inr'], 2) ?></td><td class="small"><?= (float) $__pc['payout_difference_inr'] == 0.0 ? '—' : (!empty($__pc['zoho_cost_journal_id']) ? 'Journal ' . htmlspecialchars((string) $__pc['zoho_cost_journal_id']) : 'Goes at the next sync') ?></td></tr><?php endforeach; ?>
+    <tr><td><b>Total</b></td><td class="r"><b><?= number_format(array_sum(array_map(static fn (array $x): float => (float) $x['payout_difference_inr'], $payoutCosts)), 2) ?></b></td><td></td></tr>
   </table>
   <?php endif; ?>
   <p><strong>Total <?= htmlspecialchars(IncentiveService::monthLabel($month)) ?> incentive:</strong> staff &#8377;<?= number_format($__staff, 0) ?> · associates &#8377;<?= number_format($__assocInr, 0) ?><?php foreach ($__assocFc as $cur => $amt): ?> (<?= htmlspecialchars($cur) ?> <?= number_format($amt, 2) ?>)<?php endforeach; ?></p>

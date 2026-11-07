@@ -308,7 +308,7 @@ Lead capture and nurture **stay in Zoho CRM** and are out of scope. A Zoho-quali
 | Role | **Operational system of record**: orders, documents, payments as they happen, costs, profit, incentives, commissions | **Accounting ledger**: invoices, customer payments, bills, vendor payments, expenses, journals, GST |
 | Direction | Pushes to Books (**one way, app → Zoho**) | Receives; the app only reads Books to check ("App vs Zoho check") |
 | When | Hourly job `zoho_sync` plus "Sync now" / "Sync this order" | — |
-| What goes | Commercial Invoice and Debit Note as invoices (at the customs exchange rate from the shipping bill), customer receipts, vendor bills and payments, expenses, cost entries, LC receipts, export benefits, GST refund journals, optionally customers and items (D-238); the new divisions' records too (D-257 (6)) | — |
+| What goes | Commercial Invoice and Debit Note as invoices (at the customs exchange rate from the shipping bill), customer receipts, vendor bills and payments, expenses, cost entries, LC receipts, export benefits, GST refund journals, associate payout cost journals (D-264), optionally customers and items (D-238); the new divisions' records too (D-257 (6)) | — |
 | Description rule | Every money record carries the same description in the app and in Books (D-212) | — |
 | Safety | `.env` switches (`ZOHO_INTEGRATION_ENABLED`, `ZOHO_ENVIRONMENT`, `ZOHO_EINVOICE_ENABLED`) + Admin setting "Zoho Books enabled" + go-live date | — |
 
@@ -859,7 +859,7 @@ Payment-request e-mails include the Payment Action Link paragraph. Sending the O
 | Checking | `OrderZohoMatchService`, `GET /orders/{id}/zoho-check` — read-only: match / not sent / before go-live / different / missing in Books / only in Books | |
 | Master data | `ZohoMasterDataSync`: app → Zoho customers and items, linked by exact name, made inactive (never deleted) | D-238 |
 | Descriptions | `PaymentDescription` builds the same description for app and Books (D-212) | |
-| Records in Zoho | Contacts, invoices (CI, Debit Note, ESI), customer payments, bills and vendor payments, expenses, journals (GST refunds, export benefits, IGST credit) | Ids stored on the app rows (`zoho_*` columns). |
+| Records in Zoho | Contacts, invoices (CI, Debit Note, ESI), customer payments, bills and vendor payments, expenses, journals (GST refunds, export benefits, IGST credit, associate payout costs) | Ids stored on the app rows (`zoho_*` columns). |
 | Human changes | Every change in Zoho by anyone → a row in `docs/zoho/zoho-change-log.csv` | TEST records removed before go-live, removal logged. |
 
 ### 3.13 Security
@@ -2199,8 +2199,15 @@ the same filters, counts, fields, actions and money rules on both templates
     shows the order currency; India adds one fixed-rupee line; abroad never rupees.
     "Paid in": India always INR, abroad USD/EUR/GBP. Paying records `bank_debited_inr`
     (abroad, required), `bank_charges_inr` and `payout_difference_inr` — "Associate
-    payout costs" of the month (Incentive Payouts), a company cost, not on the order;
-    not synced to Zoho yet.
+    payout costs" of the month (Incentive Payouts), a company cost, not on the order.
+    It goes to Zoho Books (owner, 7 Nov 2026) as one journal per payout
+    (`CaSyncService::syncPayoutCosts` / `caSyncService.syncPayoutCosts`, full sync only):
+    the account `zoho_payout_costs_account_id` (Associates › Commission settings) debited
+    and the deposit (bank) account credited — a negative difference the other way round —
+    notes = the D-212 description, reference `APC-<order>-<payout id>`; the journal id and
+    what was sent are kept (`incentive_payouts.zoho_cost_journal_id`, `zoho_cost_hash`), so
+    it is sent once and updated on a change. Without the account nothing is sent: the Sync
+    Log and the payouts page say so. Live TEST-org check pending.
   - **Bank details:** a change is a request; two different Finance people
     check and verify; 7-day wait before first use; encrypted, masked;
     payment only into a verified usable account.
@@ -3432,6 +3439,7 @@ Also in Pricing: commission levels (`commission_levels`) and ladder (`commission
 | `associate_bank_wait_days` | 7 | Bank-detail change wait |
 | `associate_upgrade_after_orders` | 3 | Access level upgrade (D-261) |
 | `zoho_gst_commission_tax_id` | empty | Zoho GST tax for commission bills (D-256) |
+| `zoho_payout_costs_account_id` | empty | Zoho account for associate payout costs (D-264); empty = not sent |
 | `associate_tds_section` | 194H | Settings › Associate TDS (`manage_company_settings`, reason required) |
 | `associate_tds_pct` | 2.00 | 〃 |
 | `associate_tds_threshold_inr` | 20000 | 〃 |

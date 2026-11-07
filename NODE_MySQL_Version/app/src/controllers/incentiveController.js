@@ -501,6 +501,7 @@ async function payouts(req, res) {
   res.renderView('incentives/payouts', {
     payoutCosts,
     payoutCostsTotal: Math.round(payoutCosts.reduce((t, x) => t + Number(x.payout_difference_inr), 0) * 100) / 100,
+    payoutCostsUnmapped: (await require('../services/associateCommission').settings()).zoho_payout_costs_account_id === '' ? require('../services/caSyncService').PAYOUT_COSTS_UNMAPPED : null,
     paidVia: incentiveRepository.PAID_VIA,
     staffTotal,
     associateInr,
