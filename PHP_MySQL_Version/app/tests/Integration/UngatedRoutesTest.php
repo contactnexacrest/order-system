@@ -49,6 +49,7 @@ final class UngatedRoutesTest extends DbTestCase
         'GET /client/documents/{}/download client',
         'GET /client/forgot-password public',
         'GET /client/login public',
+        'GET /client/login/code public',
         'GET /client/orders/{} client',
         'GET /client/orders/{}/comment-attachments/{}/download client',
         'GET /client/orders/{}/payment-reports/{}/screenshot client',
@@ -88,6 +89,9 @@ final class UngatedRoutesTest extends DbTestCase
         'GET /test-mode super-admin',
         'GET /vendor-details/{} public',
         'POST /2fa public +csrf',
+        'POST /2fa/backup public +csrf',
+        'POST /2fa/resend public +csrf',
+        'POST /account/backup-codes staff +csrf',
         'POST /account/notifications staff +csrf',
         'POST /account/password staff +csrf',
         'POST /account/signature staff +csrf',
@@ -100,6 +104,8 @@ final class UngatedRoutesTest extends DbTestCase
         'POST /client/end-impersonation public +csrf',
         'POST /client/forgot-password public +csrf',
         'POST /client/login public +csrf',
+        'POST /client/login/code public +csrf',
+        'POST /client/login/code/resend public +csrf',
         'POST /client/logout public +csrf',
         'POST /client/orders/{}/acknowledge-oc client +csrf',
         'POST /client/orders/{}/buyer-po client +csrf',
@@ -432,7 +438,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(41, $checked);
+        self::assertSame(42, $checked); // D-265: + POST /account/backup-codes
         self::assertSame([], $wrong);
     }
 
@@ -545,7 +551,7 @@ final class UngatedRoutesTest extends DbTestCase
             }
             $checked++;
         }
-        self::assertSame(64, $checked);
+        self::assertSame(69, $checked); // D-265: + 5 login-code POSTs
         self::assertSame([], $wrong);
     }
 
@@ -586,7 +592,7 @@ final class UngatedRoutesTest extends DbTestCase
                 [$code, $body] = $this->dispatch('GET', $route['pattern']);
                 // /associate/login/code and /associate/logout go to the login, /associate/agreement is 404 until an agreement is on file;
                 // D-255: /associate/prices now goes to the catalogue, /pricing/line-quote is 404 (JSON) without a product.
-                $redirectsOnPurpose = in_array($route['pattern'], ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement', '/associate/prices', '/pricing/line-quote'], true);
+                $redirectsOnPurpose = in_array($route['pattern'], ['/2fa', '/client/login/code', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement', '/associate/prices', '/pricing/line-quote'], true);
                 if ($code >= 500 || ($code !== 200 && !$redirectsOnPurpose) || ($code === 200 && trim($body) === '')) {
                     $failed[] = self::label($route) . " → {$code}";
                 }
@@ -596,7 +602,7 @@ final class UngatedRoutesTest extends DbTestCase
             Flash::pull();
             $checked++;
         }
-        self::assertSame(38, $checked);
+        self::assertSame(39, $checked); // D-265: + GET /client/login/code
         self::assertSame([], $failed);
     }
 
@@ -611,6 +617,9 @@ final class UngatedRoutesTest extends DbTestCase
         self::assertSame('Invalid email or password.', Flash::pull()[0]['message'] ?? null);
 
         $this->dispatch('POST', '/login', $this->withCsrf(['email' => $email, 'password' => self::PASSWORD]));
+        self::assertArrayNotHasKey('_auth_user_id', $_SESSION, 'D-265: the right password alone does not sign in — the e-mailed code is next');
+        self::assertSame($userId, $_SESSION['_2fa_pending']['user_id'] ?? null);
+        $this->dispatch('POST', '/2fa', $this->withCsrf(['code' => (string) $_SESSION['_2fa_dev_code']]));
         self::assertSame($userId, $_SESSION['_auth_user_id'] ?? null);
     }
 
@@ -691,6 +700,8 @@ final class UngatedRoutesTest extends DbTestCase
         self::assertSame('Incorrect email or password.', Flash::pull()[0]['message'] ?? null);
 
         $this->dispatch('POST', '/client/login', $this->withCsrf(['email' => $email, 'password' => self::PASSWORD]));
+        self::assertArrayNotHasKey('_client_portal_client_id', $_SESSION, 'D-265: the e-mailed code comes next');
+        $this->dispatch('POST', '/client/login/code', $this->withCsrf(['code' => (string) $_SESSION['_client_2fa_dev_code']]));
         self::assertSame($clientId, $_SESSION['_client_portal_client_id'] ?? null);
 
         $this->dispatch('POST', '/client/logout', $this->withCsrf());
@@ -703,6 +714,7 @@ final class UngatedRoutesTest extends DbTestCase
         ClientPasswordResetTokenRepository::create($clientId, hash('sha256', $token), date('Y-m-d H:i:s', time() + 600), null);
         $this->dispatch('POST', "/client/set-password/{$token}", $this->withCsrf(['new_password' => 'ClientNew12345!', 'confirm_password' => 'ClientNew12345!']));
         $this->dispatch('POST', '/client/login', $this->withCsrf(['email' => $email, 'password' => 'ClientNew12345!']));
+        $this->dispatch('POST', '/client/login/code', $this->withCsrf(['code' => (string) $_SESSION['_client_2fa_dev_code']]));
         self::assertSame($clientId, $_SESSION['_client_portal_client_id'] ?? null);
     }
 

@@ -1447,6 +1447,24 @@ CREATE TABLE two_fa_backup_codes (
   INDEX idx_2fa_backup_user (user_id)
 ) ENGINE=InnoDB;
 
+-- Owner decision D-265 (7 Nov 2026): "Remember this browser for N days" for staff
+-- (Admin › Settings › Security › login_remember_browser_days, 0 = off, the default).
+-- The cookie carries selector.validator.signature; only a SHA-256 of the validator is
+-- kept. A password change or reset bumps users.session_version and deletes the rows.
+CREATE TABLE login_remembered_browsers (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id         BIGINT UNSIGNED NOT NULL,
+  selector        CHAR(24) NOT NULL,
+  validator_hash  CHAR(64) NOT NULL,
+  session_version INT NOT NULL DEFAULT 0,
+  expires_at      DATETIME NOT NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_used_at    DATETIME NULL,
+  UNIQUE KEY uq_login_remembered_selector (selector),
+  INDEX idx_login_remembered_user (user_id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
 CREATE TABLE report_definitions (
   id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name            VARCHAR(150) NOT NULL,           -- e.g. "Weekly Overdue — Tier 2"

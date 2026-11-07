@@ -65,6 +65,7 @@ const EXPECTED = [
   'GET /client/documents/{}/download client',
   'GET /client/forgot-password public',
   'GET /client/login public',
+  'GET /client/login/code public',
   'GET /client/orders/{} client',
   'GET /client/orders/{}/comment-attachments/{}/download client',
   'GET /client/orders/{}/payment-reports/{}/screenshot client',
@@ -104,6 +105,9 @@ const EXPECTED = [
   'GET /test-mode super-admin',
   'GET /vendor-details/{} public',
   'POST /2fa public +csrf',
+  'POST /2fa/backup public +csrf',
+  'POST /2fa/resend public +csrf',
+  'POST /account/backup-codes staff +csrf',
   'POST /account/notifications staff +csrf',
   'POST /account/password staff +csrf',
   'POST /account/signature staff +csrf',
@@ -116,6 +120,8 @@ const EXPECTED = [
   'POST /client/end-impersonation public +csrf',
   'POST /client/forgot-password public +csrf',
   'POST /client/login public +csrf',
+  'POST /client/login/code public +csrf',
+  'POST /client/login/code/resend public +csrf',
   'POST /client/logout public +csrf',
   'POST /client/orders/{}/acknowledge-oc client +csrf',
   'POST /client/orders/{}/buyer-po client +csrf',
@@ -318,7 +324,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       if (res.status !== 302 || res.headers.location !== '/login') wrong.push(`${label(route)} → ${res.status} ${res.headers.location}`);
       checked++;
     }
-    expect(checked).toBe(41);
+    expect(checked).toBe(42); // D-265: + POST /account/backup-codes
     expect(wrong).toEqual([]);
   }, 60000);
 
@@ -406,7 +412,7 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
       }
       checked++;
     }
-    expect(checked).toBe(64);
+    expect(checked).toBe(69); // D-265: + 5 login-code POSTs
     expect(wrong).toEqual([]);
   }, 120000);
 
@@ -429,13 +435,13 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
     for (const route of routes().filter((r) => r.method === 'GET' && !r.pattern.includes(':'))) {
       const agent = await agentFor(route.guard);
       const res = await agent.get(route.pattern);
-      const redirectsOnPurpose = ['/2fa', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement' /* 404 until a signed agreement is on file */, '/associate/prices' /* D-255: to the catalogue */, '/pricing/line-quote' /* D-255: 404 JSON without a product */].includes(route.pattern);
+      const redirectsOnPurpose = ['/2fa', '/client/login/code', '/gallery/file', '/company-assets/preview', '/choose-department', '/associate/login/code', '/associate/logout', '/associate/agreement' /* 404 until a signed agreement is on file */, '/associate/prices' /* D-255: to the catalogue */, '/pricing/line-quote' /* D-255: 404 JSON without a product */].includes(route.pattern);
       if (res.status >= 500 || (res.status !== 200 && !redirectsOnPurpose) || (res.status === 200 && (res.text || res.body || '').length === 0)) {
         failed.push(`${label(route)} → ${res.status}`);
       }
       checked++;
     }
-    expect(checked).toBe(38);
+    expect(checked).toBe(39); // D-265: + GET /client/login/code
     expect(failed).toEqual([]);
   }, 120000);
 
@@ -466,7 +472,13 @@ describe('Routes without a permission check (QA Round 5, R5-14)', () => {
 
     const user = await createUser('Admin', { twoFa: true });
     const agent = await publicAgent();
-    const login = await agent.post('/login').type('form').send({ _csrf: agent.csrf, email: user.email, password: PASSWORD });
+    global.__D265_MANUAL_LOGIN_CODE__ = true; // see the raw code step (tests/support/loginCodeAuto.js)
+    let login;
+    try {
+      login = await agent.post('/login').type('form').send({ _csrf: agent.csrf, email: user.email, password: PASSWORD });
+    } finally {
+      global.__D265_MANUAL_LOGIN_CODE__ = false;
+    }
     expect(login.headers.location).toBe('/2fa');
     const page = await agent.get('/2fa');
     expect(page.status).toBe(200);

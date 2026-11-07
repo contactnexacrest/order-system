@@ -70,6 +70,8 @@ final class UserRepository
             'force' => $forceChange ? 1 : 0,
             'id'    => $userId,
         ]);
+        // D-265: a password change or reset forgets every remembered browser of this person.
+        \App\Services\RememberBrowserService::forgetAll($userId);
     }
 
     /**

@@ -59,7 +59,7 @@ describe('Email Templates completeness — 7 system emails now admin-editable (9
     return {
       two_factor_code: [
         'Your NexaCrest login verification code',
-        'Your verification code is: {code}\nThis code expires in 5 minutes. If you did not request this, contact your administrator.',
+        'Your verification code is: {code}\nThis code expires in 10 minutes. If you did not request this, contact your administrator.',
       ],
       client_portal_invite: [
         'Your NexaCrest order portal access',

@@ -269,8 +269,8 @@ There are **three separate sign-ins** that never open each other's pages, plus s
 
 | Who | Sign-in | What they do | Guard |
 |---|---|---|---|
-| **Staff** (all departments) | `/login` (+ 2FA if enabled) | Run orders, documents, payments, reports, settings | `SessionAuth` + `PermissionCheck` |
-| **Buyers (clients)** | `/client/login` | See their own orders, download released documents, report payments, acknowledge the OC, give feedback, request reorders, raise complaints | `ClientAuth` |
+| **Staff** (all departments) | `/login` + a 6-digit code e-mailed at every login (D-265) | Run orders, documents, payments, reports, settings | `SessionAuth` + `PermissionCheck` |
+| **Buyers (clients)** | `/client/login` + a 6-digit code e-mailed at every login (D-265) | See their own orders, download released documents, report payments, acknowledge the OC, give feedback, request reorders, raise complaints | `ClientAuth` |
 | **Associates** (outside agents who introduce buyers) | `/associate/login` (+ e-mailed code) | Their own clients and orders, quotes (by access level), commission and payouts. Never costs, margins or supplier prices. | `AssociateAuth` |
 | Prospects, buyers, suppliers, partners **without login** | Token links: `/quotation-details`, `/pi-details/{token}`, `/buyer-action/{token}`, `/payment-action/{token}`, `/supplier-action/{token}`, `/vendor-details/{token}`, `/associate-register/{token}`, `/invite/{token}` | Fill in their details, upload a signed PO or acknowledgment, send payment proof | Random token, hashed/encrypted at rest; rate limits on public forms |
 
@@ -868,7 +868,7 @@ Payment-request e-mails include the Payment Action Link paragraph. Sending the O
 |---|---|---|
 | **Passwords** | `AuthService`, `bcrypt` (Node) / `password_hash` (PHP) | Password checked *before* revealing account state (AUTH-04/05); dummy hash for unknown e-mails. Expiry (`password_expiry_days`) and forced change on first login / reset. |
 | **Lockout** | `login_attempts`, `failed_login_lockout_count` (5), `lockout_duration_minutes` (15) | Failed attempt recorded before counting (L-03). |
-| **2FA** | `TwoFactorService`, `two_fa_backup_codes`; `users.two_fa_enabled`, `two_fa_method` | E-mail code (always available) or SMS if `SMS_GATEWAY_API_KEY` is set (falls back to e-mail). In `APP_ENV=local` the code is shown on screen. Associates get an e-mailed code at login. |
+| **Login code (D-265, 7 Nov 2026)** | `TwoFactorService`, `BackupCodeService`, `RememberBrowserService` (Node `twoFactorService.js`, `backupCodeService.js`, `rememberBrowserService.js`); tables `two_fa_backup_codes`, `login_remembered_browsers`; setting `login_remember_browser_days` | **Every staff member (every role) and every buyer** enters a 6-digit code e-mailed after the password, at every login. Mandatory: it cannot be switched off per person (`users.two_fa_enabled` / `two_fa_method` are no longer read; the Users list shows "Required"). Valid 10 minutes, 5 tries (then sign in again), "Send me a new code" at most once a minute; always e-mail (SMS stays off); sent as security mail, so it goes out even when business e-mail is switched off and is never redirected. Each portal has its own pending slot (`_2fa_pending` staff, `_client_2fa_pending` buyer). Staff: `/2fa`, `/2fa/resend`, `/2fa/backup`; buyers: `/client/login/code`, `/client/login/code/resend`. Staff "Log in as this client" is unaffected. **Emergency backup codes:** an effective Super Admin or anyone holding `manage_company_settings` (MD, ED, Admin) can make 10 one-time codes on My Account (current password needed; shown once; stored hashed; a new set replaces the old) and use one on the code screen ("Use a backup code instead", shown only to them; counts against the same 5 tries). Each use is audited (`LOGIN_BACKUP_CODE_USED`) and every `manage_company_settings` holder gets an in-app notice and e-mail. **Remember this browser:** Admin › Settings › Security › `login_remember_browser_days` (default 0 = off, most 90). When above 0, staff (never buyers or associates) may tick "Remember this browser" on the code screen: an HttpOnly, SameSite=Lax, Secure-except-local cookie `nexacrest_trusted_browser` (`selector.validator.HMAC` signed with `APP_ENCRYPTION_KEY`) skips the code on that browser for that person only; the server keeps a SHA-256 of the validator and the person's `session_version`. A password change or reset deletes the rows and bumps `session_version`; setting the days to 0 ends every remembered browser. In `APP_ENV=local` the code is shown on screen. Associates keep their own e-mailed code (unchanged). |
 | **Sessions** | `bootstrap.php` / `server.js` | Cookie `nexacrest_session`, HttpOnly, Secure (not in local), SameSite=Lax, ends with the browser; idle timeout in app; `session_regenerate_id` at login. |
 | **Session versioning** | `users.session_version` | Saved at login; compared on every request; a password change bumps it so every other session (a stolen one too) is logged out (L-26). Deactivation also logs out at once (AUTH-10). |
 | **CSRF** | `Helpers/Csrf` + `Middleware/CsrfCheck` (Node `helpers/csrf.js`, `middleware/csrfCheck.js`) | One random 64-hex token per session, hidden field `_csrf`, `hash_equals` check on every POST route. A failed check redirects to the right login page; an over-size upload gives a clear 413 instead (UP-03). |
@@ -1223,7 +1223,7 @@ Edit › Departments**. An ended membership stays on record; from the next
 day it cannot be chosen, and if someone is working in it at that moment it
 stops at once.
 
-**"Log in as".** After password (and 2FA):
+**"Log in as".** After password and the e-mailed code (D-265):
 
 - One membership → straight in, working as that department.
 - Several → `/choose-department` asks which; "Start here next time" sets
@@ -3816,7 +3816,7 @@ The business view is `docs/guides/GO_LIVE_CHECKLIST.md` (tick it top to bottom o
 
 Example (PHP on Bluehost): `0 * * * * php /home/<cpaneluser>/nexacrest_webapp/app/cron/zoho_sync.php >> /home/<cpaneluser>/logs/zoho_sync.log 2>&1`. Node: `cd /opt/nexacrest_node/app && /usr/bin/node src/jobs/zohoSync.js >> /var/log/nexacrest/zoho_sync.log 2>&1`. On Node, use **either** cron **or** `RUN_JOBS_IN_PROCESS=true` (node-cron inside the web process), never both, or every job fires twice.
 
-**7. Backups set-up** (§12.3), then **first login** (md@email.com / the seeded password `ChangeMe#2026`, forced change, then 2FA), company settings, company assets, pricing, commission and incentive settings, people, products, and a **dry run in Test Mode** (references get a `TEST-` prefix) with one order taken to closure. All in the go-live checklist, sections C–F.
+**7. Backups set-up** (§12.3), then **first login** (md@email.com / the seeded password `ChangeMe#2026`, forced change, then the e-mailed login code — on a first install with e-mail not yet set up, read it from the server log or set up mail first; then make the MD and Admin backup codes on My Account), company settings, company assets, pricing, commission and incentive settings, people, products, and a **dry run in Test Mode** (references get a `TEST-` prefix) with one order taken to closure. All in the go-live checklist, sections C–F.
 
 ### 12.2 Daily and weekly checks
 
@@ -4017,7 +4017,6 @@ These two decisions were given while this handbook was written. They are not yet
 | PAR-4 | Password-hash format differs across stacks (`$2y$` vs `$2b$`) | Each stack verifies its own; matters only if one database is shared | D-258 |
 | PAR-7 | Test coverage differs between stacks: a few test files exist on one side only (Node `buyerPoActionLink`, `govtExportBenefitsGate`, `smtpEncryptionSetting`; PHP `ReasonValidator`, `DeadlockRetryTest`, the migration-convention tests), and the division Zoho pushes, the restore check with bank charges, milestone rows in the match check and retry double-post protection have no fake-transport test on either stack | Partly covered by the QA batch 4 tests; the rest waits for a priority call | D-258, master plan G14 |
 | MAIL-10c | SMTP login difference between stacks | — | D-258 |
-| 2FA backup codes | Table `two_fa_backup_codes` exists; no screen uses it | Nothing is broken; email 2FA works | O-22, master plan §10.5 |
 | Associate order-documents page | The "Full" access level includes order documents, but there is no associate-portal page for them yet | Deferred with D-261 | O-22 |
 | A7 generated agreements | Agreements generated by the app | Waits for the lawyer's wording | D-257 (5)(d) |
 | **O-23** | Activating Domestic Trade, Import & Distribution or Merchant Trade | CA, AD bank and lawyer must confirm the starting values | §14.3 |
@@ -4204,7 +4203,7 @@ No code is needed for a category that fits the existing profile (`CategoryDocume
 | Off-site backups | Provider to be chosen; rclone ready | D-260 |
 | Generated associate agreements (A7) | Waits for the lawyer | D-257 (5) |
 | Associate portal page for order documents (Full level) | Deferred | D-261, O-22 |
-| 2FA backup codes | Deferred | O-22 |
+| 2FA backup codes | Built (D-265, 7 Nov 2026) for Super Admin and company-settings holders | D-265 |
 | Kanban boards on more list pages | Owner to decide which | Master plan G12 |
 | Responsive polish (table scroll hints, tap targets) | Priority call pending | O-6 |
 | CFR golden documents | Needs double confirmation | Master plan G8 |

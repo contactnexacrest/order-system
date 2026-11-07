@@ -44,6 +44,7 @@ async function clientCookies(demo, email) {
     await p.getByLabel('Email').fill(email);
     await p.getByLabel('Password').fill(cfg.PASSWORD);
     await p.getByRole('button', { name: 'Sign in' }).click();
+    await require('../lib/demo').enterLoginCode(p, '/client/login/code'); // D-265: the e-mailed code
     await p.waitForURL((u) => !/\/login/.test(u.pathname));
     return await ctx.cookies();
   } finally { await b.close(); }

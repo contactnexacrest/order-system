@@ -149,8 +149,20 @@ async function staffCookies(key = 'md') {
     await page.getByLabel('Email').fill(s.email);
     await page.getByLabel('Password').fill(s.password);
     await page.getByRole('button', { name: 'Sign in' }).click();
+    await enterLoginCode(page, '/2fa'); // D-265: the e-mailed code
     await page.waitForURL((u) => !/\/login/.test(u.pathname));
   });
+}
+
+// D-265: staff and buyers enter a 6-digit code e-mailed after the password. The dev
+// server (APP_ENV=local) shows it on the code page; read it and submit it off camera.
+async function enterLoginCode(page, codePath) {
+  await page.waitForURL((u) => u.pathname !== '/login' && u.pathname !== '/client/login');
+  if (new URL(page.url()).pathname !== codePath) return;
+  const code = (await page.locator('.alert-dev strong').first().innerText()).trim();
+  await page.getByLabel('Code').fill(code);
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await page.waitForURL((u) => u.pathname !== codePath);
 }
 
 // A small one-page PDF that says SAMPLE, for upload demos (no real document is ever used).
@@ -210,4 +222,4 @@ function pricedProduct(associateId, name = 'Black Galaxy Granite (demo)') {
     echo $p;`));
 }
 
-module.exports = { demoStaff, removeStaff, pricedProduct, buyerWithOrders, sampleFile, sql, php, q, associate, removeAssociates, cleanup, snapshot, restore, associateCookies, staffCookies, STAFF };
+module.exports = { demoStaff, removeStaff, pricedProduct, buyerWithOrders, sampleFile, sql, php, q, associate, removeAssociates, cleanup, snapshot, restore, associateCookies, staffCookies, enterLoginCode, STAFF };

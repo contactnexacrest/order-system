@@ -13,6 +13,17 @@ const NEW_PASSWORD = 'Northsea#Portal2026';
 const st = { lcLink: '', ref: '', client: 0, order: 0, lcOrder: 0, pi: '', lcPi: '', payLink: '', setLink: '', resetLink: '' };
 const at = (o, hash = '') => `/orders/${o}${hash}`;
 
+// D-265: the 6-digit login code. The dev server shows it on screen (APP_ENV=local); that
+// developer banner is hidden for the camera, and the code is typed as from the e-mail.
+async function typeLoginCode(d) {
+  const banner = d.page.locator('.alert-dev strong').first();
+  if (!(await banner.count())) return;
+  const code = (await banner.innerText()).trim();
+  await d.page.addStyleTag({ content: '.alert-dev{display:none!important}' });
+  await d.type('input[name="code"]', code, { delay: 90 });
+  await d.clickNav(d.page.getByRole('button', { name: 'Verify' }));
+}
+
 module.exports = {
   code: 'D02',
   file: 'D02-Client-Paying-And-Your-Login.mp4',
@@ -89,12 +100,15 @@ module.exports = {
       await d.type('input[name="password"]', cfg.PASSWORD, { delay: 70 });
       await d.clickNav(d.page.getByRole('button', { name: 'Sign in' }));
     } },
+    // D-265: every sign-in now asks for a 6-digit code e-mailed to the buyer.
+    { caption: 'Your login code', say: 'For your safety, every sign-in asks for one more thing: a six-digit code we e-mail to you. It is valid for ten minutes. Type it in, and click Verify.', do: async (d) => { await typeLoginCode(d); } },
     { caption: 'My Orders', say: 'And here you are, in the client portal. My Orders lists every order you have with us, and its stage. In the next video we look inside an order: your documents, the order confirmation, and messages with our team.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.locator('tr').filter({ hasText: 'NC/' }).first(), 2200); } },
 
     { goto: '/client/account', caption: 'My Account', say: 'One more page worth knowing: My Account. Here you can change your password whenever you like: your current password, then the new one, twice.', do: async (d) => { await d.point('h1', 1000); await d.point(d.page.locator('form').filter({ has: d.page.locator('input[name="current_password"]') }), 2200); } },
     { card: 'list', kicker: 'Good to know', title: 'Your portal login', items: [
       'Your login is your e-mail address: one login for all your orders.',
       'Passwords have at least 10 characters; change yours any time in My Account.',
+      'Every sign-in also asks for a 6-digit code e-mailed to you (valid 10 minutes).',
       'Five wrong passwords in a row lock the login for 15 minutes.',
       'The portal shows final, approved documents only — never drafts.',
     ], say: 'Good to know about your login. It is your e-mail address, and one login covers all your orders with us. Your password has at least ten characters, and you can change it any time in My Account. Five wrong passwords in a row lock the login for fifteen minutes, to keep it safe. And the portal only ever shows final, approved documents, never a draft.' },
@@ -121,6 +135,7 @@ module.exports = {
       await d.type('input[name="email"]', B.BUYER_EMAIL);
       await d.type('input[name="password"]', NEW_PASSWORD, { delay: 70 });
       await d.clickNav(d.page.getByRole('button', { name: 'Sign in' }));
+      await typeLoginCode(d); // D-265
     }, caption: 'A new password', say: 'Open the link, choose a new password, type it twice, and sign in again. One more tip: after five wrong passwords in a row, your login is locked for fifteen minutes, to keep it safe. Wait, or reset your password.' },
 
     // ---------- 4. Letter of Credit ----------

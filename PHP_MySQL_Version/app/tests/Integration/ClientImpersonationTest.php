@@ -220,7 +220,9 @@ final class ClientImpersonationTest extends DbTestCase
         Database::connection()->prepare('INSERT INTO client_logins (client_id, password_hash, force_password_change) VALUES (:cid, :hash, 0)')
             ->execute(['cid' => $clientId, 'hash' => password_hash($password, PASSWORD_DEFAULT)]);
 
-        $result = ClientPortalService::attemptLogin($email, $password);
+        $step1 = ClientPortalService::attemptLogin($email, $password);
+        self::assertSame('requires_code', $step1['status'], 'D-265: the password is followed by the e-mailed code');
+        $result = ClientPortalService::completeLogin($step1['dev_code']);
 
         self::assertSame('ok', $result['status']);
         self::assertSame($clientId, ClientPortalService::currentClientId());

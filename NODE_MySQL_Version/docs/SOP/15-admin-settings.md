@@ -24,6 +24,25 @@ them.
 
 ## What staff do
 
+### Sign-in security (D-265)
+
+Every staff member, in every role, and every buyer enters a 6-digit code
+e-mailed at each login. It cannot be switched off for anyone; the Users list
+shows "2FA: Required". Admin's only choice is **Admin → Settings → Security →
+`login_remember_browser_days`** (default **0** = the code at every login, which
+is recommended; at most 90). Above 0, staff (never buyers or associates) see
+"Remember this browser" on the code screen and skip the code on that browser
+for that many days. A password change or reset forgets every remembered
+browser; putting the setting back to 0 ends them all at once.
+
+**Backup codes.** The MD, ED, Admin and any Super Admin make 10 emergency
+backup codes on **My Account** (current password needed). They are shown once
+and stored hashed; making a new set cancels the old one. On the code screen
+"Use a backup code instead" signs them in if e-mail is down. Each use is in
+the audit log (`LOGIN_BACKUP_CODE_USED`) and every holder of "Manage company
+settings" gets a notice and an e-mail. If a backup code is used unexpectedly,
+reset that person's password at once (Users → Reset password).
+
 ### Roles & Permissions
 
 > **Departments come first (D-214).** Most access is now given by adding a person to a department on their user page — see [Departments & Log in as](./21-departments.md). Edit a role's permissions only when a designation's rights themselves change. **Admin → Departments** lists every department and the role behind each designation.

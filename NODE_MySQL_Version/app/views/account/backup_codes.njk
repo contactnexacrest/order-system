@@ -1,0 +1,9 @@
+<div class="card card-narrow">
+  <h1>Your new backup codes</h1>
+  <div class="alert alert-warning">These codes are shown <b>only now</b>. Print them or write them down and keep them somewhere safe and offline. Your earlier backup codes no longer work.</div>
+  <ol class="backup-code-list" data-backup-codes>
+    {% for c in codes %}<li><code>{{ c }}</code></li>{% endfor %}
+  </ol>
+  <p class="small muted">Each code works once, in place of the e-mailed login code. Using one is recorded and the company-settings holders are told.</p>
+  <p><a class="btn-sm" href="/account">Back to My Account</a></p>
+</div>

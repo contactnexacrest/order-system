@@ -21,7 +21,30 @@ final class AccountController
         View::render('account/edit', [
             'user' => $user,
             'activeUiTemplates' => UiTemplateRepository::active(),
+            // D-265: emergency backup codes, only for Super Admin / company-settings holders.
+            'backupEligible' => \App\Services\BackupCodeService::eligible((int) $user['id']),
+            'backupRemaining' => \App\Services\BackupCodeService::remaining((int) $user['id']),
         ], 'layout/base');
+    }
+
+    /** D-265: a new set of 10 backup codes (the old set stops working), shown once. Needs the current password. */
+    public function generateBackupCodes(array $params): void
+    {
+        $userId = (int) AuthService::currentUser()['id'];
+        if (!\App\Services\BackupCodeService::eligible($userId)) {
+            http_response_code(403);
+            echo 'Backup codes are only for the accounts that run the company.';
+            return;
+        }
+        $user = UserRepository::findById($userId);
+        if (!$user || !password_verify((string) ($_POST['current_password'] ?? ''), (string) $user['password_hash'])) {
+            Flash::set('error', 'Current password is incorrect.');
+            header('Location: /account#backup-codes');
+            return;
+        }
+        $codes = \App\Services\BackupCodeService::generate($userId);
+        header('Cache-Control: no-store');
+        View::render('account/backup_codes', ['codes' => $codes], 'layout/base');
     }
 
     public function updateSignature(array $params): void

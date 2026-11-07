@@ -6,6 +6,8 @@ const flash = require('../helpers/flash');
 const activeDepartmentService = require('../services/activeDepartmentService');
 const authService = require('../services/authService');
 const twoFactorService = require('../services/twoFactorService');
+const backupCodeService = require('../services/backupCodeService');
+const rememberBrowserService = require('../services/rememberBrowserService');
 const userRepository = require('../repositories/userRepository');
 const auditLogRepository = require('../repositories/auditLogRepository');
 const emailTemplateRepository = require('../repositories/emailTemplateRepository');
@@ -65,24 +67,65 @@ async function afterLogin(req, forcePasswordChange) {
 }
 
 async function show2fa(req, res) {
-  if (!twoFactorService.pendingUserId(req)) {
+  const pending = twoFactorService.pendingUserId(req);
+  if (!pending) {
     res.redirect('/login');
     return;
   }
-  res.renderView('auth/two_factor', { devCode: req.session._2fa_dev_code || '' }, 'layout/bare');
+  res.renderView('auth/two_factor', {
+    devCode: req.session._2fa_dev_code || '',
+    // D-265: the emergency backup-code form only for Super Admin / company-settings holders.
+    backupAllowed: await backupCodeService.eligible(pending),
+    rememberDays: await rememberBrowserService.days(),
+  }, 'layout/bare');
 }
 
 async function verify2fa(req, res) {
   const code = String(req.body.code || '').trim();
-  const result = await authService.completeTwoFactor(req, code);
+  const result = await authService.completeTwoFactor(req, code, String(req.body.remember_browser || '') === '1', res);
+  await afterCode(req, res, result);
+}
 
+/** D-265: an emergency backup code instead of the e-mailed code. */
+async function verify2faBackup(req, res) {
+  const result = await authService.completeWithBackupCode(req, String(req.body.backup_code || ''), res);
+  if (result.status === 'not_allowed') {
+    flash.set(req, 'error', 'Backup codes can only be used by the accounts that hold them.');
+    res.redirect('/2fa');
+    return;
+  }
+  await afterCode(req, res, result, 'Invalid or already used backup code.');
+}
+
+/** D-265: a new code by e-mail, at most once a minute. */
+async function resend2fa(req, res) {
+  const r = await twoFactorService.resend(req);
+  if (r.status === 'none') {
+    res.redirect('/login');
+    return;
+  }
+  if (r.status === 'too_soon') {
+    flash.set(req, 'error', `Please wait ${r.wait} second(s) before asking for a new code.`);
+  } else {
+    req.session._2fa_dev_code = r.dev_code || '';
+    flash.set(req, 'success', 'A new code has been sent to your e-mail.');
+  }
+  res.redirect('/2fa');
+}
+
+async function afterCode(req, res, result, error = 'Invalid or expired verification code.') {
   if (result.status === 'ok') {
     delete req.session._2fa_dev_code;
     res.redirect(await afterLogin(req, result.force_password_change));
     return;
   }
-
-  flash.set(req, 'error', 'Invalid or expired verification code.');
+  if (!twoFactorService.pendingUserId(req)) {
+    delete req.session._2fa_dev_code;
+    flash.set(req, 'error', 'That code can no longer be used. Please sign in again to get a new one.');
+    res.redirect('/login');
+    return;
+  }
+  flash.set(req, 'error', error);
   res.redirect('/2fa');
 }
 
@@ -219,6 +262,6 @@ async function logout(req, res) {
 }
 
 module.exports = {
-  showLogin, login, show2fa, verify2fa, showForcePasswordChange, forcePasswordChange,
+  showLogin, login, show2fa, verify2fa, verify2faBackup, resend2fa, showForcePasswordChange, forcePasswordChange,
   showForgotPassword, forgotPassword, showResetPassword, resetPassword, logout,
 };

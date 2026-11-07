@@ -127,7 +127,9 @@ describe('Client portal password admin-reset', () => {
     expect(await auditLogCount('CLIENT_PASSWORD_ADMIN_RESET', clientId)).toBe(1);
 
     const loginReq = fakeReq();
-    const result = await clientPortalService.attemptLogin(loginReq, email, tempPassword);
+    const step1 = await clientPortalService.attemptLogin(loginReq, email, tempPassword);
+    expect(step1.status).toBe('requires_code'); // D-265: then the e-mailed code
+    const result = await clientPortalService.completeLogin(loginReq, step1.dev_code);
     expect(result.status).toBe('ok');
     expect(result.force_password_change).toBe(true);
   });

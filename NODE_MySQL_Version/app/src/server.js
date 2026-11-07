@@ -608,6 +608,8 @@ app.get('/login', asyncHandler(authController.showLogin));
 app.post('/login', verifyCsrf, asyncHandler(authController.login));
 app.get('/2fa', asyncHandler(authController.show2fa));
 app.post('/2fa', verifyCsrf, asyncHandler(authController.verify2fa));
+app.post('/2fa/resend', verifyCsrf, asyncHandler(authController.resend2fa));        // D-265
+app.post('/2fa/backup', verifyCsrf, asyncHandler(authController.verify2faBackup)); // D-265
 // QA-5 AUTH-15: was a bare GET with no CSRF check — a plain
 // <img src="…/logout"> on any page the victim's browser loaded would
 // silently end their session (logout CSRF), usable to repeatedly force out
@@ -671,6 +673,9 @@ app.post('/vendor-details/:token', verifyCsrf, asyncHandler(vendorDetailsControl
 // advance-cleared gate (clientPortalService.provisionIfNeeded).
 app.get('/client/login', asyncHandler(clientPortalController.showLogin));
 app.post('/client/login', verifyCsrf, asyncHandler(clientPortalController.login));
+app.get('/client/login/code', asyncHandler(clientPortalController.showLoginCode));                              // D-265
+app.post('/client/login/code', verifyCsrf, asyncHandler(clientPortalController.verifyLoginCode));             // D-265
+app.post('/client/login/code/resend', verifyCsrf, asyncHandler(clientPortalController.resendLoginCode));      // D-265
 app.post('/client/logout', verifyCsrf, asyncHandler(clientPortalController.logout));
 app.post('/client/end-impersonation', verifyCsrf, asyncHandler(clientPortalController.endImpersonation));
 app.get('/client/set-password/:token', asyncHandler(clientPortalController.showSetPassword));
@@ -724,6 +729,7 @@ app.post('/account/signature', requireAuth, verifyCsrf, asyncHandler(accountCont
 app.post('/account/notifications', requireAuth, verifyCsrf, asyncHandler(accountController.updateNotificationPreference));
 app.post('/account/ui-template', requireAuth, verifyCsrf, asyncHandler(accountController.updateUiTemplate));
 app.post('/account/password', requireAuth, verifyCsrf, asyncHandler(accountController.updatePassword));
+app.post('/account/backup-codes', requireAuth, verifyCsrf, asyncHandler(accountController.generateBackupCodes)); // D-265
 app.get('/holidays', requireAuth, requirePermission('manage_company_settings'), asyncHandler(holidayController.index));
 app.post('/holidays', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.create));
 app.post('/holidays/:id/update', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(holidayController.update));

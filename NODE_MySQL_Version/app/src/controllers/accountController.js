@@ -7,12 +7,38 @@ const passwordHash = require('../helpers/passwordHash');
 const passwordPolicyService = require('../services/passwordPolicyService');
 const authService = require('../services/authService');
 const auditLogRepository = require('../repositories/auditLogRepository');
+const backupCodeService = require('../services/backupCodeService');
 
 /** docs/schema.sql Section AI — self-service staff account page (email signature, self-service password change — a natural home for other self-service settings later). */
 
 async function edit(req, res) {
   const user = await userRepository.findById(req.user.id);
-  res.renderView('account/edit', { user, activeUiTemplates: await uiTemplateRepository.active() }, 'layout/base');
+  res.renderView('account/edit', {
+    user,
+    activeUiTemplates: await uiTemplateRepository.active(),
+    // D-265: emergency backup codes, only for Super Admin / company-settings holders.
+    backupEligible: await backupCodeService.eligible(req.user.id),
+    backupRemaining: await backupCodeService.remaining(req.user.id),
+    backupCount: backupCodeService.COUNT,
+  }, 'layout/base');
+}
+
+/** D-265: a new set of 10 backup codes (the old set stops working), shown once. Needs the current password. */
+async function generateBackupCodes(req, res) {
+  const userId = req.user.id;
+  if (!(await backupCodeService.eligible(userId))) {
+    res.status(403).send('Backup codes are only for the accounts that run the company.');
+    return;
+  }
+  const user = await userRepository.findById(userId);
+  if (!user || !(await passwordHash.verify(String(req.body.current_password || ''), user.password_hash))) {
+    flash.set(req, 'error', 'Current password is incorrect.');
+    res.redirect('/account#backup-codes');
+    return;
+  }
+  const codes = await backupCodeService.generate(userId);
+  res.set('Cache-Control', 'no-store');
+  res.renderView('account/backup_codes', { codes }, 'layout/base');
 }
 
 async function updateSignature(req, res) {
@@ -100,4 +126,4 @@ async function updatePassword(req, res) {
   res.redirect('/account');
 }
 
-module.exports = { edit, updateSignature, updateNotificationPreference, updateUiTemplate, updatePassword };
+module.exports = { edit, updateSignature, updateNotificationPreference, updateUiTemplate, updatePassword, generateBackupCodes };

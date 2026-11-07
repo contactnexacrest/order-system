@@ -72,9 +72,17 @@ A few things that catch people out the first time:
 - **Your very first login forces a password change.** That's deliberate —
   whatever password you were given to start with is never meant to be
   the one you actually use.
-- **A second step may ask for a 6-digit code** sent to your email (this is
-  two-factor authentication, and it isn't optional — see your Admin if
-  you're not receiving the email).
+- **Every login asks for a 6-digit code** e-mailed to you after your
+  password (owner decision D-265). It is valid for 10 minutes; after 5 wrong
+  tries, sign in again. "Send me a new code" works once a minute. It is not
+  optional and cannot be switched off — see your Admin if the e-mail does not
+  arrive. If Admin has switched on "Remember this browser", you may tick it
+  on your own computer to skip the code there for that many days.
+- **MD, ED, Admin and Super Admin: make your backup codes.** My Account →
+  Emergency backup codes → Make new backup codes (current password needed).
+  Keep the 10 codes offline. If e-mail ever stops working, "Use a backup code
+  instead" on the code screen signs you in; each code works once, and every
+  use is recorded and reported to the company-settings holders.
 - **Forgot your password?** The link is right there on this screen. You'll
   always see the same generic confirmation message whether or not the
   email you typed is a real account — that's intentional, not a bug.
@@ -249,7 +257,7 @@ time, from the sidebar, so you never have to go hunting for it.
 
 ## Your first week
 
-- [ ] Log in, set your real password, confirm you're receiving 2FA codes.
+- [ ] Log in, set your real password, confirm you're receiving the 6-digit login codes by e-mail (MD / ED / Admin: also make your backup codes on My Account).
 - [ ] Spend ten minutes just clicking through the sidebar — nothing will
       break, every screen here is safe to just look at.
 - [ ] Open one real, active order and follow its 9-stage tracker top to

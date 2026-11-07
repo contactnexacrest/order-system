@@ -116,9 +116,18 @@ async function loginContext(email) {
   const ctx = await request.newContext({ baseURL: baseUrl(), ignoreHTTPSErrors: true });
   const page = await ctx.get('/login');
   const token = ((await page.text()).match(/name="_csrf" value="([^"]+)"/) || [])[1];
-  const res = await ctx.post('/login', { form: { _csrf: token, email, password: PASSWORD }, maxRedirects: 0 });
-  const loc = res.headers().location || '';
-  if (res.status() >= 400 || /\/login/.test(loc)) {
+  let res = await ctx.post('/login', { form: { _csrf: token, email, password: PASSWORD }, maxRedirects: 0 });
+  let loc = res.headers().location || '';
+  // D-265: every staff login now asks for the 6-digit e-mailed code; the dev server
+  // (APP_ENV=local) shows it on the code page, which is read and submitted here.
+  if (/\/2fa$/.test(loc)) {
+    const codePage = await (await ctx.get('/2fa')).text();
+    const code = (codePage.match(/code is: <strong>(\d{6})<\/strong>/) || [])[1];
+    const codeToken = (codePage.match(/name="_csrf" value="([^"]+)"/) || [])[1];
+    res = await ctx.post('/2fa', { form: { _csrf: codeToken, code: code || '' }, maxRedirects: 0 });
+    loc = res.headers().location || '';
+  }
+  if (res.status() >= 400 || /\/(login|2fa)/.test(loc)) {
     await ctx.dispose();
     throw new Error(`login failed for ${email}: ${res.status()} ${loc}`);
   }

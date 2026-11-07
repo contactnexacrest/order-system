@@ -28,15 +28,36 @@ const ROLES = {
   procurementManager: { email: 'ui-test-procurement-mgr@nexacrest.test', name: 'UI Test Procurement Manager' },
 };
 
+/**
+ * D-265: after the password every staff member and buyer gets a 6-digit code by
+ * e-mail. The dev servers run with APP_ENV=local, which shows the code on the code
+ * page; this reads it and submits it, the way a person types it from the e-mail.
+ */
+async function enterLoginCode(page, codePath) {
+  await page.waitForLoadState('domcontentloaded');
+  if (new URL(page.url()).pathname !== codePath) return;
+  const code = ((await page.locator('.alert-dev strong').first().innerText()) || '').trim();
+  await page.getByLabel('Code').fill(code);
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await page.waitForURL((url) => url.pathname !== codePath);
+}
+
 async function login(page, role = 'admin') {
   const account = ROLES[role];
   if (!account) {
     throw new Error(`Unknown role "${role}" — known roles: ${Object.keys(ROLES).join(', ')}`);
   }
+  await loginAs(page, account.email, PASSWORD);
+}
+
+/** Signs a staff e-mail in: password, then the e-mailed code (D-265). */
+async function loginAs(page, email, password = PASSWORD) {
   await page.goto('/login');
-  await page.getByLabel('Email').fill(account.email);
-  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL((url) => url.pathname !== '/login');
+  await enterLoginCode(page, '/2fa');
 }
 
 async function logout(page) {
@@ -48,10 +69,12 @@ async function loginClient(page, email, password) {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL((url) => url.pathname !== '/client/login');
+  await enterLoginCode(page, '/client/login/code');
   // Final QA run: wait until the portal page has replaced the login page, so a check made right after
   // (e.g. the phone-width overflow check) never measures a page that is still navigating.
   await page.waitForURL((url) => !/\/client\/login/.test(url.pathname));
   await page.waitForLoadState('load');
 }
 
-module.exports = { login, logout, loginClient, ROLES, PASSWORD };
+module.exports = { login, loginAs, enterLoginCode, logout, loginClient, ROLES, PASSWORD };

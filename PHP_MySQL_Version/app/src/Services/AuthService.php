@@ -78,27 +78,19 @@ final class AuthService
         UserRepository::resetFailedLogins((int) $user['id']);
         LoginAttemptRepository::record((int) $user['id'], $email, $ip, true);
 
-        if ($user['two_fa_enabled']) {
-            $method = $user['two_fa_method'] ?? 'email';
-            $destination = $method === 'sms' ? ($user['phone'] ?? '') : $user['email'];
-
-            if ($method === 'sms' && !SmsService::isAvailable()) {
-                // Gateway not configured after all — fall back to email rather
-                // than lock the user out of their own account.
-                $method = 'email';
-                $destination = $user['email'];
-            }
-
-            $devCode = TwoFactorService::issueCodeFor((int) $user['id'], $method, $destination);
-            return ['status' => 'requires_2fa', 'method' => $method, 'dev_code' => $devCode];
+        // Owner decision D-265 (7 Nov 2026): every staff member, every role, enters a
+        // 6-digit code e-mailed at each login. It cannot be switched off per person;
+        // only a browser the person chose to remember (Admin setting, default off) skips it.
+        if (RememberBrowserService::isRemembered($user)) {
+            self::establishSession((int) $user['id']);
+            AuditLogRepository::log((int) $user['id'], 'LOGIN_SUCCESS_REMEMBERED_BROWSER', 'users', (int) $user['id']);
+            return ['status' => 'ok', 'force_password_change' => (bool) $user['force_password_change']];
         }
-
-        self::establishSession((int) $user['id']);
-        AuditLogRepository::log((int) $user['id'], 'LOGIN_SUCCESS', 'users', (int) $user['id']);
-        return ['status' => 'ok', 'force_password_change' => (bool) $user['force_password_change']];
+        $devCode = TwoFactorService::issueCodeFor((int) $user['id'], 'email', (string) $user['email']);
+        return ['status' => 'requires_2fa', 'method' => 'email', 'dev_code' => $devCode];
     }
 
-    public static function completeTwoFactor(string $submittedCode): array
+    public static function completeTwoFactor(string $submittedCode, bool $rememberBrowser = false): array
     {
         $userId = TwoFactorService::pendingUserId();
         if (!$userId) {
@@ -110,9 +102,37 @@ final class AuthService
             return ['status' => 'invalid_code'];
         }
 
+        return self::finishCodeLogin($userId, 'LOGIN_SUCCESS_2FA', $rememberBrowser);
+    }
+
+    /** D-265: an emergency backup code instead of the e-mailed one (Super Admin / company-settings holders only). */
+    public static function completeWithBackupCode(string $backupCode): array
+    {
+        $userId = TwoFactorService::pendingUserId();
+        if (!$userId) {
+            return ['status' => 'no_pending_2fa'];
+        }
+        if (!BackupCodeService::eligible($userId)) {
+            return ['status' => 'not_allowed'];
+        }
+        if (!TwoFactorService::countBackupTry() || !BackupCodeService::consume($userId, $backupCode)) {
+            AuditLogRepository::log($userId, 'LOGIN_BACKUP_CODE_FAILED', 'users', $userId);
+            return ['status' => 'invalid_code'];
+        }
+        TwoFactorService::clear();
+        BackupCodeService::recordUse($userId);
+        return self::finishCodeLogin($userId, 'LOGIN_SUCCESS_BACKUP_CODE', false);
+    }
+
+    private static function finishCodeLogin(int $userId, string $auditAction, bool $rememberBrowser): array
+    {
         $user = UserRepository::findById($userId);
         self::establishSession($userId);
-        AuditLogRepository::log($userId, 'LOGIN_SUCCESS_2FA', 'users', $userId);
+        AuditLogRepository::log($userId, $auditAction, 'users', $userId);
+        if ($rememberBrowser && RememberBrowserService::days() > 0) {
+            RememberBrowserService::remember($userId);
+            AuditLogRepository::log($userId, 'LOGIN_BROWSER_REMEMBERED', 'users', $userId, null, null, null, 'For ' . RememberBrowserService::days() . ' day(s)');
+        }
         return ['status' => 'ok', 'force_password_change' => (bool) ($user['force_password_change'] ?? false)];
     }
 

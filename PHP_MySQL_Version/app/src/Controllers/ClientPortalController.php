@@ -61,12 +61,10 @@ final class ClientPortalController
         $result = ClientPortalService::attemptLogin($email, $password);
 
         switch ($result['status']) {
-            case 'ok':
-                if ($result['force_password_change']) {
-                    header('Location: /client/account');
-                    return;
-                }
-                header('Location: /client');
+            case 'requires_code':
+                // D-265: the buyer finishes signing in with the 6-digit code e-mailed to them.
+                $_SESSION['_client_2fa_dev_code'] = $result['dev_code'] ?? '';
+                header('Location: /client/login/code');
                 return;
             case 'locked_out':
                 Flash::set('error', 'Too many failed attempts. Try again after ' . htmlspecialchars((string) $result['locked_until']) . '.');
@@ -78,6 +76,50 @@ final class ClientPortalController
                 Flash::set('error', 'Incorrect email or password.');
         }
         header('Location: /client/login');
+    }
+
+    /** D-265: the code screen. */
+    public function showLoginCode(array $params): void
+    {
+        if (!\App\Services\TwoFactorService::pendingUserId('client')) {
+            header('Location: /client/login');
+            return;
+        }
+        View::render('client_portal/login_code', ['devCode' => $_SESSION['_client_2fa_dev_code'] ?? ''], 'layout/bare');
+    }
+
+    public function verifyLoginCode(array $params): void
+    {
+        $result = ClientPortalService::completeLogin(trim((string) ($_POST['code'] ?? '')));
+        if ($result['status'] === 'ok') {
+            unset($_SESSION['_client_2fa_dev_code']);
+            header('Location: ' . ($result['force_password_change'] ? '/client/account' : '/client'));
+            return;
+        }
+        if ($result['status'] === 'invalid_code') {
+            Flash::set('error', 'Invalid or expired code.');
+            header('Location: /client/login/code');
+            return;
+        }
+        unset($_SESSION['_client_2fa_dev_code']);
+        Flash::set('error', 'That code can no longer be used. Please sign in again to get a new one.');
+        header('Location: /client/login');
+    }
+
+    public function resendLoginCode(array $params): void
+    {
+        $r = \App\Services\TwoFactorService::resend('client');
+        if ($r['status'] === 'none') {
+            header('Location: /client/login');
+            return;
+        }
+        if ($r['status'] === 'too_soon') {
+            Flash::set('error', 'Please wait ' . $r['wait'] . ' second(s) before asking for a new code.');
+        } else {
+            $_SESSION['_client_2fa_dev_code'] = $r['dev_code'] ?? '';
+            Flash::set('success', 'A new code has been sent to your e-mail.');
+        }
+        header('Location: /client/login/code');
     }
 
     public function logout(array $params): void

@@ -77,7 +77,8 @@ final class ClientLoginEmailAmbiguityTest extends DbTestCase
 
         $result = ClientPortalService::attemptLogin($distinctEmail, self::PASSWORD_B);
 
-        self::assertSame('ok', $result['status'], 'once no longer ambiguous, the client can log in normally again');
+        self::assertSame('requires_code', $result['status'], 'once no longer ambiguous, the client can log in normally again (D-265: then the e-mailed code)');
+        self::assertSame('ok', ClientPortalService::completeLogin($result['dev_code'])['status']);
     }
 
     private function createClientWithPortalLogin(string $email, string $password): int
