@@ -26,12 +26,12 @@ Prepared 5 Nov 2026 (Phase 0C.1), updated 6 Nov 2026. Work through it top to bot
 
 ## B. Install (go-live day)
 
-- [ ] Create the database (utf8mb4). Import `docs/schema.sql`, then `docs/seed.sql`. **No migrations.**
+- [ ] Create the database (utf8mb4). Import `docs/schema.sql`, then `docs/seed.sql`. **No migrations.** The database user needs the **TRIGGER** privilege ("All Privileges" includes it): the schema creates triggers, including the permanent document image store `document_image_blobs` (D-267).
 - [ ] Run the three storage-path `UPDATE`s (README, "First-time setup").
 - [ ] Fill in `app/.env`:
   - [ ] database;
   - [ ] `STORAGE_BASE_PATH`;
-  - [ ] SMTP (Bluehost);
+  - [ ] SMTP (Bluehost) — **must work before the first login**: every login asks for a 6-digit code sent by e-mail (D-265). Until mail works the code is only in the server error log;
   - [ ] `APP_ENV=production`;
   - [ ] a fresh `APP_ENCRYPTION_KEY` (Node also needs `SESSION_SECRET_KEY`);
   - [ ] Zoho: `ZOHO_INTEGRATION_ENABLED=true` and `ZOHO_ENVIRONMENT=production` only when the live Zoho organisation is ready;
@@ -44,13 +44,15 @@ Prepared 5 Nov 2026 (Phase 0C.1), updated 6 Nov 2026. Work through it top to bot
   - [ ] add the `BACKUP_…` lines to `app/.env` (keep 10 years; thin after 120 days);
   - [ ] add the three cron lines (database 02:00, documents 02:30, test-restore 04:00 on the 1st);
   - [ ] run the database and documents backups once by hand; **Admin › Backups** shows both as OK;
-  - [ ] run `scripts/backup_test_restore.sh` once; Admin › Backups shows the test-restore as OK;
+  - [ ] run `scripts/backup_test_restore.sh` once; Admin › Backups shows the test-restore as OK (the database copy includes `document_image_blobs`, the permanent document images — always restore the whole database);
   - [ ] off-site copy: when the provider is chosen, set `BACKUP_OFFSITE_TARGET`.
 
 ## C. First login and company setup
 
 - [ ] Put in the real logins and company details: the seed has role placeholders only (md@email.com, ed@email.com, "Managing Director", info@email.com, phone +91-0000000000, registered office "Registered office address, City – 000000, India"). Run the "Set the real logins and company details" SQL in the README (First-time setup): it lifts the founder-account protection trigger for a moment, sets the real names and e-mails, and puts the trigger back (check with `SHOW TRIGGERS LIKE 'users';`). The company settings can also be changed in Admin › Company settings; the founder logins only through this SQL. No real name or e-mail is ever written into the repository.
-- [ ] Log in with the real MD e-mail and the seeded password, and set a new password. Turn on 2FA.
+- [ ] Log in with the real MD e-mail and the seeded password, set a new password, and enter the 6-digit login code from the e-mail (D-265 — required for every staff member and every buyer; nothing to switch on).
+- [ ] **Backup codes:** the MD and the Admin each open My Account › Backup codes, make the 10 one-time codes and keep them **offline** (printed or in a safe). They are the way in if e-mail stops working.
+- [ ] **Admin › Settings › Security › Remember this browser:** leave it at **0 (off)** — the code is asked at every login.
 - [ ] **Company settings** (`/settings`): the real company details are already seeded — check each once (README, "Placeholder values you must replace before going live"):
   - [ ] director name, bank details and pincode;
   - [ ] **LUT number, financial year and expiry** (expiry seeded as 31 Mar 2027 — confirm);
@@ -69,10 +71,13 @@ Prepared 5 Nov 2026 (Phase 0C.1), updated 6 Nov 2026. Work through it top to bot
   - [ ] payout run monthly on the 5th;
   - [ ] counting order ₹5 lakh, registration 6 months, GST 18%;
   - [ ] Zoho GST tax for commission;
-  - [ ] TDS settings.
+  - [ ] TDS settings;
+  - [ ] **transfer charges abroad: OUR** (NexaCrest pays all bank charges; the associate receives the full amount) and **minimum payout abroad USD 100** (D-264);
+  - [ ] **Zoho account for "Associate payout costs":** first create an expense account with that name in Zoho Books, then choose it here. Until it is chosen, the exchange difference and charges of payments abroad are not sent to Zoho (the Sync Log says so).
 - [ ] **Commission levels and ladder:** check 2 / 5 / 7 / 10% and the ladder steps.
 - [ ] **Team incentive roles:** check the split (Sales 30, Sales Manager 10, Export Documentation 15, Export Compliance 5, Marketing 15, Logistics 15, Accounts 10). The incentive program is on or off, as you decide.
 - [ ] **Team incentive eligibility and caps** (SOP 20, D-259): mark any designation that is not eligible (Admin › Departments), switch off single people if needed (Edit user, MD only), and set the per-role caps per order / per month (Admin › Team Incentives). Empty means no cap.
+- [ ] **SOP access** (Admin › SOP access, SOP 15, D-266): check the chapters each role sees (generous defaults are seeded). MD, ED and Admin always see everything.
 - [ ] **Associate access levels** (SOP 24, D-261): check the level matrix (Associates › Access levels). New associates start on Starter: no prices, no FOB value, no commission %.
 - [ ] **Specifications** (Natural Stone): check the starting values. Products' own changes come where needed.
 - [ ] **Admin › Divisions:** only Export is active. Leave the others "planned".
@@ -95,7 +100,7 @@ Prepared 5 Nov 2026 (Phase 0C.1), updated 6 Nov 2026. Work through it top to bot
 
 - [ ] Switch on **test mode** (references get a `TEST-` prefix).
 - [ ] Create one order end to end: quotation → PI → advance (enter the **INR credited by the bank**) → supplier PO → freight → BL → commercial invoice → balance → original BLs received and endorsed → closure (Close Order needs both). Generate every document and check the PDFs.
-- [ ] Check CAFIN, the profit report, and the incentive and commission register (estimated, then locked).
+- [ ] Check CAFIN, the profit report, and the incentive and commission register: the associate's commission is **fixed automatically** when the balance is cleared (D-264); the team incentive is estimated until the MD locks it.
 - [ ] Check a sales staff login: no cost, margin or commission visible. Check the client portal: no CAFIN, no internal prices.
 - [ ] Check that Zoho received exactly what was expected (only if Zoho is switched on). Log it in the Zoho change log.
 - [ ] **Switch off test mode.** Delete or archive the test order.
@@ -104,5 +109,5 @@ Prepared 5 Nov 2026 (Phase 0C.1), updated 6 Nov 2026. Work through it top to bot
 
 - [ ] Daily: Zoho sync log free of errors; the alert digest arrives.
 - [ ] Weekly: Admin › Backups shows all jobs OK (the daily digest also warns); prices are not stale; the "Ready to lock" list is reviewed.
-- [ ] First payout run: check the "To pay" report, then lock and pay.
+- [ ] First payout run: check the "To pay" report; lock the team incentive (associate commissions are already fixed and become due by themselves); pay. For an associate abroad, enter the rupees the bank debited and the charges.
 - [ ] Gather the real "other costs to FOB" from the first 3–5 shipments and update the %.

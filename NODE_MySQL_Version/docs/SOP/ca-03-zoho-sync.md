@@ -196,6 +196,33 @@ What the order pays out goes to Zoho Books too, on the same sync:
   Zoho GST tax is chosen for commission (Associates → Commission settings →
   Zoho GST tax for commission). Choose it, then sync again." Commission
   without GST is unchanged.
+- **Associate payout costs (owner decision D-264, 7 Nov 2026).** An
+  associate's commission is fixed in rupees when the buyer has paid in full;
+  the bill and the payment above carry that fixed amount. For an associate
+  **abroad**, staff also record the rupees the bank actually debited and the
+  transfer charges (our bank's and the intermediary's — NexaCrest pays them,
+  they are never deducted from the commission); for an associate in India,
+  any bank charges. The **payout difference** (rupees debited + charges −
+  the fixed commission; an exchange gain makes it negative) is a company
+  cost, never an order cost. On the next full sync each paid payout with a
+  difference becomes **one journal** in Books: **Associate payout costs**
+  debited and the bank the payout was paid from credited — a gain books the
+  same two accounts the other way round. Reference
+  `<buyer inquiry ref>-APC-<payout no.>`, dated the payment day; its notes
+  are the D-212 description, e.g. "Associate commission payout — <order> —
+  <associate> — USD 1,250.00 sent, SWIFT ref …; exchange difference ₹812.50
+  and transfer charges ₹1,850.00". The bill payment and this journal
+  together equal what left the bank. **Set-up:** create an expense account
+  "Associate payout costs" in Zoho Books (Accountant → Chart of Accounts)
+  and choose it in **Associates → Commission settings → Zoho account for
+  associate payout costs**. Until it is chosen these journals are skipped,
+  the Sync Log says "…choose the Zoho account… (N waiting)" and the Payouts
+  page shows the same note; nothing is lost — they go at the first sync
+  after it is chosen. A journal is sent once: the payout keeps the Zoho
+  journal id, a repeat sync sends nothing, a corrected payout updates the
+  same journal, and a journal already in Books is found again by its
+  reference. Checked live in the Zoho test organisation on 7 Nov 2026
+  (change log Z-699 … Z-711).
 
 **What stops a bill, payment or expense, with a message in the Sync Log**
 (retried on every sync until fixed):

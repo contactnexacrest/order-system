@@ -116,6 +116,8 @@ storage/
    GRANT ALL PRIVILEGES ON nexacrest.* TO 'nexacrest_app'@'localhost';
    FLUSH PRIVILEGES;
    ```
+   ALL PRIVILEGES includes **TRIGGER**, which the schema needs (founder-login
+   protection, and the permanent document image store `document_image_blobs`, D-267).
 
 3. **Apply the schema and seed data:**
    ```bash
@@ -288,6 +290,15 @@ storage/
    You'll be forced onto `/force-password-change` immediately (by design —
    `force_password_change` is set on both seeded rows).
 
+   **Every login also asks for a 6-digit code sent by e-mail** (owner decision
+   D-265, 7 Nov 2026 — every staff member and every buyer, at every login). So
+   **set up e-mail (SMTP in `app/.env`) before the first login**; until mail works
+   the code only appears in the server error log. On a local machine
+   (`APP_ENV=local`) the code is also shown on the code page. Right after the
+   first login, the MD and the Admin each make their **emergency backup codes**
+   (My Account › Backup codes: 10 one-time codes, shown once) and keep them
+   offline — they are the way in if e-mail ever stops working.
+
 ## Using the app
 
 The UI, workflow, and permission model are functionally identical to the
@@ -454,6 +465,10 @@ Two more scripts in `src/jobs/` are run by hand, never scheduled:
 The backup is **only an extra copy**. The scripts only *read* the live database and the live
 documents (`STORAGE_BASE_PATH`); they never change, move or delete anything live, and they never
 overwrite an older backup. Records must be kept for **10 years**.
+
+The document images of every stored snapshot live in the database table `document_image_blobs`
+(D-267, insert-only, protected by triggers), so the nightly database copy already contains them;
+a restore must load the whole database, never skip that table.
 
 The scripts ship in the repository (`scripts/`, the same files on both stacks):
 
@@ -1462,3 +1477,54 @@ Everything below is in `docs/schema.sql` / `docs/seed.sql` (no migrations, D-241
 - **Questions for the CA, AD bank and lawyer:** `docs/external/`.
 - **Cron:** the same app jobs plus the three backup lines (database, documents, monthly test-restore); run them in IST (`CRON_TZ=Asia/Kolkata`). The daily alert job runs at 06:00 IST on both stacks.
 - **Go-live:** `docs/guides/GO_LIVE_CHECKLIST.md`. Still pending from others: the CA (GST for associates abroad; DOM/IMP GST, e-way bill, e-invoice and duty rates; Zoho account names), the AD bank (merchanting rules and approval) and the lawyer (Associate agreement, Schedule A, the new non-stone T&C clauses).
+
+## Follow-up (added 2026-11-07): associate payments, login codes, SOP access, document images (D-264 … D-267)
+
+Everything below is in `docs/schema.sql` / `docs/seed.sql` (no migrations, D-241) and in the
+Application Handbook. Go-live steps are in `docs/guides/GO_LIVE_CHECKLIST.md`.
+
+- **Login code for everyone (D-265, SOPs 00, 12, 15):** every staff member and every buyer enters
+  a 6-digit code e-mailed after the password, at every login (10 minutes, 5 tries, a new code at
+  most once a minute). It cannot be switched off per person. **E-mail must work before the first
+  login.** MD, ED and Admin make 10 emergency **backup codes** on My Account right after their
+  first login and keep them offline; each use is audited and the MD is told. *Admin › Settings ›
+  Security › Remember this browser* (`login_remember_browser_days`) is **0 = off** by default
+  (code every time); staff only, never buyers or associates. Associates keep their own code.
+- **SOP access by role (D-266, SOP 15):** *Admin › SOP access* — each role sees its own chapters
+  (generous defaults are seeded), extra chapters per person on *Users › Edit*, an on/off switch
+  for the whole library and for each chapter. MD, ED, Admin and System Administrator always see
+  everything; *Getting started* is always visible; a new chapter file is seen only by them until
+  it is ticked for roles.
+- **Associate payments (D-264, SOP 24):** commission is shown to associates in the order currency
+  (USD); associates based in India also see one fixed rupee line once it is fixed. The commission
+  is **fixed automatically** when the buyer has paid in full (rupees at the rate of all buyer
+  payments; it never changes afterwards), becomes due after the set days, and is held while a
+  buyer claim is open; the MD's lock now applies to the team incentive only. India: paid in INR.
+  Abroad: USD / EUR / GBP. Bank charges are never deducted. Set in *Associates › Commission
+  settings*: **transfer charges abroad** (OUR = NexaCrest pays all charges, default; or SHA),
+  **minimum payout abroad** (USD 100; smaller amounts carry to the next run), and the **Zoho
+  account for "Associate payout costs"**.
+- **Associate payout costs in Zoho (D-264, SOP ca-03):** for an associate abroad, staff record the
+  rupees the bank debited and the charges. The difference against the fixed commission (exchange
+  movement + charges) is a company cost, never an order cost, and each paid payout with a
+  difference is posted to Zoho Books as one journal (*Associate payout costs* debited, the paying
+  bank credited; a gain the other way round), reference `<inquiry ref>-APC-<payout id>`, with the
+  D-212 description. **Before go-live: create an expense account "Associate payout costs" in Zoho
+  Books and choose it in *Associates › Commission settings*;** until then the sync skips these
+  journals and says so in the Sync Log. Checked live in the Zoho test organisation on 7 Nov 2026
+  (change log Z-699 … Z-711).
+- **Document images stored once (D-267, owner double-confirmed; SOP 13):** a document's stored
+  snapshot keeps each image (seals, signature, logo, watermark) once, by SHA-256, in the table
+  **`document_image_blobs`**. Database triggers refuse any UPDATE or DELETE on it, so it is
+  **permanent** — it is part of the normal database backup and must be restored with it. Rebuilding
+  a final or superseded copy checks every image and stops with a clear error if one is missing or
+  changed; it never uses a different image. The generated PDFs are unchanged. The schema creates
+  **database triggers** (also the founder-login protection), so the database user that imports
+  `schema.sql` needs the **TRIGGER** privilege — "ALL PRIVILEGES" on the database includes it. On
+  MySQL with binary logging switched on, creating a trigger may also need SUPER or
+  `log_bin_trust_function_creators = 1` (ask the host if the import stops at a `CREATE TRIGGER`).
+- **Data export (Admin › Data export):** the temporary dump file is now always deleted, also when a
+  download is cancelled or the connection drops.
+- **Tutorial videos** (`tutorials/`, catalogue in `tutorials/VIDEO_PROGRESS.md`): videos are never
+  committed; a change that alters a recorded video is listed for the owner before any re-recording
+  (CLAUDE.md).

@@ -264,6 +264,18 @@ shipment when its PO is generated, a Merchant Trade deal when its PO or sale inv
 first generated. A Merchant Trade deal also keeps the RBI limits, the USD rate and the AD
 bank's document checklist from the day it was created.
 
+### Rebuilding a final or superseded copy (owner decision D-267, 7 Nov 2026)
+
+The PDF and Word file of every document stay on the server as the original.
+When a FINAL or SUPERSEDED copy has to be produced again, the app rebuilds it
+from what was kept at the time — including the **exact** seal, signature,
+logo and watermark images that were printed on it, which are kept once in a
+permanent store that nobody can change or delete. Each image is checked
+before use. If an image is missing or has changed, the rebuild **stops**
+with a message naming the document and the image — it never prints a
+different or newer seal or signature. If you see that message, do not try
+again: tell the Admin (the original file of the document is still there).
+
 ## Additional Documents (free-form attachments)
 
 Separate from everything above — these are staff-uploaded extras that don't
