@@ -127,6 +127,8 @@ final class OrderLockGuardMiddlewareTest extends DbTestCase
             // buyer has fully paid, which is often when the order is closed;
             // it writes only the incentive's own rows (manage_incentives).
             '/orders/{id}/incentive', '/orders/{id}/incentive/people', '/orders/{id}/incentive/recalculate', '/orders/{id}/incentive/lock',
+            // D-264 (7 Nov 2026): the MD's "Change commission" on a fixed associate commission — same reason, after full payment.
+            '/orders/{id}/incentive/associate-commission',
             // Owner request (2 Nov 2026): "Sync this order to Zoho now" pushes the
             // order's already-recorded money to Zoho Books; it writes no order data
             // and is needed most after an order has closed (late receipts, benefits).
