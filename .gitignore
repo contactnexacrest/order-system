@@ -2,3 +2,6 @@
 tutorials/out/
 *.mp4
 *.webm
+
+# Temporary agent working copies (never committed)
+.claude/worktrees/
