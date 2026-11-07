@@ -267,7 +267,8 @@ final class DocumentRepository
      */
     public static function storeRenderContext(int $documentId, array $context): void
     {
-        $json = json_encode($context, JSON_INVALID_UTF8_SUBSTITUTE | JSON_PRESERVE_ZERO_FRACTION);
+        // D-267: images are kept once in document_image_blobs; the context holds a SHA-256 reference.
+        $json = json_encode(\App\Services\RenderContextImages::pack($context), JSON_INVALID_UTF8_SUBSTITUTE | JSON_PRESERVE_ZERO_FRACTION);
         if ($json === false) {
             return;
         }
@@ -284,7 +285,8 @@ final class DocumentRepository
             return null;
         }
         $context = json_decode($json, true);
-        return is_array($context) ? $context : null;
+        // D-267: put each referenced image back exactly as stored (refuses a missing or altered image).
+        return is_array($context) ? \App\Services\RenderContextImages::unpack($context, $documentId) : null;
     }
 
     /**

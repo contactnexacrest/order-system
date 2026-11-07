@@ -249,9 +249,11 @@ async function deleteDraft(id) {
 async function storeRenderContext(documentId, context) {
   let json;
   try {
-    json = JSON.stringify(context);
+    // D-267: images are kept once in document_image_blobs; the context holds a SHA-256 reference.
+    json = JSON.stringify(await require('../services/renderContextImages').pack(context));
   } catch (e) {
-    return;
+    if (e instanceof TypeError) return; // not encodable: the old live path, as before
+    throw e;
   }
   await db.execute('UPDATE documents SET render_context_json = :c WHERE id = :id', { c: json, id: documentId });
 }
@@ -260,12 +262,15 @@ async function renderContext(documentId) {
   const row = await db.queryOne('SELECT render_context_json FROM documents WHERE id = :id', { id: documentId });
   const json = row ? row.render_context_json : null;
   if (!json) return null;
+  let context;
   try {
-    const context = JSON.parse(json);
-    return context && typeof context === 'object' ? context : null;
+    context = JSON.parse(json);
   } catch (e) {
     return null;
   }
+  if (!context || typeof context !== 'object') return null;
+  // D-267: put each referenced image back exactly as stored (refuses a missing or altered image).
+  return require('../services/renderContextImages').unpack(context, documentId);
 }
 
 /** QA batch 3 DOC-6: every revision of an order's document type, newest first (superseded ones left out), as find() rows. */

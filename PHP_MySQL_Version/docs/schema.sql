@@ -6243,3 +6243,36 @@ CREATE TABLE sop_user_chapters (
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (added_by) REFERENCES users(id)
 ) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+-- D-267 (pending owner double confirmation): every image a stored render
+-- context (documents.render_context_json) used to embed inline — company seal,
+-- signatory seal, signature, logo, watermark — is kept here ONCE, exactly as it
+-- was embedded (the same data URI string), keyed by its SHA-256. The context
+-- holds only {"__image_ref":"sha256:…"}; re-rendering checks the hash and
+-- refuses a missing or altered image. Insert-only: rows are never changed or
+-- removed (10-year record keeping) — the triggers below refuse it.
+-- ---------------------------------------------------------------------------
+CREATE TABLE document_image_blobs (
+  sha256      CHAR(64)     NOT NULL PRIMARY KEY,
+  mime_type   VARCHAR(100) NOT NULL,
+  byte_length INT UNSIGNED NOT NULL,
+  data_uri    LONGTEXT     CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+DELIMITER $$
+
+CREATE TRIGGER trg_document_image_blobs_bu BEFORE UPDATE ON document_image_blobs
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Document images are kept for record: they cannot be changed.';
+END$$
+
+CREATE TRIGGER trg_document_image_blobs_bd BEFORE DELETE ON document_image_blobs
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Document images are kept for record: they cannot be deleted.';
+END$$
+
+DELIMITER ;
