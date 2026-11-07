@@ -23,7 +23,7 @@ const BUYER = {
 /** Clean stage, the staff who hand off, and an empty intake queue. Returns the actors. */
 async function setup(demo, { withClient = false } = {}) {
   cleanStage(demo);
-  for (const k of ['exec', 'salesmgr', 'accounts', 'fm']) demo.demoStaff(k);
+  for (const k of ['exec', 'salesmgr', 'accounts', 'fm', 'procurement', 'logistics', 'compliance']) demo.demoStaff(k);
   demo.sql("UPDATE users SET is_active = 0 WHERE email NOT LIKE '%@email.com'");
   // Old dev-test submissions would fill the review queues with odd names: cleared inside the snapshot.
   demo.sql('SET FOREIGN_KEY_CHECKS = 0; DELETE FROM pi_intake_submissions; DELETE FROM client_intake_submissions; SET FOREIGN_KEY_CHECKS = 1');
@@ -100,7 +100,89 @@ const moves = {
     App\\Repositories\\OrderPaymentStatusRepository::setLegBankReference(${o}, 'advance', 'UTR SAMPLE0000321');
     App\\Repositories\\OrderPaymentStatusRepository::setAdvanceInrActual(${o}, round($adv * 84.10, 2), $uid('accounts@email.com'));
     App\\Repositories\\OrderPaymentStatusRepository::setLegExchangeRate(${o}, 'advance', 84.10, $uid('accounts@email.com'));`),
+  // Finance Manager clears the advance: the portal login is created and the Order Confirmation goes out.
+  ocSent: (demo, o) => {
+    A.php(demo, `
+      $fm = $uid('finance.manager@email.com');
+      $ord = App\\Repositories\\OrderRepository::find(${o}); $pay = App\\Repositories\\OrderPaymentStatusRepository::find(${o});
+      $fob = App\\Repositories\\OrderProductRepository::totalFobValue(${o});
+      App\\Repositories\\OrderPaymentStatusRepository::markAdvanceCleared(${o}, date('Y-m-d'), $fm);
+      App\\Repositories\\OrderPaymentStatusRepository::setBalanceAmount(${o}, App\\Repositories\\OrderPaymentStatusRepository::balanceDue($fob, (float) $ord['advance_pct'], $pay,
+        App\\Repositories\\PaymentMilestoneRepository::balanceDeduction(${o}, $fob, true)), null);
+      App\\Services\\StageGateService::passAndUnlockNext(${o}, 3, $fm);
+      App\\Services\\ClientPortalService::provisionIfNeeded((int) $ord['client_id'], ${o});`);
+    A.move(demo, 'ocSent', o);
+    return ref(demo, o, 'OC');
+  },
+  // The buyer's acknowledgement (done on camera in D03) — off camera for the later videos.
+  ocAcknowledged: (demo, o) => A.php(demo, `
+    App\\Repositories\\OrderOcAcknowledgmentRepository::markAcknowledged(${o}, 'client_portal', null, null);
+    App\\Services\\StageGateService::passAndUnlockNext(${o}, 4, null);`),
+  // Production, freight, packing, the Bill of Lading, the Commercial Invoice and the scanned BL sent
+  // (starts the balance clock). Leaves the order waiting for the balance.
+  shipped: (demo, o) => {
+    for (const m of ['supplierPo', 'freight', 'packing']) A.move(demo, m, o);
+    A.php(demo, `
+      $log = $uid('logistics@email.com');
+      App\\Repositories\\OrderShippingRepository::recordBl(${o}, 'TSLU-BL-2611-21', date('Y-m-d'));
+      Gate::passAndUnlockNext(${o}, 7, $log);
+      $docApproved(${o}, 'CI', $uid('export.executive@email.com'), $uid('sales.manager@email.com'));
+      Ship::recordScannedBlSent(${o});
+      App\\Services\\BalanceDueService::startFromScannedBl(${o}, date('Y-m-d'));`);
+    return ref(demo, o, 'CI');
+  },
+  // Accounts records the balance from the bank statement (with the rupees credited), the buyer's
+  // report is marked reviewed, and the Finance Manager clears it (Stage 8 passes).
+  balanceCleared: (demo, o) => A.php(demo, `
+    $fm = $uid('finance.manager@email.com'); $acc = $uid('accounts@email.com');
+    $p = Pay::find(${o});
+    Pay::recordBalanceReceived(${o}, (float) $p['balance_amount'], date('Y-m-d'));
+    Pay::setLegBankReference(${o}, 'balance', 'UTR SAMPLE0000789');
+    $rcpt = $pdo->prepare('INSERT INTO order_payment_receipts (order_id, leg, amount, received_on, exchange_rate, bank_reference, inr_credited, bank_rate, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    if (!$pdo->query('SELECT COUNT(*) FROM order_payment_receipts WHERE order_id = ' . (int) ${o} . " AND leg = 'advance'")->fetchColumn()) {
+      $rcpt->execute([${o}, 'advance', (float) $p['advance_amount'], date('Y-m-d'), 84.10, 'UTR SAMPLE0000321', round((float) $p['advance_amount'] * 84.10, 2), 84.10, $acc]);
+    }
+    $rcpt->execute([${o}, 'balance', (float) $p['balance_amount'], date('Y-m-d'), 84.40, 'UTR SAMPLE0000789', round((float) $p['balance_amount'] * 84.40, 2), 84.40, $acc]);
+    foreach (App\\Repositories\\ClientPaymentReportRepository::forOrder(${o}) as $r) App\\Repositories\\ClientPaymentReportRepository::markReviewed((int) $r['id'], $acc);
+    Pay::markBalanceCleared(${o}, date('Y-m-d'), $fm);
+    Gate::passAndUnlockNext(${o}, 8, $fm);`),
+  // Certificate of origin sheet, original BLs back and endorsed, documents couriered: "Documents Sent".
+  docsSent: (demo, o) => {
+    A.move(demo, 'closeReady', o);
+    A.php(demo, `
+      App\\Repositories\\OrderShippingRepository::recordCourierSent(${o}, 'TEST-COURIER-0021');
+      Gate::passAndUnlockNext(${o}, 9, $uid('logistics@email.com'));
+      OrderRepository::markShippedDocsSent(${o});`);
+  },
 };
+
+/** The buyer's portal password (the app created the login when the advance cleared). */
+function portalPassword(demo) {
+  const h = demo.php(`echo password_hash(${JSON.stringify(require('../lib/config').PASSWORD)}, PASSWORD_DEFAULT);`);
+  demo.sql(`UPDATE client_logins cl JOIN clients c ON c.id = cl.client_id SET cl.password_hash = ${demo.q(h)}, cl.is_active = 1, cl.force_password_change = 0, cl.failed_login_count = 0, cl.locked_until = NULL WHERE c.email = ${demo.q(BUYER_EMAIL)}`);
+}
+
+// D-265: the 6-digit login code. The dev server shows it on screen (APP_ENV=local); that
+// developer banner is hidden for the camera, and the code is typed as from the e-mail.
+async function typeLoginCode(d, pause = 3500) {
+  const banner = d.page.locator('.alert-dev strong').first();
+  if (!(await banner.count())) return;
+  const code = (await banner.innerText()).trim();
+  await d.page.addStyleTag({ content: '.alert-dev{display:none!important}' });
+  await d.point('input[name="code"]', pause);
+  await d.type('input[name="code"]', code, { delay: 160 });
+  await d.wait(1200);
+  await d.clickNav(d.page.getByRole('button', { name: 'Verify' }));
+}
+
+/** Signs the buyer in on camera: e-mail, password, then the e-mailed code. */
+async function signIn(d, pause) {
+  await d.goto('/client/login');
+  await d.type('input[name="email"]', BUYER_EMAIL);
+  await d.type('input[name="password"]', require('../lib/config').PASSWORD, { delay: 70 });
+  await d.clickNav(d.page.getByRole('button', { name: 'Sign in' }));
+  await typeLoginCode(d, pause);
+}
 
 /** A set-password link the tutorial knows (the app's own e-mailed token is random and never stored in clear). */
 function setPasswordLink(demo, clientId) {
@@ -110,4 +192,4 @@ function setPasswordLink(demo, clientId) {
   return `/client/set-password/${raw}`;
 }
 
-module.exports = { BUYER, BUYER_EMAIL, setup, createOrder, clientIdByEmail, moves, ref, setPasswordLink, openTo: A.openTo };
+module.exports = { BUYER, BUYER_EMAIL, setup, createOrder, clientIdByEmail, moves, ref, setPasswordLink, portalPassword, typeLoginCode, signIn, openTo: A.openTo };
