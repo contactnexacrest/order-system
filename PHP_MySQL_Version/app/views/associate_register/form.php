@@ -10,8 +10,8 @@ $__err = static fn (string $f): string => isset($errors[$f]) ? '<small class="fo
   <?php if (!empty($errors['form'])): ?><div class="alert alert-error"><?= htmlspecialchars($errors['form']) ?></div><?php endif; ?>
   <form method="post" action="/associate-register/<?= htmlspecialchars($token) ?>">
     <?= Csrf::field() ?>
-    <label>Full name *<input type="text" name="name" required minlength="2" maxlength="150" value="<?= $__v('name') ?>" placeholder="e.g. Rajesh Kumar" autocomplete="name"><?= $__err('name') ?></label>
-    <label>E-mail * <small class="muted">(your portal login)</small><input type="email" name="email" required maxlength="190" value="<?= $__v('email') ?>" placeholder="e.g. rajesh@example.com" autocomplete="email"><?= $__err('email') ?></label>
+    <label>Full name *<input type="text" name="name" required minlength="2" maxlength="150" value="<?= $__v('name') ?>" placeholder="e.g. Full name as on PAN card" autocomplete="name"><?= $__err('name') ?></label>
+    <label>E-mail * <small class="muted">(your portal login)</small><input type="email" name="email" required maxlength="190" value="<?= $__v('email') ?>" placeholder="e.g. name@email.com" autocomplete="email"><?= $__err('email') ?></label>
     <label>Phone *<input type="tel" name="phone" required minlength="6" maxlength="40" pattern="[0-9 +\(\)\-]{6,40}" value="<?= $__v('phone') ?>" placeholder="e.g. +91 98765 43210" autocomplete="tel"><?= $__err('phone') ?></label>
     <label>Based in *
       <select name="based_in" required>

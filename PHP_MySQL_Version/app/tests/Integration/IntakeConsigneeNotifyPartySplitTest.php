@@ -236,7 +236,7 @@ final class IntakeConsigneeNotifyPartySplitTest extends DbTestCase
             'consignee_postcode'               => 'CF1 1AA',
             'consignee_country'                => 'United Kingdom',
             'consignee_vat_eori_tax_no'        => 'GB777777777',
-            'consignee_contact_person'         => 'Morgan Consignee',
+            'consignee_contact_person'         => 'Consignee Logistics Manager',
             'consignee_phone'                  => '+44 29 000 0000',
             'consignee_email'                  => 'morgan@consignee.example',
             'notify_party_same_as_consignee'  => 1,

@@ -40,7 +40,7 @@
           {{ countryField('billing_country', 'billing_country', true, submission.billing_country or '', billingCountryIsOther) }}
         </label>
         <label>Contact Person *
-          <input type="text" name="contact_person" value="{{ submission.contact_person }}" placeholder="e.g., John Doe" required>
+          <input type="text" name="contact_person" value="{{ submission.contact_person }}" placeholder="e.g., Purchasing Manager" required>
         </label>
         <label>Email *
           <input type="email" name="email" value="{{ submission.email }}" placeholder="e.g., name@example.com" required>
@@ -101,7 +101,7 @@
           <small class="muted">UK: EORI No. | Others: Tax Reg. No.</small>
         </label>
         <label>Contact Person
-          <input type="text" name="consignee_contact_person" value="{{ submission.consignee_contact_person or '' }}" placeholder="e.g., Jane Smith">
+          <input type="text" name="consignee_contact_person" value="{{ submission.consignee_contact_person or '' }}" placeholder="e.g., Logistics Manager">
         </label>
         <label>Phone
           <input type="text" name="consignee_phone" value="{{ submission.consignee_phone or '' }}" placeholder="e.g., +1 555 123 4567">

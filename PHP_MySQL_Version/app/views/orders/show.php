@@ -4209,7 +4209,7 @@ $renderPaymentActionLink = function (string $leg, string $anchor) use ($order, $
             </label>
             <label>Amount (INR) *<input type="text" name="amount_inr" required placeholder="e.g. 25000.00"></label>
             <label>Date<input type="date" name="incurred_at" value="<?= date('Y-m-d') ?>"></label>
-            <label>Description * <small class="muted">(who was paid and for what — their invoice / receipt no.)</small><input type="text" name="description" required minlength="10" maxlength="255" placeholder="e.g. Agent commission — Ravi Traders, their invoice RT/45 dated 20 Oct"></label>
+            <label>Description * <small class="muted">(who was paid and for what — their invoice / receipt no.)</small><input type="text" name="description" required minlength="10" maxlength="255" placeholder="e.g. Agent commission — Demo Traders, their invoice DT/45 dated 20 Oct"></label>
             <?php // Owner decision 2026-10-29: real paid costs go to Zoho Books as expenses, paid from here. ?>
             <label>Paid from *
               <?php // Owner request (3 Nov 2026): Company account is the default. ?>

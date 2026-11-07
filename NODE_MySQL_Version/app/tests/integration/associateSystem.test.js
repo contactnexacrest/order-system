@@ -575,10 +575,12 @@ describe('Associate system (owner decision 1 Nov 2026)', () => {
     }
     expect(page).toContain('Buyer paid in full');
     const otherOrder = await agent.get(`/associate/orders/${ob}`);
-    expect([otherOrder.status, otherOrder.text]).toEqual([404, 'Order not found.']); // another associate's order
+    expect(otherOrder.status).toBe(404); // another associate's order
+    expect(otherOrder.text).toContain('Order not found.');
+    expect(otherOrder.text).toContain('Back to your home page'); // shown inside the portal with a way back home
     expect((await agent.get('/associate/commission?format=csv')).text).not.toContain('Portal Buyer B');
     expect((await agent.get(`/associate/clients/${ca}/certificate`)).text).toContain('Client registration certificate');
-    expect((await agent.get(`/associate/clients/${cb}/certificate`)).text).toBe('Client not found.');
+    expect((await agent.get(`/associate/clients/${cb}/certificate`)).text).toContain('Client not found.');
   });
 
   it('staff "view as" is read-only', async () => {

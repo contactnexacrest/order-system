@@ -50,7 +50,7 @@ $selectedTypes = $supplier['types'] ?? [];
           <input type="email" name="email" value="<?= $v('email') ?>" placeholder="e.g., name@example.com">
         </label>
         <label>Contact Person — Name
-          <input type="text" name="contact_person" value="<?= $v('contact_person') ?>" placeholder="e.g., Ramesh Kumar">
+          <input type="text" name="contact_person" value="<?= $v('contact_person') ?>" placeholder="e.g., Sales Manager">
         </label>
         <label>Contact Person — Phone
           <input type="text" name="contact_person_phone" value="<?= $v('contact_person_phone') ?>" placeholder="e.g., +91 98765 43210">

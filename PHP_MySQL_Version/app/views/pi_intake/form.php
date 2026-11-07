@@ -40,7 +40,7 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
           <input type="text" name="billing_country" value="<?= htmlspecialchars($submission['billing_country'] ?? '') ?>" placeholder="e.g., Netherlands" required>
         </label>
         <label>Contact Person *
-          <input type="text" name="contact_person" value="<?= htmlspecialchars($submission['contact_person'] ?? '') ?>" placeholder="e.g., John Doe" required>
+          <input type="text" name="contact_person" value="<?= htmlspecialchars($submission['contact_person'] ?? '') ?>" placeholder="e.g., Purchasing Manager" required>
         </label>
         <label>Email *
           <input type="email" name="email" value="<?= htmlspecialchars($submission['email'] ?? '') ?>" placeholder="e.g., name@example.com" required>
@@ -82,7 +82,7 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
           <input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($submission['consignee_vat_eori_tax_no'] ?? '') ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
         </label>
         <label>Contact Person
-          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($submission['consignee_contact_person'] ?? '') ?>" placeholder="e.g., Jane Smith">
+          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($submission['consignee_contact_person'] ?? '') ?>" placeholder="e.g., Logistics Manager">
         </label>
         <label>Phone
           <input type="text" name="consignee_phone" value="<?= htmlspecialchars($submission['consignee_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
@@ -118,7 +118,7 @@ $incotermIsOther = $incotermValue !== '' && !in_array($incotermValue, array_colu
           <input type="text" name="notify_party_country" value="<?= htmlspecialchars($submission['notify_party_country'] ?? '') ?>" placeholder="e.g., Netherlands">
         </label>
         <label>Contact Person
-          <input type="text" name="notify_party_contact_person" value="<?= htmlspecialchars($submission['notify_party_contact_person'] ?? '') ?>" placeholder="e.g., Jane Smith">
+          <input type="text" name="notify_party_contact_person" value="<?= htmlspecialchars($submission['notify_party_contact_person'] ?? '') ?>" placeholder="e.g., Logistics Manager">
         </label>
         <label>Phone
           <input type="text" name="notify_party_phone" value="<?= htmlspecialchars($submission['notify_party_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">

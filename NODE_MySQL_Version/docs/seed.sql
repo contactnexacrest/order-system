@@ -1679,7 +1679,7 @@ INSERT INTO company_settings (setting_key, setting_value, value_type, category, 
 -- The freight forwarder is included because Step 9a picks one.
 -- ================================================================
 INSERT INTO suppliers (supplier_legal_name, address, city, state, gstin, pan, contact_person, contact_person_phone, phone, email, notes, is_active) VALUES
-  ('Sample Stone Supplier (for testing)', 'Plot 12, RIICO Industrial Area', 'Kota', 'Rajasthan', '08ABCDE1234F1Z5', 'ABCDE1234F', 'Ramesh Kumar', '+91-9800000001', '+91-9800000001', 'sample.supplier@example.com', 'Sample entry for testing a fresh install — deactivate once testing is done.', 1);
+  ('Sample Stone Supplier (for testing)', 'Plot 12, RIICO Industrial Area', 'Kota', 'Rajasthan', '08ABCDE1234F1Z5', 'ABCDE1234F', 'Sales Manager', '+91-0000000000', '+91-0000000000', 'sample.supplier@example.com', 'Sample entry for testing a fresh install — deactivate once testing is done.', 1);
 SET @nx_sample_supplier := LAST_INSERT_ID();
 INSERT INTO supplier_type_links (supplier_id, supplier_type) VALUES
   (@nx_sample_supplier, 'Quarry Owner'),
@@ -1688,8 +1688,8 @@ INSERT INTO supplier_factory_addresses (supplier_id, label, address) VALUES
   (@nx_sample_supplier, 'Kota Factory', 'Plot 12, RIICO Industrial Area, Kota, Rajasthan 324007');
 
 INSERT INTO logistics_partners (partner_name, service_type, address, city, state, phone, email, contact_person_name, contact_person_phone, gstin, pan, notes, is_active) VALUES
-  ('Sample CHA & Transport (for testing)', 'both', 'Office 4, Port Road', 'Chennai', 'Tamil Nadu', '+91-9800000002', 'sample.cha@example.com', 'Suresh Iyer', '+91-9800000002', '33ABCDE1234F1Z6', 'ABCDE1234F', 'Sample entry for testing a fresh install — deactivate once testing is done.', 1),
-  ('Sample Freight Forwarder (for testing)', 'freight_forwarder', 'Suite 9, Harbour View', 'Chennai', 'Tamil Nadu', '+91-9800000003', 'sample.forwarder@example.com', 'Anita Rao', '+91-9800000003', '33ABCDE1234F1Z7', 'ABCDE1234F', 'Sample entry for testing a fresh install — deactivate once testing is done.', 1);
+  ('Sample CHA & Transport (for testing)', 'both', 'Office 4, Port Road', 'Chennai', 'Tamil Nadu', '+91-0000000000', 'sample.cha@example.com', 'Operations Manager', '+91-0000000000', '33ABCDE1234F1Z6', 'ABCDE1234F', 'Sample entry for testing a fresh install — deactivate once testing is done.', 1),
+  ('Sample Freight Forwarder (for testing)', 'freight_forwarder', 'Suite 9, Harbour View', 'Chennai', 'Tamil Nadu', '+91-0000000000', 'sample.forwarder@example.com', 'Operations Manager', '+91-0000000000', '33ABCDE1234F1Z7', 'ABCDE1234F', 'Sample entry for testing a fresh install — deactivate once testing is done.', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;
 

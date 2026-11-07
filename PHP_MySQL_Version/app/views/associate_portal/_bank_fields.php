@@ -1,6 +1,6 @@
 <?php /** Shared by the associate's bank request and Accounts' entry. $__india: based in India. */ ?>
 <div class="field-grid">
-  <label>Account holder's name *<?= $__india ? ' <small class="muted">(as on the PAN)</small>' : '' ?><input type="text" name="holder_name" required minlength="2" maxlength="150" placeholder="e.g. Rajesh Kumar"></label>
+  <label>Account holder's name *<?= $__india ? ' <small class="muted">(as on the PAN)</small>' : '' ?><input type="text" name="holder_name" required minlength="2" maxlength="150" placeholder="e.g. Name exactly as on the bank account"></label>
   <label><?= $__india ? 'Account number' : 'IBAN / account number' ?> *<input type="text" name="account_number" required minlength="6" maxlength="40" autocomplete="off" placeholder="e.g. 50100234567890"></label>
   <label>Re-enter the <?= $__india ? 'account number' : 'IBAN / account number' ?> *<input type="text" name="account_number_confirm" required minlength="6" maxlength="40" autocomplete="off" data-match="account_number" placeholder="Type the account number again"></label>
   <?php if ($__india): ?>

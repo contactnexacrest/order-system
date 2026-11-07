@@ -36,7 +36,7 @@
           <input type="email" name="email" value="<?= htmlspecialchars($partner['email'] ?? '') ?>" placeholder="e.g., name@example.com">
         </label>
         <label>Contact Person — Name
-          <input type="text" name="contact_person_name" value="<?= htmlspecialchars($partner['contact_person_name'] ?? '') ?>" placeholder="e.g., John Doe">
+          <input type="text" name="contact_person_name" value="<?= htmlspecialchars($partner['contact_person_name'] ?? '') ?>" placeholder="e.g., Operations Manager">
         </label>
         <label>Contact Person — Phone
           <input type="text" name="contact_person_phone" value="<?= htmlspecialchars($partner['contact_person_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">

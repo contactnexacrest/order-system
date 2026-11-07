@@ -53,7 +53,7 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
           <?php $countryField('billing_country', 'billing_country', true, $countries, (string) ($submission['billing_country'] ?? '')); ?>
         </label>
         <label>Contact Person *
-          <input type="text" name="contact_person" value="<?= htmlspecialchars($submission['contact_person']) ?>" placeholder="e.g., John Doe" required>
+          <input type="text" name="contact_person" value="<?= htmlspecialchars($submission['contact_person']) ?>" placeholder="e.g., Purchasing Manager" required>
         </label>
         <label>Email *
           <input type="email" name="email" value="<?= htmlspecialchars($submission['email']) ?>" placeholder="e.g., name@example.com" required>
@@ -114,7 +114,7 @@ $countryField = function (string $idPrefix, string $name, bool $required, array 
           <small class="muted">UK: EORI No. | Others: Tax Reg. No.</small>
         </label>
         <label>Contact Person
-          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($submission['consignee_contact_person'] ?? '') ?>" placeholder="e.g., Jane Smith">
+          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($submission['consignee_contact_person'] ?? '') ?>" placeholder="e.g., Logistics Manager">
         </label>
         <label>Phone
           <input type="text" name="consignee_phone" value="<?= htmlspecialchars($submission['consignee_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">

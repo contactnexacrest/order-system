@@ -35952,7 +35952,7 @@
     {
      "name": "contact_person_name",
      "type": "text",
-     "placeholder": "e.g., John Doe"
+     "placeholder": "e.g., Operations Manager"
     },
     {
      "name": "contact_person_phone",
@@ -36038,7 +36038,7 @@
     {
      "name": "contact_person_name",
      "type": "text",
-     "placeholder": "e.g., John Doe"
+     "placeholder": "e.g., Operations Manager"
     },
     {
      "name": "contact_person_phone",
@@ -36131,7 +36131,7 @@
      "name": "name",
      "type": "text",
      "required": true,
-     "placeholder": "e.g., John Doe"
+     "placeholder": "e.g., Export Executive"
     },
     {
      "name": "email",
@@ -36312,7 +36312,7 @@
      "name": "name",
      "type": "text",
      "required": true,
-     "placeholder": "e.g., John Doe"
+     "placeholder": "e.g., Export Executive"
     },
     {
      "name": "email",
@@ -36632,7 +36632,7 @@
     {
      "name": "people_note",
      "type": "text",
-     "placeholder": "e.g. Priya handled sales and documents alone",
+     "placeholder": "e.g. Export Executive handled sales and documents alone",
      "maxlength": "500"
     },
     {
@@ -39731,7 +39731,7 @@
      "name": "description",
      "type": "text",
      "required": true,
-     "placeholder": "e.g. Agent commission — Ravi Traders, their invoice RT/45 dated 20 Oct",
+     "placeholder": "e.g. Agent commission — Demo Traders, their invoice DT/45 dated 20 Oct",
      "minlength": "10",
      "maxlength": "255"
     },
@@ -40911,7 +40911,7 @@
      "name": "readable",
      "type": "text",
      "required": true,
-     "placeholder": "e.g. RAJESHEXIM",
+     "placeholder": "e.g. DEMOEXIM",
      "pattern": "[A-Za-z0-9 ]{3,12}",
      "minlength": "3",
      "maxlength": "12"
@@ -41494,7 +41494,7 @@
      "name": "name",
      "type": "text",
      "required": true,
-     "placeholder": "e.g. Rajesh Kumar",
+     "placeholder": "e.g. Full name as on PAN card",
      "minlength": "2",
      "maxlength": "150"
     },
@@ -41502,7 +41502,7 @@
      "name": "email",
      "type": "email",
      "required": true,
-     "placeholder": "e.g. rajesh@example.com",
+     "placeholder": "e.g. name@email.com",
      "maxlength": "190"
     },
     {
@@ -42834,7 +42834,7 @@
     {
      "name": "email_signature",
      "type": "textarea",
-     "placeholder": "Regards,&#10;Jane Doe&#10;Export Executive&#10;+91-XXXXXXXXXX"
+     "placeholder": "Regards,&#10;Export Executive&#10;NexaCrest International&#10;+91-0000000000"
     }
    ],
    "data_entry": true,
@@ -43025,7 +43025,7 @@
     {
      "name": "{x}",
      "type": "text",
-     "placeholder": "e.g. Rajesh Kumar"
+     "placeholder": "e.g., Sales Manager"
     },
     {
      "name": "contact_person_phone",
@@ -44317,7 +44317,7 @@
      "name": "name",
      "type": "text",
      "required": true,
-     "placeholder": "e.g. Rajesh Kumar",
+     "placeholder": "e.g. Full name as on PAN card",
      "maxlength": "150"
     },
     {
@@ -44595,7 +44595,7 @@
     {
      "name": "note",
      "type": "text",
-     "placeholder": "e.g. Rajesh, met at Stona 2026",
+     "placeholder": "e.g. Met at a trade fair",
      "maxlength": "200"
     }
    ],
@@ -44770,7 +44770,7 @@
      "name": "readable",
      "type": "text",
      "required": true,
-     "placeholder": "e.g. RAJESH",
+     "placeholder": "e.g. DEMO",
      "pattern": "[A-Za-z0-9 ]{3,12}",
      "minlength": "3",
      "maxlength": "12"
@@ -46437,7 +46437,7 @@
     {
      "name": "consignee_contact_person",
      "type": "text",
-     "placeholder": "e.g., Jane Smith"
+     "placeholder": "e.g., Logistics Manager"
     },
     {
      "name": "consignee_phone",
@@ -46486,7 +46486,7 @@
     {
      "name": "notify_party_contact_person",
      "type": "text",
-     "placeholder": "e.g., Jane Smith"
+     "placeholder": "e.g., Logistics Manager"
     },
     {
      "name": "notify_party_phone",
@@ -46501,7 +46501,7 @@
     {
      "name": "contact_person",
      "type": "text",
-     "placeholder": "e.g., John Doe"
+     "placeholder": "e.g., Purchasing Manager"
     },
     {
      "name": "email",
@@ -46621,7 +46621,7 @@
     {
      "name": "consignee_contact_person",
      "type": "text",
-     "placeholder": "e.g., Jane Smith"
+     "placeholder": "e.g., Logistics Manager"
     },
     {
      "name": "consignee_phone",
@@ -46670,7 +46670,7 @@
     {
      "name": "notify_party_contact_person",
      "type": "text",
-     "placeholder": "e.g., Jane Smith"
+     "placeholder": "e.g., Logistics Manager"
     },
     {
      "name": "notify_party_phone",
@@ -46685,7 +46685,7 @@
     {
      "name": "contact_person",
      "type": "text",
-     "placeholder": "e.g., John Doe"
+     "placeholder": "e.g., Purchasing Manager"
     },
     {
      "name": "email",
@@ -47516,7 +47516,7 @@
     {
      "name": "contact_person",
      "type": "text",
-     "placeholder": "e.g. Rajesh Kumar"
+     "placeholder": "e.g., Sales Manager"
     },
     {
      "name": "contact_phone",
@@ -47620,7 +47620,7 @@
     {
      "name": "contact_person",
      "type": "text",
-     "placeholder": "e.g. Rajesh Kumar"
+     "placeholder": "e.g., Sales Manager"
     },
     {
      "name": "contact_phone",
@@ -49383,7 +49383,7 @@
      "name": "contact_person",
      "type": "text",
      "required": true,
-     "placeholder": "e.g., John Doe"
+     "placeholder": "e.g., Purchasing Manager"
     },
     {
      "name": "email",
@@ -49448,7 +49448,7 @@
     {
      "name": "consignee_contact_person",
      "type": "text",
-     "placeholder": "e.g., Jane Smith"
+     "placeholder": "e.g., Logistics Manager"
     },
     {
      "name": "consignee_phone",
@@ -49540,7 +49540,7 @@
      "name": "contact_person",
      "type": "text",
      "required": true,
-     "placeholder": "e.g., John Doe"
+     "placeholder": "e.g., Purchasing Manager"
     },
     {
      "name": "email",
@@ -49605,7 +49605,7 @@
     {
      "name": "consignee_contact_person",
      "type": "text",
-     "placeholder": "e.g., Jane Smith"
+     "placeholder": "e.g., Logistics Manager"
     },
     {
      "name": "consignee_phone",
@@ -49715,7 +49715,7 @@
      "name": "contact_person",
      "type": "text",
      "required": true,
-     "placeholder": "e.g., John Doe"
+     "placeholder": "e.g., Purchasing Manager"
     },
     {
      "name": "email",
@@ -49777,7 +49777,7 @@
     {
      "name": "consignee_contact_person",
      "type": "text",
-     "placeholder": "e.g., Jane Smith"
+     "placeholder": "e.g., Logistics Manager"
     },
     {
      "name": "consignee_phone",
@@ -49826,7 +49826,7 @@
     {
      "name": "notify_party_contact_person",
      "type": "text",
-     "placeholder": "e.g., Jane Smith"
+     "placeholder": "e.g., Logistics Manager"
     },
     {
      "name": "notify_party_phone",
@@ -50511,7 +50511,7 @@
     {
      "name": "contact_person",
      "type": "text",
-     "placeholder": "e.g., Ramesh Kumar"
+     "placeholder": "e.g., Sales Manager"
     },
     {
      "name": "contact_person_phone",

@@ -169,7 +169,9 @@ describe('Associate portal and other QA Round 8 routes, through the real app', (
     const mineInv = await associateInvitationRepository.createLink(Number(a.id), `Invited ${tag}`, 'Netherlands');
     const theirsInv = await associateInvitationRepository.createLink(Number(b.id), `Other ${tag}`, 'Germany');
     const notMine = await post(agent, clients, `/associate/invitations/${theirsInv.id}/cancel`);
-    expect([notMine.status, notMine.text]).toEqual([404, 'Invitation not found.']);
+    expect(notMine.status).toBe(404);
+    expect(notMine.text).toContain('Invitation not found.');
+    expect(notMine.text).toContain('href="/associate">Back to your home page'); // inside the portal, with a way back home
     expect((await associateInvitationRepository.find(theirsInv.id)).status).toBe('created'); // another associate's invitation is untouched
     expect((await post(agent, clients, `/associate/invitations/${mineInv.id}/cancel`)).message).toBe('Invitation cancelled.');
     expect((await associateInvitationRepository.find(mineInv.id)).status).toBe('cancelled');
@@ -193,7 +195,8 @@ describe('Associate portal and other QA Round 8 routes, through the real app', (
     const profile = '/associate/profile';
 
     const notMine = await post(agent, commission, `/associate/commission/${theirs}/invoice`, { invoice_no: 'INV-1' });
-    expect([notMine.status, notMine.text]).toEqual([404, 'Payout not found.']);
+    expect(notMine.status).toBe(404);
+    expect(notMine.text).toContain('Payout not found.');
     expect((await post(agent, commission, `/associate/commission/${mine}/invoice`, { invoice_no: '' })).message).toBe('Enter your invoice number.');
     expect((await post(agent, commission, `/associate/commission/${mine}/invoice`, { invoice_no: 'INV-1' })).type).toBe('error'); // no file attached
     expect(await docs(a.id)).toBe(before); // nothing stored on a refusal

@@ -33,7 +33,7 @@
         <details{% if proposal %} open{% endif %}><summary>{{ 'Choose my code' if not me.personal_code else 'Change my code' }}</summary>
           <form method="post" action="/associate/code/propose" class="inline-form">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <label>Readable part (3–12 letters or digits) *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" value="{{ proposal.readable if proposal else '' }}" placeholder="e.g. RAJESHEXIM"></label>
+            <label>Readable part (3–12 letters or digits) *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" value="{{ proposal.readable if proposal else '' }}" placeholder="e.g. DEMOEXIM"></label>
             <button type="submit" class="btn-sm btn-secondary" title="Try another ending, like a captcha refresh">&#10227; New ending</button>
           </form>
           {% if proposal %}

@@ -38,7 +38,7 @@ $__codeChosen = false;
         <details<?= !empty($proposal) ? ' open' : '' ?>><summary><?= empty($me['personal_code']) ? 'Choose my code' : 'Change my code' ?></summary>
           <form method="post" action="/associate/code/propose" class="inline-form">
             <?= Csrf::field() ?>
-            <label>Readable part (3–12 letters or digits) *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" value="<?= htmlspecialchars((string) ($proposal['readable'] ?? '')) ?>" placeholder="e.g. RAJESHEXIM"></label>
+            <label>Readable part (3–12 letters or digits) *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" value="<?= htmlspecialchars((string) ($proposal['readable'] ?? '')) ?>" placeholder="e.g. DEMOEXIM"></label>
             <button type="submit" class="btn-sm btn-secondary" title="Try another ending, like a captcha refresh">&#10227; New ending</button>
           </form>
           <?php if (!empty($proposal)): ?>

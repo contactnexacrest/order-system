@@ -203,7 +203,9 @@ final class AssociatePortalRoutesTest extends DbTestCase
         $theirsInv = AssociateInvitationRepository::createLink((int) $b['id'], "Other {$this->tag}", 'Germany');
         $this->asAssociate($a);
         $notMine = $this->call('POST', "/associate/invitations/{$theirsInv['id']}/cancel");
-        self::assertSame([404, 'Invitation not found.'], [$notMine['code'], $notMine['body']]);
+        self::assertSame(404, $notMine['code']);
+        self::assertStringContainsString('Invitation not found.', $notMine['body']);
+        self::assertStringContainsString('href="/associate">Back to your home page', $notMine['body'], 'inside the portal, with a way back home');
         self::assertSame('created', AssociateInvitationRepository::find($theirsInv['id'])['status'], 'another associate\'s invitation is untouched');
         $this->asAssociate($a);
         self::assertSame('Invitation cancelled.', $this->call('POST', "/associate/invitations/{$mineInv['id']}/cancel")['flash']);
@@ -228,7 +230,8 @@ final class AssociatePortalRoutesTest extends DbTestCase
 
         $this->asAssociate($a);
         $r = $this->call('POST', "/associate/commission/{$theirs}/invoice", ['invoice_no' => 'INV-1']);
-        self::assertSame([404, 'Payout not found.'], [$r['code'], $r['body']]);
+        self::assertSame(404, $r['code']);
+        self::assertStringContainsString('Payout not found.', $r['body']);
         $this->asAssociate($a);
         self::assertSame('Enter your invoice number.', $this->call('POST', "/associate/commission/{$mine}/invoice", ['invoice_no' => ''])['flash']);
         $this->asAssociate($a);

@@ -215,9 +215,9 @@ describe('Associates Batch 2 (owner, 4 Nov 2026)', () => {
     await call(associatePortalController.chooseCode, { body: { code: 'NXA-WHATEVER-AA' } });
     expect(flash().message).toContain('New ending'); // nothing switches without a proposal
 
-    await call(associatePortalController.proposeCode, { body: { readable: 'Rajesh Exim' } });
+    await call(associatePortalController.proposeCode, { body: { readable: 'Demo Exim' } });
     const p1 = String(session.associate_code_proposal.code);
-    expect(p1).toMatch(/^NXA-RAJESHEXIM-..$/);
+    expect(p1).toMatch(/^NXA-DEMOEXIM-..$/);
     expect(associateCodeService.isValid(p1)).toBe(true);
     const page = await call(associatePortalController.clients);
     expect(page.data.proposal.code).toBe(p1);

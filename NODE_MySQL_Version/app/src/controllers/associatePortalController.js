@@ -71,6 +71,12 @@ function refuseWhenSuspended(req, res, a, back) {
   return true;
 }
 
+/** A missing record (or another associate's) inside the portal layout: 404, same wording, a way back home. */
+async function notFoundPage(req, res, message) {
+  res.status(404);
+  await render(req, res, 'not_found', { message });
+}
+
 function notFound(res, text) {
   res.status(404).send(text);
 }
@@ -226,7 +232,7 @@ async function cancelInvitation(req, res) {
   }
   const inv = await associateInvitationRepository.find(parseInt(req.params.id, 10));
   if (!inv || Number(inv.associate_id) !== Number(a.id)) {
-    notFound(res, 'Invitation not found.');
+    await notFoundPage(req, res, 'Invitation not found.');
     return;
   }
   if (!associateInvitationRepository.isUsable(inv)) {
@@ -300,7 +306,7 @@ async function order(req, res) {
   const id = Number(a.id);
   const rows = await associatePortalRepository.orders(id, parseInt(req.params.id, 10));
   if (!rows.length) {
-    notFound(res, 'Order not found.');
+    await notFoundPage(req, res, 'Order not found.');
     return;
   }
   const events = (await associateEventRepository.forAssociate(id)).filter((e) => Number(e.order_id) === Number(rows[0].id));
@@ -341,7 +347,7 @@ async function uploadInvoice(req, res) {
   const a = await me(req);
   const payout = await incentiveRepository.findPayout(parseInt(req.params.id, 10));
   if (!payout || payout.payee_kind !== 'associate' || Number(payout.associate_id) !== Number(a.id)) {
-    notFound(res, 'Payout not found.');
+    await notFoundPage(req, res, 'Payout not found.');
     return;
   }
   const no = String((req.body || {}).invoice_no || '').trim();
@@ -370,7 +376,7 @@ async function certificate(req, res) {
   const a = await me(req);
   const client = (await associateRepository.clients(Number(a.id))).find((c) => Number(c.id) === parseInt(req.params.id, 10));
   if (!client) {
-    notFound(res, 'Client not found.');
+    await notFoundPage(req, res, 'Client not found.');
     return;
   }
   const events = (await associateEventRepository.forAssociate(Number(a.id), Number(client.id))).reverse();

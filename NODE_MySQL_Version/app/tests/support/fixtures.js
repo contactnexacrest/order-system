@@ -72,6 +72,8 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
   )) || {};
 
   const ref = `JEST-TEST-${Math.random().toString(16).slice(2, 10)}`;
+  // Each order of a client gets its own sequence number (uq_client_sequence), so a test can give one client several orders.
+  const sequenceNo = Number((await db.queryOne('SELECT COALESCE(MAX(sequence_no), 0) + 1 AS n FROM orders WHERE client_id = :id', { id: clientId })).n);
   const inquiryRef = `JEST-${Math.random().toString(16).slice(2, 8)}`;
   const result = await db.execute(
     `INSERT INTO orders
@@ -91,7 +93,7 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
          notify_party_address_line2, notify_party_city, notify_party_postcode, notify_party_country,
          notify_party_contact_person, notify_party_phone, notify_party_email)
      VALUES
-        (:ref, :client_id, 1, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, 'TBC', 'NIL',
+        (:ref, :client_id, :sequence_no, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, 'TBC', 'NIL',
          CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active',
          :port_of_loading_id, :port_of_discharge_id,
          :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text, :payment_method,
@@ -107,7 +109,7 @@ async function createTestOrder(clientId, incotermCode = 'FOB', presetName = 'Sta
          :notify_party_address_line2, :notify_party_city, :notify_party_postcode, :notify_party_country,
          :notify_party_contact_person, :notify_party_phone, :notify_party_email)`,
     {
-      ref, client_id: clientId, inquiry_ref: inquiryRef,
+      ref, client_id: clientId, sequence_no: sequenceNo, inquiry_ref: inquiryRef,
       preset_id: preset.id, incoterm_id: incoterm.id, currency_id: currency.id,
       port_of_loading_id: portOfLoadingId, port_of_discharge_id: portOfDischargeId,
       incoterm_code: incoterm.code,

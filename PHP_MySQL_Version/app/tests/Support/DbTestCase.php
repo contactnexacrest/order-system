@@ -212,6 +212,10 @@ abstract class DbTestCase extends TestCase
         // exactly what OrderRepository::insertRow()'s own resolveSnapshot()
         // does in production, so a test-created order behaves identically
         // to a real one — snapshotted once here, never re-joined.
+        // Each order of a client gets its own sequence number (uq_client_sequence), so a test can give one client several orders.
+        $seqStmt = $pdo->prepare('SELECT COALESCE(MAX(sequence_no), 0) + 1 FROM orders WHERE client_id = :id');
+        $seqStmt->execute(['id' => $clientId]);
+        $sequenceNo = (int) $seqStmt->fetchColumn();
         $stmt = $pdo->prepare(
             'INSERT INTO orders
                 (order_reference, client_id, sequence_no, buyer_inquiry_ref, payment_preset_id, incoterm_id,
@@ -230,7 +234,7 @@ abstract class DbTestCase extends TestCase
                  notify_party_address_line2, notify_party_city, notify_party_postcode, notify_party_country,
                  notify_party_contact_person, notify_party_phone, notify_party_email)
              VALUES
-                (:ref, :client_id, 1, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, \'TBC\', \'NIL\',
+                (:ref, :client_id, :sequence_no, :inquiry_ref, :preset_id, :incoterm_id, :currency_id, \'TBC\', \'NIL\',
                  CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), \'active\',
                  :port_of_loading_id, :port_of_discharge_id,
                  :incoterm_code, :currency_code, :preset_name, :advance_pct, :advance_trigger_text, :payment_method,
@@ -249,6 +253,7 @@ abstract class DbTestCase extends TestCase
         $stmt->execute([
             'ref'         => 'PHPUNIT-TEST-' . bin2hex(random_bytes(4)),
             'client_id'   => $clientId,
+            'sequence_no' => $sequenceNo,
             'inquiry_ref' => 'PHPUNIT-' . bin2hex(random_bytes(3)),
             'preset_id'   => $presetId,
             'incoterm_id' => $incotermId,

@@ -583,13 +583,15 @@ final class AssociateSystemTest extends DbTestCase
             self::assertStringNotContainsString($never, strtolower(strip_tags($page)), "never shown: {$never}");
         }
         self::assertStringContainsString('Buyer paid in full', $page);
-        self::assertSame('Order not found.', $this->render(fn () => $portal->order(['id' => (string) $ob])), 'another associate\'s order');
+        $__other = $this->render(fn () => $portal->order(['id' => (string) $ob]));
+        self::assertStringContainsString('Order not found.', $__other, 'another associate\'s order');
+        self::assertStringContainsString('Back to your home page', $__other, 'shown inside the portal with a way back home');
         self::assertSame(404, http_response_code());
         $_GET = ['format' => 'csv'];
         self::assertStringNotContainsString('Portal Buyer B', $this->render(fn () => $portal->commission([])));
         $_GET = [];
         self::assertStringContainsString('Client registration certificate', $this->render(fn () => $portal->certificate(['id' => (string) $ca])));
-        self::assertSame('Client not found.', $this->render(fn () => $portal->certificate(['id' => (string) $cb])));
+        self::assertStringContainsString('Client not found.', $this->render(fn () => $portal->certificate(['id' => (string) $cb])));
     }
 
     public function testStaffViewAsIsReadOnly(): void

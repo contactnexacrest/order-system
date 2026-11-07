@@ -11,7 +11,7 @@ $__pct = static fn ($r): string => rtrim(rtrim(number_format((float) $r, 2), '0'
   <form method="post" action="<?= $editing ? '/associates/' . (int) $editing['id'] . '/update' : '/associates' ?>" enctype="multipart/form-data">
     <?= Csrf::field() ?>
     <div class="field-grid">
-      <label>Name *<input type="text" name="name" required maxlength="150" value="<?= $__v('name') ?>" placeholder="e.g. Rajesh Kumar"></label>
+      <label>Name *<input type="text" name="name" required maxlength="150" value="<?= $__v('name') ?>" placeholder="e.g. Full name as on PAN card"></label>
       <label>Based in *<select name="based_in" required><option value="india"<?= ($__a['based_in'] ?? 'india') === 'india' ? ' selected' : '' ?>>India</option><option value="abroad"<?= ($__a['based_in'] ?? '') === 'abroad' ? ' selected' : '' ?>>Abroad</option></select></label>
       <label>Country<input type="text" name="country" maxlength="80" value="<?= $__v('country') ?>" placeholder="e.g. Netherlands"></label>
       <label>Paid in (currency) *<select name="currency_code" required>

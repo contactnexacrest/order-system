@@ -67,7 +67,7 @@
     {# Owner decision D-254: old codes keep bringing buyers to the associate unless blocked here (e.g. after a leak). #}
     <form method="post" action="/associates/{{ id }}/code" class="inline-form" data-confirm="Set a new personal code for this associate?">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-      <label>New personal code — readable part *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" placeholder="e.g. RAJESH"></label>
+      <label>New personal code — readable part *<input type="text" name="readable" required minlength="3" maxlength="12" pattern="[A-Za-z0-9 ]{3,12}" placeholder="e.g. DEMO"></label>
       <label class="checkbox-label"><input type="checkbox" name="block_old" value="1"> Block the old code (e.g. it leaked)</label>
       <input type="text" name="block_reason" maxlength="300" minlength="10" placeholder="Why it is blocked (needed when blocking)" aria-label="Why the old code is blocked" data-required-when="block_old=1" data-required-when-message="Say why the old code is blocked (at least 10 characters).">
       <button type="submit" class="btn-sm btn-secondary">Set code</button>

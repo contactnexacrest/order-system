@@ -93,7 +93,7 @@
           <input type="text" name="consignee_vat_eori_tax_no" value="<?= htmlspecialchars($client['consignee_vat_eori_tax_no'] ?? '') ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
         </label>
         <label>Contact Person
-          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($client['consignee_contact_person'] ?? '') ?>" placeholder="e.g., Jane Smith">
+          <input type="text" name="consignee_contact_person" value="<?= htmlspecialchars($client['consignee_contact_person'] ?? '') ?>" placeholder="e.g., Logistics Manager">
         </label>
         <label>Phone
           <input type="text" name="consignee_phone" value="<?= htmlspecialchars($client['consignee_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
@@ -128,7 +128,7 @@
           <input type="text" name="notify_party_country" value="<?= htmlspecialchars($client['notify_party_country'] ?? '') ?>" placeholder="e.g., Netherlands">
         </label>
         <label>Contact Person
-          <input type="text" name="notify_party_contact_person" value="<?= htmlspecialchars($client['notify_party_contact_person'] ?? '') ?>" placeholder="e.g., Jane Smith">
+          <input type="text" name="notify_party_contact_person" value="<?= htmlspecialchars($client['notify_party_contact_person'] ?? '') ?>" placeholder="e.g., Logistics Manager">
         </label>
         <label>Phone
           <input type="text" name="notify_party_phone" value="<?= htmlspecialchars($client['notify_party_phone'] ?? '') ?>" placeholder="e.g., +1 555 123 4567">
@@ -143,7 +143,7 @@
       <legend>Contact</legend>
       <div class="field-grid">
         <label>Contact Person
-          <input type="text" name="contact_person" value="<?= htmlspecialchars($client['contact_person'] ?? '') ?>" placeholder="e.g., John Doe">
+          <input type="text" name="contact_person" value="<?= htmlspecialchars($client['contact_person'] ?? '') ?>" placeholder="e.g., Purchasing Manager">
         </label>
         <label>Email
           <input type="email" name="email" value="<?= htmlspecialchars($client['email'] ?? '') ?>" placeholder="e.g., name@example.com">

@@ -245,10 +245,10 @@ final class AssociateBatch2Test extends DbTestCase
         (new AssociatePortalController())->chooseCode([]);
         self::assertStringContainsString('New ending', $this->flash()['message'], 'nothing switches without a proposal');
 
-        $_POST = ['readable' => 'Rajesh Exim'];
+        $_POST = ['readable' => 'Demo Exim'];
         (new AssociatePortalController())->proposeCode([]);
         $p1 = (string) $_SESSION['associate_code_proposal']['code'];
-        self::assertMatchesRegularExpression('/^NXA-RAJESHEXIM-..$/', $p1);
+        self::assertMatchesRegularExpression('/^NXA-DEMOEXIM-..$/', $p1);
         self::assertTrue(AssociateCodeService::isValid($p1));
         $html = $this->render(fn () => (new AssociatePortalController())->clients([]));
         self::assertStringContainsString($p1, $html);

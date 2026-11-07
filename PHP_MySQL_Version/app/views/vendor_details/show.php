@@ -23,7 +23,7 @@ $bv = static fn(string $k): string => htmlspecialchars((string) ($bank[$k] ?? ''
         <label>Phone<input type="text" name="phone" value="<?= $v('phone') ?>" placeholder="e.g. +91 98765 43210"></label>
         <label>WhatsApp Number<input type="text" name="whatsapp_number" value="<?= $v('whatsapp_number') ?>" placeholder="e.g. +91 98765 43210"></label>
         <label>Email<input type="email" name="email" value="<?= $v('email') ?>" placeholder="e.g. name@company.com"></label>
-        <label>Contact Person — Name<input type="text" name="<?= htmlspecialchars($meta['contact']) ?>" value="<?= $v($meta['contact']) ?>" placeholder="e.g. Rajesh Kumar"></label>
+        <label>Contact Person — Name<input type="text" name="<?= htmlspecialchars($meta['contact']) ?>" value="<?= $v($meta['contact']) ?>" placeholder="e.g., Sales Manager"></label>
         <label>Contact Person — Phone<input type="text" name="contact_person_phone" value="<?= $v('contact_person_phone') ?>" placeholder="e.g. +91 98765 43210"></label>
         <label>Contact Person — WhatsApp<input type="text" name="contact_person_whatsapp" value="<?= $v('contact_person_whatsapp') ?>" placeholder="e.g. +91 98765 43210"></label>
         <label>GSTIN<input type="text" name="gstin" value="<?= $v('gstin') ?>" placeholder="e.g. 29ABCDE1234F1Z5"></label>

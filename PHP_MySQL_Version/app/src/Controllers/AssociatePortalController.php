@@ -46,6 +46,13 @@ final class AssociatePortalController
         return true;
     }
 
+    /** A missing record (or another associate's) inside the portal layout: 404, same wording, a way back home. */
+    private static function notFound(string $message): void
+    {
+        http_response_code(404);
+        self::render('not_found', ['message' => $message]);
+    }
+
     private static function render(string $view, array $data = []): void
     {
         $a = self::me();
@@ -217,8 +224,7 @@ final class AssociatePortalController
         }
         $inv = AssociateInvitationRepository::find((int) $params['id']);
         if ($inv === null || (int) $inv['associate_id'] !== (int) $a['id']) {
-            http_response_code(404);
-            echo 'Invitation not found.';
+            self::notFound('Invitation not found.');
             return;
         }
         if (!AssociateInvitationRepository::isUsable($inv)) {
@@ -293,8 +299,7 @@ final class AssociatePortalController
         $id = (int) self::me()['id'];
         $rows = AssociatePortalRepository::orders($id, (int) $params['id']);
         if ($rows === []) {
-            http_response_code(404);
-            echo 'Order not found.';
+            self::notFound('Order not found.');
             return;
         }
         self::render('order', ['o' => self::visibleOrders([$rows[0]])[0], 'events' => array_values(array_filter(AssociateEventRepository::forAssociate($id), static fn (array $e): bool => (int) $e['order_id'] === (int) $rows[0]['id']))]);
@@ -322,8 +327,7 @@ final class AssociatePortalController
         $a = self::me();
         $payout = IncentiveRepository::findPayout((int) $params['id']);
         if ($payout === null || $payout['payee_kind'] !== 'associate' || (int) $payout['associate_id'] !== (int) $a['id']) {
-            http_response_code(404);
-            echo 'Payout not found.';
+            self::notFound('Payout not found.');
             return;
         }
         $no = trim((string) ($_POST['invoice_no'] ?? ''));
@@ -357,8 +361,7 @@ final class AssociatePortalController
             }
         }
         if ($client === null) {
-            http_response_code(404);
-            echo 'Client not found.';
+            self::notFound('Client not found.');
             return;
         }
         $events = AssociateEventRepository::forAssociate((int) $a['id'], (int) $client['id']);

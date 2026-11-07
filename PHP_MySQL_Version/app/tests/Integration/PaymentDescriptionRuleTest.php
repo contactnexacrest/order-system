@@ -109,9 +109,9 @@ final class PaymentDescriptionRuleTest extends DbTestCase
         self::assertStringContainsString('who was paid and for what', (string) $this->flash()['message']);
         self::assertSame(0, (int) $this->value("SELECT COUNT(*) FROM order_cost_entries WHERE order_id = {$orderId}"));
 
-        $_POST['description'] = 'Agent commission — Ravi Traders, invoice RT/45';
+        $_POST['description'] = 'Agent commission — Demo Traders, invoice DT/45';
         (new OrderFinancialsController())->addCostEntry(['id' => (string) $orderId]);
-        self::assertSame('Agent commission — Ravi Traders, invoice RT/45', $this->value("SELECT description FROM order_cost_entries WHERE order_id = {$orderId}"));
+        self::assertSame('Agent commission — Demo Traders, invoice DT/45', $this->value("SELECT description FROM order_cost_entries WHERE order_id = {$orderId}"));
     }
 
     public function testAnExportBenefitReceivedSaysHowItWasCredited(): void

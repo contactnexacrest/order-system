@@ -81,7 +81,7 @@
           <input type="text" name="consignee_vat_eori_tax_no" disabled value="<?= htmlspecialchars((string) ($old['consignee_vat_eori_tax_no'] ?? '')) ?>" placeholder="UK: EORI No. | Others: Tax Reg. No.">
         </label>
         <label>Contact Person
-          <input type="text" name="consignee_contact_person" disabled value="<?= htmlspecialchars((string) ($old['consignee_contact_person'] ?? '')) ?>" placeholder="e.g., Jane Smith">
+          <input type="text" name="consignee_contact_person" disabled value="<?= htmlspecialchars((string) ($old['consignee_contact_person'] ?? '')) ?>" placeholder="e.g., Logistics Manager">
         </label>
         <label>Phone
           <input type="text" name="consignee_phone" disabled value="<?= htmlspecialchars((string) ($old['consignee_phone'] ?? '')) ?>" placeholder="e.g., +1 555 123 4567">
@@ -115,7 +115,7 @@
           <input type="text" name="notify_party_country" disabled value="<?= htmlspecialchars((string) ($old['notify_party_country'] ?? '')) ?>" placeholder="e.g., Netherlands">
         </label>
         <label>Contact Person
-          <input type="text" name="notify_party_contact_person" disabled value="<?= htmlspecialchars((string) ($old['notify_party_contact_person'] ?? '')) ?>" placeholder="e.g., Jane Smith">
+          <input type="text" name="notify_party_contact_person" disabled value="<?= htmlspecialchars((string) ($old['notify_party_contact_person'] ?? '')) ?>" placeholder="e.g., Logistics Manager">
         </label>
         <label>Phone
           <input type="text" name="notify_party_phone" disabled value="<?= htmlspecialchars((string) ($old['notify_party_phone'] ?? '')) ?>" placeholder="e.g., +1 555 123 4567">
@@ -130,7 +130,7 @@
       <legend>Contact</legend>
       <div class="field-grid">
         <label>Contact Person
-          <input type="text" name="contact_person" value="<?= htmlspecialchars((string) ($old['contact_person'] ?? '')) ?>" placeholder="e.g., John Doe">
+          <input type="text" name="contact_person" value="<?= htmlspecialchars((string) ($old['contact_person'] ?? '')) ?>" placeholder="e.g., Purchasing Manager">
         </label>
         <label>Email
           <input type="email" name="email" value="<?= htmlspecialchars((string) ($old['email'] ?? '')) ?>" placeholder="e.g., name@example.com">

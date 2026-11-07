@@ -108,8 +108,8 @@ describe('Rule D-212 — money records need the reference their description is b
     expect((await flashAfter(await post(`/orders/${orderId}/cost-entries`, fields, page))).message).toContain('who was paid and for what');
     expect(Number(await value('SELECT COUNT(*) AS n FROM order_cost_entries WHERE order_id = :o', { o: orderId }))).toBe(0);
 
-    await post(`/orders/${orderId}/cost-entries`, { ...fields, description: 'Agent commission — Ravi Traders, invoice RT/45' }, page);
-    expect(await value('SELECT description FROM order_cost_entries WHERE order_id = :o', { o: orderId })).toBe('Agent commission — Ravi Traders, invoice RT/45');
+    await post(`/orders/${orderId}/cost-entries`, { ...fields, description: 'Agent commission — Demo Traders, invoice DT/45' }, page);
+    expect(await value('SELECT description FROM order_cost_entries WHERE order_id = :o', { o: orderId })).toBe('Agent commission — Demo Traders, invoice DT/45');
   });
 
   it('an export benefit received says how it was credited', async () => {

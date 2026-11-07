@@ -1463,6 +1463,12 @@ a buyer's portal.
 Never shown at any level: cost, margin, supplier prices, profit, CAFIN,
 buyer payment amounts, other associates.
 
+An invitation, order, payout or client that is not the associate's own (or
+does not exist) answers 404 with the same short wording ("Order not
+found." etc.), shown inside the portal layout with a "Back to your home
+page" link (`associate_portal/not_found`) — it never says whether the
+record exists for someone else.
+
 **Owner decisions of 6 Nov 2026 (business volume and FOB):**
 
 - An associate **may see their commission** (per order, and the portal's

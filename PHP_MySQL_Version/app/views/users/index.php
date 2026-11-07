@@ -73,7 +73,7 @@
     <form method="post" action="/users/create">
       <?= Csrf::field() ?>
       <div class="kv-grid">
-        <label>Name * <input type="text" name="name" placeholder="e.g., John Doe" required></label>
+        <label>Name * <input type="text" name="name" placeholder="e.g., Export Executive" required></label>
         <label>Email * <input type="email" name="email" placeholder="e.g., name@example.com" required></label>
         <label>Phone <input type="text" name="phone" placeholder="e.g., +1 555 123 4567"></label>
         <label>Role

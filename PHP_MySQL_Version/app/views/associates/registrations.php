@@ -25,7 +25,7 @@ $__linkState = static function (array $l): string {
     <h2>Create an associate registration link</h2>
     <form method="post" action="/associates/registrations/links" class="inline-form">
       <?= Csrf::field() ?>
-      <label>For whom (note, optional)<input type="text" name="note" maxlength="200" placeholder="e.g. Rajesh, met at Stona 2026"></label>
+      <label>For whom (note, optional)<input type="text" name="note" maxlength="200" placeholder="e.g. Met at a trade fair"></label>
       <button type="submit" class="btn-sm">Create link</button>
     </form>
     <form method="post" action="/associates/registrations/settings" class="inline-form">

@@ -6,7 +6,7 @@
     <?= Csrf::field() ?>
     <div class="field-grid">
       <label>Name *
-        <input type="text" name="name" value="<?= htmlspecialchars($target['name']) ?>" placeholder="e.g., John Doe" required>
+        <input type="text" name="name" value="<?= htmlspecialchars($target['name']) ?>" placeholder="e.g., Export Executive" required>
       </label>
       <label>Email *
         <input type="email" name="email" value="<?= htmlspecialchars($target['email']) ?>" placeholder="e.g., name@example.com" required>
