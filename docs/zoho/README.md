@@ -32,12 +32,15 @@
   the accounts *Imported Goods Stock*, *IGST Paid on Import*, *Merchanting
   Trade Sales* and *Merchanting Trade Purchases* (names to be confirmed by
   the CA).
-- **Associate payout costs (D-264, 7 Nov 2026) — live check pending.** Each
+- **Associate payout costs (D-264, 7 Nov 2026) — live-checked 7 Nov 2026.** Each
   paid associate payout with an exchange difference or transfer charges goes to
   Books as one journal (*Associate payout costs* against the bank; reference
-  `APC-<order>-<payout id>`). Tested with a mocked Zoho only; the live check in
-  the TEST organisation (log every record here, then remove it) is still to do
-  once the Zoho keys are available in this environment. Before go-live the CA
+  `APC-<order>-<payout id>`; notes start `TEST-` for a test buyer). Live-checked
+  in the TEST organisation 60093754195 (change log Z-699 to Z-703): one journal of
+  ₹2,662.50 posted with the right sides, accounts and D-212 notes; a second sync
+  sent nothing; with the stored id cleared the existing journal was found by its
+  reference and updated, never posted twice; the test journal was then deleted.
+  Before go-live the CA
   creates the expense account and its id is entered in Associates › Commission
   settings.
 - **Before go-live: remove the TEST records (checked 6 Nov 2026).** 48 rows of
