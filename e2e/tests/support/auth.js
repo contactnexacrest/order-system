@@ -37,7 +37,7 @@ async function enterLoginCode(page, codePath) {
   await page.waitForLoadState('domcontentloaded');
   if (new URL(page.url()).pathname !== codePath) return;
   const code = ((await page.locator('.alert-dev strong').first().innerText()) || '').trim();
-  await page.getByLabel('Code').fill(code);
+  await page.locator('input[name="code"]').fill(code);
   await page.getByRole('button', { name: 'Verify' }).click();
   await page.waitForURL((url) => url.pathname !== codePath);
 }
