@@ -42,7 +42,7 @@ h1{font-size:58px;line-height:1.12;font-weight:700;margin:14px 0 18px}
 .deco{position:fixed;right:-160px;top:-160px;width:520px;height:520px;border-radius:50%;border:60px solid rgba(201,150,43,.12)}
 .deco2{position:fixed;left:-120px;bottom:-200px;width:420px;height:420px;border-radius:50%;border:40px solid rgba(255,255,255,.05)}
 ${extraCss}</style></head><body><div class="deco"></div><div class="deco2"></div>${body}
-<div class="foot">NexaCrest International · Associate tutorials · demo data only</div></body></html>`;
+<div class="foot">NexaCrest International · Tutorials · demo data only</div></body></html>`;
 }
 
 function titleCard({ code, group, title, subtitle, minutes }) {

@@ -49,8 +49,12 @@ module.exports = {
     { as: 'exec', goto: at('#step-1-quotation-prepare'), caption: 'Step 1a · Generate Quotation', say: 'Back to the Export Executive. The yellow box has gone, so: Generate Quotation. One click, and the app builds the quotation P D F from the order itself. Nothing is typed twice.', do: async (d) => { await d.clickNav(d.page.locator('#step-1-quotation-prepare').getByRole('button', { name: 'Generate Quotation' })); await d.point('.alert', 1200); } },
     { caption: 'A draft, waiting for review', say: 'The quotation exists, but only as a draft, with a DRAFT watermark. No document reaches a buyer until someone has reviewed and approved it.', do: async (d) => { await d.scrollTo('#document-review-approval'); await d.point('#document-review-approval > summary', 1500); } },
     { as: 'salesmgr', goto: at('#document-review-approval'), caption: 'The Sales Manager assigns a reviewer', say: 'The Sales Manager, who may approve documents, opens Document Review and Approval, picks the draft, and assigns a reviewer: the Managing Director.', do: async (d) => {
-      await d.click(d.page.locator('#document-review-approval details > summary').filter({ hasText: 'Not sent for review' }).first());
-      const sel = d.page.locator('select[name="reviewer_ids[]"]').first();
+      const summary = d.page.locator('#document-review-approval details > summary').filter({ hasText: 'Not sent for review' }).first();
+      await d.click(summary);
+      // The click can land while the page is still settling after the hash jump; make sure the panel is open.
+      const panel = summary.locator('xpath=..');
+      if (!(await panel.evaluate((el) => el.open))) { await panel.evaluate((el) => { el.open = true; }); await new Promise((r) => setTimeout(r, 400)); }
+      const sel = panel.locator('select[name="reviewer_ids[]"]').first();
       const label = (await sel.locator('option').allInnerTexts()).find((t) => /^Managing Director/.test(t));
       await d.select(sel, { label });
       await d.clickNav(d.page.getByRole('button', { name: 'Assign Reviewers' }).first());
@@ -68,7 +72,7 @@ module.exports = {
     { card: 'chapter', title: 'The advance payment', subtitle: 'One person records, another clears.', say: 'Chapter four. The money arrives.', do: async () => { A.move(demo, 'advanceRecorded', order); } },
     { as: 'accounts', goto: at('#step-5d-payment-record'), caption: 'Step 5d · Accounts records the remittance', say: 'The buyer paid the forty percent advance. The Accounts Executive saw it on the bank statement, and recorded it: the amount in dollars, the rupees the bank credited, and the bank reference. The app works out the exchange rate, and writes a full description of the payment by itself.', do: async (d) => { await A.openTo(d, '#step-5d-payment-record'); await d.point(d.page.locator('#step-5d-payment-record').getByText('credited by the bank', { exact: false }).first(), 2500); } },
     { caption: 'Payment Overview', say: 'And the Payment Overview, pinned near the top of every order, shows each payment leg at a glance: what is due, what has been received, and what has been cleared. Here: the advance is received, but not yet cleared.', do: async (d) => { await d.scrollTo('#payment-overview'); await d.click(d.page.locator('#payment-overview > summary')); await d.point('#payment-overview', 2200); } },
-    { as: 'fm', goto: at('#step-5e-payment-confirm'), caption: 'Step 5e · The Finance Manager clears it', say: 'Recording is not clearing. A different person, the Finance Manager, confirms the money has really landed, and marks the advance cleared. The app asks: are you sure? Yes.', do: async (d) => { await A.openTo(d, '#step-5e-payment-confirm'); await d.clickNav(d.page.locator('#step-5e-payment-confirm button[type=submit]').first()); } },
+    { as: 'fm', goto: at('#step-5e-payment-confirm'), caption: 'Step 5e · The Finance Manager clears it', say: 'Recording is not clearing. A different person, the Finance Manager, confirms the money has really landed, and marks the advance cleared. The app asks: are you sure? Yes.', do: async (d) => { await A.openTo(d, '#step-5e-payment-confirm'); await d.clickNav(d.page.locator('#step-5e-payment-confirm button[type=submit]').first()); await d.point('.alert', 1500); } },
     { caption: 'Stage 4 unlocked, portal login created', say: 'Two things just happened. Stage four is unlocked. And the buyer\'s client portal login was created automatically: from now on the buyer can follow the order themselves.', do: async (d) => { await d.point('.alert', 2500); } },
 
     // ---------- 5. Order Confirmation ----------

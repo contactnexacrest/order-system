@@ -32,7 +32,7 @@ its chapters from 1). Cross-references in the narration use the new numbers belo
 | No. | File name | Covers | Status |
 |---|---|---|---|
 | A01 | `A01-Everyone-NexaCrest-In-Ten-Minutes.mp4` | What NexaCrest does; the portals (staff, client, associate); roles and departments in one picture; the 9 stages / 19 steps; Standard vs Kanban; where help lives | checked 2026-11-07: 9.39 min, 68.5 MB, audio −20.3 dB, 18 frames + transition strips reviewed, no card flash. Runs on Admin › Sample Data (old dev test orders set aside inside the DB snapshot; `scripts/_overview.js`). |
-| A02 | `A02-Everyone-One-Order-End-To-End.mp4` (may split into Part 1 / Part 2) | One demo export order from enquiry to closure, switching between every role that touches it (Export Executive, Sales Manager, MD/ED, Accounts, Procurement, Logistics, Compliance, buyer, associate) | not started |
+| A02 | `A02-1-Everyone-One-Order-From-Enquiry-To-Confirmation.mp4` (6.8 min) + `A02-2-Everyone-One-Order-From-Factory-To-Closure.mp4` (5.1 min) | One sample CIF order from enquiry to closure, switching between every role that touches it (associate, Export Executive, Sales Manager, MD, Accounts, Finance Manager, Procurement, Logistics, Export Compliance, the buyer in the portal); routine steps done off camera during cards (scripts/_a02.js); CAFIN named as management-only, never shown to the buyer | recorded + checked 7 Nov 2026 (audio −20.5/−20.7 dB, frames, card changes) |
 
 ## Group D — Clients (buyers): every scenario
 
