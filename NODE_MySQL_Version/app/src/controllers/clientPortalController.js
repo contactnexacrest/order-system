@@ -418,11 +418,21 @@ async function showReorderForm(req, res) {
     return;
   }
 
+  // Buyer-portal fixes (7 Nov 2026): the earlier order's unit is matched whatever its case or spacing
+  // ("sqm" = "SQM"); a unit not in the list is never swapped for the default (PCS) — the buyer picks.
+  const units = await lookupRepository.dropdownOptions('unit');
+  const unitKey = (v) => String(v == null ? '' : v).replace(/\s+/g, '').toUpperCase();
+  const products = (await orderProductRepository.forOrder(orderId)).map((p) => {
+    const unitText = String(p.unit == null ? '' : p.unit).trim();
+    const match = unitText === '' ? null : units.find((o) => unitKey(o.option_value) === unitKey(unitText));
+    return { ...p, unitText, unitPick: match ? match.option_value : null, unitUnknown: unitText !== '' && !match };
+  });
+
   res.renderView('client_portal/reorder', {
     client: await clientPortalService.currentClient(req),
     order,
-    products: await orderProductRepository.forOrder(orderId),
-    units: await lookupRepository.dropdownOptions('unit'),
+    products,
+    units,
     surfaceFinishes: await lookupRepository.dropdownOptions('surface_finish'),
   }, 'layout/client');
 }

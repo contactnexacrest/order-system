@@ -186,7 +186,10 @@ what landed an order in a given bucket:
 
 Opening an order (**View documents**) shows, top to bottom (with a
 **Reorder This** link at the top for a repeat order — see
-[Chapter 17](./17-order-edit-duplication.md)):
+[Chapter 17](./17-order-edit-duplication.md); the reorder form keeps each
+line's unit, matching it to the unit list whatever its capitals or spaces,
+and if the earlier unit is not on the list it shows it and asks the buyer
+to choose one, never switching silently to PCS):
 
 1. **Order Confirmation — Your Acknowledgement Needed** — only appears
    when there's a pending OC acknowledgment; see
@@ -205,7 +208,10 @@ Opening an order (**View documents**) shows, top to bottom (with a
    upload is listed (file name + upload date); re-uploading a corrected
    copy never removes the earlier one. The upload form closes once the
    advance payment has cleared ("Contact your NexaCrest representative if
-   you need to submit an updated copy"), so in practice only a returning
+   you need to submit an updated copy"), and it is never offered on a
+   cancelled or lost order ("This order is cancelled, so a Buyer PO can no
+   longer be uploaded" — the server refuses such an upload too, also through
+   the Buyer Action Link), so in practice only a returning
    client who already has a login uses it — see
    [Chapter 2](./02-stage2-buyer-po.md) for how this feeds the same record
    the internal staff-side upload writes to.

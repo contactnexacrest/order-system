@@ -95,6 +95,10 @@ async function uploadBuyerPo(req, order) {
   // further self-upload serves no purpose and risks the buyer silently
   // replacing the copy staff already confirmed and built later documents
   // against.
+  // Buyer-portal fixes (7 Nov 2026): no Buyer PO on a cancelled or lost order, on either channel.
+  if (order.status === 'cancelled' || order.status === 'lost') {
+    return { ok: false, message: `This order is ${order.status}, so a Buyer PO can no longer be uploaded. Contact your NexaCrest representative if you have a question.` };
+  }
   if (await advanceAlreadyCleared(orderId)) {
     return { ok: false, message: 'The advance payment has already cleared, so self-service Buyer PO upload is now closed. Contact your NexaCrest representative if you need to submit an updated copy.' };
   }
