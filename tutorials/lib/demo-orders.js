@@ -37,11 +37,13 @@ async function main() {
     for (const p of ord.payouts || []) {
       await db.execute(
         `INSERT INTO incentive_payouts (order_id, payee_kind, associate_id, role, amount_inr, amount_fc, currency_code, incentive_month, status,
-            paid_on, paid_inr, tds_inr, tds_rate, tds_section, paid_reference, due_on, note)
-         VALUES (:o, 'associate', :a, 'associate', :inr, :fc, :cur, :m, :st, :paidOn, :paidInr, :tds, :rate, :sec, :ref, :due, :note)`,
+            paid_on, paid_inr, tds_inr, tds_rate, tds_section, paid_reference, due_on, note, fixed_rate, fixed_on, payout_run_on)
+         VALUES (:o, 'associate', :a, 'associate', :inr, :fc, :cur, :m, :st, :paidOn, :paidInr, :tds, :rate, :sec, :ref, :due, :note, :fixedRate, :fixedOn, :runOn)`,
         { o: orderId, a: o.associateId, inr: p.inr, fc: p.fc ?? null, cur: ord.currency || 'USD', m: p.month, st: p.status || 'due',
           paidOn: p.paidOn ?? null, paidInr: p.paidInr ?? null, tds: p.tds ?? 0, rate: p.rate ?? null, sec: p.section ?? null,
-          ref: p.ref ?? null, due: p.due ?? null, note: p.note ?? null }
+          ref: p.ref ?? null, due: p.due ?? null, note: p.note ?? null,
+          // D-264: a commission is fixed (rate and date) when the buyer has paid in full.
+          fixedRate: p.fixedRate ?? null, fixedOn: p.fixedOn ?? null, runOn: p.runOn ?? null }
       );
     }
     out.orders.push({ orderId, reference: ref });

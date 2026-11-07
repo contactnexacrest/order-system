@@ -31,7 +31,7 @@ module.exports = {
       'An order of your client moved to a new stage.',
       'Commission earned, paid, held or released.',
       'Your documents or bank details accepted or rejected; your level changed.',
-    ], say: 'You are told about everything that matters to you. A buyer registered and was accepted. An order moved to a new stage. Commission earned, paid, held, or released. And your documents or bank details accepted or rejected. Most notices also arrive by e-mail, so you do not even have to log in.' },
+    ], say: 'You are told about everything that matters to you. A buyer registered and was accepted. An order moved to a new stage. Commission fixed, paid, held, or released. And your documents or bank details accepted or rejected. Most notices also arrive by e-mail, so you do not even have to log in.' },
     { card: 'list', kicker: 'By level', title: 'Amounts in notices', items: [
       'Starter and Quoting: notices tell you what happened, without order amounts.',
       'Full: notices and e-mails may include the order amounts.',

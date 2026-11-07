@@ -20,7 +20,11 @@ async function typeLoginCode(d) {
   if (!(await banner.count())) return;
   const code = (await banner.innerText()).trim();
   await d.page.addStyleTag({ content: '.alert-dev{display:none!important}' });
-  await d.type('input[name="code"]', code, { delay: 90 });
+  // Let the narration describe the page before the code is typed and Verify is pressed.
+  await d.point('input[name="code"]', 3500);
+  await d.type('input[name="code"]', code, { delay: 160 });
+  await d.wait(1500);
+  await d.point(d.page.getByRole('button', { name: 'Verify' }), 900);
   await d.clickNav(d.page.getByRole('button', { name: 'Verify' }));
 }
 
