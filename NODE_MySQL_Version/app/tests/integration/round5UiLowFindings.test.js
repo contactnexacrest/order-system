@@ -16,7 +16,7 @@ const sopController = require('../../src/controllers/sopController');
 describe('QA Round 5 low UI findings (R5-05 / R5-06 / R5-11)', () => {
   it('SOP README links open the chapter list', async () => {
     const res = { renderView: (view, data) => { res.data = data; }, status() { return res; }, send() {} };
-    await sopController.show({ params: { chapter: '00-getting-started' }, permissions: { ca_module_view: true } }, res);
+    await sopController.show({ user: { id: 0, role_id: null }, params: { chapter: '00-getting-started' }, permissions: { ca_module_view: true } }, res); // D-266: Getting Started is open to everyone
     expect(res.data.contentHtml).not.toContain('href="/sop/README');
     expect(res.data.contentHtml).toContain('href="/sop"');
   });

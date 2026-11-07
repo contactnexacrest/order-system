@@ -115,6 +115,8 @@ around it:
 - **"SOP / Operations Guide"** is this exact manual, reachable from inside
   the app itself at any time — you're looking at it right now, just
   outside the app. Bookmark it; you'll be back.
+  Inside the app it lists the chapters for your role (and any your Admin
+  added for you); ask your Admin if you need another one.
 - **The bell icon and your name**, at the very bottom, are your
   notifications and your own account settings (including where to change
   your password later, any time you like).

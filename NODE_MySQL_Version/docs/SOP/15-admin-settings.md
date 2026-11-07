@@ -207,6 +207,30 @@ Each one has its own chapter; this list is only where to find them.
 | **Associates › Access levels** — what Starter, Quoting and Full show | MD | [SOP 24](./24-associates.md) |
 | **Admin › Backups** — last database and documents copies, test-restore, settings (read only) | Manage company settings | [SOP 32](./32-backups-restore.md) |
 
+### SOP access (owner, 7 Nov 2026, D-266)
+
+**Company Settings → SOP access** (`/admin/sop-access`, Manage company
+settings): who sees which chapter of this SOP.
+
+- **SOP library** — one switch. Off hides the SOP menu, every chapter, its
+  screenshots and the Gallery from all staff except MD and Admin; Getting
+  Started stays open.
+- **Role** — choose a role, tick the chapters it sees, press **Save**.
+  "Copy ticks from" fills the ticks from another role (check them, then
+  Save). "Show" narrows the list (ticked, new, switched off); ticks you
+  cannot see are kept when you save.
+- **On for everyone** — each chapter's button switches it off (or on) for
+  everyone except MD and Admin, even where it is ticked.
+- **New** — a chapter added to the SOP later is shown only to MD and Admin
+  until you tick it for a role or a person, or switch it on.
+- **Extra chapters for one person** — on **Users → Edit**, "Extra SOP
+  chapters for this person": add or remove chapters for someone covering
+  for a colleague. They see "Extra for you" next to them.
+
+A person sees the chapters of their own role and of every department role
+they hold. MD and Admin always see every chapter; the CA chapters still
+need the CA permission. Every change is in the Audit Log.
+
 ### Associate TDS (owner, 2 Nov 2026, D-235)
 
 **Settings → Associate TDS** (`/settings/associate-tds`, Manage company

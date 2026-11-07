@@ -35,6 +35,7 @@ final class SettingsController
         }
         // Owner points 5/8/9 (2 Nov 2026): edited on its own page with its own rules (/settings/document-cleanup).
         unset($grouped[\App\Controllers\DocumentCleanupController::CATEGORY]);
+        unset($grouped[\App\Services\SopAccessService::SETTING_CATEGORY]); // D-266: switched on Admin › SOP access
         $user = AuthService::currentUser();
         View::render('settings/index', [
             'grouped' => $grouped,
@@ -126,6 +127,9 @@ final class SettingsController
             }
             if ($byKey[$key]['category'] === DocumentCleanupController::CATEGORY) {
                 continue; // saved only through /settings/document-cleanup, with its own allowed values
+            }
+            if ($byKey[$key]['category'] === \App\Services\SopAccessService::SETTING_CATEGORY) {
+                continue; // D-266: saved only through /admin/sop-access
             }
             $oldValue = $byKey[$key]['setting_value'];
             $newValue = trim((string) $newValue);

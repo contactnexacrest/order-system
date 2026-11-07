@@ -213,6 +213,8 @@ function required() {
 
       // Same live-count badge on My Reviews: documents waiting on this user's own review.
       req.myReviewsPendingCount = await documentReviewRepository.pendingCountForReviewer(user.id);
+      // Owner decision D-266: the SOP and Gallery menu links follow the SOP library switch.
+      req.sopLibraryOpen = await require('../services/sopAccessService').libraryVisibleTo(user.id, req.permissions);
 
       // User-reported batch item 16: same live-COUNT badge pattern as the
       // Quotation/PI Intake Review links above — only queried for staff

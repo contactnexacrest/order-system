@@ -1,17 +1,18 @@
 <div class="card page-wide">
   <div class="sop-layout">
     <nav class="sop-nav">
-      <p class="muted small" style="margin-top:0;">Chapters</p>
+      <p class="muted small" style="margin-top:0;">Chapters for your role. Ask your Admin if you need another one.</p>
+      <?php if (!empty($canManage)): // D-266 ?><p class="small"><a href="/admin/sop-access">Manage who sees which chapter</a></p><?php endif; ?>
       <ul class="sop-chapter-list">
         <?php foreach ($chapters as $ch): if ($ch['category'] !== 'main') continue; ?>
-          <li><a href="/sop/<?= htmlspecialchars($ch['slug']) ?>"><?= htmlspecialchars($ch['title']) ?></a></li>
+          <li><a href="/sop/<?= htmlspecialchars($ch['slug']) ?>"><?= htmlspecialchars($ch['title']) ?></a><?= !empty($ch['extra']) ? ' <span class="badge badge-success" data-sop-extra>Extra for you</span>' : '' ?></li>
         <?php endforeach; ?>
       </ul>
       <?php if (array_filter($chapters, static fn(array $c): bool => $c['category'] === 'ca')): ?>
         <p class="muted small">CA / Accounting</p>
         <ul class="sop-chapter-list">
           <?php foreach ($chapters as $ch): if ($ch['category'] !== 'ca') continue; ?>
-            <li><a href="/sop/<?= htmlspecialchars($ch['slug']) ?>"><?= htmlspecialchars($ch['title']) ?></a></li>
+            <li><a href="/sop/<?= htmlspecialchars($ch['slug']) ?>"><?= htmlspecialchars($ch['title']) ?></a><?= !empty($ch['extra']) ? ' <span class="badge badge-success" data-sop-extra>Extra for you</span>' : '' ?></li>
           <?php endforeach; ?>
         </ul>
       <?php endif; ?>
