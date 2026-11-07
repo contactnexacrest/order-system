@@ -1,0 +1,27 @@
+{# Owner decision D-266: extra SOP chapters for one person (added to what their role and department roles show).
+   Loaded by sopAccessController.loadUserExtrasCard only for people who manage SOP access. PHP twin: views/users/_sop_extras.php. #}
+{% if sopExtrasCard %}
+<div class="card" id="sop-extras" data-sop-extras>
+  <h2>Extra SOP chapters for this person</h2>
+  <p class="muted small">Added to what their role and departments already show. Useful when someone covers for a colleague.</p>
+  {% if sopExtrasCard.extras | length == 0 %}<p class="muted">None.</p>{% endif %}
+  {% for ex in sopExtrasCard.extras %}
+    <form method="post" action="/users/{{ sopExtrasCard.userId }}/sop-chapters/remove" class="inline-form" style="margin:2px">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="slug" value="{{ ex.slug }}">
+      <span class="badge badge-info">{{ ex.title }}</span>
+      <button type="submit" class="btn-sm btn-secondary" aria-label="Remove {{ ex.title }}">Remove</button>
+    </form>
+  {% endfor %}
+  <form method="post" action="/users/{{ sopExtrasCard.userId }}/sop-chapters" class="field-grid" style="margin-top:10px">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    <label>Add a chapter *
+      <select name="slug" required>
+        <option value="">Choose…</option>
+        {% for o in sopExtrasCard.options %}<option value="{{ o.slug }}">{{ o.title }}</option>{% endfor %}
+      </select>
+    </label>
+    <div><button type="submit" class="btn-sm">Add chapter</button></div>
+  </form>
+</div>
+{% endif %}

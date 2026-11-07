@@ -2583,3 +2583,101 @@ INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('asso
 -- Owner decision D-264: abroad transfers — NexaCrest pays its own and the intermediary bank's charges (OUR) by default;
 -- an associate abroad is paid once the amount due reaches USD 100 (smaller amounts carry to the next run).
 INSERT IGNORE INTO incentive_settings (setting_key, setting_value) VALUES ('associate_abroad_charges', 'OUR'), ('associate_abroad_min_payout_usd', '100'), ('zoho_payout_costs_account_id', '');
+
+-- ================================================================
+-- Owner decision D-266 (7 Nov 2026): who sees which SOP chapter. Library switch on; every shipped
+-- chapter configured and on; generous role defaults (Admin changes them in Admin > SOP access).
+-- Management (Admin, MD, ED, System Administrator) also always see everything through manage_company_settings.
+-- ================================================================
+INSERT INTO company_settings (setting_key, setting_value, value_type, category, description, is_sensitive) VALUES
+  ('sop_library_enabled', '1', 'boolean', 'sop_access', 'D-266: the SOP library (menu, chapters, screenshots, Gallery) for staff. Off = only MD and Admin see it; Getting Started stays open. Switched on Admin > SOP access.', 0);
+INSERT INTO sop_chapters (slug, is_enabled) VALUES
+  ('00-getting-started', 1),
+  ('00-introduction', 1),
+  ('01-stage1-enquiry-quotation', 1),
+  ('02-stage2-buyer-po', 1),
+  ('03-stage3-pi-advance', 1),
+  ('04-stage4-order-confirmation', 1),
+  ('05-stage5-supplier-po', 1),
+  ('06-stage6-freight', 1),
+  ('07-stage7-packing-bl', 1),
+  ('08-stage8-ci-balance', 1),
+  ('09-stage9-despatch-closure', 1),
+  ('10-amendments', 1),
+  ('11-disputes', 1),
+  ('12-client-portal', 1),
+  ('13-document-review-approval', 1),
+  ('14-reports', 1),
+  ('15-admin-settings', 1),
+  ('16-test-mode', 1),
+  ('17-order-edit-duplication', 1),
+  ('18-data-export-migration', 1),
+  ('19-complaints', 1),
+  ('20-incentives', 1),
+  ('21-departments', 1),
+  ('22-procurement', 1),
+  ('23-coordination', 1),
+  ('24-associates', 1),
+  ('25-export-compliance', 1),
+  ('26-agreements', 1),
+  ('27-pricing', 1),
+  ('28-divisions', 1),
+  ('29-domestic-trade', 1),
+  ('30-import-distribution', 1),
+  ('31-merchant-trade', 1),
+  ('32-backups-restore', 1),
+  ('ca-01-overview', 1),
+  ('ca-02-revenue-reports', 1),
+  ('ca-03-zoho-sync', 1),
+  ('ca-04-expenses', 1),
+  ('ca-05-bank-reconciliation', 1),
+  ('ca-06-fy-lock', 1),
+  ('ca-07-export-benefits', 1),
+  ('ca-08-order-financials', 1),
+  ('ca-09-gst-refunds', 1);
+-- Management and Admin see every chapter
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, c.slug FROM roles r CROSS JOIN (SELECT '00-getting-started' AS slug UNION ALL SELECT '00-introduction' AS slug UNION ALL SELECT '01-stage1-enquiry-quotation' AS slug UNION ALL SELECT '02-stage2-buyer-po' AS slug UNION ALL SELECT '03-stage3-pi-advance' AS slug UNION ALL SELECT '04-stage4-order-confirmation' AS slug UNION ALL SELECT '05-stage5-supplier-po' AS slug UNION ALL SELECT '06-stage6-freight' AS slug UNION ALL SELECT '07-stage7-packing-bl' AS slug UNION ALL SELECT '08-stage8-ci-balance' AS slug UNION ALL SELECT '09-stage9-despatch-closure' AS slug UNION ALL SELECT '10-amendments' AS slug UNION ALL SELECT '11-disputes' AS slug UNION ALL SELECT '12-client-portal' AS slug UNION ALL SELECT '13-document-review-approval' AS slug UNION ALL SELECT '14-reports' AS slug UNION ALL SELECT '15-admin-settings' AS slug UNION ALL SELECT '16-test-mode' AS slug UNION ALL SELECT '17-order-edit-duplication' AS slug UNION ALL SELECT '18-data-export-migration' AS slug UNION ALL SELECT '19-complaints' AS slug UNION ALL SELECT '20-incentives' AS slug UNION ALL SELECT '21-departments' AS slug UNION ALL SELECT '22-procurement' AS slug UNION ALL SELECT '23-coordination' AS slug UNION ALL SELECT '24-associates' AS slug UNION ALL SELECT '25-export-compliance' AS slug UNION ALL SELECT '26-agreements' AS slug UNION ALL SELECT '27-pricing' AS slug UNION ALL SELECT '28-divisions' AS slug UNION ALL SELECT '29-domestic-trade' AS slug UNION ALL SELECT '30-import-distribution' AS slug UNION ALL SELECT '31-merchant-trade' AS slug UNION ALL SELECT '32-backups-restore' AS slug UNION ALL SELECT 'ca-01-overview' AS slug UNION ALL SELECT 'ca-02-revenue-reports' AS slug UNION ALL SELECT 'ca-03-zoho-sync' AS slug UNION ALL SELECT 'ca-04-expenses' AS slug UNION ALL SELECT 'ca-05-bank-reconciliation' AS slug UNION ALL SELECT 'ca-06-fy-lock' AS slug UNION ALL SELECT 'ca-07-export-benefits' AS slug UNION ALL SELECT 'ca-08-order-financials' AS slug UNION ALL SELECT 'ca-09-gst-refunds' AS slug) c
+  WHERE r.name IN ('Admin', 'Managing Director', 'Executive Director', 'System Administrator');
+-- Sales
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, c.slug FROM roles r CROSS JOIN (SELECT '00-getting-started' AS slug UNION ALL SELECT '00-introduction' AS slug UNION ALL SELECT '12-client-portal' AS slug UNION ALL SELECT '17-order-edit-duplication' AS slug UNION ALL SELECT '19-complaints' AS slug UNION ALL SELECT '23-coordination' AS slug UNION ALL SELECT '01-stage1-enquiry-quotation' AS slug UNION ALL SELECT '02-stage2-buyer-po' AS slug UNION ALL SELECT '03-stage3-pi-advance' AS slug UNION ALL SELECT '04-stage4-order-confirmation' AS slug UNION ALL SELECT '10-amendments' AS slug UNION ALL SELECT '11-disputes' AS slug UNION ALL SELECT '13-document-review-approval' AS slug UNION ALL SELECT '24-associates' AS slug) c
+  WHERE r.name IN ('Export Executive', 'Sales/Export Manager', 'Sales Director');
+-- Procurement
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, c.slug FROM roles r CROSS JOIN (SELECT '00-getting-started' AS slug UNION ALL SELECT '00-introduction' AS slug UNION ALL SELECT '12-client-portal' AS slug UNION ALL SELECT '17-order-edit-duplication' AS slug UNION ALL SELECT '19-complaints' AS slug UNION ALL SELECT '23-coordination' AS slug UNION ALL SELECT '05-stage5-supplier-po' AS slug UNION ALL SELECT '22-procurement' AS slug) c
+  WHERE r.name IN ('Procurement Executive', 'Procurement Manager', 'Procurement Director');
+-- Logistics
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, c.slug FROM roles r CROSS JOIN (SELECT '00-getting-started' AS slug UNION ALL SELECT '00-introduction' AS slug UNION ALL SELECT '12-client-portal' AS slug UNION ALL SELECT '17-order-edit-duplication' AS slug UNION ALL SELECT '19-complaints' AS slug UNION ALL SELECT '23-coordination' AS slug UNION ALL SELECT '06-stage6-freight' AS slug UNION ALL SELECT '07-stage7-packing-bl' AS slug UNION ALL SELECT '09-stage9-despatch-closure' AS slug) c
+  WHERE r.name IN ('Logistics Executive', 'Logistics Manager', 'Logistics Director');
+-- Accounts and Finance
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, c.slug FROM roles r CROSS JOIN (SELECT '00-getting-started' AS slug UNION ALL SELECT '00-introduction' AS slug UNION ALL SELECT '12-client-portal' AS slug UNION ALL SELECT '17-order-edit-duplication' AS slug UNION ALL SELECT '19-complaints' AS slug UNION ALL SELECT '23-coordination' AS slug UNION ALL SELECT '03-stage3-pi-advance' AS slug UNION ALL SELECT '08-stage8-ci-balance' AS slug UNION ALL SELECT '14-reports' AS slug UNION ALL SELECT '20-incentives' AS slug UNION ALL SELECT 'ca-01-overview' AS slug UNION ALL SELECT 'ca-02-revenue-reports' AS slug UNION ALL SELECT 'ca-03-zoho-sync' AS slug UNION ALL SELECT 'ca-04-expenses' AS slug UNION ALL SELECT 'ca-05-bank-reconciliation' AS slug UNION ALL SELECT 'ca-06-fy-lock' AS slug UNION ALL SELECT 'ca-07-export-benefits' AS slug UNION ALL SELECT 'ca-08-order-financials' AS slug UNION ALL SELECT 'ca-09-gst-refunds' AS slug) c
+  WHERE r.name IN ('Accounts Executive', 'Finance Manager', 'Finance Director');
+-- Export Compliance
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, c.slug FROM roles r CROSS JOIN (SELECT '00-getting-started' AS slug UNION ALL SELECT '00-introduction' AS slug UNION ALL SELECT '12-client-portal' AS slug UNION ALL SELECT '17-order-edit-duplication' AS slug UNION ALL SELECT '19-complaints' AS slug UNION ALL SELECT '23-coordination' AS slug UNION ALL SELECT '07-stage7-packing-bl' AS slug UNION ALL SELECT '25-export-compliance' AS slug UNION ALL SELECT '26-agreements' AS slug) c
+  WHERE r.name IN ('Export Compliance Executive', 'Export Compliance Manager', 'Export Compliance Director');
+-- Order coordination (follows every stage)
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, c.slug FROM roles r CROSS JOIN (SELECT '00-getting-started' AS slug UNION ALL SELECT '00-introduction' AS slug UNION ALL SELECT '12-client-portal' AS slug UNION ALL SELECT '17-order-edit-duplication' AS slug UNION ALL SELECT '19-complaints' AS slug UNION ALL SELECT '23-coordination' AS slug UNION ALL SELECT '01-stage1-enquiry-quotation' AS slug UNION ALL SELECT '02-stage2-buyer-po' AS slug UNION ALL SELECT '03-stage3-pi-advance' AS slug UNION ALL SELECT '04-stage4-order-confirmation' AS slug UNION ALL SELECT '05-stage5-supplier-po' AS slug UNION ALL SELECT '06-stage6-freight' AS slug UNION ALL SELECT '07-stage7-packing-bl' AS slug UNION ALL SELECT '08-stage8-ci-balance' AS slug UNION ALL SELECT '09-stage9-despatch-closure' AS slug UNION ALL SELECT '13-document-review-approval' AS slug) c
+  WHERE r.name IN ('Order Coordinator', 'Operations Manager');
+-- Viewer / Auditor (read-only)
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, c.slug FROM roles r CROSS JOIN (SELECT '00-getting-started' AS slug UNION ALL SELECT '00-introduction' AS slug UNION ALL SELECT '12-client-portal' AS slug UNION ALL SELECT '17-order-edit-duplication' AS slug UNION ALL SELECT '19-complaints' AS slug UNION ALL SELECT '23-coordination' AS slug UNION ALL SELECT '01-stage1-enquiry-quotation' AS slug UNION ALL SELECT '02-stage2-buyer-po' AS slug UNION ALL SELECT '03-stage3-pi-advance' AS slug UNION ALL SELECT '04-stage4-order-confirmation' AS slug UNION ALL SELECT '05-stage5-supplier-po' AS slug UNION ALL SELECT '06-stage6-freight' AS slug UNION ALL SELECT '07-stage7-packing-bl' AS slug UNION ALL SELECT '08-stage8-ci-balance' AS slug UNION ALL SELECT '09-stage9-despatch-closure' AS slug UNION ALL SELECT '14-reports' AS slug) c
+  WHERE r.name IN ('Viewer / Auditor');
+-- CA / Chartered Accountant
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, c.slug FROM roles r CROSS JOIN (SELECT '00-getting-started' AS slug UNION ALL SELECT '00-introduction' AS slug UNION ALL SELECT '12-client-portal' AS slug UNION ALL SELECT '17-order-edit-duplication' AS slug UNION ALL SELECT '19-complaints' AS slug UNION ALL SELECT '23-coordination' AS slug UNION ALL SELECT '08-stage8-ci-balance' AS slug UNION ALL SELECT '14-reports' AS slug UNION ALL SELECT 'ca-01-overview' AS slug UNION ALL SELECT 'ca-02-revenue-reports' AS slug UNION ALL SELECT 'ca-03-zoho-sync' AS slug UNION ALL SELECT 'ca-04-expenses' AS slug UNION ALL SELECT 'ca-05-bank-reconciliation' AS slug UNION ALL SELECT 'ca-06-fy-lock' AS slug UNION ALL SELECT 'ca-07-export-benefits' AS slug UNION ALL SELECT 'ca-08-order-financials' AS slug UNION ALL SELECT 'ca-09-gst-refunds' AS slug) c
+  WHERE r.name IN ('CA / Chartered Accountant');
+-- Investor (view only)
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, c.slug FROM roles r CROSS JOIN (SELECT '00-getting-started' AS slug UNION ALL SELECT '00-introduction' AS slug UNION ALL SELECT '12-client-portal' AS slug UNION ALL SELECT '17-order-edit-duplication' AS slug UNION ALL SELECT '19-complaints' AS slug UNION ALL SELECT '23-coordination' AS slug UNION ALL SELECT '14-reports' AS slug UNION ALL SELECT '28-divisions' AS slug) c
+  WHERE r.name IN ('Investor (view only)');
+-- Sales: 27 Pricing only for a sales role that holds the product-pricing permission
+INSERT INTO sop_role_chapters (role_id, slug)
+  SELECT r.id, '27-pricing' FROM roles r
+  WHERE r.name IN ('Export Executive', 'Sales/Export Manager', 'Sales Director')
+    AND EXISTS (SELECT 1 FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
+                WHERE rp.role_id = r.id AND rp.is_enabled = 1 AND p.permission_key = 'view_product_pricing');

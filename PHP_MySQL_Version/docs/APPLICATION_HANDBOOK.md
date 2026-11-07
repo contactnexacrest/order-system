@@ -1541,6 +1541,41 @@ Staff permissions for associates: `manage_associates` (Admin, MD, ED),
 `manage_associate_bank` (Admin, MD, Finance Manager/Director). Only the MD
 (or a Super Admin) can move or remove a client's associate, with a reason.
 
+### 4.12 SOP access by role (D-266)
+
+Owner decision D-266 (7 Nov 2026). The SOP / Operations Guide (`/sop`) shows each staff member only the chapters for their work. Service `SopAccessService` / `sopAccessService.js`; screen **Admin › SOP access** (`/admin/sop-access`, link at the top of Company Settings and on the SOP home page for those who manage it).
+
+| Rule | How |
+|---|---|
+| **SOP library on/off** | Company setting `sop_library_enabled` (category `sop_access`, kept off the general Settings page). Off hides the SOP menu, every chapter, its screenshots and the **Gallery** from all staff except the people who always see everything. Getting Started stays open. |
+| **Per chapter, on for everyone** | `sop_chapters.is_enabled`. Off hides the chapter from everyone except the people below, even where it is ticked. |
+| **Role ticks** | `sop_role_chapters (role_id, slug)`. A person sees the chapters of their own role **and** of every role they hold through a current department membership (same model as permissions, §4.4). "Copy ticks from" another role fills the form; nothing is saved until Save. |
+| **Extra chapters for one person** | `sop_user_chapters (user_id, slug)`, added on **Users › Edit** ("Extra SOP chapters for this person"); shown as **Extra for you** in their list. |
+| **Always everything** | An effective Super Admin and whoever holds `manage_company_settings` (seeded: Admin, MD, ED, System Administrator) see every chapter and manage SOP access. No new permission was added. A "Preview as" another designation shows that designation's chapters only. |
+| **Always visible** | `00-getting-started`, to every staff member, even with the library off. |
+| **CA chapters** | A `ca-` chapter still also needs `ca_module_view`. |
+| **New chapter** | A chapter file with no `sop_chapters` row is **New**: only the people who always see everything see it until it is ticked for a role or a person, or switched on. |
+| **Links and screenshots** | A link to a chapter the person cannot open is shown as plain text. A screenshot (`/sop-assets/…`) is served only when a chapter the person may open (or the SOP home page) shows it, else 403 "Not permitted.". |
+| **Refusal** | Opening a hidden chapter shows, in the normal layout with HTTP 403: "This SOP chapter isn't available for your role. Ask your Admin to add it if you need it." with "Back to your SOP chapters". With the library off: "The SOP library is switched off. Ask your Admin if you need it." with "Open Getting Started". |
+| **Audit** | `SOP_LIBRARY_SWITCHED`, `SOP_CHAPTER_SWITCHED`, `SOP_ROLE_CHAPTERS_SAVED`, `SOP_USER_CHAPTER_ADDED`, `SOP_USER_CHAPTER_REMOVED`. |
+
+**Seeded defaults (fresh install; generous — Admin changes them).** Everyone: 00 Getting started, 00 Introduction, 12 Client portal, 17 Order edit & duplication, 19 Complaints, 23 Coordination. Plus:
+
+| Roles | Chapters |
+|---|---|
+| Admin, Managing Director, Executive Director, System Administrator | every chapter |
+| Export Executive, Sales/Export Manager, Sales Director | 01–04, 10 Amendments, 11 Disputes, 13 Document review, 24 Associates; 27 Pricing for a sales role holding `view_product_pricing` |
+| Procurement Executive / Manager / Director | 05, 22 Procurement |
+| Logistics Executive / Manager / Director | 06, 07, 09 |
+| Accounts Executive, Finance Manager, Finance Director | 03, 08, 14 Reports, 20 Incentives, every `ca-` chapter |
+| Export Compliance Executive / Manager / Director | 07, 25 Export compliance, 26 Agreements |
+| Order Coordinator, Operations Manager | 01–09, 13 |
+| Viewer / Auditor | 01–09, 14 |
+| CA / Chartered Accountant | 08, 14, every `ca-` chapter |
+| Investor (view only) | 14, 28 Divisions |
+
+Every chapter shipped at install is configured and on. Tests: `SopAccessD266Test` / `sopAccessD266.test.js`.
+
 ## 5. The order life cycle, step by step
 
 This section follows one export order from the first enquiry to archive. It

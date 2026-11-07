@@ -268,6 +268,14 @@ $documentCleanup = new \App\Controllers\DocumentCleanupController();
 $router->get('/settings/document-cleanup', [$documentCleanup, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
 $router->post('/settings/document-cleanup', [$documentCleanup, 'save'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 $router->post('/settings/document-cleanup/run', [$documentCleanup, 'run'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+// Owner decision D-266 (7 Nov 2026): who sees which SOP chapter.
+$sopAccess = new \App\Controllers\SopAccessController();
+$router->get('/admin/sop-access', [$sopAccess, 'index'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings')]);
+$router->post('/admin/sop-access/library', [$sopAccess, 'saveLibrary'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/admin/sop-access/chapter', [$sopAccess, 'saveChapter'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/admin/sop-access/role', [$sopAccess, 'saveRole'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/users/{id}/sop-chapters', [$sopAccess, 'addUserExtra'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
+$router->post('/users/{id}/sop-chapters/remove', [$sopAccess, 'removeUserExtra'], [SessionAuth::required(), PermissionCheck::requires('manage_company_settings'), CsrfCheck::verify()]);
 // Owner follow-up on point 18 (2 Nov 2026): the "Why is it different?" reasons on buyer remittance forms.
 // Owner decision 2 Nov 2026 (D-235): TDS on associate commission — settings and the quarterly TDS register.
 $associateTds = new \App\Controllers\AssociateTdsController();

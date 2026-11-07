@@ -100,3 +100,4 @@
 </div>
 <?php endif; ?>
 <?php $__partyType = "staff"; $__partyId = (int) $target["id"]; require __DIR__ . "/../agreements/_party_card.php"; ?>
+<?php require __DIR__ . '/_sop_extras.php'; // D-266 ?>

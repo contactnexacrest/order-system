@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Helpers\View;
 use App\Services\AuthService;
 use App\Services\PermissionService;
+use App\Services\SopAccessService;
 use League\CommonMark\GithubFlavoredMarkdownConverter;
 
 /**
@@ -44,6 +45,34 @@ final class SopController
         );
     }
 
+    /** @return array{0:int,1:?int} the signed-in staff member's id and role id */
+    private function who(): array
+    {
+        $user = AuthService::currentUser();
+        return [(int) ($user['id'] ?? 0), isset($user['role_id']) && $user['role_id'] !== null ? (int) $user['role_id'] : null];
+    }
+
+    /** @return list<string> */
+    private function visibleSlugs(): array
+    {
+        [$userId, $roleId] = $this->who();
+        return SopAccessService::visibleSlugs($userId, $roleId, $this->canViewCaChapters());
+    }
+
+    /** @return list<string> chapters shown as "Extra for you" (not for people who see every chapter anyway) */
+    private function extraSlugs(): array
+    {
+        [$userId, $roleId] = $this->who();
+        return SopAccessService::isPrivileged($userId, $roleId) ? [] : SopAccessService::userExtras($userId);
+    }
+
+    /** D-266: the refusal page — in the normal layout, never a bare error. */
+    private function refuse(string $message, string $backUrl, string $backLabel): void
+    {
+        http_response_code(403);
+        View::render('sop/forbidden', ['message' => $message, 'backUrl' => $backUrl, 'backLabel' => $backLabel], 'layout/base');
+    }
+
     private function docsDir(): string
     {
         return dirname(__DIR__, 3) . '/docs/SOP';
@@ -75,21 +104,21 @@ final class SopController
         $files = glob($dir . '/*.md') ?: [];
         sort($files, SORT_STRING);
 
-        $canViewCa = $this->canViewCaChapters();
+        // Owner decision D-266: only the chapters this person may open (role ticks,
+        // department roles, own extras; ca- still needs ca_module_view).
+        $visible = array_flip($this->visibleSlugs());
+        $extras = array_flip($this->extraSlugs());
         $chapters = [];
         foreach ($files as $path) {
             $slug = basename($path, '.md');
-            if ($slug === 'README') {
+            if ($slug === 'README' || !isset($visible[$slug])) {
                 continue;
-            }
-            $category = str_starts_with($slug, 'ca-') ? 'ca' : 'main';
-            if ($category === 'ca' && !$canViewCa) {
-                continue; // same gap Reference Library's index() already closes for its own content
             }
             $chapters[] = [
                 'slug'     => $slug,
                 'title'    => $this->extractTitle($path) ?? $slug,
-                'category' => $category,
+                'category' => str_starts_with($slug, 'ca-') ? 'ca' : 'main',
+                'extra'    => isset($extras[$slug]),
             ];
         }
         return $chapters;
@@ -130,17 +159,24 @@ final class SopController
             throw new \RuntimeException("Could not read {$path}");
         }
         // QA Round 5, R5-04: links to pages this user can't open become plain text.
-        return \App\Helpers\PermittedLinks::filterHtml((string) $this->converter()->convert($this->rewriteRelativeLinks($raw)));
+        // D-266: links to chapters this person cannot open become plain text.
+        return SopAccessService::filterChapterLinks(\App\Helpers\PermittedLinks::filterHtml((string) $this->converter()->convert($this->rewriteRelativeLinks($raw))), $this->visibleSlugs());
     }
 
     public function index(array $params): void
     {
+        [$userId, $roleId] = $this->who();
+        if (!SopAccessService::libraryVisibleTo($userId, $roleId)) {
+            $this->refuse(SopAccessService::LIBRARY_OFF, '/getting-started', 'Open Getting Started');
+            return;
+        }
         $readmePath = $this->docsDir() . '/README.md';
         $contentHtml = is_file($readmePath) ? $this->renderMarkdownFile($readmePath) : null;
 
         View::render('sop/index', [
             'contentHtml' => $contentHtml,
             'chapters'    => $this->chapters(),
+            'canManage'   => SopAccessService::isPrivileged($userId, $roleId),
         ], 'layout/base');
     }
 
@@ -158,9 +194,14 @@ final class SopController
             echo 'SOP chapter not found.';
             return;
         }
-        if (str_starts_with($slug, 'ca-') && !$this->canViewCaChapters()) {
-            http_response_code(403);
-            echo '<h1>403 — Not permitted</h1><p>You do not have access to CA / Accounting module chapters.</p><p><a href="/sop">Back to SOP</a></p>';
+        // D-266 (and the earlier ca- rule): a chapter this person may not open.
+        if (!in_array($slug, $this->visibleSlugs(), true)) {
+            [$userId, $roleId] = $this->who();
+            if (!SopAccessService::libraryVisibleTo($userId, $roleId)) {
+                $this->refuse(SopAccessService::LIBRARY_OFF, '/getting-started', 'Open Getting Started');
+            } else {
+                $this->refuse(SopAccessService::CHAPTER_NOT_AVAILABLE, '/sop', 'Back to your SOP chapters');
+            }
             return;
         }
 
@@ -180,6 +221,14 @@ final class SopController
         if ($filename === '' || !is_file($path) || dirname(realpath($path)) !== realpath($this->docsDir() . '/images')) {
             http_response_code(404);
             echo 'Image not found.';
+            return;
+        }
+
+        // D-266: only a screenshot shown in a chapter this person may open.
+        [$userId, $roleId] = $this->who();
+        if (!SopAccessService::imageVisible($filename, $userId, $roleId, $this->visibleSlugs())) {
+            http_response_code(403);
+            echo 'Not permitted.';
             return;
         }
 

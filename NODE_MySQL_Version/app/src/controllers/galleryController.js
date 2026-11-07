@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const sopAccess = require('../services/sopAccessService');
 
 /**
  * Port of App\Controllers\GalleryController — a pure disk-backed
@@ -70,7 +71,17 @@ function resolveSafePath(relative) {
   return null;
 }
 
+/** Owner decision D-266: the Gallery belongs to the help library — hidden with it when the SOP library is off. */
+async function libraryClosed(req) {
+  return !(await sopAccess.libraryVisibleTo(req.user.id, req.permissions));
+}
+
 async function index(req, res) {
+  if (await libraryClosed(req)) {
+    res.status(403);
+    res.renderView('sop/forbidden', { message: sopAccess.LIBRARY_OFF, backUrl: '/getting-started', backLabel: 'Open Getting Started' }, 'layout/base');
+    return;
+  }
   let relative = String(req.query.p || '').replace(/^\/+|\/+$/g, '');
   let dir = resolveSafePath(relative);
 
@@ -129,6 +140,10 @@ async function index(req, res) {
 
 /** Streams one file's raw bytes — images render inline, everything else downloads. */
 async function file(req, res) {
+  if (await libraryClosed(req)) {
+    res.status(403).send('Not permitted.');
+    return;
+  }
   const relative = String(req.query.p || '').replace(/^\/+|\/+$/g, '');
   const resolved = resolveSafePath(relative);
 

@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { marked } = require('marked');
 const permittedLinks = require('../helpers/permittedLinks');
+const sopAccess = require('../services/sopAccessService');
 
 /**
  * Port of App\Controllers\SopController — staff-facing viewer for the
@@ -43,10 +44,10 @@ function rewriteRelativeLinks(markdown) {
   return out;
 }
 
-function renderMarkdownFile(filePath, permissions) {
+function renderMarkdownFile(filePath, permissions, visible) {
   const raw = fs.readFileSync(filePath, 'utf8');
-  // QA Round 5, R5-04: links to pages this user can't open become plain text.
-  return permittedLinks.filterHtml(marked.parse(rewriteRelativeLinks(raw)), permissions);
+  // D-266: links to chapters this person cannot open become plain text.
+  return sopAccess.filterChapterLinks(permittedLinks.filterHtml(marked.parse(rewriteRelativeLinks(raw)), permissions), visible);
 }
 
 function extractTitle(filePath) {
@@ -74,8 +75,18 @@ function canViewCaChapters(req) {
   return !!(req.permissions || {}).ca_module_view;
 }
 
-function chapters(req) {
-  const canViewCa = canViewCaChapters(req);
+function roleIdOf(req) {
+  return req.user && req.user.role_id !== null && req.user.role_id !== undefined ? Number(req.user.role_id) : null;
+}
+
+/** Owner decision D-266: the chapters this person may open (role ticks, department roles, own extras; ca- still needs ca_module_view). */
+async function visibleSlugs(req) {
+  return sopAccess.visibleSlugs(req.user.id, roleIdOf(req), req.permissions);
+}
+
+async function chapters(req, visible) {
+  const allowed = new Set(visible);
+  const extras = (await sopAccess.isPrivileged(req.user.id, req.permissions)) ? new Set() : new Set(await sopAccess.userExtras(req.user.id));
   const files = fs.readdirSync(DOCS_DIR)
     .filter((f) => f.endsWith('.md') && f !== 'README.md')
     .sort();
@@ -84,16 +95,30 @@ function chapters(req) {
       const slug = f.slice(0, -3);
       const title = extractTitle(path.join(DOCS_DIR, f)) || slug;
       const category = slug.startsWith('ca-') ? 'ca' : 'main';
-      return { slug, title, category };
+      return { slug, title, category, extra: extras.has(slug) };
     })
-    // same gap Reference Library's index() already closes for its own content
-    .filter((ch) => ch.category !== 'ca' || canViewCa);
+    .filter((ch) => allowed.has(ch.slug));
+}
+
+/** D-266: the refusal page — in the normal layout, never a bare error. */
+function refuse(res, message, backUrl, backLabel) {
+  res.status(403);
+  res.renderView('sop/forbidden', { message, backUrl, backLabel }, 'layout/base');
 }
 
 async function index(req, res) {
+  if (!(await sopAccess.libraryVisibleTo(req.user.id, req.permissions))) {
+    refuse(res, sopAccess.LIBRARY_OFF, '/getting-started', 'Open Getting Started');
+    return;
+  }
+  const visible = await visibleSlugs(req);
   const readmePath = path.join(DOCS_DIR, 'README.md');
-  const contentHtml = fs.existsSync(readmePath) ? renderMarkdownFile(readmePath, req.permissions) : null;
-  res.renderView('sop/index', { contentHtml, chapters: chapters(req) }, 'layout/base');
+  const contentHtml = fs.existsSync(readmePath) ? renderMarkdownFile(readmePath, req.permissions, visible) : null;
+  res.renderView('sop/index', {
+    contentHtml,
+    chapters: await chapters(req, visible),
+    canManage: await sopAccess.isPrivileged(req.user.id, req.permissions),
+  }, 'layout/base');
 }
 
 async function show(req, res) {
@@ -109,14 +134,20 @@ async function show(req, res) {
     res.status(404).send('SOP chapter not found.');
     return;
   }
-  if (slug.startsWith('ca-') && !canViewCaChapters(req)) {
-    res.status(403).send('<h1>403 — Not permitted</h1><p>You do not have access to CA / Accounting module chapters.</p><p><a href="/sop">Back to SOP</a></p>');
+  // D-266 (and the earlier ca- rule): a chapter this person may not open.
+  const visible = await visibleSlugs(req);
+  if (!visible.includes(slug)) {
+    if (!(await sopAccess.libraryVisibleTo(req.user.id, req.permissions))) {
+      refuse(res, sopAccess.LIBRARY_OFF, '/getting-started', 'Open Getting Started');
+    } else {
+      refuse(res, sopAccess.CHAPTER_NOT_AVAILABLE, '/sop', 'Back to your SOP chapters');
+    }
     return;
   }
 
   res.renderView('sop/show', {
-    contentHtml: renderMarkdownFile(filePath, req.permissions),
-    chapters: chapters(req),
+    contentHtml: renderMarkdownFile(filePath, req.permissions, visible),
+    chapters: await chapters(req, visible),
     currentSlug: slug,
   }, 'layout/base');
 }
@@ -137,6 +168,12 @@ async function asset(req, res) {
 
   if (!filename || !resolved || path.dirname(resolved) !== fs.realpathSync(IMAGES_DIR)) {
     res.status(404).send('Image not found.');
+    return;
+  }
+
+  // D-266: only a screenshot shown in a chapter this person may open.
+  if (!(await sopAccess.imageVisible(filename, req.user.id, req.permissions, await visibleSlugs(req)))) {
+    res.status(403).send('Not permitted.');
     return;
   }
 

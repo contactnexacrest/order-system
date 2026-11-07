@@ -1200,6 +1200,12 @@
     "GET /settings/document-cleanup",
     "POST /settings/document-cleanup",
     "POST /settings/document-cleanup/run",
+    "GET /admin/sop-access",
+    "POST /admin/sop-access/library",
+    "POST /admin/sop-access/chapter",
+    "POST /admin/sop-access/role",
+    "POST /users/{id}/sop-chapters",
+    "POST /users/{id}/sop-chapters/remove",
     "GET /settings/associate-tds",
     "POST /settings/associate-tds",
     "GET /settings/remittance-reasons",
@@ -6777,6 +6783,227 @@
     ],
     "node": [
      "routeBehaviour.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "GET",
+   "path": "/admin/sop-access",
+   "controller": "SopAccessController",
+   "action": "index",
+   "requires_all": [
+    "manage_company_settings"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "sopAccessController.index",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "RouteMatrix: Admin page opens without 5xx"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SopAccessD266Test.php"
+    ],
+    "node": [
+     "sopAccessD266.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/admin/sop-access/library",
+   "controller": "SopAccessController",
+   "action": "saveLibrary",
+   "requires_all": [
+    "manage_company_settings"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "sopAccessController.saveLibrary",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SopAccessD266Test.php"
+    ],
+    "node": [
+     "sopAccessD266.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/admin/sop-access/chapter",
+   "controller": "SopAccessController",
+   "action": "saveChapter",
+   "requires_all": [
+    "manage_company_settings"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "sopAccessController.saveChapter",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SopAccessD266Test.php"
+    ],
+    "node": [
+     "sopAccessD266.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/admin/sop-access/role",
+   "controller": "SopAccessController",
+   "action": "saveRole",
+   "requires_all": [
+    "manage_company_settings"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "sopAccessController.saveRole",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SopAccessD266Test.php"
+    ],
+    "node": [
+     "sopAccessD266.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/users/{id}/sop-chapters",
+   "controller": "SopAccessController",
+   "action": "addUserExtra",
+   "requires_all": [
+    "manage_company_settings"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "sopAccessController.addUserExtra",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SopAccessD266Test.php"
+    ],
+    "node": [
+     "sopAccessD266.test.js"
+    ],
+    "e2e": []
+   },
+   "money_route": false,
+   "cafin_route": false
+  },
+  {
+   "method": "POST",
+   "path": "/users/{id}/sop-chapters/remove",
+   "controller": "SopAccessController",
+   "action": "removeUserExtra",
+   "requires_all": [
+    "manage_company_settings"
+   ],
+   "requires_any": [],
+   "guards": [
+    "session",
+    "csrf"
+   ],
+   "php_line": null,
+   "node_line": null,
+   "node_handler": "sopAccessController.removeUserExtra",
+   "node_difference": null,
+   "sweep_coverage": [
+    "RouteMatrix: 403 for zero-permission user (both stacks)",
+    "UngatedRoutes: CSRF required"
+   ],
+   "php_file": "PHP_MySQL_Version/public_html/index.php",
+   "node_file": "NODE_MySQL_Version/app/src/server.js",
+   "public": false,
+   "actor": "staff",
+   "specific_test_files": {
+    "php": [
+     "SopAccessD266Test.php"
+    ],
+    "node": [
+     "sopAccessD266.test.js"
     ],
     "e2e": []
    },

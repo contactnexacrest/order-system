@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\View;
+use App\Services\AuthService;
+use App\Services\SopAccessService;
 
 /**
  * A pure disk-backed knowledgebase gallery — reads whatever folders and
@@ -76,8 +78,20 @@ final class GalleryController
         return in_array($ext, self::IMAGE_EXTENSIONS, true);
     }
 
+    /** Owner decision D-266: the Gallery belongs to the help library — hidden with it when the SOP library is off. */
+    private function libraryClosed(): bool
+    {
+        $user = AuthService::currentUser();
+        return !SopAccessService::libraryVisibleTo((int) ($user['id'] ?? 0), isset($user['role_id']) && $user['role_id'] !== null ? (int) $user['role_id'] : null);
+    }
+
     public function index(array $params): void
     {
+        if ($this->libraryClosed()) {
+            http_response_code(403);
+            View::render('sop/forbidden', ['message' => SopAccessService::LIBRARY_OFF, 'backUrl' => '/getting-started', 'backLabel' => 'Open Getting Started'], 'layout/base');
+            return;
+        }
         $relative = trim((string) ($_GET['p'] ?? ''), '/');
         $dir = $this->resolveSafePath($relative);
 
@@ -138,6 +152,11 @@ final class GalleryController
     /** Streams one file's raw bytes — images render inline, everything else downloads. */
     public function file(array $params): void
     {
+        if ($this->libraryClosed()) {
+            http_response_code(403);
+            echo 'Not permitted.';
+            return;
+        }
         $relative = trim((string) ($_GET['p'] ?? ''), '/');
         $path = $this->resolveSafePath($relative);
 

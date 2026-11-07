@@ -10,6 +10,7 @@
   <p class="muted small">&#9776; <a href="/settings/remittance-reasons">Remittance difference reasons</a> — the list behind "Why is it different?" when a buyer remittance differs from what is due (bank charges, buyer paid less, buyer paid more).</p>
   <p class="muted small">&#8377; <a href="/settings/associate-tds">Associate TDS</a> — section, rate, threshold, rate without PAN and the rules for associates abroad used to work out TDS on associate commission (D-235).</p>
   <p class="muted small">&#128465; <a href="/settings/document-cleanup">Document copies clean-up</a> — remove draft and other un-needed copies of generated documents to save storage (off until switched on).</p>
+  <p class="muted small">&#128214; <a href="/admin/sop-access">SOP access</a> — the SOP library on or off, which chapters each role sees, and chapters switched off for everyone (D-266).</p>
   <p class="muted small"><strong>Super Admin only</strong> fields (the mail CC list) can only be changed by a Super Admin — everyone else sees them read-only, with no unlock option.</p>
 
   <form method="post" action="/settings/update" onsubmit="return confirmSettingsSave(this);">

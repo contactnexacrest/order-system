@@ -6195,3 +6195,33 @@ ALTER TABLE incentive_payouts
 ALTER TABLE incentive_payouts
   ADD COLUMN zoho_cost_journal_id VARCHAR(40) NULL,
   ADD COLUMN zoho_cost_hash CHAR(64) NULL;
+
+-- ================================================================
+-- Owner decision D-266 (7 Nov 2026): who sees which SOP chapter.
+-- A chapter file with no sop_chapters row is "New": only MD/Admin
+-- (manage_company_settings) and an effective Super Admin see it until it
+-- is ticked for a role or a person, or switched on. is_enabled = 0 hides it
+-- from everyone else. The library switch is company setting sop_library_enabled.
+-- ================================================================
+CREATE TABLE sop_chapters (
+  slug        VARCHAR(80) NOT NULL PRIMARY KEY,   -- docs/SOP/<slug>.md
+  is_enabled  TINYINT(1) NOT NULL DEFAULT 1,      -- "on for everyone"
+  updated_by  BIGINT UNSIGNED NULL,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+CREATE TABLE sop_role_chapters (
+  role_id  BIGINT UNSIGNED NOT NULL,
+  slug     VARCHAR(80) NOT NULL,
+  PRIMARY KEY (role_id, slug),
+  FOREIGN KEY (role_id) REFERENCES roles(id)
+) ENGINE=InnoDB;
+CREATE TABLE sop_user_chapters (
+  user_id   BIGINT UNSIGNED NOT NULL,
+  slug      VARCHAR(80) NOT NULL,
+  added_by  BIGINT UNSIGNED NULL,
+  added_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, slug),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (added_by) REFERENCES users(id)
+) ENGINE=InnoDB;

@@ -474,6 +474,8 @@ app.use((req, res, next) => {
       clientIntakePendingCount: req.clientIntakePendingCount || 0,
       piIntakePendingCount: req.piIntakePendingCount || 0,
       myReviewsPendingCount: req.myReviewsPendingCount || 0,
+      sopLibraryOpen: req.sopLibraryOpen !== false, // D-266
+      sopExtrasCard: req.sopExtrasCard || null, // D-266: Users › Edit
       emailApprovalsPendingCount: req.emailApprovalsPendingCount || 0,
       settingsExpiryWarningCount: req.settingsExpiryWarningCount || 0,
       zohoWaitingMenu: req.zohoWaitingMenu ?? null,
@@ -694,6 +696,14 @@ const documentCleanupController = require('./controllers/documentCleanupControll
 app.get('/settings/document-cleanup', requireAuth, requirePermission('manage_company_settings'), asyncHandler(documentCleanupController.index));
 app.post('/settings/document-cleanup', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(documentCleanupController.save));
 app.post('/settings/document-cleanup/run', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(documentCleanupController.run));
+// Owner decision D-266 (7 Nov 2026): who sees which SOP chapter.
+const sopAccessController = require('./controllers/sopAccessController');
+app.get('/admin/sop-access', requireAuth, requirePermission('manage_company_settings'), asyncHandler(sopAccessController.index));
+app.post('/admin/sop-access/library', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(sopAccessController.saveLibrary));
+app.post('/admin/sop-access/chapter', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(sopAccessController.saveChapter));
+app.post('/admin/sop-access/role', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(sopAccessController.saveRole));
+app.post('/users/:id/sop-chapters', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(sopAccessController.addUserExtra));
+app.post('/users/:id/sop-chapters/remove', requireAuth, requirePermission('manage_company_settings'), verifyCsrf, asyncHandler(sopAccessController.removeUserExtra));
 // Owner follow-up on point 18 (2 Nov 2026): the "Why is it different?" reasons on buyer remittance forms.
 const remittanceReasonController = require('./controllers/remittanceReasonController');
 // Owner decision 2 Nov 2026 (D-235): TDS on associate commission — settings and the quarterly TDS register.
@@ -1493,7 +1503,7 @@ app.get('/admin/data-export/data', requireAuth, requirePermission('data_export_r
 
 app.get('/users', requireAuth, requirePermission('manage_users'), asyncHandler(userController.index));
 app.post('/users/create', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.create));
-app.get('/users/:id/edit', requireAuth, requirePermission('manage_users'), asyncHandler(userController.editForm));
+app.get('/users/:id/edit', requireAuth, requirePermission('manage_users'), asyncHandler(require('./controllers/sopAccessController').loadUserExtrasCard), asyncHandler(userController.editForm));
 app.post('/users/:id/update', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.update));
 app.post('/users/:id/toggle-active', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.toggleActive));
 app.post('/users/:id/archive', requireAuth, requirePermission('manage_users'), verifyCsrf, asyncHandler(userController.archive));

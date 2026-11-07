@@ -1,0 +1,64 @@
+{# Owner decision D-266: Admin › SOP access. PHP twin: views/sop_access/index.php. #}
+{% set roleIdSel = role.id if role else 0 %}
+<div class="card page-wide">
+  <h1>SOP access</h1>
+  <p class="muted"><a href="/settings">&larr; Company Settings</a> · <a href="/sop">Open the SOP</a></p>
+
+  <div class="alert alert-info" data-sop-library>
+    <strong>SOP library: {{ 'On for staff' if libraryOn else 'Off' }}</strong> — off hides the SOP menu, every chapter, its screenshots and the Gallery from all staff except MD and Admin. Getting Started always stays open.
+    <form method="post" action="/admin/sop-access/library" class="inline-form" style="margin-top:8px">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="role_id" value="{{ roleIdSel }}">
+      <input type="hidden" name="library" value="{{ 'off' if libraryOn else 'on' }}">
+      <button type="submit" class="btn-sm {{ 'btn-secondary' if libraryOn else '' }}">{{ 'Switch the SOP library off' if libraryOn else 'Switch the SOP library on' }}</button>
+    </form>
+  </div>
+
+  <form method="get" action="/admin/sop-access" class="field-grid">
+    <label>Role *
+      <select name="role_id" required>
+        <option value="">Choose…</option>
+        {% for r in roles %}<option value="{{ r.id }}"{% if roleIdSel == r.id %} selected{% endif %}>{{ r.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Copy ticks from
+      <select name="copy_from">
+        <option value="">Choose…</option>
+        {% for r in roles %}<option value="{{ r.id }}"{% if copyFrom == r.id %} selected{% endif %}>{{ r.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Show
+      <select name="show">
+        {% for k, label in showOptions %}<option value="{{ k }}"{% if show == k %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <div><button type="submit" class="btn-sm">Show chapters</button></div>
+  </form>
+
+  {% if not role %}
+    <p class="muted">Choose a role to tick the chapters it sees.</p>
+  {% else %}
+    {% if role.sees_all %}<div class="alert alert-warning">This role manages company settings, so it always sees every chapter. Ticks only matter if that permission is taken away.</div>{% endif %}
+    {% if copyFrom !== null %}<div class="alert alert-warning">Ticks copied from another role — check them and press Save to keep them.</div>{% endif %}
+    <form method="post" action="/admin/sop-access/chapter" id="sop-chapter-toggle"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><input type="hidden" name="role_id" value="{{ roleIdSel }}"></form>
+    <form method="post" action="/admin/sop-access/role" data-sop-role-form>
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="role_id" value="{{ roleIdSel }}">
+      {% for s in hiddenTicked %}<input type="hidden" name="slugs[]" value="{{ s }}">{% endfor %}
+      <table class="list">
+        <tr><th>Chapter (ticked = {{ role.name }} sees it)</th><th>Note</th><th>On for everyone</th></tr>
+        {% for row in rows %}
+          <tr data-sop-row="{{ row.slug }}">
+            <td><label class="checkbox-inline"><input type="checkbox" name="slugs[]" value="{{ row.slug }}"{% if row.ticked %} checked{% endif %}{% if row.state == 'always' %} disabled{% endif %}> {{ row.title }}</label></td>
+            <td>{% if row.state == 'always' %}always shown{% elif row.state == 'new' %}<span class="badge badge-warning">New — only MD/Admin until ticked</span>{% elif row.state == 'off' %}switched off for everyone{% elif row.ca %}also needs CA permission{% endif %}</td>
+            <td>{% if row.state != 'always' %}{% set isOn = row.state == 'on' %}<button type="submit" form="sop-chapter-toggle" name="toggle" value="{{ row.slug }}:{{ '0' if isOn else '1' }}" class="btn-sm {{ 'btn-secondary' if isOn else '' }}">{{ 'On — switch off' if isOn else ('Switch on' if row.state == 'new' else 'Off — switch on') }}</button>{% endif %}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="3" class="muted">No chapters match.</td></tr>
+        {% endfor %}
+      </table>
+      <p class="muted small">MD and Admin always see every chapter, so nobody can hide the help from the people who manage it. Every change is written to the Audit Log.</p>
+      <button type="submit">Save {{ role.name }}</button>
+    </form>
+  {% endif %}
+</div>

@@ -1,17 +1,18 @@
 <div class="card page-wide">
   <div class="sop-layout">
     <nav class="sop-nav">
-      <p class="muted small" style="margin-top:0;">Chapters</p>
+      <p class="muted small" style="margin-top:0;">Chapters for your role. Ask your Admin if you need another one.</p>
+      {% if canManage %}<p class="small"><a href="/admin/sop-access">Manage who sees which chapter</a></p>{% endif %}
       <ul class="sop-chapter-list">
         {% for ch in chapters %}
-          {% if ch.category == 'main' %}<li><a href="/sop/{{ ch.slug }}">{{ ch.title }}</a></li>{% endif %}
+          {% if ch.category == 'main' %}<li><a href="/sop/{{ ch.slug }}">{{ ch.title }}</a>{% if ch.extra %} <span class="badge badge-success" data-sop-extra>Extra for you</span>{% endif %}</li>{% endif %}
         {% endfor %}
       </ul>
       {% if chapters | selectattr('category', 'equalto', 'ca') | list | length > 0 %}
         <p class="muted small">CA / Accounting</p>
         <ul class="sop-chapter-list">
           {% for ch in chapters %}
-            {% if ch.category == 'ca' %}<li><a href="/sop/{{ ch.slug }}">{{ ch.title }}</a></li>{% endif %}
+            {% if ch.category == 'ca' %}<li><a href="/sop/{{ ch.slug }}">{{ ch.title }}</a>{% if ch.extra %} <span class="badge badge-success" data-sop-extra>Extra for you</span>{% endif %}</li>{% endif %}
           {% endfor %}
         </ul>
       {% endif %}
