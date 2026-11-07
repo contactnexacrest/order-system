@@ -55,6 +55,15 @@ final class DataExportController
 
     private function stream(string $tmpPath, string $kind, string $auditAction): void
     {
+        // The dump is a large temporary file (it can be well over 1 GB): it must be deleted
+        // even when the download is cancelled or the connection drops part-way, or each
+        // aborted download leaves a full copy of the database on the server's disk.
+        ignore_user_abort(true);
+        register_shutdown_function(static function () use ($tmpPath): void {
+            if (is_file($tmpPath)) {
+                @unlink($tmpPath);
+            }
+        });
         $user = AuthService::currentUser();
         $filename = sprintf('nexacrest-%s-%s.sql', $kind, date('Ymd-His'));
 
@@ -64,7 +73,12 @@ final class DataExportController
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('Content-Length: ' . (string) filesize($tmpPath));
         header('Cache-Control: no-store');
-        readfile($tmpPath);
-        unlink($tmpPath);
+        try {
+            readfile($tmpPath);
+        } finally {
+            if (is_file($tmpPath)) {
+                @unlink($tmpPath);
+            }
+        }
     }
 }

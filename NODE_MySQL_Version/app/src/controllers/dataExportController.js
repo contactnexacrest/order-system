@@ -47,6 +47,20 @@ async function downloadData(req, res) {
 }
 
 async function stream(req, res, tmpPath, kind, auditAction) {
+  // The dump is a large temporary file (it can be well over 1 GB): it must be deleted even
+  // when the download is cancelled or the connection drops part-way, or each aborted
+  // download leaves a full copy of the database on the server's disk.
+  let removed = false;
+  const remove = () => { if (!removed) { removed = true; fs.unlink(tmpPath, () => {}); } };
+  try {
+    await streamFile(req, res, tmpPath, kind, auditAction, remove);
+  } catch (e) {
+    remove();
+    throw e;
+  }
+}
+
+async function streamFile(req, res, tmpPath, kind, auditAction, remove) {
   const user = req.user;
   const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
   const filename = `nexacrest-${kind}-${timestamp}.sql`;
@@ -60,10 +74,11 @@ async function stream(req, res, tmpPath, kind, auditAction) {
   res.setHeader('Cache-Control', 'no-store');
 
   const readStream = fs.createReadStream(tmpPath);
+  readStream.on('close', remove);
+  readStream.on('error', remove);
+  // If the browser goes away before the end, stop reading so the file is closed and removed.
+  res.on('close', () => { if (!readStream.destroyed) readStream.destroy(); });
   readStream.pipe(res);
-  readStream.on('close', () => {
-    fs.unlink(tmpPath, () => {});
-  });
 }
 
-module.exports = { index, downloadSchema, downloadData };
+module.exports = { index, downloadSchema, downloadData, stream };
