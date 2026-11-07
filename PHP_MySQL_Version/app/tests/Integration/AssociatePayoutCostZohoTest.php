@@ -114,11 +114,12 @@ final class AssociatePayoutCostZohoTest extends DbTestCase
     public function testTheJournalBooksPayoutCostsAgainstTheBankAndASavingTheOtherWayRound(): void
     {
         [$p, $orderId, $a] = $this->paidAbroad();
-        $ref = OrderRepository::find($orderId)['order_reference'];
+        // Live Zoho check 7 Nov 2026: in Books the order goes by its buyer inquiry ref, as on the commission bill.
+        $ref = OrderRepository::find($orderId)['buyer_inquiry_ref'];
         $description = "Associate commission payout — {$ref} — " . AssociateRepository::find($a)['name'] . ' — USD 1,250.00 sent, SWIFT ref FT2612050001; exchange difference ₹812.50 and transfer charges ₹1,850.00';
         self::assertSame([
             'journal_date' => '2026-12-05',
-            'reference_number' => "APC-{$ref}-{$p['id']}",
+            'reference_number' => "{$ref}-APC-{$p['id']}",
             'notes' => "TEST- {$description}",
             'line_items' => [
                 ['account_id' => 'AC-APC', 'debit_or_credit' => 'debit', 'amount' => 2662.5, 'description' => $description],
@@ -136,6 +137,16 @@ final class AssociatePayoutCostZohoTest extends DbTestCase
             ['account_id' => 'SBI-1', 'debit_or_credit' => 'debit', 'amount' => 462.5, 'description' => 'Associate payout cost saving (the rupee came out cheaper)'],
         ], $j['line_items']);
         self::assertStringStartsWith('Associate commission payout', $j['notes'], 'no TEST- prefix for a buyer that is not test data');
+    }
+
+    public function testTheCommissionPaymentToAnAssociateAbroadCarriesItsSwiftReference(): void
+    {
+        // Live Zoho check 7 Nov 2026: the vendor payment of an associate paid abroad said "UTR <SWIFT ref>".
+        [, $orderId] = $this->paidAbroad();
+        $o = OrderRepository::find($orderId);
+        $c = ZohoBooksService::associateCommission(['order_id' => $orderId, 'buyer_inquiry_ref' => $o['buyer_inquiry_ref'], 'buyer_name' => $o['company_legal_name']]);
+        self::assertStringContainsString('gross ₹104,312.50, no TDS, net paid ₹104,312.50 · SWIFT ref FT2612050001 · against bill ', $c['payment_description']);
+        self::assertStringNotContainsString('UTR', $c['payment_description']);
     }
 
     public function testSkippedWithAClearNoteWhileTheZohoAccountIsNotChosen(): void

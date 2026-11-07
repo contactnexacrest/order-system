@@ -203,7 +203,7 @@ final class AssociateTds
      *
      * @param list<string> $orderRefs
      */
-    public static function paymentDescription(string $associateName, array $orderRefs, float $gross, float $tds, ?float $rate, ?string $section, float $net, string $reference, float $gst = 0.0): string
+    public static function paymentDescription(string $associateName, array $orderRefs, float $gross, float $tds, ?float $rate, ?string $section, float $net, string $reference, float $gst = 0.0, string $referenceLabel = 'UTR'): string
     {
         $tdsPart = $tds > 0
             ? 'TDS u/s ' . ($section ?? self::settings()['section']) . ' ₹' . number_format($tds, 2) . ($rate !== null && $rate > 0 ? ' (' . self::pct($rate) . ')' : '')
@@ -211,7 +211,8 @@ final class AssociateTds
         return 'Associate commission for ' . $associateName . ' — order' . (count($orderRefs) > 1 ? 's ' : ' ') . implode(', ', $orderRefs)
             . ' — gross ₹' . number_format($gross, 2) . ', ' . $tdsPart . ', net paid ₹' . number_format($net, 2)
             . ($gst > 0 ? ' + GST ₹' . number_format($gst, 2) . " on the associate's tax invoice (input credit), total paid ₹" . number_format(round($net + $gst, 2), 2) : '')
-            . ($reference !== '' ? ' · UTR ' . $reference : '');
+            // Live Zoho check 7 Nov 2026: a transfer abroad goes by SWIFT, so its reference is a SWIFT ref, not a UTR (rule D-212).
+            . ($reference !== '' ? ' · ' . $referenceLabel . ' ' . $reference : '');
     }
 
     /**

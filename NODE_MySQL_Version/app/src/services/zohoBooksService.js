@@ -706,10 +706,13 @@ async function payoutCostJournalPayload(payout, costsAccountId, bankAccountId, o
   order = order || await require('../repositories/orderRepository').find(Number(payout.order_id));
   const difference = round(Number(payout.payout_difference_inr), 2);
   const amount = Math.abs(difference);
-  const description = await associatePayoutService.payoutCostDescription(payout, order);
+  // Live Zoho check 7 Nov 2026: in Books the order goes by its buyer inquiry ref, as on the commission bill and
+  // payment and every other cost of the order ({ref}-EXP-…, {ref}-COST-…, {ref}-BEN-…), so the CA finds them together.
+  const orderRef = String((order && order.buyer_inquiry_ref) || (order && order.order_reference) || payout.order_id);
+  const description = await associatePayoutService.payoutCostDescription(payout, order, null, orderRef);
   return {
     journal_date: String(payout.paid_on).slice(0, 10),
-    reference_number: `APC-${(order && order.order_reference) || payout.order_id}-${payout.id}`,
+    reference_number: `${orderRef}-APC-${payout.id}`,
     notes: `${test ? `${zohoGuard.TEST_PREFIX} ` : ''}${description}`,
     line_items: [
       { account_id: costsAccountId, debit_or_credit: difference >= 0 ? 'debit' : 'credit', amount, description },
@@ -1801,7 +1804,7 @@ async function associateCommission(cost) {
     tds_inr: tds,
     reference: refs.join(', '),
     bill_description: what + (invoices.length ? ` · associate invoice ${invoices.join(', ')}` : ' · no associate invoice on file') + (tds > 0 ? ` · TDS ${tds.toFixed(2)} deducted` : ''),
-    payment_description: `${associateTds.paymentDescription(a.name, [String(cost.buyer_inquiry_ref)], round(paid + tds, 2), tds, tdsRate, tdsSection, paid, refs.join(', '), tdsSettings.section, gst)} · against bill ${billNo}`,
+    payment_description: `${associateTds.paymentDescription(a.name, [String(cost.buyer_inquiry_ref)], round(paid + tds, 2), tds, tdsRate, tdsSection, paid, refs.join(', '), tdsSettings.section, gst, require('./associatePayoutService').isIndia(a) ? 'UTR' : 'SWIFT ref')} · against bill ${billNo}`,
     // With a Zoho TDS tax set in Settings the bill carries the TDS (Zoho's TDS feature) and its balance is the net; otherwise the
     // bill is the gross, the payment the net, and the TDS is left on the bill for the CA to book.
     tds_tax_id: tds > 0 && tdsSettings.zoho_tax_id !== '' ? tdsSettings.zoho_tax_id : null,

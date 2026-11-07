@@ -108,12 +108,13 @@ describe('Associate payout costs to Zoho Books (D-264)', () => {
 
   it('books payout costs against the bank, and a saving the other way round', async () => {
     let [p, orderId, a] = await paidAbroad();
-    const ref = (await orderRepository.find(orderId)).order_reference;
+    // Live Zoho check 7 Nov 2026: in Books the order goes by its buyer inquiry ref, as on the commission bill.
+    const ref = (await orderRepository.find(orderId)).buyer_inquiry_ref;
     const name = (await associateRepository.find(a)).name;
     const description = `Associate commission payout — ${ref} — ${name} — USD 1,250.00 sent, SWIFT ref FT2612050001; exchange difference ₹812.50 and transfer charges ₹1,850.00`;
     expect(await zohoBooksService.payoutCostJournalPayload(p, 'AC-APC', 'SBI-1', null, true)).toEqual({
       journal_date: '2026-12-05',
-      reference_number: `APC-${ref}-${p.id}`,
+      reference_number: `${ref}-APC-${p.id}`,
       notes: `TEST- ${description}`,
       line_items: [
         { account_id: 'AC-APC', debit_or_credit: 'debit', amount: 2662.5, description },
@@ -131,6 +132,15 @@ describe('Associate payout costs to Zoho Books (D-264)', () => {
       { account_id: 'SBI-1', debit_or_credit: 'debit', amount: 462.5, description: 'Associate payout cost saving (the rupee came out cheaper)' },
     ]);
     expect(j.notes.startsWith('Associate commission payout')).toBe(true); // no TEST- prefix for a buyer that is not test data
+  });
+
+  it('the commission payment to an associate abroad carries its SWIFT reference', async () => {
+    // Live Zoho check 7 Nov 2026: the vendor payment of an associate paid abroad said "UTR <SWIFT ref>".
+    const [, orderId] = await paidAbroad();
+    const o = await orderRepository.find(orderId);
+    const c = await zohoBooksService.associateCommission({ order_id: orderId, buyer_inquiry_ref: o.buyer_inquiry_ref, buyer_name: o.company_legal_name });
+    expect(c.payment_description).toContain('gross ₹104,312.50, no TDS, net paid ₹104,312.50 · SWIFT ref FT2612050001 · against bill ');
+    expect(c.payment_description).not.toContain('UTR');
   });
 
   it('is skipped with a clear note while the Zoho account is not chosen', async () => {

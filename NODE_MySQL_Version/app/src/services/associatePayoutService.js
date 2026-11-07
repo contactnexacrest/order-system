@@ -368,10 +368,10 @@ async function recordPaymentCosts(payoutId, bankDebitedInr, bankChargesInr) {
  * Owner rule D-212: the payout-cost line, e.g. "Associate commission payout — NC-EXP-0142 — Demo Associate —
  * USD 1,250.00 sent, SWIFT ref FT2612050001; exchange difference ₹812.50 and transfer charges ₹1,850.00".
  */
-async function payoutCostDescription(p, order = null, associate = null) {
+async function payoutCostDescription(p, order = null, associate = null, orderLabel = null) {
   order = order || await orderRepository().find(Number(p.order_id));
   associate = associate || await associateRepository().find(Number(p.associate_id));
-  const s = `Associate commission payout — ${(order && order.order_reference) || p.order_id} — ${(associate && associate.name) || 'associate'} — `;
+  const s = `Associate commission payout — ${orderLabel || (order && order.order_reference) || p.order_id} — ${(associate && associate.name) || 'associate'} — `;
   const charges = Number(p.bank_charges_inr || 0);
   if (isIndia(associate)) return `${s}₹${money(p.paid_inr)} paid, UTR ${p.paid_reference || '—'}; transfer charges ₹${money(charges)}`;
   const exchange = round2(Number(p.payout_difference_inr || 0) - charges);

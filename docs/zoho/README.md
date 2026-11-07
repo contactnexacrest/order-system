@@ -35,11 +35,20 @@
 - **Associate payout costs (D-264, 7 Nov 2026) — live-checked 7 Nov 2026.** Each
   paid associate payout with an exchange difference or transfer charges goes to
   Books as one journal (*Associate payout costs* against the bank; reference
-  `APC-<order>-<payout id>`; notes start `TEST-` for a test buyer). Live-checked
+  `<buyer inquiry ref>-APC-<payout id>`; notes start `TEST-` for a test buyer). Live-checked
   in the TEST organisation 60093754195 (change log Z-699 to Z-703): one journal of
   ₹2,662.50 posted with the right sides, accounts and D-212 notes; a second sync
   sent nothing; with the stored id cleared the existing journal was found by its
   reference and updated, never posted twice; the test journal was then deleted.
+  **End-to-end live check 7 Nov 2026 (change log Z-704 to Z-711):** an associate
+  abroad (USD 1,250.00 fixed at ₹1,04,312.50) — bill ₹1,04,312.50, payment
+  ₹1,04,312.50, journal ₹2,662.50, together exactly what the bank paid out
+  (₹1,05,125.00 debited + ₹1,850.00 charges); an associate in India — bill
+  ₹1,04,312.50 gross, payment ₹83,449.50 net, TDS ₹20,863.00 left on the bill for
+  the CA (no Zoho TDS tax chosen), journal ₹15.00 charges. Re-sync: no duplicates.
+  Two wording fixes came out of it (both stacks): the payment to an associate
+  abroad says "SWIFT ref" (not "UTR"), and the journal uses the buyer inquiry ref
+  like the bill and payment. All test records deleted.
   Before go-live the CA
   creates the expense account and its id is entered in Associates › Commission
   settings.

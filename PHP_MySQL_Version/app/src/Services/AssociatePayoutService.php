@@ -450,11 +450,11 @@ final class AssociatePayoutService
      * Owner rule D-212: the payout-cost line, e.g. "Associate commission payout — NC-EXP-0142 — Demo Associate —
      * USD 1,250.00 sent, SWIFT ref FT2612050001; exchange difference ₹812.50 and transfer charges ₹1,850.00".
      */
-    public static function payoutCostDescription(array $p, ?array $order = null, ?array $associate = null): string
+    public static function payoutCostDescription(array $p, ?array $order = null, ?array $associate = null, ?string $orderLabel = null): string
     {
         $order ??= OrderRepository::find((int) $p['order_id']);
         $associate ??= AssociateRepository::find((int) $p['associate_id']);
-        $s = 'Associate commission payout — ' . ($order['order_reference'] ?? $p['order_id']) . ' — ' . ($associate['name'] ?? 'associate') . ' — ';
+        $s = 'Associate commission payout — ' . ($orderLabel ?? ($order['order_reference'] ?? $p['order_id'])) . ' — ' . ($associate['name'] ?? 'associate') . ' — ';
         $charges = (float) ($p['bank_charges_inr'] ?? 0);
         if (self::isIndia($associate)) {
             return $s . '₹' . self::money((float) $p['paid_inr']) . ' paid, UTR ' . ($p['paid_reference'] ?? '—') . '; transfer charges ₹' . self::money($charges);

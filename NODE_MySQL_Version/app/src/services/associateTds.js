@@ -152,14 +152,15 @@ async function shortfallCarried(associateId, from, to, exceptPayoutId = 0) {
 }
 
 /** Owner rule D-212: the description of an associate commission payment, from the facts; fresh-eyes review M5: the GST paid on top is named too (the Zoho payment amount includes it). */
-function paymentDescription(associateName, orderRefs, gross, tds, rate, section, net, reference, defaultSection = '194H', gst = 0) {
+function paymentDescription(associateName, orderRefs, gross, tds, rate, section, net, reference, defaultSection = '194H', gst = 0, referenceLabel = 'UTR') {
   const tdsPart = tds > 0
     ? `TDS u/s ${section || defaultSection} ₹${money(tds)}${rate !== null && rate !== undefined && Number(rate) > 0 ? ` (${pct(rate)})` : ''}`
     : 'no TDS';
   return `Associate commission for ${associateName} — order${orderRefs.length > 1 ? 's ' : ' '}${orderRefs.join(', ')}`
     + ` — gross ₹${money(gross)}, ${tdsPart}, net paid ₹${money(net)}`
     + (Number(gst) > 0 ? ` + GST ₹${money(gst)} on the associate's tax invoice (input credit), total paid ₹${money(round2(Number(net) + Number(gst)))}` : '')
-    + `${reference !== '' ? ` · UTR ${reference}` : ''}`;
+    // Live Zoho check 7 Nov 2026: a transfer abroad goes by SWIFT, so its reference is a SWIFT ref, not a UTR (rule D-212).
+    + `${reference !== '' ? ` · ${referenceLabel} ${reference}` : ''}`;
 }
 
 async function register(fyStart, q = null) {

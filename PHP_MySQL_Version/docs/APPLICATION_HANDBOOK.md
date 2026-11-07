@@ -2239,7 +2239,7 @@ the same filters, counts, fields, actions and money rules on both templates
     (`CaSyncService::syncPayoutCosts` / `caSyncService.syncPayoutCosts`, full sync only):
     the account `zoho_payout_costs_account_id` (Associates › Commission settings) debited
     and the deposit (bank) account credited — a negative difference the other way round —
-    notes = the D-212 description, reference `APC-<order>-<payout id>`; the journal id and
+    notes = the D-212 description, reference `<buyer inquiry ref>-APC-<payout id>` (the order goes by its buyer inquiry ref in Books, as on the commission bill and payment); the journal id and
     what was sent are kept (`incentive_payouts.zoho_cost_journal_id`, `zoho_cost_hash`), so
     it is sent once and updated on a change. Without the account nothing is sent: the Sync
     Log and the payouts page say so. Live TEST-org check pending.
@@ -3266,7 +3266,7 @@ The app **builds** it from the facts, so it is never blank or wrong. Staff notes
 | LC money | `LC money received from <Buyer> for order <ref> · LC <no.> (<bank>) · USD 20,000.00, ₹1,679,300.00 credited after ₹700.00 bank charges · against Commercial Invoice <CI no.> · bank ref <ref>` |
 | Milestone | `Milestone 2 (30% on loading) received from <Buyer> for order <ref> · USD 6,000.00 at ₹83.90 · against Commercial Invoice <CI no.> · bank ref <UTR>` |
 | Bank charges cost (D-244) | `Bank charges deducted in rupees from <Buyer>'s <leg> remittance for order <ref>: USD x at the bank's rate ₹r = ₹y, credited ₹z, charges ₹g · bank ref <UTR>` |
-| Associate payment (`AssociateTds::paymentDescription`) | `Associate commission for <Associate> — order <ref> — gross ₹84,000.00, TDS u/s 194H ₹1,680.00 (2%), net paid ₹82,320.00 + GST ₹15,120.00 on the associate's tax invoice (input credit), total paid ₹97,440.00 · UTR <ref>` |
+| Associate payment (`AssociateTds::paymentDescription`) | `Associate commission for <Associate> — order <ref> — gross ₹84,000.00, TDS u/s 194H ₹1,680.00 (2%), net paid ₹82,320.00 + GST ₹15,120.00 on the associate's tax invoice (input credit), total paid ₹97,440.00 · UTR <ref>` (an associate abroad: `· SWIFT ref <ref>`) |
 | Associate payout cost | `Associate commission to <Associate> on order <ref> (payout no. <n>, settles their commission invoice for this order): ₹84,000.00 + GST ₹15,120.00, TDS ₹1,680.00 · bank ref <ref>` |
 | Inspection fee | `Pre-shipment inspection fee — <agency>, invoice <no.>` |
 | LC loan interest | `Bank loan interest (LC order) · LC <no.> · loan ₹1,000,000.00 at 9.5%` |

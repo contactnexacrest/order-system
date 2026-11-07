@@ -814,7 +814,7 @@ final class ZohoBooksService
             'tds_inr' => $tds,
             'reference' => implode(', ', $refs),
             'bill_description' => $what . ($invoices !== [] ? ' · associate invoice ' . implode(', ', $invoices) : ' · no associate invoice on file') . ($tds > 0 ? ' · TDS ' . number_format($tds, 2, '.', '') . ' deducted' : ''),
-            'payment_description' => \App\Services\AssociateTds::paymentDescription((string) $a['name'], [(string) $cost['buyer_inquiry_ref']], round($paid + $tds, 2), $tds, $tdsRate, $tdsSection, $paid, implode(', ', $refs), $gst) . ' · against bill ' . $billNo,
+            'payment_description' => \App\Services\AssociateTds::paymentDescription((string) $a['name'], [(string) $cost['buyer_inquiry_ref']], round($paid + $tds, 2), $tds, $tdsRate, $tdsSection, $paid, implode(', ', $refs), $gst, AssociatePayoutService::isIndia($a) ? 'UTR' : 'SWIFT ref') . ' · against bill ' . $billNo,
             // With a Zoho TDS tax set in Settings the bill carries the TDS (Zoho's TDS feature) and its balance is the net; otherwise the
             // bill is the gross, the payment the net, and the TDS is left on the bill for the CA to book.
             'tds_tax_id' => $tds > 0 && $tdsTaxId !== '' ? $tdsTaxId : null,
@@ -979,12 +979,15 @@ final class ZohoBooksService
         $order ??= \App\Repositories\OrderRepository::find((int) $payout['order_id']);
         $difference = round((float) $payout['payout_difference_inr'], 2);
         $amount = abs($difference);
-        $description = AssociatePayoutService::payoutCostDescription($payout, $order);
+        // Live Zoho check 7 Nov 2026: in Books the order goes by its buyer inquiry ref, as on the commission bill and
+        // payment and every other cost of the order ({ref}-EXP-…, {ref}-COST-…, {ref}-BEN-…), so the CA finds them together.
+        $orderRef = (string) (($order['buyer_inquiry_ref'] ?? '') !== '' ? $order['buyer_inquiry_ref'] : ($order['order_reference'] ?? $payout['order_id']));
+        $description = AssociatePayoutService::payoutCostDescription($payout, $order, null, $orderRef);
         $costSide = $difference >= 0 ? 'debit' : 'credit';
         $bankSide = $difference >= 0 ? 'credit' : 'debit';
         return [
             'journal_date' => (string) $payout['paid_on'],
-            'reference_number' => 'APC-' . ($order['order_reference'] ?? $payout['order_id']) . '-' . $payout['id'],
+            'reference_number' => $orderRef . '-APC-' . $payout['id'],
             'notes' => ($test ? ZohoGuard::TEST_PREFIX . ' ' : '') . $description,
             'line_items' => [
                 ['account_id' => $costsAccountId, 'debit_or_credit' => $costSide, 'amount' => $amount, 'description' => $description],
