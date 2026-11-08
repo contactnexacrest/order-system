@@ -6,7 +6,7 @@
 function overlayMain(brand, zoom) {
   const KEY = '__tut';
   // Zoom the page from the very first paint (the overlay styles follow at DOMContentLoaded).
-  try { const z = document.createElement('style'); z.id = 'tut-zoom'; z.textContent = `body{zoom:${zoom}}.dev-server-banner{display:none!important}`; document.documentElement.appendChild(z); } catch (e) { /* ignore */ }
+  try { const z = document.createElement('style'); z.id = 'tut-zoom'; z.textContent = `body{zoom:${zoom}}.dev-server-banner,.alert-dev{display:none!important}`; document.documentElement.appendChild(z); } catch (e) { /* ignore */ }
   const load = () => { try { return JSON.parse(sessionStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } };
   const save = (s) => { try { sessionStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } };
 

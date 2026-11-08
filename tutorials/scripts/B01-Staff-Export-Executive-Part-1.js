@@ -17,8 +17,7 @@ const EXEC = 'export.executive@email.com';
 async function typeLoginCode(d) {
   const banner = d.page.locator('.alert-dev strong').first();
   if (!(await banner.count())) return;
-  const code = (await banner.innerText()).trim();
-  await d.page.addStyleTag({ content: '.alert-dev{display:none!important}' });
+  const code = ((await banner.textContent()) || '').trim();
   await d.point('input[name="code"]', 2500);
   await d.type('input[name="code"]', code, { delay: 160 });
   await d.wait(1200);

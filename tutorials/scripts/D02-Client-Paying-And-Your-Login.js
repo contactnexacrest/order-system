@@ -18,8 +18,7 @@ const at = (o, hash = '') => `/orders/${o}${hash}`;
 async function typeLoginCode(d) {
   const banner = d.page.locator('.alert-dev strong').first();
   if (!(await banner.count())) return;
-  const code = (await banner.innerText()).trim();
-  await d.page.addStyleTag({ content: '.alert-dev{display:none!important}' });
+  const code = ((await banner.textContent()) || '').trim();
   // Let the narration describe the page before the code is typed and Verify is pressed.
   await d.point('input[name="code"]', 3500);
   await d.type('input[name="code"]', code, { delay: 160 });
