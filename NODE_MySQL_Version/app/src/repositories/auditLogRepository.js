@@ -49,11 +49,39 @@ async function search({ entityType = null, entityId = null, userId = null, actio
 
   let sql = `SELECT al.*, u.name AS user_name FROM audit_log al LEFT JOIN users u ON u.id = al.user_id`;
   if (where.length) sql += ' WHERE ' + where.join(' AND ');
-  sql += ` ORDER BY al.created_at DESC LIMIT ${parseInt(limit, 10)} OFFSET ${parseInt(offset, 10)}`;
+  // D-268: id breaks ties within the same second, so "latest first" is stable.
+  sql += ` ORDER BY al.created_at DESC, al.id DESC LIMIT ${parseInt(limit, 10)} OFFSET ${parseInt(offset, 10)}`;
 
   // Owner decision 1 Nov 2026 (C-14): a Zoho secret edited before secrets were masked may sit in an older row; never shown again.
   const secretSetting = require('../helpers/secretSetting');
   return (await db.query(sql, params)).map((r) => (r.entity_type === 'company_settings' && secretSetting.isSecret(r.field_name)
+    ? { ...r, old_value: secretSetting.forAudit(r.old_value), new_value: secretSetting.forAudit(r.new_value) } : r));
+}
+
+/**
+ * D-268: the dashboard's Recent Activity for staff without the audit-log
+ * permission — only their own actions, plus actions on the orders in
+ * orderIds (the orders they can open, by the Orders list's own visibility
+ * rule). Another person's login, or anything they did outside those
+ * orders, is never included.
+ */
+async function recentVisibleTo(userId, orderIds, limit = 15) {
+  const where = [`al.user_id = ${parseInt(userId, 10)}`];
+  const ids = (orderIds || []).map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id)).join(',');
+  if (ids !== '') {
+    where.push(`(al.entity_type IN ('orders', 'order_payment_status') AND al.entity_id IN (${ids}))`);
+    where.push(`(al.entity_type = 'documents' AND al.entity_id IN (SELECT id FROM documents WHERE order_id IN (${ids})))`);
+    where.push(`(al.entity_type = 'disputes' AND al.entity_id IN (SELECT id FROM disputes WHERE order_id IN (${ids})))`);
+    where.push(`(al.entity_type = 'amendments' AND al.entity_id IN (SELECT id FROM amendments WHERE order_id IN (${ids})))`);
+    where.push(`(al.entity_type = 'email_log' AND al.entity_id IN (SELECT id FROM email_log WHERE order_id IN (${ids})))`);
+    where.push(`(al.entity_type = 'order_supplier_po' AND al.entity_id IN (SELECT id FROM order_supplier_po WHERE order_id IN (${ids})))`);
+  }
+  const sql = `SELECT al.*, u.name AS user_name
+     FROM audit_log al LEFT JOIN users u ON u.id = al.user_id
+     WHERE ${where.join(' OR ')}
+     ORDER BY al.created_at DESC, al.id DESC LIMIT ${parseInt(limit, 10)}`;
+  const secretSetting = require('../helpers/secretSetting');
+  return (await db.query(sql, {})).map((r) => (r.entity_type === 'company_settings' && secretSetting.isSecret(r.field_name)
     ? { ...r, old_value: secretSetting.forAudit(r.old_value), new_value: secretSetting.forAudit(r.new_value) } : r));
 }
 
@@ -97,4 +125,4 @@ async function forOrder(orderId) {
   );
 }
 
-module.exports = { log, search, distinctActionTypes, forOrder };
+module.exports = { log, search, recentVisibleTo, distinctActionTypes, forOrder };

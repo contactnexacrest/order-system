@@ -54,8 +54,42 @@ final class OrderCommentRepository
 
     public static function markEmailSent(int $commentId): void
     {
-        $stmt = Database::connection()->prepare('UPDATE order_comments SET email_sent = 1 WHERE id = :id');
-        $stmt->execute(['id' => $commentId]);
+        self::recordEmailStatus($commentId, 'sent');
+    }
+
+    /**
+     * D-268: what happened to a staff post's client e-mail — 'sent',
+     * 'sending_off' (Admin switched e-mail sending off), 'no_email' (no
+     * client e-mail on file) or 'failed' (the send itself failed).
+     */
+    public static function recordEmailStatus(int $commentId, string $status): void
+    {
+        $stmt = Database::connection()->prepare(
+            'UPDATE order_comments SET email_status = :status, email_sent = :sent WHERE id = :id'
+        );
+        $stmt->execute(['status' => $status, 'sent' => $status === 'sent' ? 1 : 0, 'id' => $commentId]);
+    }
+
+    /**
+     * D-268: the note staff see beside a staff post in Order Communication,
+     * giving the true reason when the client was not e-mailed. A client's
+     * own post carries no note. A post saved before D-268 has no recorded
+     * reason, so it only says it was not e-mailed.
+     */
+    public static function emailNote(array $comment): string
+    {
+        if (($comment['author_type'] ?? '') !== 'staff') {
+            return '';
+        }
+        if ((int) ($comment['email_sent'] ?? 0) === 1) {
+            return 'e-mailed';
+        }
+        return match ($comment['email_status'] ?? null) {
+            'sending_off' => 'not e-mailed — e-mail sending is switched off in Admin',
+            'no_email'    => 'not e-mailed — no client e-mail on file',
+            'failed'      => 'not e-mailed — the e-mail could not be sent',
+            default       => 'not e-mailed',
+        };
     }
 
     /**
@@ -102,6 +136,7 @@ final class OrderCommentRepository
 
         foreach ($rows as &$row) {
             $row['attachments'] = $byComment[(int) $row['id']] ?? [];
+            $row['email_note'] = self::emailNote($row);
         }
         return $rows;
     }

@@ -30,6 +30,21 @@ final class CoordinationController
         return DepartmentTaskRepository::scopeFor(ActiveDepartmentService::current($userId));
     }
 
+    /**
+     * D-268: a staff member with no current department membership (and no
+     * Admin "Preview as") sees only the tasks on orders they own — never
+     * every department's queue. Management (the cockpit permission: Admin,
+     * MD/ED, directors, Order Coordinator) keeps the company-wide view.
+     */
+    private static function ownTasksOnly(int $userId): bool
+    {
+        if (ActiveDepartmentService::current($userId) !== null || ActiveDepartmentService::preview() !== null) {
+            return false;
+        }
+        $user = AuthService::currentUser();
+        return !\App\Services\PermissionService::can($userId, isset($user['role_id']) ? (int) $user['role_id'] : null, 'view_cockpit');
+    }
+
     /** @param list<array<string,mixed>> $tasks @return list<array<string,mixed>> only tasks on orders this person can open */
     private static function visible(array $tasks): array
     {
@@ -43,7 +58,8 @@ final class CoordinationController
     public function myTasks(array $params): void
     {
         $userId = (int) AuthService::currentUserId();
-        $mine = ($_GET['show'] ?? '') === 'mine';
+        $ownOnly = self::ownTasksOnly($userId);
+        $mine = $ownOnly || ($_GET['show'] ?? '') === 'mine';
         $tasks = self::visible(DepartmentTaskRepository::open(self::departmentsFor($userId)));
         if ($mine) {
             $tasks = array_values(array_filter($tasks, static fn (array $t): bool => (int) ($t['owner_id'] ?? 0) === $userId));
@@ -60,6 +76,7 @@ final class CoordinationController
             View::render('coordination/my_tasks_kanban', [
                 'columns' => $columns,
                 'mine' => $mine,
+                'ownOnly' => $ownOnly,
                 'acting' => ActiveDepartmentService::actingLabel($userId),
             ], 'layout/base');
             return;
@@ -67,6 +84,7 @@ final class CoordinationController
         View::render('coordination/my_tasks', [
             'tasks' => $tasks,
             'mine' => $mine,
+            'ownOnly' => $ownOnly,
             // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
             'kanbanUser' => \App\Services\UiTemplateService::resolve(AuthService::currentUser()['ui_template_preference_id'] ?? null) === 'kanban',
             'acting' => ActiveDepartmentService::actingLabel($userId),

@@ -104,11 +104,41 @@ final class AuditLogRepository
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY al.created_at DESC LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset;
+        // D-268: id breaks ties within the same second, so "latest first" is stable.
+        $sql .= ' ORDER BY al.created_at DESC, al.id DESC LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset;
 
         $stmt = Database::connection()->prepare($sql);
         $stmt->execute($params);
         return self::maskSecrets($stmt->fetchAll());
+    }
+
+    /**
+     * D-268: the dashboard's Recent Activity for staff without the audit-log
+     * permission — only their own actions, plus actions on the orders in
+     * $orderIds (the orders they can open, by the Orders list's own
+     * visibility rule). Another person's login, or anything they did
+     * outside those orders, is never included.
+     *
+     * @param list<int> $orderIds
+     * @return array<int, array<string,mixed>>
+     */
+    public static function recentVisibleTo(int $userId, array $orderIds, int $limit = 15): array
+    {
+        $where = ['al.user_id = ' . (int) $userId];
+        $ids = implode(',', array_map('intval', $orderIds));
+        if ($ids !== '') {
+            $where[] = "(al.entity_type IN ('orders', 'order_payment_status') AND al.entity_id IN ({$ids}))";
+            $where[] = "(al.entity_type = 'documents' AND al.entity_id IN (SELECT id FROM documents WHERE order_id IN ({$ids})))";
+            $where[] = "(al.entity_type = 'disputes' AND al.entity_id IN (SELECT id FROM disputes WHERE order_id IN ({$ids})))";
+            $where[] = "(al.entity_type = 'amendments' AND al.entity_id IN (SELECT id FROM amendments WHERE order_id IN ({$ids})))";
+            $where[] = "(al.entity_type = 'email_log' AND al.entity_id IN (SELECT id FROM email_log WHERE order_id IN ({$ids})))";
+            $where[] = "(al.entity_type = 'order_supplier_po' AND al.entity_id IN (SELECT id FROM order_supplier_po WHERE order_id IN ({$ids})))";
+        }
+        $sql = 'SELECT al.*, u.name AS user_name
+                FROM audit_log al LEFT JOIN users u ON u.id = al.user_id
+                WHERE ' . implode(' OR ', $where) . '
+                ORDER BY al.created_at DESC, al.id DESC LIMIT ' . (int) $limit;
+        return self::maskSecrets(Database::connection()->query($sql)->fetchAll());
     }
 
     /** @return string[] distinct action_type values, for the filter dropdown */

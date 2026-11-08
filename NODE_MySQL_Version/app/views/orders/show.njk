@@ -1596,7 +1596,7 @@
           <div class="chat-bubble {{ 'staff' if isStaff else 'client' }}">
             <div class="chat-bubble-meta">
               <span class="who">{{ 'Staff' if isStaff else 'Client' }} — {{ (c.staff_name if isStaff else c.client_name) or 'Unknown' }}</span>
-              <span>{{ c.created_at | humanDate }}{% if isStaff %}{{ ' · emailed' if c.email_sent else ' · not emailed (no client email on file)' }}{% endif %}</span>
+              <span>{{ c.created_at | humanDate }}{% if c.email_note %} · <span class="chat-email-note">{{ c.email_note }}</span>{% endif %}</span>
             </div>
             {% if c.body %}<div class="chat-bubble-body">{{ c.body }}</div>{% endif %}
             {% if c.attachments.length > 0 %}

@@ -21,7 +21,36 @@ async function attachFile(commentId, fileStoreId) {
 }
 
 async function markEmailSent(commentId) {
-  await db.execute('UPDATE order_comments SET email_sent = 1 WHERE id = :id', { id: commentId });
+  await recordEmailStatus(commentId, 'sent');
+}
+
+/**
+ * D-268: what happened to a staff post's client e-mail — 'sent',
+ * 'sending_off' (Admin switched e-mail sending off), 'no_email' (no
+ * client e-mail on file) or 'failed' (the send itself failed).
+ */
+async function recordEmailStatus(commentId, status) {
+  await db.execute(
+    'UPDATE order_comments SET email_status = :status, email_sent = :sent WHERE id = :id',
+    { status, sent: status === 'sent' ? 1 : 0, id: commentId }
+  );
+}
+
+/**
+ * D-268: the note staff see beside a staff post in Order Communication,
+ * giving the true reason when the client was not e-mailed. A client's own
+ * post carries no note. A post saved before D-268 has no recorded reason,
+ * so it only says it was not e-mailed.
+ */
+function emailNote(comment) {
+  if (!comment || comment.author_type !== 'staff') return '';
+  if (Number(comment.email_sent) === 1) return 'e-mailed';
+  switch (comment.email_status) {
+    case 'sending_off': return 'not e-mailed — e-mail sending is switched off in Admin';
+    case 'no_email': return 'not e-mailed — no client e-mail on file';
+    case 'failed': return 'not e-mailed — the e-mail could not be sent';
+    default: return 'not e-mailed';
+  }
 }
 
 /**
@@ -81,8 +110,9 @@ async function forOrder(orderId) {
 
   for (const row of rows) {
     row.attachments = byComment[row.id] || [];
+    row.email_note = emailNote(row);
   }
   return rows;
 }
 
-module.exports = { create, attachFile, markEmailSent, findAttachmentForOrder, forOrder };
+module.exports = { create, attachFile, markEmailSent, recordEmailStatus, emailNote, findAttachmentForOrder, forOrder };
