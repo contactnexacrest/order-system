@@ -2264,7 +2264,7 @@ $renderComplianceCard = static function (string $phase, string $step) use ($comp
           <div class="chat-bubble <?= $isStaff ? 'staff' : 'client' ?>">
             <div class="chat-bubble-meta">
               <span class="who"><?= $isStaff ? 'Staff' : 'Client' ?> — <?= htmlspecialchars($isStaff ? ($c['staff_name'] ?? 'Unknown') : ($c['client_name'] ?? 'Unknown')) ?></span>
-              <span><?= htmlspecialchars(Dates::human($c['created_at'])) ?><?= $isStaff ? ($c['email_sent'] ? ' · emailed' : ' · not emailed (no client email on file)') : '' ?></span>
+              <span><?= htmlspecialchars(Dates::human($c['created_at'])) ?><?php $emailNote = \App\Repositories\OrderCommentRepository::emailNote($c); ?><?php if ($emailNote !== ''): ?> · <span class="chat-email-note"><?= htmlspecialchars($emailNote) ?></span><?php endif; ?></span>
             </div>
             <?php if ($c['body']): ?><div class="chat-bubble-body"><?= htmlspecialchars($c['body']) ?></div><?php endif; ?>
             <?php if (!empty($c['attachments'])): ?>

@@ -68,9 +68,23 @@ final class DashboardController
         $data['associateUpgrades'] = PermissionService::can($userId, $roleId, 'manage_associates') ? \App\Services\AssociateAccess::upgradeSuggestions() : [];
 
         if ($canViewReports) {
-            $data['recentActivity'] = \App\Services\AuditMoneyMask::maskAll(AuditLogRepository::search(null, null, null, null, null, null, 15, 0));
+            // D-268: the full app-wide feed only with the audit-log permission (Admin/MD); everyone else sees
+            // their own actions plus actions on the orders they can open (the Orders list's visibility rule).
+            $rows = PermissionService::can($userId, $roleId, 'view_audit_log')
+                ? AuditLogRepository::search(null, null, null, null, null, null, 15, 0)
+                : AuditLogRepository::recentVisibleTo($userId, self::openableOrderIds(), 15);
+            $data['recentActivity'] = \App\Services\AuditMoneyMask::maskAll($rows);
         }
 
         View::render('dashboard/index', $data, 'layout/base');
+    }
+
+    /** @return list<int> D-268: the orders the signed-in user can open — the Orders list's rule (division, assignment, archived). */
+    private static function openableOrderIds(): array
+    {
+        [$visSql, $visParams] = \App\Services\OrderAccessService::visibilitySql('o');
+        $stmt = \App\Config\Database::connection()->prepare('SELECT o.id FROM orders o WHERE 1 = 1' . $visSql);
+        $stmt->execute($visParams);
+        return array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
     }
 }

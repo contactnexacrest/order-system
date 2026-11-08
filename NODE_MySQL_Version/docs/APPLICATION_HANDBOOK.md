@@ -1902,6 +1902,11 @@ settlement).
   (D-152).
 - **15 Order Communication** — two-way chat with the client
   (`order_comments`, attachments); with mail off the client is not e-mailed.
+  Beside each staff post, staff see what happened to its e-mail (D-268,
+  stored in `order_comments.email_status`): "e-mailed", "not e-mailed —
+  e-mail sending is switched off in Admin", "not e-mailed — no client
+  e-mail on file" or "not e-mailed — the e-mail could not be sent" (posts
+  saved before D-268: "not e-mailed"). Client posts carry no note.
 - **16 Order Feedback** — 1–5 stars + testimonial, after documents are sent
   (`order_feedback`); staff can record it for the client.
 - **17 Complaints**, **18 Disputes** — 5.9.
@@ -2514,6 +2519,12 @@ the same filters, counts, fields, actions and money rules on both templates
   Expiry Warnings (LUT/RCMC), Agreements expiring, Team incentives ready to
   lock, Associates ready for Quoting, Recent Activity. Insights › Reports
   (`/reports`).
+- **Recent Activity (D-268).** Shown with `view_reports` or
+  `view_audit_log`. With `view_audit_log` (Admin, MD, ED): the latest 15
+  audit entries app-wide. Without it: only the person's own actions plus
+  actions on the orders they can open (the Orders list's visibility rule —
+  division, assignment unless `view_all_orders`, archived only with
+  `view_archived_orders`); never another person's login.
 - **Reports** (route → permission):
 
 | Report | Route | Permission |
@@ -2561,6 +2572,13 @@ the same filters, counts, fields, actions and money rules on both templates
     (7/7), eBRC follow-up (7/7).
   - Overdue tasks are red; escalated ones show in the cockpit. Tasks never
     show amounts.
+  - Whose tasks (D-268): a member works their department's queue
+    (Management, the Order Desk and Audit see every department's). With no
+    current department membership, a person sees only the tasks on orders
+    they own (the department owner), with a note saying so — except
+    holders of `view_cockpit` (Admin, MD, ED, directors, Order Coordinator,
+    Operations Manager) and an Admin in "Preview as", who keep every
+    department's list. Same on the list and the Kanban board.
   - One owner per department per order (`assign_department_owner`); MD/ED,
     Admin and the Order Coordinator choose for any department.
   - Cockpit: open/overdue/escalated per department, orders without an

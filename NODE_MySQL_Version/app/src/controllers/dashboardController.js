@@ -62,12 +62,24 @@ async function index(req, res) {
   }
 
   if (canViewReports) {
-    data.recentActivity = await auditMoneyMask.maskAll(req.permissions, await auditLogRepository.search({ limit: 15, offset: 0 }));
+    // D-268: the full app-wide feed only with the audit-log permission (Admin/MD); everyone else sees
+    // their own actions plus actions on the orders they can open (the Orders list's visibility rule).
+    const rows = permissions.view_audit_log
+      ? await auditLogRepository.search({ limit: 15, offset: 0 })
+      : await auditLogRepository.recentVisibleTo(user.id, await openableOrderIds(user.id, permissions), 15);
+    data.recentActivity = await auditMoneyMask.maskAll(req.permissions, rows);
   }
 
   data.agreementsExpiring = await require('./agreementController').expiringSoon(req);
   data.agreementPartyTypes = require('../repositories/agreementRepository').PARTY_TYPES;
   res.renderView('dashboard/index', data, 'layout/base');
+}
+
+/** D-268: the orders the signed-in user can open — the Orders list's rule (division, assignment, archived). */
+async function openableOrderIds(userId, permissions) {
+  const { sql, params } = require('../services/orderAccessService').visibilitySql(userId, permissions, 'o');
+  const rows = await require('../config/db').query(`SELECT o.id FROM orders o WHERE 1 = 1${sql}`, params);
+  return rows.map((r) => Number(r.id));
 }
 
 module.exports = { index };

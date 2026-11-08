@@ -26,11 +26,15 @@ $renderKanbanCard = static function (array $t): string {
       <p class="muted" style="margin:0;">What <?= $acting ? htmlspecialchars($acting) : 'your department' ?> has to do next, earliest due first. A task appears here when the step before it is done, and goes away when you do it. Overdue tasks are red; after a few more days they are escalated to management.</p>
     </div>
     <div class="btn-row" style="margin-top:0;">
+      <?php if (empty($ownOnly)): ?>
       <a class="btn-sm<?= $mine ? ' btn-secondary' : '' ?>" href="/my-tasks">All of my department's tasks</a>
       <a class="btn-sm<?= $mine ? '' : ' btn-secondary' ?>" href="/my-tasks?show=mine">Only orders I own</a>
+      <?php endif; ?>
       <a class="btn-sm btn-secondary" href="/my-tasks?view=list<?= $mine ? '&amp;show=mine' : '' ?>">Switch to list view</a>
     </div>
   </div>
+
+  <?php if (!empty($ownOnly)): ?><p class="alert alert-info my-tasks-own-only"><?= htmlspecialchars('You are not a member of any department at the moment, so only tasks on orders you own are listed here. Admin can add you to a department to see its queue.') ?></p><?php endif; ?>
 
   <div class="kanban-board">
     <?php foreach ($columns as $key => $col): ?>

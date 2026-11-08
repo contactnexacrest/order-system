@@ -361,6 +361,13 @@ a.btn-sm{padding:0.45rem 0.9rem;font-size:0.85rem;}
 .product-row label{margin-bottom:0.2rem;font-size:0.75rem;}
 .product-row input{margin-top:0;}
 .product-row-actions{display:flex;gap:0.35rem;}
+/* D-268: on a product line, "Pick from Products" and the product's specification options each take the
+   full row width, and the options sit in a responsive grid, so a product with many options never stretches
+   one cell into a tall column that pushes the picker (and the rest of the line) down. */
+.product-row > label.full,.product-row > .spec-options{grid-column:1 / -1;}
+.spec-options{display:grid;grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));gap:0.4rem 0.75rem;align-items:end;}
+.spec-options:empty{display:none;}
+.spec-options .spec-option{margin:0;}
 .remove-row{background:var(--danger);padding:0.5rem 0.7rem;}
 .remove-row:hover{background:#7e3221;}
 

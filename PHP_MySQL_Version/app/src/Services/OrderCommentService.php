@@ -49,7 +49,12 @@ final class OrderCommentService
         $clientEmail = EmailDispatchService::clientEmailFor($order);
         if ($clientEmail !== null) {
             $order['client_email'] = $clientEmail;
-            self::emailClient($order, $authorUserId, $commentId, $bodyTrim, $fileStoreIds);
+            // D-268: checked before sending, so the note gives the true reason (the switch, not a missing address).
+            $sendingOff = CompanySettingsRepository::get('mail_sending_enabled') === '0';
+            $sent = self::emailClient($order, $authorUserId, $bodyTrim, $fileStoreIds);
+            OrderCommentRepository::recordEmailStatus($commentId, $sent ? 'sent' : ($sendingOff ? 'sending_off' : 'failed'));
+        } else {
+            OrderCommentRepository::recordEmailStatus($commentId, 'no_email');
         }
 
         AuditLogRepository::log($authorUserId, 'ORDER_COMMENT_POSTED', 'orders', $orderId);
@@ -83,7 +88,7 @@ final class OrderCommentService
         return $trimmed !== '' ? $trimmed : null;
     }
 
-    private static function emailClient(array $order, int $authorUserId, int $commentId, ?string $body, array $fileStoreIds): void
+    private static function emailClient(array $order, int $authorUserId, ?string $body, array $fileStoreIds): bool
     {
         $sender = UserRepository::findById($authorUserId);
         $subject = "Update on your order {$order['order_reference']} — " . (string) CompanySettingsRepository::get('legal_name');
@@ -122,9 +127,6 @@ final class OrderCommentService
             ? $signature
             : "Regards,\n" . ($sender['name'] ?? '') . "\n" . EmailDispatchService::senderTitle($sender ?: null); // QA batch 3 MAIL-5: the sender's own title, not the MD's
 
-        $sent = MailSenderService::send($order['client_email'], $subject, $message, $direct);
-        if ($sent) {
-            OrderCommentRepository::markEmailSent($commentId);
-        }
+        return MailSenderService::send($order['client_email'], $subject, $message, $direct);
     }
 }

@@ -1,9 +1,12 @@
 <div class="card page-wide">
   <h1>My tasks</h1>
   <p class="muted">What <?= $acting ? htmlspecialchars($acting) : 'your department' ?> has to do next, earliest due first. A task appears here when the step before it is done, and goes away when you do it. Overdue tasks are red; after a few more days they are escalated to management.</p>
+  <?php if (!empty($ownOnly)): ?><p class="alert alert-info my-tasks-own-only"><?= htmlspecialchars('You are not a member of any department at the moment, so only tasks on orders you own are listed here. Admin can add you to a department to see its queue.') ?></p><?php endif; ?>
   <div class="btn-row">
+    <?php if (empty($ownOnly)): ?>
     <a class="btn-sm<?= $mine ? ' btn-secondary' : '' ?>" href="/my-tasks<?= !empty($kanbanUser) ? '?view=list' : '' ?>">All of my department's tasks</a>
     <a class="btn-sm<?= $mine ? '' : ' btn-secondary' ?>" href="/my-tasks?show=mine<?= !empty($kanbanUser) ? '&amp;view=list' : '' ?>">Only orders I own</a>
+    <?php endif; ?>
     <?php if (!empty($kanbanUser)): ?><a class="btn-sm btn-secondary" href="/my-tasks<?= $mine ? '?show=mine' : '' ?>">Switch to board view</a><?php endif; ?>
   </div>
   <div class="table-scroll">

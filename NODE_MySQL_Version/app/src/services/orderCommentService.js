@@ -50,7 +50,12 @@ async function postAsStaff(orderId, authorUserId, body, fileStoreIds) {
   const clientEmail = await require('./emailDispatchService').clientEmailFor(order);
   if (clientEmail !== null) {
     order.client_email = clientEmail;
-    await emailClient(order, authorUserId, commentId, bodyTrim, fileStoreIds);
+    // D-268: checked before sending, so the note gives the true reason (the switch, not a missing address).
+    const sendingOff = (await companySettingsRepository.get('mail_sending_enabled')) === '0';
+    const sent = await emailClient(order, authorUserId, bodyTrim, fileStoreIds);
+    await orderCommentRepository.recordEmailStatus(commentId, sent ? 'sent' : (sendingOff ? 'sending_off' : 'failed'));
+  } else {
+    await orderCommentRepository.recordEmailStatus(commentId, 'no_email');
   }
 
   await auditLogRepository.log(authorUserId, 'ORDER_COMMENT_POSTED', 'orders', orderId);
@@ -74,7 +79,7 @@ async function postAsClient(orderId, clientId, body, fileStoreIds) {
   return commentId;
 }
 
-async function emailClient(order, authorUserId, commentId, body, fileStoreIds) {
+async function emailClient(order, authorUserId, body, fileStoreIds) {
   const sender = await userRepository.findById(authorUserId);
   const subject = `Update on your order ${order.order_reference} — ${await companySettingsRepository.get('legal_name')}`;
 
@@ -110,10 +115,7 @@ async function emailClient(order, authorUserId, commentId, body, fileStoreIds) {
     ? signature
     : `Regards,\n${(sender && sender.name) || ''}\n${await require('./emailDispatchService').senderTitleFor(sender || null)}`; // QA batch 3 MAIL-5
 
-  const sent = await mailSenderService.send(order.client_email, subject, message, direct);
-  if (sent) {
-    await orderCommentRepository.markEmailSent(commentId);
-  }
+  return mailSenderService.send(order.client_email, subject, message, direct);
 }
 
 module.exports = { postAsStaff, postAsClient };

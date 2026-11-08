@@ -29,6 +29,13 @@ amounts.
 Management, the Order Desk and Audit have no tasks of their own, so they
 see every department's list.
 
+**Not in any department?** If you have no current department membership,
+My tasks lists only the tasks on orders **you own** (you are that
+department's owner on the order), and a note at the top says so. Ask
+Admin to add you to a department to see its whole queue. Admin, MD/ED, the
+directors, the Order Coordinator and the Operations Manager keep every
+department's list even without a membership.
+
 ## The daily digest
 
 Every morning (08:15 IST) each person gets **one e-mail** listing what waits

@@ -20,6 +20,17 @@ async function departmentsFor(req, userId) {
   return departmentTaskRepository.scopeFor(await activeDepartmentService.current(req, userId));
 }
 
+/**
+ * D-268: a staff member with no current department membership (and no
+ * Admin "Preview as") sees only the tasks on orders they own — never every
+ * department's queue. Management (the cockpit permission: Admin, MD/ED,
+ * directors, Order Coordinator) keeps the company-wide view.
+ */
+async function ownTasksOnly(req, userId) {
+  if ((await activeDepartmentService.current(req, userId)) !== null || (await activeDepartmentService.preview(req)) !== null) return false;
+  return !(req.permissions || {}).view_cockpit;
+}
+
 /** Only tasks on orders this person can open. */
 async function visible(req, tasks) {
   const mayOpen = await orderAccessService.orderLinkChecker(req.user.id, req.permissions);
@@ -27,7 +38,8 @@ async function visible(req, tasks) {
 }
 
 async function myTasks(req, res) {
-  const mine = req.query.show === 'mine';
+  const ownOnly = await ownTasksOnly(req, req.user.id);
+  const mine = ownOnly || req.query.show === 'mine';
   let tasks = await visible(req, await departmentTaskRepository.open(await departmentsFor(req, req.user.id)));
   if (mine) {
     tasks = tasks.filter((t) => Number(t.owner_id || 0) === Number(req.user.id));
@@ -48,6 +60,7 @@ async function myTasks(req, res) {
     res.renderView('coordination/my_tasks_kanban', {
       columns,
       mine,
+      ownOnly,
       acting: p ? `Preview: ${p.title} · ${p.department_name}` : (m ? activeDepartmentService.label(m) : null),
     }, 'layout/base');
     return;
@@ -55,6 +68,7 @@ async function myTasks(req, res) {
   res.renderView('coordination/my_tasks', {
     tasks,
     mine,
+    ownOnly,
     // Owner hard rule 2026-11-01: a Kanban user who switched to the list can switch back.
     kanbanUser: (await require('../services/uiTemplateService').resolve(req.user.ui_template_preference_id || null)) === 'kanban',
     acting: p ? `Preview: ${p.title} · ${p.department_name}` : (m ? activeDepartmentService.label(m) : null),

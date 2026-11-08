@@ -2571,6 +2571,7 @@ CREATE TABLE order_comments (
   author_client_id        BIGINT UNSIGNED NULL,   -- set when author_type = 'client'
   body                    TEXT NULL,              -- comment text; NULL allowed for an attachment-only post
   email_sent              TINYINT(1) NOT NULL DEFAULT 0,  -- whether this staff comment's client email actually went out
+  email_status            VARCHAR(20) NULL,       -- D-268: sent / sending_off / no_email / failed (why a staff post was or was not e-mailed); NULL for client posts
   created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (order_id) REFERENCES orders(id),
   FOREIGN KEY (author_user_id) REFERENCES users(id),
