@@ -158,9 +158,11 @@ module.exports = {
       'Both stay in My Orders, with every document you received.',
       'Changed your mind? Talk to your NexaCrest contact: we start a new order.',
     ], say: 'What is the difference? Lost is an order that did not go ahead, before any payment was made. Cancelled is an order that was called off, and every cancellation at our side is approved by a second person, with any refund recorded. Both stay in My Orders, with every document you received. And if you change your mind later, simply talk to your NexaCrest contact, and we start a new order.' },
-    { caption: 'Inside a cancelled order', say: 'Inside a cancelled order, the documents you already received are still there to download. But there is nothing to pay: Report a Payment says this order is cancelled, so there is no payment to report on it.', do: async (d) => {
+    { caption: 'Inside a cancelled order', say: 'Inside a cancelled order, the documents you already received are still there to download. The Buyer PO box no longer offers an upload: it says the order is cancelled, so a Buyer PO can no longer be uploaded. And there is nothing to pay: Report a Payment says this order is cancelled, so there is no payment to report on it.', do: async (d) => {
       await d.clickNav(section(d, 'Cancelled').getByRole('link', { name: 'View documents' }));
       await d.point(section(d, 'Documents').locator('table'), 2200);
+      const po = section(d, 'Buyer PO');
+      await d.scrollTo(po); await d.point(po.getByText('can no longer be uploaded'), 3200);
       const s = section(d, 'Report a Payment');
       await d.scrollTo(s); await d.point(s.locator('strong'), 3000);
     } },
