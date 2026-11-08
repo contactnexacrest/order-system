@@ -18,8 +18,7 @@ const at = (hash = '') => `/orders/${order}${hash}`;
 async function typeLoginCode(d) {
   const banner = d.page.locator('.alert-dev strong').first();
   if (!(await banner.count())) return;
-  const code = (await banner.innerText()).trim();
-  await d.page.addStyleTag({ content: '.alert-dev{display:none!important}' });
+  const code = ((await banner.textContent()) || '').trim();
   await d.point('input[name="code"]', 2500);
   await d.type('input[name="code"]', code, { delay: 160 });
   await d.wait(1200);
@@ -55,6 +54,10 @@ module.exports = {
     { as: 'salesmgrLogin', goto: '/login', caption: 'Staff login', say: 'Sign in with your work e-mail and your password. We log in as the Sales Manager.', do: async (d) => {
       await d.type(d.page.getByLabel('Email'), 'sales.manager@email.com');
       await d.type(d.page.getByLabel('Password'), demo.STAFF.salesmgr.password, { delay: 40 });
+      // The dev server prints the code on the page (APP_ENV=local only): hidden before the page draws.
+      await d.page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => {
+        const st = document.createElement('style'); st.textContent = '.alert-dev{display:none!important}'; document.head.appendChild(st);
+      }));
       await d.clickNav(d.page.getByRole('button', { name: 'Sign in' }));
     } },
     { caption: 'The e-mailed code', say: 'Then the second step: the six digit code we e-mail you at that moment. Type it, and press Verify. It works once, for a few minutes. Never share it: nobody from NexaCrest will ever ask you for it.', do: async (d) => { await typeLoginCode(d); } },
